@@ -20,6 +20,7 @@ import {
   type ExecutionStore,
 } from './execution-store.js'
 import type { PathParameters, RequestBody } from './route-types.js'
+import { integerEnv } from './env.js'
 import {
   executionError,
   TemporalExecutionStore,
@@ -66,6 +67,10 @@ export async function registerExecutionGatewayRoutes(
   options: { store: ExecutionStore; token?: string },
 ): Promise<void> {
   const { store, token } = options
+  const workflowTimeoutSeconds = integerEnv(
+    'TEMPORAL_WORKFLOW_TIMEOUT_SECONDS',
+    10_800,
+  )
   await app.register(openapiGlue, {
     specification: specPath(),
     serviceHandlers: {
@@ -104,10 +109,7 @@ export async function registerExecutionGatewayRoutes(
                 workflow,
                 run_id: body.run_id,
                 input_data: body.input,
-                timeout_seconds: Number.parseInt(
-                  process.env.TEMPORAL_WORKFLOW_TIMEOUT_SECONDS ?? '10800',
-                  10,
-                ),
+                timeout_seconds: workflowTimeoutSeconds,
                 ...('runtime' in body ? { runtime: body.runtime } : {}),
               }),
             ),
@@ -209,6 +211,7 @@ export async function createApp(options: {
 export async function startExecutionGateway(): Promise<{
   close(): Promise<void>
 }> {
+  const port = integerEnv('EXECUTION_GATEWAY_PORT', 8000, 1, 65_535)
   const store = await TemporalExecutionStore.connect()
   const token = process.env.EXECUTION_GATEWAY_TOKEN?.trim()
   const host = process.env.EXECUTION_GATEWAY_HOST?.trim() || '127.0.0.1'
@@ -225,7 +228,7 @@ export async function startExecutionGateway(): Promise<{
   const app = await createApp({ store, ...(token ? { token } : {}) })
   await app.listen({
     host,
-    port: Number.parseInt(process.env.EXECUTION_GATEWAY_PORT ?? '8000', 10),
+    port,
   })
   return {
     close: async () => {

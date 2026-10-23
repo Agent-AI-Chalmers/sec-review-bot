@@ -1,3 +1,5 @@
+import pytest
+
 from sec_review_agents.features import (
     agent_mcp_enabled,
     agent_skills_enabled,
@@ -52,3 +54,17 @@ def test_memory_processing_disabled(monkeypatch) -> None:
     monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "false")
 
     assert memory_processing_enabled() is False
+
+
+def test_invalid_enabled_flag_does_not_silently_enable_feature(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "flase")
+
+    with pytest.raises(ValueError, match="AGENT_MEMORY_PROCESSING_ENABLED"):
+        memory_processing_enabled()
+
+
+def test_invalid_disabled_flag_does_not_silently_disable_feature(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_MCP_ENABLED", "treu")
+
+    with pytest.raises(ValueError, match="AGENT_MCP_ENABLED"):
+        agent_mcp_enabled()

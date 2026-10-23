@@ -77,7 +77,7 @@ from sec_review_agents.filesystem.unix_paths import (
     normalize_unix_path,
     unix_path_has_prefix,
 )
-from sec_review_agents.utils.env import env_value, parse_int_env
+from sec_review_agents.utils.env import env_value, int_env
 
 
 @dataclass(frozen=True)
@@ -118,14 +118,14 @@ class BwrapSandboxBackend(SandboxBackendProtocol):
         self.command_timeout_ms = (
             command_timeout_ms
             if command_timeout_ms is not None
-            else parse_int_env(
-                env_value("AGENT_COMMAND_TIMEOUT_MS"),
+            else int_env(
+                "AGENT_COMMAND_TIMEOUT_MS",
                 DEFAULT_COMMAND_TIMEOUT_MS,
+                minimum=1,
             )
         )
-        self.max_output_bytes = (
-            parse_int_env(env_value("AGENT_BWRAP_MAX_OUTPUT_BYTES"), 1024 * 1024)
-            or 1024 * 1024
+        self.max_output_bytes = int_env(
+            "AGENT_BWRAP_MAX_OUTPUT_BYTES", 1024 * 1024, minimum=1
         )
         self.limits = limits or default_filesystem_limits()
         self.routes = tuple(routes)

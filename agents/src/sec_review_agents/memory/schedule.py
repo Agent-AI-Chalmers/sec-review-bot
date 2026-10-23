@@ -27,7 +27,7 @@ from sec_review_agents.temporal.config import (
     DEFAULT_MEMORY_TASK_QUEUE,
     DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
 )
-from sec_review_agents.utils.env import env_value, parse_int_env
+from sec_review_agents.utils.env import int_env
 
 MEMORY_MAINTENANCE_SCHEDULE_ID = "memory-maintenance"
 MEMORY_MAINTENANCE_SCHEDULE_DEFAULT_INTERVAL_SECONDS = 60 * 60
@@ -108,16 +108,6 @@ async def ensure_memory_maintenance_schedule(
     }
 
 
-def _workflow_timeout_seconds() -> int:
-    return (
-        parse_int_env(
-            env_value("TEMPORAL_WORKFLOW_TIMEOUT_SECONDS"),
-            DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
-        )
-        or DEFAULT_WORKFLOW_TIMEOUT_SECONDS
-    )
-
-
 async def ensure_default_memory_maintenance_schedule(
     client: Client,
     *,
@@ -126,7 +116,11 @@ async def ensure_default_memory_maintenance_schedule(
     return await ensure_memory_maintenance_schedule(
         client,
         MemoryMaintenanceScheduleRequest(
-            timeout_seconds=_workflow_timeout_seconds(),
+            timeout_seconds=int_env(
+                "TEMPORAL_WORKFLOW_TIMEOUT_SECONDS",
+                DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
+                minimum=1,
+            ),
             task_queue=task_queue,
         ),
     )

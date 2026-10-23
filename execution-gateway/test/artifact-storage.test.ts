@@ -15,14 +15,14 @@ import {
   publishDiagnosticArtifact,
 } from '../src/artifact-storage.js'
 
-void test('missing terminal artifact roots are reported as unavailable', async () => {
+await test('missing terminal artifact roots are reported as unavailable', async () => {
   assert.deepEqual(
     await publishDiagnosticArtifact('/path/that/does/not/exist', 'run-missing'),
     { status: 'unavailable' },
   )
 })
 
-void test('diagnostic archives use Node zstd and preserve file contents', async () => {
+await test('diagnostic archives use Node zstd and preserve file contents', async () => {
   const root = await mkdtemp(path.join(tmpdir(), 'gateway-artifact-test-'))
   const source = path.join(root, 'source')
   const archive = path.join(root, 'artifact.tar.zst')
@@ -60,7 +60,7 @@ void test('diagnostic archives use Node zstd and preserve file contents', async 
   }
 })
 
-void test('existing diagnostic artifacts are reused from immutable metadata', async (t) => {
+await test('existing diagnostic artifacts are reused from immutable metadata', async (t) => {
   const root = await mkdtemp(path.join(tmpdir(), 'gateway-artifact-test-'))
   const previous = {
     bucket: process.env.SEC_REVIEW_ARTIFACT_S3_BUCKET,
@@ -102,7 +102,7 @@ void test('existing diagnostic artifacts are reused from immutable metadata', as
   }
 })
 
-void test('existing diagnostic artifacts require complete immutable metadata', async (t) => {
+await test('existing diagnostic artifacts require complete immutable metadata', async (t) => {
   const root = await mkdtemp(path.join(tmpdir(), 'gateway-artifact-test-'))
   const previous = {
     bucket: process.env.SEC_REVIEW_ARTIFACT_S3_BUCKET,
@@ -130,7 +130,7 @@ void test('existing diagnostic artifacts require complete immutable metadata', a
   }
 })
 
-void test('precondition conflicts reuse only the same immutable object', async (t) => {
+await test('precondition conflicts reuse only the same immutable object', async (t) => {
   const root = await mkdtemp(path.join(tmpdir(), 'gateway-artifact-test-'))
   await writeFile(path.join(root, 'result.txt'), 'review result')
   const previous = {

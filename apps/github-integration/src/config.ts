@@ -3,6 +3,8 @@ import fs from 'fs'
 import nodePath from 'path'
 import { fileURLToPath } from 'url'
 
+import { integerEnv } from './utils/env.js'
+
 const CURRENT_FILE_PATH = fileURLToPath(import.meta.url)
 const CURRENT_DIR_PATH = nodePath.dirname(CURRENT_FILE_PATH)
 const PACKAGE_ENV_PATH = nodePath.resolve(CURRENT_DIR_PATH, '.env')
@@ -25,16 +27,16 @@ const private_key_path = process.env['PRIVATE_KEY_PATH']
 const secret = process.env['WEBHOOK_SECRET']
 const enterprise_hostname = process.env['ENTERPRISE_HOSTNAME']
 const github_api_version = process.env['GITHUB_API_VERSION'] || '2026-03-10'
-const port = process.env['PORT'] || 30000
+const port = integerEnv('PORT', 30000, 1, 65_535)
 const webhook_path = '/api/webhook'
 const repository_review_dispatch_path = '/api/repository-review/dispatch'
-const repository_review_dispatch_max_body_bytes = Number.parseInt(
-  process.env['SEC_BOT_DISPATCH_MAX_BODY_BYTES'] || '1048576',
-  10
+const repository_review_dispatch_max_body_bytes = integerEnv(
+  'SEC_BOT_DISPATCH_MAX_BODY_BYTES',
+  1_048_576
 )
-const repository_review_dispatch_read_timeout_ms = Number.parseInt(
-  process.env['SEC_BOT_DISPATCH_READ_TIMEOUT_MS'] || '10000',
-  10
+const repository_review_dispatch_read_timeout_ms = integerEnv(
+  'SEC_BOT_DISPATCH_READ_TIMEOUT_MS',
+  10_000
 )
 const input_bundle_staging_root = nodePath.resolve(
   process.cwd(),

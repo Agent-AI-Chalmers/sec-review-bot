@@ -11,7 +11,7 @@ field the request can smuggle in.
 
 from typing import Any, TypedDict
 
-from sec_review_agents.utils.env import env_value, parse_bool_env
+from sec_review_agents.utils.env import bool_env
 
 
 class ExecutionRuntimeContext(TypedDict, total=False):
@@ -38,7 +38,7 @@ def runtime_context_from_config(value: Any) -> ExecutionRuntimeContext:
 
     context: ExecutionRuntimeContext = {}
     if "workspace_image" in value:
-        if not parse_bool_env(env_value(ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV), False):
+        if not bool_env(ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV, False):
             # Eval harnesses may opt in; production workers should use server config.
             raise ValueError(
                 "runtime.workspace_image override is disabled; set "

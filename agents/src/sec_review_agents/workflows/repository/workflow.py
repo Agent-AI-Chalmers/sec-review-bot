@@ -1,5 +1,4 @@
 import asyncio
-import os
 from collections.abc import Mapping, Sequence
 from datetime import timedelta
 from pathlib import Path
@@ -128,18 +127,16 @@ def _repository_case_published_transcript_path(
 
 
 def resolve_repository_case_processing_max_concurrency(case_count: int) -> int:
-    from sec_review_agents.utils.env import parse_int_env
+    from sec_review_agents.utils.env import int_env
 
     if case_count <= 0:
         return 1
-    configured = (
-        parse_int_env(
-            os.environ.get("AGENT_CASE_PROCESSING_MAX_CONCURRENCY"),
-            DEFAULT_CASE_PROCESSING_MAX_CONCURRENCY,
-        )
-        or DEFAULT_CASE_PROCESSING_MAX_CONCURRENCY
+    configured = int_env(
+        "AGENT_CASE_PROCESSING_MAX_CONCURRENCY",
+        DEFAULT_CASE_PROCESSING_MAX_CONCURRENCY,
+        minimum=1,
     )
-    return max(1, min(case_count, configured))
+    return min(case_count, configured)
 
 
 @activity.defn

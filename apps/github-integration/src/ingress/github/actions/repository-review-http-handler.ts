@@ -58,22 +58,9 @@ class DispatchBodyReadError extends Error {
   }
 }
 
-function positiveIntegerOrDefault(
-  value: number,
-  default_value: number
-): number {
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : default_value
-}
-
 async function readBody(request: IncomingMessage): Promise<Buffer> {
-  const maxBodyBytes = positiveIntegerOrDefault(
-    repository_review_dispatch_max_body_bytes,
-    1_048_576
-  )
-  const readTimeoutMs = positiveIntegerOrDefault(
-    repository_review_dispatch_read_timeout_ms,
-    10_000
-  )
+  const maxBodyBytes = repository_review_dispatch_max_body_bytes
+  const readTimeoutMs = repository_review_dispatch_read_timeout_ms
 
   // Keep request size and time bounded before parsing or authentication work.
   return await new Promise((resolve, reject) => {

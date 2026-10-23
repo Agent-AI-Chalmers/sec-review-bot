@@ -6,6 +6,7 @@ import {
   parsePublishContextForWorkflow,
   type PublishContext
 } from './publish-context.js'
+import { integerEnv } from '../utils/env.js'
 
 export type ReviewRunRecord = components['schemas']['ReviewRunRecord']
 export type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
@@ -81,14 +82,6 @@ function serviceToken(): string {
   return value
 }
 
-function requestTimeoutMs(): number {
-  const parsed = Number.parseInt(
-    process.env.CONTROL_PLANE_REQUEST_TIMEOUT_MS ?? '',
-    10
-  )
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 30_000
-}
-
 /** The REST error envelope: `{ error: string, code?: string }` (HTTP 400/404/409/500). */
 interface HttpErrorBody {
   error?: string
@@ -134,7 +127,10 @@ class HttpControlPlaneClient {
   ): Promise<SuccessBody<Id>> {
     const path = contractPath(operation, params)
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), requestTimeoutMs())
+    const timeout = setTimeout(
+      () => controller.abort(),
+      integerEnv('CONTROL_PLANE_REQUEST_TIMEOUT_MS', 30_000)
+    )
     timeout.unref?.()
     try {
       const response = await fetch(`${serviceUrl()}${path}`, {

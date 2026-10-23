@@ -342,16 +342,30 @@ test('createWorkspaceSnapshotTar restores a self-consistent git workspace from t
     await fs.rm(root, { recursive: true, force: true })
   }
 })
-test('configuredGitTimeoutMs defaults and reads a validated override', () => {
-  assert.strictEqual(configuredGitTimeoutMs(undefined), 600_000)
-  assert.strictEqual(configuredGitTimeoutMs(''), 600_000)
-  assert.strictEqual(configuredGitTimeoutMs('1500'), 1500)
+test('configuredGitTimeoutMs defaults and reads a validated override', (t) => {
+  const previous = process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS
+  t.after(() => {
+    if (previous === undefined)
+      delete process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS
+    else process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS = previous
+  })
+  delete process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS
+  assert.strictEqual(configuredGitTimeoutMs(), 600_000)
+  process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS = '1500'
+  assert.strictEqual(configuredGitTimeoutMs(), 1500)
 })
 
-test('configuredGitTimeoutMs rejects a non-positive or malformed override', () => {
-  for (const value of ['0', '-1', 'abc', '1.5', '10s']) {
+test('configuredGitTimeoutMs rejects a non-positive or malformed override', (t) => {
+  const previous = process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS
+  t.after(() => {
+    if (previous === undefined)
+      delete process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS
+    else process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS = previous
+  })
+  for (const value of ['', '0', '-1', 'abc', '1.5', '10s']) {
+    process.env.GITHUB_INTEGRATION_GIT_TIMEOUT_MS = value
     assert.throws(
-      () => configuredGitTimeoutMs(value),
+      () => configuredGitTimeoutMs(),
       /GITHUB_INTEGRATION_GIT_TIMEOUT_MS/
     )
   }

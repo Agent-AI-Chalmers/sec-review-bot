@@ -81,7 +81,7 @@ from sec_review_agents.filesystem.unix_paths import (
     normalize_unix_path,
     unix_path_has_prefix,
 )
-from sec_review_agents.utils.env import env_value, parse_bool_env, parse_int_env
+from sec_review_agents.utils.env import bool_env, int_env
 
 # Standard-library logging, not the project's structlog wrapper: `filesystem` is a foundational
 # package and may not import `observability`. A cleanup failure during an exceptional exit has
@@ -120,17 +120,12 @@ class DockerSandboxBackend(SandboxBackendProtocol):
         self.user = container.user
         self.ownership_uid = os.getuid() if hasattr(os, "getuid") else None
         self.ownership_gid = os.getgid() if hasattr(os, "getgid") else None
-        self.normalize_writable_mount_ownership = parse_bool_env(
-            env_value("AGENT_DOCKER_NORMALIZE_WRITABLE_MOUNT_OWNERSHIP"),
-            True,
+        self.normalize_writable_mount_ownership = bool_env(
+            "AGENT_DOCKER_NORMALIZE_WRITABLE_MOUNT_OWNERSHIP", True
         )
         self.command_timeout_ms = container.timeout_ms
-        self.max_output_bytes = (
-            parse_int_env(
-                env_value("AGENT_DOCKER_MAX_OUTPUT_BYTES"),
-                1024 * 1024,
-            )
-            or 1024 * 1024
+        self.max_output_bytes = int_env(
+            "AGENT_DOCKER_MAX_OUTPUT_BYTES", 1024 * 1024, minimum=1
         )
         self.mounts = container.mounts
         self.working_directory = container.working_directory

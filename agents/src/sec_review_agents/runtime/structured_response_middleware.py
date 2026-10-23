@@ -21,7 +21,6 @@
 # declared changed files match an observed workspace patch, belong to their own
 # middleware.
 
-import os
 from typing import Annotated, Any, ClassVar, NotRequired, override
 
 from langchain.agents.middleware.types import (
@@ -36,7 +35,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langgraph.channels.untracked_value import UntrackedValue
 from langgraph.runtime import Runtime
 
-from sec_review_agents.utils.env import parse_int_env
+from sec_review_agents.utils.env import int_env
 
 MISSING_STRUCTURED_RESPONSE_MAX_RETRIES_ENV = (
     "AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES"
@@ -45,8 +44,7 @@ PRIVATE_STATE_ATTR = OmitFromSchema(input=True, output=True)
 
 
 def missing_structured_response_max_retries() -> int:
-    parsed = parse_int_env(os.environ.get(MISSING_STRUCTURED_RESPONSE_MAX_RETRIES_ENV))
-    return 2 if parsed is None else parsed
+    return int_env(MISSING_STRUCTURED_RESPONSE_MAX_RETRIES_ENV, 2, minimum=0)
 
 
 class MissingStructuredResponseState(AgentState[ResponseT]):

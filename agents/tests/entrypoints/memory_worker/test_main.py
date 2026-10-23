@@ -50,3 +50,20 @@ async def test_memory_worker_owns_memory_registration_and_schedule(monkeypatch) 
         connect.return_value,
         task_queue="sec-review-memory",
     )
+
+
+@pytest.mark.asyncio
+async def test_memory_worker_rejects_invalid_concurrency_before_connecting(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("TEMPORAL_MEMORY_MAX_CONCURRENT_ACTIVITIES", "many")
+    connect = AsyncMock()
+    monkeypatch.setattr(worker_module, "connect_temporal_client", connect)
+
+    with pytest.raises(
+        ValueError,
+        match="TEMPORAL_MEMORY_MAX_CONCURRENT_ACTIVITIES must be a decimal integer",
+    ):
+        await worker_module.run_worker()
+
+    connect.assert_not_awaited()

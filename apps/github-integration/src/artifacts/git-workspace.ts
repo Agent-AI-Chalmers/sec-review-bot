@@ -5,6 +5,7 @@ import path from 'path'
 import { promisify } from 'util'
 
 import { logWarn } from '../utils/logger.js'
+import { integerEnv } from '../utils/env.js'
 
 const execFileAsync = promisify(execFile)
 export const WORKSPACE_SNAPSHOT_TAR_NAME = 'workspace.snapshot.tar'
@@ -21,21 +22,8 @@ const DEFAULT_GIT_COMMAND_TIMEOUT_MS = 600_000
 type Sleep = (delay_ms: number) => Promise<void>
 
 /** Resolve the per-command timeout, validating the environment override. */
-export function configuredGitTimeoutMs(
-  configured = process.env[GIT_COMMAND_TIMEOUT_ENV]
-): number {
-  if (configured === undefined || configured.trim() === '') {
-    return DEFAULT_GIT_COMMAND_TIMEOUT_MS
-  }
-  const parsed = Number.parseInt(configured, 10)
-  if (
-    !Number.isFinite(parsed) ||
-    parsed <= 0 ||
-    String(parsed) !== configured.trim()
-  ) {
-    throw new Error(`${GIT_COMMAND_TIMEOUT_ENV} must be a positive integer.`)
-  }
-  return parsed
+export function configuredGitTimeoutMs(): number {
+  return integerEnv(GIT_COMMAND_TIMEOUT_ENV, DEFAULT_GIT_COMMAND_TIMEOUT_MS)
 }
 
 // Materialization flow for real-history workspaces:

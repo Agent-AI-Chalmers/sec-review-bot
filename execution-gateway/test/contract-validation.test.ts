@@ -10,7 +10,7 @@ import {
   validateExecutionRequest,
 } from '../src/contract-validation.js'
 
-void test('execution contract owns the Temporal workflow type and envelope', () => {
+await test('execution contract owns the Temporal workflow type and envelope', () => {
   assert.equal(executionWorkflowType(), 'execution-workflow')
   assert.doesNotThrow(() =>
     validateExecutionRequest({
@@ -32,7 +32,7 @@ void test('execution contract owns the Temporal workflow type and envelope', () 
   )
 })
 
-void test('execution runtime accepts only the declared override shape', () => {
+await test('execution runtime accepts only the declared override shape', () => {
   const request = {
     workflow: 'issue-review',
     run_id: 'run-runtime-contract',
@@ -63,7 +63,7 @@ void test('execution runtime accepts only the declared override shape', () => {
   }
 })
 
-void test('execution errors match the public envelope before crossing HTTP', () => {
+await test('execution errors match the public envelope before crossing HTTP', () => {
   assert.equal(
     isExecutionError({
       category: 'runtime',
@@ -80,7 +80,7 @@ void test('execution errors match the public envelope before crossing HTTP', () 
   )
 })
 
-void test('contract schemas resolve independently of the process working directory', async () => {
+await test('contract schemas resolve independently of the process working directory', async () => {
   const original = process.cwd()
   const other = await mkdtemp(path.join(tmpdir(), 'gateway-cwd-'))
   try {
