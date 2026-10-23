@@ -8,11 +8,20 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 
+import ts from 'typescript'
 import { parse } from 'yaml'
 
 import { staleGeneratedArtifacts } from '../src/check-generated-artifacts.js'
-import { generatedArtifacts as workflowInputTypes } from '../src/generate-workflow-input-types.js'
-import { generatedArtifacts as types } from '../src/generate-types.js'
+import {
+  generatedArtifacts as integrationTypes,
+  renderIntegrationContractDeclarations,
+  renderWorkflowInputDeclarations
+} from '../src/generate-integration-types.js'
+import {
+  CONTROL_PLANE_OUTPUT_PATH,
+  generatedArtifacts as types,
+  renderExecutionApiTypes
+} from '../src/generate-types.js'
 import { REPO_ROOT } from '../src/repo-root.js'
 
 const MANIFEST_PATH = path.join(
@@ -33,6 +42,42 @@ interface Manifest {
   }>
 }
 
+function exportedTypeNames(source: string): Set<string> {
+  const file = ts.createSourceFile(
+    'generated.ts',
+    source,
+    ts.ScriptTarget.Latest,
+    false,
+    ts.ScriptKind.TS
+  )
+  const names = new Set<string>()
+  for (const statement of file.statements) {
+    if (
+      !ts.isInterfaceDeclaration(statement) &&
+      !ts.isTypeAliasDeclaration(statement)
+    ) {
+      continue
+    }
+    const exported = statement.modifiers?.some(
+      (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword
+    )
+    if (exported) names.add(statement.name.text)
+  }
+  return names
+}
+
+const WORKFLOW_INPUT_TYPES = [
+  'IssueReviewInput',
+  'PullRequestReviewInput',
+  'RepositoryReviewInput'
+] as const
+
+function assertHasWorkflowInputs(names: Set<string>): void {
+  for (const name of WORKFLOW_INPUT_TYPES) {
+    assert.ok(names.has(name), `generated declarations do not export ${name}`)
+  }
+}
+
 test('the HTTP contract is a hand-maintained YAML source, not a service projection', () => {
   const sourcePath = path.join(
     REPO_ROOT,
@@ -48,9 +93,36 @@ test('the HTTP contract is a hand-maintained YAML source, not a service projecti
   assert.equal(contract['x-contract-source'], 'hand-maintained')
 })
 
+test('contract declaration projections expose only the types each consumer owns', async () => {
+  const workflowInputs = exportedTypeNames(
+    await renderWorkflowInputDeclarations()
+  )
+  const integrationContract = exportedTypeNames(
+    await renderIntegrationContractDeclarations()
+  )
+
+  assertHasWorkflowInputs(workflowInputs)
+  assert.equal(workflowInputs.has('ReviewRecord'), false)
+  assert.equal(workflowInputs.has('FileChange'), false)
+
+  assertHasWorkflowInputs(integrationContract)
+  assert.equal(integrationContract.has('ReviewRecord'), true)
+  assert.equal(integrationContract.has('FileChange'), true)
+})
+
+test('the Execution API projection remains limited to workflow inputs', async () => {
+  const names = exportedTypeNames(
+    await renderExecutionApiTypes(CONTROL_PLANE_OUTPUT_PATH)
+  )
+
+  assertHasWorkflowInputs(names)
+  assert.equal(names.has('ReviewRecord'), false)
+  assert.equal(names.has('FileChange'), false)
+})
+
 const ACTUAL_OUTPUTS: Record<string, string[]> = {
   types: types().map((a) => path.relative(REPO_ROOT, a.output)),
-  'workflow-input-types': workflowInputTypes().map((a) =>
+  'integration-types': integrationTypes().map((a) =>
     path.relative(REPO_ROOT, a.output)
   )
 }

@@ -1,20 +1,11 @@
 import { asList, isRecord, nonEmptyText } from './view-utils.js'
+import type { FileChange } from '../execution/integration-contract-types-generated.js'
 
-export type TextEncoding = 'utf-8' | 'base64'
-export type FileMode = '100644' | '100755'
+type UpsertFileChange = Extract<FileChange, { status: 'upsert' }>
 
-export type FileChange =
-  | {
-      path: string
-      status: 'deleted'
-    }
-  | {
-      path: string
-      status: 'upsert'
-      content_encoding: TextEncoding
-      content: string
-      mode?: FileMode
-    }
+export type { FileChange }
+export type TextEncoding = UpsertFileChange['content_encoding']
+export type FileMode = NonNullable<UpsertFileChange['mode']>
 
 export function fileChangePaths(file_changes: unknown): string[] {
   const paths = asList(file_changes)

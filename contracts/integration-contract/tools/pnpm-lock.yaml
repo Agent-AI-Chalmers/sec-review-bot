@@ -169,6 +169,9 @@ importers:
       '@stoplight/spectral-cli':
         specifier: ^6.17.0
         version: 6.17.0
+      json-schema-to-typescript:
+        specifier: 16.0.0
+        version: 16.0.0
       openapi-typescript:
         specifier: ^7.13.0
         version: 7.13.0(typescript@6.0.3)
@@ -202,6 +205,10 @@ importers:
         version: 8.71.2(eslint@10.12.0(supports-color@10.2.2))(supports-color@10.2.2)(typescript@6.0.3)
 
 packages:
+
+  '@apidevtools/json-schema-ref-parser@11.9.3':
+    resolution: {integrity: sha512-60vepv88RwcJtSHrD6MjIL6Ta3SOYbgfnkHb+ppAVK+o9mXprRtulx7VlRl3lN3bbvysAfCS7WMVfhUYemB0IQ==}
+    engines: {node: '>= 16'}
 
   '@asyncapi/specs@6.11.1':
     resolution: {integrity: sha512-A3WBLqAKGoJ2+6FWFtpjBlCQ1oFCcs4GxF7zsIGvNqp/klGUHjlA3aAcZ9XMMpLGE8zPeYDz2x9FmO6DSuKraQ==}
@@ -435,6 +442,9 @@ packages:
     resolution: {integrity: sha512-bV0Tgo9K4hfPCek+aMAn81RppFKv2ySDQeMoSZuvTASywNTnVJCArCZE2FWqpvIatKu7VMRLWlR1EazvVhDyhQ==}
     engines: {node: '>=18.18'}
 
+  '@jsdevtools/ono@7.1.3':
+    resolution: {integrity: sha512-4JQNk+3mVzK3xh2rqd6RB4J46qUR19azEHBneZyTZM+c456qOrbbM/5xcR8huNCCcbVt7+UmizG6GuUvPvKUYg==}
+
   '@jsep-plugin/assignment@1.4.0':
     resolution: {integrity: sha512-nw2Px23Eirx0PFTVoPrb3FEq9Wkmg6vxcDtt38MtBCf1G0tjLCB9cK+3seOXyiw+6+aalgYhvJabQbWwMVKlEQ==}
     engines: {node: '>= 10.16.0'}
@@ -611,6 +621,9 @@ packages:
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
 
+  '@types/lodash@4.17.27':
+    resolution: {integrity: sha512-VenMRv/eKNrspX9v3H4dbmjsrnCOYdYBG3kxXKk3dG6X+urBGcj2Prww3xw1U5K4FV/mE4h5GbWd0szEKf+9ew==}
+
   '@types/markdown-escape@1.1.3':
     resolution: {integrity: sha512-JIc1+s3y5ujKnt/+N+wq6s/QdL2qZ11fP79MijrVXsAAnzSxCbT2j/3prHRouJdZ2yFLN3vkP0HytfnoCczjOw==}
 
@@ -732,6 +745,9 @@ packages:
 
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
+
+  argparse@3.0.3:
+    resolution: {integrity: sha512-Sn98ftV3KfsO8xfLPHG6oT8y+b0yvbrLgZjgPDXsharNY15tTAjqIsIju4S32nl6/iEUNNE4v+yL2Zhm8ooP3w==}
 
   array-buffer-byte-length@1.0.2:
     resolution: {integrity: sha512-LHE+8BuR7RYGDKvnrmcuSq3tDcKv9OFEXQt/HpbZhY7V6h0zlUXutnAD82GiFx9rdieCMjkvtcsPqBwgUl1Iiw==}
@@ -1305,9 +1321,18 @@ packages:
     resolution: {integrity: sha512-SFNOvSJ+Dgf/9An904Yx+CgSlIPCkIpao4qo51lpee25TIRejdH3rhR4EZMGoNx3/TP3O+wzWuiTFl4sqbltzA==}
     hasBin: true
 
+  js-yaml@5.5.0:
+    resolution: {integrity: sha512-paNr4LFIFPjeeSmwNYdrb8FafLLG/Cr2Af3GjbsHJ5CxIjH4r0c2emlmRdAtpPAieP1gRVzk6buBbVP5gBMGAg==}
+    hasBin: true
+
   jsep@1.6.0:
     resolution: {integrity: sha512-Y8Tr54CX7B5YGAwo7/n8eumidEX3Opx98RyyQVnlHqUaZcPA8uUzL2v1rshr9ypW9Q6hNjfJtg3sL+8kaNE7TA==}
     engines: {node: '>= 20.16.0'}
+
+  json-schema-to-typescript@16.0.0:
+    resolution: {integrity: sha512-Ah6kK4q6SjlMzWBH1eNOQkdRh5Qhr5T/RCFwfjQqWZA7UDW+N47A8wfyoiN0L884s4L4bAEI54IjIuN3/u0B/A==}
+    engines: {node: '>=16.0.0'}
+    hasBin: true
 
   json-schema-traverse@0.4.1:
     resolution: {integrity: sha512-xbbCH5dCYU5T8LcEhhuh7HJ88HXuW3qsI3Y0zOZFKfZEHcpWiHU/Jxzk629Brsab/mMiHQti9wMP+845RPe3Vg==}
@@ -1382,6 +1407,9 @@ packages:
   minimatch@5.1.9:
     resolution: {integrity: sha512-7o1wEA2RyMP7Iu7GNba9vc0RWWGACJOCZBJX2GJWip0ikV+wcOsgVuY9uE8CPiyQhkGFSlhuSkZPavN7u1c2Fw==}
     engines: {node: '>=10'}
+
+  minimist@1.2.8:
+    resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
@@ -1806,6 +1834,12 @@ packages:
 
 snapshots:
 
+  '@apidevtools/json-schema-ref-parser@11.9.3':
+    dependencies:
+      '@jsdevtools/ono': 7.1.3
+      '@types/json-schema': 7.0.15
+      js-yaml: 4.3.2
+
   '@asyncapi/specs@6.11.1':
     dependencies:
       '@types/json-schema': 7.0.15
@@ -1957,6 +1991,8 @@ snapshots:
   '@humanwhocodes/module-importer@1.0.1': {}
 
   '@humanwhocodes/retry@0.4.3': {}
+
+  '@jsdevtools/ono@7.1.3': {}
 
   '@jsep-plugin/assignment@1.4.0(jsep@1.6.0)':
     dependencies:
@@ -2303,6 +2339,8 @@ snapshots:
 
   '@types/json-schema@7.0.15': {}
 
+  '@types/lodash@4.17.27': {}
+
   '@types/markdown-escape@1.1.3': {}
 
   '@types/node@24.19.2':
@@ -2447,6 +2485,8 @@ snapshots:
       color-convert: 2.0.1
 
   argparse@2.0.1: {}
+
+  argparse@3.0.3: {}
 
   array-buffer-byte-length@1.0.2:
     dependencies:
@@ -3149,7 +3189,22 @@ snapshots:
     dependencies:
       argparse: 2.0.1
 
+  js-yaml@5.5.0:
+    dependencies:
+      argparse: 3.0.3
+
   jsep@1.6.0: {}
+
+  json-schema-to-typescript@16.0.0:
+    dependencies:
+      '@apidevtools/json-schema-ref-parser': 11.9.3
+      '@types/json-schema': 7.0.15
+      '@types/lodash': 4.17.27
+      js-yaml: 5.5.0
+      lodash: 4.18.1
+      minimist: 1.2.8
+      prettier: 3.9.10
+      tinyglobby: 0.2.17
 
   json-schema-traverse@0.4.1: {}
 
@@ -3218,6 +3273,8 @@ snapshots:
   minimatch@5.1.9:
     dependencies:
       brace-expansion: 2.1.7
+
+  minimist@1.2.8: {}
 
   ms@2.1.3: {}
 

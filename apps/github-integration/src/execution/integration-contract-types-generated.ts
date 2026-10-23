@@ -33,6 +33,72 @@ export interface RepositoryScanScope {
   }[]
 }
 
+export type FileChange =
+  | {
+      path: string
+      status: 'upsert'
+      content: string
+      content_encoding: 'utf-8' | 'base64'
+      mode?: '100644' | '100755'
+    }
+  | {
+      path: string
+      status: 'deleted'
+    }
+
+export interface ReviewRecord {
+  analysis: {
+    verdict:
+      | 'no-actionable-finding'
+      | 'inconclusive'
+      | 'plausible-risk'
+      | 'confirmed-defect'
+      | 'confirmed-vulnerability'
+      | null
+    overview: string | null
+    narratives: Record<string, unknown>[]
+  }
+  mitigation: {
+    overview: string | null
+    changed_files: string[]
+    file_changes: FileChange[]
+    patch_diff: string | null
+  }
+  verification: {
+    overview: string | null
+    review_target_claim: string | null
+    validation_level:
+      | 'static'
+      | 'logic-simulated'
+      | 'runtime-partial'
+      | 'runtime-endpoint'
+      | null
+    patch_coverage:
+      | 'full'
+      | 'partial'
+      | 'local-only'
+      | 'unresolved'
+      | 'misaligned'
+      | 'no-patch'
+      | 'not-applicable'
+      | null
+    regression_status:
+      'passed' | 'failed' | 'not-run' | 'not-applicable' | 'unresolved' | null
+    resolution_next_step: 'none' | 'retry-ai' | 'manual-review' | null
+    patch_findings: string[]
+    verification_findings: string[]
+    residual_risks: string[]
+  }
+  cvss: null | {
+    outcome: 'scored' | 'not-scored' | 'skipped' | null
+    base_score: number | null
+    severity: string | null
+    vector: string | null
+    overview: string | null
+    not_scored_reason: string | null
+  }
+}
+
 export interface IssueReviewInput {
   contract_version: 'v6'
   input_bundle: InputBundleArtifactRef
