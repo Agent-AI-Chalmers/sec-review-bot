@@ -59,3 +59,29 @@ def test_schemas_root_fails_loudly_for_unknown_version(tmp_path: Path) -> None:
         sys.modules.pop("sec_review_agents.contract_version", None)
         if saved is not None:
             sys.modules["sec_review_agents.contract_version"] = saved
+
+
+def test_execution_schema_resolves_from_repository_layout() -> None:
+    schema = hatch_build._execution_schema_path(AGENTS_ROOT)
+
+    assert schema == (
+        AGENTS_ROOT.parent
+        / "contracts"
+        / "execution-contract"
+        / "v1"
+        / "execution-request.schema.json"
+    )
+
+
+def test_execution_schema_resolves_from_sdist_layout(tmp_path: Path) -> None:
+    schema = (
+        tmp_path
+        / "contracts"
+        / "execution-contract"
+        / "v1"
+        / "execution-request.schema.json"
+    )
+    schema.parent.mkdir(parents=True)
+    schema.write_text("{}", encoding="utf-8")
+
+    assert hatch_build._execution_schema_path(tmp_path) == schema

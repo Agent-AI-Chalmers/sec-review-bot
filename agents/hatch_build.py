@@ -42,6 +42,22 @@ def _contract_schemas_root(project_root: Path) -> Path:
     )
 
 
+def _execution_schema_path(project_root: Path) -> Path:
+    relative_path = (
+        Path("contracts")
+        / "execution-contract"
+        / "v1"
+        / "execution-request.schema.json"
+    )
+    # A repository build keeps contracts beside agents/. The sdist hook copies
+    # them under the archive root, which becomes project_root for its wheel build.
+    candidates = (project_root.parent / relative_path, project_root / relative_path)
+    for candidate in candidates:
+        if candidate.is_file():
+            return candidate
+    raise RuntimeError("Could not locate execution-contract/v1 schema.")
+
+
 class CustomBuildHook(BuildHookInterface):
     """Include canonical schemas in both source and wheel distributions."""
 
@@ -49,15 +65,7 @@ class CustomBuildHook(BuildHookInterface):
         contract_version_dir = _contract_version_dir(Path(self.root))
         schema_root = _contract_schemas_root(Path(self.root))
         force_include = build_data.setdefault("force_include", {})
-        runtime_schema = (
-            Path(self.root).parent
-            / "contracts"
-            / "execution-contract"
-            / "v1"
-            / "execution-request.schema.json"
-        )
-        if not runtime_schema.is_file():
-            raise RuntimeError("Could not locate execution-contract/v1 schema.")
+        runtime_schema = _execution_schema_path(Path(self.root))
         if self.target_name == "sdist":
             force_include[str(schema_root)] = (
                 f"contracts/integration-contract/{contract_version_dir}/schemas"
