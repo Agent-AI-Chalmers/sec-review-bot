@@ -24,3 +24,5 @@ Optional. Delete this section when there is nothing useful to add.
 
 Call out details that help review but do not belong in the summary, such as where to start, non-obvious trade-offs, deliberately preserved behavior, excluded scope, unusual artifacts, uncertainties, or follow-up work.
 -->
+
+<!-- Add any other headings or sections that help explain this pull request. -->

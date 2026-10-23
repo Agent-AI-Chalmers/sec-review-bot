@@ -32,4 +32,6 @@ Follow [the pull request template](.github/pull_request_template.md):
 - `Validation` lists checks, tests, and focused probes actually run, including relevant gaps.
 - `Review Notes` is optional and should contain only information that helps review, such as useful review order, non-obvious trade-offs, deliberately preserved behavior, excluded scope, unusual artifacts, uncertainties, or follow-up work.
 
+The repository checks that the three required sections are present and non-empty, that `Compatibility` contains exactly one supported classification, and that a breaking change includes migration guidance. Additional headings and sections are welcome and are not interpreted by the check.
+
 Delete `Review Notes` when it adds no value, and do not claim validation that was not performed.

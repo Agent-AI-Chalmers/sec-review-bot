@@ -144,4 +144,4 @@ For architecture review, report only the smallest set of changes that clearly re
 
 ### Pull Request Descriptions
 
-When creating or updating a pull request, follow `CONTRIBUTING.md` and `.github/pull_request_template.md`. Keep the title, compatibility statement, validation evidence, and optional review notes accurate to the actual change.
+When creating or updating a pull request, follow `CONTRIBUTING.md` and `.github/pull_request_template.md`. Keep the title, compatibility statement, validation evidence, and optional review notes accurate to the actual change. Additional headings are allowed when they make the pull request easier to review.
