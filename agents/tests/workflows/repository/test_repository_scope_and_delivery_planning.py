@@ -144,7 +144,15 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 },
                 "mitigation": {
                     "overview": f"{title} mitigation overview.",
-                    "changed_files": changed_files,
+                    "file_changes": [
+                        {
+                            "path": path,
+                            "status": "upsert",
+                            "content": "",
+                            "content_encoding": "utf-8",
+                        }
+                        for path in changed_files
+                    ],
                     "patch_diff": None,
                     "residual_risks": [],
                 },
@@ -718,7 +726,6 @@ class TestRepositoryScopeAndDeliveryPlanning:
                     "analyzer_overview": "",
                     "analyzer_verdict": None,
                     "mitigation_overview": "",
-                    "mitigator_changed_files": [],
                     "mitigator_file_changes": [],
                     "mitigator_patch_diff": "diff --git a/src/a.ts b/src/a.ts\n",
                     "verifier_overview": "",
@@ -734,7 +741,6 @@ class TestRepositoryScopeAndDeliveryPlanning:
                     "analyzer_overview": "",
                     "analyzer_verdict": None,
                     "mitigation_overview": "",
-                    "mitigator_changed_files": [],
                     "mitigator_file_changes": [],
                     "mitigator_patch_diff": "",
                     "verifier_overview": "",

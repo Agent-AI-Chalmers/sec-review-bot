@@ -35,7 +35,6 @@ def delivery_strategy(delivery_entry: DeliveryEntry) -> DeliveryStrategy:
 def single_delivery_case_view(case_result: Mapping[str, Any]) -> dict[str, Any]:
     return {
         "case_id": case_result["case_id"],
-        "mitigator_changed_files": case_result["mitigator_changed_files"],
         "mitigator_file_changes": case_result["mitigator_file_changes"],
         "mitigator_patch_diff": case_result["mitigator_patch_diff"],
     }
@@ -46,7 +45,7 @@ def combined_delivery_case_view(case_result: Mapping[str, Any]) -> dict[str, Any
         "case_id": case_result["case_id"],
         "analyzer_overview": case_result["analyzer_overview"],
         "analyzer_verdict": case_result["analyzer_verdict"],
-        "mitigator_changed_files": case_result["mitigator_changed_files"],
+        "mitigator_file_changes": case_result["mitigator_file_changes"],
         "mitigator_patch_diff": case_result["mitigator_patch_diff"],
         "verifier_overview": case_result["verifier_overview"],
         "verifier_coverage": case_result["verifier_coverage"],

@@ -211,7 +211,7 @@ def test_delivery_planning_stage_does_not_own_input_projection() -> None:
     forbidden_tokens = (
         "write_text",
         "mitigation_overview",
-        "mitigator_changed_files",
+        "mitigator_file_changes",
         "mitigator_patch_diff",
     )
 

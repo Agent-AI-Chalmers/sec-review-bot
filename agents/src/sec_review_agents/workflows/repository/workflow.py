@@ -34,7 +34,6 @@ from sec_review_agents.workflows.review_intent import (
     require_review_intent,
 )
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
-from sec_review_agents.workspace.file_changes import file_change_paths
 
 DEFAULT_CASE_PROCESSING_MAX_CONCURRENCY = 1
 
@@ -609,7 +608,6 @@ def project_repository_case_result_for_delivery(
         "analyzer_overview": analysis["overview"],
         "analyzer_verdict": analysis["verdict"],
         "mitigation_overview": mitigation.get("overview") or "",
-        "mitigator_changed_files": file_change_paths(mitigation.get("file_changes")),
         "mitigator_file_changes": mitigation.get("file_changes") or [],
         "mitigator_patch_diff": mitigation.get("patch_diff"),
         "verifier_overview": verification["overview"],

@@ -251,15 +251,15 @@ def persist_workspace_patch(
     normalized_patch = patch_artifact["patch_content"]
 
     patch_path = persist_text_artifact(patch_root_path, filename, normalized_patch)
+    file_changes = collect_publishable_file_changes(
+        workspace_path,
+        patch_artifact["changed_files"],
+    )
 
     return {
         "patch_path": str(patch_path),
         "patch_diff": normalized_patch,
-        "file_changes": collect_publishable_file_changes(
-            workspace_path,
-            patch_artifact["changed_files"],
-        ),
-        **patch_artifact,
+        "file_changes": file_changes,
     }
 
 
