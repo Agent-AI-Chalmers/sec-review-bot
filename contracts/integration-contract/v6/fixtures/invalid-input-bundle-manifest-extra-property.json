@@ -1,6 +1,6 @@
 {
   "contract_version": "v6",
-  "kind": "runner-input-bundle",
+  "unexpected": true,
   "workspace": {
     "snapshot": "workspace.snapshot.tar"
   },

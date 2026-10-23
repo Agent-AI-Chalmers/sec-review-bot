@@ -29,15 +29,17 @@ contracts/
 
 ## 契约族
 
-- [integration-contract](integration-contract/README.zh.md)：Runner 与其调用方之间的公开集成点。当前版本：[v6](integration-contract/v6/CONTRACT.zh.md)。
-- [execution-contract](execution-contract/README.zh.md)：Execution Gateway 与 Execution Worker 之间私有的 Temporal dispatch 边界。当前版本：v1。
-- [control-plane-api](control-plane-api/README.zh.md)：Control Plane 与其调用方交换的形状。当前版本：[v1](control-plane-api/README.zh.md)。
-- [memory-catalog-api](memory-catalog-api/README.zh.md)：Memory Catalog Server 与 Execution Worker 之间的 HTTP 边界。当前版本：v1。
-- [setup-declaration](setup-declaration/README.zh.md)：仓库用来准备其审查沙箱的 `.sec-review/setup.yml` 格式。当前版本：[v1](setup-declaration/v1/SPEC.zh.md)。
+| 契约族 | 边界 | 参与方 | 当前版本 |
+| --- | --- | --- | --- |
+| [integration-contract](integration-contract/README.zh.md) | 公开 Execution API 与 workflow `input` / `result` 数据 | Execution API provider、调用方与下游发布方 | [v6](integration-contract/v6/CONTRACT.zh.md) |
+| [execution-contract](execution-contract/README.zh.md) | 私有 Temporal dispatch envelope | Execution Gateway 与 Execution Worker | v1 |
+| [control-plane-api](control-plane-api/README.zh.md) | Control Plane HTTP API 与 observed run 形状 | Control Plane 与其调用方 | [v1](control-plane-api/README.zh.md) |
+| [memory-catalog-api](memory-catalog-api/README.zh.md) | Managed-memory catalog HTTP API | Memory Catalog Server 与 workers | v1 |
+| [setup-declaration](setup-declaration/README.zh.md) | 受信任的 `.sec-review/setup.yml` 格式 | 被审查仓库、GitHub Integration 与 Execution Worker | [v1](setup-declaration/v1/SPEC.zh.md) |
 
 ## 适用于每个族的规则
 
-族名取自这个族覆盖的内容。若所有形状都属于同一个组件，就以该组件命名——`control-plane-api` 就是 Control Plane 自己的形状；若形状横跨多方，就以它们的交汇点命名——`integration-contract` 横跨 Runner、其调用方和下游发布方。
+族名取自这个族覆盖的内容。若所有形状都属于同一个组件，就以该组件命名——`control-plane-api` 就是 Control Plane 自己的形状；若形状横跨多方，就以它们的交汇点命名——`integration-contract` 横跨 Execution provider、调用方和下游发布方。
 
 不要用某个消费方命名，因为消费方会变、提供方不会；也不要复用别的族已用于其他含义的词。
 

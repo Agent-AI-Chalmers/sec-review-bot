@@ -70,13 +70,13 @@ def test_execution_worker_accepts_shared_input_bundle_manifest_fixture() -> None
     validate_v6_input_bundle_manifest(contract_fixture("input-bundle-manifest.json"))
 
 
-def test_execution_worker_rejects_removed_input_bundle_kind() -> None:
+def test_execution_worker_rejects_extra_input_bundle_manifest_property() -> None:
     with pytest.raises(
         ValueError,
         match="Execution input bundle manifest does not match contract v6",
     ):
         validate_v6_input_bundle_manifest(
-            contract_fixture("invalid-input-bundle-manifest-kind.json")
+            contract_fixture("invalid-input-bundle-manifest-extra-property.json")
         )
 
 

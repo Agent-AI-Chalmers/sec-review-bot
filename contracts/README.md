@@ -26,21 +26,17 @@ A family may also hold documents that apply to every version, such as a transpor
 
 ## Families
 
-- [integration-contract](integration-contract/README.md): the public integration point
-  between the Runner and its callers. Current version: [v6](integration-contract/v6/CONTRACT.md).
-- [execution-contract](execution-contract/README.md): the private Temporal dispatch boundary between Execution Gateway and Execution Worker. Current version: v1.
-- [control-plane-api](control-plane-api/README.md): the shapes Control Plane exchanges
-  with its callers. Current version:
-  [v1](control-plane-api/README.md).
-- [memory-catalog-api](memory-catalog-api/README.md): the HTTP boundary between the
-  Memory Catalog Server and execution workers. Current version: v1.
-- [setup-declaration](setup-declaration/README.md): the `.sec-review/setup.yml` format a
-  repository uses to prepare its review sandbox. Current version:
-  [v1](setup-declaration/v1/SPEC.md).
+| Family | Boundary | Parties | Current version |
+| --- | --- | --- | --- |
+| [integration-contract](integration-contract/README.md) | Public Execution API and workflow `input` / `result` data | Execution API providers, callers, and downstream publishers | [v6](integration-contract/v6/CONTRACT.md) |
+| [execution-contract](execution-contract/README.md) | Private Temporal dispatch envelope | Execution Gateway and Execution Worker | v1 |
+| [control-plane-api](control-plane-api/README.md) | Control Plane HTTP API and observed run shapes | Control Plane and its callers | [v1](control-plane-api/README.md) |
+| [memory-catalog-api](memory-catalog-api/README.md) | Managed-memory catalog HTTP API | Memory Catalog Server and workers | v1 |
+| [setup-declaration](setup-declaration/README.md) | Trusted `.sec-review/setup.yml` format | Reviewed repositories, GitHub Integration, and Execution Worker | [v1](setup-declaration/v1/SPEC.md) |
 
 ## Rules For Every Family
 
-A family is named for what it covers. If one component owns every shape in it, name it after that component — `control-plane-api` is Control Plane's own shapes. If the shapes span several parties, name it after where they meet — `integration-contract` spans the Runner, its callers, and a downstream publisher.
+A family is named for what it covers. If one component owns every shape in it, name it after that component — `control-plane-api` is Control Plane's own shapes. If the shapes span several parties, name it after where they meet — `integration-contract` spans Execution providers, callers, and downstream publishers.
 
 Do not name a family after one of its consumers: consumers change, the provider does not. And do not reuse a word that another family already uses for a different meaning.
 

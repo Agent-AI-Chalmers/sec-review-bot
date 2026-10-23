@@ -4,10 +4,12 @@
 
 For project facts, read the maintained docs:
 
-- `README.md` for the repository overview.
-- `agents/README.md` for the Python runner and agent implementation.
-- `apps/github-integration/README.md` for the GitHub integration service.
-- `docs/README.md` for deeper architecture, workflow, integration, and operations notes.
+- `README.md` for the repository overview and entry points.
+- `docs/architecture/SYSTEM_ARCHITECTURE.md` for runtime entities, ownership, data flow, and cross-service boundaries.
+- `docs/README.md` for the documentation map across architecture, contracts, workflows, agent design, and operations.
+- The nearest package or directory `README.md` for local responsibilities, setup, and checks.
+- `contracts/README.md` and the relevant contract-family README for cross-package interfaces and generated artifacts.
+- `CONTRIBUTING.md` for repository-wide change and pull request expectations.
 
 ## Architecture And Contract Razor
 
@@ -88,15 +90,32 @@ uv run python -m pytest
 
 ### TypeScript Checks
 
-For TypeScript changes under `apps/github-integration/`, use the package-local checks from that directory:
+For TypeScript changes, run checks from every affected package directory. The common baseline is:
 
 ```bash
+pnpm run format:check
 pnpm run lint
 pnpm run typecheck
 pnpm test
 ```
 
-`pnpm run lint:fix` is appropriate for local mechanical cleanup. Use the non-mutating `lint`, `typecheck`, and `test` commands when reporting verification.
+Read that package's `README.md` and `package.json` for additional required checks such as `build`, `test:integration`, or `test:smoke`. `pnpm run lint:fix` and `pnpm run format` are appropriate for local mechanical cleanup. Use the non-mutating commands when reporting verification.
+
+### Contract Changes
+
+For changes under `contracts/`, read `contracts/README.md` and the affected family README. Run the family tool from `contracts/<family>/tools/`:
+
+```bash
+pnpm run generate
+pnpm run check
+pnpm run format:check
+pnpm run lint
+pnpm --if-present run lint:contract
+pnpm run typecheck
+pnpm test
+```
+
+Commit regenerated projections with their source contract changes, and run the checks for every package that consumes the changed contract.
 
 ### Repository Scripts
 
@@ -142,6 +161,6 @@ If a change requires preserving an old path, prefer deleting it instead of wrapp
 
 For architecture review, report only the smallest set of changes that clearly removes real confusion, bug risk, implicit state, or maintenance cost.
 
-### Pull Request Descriptions
+### Pull Requests
 
 When creating or updating a pull request, follow `CONTRIBUTING.md` and `.github/pull_request_template.md`. Keep the title, compatibility statement, validation evidence, and optional review notes accurate to the actual change. Additional headings are allowed when they make the pull request easier to review.

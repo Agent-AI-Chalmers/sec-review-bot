@@ -25,9 +25,22 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
           node <<'NODE'
           const body = process.env.PR_BODY ?? ''
+          const author = process.env.PR_AUTHOR ?? ''
+
+          // Dependabot owns its generated release notes and command block. It
+          // cannot render the repository's human-authored PR template.
+          if (author === 'dependabot[bot]') {
+            if (!body.trim()) {
+              console.error('Dependabot pull request description is empty.')
+              process.exit(1)
+            }
+            process.exit(0)
+          }
+
           const requiredSections = ['Summary', 'Compatibility', 'Validation']
           const sections = new Map()
           let currentSection = null
