@@ -54,11 +54,7 @@ async def generate_delivery_plan(
             "counts": counts,
             "deliveries": planned_entries,
         }
-        persist_json_artifact(
-            delivery_planning_root,
-            "delivery-plan",
-            result,
-        )
+        persist_delivery_plan(run_artifacts_root=run_artifacts_root, result=result)
         log_stage_completed(
             stage="delivery-planning",
             started_at=started_at,
@@ -76,10 +72,9 @@ async def generate_delivery_plan(
         raise
 
 
-def build_skipped_delivery_plan(
-    *, run_artifacts_root: Path, total_case_count: int
-) -> dict[str, Any]:
-    result: dict[str, Any] = {
+def build_skipped_delivery_plan(*, total_case_count: int) -> dict[str, Any]:
+    """Build a skipped plan; the workflow activity owns persistence."""
+    return {
         "status": "skipped",
         "metadata": {
             "planning_mode": "skipped",
@@ -93,15 +88,18 @@ def build_skipped_delivery_plan(
         },
         "deliveries": [],
     }
+
+
+def persist_delivery_plan(*, run_artifacts_root: Path, result: dict[str, Any]) -> None:
     persist_json_artifact(
         run_artifacts_root / "delivery-planning",
         "delivery-plan",
         result,
     )
-    return result
 
 
 __all__ = [
     "build_skipped_delivery_plan",
     "generate_delivery_plan",
+    "persist_delivery_plan",
 ]

@@ -641,6 +641,7 @@ async def plan_repository_delivery_activity(
     from sec_review_agents.delivery_stages.planning import (
         build_skipped_delivery_plan,
         generate_delivery_plan,
+        persist_delivery_plan,
     )
     from sec_review_agents.utils.paths import required_path
 
@@ -651,10 +652,12 @@ async def plan_repository_delivery_activity(
     )
     delivery_case_inputs = _delivery_case_inputs(case_results)
     if not delivery_case_inputs:
-        return build_skipped_delivery_plan(
+        result = build_skipped_delivery_plan(total_case_count=len(case_results))
+        persist_delivery_plan(
             run_artifacts_root=run_artifacts_root,
-            total_case_count=len(case_results),
+            result=result,
         )
+        return result
     return await generate_delivery_plan(
         run_artifacts_root=run_artifacts_root,
         case_results=delivery_case_inputs,

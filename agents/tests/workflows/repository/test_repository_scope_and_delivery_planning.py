@@ -448,6 +448,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
             )
 
         assert result["metadata"]["planning_mode"] == "single"
+        assert "agent_result" not in result
+        assert "agent_results" not in result
         assert result["metadata"]["planning_pass_count"] == 2
         assert result["counts"]["input_case_count"] == 2
         assert result["counts"]["delivery_count"] == 1

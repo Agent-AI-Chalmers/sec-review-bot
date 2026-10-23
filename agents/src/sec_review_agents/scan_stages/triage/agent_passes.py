@@ -60,14 +60,14 @@ async def run_repository_triage_agent(
         },
     )
     if triage_mode == "batched":
-        workbench_state, agent_results = await _run_batched_triage_passes(
+        workbench_state, pass_count = await _run_batched_triage_passes(
             triage_root=triage_root,
             triage_candidates=triage_candidates,
             max_passes=max_passes,
             max_batch_size=max_batch_size,
         )
     else:
-        workbench_state, agent_results = await _run_single_triage_passes(
+        workbench_state, pass_count = await _run_single_triage_passes(
             triage_root=triage_root,
             triage_candidates=triage_candidates,
             max_passes=max_passes,
@@ -77,14 +77,12 @@ async def run_repository_triage_agent(
     if not finish_result["ok"]:
         raise RuntimeError("triage workbench is incomplete after agent execution.")
     result = {
-        "agent_result": agent_results[-1] if agent_results else None,
-        "agent_results": agent_results,
         "cases": finish_result["cases"],
         "suppressed_candidates": finish_result["suppressed_candidates"],
         "constraints": finish_result["constraints"],
         "metadata": {
             "triage_mode": triage_mode,
-            "triage_pass_count": len(agent_results),
+            "triage_pass_count": pass_count,
             "batch_size": max_batch_size if triage_mode == "batched" else None,
         },
     }
@@ -96,19 +94,18 @@ async def _run_single_triage_passes(
     triage_root: Path,
     triage_candidates: list[dict[str, Any]],
     max_passes: int,
-) -> tuple[TriageWorkbenchState, list[dict | None]]:
+) -> tuple[TriageWorkbenchState, int]:
     workbench_state = TriageWorkbenchState.from_candidates(triage_candidates)
-    agent_results: list[dict | None] = []
+    pass_count = 0
     for pass_index in range(max(1, max_passes)):
         edit_event_start = len(workbench_state.edit_events)
-        agent_results.append(
-            await _run_repository_triage_agent_pass(
-                triage_root=triage_root,
-                pass_meta={"kind": "refinement"} if pass_index > 0 else None,
-                workbench_state=workbench_state,
-                pass_index=pass_index,
-            )
+        await _run_repository_triage_agent_pass(
+            triage_root=triage_root,
+            pass_meta={"kind": "refinement"} if pass_index > 0 else None,
+            workbench_state=workbench_state,
+            pass_index=pass_index,
         )
+        pass_count += 1
         if not _should_run_another_triage_pass(
             workbench_state=workbench_state,
             pass_index=pass_index,
@@ -116,7 +113,7 @@ async def _run_single_triage_passes(
             pass_edit_events=workbench_state.edit_events[edit_event_start:],
         ):
             break
-    return workbench_state, agent_results
+    return workbench_state, pass_count
 
 
 async def _run_batched_triage_passes(
@@ -125,9 +122,9 @@ async def _run_batched_triage_passes(
     triage_candidates: list[dict[str, Any]],
     max_passes: int,
     max_batch_size: int,
-) -> tuple[TriageWorkbenchState, list[dict | None]]:
+) -> tuple[TriageWorkbenchState, int]:
     global_state = TriageWorkbenchState.from_candidates(triage_candidates)
-    agent_results: list[dict | None] = []
+    pass_count = 0
     draft_origins: list[dict] = []
     batches = triage_candidate_batches(triage_candidates, max_batch_size=max_batch_size)
     batch_concurrency = min(
@@ -143,9 +140,9 @@ async def _run_batched_triage_passes(
     async def run_batch(
         index: int,
         batch_candidate_ids: list[str],
-    ) -> tuple[int, dict | None, list[dict]]:
+    ) -> tuple[int, list[dict]]:
         async with semaphore:
-            agent_result, batch_group_drafts = await _run_triage_batch_draft(
+            batch_group_drafts = await _run_triage_batch_draft(
                 triage_root=triage_root,
                 triage_candidates=triage_candidates,
                 batch_candidate_ids=batch_candidate_ids,
@@ -156,7 +153,7 @@ async def _run_batched_triage_passes(
                     "max_batch_size": max_batch_size,
                 },
             )
-            return index, agent_result, batch_group_drafts
+            return index, batch_group_drafts
 
     batch_results = await asyncio.gather(
         *(
@@ -164,14 +161,11 @@ async def _run_batched_triage_passes(
             for index, batch_candidate_ids in enumerate(batches, start=1)
         )
     )
-    indexed_batch_results = {
-        index: (agent_result, batch_group_drafts)
-        for index, agent_result, batch_group_drafts in batch_results
-    }
+    indexed_batch_results = dict(batch_results)
+    pass_count += len(batch_results)
 
     for index in range(1, len(batches) + 1):
-        agent_result, batch_group_drafts = indexed_batch_results[index]
-        agent_results.append(agent_result)
+        batch_group_drafts = indexed_batch_results[index]
         if not batch_group_drafts:
             continue
         create_result = global_state.create_groups(groups=batch_group_drafts)
@@ -186,15 +180,14 @@ async def _run_batched_triage_passes(
 
     for pass_index in range(1, max(1, max_passes)):
         edit_event_start = len(global_state.edit_events)
-        agent_results.append(
-            await _run_repository_triage_agent_pass(
-                triage_root=triage_root,
-                pass_meta={"kind": "refinement"},
-                workbench_state=global_state,
-                pass_index=pass_index,
-                draft_origins=draft_origins,
-            )
+        await _run_repository_triage_agent_pass(
+            triage_root=triage_root,
+            pass_meta={"kind": "refinement"},
+            workbench_state=global_state,
+            pass_index=pass_index,
+            draft_origins=draft_origins,
         )
+        pass_count += 1
         if not _should_run_another_triage_pass(
             workbench_state=global_state,
             pass_index=pass_index,
@@ -202,7 +195,7 @@ async def _run_batched_triage_passes(
             pass_edit_events=global_state.edit_events[edit_event_start:],
         ):
             break
-    return global_state, agent_results
+    return global_state, pass_count
 
 
 async def _run_triage_batch_draft(
@@ -211,7 +204,7 @@ async def _run_triage_batch_draft(
     triage_candidates: list[dict[str, Any]],
     batch_candidate_ids: list[str],
     batch: dict,
-) -> tuple[dict | None, list[dict]]:
+) -> list[dict]:
     requested_candidate_ids = {
         str(candidate_id or "").strip()
         for candidate_id in batch_candidate_ids
@@ -223,13 +216,13 @@ async def _run_triage_batch_draft(
         if str(candidate.get("candidate_id") or "").strip() in requested_candidate_ids
     ]
     batch_state = TriageWorkbenchState.from_candidates(batch_candidates)
-    agent_result = await _run_repository_triage_agent_pass(
+    await _run_repository_triage_agent_pass(
         triage_root=triage_root,
         pass_meta=batch,
         workbench_state=batch_state,
         pass_index=0,
     )
-    return agent_result, batch_state.group_drafts()
+    return batch_state.group_drafts()
 
 
 async def _run_repository_triage_agent_pass(
