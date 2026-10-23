@@ -30,9 +30,9 @@ from sec_review_agents.memory.store import (
     resolve_memory_store_dir,
 )
 from sec_review_agents.temporal.config import (
+    DEFAULT_MEMORY_TASK_QUEUE,
     DEFAULT_TEMPORAL_ADDRESS,
     DEFAULT_TEMPORAL_NAMESPACE,
-    DEFAULT_TEMPORAL_TASK_QUEUE,
     DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
 )
 from sec_review_agents.utils.env import bootstrap_agents_env, env_value, parse_int_env
@@ -62,7 +62,7 @@ def _add_temporal_options(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--task-queue",
-        default=env_value("TEMPORAL_TASK_QUEUE") or DEFAULT_TEMPORAL_TASK_QUEUE,
+        default=DEFAULT_MEMORY_TASK_QUEUE,
         help="Temporal task queue for the memory workflow.",
     )
     parser.add_argument(

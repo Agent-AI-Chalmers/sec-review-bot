@@ -15,7 +15,6 @@ from sec_review_agents.delivery_stages.result import (
 from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
 from sec_review_agents.temporal.support import prepare_internal_workflow_activity
 from sec_review_agents.utils.paths import required_path
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.repository.workflow import (
     RepositoryCaseReviewRequest,
     build_blocked_repository_case_result,
@@ -29,10 +28,11 @@ from sec_review_agents.workflows.repository.workflow import (
     window_deletion_summary_activity,
 )
 from sec_review_agents.workflows.repository_case import direct as repository_case_direct
+from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 
 async def run_repository_review_direct(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
     prepare_internal_workflow_activity(request.workflow, request.run_id)
     scan_result = await run_repository_scan_direct(request)
@@ -47,7 +47,7 @@ async def run_repository_review_direct(
 
 
 async def run_repository_scan_direct(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
     discovery_result = await run_repository_discovery_direct(request)
     triage_result = await triage_repository_activity(request, discovery_result)
@@ -61,7 +61,7 @@ async def run_repository_scan_direct(
 
 
 async def run_repository_discovery_direct(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
 ) -> DiscoveryResult:
     manifest = build_repository_discovery_manifest_activity(request)
     max_concurrency = max(1, int(manifest["max_concurrency"]))
@@ -90,7 +90,7 @@ async def run_repository_discovery_direct(
 
 
 async def run_repository_case_reviews_direct(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
     scan_result: dict[str, Any],
 ) -> list[dict[str, Any]]:
     cases = list(scan_result["triage_result"]["cases"])
@@ -128,7 +128,7 @@ async def run_repository_case_reviews_direct(
 
 
 async def run_repository_delivery_direct(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
     case_results: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     delivery_plan = await plan_repository_delivery_activity(request, case_results)

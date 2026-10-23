@@ -2,7 +2,8 @@ from sec_review_agents.utils.env import env_value, parse_bool_env
 
 AGENT_SKILLS_ENABLED_ENV = "AGENT_SKILLS_ENABLED"
 AGENT_MCP_ENABLED_ENV = "AGENT_MCP_ENABLED"
-AGENT_MEMORY_ENABLED_ENV = "AGENT_MEMORY_ENABLED"
+AGENT_MEMORY_CONSUMPTION_ENABLED_ENV = "AGENT_MEMORY_CONSUMPTION_ENABLED"
+AGENT_MEMORY_PROCESSING_ENABLED_ENV = "AGENT_MEMORY_PROCESSING_ENABLED"
 
 
 def agent_skills_enabled() -> bool:
@@ -14,5 +15,9 @@ def agent_mcp_enabled() -> bool:
     return parse_bool_env(env_value(AGENT_MCP_ENABLED_ENV), False)
 
 
-def agent_memory_enabled() -> bool:
-    return parse_bool_env(env_value(AGENT_MEMORY_ENABLED_ENV), True)
+def memory_consumption_enabled() -> bool:
+    return parse_bool_env(env_value(AGENT_MEMORY_CONSUMPTION_ENABLED_ENV), True)
+
+
+def memory_processing_enabled() -> bool:
+    return parse_bool_env(env_value(AGENT_MEMORY_PROCESSING_ENABLED_ENV), True)

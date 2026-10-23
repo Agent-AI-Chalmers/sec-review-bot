@@ -40,7 +40,7 @@ async def run_mcp_case(
             "AGENT_DOCKER_IMAGE": docker_image,
             "AGENT_DOCKER_NETWORK_MODE": "none",
             "AGENT_MCP_ENABLED": "true" if mcp_enabled else "false",
-            "AGENT_MEMORY_ENABLED": "false",
+            "AGENT_MEMORY_CONSUMPTION_ENABLED": "false",
             "AGENT_SKILLS_ENABLED": "false",
         },
         clear=False,

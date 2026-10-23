@@ -50,7 +50,7 @@ When running from this repository, local commands read `agents/.env` and `agents
 
 The local `run-local-*` CLIs and `sec-review-agents-check-llm-deployments` load `agents/.env`, but never overwrite environment variables already set in the process.
 
-`sec-review-agents-execution-worker` does not load `.env` by itself. Pass its environment through the shell, process supervisor, or CI. Execution Gateway is a separate TypeScript service under [`execution-gateway/`](../execution-gateway/README.md).
+`sec-review-execution-worker` and `sec-review-memory-worker` do not load `.env` themselves. Pass their environment through the shell, process supervisor, or CI. Execution Gateway is a separate TypeScript service under [`execution-gateway/`](../execution-gateway/README.md).
 
 There is no `.env` path override. `MODEL_PROVIDERS_CONFIG_TOML` has the highest priority for model config; set it only when using another TOML location or when the run layout does not preserve the project-relative path.
 
@@ -117,7 +117,7 @@ flowchart LR
     direct --> execution
 ```
 
-The external TypeScript Gateway receives HTTP run requests and uses the Temporal client to start and query workflows; it does not execute agents. Temporal Server persists workflow state and dispatches tasks to the polling worker. Direct local execution bypasses both the HTTP service and Temporal while reusing activity functions; `run-local-* --temporal` bypasses the HTTP service but uses Temporal Server and the worker.
+The external TypeScript Gateway receives HTTP run requests and uses the Temporal client to start and query workflows; it does not execute agents. Temporal Server persists workflow state and dispatches review and memory tasks to their separate polling workers. Direct local execution bypasses both the HTTP service and Temporal while reusing activity functions; `run-local-* --temporal` bypasses the HTTP service but uses Temporal Server and Execution Worker.
 
 ## Local Runs
 
@@ -229,13 +229,13 @@ set +a
 
 TEMPORAL_ADDRESS=127.0.0.1:7233 \
 TEMPORAL_NAMESPACE=default \
-TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-execution-worker
+TEMPORAL_EXECUTION_TASK_QUEUE=sec-review-execution \
+sec-review-execution-worker
 ```
 
-### Run the Worker Manually
+### Run the Workers Manually
 
-Start Temporal and the worker in separate terminals. Run the independent HTTP service from [`execution-gateway/`](../execution-gateway/README.md).
+Start Temporal and both workers in separate terminals. Run the independent HTTP service from [`execution-gateway/`](../execution-gateway/README.md).
 
 Minimal local startup shape:
 
@@ -245,15 +245,22 @@ Terminal 1, Temporal Server:
 temporal server start-dev
 ```
 
-Terminal 2, Temporal Worker:
+Terminal 2, Execution Worker:
 
 ```bash
 TEMPORAL_ADDRESS=127.0.0.1:7233 \
-TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-execution-worker
+TEMPORAL_EXECUTION_TASK_QUEUE=sec-review-execution \
+sec-review-execution-worker
 ```
 
-The worker polls Temporal for registered workflow and activity tasks and executes them. Model, sandbox, skills, and activity concurrency environment variables belong to the worker runtime.
+Terminal 3, Memory Worker:
+
+```bash
+TEMPORAL_ADDRESS=127.0.0.1:7233 \
+sec-review-memory-worker
+```
+
+Execution Worker handles review workflows, sandboxed activities, and transcript publication. Memory Worker handles asynchronous extraction and maintenance. They use separate task queues and concurrency limits.
 
 Docker Compose control-plane startup and host worker operation are documented in the [local integrated deployment guide](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md).
 
@@ -261,7 +268,7 @@ Docker Compose control-plane startup and host worker operation are documented in
 
 Agents can declare the skills they need. The worker prepares and mounts the declared skills when it starts an agent. See [Agent Skills](../docs/agent/SKILLS.md) for details.
 
-Memory has two mutually exclusive storage modes. Local/offline execution sets `AGENT_MEMORY_DIR`; main agents receive a snapshot of its `memory/` subtree at `/memory`. Managed workers instead set `AGENT_MEMORY_CATALOG_URL` and `AGENT_MEMORY_CATALOG_TOKEN`; they fetch the active immutable memory version from object storage and materialize the same local read-only `/memory` view. A configured service never falls back to `AGENT_MEMORY_DIR`. Set `AGENT_MEMORY_ENABLED=false` to disable memory end to end. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the design principles and lifecycle.
+Memory has two mutually exclusive storage modes. Local/offline execution sets `AGENT_MEMORY_DIR`; main agents receive a snapshot of its `memory/` subtree at `/memory`. Managed workers instead set `AGENT_MEMORY_CATALOG_URL` and `AGENT_MEMORY_CATALOG_TOKEN`; they fetch the active immutable memory version from object storage and materialize the same local read-only `/memory` view. A configured service never falls back to `AGENT_MEMORY_DIR`. `AGENT_MEMORY_CONSUMPTION_ENABLED` controls whether review agents read that view, while `AGENT_MEMORY_PROCESSING_ENABLED` controls transcript extraction and maintenance. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the design principles and lifecycle.
 
 Agents that require structured output check whether the final state contains `structured_response`. If the model only returns plain text and does not produce a structured result, agent middleware appends a correction message inside the LangChain agent loop and retries. Retry count is controlled by `AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES`, default `2`. This fallback is separate from provider/API request retry and does not handle schema-parameter validation errors; those remain under LangChain structured-output retry behavior.
 

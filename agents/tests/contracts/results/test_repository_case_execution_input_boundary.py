@@ -3,7 +3,6 @@ from typing import Any
 
 import pytest
 
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.repository.case_execution_input import (
     RepositoryCaseExecutionInput,
     prepare_case_execution_input,
@@ -14,6 +13,7 @@ from sec_review_agents.workflows.repository.workflow import (
     prepare_repository_case_review_inputs_activity,
 )
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
+from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 
 def _prepare_case_execution_input(
@@ -174,7 +174,7 @@ def test_repository_case_transcripts_are_published_under_the_case_root(
 ) -> None:
     """Case-owned transcripts let only a completed case register its own extraction."""
     cases_root = tmp_path / "artifacts" / "run-1" / "cases"
-    request = InternalWorkflowRequest(
+    request = ReviewWorkflowRequest(
         workflow="repository-review",
         run_id="run-1",
         prepared_input={

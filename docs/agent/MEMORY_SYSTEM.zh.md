@@ -74,7 +74,7 @@ maintenance 会读取 extraction 产生的 observations，并把有用经验并�
 
 大致流程就是异步检查：
 
-- 来源：issue 或 pull-request review 发布 transcripts 后，会直接启动对应 review 的 extraction。repository review 则会为每个实际存在 transcripts 的 case 启动一次 extraction。
+- 来源：issue 或 pull-request review 发布 transcripts 后，会进入异步 memory 处理。repository review 则会按每个实际存在 transcripts 的 case 形成一个 extraction unit。
 - extraction 会分别处理各个 review，并产出 pending observations。
   - 可以并发执行多个 extraction。
 - maintenance 定时检查，达到阈值或者时间过长就处理：maintenance trigger schedule 默认每小时运行一次。只有 pending observations 至少有 10 条，或者最老的 pending observation 已经等待至少 1 天时，才启动 maintenance。
@@ -82,6 +82,15 @@ maintenance 会读取 extraction 产生的 observations，并把有用经验并�
   - 用 `processed` 表示已经审阅并处理过，不表示经验一定被吸收进 memory（如上会做判断）。
 
 > 10 条是经验设计，可调整
+
+## 功能开关
+
+两个开关互相独立，可以只停读取不停生产，反之亦然：
+
+- `AGENT_MEMORY_CONSUMPTION_ENABLED` 控制 review agent 是否读取 memory。它不控制 extraction 和 maintenance，也不会阻止 worker 查询 Memory Catalog。
+- `AGENT_MEMORY_PROCESSING_ENABLED` 控制 extraction 和 maintenance。它不影响 review agent；关闭时 review agent 仍然把 memory 当作不可用，以便与正在产出的 memory 保持确定性。
+
+关闭 consumption 不等于禁止 processing 或 catalog 协调；关闭 processing 也不改变 review agent 读取的内容。
 
 ## 治理
 

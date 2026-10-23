@@ -25,6 +25,7 @@ from sec_review_agents.agents.memory_maintainer.tools import (
     build_memory_delete_file_tool,
 )
 from sec_review_agents.artifacts.reference import ArtifactReference
+from sec_review_agents.features import AGENT_MEMORY_CONSUMPTION_ENABLED_ENV
 from sec_review_agents.filesystem.backend_factory import (
     create_backend_with_path_views,
 )
@@ -45,7 +46,6 @@ from sec_review_agents.memory.middleware import (
 )
 from sec_review_agents.memory.store import (
     AGENT_MEMORY_DIR_ENV,
-    AGENT_MEMORY_ENABLED_ENV,
     AGENT_MEMORY_MATERIALIZED_ROOT_ENV,
     materialize_configured_memory_view,
     memory_runtime_available,
@@ -407,15 +407,21 @@ def test_resolve_memory_store_dir_requires_configuration() -> None:
         memory_store.resolve_memory_store_dir(None, required=True)
 
 
-def test_resolve_memory_store_dir_respects_global_disable() -> None:
-    with (
-        patch.dict("os.environ", {AGENT_MEMORY_ENABLED_ENV: "false"}, clear=True),
-        pytest.raises(ValueError, match="Memory is disabled"),
+def test_resolve_memory_store_dir_ignores_consumption_toggle(
+    tmp_path: Path,
+) -> None:
+    with patch.dict(
+        "os.environ",
+        {
+            memory_store.AGENT_MEMORY_DIR_ENV: str(tmp_path / "memory"),
+            AGENT_MEMORY_CONSUMPTION_ENABLED_ENV: "false",
+        },
+        clear=True,
     ):
-        memory_store.resolve_memory_store_dir(None, required=True)
-
-    with patch.dict("os.environ", {AGENT_MEMORY_ENABLED_ENV: "false"}, clear=True):
-        assert memory_store.resolve_memory_store_dir(None, required=False) is None
+        assert (
+            memory_store.resolve_memory_store_dir(None, required=True)
+            == (tmp_path / "memory").resolve()
+        )
 
 
 def test_memory_delete_file_tool_deletes_direct_topic_file(tmp_path: Path) -> None:

@@ -27,7 +27,6 @@ from sec_review_agents.temporal.support import (
     execute_activity,
     prepare_internal_workflow_activity,
 )
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.repository.case_execution_input import (
     RepositoryCaseExecutionInput,
 )
@@ -35,6 +34,7 @@ from sec_review_agents.workflows.review_intent import (
     REVIEW_OBJECTIVE_AUDIT,
     require_review_intent,
 )
+from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 DEFAULT_CASE_PROCESSING_MAX_CONCURRENCY = 1
 
@@ -81,7 +81,7 @@ def _stage_error_message(error: Exception) -> str:
 
 
 def _repository_case_timeout_seconds(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
 ) -> int:
     timeout_seconds = request.timeout_seconds
     if (
@@ -144,7 +144,7 @@ def resolve_repository_case_processing_max_concurrency(case_count: int) -> int:
 
 @activity.defn
 def build_repository_discovery_manifest_activity(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
     from sec_review_agents.scan_stages.discovery.stage import (
         prepare_discovery_chunks,
@@ -226,7 +226,7 @@ def build_repository_discovery_result_activity(
 
 @activity.defn
 async def triage_repository_activity(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
     discovery_result: Mapping[str, Any],
 ) -> TriageResult:
     from sec_review_agents.scan_stages.triage.stage import run_repository_triage_stage
@@ -240,7 +240,7 @@ async def triage_repository_activity(
 
 @activity.defn
 def prepare_repository_case_review_inputs_activity(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
     cases: Sequence[Mapping[str, Any]],
 ) -> RepositoryCaseRequestBatch:
     from sec_review_agents.runtime.setup_bootstrap import (
@@ -633,7 +633,7 @@ def _delivery_case_inputs(
 
 @activity.defn
 async def plan_repository_delivery_activity(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
     case_results: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     from sec_review_agents.delivery_stages.planning import (
@@ -661,7 +661,7 @@ async def plan_repository_delivery_activity(
 
 @activity.defn
 def prepare_repository_delivery_execution_activity(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
     case_results: Sequence[Mapping[str, Any]],
     delivery_plan: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -699,7 +699,7 @@ def prepare_repository_delivery_execution_activity(
 
 @activity.defn
 def build_skipped_repository_delivery_result_activity(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
     from sec_review_agents.delivery_stages.result import (
         build_skipped_delivery_result,
@@ -790,7 +790,7 @@ def build_repository_delivery_result_activity(
 
 @activity.defn
 def build_repository_review_result_activity(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
     scan_result: Mapping[str, Any],
     case_results: Sequence[Mapping[str, Any]],
     delivery_result: Mapping[str, Any],
@@ -821,7 +821,7 @@ def build_repository_review_result_activity(
 @workflow.defn
 class RepositoryDiscoveryWorkflow:
     @workflow.run
-    async def run(self, request: InternalWorkflowRequest) -> dict[str, Any]:
+    async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
         manifest = await execute_activity(
             build_repository_discovery_manifest_activity,
             request,
@@ -870,7 +870,7 @@ class RepositoryDiscoveryWorkflow:
 
 @activity.defn
 def window_deletion_summary_activity(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
     from sec_review_agents.workflows.repository.case_execution_input import (
         window_deletion_summary,
@@ -885,7 +885,7 @@ def window_deletion_summary_activity(
 @workflow.defn
 class RepositoryScanWorkflow:
     @workflow.run
-    async def run(self, request: InternalWorkflowRequest) -> dict[str, Any]:
+    async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
         discovery_result = await workflow.execute_child_workflow(
             RepositoryDiscoveryWorkflow.run,
             request,
@@ -1046,7 +1046,7 @@ class RepositoryCaseProcessingWorkflow:
     @workflow.run
     async def run(
         self,
-        request: InternalWorkflowRequest,
+        request: ReviewWorkflowRequest,
         scan_result: dict[str, Any],
     ) -> list[dict[str, Any]]:
         cases = list(scan_result["triage_result"]["cases"])
@@ -1106,7 +1106,7 @@ class RepositoryDeliveryWorkflow:
     @workflow.run
     async def run(
         self,
-        request: InternalWorkflowRequest,
+        request: ReviewWorkflowRequest,
         case_results: Sequence[Mapping[str, Any]],
     ) -> dict[str, Any]:
         delivery_plan = await execute_activity(
@@ -1191,7 +1191,7 @@ class RepositoryDeliveryWorkflow:
 @workflow.defn
 class RepositoryReviewWorkflow:
     @workflow.run
-    async def run(self, request: InternalWorkflowRequest) -> dict[str, Any]:
+    async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
         await execute_activity(
             prepare_internal_workflow_activity,
             request.workflow,
@@ -1245,7 +1245,7 @@ class RepositoryReviewWorkflow:
                     timeout_seconds=request.timeout_seconds,
                 ),
                 source_workflow=request.workflow,
-                start_extractions=request.memory_extraction_enabled,
+                start_extractions=request.post_processing.memory_processing_enabled,
             )
         return {
             "ok": True,
@@ -1255,7 +1255,7 @@ class RepositoryReviewWorkflow:
 
 
 def _repository_case_workflow_id(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
     case_request: RepositoryCaseReviewRequest,
 ) -> str:
     case_id = str(case_request["case_execution_input"]["case_id"]).strip()

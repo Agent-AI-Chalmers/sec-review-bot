@@ -20,10 +20,10 @@ from sec_review_agents.temporal.support import (
     prepare_internal_workflow_activity,
 )
 from sec_review_agents.utils.paths import required_path
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.review_intent import (
     require_review_intent,
 )
+from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 
 @activity.defn
@@ -259,7 +259,7 @@ def build_issue_review_result_activity(
 @workflow.defn
 class IssueReviewWorkflow:
     @workflow.run
-    async def run(self, request: InternalWorkflowRequest) -> dict[str, Any]:
+    async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
         await execute_activity(
             prepare_internal_workflow_activity,
             request.workflow,
@@ -352,7 +352,7 @@ class IssueReviewWorkflow:
                 timeout_seconds=request.timeout_seconds,
             ),
             source_workflow=request.workflow,
-            start_extractions=request.memory_extraction_enabled,
+            start_extractions=request.post_processing.memory_processing_enabled,
         )
         return {
             "ok": True,

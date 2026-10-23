@@ -9,10 +9,6 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 from sec_review_agents.artifacts.reference import ArtifactReference
-from sec_review_agents.features import (
-    AGENT_MEMORY_ENABLED_ENV,
-    agent_memory_enabled,
-)
 from sec_review_agents.filesystem.path_views import PathView, memory_view
 from sec_review_agents.memory.state import initialize_memory_state
 from sec_review_agents.utils.env import env_value
@@ -121,12 +117,6 @@ def resolve_memory_store_dir(
 def resolve_memory_store_dir(
     configured_path: Path | None, *, required: bool
 ) -> Path | None:
-    if not agent_memory_enabled():
-        if required:
-            raise ValueError(
-                f"Memory is disabled. Set {AGENT_MEMORY_ENABLED_ENV}=true to enable it."
-            )
-        return None
     if configured_path is not None:
         return configured_path.expanduser().resolve()
     configured = env_value(AGENT_MEMORY_DIR_ENV)

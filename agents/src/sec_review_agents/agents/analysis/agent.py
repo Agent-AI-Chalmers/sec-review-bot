@@ -7,7 +7,7 @@ from langchain.agents.middleware import AgentMiddleware
 from langgraph.graph.state import CompiledStateGraph
 
 from sec_review_agents.agents.analysis.model import AnalysisOutput
-from sec_review_agents.features import agent_memory_enabled, agent_skills_enabled
+from sec_review_agents.features import agent_skills_enabled, memory_consumption_enabled
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.memory.middleware import (
     SECURITY_REVIEW_MEMORY_SYSTEM_PROMPT,
@@ -38,7 +38,7 @@ async def create_analysis_agent_graph(
     mcp_tools: list[Any],
 ) -> CompiledStateGraph:
     model = create_chat_model(agent_name=agent_name)
-    memory_enabled = agent_memory_enabled() and memory_runtime_available()
+    memory_enabled = memory_consumption_enabled() and memory_runtime_available()
     agent_middleware: list[AgentMiddleware[Any, Any, Any]] = [
         MissingStructuredResponseMiddleware(
             max_retries=missing_structured_response_max_retries(),

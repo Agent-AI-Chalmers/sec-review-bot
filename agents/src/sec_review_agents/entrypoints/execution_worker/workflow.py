@@ -17,11 +17,14 @@ from sec_review_agents.entrypoints.run_protocol import (
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.issue.workflow import IssueReviewWorkflow
 from sec_review_agents.workflows.pull_request.workflow import PullRequestReviewWorkflow
 from sec_review_agents.workflows.repository.workflow import (
     RepositoryReviewWorkflow,
+)
+from sec_review_agents.workflows.review_request import (
+    ReviewPostProcessingPolicy,
+    ReviewWorkflowRequest,
 )
 
 
@@ -29,6 +32,7 @@ from sec_review_agents.workflows.repository.workflow import (
 def prepare_execution_run_activity(request: ExecutionRequest) -> dict[str, Any]:
     from sec_review_agents.entrypoints.input_preparation import prepare_run_input
     from sec_review_agents.entrypoints.run_protocol import build_execution_error
+    from sec_review_agents.features import memory_processing_enabled
     from sec_review_agents.observability.diagnostics import (
         bind_workflow_context,
         log_diagnostic,
@@ -55,6 +59,7 @@ def prepare_execution_run_activity(request: ExecutionRequest) -> dict[str, Any]:
             ),
             "runtime_context": runtime_context_from_config(request.runtime),
             "timeout_seconds": request.timeout_seconds,
+            "memory_processing_enabled": memory_processing_enabled(),
         }
     except ValueError as error:
         return {
@@ -91,12 +96,15 @@ class ExecutionWorkflow:
         )
         if prepared.get("ok") is False:
             return prepared
-        internal_request = InternalWorkflowRequest(
+        internal_request = ReviewWorkflowRequest(
             workflow=prepared["workflow"],
             run_id=prepared["run_id"],
             prepared_input=prepared["prepared_input"],
             timeout_seconds=prepared["timeout_seconds"],
             runtime_context=prepared["runtime_context"],
+            post_processing=ReviewPostProcessingPolicy(
+                memory_processing_enabled=prepared["memory_processing_enabled"]
+            ),
         )
         if request.workflow == "issue-review":
             result = await workflow.execute_child_workflow(

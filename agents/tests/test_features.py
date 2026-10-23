@@ -1,7 +1,8 @@
 from sec_review_agents.features import (
     agent_mcp_enabled,
-    agent_memory_enabled,
     agent_skills_enabled,
+    memory_consumption_enabled,
+    memory_processing_enabled,
 )
 
 
@@ -29,13 +30,25 @@ def test_agent_mcp_enabled(monkeypatch) -> None:
     assert agent_mcp_enabled() is True
 
 
-def test_agent_memory_enabled_defaults_to_true(monkeypatch) -> None:
-    monkeypatch.delenv("AGENT_MEMORY_ENABLED", raising=False)
+def test_memory_consumption_enabled_defaults_to_true(monkeypatch) -> None:
+    monkeypatch.delenv("AGENT_MEMORY_CONSUMPTION_ENABLED", raising=False)
 
-    assert agent_memory_enabled() is True
+    assert memory_consumption_enabled() is True
 
 
 def test_agent_memory_disabled(monkeypatch) -> None:
-    monkeypatch.setenv("AGENT_MEMORY_ENABLED", "false")
+    monkeypatch.setenv("AGENT_MEMORY_CONSUMPTION_ENABLED", "false")
 
-    assert agent_memory_enabled() is False
+    assert memory_consumption_enabled() is False
+
+
+def test_memory_processing_enabled_defaults_to_true(monkeypatch) -> None:
+    monkeypatch.delenv("AGENT_MEMORY_PROCESSING_ENABLED", raising=False)
+
+    assert memory_processing_enabled() is True
+
+
+def test_memory_processing_disabled(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "false")
+
+    assert memory_processing_enabled() is False

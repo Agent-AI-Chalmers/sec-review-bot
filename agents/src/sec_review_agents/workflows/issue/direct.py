@@ -6,7 +6,6 @@ from sec_review_agents.review_stages.feedback_loop import (
     should_retry_from_verifier_result,
 )
 from sec_review_agents.temporal.support import prepare_internal_workflow_activity
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.issue.workflow import (
     analyze_issue_activity,
     archive_issue_feedback_attempt_activity,
@@ -14,9 +13,10 @@ from sec_review_agents.workflows.issue.workflow import (
     mitigate_issue_activity,
     verify_issue_activity,
 )
+from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 
-async def run_issue_review_direct(request: InternalWorkflowRequest) -> dict[str, Any]:
+async def run_issue_review_direct(request: ReviewWorkflowRequest) -> dict[str, Any]:
     prepare_internal_workflow_activity(request.workflow, request.run_id)
     prepared_input = request.prepared_input
     runtime_context = request.runtime_context

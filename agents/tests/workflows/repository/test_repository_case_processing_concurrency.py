@@ -11,7 +11,6 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import Worker
 
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.repository import direct as repository_direct
 from sec_review_agents.workflows.repository.case_execution_input import (
     RepositoryCaseExecutionInput,
@@ -26,6 +25,7 @@ from sec_review_agents.workflows.repository.workflow import (
 )
 from sec_review_agents.workflows.repository_case import direct as repository_case_direct
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
+from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from tests.temporal_test_utils import temporal_time_skipping_environment
 
 
@@ -48,8 +48,8 @@ def repository_case_execution_input(case_id: str) -> RepositoryCaseExecutionInpu
     }
 
 
-def _internal_workflow_request(run_id: str = "run-test") -> InternalWorkflowRequest:
-    return InternalWorkflowRequest(
+def _review_workflow_request(run_id: str = "run-test") -> ReviewWorkflowRequest:
+    return ReviewWorkflowRequest(
         workflow="repository-review",
         run_id=run_id,
         prepared_input={
@@ -167,7 +167,7 @@ async def test_case_verification_activity_persists_skip_without_running_verifier
 
 @pytest.mark.asyncio
 async def test_direct_repository_scan_awaits_async_triage_activity() -> None:
-    request = _internal_workflow_request()
+    request = _review_workflow_request()
     discovery_result = {"candidates": [{"candidate_id": "candidate-a"}]}
     triage_result = {"cases": [{"case_id": "case-a"}]}
 
@@ -236,7 +236,7 @@ async def test_direct_repository_discovery_refills_sliding_window() -> None:
         ),
     ):
         result = await repository_direct.run_repository_discovery_direct(
-            _internal_workflow_request()
+            _review_workflow_request()
         )
 
     assert result == {"chunk_ids": ["chunk-0", "chunk-1", "chunk-2", "chunk-3"]}
@@ -268,7 +268,7 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
 
     @activity.defn(name="prepare_repository_case_review_inputs_activity")
     def fake_prepare_case_review_inputs(
-        _request: InternalWorkflowRequest,
+        _request: ReviewWorkflowRequest,
         _cases: list[dict],
     ) -> dict:
         return {
@@ -412,7 +412,7 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
                     return await env.client.execute_workflow(
                         RepositoryCaseProcessingWorkflow.run,
                         args=[
-                            InternalWorkflowRequest(
+                            ReviewWorkflowRequest(
                                 workflow="repository-review",
                                 run_id="run-test",
                                 prepared_input={},
@@ -472,7 +472,7 @@ async def test_direct_repository_review_isolates_case_failure() -> None:
         ),
     ):
         results = await repository_direct.run_repository_case_reviews_direct(
-            InternalWorkflowRequest(
+            ReviewWorkflowRequest(
                 workflow="repository-review",
                 run_id="run-test",
                 prepared_input={},
@@ -524,7 +524,7 @@ async def test_direct_repository_case_review_fanout_is_bounded() -> None:
         ),
     ):
         results = await repository_direct.run_repository_case_reviews_direct(
-            InternalWorkflowRequest(
+            ReviewWorkflowRequest(
                 workflow="repository-review",
                 run_id="run-test",
                 prepared_input={},
@@ -550,7 +550,7 @@ async def test_repository_discovery_workflow_refills_chunk_window() -> None:
 
     @activity.defn(name="build_repository_discovery_manifest_activity")
     def fake_build_discovery_manifest(
-        _request: InternalWorkflowRequest,
+        _request: ReviewWorkflowRequest,
     ) -> dict:
         return {
             "entries": [],
@@ -608,7 +608,7 @@ async def test_repository_discovery_workflow_refills_chunk_window() -> None:
                 ):
                     return await env.client.execute_workflow(
                         RepositoryDiscoveryWorkflow.run,
-                        InternalWorkflowRequest(
+                        ReviewWorkflowRequest(
                             workflow="repository-review",
                             run_id="run-test",
                             prepared_input={},

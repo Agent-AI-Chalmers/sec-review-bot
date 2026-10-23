@@ -13,7 +13,6 @@ from sec_review_agents.temporal.support import (
     execute_activity,
     prepare_internal_workflow_activity,
 )
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.issue.workflow import (
     analyze_issue_activity,
 )
@@ -23,6 +22,7 @@ from sec_review_agents.workflows.review_intent import (
     TestChangesPolicy,
     require_review_intent,
 )
+from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 
 @activity.defn
@@ -105,7 +105,7 @@ def build_issue_two_stage_result_activity(
 @workflow.defn
 class IssueTwoStageWorkflow:
     @workflow.run
-    async def run(self, request: InternalWorkflowRequest) -> dict[str, Any]:
+    async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
         await execute_activity(
             prepare_internal_workflow_activity,
             request.workflow,
@@ -251,7 +251,7 @@ async def execute_issue_two_stage(
 
 
 async def run_issue_two_stage_direct(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
     prepared_input = request.prepared_input
     runtime_context = request.runtime_context

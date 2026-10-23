@@ -140,8 +140,9 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_path(root, [(680, 151), (720, 151)], bidirectional=True)
     add_path(root, [(900, 151), (940, 151)], bidirectional=True)
     add_path(root, [(1025, 187), (1025, 315)])
-    add_path(root, [(1110, 351), (1210, 351), (1210, 478), (1260, 478)], bidirectional=True)
-    add_path(root, [(1350, 537), (1350, 650)])
+    add_path(root, [(1110, 351), (1260, 351)], bidirectional=True)
+    add_path(root, [(1110, 369), (1160, 369), (1160, 478), (1260, 478)], bidirectional=True)
+    add_path(root, [(1260, 333), (1245, 333), (1245, 691), (1260, 691)])
     add_path(root, [(210, 351), (300, 351)])
     add_path(root, [(470, 351), (490, 351), (490, 205), (720, 205), (720, 169)])
     add_path(root, [(680, 169), (700, 169), (700, 560), (975, 560), (975, 590)])
@@ -149,8 +150,9 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_path(root, [(600, 387), (600, 560), (740, 560), (740, 590)])
     add_path(root, [(1110, 169), (1140, 169), (1140, 560), (1070, 560), (1070, 590)])
     add_path(root, [(1025, 387), (1025, 590)], bidirectional=True)
-    add_path(root, [(1260, 514), (1190, 514), (1190, 631), (1130, 631)], bidirectional=True)
-    add_path(root, [(1260, 478), (1180, 478), (1180, 420), (710, 420), (710, 369), (690, 369)], bidirectional=True, dashed=True)
+    add_path(root, [(1260, 369), (1190, 369), (1190, 631), (1130, 631)], bidirectional=True)
+    add_path(root, [(1260, 514), (1210, 514), (1210, 631), (1130, 631)], bidirectional=True)
+    add_path(root, [(1260, 496), (1180, 496), (1180, 420), (710, 420), (710, 369), (690, 369)], bidirectional=True, dashed=True)
 
     add_node(root, "github", 50, 115, 160, 72, "GitHub", "external-node")
     add_node(root, "browser", 50, 315, 160, 72, labels["browser"], "external-node")
@@ -163,7 +165,8 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_node(root, "catalog", 510, 315, 180, 72, "Memory Catalog\nServer", "memory-node")
     add_node(root, "postgres", 700, 590, 190, 82, "PostgreSQL", "storage-node")
     add_node(root, "storage", 940, 590, 190, 82, labels["storage"], "storage-node")
-    add_node(root, "worker", 1260, 455, 180, 82, "Execution Worker", "execution-node")
+    add_node(root, "execution-worker", 1260, 315, 180, 72, "Execution Worker", "execution-node")
+    add_node(root, "memory-worker", 1260, 455, 180, 82, "Memory Worker", "memory-node")
     add_node(root, "sandbox", 1260, 650, 180, 82, "Docker sandbox", "sandbox-node")
 
     tree = ET.ElementTree(root)
@@ -175,7 +178,7 @@ render(
     "local-integrated-deployment.svg",
     {
         "title": "Local integrated deployment shape",
-        "description": "GitHub and an operator browser connect to Docker Compose services, while the host Execution Worker runs agent sandboxes.",
+        "description": "GitHub and an operator browser connect to Docker Compose services, while separate host workers execute reviews and asynchronous memory processing.",
         "external": "External",
         "host": "Host",
         "browser": "Operator\nbrowser",
@@ -187,7 +190,7 @@ render(
     "local-integrated-deployment.zh.svg",
     {
         "title": "本地集成部署结构",
-        "description": "GitHub 和运维人员浏览器连接 Docker Compose 服务，宿主机上的 Execution Worker 运行 agent sandbox。",
+        "description": "GitHub 和运维人员浏览器连接 Docker Compose 服务，宿主机上的两个 worker 分别执行 review 和异步 memory 工作。",
         "external": "外部",
         "host": "宿主机",
         "browser": "运维人员\n浏览器",
