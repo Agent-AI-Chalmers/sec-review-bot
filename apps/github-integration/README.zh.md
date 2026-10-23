@@ -13,7 +13,7 @@
 本地开发时，在仓库根目录安装 Control Plane 服务和 integration 的依赖：
 
 ```bash
-corepack enable pnpm
+corepack install --global pnpm@12
 pnpm --dir control-plane install
 pnpm --dir apps/github-integration install
 ```

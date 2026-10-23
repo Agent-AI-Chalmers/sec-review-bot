@@ -436,18 +436,20 @@ RustFS 状态和 PostgreSQL 状态是两套独立数据。应将 `.agent-rustfs-
 
 GitHub integration 的镜像构建和 Git workspace 拉取使用不同的网络配置。Compose 部署在根目录 `.env` 中设置这些变量；非 Compose 启动时，在 GitHub integration 的 `.env` 中设置运行时变量。
 
-### pnpm registry
+### pnpm 与 npm registry
 
-构建 GitHub integration 镜像时，Corepack 和 pnpm 默认访问 `https://registry.npmjs.org`。该地址不可用或速度不稳定时，可以改用可达的 registry：
+Node 服务镜像从 `ghcr.io/pnpm/pnpm:12-alpine` 复制 pnpm 12，构建过程中不再下载 package manager。因此 Docker 必须能直接访问 GHCR，或通过 daemon 配置的 registry mirror 或代理访问。
+
+pnpm 默认从 `https://registry.npmjs.org` 下载项目依赖。该地址不可用或速度不稳定时，可以改用可达的 npm registry：
 
 ```bash
 NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 ```
 
-这个变量只在镜像构建阶段传给 Corepack 和 pnpm。修改后需要重新构建 GitHub integration 镜像：
+这个变量只在镜像构建阶段传给 pnpm，不会改变 Docker 拉取 pnpm 基础镜像的位置。修改后需要重新构建 Node 服务镜像：
 
 ```bash
-docker compose --profile app build github-integration
+docker compose --profile app build control-plane control-plane-ui execution-gateway github-integration memory-catalog
 ```
 
 ### Git fetch

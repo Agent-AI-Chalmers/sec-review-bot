@@ -11,7 +11,7 @@ It does not execute agent workflows directly. It prepares inputs, submits and ob
 For local development, install the Control Plane service and integration dependencies from the repository root:
 
 ```bash
-corepack enable pnpm
+corepack install --global pnpm@12
 pnpm --dir control-plane install
 pnpm --dir apps/github-integration install
 ```
