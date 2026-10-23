@@ -946,11 +946,16 @@ test('ReviewRunStore leaves ingress replay read-only and lets the coordinator ta
       ownerA.markQueued(first.record.run_id, first.preparation_token, {}),
       /cannot transition/
     )
-    await assert.rejects(
-      ownerA.failPreparation(first.record.run_id, first.preparation_token, {
-        message: 'late failure'
-      }),
-      /lost its claim/
+    assert.deepStrictEqual(
+      await ownerA.failPreparation(
+        first.record.run_id,
+        first.preparation_token,
+        {
+          message: 'late failure'
+        }
+      ),
+      { retry_scheduled: false },
+      'a stale owner must not turn a fenced no-op into an error'
     )
     await ownerB.markQueued(takeover.run_id, takeover.claim_token, {})
     assert.strictEqual(
