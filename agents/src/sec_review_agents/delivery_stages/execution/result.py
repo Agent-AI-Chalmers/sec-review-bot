@@ -13,7 +13,6 @@ class DeliveryExecutionResult(BaseModel):
     error: str | None
     patch_path: str | None
     patch_diff: str
-    changed_files: list[str] = Field(default_factory=list)
     file_changes: list[FileChange] = Field(default_factory=list)
     applied_case_ids: list[str] = Field(default_factory=list)
 
@@ -25,7 +24,6 @@ def build_delivery_execution_result(
     delivery_id: str,
     status: str,
     error: str | None,
-    changed_files: list[str],
     file_changes: list[FileChange] | None,
     patch_diff: str,
     applied_case_ids: list[str],
@@ -38,7 +36,6 @@ def build_delivery_execution_result(
             "error": error,
             "patch_path": patch_path,
             "patch_diff": patch_diff,
-            "changed_files": changed_files,
             "file_changes": file_changes or [],
             "applied_case_ids": applied_case_ids,
         }

@@ -71,6 +71,7 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
             return_value={
                 "patch_content": "diff --git a/app.py b/app.py\n",
                 "changed_files": ["app.py"],
+                "file_changes": [{"path": "app.py", "status": "deleted"}],
             },
         ),
     ):
@@ -88,7 +89,9 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
     assert result["kind"] == "issue-single-agent-strategy-result"
     review_record = result["review_record"]
     assert set(review_record) == {"analysis", "mitigation", "verification", "cvss"}
-    assert review_record["mitigation"]["changed_files"] == ["app.py"]
+    assert review_record["mitigation"]["file_changes"] == [
+        {"path": "app.py", "status": "deleted"}
+    ]
 
 
 @pytest.mark.asyncio
@@ -141,6 +144,7 @@ async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_dec
             return_value={
                 "patch_content": "diff --git a/app.py b/app.py\n",
                 "changed_files": ["app.py"],
+                "file_changes": [{"path": "app.py", "status": "deleted"}],
             },
         ),
     ):
@@ -158,5 +162,7 @@ async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_dec
         ).exists()
 
     assert set(result) == {"kind", "review_record"}
-    assert result["review_record"]["mitigation"]["changed_files"] == ["app.py"]
+    assert result["review_record"]["mitigation"]["file_changes"] == [
+        {"path": "app.py", "status": "deleted"}
+    ]
     assert default_artifact_result_exists

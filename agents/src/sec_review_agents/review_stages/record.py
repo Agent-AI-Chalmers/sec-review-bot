@@ -47,11 +47,9 @@ class ReviewRecordAnalysis(BaseModel):
 
 
 class ReviewRecordMitigation(BaseModel):
-    # `changed_files` is a display-only path projection; `file_changes` is the
-    # authoritative final-content shape for publishing; `patch_diff` is the
-    # diff/reference view and cannot reconstruct file contents by itself.
+    # `file_changes` is authoritative. `patch_diff` is a derived review and
+    # location artifact; it must not be used to reconstruct final file contents.
     overview: str | None = None
-    changed_files: list[str] = Field(default_factory=list)
     file_changes: list[FileChange] = Field(default_factory=list)
     patch_diff: str | None = None
 
@@ -61,13 +59,6 @@ class ReviewRecordMitigation(BaseModel):
     @classmethod
     def string_or_none(cls, value: Any) -> str | None:
         return value if isinstance(value, str) else None
-
-    @field_validator("changed_files", mode="before")
-    @classmethod
-    def string_changed_files(cls, value: Any) -> list[str]:
-        if not isinstance(value, list):
-            return []
-        return [item for item in value if isinstance(item, str)]
 
     @field_validator("file_changes", mode="before")
     @classmethod

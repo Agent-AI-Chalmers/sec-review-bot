@@ -10,14 +10,113 @@ import {
   coverageHeadline,
   renderReviewStatusLines
 } from '../../../src/reviews/view-utils.js'
+import type { ReviewRecord } from '../../../src/reviews/review-record.js'
+import type {
+  RepositoryCaseResult,
+  RepositoryScanSummary,
+  RepositoryWorkflowResult
+} from '../../../src/reviews/repositories/result.js'
+
+function reviewRecord(
+  overrides: {
+    analysis?: Partial<ReviewRecord['analysis']>
+    mitigation?: Partial<ReviewRecord['mitigation']>
+    verification?: Partial<ReviewRecord['verification']>
+    cvss?: Partial<NonNullable<ReviewRecord['cvss']>> | null
+  } = {}
+): ReviewRecord {
+  return {
+    analysis: {
+      verdict: null,
+      overview: null,
+      narratives: [],
+      ...overrides.analysis
+    },
+    mitigation: {
+      overview: null,
+      file_changes: [],
+      patch_diff: null,
+      ...overrides.mitigation
+    },
+    verification: {
+      overview: null,
+      review_target_claim: null,
+      validation_level: null,
+      patch_coverage: null,
+      regression_status: null,
+      resolution_next_step: null,
+      patch_findings: [],
+      verification_findings: [],
+      residual_risks: [],
+      ...overrides.verification
+    },
+    cvss:
+      overrides.cvss === undefined || overrides.cvss === null
+        ? (overrides.cvss ?? null)
+        : {
+            outcome: null,
+            base_score: null,
+            severity: null,
+            vector: null,
+            overview: null,
+            not_scored_reason: null,
+            ...overrides.cvss
+          }
+  }
+}
+
+function scanSummary(
+  overrides: Partial<RepositoryScanSummary> = {}
+): RepositoryScanSummary {
+  return {
+    scannable_file_count: 0,
+    scanned_file_count: 0,
+    skipped_file_count: 0,
+    candidate_count: 0,
+    case_count: 0,
+    suppressed_candidate_count: 0,
+    deleted_file_count: 0,
+    ...overrides
+  }
+}
+
+function repositoryResult(
+  case_results: RepositoryCaseResult[] = [],
+  options: {
+    scan_summary?: Partial<RepositoryScanSummary>
+    deletion_review_skipped?: boolean
+  } = {}
+): RepositoryWorkflowResult {
+  return {
+    contract_version: 'v6',
+    scan_summary: scanSummary(options.scan_summary),
+    case_results,
+    deliveries: [],
+    deletion_review_skipped: options.deletion_review_skipped ?? false
+  }
+}
+
+function summaryView(
+  case_results: RepositoryCaseResult[] = [],
+  options: {
+    scan_summary?: Partial<RepositoryScanSummary>
+    deletion_review_skipped?: boolean
+  } = {}
+) {
+  return buildRepositorySummaryWorkflowView(
+    repositoryResult(case_results, options),
+    { run_id: 'run-1' }
+  )
+}
 
 test('repository renderer derives blocked confirmed case cards from case results', () => {
-  const review_record = {
+  const review_record = reviewRecord({
     analysis: {
       verdict: 'confirmed-defect',
       overview: 'Webhook retry payloads can reuse stale signature metadata.'
     },
     cvss: {
+      outcome: 'scored',
       base_score: 5.8,
       severity: 'medium',
       vector: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N',
@@ -32,28 +131,29 @@ test('repository renderer derives blocked confirmed case cards from case results
       patch_coverage: 'partial',
       regression_status: 'not-run',
       validation_level: 'static',
-      resolution_next_step: 'Manual review needed.',
+      resolution_next_step: 'manual-review',
       overview: 'Queued retry payloads remain unverified.'
     }
-  }
+  })
   const body = renderRepositorySecuritySummaryComment({
-    workflow_result: {
-      run_id: 'run-1',
-      scan_summary: {
-        scannable_file_count: 1,
-        scanned_file_count: 1,
-        case_count: 1,
-        suppressed_candidate_count: 0
-      },
-      case_results: [
+    workflow_result: summaryView(
+      [
         {
           case_id: 'case-1',
           disposition: 'blocked',
           reason: 'The verifier did not fully approve the patch.',
           review_record
         }
-      ]
-    },
+      ],
+      {
+        scan_summary: {
+          scannable_file_count: 1,
+          scanned_file_count: 1,
+          case_count: 1,
+          suppressed_candidate_count: 0
+        }
+      }
+    ),
     published_delivery_entries: [],
     event_type: 'manual',
     target_branch: 'main'
@@ -105,28 +205,24 @@ test('repository renderer derives blocked confirmed case cards from case results
 
 test('repository blocked confirmed case uses disposition reason as mitigation and verification fallback', () => {
   const body = renderRepositorySecuritySummaryComment({
-    workflow_result: {
-      run_id: 'run-1',
-      case_results: [
-        {
-          case_id: 'case-1',
-          disposition: 'blocked',
-          reason: 'Verifier rejected the incomplete patch.',
-          review_record: {
-            analysis: {
-              verdict: 'confirmed-vulnerability',
-              overview: 'Signed webhook retries can be replayed.'
-            },
-            mitigation: {},
-            verification: {
-              patch_coverage: 'partial',
-              regression_status: 'not-run',
-              validation_level: 'static'
-            }
+    workflow_result: summaryView([
+      {
+        case_id: 'case-1',
+        disposition: 'blocked',
+        reason: 'Verifier rejected the incomplete patch.',
+        review_record: reviewRecord({
+          analysis: {
+            verdict: 'confirmed-vulnerability',
+            overview: 'Signed webhook retries can be replayed.'
+          },
+          verification: {
+            patch_coverage: 'partial',
+            regression_status: 'not-run',
+            validation_level: 'static'
           }
-        }
-      ]
-    },
+        })
+      }
+    ]),
     published_delivery_entries: [],
     event_type: 'manual',
     target_branch: 'main'
@@ -146,32 +242,38 @@ test('repository blocked confirmed case uses disposition reason as mitigation an
 
 test('repository renderer preserves CVSS not-scored state', () => {
   const summary = renderRepositorySecuritySummaryComment({
-    workflow_result: {
-      run_id: 'run-1',
-      case_results: [
-        {
-          review_record: {
-            cvss: {
-              base_score: 7.2,
-              severity: 'high'
-            }
+    workflow_result: summaryView([
+      {
+        case_id: 'case-1',
+        disposition: 'keep',
+        reason: null,
+        review_record: reviewRecord({
+          cvss: {
+            outcome: 'scored',
+            base_score: 7.2,
+            severity: 'high'
           }
-        },
-        {
-          review_record: {
-            cvss: {
-              outcome: 'not-scored'
-            }
+        })
+      },
+      {
+        case_id: 'case-2',
+        disposition: 'keep',
+        reason: null,
+        review_record: reviewRecord({
+          cvss: {
+            outcome: 'not-scored'
           }
-        }
-      ]
-    },
+        })
+      }
+    ]),
     published_delivery_entries: [
       {
+        delivery_id: 'delivery-1',
         case_count: 1,
         cvss_outcome: 'not-scored',
         cvss_base_score: null,
         cvss_severity: null,
+        file_changes: [],
         title: '[sec] container-runs-as-root',
         html_url: 'https://example.test/pull/1'
       }
@@ -195,17 +297,20 @@ test('repository renderer preserves CVSS not-scored state', () => {
     repo: { repo_full_name: 'octo-org/example' },
     delivery: {
       delivery_id: 'delivery-1',
+      file_changes: [],
       case_ids: ['case-1'],
       case_count: 1
     },
     case_results: [
       {
         case_id: 'case-1',
-        review_record: {
+        disposition: 'keep',
+        reason: null,
+        review_record: reviewRecord({
           cvss: {
             outcome: 'not-scored'
           }
-        }
+        })
       }
     ]
   })
@@ -239,20 +344,15 @@ test('repository renderer preserves CVSS not-scored state', () => {
   assert.doesNotMatch(body, /Review target claim: \(none\)/)
 })
 
-test('repository summary workflow view keeps minimal case fields for rendering', () => {
+test('repository summary workflow view projects a validated repository result without reparsing', () => {
+  const caseResult: RepositoryCaseResult = {
+    case_id: 'case-1',
+    disposition: 'keep',
+    reason: null,
+    review_record: reviewRecord()
+  }
   const view = buildRepositorySummaryWorkflowView(
-    {
-      cases: [{ summary: 'Retained triage case' }],
-      scan_summary: {
-        case_count: 1
-      },
-      case_results: [
-        {
-          case_id: 'case-1',
-          disposition: 'keep'
-        }
-      ]
-    },
+    repositoryResult([caseResult], { scan_summary: { case_count: 1 } }),
     { run_id: 'run-1' }
   )
 
@@ -281,14 +381,7 @@ test('repository summary workflow view keeps minimal case fields for rendering',
         unknown: 0
       }
     },
-    case_results: [
-      {
-        case_id: 'case-1',
-        disposition: 'keep',
-        reason: null,
-        review_record: {}
-      }
-    ]
+    case_results: [caseResult]
   })
 })
 
@@ -297,7 +390,7 @@ test('repository draft PR body lists delivery modified files', () => {
     repo: { repo_full_name: 'octo-org/example' },
     delivery: {
       delivery_id: 'delivery-1',
-      file_changes: [{ path: 'src/server.js' }],
+      file_changes: [{ path: 'src/server.js', status: 'deleted' }],
       case_ids: ['case-1'],
       case_count: 1
     }
@@ -313,19 +406,22 @@ test('repository draft PR body renders case details from case results', () => {
     repo: { repo_full_name: 'octo-org/example' },
     delivery: {
       delivery_id: 'delivery-1',
-      file_changes: [{ path: 'src/server.js' }],
+      file_changes: [{ path: 'src/server.js', status: 'deleted' }],
       case_ids: ['case-1'],
       case_count: 1
     },
     case_results: [
       {
         case_id: 'case-1',
-        review_record: {
+        disposition: 'keep',
+        reason: null,
+        review_record: reviewRecord({
           analysis: {
             verdict: 'confirmed-defect',
             overview: 'Preview endpoint exposed repository files.'
           },
           cvss: {
+            outcome: 'scored',
             base_score: 8.7,
             severity: 'high',
             vector: 'CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:N',
@@ -342,7 +438,7 @@ test('repository draft PR body renders case details from case results', () => {
             patch_findings: ['Reviewer-visible concern.'],
             verification_findings: []
           }
-        }
+        })
       }
     ]
   })
@@ -364,24 +460,26 @@ test('repository draft PR case details use delivery fallback text', () => {
     repo: { repo_full_name: 'octo-org/example' },
     delivery: {
       delivery_id: 'delivery-1',
+      file_changes: [],
       case_ids: ['case-1'],
       case_count: 1
     },
     case_results: [
       {
         case_id: 'case-1',
-        review_record: {
+        disposition: 'keep',
+        reason: null,
+        review_record: reviewRecord({
           analysis: {
             verdict: 'confirmed-defect',
             overview: 'Preview endpoint exposed repository files.'
           },
-          mitigation: {},
           verification: {
             patch_coverage: 'full',
             regression_status: 'not-run',
             validation_level: 'static'
           }
-        }
+        })
       }
     ]
   })
@@ -399,9 +497,7 @@ test('repository draft PR case details use delivery fallback text', () => {
 
 test('repository summary notes shared modified files across deliveries', () => {
   const body = renderRepositorySecuritySummaryComment({
-    workflow_result: {
-      run_id: 'run-1'
-    },
+    workflow_result: summaryView(),
     published_delivery_entries: [
       {
         delivery_id: 'case-1',
@@ -409,7 +505,7 @@ test('repository summary notes shared modified files across deliveries', () => {
         cvss_outcome: null,
         cvss_base_score: null,
         cvss_severity: null,
-        file_changes: [{ path: 'src/server.js' }],
+        file_changes: [{ path: 'src/server.js', status: 'deleted' }],
         title: '[sec] first',
         html_url: 'https://example.test/pull/1'
       },
@@ -419,7 +515,7 @@ test('repository summary notes shared modified files across deliveries', () => {
         cvss_outcome: null,
         cvss_base_score: null,
         cvss_severity: null,
-        file_changes: [{ path: 'src/server.js' }],
+        file_changes: [{ path: 'src/server.js', status: 'deleted' }],
         title: '[sec] second',
         html_url: 'https://example.test/pull/2'
       },
@@ -429,7 +525,7 @@ test('repository summary notes shared modified files across deliveries', () => {
         cvss_outcome: null,
         cvss_base_score: null,
         cvss_severity: null,
-        file_changes: [{ path: 'Dockerfile' }],
+        file_changes: [{ path: 'Dockerfile', status: 'deleted' }],
         title: '[sec] third',
         html_url: 'https://example.test/pull/3'
       }
@@ -454,8 +550,7 @@ test('repository renderer warns when deletion review was skipped', () => {
   // If the comment looks the same as a fully reviewed run, a reader has no way to know that none
   // of the window's deletions were examined.
   const body = renderRepositorySecuritySummaryComment({
-    workflow_result: {
-      run_id: 'run-1',
+    workflow_result: summaryView([], {
       deletion_review_skipped: true,
       scan_summary: {
         scannable_file_count: 3,
@@ -463,9 +558,8 @@ test('repository renderer warns when deletion review was skipped', () => {
         case_count: 0,
         suppressed_candidate_count: 0,
         deleted_file_count: 250
-      },
-      case_results: []
-    },
+      }
+    }),
     published_delivery_entries: [],
     event_type: 'scheduled',
     target_branch: 'main'
@@ -483,8 +577,7 @@ test('repository renderer warns when deletion review was skipped', () => {
 
 test('repository renderer stays quiet when deletion review ran', () => {
   const body = renderRepositorySecuritySummaryComment({
-    workflow_result: {
-      run_id: 'run-1',
+    workflow_result: summaryView([], {
       deletion_review_skipped: false,
       scan_summary: {
         scannable_file_count: 3,
@@ -492,9 +585,8 @@ test('repository renderer stays quiet when deletion review ran', () => {
         case_count: 0,
         suppressed_candidate_count: 0,
         deleted_file_count: 4
-      },
-      case_results: []
-    },
+      }
+    }),
     published_delivery_entries: [],
     event_type: 'scheduled',
     target_branch: 'main'

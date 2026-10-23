@@ -19,7 +19,6 @@ function issueReviewRecordWithPatch(): ReviewRecord {
     },
     mitigation: {
       overview: 'Apply the fix.',
-      changed_files: ['src/app.ts'],
       file_changes: [
         {
           path: 'src/app.ts',

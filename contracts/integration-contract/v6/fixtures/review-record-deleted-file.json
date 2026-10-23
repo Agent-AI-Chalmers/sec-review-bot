@@ -6,9 +6,6 @@
   },
   "mitigation": {
     "overview": "Remove the debug endpoint file.",
-    "changed_files": [
-      "src/debug-endpoint.ts"
-    ],
     "file_changes": [
       {
         "path": "src/debug-endpoint.ts",

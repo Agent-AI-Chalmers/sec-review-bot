@@ -22,7 +22,6 @@
         },
         "mitigation": {
           "overview": "No repository patch can rotate the exposed credential.",
-          "changed_files": [],
           "file_changes": [],
           "patch_diff": null
         },

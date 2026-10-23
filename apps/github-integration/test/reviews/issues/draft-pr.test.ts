@@ -37,7 +37,6 @@ function reviewRecordWithMitigation(mitigation: TestMitigation): ReviewRecord {
     },
     mitigation: {
       overview: null,
-      changed_files: [],
       file_changes: [],
       patch_diff: null,
       ...mitigation
@@ -368,7 +367,6 @@ test('issue draft PR publishes from review_record file_changes without workspace
     repo_name: 'example-repo'
   }
   const review_record = reviewRecordWithMitigation({
-    changed_files: ['src/app.txt', 'src/remove.txt'],
     file_changes: [
       {
         path: '/workspace/src/app.txt',
@@ -446,9 +444,7 @@ test('issue draft PR is not promoted when file_changes are absent', async () => 
     },
     run_id: 'run-12345678',
     workspace_ref: 'base-sha',
-    review_record: reviewRecordWithMitigation({
-      changed_files: ['src/app.txt']
-    })
+    review_record: reviewRecordWithMitigation({})
   })
 
   assert.strictEqual(result, null)
@@ -456,54 +452,9 @@ test('issue draft PR is not promoted when file_changes are absent', async () => 
   assert.strictEqual(harness.trees.length, 0)
 })
 
-test('issue draft PR ignores unsafe display changed_files when file_changes are safe', async () => {
-  const { octokit, calls: harness } = createOctokitMock()
-  const issue: CreateDraftPrIssue = {
-    issue_number: 42,
-    issue_title: 'Fix unsafe path',
-    owner_login: 'octo-org',
-    repo_name: 'example-repo'
-  }
-  const review_record = reviewRecordWithMitigation({
-    changed_files: [
-      'workspace/../notes',
-      '.github/workflows/pwn.yml',
-      'src/app.txt'
-    ],
-    file_changes: [
-      {
-        path: 'src/app.txt',
-        status: 'upsert',
-        content: 'fixed\n',
-        content_encoding: 'utf-8'
-      }
-    ]
-  })
-  review_record.verification.patch_coverage = 'full'
-
-  const result = await createDraftPullRequestFromIssueReviewRecord({
-    octokit,
-    issue,
-    run_id: 'run-12345678',
-    workspace_ref: 'base-sha',
-    review_record
-  })
-
-  assert.strictEqual(result?.html_url, 'https://example.test/pull/1')
-  assert.deepStrictEqual(harness.trees[0], [
-    {
-      path: 'src/app.txt',
-      mode: '100644',
-      type: 'blob',
-      sha: 'blob-1'
-    }
-  ])
-})
-
 test('issue draft PR rejects unsupported file modes', async () => {
   const { octokit, calls: harness } = createOctokitMock()
   const review_record = reviewRecordWithMitigation({
-    changed_files: ['src/app.txt'],
     file_changes: [
       {
         path: 'src/app.txt',
@@ -538,7 +489,6 @@ test('issue draft PR rejects unsupported file modes', async () => {
 test('issue draft PR rejects deleted file changes with mode', async () => {
   const { octokit, calls: harness } = createOctokitMock()
   const review_record = reviewRecordWithMitigation({
-    changed_files: ['src/remove.txt'],
     file_changes: [
       {
         path: 'src/remove.txt',

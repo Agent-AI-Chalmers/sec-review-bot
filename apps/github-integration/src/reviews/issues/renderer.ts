@@ -1,9 +1,8 @@
 import type { ReviewRecord } from '../review-record.js'
+import { fileChangePaths } from '../file-change.js'
 import { validateRepoRelativePath } from '../repo-path.js'
 import {
-  asList,
   inlineCode,
-  isRecord,
   renderAnalysisNarratives,
   renderChangedFilesLines,
   renderReviewStatusLines,
@@ -41,7 +40,6 @@ const EMPTY_ANALYSIS: ReviewRecord['analysis'] = {
 
 const EMPTY_MITIGATION: ReviewRecord['mitigation'] = {
   overview: null,
-  changed_files: [],
   file_changes: [],
   patch_diff: null
 }
@@ -62,42 +60,35 @@ function asNonEmptyString(value: unknown): string {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : ''
 }
 
-function buildVerifierHeadline(verification: unknown): string {
-  const safeVerifier = isRecord(verification) ? verification : {}
+function buildVerifierHeadline(
+  verification: ReviewRecord['verification']
+): string {
   const patch_coverage =
-    asNonEmptyString(safeVerifier.patch_coverage) || 'unknown'
+    asNonEmptyString(verification.patch_coverage) || 'unknown'
 
   return `Verifier assessed patch=${patch_coverage}.`
 }
 
-function renderIssueAnalysisSection(analysis: unknown): string | null {
-  const safeAnalysis = isRecord(analysis) ? analysis : {}
-  if (!analysis) {
-    return null
-  }
-
+function renderIssueAnalysisSection(
+  analysis: ReviewRecord['analysis']
+): string | null {
   const lines = [
-    `**Verdict:** ${inlineCode(safeAnalysis.verdict ?? 'unknown')}`,
+    `**Verdict:** ${inlineCode(analysis.verdict ?? 'unknown')}`,
     '',
-    String(safeAnalysis.overview ?? 'Issue analysis completed.'),
+    String(analysis.overview ?? 'Issue analysis completed.'),
     '',
-    ...renderAnalysisNarratives(safeAnalysis.narratives)
+    ...renderAnalysisNarratives(analysis.narratives)
   ]
 
   return lines.join('\n')
 }
 
-function renderIssueMitigationSection(mitigation: unknown): string | null {
-  const safeMitigation = isRecord(mitigation) ? mitigation : {}
-  if (!mitigation) {
-    return null
-  }
+function renderIssueMitigationSection(
+  mitigation: ReviewRecord['mitigation']
+): string | null {
+  const changed_files = fileChangePaths(mitigation.file_changes)
 
-  const changed_files = asList<string>(safeMitigation.changed_files)
-
-  const lines = [
-    String(safeMitigation.overview ?? 'Issue mitigation completed.')
-  ]
+  const lines = [String(mitigation.overview ?? 'Issue mitigation completed.')]
 
   if (changed_files.length > 0) {
     lines.push('', ...renderChangedFilesLines(changed_files))
@@ -106,13 +97,10 @@ function renderIssueMitigationSection(mitigation: unknown): string | null {
   return lines.join('\n')
 }
 
-function renderIssueVerificationSection(verification: unknown): string | null {
-  const safeVerification = isRecord(verification) ? verification : {}
-  if (!verification) {
-    return null
-  }
-
-  const lines = renderVerificationSummaryLines(safeVerification, {
+function renderIssueVerificationSection(
+  verification: ReviewRecord['verification']
+): string | null {
+  const lines = renderVerificationSummaryLines(verification, {
     includeHeadline: true,
     includeOverview: false,
     includeUnknownResolutionNextStep: true,
@@ -141,12 +129,11 @@ function renderFoldedSection(
 }
 
 function renderIssueCodeModificationSummary(
-  mitigation: unknown,
+  mitigation: ReviewRecord['mitigation'],
   draftPrPlan: DraftPrPlanLike | null,
   draftPullRequest: DraftPullRequestLike | null
 ): string | null {
-  const safeMitigation = isRecord(mitigation) ? mitigation : {}
-  if (!mitigation || !draftPrPlan) {
+  if (!draftPrPlan) {
     return null
   }
 
@@ -163,7 +150,7 @@ function renderIssueCodeModificationSummary(
     lines.push(
       '',
       String(
-        safeMitigation.overview ??
+        mitigation.overview ??
           'No concrete patch is ready yet, so the issue should stay as a summary thread until a code change is produced.'
       )
     )
@@ -252,7 +239,7 @@ function renderSuggestedDraftPrSection(
 export function hasReviewRecordPatchReadyForPromotion(
   review_record: ReviewRecord | null | undefined
 ): boolean {
-  return asList(review_record?.mitigation?.file_changes).length > 0
+  return (review_record?.mitigation.file_changes.length ?? 0) > 0
 }
 
 export function normalizePromotionFilePath(filePath: unknown): string {
@@ -360,7 +347,9 @@ export function buildDraftPullRequestBodyFromReviewRecord({
   const analysis = review_record?.analysis ?? EMPTY_ANALYSIS
   const mitigation = review_record?.mitigation ?? EMPTY_MITIGATION
   const verification = review_record?.verification ?? EMPTY_VERIFICATION
-  const changed_files = normalizeDisplayFiles(mitigation.changed_files)
+  const changed_files = normalizeDisplayFiles(
+    fileChangePaths(mitigation.file_changes)
+  )
   const analysisLines = [
     `- Verdict: ${inlineCode(analysis.verdict ?? 'unknown')}`,
     '',
@@ -426,7 +415,7 @@ export async function buildSuggestedDraftPrPlanFromReviewRecord({
   review_record: ReviewRecord | null | undefined
 }): Promise<DraftPrPlanLike> {
   const changed_files = normalizeDisplayFiles(
-    review_record?.mitigation?.changed_files
+    fileChangePaths(review_record?.mitigation?.file_changes)
   )
   const patch_ready = hasReviewRecordPatchReadyForPromotion(review_record)
   const patch_preview = patch_ready
@@ -453,7 +442,7 @@ export async function buildSuggestedDraftPrPlanFromReviewRecord({
         `Regression status: ${inlineCode(verification.regression_status ?? 'unknown')}`,
         `Validation level: ${inlineCode(verification.validation_level ?? 'unknown')}`
       ].filter((item): item is string => Boolean(item)),
-      residual_risks: asList<string>(verification.residual_risks).slice(0, 5)
+      residual_risks: verification.residual_risks.slice(0, 5)
     }
   }
 }

@@ -31,6 +31,7 @@ from sec_review_agents.utils.files import (
     persist_json_artifact,
     remove_json_artifacts,
 )
+from sec_review_agents.workspace.file_changes import file_change_paths
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
 
@@ -181,16 +182,11 @@ def validate_verification_coverages(
     structured_result: Mapping[str, Any], mitigation_result: Mapping[str, Any] | None
 ) -> None:
     patch_coverage = structured_result.get("patch_coverage")
-    changed_files = (mitigation_result or {}).get("changed_files")
-    if (
-        isinstance(changed_files, list)
-        and changed_files
-        and patch_coverage
-        in {
-            "no-patch",
-            "not-applicable",
-        }
-    ):
+    changed_files = file_change_paths((mitigation_result or {}).get("file_changes"))
+    if changed_files and patch_coverage in {
+        "no-patch",
+        "not-applicable",
+    }:
         raise RuntimeError(
             "Verifier must evaluate the patch when mitigation exported changed files."
         )

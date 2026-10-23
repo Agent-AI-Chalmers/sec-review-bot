@@ -8,6 +8,7 @@ from sec_review_agents.utils.structured_renderer import (
     render_structured_markdown,
     render_structured_markdown_section,
 )
+from sec_review_agents.workspace.file_changes import file_change_paths
 
 # One verifier-driven repair pass is the current production safety boundary. The
 # history plumbing below is intentionally ready for higher limits, but changing
@@ -106,8 +107,10 @@ def mitigation_result_summary(
     payload: dict[str, Any] = {
         "overview": mitigation_result.get("overview"),
     }
-    if "changed_files" in mitigation_result:
-        payload["changed_files"] = mitigation_result.get("changed_files") or []
+    if "file_changes" in mitigation_result:
+        payload["changed_files"] = file_change_paths(
+            mitigation_result.get("file_changes")
+        )
     return payload
 
 

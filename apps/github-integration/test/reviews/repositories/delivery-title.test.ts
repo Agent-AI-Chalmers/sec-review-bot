@@ -6,7 +6,7 @@ import { buildDeliveryDraftPrTitle } from '../../../src/reviews/repositories/del
 test('repository draft PR title uses the primary changed code file and case id', () => {
   const title = buildDeliveryDraftPrTitle({
     delivery_id: 'delivery-1',
-    file_changes: [{ path: 'src/server.js' }],
+    file_changes: [{ path: 'src/server.js', status: 'deleted' }],
     case_ids: ['case-1'],
     case_count: 1
   })
@@ -20,7 +20,7 @@ test('repository draft PR title uses the primary changed code file and case id',
 test('repository draft PR title falls back to delivery id when case id is missing', () => {
   const title = buildDeliveryDraftPrTitle({
     delivery_id: 'delivery-1',
-    file_changes: [{ path: 'src/server.js' }],
+    file_changes: [{ path: 'src/server.js', status: 'deleted' }],
     case_ids: [],
     case_count: 1
   })
@@ -34,7 +34,10 @@ test('repository draft PR title falls back to delivery id when case id is missin
 test('repository draft PR title uses primary case id and related count for combined deliveries', () => {
   const title = buildDeliveryDraftPrTitle({
     delivery_id: 'delivery-1',
-    file_changes: [{ path: 'README.md' }, { path: 'src/server.js' }],
+    file_changes: [
+      { path: 'README.md', status: 'deleted' },
+      { path: 'src/server.js', status: 'deleted' }
+    ],
     case_ids: ['case-1', 'case-2'],
     case_count: 2
   })

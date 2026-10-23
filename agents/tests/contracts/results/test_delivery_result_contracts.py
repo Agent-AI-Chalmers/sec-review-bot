@@ -128,7 +128,6 @@ def test_delivery_execution_result_builder_tracks_public_fields() -> None:
         error=None,
         patch_path=None,
         patch_diff="",
-        changed_files=[],
         file_changes=[],
         applied_case_ids=["case-1"],
     )
@@ -139,7 +138,6 @@ def test_delivery_execution_result_builder_tracks_public_fields() -> None:
         "error",
         "patch_path",
         "patch_diff",
-        "changed_files",
         "file_changes",
         "applied_case_ids",
     }
@@ -188,7 +186,6 @@ def test_delivery_execution_result_is_json_serializable_public_payload() -> None
         error=None,
         patch_path=None,
         patch_diff="",
-        changed_files=[],
         file_changes=[],
         applied_case_ids=["case-1"],
     )

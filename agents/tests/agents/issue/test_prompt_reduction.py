@@ -81,7 +81,7 @@ def test_initial_verification_prompt_omits_narratives_section() -> None:
     }
     mitigation_result = {
         "overview": "Mitigation overview",
-        "changed_files": ["a.py"],
+        "file_changes": [{"path": "a.py", "status": "deleted"}],
         "residual_risks": ["risk-b"],
     }
 
@@ -298,7 +298,7 @@ def test_retry_mitigation_prompt_keeps_verifier_as_primary_corrective_signal() -
         "retry_index": 1,
         "previous_mitigation_result": {
             "overview": "Old mitigation",
-            "changed_files": ["a.py"],
+            "file_changes": [{"path": "a.py", "status": "deleted"}],
         },
         "previous_verifier_result": {
             "overview": "Old verifier",

@@ -1,4 +1,5 @@
 import type { ReviewRecord } from '../review-record.js'
+import { fileChangePaths } from '../file-change.js'
 import {
   displayText,
   inlineCode,
@@ -38,7 +39,7 @@ function renderMitigationSection(
   mitigation: ReviewRecord['mitigation']
 ): string | null {
   const overview = asNonEmptyString(mitigation.overview)
-  const changed_files = mitigation.changed_files
+  const changed_files = fileChangePaths(mitigation.file_changes)
 
   if (!overview && changed_files.length === 0) {
     return null
@@ -104,7 +105,6 @@ export function renderAnalysisSummaryCommentFromReviewRecord(
   }
   const mitigation = review_record?.mitigation ?? {
     overview: null,
-    changed_files: [],
     file_changes: [],
     patch_diff: null
   }

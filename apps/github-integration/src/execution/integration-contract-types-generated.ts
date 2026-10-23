@@ -60,7 +60,6 @@ export interface ReviewRecord {
   }
   mitigation: {
     overview: string | null
-    changed_files: string[]
     file_changes: FileChange[]
     patch_diff: string | null
   }

@@ -39,13 +39,6 @@ import {
 } from './result.js'
 import type { RepositoryContext } from './submit.js'
 import type { PersistedRepositoryScanTarget } from '../../control-plane/publish-context.js'
-import {
-  asList,
-  isRecord,
-  nonEmptyText,
-  optionalNumber,
-  type AnyRecord
-} from '../view-utils.js'
 
 interface PublishedDeliveryEntry {
   // Publish-time view for the summary renderer. It is not an agent result:
@@ -57,7 +50,7 @@ interface PublishedDeliveryEntry {
   cvss_severity: string | null
   title: string
   html_url: string
-  file_changes: unknown[]
+  file_changes: RepositoryDelivery['file_changes']
 }
 
 interface DraftPullRequestSummary {
@@ -102,15 +95,9 @@ function deliveryCvssFieldsFromCases(
   cvss_base_score: number | null
   cvss_severity: string | null
 } {
-  const case_ids = new Set(
-    asList(delivery.case_ids)
-      .map(nonEmptyText)
-      .filter((item) => item.length > 0)
-  )
-  const matchedCases = asList<AnyRecord>(case_results).filter((item) =>
-    case_ids.has(nonEmptyText(item.case_id))
-  )
-  const case_count = optionalNumber(delivery.case_count) ?? case_ids.size
+  const case_ids = new Set(delivery.case_ids)
+  const matchedCases = case_results.filter((item) => case_ids.has(item.case_id))
+  const case_count = delivery.case_count
   let best_score: number | null = null
   let best_severity: string | null = null
   let first_non_scored_outcome: string | null = null
@@ -118,27 +105,26 @@ function deliveryCvssFieldsFromCases(
   let cvssCount = 0
 
   for (const item of matchedCases) {
-    const review_record = isRecord(item.review_record) ? item.review_record : {}
-    const cvss = isRecord(review_record.cvss) ? review_record.cvss : {}
-    if (Object.keys(cvss).length === 0) {
+    const cvss = item.review_record.cvss
+    if (cvss === null) {
       continue
     }
     cvssCount += 1
 
-    const outcome = nonEmptyText(cvss.outcome)
+    const outcome = cvss.outcome
     if (outcome === 'not-scored') {
       notScoredCount += 1
     } else if (outcome && outcome !== 'scored' && !first_non_scored_outcome) {
       first_non_scored_outcome = outcome
     }
 
-    const score = optionalNumber(cvss.base_score)
+    const score = cvss.base_score
     if (score == null) {
       continue
     }
     if (best_score == null || score > best_score) {
       best_score = score
-      best_severity = nonEmptyText(cvss.severity) || null
+      best_severity = cvss.severity
     }
   }
 

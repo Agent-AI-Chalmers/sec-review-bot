@@ -31,7 +31,7 @@ from tests.temporal_test_utils import temporal_time_skipping_environment
 
 def assert_not_run_review_record(review_record: dict) -> None:
     assert review_record["analysis"]["verdict"] is None
-    assert review_record["mitigation"]["changed_files"] == []
+    assert review_record["mitigation"]["file_changes"] == []
     assert review_record["verification"]["patch_coverage"] is None
     assert review_record["cvss"] is None
 

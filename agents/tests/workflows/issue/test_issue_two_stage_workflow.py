@@ -27,7 +27,7 @@ async def test_two_stage_workflow_runs_internal_self_check_mitigation_without_ve
     }
     mitigation_result = {
         "overview": "applied",
-        "changed_files": ["demo.py"],
+        "file_changes": [{"path": "demo.py", "status": "deleted"}],
         "residual_risks": [],
     }
 
@@ -58,7 +58,9 @@ async def test_two_stage_workflow_runs_internal_self_check_mitigation_without_ve
     assert result["kind"] == "issue-two-stage-strategy-result"
     review_record = result["review_record"]
     assert set(review_record) == {"analysis", "mitigation", "verification", "cvss"}
-    assert review_record["mitigation"]["changed_files"] == ["demo.py"]
+    assert review_record["mitigation"]["file_changes"] == [
+        {"path": "demo.py", "status": "deleted"}
+    ]
     assert review_record["analysis"]["verdict"] == "confirmed-vulnerability"
     assert review_record["verification"]["patch_coverage"] is None
 
@@ -177,4 +179,4 @@ async def test_two_stage_repair_objective_skips_mitigation_without_confirmed_nar
 
     assert analyze_mock.call_args.kwargs["review_objective"] == "repair"
     mitigate_mock.assert_not_called()
-    assert result["review_record"]["mitigation"]["changed_files"] == []
+    assert result["review_record"]["mitigation"]["file_changes"] == []

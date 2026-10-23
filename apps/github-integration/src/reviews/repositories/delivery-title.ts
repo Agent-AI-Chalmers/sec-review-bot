@@ -1,12 +1,5 @@
 import { fileChangePaths } from '../file-change.js'
-import { asList, optionalNumber } from '../view-utils.js'
-
-interface DeliveryTitleSource {
-  case_count?: unknown
-  case_ids?: unknown[]
-  delivery_id?: unknown
-  file_changes?: unknown[]
-}
+import type { RepositoryDelivery } from './result.js'
 
 function isDocumentationPath(value: string): boolean {
   const lower = value.toLowerCase()
@@ -17,7 +10,7 @@ function isDocumentationPath(value: string): boolean {
   )
 }
 
-function primaryFileForDeliveryTitle(delivery: DeliveryTitleSource): string {
+function primaryFileForDeliveryTitle(delivery: RepositoryDelivery): string {
   const changed_files = fileChangePaths(delivery.file_changes)
   return (
     changed_files.find((item) => !isDocumentationPath(item)) ??
@@ -26,17 +19,12 @@ function primaryFileForDeliveryTitle(delivery: DeliveryTitleSource): string {
   )
 }
 
-function titleDisambiguator(delivery: DeliveryTitleSource): string {
-  const firstCaseId = asList(delivery.case_ids)
-    .map((item) => String(item ?? '').trim())
-    .find((item) => item.length > 0)
-  const delivery_id = String(delivery.delivery_id ?? '').trim()
-  return firstCaseId || delivery_id
+function titleDisambiguator(delivery: RepositoryDelivery): string {
+  return delivery.case_ids[0] ?? delivery.delivery_id
 }
 
-function deliveryTitleSuffix(delivery: DeliveryTitleSource): string {
-  const case_count =
-    optionalNumber(delivery.case_count) ?? asList(delivery.case_ids).length
+function deliveryTitleSuffix(delivery: RepositoryDelivery): string {
+  const case_count = delivery.case_count
   const disambiguator = titleDisambiguator(delivery)
   if (case_count <= 1) {
     return disambiguator ? ` (${disambiguator})` : ''
@@ -46,10 +34,11 @@ function deliveryTitleSuffix(delivery: DeliveryTitleSource): string {
   return ` (${[disambiguator, related].filter(Boolean).join(' ')})`
 }
 
-export function buildDeliveryDraftPrTitle(delivery: unknown): string {
-  const normalizedDelivery = (delivery ?? {}) as DeliveryTitleSource
-  const primaryFile = primaryFileForDeliveryTitle(normalizedDelivery)
-  const suffix = deliveryTitleSuffix(normalizedDelivery)
+export function buildDeliveryDraftPrTitle(
+  delivery: RepositoryDelivery
+): string {
+  const primaryFile = primaryFileForDeliveryTitle(delivery)
+  const suffix = deliveryTitleSuffix(delivery)
   if (primaryFile) {
     return `[sec] Fix security issue in ${primaryFile}${suffix}`
   }

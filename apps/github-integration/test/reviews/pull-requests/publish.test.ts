@@ -90,7 +90,6 @@ function review_record(
     },
     mitigation: {
       overview: null,
-      changed_files: [],
       file_changes: [],
       patch_diff: null
     },
@@ -306,7 +305,6 @@ test('pull request publish approves when analysis is not confirmed', async () =>
         },
         mitigation: {
           overview: null,
-          changed_files: [],
           file_changes: [],
           patch_diff: null
         },
@@ -539,7 +537,6 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
       review_record: review_record({
         mitigation: {
           overview: 'Remove the unsafe default.',
-          changed_files: ['src/server.js'],
           file_changes: [],
           patch_diff: [
             'diff --git a/src/server.js b/src/server.js',
@@ -606,7 +603,6 @@ test('pull request publish does not create a fallback review after an uncertain 
         review_record: review_record({
           mitigation: {
             overview: 'Remove the unsafe default.',
-            changed_files: ['src/server.js'],
             file_changes: [],
             patch_diff: [
               'diff --git a/src/server.js b/src/server.js',

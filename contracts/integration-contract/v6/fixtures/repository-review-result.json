@@ -22,10 +22,14 @@
         },
         "mitigation": {
           "overview": "Recompute the signature metadata before enqueueing retry payloads.",
-          "changed_files": [
-            "src/webhook.ts"
+          "file_changes": [
+            {
+              "path": "src/webhook.ts",
+              "status": "upsert",
+              "content": "export function verifyRetrySignature() { return true }",
+              "content_encoding": "utf-8"
+            }
           ],
-          "file_changes": [],
           "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n+verifyRetrySignature()"
         },
         "verification": {

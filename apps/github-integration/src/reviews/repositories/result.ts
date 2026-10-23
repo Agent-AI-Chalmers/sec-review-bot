@@ -21,9 +21,19 @@ export interface RepositoryCaseResult {
   reason: string | null
 }
 
+export interface RepositoryScanSummary {
+  scannable_file_count: number
+  scanned_file_count: number
+  skipped_file_count: number
+  candidate_count: number
+  case_count: number
+  suppressed_candidate_count: number
+  deleted_file_count: number
+}
+
 export interface RepositoryWorkflowResult {
   contract_version: ContractVersion
-  scan_summary: Record<string, unknown>
+  scan_summary: RepositoryScanSummary
   case_results: RepositoryCaseResult[]
   deliveries: RepositoryDelivery[]
   // True when the window removed more files than deletion review covers. The schema makes it

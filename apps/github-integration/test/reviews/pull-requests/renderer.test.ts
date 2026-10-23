@@ -21,7 +21,6 @@ test('pull request renderer preserves inline code in review prose', () => {
     },
     mitigation: {
       overview: null,
-      changed_files: [],
       file_changes: [],
       patch_diff: null
     },
@@ -60,7 +59,6 @@ test('pull request renderer summarizes each review stage without implying PR fil
     },
     mitigation: {
       overview: 'No mitigation was needed.',
-      changed_files: [],
       file_changes: [],
       patch_diff: null
     },
@@ -98,8 +96,10 @@ test('pull request renderer reports mitigation file count only when a patch exis
     },
     mitigation: {
       overview: 'A patch was proposed.',
-      changed_files: ['src/a.ts', 'src/b.ts'],
-      file_changes: [],
+      file_changes: [
+        { path: 'src/a.ts', status: 'deleted' },
+        { path: 'src/b.ts', status: 'deleted' }
+      ],
       patch_diff: 'patch'
     },
     verification: {

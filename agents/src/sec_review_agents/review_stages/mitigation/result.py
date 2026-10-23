@@ -9,7 +9,6 @@ from sec_review_agents.workspace.file_changes import FileChange
 
 class MitigationStageResult(BaseModel):
     overview: str
-    changed_files: list[str] = Field(default_factory=list)
     file_changes: list[FileChange] = Field(default_factory=list)
     patch_diff: str = ""
 
@@ -19,14 +18,12 @@ class MitigationStageResult(BaseModel):
 def build_mitigation_stage_result(
     *,
     overview: str,
-    changed_files: list[str],
     file_changes: list[FileChange] | None = None,
     patch_diff: str = "",
 ) -> dict[str, Any]:
     return MitigationStageResult.model_validate(
         {
             "overview": overview,
-            "changed_files": changed_files,
             "file_changes": file_changes or [],
             "patch_diff": patch_diff,
         }
@@ -36,5 +33,4 @@ def build_mitigation_stage_result(
 def build_skipped_mitigation_result(*, reason: str) -> dict[str, Any]:
     return build_mitigation_stage_result(
         overview=reason,
-        changed_files=[],
     )

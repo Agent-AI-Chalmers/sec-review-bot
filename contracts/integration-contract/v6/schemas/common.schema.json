@@ -168,7 +168,6 @@
           "additionalProperties": false,
           "required": [
             "overview",
-            "changed_files",
             "file_changes",
             "patch_diff"
           ],
@@ -179,12 +178,6 @@
                 "null"
               ]
             },
-            "changed_files": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            },
             "file_changes": {
               "type": "array",
               "items": {
@@ -192,6 +185,7 @@
               }
             },
             "patch_diff": {
+              "$comment": "Derived review and location artifact. Final file state is authoritative in file_changes; callers may regenerate this diff from the baseline tree and file_changes.",
               "type": [
                 "string",
                 "null"
@@ -583,6 +577,7 @@
           }
         },
         "patch_diff": {
+          "$comment": "Derived review and location artifact. Final file state is authoritative in file_changes; callers may regenerate this diff from the delivery baseline tree and file_changes.",
           "type": "string"
         },
         "file_changes": {

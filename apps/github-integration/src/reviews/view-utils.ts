@@ -1,10 +1,12 @@
-export type AnyRecord = Record<string, unknown>
+import { fileChangePaths } from './file-change.js'
 
-export function asList<T = unknown>(value: unknown): T[] {
+type AnyRecord = Record<string, unknown>
+
+function asList<T = unknown>(value: unknown): T[] {
   return Array.isArray(value) ? (value as T[]) : []
 }
 
-export function isRecord(value: unknown): value is AnyRecord {
+function isRecord(value: unknown): value is AnyRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
@@ -14,15 +16,8 @@ export function nonEmptyText(value: unknown): string {
     .trim()
 }
 
-export function optionalNumber(value: unknown): number | null {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : null
-  }
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value)
-    return Number.isFinite(parsed) ? parsed : null
-  }
-  return null
+function finiteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
 export function cvssSeverityRank(severity: unknown): number {
@@ -260,9 +255,9 @@ function sortedAnalysisNarratives(narratives: unknown): AnyRecord[] {
     .filter(isRecord)
     .sort((left, right) => {
       const leftPriority =
-        optionalNumber(left.priority) ?? Number.MAX_SAFE_INTEGER
+        finiteNumber(left.priority) ?? Number.MAX_SAFE_INTEGER
       const rightPriority =
-        optionalNumber(right.priority) ?? Number.MAX_SAFE_INTEGER
+        finiteNumber(right.priority) ?? Number.MAX_SAFE_INTEGER
       return leftPriority - rightPriority
     })
 }
@@ -439,7 +434,7 @@ export function renderReviewStatusLines(
 
   return [
     `- Analysis: ${inlineCode(analysisHeadline(analysis.verdict))}`,
-    `- Mitigation: ${inlineCode(mitigationHeadline(analysis.verdict, asList(mitigation.changed_files)))}`,
+    `- Mitigation: ${inlineCode(mitigationHeadline(analysis.verdict, fileChangePaths(mitigation.file_changes)))}`,
     `- Verification: ${inlineCode(`${coverageHeadline(verification.patch_coverage)}; ${verificationHeadline(verification.validation_level)}; ${checksHeadline(verification.regression_status)}`)}`,
     ...(options.includeResolutionNextStep && resolution_next_step !== 'none'
       ? [`- Resolution next step: ${inlineCode(resolution_next_step)}`]

@@ -47,7 +47,6 @@ def test_stage_result_compiler_models_track_public_fields() -> None:
     }
     assert set(MitigationStageResult.model_fields) == {
         "overview",
-        "changed_files",
         "file_changes",
         "patch_diff",
     }
@@ -67,7 +66,6 @@ def test_stage_result_compiler_models_track_public_fields() -> None:
 def test_mitigation_stage_builder_emits_required_file_changes() -> None:
     result = build_mitigation_stage_result(
         overview="No mitigation target.",
-        changed_files=[],
     )
 
     assert result["file_changes"] == []
@@ -83,7 +81,7 @@ def test_stage_result_builders_emit_json_serializable_public_payloads() -> None:
         ),
         build_mitigation_stage_result(
             overview="Patched input validation.",
-            changed_files=["src/app.py"],
+            file_changes=[{"path": "src/app.py", "status": "deleted"}],
         ),
         build_verification_stage_result(
             overview="Patch covers the target claim.",

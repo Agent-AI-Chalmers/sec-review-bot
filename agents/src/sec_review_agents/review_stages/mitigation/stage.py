@@ -219,7 +219,6 @@ async def run_mitigation_stage(
         )
         result = build_mitigation_stage_result(
             overview=agent_output["overview"],
-            changed_files=patch_artifact["changed_files"],
             file_changes=patch_artifact.get("file_changes", []),
             patch_diff=str(patch_artifact.get("patch_diff") or ""),
         )

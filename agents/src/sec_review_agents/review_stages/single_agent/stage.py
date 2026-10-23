@@ -34,7 +34,6 @@ from sec_review_agents.workspace.snapshots import (
 def _build_completed_single_agent_outcome(
     *,
     agent_output: dict,
-    changed_files: list[str],
     file_changes: list[dict[str, Any]],
     patch_diff: str,
 ) -> dict[str, Any]:
@@ -44,7 +43,6 @@ def _build_completed_single_agent_outcome(
         validation_level=agent_output["validation_level"],
         regression_status=agent_output["regression_status"],
         target_claim=agent_output["target_claim"],
-        changed_files=changed_files,
         file_changes=file_changes,
         patch_diff=patch_diff,
         residual_risks=agent_output["residual_risks"],
@@ -138,7 +136,6 @@ def build_single_agent_stage_outcome(
 ) -> dict[str, Any]:
     return _build_completed_single_agent_outcome(
         agent_output=agent_output,
-        changed_files=patch_artifact["changed_files"],
         file_changes=patch_artifact.get("file_changes", []),
         patch_diff=str(patch_artifact.get("patch_diff") or ""),
     )

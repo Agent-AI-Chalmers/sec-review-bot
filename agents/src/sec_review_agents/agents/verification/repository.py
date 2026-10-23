@@ -37,6 +37,7 @@ from sec_review_agents.utils.markdown import code_block
 from sec_review_agents.utils.structured_renderer import (
     render_structured_markdown_section,
 )
+from sec_review_agents.workspace.file_changes import file_change_paths
 
 REPOSITORY_VERIFICATION_INITIAL_INTRO = "\n".join(
     [
@@ -195,7 +196,9 @@ def _mitigation_summary(
 ) -> dict[str, Any]:
     return {
         "overview": (mitigation_result or {}).get("overview"),
-        "changed_files": (mitigation_result or {}).get("changed_files") or [],
+        "changed_files": file_change_paths(
+            (mitigation_result or {}).get("file_changes")
+        ),
     }
 
 

@@ -271,7 +271,7 @@ def test_review_record_analysis_projection_drops_unrecognized_verdicts() -> None
         assert record["analysis"]["verdict"] is None
 
 
-def test_review_record_preserves_empty_changed_files() -> None:
+def test_review_record_drops_removed_changed_files_projection() -> None:
     record = build_review_record(
         analysis_result={
             "verdict": "confirmed-defect",
@@ -285,7 +285,8 @@ def test_review_record_preserves_empty_changed_files() -> None:
         cvss_result=None,
     )
 
-    assert record["mitigation"]["changed_files"] == []
+    assert "changed_files" not in record["mitigation"]
+    assert record["mitigation"]["file_changes"] == []
 
 
 def test_repository_case_review_record_keeps_delivery_gate_out_of_review_record(
@@ -298,7 +299,7 @@ def test_repository_case_review_record_keeps_delivery_gate_out_of_review_record(
     mitigation_result = {
         "status": "completed",
         "overview": "parameterized query",
-        "changed_files": ["src/a.py"],
+        "file_changes": [{"path": "src/a.py", "status": "deleted"}],
         "patch_diff": "diff --git a/src/a.py b/src/a.py\n",
     }
     verifier_result = {
@@ -330,7 +331,9 @@ def test_repository_case_review_record_keeps_delivery_gate_out_of_review_record(
         "SQL injection in src/a.py was fixed."
     )
     assert "disposition" not in record
-    assert record["mitigation"]["changed_files"] == ["src/a.py"]
+    assert record["mitigation"]["file_changes"] == [
+        {"path": "src/a.py", "status": "deleted"}
+    ]
     assert record["mitigation"]["patch_diff"] == "diff --git a/src/a.py b/src/a.py\n"
     assert "raw" not in record
 

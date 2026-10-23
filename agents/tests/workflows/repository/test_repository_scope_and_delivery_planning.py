@@ -669,8 +669,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
                     anchor_line=2,
                 ),
             ]
-            case_results[0]["review_record"]["mitigation"]["changed_files"] = [
-                "src/a.ts"
+            case_results[0]["review_record"]["mitigation"]["file_changes"] = [
+                {"path": "src/a.ts", "status": "deleted"}
             ]
 
             with (
@@ -764,7 +764,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
             "verdict": "confirmed-vulnerability",
         }
         mitigator_result = {
-            "changed_files": ["src/server.js"],
+            "file_changes": [{"path": "src/server.js", "status": "deleted"}],
         }
         verifier_result = {
             "overview": "Patch fully covers the target claim.",
@@ -789,7 +789,9 @@ class TestRepositoryScopeAndDeliveryPlanning:
         """Fail closed when regression evidence is failed, unresolved, or absent."""
         case_disposition = derive_case_disposition(
             {"verdict": "confirmed-vulnerability"},
-            mitigator_result={"changed_files": ["src/server.js"]},
+            mitigator_result={
+                "file_changes": [{"path": "src/server.js", "status": "deleted"}]
+            },
             verifier_result={
                 "patch_coverage": "full",
                 "regression_status": regression_status,
@@ -804,7 +806,9 @@ class TestRepositoryScopeAndDeliveryPlanning:
         """Block delivery whenever the verifier still requests follow-up."""
         case_disposition = derive_case_disposition(
             {"verdict": "confirmed-vulnerability"},
-            mitigator_result={"changed_files": ["src/server.js"]},
+            mitigator_result={
+                "file_changes": [{"path": "src/server.js", "status": "deleted"}]
+            },
             verifier_result={
                 "patch_coverage": "full",
                 "regression_status": "passed",
@@ -820,7 +824,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
             "verdict": "confirmed-vulnerability",
         }
         mitigator_result = {
-            "changed_files": ["src/server.js"],
+            "file_changes": [{"path": "src/server.js", "status": "deleted"}],
         }
         verifier_result = {
             "overview": "Patch partially covers the target claim.",
