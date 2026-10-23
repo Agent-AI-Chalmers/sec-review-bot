@@ -141,3 +141,7 @@ These rules also apply to new functionality, experiments, and internal ablations
 If a change requires preserving an old path, prefer deleting it instead of wrapping it again, unless current callers still require it and the user has not approved a breaking change.
 
 For architecture review, report only the smallest set of changes that clearly removes real confusion, bug risk, implicit state, or maintenance cost.
+
+### Pull Request Descriptions
+
+When creating or updating a pull request, follow `CONTRIBUTING.md` and `.github/pull_request_template.md`. Keep the title, compatibility statement, validation evidence, and optional review notes accurate to the actual change.
