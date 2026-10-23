@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from sec_review_agents.runtime.external_tools import (
+from sec_review_agents.external_tools import (
     configured_external_tools,
     external_tool_prompt_paths_for,
 )
@@ -74,7 +74,7 @@ def test_external_tool_prompts_reject_a_shell_less_backend(monkeypatch) -> None:
 
     with (
         patch(
-            "sec_review_agents.runtime.external_tools." "selected_sandbox_backend_kind",
+            "sec_review_agents.external_tools.resolver.selected_sandbox_backend_kind",
             return_value="local",
         ),
         pytest.raises(
