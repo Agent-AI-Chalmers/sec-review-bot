@@ -61,6 +61,8 @@ Each family README records who owns which side of its boundary and what callers 
 
 Some artifacts are generated from a hand-written contract rather than maintained by hand — a TypeScript projection of an API, committed JSON Schemas, a generated parameter list. Each family owns the tool that renders and checks its projections, under `<family>/tools/`, so the tool that reads a contract lives beside it and where its outputs land (which may be another package) does not change who owns the check. A family's `tools/generated-artifacts.json` lists what it derives and where it lands.
 
+Name a stable package entry point for the responsibility callers consume, even when a generator maintains it (`contract-version.ts`, for example). Raw mechanical projections may carry `generated` in the filename when that helps distinguish files that should not accumulate hand-written behavior (`contract-types-generated.ts`, for example). The filename is not the enforcement boundary: every committed generated artifact must identify itself in its header, appear in the family manifest, and be covered by the freshness and CI checks below.
+
 Each tool provides `pnpm --dir contracts/<family>/tools run generate` to render every artifact and `pnpm --dir contracts/<family>/tools run check` to prove the committed copies match. A family's test asserts the manifest matches the generators' own declared outputs and that the CI change filter triggers on every listed artifact, so a new projection is covered by being listed, not by remembering to wire up a check.
 
 ## Change Checklist

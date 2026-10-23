@@ -1,14 +1,41 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
 
 import {
   executionWorkflowType,
   isExecutionError,
+  validateExecutionInput,
   validateExecutionRequest,
+  validateExecutionResult,
 } from '../src/contract-validation.js'
+import { WORKFLOW_CONTRACT_VERSION } from '../src/contract-version.js'
+
+const REPO_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+)
+
+function contractFixture(name: string): unknown {
+  return JSON.parse(
+    readFileSync(
+      path.join(
+        REPO_ROOT,
+        'contracts',
+        'integration-contract',
+        WORKFLOW_CONTRACT_VERSION,
+        'fixtures',
+        name,
+      ),
+      'utf8',
+    ),
+  )
+}
 
 await test('execution contract owns the Temporal workflow type and envelope', () => {
   assert.equal(executionWorkflowType(), 'execution-workflow')
@@ -77,6 +104,21 @@ await test('execution errors match the public envelope before crossing HTTP', ()
   assert.equal(
     isExecutionError({ code: 'EXECUTION_FAILED', message: 'failed' }),
     false,
+  )
+})
+
+await test('the generated contract version selects input and result schemas', () => {
+  assert.doesNotThrow(() =>
+    validateExecutionInput(
+      'issue-review',
+      contractFixture('issue-review-input.json'),
+    ),
+  )
+  assert.doesNotThrow(() =>
+    validateExecutionResult(
+      'repository-review',
+      contractFixture('repository-review-result.json'),
+    ),
   )
 })
 

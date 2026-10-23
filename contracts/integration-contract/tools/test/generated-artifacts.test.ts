@@ -15,7 +15,8 @@ import { staleGeneratedArtifacts } from '../src/check-generated-artifacts.js'
 import {
   generatedArtifacts as integrationTypes,
   renderIntegrationContractDeclarations,
-  renderWorkflowInputDeclarations
+  renderWorkflowInputDeclarations,
+  WORKFLOW_CONTRACT_VERSION
 } from '../src/generate-integration-types.js'
 import {
   CONTROL_PLANE_OUTPUT_PATH,
@@ -178,7 +179,7 @@ test('the workflow byte limit is projected from common.schema.json', () => {
         REPO_ROOT,
         'contracts',
         'integration-contract',
-        'v6',
+        WORKFLOW_CONTRACT_VERSION,
         'schemas',
         'common.schema.json'
       ),
@@ -202,6 +203,33 @@ test('the workflow byte limit is projected from common.schema.json', () => {
       `export const MAX_WORKFLOW_INPUT_BYTES = ${common.$defs.workflowInputBytes.const}(?:\\n|$)`
     )
   )
+})
+
+test('the selected workflow schemas declare the generated contract version', () => {
+  for (const schemaName of [
+    'issue-review-input.schema.json',
+    'pull-request-review-input.schema.json',
+    'repository-review-input.schema.json'
+  ]) {
+    const schema = JSON.parse(
+      readFileSync(
+        path.join(
+          REPO_ROOT,
+          'contracts',
+          'integration-contract',
+          WORKFLOW_CONTRACT_VERSION,
+          'schemas',
+          schemaName
+        ),
+        'utf8'
+      )
+    ) as { properties?: { contract_version?: { const?: unknown } } }
+    assert.equal(
+      schema.properties?.contract_version?.const,
+      WORKFLOW_CONTRACT_VERSION,
+      `${schemaName} disagrees with the selected workflow contract version`
+    )
+  }
 })
 
 /** Does any glob in `patterns` cover `filePath`? Supports `**` and `*`; exact strings match. */

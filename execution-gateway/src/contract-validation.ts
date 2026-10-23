@@ -12,8 +12,7 @@ import type {
   ExecutionWorkflow,
   WorkflowInputByName,
 } from './contract-types-generated.js'
-
-const WORKFLOW_CONTRACT_VERSION = 'v6'
+import { WORKFLOW_CONTRACT_VERSION } from './contract-version.js'
 
 function contractsRoot(): string {
   const configured = process.env.SEC_REVIEW_CONTRACTS_ROOT?.trim()

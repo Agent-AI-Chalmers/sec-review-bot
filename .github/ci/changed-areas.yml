@@ -41,7 +41,9 @@ contract-tools:
   - 'apps/control-plane-ui/src/state-machines.generated.ts'
   - 'control-plane/src/state-machines.generated.ts'
   - 'apps/github-integration/src/execution/integration-contract-types-generated.ts'
+  - 'apps/github-integration/src/execution/contract-version.ts'
   - 'execution-gateway/src/contract-types-generated.ts'
+  - 'execution-gateway/src/contract-version.ts'
   - 'memory-catalog/src/contract-types-generated.ts'
   # CI tooling.
   - '.github/ci/**'

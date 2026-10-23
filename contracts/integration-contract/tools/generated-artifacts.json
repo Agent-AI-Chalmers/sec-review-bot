@@ -36,7 +36,9 @@
         "contracts/integration-contract/v6/schemas/common.schema.json"
       ],
       "outputs": [
-        "apps/github-integration/src/execution/integration-contract-types-generated.ts"
+        "apps/github-integration/src/execution/integration-contract-types-generated.ts",
+        "execution-gateway/src/contract-version.ts",
+        "apps/github-integration/src/execution/contract-version.ts"
       ]
     }
   ]

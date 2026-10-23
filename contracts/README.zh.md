@@ -58,6 +58,8 @@ Fixture 是契约校验的一部分。Manifest 记录每个 schema 必须接受�
 
 有些产物是从手写契约生成的，而不是手工维护——例如 API 的 TypeScript 投影、提交的 JSON Schema、生成的参数列表。每个族拥有渲染并校验其投影的工具，放在 `<family>/tools/` 下：读取契约的工具就挨着契约，而它的产物落在哪里（可能在别的包中）不影响谁拥有该检查。每个族的 `tools/generated-artifacts.json` 列出它派生什么、落到哪里。
 
+稳定的包内入口按调用方消费的职责命名，即使它由生成器维护，例如 `contract-version.ts`。原始机械投影可以在文件名中保留 `generated`，用于提示该文件不应逐渐承载手写行为，例如 `contract-types-generated.ts`。文件名不是强制边界：每个提交到仓库的生成产物都必须在文件头标明其生成身份、列入该族的 manifest，并由下述 freshness 与 CI 检查覆盖。
+
 每个工具提供 `pnpm --dir contracts/<family>/tools run generate` 重新生成全部产物，以及 `pnpm --dir contracts/<family>/tools run check` 校验已提交副本是否一致。每个族的测试会断言 manifest 与生成器自身声明的输出一致，并断言 CI 的变更过滤器覆盖清单中每一个产物；因此新增一个投影只需把它列进清单，而不必记得再接一个检查。
 
 ## 变更清单
