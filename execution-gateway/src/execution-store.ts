@@ -8,7 +8,7 @@ export interface ExecutionRequest {
   run_id: string
   input_data: WorkflowInputByName[ExecutionWorkflow]
   timeout_seconds: number
-  runtime?: unknown
+  runtime?: { workspace_image?: string } | null
 }
 
 export interface ExecutionRecord {

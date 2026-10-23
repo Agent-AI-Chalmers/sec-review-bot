@@ -8,7 +8,7 @@ import {
 } from 'ajv/dist/2020.js'
 
 import type { WorkflowName } from './shapes.js'
-import { CONTRACT_VERSION_DIR } from './contract-version.js'
+import { CONTRACT_VERSION } from './contract-version.js'
 
 const RESULT_SCHEMA_BY_WORKFLOW: Record<WorkflowName, string> = {
   'issue-review': 'issue-review-result.schema.json',
@@ -22,22 +22,27 @@ let validators: Map<string, ValidateFunction> | null = null
 
 function contractSchemasRoot(): string {
   const configuredRoot = process.env.SEC_REVIEW_CONTRACTS_ROOT
+  if (configuredRoot !== undefined) {
+    const root = path.resolve(
+      configuredRoot,
+      'integration-contract',
+      CONTRACT_VERSION,
+      'schemas'
+    )
+    if (!existsSync(path.join(root, 'common.schema.json'))) {
+      throw new Error(
+        `SEC_REVIEW_CONTRACTS_ROOT=${configuredRoot} does not contain integration-contract/${CONTRACT_VERSION}/schemas/common.schema.json.`
+      )
+    }
+    return root
+  }
+
   const candidates = [
-    ...(configuredRoot
-      ? [
-          path.resolve(
-            configuredRoot,
-            'integration-contract',
-            CONTRACT_VERSION_DIR,
-            'schemas'
-          )
-        ]
-      : []),
     path.resolve(
       process.cwd(),
       'contracts',
       'integration-contract',
-      CONTRACT_VERSION_DIR,
+      CONTRACT_VERSION,
       'schemas'
     ),
     path.resolve(
@@ -46,7 +51,7 @@ function contractSchemasRoot(): string {
       '..',
       'contracts',
       'integration-contract',
-      CONTRACT_VERSION_DIR,
+      CONTRACT_VERSION,
       'schemas'
     )
   ]
@@ -55,7 +60,7 @@ function contractSchemasRoot(): string {
   )
   if (root === undefined) {
     throw new Error(
-      `Could not locate contract ${CONTRACT_VERSION_DIR} schemas for execution validation.`
+      `Could not locate contract ${CONTRACT_VERSION} schemas for execution validation.`
     )
   }
   return root
@@ -109,7 +114,7 @@ function assertSchema(schemaName: string, value: unknown, label: string): void {
       )
       .join('; ')
     throw new Error(
-      `${label} does not match contract ${CONTRACT_VERSION_DIR}${details ? `: ${details}` : '.'}`
+      `${label} does not match contract ${CONTRACT_VERSION}${details ? `: ${details}` : '.'}`
     )
   }
 }
@@ -118,8 +123,7 @@ function assertSchema(schemaName: string, value: unknown, label: string): void {
  * Validate a workflow result against the current contract's result schema.
  *
  * Version-independent by name: the schema is selected from
- * `CONTRACT_VERSION_DIR` (the single source of truth for the on-disk contract
- * version), so this function tracks contract bumps without a rename.
+ * `CONTRACT_VERSION`, so this function tracks contract bumps without a rename.
  */
 export function assertWorkflowResult(
   workflow: WorkflowName,

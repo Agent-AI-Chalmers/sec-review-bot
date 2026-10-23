@@ -260,10 +260,7 @@ def test_v6_review_record_schema_rejects_unsafe_file_change_paths() -> None:
 def test_contracts_root_env_var_is_authoritative(monkeypatch, tmp_path: Path) -> None:
     # A set root must be used as-is: the operator names where the schemas are.
     schemas = (
-        tmp_path
-        / "integration-contract"
-        / contract_schema.CONTRACT_VERSION_DIR
-        / "schemas"
+        tmp_path / "integration-contract" / contract_schema.CONTRACT_VERSION / "schemas"
     )
     schemas.mkdir(parents=True)
     (schemas / "common.schema.json").write_text("{}", encoding="utf-8")

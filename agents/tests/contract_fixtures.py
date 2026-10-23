@@ -6,14 +6,14 @@ from typing import Any
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from referencing import Registry, Resource
 
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION_DIR
+from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from tests.project_paths import CONTRACTS_ROOT
 
 # --- integration-contract family ------------------------------------------
 
 INTEGRATION_CONTRACT_ROOT = CONTRACTS_ROOT / "integration-contract"
-_FIXTURES_ROOT = INTEGRATION_CONTRACT_ROOT / CONTRACT_VERSION_DIR / "fixtures"
-_SCHEMAS_ROOT = INTEGRATION_CONTRACT_ROOT / CONTRACT_VERSION_DIR / "schemas"
+_FIXTURES_ROOT = INTEGRATION_CONTRACT_ROOT / CONTRACT_VERSION / "fixtures"
+_SCHEMAS_ROOT = INTEGRATION_CONTRACT_ROOT / CONTRACT_VERSION / "schemas"
 
 
 def contract_fixture(name: str) -> dict[str, Any]:

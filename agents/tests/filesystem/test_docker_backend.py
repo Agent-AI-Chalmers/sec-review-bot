@@ -252,19 +252,8 @@ async def test_docker_backend_aclose_is_idempotent_after_sync_close() -> None:
     remove_container.assert_called_once()
 
 
-def test_sandbox_backend_defaults_to_docker_when_available() -> None:
-    with (
-        patch.dict("os.environ", {}, clear=True),
-        patch(
-            "sec_review_agents.filesystem.docker_runtime.shutil.which",
-            return_value="/usr/bin/docker",
-        ),
-        patch(
-            "sec_review_agents.filesystem.docker_runtime.subprocess.run",
-        ) as run_mock,
-    ):
-        run_mock.return_value.returncode = 0
-
+def test_sandbox_backend_defaults_to_docker() -> None:
+    with patch.dict("os.environ", {}, clear=True):
         assert selected_sandbox_backend_kind() == "docker"
 
 
@@ -288,7 +277,7 @@ def test_sandbox_backend_rejects_unknown_mode() -> None:
         patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "host"}, clear=True),
         pytest.raises(
             ValueError,
-            match="AGENT_SANDBOX_BACKEND must be one of: auto, docker, bwrap",
+            match="AGENT_SANDBOX_BACKEND must be one of: docker, bwrap",
         ),
     ):
         selected_sandbox_backend_kind()

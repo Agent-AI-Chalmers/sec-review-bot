@@ -85,21 +85,11 @@ def test_external_tool_prompts_reject_a_shell_less_backend(monkeypatch) -> None:
         external_tool_prompt_paths_for(("joern",))
 
 
-def test_external_tool_prompts_fail_when_no_sandbox_resolves(monkeypatch) -> None:
-    """`auto` with no usable sandbox must not silently pick a text reader."""
-    # Declare the policy under test. A concrete value here (from `agents/.env`, which another
-    # test may have loaded) skips the probe entirely and the check never runs.
+def test_external_tool_prompts_reject_the_removed_auto_backend(monkeypatch) -> None:
     monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "auto")
     monkeypatch.setenv("AGENT_PLAYWRIGHT_ENABLED", "true")
 
-    with (
-        patch(
-            "sec_review_agents.filesystem.backend_selection."
-            "is_docker_runtime_available",
-            return_value=False,
-        ),
-        pytest.raises(ValueError, match="found no usable sandbox"),
-    ):
+    with pytest.raises(ValueError, match="must be one of: docker, bwrap"):
         external_tool_prompt_paths_for(("playwright",))
 
 

@@ -278,9 +278,8 @@ Memory 有两种互斥的存储模式。本地或离线运行设置 `AGENT_MEMOR
 
 审查代码的 agent stage 必须运行在能够执行命令的 sandbox 里，否则它无法运行测试、读取历史或复现发现。具体用哪个 sandbox 属于部署配置：
 
-- `AGENT_SANDBOX_BACKEND` 不设置或设置为 `auto`：Docker runtime 可用时使用 Docker sandbox，不可用则报错并说明缺的是什么
-- `AGENT_SANDBOX_BACKEND=docker`：要求使用 Docker sandbox
-- `AGENT_SANDBOX_BACKEND=bwrap`：显式启用 bubblewrap（仅 Linux/WSL2；`auto` 永远不会选中它）
+- `AGENT_SANDBOX_BACKEND` 不设置或设置为 `docker`：要求使用 Docker sandbox
+- `AGENT_SANDBOX_BACKEND=bwrap`：显式启用 bubblewrap（仅 Linux/WSL2）
 
 没有任何取值可以选择本地 filesystem backend。它没有 shell，把它交给审查代码的 stage，等于悄悄让那一步无法执行任何命令。不需要 shell 的 stage 会自行选择它，因此这不是部署配置。
 

@@ -86,20 +86,10 @@ def test_local_backend_routes_use_agent_path(tmp_path: Path) -> None:
     assert "/mnt/material/workspace/" not in backend.routes
 
 
-def test_auto_backend_selection_does_not_fall_back_to_local() -> None:
-    """`auto` must fail rather than hand an execution-capable agent a text reader.
-
-    `local` has no shell, so falling back to it when Docker is missing would
-    silently turn every agent that reviews code into one that can only read
-    files. bwrap is not a valid fallback either: it is opt-in only.
-    """
+def test_environment_cannot_select_the_removed_auto_backend() -> None:
     with (
-        patch.dict("os.environ", {}, clear=True),
-        patch(
-            "sec_review_agents.filesystem.docker_runtime.shutil.which",
-            return_value=None,
-        ),
-        pytest.raises(ValueError, match="found no usable sandbox"),
+        patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "auto"}, clear=True),
+        pytest.raises(ValueError, match="must be one of: docker, bwrap"),
     ):
         selected_sandbox_backend_kind()
 
@@ -108,7 +98,7 @@ def test_environment_cannot_select_the_local_backend() -> None:
     """No operator setting may downgrade an agent to a shell-less backend."""
     with (
         patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "local"}, clear=True),
-        pytest.raises(ValueError, match="must be one of: auto, docker, bwrap"),
+        pytest.raises(ValueError, match="must be one of: docker, bwrap"),
     ):
         selected_sandbox_backend_kind()
 

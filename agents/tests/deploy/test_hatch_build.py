@@ -16,7 +16,7 @@ from tests.project_paths import AGENTS_ROOT
 def test_version_dir_matches_the_runtime_constant() -> None:
     from sec_review_agents.contract_version import CONTRACT_VERSION
 
-    assert hatch_build._contract_version_dir(AGENTS_ROOT) == CONTRACT_VERSION
+    assert hatch_build._contract_version(AGENTS_ROOT) == CONTRACT_VERSION
 
 
 def test_version_module_has_no_imports() -> None:
@@ -38,7 +38,7 @@ def test_schemas_root_resolves_for_the_derived_version() -> None:
     root = hatch_build._contract_schemas_root(AGENTS_ROOT)
     assert (root / "common.schema.json").is_file()
     # The resolved directory's version segment is the derived one.
-    assert root.parent.name == hatch_build._contract_version_dir(AGENTS_ROOT)
+    assert root.parent.name == hatch_build._contract_version(AGENTS_ROOT)
 
 
 def test_schemas_root_fails_loudly_for_unknown_version(tmp_path: Path) -> None:
@@ -48,7 +48,7 @@ def test_schemas_root_fails_loudly_for_unknown_version(tmp_path: Path) -> None:
 
     (tmp_path / "src" / "sec_review_agents").mkdir(parents=True)
     (tmp_path / "src" / "sec_review_agents" / "contract_version.py").write_text(
-        'CONTRACT_VERSION_DIR = "v-does-not-exist"\n', encoding="utf-8"
+        'CONTRACT_VERSION = "v-does-not-exist"\n', encoding="utf-8"
     )
     # A stale cached module would mask the fake one under tmp_path.
     saved = sys.modules.pop("sec_review_agents.contract_version", None)

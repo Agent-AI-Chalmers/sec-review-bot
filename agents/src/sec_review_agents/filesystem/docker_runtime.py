@@ -14,10 +14,10 @@ DEFAULT_DOCKER_SANDBOX_IMAGE = "mcr.microsoft.com/devcontainers/universal:6-nobl
 
 
 def is_docker_runtime_available(docker_bin: str) -> bool:
-    """Report current Docker runtime availability for automatic backend selection."""
+    """Report whether integration tests can use the configured Docker runtime."""
     # Do not cache this probe: both the Docker daemon and the configured
-    # executable are external, mutable state. Reusing an old result can select
-    # the wrong backend after a daemon restart or an environment change.
+    # executable are external, mutable state. Reusing an old result can report
+    # stale availability after a daemon restart or an environment change.
     if shutil.which(docker_bin) is None:
         return False
 

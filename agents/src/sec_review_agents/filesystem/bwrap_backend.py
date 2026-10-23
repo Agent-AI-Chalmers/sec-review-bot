@@ -2,7 +2,7 @@
 
 # Experimental local-only bwrap backend.
 #
-# This backend is deliberately opt-in and should not be selected by `auto`.
+# This backend is deliberately opt-in because its isolation depends on host policy.
 # Bubblewrap is Linux-specific. It can run inside a WSL2 Linux distribution when
 # bwrap and the required namespace policy are available, but it is not a native
 # Windows or macOS backend. It also depends on host kernel, user-namespace, and

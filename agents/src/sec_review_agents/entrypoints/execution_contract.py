@@ -7,7 +7,7 @@ from dataclasses import asdict, dataclass
 from functools import cache
 from importlib.resources import files
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 
@@ -44,13 +44,17 @@ RUN_ID_PATTERN_TEXT = str(_schema()["properties"]["run_id"]["pattern"])
 RUN_ID_PATTERN = re.compile(RUN_ID_PATTERN_TEXT)
 
 
+class ExecutionRuntimeConfig(TypedDict, total=False):
+    workspace_image: str
+
+
 @dataclass(frozen=True)
 class ExecutionRequest:
     workflow: str
     run_id: str
     input_data: dict[str, Any]
     timeout_seconds: int
-    runtime: Any = None
+    runtime: ExecutionRuntimeConfig | None = None
 
 
 def validate_execution_request(request: ExecutionRequest) -> None:
@@ -72,5 +76,6 @@ __all__ = [
     "RUN_ID_PATTERN",
     "RUN_ID_PATTERN_TEXT",
     "ExecutionRequest",
+    "ExecutionRuntimeConfig",
     "validate_execution_request",
 ]
