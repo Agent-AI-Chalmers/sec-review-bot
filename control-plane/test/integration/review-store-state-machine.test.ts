@@ -2822,12 +2822,12 @@ test('markQueued refuses to submit into a publication that already ended', async
   }
 })
 
-test('a preparation failure refuses to commit when its claim was taken mid-transaction', async () => {
+test('a preparation failure becomes a no-op when its claim is fenced mid-transaction', async () => {
   // `failPreparation` closes the preparation row first, and that UPDATE doubles as the claim
   // check: it only matches while the row is still `preparing` under our token. If another writer
   // (an expired lease in `expireStale`) replaces the row before it runs, the UPDATE matches
-  // nothing and the whole cross-axis failure aborts instead of recording `preparing -> failed`
-  // on a claim that is no longer ours.
+  // nothing. The stale owner must not record `preparing -> failed` on a claim that is no longer
+  // ours, but losing the fence is a normal concurrent outcome rather than a server error.
   //
   // A trigger stands in for that writer by rewriting the row just before the statement that
   // checks it, which is exactly the window a concurrent lease expiry occupies. A normal call
@@ -2861,18 +2861,18 @@ test('a preparation failure refuses to commit when its claim was taken mid-trans
       FOR EACH ROW EXECUTE FUNCTION test_steal_preparation_claim();
     `)
     try {
-      await assert.rejects(
-        store.failPreparation(
+      assert.deepStrictEqual(
+        await store.failPreparation(
           runId,
           admission.preparation_token,
           { code: 'PREPARATION_INPUT_INVALID', message: 'cannot build input' },
           { retry: false }
         ),
-        /lost its claim before it could be marked failed/,
-        'a claim lost before the closing update must abort the failure'
+        { retry_scheduled: false },
+        'a fenced owner must report that it scheduled no retry'
       )
-      // The whole cross-axis failure rolled back: the preparation keeps the state the competing
-      // writer left, and no audit event claims a transition this transaction did not make.
+      // The preparation keeps the state the competing writer left, and no audit event claims a
+      // transition this invocation did not make.
       const record = await store.getRun(runId)
       assert.strictEqual(
         record?.preparation.status,
