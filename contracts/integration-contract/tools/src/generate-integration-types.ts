@@ -272,7 +272,9 @@ function renderWorkflowName(): string {
   const suffix = '-input.schema.json'
   const workflows = WORKFLOW_INPUTS.map(({ schema }) => {
     if (!schema.endsWith(suffix)) {
-      throw new Error(`workflow input schema must end with ${suffix}: ${schema}`)
+      throw new Error(
+        `workflow input schema must end with ${suffix}: ${schema}`
+      )
     }
     return schema.slice(0, -suffix.length)
   })
