@@ -22,17 +22,22 @@ let validators: Map<string, ValidateFunction> | null = null
 
 function contractSchemasRoot(): string {
   const configuredRoot = process.env.SEC_REVIEW_CONTRACTS_ROOT
+  if (configuredRoot !== undefined) {
+    const root = path.resolve(
+      configuredRoot,
+      'integration-contract',
+      CONTRACT_VERSION_DIR,
+      'schemas'
+    )
+    if (!existsSync(path.join(root, 'common.schema.json'))) {
+      throw new Error(
+        `SEC_REVIEW_CONTRACTS_ROOT=${configuredRoot} does not contain integration-contract/${CONTRACT_VERSION_DIR}/schemas/common.schema.json.`
+      )
+    }
+    return root
+  }
+
   const candidates = [
-    ...(configuredRoot
-      ? [
-          path.resolve(
-            configuredRoot,
-            'integration-contract',
-            CONTRACT_VERSION_DIR,
-            'schemas'
-          )
-        ]
-      : []),
     path.resolve(
       process.cwd(),
       'contracts',
