@@ -1,5 +1,5 @@
 {
-  "$comment": "Corpus of setup-declaration inputs shared by the Runner (Python) and the GitHub integration (TypeScript). Each valid case must parse as a declaration; each invalid case must be rejected. The file-name prefix classifies a case, and the manifest records it explicitly so both implementations are checked against the same boundary.",
+  "$comment": "Corpus of setup-declaration inputs shared by the Execution Worker (Python) and GitHub Integration (TypeScript). Each valid case must parse as a declaration; each invalid case must be rejected. The file-name prefix classifies a case, and the manifest records it explicitly so both implementations are checked against the same boundary.",
   "valid": [
     "valid-all-keys.yml",
     "valid-large-timeout.yml",

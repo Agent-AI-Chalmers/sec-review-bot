@@ -593,7 +593,7 @@
       "minLength": 1,
       "maxLength": 65536,
       "pattern": ".*\\S.*",
-      "$comment": "Inline setup declaration text (`.sec-review/setup.yml`). Non-blank and bounded: the text travels inside the workflow input, so an unbounded file would grow the submission without limit. The real cap is 64 KiB of UTF-8 bytes, enforced by both producers before parse and by the runner's parser; this `maxLength` counts characters, so it can only admit a few extra multi-byte characters as a backstop -- the byte cap still rejects them loudly (before submission in the integration, at parse in the runner)."
+      "$comment": "Inline setup declaration text (`.sec-review/setup.yml`). Non-blank and bounded: the text travels inside the workflow input, so an unbounded file would grow the submission without limit. The real cap is 64 KiB of UTF-8 bytes, enforced by both producers before parse and by the Execution Worker's parser; this `maxLength` counts characters, so it can only admit a few extra multi-byte characters as a backstop -- the byte cap still rejects them loudly (before submission in GitHub Integration, at parse in the Execution Worker)."
     },
     "changedFileStatus": {
       "type": "string",
