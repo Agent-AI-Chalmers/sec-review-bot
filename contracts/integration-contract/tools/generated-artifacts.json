@@ -6,7 +6,9 @@
       "name": "types",
       "script": "contracts/integration-contract/tools/src/generate-types.ts",
       "code_inputs": [
-        "contracts/integration-contract/tools/src/generate-workflow-input-types.ts"
+        "contracts/integration-contract/tools/src/generate-integration-types.ts",
+        "control-plane/.prettierrc.json",
+        "execution-gateway/.prettierrc.json"
       ],
       "command": "pnpm --dir contracts/integration-contract/tools run generate",
       "inputs": [
@@ -22,13 +24,15 @@
       ]
     },
     {
-      "name": "workflow-input-types",
-      "script": "contracts/integration-contract/tools/src/generate-workflow-input-types.ts",
+      "name": "integration-types",
+      "script": "contracts/integration-contract/tools/src/generate-integration-types.ts",
+      "code_inputs": ["apps/github-integration/.prettierrc.json"],
       "command": "pnpm --dir contracts/integration-contract/tools run generate",
       "inputs": [
         "contracts/integration-contract/v6/schemas/issue-review-input.schema.json",
         "contracts/integration-contract/v6/schemas/pull-request-review-input.schema.json",
         "contracts/integration-contract/v6/schemas/repository-review-input.schema.json",
+        "contracts/integration-contract/v6/schemas/review-record.schema.json",
         "contracts/integration-contract/v6/schemas/common.schema.json"
       ],
       "outputs": [

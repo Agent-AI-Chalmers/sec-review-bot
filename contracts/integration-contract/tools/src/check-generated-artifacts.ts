@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { generatedArtifacts as workflowInputTypes } from './generate-workflow-input-types.js'
+import { generatedArtifacts as integrationTypes } from './generate-integration-types.js'
 import { generatedArtifacts as apiTypes } from './generate-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
@@ -18,7 +18,7 @@ export interface StaleArtifact {
 /** Every committed artifact of this family that does not match a fresh render. */
 export async function staleGeneratedArtifacts(): Promise<StaleArtifact[]> {
   const stale: StaleArtifact[] = []
-  for (const artifact of [...apiTypes(), ...workflowInputTypes()]) {
+  for (const artifact of [...apiTypes(), ...integrationTypes()]) {
     const output = path.relative(REPO_ROOT, artifact.output)
     const committed = readFileSync(artifact.output, 'utf8')
     if (committed !== (await artifact.render())) {

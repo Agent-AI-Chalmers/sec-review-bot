@@ -13,7 +13,7 @@ import prettier from 'prettier'
 import { parse } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
-import { renderWorkflowInputDeclarations } from './generate-workflow-input-types.js'
+import { renderWorkflowInputDeclarations } from './generate-integration-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
@@ -48,7 +48,7 @@ export async function renderExecutionApiTypes(
 ): Promise<string> {
   const spec = parse(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
   const composedTypes = `
-${renderWorkflowInputDeclarations()}
+${await renderWorkflowInputDeclarations()}
 
 export interface WorkflowInputByName {
   'issue-review': IssueReviewInput
