@@ -72,7 +72,7 @@ Experience production runs through an asynchronous path and does not affect the 
 
 Roughly, the flow is a set of asynchronous checks:
 
-- Source: after an issue or pull-request review publishes transcripts, it starts extraction for that review. Repository review starts one extraction per case whose transcripts exist.
+- Source: after an issue or pull-request review publishes transcripts, the review enters asynchronous memory processing. Repository review contributes one extraction unit per case whose transcripts exist.
 - Extraction processes each review independently and produces pending observations.
   - Multiple extractions can run concurrently.
 - Maintenance checks periodically and runs when the threshold or age condition is met: the maintenance trigger schedule runs every hour by default. It starts maintenance only when at least 10 observations are pending, or when the oldest pending observation has waited at least one day.
@@ -80,6 +80,15 @@ Roughly, the flow is a set of asynchronous checks:
   - `processed` means reviewed and handled. It does not mean the experience was necessarily absorbed into memory.
 
 > The threshold of 10 is an empirical design choice and can be adjusted.
+
+## Feature switches
+
+Two switches are independent, so operators can stop reading without stopping production, or the reverse:
+
+- `AGENT_MEMORY_CONSUMPTION_ENABLED` controls whether review agents read memory. It does not gate extraction or maintenance, and it does not stop the workers from querying Memory Catalog.
+- `AGENT_MEMORY_PROCESSING_ENABLED` controls extraction and maintenance. It does not apply to review agents, which keep treating memory as unavailable so that they stay deterministic in step with the memory that is being produced.
+
+Disabling consumption does not forbid processing or catalog coordination, and disabling processing does not change what review agents read.
 
 ## Governance
 

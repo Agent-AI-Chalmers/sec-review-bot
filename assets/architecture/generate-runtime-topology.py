@@ -176,19 +176,6 @@ def render(filename: str, labels: dict[str, str]) -> None:
         class_="group persistence",
     )
 
-    add_node(root, "operator", 45, 94, 150, 72, labels["operator"], "external-node")
-    add_node(root, "github", 45, 254, 150, 72, "GitHub", "external-node")
-    add_node(root, "ui", 280, 94, 160, 72, "Control Plane UI", "control-node")
-    add_node(root, "integration", 280, 254, 160, 72, "GitHub\nIntegration", "control-node")
-    add_node(root, "control", 495, 94, 170, 72, "Review Control\nPlane", "control-node")
-    add_node(root, "gateway", 710, 94, 160, 72, "Execution\nGateway", "execution-node")
-    add_node(root, "temporal", 895, 94, 160, 72, "Temporal Server", "execution-node")
-    add_node(root, "worker", 1080, 94, 160, 72, "Execution\nWorker", "execution-node")
-    add_node(root, "catalog", 1080, 254, 160, 72, "Memory Catalog\nServer", "memory-node")
-
-    add_store(root, "postgres", 500, 515, 210, 92, "PostgreSQL", "storage-node", "database")
-    add_store(root, "storage", 970, 515, 210, 92, labels["storage"], "storage-node", "objects")
-
     add_path(root, [(195, 130), (280, 130)])
     add_path(root, [(195, 290), (280, 290)], bidirectional=True)
     add_path(root, [(440, 130), (495, 130)])
@@ -196,13 +183,29 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_path(root, [(665, 130), (710, 130)], bidirectional=True)
     add_path(root, [(870, 130), (895, 130)])
     add_path(root, [(1055, 130), (1080, 130)], bidirectional=True)
-    add_path(root, [(1160, 166), (1160, 254)], bidirectional=True)
+    add_path(root, [(975, 166), (975, 254)], bidirectional=True)
+    add_path(root, [(1055, 290), (1080, 290)], bidirectional=True)
 
     add_path(root, [(580, 166), (580, 515)])
     add_path(root, [(1160, 326), (1160, 485), (655, 485), (655, 515)])
     add_path(root, [(360, 326), (360, 625), (930, 625), (930, 561), (970, 561)])
     add_path(root, [(790, 166), (790, 400), (950, 400), (950, 475), (1075, 475), (1075, 515)])
     add_path(root, [(1240, 130), (1310, 130), (1310, 561), (1180, 561)], bidirectional=True)
+    add_path(root, [(975, 326), (975, 515)], bidirectional=True)
+
+    add_node(root, "operator", 45, 94, 150, 72, labels["operator"], "external-node")
+    add_node(root, "github", 45, 254, 150, 72, "GitHub", "external-node")
+    add_node(root, "ui", 280, 94, 160, 72, "Control Plane UI", "control-node")
+    add_node(root, "integration", 280, 254, 160, 72, "GitHub\nIntegration", "control-node")
+    add_node(root, "control", 495, 94, 170, 72, "Review Control\nPlane", "control-node")
+    add_node(root, "gateway", 710, 94, 160, 72, "Execution\nGateway", "execution-node")
+    add_node(root, "temporal", 895, 94, 160, 72, "Temporal Server", "execution-node")
+    add_node(root, "execution-worker", 1080, 94, 160, 72, "Execution\nWorker", "execution-node")
+    add_node(root, "memory-worker", 895, 254, 160, 72, "Memory\nWorker", "memory-node")
+    add_node(root, "catalog", 1080, 254, 160, 72, "Memory Catalog\nServer", "memory-node")
+
+    add_store(root, "postgres", 500, 515, 210, 92, "PostgreSQL", "storage-node", "database")
+    add_store(root, "storage", 970, 515, 210, 92, labels["storage"], "storage-node", "objects")
 
     add_text(root, 810, 454, labels["persistence"], css_class="group-label")
 

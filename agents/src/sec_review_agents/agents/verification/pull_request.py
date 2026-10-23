@@ -6,7 +6,7 @@ from sec_review_agents.agents.verification.external_tools import (
     VERIFICATION_AGENT_EXTERNAL_TOOLS,
 )
 from sec_review_agents.agents.verification.skills import VERIFICATION_AGENT_SKILLS
-from sec_review_agents.features import agent_memory_enabled, agent_skills_enabled
+from sec_review_agents.features import agent_skills_enabled, memory_consumption_enabled
 from sec_review_agents.filesystem import backend_selection
 from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.filesystem.path_views import (
@@ -65,7 +65,9 @@ def create_pr_verification_backend(
         )
     workspace_image = runtime_workspace_image(runtime_context)
     backend_kind = backend_selection.selected_sandbox_backend_kind()
-    memory_view = configured_memory_path_view() if agent_memory_enabled() else None
+    memory_view = (
+        configured_memory_path_view() if memory_consumption_enabled() else None
+    )
     tmp_view = tmp_view_for_backend(backend_kind)
     path_views = [
         workspace_view(host_path=workspace_root_path, writable=True),

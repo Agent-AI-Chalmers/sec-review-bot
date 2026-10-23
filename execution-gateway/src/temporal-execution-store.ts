@@ -64,7 +64,8 @@ export class TemporalExecutionStore implements ExecutionStore {
     return new TemporalExecutionStore(
       connection,
       client,
-      process.env.TEMPORAL_TASK_QUEUE?.trim() || 'sec-review-agents',
+      process.env.TEMPORAL_EXECUTION_TASK_QUEUE?.trim() ||
+        'sec-review-execution',
     )
   }
 

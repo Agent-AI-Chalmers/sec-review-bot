@@ -52,7 +52,7 @@ LLM 配置按 deployment 选择 provider。
 
 本地 `run-local-*` CLI 和 `sec-review-agents-check-llm-deployments` 会加载 `agents/.env`，但不会覆盖进程里已有的环境变量。
 
-`sec-review-agents-execution-worker` 不会自己加载 `.env`，需要由 shell、process supervisor 或 CI 注入环境变量。Execution Gateway 是 [`execution-gateway/`](../execution-gateway/README.zh.md) 下独立的 TypeScript 服务。
+`sec-review-execution-worker` 和 `sec-review-memory-worker` 不会自己加载 `.env`，需要由 shell、process supervisor 或 CI 注入环境变量。Execution Gateway 是 [`execution-gateway/`](../execution-gateway/README.zh.md) 下独立的 TypeScript 服务。
 
 没有 `.env` 文件路径 override。`MODEL_PROVIDERS_CONFIG_TOML` 是模型配置路径的最高优先级入口；只有想把 TOML 放到其他位置，或运行方式不保留当前项目相对目录结构时，才需要显式设置它。
 
@@ -231,13 +231,13 @@ set +a
 
 TEMPORAL_ADDRESS=127.0.0.1:7233 \
 TEMPORAL_NAMESPACE=default \
-TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-execution-worker
+TEMPORAL_EXECUTION_TASK_QUEUE=sec-review-execution \
+sec-review-execution-worker
 ```
 
-### 手动启动 Worker
+### 手动启动 Workers
 
-分别启动 Temporal 和 worker。独立 HTTP 服务从 [`execution-gateway/`](../execution-gateway/README.zh.md) 启动。
+分别启动 Temporal 和两个 worker。独立 HTTP 服务从 [`execution-gateway/`](../execution-gateway/README.zh.md) 启动。
 
 最小本地启动形状：
 
@@ -247,15 +247,22 @@ sec-review-agents-execution-worker
 temporal server start-dev
 ```
 
-终端 2，Temporal Worker：
+终端 2，Execution Worker：
 
 ```bash
 TEMPORAL_ADDRESS=127.0.0.1:7233 \
-TEMPORAL_TASK_QUEUE=sec-review-agents \
-sec-review-agents-execution-worker
+TEMPORAL_EXECUTION_TASK_QUEUE=sec-review-execution \
+sec-review-execution-worker
 ```
 
-Worker 从 Temporal 获取并执行已注册的 workflow 和 activity task。模型、sandbox、skills 和 activity 并发相关环境变量属于 worker 运行环境。
+终端 3，Memory Worker：
+
+```bash
+TEMPORAL_ADDRESS=127.0.0.1:7233 \
+sec-review-memory-worker
+```
+
+Execution Worker 负责 review workflow、sandbox activity 和 transcript 发布；Memory Worker 负责异步 extraction 与 maintenance。两者使用独立的 task queue 和并发限制。
 
 Docker Compose 控制平面和宿主机 worker 的运行方式见[本地集成部署](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
 
@@ -263,7 +270,7 @@ Docker Compose 控制平面和宿主机 worker 的运行方式见[本地集成�
 
 Agent 可以声明自己需要的 skills。worker 启动 agent 时会自动准备并挂载声明的 skills。更多设计细节见 [Agent Skills](../docs/agent/SKILLS.zh.md)。
 
-Memory 有两种互斥的存储模式。本地或离线运行设置 `AGENT_MEMORY_DIR`，主 agent 会把其中 `memory/` 子树的快照挂载为 `/memory`。Managed worker 则设置 `AGENT_MEMORY_CATALOG_URL` 和 `AGENT_MEMORY_CATALOG_TOKEN`，从对象存储取得 active immutable memory version，再物化成同样的本地只读 `/memory` 视图。只要配置了 service，就不会回退读取 `AGENT_MEMORY_DIR`。设置 `AGENT_MEMORY_ENABLED=false` 可以整套关闭 memory。设计原则和生命周期见 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)。
+Memory 有两种互斥的存储模式。本地或离线运行设置 `AGENT_MEMORY_DIR`，主 agent 会把其中 `memory/` 子树的快照挂载为 `/memory`。Managed worker 则设置 `AGENT_MEMORY_CATALOG_URL` 和 `AGENT_MEMORY_CATALOG_TOKEN`，从对象存储取得 active immutable memory version，再物化成同样的本地只读 `/memory` 视图。只要配置了 service，就不会回退读取 `AGENT_MEMORY_DIR`。`AGENT_MEMORY_CONSUMPTION_ENABLED` 控制 review agent 是否读取该视图，`AGENT_MEMORY_PROCESSING_ENABLED` 控制 transcript extraction 和 maintenance。设计原则和生命周期见 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)。
 
 需要结构化输出的 agent 会检查最终 state 是否包含 `structured_response`。如果模型只返回普通文本、没有产出结构化结果，agent middleware 会在 LangChain agent loop 内追加一条纠偏消息并重试；重试次数由 `AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES` 控制，默认 `2`。这层兜底独立于 provider/API 请求重试，不处理 schema 参数校验错误；参数校验错误仍交给 LangChain structured output 自身的 retry 机制。
 

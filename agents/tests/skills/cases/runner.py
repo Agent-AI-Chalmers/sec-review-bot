@@ -105,7 +105,7 @@ async def _create_case_agent(
             return_value=skills_enabled,
         ),
         patch(
-            "sec_review_agents.agents.analysis.repository.agent_memory_enabled",
+            "sec_review_agents.agents.analysis.repository.memory_consumption_enabled",
             return_value=False,
         ),
     ):

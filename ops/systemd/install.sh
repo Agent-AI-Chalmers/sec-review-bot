@@ -38,14 +38,20 @@ rendered_deployment_env=$(mktemp)
 trap 'rm -f "$rendered_deployment_env"' EXIT HUP INT TERM
 
 # Fail before installing units that cannot run under the selected service user.
-if [ ! -x "$repository_root/agents/.venv/bin/sec-review-agents-execution-worker" ]; then
-    echo "Missing agents worker executable." >&2
+if [ ! -x "$repository_root/agents/.venv/bin/sec-review-execution-worker" ] ||
+    [ ! -x "$repository_root/agents/.venv/bin/sec-review-memory-worker" ]; then
+    echo "Missing execution or memory worker executable." >&2
     echo "Run 'uv sync --frozen --no-dev' in $repository_root/agents first." >&2
     exit 1
 fi
 if ! /usr/sbin/runuser -u "$service_user" -- \
-    test -x "$repository_root/agents/.venv/bin/sec-review-agents-execution-worker"; then
-    echo "The service user cannot execute the agents worker." >&2
+    test -x "$repository_root/agents/.venv/bin/sec-review-execution-worker"; then
+    echo "The service user cannot execute the execution worker." >&2
+    exit 1
+fi
+if ! /usr/sbin/runuser -u "$service_user" -- \
+    test -x "$repository_root/agents/.venv/bin/sec-review-memory-worker"; then
+    echo "The service user cannot execute the memory worker." >&2
     exit 1
 fi
 if ! /usr/sbin/runuser -u "$service_user" -- \
@@ -171,8 +177,11 @@ render_unit \
     "$script_dir/sec-review-bot-control-plane.service.in" \
     "$unit_dir/sec-review-bot-control-plane.service"
 render_unit \
-    "$script_dir/sec-review-agents-execution-worker@.service.in" \
-    "$unit_dir/sec-review-agents-execution-worker@.service"
+    "$script_dir/sec-review-execution-worker@.service.in" \
+    "$unit_dir/sec-review-execution-worker@.service"
+render_unit \
+    "$script_dir/sec-review-memory-worker@.service.in" \
+    "$unit_dir/sec-review-memory-worker@.service"
 
 systemctl daemon-reload
 

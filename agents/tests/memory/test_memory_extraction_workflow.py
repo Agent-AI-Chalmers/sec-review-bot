@@ -6,7 +6,6 @@ import pytest
 from temporalio.common import WorkflowIDReusePolicy
 
 from sec_review_agents.artifacts.reference import ArtifactReference
-from sec_review_agents.entrypoints.execution_worker import main as worker
 from sec_review_agents.memory import extraction_workflow, maintenance_workflow
 from sec_review_agents.memory.extraction_workflow import (
     MemoryExtractionRequest,
@@ -20,6 +19,7 @@ from sec_review_agents.memory.maintenance_workflow import (
     MemoryMaintenanceRequest,
     MemoryMaintenanceWorkflow,
 )
+from sec_review_agents.temporal.config import DEFAULT_MEMORY_TASK_QUEUE
 
 
 def _reference() -> ArtifactReference:
@@ -28,17 +28,6 @@ def _reference() -> ArtifactReference:
         digest=f"sha256:{'a' * 64}",
         media_type="application/tar+zstd",
         size_bytes=42,
-    )
-
-
-def test_worker_registers_direct_memory_workflows_and_activities() -> None:
-    assert worker.MemoryExtractionWorkflow is MemoryExtractionWorkflow
-    assert worker.MemoryMaintenanceWorkflow is MemoryMaintenanceWorkflow
-    assert worker.run_memory_extraction_activity is (
-        extraction_workflow.run_memory_extraction_activity
-    )
-    assert worker.run_memory_maintenance_activity is (
-        maintenance_workflow.run_memory_maintenance_activity
     )
 
 
@@ -105,6 +94,48 @@ async def test_publication_starts_one_abandoned_child_per_review_unit(
         call[1]["id_reuse_policy"] is WorkflowIDReusePolicy.REJECT_DUPLICATE
         for call in started
     )
+    assert all(call[1]["task_queue"] == DEFAULT_MEMORY_TASK_QUEUE for call in started)
+
+
+@pytest.mark.asyncio
+async def test_publication_reports_already_started_extraction(
+    monkeypatch,
+) -> None:
+    async def fake_execute_activity(*_args, **_kwargs):
+        return {
+            "transcript_bundle": _reference().as_dict(),
+            "review_unit_ids": ["case-a"],
+        }
+
+    async def already_started(*_args, **_kwargs):
+        raise extraction_workflow.WorkflowAlreadyStartedError(
+            "memory-extraction:test", "MemoryExtractionWorkflow"
+        )
+
+    monkeypatch.setattr(
+        extraction_workflow.workflow, "execute_activity", fake_execute_activity
+    )
+    monkeypatch.setattr(
+        extraction_workflow.workflow, "start_child_workflow", already_started
+    )
+    monkeypatch.setattr(extraction_workflow.workflow, "logger", Mock())
+
+    result = await publish_and_start_memory_extractions(
+        TranscriptBundlePublicationRequest("run-1", "/tmp/run-1", [], 30),
+        source_workflow="issue-review",
+        start_extractions=True,
+    )
+
+    assert result["extractions"] == [
+        {
+            "review_unit_id": "case-a",
+            "workflow_id": memory_extraction_workflow_id(
+                transcript_digest=_reference().digest,
+                review_unit_id="case-a",
+            ),
+            "status": "already_started",
+        }
+    ]
 
 
 @pytest.mark.asyncio
@@ -232,6 +263,29 @@ async def test_catalog_observation_conflict_is_not_retried(monkeypatch) -> None:
 
     assert captured.value.type == "MEMORY_CATALOG_OBSERVATION_CONFLICT"
     assert captured.value.non_retryable is True
+
+
+@pytest.mark.asyncio
+async def test_extraction_activity_skips_when_processing_is_disabled(
+    monkeypatch,
+) -> None:
+    request = MemoryExtractionRequest(
+        source_workflow="issue-review",
+        run_id="run-1",
+        review_unit_id="review",
+        transcript_bundle=_reference().as_dict(),
+        timeout_seconds=30,
+    )
+    run_extraction = AsyncMock()
+    monkeypatch.setattr(extraction_workflow, "run_memory_extraction", run_extraction)
+    monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "false")
+
+    assert await extraction_workflow.run_memory_extraction_activity(request) == {
+        "ok": True,
+        "skipped": True,
+        "reason": "AGENT_MEMORY_PROCESSING_ENABLED is false.",
+    }
+    run_extraction.assert_not_awaited()
 
 
 @pytest.mark.asyncio

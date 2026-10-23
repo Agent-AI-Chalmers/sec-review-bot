@@ -5,16 +5,20 @@ from sec_review_agents.cli.local_materialization.common import (
     effective_issue_strategy,
 )
 from sec_review_agents.entrypoints.input_preparation import prepare_workflow_input
+from sec_review_agents.features import memory_processing_enabled
 from sec_review_agents.runtime.runtime_config import runtime_context_from_config
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
+from sec_review_agents.workflows.review_request import (
+    ReviewPostProcessingPolicy,
+    ReviewWorkflowRequest,
+)
 
 
 def build_local_workflow_request(
     bundle: ReviewBundle,
     *,
     timeout_seconds: int,
-) -> InternalWorkflowRequest:
-    return InternalWorkflowRequest(
+) -> ReviewWorkflowRequest:
+    return ReviewWorkflowRequest(
         workflow=bundle.workflow,
         run_id=bundle.run_id,
         prepared_input=prepare_workflow_input(
@@ -24,7 +28,9 @@ def build_local_workflow_request(
         ),
         timeout_seconds=timeout_seconds,
         runtime_context=runtime_context_from_config(bundle.runtime_config),
-        memory_extraction_enabled=False,
+        post_processing=ReviewPostProcessingPolicy(
+            memory_processing_enabled=memory_processing_enabled()
+        ),
     )
 
 

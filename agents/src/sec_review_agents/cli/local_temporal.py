@@ -17,9 +17,9 @@ from sec_review_agents.cli.local_materialization.common import (
     effective_issue_strategy,
 )
 from sec_review_agents.temporal.config import (
+    DEFAULT_EXECUTION_TASK_QUEUE,
     DEFAULT_TEMPORAL_ADDRESS,
     DEFAULT_TEMPORAL_NAMESPACE,
-    DEFAULT_TEMPORAL_TASK_QUEUE,
     DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
 )
 from sec_review_agents.utils.env import env_value, parse_int_env
@@ -37,7 +37,10 @@ class LocalTemporalConfig:
         return cls(
             address=env_value("TEMPORAL_ADDRESS") or DEFAULT_TEMPORAL_ADDRESS,
             namespace=env_value("TEMPORAL_NAMESPACE") or DEFAULT_TEMPORAL_NAMESPACE,
-            task_queue=env_value("TEMPORAL_TASK_QUEUE") or DEFAULT_TEMPORAL_TASK_QUEUE,
+            task_queue=(
+                env_value("TEMPORAL_EXECUTION_TASK_QUEUE")
+                or DEFAULT_EXECUTION_TASK_QUEUE
+            ),
             workflow_timeout_seconds=parse_int_env(
                 env_value("TEMPORAL_WORKFLOW_TIMEOUT_SECONDS"),
                 DEFAULT_WORKFLOW_TIMEOUT_SECONDS,

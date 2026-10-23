@@ -158,7 +158,7 @@ async def test_configured_schedules_ensure_only_maintenance(monkeypatch) -> None
         calls.append((client, task_queue))
         return {"action": "created", "schedule_id": "memory-maintenance"}
 
-    monkeypatch.setenv("AGENT_MEMORY_ENABLED", "true")
+    monkeypatch.setenv("AGENT_MEMORY_CONSUMPTION_ENABLED", "true")
     monkeypatch.setenv("AGENT_MEMORY_CATALOG_URL", "http://memory")
     monkeypatch.setenv("AGENT_MEMORY_CATALOG_TOKEN", "secret")
     monkeypatch.setattr(

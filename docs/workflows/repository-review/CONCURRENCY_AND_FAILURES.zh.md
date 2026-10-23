@@ -104,7 +104,7 @@ Discovery 是否值得调，取决于 chunk 数和单个 chunk 的耗时。如�
 
 ---
 
-Temporal 部署还通过 `TEMPORAL_MAX_CONCURRENT_ACTIVITIES` 限制单个 worker 进程同时执行的 activities 数量。上面的 workflow 并发配置控制 workflow 最多允许多少任务同时在飞。如果 worker 容量太小，workflow 已经调度出去的 activity 仍然会在 Temporal 侧等待。
+Temporal 部署还通过 `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` 限制单个 Execution Worker 进程同时执行的 review activities 数量。上面的 workflow 并发配置控制 workflow 最多允许多少任务同时在飞。如果 worker 容量太小，workflow 已经调度出去的 activity 仍然会在 Temporal 侧等待。
 
 ## 资源限制
 

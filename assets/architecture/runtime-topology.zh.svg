@@ -47,6 +47,21 @@
   <g>
     <rect x="250" y="420" width="1120" height="230" rx="7" class="group persistence" />
   </g>
+  <path d="M 195 130 L 280 130" class="edge" marker-end="url(#arrow)" />
+  <path d="M 195 290 L 280 290" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 440 130 L 495 130" class="edge" marker-end="url(#arrow)" />
+  <path d="M 440 290 L 470 290 L 470 148 L 495 148" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 665 130 L 710 130" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 870 130 L 895 130" class="edge" marker-end="url(#arrow)" />
+  <path d="M 1055 130 L 1080 130" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 975 166 L 975 254" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1055 290 L 1080 290" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 580 166 L 580 515" class="edge" marker-end="url(#arrow)" />
+  <path d="M 1160 326 L 1160 485 L 655 485 L 655 515" class="edge" marker-end="url(#arrow)" />
+  <path d="M 360 326 L 360 625 L 930 625 L 930 561 L 970 561" class="edge" marker-end="url(#arrow)" />
+  <path d="M 790 166 L 790 400 L 950 400 L 950 475 L 1075 475 L 1075 515" class="edge" marker-end="url(#arrow)" />
+  <path d="M 1240 130 L 1310 130 L 1310 561 L 1180 561" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 975 326 L 975 515" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
   <g id="operator" class="node external-node">
     <rect x="45" y="94" width="150" height="72" rx="8" class="node-surface" />
     <path d="M 53 95 H 187" class="node-accent" />
@@ -100,12 +115,20 @@
       <tspan x="975" dy="0">Temporal Server</tspan>
     </text>
   </g>
-  <g id="worker" class="node execution-node">
+  <g id="execution-worker" class="node execution-node">
     <rect x="1080" y="94" width="160" height="72" rx="8" class="node-surface" />
     <path d="M 1088 95 H 1232" class="node-accent" />
     <text x="1160" y="126" class="node-label" text-anchor="middle">
       <tspan x="1160" dy="0">Execution</tspan>
       <tspan x="1160" dy="18">Worker</tspan>
+    </text>
+  </g>
+  <g id="memory-worker" class="node memory-node">
+    <rect x="895" y="254" width="160" height="72" rx="8" class="node-surface" />
+    <path d="M 903 255 H 1047" class="node-accent" />
+    <text x="975" y="286" class="node-label" text-anchor="middle">
+      <tspan x="975" dy="0">Memory</tspan>
+      <tspan x="975" dy="18">Worker</tspan>
     </text>
   </g>
   <g id="catalog" class="node memory-node">
@@ -136,19 +159,6 @@
       <tspan x="1098" dy="0">对象存储</tspan>
     </text>
   </g>
-  <path d="M 195 130 L 280 130" class="edge" marker-end="url(#arrow)" />
-  <path d="M 195 290 L 280 290" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 440 130 L 495 130" class="edge" marker-end="url(#arrow)" />
-  <path d="M 440 290 L 470 290 L 470 148 L 495 148" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 665 130 L 710 130" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 870 130 L 895 130" class="edge" marker-end="url(#arrow)" />
-  <path d="M 1055 130 L 1080 130" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 1160 166 L 1160 254" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 580 166 L 580 515" class="edge" marker-end="url(#arrow)" />
-  <path d="M 1160 326 L 1160 485 L 655 485 L 655 515" class="edge" marker-end="url(#arrow)" />
-  <path d="M 360 326 L 360 625 L 930 625 L 930 561 L 970 561" class="edge" marker-end="url(#arrow)" />
-  <path d="M 790 166 L 790 400 L 950 400 L 950 475 L 1075 475 L 1075 515" class="edge" marker-end="url(#arrow)" />
-  <path d="M 1240 130 L 1310 130 L 1310 561 L 1180 561" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
   <text x="810" y="454" class="group-label" text-anchor="middle">
     <tspan x="810" dy="0">持久化设施</tspan>
   </text>

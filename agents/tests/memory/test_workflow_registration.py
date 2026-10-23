@@ -4,22 +4,13 @@ from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.memory.extraction_workflow import (
     TranscriptBundlePublicationRequest,
 )
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.issue import workflow as issue_workflow
 from sec_review_agents.workflows.pull_request import workflow as pr_workflow
 from sec_review_agents.workflows.repository import workflow as repository_workflow
-
-
-def test_internal_workflow_request_enables_memory_extraction_by_default() -> None:
-    request = InternalWorkflowRequest(
-        workflow="issue-review",
-        run_id="run-1",
-        prepared_input={},
-        timeout_seconds=30,
-        runtime_context={},
-    )
-
-    assert request.memory_extraction_enabled is True
+from sec_review_agents.workflows.review_request import (
+    ReviewPostProcessingPolicy,
+    ReviewWorkflowRequest,
+)
 
 
 @pytest.mark.asyncio
@@ -44,7 +35,7 @@ async def test_issue_review_publishes_transcripts_and_starts_memory(
     )
     monkeypatch.setattr(issue_workflow, "execute_activity", fake_execute_activity)
 
-    request = InternalWorkflowRequest(
+    request = ReviewWorkflowRequest(
         workflow="issue-review",
         run_id="run-1",
         prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
@@ -89,7 +80,7 @@ async def test_pull_request_review_publishes_transcripts_and_starts_memory(
     )
     monkeypatch.setattr(pr_workflow, "execute_activity", fake_execute_activity)
 
-    request = InternalWorkflowRequest(
+    request = ReviewWorkflowRequest(
         workflow="pull-request-review",
         run_id="run-1",
         prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
@@ -127,7 +118,7 @@ async def test_repository_review_without_cases_does_not_publish_empty_bundle(
         fake_execute_child_workflow,
     )
 
-    request = InternalWorkflowRequest(
+    request = ReviewWorkflowRequest(
         workflow="repository-review",
         run_id="run-1",
         prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
@@ -181,7 +172,7 @@ async def test_repository_review_publishes_all_case_units_once(monkeypatch) -> N
         fake_publish,
     )
 
-    request = InternalWorkflowRequest(
+    request = ReviewWorkflowRequest(
         workflow="repository-review",
         run_id="run-1",
         prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
@@ -269,16 +260,16 @@ async def test_repository_case_does_not_publish_before_parent_run_finishes(
 
 
 @pytest.mark.asyncio
-async def test_issue_review_still_publishes_when_memory_extraction_is_disabled(
+async def test_issue_review_still_publishes_transcripts_for_direct_control(
     monkeypatch,
 ) -> None:
-    request = InternalWorkflowRequest(
+    request = ReviewWorkflowRequest(
         workflow="issue-review",
         run_id="run-1",
         prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
         timeout_seconds=30,
         runtime_context={},
-        memory_extraction_enabled=False,
+        post_processing=ReviewPostProcessingPolicy(memory_processing_enabled=False),
     )
 
     calls: list[bool] = []

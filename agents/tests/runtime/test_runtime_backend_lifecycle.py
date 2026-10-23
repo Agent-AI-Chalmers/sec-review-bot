@@ -464,7 +464,7 @@ def test_repository_analyzer_backend_omits_memory_when_globally_disabled(
         patch.dict(
             "os.environ",
             {
-                "AGENT_MEMORY_ENABLED": "false",
+                "AGENT_MEMORY_CONSUMPTION_ENABLED": "false",
                 "AGENT_MEMORY_DIR": str(memory_root),
             },
         ),

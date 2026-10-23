@@ -217,7 +217,6 @@ async def _replay_one_case(
             ),
             "timeout_seconds": DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
             "runtime_context": {},
-            "memory_extraction_enabled": False,
         }
         return await run_repository_case_review_direct(request)
 

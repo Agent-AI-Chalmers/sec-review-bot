@@ -35,4 +35,4 @@ COPY --from=contracts integration-contract /contracts/integration-contract
 COPY --from=contracts execution-contract /contracts/execution-contract
 RUN uv sync --frozen --no-dev
 
-CMD ["sec-review-agents-execution-worker"]
+CMD ["sec-review-execution-worker"]

@@ -23,7 +23,7 @@ class MemoryMaintenanceRequest:
 async def run_memory_maintenance_activity(
     request: MemoryMaintenanceRequest,
 ) -> dict[str, Any]:
-    from sec_review_agents.features import agent_memory_enabled
+    from sec_review_agents.features import memory_processing_enabled
     from sec_review_agents.memory.catalog_client import (
         configured_memory_catalog_client,
     )
@@ -57,8 +57,8 @@ async def run_memory_maintenance_activity(
             "ok": True,
             "skipped": True,
             "reason": (
-                "AGENT_MEMORY_ENABLED is false."
-                if not agent_memory_enabled()
+                "AGENT_MEMORY_PROCESSING_ENABLED is false."
+                if not memory_processing_enabled()
                 else "AGENT_MEMORY_DIR is not configured."
             ),
         }
@@ -79,7 +79,7 @@ async def run_memory_maintenance_activity(
 
 @activity.defn
 def count_pending_memory_observations_activity() -> dict[str, Any]:
-    from sec_review_agents.features import agent_memory_enabled
+    from sec_review_agents.features import memory_processing_enabled
     from sec_review_agents.memory.catalog_client import (
         configured_memory_catalog_client,
     )
@@ -109,8 +109,8 @@ def count_pending_memory_observations_activity() -> dict[str, Any]:
             "skipped": True,
             "pending_count": 0,
             "reason": (
-                "AGENT_MEMORY_ENABLED is false."
-                if not agent_memory_enabled()
+                "AGENT_MEMORY_PROCESSING_ENABLED is false."
+                if not memory_processing_enabled()
                 else "AGENT_MEMORY_DIR is not configured."
             ),
         }

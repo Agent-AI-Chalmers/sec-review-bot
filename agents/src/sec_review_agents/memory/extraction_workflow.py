@@ -9,6 +9,7 @@ from temporalio import activity, workflow
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import WorkflowAlreadyStartedError
 
+from sec_review_agents.temporal.config import DEFAULT_MEMORY_TASK_QUEUE
 from sec_review_agents.temporal.support import activity_retry_policy
 
 
@@ -61,8 +62,9 @@ async def publish_and_start_memory_extractions(
         )
     except Exception as error:
         workflow.logger.warning(
-            "Failed to publish transcript bundle for %s: %s",
+            "Failed to publish transcript bundle run_id=%s error_type=%s error=%s",
             request.run_id,
+            type(error).__name__,
             error,
         )
         return {
@@ -101,6 +103,7 @@ async def publish_and_start_memory_extractions(
                     timeout_seconds=request.timeout_seconds,
                 ),
                 id=extraction_id,
+                task_queue=DEFAULT_MEMORY_TASK_QUEUE,
                 parent_close_policy=workflow.ParentClosePolicy.ABANDON,
                 id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
             )
@@ -251,10 +254,17 @@ async def run_memory_extraction_activity(
 ) -> dict[str, Any]:
     from temporalio.exceptions import ApplicationError
 
+    from sec_review_agents.features import memory_processing_enabled
     from sec_review_agents.memory.catalog_client import MemoryCatalogConflictError
     from sec_review_agents.utils.env import bootstrap_agents_env
 
     bootstrap_agents_env()
+    if not memory_processing_enabled():
+        return {
+            "ok": True,
+            "skipped": True,
+            "reason": "AGENT_MEMORY_PROCESSING_ENABLED is false.",
+        }
     try:
         return await run_memory_extraction(request)
     except MemoryCatalogConflictError as error:

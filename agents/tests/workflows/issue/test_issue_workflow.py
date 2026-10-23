@@ -4,12 +4,12 @@ from unittest.mock import patch
 
 import pytest
 
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.issue.direct import run_issue_review_direct
 from sec_review_agents.workflows.issue.workflow import (
     mitigate_issue_activity,
     verify_issue_activity,
 )
+from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 
 @pytest.mark.asyncio
@@ -50,7 +50,7 @@ async def test_direct_review_records_skipped_verification_without_confirmed_targ
         "overview": "Verification skipped.",
         "resolution_next_step": "none",
     }
-    request = InternalWorkflowRequest(
+    request = ReviewWorkflowRequest(
         workflow="issue-review",
         run_id="run-no-target",
         prepared_input={},

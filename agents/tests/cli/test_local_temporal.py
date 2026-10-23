@@ -74,6 +74,17 @@ def test_local_issue_strategy_uses_distinct_workflow_id() -> None:
     assert local_workflow_id(_issue_bundle("single-agent")) == "run-1:single-agent"
 
 
+def test_local_temporal_request_respects_memory_processing_flag(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "false")
+    request = build_local_workflow_request(
+        _prepared_issue_bundle(tmp_path), timeout_seconds=30
+    )
+
+    assert request.post_processing.memory_processing_enabled is False
+
+
 def test_local_temporal_uses_materialized_artifact_root(
     tmp_path: Path,
     monkeypatch,
@@ -83,7 +94,7 @@ def test_local_temporal_uses_materialized_artifact_root(
     config = LocalTemporalConfig(
         address="127.0.0.1:7233",
         namespace="default",
-        task_queue="sec-review-agents",
+        task_queue="sec-review-execution",
         workflow_timeout_seconds=30,
     )
 
@@ -95,4 +106,3 @@ def test_local_temporal_uses_materialized_artifact_root(
     assert request.prepared_input["artifact_root_path"] == str(
         bundle.artifact_root_path
     )
-    assert request.memory_extraction_enabled is False

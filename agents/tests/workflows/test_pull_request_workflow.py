@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 import pytest
 
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.pull_request.direct import (
     run_pull_request_review_direct,
 )
@@ -12,6 +11,7 @@ from sec_review_agents.workflows.pull_request.workflow import (
     mitigate_pull_request_activity,
     verify_pull_request_activity,
 )
+from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 
 def _prepared_input(artifact_root: Path) -> dict[str, Any]:
@@ -97,7 +97,7 @@ async def test_direct_review_records_skipped_verification_without_confirmed_targ
         "overview": "Verification skipped.",
         "resolution_next_step": "none",
     }
-    request = InternalWorkflowRequest(
+    request = ReviewWorkflowRequest(
         workflow="pull-request-review",
         run_id="run-no-target",
         prepared_input={},

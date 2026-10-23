@@ -517,9 +517,12 @@ export class PreparationStore {
         [runId, this.connectorId, token, error.code ?? null, error.message]
       )
       if (prepared.rowCount !== 1)
-        throw new Error(
-          `Preparation ${runId} lost its claim before it could be marked failed.`
-        )
+        // Losing the compare-and-set is the expected result when a lease expiry or another
+        // owner concludes this preparation first. The token fence did its job: this caller must
+        // not write a second terminal transition, but it also must not turn the winner's valid
+        // transition into a server error. `false` means that this invocation scheduled no retry;
+        // the durable row and its audit event belong to whichever owner won the fence.
+        return { retry_scheduled: false }
       // An `uncertain` execution deliberately keeps `started_at` NULL: the submission may never
       // have been accepted, so the phase has not provably begun. `completeSubmissionRecovery`
       // fills the start once a replay is accepted; do not set it here.

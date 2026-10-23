@@ -12,12 +12,12 @@ import pytest
 from sec_review_agents.agents.delivery_planning.workbench_state import (
     DeliveryWorkbenchState,
 )
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.repository import direct as repository_direct
 from sec_review_agents.workflows.repository.workflow import (
     plan_repository_delivery_activity,
     prepare_repository_delivery_execution_activity,
 )
+from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from sec_review_agents.workspace.file_changes import (
     FileChange,
     collect_publishable_file_changes,
@@ -78,7 +78,7 @@ async def _execute_delivery_direct_for_test(
             workspace_path=workspace_path,
             tar_path=Path(input_data["bundle_paths"]["workspace_snapshot_tar_path"]),
         )
-    request = InternalWorkflowRequest(
+    request = ReviewWorkflowRequest(
         workflow="repository-review",
         run_id="delivery-execution-test",
         prepared_input=input_data,
@@ -101,7 +101,7 @@ async def _run_repository_delivery_workflow_steps_for_test(
     input_data: dict,
     case_results: list[dict],
 ) -> dict[str, Any]:
-    request = InternalWorkflowRequest(
+    request = ReviewWorkflowRequest(
         workflow="repository-review",
         run_id=input_data["run_id"],
         prepared_input=input_data,
@@ -409,7 +409,7 @@ class TestRepositoryDeliveryExecution:
                 },
             ]
         }
-        request = InternalWorkflowRequest(
+        request = ReviewWorkflowRequest(
             workflow="repository-review",
             run_id=self.run_id,
             prepared_input=self.input_data,

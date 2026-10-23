@@ -64,7 +64,7 @@ async def run_external_tool_case(
                 external_tool_enabled and case.tool == "playwright"
             ),
             "AGENT_MCP_ENABLED": "false",
-            "AGENT_MEMORY_ENABLED": "false",
+            "AGENT_MEMORY_CONSUMPTION_ENABLED": "false",
             "AGENT_SKILLS_ENABLED": "false",
         },
         clear=False,

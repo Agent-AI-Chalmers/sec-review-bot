@@ -12,12 +12,12 @@ from sec_review_agents.temporal.support import (
     execute_activity,
     prepare_internal_workflow_activity,
 )
-from sec_review_agents.workflows.execution_request import InternalWorkflowRequest
 from sec_review_agents.workflows.review_intent import (
     ReviewObjective,
     TestChangesPolicy,
     require_review_intent,
 )
+from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 
 async def run_issue_single_agent(
@@ -70,7 +70,7 @@ async def run_issue_single_agent(
 
 @activity.defn
 async def run_issue_single_agent_activity(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
@@ -106,7 +106,7 @@ async def run_issue_single_agent_activity(
 
 @activity.defn
 def build_issue_single_agent_result_activity(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
     single_agent_result: dict[str, Any],
 ) -> dict[str, Any]:
     from sec_review_agents.utils.files import persist_json_artifact
@@ -129,7 +129,7 @@ def build_issue_single_agent_result_activity(
 @workflow.defn
 class IssueSingleAgentWorkflow:
     @workflow.run
-    async def run(self, request: InternalWorkflowRequest) -> dict[str, Any]:
+    async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
         await execute_activity(
             prepare_internal_workflow_activity,
             request.workflow,
@@ -260,7 +260,7 @@ async def execute_issue_single_agent(
 
 
 async def run_issue_single_agent_direct(
-    request: InternalWorkflowRequest,
+    request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
     prepare_internal_workflow_activity(request.workflow, request.run_id)
     single_agent_result = await run_issue_single_agent_activity(request)
