@@ -86,7 +86,7 @@ def persist_cvss_failure(
     cvss_artifacts_path: Path,
     error: str,
 ) -> None:
-    """Persist execution diagnostics without fabricating a CVSS stage result."""
+    """Persist a scoring failure observed by the running CVSS stage."""
     remove_json_artifacts(cvss_artifacts_path, ("cvss-v4-result",))
     persist_json_artifact(
         cvss_artifacts_path,

@@ -7,6 +7,7 @@ from sec_review_agents.observability.diagnostics import (
     log_stage_failed,
     log_stage_started,
 )
+from sec_review_agents.review_stages.cvss.stage import persist_cvss_failure
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.repository_case.analysis import (
@@ -187,6 +188,7 @@ async def score_repository_case_cvss_stage(
     *,
     cvss_artifacts_path: Path,
 ) -> dict[str, Any]:
+    """Score CVSS and persist failures raised during the scoring execution."""
     case_id = case_execution_input.get("case_id")
     workspace_snapshot_tar_path = _case_path(
         case_execution_input, "workspace_snapshot_tar_path"
@@ -213,6 +215,12 @@ async def score_repository_case_cvss_stage(
         )
         return result
     except Exception as error:
+        # Record failures the scoring execution can classify. Its caller owns
+        # scheduling, timeout, cancellation, and worker-lifecycle diagnostics.
+        persist_cvss_failure(
+            cvss_artifacts_path=cvss_artifacts_path,
+            error=f"{type(error).__name__}: {error}",
+        )
         log_stage_failed(
             stage="cvss-v4-scoring",
             started_at=started_at,

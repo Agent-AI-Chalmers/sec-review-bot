@@ -9,13 +9,11 @@ from sec_review_agents.review_stages.feedback_loop import (
 )
 from sec_review_agents.workflows.repository.workflow import (
     RepositoryCaseReviewRequest,
-    _stage_error_message,
     analyze_repository_case_activity,
     archive_repository_case_feedback_attempt_activity,
     build_repository_case_result_activity,
     mitigate_repository_case_activity,
     prepare_repository_case_activity,
-    record_repository_case_cvss_failure_activity,
     score_repository_case_cvss_activity,
     verify_repository_case_activity,
 )
@@ -84,16 +82,12 @@ async def run_repository_case_review_direct(
                 retry_context,
                 runtime_context,
             )
-        # Match the workflow path: CVSS scoring failures do not block
-        # mitigation/verifier output, but public CVSS remains empty.
+        # Match the workflow path: observed scoring failures are persisted by the
+        # stage, while CVSS remains advisory to the case result.
         cvss_result: dict[str, Any] | None
         try:
             cvss_result = await cvss_result_task
-        except Exception as cvss_error:
-            record_repository_case_cvss_failure_activity(
-                prepared_case,
-                _stage_error_message(cvss_error),
-            )
+        except Exception:
             cvss_result = None
     except Exception:
         cvss_result_task.cancel()

@@ -75,10 +75,6 @@ def build_blocked_repository_case_result(
     }
 
 
-def _stage_error_message(error: Exception) -> str:
-    return f"{type(error).__name__}: {error}"
-
-
 def _repository_case_timeout_seconds(
     request: ReviewWorkflowRequest,
 ) -> int:
@@ -405,27 +401,6 @@ async def score_repository_case_cvss_activity(
             prepared_case["artifact_paths"],
             "cvss",
         ),
-    )
-
-
-@activity.defn
-def record_repository_case_cvss_failure_activity(
-    prepared_case: dict[str, Any],
-    error: str,
-) -> None:
-    from sec_review_agents.observability.trace_context import bind_trace_context
-    from sec_review_agents.review_stages.cvss.stage import (
-        persist_cvss_failure,
-    )
-    from sec_review_agents.utils.paths import artifact_path
-
-    bind_trace_context(workflow="repository-review")
-    persist_cvss_failure(
-        cvss_artifacts_path=artifact_path(
-            prepared_case["artifact_paths"],
-            "cvss",
-        ),
-        error=error,
     )
 
 
@@ -1009,17 +984,13 @@ class RepositoryCaseReviewWorkflow:
                     schedule_to_close_timeout=activity_timeout,
                     retry_policy=retry_policy,
                 )
-            # CVSS is advisory for the case record. If scoring exhausts retries,
-            # preserve the mitigation/verifier result and leave public CVSS empty.
+            # CVSS is advisory. Scoring failures observed by the activity are
+            # persisted there; Temporal remains the record for infrastructure
+            # failures that happen outside the activity execution.
             try:
                 cvss_result = await cvss_task
-            except Exception as cvss_error:
-                cvss_result = await workflow.execute_activity(
-                    record_repository_case_cvss_failure_activity,
-                    args=[prepared_case, _stage_error_message(cvss_error)],
-                    schedule_to_close_timeout=activity_timeout,
-                    retry_policy=retry_policy,
-                )
+            except Exception:
+                cvss_result = None
         except Exception:
             if not cvss_task.done():
                 cvss_task.cancel()
@@ -1291,7 +1262,6 @@ __all__ = [
     "prepare_repository_case_review_inputs_activity",
     "prepare_repository_delivery_execution_activity",
     "project_repository_case_result_for_delivery",
-    "record_repository_case_cvss_failure_activity",
     "scan_repository_discovery_chunk_activity",
     "score_repository_case_cvss_activity",
     "triage_repository_activity",
