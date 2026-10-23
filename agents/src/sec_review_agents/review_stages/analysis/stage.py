@@ -84,10 +84,16 @@ async def run_analysis_stage(
                     user_prompt=user_prompt,
                     transcript_paths=transcript_paths,
                 )
-        return persist_analysis_stage_result(
-            agent_output=agent_output,
-            analyzer_artifacts_path=analyzer_artifacts_path,
+        result = build_analysis_stage_result(
+            overview=agent_output["overview"],
+            narratives=agent_output["narratives"],
+            verdict=agent_output["overall_verdict"],
         )
+        persist_analysis_stage_result(
+            analyzer_artifacts_path=analyzer_artifacts_path,
+            result=result,
+        )
+        return result
 
 
 def reset_analysis_artifacts(*, analyzer_artifacts_path: Path) -> None:
@@ -110,20 +116,15 @@ def prepare_analysis_transcript(
 
 def persist_analysis_stage_result(
     *,
-    agent_output: dict[str, Any],
     analyzer_artifacts_path: Path,
-) -> dict[str, Any]:
-    result = build_analysis_stage_result(
-        overview=agent_output["overview"],
-        narratives=agent_output["narratives"],
-        verdict=agent_output["overall_verdict"],
-    )
+    result: dict[str, Any],
+) -> None:
+    """Persist an already-built analysis result."""
     persist_json_artifact(
         analyzer_artifacts_path,
         "analysis-result",
         result,
     )
-    return result
 
 
 __all__ = [

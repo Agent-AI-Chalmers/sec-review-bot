@@ -34,25 +34,6 @@ from sec_review_agents.workspace.snapshots import (
 )
 
 
-def _build_completed_single_agent_outcome(
-    *,
-    agent_output: dict,
-    file_changes: list[dict[str, Any]],
-    patch_diff: str,
-) -> dict[str, Any]:
-    return build_single_agent_fix_outcome(
-        overview=agent_output["overview"],
-        verdict=agent_output["verdict"],
-        validation_level=agent_output["validation_level"],
-        regression_status=agent_output["regression_status"],
-        target_claim=agent_output["target_claim"],
-        file_changes=file_changes,
-        patch_diff=patch_diff,
-        residual_risks=agent_output["residual_risks"],
-        self_check_notes=agent_output["self_check_notes"],
-    )
-
-
 async def run_single_agent_stage(
     *,
     agent_name: str,
@@ -130,22 +111,17 @@ async def run_single_agent_stage(
             "workspace.patch",
             patch_artifact["patch_diff"],
         )
-        return build_single_agent_stage_outcome(
-            agent_output=agent_output,
-            patch_artifact=patch_artifact,
+        return build_single_agent_fix_outcome(
+            overview=agent_output["overview"],
+            verdict=agent_output["verdict"],
+            validation_level=agent_output["validation_level"],
+            regression_status=agent_output["regression_status"],
+            target_claim=agent_output["target_claim"],
+            file_changes=patch_artifact["file_changes"],
+            patch_diff=patch_artifact["patch_diff"],
+            residual_risks=agent_output["residual_risks"],
+            self_check_notes=agent_output["self_check_notes"],
         )
-
-
-def build_single_agent_stage_outcome(
-    *,
-    agent_output: dict[str, Any],
-    patch_artifact: dict[str, Any],
-) -> dict[str, Any]:
-    return _build_completed_single_agent_outcome(
-        agent_output=agent_output,
-        file_changes=patch_artifact.get("file_changes", []),
-        patch_diff=str(patch_artifact.get("patch_diff") or ""),
-    )
 
 
 __all__ = [
