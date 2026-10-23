@@ -23,7 +23,7 @@ from sec_review_agents.scan_stages.discovery.result import (
     DiscoveryFileResult,
     DiscoveryResult,
 )
-from sec_review_agents.utils.env import parse_int_env
+from sec_review_agents.utils.env import int_env
 from sec_review_agents.utils.files import persist_json_artifact, remove_json_artifacts
 from sec_review_agents.utils.paths_ignore import (
     matches_paths_ignore,
@@ -162,12 +162,10 @@ def _classify_candidate_file(relative_path: Path) -> tuple[bool, str, str]:
 
 
 def _resolve_discovery_max_file_bytes() -> tuple[int, str]:
-    env_max_file_bytes = parse_int_env(
-        os.environ.get("AGENT_DISCOVERY_MAX_FILE_BYTES"), None
-    )
+    env_max_file_bytes = int_env("AGENT_DISCOVERY_MAX_FILE_BYTES", None, minimum=0)
 
     if env_max_file_bytes is not None:
-        return max(0, env_max_file_bytes), "AGENT_DISCOVERY_MAX_FILE_BYTES"
+        return env_max_file_bytes, "AGENT_DISCOVERY_MAX_FILE_BYTES"
     return DEFAULT_DISCOVERY_MAX_FILE_BYTES, "default"
 
 
@@ -793,17 +791,14 @@ async def execute_discovery(
 
 
 def _resolve_discovery_max_concurrency(entry_count: int) -> int:
-    configured = (
-        parse_int_env(
-            os.environ.get("AGENT_DISCOVERY_MAX_CONCURRENCY"),
-            DEFAULT_DISCOVERY_MAX_CONCURRENCY,
-        )
-        or DEFAULT_DISCOVERY_MAX_CONCURRENCY
+    configured = int_env(
+        "AGENT_DISCOVERY_MAX_CONCURRENCY",
+        DEFAULT_DISCOVERY_MAX_CONCURRENCY,
+        minimum=1,
     )
-    bounded = max(1, configured)
     if entry_count <= 0:
         return 1
-    return min(bounded, entry_count)
+    return min(configured, entry_count)
 
 
 async def scan_discovery_chunk(

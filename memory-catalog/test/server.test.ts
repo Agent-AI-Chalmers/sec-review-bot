@@ -22,7 +22,7 @@ const revision = {
   created_at: '2026-10-23T00:00:00.000Z',
 }
 
-void test('the contract authenticates and validates observation registration', async () => {
+await test('the contract authenticates and validates observation registration', async () => {
   const observations: unknown[] = []
   const store: MemoryCatalogStore = {
     initialize: () => Promise.resolve(),
@@ -82,7 +82,7 @@ void test('the contract authenticates and validates observation registration', a
   await app.close()
 })
 
-void test('an observation identity conflict is a declared 409', async () => {
+await test('an observation identity conflict is a declared 409', async () => {
   const store: MemoryCatalogStore = {
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
@@ -130,7 +130,7 @@ void test('an observation identity conflict is a declared 409', async () => {
   await app.close()
 })
 
-void test('revision history is queryable through the public contract', async () => {
+await test('revision history is queryable through the public contract', async () => {
   const calls: unknown[] = []
   const store: MemoryCatalogStore = {
     initialize: () => Promise.resolve(),

@@ -10,16 +10,13 @@ from langchain_core.messages import AIMessage
 from langgraph.runtime import Runtime
 
 from sec_review_agents.observability.diagnostics import log_diagnostic
-from sec_review_agents.utils.env import env_value, parse_bool_env
+from sec_review_agents.utils.env import bool_env
 
 _CONTENT_TEXT_KEYS = ("text", "content", "input", "reasoning", "thinking")
 
 
 def model_turn_diagnostics_enabled() -> bool:
-    return parse_bool_env(
-        env_value("AGENT_MODEL_TURN_DIAGNOSTICS"),
-        True,
-    )
+    return bool_env("AGENT_MODEL_TURN_DIAGNOSTICS", True)
 
 
 def _content_block_has_substantive_content(item: Any) -> bool:

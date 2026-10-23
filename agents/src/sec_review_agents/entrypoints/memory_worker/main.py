@@ -9,23 +9,20 @@ from sec_review_agents.entrypoints.memory_worker.workflows import ACTIVITIES, WO
 from sec_review_agents.memory.schedule import ensure_configured_memory_schedules
 from sec_review_agents.temporal.config import DEFAULT_MEMORY_TASK_QUEUE
 from sec_review_agents.temporal.worker_runtime import connect_temporal_client
-from sec_review_agents.utils.env import env_value, parse_int_env
+from sec_review_agents.utils.env import int_env
 
 DEFAULT_MAX_CONCURRENT_ACTIVITIES = 1
 
 
 async def run_worker() -> None:
-    client = await connect_temporal_client()
     task_queue = DEFAULT_MEMORY_TASK_QUEUE
-    await ensure_configured_memory_schedules(client, task_queue=task_queue)
-    max_concurrent_activities = max(
-        1,
-        parse_int_env(
-            env_value("TEMPORAL_MEMORY_MAX_CONCURRENT_ACTIVITIES"),
-            DEFAULT_MAX_CONCURRENT_ACTIVITIES,
-        )
-        or DEFAULT_MAX_CONCURRENT_ACTIVITIES,
+    max_concurrent_activities = int_env(
+        "TEMPORAL_MEMORY_MAX_CONCURRENT_ACTIVITIES",
+        DEFAULT_MAX_CONCURRENT_ACTIVITIES,
+        minimum=1,
     )
+    client = await connect_temporal_client()
+    await ensure_configured_memory_schedules(client, task_queue=task_queue)
     with ThreadPoolExecutor(max_workers=max_concurrent_activities) as executor:
         worker = Worker(
             client,

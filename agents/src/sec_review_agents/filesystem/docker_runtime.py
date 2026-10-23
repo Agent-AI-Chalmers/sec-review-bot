@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 
 from sec_review_agents.filesystem.command_output import combine_command_output
 from sec_review_agents.filesystem.limits import DEFAULT_COMMAND_TIMEOUT_MS
-from sec_review_agents.utils.env import env_value, parse_bool_env, parse_int_env
+from sec_review_agents.utils.env import bool_env, env_value, int_env
 
 DEFAULT_DOCKER_SANDBOX_IMAGE = "mcr.microsoft.com/devcontainers/universal:6-noble"
 
@@ -171,12 +171,11 @@ def create_docker_container_resource(
         mounts=mounts,
         working_directory=working_directory,
         environment={},
-        auto_remove=parse_bool_env(env_value("AGENT_DOCKER_AUTO_REMOVE"), True),
+        auto_remove=bool_env("AGENT_DOCKER_AUTO_REMOVE", True),
         network_mode=env_value("AGENT_DOCKER_NETWORK_MODE") or "none",
         user=env_value("AGENT_DOCKER_USER") or None,
-        timeout_ms=parse_int_env(
-            env_value("AGENT_COMMAND_TIMEOUT_MS"),
-            DEFAULT_COMMAND_TIMEOUT_MS,
+        timeout_ms=int_env(
+            "AGENT_COMMAND_TIMEOUT_MS", DEFAULT_COMMAND_TIMEOUT_MS, minimum=1
         ),
     )
 

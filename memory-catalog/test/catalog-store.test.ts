@@ -19,7 +19,7 @@ const audit = {
   size_bytes: 21,
 }
 
-void test('maintenance commit records immutable history before moving the active pointer', async () => {
+await test('maintenance commit records immutable history before moving the active pointer', async () => {
   const statements: Array<{ sql: string; parameters?: unknown[] }> = []
   const client = {
     query: (sql: string, parameters?: unknown[]) => {
@@ -63,7 +63,7 @@ void test('maintenance commit records immutable history before moving the active
   assert.deepEqual(statements[5]?.parameters, [4])
 })
 
-void test('revision history pagination returns an exclusive descending cursor', async () => {
+await test('revision history pagination returns an exclusive descending cursor', async () => {
   const queried: unknown[][] = []
   const pool = {
     query: (_sql: string, parameters: unknown[]) => {

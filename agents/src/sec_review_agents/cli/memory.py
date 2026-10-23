@@ -35,7 +35,7 @@ from sec_review_agents.temporal.config import (
     DEFAULT_TEMPORAL_NAMESPACE,
     DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
 )
-from sec_review_agents.utils.env import bootstrap_agents_env, env_value, parse_int_env
+from sec_review_agents.utils.env import bootstrap_agents_env, env_value, int_env
 
 DEFAULT_MAINTENANCE_BATCH_SIZE = 10
 
@@ -53,11 +53,11 @@ def _add_temporal_options(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--timeout-seconds",
         type=int,
-        default=parse_int_env(
-            env_value("TEMPORAL_WORKFLOW_TIMEOUT_SECONDS"),
+        default=int_env(
+            "TEMPORAL_WORKFLOW_TIMEOUT_SECONDS",
             DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
-        )
-        or DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
+            minimum=1,
+        ),
         help="Timeout passed to memory workflow activities.",
     )
     parser.add_argument(

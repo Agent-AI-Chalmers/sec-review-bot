@@ -1,5 +1,7 @@
 import { isIP } from 'node:net'
 
+import { integerEnv } from './env.js'
+
 import type {
   ControlPlaneWorkflow,
   ExecutionArtifactStorage
@@ -235,13 +237,6 @@ function serviceUrl(): string {
   return value.replace(/\/+$/, '')
 }
 
-function integerEnv(name: string, fallback: number, allowZero = false): number {
-  const parsed = Number.parseInt(process.env[name] ?? '', 10)
-  return Number.isFinite(parsed) && (allowZero ? parsed >= 0 : parsed > 0)
-    ? parsed
-    : fallback
-}
-
 function isLoopback(hostname: string): boolean {
   if (hostname === 'localhost') return true
   const value =
@@ -306,7 +301,7 @@ async function request(
   bodyParseError?: SyntaxError
 }> {
   const base = serviceUrl()
-  const retries = integerEnv('EXECUTION_API_REQUEST_RETRIES', 2, true)
+  const retries = integerEnv('EXECUTION_API_REQUEST_RETRIES', 2, 0)
   const timeout = integerEnv('EXECUTION_API_REQUEST_TIMEOUT_MS', 30_000)
   const delay = integerEnv('EXECUTION_API_RETRY_BASE_DELAY_MS', 500)
   let lastError: unknown

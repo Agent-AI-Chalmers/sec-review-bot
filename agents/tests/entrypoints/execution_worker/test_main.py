@@ -57,3 +57,20 @@ async def test_worker_applies_activity_concurrency_to_temporal_and_executor(
     assert captured["executor_max_workers"] == expected
     assert captured["worker_max_concurrent_activities"] == expected
     assert isinstance(captured["activity_executor"], FakeExecutor)
+
+
+@pytest.mark.asyncio
+async def test_worker_rejects_invalid_concurrency_before_connecting(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES", "many")
+    connect = AsyncMock()
+    monkeypatch.setattr(worker_module, "connect_temporal_client", connect)
+
+    with pytest.raises(
+        ValueError,
+        match="TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES must be a decimal integer",
+    ):
+        await worker_module.run_worker()
+
+    connect.assert_not_awaited()

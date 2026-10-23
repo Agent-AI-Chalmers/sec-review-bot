@@ -13,24 +13,21 @@ from sec_review_agents.temporal.config import (
     DEFAULT_EXECUTION_TASK_QUEUE,
 )
 from sec_review_agents.temporal.worker_runtime import connect_temporal_client
-from sec_review_agents.utils.env import env_value, parse_int_env
+from sec_review_agents.utils.env import env_value, int_env
 
 DEFAULT_MAX_CONCURRENT_ACTIVITIES = 2
 
 
 async def run_worker() -> None:
-    client = await connect_temporal_client()
     task_queue = (
         env_value("TEMPORAL_EXECUTION_TASK_QUEUE") or DEFAULT_EXECUTION_TASK_QUEUE
     )
-    max_concurrent_activities = max(
-        1,
-        parse_int_env(
-            env_value("TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES"),
-            DEFAULT_MAX_CONCURRENT_ACTIVITIES,
-        )
-        or DEFAULT_MAX_CONCURRENT_ACTIVITIES,
+    max_concurrent_activities = int_env(
+        "TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES",
+        DEFAULT_MAX_CONCURRENT_ACTIVITIES,
+        minimum=1,
     )
+    client = await connect_temporal_client()
     with ThreadPoolExecutor(max_workers=max_concurrent_activities) as executor:
         worker = Worker(
             client,

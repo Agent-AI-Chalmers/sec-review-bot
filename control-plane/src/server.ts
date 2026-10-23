@@ -12,6 +12,7 @@ import Fastify, {
 } from 'fastify'
 
 import { contractDigest } from './contract-digest.js'
+import { integerEnv } from './env.js'
 import { ReviewRunStore } from './review-store.js'
 import type {
   PreparationStatus,
@@ -797,6 +798,11 @@ export async function registerControlPlaneRoutes(
 export async function startControlPlaneServer(): Promise<{
   close: () => Promise<void>
 }> {
+  const intervalMs = integerEnv(
+    'AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS',
+    15_000
+  )
+  const port = integerEnv('CONTROL_PLANE_PORT', 8090, 1, 65_535)
   const token = requiredEnv('CONTROL_PLANE_SERVICE_TOKEN')
   const readToken = requiredEnv('CONTROL_PLANE_READ_TOKEN')
   // Optional by design: a deployment that does not want an operator surface simply leaves it
@@ -811,14 +817,6 @@ export async function startControlPlaneServer(): Promise<{
     onDroppedRunRow: (dropped) => logDroppedRunRow(connectorId, dropped)
   })
   await store.initialize()
-  const configuredIntervalMs = Number.parseInt(
-    process.env.AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS || '15000',
-    10
-  )
-  const intervalMs =
-    Number.isFinite(configuredIntervalMs) && configuredIntervalMs > 0
-      ? configuredIntervalMs
-      : 15_000
   const coordinator = startReviewRunCoordinatorLoop({
     intervalMs,
     runOnce: async () =>
@@ -909,7 +907,6 @@ export async function startControlPlaneServer(): Promise<{
     ...(adminToken === undefined ? {} : { adminToken })
   })
 
-  const port = Number.parseInt(process.env.CONTROL_PLANE_PORT || '8090', 10)
   await app.listen({ port, host: '0.0.0.0' })
   return {
     close: async () => {

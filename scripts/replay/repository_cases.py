@@ -13,10 +13,10 @@ from sec_review_agents.runtime.transcripts import (
 )
 from sec_review_agents.temporal.config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 from sec_review_agents.utils.env import (
+    bool_env,
     bootstrap_agents_env,
     env_value,
-    parse_bool_env,
-    parse_int_env,
+    int_env,
 )
 from sec_review_agents.utils.files import persist_json_artifact
 from sec_review_agents.workflows.repository.case_execution_input import (
@@ -166,19 +166,19 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--start",
         type=int,
-        default=parse_int_env(env_value(ENV_START), 1),
+        default=int_env(ENV_START, 1, minimum=1),
         help=f"1-based case ordinal to start from. Env: {ENV_START}.",
     )
     parser.add_argument(
         "--limit",
         type=int,
-        default=parse_int_env(env_value(ENV_LIMIT)),
+        default=int_env(ENV_LIMIT, None, minimum=1),
         help=f"Maximum number of cases to process in this invocation. Env: {ENV_LIMIT}.",
     )
     parser.add_argument(
         "--rerun-existing",
         action=argparse.BooleanOptionalAction,
-        default=parse_bool_env(env_value(ENV_RERUN_EXISTING), False),
+        default=bool_env(ENV_RERUN_EXISTING, False),
         help="Rerun cases even when an existing result already has a result for the case.",
     )
     return parser.parse_args()
@@ -189,7 +189,6 @@ def _case_review_request(
     run_id: str,
     bundle_paths: dict[str, Path],
     cases_artifacts_path: str,
-    case_index: int,
     scan_mode: str,
     test_changes: Any,
     case: dict[str, Any],
@@ -222,7 +221,6 @@ async def _run_case_review(
     run_id: str,
     bundle_paths: dict[str, Path],
     cases_artifacts_path: str,
-    case_index: int,
     scan_mode: str,
     test_changes: Any,
     case: dict[str, Any],
@@ -232,7 +230,6 @@ async def _run_case_review(
             _case_review_request(
                 run_id=run_id,
                 cases_artifacts_path=cases_artifacts_path,
-                case_index=case_index,
                 scan_mode=scan_mode,
                 test_changes=test_changes,
                 bundle_paths=bundle_paths,
@@ -313,8 +310,8 @@ async def main() -> None:
     results_by_id = {_case_result_id(item): item for item in existing_results}
 
     to_run = [
-        (start_index + offset, case)
-        for offset, case in enumerate(selected_cases, start=1)
+        case
+        for case in selected_cases
         if args.rerun_existing or _case_id(case) not in results_by_id
     ]
 
@@ -326,14 +323,13 @@ async def main() -> None:
                 semaphore=semaphore,
                 run_id=run_artifacts.name,
                 cases_artifacts_path=replay_input["artifact_paths"]["cases"],
-                case_index=case_index,
                 scan_mode=replay_input["scan_target"]["scan_mode"],
                 test_changes=test_changes,
                 bundle_paths=bundle_paths,
                 case=case,
             )
         )
-        for case_index, case in to_run
+        for case in to_run
     ]
     for task in asyncio.as_completed(tasks):
         result = await task

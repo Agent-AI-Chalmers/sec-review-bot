@@ -1,6 +1,5 @@
 """Build and archive delivery execution input payloads."""
 
-import os
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -10,7 +9,7 @@ from sec_review_agents.delivery_stages.model import (
     DeliveryEntry,
     DeliveryStrategy,
 )
-from sec_review_agents.utils.env import parse_int_env
+from sec_review_agents.utils.env import int_env
 from sec_review_agents.utils.files import persist_json_artifact
 
 DELIVERY_PATCH_MAX_CONCURRENCY = 4
@@ -20,11 +19,9 @@ DELIVERY_STRATEGIES = {"single", "combined"}
 def resolve_delivery_patch_max_concurrency(delivery_count: int) -> int:
     if delivery_count <= 0:
         return 1
-    configured = parse_int_env(
-        os.environ.get("REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY")
-    )
+    configured = int_env("REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY", None, minimum=1)
     if configured is not None:
-        return max(1, min(delivery_count, configured))
+        return min(delivery_count, configured)
     return min(delivery_count, DELIVERY_PATCH_MAX_CONCURRENCY)
 
 

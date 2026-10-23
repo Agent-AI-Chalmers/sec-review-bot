@@ -1,7 +1,7 @@
 import math
 from dataclasses import dataclass, field
 
-from sec_review_agents.utils.env import env_value, parse_int_env
+from sec_review_agents.utils.env import env_value, float_env, int_env
 
 DEFAULT_IGNORED_DIRS = frozenset(
     {
@@ -89,21 +89,6 @@ class FilesystemLimits:
         )
 
 
-def _env_int(name: str, default: int) -> int:
-    value = parse_int_env(env_value(name), default)
-    return default if value is None else value
-
-
-def _env_float(name: str, default: float) -> float:
-    raw_value = env_value(name)
-    if raw_value is None:
-        return default
-    try:
-        return float(raw_value)
-    except TypeError, ValueError:
-        return default
-
-
 def default_filesystem_limits() -> FilesystemLimits:
     ignored_dirs = set(DEFAULT_IGNORED_DIRS)
     extra_ignored = env_value("AGENT_FILESYSTEM_EXTRA_IGNORED_DIRS")
@@ -113,15 +98,23 @@ def default_filesystem_limits() -> FilesystemLimits:
         )
 
     return FilesystemLimits(
-        glob_max_results=_env_int("AGENT_FILESYSTEM_GLOB_MAX_RESULTS", 1000),
-        glob_max_seconds=_env_float("AGENT_FILESYSTEM_GLOB_MAX_SECONDS", 8.0),
-        glob_max_visited=_env_int("AGENT_FILESYSTEM_GLOB_MAX_VISITED", 50_000),
-        grep_max_matches=_env_int("AGENT_FILESYSTEM_GREP_MAX_MATCHES", 500),
-        grep_max_seconds=_env_float("AGENT_FILESYSTEM_GREP_MAX_SECONDS", 8.0),
-        grep_max_files=_env_int("AGENT_FILESYSTEM_GREP_MAX_FILES", 20_000),
-        ls_max_entries=_env_int("AGENT_FILESYSTEM_LS_MAX_ENTRIES", 2000),
-        read_max_bytes=_env_int("AGENT_FILESYSTEM_READ_MAX_BYTES", 1_000_000),
-        read_max_scan_bytes=_env_int("AGENT_FILESYSTEM_READ_MAX_SCAN_BYTES", 2_000_000),
+        glob_max_results=int_env("AGENT_FILESYSTEM_GLOB_MAX_RESULTS", 1000, minimum=1),
+        glob_max_seconds=float_env(
+            "AGENT_FILESYSTEM_GLOB_MAX_SECONDS", 8.0, minimum=0.0
+        ),
+        glob_max_visited=int_env(
+            "AGENT_FILESYSTEM_GLOB_MAX_VISITED", 50_000, minimum=1
+        ),
+        grep_max_matches=int_env("AGENT_FILESYSTEM_GREP_MAX_MATCHES", 500, minimum=1),
+        grep_max_seconds=float_env(
+            "AGENT_FILESYSTEM_GREP_MAX_SECONDS", 8.0, minimum=0.0
+        ),
+        grep_max_files=int_env("AGENT_FILESYSTEM_GREP_MAX_FILES", 20_000, minimum=1),
+        ls_max_entries=int_env("AGENT_FILESYSTEM_LS_MAX_ENTRIES", 2000, minimum=1),
+        read_max_bytes=int_env("AGENT_FILESYSTEM_READ_MAX_BYTES", 1_000_000, minimum=1),
+        read_max_scan_bytes=int_env(
+            "AGENT_FILESYSTEM_READ_MAX_SCAN_BYTES", 2_000_000, minimum=1
+        ),
         ignored_dirs=frozenset(ignored_dirs),
     )
 

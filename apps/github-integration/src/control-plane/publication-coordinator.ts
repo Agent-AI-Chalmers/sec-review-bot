@@ -5,6 +5,7 @@ import { startReviewRunCoordinatorLoop } from '../control-plane/coordinator.js'
 import { handleIssueReviewRun } from '../reviews/issues/publish.js'
 import { handlePullRequestReviewRun } from '../reviews/pull-requests/publish.js'
 import { handleRepositoryReviewRun } from '../reviews/repositories/publish.js'
+import { integerEnv } from '../utils/env.js'
 import { logError, logInfo, logWarn } from '../utils/logger.js'
 import { asErrorMessage, errorCode } from '../utils/error-utils.js'
 import { classifyPublicationFailure } from './publication-failure.js'
@@ -30,11 +31,7 @@ interface Options {
 }
 
 function pollIntervalMs(): number {
-  const parsed = Number.parseInt(
-    process.env.CONTROL_PLANE_PUBLICATION_POLL_INTERVAL_MS || '15000',
-    10
-  )
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 15_000
+  return integerEnv('CONTROL_PLANE_PUBLICATION_POLL_INTERVAL_MS', 15_000)
 }
 
 async function publishWork(

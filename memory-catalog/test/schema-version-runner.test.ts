@@ -26,7 +26,7 @@ function poolWithAppliedVersions(
   } as unknown as Pool
 }
 
-void test('applies the initial catalog schema and records its checksum', async () => {
+await test('applies the initial catalog schema and records its checksum', async () => {
   const statements: Array<{ sql: string; parameters?: unknown[] }> = []
 
   await applySchemaVersions(poolWithAppliedVersions([], statements))
@@ -42,7 +42,7 @@ void test('applies the initial catalog schema and records its checksum', async (
   assert.match(String(ledgerInsert?.parameters?.[2]), /^[a-f0-9]{64}$/)
 })
 
-void test('rejects a database schema newer than this catalog understands', async () => {
+await test('rejects a database schema newer than this catalog understands', async () => {
   await assert.rejects(
     applySchemaVersions(
       poolWithAppliedVersions([
@@ -53,7 +53,7 @@ void test('rejects a database schema newer than this catalog understands', async
   )
 })
 
-void test('rejects changes to an applied schema version', async () => {
+await test('rejects changes to an applied schema version', async () => {
   const sql = await readFile(
     new URL(
       '../src/database/schema-versions/001_initial_catalog.sql',

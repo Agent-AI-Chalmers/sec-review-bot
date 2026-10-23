@@ -14,7 +14,7 @@ export type RepositoryReviewDispatchHandler = (args: {
 
 interface AppHttpHandlerOptions {
   app: App
-  port: string | number
+  port: number
   repository_review_dispatch_path: string
   repository_review_dispatch_handler: RepositoryReviewDispatchHandler
   webhook_middleware: NodeHttpMiddleware
@@ -32,7 +32,7 @@ function writeJson(
 
 function requestUrlFromNodeRequest(
   request: IncomingMessage,
-  port: string | number
+  port: number
 ): URL | null {
   const requestPath =
     typeof request.url === 'string' && request.url.length > 0

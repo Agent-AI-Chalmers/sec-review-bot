@@ -26,6 +26,34 @@ test.afterEach(() => {
   delete process.env.EXECUTION_API_URL
   delete process.env.EXECUTION_API_TOKEN
   delete process.env.EXECUTION_API_REQUEST_RETRIES
+  delete process.env.EXECUTION_API_REQUEST_TIMEOUT_MS
+  delete process.env.EXECUTION_API_RETRY_BASE_DELAY_MS
+})
+
+test('invalid request configuration fails instead of using a fallback', async () => {
+  configureExecution()
+  process.env.EXECUTION_API_REQUEST_TIMEOUT_MS = '1000ms'
+  let fetched = false
+  globalThis.fetch = async () => {
+    fetched = true
+    return new Response('{}', { status: 200 })
+  }
+
+  await assert.rejects(
+    getExecutionRunStatus('run-1'),
+    /EXECUTION_API_REQUEST_TIMEOUT_MS must be a decimal integer/
+  )
+  assert.strictEqual(fetched, false)
+})
+
+test('out-of-range request configuration fails instead of using a fallback', async () => {
+  configureExecution()
+  process.env.EXECUTION_API_RETRY_BASE_DELAY_MS = '0'
+
+  await assert.rejects(
+    getExecutionRunStatus('run-1'),
+    /EXECUTION_API_RETRY_BASE_DELAY_MS must be at least 1/
+  )
 })
 
 test('submission sends authentication and accepts only the expected identity', async () => {

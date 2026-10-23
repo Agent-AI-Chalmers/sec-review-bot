@@ -57,7 +57,7 @@ function fixture(name: string): Record<string, unknown> {
   ) as Record<string, unknown>
 }
 
-void test('health endpoint follows the OpenAPI route', async () => {
+await test('health endpoint follows the OpenAPI route', async () => {
   const app = await createApp({ store: new FakeStore() })
   const response = await app.inject({ method: 'GET', url: '/healthz' })
   assert.equal(response.statusCode, 200)
@@ -65,7 +65,17 @@ void test('health endpoint follows the OpenAPI route', async () => {
   await app.close()
 })
 
-void test('creates and reads an execution run', async () => {
+await test('invalid workflow timeout fails while creating the app', async (t) => {
+  process.env.TEMPORAL_WORKFLOW_TIMEOUT_SECONDS = '10800ms'
+  t.after(() => delete process.env.TEMPORAL_WORKFLOW_TIMEOUT_SECONDS)
+
+  await assert.rejects(
+    createApp({ store: new FakeStore() }),
+    /TEMPORAL_WORKFLOW_TIMEOUT_SECONDS must be a decimal integer/,
+  )
+})
+
+await test('creates and reads an execution run', async () => {
   const store = new FakeStore()
   const app = await createApp({ store, token: 'secret' })
   const create = await app.inject({
@@ -90,7 +100,7 @@ void test('creates and reads an execution run', async () => {
   await app.close()
 })
 
-void test('rejects requests that violate the workflow input contract', async () => {
+await test('rejects requests that violate the workflow input contract', async () => {
   const app = await createApp({ store: new FakeStore() })
   const response = await app.inject({
     method: 'POST',
@@ -121,7 +131,7 @@ void test('rejects requests that violate the workflow input contract', async () 
   await app.close()
 })
 
-void test('requires the configured bearer token', async () => {
+await test('requires the configured bearer token', async () => {
   const app = await createApp({ store: new FakeStore(), token: 'secret' })
   const response = await app.inject({
     method: 'GET',
@@ -141,7 +151,7 @@ void test('requires the configured bearer token', async () => {
   await app.close()
 })
 
-void test('returns missing runs in the public error envelope', async () => {
+await test('returns missing runs in the public error envelope', async () => {
   const app = await createApp({ store: new FakeStore() })
   const response = await app.inject({
     method: 'GET',
@@ -161,7 +171,7 @@ void test('returns missing runs in the public error envelope', async () => {
   await app.close()
 })
 
-void test('reports Temporal submission failures as internal errors', async () => {
+await test('reports Temporal submission failures as internal errors', async () => {
   const store = new FakeStore()
   store.startError = new Error('Temporal unavailable')
   const app = await createApp({ store })

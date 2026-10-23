@@ -18,6 +18,7 @@ import {
 import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
 import { repositoryFullName } from '../github/repository-service.js'
 import { isRecord } from '../utils/error-utils.js'
+import { integerEnv } from '../utils/env.js'
 import { logError, logInfo } from '../utils/logger.js'
 import {
   classifyPreparationFailure,
@@ -28,14 +29,6 @@ import { installationOctokitForRepo } from '../github/installation-client.js'
 
 interface PreparationCoordinator {
   stop: () => Promise<void>
-}
-
-function pollIntervalMs(): number {
-  const parsed = Number.parseInt(
-    process.env.CONTROL_PLANE_PREPARATION_POLL_INTERVAL_MS || '5000',
-    10
-  )
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 5000
 }
 
 function requireRecord(value: unknown, label: string): Record<string, unknown> {
@@ -496,7 +489,7 @@ export async function prepareReviewRunsOnce({
 export function startPreparationCoordinator({
   app,
   store = controlPlaneClient,
-  intervalMs = pollIntervalMs()
+  intervalMs = integerEnv('CONTROL_PLANE_PREPARATION_POLL_INTERVAL_MS', 5000)
 }: {
   app: App
   store?: PreparationCoordinatorStore

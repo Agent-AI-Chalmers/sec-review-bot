@@ -20,6 +20,7 @@ import type {
   QueryParameters,
   RequestBody,
 } from './route-types.js'
+import { integerEnv } from './env.js'
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim()
@@ -162,6 +163,7 @@ export async function createApp(options: {
 export async function startMemoryCatalogServer(): Promise<{
   close: () => Promise<void>
 }> {
+  const port = integerEnv('MEMORY_CATALOG_PORT', 8092, 1, 65_535)
   const store = new PostgresMemoryCatalogStore(
     requiredEnv('MEMORY_CATALOG_DATABASE_URL'),
   )
@@ -170,7 +172,6 @@ export async function startMemoryCatalogServer(): Promise<{
     store,
     token: requiredEnv('MEMORY_CATALOG_TOKEN'),
   })
-  const port = Number.parseInt(process.env.MEMORY_CATALOG_PORT ?? '8092', 10)
   const host = process.env.MEMORY_CATALOG_HOST?.trim() || '127.0.0.1'
   await app.listen({ port, host })
   return {

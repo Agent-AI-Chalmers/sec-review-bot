@@ -22,7 +22,7 @@ from sec_review_agents.temporal.config import (
     DEFAULT_TEMPORAL_NAMESPACE,
     DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
 )
-from sec_review_agents.utils.env import env_value, parse_int_env
+from sec_review_agents.utils.env import env_value, int_env
 
 
 @dataclass(frozen=True)
@@ -41,11 +41,11 @@ class LocalTemporalConfig:
                 env_value("TEMPORAL_EXECUTION_TASK_QUEUE")
                 or DEFAULT_EXECUTION_TASK_QUEUE
             ),
-            workflow_timeout_seconds=parse_int_env(
-                env_value("TEMPORAL_WORKFLOW_TIMEOUT_SECONDS"),
+            workflow_timeout_seconds=int_env(
+                "TEMPORAL_WORKFLOW_TIMEOUT_SECONDS",
                 DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
-            )
-            or DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
+                minimum=1,
+            ),
         )
 
 
