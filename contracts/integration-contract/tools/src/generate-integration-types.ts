@@ -57,7 +57,10 @@ const WORKFLOW_INPUT_COMMON_DEFS = [
 
 /** Workflow input schemas projected into the integration's input contract. */
 const WORKFLOW_INPUTS = [
-  { schema: 'issue-review-input.schema.json', interface: 'IssueReviewInput' },
+  {
+    schema: 'issue-review-input.schema.json',
+    interface: 'IssueReviewInput'
+  },
   {
     schema: 'pull-request-review-input.schema.json',
     interface: 'PullRequestReviewInput'
@@ -265,6 +268,19 @@ export async function renderIntegrationContractDeclarations(): Promise<string> {
   return await renderDeclarations(common, NAMED_COMMON_DEFS.keys())
 }
 
+function renderWorkflowName(): string {
+  const suffix = '-input.schema.json'
+  const workflows = WORKFLOW_INPUTS.map(({ schema }) => {
+    if (!schema.endsWith(suffix)) {
+      throw new Error(
+        `workflow input schema must end with ${suffix}: ${schema}`
+      )
+    }
+    return schema.slice(0, -suffix.length)
+  })
+  return `export type WorkflowName = ${workflows.map((workflow) => `'${workflow}'`).join(' | ')}`
+}
+
 export async function renderWorkflowInputDeclarations(): Promise<string> {
   const common = readSchema(COMMON_SCHEMA)
   return await renderDeclarations(common, WORKFLOW_INPUT_COMMON_DEFS)
@@ -301,6 +317,8 @@ async function renderFile(): Promise<string> {
   return [
     `// Generated from contracts/integration-contract/${WORKFLOW_CONTRACT_VERSION}/schemas. Do not edit by hand.`,
     '// Regenerate with `pnpm --dir contracts/integration-contract/tools run generate`.',
+    '',
+    renderWorkflowName(),
     '',
     await renderIntegrationContractDeclarations(),
     '',

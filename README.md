@@ -10,7 +10,7 @@ An experimental security review bot for GitHub issues, pull requests, and reposi
 
 English · [中文](README.zh.md)
 
-[Documentation](docs/README.md) · [Deployment](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md)
+[Documentation](docs/README.md) · [Deployment](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 

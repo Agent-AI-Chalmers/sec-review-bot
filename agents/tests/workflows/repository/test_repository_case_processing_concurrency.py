@@ -325,10 +325,6 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
             "severity": "high",
         }
 
-    @activity.defn(name="build_failed_repository_case_cvss_result_activity")
-    def fake_failed_cvss(_prepared_case: dict, error: str) -> None:
-        _ = error
-
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigator(
         prepared_case: dict,
@@ -401,7 +397,6 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
                         fake_prepare_repository_case,
                         fake_analyzer,
                         fake_cvss,
-                        fake_failed_cvss,
                         fake_mitigator,
                         fake_verifier,
                         fake_archive,
@@ -670,10 +665,6 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
             "severity": "high",
         }
 
-    @activity.defn(name="build_failed_repository_case_cvss_result_activity")
-    def fake_failed_cvss(_prepared_case: dict, error: str) -> None:
-        _ = error
-
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigator(
         _prepared_case: dict,
@@ -738,7 +729,6 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
                         fake_prepare_repository_case,
                         fake_analyzer,
                         fake_cvss,
-                        fake_failed_cvss,
                         fake_mitigator,
                         fake_verifier,
                         fake_archive,
@@ -787,10 +777,6 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
     @activity.defn(name="score_repository_case_cvss_activity")
     def fake_cvss(_prepared_case: dict, _analysis_result: dict) -> dict:
         raise RuntimeError("cvss failed after retries")
-
-    @activity.defn(name="build_failed_repository_case_cvss_result_activity")
-    def fake_failed_cvss(_prepared_case: dict, error: str) -> None:
-        _ = error
 
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigator(
@@ -851,7 +837,6 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
                         fake_prepare_repository_case,
                         fake_analyzer,
                         fake_cvss,
-                        fake_failed_cvss,
                         fake_mitigator,
                         fake_verifier,
                         fake_archive,
@@ -1042,9 +1027,6 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
     ) -> dict:
         return {"patch_coverage": "full"}
 
-    def fake_failed_cvss(_prepared_case: dict, error: str) -> None:
-        _ = error
-
     def fake_build_result(
         prepared_case: dict,
         _analysis_result: dict,
@@ -1084,11 +1066,6 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
             repository_case_direct,
             "verify_repository_case_activity",
             side_effect=fake_verifier,
-        ),
-        patch.object(
-            repository_case_direct,
-            "build_failed_repository_case_cvss_result_activity",
-            side_effect=fake_failed_cvss,
         ),
         patch.object(
             repository_case_direct,

@@ -36,7 +36,6 @@ class DeliveryCaseInput(TypedDict):
     analyzer_overview: str
     analyzer_verdict: str | None
     mitigation_overview: str
-    mitigator_changed_files: list[str]
     mitigator_file_changes: list[FileChange]
     mitigator_patch_diff: str | None
     verifier_overview: str

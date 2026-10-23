@@ -62,14 +62,14 @@ async def run_delivery_planning(
 ) -> dict:
     persist_delivery_planning_input(delivery_planning_root, planning_cases)
     if planning_mode == "batched":
-        workbench_state, agent_results = await _run_batched_delivery_planning_passes(
+        workbench_state, pass_count = await _run_batched_delivery_planning_passes(
             delivery_planning_root=delivery_planning_root,
             planning_cases=planning_cases,
             max_passes=max_passes,
             max_batch_size=max_batch_size,
         )
     else:
-        workbench_state, agent_results = await _run_single_delivery_planning_passes(
+        workbench_state, pass_count = await _run_single_delivery_planning_passes(
             delivery_planning_root=delivery_planning_root,
             planning_cases=planning_cases,
             max_passes=max_passes,
@@ -81,13 +81,11 @@ async def run_delivery_planning(
         )
     deliveries = finish_result["deliveries"]
     return {
-        "agent_result": agent_results[-1] if agent_results else None,
-        "agent_results": agent_results,
         "deliveries": deliveries,
         "constraints": finish_result["constraints"],
         "metadata": {
             "planning_mode": planning_mode,
-            "planning_pass_count": len(agent_results),
+            "planning_pass_count": pass_count,
             "batch_size": max_batch_size if planning_mode == "batched" else None,
         },
         "counts": {
@@ -102,20 +100,19 @@ async def _run_single_delivery_planning_passes(
     delivery_planning_root: Path,
     planning_cases: list[dict[str, Any]],
     max_passes: int,
-) -> tuple[DeliveryWorkbenchState, list[dict | None]]:
+) -> tuple[DeliveryWorkbenchState, int]:
     workbench_state = DeliveryWorkbenchState.from_items(_planning_items(planning_cases))
-    agent_results: list[dict | None] = []
+    pass_count = 0
     for pass_index in range(max(1, max_passes)):
         edit_event_start = len(workbench_state.edit_events)
-        agent_results.append(
-            await _run_delivery_planning_agent_pass(
-                delivery_planning_root=delivery_planning_root,
-                pass_meta={"kind": "refinement"} if pass_index > 0 else None,
-                workbench_state=workbench_state,
-                planning_cases=planning_cases,
-                pass_index=pass_index,
-            )
+        await _run_delivery_planning_agent_pass(
+            delivery_planning_root=delivery_planning_root,
+            pass_meta={"kind": "refinement"} if pass_index > 0 else None,
+            workbench_state=workbench_state,
+            planning_cases=planning_cases,
+            pass_index=pass_index,
         )
+        pass_count += 1
         if not _should_run_another_delivery_planning_pass(
             workbench_state=workbench_state,
             pass_index=pass_index,
@@ -123,7 +120,7 @@ async def _run_single_delivery_planning_passes(
             pass_edit_events=workbench_state.edit_events[edit_event_start:],
         ):
             break
-    return workbench_state, agent_results
+    return workbench_state, pass_count
 
 
 async def _run_batched_delivery_planning_passes(
@@ -132,9 +129,9 @@ async def _run_batched_delivery_planning_passes(
     planning_cases: list[dict[str, Any]],
     max_passes: int,
     max_batch_size: int,
-) -> tuple[DeliveryWorkbenchState, list[dict | None]]:
+) -> tuple[DeliveryWorkbenchState, int]:
     global_state = DeliveryWorkbenchState.from_items(_planning_items(planning_cases))
-    agent_results: list[dict | None] = []
+    pass_count = 0
     draft_origins: list[dict] = []
     batches = planning_case_id_batches(planning_cases, max_batch_size=max_batch_size)
     batch_concurrency = min(
@@ -150,9 +147,9 @@ async def _run_batched_delivery_planning_passes(
     async def run_batch(
         index: int,
         batch_case_ids: list[str],
-    ) -> tuple[int, dict | None, list[dict]]:
+    ) -> tuple[int, list[dict]]:
         async with semaphore:
-            agent_result, batch_group_drafts = await _run_delivery_planning_batch_draft(
+            batch_group_drafts = await _run_delivery_planning_batch_draft(
                 delivery_planning_root=delivery_planning_root,
                 planning_cases=planning_cases,
                 batch_case_ids=batch_case_ids,
@@ -163,7 +160,7 @@ async def _run_batched_delivery_planning_passes(
                     "max_batch_size": max_batch_size,
                 },
             )
-            return index, agent_result, batch_group_drafts
+            return index, batch_group_drafts
 
     batch_results = await asyncio.gather(
         *(
@@ -171,14 +168,11 @@ async def _run_batched_delivery_planning_passes(
             for index, batch_case_ids in enumerate(batches, start=1)
         )
     )
-    indexed_batch_results = {
-        index: (agent_result, batch_group_drafts)
-        for index, agent_result, batch_group_drafts in batch_results
-    }
+    indexed_batch_results = dict(batch_results)
+    pass_count += len(batch_results)
 
     for index in range(1, len(batches) + 1):
-        agent_result, batch_group_drafts = indexed_batch_results[index]
-        agent_results.append(agent_result)
+        batch_group_drafts = indexed_batch_results[index]
         if not batch_group_drafts:
             continue
         create_result = global_state.create_groups(groups=batch_group_drafts)
@@ -193,16 +187,15 @@ async def _run_batched_delivery_planning_passes(
 
     for pass_index in range(1, max(1, max_passes)):
         edit_event_start = len(global_state.edit_events)
-        agent_results.append(
-            await _run_delivery_planning_agent_pass(
-                delivery_planning_root=delivery_planning_root,
-                pass_meta={"kind": "refinement"},
-                workbench_state=global_state,
-                planning_cases=planning_cases,
-                pass_index=pass_index,
-                draft_origins=draft_origins,
-            )
+        await _run_delivery_planning_agent_pass(
+            delivery_planning_root=delivery_planning_root,
+            pass_meta={"kind": "refinement"},
+            workbench_state=global_state,
+            planning_cases=planning_cases,
+            pass_index=pass_index,
+            draft_origins=draft_origins,
         )
+        pass_count += 1
         if not _should_run_another_delivery_planning_pass(
             workbench_state=global_state,
             pass_index=pass_index,
@@ -211,7 +204,7 @@ async def _run_batched_delivery_planning_passes(
         ):
             break
 
-    return global_state, agent_results
+    return global_state, pass_count
 
 
 async def _run_delivery_planning_batch_draft(
@@ -220,17 +213,17 @@ async def _run_delivery_planning_batch_draft(
     planning_cases: list[dict[str, Any]],
     batch_case_ids: list[str],
     batch: dict,
-) -> tuple[dict | None, list[dict]]:
+) -> list[dict]:
     batch_cases = _planning_cases_for_batch(planning_cases, batch_case_ids)
     batch_state = DeliveryWorkbenchState.from_items(_planning_items(batch_cases))
-    agent_result = await _run_delivery_planning_agent_pass(
+    await _run_delivery_planning_agent_pass(
         delivery_planning_root=delivery_planning_root,
         pass_meta=batch,
         workbench_state=batch_state,
         planning_cases=batch_cases,
         pass_index=0,
     )
-    return agent_result, batch_state.group_drafts()
+    return batch_state.group_drafts()
 
 
 async def _run_delivery_planning_agent_pass(

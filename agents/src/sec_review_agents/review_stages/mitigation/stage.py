@@ -33,8 +33,8 @@ from sec_review_agents.utils.files import (
     reset_stage_attempt_artifacts,
 )
 from sec_review_agents.workspace.patches import (
+    build_patch_artifact,
     normalize_declared_changed_files,
-    persist_workspace_patch,
 )
 from sec_review_agents.workspace.snapshots import (
     restore_workspace_from_snapshot_tar,
@@ -47,6 +47,7 @@ def persist_mitigation_result(
     *,
     attempt_label: str,
 ) -> None:
+    """Persist the latest mitigation result and its retry-specific copy."""
     persist_json_artifact(
         mitigator_artifacts_path,
         "mitigation-result",
@@ -57,6 +58,26 @@ def persist_mitigation_result(
             mitigator_artifacts_path,
             f"mitigation-result.{attempt_label}",
             result,
+        )
+
+
+def persist_mitigation_patch(
+    mitigator_artifacts_path: Path,
+    patch_diff: str,
+    *,
+    attempt_label: str,
+) -> None:
+    """Persist the latest workspace patch and its retry-specific copy."""
+    persist_text_artifact(
+        mitigator_artifacts_path,
+        "workspace.patch",
+        patch_diff,
+    )
+    if attempt_label != "initial":
+        persist_text_artifact(
+            mitigator_artifacts_path,
+            f"workspace.{attempt_label}.patch",
+            patch_diff,
         )
 
 
@@ -124,13 +145,11 @@ def create_skipped_mitigation_result(
     )
     # Skipped mitigation still emits the patch files expected by downstream
     # verifier/delivery contracts, but with empty content.
-    persist_text_artifact(mitigator_artifacts_path, "workspace.patch", "")
-    if attempt_label != "initial":
-        persist_text_artifact(
-            mitigator_artifacts_path,
-            f"workspace.{attempt_label}.patch",
-            "",
-        )
+    persist_mitigation_patch(
+        mitigator_artifacts_path,
+        "",
+        attempt_label=attempt_label,
+    )
     result = build_skipped_mitigation_result(reason=reason)
     persist_mitigation_result(
         mitigator_artifacts_path, result, attempt_label=attempt_label
@@ -211,16 +230,19 @@ async def run_mitigation_stage(
             declared_patch_paths = normalize_declared_changed_files(raw_declared_paths)
         else:
             raise ValueError("declared_changed_files must be a list.")
-        patch_artifact = persist_mitigation_patch(
-            declared_patch_paths=declared_patch_paths,
-            workspace_path=workspace_path,
-            mitigator_artifacts_path=mitigator_artifacts_path,
+        patch_artifact = build_patch_artifact(
+            workspace_path,
+            include_paths=declared_patch_paths,
+        )
+        persist_mitigation_patch(
+            mitigator_artifacts_path,
+            patch_artifact["patch_diff"],
             attempt_label=attempt_label,
         )
         result = build_mitigation_stage_result(
             overview=agent_output["overview"],
-            file_changes=patch_artifact.get("file_changes", []),
-            patch_diff=str(patch_artifact.get("patch_diff") or ""),
+            file_changes=patch_artifact["file_changes"],
+            patch_diff=patch_artifact["patch_diff"],
         )
         persist_mitigation_result(
             mitigator_artifacts_path,
@@ -245,27 +267,6 @@ def prepare_mitigation_transcript(
 
     published_transcript_path.unlink(missing_ok=True)
     return (local_transcript_path, published_transcript_path)
-
-
-def persist_mitigation_patch(
-    *,
-    declared_patch_paths: list[str],
-    workspace_path: Path,
-    mitigator_artifacts_path: Path,
-    attempt_label: str,
-) -> dict[str, Any]:
-    patch_artifact = persist_workspace_patch(
-        workspace_path,
-        patch_root_path=mitigator_artifacts_path,
-        include_paths=declared_patch_paths,
-    )
-    if attempt_label != "initial":
-        persist_text_artifact(
-            mitigator_artifacts_path,
-            f"workspace.{attempt_label}.patch",
-            str(patch_artifact.get("patch_diff") or ""),
-        )
-    return patch_artifact
 
 
 __all__ = [

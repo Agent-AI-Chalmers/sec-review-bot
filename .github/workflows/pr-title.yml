@@ -1,0 +1,43 @@
+name: PR Title
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+  # Required checks must also report on merge queue candidates. The pull request
+  # title was already validated before the candidate entered the queue.
+  merge_group:
+    types:
+      - checks_requested
+
+permissions:
+  contents: read
+
+jobs:
+  title:
+    name: PR Title
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate pull request title
+        if: github.event_name == 'pull_request'
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          node <<'NODE'
+          const pattern = /^(feat|fix|refactor|docs|test|chore|build|ci)(\([a-z0-9][a-z0-9._/-]*\))?!?: \S(?:.*\S)?$/
+          const title = process.env.PR_TITLE ?? ''
+
+          if (!pattern.test(title)) {
+            console.error('Invalid pull request title: %s', title)
+            console.error('Expected: <type>(<optional-scope>): <concise summary>')
+            console.error('Allowed types: feat, fix, refactor, docs, test, chore, build, ci')
+            process.exit(1)
+          }
+          NODE
+
+      - name: Preserve the required check in the merge queue
+        if: github.event_name == 'merge_group'
+        run: echo "The pull request title was validated before entering the merge queue."

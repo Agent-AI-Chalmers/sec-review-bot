@@ -21,33 +21,17 @@ from sec_review_agents.runtime.setup_bootstrap import (
     record_bootstrap_result,
 )
 from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
-from sec_review_agents.utils.files import reset_stage_attempt_artifacts
+from sec_review_agents.utils.files import (
+    persist_text_artifact,
+    reset_stage_attempt_artifacts,
+)
 from sec_review_agents.workspace.patches import (
+    build_patch_artifact,
     normalize_declared_changed_files,
-    persist_workspace_patch,
 )
 from sec_review_agents.workspace.snapshots import (
     restore_workspace_from_snapshot_tar,
 )
-
-
-def _build_completed_single_agent_outcome(
-    *,
-    agent_output: dict,
-    file_changes: list[dict[str, Any]],
-    patch_diff: str,
-) -> dict[str, Any]:
-    return build_single_agent_fix_outcome(
-        overview=agent_output["overview"],
-        verdict=agent_output["verdict"],
-        validation_level=agent_output["validation_level"],
-        regression_status=agent_output["regression_status"],
-        target_claim=agent_output["target_claim"],
-        file_changes=file_changes,
-        patch_diff=patch_diff,
-        residual_risks=agent_output["residual_risks"],
-        self_check_notes=agent_output["self_check_notes"],
-    )
 
 
 async def run_single_agent_stage(
@@ -118,27 +102,26 @@ async def run_single_agent_stage(
             declared_patch_paths = normalize_declared_changed_files(raw_declared_paths)
         else:
             raise ValueError("declared_changed_files must be a list.")
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             workspace_path,
-            patch_root_path=single_agent_artifacts_path,
             include_paths=declared_patch_paths,
         )
-        return build_single_agent_stage_outcome(
-            agent_output=agent_output,
-            patch_artifact=patch_artifact,
+        persist_text_artifact(
+            single_agent_artifacts_path,
+            "workspace.patch",
+            patch_artifact["patch_diff"],
         )
-
-
-def build_single_agent_stage_outcome(
-    *,
-    agent_output: dict[str, Any],
-    patch_artifact: dict[str, Any],
-) -> dict[str, Any]:
-    return _build_completed_single_agent_outcome(
-        agent_output=agent_output,
-        file_changes=patch_artifact.get("file_changes", []),
-        patch_diff=str(patch_artifact.get("patch_diff") or ""),
-    )
+        return build_single_agent_fix_outcome(
+            overview=agent_output["overview"],
+            verdict=agent_output["verdict"],
+            validation_level=agent_output["validation_level"],
+            regression_status=agent_output["regression_status"],
+            target_claim=agent_output["target_claim"],
+            file_changes=patch_artifact["file_changes"],
+            patch_diff=patch_artifact["patch_diff"],
+            residual_risks=agent_output["residual_risks"],
+            self_check_notes=agent_output["self_check_notes"],
+        )
 
 
 __all__ = [

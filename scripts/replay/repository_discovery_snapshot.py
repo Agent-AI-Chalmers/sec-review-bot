@@ -18,6 +18,7 @@ from pathlib import Path
 from sec_review_agents.memory.store import initialize_configured_memory_store
 from sec_review_agents.scan_stages.discovery.stage import (
     build_discovery_result_from_chunks,
+    persist_discovery_result,
     prepare_discovery_chunks,
     scan_discovery_chunk,
 )
@@ -120,7 +121,7 @@ async def _run_discovery(
     ):
         ordered_results[index] = result
 
-    return build_discovery_result_from_chunks(
+    result = build_discovery_result_from_chunks(
         entries=manifest["entries"],
         skipped_files=manifest["skipped_files"],
         chunks=chunks,
@@ -130,9 +131,11 @@ async def _run_discovery(
         chunk_target_tokens=int(manifest["chunk_target_tokens"]),
         chunk_target_ratio=str(manifest["chunk_target_ratio"]),
         chunk_hard_limit_tokens=int(manifest["chunk_hard_limit_tokens"]),
+        discovery_concurrency=int(manifest["max_concurrency"]),
         chunk_strategy=str(manifest["chunk_strategy"]),
-        discovery_artifacts_path=artifacts,
     )
+    persist_discovery_result(discovery_artifacts_path=artifacts, result=result)
+    return result
 
 
 async def _main() -> None:

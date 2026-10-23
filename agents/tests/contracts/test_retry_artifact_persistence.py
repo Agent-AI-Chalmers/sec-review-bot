@@ -211,25 +211,17 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
         )
         return structured_payload
 
-    def fake_persist_workspace_patch(
+    def fake_build_patch_artifact(
         workspace_path,
         *,
-        patch_root_path,
         include_paths,
-        filename="workspace.patch",
     ):
         _ = workspace_path
         assert include_paths == ["demo.txt"]
-        root_path = Path(patch_root_path)
-        root_path.mkdir(parents=True, exist_ok=True)
-        patch_payload = {
-            "patch_content": "diff --git a/demo.txt b/demo.txt\n",
-            "changed_files": ["demo.txt"],
+        return {
+            "patch_diff": "diff --git a/demo.txt b/demo.txt\n",
+            "file_changes": [{"path": "demo.txt", "status": "deleted"}],
         }
-        (root_path / filename).write_text(
-            patch_payload["patch_content"], encoding="utf-8"
-        )
-        return patch_payload
 
     with (
         patch(
@@ -241,8 +233,8 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
             side_effect=fake_invoke_agent_runtime_graph,
         ),
         patch(
-            "sec_review_agents.review_stages.mitigation.stage.persist_workspace_patch",
-            side_effect=fake_persist_workspace_patch,
+            "sec_review_agents.review_stages.mitigation.stage.build_patch_artifact",
+            side_effect=fake_build_patch_artifact,
         ),
         patch(
             "sec_review_agents.review_stages.mitigation.result.build_mitigation_stage_result",

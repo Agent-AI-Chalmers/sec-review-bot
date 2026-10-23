@@ -3,9 +3,9 @@ import subprocess
 import pytest
 
 from sec_review_agents.workspace.patches import (
+    build_patch_artifact,
     normalize_declared_changed_files,
     observe_workspace_changed_files,
-    persist_workspace_patch,
 )
 
 
@@ -84,27 +84,8 @@ def test_observe_workspace_changed_files_reports_spaced_and_mode_only_paths(
     ]
 
 
-def test_persist_workspace_patch_rejects_path_like_artifact_filenames(
-    tmp_path,
-) -> None:
-    workspace = tmp_path / "workspace"
-    workspace.mkdir()
-    (workspace / ".git").mkdir()
-
-    with pytest.raises(ValueError, match="plain file name"):
-        persist_workspace_patch(
-            workspace,
-            patch_root_path=tmp_path / "patches",
-            filename="../workspace.patch",
-            include_paths=[],
-        )
-
-
-def test_persist_workspace_patch_requires_explicit_include_paths(tmp_path) -> None:
+def test_build_patch_artifact_requires_explicit_include_paths(tmp_path) -> None:
     with pytest.raises(TypeError, match="include_paths"):
         # Intentionally omit include_paths to verify the public helper fails
         # loudly when callers do not choose an explicit patch scope.
-        persist_workspace_patch(  # type: ignore[call-arg]
-            tmp_path,
-            patch_root_path=tmp_path / "patches",
-        )
+        build_patch_artifact(tmp_path)  # type: ignore[call-arg]

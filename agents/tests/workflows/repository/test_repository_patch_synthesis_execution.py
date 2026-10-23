@@ -12,6 +12,7 @@ import pytest
 from sec_review_agents.agents.delivery_planning.workbench_state import (
     DeliveryWorkbenchState,
 )
+from sec_review_agents.utils.files import persist_text_artifact
 from sec_review_agents.workflows.repository import direct as repository_direct
 from sec_review_agents.workflows.repository.workflow import (
     plan_repository_delivery_activity,
@@ -21,10 +22,11 @@ from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from sec_review_agents.workspace.file_changes import (
     FileChange,
     collect_publishable_file_changes,
+    file_change_paths,
 )
 from sec_review_agents.workspace.patches import (
+    build_patch_artifact,
     observe_workspace_changed_files,
-    persist_workspace_patch,
 )
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 
@@ -64,6 +66,10 @@ def _build_file_changes_from_workspace_patch(
             patched_workspace_path,
             include_paths or observe_workspace_changed_files(patched_workspace_path),
         )
+
+
+def _patch_paths(patch_artifact: dict[str, Any]) -> list[str]:
+    return file_change_paths(patch_artifact["file_changes"])
 
 
 async def _execute_delivery_direct_for_test(
@@ -174,7 +180,7 @@ class TestRepositoryDeliveryExecution:
             changed_files = [
                 path
                 for case_item in case_items
-                for path in case_item.get("mitigator_changed_files", [])
+                for path in file_change_paths(case_item.get("mitigator_file_changes"))
             ]
             file_changes = [
                 {
@@ -186,14 +192,8 @@ class TestRepositoryDeliveryExecution:
                 for path in changed_files
             ]
             return {
-                "delivery_id": delivery_entry["delivery_id"],
-                "status": "ready",
-                "error": None,
-                "patch_path": None,
                 "patch_diff": "",
-                "changed_files": changed_files,
                 "file_changes": file_changes,
-                "applied_case_ids": delivery_entry["case_ids"],
             }
 
         return patch(
@@ -256,12 +256,16 @@ class TestRepositoryDeliveryExecution:
         )
         mutate_workspace(case_workspace_root)
 
-        patch_root = self.case_artifacts / case_id / "mitigator"
-        return persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             case_workspace_root,
-            patch_root_path=patch_root,
             include_paths=observe_workspace_changed_files(case_workspace_root),
         )
+        patch_path = persist_text_artifact(
+            self.case_artifacts / case_id / "mitigator",
+            "workspace.patch",
+            patch_artifact["patch_diff"],
+        )
+        return {**patch_artifact, "patch_path": str(patch_path)}
 
     def _case_result(
         self,
@@ -290,7 +294,6 @@ class TestRepositoryDeliveryExecution:
         )
         mitigation = {
             "overview": f"Mitigation overview for {case_id}.",
-            "changed_files": changed_files,
             "file_changes": file_changes,
             "patch_diff": patch_diff,
             "residual_risks": [],
@@ -434,8 +437,9 @@ class TestRepositoryDeliveryExecution:
         combined_case = delivery_execution_input["combined_delivery_execution_items"][
             0
         ]["case_items"][0]
-        assert combined_case["mitigator_changed_files"] == ["src/combined.py"]
-        assert "mitigator_file_changes" not in combined_case
+        assert combined_case["mitigator_file_changes"] == [
+            {"path": "src/combined.py", "content": "combined content"}
+        ]
         assert combined_case["mitigator_patch_diff"] == "combined diff"
 
     @pytest.mark.asyncio
@@ -452,7 +456,9 @@ class TestRepositoryDeliveryExecution:
                 "alpha updated\n", encoding="utf-8"
             ),
         )
-        case_result = self._case_result("case-1", patch_artifact["changed_files"])
+        case_result = self._case_result(
+            "case-1", file_change_paths(patch_artifact["file_changes"])
+        )
 
         result = await _execute_delivery_direct_for_test(
             input_data=self.input_data,
@@ -476,7 +482,7 @@ class TestRepositoryDeliveryExecution:
             }
         ]
 
-    def test_persist_workspace_patch_uses_git_diff_and_skips_ignored_untracked_files(
+    def test_build_patch_artifact_uses_git_diff_and_skips_ignored_untracked_files(
         self,
     ) -> None:
         self._write_workspace(
@@ -494,19 +500,13 @@ class TestRepositoryDeliveryExecution:
         generated_file.parent.mkdir(parents=True, exist_ok=True)
         generated_file.write_text("generated\n", encoding="utf-8")
 
-        patch_root = self.case_artifacts / "case-git" / "patch"
-
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             self.workspace_root,
-            patch_root_path=patch_root,
             include_paths=observe_workspace_changed_files(self.workspace_root),
         )
 
-        assert patch_artifact["changed_files"] == ["src/app.txt"]
-        assert (
-            "diff --git a/src/app.txt b/src/app.txt" in patch_artifact["patch_content"]
-        )
-        assert patch_artifact["patch_diff"] == patch_artifact["patch_content"]
+        assert file_change_paths(patch_artifact["file_changes"]) == ["src/app.txt"]
+        assert "diff --git a/src/app.txt b/src/app.txt" in patch_artifact["patch_diff"]
         assert patch_artifact["file_changes"] == [
             {
                 "path": "src/app.txt",
@@ -516,9 +516,9 @@ class TestRepositoryDeliveryExecution:
                 "content_encoding": "utf-8",
             }
         ]
-        assert ".next/cache/trace.txt" not in patch_artifact["patch_content"]
+        assert ".next/cache/trace.txt" not in patch_artifact["patch_diff"]
 
-    def test_persist_workspace_patch_disables_git_diff_color(self) -> None:
+    def test_build_patch_artifact_disables_git_diff_color(self) -> None:
         self._write_workspace({"src/app.txt": "alpha\n"})
         self._init_workspace_git_repo()
         (self.workspace_root / "src/app.txt").write_text(
@@ -537,29 +537,25 @@ class TestRepositoryDeliveryExecution:
         with patch(
             "sec_review_agents.workspace.patches.subprocess.run", record_git_diff
         ):
-            persist_workspace_patch(
+            build_patch_artifact(
                 self.workspace_root,
-                patch_root_path=self.case_artifacts / "case-git-no-color" / "patch",
                 include_paths=["src/app.txt"],
             )
 
         assert observed_git_diff_commands
         assert all("--no-color" in command for command in observed_git_diff_commands)
 
-    def test_persist_workspace_patch_requires_git_workspace(self) -> None:
+    def test_build_patch_artifact_requires_git_workspace(self) -> None:
         self._write_workspace({"src/app.txt": "alpha\n"})
         self._init_workspace_git_repo()
 
-        patch_root = self.case_artifacts / "case-git-missing-writable" / "patch"
-
         with pytest.raises(RuntimeError, match="git-initialized workspace"):
-            persist_workspace_patch(
+            build_patch_artifact(
                 self.local_root,
-                patch_root_path=patch_root,
                 include_paths=[],
             )
 
-    def test_persist_workspace_patch_can_scope_to_declared_paths(self) -> None:
+    def test_build_patch_artifact_can_scope_to_declared_paths(self) -> None:
         self._write_workspace(
             {
                 "src/app.txt": "alpha\n",
@@ -578,25 +574,20 @@ class TestRepositoryDeliveryExecution:
         tap_file.parent.mkdir(parents=True, exist_ok=True)
         tap_file.write_text("generated\n", encoding="utf-8")
 
-        patch_root = self.case_artifacts / "case-git-scoped" / "patch"
-
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             self.workspace_root,
-            patch_root_path=patch_root,
             include_paths=["src/app.txt"],
         )
 
-        assert patch_artifact["changed_files"] == ["src/app.txt"]
-        assert (
-            "diff --git a/src/app.txt b/src/app.txt" in patch_artifact["patch_content"]
-        )
+        assert file_change_paths(patch_artifact["file_changes"]) == ["src/app.txt"]
+        assert "diff --git a/src/app.txt b/src/app.txt" in patch_artifact["patch_diff"]
         assert [item["path"] for item in patch_artifact["file_changes"]] == [
             "src/app.txt"
         ]
-        assert "README.md" not in patch_artifact["patch_content"]
-        assert ".tap/test-results/app.tap" not in patch_artifact["patch_content"]
+        assert "README.md" not in patch_artifact["patch_diff"]
+        assert ".tap/test-results/app.tap" not in patch_artifact["patch_diff"]
 
-    def test_persist_workspace_patch_normalizes_renames_to_delete_and_upsert(
+    def test_build_patch_artifact_normalizes_renames_to_delete_and_upsert(
         self,
     ) -> None:
         self._write_workspace({"src/old.txt": "same content\n"})
@@ -614,17 +605,17 @@ class TestRepositoryDeliveryExecution:
         )
         (self.workspace_root / "src/old.txt").unlink()
 
-        patch_root = self.case_artifacts / "case-git-rename" / "patch"
-
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             self.workspace_root,
-            patch_root_path=patch_root,
             include_paths=observe_workspace_changed_files(self.workspace_root),
         )
 
-        assert patch_artifact["changed_files"] == ["src/new.txt", "src/old.txt"]
-        assert "rename from src/old.txt" not in patch_artifact["patch_content"]
-        assert "rename to src/new.txt" not in patch_artifact["patch_content"]
+        assert file_change_paths(patch_artifact["file_changes"]) == [
+            "src/new.txt",
+            "src/old.txt",
+        ]
+        assert "rename from src/old.txt" not in patch_artifact["patch_diff"]
+        assert "rename to src/new.txt" not in patch_artifact["patch_diff"]
         assert patch_artifact["file_changes"] == [
             {
                 "path": "src/new.txt",
@@ -639,7 +630,7 @@ class TestRepositoryDeliveryExecution:
             },
         ]
 
-    def test_persist_workspace_patch_empty_scope_emits_empty_patch(self) -> None:
+    def test_build_patch_artifact_empty_scope_emits_empty_patch(self) -> None:
         self._write_workspace(
             {
                 "src/app.txt": "alpha\n",
@@ -651,20 +642,16 @@ class TestRepositoryDeliveryExecution:
             "alpha updated\n", encoding="utf-8"
         )
 
-        patch_root = self.case_artifacts / "case-git-empty-scope" / "patch"
-
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             self.workspace_root,
-            patch_root_path=patch_root,
             include_paths=[],
         )
 
-        assert patch_artifact["patch_content"] == ""
         assert patch_artifact["patch_diff"] == ""
-        assert patch_artifact["changed_files"] == []
+        assert file_change_paths(patch_artifact["file_changes"]) == []
         assert patch_artifact["file_changes"] == []
 
-    def test_persist_workspace_patch_preserves_symlink_semantics(self) -> None:
+    def test_build_patch_artifact_preserves_symlink_semantics(self) -> None:
         self._write_workspace(
             {
                 "contrib/gce/configure.sh": "echo baseline\n",
@@ -677,17 +664,16 @@ class TestRepositoryDeliveryExecution:
             "echo updated\n", encoding="utf-8"
         )
 
-        patch_root = self.case_artifacts / "case-git-symlink" / "patch"
-
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             self.workspace_root,
-            patch_root_path=patch_root,
             include_paths=observe_workspace_changed_files(self.workspace_root),
         )
 
-        assert patch_artifact["changed_files"] == ["contrib/gce/configure.sh"]
-        assert "diff --git a/cluster-gce" not in patch_artifact["patch_content"]
-        assert "deleted file mode 120000" not in patch_artifact["patch_content"]
+        assert file_change_paths(patch_artifact["file_changes"]) == [
+            "contrib/gce/configure.sh"
+        ]
+        assert "diff --git a/cluster-gce" not in patch_artifact["patch_diff"]
+        assert "deleted file mode 120000" not in patch_artifact["patch_diff"]
 
     def test_build_file_changes_from_workspace_patch_rejects_unsafe_paths(
         self,
@@ -723,7 +709,9 @@ class TestRepositoryDeliveryExecution:
             "case-1",
             lambda workspace: (workspace / "src/remove.txt").unlink(),
         )
-        case_result = self._case_result("case-1", patch_artifact["changed_files"])
+        case_result = self._case_result(
+            "case-1", file_change_paths(patch_artifact["file_changes"])
+        )
 
         await _execute_delivery_direct_for_test(
             input_data=self.input_data,
@@ -746,7 +734,6 @@ class TestRepositoryDeliveryExecution:
     ) -> None:
         case_result = self._case_result("case-1", [])
         case_result["review_record"]["mitigation"]["patch_diff"] = None
-        case_result["review_record"]["mitigation"]["changed_files"] = ["src/app.txt"]
         case_result["review_record"]["mitigation"]["file_changes"] = [
             {
                 "path": "src/app.txt",
@@ -779,7 +766,6 @@ class TestRepositoryDeliveryExecution:
         shutil.rmtree(self.workspace_root, ignore_errors=True)
         case_result = self._case_result("case-1", [])
         case_result["review_record"]["mitigation"]["patch_diff"] = None
-        case_result["review_record"]["mitigation"]["changed_files"] = ["src/app.txt"]
         case_result["review_record"]["mitigation"]["file_changes"] = [
             {
                 "path": "src/app.txt",
@@ -811,7 +797,7 @@ class TestRepositoryDeliveryExecution:
         result = await _execute_delivery_direct_for_test(
             input_data=self.input_data,
             keep_case_results=[
-                self._case_result("case-1", patch["changed_files"]),
+                self._case_result("case-1", _patch_paths(patch)),
             ],
             delivery_plan=self._delivery_plan(
                 [
@@ -846,8 +832,8 @@ class TestRepositoryDeliveryExecution:
             ),
         )
         case_results = [
-            self._case_result("case-one", patch_one["changed_files"]),
-            self._case_result("case-two", patch_two["changed_files"]),
+            self._case_result("case-one", _patch_paths(patch_one)),
+            self._case_result("case-two", _patch_paths(patch_two)),
         ]
         Path(patch_one["patch_path"]).unlink()
         Path(patch_two["patch_path"]).unlink()
@@ -933,8 +919,8 @@ class TestRepositoryDeliveryExecution:
             ),
         )
         case_results = [
-            self._case_result("case-one", patch_one["changed_files"]),
-            self._case_result("case-two", patch_two["changed_files"]),
+            self._case_result("case-one", _patch_paths(patch_one)),
+            self._case_result("case-two", _patch_paths(patch_two)),
         ]
 
         invoke_calls = {"count": 0}
@@ -1003,8 +989,8 @@ class TestRepositoryDeliveryExecution:
             ),
         )
         case_results = [
-            self._case_result("case-one", patch_one["changed_files"]),
-            self._case_result("case-two", patch_two["changed_files"]),
+            self._case_result("case-one", _patch_paths(patch_one)),
+            self._case_result("case-two", _patch_paths(patch_two)),
         ]
 
         create_agent_calls: list[dict] = []
@@ -1068,8 +1054,8 @@ class TestRepositoryDeliveryExecution:
             ),
         )
         case_results = [
-            self._case_result("case-one", patch_one["changed_files"]),
-            self._case_result("case-two", patch_two["changed_files"]),
+            self._case_result("case-one", _patch_paths(patch_one)),
+            self._case_result("case-two", _patch_paths(patch_two)),
         ]
 
         invoke_calls = {"count": 0}
@@ -1126,8 +1112,8 @@ class TestRepositoryDeliveryExecution:
             ),
         )
         case_results = [
-            self._case_result("case-one", patch_one["changed_files"]),
-            self._case_result("case-two", patch_two["changed_files"]),
+            self._case_result("case-one", _patch_paths(patch_one)),
+            self._case_result("case-two", _patch_paths(patch_two)),
         ]
 
         invoke_calls = {"count": 0}
@@ -1196,8 +1182,8 @@ class TestRepositoryDeliveryExecution:
             ),
         )
         case_results = [
-            self._case_result("case-one", patch_one["changed_files"]),
-            self._case_result("case-two", patch_two["changed_files"]),
+            self._case_result("case-one", _patch_paths(patch_one)),
+            self._case_result("case-two", _patch_paths(patch_two)),
         ]
 
         invoke_calls = {"count": 0}
@@ -1289,8 +1275,8 @@ class TestRepositoryDeliveryExecution:
 
         patch_two = self._prepare_case_patch("case-two", _mutate_case_two)
         case_results = [
-            self._case_result("case-one", patch_one["changed_files"]),
-            self._case_result("case-two", patch_two["changed_files"]),
+            self._case_result("case-one", _patch_paths(patch_one)),
+            self._case_result("case-two", _patch_paths(patch_two)),
         ]
 
         invoke_calls = {"count": 0}
@@ -1353,7 +1339,7 @@ class TestRepositoryDeliveryExecution:
                 "alpha updated\n", encoding="utf-8"
             ),
         )
-        case_result = self._case_result("case-1", patch_artifact["changed_files"])
+        case_result = self._case_result("case-1", _patch_paths(patch_artifact))
 
         shutil.rmtree(self.workspace_root, ignore_errors=True)
 
@@ -1383,7 +1369,7 @@ class TestRepositoryDeliveryExecution:
                 "alpha updated\n", encoding="utf-8"
             ),
         )
-        case_result = self._case_result("case-1", patch_artifact["changed_files"])
+        case_result = self._case_result("case-1", _patch_paths(patch_artifact))
         case_result["review_record"]["verification"]["residual_risks"] = [
             "raw-verifier-risk"
         ]
@@ -1419,7 +1405,7 @@ class TestRepositoryDeliveryExecution:
                 "alpha updated\n", encoding="utf-8"
             ),
         )
-        case_result = self._case_result("case-1", patch_artifact["changed_files"])
+        case_result = self._case_result("case-1", _patch_paths(patch_artifact))
 
         with patch(
             "sec_review_agents.delivery_stages.execution.patch_synthesis.create_patch_synthesis_agent_graph"
@@ -1528,8 +1514,8 @@ class TestRepositoryDeliveryExecution:
             ),
         )
         case_results = [
-            self._case_result("case-a", patch_a["changed_files"]),
-            self._case_result("case-b", patch_b["changed_files"]),
+            self._case_result("case-a", _patch_paths(patch_a)),
+            self._case_result("case-b", _patch_paths(patch_b)),
         ]
 
         with self._use_deterministic_combined_patch_outcomes():
@@ -1577,7 +1563,7 @@ class TestRepositoryDeliveryExecution:
                 ).write_text(content, encoding="utf-8"),
             )
             case_results.append(
-                self._case_result(case_id, patch_artifact["changed_files"])
+                self._case_result(case_id, _patch_paths(patch_artifact))
             )
 
         def fake_synthesize_combined_delivery_patch(
@@ -1590,7 +1576,9 @@ class TestRepositoryDeliveryExecution:
             if case_ids == ["case-a", "case-b"]:
                 raise RuntimeError("synthetic patch synthesis failure")
             changed_files = [
-                path for item in case_items for path in item["mitigator_changed_files"]
+                path
+                for item in case_items
+                for path in file_change_paths(item["mitigator_file_changes"])
             ]
             file_changes = [
                 {
@@ -1602,14 +1590,8 @@ class TestRepositoryDeliveryExecution:
                 for path in changed_files
             ]
             return {
-                "delivery_id": delivery_entry["delivery_id"],
-                "status": "ready",
-                "error": None,
-                "patch_path": None,
                 "patch_diff": "synthetic combined patch",
-                "changed_files": changed_files,
                 "file_changes": file_changes,
-                "applied_case_ids": case_ids,
             }
 
         with patch(
@@ -1665,7 +1647,7 @@ class TestRepositoryDeliveryExecution:
                 ).write_text(content, encoding="utf-8"),
             )
             case_results.append(
-                self._case_result(case_id, patch_artifact["changed_files"])
+                self._case_result(case_id, _patch_paths(patch_artifact))
             )
 
         baseline_snapshot_tar_paths: list[Path] = []
@@ -1678,16 +1660,9 @@ class TestRepositoryDeliveryExecution:
             **_kwargs,
         ) -> dict:
             baseline_snapshot_tar_paths.append(baseline_snapshot_tar_path)
-            case_ids = [item["case_id"] for item in case_items]
             return {
-                "delivery_id": delivery_entry["delivery_id"],
-                "status": "ready",
-                "error": None,
-                "patch_path": None,
                 "patch_diff": "",
-                "changed_files": [],
                 "file_changes": [],
-                "applied_case_ids": case_ids,
             }
 
         with patch(
@@ -1732,7 +1707,7 @@ class TestRepositoryDeliveryExecution:
                 "alpha updated\n", encoding="utf-8"
             ),
         )
-        case_result = self._case_result("case-1", patch_artifact["changed_files"])
+        case_result = self._case_result("case-1", _patch_paths(patch_artifact))
 
         await _execute_delivery_direct_for_test(
             input_data=self.input_data,
@@ -1766,12 +1741,16 @@ class TestRepositoryDeliveryExecution:
                 "bravo updated\n", encoding="utf-8"
             ),
         )
-        case_a = self._case_result("case-a", patch_a["changed_files"])
-        case_b = self._case_result("case-b", patch_b["changed_files"])
-        case_b["review_record"]["mitigation"]["changed_files"] = [
-            "src/b.txt",
-            "src/c.txt",
-        ]
+        case_a = self._case_result("case-a", _patch_paths(patch_a))
+        case_b = self._case_result("case-b", _patch_paths(patch_b))
+        case_b["review_record"]["mitigation"]["file_changes"].append(
+            {
+                "path": "src/c.txt",
+                "status": "upsert",
+                "content": "charlie updated\n",
+                "content_encoding": "utf-8",
+            }
+        )
 
         create_agent_calls: list[dict] = []
 

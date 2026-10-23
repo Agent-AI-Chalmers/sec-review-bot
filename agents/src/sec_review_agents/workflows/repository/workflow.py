@@ -34,7 +34,6 @@ from sec_review_agents.workflows.review_intent import (
     require_review_intent,
 )
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
-from sec_review_agents.workspace.file_changes import file_change_paths
 
 DEFAULT_CASE_PROCESSING_MAX_CONCURRENCY = 1
 
@@ -74,10 +73,6 @@ def build_blocked_repository_case_result(
             cvss_result=None,
         ),
     }
-
-
-def _stage_error_message(error: Exception) -> str:
-    return f"{type(error).__name__}: {error}"
 
 
 def _repository_case_timeout_seconds(
@@ -205,9 +200,10 @@ def build_repository_discovery_result_activity(
 ) -> DiscoveryResult:
     from sec_review_agents.scan_stages.discovery.stage import (
         build_discovery_result_from_chunks,
+        persist_discovery_result,
     )
 
-    return build_discovery_result_from_chunks(
+    result = build_discovery_result_from_chunks(
         entries=list(manifest["entries"]),
         skipped_files=list(manifest["skipped_files"]),
         chunks=list(manifest["chunks"]),
@@ -217,9 +213,14 @@ def build_repository_discovery_result_activity(
         chunk_target_tokens=int(manifest["chunk_target_tokens"]),
         chunk_target_ratio=str(manifest["chunk_target_ratio"]),
         chunk_hard_limit_tokens=int(manifest["chunk_hard_limit_tokens"]),
+        discovery_concurrency=int(manifest["max_concurrency"]),
         chunk_strategy=str(manifest["chunk_strategy"]),
-        discovery_artifacts_path=Path(str(manifest["discovery_artifacts_path"])),
     )
+    persist_discovery_result(
+        discovery_artifacts_path=Path(str(manifest["discovery_artifacts_path"])),
+        result=result,
+    )
+    return result
 
 
 @activity.defn
@@ -400,27 +401,6 @@ async def score_repository_case_cvss_activity(
             prepared_case["artifact_paths"],
             "cvss",
         ),
-    )
-
-
-@activity.defn
-def build_failed_repository_case_cvss_result_activity(
-    prepared_case: dict[str, Any],
-    error: str,
-) -> None:
-    from sec_review_agents.observability.trace_context import bind_trace_context
-    from sec_review_agents.review_stages.cvss.stage import (
-        persist_failed_cvss_v4_result,
-    )
-    from sec_review_agents.utils.paths import artifact_path
-
-    bind_trace_context(workflow="repository-review")
-    return persist_failed_cvss_v4_result(
-        cvss_artifacts_path=artifact_path(
-            prepared_case["artifact_paths"],
-            "cvss",
-        ),
-        error=error,
     )
 
 
@@ -609,7 +589,6 @@ def project_repository_case_result_for_delivery(
         "analyzer_overview": analysis["overview"],
         "analyzer_verdict": analysis["verdict"],
         "mitigation_overview": mitigation.get("overview") or "",
-        "mitigator_changed_files": file_change_paths(mitigation.get("file_changes")),
         "mitigator_file_changes": mitigation.get("file_changes") or [],
         "mitigator_patch_diff": mitigation.get("patch_diff"),
         "verifier_overview": verification["overview"],
@@ -637,6 +616,7 @@ async def plan_repository_delivery_activity(
     from sec_review_agents.delivery_stages.planning import (
         build_skipped_delivery_plan,
         generate_delivery_plan,
+        persist_delivery_plan,
     )
     from sec_review_agents.utils.paths import required_path
 
@@ -647,10 +627,12 @@ async def plan_repository_delivery_activity(
     )
     delivery_case_inputs = _delivery_case_inputs(case_results)
     if not delivery_case_inputs:
-        return build_skipped_delivery_plan(
+        result = build_skipped_delivery_plan(total_case_count=len(case_results))
+        persist_delivery_plan(
             run_artifacts_root=run_artifacts_root,
-            total_case_count=len(case_results),
+            result=result,
         )
+        return result
     return await generate_delivery_plan(
         run_artifacts_root=run_artifacts_root,
         case_results=delivery_case_inputs,
@@ -1002,17 +984,13 @@ class RepositoryCaseReviewWorkflow:
                     schedule_to_close_timeout=activity_timeout,
                     retry_policy=retry_policy,
                 )
-            # CVSS is advisory for the case record. If scoring exhausts retries,
-            # preserve the mitigation/verifier result and leave public CVSS empty.
+            # CVSS is advisory. Scoring failures observed by the activity are
+            # persisted there; Temporal remains the record for infrastructure
+            # failures that happen outside the activity execution.
             try:
                 cvss_result = await cvss_task
-            except Exception as cvss_error:
-                cvss_result = await workflow.execute_activity(
-                    build_failed_repository_case_cvss_result_activity,
-                    args=[prepared_case, _stage_error_message(cvss_error)],
-                    schedule_to_close_timeout=activity_timeout,
-                    retry_policy=retry_policy,
-                )
+            except Exception:
+                cvss_result = None
         except Exception:
             if not cvss_task.done():
                 cvss_task.cancel()
@@ -1270,7 +1248,6 @@ __all__ = [
     "analyze_repository_case_activity",
     "archive_repository_case_feedback_attempt_activity",
     "build_blocked_repository_case_result",
-    "build_failed_repository_case_cvss_result_activity",
     "build_repository_case_result_activity",
     "build_repository_delivery_result_activity",
     "build_repository_discovery_manifest_activity",

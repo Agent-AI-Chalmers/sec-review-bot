@@ -22,12 +22,15 @@ from sec_review_agents.delivery_stages.model import (
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
-from sec_review_agents.utils.files import reset_stage_attempt_artifacts
+from sec_review_agents.utils.files import (
+    persist_text_artifact,
+    reset_stage_attempt_artifacts,
+)
 from sec_review_agents.utils.markdown import inline_code, md
-from sec_review_agents.workspace.file_changes import FileChange
+from sec_review_agents.workspace.file_changes import file_change_paths
 from sec_review_agents.workspace.patches import (
+    build_patch_artifact,
     normalize_declared_changed_files,
-    persist_workspace_patch,
 )
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -43,7 +46,7 @@ def _file_overlap_summary(
             continue
         changed_files: list[str] = []
         seen_paths: set[str] = set()
-        for path in case_payload.get("mitigator_changed_files") or []:
+        for path in file_change_paths(case_payload.get("mitigator_file_changes")):
             if path in seen_paths:
                 continue
             seen_paths.add(path)
@@ -102,7 +105,8 @@ def render_delivery_patch_synthesis_brief(
         case_id = str(case.get("case_id") or "")
         changed_files = (
             ", ".join(
-                inline_code(path) for path in case.get("mitigator_changed_files") or []
+                inline_code(path)
+                for path in file_change_paths(case.get("mitigator_file_changes"))
             )
             or "none"
         )
@@ -139,25 +143,6 @@ def build_delivery_patch_synthesis_user_prompt(
     )
 
 
-def _patch_synthesis_result(
-    *,
-    status: str,
-    error: str | None,
-    patch_path: str | None,
-    changed_files: list[str],
-    patch_diff: str = "",
-    file_changes: list[FileChange] | None = None,
-) -> dict[str, Any]:
-    return {
-        "status": status,
-        "error": error,
-        "patch_path": patch_path,
-        "patch_diff": patch_diff,
-        "changed_files": changed_files,
-        "file_changes": file_changes or [],
-    }
-
-
 async def synthesize_combined_delivery_patch(
     *,
     baseline_snapshot_tar_path: Path,
@@ -165,24 +150,19 @@ async def synthesize_combined_delivery_patch(
     delivery_entry: DeliveryEntry,
     case_items: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
+    """Build and persist the patch artifact for one combined delivery.
+
+    Delivery execution owns status and error reporting. This function returns only
+    patch data, using an empty artifact when the agent declares no changed files.
+    """
     delivery_id = delivery_entry["delivery_id"]
     if not delivery_id:
-        return _patch_synthesis_result(
-            status="invalid-input",
-            error="Missing delivery_id for combined patch synthesis.",
-            patch_path=None,
-            changed_files=[],
-        )
+        raise ValueError("Missing delivery_id for combined patch synthesis.")
 
     if not baseline_snapshot_tar_path.exists():
-        return _patch_synthesis_result(
-            status="invalid-input",
-            error=(
-                "Missing patch-synthesis baseline snapshot at "
-                f"{baseline_snapshot_tar_path}."
-            ),
-            patch_path=None,
-            changed_files=[],
+        raise FileNotFoundError(
+            "Missing patch-synthesis baseline snapshot at "
+            f"{baseline_snapshot_tar_path}."
         )
 
     case_ids = [item["case_id"] for item in case_items]
@@ -235,31 +215,15 @@ async def synthesize_combined_delivery_patch(
             raw_declared_changed_files
         )
         if not declared_changed_files:
-            return _patch_synthesis_result(
-                status="no-changes",
-                error="Patch synthesis agent declared no delivery file changes.",
-                patch_path=None,
-                changed_files=[],
-            )
-        patch_path = delivery_artifacts_root / "workspace.patch"
-        patch_path.parent.mkdir(parents=True, exist_ok=True)
-        patch_artifact = persist_workspace_patch(
+            return {"patch_diff": "", "file_changes": []}
+
+        patch_artifact = build_patch_artifact(
             workspace_path,
-            patch_root_path=patch_path.parent,
             include_paths=declared_changed_files,
         )
-        if not patch_artifact["file_changes"]:
-            return _patch_synthesis_result(
-                status="no-changes",
-                error="Patch synthesis agent produced no declared delivery file changes.",
-                patch_path=None,
-                changed_files=[],
-            )
-        return _patch_synthesis_result(
-            status="ready",
-            error=None,
-            patch_path=patch_artifact["patch_path"],
-            patch_diff=patch_artifact["patch_diff"],
-            changed_files=patch_artifact["changed_files"],
-            file_changes=patch_artifact["file_changes"],
+        persist_text_artifact(
+            delivery_artifacts_root,
+            "workspace.patch",
+            patch_artifact["patch_diff"],
         )
+        return patch_artifact

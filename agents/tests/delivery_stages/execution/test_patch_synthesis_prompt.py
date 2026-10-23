@@ -25,7 +25,14 @@ def test_reference_patch_is_inlined_without_per_patch_truncation() -> None:
         case_items=[
             {
                 "case_id": case_id,
-                "mitigator_changed_files": ["large.txt"],
+                "mitigator_file_changes": [
+                    {
+                        "path": "large.txt",
+                        "status": "upsert",
+                        "content": "replacement\n",
+                        "content_encoding": "utf-8",
+                    }
+                ],
                 "mitigator_patch_diff": patch_text,
             }
         ],

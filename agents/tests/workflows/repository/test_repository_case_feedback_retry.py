@@ -264,13 +264,6 @@ async def _run_case_workflow(state: _CaseWorkflowState) -> dict[str, Any]:
     ) -> dict[str, Any]:
         return {"outcome": "scored"}
 
-    @activity.defn(name="build_failed_repository_case_cvss_result_activity")
-    def fake_build_failed_repository_case_cvss_result(
-        _prepared_case: dict[str, Any],
-        error: str,
-    ) -> None:
-        _ = error
-
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigate_repository_case(
         _prepared_case: dict[str, Any],
@@ -336,7 +329,6 @@ async def _run_case_workflow(state: _CaseWorkflowState) -> dict[str, Any]:
                     fake_prepare_repository_case,
                     fake_analyze_repository_case,
                     fake_score_repository_case_cvss,
-                    fake_build_failed_repository_case_cvss_result,
                     fake_mitigate_repository_case,
                     fake_verify_repository_case,
                     fake_archive_repository_case_feedback_attempt,

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from sec_review_agents.delivery_stages.model import DeliveryCaseInput
+from sec_review_agents.workspace.file_changes import file_change_paths
 
 
 def prepare_delivery_planning_patch_view(
@@ -35,7 +36,7 @@ def build_delivery_planning_cases(
         {
             "case_id": item["case_id"],
             "overview": item["mitigation_overview"],
-            "changed_files": sorted(item["mitigator_changed_files"]),
+            "changed_files": sorted(file_change_paths(item["mitigator_file_changes"])),
         }
         for item in case_results
     ]

@@ -154,7 +154,9 @@ async def test_repository_triage_single_mode_passes_explicit_runtime_inputs(
             triage_mode="single",
         )
 
-    assert result["agent_results"] == [{"passIndex": 0}]
+    assert result["metadata"]["triage_pass_count"] == 1
+    assert "agent_result" not in result
+    assert "agent_results" not in result
     assert pass_mock.call_args.kwargs["triage_root"] == triage_root
     assert pass_metas == [None]
     assert json.loads((triage_root / "triage-input.json").read_text()) == {
@@ -175,4 +177,6 @@ async def test_repository_triage_batched_mode_uses_explicit_runtime_inputs(
         max_batch_size=2,
     )
 
-    assert result["agent_results"] == []
+    assert result["metadata"]["triage_pass_count"] == 0
+    assert "agent_result" not in result
+    assert "agent_results" not in result

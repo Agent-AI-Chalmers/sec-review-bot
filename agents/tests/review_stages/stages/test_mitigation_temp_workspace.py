@@ -67,9 +67,8 @@ async def _run_mitigation_stage_for_workspace_capture(
             side_effect=invoke_agent_graph,
         ),
         patch(
-            "sec_review_agents.review_stages.mitigation.stage.persist_workspace_patch",
+            "sec_review_agents.review_stages.mitigation.stage.build_patch_artifact",
             return_value={
-                "changed_files": [],
                 "file_changes": [],
                 "patch_diff": "",
             },

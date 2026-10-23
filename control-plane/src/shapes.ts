@@ -32,8 +32,6 @@ export type {
   ReviewRunRecord
 }
 
-export type WorkflowName =
-  'issue-review' | 'pull-request-review' | 'repository-review'
 export type IngressKind = 'github_webhook' | 'github_actions_dispatch'
 export type ExecutionStatus =
   | 'pending'

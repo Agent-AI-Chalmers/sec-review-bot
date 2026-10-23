@@ -92,7 +92,6 @@ def test_delivery_result_contract_tracks_required_sections(tmp_path) -> None:
                 "delivery_id": "delivery-1",
                 "status": "ready",
                 "error": None,
-                "patch_path": None,
                 "patch_diff": "",
                 "changed_files": ["src/app.py"],
                 "file_changes": [
@@ -103,7 +102,6 @@ def test_delivery_result_contract_tracks_required_sections(tmp_path) -> None:
                         "content_encoding": "utf-8",
                     }
                 ],
-                "applied_case_ids": ["case-1"],
             }
         ],
     )
@@ -126,20 +124,16 @@ def test_delivery_execution_result_builder_tracks_public_fields() -> None:
         delivery_id="delivery-1",
         status="ready",
         error=None,
-        patch_path=None,
         patch_diff="",
         file_changes=[],
-        applied_case_ids=["case-1"],
     )
 
     assert set(result) == {
         "delivery_id",
         "status",
         "error",
-        "patch_path",
         "patch_diff",
         "file_changes",
-        "applied_case_ids",
     }
 
 
@@ -184,10 +178,8 @@ def test_delivery_execution_result_is_json_serializable_public_payload() -> None
         delivery_id="delivery-1",
         status="ready",
         error=None,
-        patch_path=None,
         patch_diff="",
         file_changes=[],
-        applied_case_ids=["case-1"],
     )
 
     assert type(result) is dict
@@ -210,7 +202,6 @@ def test_delivery_result_builders_emit_json_serializable_public_payloads() -> No
                 "delivery_id": "delivery-1",
                 "status": "ready",
                 "error": None,
-                "patch_path": None,
                 "patch_diff": "",
                 "changed_files": ["src/app.py"],
                 "file_changes": [
@@ -221,7 +212,6 @@ def test_delivery_result_builders_emit_json_serializable_public_payloads() -> No
                         "content_encoding": "utf-8",
                     }
                 ],
-                "applied_case_ids": ["case-1"],
             }
         ],
     )
@@ -248,7 +238,6 @@ def test_delivery_result_persistence_writes_stage_artifacts(tmp_path) -> None:
                 "delivery_id": "delivery-1",
                 "status": "ready",
                 "error": None,
-                "patch_path": None,
                 "patch_diff": "",
                 "changed_files": ["src/app.py"],
                 "file_changes": [
@@ -259,7 +248,6 @@ def test_delivery_result_persistence_writes_stage_artifacts(tmp_path) -> None:
                         "content_encoding": "utf-8",
                     }
                 ],
-                "applied_case_ids": ["case-1"],
             }
         ],
     )

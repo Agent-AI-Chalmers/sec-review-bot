@@ -15,7 +15,6 @@ from sec_review_agents.agents.cvss.model import (
 from sec_review_agents.review_stages.cvss.result import (
     CvssStageResult,
     build_cvss_v4_stage_result,
-    build_failed_cvss_v4_result,
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
@@ -31,6 +30,7 @@ def persist_cvss_stage_result(
     cvss_artifacts_path: Path,
     result: Mapping[str, Any],
 ) -> None:
+    remove_json_artifacts(cvss_artifacts_path, ("cvss-v4-failure",))
     persist_json_artifact(
         cvss_artifacts_path,
         "cvss-v4-result",
@@ -81,14 +81,17 @@ def _compute_cvss_v4_base(vector: str) -> tuple[str, float, str]:
     return str(parsed.clean_vector()), score, severity_value
 
 
-def persist_failed_cvss_v4_result(
+def persist_cvss_failure(
     *,
     cvss_artifacts_path: Path,
     error: str,
 ) -> None:
-    persist_cvss_stage_result(
-        cvss_artifacts_path=cvss_artifacts_path,
-        result=build_failed_cvss_v4_result(error=error),
+    """Persist a scoring failure observed by the running CVSS stage."""
+    remove_json_artifacts(cvss_artifacts_path, ("cvss-v4-result",))
+    persist_json_artifact(
+        cvss_artifacts_path,
+        "cvss-v4-failure",
+        {"error": error},
     )
 
 
@@ -149,7 +152,10 @@ async def run_cvss_v4_scoring_stage(
 
 
 def reset_cvss_artifacts(*, cvss_artifacts_path: Path) -> None:
-    remove_json_artifacts(cvss_artifacts_path, ("cvss-v4-result",))
+    remove_json_artifacts(
+        cvss_artifacts_path,
+        ("cvss-v4-result", "cvss-v4-failure"),
+    )
     remove_transcripts((transcript_path(cvss_artifacts_path),))
 
 
@@ -186,7 +192,7 @@ __all__ = [
     "CvssV4ScoringOutput",
     "build_cvss_stage_result_from_agent_output",
     "is_cvss_v4_scoring_target",
+    "persist_cvss_failure",
     "persist_cvss_stage_result",
-    "persist_failed_cvss_v4_result",
     "run_cvss_v4_scoring_stage",
 ]
