@@ -21,10 +21,13 @@ from sec_review_agents.runtime.setup_bootstrap import (
     record_bootstrap_result,
 )
 from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
-from sec_review_agents.utils.files import reset_stage_attempt_artifacts
+from sec_review_agents.utils.files import (
+    persist_text_artifact,
+    reset_stage_attempt_artifacts,
+)
 from sec_review_agents.workspace.patches import (
+    build_patch_artifact,
     normalize_declared_changed_files,
-    persist_workspace_patch,
 )
 from sec_review_agents.workspace.snapshots import (
     restore_workspace_from_snapshot_tar,
@@ -118,10 +121,14 @@ async def run_single_agent_stage(
             declared_patch_paths = normalize_declared_changed_files(raw_declared_paths)
         else:
             raise ValueError("declared_changed_files must be a list.")
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             workspace_path,
-            patch_root_path=single_agent_artifacts_path,
             include_paths=declared_patch_paths,
+        )
+        persist_text_artifact(
+            single_agent_artifacts_path,
+            "workspace.patch",
+            patch_artifact["patch_diff"],
         )
         return build_single_agent_stage_outcome(
             agent_output=agent_output,

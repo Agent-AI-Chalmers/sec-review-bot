@@ -22,12 +22,15 @@ from sec_review_agents.delivery_stages.model import (
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
-from sec_review_agents.utils.files import reset_stage_attempt_artifacts
+from sec_review_agents.utils.files import (
+    persist_text_artifact,
+    reset_stage_attempt_artifacts,
+)
 from sec_review_agents.utils.markdown import inline_code, md
 from sec_review_agents.workspace.file_changes import FileChange, file_change_paths
 from sec_review_agents.workspace.patches import (
+    build_patch_artifact,
     normalize_declared_changed_files,
-    persist_workspace_patch,
 )
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -238,11 +241,14 @@ async def synthesize_combined_delivery_patch(
                 patch_path=None,
             )
         patch_path = delivery_artifacts_root / "workspace.patch"
-        patch_path.parent.mkdir(parents=True, exist_ok=True)
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             workspace_path,
-            patch_root_path=patch_path.parent,
             include_paths=declared_changed_files,
+        )
+        persisted_patch_path = persist_text_artifact(
+            patch_path.parent,
+            patch_path.name,
+            patch_artifact["patch_diff"],
         )
         if not patch_artifact["file_changes"]:
             return _patch_synthesis_result(
@@ -253,7 +259,7 @@ async def synthesize_combined_delivery_patch(
         return _patch_synthesis_result(
             status="ready",
             error=None,
-            patch_path=patch_artifact["patch_path"],
+            patch_path=str(persisted_patch_path),
             patch_diff=patch_artifact["patch_diff"],
             file_changes=patch_artifact["file_changes"],
         )

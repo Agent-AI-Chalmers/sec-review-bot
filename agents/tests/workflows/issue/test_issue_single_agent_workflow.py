@@ -67,10 +67,9 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
             return_value=structured_payload,
         ),
         patch(
-            "sec_review_agents.review_stages.single_agent.stage.persist_workspace_patch",
+            "sec_review_agents.review_stages.single_agent.stage.build_patch_artifact",
             return_value={
-                "patch_content": "diff --git a/app.py b/app.py\n",
-                "changed_files": ["app.py"],
+                "patch_diff": "diff --git a/app.py b/app.py\n",
                 "file_changes": [{"path": "app.py", "status": "deleted"}],
             },
         ),
@@ -140,10 +139,9 @@ async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_dec
             return_value=structured_payload,
         ),
         patch(
-            "sec_review_agents.review_stages.single_agent.stage.persist_workspace_patch",
+            "sec_review_agents.review_stages.single_agent.stage.build_patch_artifact",
             return_value={
-                "patch_content": "diff --git a/app.py b/app.py\n",
-                "changed_files": ["app.py"],
+                "patch_diff": "diff --git a/app.py b/app.py\n",
                 "file_changes": [{"path": "app.py", "status": "deleted"}],
             },
         ),

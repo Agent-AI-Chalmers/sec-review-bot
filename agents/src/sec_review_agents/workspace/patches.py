@@ -3,7 +3,6 @@ import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
-from sec_review_agents.utils.files import persist_text_artifact
 from sec_review_agents.workspace.paths import normalize_declared_file_path
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -90,6 +89,11 @@ def _path_matches_any(path: str, include_paths: list[str]) -> bool:
 def _build_git_workspace_patch(
     workspace_path: Path, *, include_paths: Sequence[str] | None = None
 ) -> tuple[str, list[str]]:
+    """Run Git diff and return its patch text and observed repository paths.
+
+    An empty scope observes the whole workspace. Untracked files are temporarily
+    marked intent-to-add, then reset before this function returns.
+    """
     scoped_paths = _filter_paths(include_paths)
     untracked_paths = _list_untracked_paths(workspace_path)
     if scoped_paths:
@@ -181,7 +185,12 @@ def build_workspace_patch(
     *,
     include_paths: Sequence[str],
 ) -> dict:
-    """Build a publishable patch from declared workspace paths only."""
+    """Build, but do not persist, the patch for explicitly declared paths.
+
+    Runtime acceptance and artifact construction share this export policy. The
+    returned paths are Git-observed changes within ``include_paths``. An empty
+    declared scope returns an empty patch instead of exporting the whole workspace.
+    """
     # `include_paths=[]` means "the agent declared no publishable changed paths".
     # Keep the emitted patch empty so undeclared workspace edits never become
     # publishable patch content.
@@ -233,32 +242,27 @@ def check_workspace_patch_applies_to_fresh_baseline(
         )
 
 
-def persist_workspace_patch(
+def build_patch_artifact(
     workspace_path: Path,
     *,
-    patch_root_path: Path,
-    filename: str = "workspace.patch",
     include_paths: Sequence[str],
 ) -> dict:
+    """Build review diff and final-file changes from the same workspace paths."""
     from sec_review_agents.workspace.file_changes import (
         collect_publishable_file_changes,
     )
 
-    patch_artifact = build_workspace_patch(
+    workspace_patch = build_workspace_patch(
         workspace_path,
         include_paths=include_paths,
     )
-    normalized_patch = patch_artifact["patch_content"]
-
-    patch_path = persist_text_artifact(patch_root_path, filename, normalized_patch)
     file_changes = collect_publishable_file_changes(
         workspace_path,
-        patch_artifact["changed_files"],
+        workspace_patch["changed_files"],
     )
 
     return {
-        "patch_path": str(patch_path),
-        "patch_diff": normalized_patch,
+        "patch_diff": workspace_patch["patch_content"],
         "file_changes": file_changes,
     }
 

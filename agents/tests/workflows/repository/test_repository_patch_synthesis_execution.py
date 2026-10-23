@@ -12,6 +12,7 @@ import pytest
 from sec_review_agents.agents.delivery_planning.workbench_state import (
     DeliveryWorkbenchState,
 )
+from sec_review_agents.utils.files import persist_text_artifact
 from sec_review_agents.workflows.repository import direct as repository_direct
 from sec_review_agents.workflows.repository.workflow import (
     plan_repository_delivery_activity,
@@ -24,8 +25,8 @@ from sec_review_agents.workspace.file_changes import (
     file_change_paths,
 )
 from sec_review_agents.workspace.patches import (
+    build_patch_artifact,
     observe_workspace_changed_files,
-    persist_workspace_patch,
 )
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 
@@ -260,12 +261,16 @@ class TestRepositoryDeliveryExecution:
         )
         mutate_workspace(case_workspace_root)
 
-        patch_root = self.case_artifacts / case_id / "mitigator"
-        return persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             case_workspace_root,
-            patch_root_path=patch_root,
             include_paths=observe_workspace_changed_files(case_workspace_root),
         )
+        patch_path = persist_text_artifact(
+            self.case_artifacts / case_id / "mitigator",
+            "workspace.patch",
+            patch_artifact["patch_diff"],
+        )
+        return {**patch_artifact, "patch_path": str(patch_path)}
 
     def _case_result(
         self,
@@ -482,7 +487,7 @@ class TestRepositoryDeliveryExecution:
             }
         ]
 
-    def test_persist_workspace_patch_uses_git_diff_and_skips_ignored_untracked_files(
+    def test_build_patch_artifact_uses_git_diff_and_skips_ignored_untracked_files(
         self,
     ) -> None:
         self._write_workspace(
@@ -500,11 +505,8 @@ class TestRepositoryDeliveryExecution:
         generated_file.parent.mkdir(parents=True, exist_ok=True)
         generated_file.write_text("generated\n", encoding="utf-8")
 
-        patch_root = self.case_artifacts / "case-git" / "patch"
-
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             self.workspace_root,
-            patch_root_path=patch_root,
             include_paths=observe_workspace_changed_files(self.workspace_root),
         )
 
@@ -521,7 +523,7 @@ class TestRepositoryDeliveryExecution:
         ]
         assert ".next/cache/trace.txt" not in patch_artifact["patch_diff"]
 
-    def test_persist_workspace_patch_disables_git_diff_color(self) -> None:
+    def test_build_patch_artifact_disables_git_diff_color(self) -> None:
         self._write_workspace({"src/app.txt": "alpha\n"})
         self._init_workspace_git_repo()
         (self.workspace_root / "src/app.txt").write_text(
@@ -540,29 +542,25 @@ class TestRepositoryDeliveryExecution:
         with patch(
             "sec_review_agents.workspace.patches.subprocess.run", record_git_diff
         ):
-            persist_workspace_patch(
+            build_patch_artifact(
                 self.workspace_root,
-                patch_root_path=self.case_artifacts / "case-git-no-color" / "patch",
                 include_paths=["src/app.txt"],
             )
 
         assert observed_git_diff_commands
         assert all("--no-color" in command for command in observed_git_diff_commands)
 
-    def test_persist_workspace_patch_requires_git_workspace(self) -> None:
+    def test_build_patch_artifact_requires_git_workspace(self) -> None:
         self._write_workspace({"src/app.txt": "alpha\n"})
         self._init_workspace_git_repo()
 
-        patch_root = self.case_artifacts / "case-git-missing-writable" / "patch"
-
         with pytest.raises(RuntimeError, match="git-initialized workspace"):
-            persist_workspace_patch(
+            build_patch_artifact(
                 self.local_root,
-                patch_root_path=patch_root,
                 include_paths=[],
             )
 
-    def test_persist_workspace_patch_can_scope_to_declared_paths(self) -> None:
+    def test_build_patch_artifact_can_scope_to_declared_paths(self) -> None:
         self._write_workspace(
             {
                 "src/app.txt": "alpha\n",
@@ -581,11 +579,8 @@ class TestRepositoryDeliveryExecution:
         tap_file.parent.mkdir(parents=True, exist_ok=True)
         tap_file.write_text("generated\n", encoding="utf-8")
 
-        patch_root = self.case_artifacts / "case-git-scoped" / "patch"
-
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             self.workspace_root,
-            patch_root_path=patch_root,
             include_paths=["src/app.txt"],
         )
 
@@ -597,7 +592,7 @@ class TestRepositoryDeliveryExecution:
         assert "README.md" not in patch_artifact["patch_diff"]
         assert ".tap/test-results/app.tap" not in patch_artifact["patch_diff"]
 
-    def test_persist_workspace_patch_normalizes_renames_to_delete_and_upsert(
+    def test_build_patch_artifact_normalizes_renames_to_delete_and_upsert(
         self,
     ) -> None:
         self._write_workspace({"src/old.txt": "same content\n"})
@@ -615,11 +610,8 @@ class TestRepositoryDeliveryExecution:
         )
         (self.workspace_root / "src/old.txt").unlink()
 
-        patch_root = self.case_artifacts / "case-git-rename" / "patch"
-
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             self.workspace_root,
-            patch_root_path=patch_root,
             include_paths=observe_workspace_changed_files(self.workspace_root),
         )
 
@@ -643,7 +635,7 @@ class TestRepositoryDeliveryExecution:
             },
         ]
 
-    def test_persist_workspace_patch_empty_scope_emits_empty_patch(self) -> None:
+    def test_build_patch_artifact_empty_scope_emits_empty_patch(self) -> None:
         self._write_workspace(
             {
                 "src/app.txt": "alpha\n",
@@ -655,20 +647,16 @@ class TestRepositoryDeliveryExecution:
             "alpha updated\n", encoding="utf-8"
         )
 
-        patch_root = self.case_artifacts / "case-git-empty-scope" / "patch"
-
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             self.workspace_root,
-            patch_root_path=patch_root,
             include_paths=[],
         )
 
         assert patch_artifact["patch_diff"] == ""
-        assert patch_artifact["patch_diff"] == ""
         assert file_change_paths(patch_artifact["file_changes"]) == []
         assert patch_artifact["file_changes"] == []
 
-    def test_persist_workspace_patch_preserves_symlink_semantics(self) -> None:
+    def test_build_patch_artifact_preserves_symlink_semantics(self) -> None:
         self._write_workspace(
             {
                 "contrib/gce/configure.sh": "echo baseline\n",
@@ -681,11 +669,8 @@ class TestRepositoryDeliveryExecution:
             "echo updated\n", encoding="utf-8"
         )
 
-        patch_root = self.case_artifacts / "case-git-symlink" / "patch"
-
-        patch_artifact = persist_workspace_patch(
+        patch_artifact = build_patch_artifact(
             self.workspace_root,
-            patch_root_path=patch_root,
             include_paths=observe_workspace_changed_files(self.workspace_root),
         )
 
