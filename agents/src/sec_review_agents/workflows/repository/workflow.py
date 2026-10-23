@@ -204,9 +204,10 @@ def build_repository_discovery_result_activity(
 ) -> DiscoveryResult:
     from sec_review_agents.scan_stages.discovery.stage import (
         build_discovery_result_from_chunks,
+        persist_discovery_result,
     )
 
-    return build_discovery_result_from_chunks(
+    result = build_discovery_result_from_chunks(
         entries=list(manifest["entries"]),
         skipped_files=list(manifest["skipped_files"]),
         chunks=list(manifest["chunks"]),
@@ -216,9 +217,14 @@ def build_repository_discovery_result_activity(
         chunk_target_tokens=int(manifest["chunk_target_tokens"]),
         chunk_target_ratio=str(manifest["chunk_target_ratio"]),
         chunk_hard_limit_tokens=int(manifest["chunk_hard_limit_tokens"]),
+        discovery_concurrency=int(manifest["max_concurrency"]),
         chunk_strategy=str(manifest["chunk_strategy"]),
-        discovery_artifacts_path=Path(str(manifest["discovery_artifacts_path"])),
     )
+    persist_discovery_result(
+        discovery_artifacts_path=Path(str(manifest["discovery_artifacts_path"])),
+        result=result,
+    )
+    return result
 
 
 @activity.defn

@@ -9,6 +9,7 @@ from pathlib import Path
 
 from sec_review_agents.scan_stages.discovery.stage import (
     build_discovery_result_from_chunks,
+    persist_discovery_result,
     prepare_discovery_chunks,
     scan_discovery_chunk,
 )
@@ -85,8 +86,12 @@ async def main() -> None:
         chunk_target_tokens=int(manifest["chunk_target_tokens"]),
         chunk_target_ratio=str(manifest["chunk_target_ratio"]),
         chunk_hard_limit_tokens=int(manifest["chunk_hard_limit_tokens"]),
+        discovery_concurrency=int(manifest["max_concurrency"]),
         chunk_strategy=str(manifest["chunk_strategy"]),
-        discovery_artifacts_path=manifest["discovery_artifacts_path"],
+    )
+    persist_discovery_result(
+        discovery_artifacts_path=Path(manifest["discovery_artifacts_path"]),
+        result=discovery_result,
     )
 
     discovery_artifacts_path = Path(

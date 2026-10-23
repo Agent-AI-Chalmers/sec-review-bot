@@ -294,8 +294,16 @@ def test_discovery_artifacts_record_target_and_hard_token_limits(
         chunk_target_tokens=50_000,
         chunk_target_ratio="1/5",
         chunk_hard_limit_tokens=200_000,
-        discovery_artifacts_path=artifacts,
+        discovery_concurrency=1,
     )
+    result_path = artifacts / "discovery-result.json"
+    assert not result_path.exists()
+
+    discovery_stage.persist_discovery_result(
+        discovery_artifacts_path=artifacts,
+        result=result,
+    )
+    assert json.loads(result_path.read_text(encoding="utf-8")) == result
     assert result["metadata"]["discovery_deployment_input_limit_tokens"] == 250_000
     assert result["metadata"]["discovery_chunk_target_tokens"] == 50_000
     assert result["metadata"]["discovery_chunk_target_ratio"] == "1/5"

@@ -10,9 +10,6 @@ from sec_review_agents.agents.discovery.prompts import (
     build_repository_discovery_system_prompt,
     build_repository_discovery_user_prompt,
 )
-from sec_review_agents.observability.diagnostics import (
-    log_stage_completed,
-)
 from sec_review_agents.runtime.deployment_limits import (
     resolve_bound_deployment_max_input_tokens,
 )
@@ -889,10 +886,10 @@ def build_discovery_result_from_chunks(
     chunk_target_tokens: int,
     chunk_target_ratio: str,
     chunk_hard_limit_tokens: int,
+    discovery_concurrency: int,
     chunk_strategy: str = DEFAULT_DISCOVERY_CHUNK_STRATEGY,
-    discovery_artifacts_path: Path,
-    started_at: float | None = None,
 ) -> DiscoveryResult:
+    """Combine ordered chunk outcomes into the stage result without side effects."""
     candidates: list[dict[str, Any]] = []
     file_results: list[DiscoveryFileResult] = []
     all_skipped_files = [dict(item) for item in skipped_files]
@@ -906,7 +903,6 @@ def build_discovery_result_from_chunks(
         candidates.extend(scan_result.get("file_candidates") or [])
         file_results.extend(chunk_file_results)
 
-    discovery_concurrency = _resolve_discovery_max_concurrency(len(chunks))
     result: DiscoveryResult = {
         "status": "completed",
         "metadata": {
@@ -929,21 +925,14 @@ def build_discovery_result_from_chunks(
         "skipped_files": all_skipped_files,
         "candidates": candidates,
     }
-    persist_json_artifact(
-        discovery_artifacts_path,
-        "discovery-result",
-        result,
-    )
-    if started_at is not None:
-        log_stage_completed(
-            stage="discovery",
-            started_at=started_at,
-            scannable_file_count=len(entries),
-            skipped_file_count=len(all_skipped_files),
-            candidate_count=len(candidates),
-            discovery_concurrency=discovery_concurrency,
-        )
     return result
+
+
+def persist_discovery_result(
+    *, discovery_artifacts_path: Path, result: DiscoveryResult
+) -> None:
+    """Persist the canonical discovery stage result."""
+    persist_json_artifact(discovery_artifacts_path, "discovery-result", result)
 
 
 def prepare_discovery_chunks(
