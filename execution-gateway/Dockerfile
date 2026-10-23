@@ -13,8 +13,7 @@ RUN corepack enable pnpm \
 
 COPY tsconfig.json tsconfig.build.json eslint.config.js .prettierrc.json ./
 COPY src ./src
-COPY --from=contracts integration-contract/openapi.yaml /contracts/integration-contract/openapi.yaml
-COPY --from=contracts integration-contract/v6 /contracts/integration-contract/v6
+COPY --from=contracts integration-contract /contracts/integration-contract
 COPY --from=contracts execution-contract /contracts/execution-contract
 RUN pnpm run build \
     && pnpm deploy --filter . --prod /prod

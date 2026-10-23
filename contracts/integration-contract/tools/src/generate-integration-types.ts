@@ -1,6 +1,7 @@
 // Project the integration contract's JSON Schemas into consumer-specific TypeScript declarations.
 //
-// The schemas under `contracts/integration-contract/v6/schemas` are the hand-written source of
+// The selected schemas under `contracts/integration-contract/<version>/schemas` are the
+// hand-written source of
 // truth for workflow transport shapes. The Control Plane and Execution Gateway need workflow
 // inputs, while the GitHub integration also consumes review results. Hand-maintained copies are
 // how those shapes drifted before; this generator projects only what each consumer needs.
@@ -19,11 +20,13 @@ import { REPO_ROOT } from './repo-root.js'
 
 type JsonSchema = Record<string, unknown>
 
+export const WORKFLOW_CONTRACT_VERSION = 'v6'
+
 const SCHEMA_DIR = path.join(
   REPO_ROOT,
   'contracts',
   'integration-contract',
-  'v6',
+  WORKFLOW_CONTRACT_VERSION,
   'schemas'
 )
 const COMMON_SCHEMA = 'common.schema.json'
@@ -296,7 +299,7 @@ async function renderDeclarations(
 
 async function renderFile(): Promise<string> {
   return [
-    '// Generated from contracts/integration-contract/v6/schemas. Do not edit by hand.',
+    `// Generated from contracts/integration-contract/${WORKFLOW_CONTRACT_VERSION}/schemas. Do not edit by hand.`,
     '// Regenerate with `pnpm --dir contracts/integration-contract/tools run generate`.',
     '',
     await renderIntegrationContractDeclarations(),
@@ -304,6 +307,47 @@ async function renderFile(): Promise<string> {
     renderLimits(),
     ''
   ].join('\n')
+}
+
+function gatewayVersionOutput(): string {
+  return path.join(REPO_ROOT, 'execution-gateway', 'src', 'contract-version.ts')
+}
+
+function integrationVersionOutput(): string {
+  return path.join(
+    REPO_ROOT,
+    'apps',
+    'github-integration',
+    'src',
+    'execution',
+    'contract-version.ts'
+  )
+}
+
+async function renderGatewayVersion(output: string): Promise<string> {
+  const rendered = [
+    `// Generated from the integration-contract projection selected by contracts/integration-contract/tools/src/generate-integration-types.ts. Do not edit.`,
+    '// Regenerate with `pnpm --dir contracts/integration-contract/tools run generate`.',
+    '',
+    `export const WORKFLOW_CONTRACT_VERSION = '${WORKFLOW_CONTRACT_VERSION}' as const`,
+    ''
+  ].join('\n')
+  const options = await prettier.resolveConfig(output)
+  return await prettier.format(rendered, { ...options, filepath: output })
+}
+
+async function renderIntegrationVersion(output: string): Promise<string> {
+  const rendered = [
+    `// Generated from the integration-contract projection selected by contracts/integration-contract/tools/src/generate-integration-types.ts. Do not edit.`,
+    '// Regenerate with `pnpm --dir contracts/integration-contract/tools run generate`.',
+    '',
+    `export const CONTRACT_VERSION = '${WORKFLOW_CONTRACT_VERSION}' as const`,
+    '',
+    'export type ContractVersion = typeof CONTRACT_VERSION',
+    ''
+  ].join('\n')
+  const options = await prettier.resolveConfig(output)
+  return await prettier.format(rendered, { ...options, filepath: output })
 }
 
 function inputTypesOutput(): string {
@@ -318,17 +362,27 @@ function inputTypesOutput(): string {
 }
 
 export function generatedArtifacts(): GeneratedArtifact[] {
-  const output = inputTypesOutput()
+  const integrationTypesOutput = inputTypesOutput()
+  const gatewayVersion = gatewayVersionOutput()
+  const integrationVersion = integrationVersionOutput()
   return [
     {
-      output,
+      output: integrationTypesOutput,
       render: async () => {
-        const options = await prettier.resolveConfig(output)
+        const options = await prettier.resolveConfig(integrationTypesOutput)
         return await prettier.format(await renderFile(), {
           ...options,
-          filepath: output
+          filepath: integrationTypesOutput
         })
       }
+    },
+    {
+      output: gatewayVersion,
+      render: async () => await renderGatewayVersion(gatewayVersion)
+    },
+    {
+      output: integrationVersion,
+      render: async () => await renderIntegrationVersion(integrationVersion)
     }
   ]
 }
