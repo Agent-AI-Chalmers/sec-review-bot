@@ -17,6 +17,17 @@
     },
     "input_data": { "type": "object" },
     "timeout_seconds": { "type": "integer", "minimum": 1 },
-    "runtime": {}
+    "runtime": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "workspace_image": { "type": "string", "pattern": "\\S" }
+          }
+        }
+      ]
+    }
   }
 }

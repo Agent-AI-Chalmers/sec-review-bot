@@ -32,6 +32,37 @@ void test('execution contract owns the Temporal workflow type and envelope', () 
   )
 })
 
+void test('execution runtime accepts only the declared override shape', () => {
+  const request = {
+    workflow: 'issue-review',
+    run_id: 'run-runtime-contract',
+    input_data: {},
+    timeout_seconds: 60,
+  }
+
+  assert.doesNotThrow(() => validateExecutionRequest(request))
+  assert.doesNotThrow(() =>
+    validateExecutionRequest({ ...request, runtime: null }),
+  )
+  assert.doesNotThrow(() =>
+    validateExecutionRequest({
+      ...request,
+      runtime: { workspace_image: 'benchmark:latest' },
+    }),
+  )
+  for (const runtime of [
+    'benchmark:latest',
+    [],
+    { workspace_image: '   ' },
+    { unknown: true },
+  ]) {
+    assert.throws(
+      () => validateExecutionRequest({ ...request, runtime }),
+      /execution-contract\/v1/,
+    )
+  }
+})
+
 void test('execution errors match the public envelope before crossing HTTP', () => {
   assert.equal(
     isExecutionError({
