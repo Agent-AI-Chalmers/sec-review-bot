@@ -37,14 +37,13 @@ def _build_single_delivery_outcome(
     case_result = case_results_by_case_id[case_id]
     patch_diff = case_result["mitigator_patch_diff"] or ""
     file_changes = case_result["mitigator_file_changes"]
+    has_changes = bool(file_changes)
     return build_delivery_execution_result(
         delivery_id=delivery_id,
-        status="ready",
-        error=None,
+        status="ready" if has_changes else "no-changes",
+        error=None if has_changes else "Single delivery has no file changes.",
         file_changes=file_changes,
         patch_diff=patch_diff,
-        applied_case_ids=[case_id],
-        patch_path=None,
     )
 
 
@@ -76,7 +75,7 @@ async def execute_delivery_entry(
             "baseline_snapshot_tar_path is required for combined deliveries."
         )
     try:
-        synthesis_result = await synthesize_combined_delivery_patch(
+        patch_artifact = await synthesize_combined_delivery_patch(
             baseline_snapshot_tar_path=baseline_snapshot_tar_path,
             patch_synthesis_root=run_artifacts_root / "patch-synthesis",
             delivery_entry=delivery_entry,
@@ -85,14 +84,18 @@ async def execute_delivery_entry(
                 for case_id in case_ids
             ],
         )
+        file_changes = patch_artifact["file_changes"]
+        has_changes = bool(file_changes)
         return build_delivery_execution_result(
             delivery_id=delivery_id,
-            status=synthesis_result["status"],
-            error=synthesis_result.get("error"),
-            file_changes=synthesis_result.get("file_changes") or [],
-            patch_diff=str(synthesis_result.get("patch_diff") or ""),
-            applied_case_ids=case_ids,
-            patch_path=synthesis_result.get("patch_path"),
+            status="ready" if has_changes else "no-changes",
+            error=(
+                None
+                if has_changes
+                else "Patch synthesis produced no delivery file changes."
+            ),
+            file_changes=file_changes,
+            patch_diff=patch_artifact["patch_diff"],
         )
     except Exception as error:
         return build_delivery_execution_result(
@@ -101,8 +104,6 @@ async def execute_delivery_entry(
             error=f"Patch synthesis failed: {error}",
             file_changes=[],
             patch_diff="",
-            applied_case_ids=case_ids,
-            patch_path=None,
         )
 
 

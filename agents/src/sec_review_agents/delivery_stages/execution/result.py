@@ -1,6 +1,6 @@
 """Delivery execution result payloads."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -9,12 +9,10 @@ from sec_review_agents.workspace.file_changes import FileChange
 
 class DeliveryExecutionResult(BaseModel):
     delivery_id: str
-    status: str
+    status: Literal["ready", "no-changes", "failed"]
     error: str | None
-    patch_path: str | None
     patch_diff: str
     file_changes: list[FileChange] = Field(default_factory=list)
-    applied_case_ids: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore")
 
@@ -22,22 +20,18 @@ class DeliveryExecutionResult(BaseModel):
 def build_delivery_execution_result(
     *,
     delivery_id: str,
-    status: str,
+    status: Literal["ready", "no-changes", "failed"],
     error: str | None,
     file_changes: list[FileChange] | None,
     patch_diff: str,
-    applied_case_ids: list[str],
-    patch_path: str | None,
 ) -> dict[str, Any]:
     return DeliveryExecutionResult.model_validate(
         {
             "delivery_id": delivery_id,
             "status": status,
             "error": error,
-            "patch_path": patch_path,
             "patch_diff": patch_diff,
             "file_changes": file_changes or [],
-            "applied_case_ids": applied_case_ids,
         }
     ).model_dump(mode="json")
 

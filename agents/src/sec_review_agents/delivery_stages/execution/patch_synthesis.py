@@ -27,7 +27,7 @@ from sec_review_agents.utils.files import (
     reset_stage_attempt_artifacts,
 )
 from sec_review_agents.utils.markdown import inline_code, md
-from sec_review_agents.workspace.file_changes import FileChange, file_change_paths
+from sec_review_agents.workspace.file_changes import file_change_paths
 from sec_review_agents.workspace.patches import (
     build_patch_artifact,
     normalize_declared_changed_files,
@@ -143,23 +143,6 @@ def build_delivery_patch_synthesis_user_prompt(
     )
 
 
-def _patch_synthesis_result(
-    *,
-    status: str,
-    error: str | None,
-    patch_path: str | None,
-    patch_diff: str = "",
-    file_changes: list[FileChange] | None = None,
-) -> dict[str, Any]:
-    return {
-        "status": status,
-        "error": error,
-        "patch_path": patch_path,
-        "patch_diff": patch_diff,
-        "file_changes": file_changes or [],
-    }
-
-
 async def synthesize_combined_delivery_patch(
     *,
     baseline_snapshot_tar_path: Path,
@@ -167,22 +150,19 @@ async def synthesize_combined_delivery_patch(
     delivery_entry: DeliveryEntry,
     case_items: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
+    """Build and persist the patch artifact for one combined delivery.
+
+    Delivery execution owns status and error reporting. This function returns only
+    patch data, using an empty artifact when the agent declares no changed files.
+    """
     delivery_id = delivery_entry["delivery_id"]
     if not delivery_id:
-        return _patch_synthesis_result(
-            status="invalid-input",
-            error="Missing delivery_id for combined patch synthesis.",
-            patch_path=None,
-        )
+        raise ValueError("Missing delivery_id for combined patch synthesis.")
 
     if not baseline_snapshot_tar_path.exists():
-        return _patch_synthesis_result(
-            status="invalid-input",
-            error=(
-                "Missing patch-synthesis baseline snapshot at "
-                f"{baseline_snapshot_tar_path}."
-            ),
-            patch_path=None,
+        raise FileNotFoundError(
+            "Missing patch-synthesis baseline snapshot at "
+            f"{baseline_snapshot_tar_path}."
         )
 
     case_ids = [item["case_id"] for item in case_items]
@@ -235,31 +215,15 @@ async def synthesize_combined_delivery_patch(
             raw_declared_changed_files
         )
         if not declared_changed_files:
-            return _patch_synthesis_result(
-                status="no-changes",
-                error="Patch synthesis agent declared no delivery file changes.",
-                patch_path=None,
-            )
-        patch_path = delivery_artifacts_root / "workspace.patch"
+            return {"patch_diff": "", "file_changes": []}
+
         patch_artifact = build_patch_artifact(
             workspace_path,
             include_paths=declared_changed_files,
         )
-        persisted_patch_path = persist_text_artifact(
-            patch_path.parent,
-            patch_path.name,
+        persist_text_artifact(
+            delivery_artifacts_root,
+            "workspace.patch",
             patch_artifact["patch_diff"],
         )
-        if not patch_artifact["file_changes"]:
-            return _patch_synthesis_result(
-                status="no-changes",
-                error="Patch synthesis agent produced no declared delivery file changes.",
-                patch_path=None,
-            )
-        return _patch_synthesis_result(
-            status="ready",
-            error=None,
-            patch_path=str(persisted_patch_path),
-            patch_diff=patch_artifact["patch_diff"],
-            file_changes=patch_artifact["file_changes"],
-        )
+        return patch_artifact

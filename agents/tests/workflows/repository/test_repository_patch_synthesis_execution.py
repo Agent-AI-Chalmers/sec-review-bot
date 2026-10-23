@@ -192,13 +192,8 @@ class TestRepositoryDeliveryExecution:
                 for path in changed_files
             ]
             return {
-                "delivery_id": delivery_entry["delivery_id"],
-                "status": "ready",
-                "error": None,
-                "patch_path": None,
                 "patch_diff": "",
                 "file_changes": file_changes,
-                "applied_case_ids": delivery_entry["case_ids"],
             }
 
         return patch(
@@ -1595,13 +1590,8 @@ class TestRepositoryDeliveryExecution:
                 for path in changed_files
             ]
             return {
-                "delivery_id": delivery_entry["delivery_id"],
-                "status": "ready",
-                "error": None,
-                "patch_path": None,
                 "patch_diff": "synthetic combined patch",
                 "file_changes": file_changes,
-                "applied_case_ids": case_ids,
             }
 
         with patch(
@@ -1670,16 +1660,9 @@ class TestRepositoryDeliveryExecution:
             **_kwargs,
         ) -> dict:
             baseline_snapshot_tar_paths.append(baseline_snapshot_tar_path)
-            case_ids = [item["case_id"] for item in case_items]
             return {
-                "delivery_id": delivery_entry["delivery_id"],
-                "status": "ready",
-                "error": None,
-                "patch_path": None,
                 "patch_diff": "",
-                "changed_files": [],
                 "file_changes": [],
-                "applied_case_ids": case_ids,
             }
 
         with patch(
