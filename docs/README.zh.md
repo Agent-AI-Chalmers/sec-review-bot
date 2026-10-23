@@ -10,6 +10,24 @@
 
 ## 文档地图
 
+### architecture/
+
+- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：运行实体与职责、端到端数据流、状态与恢复边界、跨服务契约、事实来源和凭据所有权。
+
+### Packages 与服务
+
+Package README 负责本地 setup、命令、配置与实现布局。运行实体和源码 package 并非一一对应：`agents/` 同时实现两个 worker 进程。
+
+| 运行实体 | Package 指南 |
+| --- | --- |
+| GitHub Integration | [`apps/github-integration/README.md`](../apps/github-integration/README.zh.md) |
+| Review Control Plane | [`control-plane/README.md`](../control-plane/README.zh.md) |
+| Control Plane UI | [`apps/control-plane-ui/README.md`](../apps/control-plane-ui/README.md) |
+| Execution Gateway | [`execution-gateway/README.md`](../execution-gateway/README.zh.md) |
+| Execution Worker | [`agents/README.md`](../agents/README.zh.md) |
+| Memory Worker | [`agents/README.md`](../agents/README.zh.md) |
+| Memory Catalog Server | [`memory-catalog/README.md`](../memory-catalog/README.zh.md) |
+
 ### agent/
 
 需要理解 agent 边界、能力或 framework 取舍时，看这里。
@@ -24,22 +42,7 @@
 
 ### contracts/
 
-`contracts/` 记录的是那些**彼此看不到对方类型**的组件之间的接口：App 侧、Control Plane、Agent 侧。每个族各留一份规范、JSON Schema 和 fixtures，并在两侧各放一组测试；形状一旦漂移，两边都会挂掉。执行得比这少的族，会写明自己没覆盖什么。
-
-一个族对应一条边界：
-
-| 族 | 边界 | 两侧 |
-| --- | --- | --- |
-| [integration-contract](../contracts/integration-contract/README.zh.md) | Execution API 的 HTTP 面，以及 workflow 的 `input` / `result` 数据 | Execution API provider 与调用方 |
-| [control-plane-api](../contracts/control-plane-api/README.zh.md) | 控制台读取的运行形状，以及集成方派生客户端所依据的手写 OpenAPI 契约 | Control Plane 与它的调用方 |
-
-先读 [Contracts README](../contracts/README.zh.md)：它定义了族目录的布局、命名规则、schema 该拥有什么，以及 fixtures 如何参与校验。各族 README 再分别说明消费者可以依赖什么、哪一侧归谁、以及哪些是刻意不做成 schema 的。
-
-- [integration-contract/v6/CONTRACT.md](../contracts/integration-contract/v6/CONTRACT.md) / [中文](../contracts/integration-contract/v6/CONTRACT.zh.md)：workflow 数据契约。
-- [integration-contract/openapi.yaml](../contracts/integration-contract/openapi.yaml)：人工维护的 Execution API 唯一真值。
-- [control-plane-api/openapi.yaml](../contracts/control-plane-api/openapi.yaml)：Control Plane HTTP 契约——路由、schema、安全方案与错误码。
-- [control-plane-api/v1/observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json)：控制台读取返回的脱敏运行形状。
-- [control-plane-api/v1/review-run-record.schema.json](../contracts/control-plane-api/v1/review-run-record.schema.json)：协调记录的形状。
+完整的跨 package 边界目录、所有者、版本、可执行资产与变更流程统一维护在 [Contracts README](../contracts/README.zh.md) 中。各契约族 README 再分别定义消费者可以依赖什么，以及哪些规则刻意留给领域代码。
 
 ### workflows/
 
@@ -71,10 +74,6 @@
 - [AGENT_PARTITION_WORKBENCH.md](workflows/repository-review/AGENT_PARTITION_WORKBENCH.md) / [中文](workflows/repository-review/AGENT_PARTITION_WORKBENCH.zh.md)：Agent 直接编辑的分组工作台。
 - [CVSSV4.md](workflows/repository-review/CVSSV4.md) / [中文](workflows/repository-review/CVSSV4.zh.md)：CVSS v4 评分。
 - [CONCURRENCY_AND_FAILURES.md](workflows/repository-review/CONCURRENCY_AND_FAILURES.md) / [中文](workflows/repository-review/CONCURRENCY_AND_FAILURES.zh.md)：Repository review 并发与失败边界。
-
-### architecture/
-
-- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：运行实体、端到端数据流、跨服务契约、事实来源和凭据所有权。
 
 ### operations/
 

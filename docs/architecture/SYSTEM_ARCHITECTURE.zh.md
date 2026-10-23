@@ -12,6 +12,20 @@ Sec Review Bot 包含七个运行实体，各自拥有独立的职责和部署�
 
 Temporal Server 属于基础设施，但它会直接向两个 worker pool 分发工作，因此拓扑图将它与运行服务放在一起。PostgreSQL 和对象存储则单独作为持久化设施呈现。主 review 链路与异步 memory 链路使用不同的 task queue 和 worker 进程。
 
+## 运行实体职责地图
+
+| 运行实体 | 代码 | 负责内容 | 本地指南 |
+| --- | --- | --- | --- |
+| GitHub Integration | `apps/github-integration/` | GitHub 入口、input 准备、Control Plane client 与 GitHub publication | [README](../../apps/github-integration/README.zh.md) |
+| Review Control Plane | `control-plane/` | 接纳、持久化 run 状态、恢复、execution 观察与 publication 协调 | [README](../../control-plane/README.zh.md) |
+| Control Plane UI | `apps/control-plane-ui/` | 经过鉴权的运维控制台与只读 Control Plane 投影 | [README](../../apps/control-plane-ui/README.md) |
+| Execution Gateway | `execution-gateway/` | 经过鉴权的 Execution API 与 HTTP-to-Temporal 转换 | [README](../../execution-gateway/README.zh.md) |
+| Execution Worker | `agents/` | Review workflow、activity、agent runtime、stage artifact 与 transcript publication | [README](../../agents/README.zh.md) |
+| Memory Worker | `agents/` | 异步 memory extraction 与 maintenance workflow | [README](../../agents/README.zh.md) |
+| Memory Catalog Server | `memory-catalog/` | Observation catalog、不可变 memory revision history 与 active revision 协调 | [README](../../memory-catalog/README.zh.md) |
+
+这些运行实体通过 [`contracts/`](../../contracts/README.zh.md) 下由项目维护的边界通信。目录位置不代表共享运行时所有权：两个 worker 虽然实现在同一个 Python package 中，却是独立进程；`apps/` 下的两个应用也分别独立部署。
+
 ## 主 Review 链路
 
 ```mermaid
@@ -70,12 +84,15 @@ sequenceDiagram
   end
 ```
 
-## 持久化与职责边界
+## 状态与恢复边界
 
-图中展示的是每次交互首次发生的顺序；轮询、heartbeat、重试和状态写入可能重复多次。Control Plane 在 integration 准备 input 前持久化稳定的 `run_id`，因此 input 准备或提交失败时仍然存在持久化的 run 身份；只有在接纳前被拒绝的请求没有 `run_id`。Control Plane 还会在跨越 Execution API 边界前持久化可重放的 Execution input，使状态不确定的 submission 可以重试，而不需要重建进程内状态。
+| 持久状态 | 所有者 | 用途 |
+| --- | --- | --- |
+| Run 接纳、可重放 execution input、execution observation 与 publication progress | Review Control Plane 的 PostgreSQL | 跨服务重启的协调与恢复 |
+| Workflow 与 activity history | Temporal Server | 持久调度、重试、超时与 workflow 恢复 |
+| Input bundle、终态 artifact、transcript、audit bundle 与 memory revision | Object Storage | 大型 artifact 的不可变交换与归档 |
+| Memory observation 与 active revision pointer | Memory Catalog Server 的 PostgreSQL | Catalog 协调与通过 compare-and-swap 激活 revision |
 
-Integration 主动从 Control Plane 领取 publication 工作，而不是等待 Control Plane 回调。Control Plane 将成功终态的工作保持为 `pending`，原子地向 connector 分配 publication claim，并接收 connector 回写的成功或失败结果。因此 GitHub 专用副作用不会进入 Control Plane，integration 重启后也能继续处理未完成工作。
+这些存储是彼此独立的恢复输入。Temporal history 缺失不能证明 publication 的结果，PostgreSQL 中存在 run record 也不代表其引用的对象仍然存在。恢复过程必须与每类状态的所有者对账，不能从一个子系统推断另一个子系统的结果。
 
-`apps/github-integration/` 负责解析 GitHub 请求、准备 input 和执行 GitHub 发布。`control-plane/` 负责接纳、Execution 协调、恢复和持久化 run 状态。`execution-gateway/` 负责经过鉴权的 HTTP-to-Temporal 边界。`agents/` 负责两个 worker 进程、对应 workflow 和 agent runtime；Execution Worker 处理 review execution 与 transcript 发布，Memory Worker 处理 extraction 与 maintenance。`memory-catalog/` 负责 managed-memory PostgreSQL 状态和 revision 提交。`apps/control-plane-ui/` 读取脱敏的 Control Plane 查询 API，不直接访问 PostgreSQL。
-
-Control Plane 的状态、claim、schema 和 API 细节见 [Control Plane README](../../control-plane/README.zh.md)。
+外部副作用只有在负责协调该副作用的组件记录结果后才算完成。组件内部的状态机与重试规则属于对应 package README；跨组件数据形状属于相关 contract family。

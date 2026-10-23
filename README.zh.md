@@ -10,7 +10,7 @@
 
 [English](README.md) · 中文
 
-[文档](docs/README.zh.md) · [部署](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)
+[架构](docs/architecture/SYSTEM_ARCHITECTURE.zh.md) · [文档](docs/README.zh.md) · [部署](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md) · [贡献指南](CONTRIBUTING.md)
 
 </div>
 
@@ -121,10 +121,12 @@ sudo systemctl enable --now sec-review-bot.target
 
 | 目标                            | 入口                                                                     |
 | ------------------------------- | ------------------------------------------------------------------------ |
+| 理解运行实体与职责边界          | [系统架构](docs/architecture/SYSTEM_ARCHITECTURE.zh.md)                  |
 | 本地启动完整链路和执行 worker   | [本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)    |
-| 开发 GitHub integration         | [GitHub integration 说明](apps/github-integration/README.zh.md)          |
-| 开发 agent 运行后端或做本地运行 | [Agents 本地运行说明](agents/README.zh.md)                               |
+| 开发某个 package 或服务         | [文档地图](docs/README.zh.md)及对应 package 的 README                    |
+| 修改 contract 或生成产物        | [Contracts 说明](contracts/README.zh.md)                                 |
 | 把 GitHub 入站请求转发到本地    | [本地 GitHub 入站设置](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) |
+| 准备贡献                        | [贡献指南](CONTRIBUTING.md)                                              |
 
 ## 论文
 

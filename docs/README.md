@@ -8,6 +8,24 @@ For a project overview, start with the repository [README](../README.md).
 
 ## Documentation Map
 
+### architecture/
+
+- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md): Runtime entities and responsibilities, end-to-end data flow, state and recovery boundaries, cross-service contracts, sources of truth, and credential ownership.
+
+### Packages and services
+
+Package READMEs own local setup, commands, configuration, and implementation layout. Runtime entities and source packages are not one-to-one: `agents/` implements both worker processes.
+
+| Runtime entity | Package guide |
+| --- | --- |
+| GitHub Integration | [`apps/github-integration/README.md`](../apps/github-integration/README.md) |
+| Review Control Plane | [`control-plane/README.md`](../control-plane/README.md) |
+| Control Plane UI | [`apps/control-plane-ui/README.md`](../apps/control-plane-ui/README.md) |
+| Execution Gateway | [`execution-gateway/README.md`](../execution-gateway/README.md) |
+| Execution Worker | [`agents/README.md`](../agents/README.md) |
+| Memory Worker | [`agents/README.md`](../agents/README.md) |
+| Memory Catalog Server | [`memory-catalog/README.md`](../memory-catalog/README.md) |
+
 ### agent/
 
 Use these docs when you need agent boundaries, capabilities, or framework decisions.
@@ -22,22 +40,7 @@ Use these docs when you need agent boundaries, capabilities, or framework decisi
 
 ### contracts/
 
-`contracts/` holds the interfaces between components that cannot see each other's types: the App side, the Control Plane, and the Agent side. Each family keeps a specification, JSON Schemas, and fixtures, plus tests on both sides that fail the moment a shape drifts. A family that enforces less than that writes down what it does not cover.
-
-One family covers one boundary:
-
-| Family | Boundary | Sides |
-| --- | --- | --- |
-| [integration-contract](../contracts/integration-contract/README.md) | the Execution API HTTP surface and workflow `input` / `result` data | Execution API providers and callers |
-| [control-plane-api](../contracts/control-plane-api/README.md) | the run shapes the console reads, and the hand-written OpenAPI contract the integration derives its client from | Control Plane and its callers |
-
-Read [Contracts README](../contracts/README.md) first: it defines the family layout, the naming rule, what a schema owns, and how fixtures take part in validation. Each family README then states what a consumer may rely on, who owns which side, and what is deliberately not schematized.
-
-- [integration-contract/v6/CONTRACT.md](../contracts/integration-contract/v6/CONTRACT.md): the workflow data contract.
-- [integration-contract/openapi.yaml](../contracts/integration-contract/openapi.yaml): the hand-maintained source of truth for the Execution API.
-- [control-plane-api/openapi.yaml](../contracts/control-plane-api/openapi.yaml): the Control Plane HTTP contract — routes, schemas, security, and error codes.
-- [control-plane-api/v1/observed-run.schema.json](../contracts/control-plane-api/v1/observed-run.schema.json): the redacted run a console read returns.
-- [control-plane-api/v1/review-run-record.schema.json](../contracts/control-plane-api/v1/review-run-record.schema.json): the coordination record shape.
+Read the [Contracts README](../contracts/README.md) for the canonical catalog of cross-package boundaries, their owners, versions, executable assets, and change procedure. Each family README then defines what consumers may rely on and what the contract deliberately leaves to domain code.
 
 ### workflows/
 
@@ -69,10 +72,6 @@ The main public workflow IDs are `issue-review`, `pull-request-review`, and `rep
 - [AGENT_PARTITION_WORKBENCH.md](workflows/repository-review/AGENT_PARTITION_WORKBENCH.md): Agent-edited partition workbench.
 - [CVSSV4.md](workflows/repository-review/CVSSV4.md): CVSS v4 scoring.
 - [CONCURRENCY_AND_FAILURES.md](workflows/repository-review/CONCURRENCY_AND_FAILURES.md): Repository review concurrency and failure boundaries.
-
-### architecture/
-
-- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md): Runtime entities, end-to-end data flow, cross-service contracts, sources of truth, and credential ownership.
 
 ### operations/
 

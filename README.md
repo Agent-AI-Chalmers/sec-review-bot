@@ -10,7 +10,7 @@ An experimental security review bot for GitHub issues, pull requests, and reposi
 
 English · [中文](README.zh.md)
 
-[Documentation](docs/README.md) · [Deployment](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) · [Contributing](CONTRIBUTING.md)
+[Architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) · [Documentation](docs/README.md) · [Deployment](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) · [Contributing](CONTRIBUTING.md)
 
 </div>
 
@@ -124,10 +124,12 @@ Package-specific setup and commands live in the package READMEs.
 
 | Goal                                           | Start here                                                                          |
 | ---------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Understand runtime entities and ownership      | [System architecture](docs/architecture/SYSTEM_ARCHITECTURE.md)                    |
 | Run the full local stack and execution workers | [Local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) |
-| GitHub integration development                 | [GitHub integration guide](apps/github-integration/README.md)                       |
-| Agent backend development and local runs       | [Agents local run guide](agents/README.md)                                          |
+| Develop a package or service                   | [Documentation map](docs/README.md) and the package's README                        |
+| Contract and generated-artifact changes        | [Contracts guide](contracts/README.md)                                              |
 | GitHub inbound routing to local                | [Local GitHub inbound setup](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md)         |
+| Prepare a contribution                         | [Contributing guide](CONTRIBUTING.md)                                               |
 
 ## Publication
 
