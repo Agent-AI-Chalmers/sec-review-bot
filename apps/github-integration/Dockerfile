@@ -1,14 +1,17 @@
+FROM ghcr.io/pnpm/pnpm:12-alpine AS pnpm
+
 FROM node:24-alpine AS builder
 
+COPY --from=pnpm /opt/pnpm /opt/pnpm
+ENV PATH="/opt/pnpm:${PATH}"
+
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
-ENV COREPACK_NPM_REGISTRY=${NPM_CONFIG_REGISTRY} \
-    npm_config_registry=${NPM_CONFIG_REGISTRY}
+ENV npm_config_registry=${NPM_CONFIG_REGISTRY}
 
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN corepack enable pnpm \
-    && pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
+RUN pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
     && pnpm install --frozen-lockfile
 
 COPY . ./
@@ -19,9 +22,9 @@ RUN pnpm deploy --filter . --prod /prod
 
 FROM node:24-alpine
 
-# The GitHub integration service is also the input bundle materializer. It needs git to
-# materialize review refs and tar to create / extract workspace snapshots.
-RUN apk add --no-cache ca-certificates git tar
+# The GitHub integration service needs git and system CA certificates to materialize review
+# refs over HTTPS. Alpine's BusyBox already provides the tar used for workspace snapshots.
+RUN apk add --no-cache ca-certificates git
 
 WORKDIR /app
 

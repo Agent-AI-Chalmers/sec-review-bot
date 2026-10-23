@@ -1,14 +1,17 @@
+FROM ghcr.io/pnpm/pnpm:12-alpine AS pnpm
+
 FROM node:24-alpine AS builder
 
+COPY --from=pnpm /opt/pnpm /opt/pnpm
+ENV PATH="/opt/pnpm:${PATH}"
+
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
-ENV COREPACK_NPM_REGISTRY=${NPM_CONFIG_REGISTRY} \
-    npm_config_registry=${NPM_CONFIG_REGISTRY}
+ENV npm_config_registry=${NPM_CONFIG_REGISTRY}
 
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN corepack enable pnpm \
-    && pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
+RUN pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
     && pnpm install --frozen-lockfile
 
 COPY . ./

@@ -434,18 +434,20 @@ RustFS state and PostgreSQL state are independent data sets. Back up `.agent-rus
 
 The GitHub integration image build and Git workspace fetches use separate network settings. For Compose, set these variables in the repository `.env`; for non-Compose startup, set runtime variables in the GitHub integration `.env`.
 
-### pnpm Registry
+### pnpm And npm Registries
 
-Corepack and pnpm use `https://registry.npmjs.org` by default while building the GitHub integration image. If that endpoint is unavailable or unreliable, select a reachable registry:
+The Node service images copy pnpm 12 from `ghcr.io/pnpm/pnpm:12-alpine`; this avoids downloading the package manager during the build. Docker must therefore be able to pull from GHCR, directly or through the daemon's configured registry mirror or proxy.
+
+pnpm uses `https://registry.npmjs.org` by default for project dependencies. If that endpoint is unavailable or unreliable, select a reachable npm registry:
 
 ```bash
 NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 ```
 
-This variable is passed only to Corepack and pnpm during the image build. Rebuild the GitHub integration image after changing it:
+This variable is passed only to pnpm during the image build; it does not change where Docker pulls the pnpm base image. Rebuild the Node service images after changing it:
 
 ```bash
-docker compose --profile app build github-integration
+docker compose --profile app build control-plane control-plane-ui execution-gateway github-integration memory-catalog
 ```
 
 ### Git Fetch
