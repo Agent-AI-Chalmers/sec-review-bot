@@ -8,7 +8,7 @@ create table revisions (
 );
 
 comment on table revisions is
-  'Immutable history of successfully committed managed-memory revisions and the maintenance audit that produced each one.';
+  'Immutable history of successfully committed memory tree revisions and the maintenance audit that produced each one.';
 comment on column revisions.artifact_reference is
   'Content-addressed memory version published before this revision committed.';
 comment on column revisions.maintenance_audit_reference is

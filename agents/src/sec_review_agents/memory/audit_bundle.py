@@ -81,7 +81,7 @@ def publish_memory_audit_bundle(
     return publish_immutable_s3_artifact(
         reference,
         key=key,
-        description="managed memory audit bundle",
+        description="coordinated memory audit bundle",
     )
 
 

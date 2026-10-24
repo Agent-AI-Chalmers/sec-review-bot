@@ -725,7 +725,7 @@ def test_materialize_configured_memory_view_locks_source_during_snapshot(
     assert lock_calls == [(memory_root.resolve(), False)]
 
 
-def test_materialize_managed_active_memory_by_digest(
+def test_materialize_coordinated_active_memory_by_digest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -755,7 +755,7 @@ def test_materialize_managed_active_memory_by_digest(
         materialize_calls.append((value, destination))
         content_root = destination / "memory"
         (content_root / "topics").mkdir(parents=True)
-        (content_root / "MEMORY.md").write_text("# Managed\n", encoding="utf-8")
+        (content_root / "MEMORY.md").write_text("# Coordinated\n", encoding="utf-8")
         return content_root
 
     with (
@@ -771,14 +771,14 @@ def test_materialize_managed_active_memory_by_digest(
         first = materialize_configured_memory_view()
         second = materialize_configured_memory_view()
 
-    expected = materialized_root / f"managed-{'a' * 64}" / "memory"
+    expected = materialized_root / f"version-{'a' * 64}" / "memory"
     assert first == expected
     assert second == expected
-    assert (expected / "MEMORY.md").read_text(encoding="utf-8") == "# Managed\n"
+    assert (expected / "MEMORY.md").read_text(encoding="utf-8") == "# Coordinated\n"
     assert materialize_calls == [(reference, expected.parent)]
 
 
-def test_managed_memory_without_active_version_does_not_fall_back_locally(
+def test_coordinated_memory_without_active_version_does_not_fall_back_locally(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

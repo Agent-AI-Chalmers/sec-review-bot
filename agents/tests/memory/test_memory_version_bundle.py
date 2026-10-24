@@ -63,7 +63,7 @@ def test_memory_version_digest_depends_on_content_not_mtime(tmp_path: Path) -> N
     assert first.digest == second.digest
 
 
-def test_managed_memory_version_requires_s3_configuration(tmp_path: Path) -> None:
+def test_coordinated_memory_version_requires_s3_configuration(tmp_path: Path) -> None:
     memory = tmp_path / "memory"
     memory.mkdir()
     (memory / "MEMORY.md").write_text("# Index\n", encoding="utf-8")

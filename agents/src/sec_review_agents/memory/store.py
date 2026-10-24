@@ -229,11 +229,11 @@ def materialize_configured_memory_view() -> Path | None:
             return None
         reference = ArtifactReference.from_mapping(raw_reference)
         if urlparse(reference.uri).scheme != "s3":
-            raise ValueError("Managed active memory must use an S3 artifact reference.")
+            raise ValueError("Catalog active memory must use an S3 artifact reference.")
         base_root = memory_materialized_base_root()
         base_root.mkdir(parents=True, exist_ok=True)
         digest = reference.digest.removeprefix("sha256:")
-        version_root = base_root / f"managed-{digest}"
+        version_root = base_root / f"version-{digest}"
         content_root = version_root / MEMORY_DIRNAME
         lock_path = base_root / f".{version_root.name}.lock"
         with lock_path.open("w", encoding="utf-8") as lock_file:

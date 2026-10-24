@@ -3,7 +3,7 @@ info:
   title: Memory Catalog API
   version: v1
   description: |
-    Hand-maintained single source of truth for the managed-memory catalog HTTP
+    Hand-maintained single source of truth for the memory coordination HTTP
     boundary. Service implementations and generated types consume this document;
     service code does not generate it.
 x-contract-source: hand-maintained

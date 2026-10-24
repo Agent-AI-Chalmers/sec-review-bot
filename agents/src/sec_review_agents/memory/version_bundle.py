@@ -104,7 +104,7 @@ def publish_memory_version(
     return publish_immutable_s3_artifact(
         reference,
         key=key,
-        description="managed memory version",
+        description="coordinated memory version",
     )
 
 

@@ -28,7 +28,7 @@ async def run_memory_maintenance_activity(
         configured_memory_catalog_client,
     )
     from sec_review_agents.memory.maintainer import (
-        maintain_managed_memory_with_result,
+        maintain_coordinated_memory_with_result,
         maintain_memory_with_result,
     )
     from sec_review_agents.memory.store import resolve_memory_store_dir
@@ -39,7 +39,7 @@ async def run_memory_maintenance_activity(
     if request.batch_size < 1:
         raise ValueError("Memory maintenance batch_size must be positive.")
     if catalog_client is not None:
-        result = await maintain_managed_memory_with_result(
+        result = await maintain_coordinated_memory_with_result(
             catalog_client=catalog_client,
             deployment=None,
             batch_size=request.batch_size,
