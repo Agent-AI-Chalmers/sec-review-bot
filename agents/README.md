@@ -97,7 +97,7 @@ The Python package is easiest to read by responsibility:
    - `cli/`: commands for development and operations that perform one requested task and exit, plus their local-only support code.
 
 5. Production entrypoints.
-   - `entrypoints/`: the Temporal execution worker plus its execution contract, run protocol, and workflow input preparation boundaries. The HTTP Gateway and managed-memory service are separate TypeScript packages.
+   - `entrypoints/`: the Temporal execution worker plus its execution contract, run protocol, and workflow input preparation boundaries.
 
 6. Artifact persistence and run diagnostics.
    - `artifacts/`: immutable artifact references, local and S3 transport, materialization, and safe archive extraction.
@@ -280,7 +280,7 @@ Docker Compose control-plane startup and host worker operation are documented in
 
 Agents can declare the skills they need. The worker prepares and mounts the declared skills when it starts an agent. See [Agent Skills](../docs/agent/SKILLS.md) for details.
 
-Memory has two mutually exclusive storage modes. Local/offline execution sets `AGENT_MEMORY_DIR`; main agents receive a snapshot of its `memory/` subtree at `/memory`. Managed workers instead set `AGENT_MEMORY_CATALOG_URL` and `AGENT_MEMORY_CATALOG_TOKEN`; they fetch the active immutable memory version from object storage and materialize the same local read-only `/memory` view. A configured service never falls back to `AGENT_MEMORY_DIR`. `AGENT_MEMORY_CONSUMPTION_ENABLED` controls whether review agents read that view, while `AGENT_MEMORY_PROCESSING_ENABLED` controls transcript extraction and maintenance. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the design principles and lifecycle.
+Memory has two mutually exclusive state modes. In local mode, `AGENT_MEMORY_DIR` owns curated memory, observations, and the SQLite ledger; main agents receive a snapshot of its `memory/` subtree at `/memory`. In coordinated mode, workers set `AGENT_MEMORY_CATALOG_URL` and `AGENT_MEMORY_CATALOG_TOKEN`; external services persist shared observations and revisions, the catalog provides the compare-and-swap commit boundary, and workers materialize the active immutable version from object storage as the same read-only `/memory` view. Coordinated mode never falls back to `AGENT_MEMORY_DIR`. `AGENT_MEMORY_CONSUMPTION_ENABLED` controls whether review agents read that view, while `AGENT_MEMORY_PROCESSING_ENABLED` controls transcript extraction and maintenance. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the design principles and lifecycle.
 
 Agents that require structured output check whether the final state contains `structured_response`. If the model only returns plain text and does not produce a structured result, agent middleware appends a correction message inside the LangChain agent loop and retries. Retry count is controlled by `AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES`, default `2`. This fallback is separate from provider/API request retry and does not handle schema-parameter validation errors; those remain under LangChain structured-output retry behavior.
 

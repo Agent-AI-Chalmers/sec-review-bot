@@ -99,7 +99,7 @@ Python package 按职责读最清楚：
    - `cli/`：用于开发和运维、完成一次指定任务后退出的命令，以及只服务于本地命令的支持代码。
 
 5. 生产 entrypoints。
-   - `entrypoints/`：Temporal execution worker，以及它的 execution contract、run protocol 和 workflow input preparation 边界。HTTP Gateway 和 managed-memory service 已是独立 TypeScript package。
+   - `entrypoints/`：Temporal execution worker，以及它的 execution contract、run protocol 和 workflow input preparation 边界。
 
 6. Artifact 持久化与 run diagnostics。
    - `artifacts/`：不可变 artifact reference、本地与 S3 传输、物化和安全 archive 解包。
@@ -282,7 +282,7 @@ Docker Compose 控制平面和宿主机 worker 的运行方式见[本地集成�
 
 Agent 可以声明自己需要的 skills。worker 启动 agent 时会自动准备并挂载声明的 skills。更多设计细节见 [Agent Skills](../docs/agent/SKILLS.zh.md)。
 
-Memory 有两种互斥的存储模式。本地或离线运行设置 `AGENT_MEMORY_DIR`，主 agent 会把其中 `memory/` 子树的快照挂载为 `/memory`。Managed worker 则设置 `AGENT_MEMORY_CATALOG_URL` 和 `AGENT_MEMORY_CATALOG_TOKEN`，从对象存储取得 active immutable memory version，再物化成同样的本地只读 `/memory` 视图。只要配置了 service，就不会回退读取 `AGENT_MEMORY_DIR`。`AGENT_MEMORY_CONSUMPTION_ENABLED` 控制 review agent 是否读取该视图，`AGENT_MEMORY_PROCESSING_ENABLED` 控制 transcript extraction 和 maintenance。设计原则和生命周期见 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)。
+Memory 有两种互斥的状态模式。在 local mode 中，`AGENT_MEMORY_DIR` 持有整理后的 memory、observations 和 SQLite ledger，主 agent 会把其中 `memory/` 子树的快照挂载为 `/memory`。在 coordinated mode 中，worker 设置 `AGENT_MEMORY_CATALOG_URL` 和 `AGENT_MEMORY_CATALOG_TOKEN`；外部服务持久化共享 observations 和 revisions，catalog 提供 compare-and-swap 提交边界，worker 再从对象存储物化 active immutable version，形成同样的本地只读 `/memory` 视图。Coordinated mode 不会回退读取 `AGENT_MEMORY_DIR`。`AGENT_MEMORY_CONSUMPTION_ENABLED` 控制 review agent 是否读取该视图，`AGENT_MEMORY_PROCESSING_ENABLED` 控制 transcript extraction 和 maintenance。设计原则和生命周期见 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)。
 
 需要结构化输出的 agent 会检查最终 state 是否包含 `structured_response`。如果模型只返回普通文本、没有产出结构化结果，agent middleware 会在 LangChain agent loop 内追加一条纠偏消息并重试；重试次数由 `AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES` 控制，默认 `2`。这层兜底独立于 provider/API 请求重试，不处理 schema 参数校验错误；参数校验错误仍交给 LangChain structured output 自身的 retry 机制。
 

@@ -347,7 +347,7 @@ async def maintain_managed_memory_with_result(
     batch_size: int,
     deployment: str | None = None,
 ) -> MemoryMaintenanceResult:
-    """Maintain one managed batch and commit it with a revision CAS."""
+    """Maintain one coordinated batch and commit it with a revision CAS."""
     from sec_review_agents.artifacts.reference import ArtifactReference
     from sec_review_agents.memory.audit_bundle import publish_memory_audit_bundle
     from sec_review_agents.memory.version_bundle import (
