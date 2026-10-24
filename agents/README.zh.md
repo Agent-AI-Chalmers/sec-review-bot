@@ -131,7 +131,13 @@ flowchart LR
 - Local `--temporal` run：用于验证 workflow / activity 编排。
 - 手动启动 Service 和 Worker：用于在不启动完整 Compose 栈时验证完整 service path。
 
-两种 `run-local-*` 路径都不参与 memory extraction 或 maintenance；手动启动的 Service 和 Worker 则使用生产 workflow 路径。
+| 执行路径 | Diagnostic publication | Memory processing |
+| --- | --- | --- |
+| Direct `run-local-*`，标准 workflow | 本地 diagnostic bundle | 禁用 |
+| Direct `run-local-*`，`single-agent` 或 `two-stage` ablation | 本地 diagnostic bundle | 禁用 |
+| 本地 `--temporal`，标准 workflow | 本地 diagnostic bundle | 由 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
+| 本地 `--temporal`，`single-agent` 或 `two-stage` ablation | 本地 diagnostic bundle | 禁用 |
+| 手动启动 Service 和 Worker | 对象存储中的 diagnostic bundle | 使用生产 workflow 行为 |
 
 ### `run-local-*` 命令
 

@@ -129,7 +129,13 @@ There are three local execution paths:
 - Local `--temporal` run: for exercising workflow / activity orchestration.
 - Manually started service and worker: for exercising the complete service path without the full Compose stack.
 
-The two `run-local-*` paths do not participate in memory extraction or maintenance. The manually started service and worker use the production workflow path.
+| Execution path | Diagnostic publication | Memory processing |
+| --- | --- | --- |
+| Direct `run-local-*`, standard workflow | Local diagnostic bundle | Disabled |
+| Direct `run-local-*`, `single-agent` or `two-stage` ablation | Local diagnostic bundle | Disabled |
+| Local `--temporal`, standard workflow | Local diagnostic bundle | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED` |
+| Local `--temporal`, `single-agent` or `two-stage` ablation | Local diagnostic bundle | Disabled |
+| Manually started service and workers | Diagnostic bundle in object storage | Production workflow behavior |
 
 ### `run-local-*` Commands
 

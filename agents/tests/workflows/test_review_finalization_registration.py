@@ -1,6 +1,8 @@
 import pytest
 
 from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.workflows.issue import single_agent as single_agent_workflow
+from sec_review_agents.workflows.issue import two_stage as two_stage_workflow
 from sec_review_agents.workflows.issue import workflow as issue_workflow
 from sec_review_agents.workflows.pull_request import workflow as pr_workflow
 from sec_review_agents.workflows.repository import workflow as repository_workflow
@@ -33,6 +35,67 @@ def _finalized(*review_unit_ids: str) -> dict[str, object]:
         },
         "review_unit_ids": list(review_unit_ids),
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("workflow_module", "workflow_class"),
+    [
+        (two_stage_workflow, two_stage_workflow.IssueTwoStageWorkflow),
+        (single_agent_workflow, single_agent_workflow.IssueSingleAgentWorkflow),
+    ],
+)
+async def test_issue_ablation_finalizes_without_scheduling_memory(
+    monkeypatch,
+    workflow_module,
+    workflow_class,
+) -> None:
+    publications: list[RunDiagnosticPublicationRequest] = []
+    public_result = {"contract_version": CONTRACT_VERSION}
+
+    async def fake_execute_activity(activity_fn, *args, **_kwargs):
+        if activity_fn.__name__.startswith("build_"):
+            return public_result
+        return {}
+
+    async def fake_finalize(request):
+        publications.append(request)
+        return _finalized("review")
+
+    monkeypatch.setattr(workflow_module, "execute_activity", fake_execute_activity)
+    monkeypatch.setattr(workflow_module, "finalize_review_run", fake_finalize)
+
+    result = await workflow_class().run(
+        ReviewWorkflowRequest(
+            workflow="issue-review",
+            run_id="run-1",
+            prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+            timeout_seconds=30,
+            runtime_context={},
+            post_processing=ReviewPostProcessingPolicy(diagnostic_publication="local"),
+        )
+    )
+
+    assert result == {
+        "ok": True,
+        "result": public_result,
+        "artifact_storage": _finalized("review")["artifact_storage"],
+    }
+    assert publications == [
+        RunDiagnosticPublicationRequest(
+            run_id="run-1",
+            artifact_root_path="/tmp/run-1/artifacts",
+            review_units=[
+                {
+                    "review_unit_id": "review",
+                    "transcript_root": "/tmp/run-1/artifacts/transcripts",
+                }
+            ],
+            result=public_result,
+            timeout_seconds=30,
+            publication="local",
+        )
+    ]
 
 
 @pytest.mark.asyncio
