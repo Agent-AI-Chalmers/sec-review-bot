@@ -1,11 +1,10 @@
+"""Publish the authoritative run diagnostic bundle from a Temporal activity."""
+
 from dataclasses import dataclass
-from datetime import timedelta
 from pathlib import Path
 from typing import Any, Literal
 
-from temporalio import activity, workflow
-
-from sec_review_agents.temporal.support import activity_retry_policy
+from temporalio import activity
 
 
 @dataclass(frozen=True)
@@ -14,7 +13,6 @@ class RunDiagnosticPublicationRequest:
     artifact_root_path: str
     review_units: list[dict[str, str]]
     result: dict[str, Any]
-    timeout_seconds: int
     publication: Literal["local", "managed"]
 
 
@@ -57,20 +55,7 @@ def publish_run_diagnostic_activity(
     }
 
 
-async def finalize_review_run(
-    request: RunDiagnosticPublicationRequest,
-) -> dict[str, Any]:
-    """Publish the authoritative run diagnostic artifact before review success."""
-    return await workflow.execute_activity(
-        publish_run_diagnostic_activity,
-        request,
-        schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-        retry_policy=activity_retry_policy(),
-    )
-
-
 __all__ = [
     "RunDiagnosticPublicationRequest",
-    "finalize_review_run",
     "publish_run_diagnostic_activity",
 ]

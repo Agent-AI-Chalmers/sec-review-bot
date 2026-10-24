@@ -23,12 +23,12 @@ from sec_review_agents.temporal.support import (
     prepare_internal_workflow_activity,
 )
 from sec_review_agents.workflows.memory_scheduling import schedule_memory_extractions
+from sec_review_agents.workflows.publish_run_diagnostic import (
+    RunDiagnosticPublicationRequest,
+    publish_run_diagnostic_activity,
+)
 from sec_review_agents.workflows.repository.case_execution_input import (
     RepositoryCaseExecutionInput,
-)
-from sec_review_agents.workflows.review_finalization import (
-    RunDiagnosticPublicationRequest,
-    finalize_review_run,
 )
 from sec_review_agents.workflows.review_intent import (
     REVIEW_OBJECTIVE_AUDIT,
@@ -1212,15 +1212,16 @@ class RepositoryReviewWorkflow:
             for case_result in case_results
             if isinstance(case_result.get("case_id"), str)
         ]
-        finalized = await finalize_review_run(
+        finalized = await execute_activity(
+            publish_run_diagnostic_activity,
             RunDiagnosticPublicationRequest(
                 run_id=request.run_id,
                 artifact_root_path=str(artifact_root),
                 review_units=review_units,
                 result=result,
-                timeout_seconds=request.timeout_seconds,
                 publication=request.post_processing.diagnostic_publication,
-            )
+            ),
+            timeout_seconds=request.timeout_seconds,
         )
         memory_processing: dict[str, Any] | None = None
         if review_units:

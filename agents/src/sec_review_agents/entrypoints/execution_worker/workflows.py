@@ -25,6 +25,9 @@ from sec_review_agents.workflows.issue.workflow import (
     mitigate_issue_activity,
     verify_issue_activity,
 )
+from sec_review_agents.workflows.publish_run_diagnostic import (
+    publish_run_diagnostic_activity,
+)
 from sec_review_agents.workflows.pull_request.workflow import (
     PullRequestReviewWorkflow,
     analyze_pull_request_activity,
@@ -60,9 +63,6 @@ from sec_review_agents.workflows.repository.workflow import (
     triage_repository_activity,
     verify_repository_case_activity,
     window_deletion_summary_activity,
-)
-from sec_review_agents.workflows.review_finalization import (
-    publish_run_diagnostic_activity,
 )
 
 WORKFLOWS: list[Any] = [

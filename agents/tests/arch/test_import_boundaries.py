@@ -133,14 +133,13 @@ def test_memory_package_does_not_own_run_diagnostic_publication() -> None:
     memory_root = PACKAGE_ROOT / "memory"
     forbidden_symbols = {
         "RunDiagnosticPublicationRequest",
-        "finalize_review_run",
         "publish_run_diagnostic_activity",
     }
     violations = import_violations(
         memory_root,
         (
             "sec_review_agents.workflows.memory_scheduling",
-            "sec_review_agents.workflows.review_finalization",
+            "sec_review_agents.workflows.publish_run_diagnostic",
         ),
     )
 
