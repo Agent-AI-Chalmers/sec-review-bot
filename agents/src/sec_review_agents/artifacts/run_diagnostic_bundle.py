@@ -1,0 +1,236 @@
+"""Build, publish, and materialize the authoritative artifact for one review run."""
+
+import json
+import tarfile
+import tempfile
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
+
+from sec_review_agents.artifacts.archive import extract_archive
+from sec_review_agents.artifacts.immutable_s3 import publish_immutable_s3_artifact
+from sec_review_agents.artifacts.reference import (
+    ArtifactReference,
+    local_artifact_reference,
+    materialize_artifact,
+)
+from sec_review_agents.runtime.transcripts import TRANSCRIPT_SUFFIX
+
+DIAGNOSTIC_BUNDLE_FILENAME = "diagnostic-tree.v1.tar.zst"
+DIAGNOSTIC_BUNDLE_MANIFEST = "manifest.json"
+DIAGNOSTIC_TREE_DIR = "artifact-tree"
+MAX_DIAGNOSTIC_BUNDLE_BYTES = 1024 * 1024 * 1024
+MAX_DIAGNOSTIC_BUNDLE_ENTRIES = 100_000
+MAX_EXTRACTED_DIAGNOSTIC_BYTES = 8 * 1024 * 1024 * 1024
+
+
+@dataclass(frozen=True)
+class DiagnosticReviewUnit:
+    review_unit_id: str
+    transcript_root: Path
+
+
+@dataclass(frozen=True)
+class MaterializedTranscriptUnit:
+    review_unit_id: str
+    transcript_paths: tuple[Path, ...]
+
+
+def diagnostic_bundle_s3_key(run_id: str) -> str:
+    _validate_path_component(run_id, label="run_id")
+    return f"runs/{run_id}/artifacts/{DIAGNOSTIC_BUNDLE_FILENAME}"
+
+
+def _validate_path_component(value: str, *, label: str) -> str:
+    if not value or value in {".", ".."} or Path(value).name != value:
+        raise ValueError(f"Diagnostic bundle {label} must be one path component.")
+    return value
+
+
+def publish_run_diagnostic_bundle(
+    *,
+    run_id: str,
+    artifact_root: Path,
+    review_units: list[DiagnosticReviewUnit],
+    result: dict[str, Any],
+    remote: bool = True,
+) -> ArtifactReference:
+    """Archive one complete review run and optionally publish it to object storage."""
+    _validate_path_component(run_id, label="run_id")
+    artifact_root = artifact_root.resolve()
+    output_dir = artifact_root / "published"
+    output_dir.mkdir(parents=True, exist_ok=True)
+    archive_path = output_dir / DIAGNOSTIC_BUNDLE_FILENAME
+    manifest_units = _manifest_units(artifact_root, review_units)
+
+    with tempfile.TemporaryDirectory(prefix="sec-review-diagnostic-bundle-") as tempdir:
+        manifest_path = Path(tempdir) / DIAGNOSTIC_BUNDLE_MANIFEST
+        manifest_path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "run_id": run_id,
+                    "result": "result.json",
+                    "review_units": manifest_units,
+                },
+                separators=(",", ":"),
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        result_path = Path(tempdir) / "result.json"
+        result_path.write_text(
+            json.dumps(result, separators=(",", ":"), sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        with tarfile.open(archive_path, mode="w:zst") as archive:
+            archive.add(
+                manifest_path,
+                arcname=DIAGNOSTIC_BUNDLE_MANIFEST,
+                filter=_normalize_tar_info,
+            )
+            archive.add(
+                result_path,
+                arcname="result.json",
+                filter=_normalize_tar_info,
+            )
+            _add_artifact_tree(archive, artifact_root)
+
+    reference = local_artifact_reference(archive_path)
+    if not remote:
+        return reference
+    return publish_immutable_s3_artifact(
+        reference,
+        key=diagnostic_bundle_s3_key(run_id),
+        description="run diagnostic bundle",
+    )
+
+
+def _manifest_units(
+    artifact_root: Path,
+    review_units: list[DiagnosticReviewUnit],
+) -> list[dict[str, Any]]:
+    manifest_units: list[dict[str, Any]] = []
+    seen_unit_ids: set[str] = set()
+    for unit in review_units:
+        _validate_path_component(unit.review_unit_id, label="review_unit_id")
+        if unit.review_unit_id in seen_unit_ids:
+            raise ValueError(
+                f"Diagnostic bundle review unit is duplicated: {unit.review_unit_id}"
+            )
+        seen_unit_ids.add(unit.review_unit_id)
+        transcript_root = unit.transcript_root.resolve()
+        try:
+            transcript_root.relative_to(artifact_root)
+        except ValueError as error:
+            raise ValueError(
+                "Diagnostic bundle transcript root must be inside artifact root."
+            ) from error
+        transcript_paths = [
+            f"{DIAGNOSTIC_TREE_DIR}/{path.relative_to(artifact_root).as_posix()}"
+            for path in sorted(transcript_root.glob(f"*{TRANSCRIPT_SUFFIX}"))
+            if path.is_file()
+        ]
+        if transcript_paths:
+            manifest_units.append(
+                {"id": unit.review_unit_id, "transcripts": transcript_paths}
+            )
+    return manifest_units
+
+
+def _add_artifact_tree(archive: tarfile.TarFile, artifact_root: Path) -> None:
+    archive.add(
+        artifact_root,
+        arcname=DIAGNOSTIC_TREE_DIR,
+        recursive=False,
+        filter=_normalize_tar_info,
+    )
+    for path in sorted(artifact_root.rglob("*")):
+        relative = path.relative_to(artifact_root)
+        if relative.parts[0] == "published" or path.is_symlink():
+            continue
+        archive.add(
+            path,
+            arcname=f"{DIAGNOSTIC_TREE_DIR}/{relative.as_posix()}",
+            recursive=False,
+            filter=_normalize_tar_info,
+        )
+
+
+def _normalize_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
+    """Remove host- and attempt-specific metadata from archive members."""
+    info.mtime = 0
+    info.uid = 0
+    info.gid = 0
+    info.uname = ""
+    info.gname = ""
+    return info
+
+
+def materialize_diagnostic_transcript_unit(
+    reference: ArtifactReference,
+    *,
+    run_id: str,
+    review_unit_id: str,
+    destination: Path,
+) -> MaterializedTranscriptUnit:
+    archive_path = materialize_artifact(
+        reference,
+        destination.with_suffix(".tar.zst"),
+        maximum_size=MAX_DIAGNOSTIC_BUNDLE_BYTES,
+        expected_s3_key=(
+            diagnostic_bundle_s3_key(run_id)
+            if urlparse(reference.uri).scheme == "s3"
+            else None
+        ),
+    )
+    root = extract_archive(
+        archive_path,
+        destination,
+        maximum_entries=MAX_DIAGNOSTIC_BUNDLE_ENTRIES,
+        maximum_extracted_bytes=MAX_EXTRACTED_DIAGNOSTIC_BYTES,
+    )
+    manifest = json.loads(
+        (root / DIAGNOSTIC_BUNDLE_MANIFEST).read_text(encoding="utf-8")
+    )
+    if manifest.get("version") != 1 or manifest.get("run_id") != run_id:
+        raise ValueError(
+            "Diagnostic bundle manifest does not match extraction request."
+        )
+    units = manifest.get("review_units")
+    if not isinstance(units, list):
+        raise ValueError("Diagnostic bundle manifest has no review units.")
+    for unit in units:
+        if not isinstance(unit, dict) or unit.get("id") != review_unit_id:
+            continue
+        paths = unit.get("transcripts")
+        if not isinstance(paths, list) or not paths:
+            raise ValueError("Diagnostic review unit has no transcript files.")
+        resolved_paths: list[Path] = []
+        for value in paths:
+            if not isinstance(value, str):
+                raise ValueError("Diagnostic manifest path must be a string.")
+            path = (root / value).resolve()
+            try:
+                path.relative_to(root.resolve())
+            except ValueError as error:
+                raise ValueError("Diagnostic manifest path escapes bundle.") from error
+            if not path.is_file() or path.suffix != TRANSCRIPT_SUFFIX:
+                raise ValueError(f"Diagnostic bundle file is missing: {value}")
+            resolved_paths.append(path)
+        return MaterializedTranscriptUnit(
+            review_unit_id=review_unit_id,
+            transcript_paths=tuple(resolved_paths),
+        )
+    raise ValueError(f"Diagnostic review unit not found: {review_unit_id}")
+
+
+__all__ = [
+    "DiagnosticReviewUnit",
+    "MaterializedTranscriptUnit",
+    "diagnostic_bundle_s3_key",
+    "materialize_diagnostic_transcript_unit",
+    "publish_run_diagnostic_bundle",
+]

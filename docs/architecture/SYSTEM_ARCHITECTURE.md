@@ -16,7 +16,7 @@ Temporal Server is infrastructure, but it directly dispatches work to both worke
 | Review Control Plane | `control-plane/` | Admission, durable run state, recovery, execution observation, and publication coordination | [README](../../control-plane/README.md) |
 | Control Plane UI | `apps/control-plane-ui/` | Authenticated operator console and read-only Control Plane projection | [README](../../apps/control-plane-ui/README.md) |
 | Execution Gateway | `execution-gateway/` | Authenticated Execution API and HTTP-to-Temporal translation | [README](../../execution-gateway/README.md) |
-| Execution Worker | `agents/` | Review workflows, activities, agent runtime, stage artifacts, and transcript publication | [README](../../agents/README.md) |
+| Execution Worker | `agents/` | Review workflows, activities, agent runtime, stage artifacts, and run diagnostic publication | [README](../../agents/README.md) |
 | Memory Worker | `agents/` | Asynchronous memory extraction and maintenance workflows | [README](../../agents/README.md) |
 | Memory Catalog Server | `memory-catalog/` | Observation catalog, immutable memory revision history, and active revision coordination | [README](../../memory-catalog/README.md) |
 
@@ -47,9 +47,9 @@ sequenceDiagram
     Control->>Gateway: Observe execution
     Gateway-->>Control: Current status
   end
-  ExecutionWorker-->>Gateway: Workflow result and artifact tree
-  Gateway->>Storage: Publish terminal artifact
-  Gateway-->>Control: Result and artifact reference
+  ExecutionWorker->>Storage: Publish run diagnostic bundle
+  ExecutionWorker-->>Gateway: Workflow result and diagnostic reference
+  Gateway-->>Control: Result and diagnostic reference
   Integration->>Control: Claim publication work
   Control-->>Integration: Result and publish context
   Integration->>GitHub: Publish review output
@@ -66,10 +66,11 @@ sequenceDiagram
   participant Catalog as Memory Catalog Server
   participant Storage as Object Storage
 
-  ExecutionWorker->>Storage: Publish completed-review transcripts
   ExecutionWorker->>Temporal: Request asynchronous memory processing
   Temporal->>MemoryWorker: Dispatch memory extraction work
-  MemoryWorker->>Storage: Read transcript bundle and publish audit bundle
+  MemoryWorker->>Storage: Read review transcripts from run diagnostic bundle
+  Note over MemoryWorker: Extract memory and record Memory Agent transcripts
+  MemoryWorker->>Storage: Publish Memory Agent audit bundle
   MemoryWorker->>Catalog: Register pending observation
   loop Scheduled memory maintenance
     Temporal->>MemoryWorker: Dispatch maintenance work
@@ -79,16 +80,3 @@ sequenceDiagram
     MemoryWorker->>Catalog: Commit revision and active pointer with compare-and-swap
   end
 ```
-
-## State and recovery boundaries
-
-| Durable state | Owner | Purpose |
-| --- | --- | --- |
-| Run admission, replayable execution input, execution observation, and publication progress | Review Control Plane in PostgreSQL | Coordination and recovery across service restarts |
-| Workflow and activity history | Temporal Server | Durable scheduling, retries, timeouts, and workflow recovery |
-| Input bundles, terminal artifacts, transcripts, audit bundles, and memory revisions | Object Storage | Immutable exchange and archival of large artifacts |
-| Memory observations and the active revision pointer | Memory Catalog Server in PostgreSQL | Catalog coordination and compare-and-swap revision activation |
-
-These stores are independent recovery inputs. Missing Temporal history does not establish a publication outcome, and a PostgreSQL run record does not imply that its referenced object still exists. Recovery must reconcile the owner of each state rather than infer one subsystem's outcome from another subsystem.
-
-An external side effect is complete only when the component that owns its coordination state records the outcome. Component-specific state machines and retry rules belong in the owning package README; cross-component data shapes belong in the relevant contract family.

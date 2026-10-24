@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 
@@ -8,6 +8,7 @@ from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 class ReviewPostProcessingPolicy:
     # Execution policy stays separate from the review input and controls production.
     memory_processing_enabled: bool = True
+    diagnostic_publication: Literal["local", "managed"] = "local"
 
 
 @dataclass(frozen=True)

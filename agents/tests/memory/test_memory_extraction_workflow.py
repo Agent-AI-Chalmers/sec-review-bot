@@ -3,28 +3,24 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
 
 import pytest
-from temporalio.common import WorkflowIDReusePolicy
 
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.memory import extraction_workflow, maintenance_workflow
 from sec_review_agents.memory.extraction_workflow import (
     MemoryExtractionRequest,
     MemoryExtractionWorkflow,
-    TranscriptBundlePublicationRequest,
     memory_extraction_workflow_id,
-    publish_and_start_memory_extractions,
     run_memory_extraction,
 )
 from sec_review_agents.memory.maintenance_workflow import (
     MemoryMaintenanceRequest,
     MemoryMaintenanceWorkflow,
 )
-from sec_review_agents.temporal.config import DEFAULT_MEMORY_TASK_QUEUE
 
 
 def _reference() -> ArtifactReference:
     return ArtifactReference(
-        uri="s3://sec-review/runs/run-1/transcripts/review.tar.zst",
+        uri="s3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst",
         digest=f"sha256:{'a' * 64}",
         media_type="application/tar+zstd",
         size_bytes=42,
@@ -47,125 +43,12 @@ def test_extraction_workflow_id_is_stable_per_transcript_unit() -> None:
 
 
 @pytest.mark.asyncio
-async def test_publication_starts_one_abandoned_child_per_review_unit(
-    monkeypatch,
-) -> None:
-    started = []
-
-    async def fake_execute_activity(*_args, **_kwargs):
-        return {
-            "transcript_bundle": _reference().as_dict(),
-            "review_unit_ids": ["case-a", "case-b"],
-        }
-
-    async def fake_start_child(*args, **kwargs):
-        started.append((args, kwargs))
-
-    monkeypatch.setattr(
-        extraction_workflow.workflow, "execute_activity", fake_execute_activity
-    )
-    monkeypatch.setattr(
-        extraction_workflow.workflow, "start_child_workflow", fake_start_child
-    )
-
-    result = await publish_and_start_memory_extractions(
-        TranscriptBundlePublicationRequest(
-            run_id="run-1",
-            artifact_root_path="/tmp/run-1",
-            review_units=[],
-            timeout_seconds=30,
-        ),
-        source_workflow="repository-review",
-        start_extractions=True,
-    )
-
-    assert result["transcript_publication"] == "published"
-    assert [entry["status"] for entry in result["extractions"]] == [
-        "started",
-        "started",
-    ]
-    assert [call[0][1].review_unit_id for call in started] == ["case-a", "case-b"]
-    assert all(
-        call[1]["parent_close_policy"]
-        is extraction_workflow.workflow.ParentClosePolicy.ABANDON
-        for call in started
-    )
-    assert all(
-        call[1]["id_reuse_policy"] is WorkflowIDReusePolicy.REJECT_DUPLICATE
-        for call in started
-    )
-    assert all(call[1]["task_queue"] == DEFAULT_MEMORY_TASK_QUEUE for call in started)
-
-
-@pytest.mark.asyncio
-async def test_publication_reports_already_started_extraction(
-    monkeypatch,
-) -> None:
-    async def fake_execute_activity(*_args, **_kwargs):
-        return {
-            "transcript_bundle": _reference().as_dict(),
-            "review_unit_ids": ["case-a"],
-        }
-
-    async def already_started(*_args, **_kwargs):
-        raise extraction_workflow.WorkflowAlreadyStartedError(
-            "memory-extraction:test", "MemoryExtractionWorkflow"
-        )
-
-    monkeypatch.setattr(
-        extraction_workflow.workflow, "execute_activity", fake_execute_activity
-    )
-    monkeypatch.setattr(
-        extraction_workflow.workflow, "start_child_workflow", already_started
-    )
-    monkeypatch.setattr(extraction_workflow.workflow, "logger", Mock())
-
-    result = await publish_and_start_memory_extractions(
-        TranscriptBundlePublicationRequest("run-1", "/tmp/run-1", [], 30),
-        source_workflow="issue-review",
-        start_extractions=True,
-    )
-
-    assert result["extractions"] == [
-        {
-            "review_unit_id": "case-a",
-            "workflow_id": memory_extraction_workflow_id(
-                transcript_digest=_reference().digest,
-                review_unit_id="case-a",
-            ),
-            "status": "already_started",
-        }
-    ]
-
-
-@pytest.mark.asyncio
-async def test_publication_failure_is_returned_as_postprocessing_metadata(
-    monkeypatch,
-) -> None:
-    async def fail(*_args, **_kwargs):
-        raise RuntimeError("storage unavailable")
-
-    monkeypatch.setattr(extraction_workflow.workflow, "execute_activity", fail)
-    monkeypatch.setattr(extraction_workflow.workflow, "logger", Mock())
-    result = await publish_and_start_memory_extractions(
-        TranscriptBundlePublicationRequest("run-1", "/tmp/run-1", [], 30),
-        source_workflow="issue-review",
-        start_extractions=True,
-    )
-    assert result == {
-        "transcript_publication": "failed",
-        "extractions": [],
-        "error_code": "TRANSCRIPT_PUBLICATION_FAILED",
-    }
-
-
-@pytest.mark.asyncio
 async def test_extraction_workflow_executes_one_activity(monkeypatch) -> None:
     request = MemoryExtractionRequest(
         source_workflow="issue-review",
         run_id="run-1",
         review_unit_id="review",
-        transcript_bundle=_reference().as_dict(),
+        diagnostic_bundle=_reference().as_dict(),
         timeout_seconds=30,
     )
     execute = AsyncMock(return_value={"ok": True})
@@ -204,7 +87,7 @@ async def test_managed_extraction_registers_observation_with_provenance(
         lambda: client,
     )
     monkeypatch.setattr(
-        "sec_review_agents.memory.transcript_bundle.materialize_transcript_unit",
+        "sec_review_agents.artifacts.run_diagnostic_bundle.materialize_diagnostic_transcript_unit",
         lambda *_args, **_kwargs: SimpleNamespace(transcript_paths=(transcript,)),
     )
     monkeypatch.setattr(
@@ -219,7 +102,7 @@ async def test_managed_extraction_registers_observation_with_provenance(
         source_workflow="issue-review",
         run_id="run-1",
         review_unit_id="review",
-        transcript_bundle=_reference().as_dict(),
+        diagnostic_bundle=_reference().as_dict(),
         timeout_seconds=30,
     )
 
@@ -254,7 +137,7 @@ async def test_catalog_observation_conflict_is_not_retried(monkeypatch) -> None:
         source_workflow="issue-review",
         run_id="run-1",
         review_unit_id="review",
-        transcript_bundle=_reference().as_dict(),
+        diagnostic_bundle=_reference().as_dict(),
         timeout_seconds=30,
     )
 
@@ -273,7 +156,7 @@ async def test_extraction_activity_skips_when_processing_is_disabled(
         source_workflow="issue-review",
         run_id="run-1",
         review_unit_id="review",
-        transcript_bundle=_reference().as_dict(),
+        diagnostic_bundle=_reference().as_dict(),
         timeout_seconds=30,
     )
     run_extraction = AsyncMock()

@@ -103,7 +103,8 @@ class ExecutionWorkflow:
             timeout_seconds=prepared["timeout_seconds"],
             runtime_context=prepared["runtime_context"],
             post_processing=ReviewPostProcessingPolicy(
-                memory_processing_enabled=prepared["memory_processing_enabled"]
+                memory_processing_enabled=prepared["memory_processing_enabled"],
+                diagnostic_publication="managed",
             ),
         )
         if request.workflow == "issue-review":
@@ -137,7 +138,6 @@ class ExecutionWorkflow:
             }
         return {
             **result,
-            "artifact_root_path": str(prepared["prepared_input"]["artifact_root_path"]),
         }
 
 

@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import path from 'node:path'
 
 import {
   Client,
@@ -15,7 +14,6 @@ import {
   validateExecutionResult,
   validateExecutionRequest,
 } from './contract-validation.js'
-import { publishDiagnosticArtifact } from './artifact-storage.js'
 import {
   ExecutionRunConflictError,
   type ExecutionRecord,
@@ -133,18 +131,12 @@ export class TemporalExecutionStore {
     }
     if (temporalStatus === 'COMPLETED') {
       const response = (await handle.result()) as Record<string, unknown>
-      const artifact_storage = await projectArtifactStorage(
-        typeof response.artifact_root_path === 'string'
-          ? response.artifact_root_path
-          : undefined,
-        runId,
-      )
       if (response.ok === true && 'result' in response) {
         if (!workflow) {
           return {
             run_id: runId,
             status: 'failed',
-            artifact_storage,
+            artifact_storage: { status: 'unavailable' },
             error: executionError(
               'EXECUTION_RESPONSE_INVALID',
               'Completed execution is missing its workflow identity.',
@@ -158,7 +150,29 @@ export class TemporalExecutionStore {
             run_id: runId,
             workflow,
             status: 'failed',
-            artifact_storage,
+            artifact_storage: { status: 'unavailable' },
+            error: executionError(
+              'EXECUTION_RESPONSE_INVALID',
+              error instanceof Error ? error.message : String(error),
+            ),
+          }
+        }
+        let artifact_storage: ArtifactStorageProjection
+        try {
+          artifact_storage = parseRunDiagnosticArtifact(
+            response.artifact_storage,
+            runId,
+          )
+        } catch (error) {
+          return {
+            run_id: runId,
+            workflow,
+            status: 'failed',
+            artifact_storage: {
+              status: 'failed',
+              error_code: 'ARTIFACT_REFERENCE_INVALID',
+              message: 'Execution returned an invalid run diagnostic artifact.',
+            },
             error: executionError(
               'EXECUTION_RESPONSE_INVALID',
               error instanceof Error ? error.message : String(error),
@@ -186,7 +200,7 @@ export class TemporalExecutionStore {
         run_id: runId,
         ...(workflow ? { workflow } : {}),
         status: 'failed',
-        artifact_storage,
+        artifact_storage: { status: 'unavailable' },
         error: isExecutionError(response.error)
           ? response.error
           : executionError(
@@ -212,29 +226,65 @@ export class TemporalExecutionStore {
   }
 }
 
-async function projectArtifactStorage(
-  root: string | undefined,
-  runId: string,
-): Promise<import('./artifact-storage.js').ArtifactStorageProjection> {
-  if (!root) return { status: 'unavailable' }
-  try {
-    const configured = process.env.SEC_REVIEW_AGENT_ARTIFACT_ROOT?.trim()
-    if (!configured)
-      throw new Error('SEC_REVIEW_AGENT_ARTIFACT_ROOT is required.')
-    const expected = path.resolve(configured, runId)
-    const actual = path.resolve(root)
-    if (actual !== expected)
-      throw new Error(
-        'Worker artifact root does not match the mounted run root.',
-      )
-    return await publishDiagnosticArtifact(actual, runId)
-  } catch {
-    return {
-      status: 'failed',
-      error_code: 'ARTIFACT_UPLOAD_FAILED',
-      message: 'Unable to store terminal run artifacts.',
-    }
+interface ArtifactStorageProjection {
+  status: 'available' | 'unavailable' | 'failed'
+  artifact?: {
+    kind: 'diagnostic_bundle'
+    uri: string
+    media_type: 'application/tar+zstd'
+    digest: string
+    size_bytes: number
   }
+  error_code?: string
+  message?: string
+}
+
+export function parseRunDiagnosticArtifact(
+  value: unknown,
+  runId: string,
+): ArtifactStorageProjection {
+  if (!isRecord(value) || value.status !== 'available')
+    throw new Error('Execution response is missing artifact_storage.')
+  const artifact = value.artifact
+  if (
+    !isRecord(artifact) ||
+    artifact.kind !== 'diagnostic_bundle' ||
+    artifact.media_type !== 'application/tar+zstd' ||
+    typeof artifact.uri !== 'string' ||
+    typeof artifact.digest !== 'string' ||
+    !/^sha256:[0-9a-f]{64}$/.test(artifact.digest) ||
+    !Number.isSafeInteger(artifact.size_bytes) ||
+    (artifact.size_bytes as number) < 0
+  )
+    throw new Error('Execution response has malformed artifact metadata.')
+  const uri = new URL(artifact.uri)
+  if (
+    uri.protocol !== 's3:' ||
+    uri.hostname === '' ||
+    uri.pathname !== `/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst` ||
+    uri.username !== '' ||
+    uri.password !== '' ||
+    uri.port !== '' ||
+    uri.search !== '' ||
+    uri.hash !== ''
+  )
+    throw new Error(
+      'Execution response has an invalid diagnostic artifact URI.',
+    )
+  return {
+    status: 'available',
+    artifact: {
+      kind: 'diagnostic_bundle',
+      uri: artifact.uri,
+      media_type: 'application/tar+zstd',
+      digest: artifact.digest,
+      size_bytes: artifact.size_bytes as number,
+    },
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 export function executionError(

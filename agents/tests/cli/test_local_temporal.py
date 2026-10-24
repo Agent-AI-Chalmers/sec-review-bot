@@ -83,6 +83,7 @@ def test_local_temporal_request_respects_memory_processing_flag(
     )
 
     assert request.post_processing.memory_processing_enabled is False
+    assert request.post_processing.diagnostic_publication == "local"
 
 
 def test_local_temporal_uses_materialized_artifact_root(

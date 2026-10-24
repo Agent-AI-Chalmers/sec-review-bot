@@ -152,7 +152,7 @@ def test_local_direct_runs_review_only(
     assert result == {"ok": True}
     assert calls == ["direct:run-1"]
     assert (
-        bundle.artifact_root_path / "published" / "review-transcripts.v1.tar.zst"
+        bundle.artifact_root_path / "published" / "diagnostic-tree.v1.tar.zst"
     ).is_file()
 
 

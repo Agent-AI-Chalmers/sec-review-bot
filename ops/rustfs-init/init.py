@@ -1,7 +1,7 @@
 """Converge a fresh RustFS instance to the storage boundary used by this project.
 
 This module runs once as the Compose ``rustfs-init`` service. It creates the
-fixed ``sec-review`` bucket, upserts five runtime identities, installs their
+fixed ``sec-review`` bucket, upserts four runtime identities, installs their
 least-privilege policies from ``/policies``, and attaches one policy to each
 identity. It is intentionally deployment code rather than an application
 storage client: normal services never receive the root credentials used here.
@@ -9,11 +9,10 @@ storage client: normal services never receive the root credentials used here.
 The resulting ownership model is:
 
 * GitHub integration can read and write immutable input bundles.
-* The execution worker reads input bundles, reads/writes run transcripts, and
+* The execution worker reads input bundles, writes run diagnostic bundles, and
   reads active immutable memory versions.
-* The memory worker reads run transcripts and reads/writes immutable memory
-  versions and memory-agent audit bundles.
-* Execution Gateway can read and write terminal result artifacts.
+* The memory worker reads run diagnostic bundles and reads/writes immutable memory
+  versions and Memory Agent audit bundles.
 * Control Plane UI can only read terminal result artifacts.
 
 All provisioning operations are safe to repeat. Rerunning the container also
@@ -152,11 +151,6 @@ def main() -> None:
     integration_secret_key = required_env("SEC_REVIEW_INTEGRATION_S3_SECRET_KEY")
     execution_worker_secret_key = required_env("SEC_REVIEW_EXECUTION_S3_SECRET_KEY")
     memory_worker_secret_key = required_env("SEC_REVIEW_MEMORY_S3_SECRET_KEY")
-    storage_writer_access_key = os.environ.get(
-        "SEC_REVIEW_ARTIFACT_STORAGE_S3_ACCESS_KEY",
-        "sec-review-artifact-storage-writer",
-    )
-    storage_writer_secret_key = required_env("SEC_REVIEW_ARTIFACT_STORAGE_S3_SECRET_KEY")
     ui_reader_access_key = os.environ.get(
         "SEC_REVIEW_UI_S3_ACCESS_KEY", "sec-review-ui-artifact-reader"
     )
@@ -167,7 +161,6 @@ def main() -> None:
     put_user(integration_access_key, integration_secret_key)
     put_user(execution_worker_access_key, execution_worker_secret_key)
     put_user(memory_worker_access_key, memory_worker_secret_key)
-    put_user(storage_writer_access_key, storage_writer_secret_key)
     put_user(ui_reader_access_key, ui_reader_secret_key)
     put_policy("sec-review-input-writer", policy_root / "integration-policy.json")
     put_policy(
@@ -178,7 +171,6 @@ def main() -> None:
         "sec-review-memory-worker-storage",
         policy_root / "memory-worker-policy.json",
     )
-    put_policy("sec-review-artifact-storage-writer", policy_root / "artifact-policy.json")
     put_policy(
         "sec-review-ui-artifact-reader",
         policy_root / "ui-artifact-reader-policy.json",
@@ -186,7 +178,6 @@ def main() -> None:
     attach_policy("sec-review-input-writer", integration_access_key)
     attach_policy("sec-review-execution-worker-storage", execution_worker_access_key)
     attach_policy("sec-review-memory-worker-storage", memory_worker_access_key)
-    attach_policy("sec-review-artifact-storage-writer", storage_writer_access_key)
     attach_policy("sec-review-ui-artifact-reader", ui_reader_access_key)
 
 
