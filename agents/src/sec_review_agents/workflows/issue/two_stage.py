@@ -8,6 +8,10 @@ from temporalio import activity, workflow
 
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
+from sec_review_agents.run_diagnostics.publication import (
+    RunDiagnosticPublicationRequest,
+    publish_run_diagnostic_activity,
+)
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
     execute_activity,
@@ -16,10 +20,6 @@ from sec_review_agents.temporal.support import (
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.issue.workflow import (
     analyze_issue_activity,
-)
-from sec_review_agents.workflows.publish_run_diagnostic import (
-    RunDiagnosticPublicationRequest,
-    publish_run_diagnostic_activity,
 )
 from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_ALLOW,

@@ -7,16 +7,16 @@ from typing import Any
 from temporalio import activity, workflow
 
 from sec_review_agents.review_stages.record import build_review_record
+from sec_review_agents.run_diagnostics.publication import (
+    RunDiagnosticPublicationRequest,
+    publish_run_diagnostic_activity,
+)
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
     execute_activity,
     prepare_internal_workflow_activity,
 )
 from sec_review_agents.utils.paths import required_path
-from sec_review_agents.workflows.publish_run_diagnostic import (
-    RunDiagnosticPublicationRequest,
-    publish_run_diagnostic_activity,
-)
 from sec_review_agents.workflows.review_intent import (
     ReviewObjective,
     TestChangesPolicy,

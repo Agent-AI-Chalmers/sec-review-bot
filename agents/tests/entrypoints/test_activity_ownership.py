@@ -4,7 +4,7 @@ from sec_review_agents.entrypoints.execution_worker.workflows import (
 from sec_review_agents.entrypoints.memory_worker.workflows import (
     ACTIVITIES as MEMORY_ACTIVITIES,
 )
-from sec_review_agents.workflows.publish_run_diagnostic import (
+from sec_review_agents.run_diagnostics.publication import (
     publish_run_diagnostic_activity,
 )
 

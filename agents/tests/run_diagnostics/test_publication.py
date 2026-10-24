@@ -1,8 +1,8 @@
 from pathlib import Path
 
 from sec_review_agents.artifacts.reference import ArtifactReference
-from sec_review_agents.artifacts.run_diagnostic_bundle import PublishedDiagnosticBundle
-from sec_review_agents.workflows.publish_run_diagnostic import (
+from sec_review_agents.run_diagnostics.bundle import PublishedDiagnosticBundle
+from sec_review_agents.run_diagnostics.publication import (
     RunDiagnosticPublicationRequest,
     publish_run_diagnostic_activity,
 )
@@ -25,7 +25,7 @@ def test_publication_activity_uses_publisher_review_unit_ids(
         review_unit_ids=("case-a",),
     )
     monkeypatch.setattr(
-        "sec_review_agents.artifacts.run_diagnostic_bundle.publish_run_diagnostic_bundle",
+        "sec_review_agents.run_diagnostics.bundle.publish_run_diagnostic_bundle",
         lambda **_kwargs: publication,
     )
 

@@ -14,6 +14,10 @@ from sec_review_agents.review_stages.feedback_loop import (
 )
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
+from sec_review_agents.run_diagnostics.publication import (
+    RunDiagnosticPublicationRequest,
+    publish_run_diagnostic_activity,
+)
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
 from sec_review_agents.scan_stages.triage.result import TriageResult
@@ -23,10 +27,6 @@ from sec_review_agents.temporal.support import (
     prepare_internal_workflow_activity,
 )
 from sec_review_agents.workflows.memory_scheduling import schedule_memory_extractions
-from sec_review_agents.workflows.publish_run_diagnostic import (
-    RunDiagnosticPublicationRequest,
-    publish_run_diagnostic_activity,
-)
 from sec_review_agents.workflows.repository.case_execution_input import (
     RepositoryCaseExecutionInput,
 )

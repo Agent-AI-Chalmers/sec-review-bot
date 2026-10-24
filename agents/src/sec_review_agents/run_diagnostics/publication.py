@@ -20,7 +20,7 @@ class RunDiagnosticPublicationRequest:
 def publish_run_diagnostic_activity(
     request: RunDiagnosticPublicationRequest,
 ) -> dict[str, Any]:
-    from sec_review_agents.artifacts.run_diagnostic_bundle import (
+    from sec_review_agents.run_diagnostics.bundle import (
         DiagnosticReviewUnit,
         publish_run_diagnostic_bundle,
     )

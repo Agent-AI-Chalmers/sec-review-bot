@@ -99,7 +99,11 @@ The Python package is easiest to read by responsibility:
 5. Production entrypoints.
    - `entrypoints/`: the Temporal execution worker plus its execution contract, run protocol, and workflow input preparation boundaries. The HTTP Gateway and managed-memory service are separate TypeScript packages.
 
-6. Runtime support: infrastructure needed to run agents.
+6. Artifact persistence and run diagnostics.
+   - `artifacts/`: immutable artifact references, local and S3 transport, materialization, and safe archive extraction.
+   - `run_diagnostics/`: the per-run diagnostic bundle format, build and materialize logic, and its Temporal publication activity.
+
+7. Runtime support: infrastructure needed to run agents.
    - `runtime/`, `filesystem/`, `workspace/`, `llm/`, `resources/`, `observability/`: agent runtime, filesystem sandbox, workspace artifacts, model config, prompt / skill resources, and diagnostics.
 
 ## Execution Architecture

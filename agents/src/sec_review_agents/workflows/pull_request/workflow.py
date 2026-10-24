@@ -10,6 +10,10 @@ from sec_review_agents.review_stages.feedback_loop import (
     should_retry_from_verifier_result,
 )
 from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
+from sec_review_agents.run_diagnostics.publication import (
+    RunDiagnosticPublicationRequest,
+    publish_run_diagnostic_activity,
+)
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
     execute_activity,
@@ -17,10 +21,6 @@ from sec_review_agents.temporal.support import (
 )
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.memory_scheduling import schedule_memory_extractions
-from sec_review_agents.workflows.publish_run_diagnostic import (
-    RunDiagnosticPublicationRequest,
-    publish_run_diagnostic_activity,
-)
 from sec_review_agents.workflows.review_intent import (
     REVIEW_OBJECTIVE_AUDIT,
     require_review_intent,

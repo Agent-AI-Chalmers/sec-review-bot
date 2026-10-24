@@ -60,6 +60,7 @@ def test_foundational_packages_do_not_import_upper_layers() -> None:
         PACKAGE_ROOT / "resources",
         PACKAGE_ROOT / "workspace",
         PACKAGE_ROOT / "filesystem",
+        PACKAGE_ROOT / "artifacts",
     ]
     forbidden_prefixes = (
         "sec_review_agents.cli",
@@ -129,6 +130,20 @@ def test_runtime_package_does_not_import_domain_or_workflow_packages() -> None:
     assert violations == []
 
 
+def test_run_diagnostics_package_does_not_import_orchestration_packages() -> None:
+    violations = import_violations(
+        PACKAGE_ROOT / "run_diagnostics",
+        (
+            "sec_review_agents.cli",
+            "sec_review_agents.entrypoints",
+            "sec_review_agents.memory",
+            "sec_review_agents.workflows",
+        ),
+    )
+
+    assert violations == []
+
+
 def test_memory_package_does_not_own_run_diagnostic_publication() -> None:
     memory_root = PACKAGE_ROOT / "memory"
     forbidden_symbols = {
@@ -139,7 +154,7 @@ def test_memory_package_does_not_own_run_diagnostic_publication() -> None:
         memory_root,
         (
             "sec_review_agents.workflows.memory_scheduling",
-            "sec_review_agents.workflows.publish_run_diagnostic",
+            "sec_review_agents.run_diagnostics.publication",
         ),
     )
 

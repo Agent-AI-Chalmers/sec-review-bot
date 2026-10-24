@@ -1,12 +1,12 @@
 import pytest
 
 from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.run_diagnostics.publication import (
+    RunDiagnosticPublicationRequest,
+)
 from sec_review_agents.workflows.issue import single_agent as single_agent_workflow
 from sec_review_agents.workflows.issue import two_stage as two_stage_workflow
 from sec_review_agents.workflows.issue import workflow as issue_workflow
-from sec_review_agents.workflows.publish_run_diagnostic import (
-    RunDiagnosticPublicationRequest,
-)
 from sec_review_agents.workflows.pull_request import workflow as pr_workflow
 from sec_review_agents.workflows.repository import workflow as repository_workflow
 from sec_review_agents.workflows.review_request import (

@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from sec_review_agents.artifacts.run_diagnostic_bundle import (
+from sec_review_agents.run_diagnostics.bundle import (
     DiagnosticReviewUnit,
     materialize_diagnostic_transcript_unit,
     publish_run_diagnostic_bundle,
@@ -137,7 +137,7 @@ def test_diagnostic_bundle_build_failure_preserves_existing_file(
 
     with (
         patch(
-            "sec_review_agents.artifacts.run_diagnostic_bundle.tarfile.open",
+            "sec_review_agents.run_diagnostics.bundle.tarfile.open",
             side_effect=OSError("archive failed"),
         ),
         pytest.raises(OSError, match="archive failed"),

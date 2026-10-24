@@ -6,6 +6,9 @@ from sec_review_agents.entrypoints.execution_worker.workflow import (
     ExecutionWorkflow,
     prepare_execution_run_activity,
 )
+from sec_review_agents.run_diagnostics.publication import (
+    publish_run_diagnostic_activity,
+)
 from sec_review_agents.temporal.support import prepare_internal_workflow_activity
 from sec_review_agents.workflows.issue.single_agent import (
     IssueSingleAgentWorkflow,
@@ -24,9 +27,6 @@ from sec_review_agents.workflows.issue.workflow import (
     build_issue_review_result_activity,
     mitigate_issue_activity,
     verify_issue_activity,
-)
-from sec_review_agents.workflows.publish_run_diagnostic import (
-    publish_run_diagnostic_activity,
 )
 from sec_review_agents.workflows.pull_request.workflow import (
     PullRequestReviewWorkflow,

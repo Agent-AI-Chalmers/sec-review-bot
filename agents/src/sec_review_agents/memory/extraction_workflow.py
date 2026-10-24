@@ -40,9 +40,6 @@ async def run_memory_extraction(
         MEMORY_EXTRACTOR_AGENT_NAME,
     )
     from sec_review_agents.artifacts.reference import ArtifactReference
-    from sec_review_agents.artifacts.run_diagnostic_bundle import (
-        materialize_diagnostic_transcript_unit,
-    )
     from sec_review_agents.memory.audit_bundle import publish_memory_audit_bundle
     from sec_review_agents.memory.catalog_client import (
         configured_memory_catalog_client,
@@ -52,6 +49,9 @@ async def run_memory_extraction(
         preview_memory_observation_from_paths,
     )
     from sec_review_agents.memory.store import resolve_memory_store_dir
+    from sec_review_agents.run_diagnostics.bundle import (
+        materialize_diagnostic_transcript_unit,
+    )
 
     reference = ArtifactReference.from_mapping(request.diagnostic_bundle)
     extraction_id = memory_extraction_workflow_id(

@@ -1,1 +1,1 @@
-"""Artifact transport boundaries shared by review and memory workers."""
+"""Shared immutable artifact transport primitives."""
