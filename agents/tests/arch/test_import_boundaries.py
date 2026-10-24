@@ -286,7 +286,7 @@ def test_foundational_packages_do_not_import_runner_runtime_input_preparation() 
     assert violations == []
 
 
-def test_run_protocol_does_not_leak_into_workflow_input_consumers() -> None:
+def test_execution_protocol_does_not_leak_into_workflow_input_consumers() -> None:
     roots = [
         PACKAGE_ROOT / "cli",
         PACKAGE_ROOT / "workflows",
@@ -297,7 +297,7 @@ def test_run_protocol_does_not_leak_into_workflow_input_consumers() -> None:
         violations.extend(
             import_violations(
                 root,
-                ("sec_review_agents.entrypoints.run_protocol",),
+                ("sec_review_agents.entrypoints.execution_protocol",),
             )
         )
 
@@ -338,8 +338,8 @@ print(json.dumps(sorted(name for name in sys.modules if name.startswith(prefixes
     assert result.stdout.strip() == "[]"
 
 
-def test_run_protocol_does_not_import_stage_modules() -> None:
-    protocol_path = PACKAGE_ROOT / "entrypoints" / "run_protocol.py"
+def test_execution_protocol_does_not_import_stage_modules() -> None:
+    protocol_path = PACKAGE_ROOT / "entrypoints" / "execution_protocol.py"
     assert protocol_path.exists()
     violations = import_violations(
         protocol_path,

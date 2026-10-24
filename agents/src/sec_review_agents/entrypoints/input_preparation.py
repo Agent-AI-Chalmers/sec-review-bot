@@ -17,7 +17,7 @@ from sec_review_agents.entrypoints.contract_schema import (
     validate_v6_input_bundle_manifest,
     validate_v6_workflow_input,
 )
-from sec_review_agents.entrypoints.run_protocol import validate_run_id
+from sec_review_agents.entrypoints.execution_protocol import validate_run_id
 from sec_review_agents.utils.env import env_value
 
 ISSUE_ARTIFACT_PATHS = {
