@@ -5,7 +5,7 @@ import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import unquote, urlparse
 
 from sec_review_agents.artifacts.input_storage import download_s3_input_bundle
 
@@ -72,20 +72,28 @@ def materialize_artifact(
     maximum_size: int,
     expected_s3_key: str | None = None,
 ) -> Path:
-    """Download one S3 artifact reference into a verified local archive."""
+    """Resolve one shared artifact reference to a verified local archive."""
     if reference.size_bytes > maximum_size:
         raise ValueError("Artifact archive exceeds the compressed size limit.")
 
     parsed = urlparse(reference.uri)
-    if parsed.scheme != "s3":
+    if parsed.scheme == "file":
+        if parsed.netloc or parsed.query or parsed.fragment:
+            raise ValueError("Local artifact URI must be an absolute file URI.")
+        archive_path = Path(unquote(parsed.path))
+        if not archive_path.is_absolute():
+            raise ValueError("Local artifact URI path must be absolute.")
+        archive_path = archive_path.resolve()
+    elif parsed.scheme == "s3":
+        archive_path = download_s3_input_bundle(
+            reference.uri,
+            destination,
+            expected_size=reference.size_bytes,
+            maximum_size=maximum_size,
+            expected_key=expected_s3_key,
+        ).resolve()
+    else:
         raise ValueError(f"Unsupported artifact URI scheme: {parsed.scheme}")
-    archive_path = download_s3_input_bundle(
-        reference.uri,
-        destination,
-        expected_size=reference.size_bytes,
-        maximum_size=maximum_size,
-        expected_key=expected_s3_key,
-    ).resolve()
 
     if not archive_path.is_file():
         raise ValueError(f"Artifact archive not found: {archive_path}")

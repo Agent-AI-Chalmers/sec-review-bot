@@ -9,7 +9,7 @@
     {
       "Effect": "Allow",
       "Action": ["s3:GetObject", "s3:PutObject"],
-      "Resource": ["arn:aws:s3:::sec-review/runs/*/transcripts/*"]
+      "Resource": ["arn:aws:s3:::sec-review/runs/*/artifacts/*"]
     },
     {
       "Effect": "Allow",

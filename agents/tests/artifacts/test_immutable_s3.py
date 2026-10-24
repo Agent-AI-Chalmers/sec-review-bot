@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -124,10 +125,48 @@ def test_publish_immutable_s3_artifact_rejects_conflicting_existing_object(
         )
 
 
-def test_materialize_artifact_rejects_file_references(tmp_path: Path) -> None:
+def test_materialize_artifact_accepts_verified_shared_file_reference(
+    tmp_path: Path,
+) -> None:
     artifact = tmp_path / "artifact.tar.zst"
     artifact.write_bytes(b"archive")
     reference = local_artifact_reference(artifact)
 
-    with pytest.raises(ValueError, match="Unsupported artifact URI scheme: file"):
+    assert (
+        materialize_artifact(reference, tmp_path / "unused", maximum_size=100)
+        == artifact.resolve()
+    )
+
+
+def test_materialize_artifact_decodes_shared_file_uri_path(tmp_path: Path) -> None:
+    artifact = tmp_path / "sec review" / "artifact.tar.zst"
+    artifact.parent.mkdir()
+    artifact.write_bytes(b"archive")
+    reference = local_artifact_reference(artifact)
+
+    assert "%20" in reference.uri
+    assert (
+        materialize_artifact(reference, tmp_path / "unused", maximum_size=100)
+        == artifact.resolve()
+    )
+
+
+def test_materialize_artifact_rejects_relative_file_uri(tmp_path: Path) -> None:
+    artifact = tmp_path / "artifact.tar.zst"
+    artifact.write_bytes(b"archive")
+    reference = replace(
+        local_artifact_reference(artifact), uri="file:relative/artifact.tar.zst"
+    )
+
+    with pytest.raises(ValueError, match="path must be absolute"):
+        materialize_artifact(reference, tmp_path / "unused", maximum_size=100)
+
+
+def test_materialize_artifact_rejects_modified_shared_file(tmp_path: Path) -> None:
+    artifact = tmp_path / "artifact.tar.zst"
+    artifact.write_bytes(b"archive")
+    reference = local_artifact_reference(artifact)
+    artifact.write_bytes(b"changed")
+
+    with pytest.raises(ValueError, match="digest does not match"):
         materialize_artifact(reference, tmp_path / "unused", maximum_size=100)

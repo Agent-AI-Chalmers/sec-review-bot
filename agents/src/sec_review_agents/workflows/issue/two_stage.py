@@ -13,8 +13,13 @@ from sec_review_agents.temporal.support import (
     execute_activity,
     prepare_internal_workflow_activity,
 )
+from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.issue.workflow import (
     analyze_issue_activity,
+)
+from sec_review_agents.workflows.review_finalization import (
+    RunDiagnosticPublicationRequest,
+    finalize_review_run,
 )
 from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_ALLOW,
@@ -135,7 +140,30 @@ class IssueTwoStageWorkflow:
             },
             timeout_seconds=request.timeout_seconds,
         )
-        return {"ok": True, "result": public_result}
+        artifact_root = required_path(
+            prepared_input.get("artifact_root_path"),
+            label="artifact_root_path",
+        )
+        finalized = await finalize_review_run(
+            RunDiagnosticPublicationRequest(
+                run_id=request.run_id,
+                artifact_root_path=str(artifact_root),
+                review_units=[
+                    {
+                        "review_unit_id": "review",
+                        "transcript_root": str(artifact_root / "transcripts"),
+                    }
+                ],
+                result=public_result,
+                timeout_seconds=request.timeout_seconds,
+                publication=request.post_processing.diagnostic_publication,
+            )
+        )
+        return {
+            "ok": True,
+            "result": public_result,
+            "artifact_storage": finalized["artifact_storage"],
+        }
 
 
 async def run_issue_two_stage(

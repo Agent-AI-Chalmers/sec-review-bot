@@ -129,6 +129,34 @@ def test_runtime_package_does_not_import_domain_or_workflow_packages() -> None:
     assert violations == []
 
 
+def test_memory_package_does_not_own_run_diagnostic_publication() -> None:
+    memory_root = PACKAGE_ROOT / "memory"
+    forbidden_symbols = {
+        "RunDiagnosticPublicationRequest",
+        "finalize_review_run",
+        "publish_run_diagnostic_activity",
+    }
+    violations = import_violations(
+        memory_root,
+        (
+            "sec_review_agents.workflows.memory_scheduling",
+            "sec_review_agents.workflows.review_finalization",
+        ),
+    )
+
+    for path in memory_root.rglob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        declared = {
+            node.name
+            for node in tree.body
+            if isinstance(node, ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef)
+        }
+        for symbol in sorted(declared & forbidden_symbols):
+            violations.append(f"{path.relative_to(PACKAGE_ROOT)} declares {symbol}")
+
+    assert violations == []
+
+
 def test_review_stages_package_does_not_own_workflow_specific_implementations() -> None:
     review_stages_root = PACKAGE_ROOT / "review_stages"
     forbidden_paths = [

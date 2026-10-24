@@ -10,7 +10,7 @@ For a project overview, start with the repository [README](../README.md).
 
 ### architecture/
 
-- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md): Runtime entities and responsibilities, end-to-end data flow, state and recovery boundaries, cross-service contracts, sources of truth, and credential ownership.
+- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md): Runtime entities, deployment boundaries, ownership, and the main review and asynchronous memory paths.
 
 ### Packages and services
 

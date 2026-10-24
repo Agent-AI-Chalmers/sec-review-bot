@@ -4,10 +4,6 @@ from typing import Any
 from temporalio import activity, workflow
 
 from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
-from sec_review_agents.memory.extraction_workflow import (
-    TranscriptBundlePublicationRequest,
-    publish_and_start_memory_extractions,
-)
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
     feedback_retry_context,
@@ -20,6 +16,11 @@ from sec_review_agents.temporal.support import (
     prepare_internal_workflow_activity,
 )
 from sec_review_agents.utils.paths import required_path
+from sec_review_agents.workflows.memory_scheduling import schedule_memory_extractions
+from sec_review_agents.workflows.review_finalization import (
+    RunDiagnosticPublicationRequest,
+    finalize_review_run,
+)
 from sec_review_agents.workflows.review_intent import (
     require_review_intent,
 )
@@ -339,8 +340,8 @@ class IssueReviewWorkflow:
             request.prepared_input.get("artifact_root_path"),
             label="artifact_root_path",
         )
-        memory_processing = await publish_and_start_memory_extractions(
-            TranscriptBundlePublicationRequest(
+        finalized = await finalize_review_run(
+            RunDiagnosticPublicationRequest(
                 run_id=request.run_id,
                 artifact_root_path=str(artifact_root),
                 review_units=[
@@ -349,15 +350,24 @@ class IssueReviewWorkflow:
                         "transcript_root": str(artifact_root / "transcripts"),
                     }
                 ],
+                result=result,
                 timeout_seconds=request.timeout_seconds,
-            ),
+                publication=request.post_processing.diagnostic_publication,
+            )
+        )
+        memory_processing = await schedule_memory_extractions(
             source_workflow=request.workflow,
-            start_extractions=request.post_processing.memory_processing_enabled,
+            run_id=request.run_id,
+            diagnostic_bundle=dict(finalized["diagnostic_bundle"]),
+            review_unit_ids=[str(value) for value in finalized["review_unit_ids"]],
+            timeout_seconds=request.timeout_seconds,
+            enabled=request.post_processing.memory_processing_enabled,
         )
         return {
             "ok": True,
             "result": result,
             "memory_processing": memory_processing,
+            "artifact_storage": finalized["artifact_storage"],
         }
 
 

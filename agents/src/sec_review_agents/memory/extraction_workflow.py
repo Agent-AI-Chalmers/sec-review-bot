@@ -6,29 +6,18 @@ from pathlib import Path
 from typing import Any
 
 from temporalio import activity, workflow
-from temporalio.common import WorkflowIDReusePolicy
-from temporalio.exceptions import WorkflowAlreadyStartedError
 
-from sec_review_agents.temporal.config import DEFAULT_MEMORY_TASK_QUEUE
 from sec_review_agents.temporal.support import activity_retry_policy
 
 
 @dataclass(frozen=True)
 class MemoryExtractionRequest:
-    """Extract durable memory from one unit in an immutable transcript bundle."""
+    """Extract durable memory from one unit in an immutable run diagnostic."""
 
     source_workflow: str
     run_id: str
     review_unit_id: str
-    transcript_bundle: dict[str, Any]
-    timeout_seconds: int
-
-
-@dataclass(frozen=True)
-class TranscriptBundlePublicationRequest:
-    run_id: str
-    artifact_root_path: str
-    review_units: list[dict[str, str]]
+    diagnostic_bundle: dict[str, Any]
     timeout_seconds: int
 
 
@@ -42,120 +31,6 @@ def memory_extraction_workflow_id(
     return f"memory-extraction:{hashlib.sha256(identity).hexdigest()}"
 
 
-async def publish_and_start_memory_extractions(
-    request: TranscriptBundlePublicationRequest,
-    *,
-    source_workflow: str,
-    start_extractions: bool,
-) -> dict[str, Any]:
-    """Publish one run bundle and start independent extraction workflows.
-
-    Transcript publication and memory extraction are post-processing: failures
-    are returned as workflow metadata and do not change the review result.
-    """
-    try:
-        published = await workflow.execute_activity(
-            publish_transcript_bundle_activity,
-            request,
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-    except Exception as error:
-        workflow.logger.warning(
-            "Failed to publish transcript bundle run_id=%s error_type=%s error=%s",
-            request.run_id,
-            type(error).__name__,
-            error,
-        )
-        return {
-            "transcript_publication": "failed",
-            "extractions": [],
-            "error_code": "TRANSCRIPT_PUBLICATION_FAILED",
-        }
-
-    transcript_bundle = dict(published["transcript_bundle"])
-    result: dict[str, Any] = {
-        "transcript_publication": "published",
-        "extractions": [],
-    }
-    if not start_extractions:
-        return result
-
-    digest = str(transcript_bundle["digest"])
-    for review_unit_id_value in published["review_unit_ids"]:
-        review_unit_id = str(review_unit_id_value)
-        extraction_id = memory_extraction_workflow_id(
-            transcript_digest=digest,
-            review_unit_id=review_unit_id,
-        )
-        extraction = {
-            "review_unit_id": review_unit_id,
-            "workflow_id": extraction_id,
-        }
-        try:
-            await workflow.start_child_workflow(
-                MemoryExtractionWorkflow.run,
-                MemoryExtractionRequest(
-                    source_workflow=source_workflow,
-                    run_id=request.run_id,
-                    review_unit_id=review_unit_id,
-                    transcript_bundle=transcript_bundle,
-                    timeout_seconds=request.timeout_seconds,
-                ),
-                id=extraction_id,
-                task_queue=DEFAULT_MEMORY_TASK_QUEUE,
-                parent_close_policy=workflow.ParentClosePolicy.ABANDON,
-                id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
-            )
-            extraction["status"] = "started"
-        except WorkflowAlreadyStartedError:
-            extraction["status"] = "already_started"
-        except Exception as error:
-            workflow.logger.warning(
-                "Failed to start memory extraction %s: %s",
-                extraction_id,
-                error,
-            )
-            extraction["status"] = "start_failed"
-            extraction["error_code"] = "MEMORY_EXTRACTION_START_FAILED"
-        result["extractions"].append(extraction)
-    return result
-
-
-@activity.defn
-def publish_transcript_bundle_activity(
-    request: TranscriptBundlePublicationRequest,
-) -> dict[str, Any]:
-    from sec_review_agents.memory.transcript_bundle import (
-        TranscriptReviewUnit,
-        publish_transcript_bundle,
-    )
-    from sec_review_agents.utils.env import bootstrap_agents_env
-
-    bootstrap_agents_env()
-    units = [
-        TranscriptReviewUnit(
-            review_unit_id=str(unit["review_unit_id"]),
-            transcript_root=Path(unit["transcript_root"]),
-        )
-        for unit in request.review_units
-    ]
-    reference = publish_transcript_bundle(
-        run_id=request.run_id,
-        artifact_root=Path(request.artifact_root_path),
-        review_units=units,
-    )
-    included_ids = [
-        unit.review_unit_id
-        for unit in units
-        if list(unit.transcript_root.glob("*.jsonl"))
-    ]
-    return {
-        "transcript_bundle": reference.as_dict(),
-        "review_unit_ids": included_ids,
-    }
-
-
 async def run_memory_extraction(
     request: MemoryExtractionRequest,
     *,
@@ -165,6 +40,9 @@ async def run_memory_extraction(
         MEMORY_EXTRACTOR_AGENT_NAME,
     )
     from sec_review_agents.artifacts.reference import ArtifactReference
+    from sec_review_agents.artifacts.run_diagnostic_bundle import (
+        materialize_diagnostic_transcript_unit,
+    )
     from sec_review_agents.memory.audit_bundle import publish_memory_audit_bundle
     from sec_review_agents.memory.catalog_client import (
         configured_memory_catalog_client,
@@ -174,9 +52,8 @@ async def run_memory_extraction(
         preview_memory_observation_from_paths,
     )
     from sec_review_agents.memory.store import resolve_memory_store_dir
-    from sec_review_agents.memory.transcript_bundle import materialize_transcript_unit
 
-    reference = ArtifactReference.from_mapping(request.transcript_bundle)
+    reference = ArtifactReference.from_mapping(request.diagnostic_bundle)
     extraction_id = memory_extraction_workflow_id(
         transcript_digest=reference.digest,
         review_unit_id=request.review_unit_id,
@@ -184,11 +61,11 @@ async def run_memory_extraction(
     catalog_client = configured_memory_catalog_client()
     with tempfile.TemporaryDirectory(prefix="sec-review-extraction-input-") as tempdir:
         temp_root = Path(tempdir)
-        materialized = materialize_transcript_unit(
+        materialized = materialize_diagnostic_transcript_unit(
             reference,
             run_id=request.run_id,
             review_unit_id=request.review_unit_id,
-            destination=temp_root / "transcript-bundle",
+            destination=temp_root / "diagnostic-bundle",
         )
         if catalog_client is None:
             memory_store_dir = resolve_memory_store_dir(None, required=True)
@@ -290,10 +167,7 @@ class MemoryExtractionWorkflow:
 __all__ = [
     "MemoryExtractionRequest",
     "MemoryExtractionWorkflow",
-    "TranscriptBundlePublicationRequest",
     "memory_extraction_workflow_id",
-    "publish_and_start_memory_extractions",
-    "publish_transcript_bundle_activity",
     "run_memory_extraction",
     "run_memory_extraction_activity",
 ]

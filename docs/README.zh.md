@@ -12,7 +12,7 @@
 
 ### architecture/
 
-- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：运行实体与职责、端到端数据流、状态与恢复边界、跨服务契约、事实来源和凭据所有权。
+- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：运行实体、部署边界、职责所有权，以及主 review 与异步 memory 链路。
 
 ### Packages 与服务
 

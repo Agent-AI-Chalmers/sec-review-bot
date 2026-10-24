@@ -7,10 +7,6 @@ from typing import Any, TypedDict
 from temporalio import activity, workflow
 
 from sec_review_agents.delivery_stages.model import DeliveryCaseInput
-from sec_review_agents.memory.extraction_workflow import (
-    TranscriptBundlePublicationRequest,
-    publish_and_start_memory_extractions,
-)
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
     feedback_retry_context,
@@ -26,8 +22,13 @@ from sec_review_agents.temporal.support import (
     execute_activity,
     prepare_internal_workflow_activity,
 )
+from sec_review_agents.workflows.memory_scheduling import schedule_memory_extractions
 from sec_review_agents.workflows.repository.case_execution_input import (
     RepositoryCaseExecutionInput,
+)
+from sec_review_agents.workflows.review_finalization import (
+    RunDiagnosticPublicationRequest,
+    finalize_review_run,
 )
 from sec_review_agents.workflows.review_intent import (
     REVIEW_OBJECTIVE_AUDIT,
@@ -1211,22 +1212,31 @@ class RepositoryReviewWorkflow:
             for case_result in case_results
             if isinstance(case_result.get("case_id"), str)
         ]
+        finalized = await finalize_review_run(
+            RunDiagnosticPublicationRequest(
+                run_id=request.run_id,
+                artifact_root_path=str(artifact_root),
+                review_units=review_units,
+                result=result,
+                timeout_seconds=request.timeout_seconds,
+                publication=request.post_processing.diagnostic_publication,
+            )
+        )
         memory_processing: dict[str, Any] | None = None
         if review_units:
-            memory_processing = await publish_and_start_memory_extractions(
-                TranscriptBundlePublicationRequest(
-                    run_id=request.run_id,
-                    artifact_root_path=str(artifact_root),
-                    review_units=review_units,
-                    timeout_seconds=request.timeout_seconds,
-                ),
+            memory_processing = await schedule_memory_extractions(
                 source_workflow=request.workflow,
-                start_extractions=request.post_processing.memory_processing_enabled,
+                run_id=request.run_id,
+                diagnostic_bundle=dict(finalized["diagnostic_bundle"]),
+                review_unit_ids=[str(value) for value in finalized["review_unit_ids"]],
+                timeout_seconds=request.timeout_seconds,
+                enabled=request.post_processing.memory_processing_enabled,
             )
         return {
             "ok": True,
             "result": result,
             "memory_processing": memory_processing,
+            "artifact_storage": finalized["artifact_storage"],
         }
 
 

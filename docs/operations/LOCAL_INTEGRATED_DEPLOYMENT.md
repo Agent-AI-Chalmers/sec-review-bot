@@ -107,7 +107,7 @@ Compose-level defaults are documented in [compose.env.sample](../../compose.env.
 
 Set `EXECUTION_API_TOKEN`, `AGENT_MEMORY_CATALOG_TOKEN`, and the PostgreSQL/RustFS passwords to independently generated secrets, for example with `openssl rand -hex 32`. Copy the same Memory Catalog token into `ops/systemd/deployment.env`; Compose gives it to the independent Memory Catalog Server container, while both host workers use it as a narrow client credential. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
 
-RustFS uses a separate workload identity for each responsibility: the integration writes input objects; Execution Worker reads inputs, reads/writes transcript bundles, and reads active memory revisions; Memory Worker reads transcripts and reads/writes memory revisions and audit bundles; the artifact storage writer writes terminal artifacts; and the UI BFF reads stored artifacts for authenticated downloads. The corresponding secret keys in `compose.env.sample` belong to those identities and should be generated independently.
+RustFS uses a separate workload identity for each responsibility: the integration writes input objects; Execution Worker reads inputs, writes run diagnostic bundles, and reads active memory revisions; Memory Worker reads run diagnostics and reads/writes memory revisions and Memory Agent audit bundles; and the UI BFF reads stored diagnostics for authenticated downloads. The corresponding secret keys in `compose.env.sample` belong to those identities and should be generated independently.
 
 ### 2. GitHub Integration `.env`
 
@@ -171,12 +171,12 @@ Core fields:
 | `AGENT_MEMORY_CONSUMPTION_ENABLED` | Allow review agents to read curated memory; defaults to `true`. |
 | `AGENT_MEMORY_PROCESSING_ENABLED` | Allow transcript extraction and memory maintenance; defaults to `true`. |
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Host-worker endpoint for RustFS; the Compose default is exposed at `http://127.0.0.1:9100`. |
-| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`, `SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker credential; it can read run inputs, read/write transcript bundles, and read active memory revisions. |
-| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`, `SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Worker credential; it can read transcript bundles and read/write memory revisions and audit bundles. |
+| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`, `SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker credential; it can read run inputs, write run diagnostic bundles, and read active memory revisions. |
+| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`, `SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Worker credential; it can read run diagnostic bundles and read/write memory revisions and Memory Agent audit bundles. |
 | `AGENT_MEMORY_CATALOG_URL` | Independent managed-memory API; the Compose default is `http://127.0.0.1:8092`. |
 | `AGENT_MEMORY_CATALOG_TOKEN` | Must match the repository `.env`; it authorizes memory coordination but grants no direct PostgreSQL access. |
 
-Execution Gateway receives a separate artifact-storage-writer credential through Compose. It can write only `runs/*/artifacts/*`. Worker credentials remain split by the prefixes each process owns, and agent sandboxes receive neither credential. Gateway reads Execution Worker's artifact root through a read-only bind mount only after a run becomes terminal.
+Execution Worker publishes the authoritative run diagnostic under `runs/*/artifacts/*` before the workflow succeeds. Execution Gateway only validates and forwards that immutable reference; it has neither object-storage credentials nor a mount of the worker artifact tree. Agent sandboxes receive no workload storage credentials.
 
 The Memory Catalog Server is a separate TypeScript service, not part of Control Plane. Compose runs one PostgreSQL instance with separate `sec_review_control_plane` and `sec_review_memory_catalog` databases. Only Memory Catalog receives `MEMORY_CATALOG_DATABASE_URL`; it stores observations plus the active memory pointer in its database. Temporal owns extraction execution and the singleton maintenance workflow; PostgreSQL is only the durable catalog and compare-and-swap commit boundary. Host workers call the service with `AGENT_MEMORY_CATALOG_TOKEN`; they materialize transcripts and active memory locally for each activity, and agent sandboxes only see the resulting filesystem mounts. Do not also set `AGENT_MEMORY_DIR` for a managed worker.
 
@@ -287,7 +287,7 @@ sudo systemctl enable --now sec-review-bot.target
 
 `sec-review-bot.target` is the single systemd entry point for the complete deployment. It groups the Compose control plane with `sec-review-execution-worker@1.service` and `sec-review-memory-worker@1.service` so they can be managed together.
 
-The control plane contains GitHub integration, Execution Gateway, and Temporal. Execution Worker runs review workflows, creates Docker sandboxes, and publishes transcripts. Memory Worker runs asynchronous extraction and maintenance without owning the review sandbox boundary.
+The control plane contains GitHub integration, Execution Gateway, and Temporal. Execution Worker runs review workflows, creates Docker sandboxes, and publishes run diagnostics. Memory Worker consumes those diagnostics for asynchronous extraction and maintenance without owning the review sandbox boundary.
 
 Startup and runtime failures are supervised differently, and it matters when diagnosing a run:
 

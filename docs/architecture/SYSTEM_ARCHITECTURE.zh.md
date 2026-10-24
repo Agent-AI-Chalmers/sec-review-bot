@@ -20,7 +20,7 @@ Temporal Server 属于基础设施，但它会直接向两个 worker pool 分发
 | Review Control Plane | `control-plane/` | 接纳、持久化 run 状态、恢复、execution 观察与 publication 协调 | [README](../../control-plane/README.zh.md) |
 | Control Plane UI | `apps/control-plane-ui/` | 经过鉴权的运维控制台与只读 Control Plane 投影 | [README](../../apps/control-plane-ui/README.md) |
 | Execution Gateway | `execution-gateway/` | 经过鉴权的 Execution API 与 HTTP-to-Temporal 转换 | [README](../../execution-gateway/README.zh.md) |
-| Execution Worker | `agents/` | Review workflow、activity、agent runtime、stage artifact 与 transcript publication | [README](../../agents/README.zh.md) |
+| Execution Worker | `agents/` | Review workflow、activity、agent runtime、stage artifact 与 run diagnostic publication | [README](../../agents/README.zh.md) |
 | Memory Worker | `agents/` | 异步 memory extraction 与 maintenance workflow | [README](../../agents/README.zh.md) |
 | Memory Catalog Server | `memory-catalog/` | Observation catalog、不可变 memory revision history 与 active revision 协调 | [README](../../memory-catalog/README.zh.md) |
 
@@ -51,9 +51,9 @@ sequenceDiagram
     Control->>Gateway: 观察 execution
     Gateway-->>Control: 返回当前状态
   end
-  ExecutionWorker-->>Gateway: 返回 workflow result 和 artifact tree
-  Gateway->>Storage: 发布终态 artifact
-  Gateway-->>Control: 返回 result 和 artifact 引用
+  ExecutionWorker->>Storage: 发布 run diagnostic bundle
+  ExecutionWorker-->>Gateway: 返回 workflow result 和 diagnostic 引用
+  Gateway-->>Control: 返回 result 和 diagnostic 引用
   Integration->>Control: 领取 publication 工作
   Control-->>Integration: 返回 result 和 publish context
   Integration->>GitHub: 发布 review 结果
@@ -70,10 +70,11 @@ sequenceDiagram
   participant Catalog as Memory Catalog Server
   participant Storage as 对象存储
 
-  ExecutionWorker->>Storage: 发布已完成 review 的 transcript
   ExecutionWorker->>Temporal: 请求异步 memory 处理
   Temporal->>MemoryWorker: 分发 memory extraction 工作
-  MemoryWorker->>Storage: 读取 transcript bundle 并发布 audit bundle
+  MemoryWorker->>Storage: 从 run diagnostic bundle 读取 review transcript
+  Note over MemoryWorker: 提取 memory 并记录 Memory Agent transcript
+  MemoryWorker->>Storage: 发布 Memory Agent 审计包
   MemoryWorker->>Catalog: 注册待处理 observation
   loop 定期 memory maintenance
     Temporal->>MemoryWorker: 分发 maintenance 工作
@@ -83,16 +84,3 @@ sequenceDiagram
     MemoryWorker->>Catalog: 通过 compare-and-swap 提交 revision 和 active pointer
   end
 ```
-
-## 状态与恢复边界
-
-| 持久状态 | 所有者 | 用途 |
-| --- | --- | --- |
-| Run 接纳、可重放 execution input、execution observation 与 publication progress | Review Control Plane 的 PostgreSQL | 跨服务重启的协调与恢复 |
-| Workflow 与 activity history | Temporal Server | 持久调度、重试、超时与 workflow 恢复 |
-| Input bundle、终态 artifact、transcript、audit bundle 与 memory revision | Object Storage | 大型 artifact 的不可变交换与归档 |
-| Memory observation 与 active revision pointer | Memory Catalog Server 的 PostgreSQL | Catalog 协调与通过 compare-and-swap 激活 revision |
-
-这些存储是彼此独立的恢复输入。Temporal history 缺失不能证明 publication 的结果，PostgreSQL 中存在 run record 也不代表其引用的对象仍然存在。恢复过程必须与每类状态的所有者对账，不能从一个子系统推断另一个子系统的结果。
-
-外部副作用只有在负责协调该副作用的组件记录结果后才算完成。组件内部的状态机与重试规则属于对应 package README；跨组件数据形状属于相关 contract family。

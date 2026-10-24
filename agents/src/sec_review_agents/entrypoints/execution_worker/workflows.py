@@ -6,9 +6,6 @@ from sec_review_agents.entrypoints.execution_worker.workflow import (
     ExecutionWorkflow,
     prepare_execution_run_activity,
 )
-from sec_review_agents.memory.extraction_workflow import (
-    publish_transcript_bundle_activity,
-)
 from sec_review_agents.temporal.support import prepare_internal_workflow_activity
 from sec_review_agents.workflows.issue.single_agent import (
     IssueSingleAgentWorkflow,
@@ -64,6 +61,9 @@ from sec_review_agents.workflows.repository.workflow import (
     verify_repository_case_activity,
     window_deletion_summary_activity,
 )
+from sec_review_agents.workflows.review_finalization import (
+    publish_run_diagnostic_activity,
+)
 
 WORKFLOWS: list[Any] = [
     ExecutionWorkflow,
@@ -88,7 +88,7 @@ ACTIVITIES: list[Any] = [
     build_issue_review_result_activity,
     build_issue_single_agent_result_activity,
     build_issue_two_stage_result_activity,
-    publish_transcript_bundle_activity,
+    publish_run_diagnostic_activity,
     analyze_pull_request_activity,
     mitigate_pull_request_activity,
     verify_pull_request_activity,

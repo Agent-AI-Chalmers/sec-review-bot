@@ -3,15 +3,15 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from sec_review_agents.artifacts.run_diagnostic_bundle import (
+    DiagnosticReviewUnit,
+    publish_run_diagnostic_bundle,
+)
 from sec_review_agents.cli.local_execution import (
     build_local_workflow_request,
     direct_run_for_bundle,
 )
 from sec_review_agents.cli.local_materialization.common import ReviewBundle
-from sec_review_agents.memory.transcript_bundle import (
-    TranscriptReviewUnit,
-    publish_transcript_bundle,
-)
 from sec_review_agents.temporal.config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 
 
@@ -29,15 +29,19 @@ def run_local_direct_workflow(bundle: ReviewBundle) -> dict[str, Any]:
     )
     run_direct = direct_run_for_bundle(bundle)
     result = asyncio.run(run_direct(request))
-    _publish_local_transcripts(bundle)
+    _publish_local_diagnostic(bundle, result=dict(result))
     return dict(result)
 
 
-def _publish_local_transcripts(bundle: ReviewBundle) -> None:
+def _publish_local_diagnostic(
+    bundle: ReviewBundle,
+    *,
+    result: dict[str, Any],
+) -> None:
     artifact_root = bundle.artifact_root_path
     if bundle.workflow == "repository-review":
         units = [
-            TranscriptReviewUnit(
+            DiagnosticReviewUnit(
                 review_unit_id=case_root.name,
                 transcript_root=case_root / "transcripts",
             )
@@ -47,19 +51,19 @@ def _publish_local_transcripts(bundle: ReviewBundle) -> None:
     else:
         transcript_root = artifact_root / "transcripts"
         units = (
-            [TranscriptReviewUnit("review", transcript_root)]
+            [DiagnosticReviewUnit("review", transcript_root)]
             if list(transcript_root.glob("*.jsonl"))
             else []
         )
-    if units:
-        # Direct mode is an offline producer even when the shell also carries
-        # managed-deployment S3 settings.
-        publish_transcript_bundle(
-            run_id=bundle.run_id,
-            artifact_root=Path(artifact_root),
-            review_units=units,
-            remote=False,
-        )
+    # Direct mode is an offline producer even when the shell also carries
+    # managed-deployment S3 settings.
+    publish_run_diagnostic_bundle(
+        run_id=bundle.run_id,
+        artifact_root=Path(artifact_root),
+        review_units=units,
+        result=result,
+        remote=False,
+    )
 
 
 __all__ = ["run_local_direct_workflow"]

@@ -129,7 +129,13 @@ There are three local execution paths:
 - Local `--temporal` run: for exercising workflow / activity orchestration.
 - Manually started service and worker: for exercising the complete service path without the full Compose stack.
 
-The two `run-local-*` paths do not participate in memory extraction or maintenance. The manually started service and worker use the production workflow path.
+| Execution path | Diagnostic publication | Memory processing |
+| --- | --- | --- |
+| Direct `run-local-*`, standard workflow | Local diagnostic bundle | Disabled |
+| Direct `run-local-*`, `single-agent` or `two-stage` ablation | Local diagnostic bundle | Disabled |
+| Local `--temporal`, standard workflow | Local diagnostic bundle | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED` |
+| Local `--temporal`, `single-agent` or `two-stage` ablation | Local diagnostic bundle | Disabled |
+| Manually started service and workers | Diagnostic bundle in object storage | Production workflow behavior |
 
 ### `run-local-*` Commands
 
@@ -209,6 +215,8 @@ Use `--temporal` only when you specifically want to exercise internal Temporal w
 
 With `--temporal`, the same local command still prepares input on the developer machine, but the workflow stages run through Temporal workflow / activity scheduling. This is useful when debugging workflow orchestration, retries, activity boundaries, or Temporal-visible state. It still bypasses the HTTP Execution Gateway, so it is not the same as the full service path.
 
+Local Temporal execution keeps the run diagnostic bundle on the local filesystem and passes a verified `file://` reference between workers. The local Execution and Memory Workers must therefore share the artifact filesystem and see it at the same absolute path. This mode does not require S3-compatible object storage.
+
 Before running a `--temporal` local command, start a local Temporal dev server:
 
 ```bash
@@ -260,7 +268,7 @@ TEMPORAL_ADDRESS=127.0.0.1:7233 \
 sec-review-memory-worker
 ```
 
-Execution Worker handles review workflows, sandboxed activities, and transcript publication. Memory Worker handles asynchronous extraction and maintenance. They use separate task queues and concurrency limits.
+Execution Worker handles review workflows, sandboxed activities, and run diagnostic publication. Memory Worker reads the published diagnostic to perform asynchronous extraction and maintenance. They use separate task queues and concurrency limits.
 
 Docker Compose control-plane startup and host worker operation are documented in the [local integrated deployment guide](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md).
 

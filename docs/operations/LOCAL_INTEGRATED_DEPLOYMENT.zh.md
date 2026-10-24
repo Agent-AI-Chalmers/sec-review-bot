@@ -109,7 +109,7 @@ Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个�
 
 将 `EXECUTION_API_TOKEN`、`AGENT_MEMORY_CATALOG_TOKEN` 以及 PostgreSQL/RustFS 密码分别设置为独立生成的 secret，例如使用 `openssl rand -hex 32`。把同一枚 Memory Catalog token 也写入 `ops/systemd/deployment.env`：Compose 把它交给独立 Memory Catalog Server 容器，两个宿主机 worker 用它作为窄客户端凭据。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
 
-RustFS 按职责为各组件分配独立身份：integration 写入 input object；Execution Worker 读取 input、读写 transcript bundle 并读取 active memory revision；Memory Worker 读取 transcript，并读写 memory revision 和 audit bundle；artifact storage writer 写入终态 artifact；UI BFF 为经过认证的下载读取已存储 artifact。`compose.env.sample` 中对应的 secret key 属于这些不同身份，应当分别生成。
+RustFS 按职责为各组件分配独立身份：integration 写入 input object；Execution Worker 读取 input、写入 run diagnostic bundle 并读取 active memory revision；Memory Worker 读取 run diagnostic，并读写 memory revision 和 Memory Agent 审计包；UI BFF 为经过认证的下载读取已存储 diagnostic。`compose.env.sample` 中对应的 secret key 属于这些不同身份，应当分别生成。
 
 ### 2. GitHub integration `.env`
 
@@ -173,12 +173,12 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `AGENT_MEMORY_CONSUMPTION_ENABLED` | 允许 review agent 读取整理后的 memory；默认是 `true`。 |
 | `AGENT_MEMORY_PROCESSING_ENABLED` | 允许 transcript extraction 和 memory maintenance；默认是 `true`。 |
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9100`。 |
-| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、读写 transcript bundle，并读取 active memory revision。 |
-| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Worker 凭据；可读取 transcript bundle，并读写 memory revision 和 audit bundle。 |
+| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入 run diagnostic bundle，并读取 active memory revision。 |
+| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Worker 凭据；可读取 run diagnostic bundle，并读写 memory revision 和 Memory Agent 审计包。 |
 | `AGENT_MEMORY_CATALOG_URL` | 独立的 managed-memory API；Compose 默认是 `http://127.0.0.1:8092`。 |
 | `AGENT_MEMORY_CATALOG_TOKEN` | 必须与仓库 `.env` 一致；它只授权 memory 协调，不提供 PostgreSQL 直连权限。 |
 
-Execution Gateway 通过 Compose 使用独立的 artifact-storage-writer 凭据，只能写入 `runs/*/artifacts/*`。两个 worker 的凭据按各自拥有的对象前缀分离，agent sandbox 不会收到其中任何一套凭据。Gateway 只在 run 进入终态后通过只读 bind mount 读取 Execution Worker artifact root。
+Execution Worker 会在 workflow 成功前把权威 run diagnostic 发布到 `runs/*/artifacts/*`。Execution Gateway 只校验并转发该不可变引用，不持有对象存储凭据，也不挂载 worker artifact tree。Agent sandbox 不会收到任何 workload storage 凭据。
 
 Memory Catalog Server 是独立 TypeScript 服务，不属于 Control Plane。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_control_plane` 和 `sec_review_memory_catalog` database。只有 Memory Catalog 收到 `MEMORY_CATALOG_DATABASE_URL`，并在自己的 database 中保存 observations 和 active memory pointer。提取执行和单例维护 workflow 由 Temporal 管理，PostgreSQL 只负责持久目录以及 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；transcript 和 active memory 仍由 worker 在每次 activity 中物化到本地，agent sandbox 只看到最终 filesystem mount。Managed worker 不要同时设置 `AGENT_MEMORY_DIR`。
 
@@ -289,7 +289,7 @@ sudo systemctl enable --now sec-review-bot.target
 
 `sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 Compose 控制平面、`sec-review-execution-worker@1.service` 和 `sec-review-memory-worker@1.service` 组合起来统一管理。
 
-控制平面包括 GitHub integration、Execution Gateway 和 Temporal。Execution Worker 运行 review workflow、创建 Docker sandbox 并发布 transcript；Memory Worker 运行异步 extraction 和 maintenance，不拥有 review sandbox 边界。
+控制平面包括 GitHub integration、Execution Gateway 和 Temporal。Execution Worker 运行 review workflow、创建 Docker sandbox 并发布 run diagnostic；Memory Worker 消费该诊断包执行异步 extraction 和 maintenance，不拥有 review sandbox 边界。
 
 启动期失败和运行期失败的监督方式不同，排查时这个区别很关键：
 

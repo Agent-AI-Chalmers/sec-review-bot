@@ -131,7 +131,13 @@ flowchart LR
 - Local `--temporal` run：用于验证 workflow / activity 编排。
 - 手动启动 Service 和 Worker：用于在不启动完整 Compose 栈时验证完整 service path。
 
-两种 `run-local-*` 路径都不参与 memory extraction 或 maintenance；手动启动的 Service 和 Worker 则使用生产 workflow 路径。
+| 执行路径 | Diagnostic publication | Memory processing |
+| --- | --- | --- |
+| Direct `run-local-*`，标准 workflow | 本地 diagnostic bundle | 禁用 |
+| Direct `run-local-*`，`single-agent` 或 `two-stage` ablation | 本地 diagnostic bundle | 禁用 |
+| 本地 `--temporal`，标准 workflow | 本地 diagnostic bundle | 由 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
+| 本地 `--temporal`，`single-agent` 或 `two-stage` ablation | 本地 diagnostic bundle | 禁用 |
+| 手动启动 Service 和 Worker | 对象存储中的 diagnostic bundle | 使用生产 workflow 行为 |
 
 ### `run-local-*` 命令
 
@@ -211,6 +217,8 @@ sec-review-agents-run-local-repository \
 
 显式传 `--temporal` 时，同一个本地命令仍然在开发机上准备输入，但后续 workflow stages 会通过 Temporal workflow / activity 调度执行。这个模式适合调试 workflow 编排、retry、activity 边界或 Temporal 中可见的状态。它仍然绕过 HTTP Execution Gateway，因此不等同于完整 service path。
 
+本地 Temporal 执行会把 run diagnostic bundle 保存在本地文件系统中，并通过经过校验的 `file://` 引用在 worker 之间传递。因此，本地 Execution Worker 与 Memory Worker 必须共享 artifact 文件系统，并以相同的绝对路径访问该文件；这种运行方式不需要 S3 兼容对象存储。
+
 运行 `--temporal` local command 前，先启动本地 Temporal dev server：
 
 ```bash
@@ -262,7 +270,7 @@ TEMPORAL_ADDRESS=127.0.0.1:7233 \
 sec-review-memory-worker
 ```
 
-Execution Worker 负责 review workflow、sandbox activity 和 transcript 发布；Memory Worker 负责异步 extraction 与 maintenance。两者使用独立的 task queue 和并发限制。
+Execution Worker 负责 review workflow、sandbox activity 和 run diagnostic 发布；Memory Worker 读取已发布的诊断包，负责异步 extraction 与 maintenance。两者使用独立的 task queue 和并发限制。
 
 Docker Compose 控制平面和宿主机 worker 的运行方式见[本地集成部署](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
 
