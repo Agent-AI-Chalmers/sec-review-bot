@@ -14,11 +14,7 @@ import {
   supportedWorkflows,
   validateExecutionInput,
 } from './contract-validation.js'
-import {
-  ExecutionRunConflictError,
-  type ExecutionRecord,
-  type ExecutionStore,
-} from './execution-store.js'
+import { ExecutionRunConflictError, type ExecutionRecord } from './execution.js'
 import type { PathParameters, RequestBody } from './route-types.js'
 import { integerEnv } from './env.js'
 import {
@@ -64,7 +60,10 @@ function semanticError(
 
 export async function registerExecutionGatewayRoutes(
   app: FastifyInstance,
-  options: { store: ExecutionStore; token?: string },
+  options: {
+    store: Pick<TemporalExecutionStore, 'start' | 'get'>
+    token?: string
+  },
 ): Promise<void> {
   const { store, token } = options
   const workflowTimeoutSeconds = integerEnv(
@@ -182,7 +181,7 @@ export async function registerExecutionGatewayRoutes(
 }
 
 export async function createApp(options: {
-  store: ExecutionStore
+  store: Pick<TemporalExecutionStore, 'start' | 'get'>
   token?: string
 }): Promise<FastifyInstance> {
   const app = Fastify({

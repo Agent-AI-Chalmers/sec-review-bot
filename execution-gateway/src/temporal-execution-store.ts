@@ -20,8 +20,7 @@ import {
   ExecutionRunConflictError,
   type ExecutionRecord,
   type ExecutionRequest,
-  type ExecutionStore,
-} from './execution-store.js'
+} from './execution.js'
 
 function fingerprint(request: ExecutionRequest): string {
   return createHash('sha256')
@@ -46,7 +45,7 @@ function statusName(status: { name?: string } | string | undefined): string {
   return status?.name ?? 'UNKNOWN'
 }
 
-export class TemporalExecutionStore implements ExecutionStore {
+export class TemporalExecutionStore {
   private constructor(
     private readonly connection: Connection,
     private readonly client: Client,
