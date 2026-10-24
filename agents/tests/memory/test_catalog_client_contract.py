@@ -1,7 +1,6 @@
 import json
 from email.message import Message
 from io import BytesIO
-from pathlib import Path
 from typing import Any
 from unittest.mock import patch
 from urllib.error import HTTPError
@@ -15,10 +14,9 @@ from sec_review_agents.memory.catalog_client import (
     MemoryCatalogClient,
     MemoryCatalogConflictError,
 )
+from tests.project_paths import CONTRACTS_ROOT
 
-CONTRACT_PATH = (
-    Path(__file__).parents[3] / "contracts" / "memory-catalog-api" / "openapi.yaml"
-)
+CONTRACT_PATH = CONTRACTS_ROOT / "memory-catalog-api" / "openapi.yaml"
 
 
 def _validator(schema_name: str) -> Draft202012Validator:

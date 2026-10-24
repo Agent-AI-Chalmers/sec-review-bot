@@ -151,6 +151,18 @@ def test_materialize_artifact_decodes_shared_file_uri_path(tmp_path: Path) -> No
     )
 
 
+def test_materialize_artifact_decodes_non_ascii_file_uri_path(tmp_path: Path) -> None:
+    artifact = tmp_path / "诊断" / "artifact.tar.zst"
+    artifact.parent.mkdir()
+    artifact.write_bytes(b"archive")
+    reference = local_artifact_reference(artifact)
+
+    assert (
+        materialize_artifact(reference, tmp_path / "unused", maximum_size=100)
+        == artifact.resolve()
+    )
+
+
 def test_materialize_artifact_rejects_relative_file_uri(tmp_path: Path) -> None:
     artifact = tmp_path / "artifact.tar.zst"
     artifact.write_bytes(b"archive")

@@ -1,6 +1,7 @@
 """Build, publish, and materialize the authoritative artifact for one review run."""
 
 import json
+import os
 import tarfile
 import tempfile
 from dataclasses import dataclass
@@ -61,9 +62,55 @@ def publish_run_diagnostic_bundle(
     artifact_root = artifact_root.resolve()
     output_dir = artifact_root / "published"
     output_dir.mkdir(parents=True, exist_ok=True)
-    archive_path = output_dir / DIAGNOSTIC_BUNDLE_FILENAME
+    archive_path = (output_dir / DIAGNOSTIC_BUNDLE_FILENAME).resolve()
     manifest_units = _manifest_units(artifact_root, review_units)
 
+    temporary_archive = _temporary_archive_path(output_dir)
+    try:
+        _build_diagnostic_archive(
+            temporary_archive,
+            artifact_root=artifact_root,
+            manifest_units=manifest_units,
+            result=result,
+            run_id=run_id,
+        )
+        reference = _install_immutable_file_archive(
+            local_artifact_reference(temporary_archive),
+            temporary_archive=temporary_archive,
+            destination=archive_path,
+        )
+    finally:
+        if temporary_archive.exists():
+            temporary_archive.unlink()
+            _fsync_directory(output_dir)
+
+    if not remote:
+        return reference
+    return publish_immutable_s3_artifact(
+        reference,
+        key=diagnostic_bundle_s3_key(run_id),
+        description="run diagnostic bundle",
+    )
+
+
+def _temporary_archive_path(output_dir: Path) -> Path:
+    # mkstemp creates the archive 0600; hard-linking preserves that owner-only
+    # mode at the published path because diagnostics contain transcripts.
+    descriptor, value = tempfile.mkstemp(
+        prefix=f".{DIAGNOSTIC_BUNDLE_FILENAME}.", suffix=".tmp", dir=output_dir
+    )
+    os.close(descriptor)
+    return Path(value)
+
+
+def _build_diagnostic_archive(
+    archive_path: Path,
+    *,
+    artifact_root: Path,
+    manifest_units: list[dict[str, Any]],
+    result: dict[str, Any],
+    run_id: str,
+) -> None:
     with tempfile.TemporaryDirectory(prefix="sec-review-diagnostic-bundle-") as tempdir:
         manifest_path = Path(tempdir) / DIAGNOSTIC_BUNDLE_MANIFEST
         manifest_path.write_text(
@@ -97,15 +144,43 @@ def publish_run_diagnostic_bundle(
                 filter=_normalize_tar_info,
             )
             _add_artifact_tree(archive, artifact_root)
+    with archive_path.open("rb") as archive_file:
+        os.fsync(archive_file.fileno())
 
-    reference = local_artifact_reference(archive_path)
-    if not remote:
-        return reference
-    return publish_immutable_s3_artifact(
-        reference,
-        key=diagnostic_bundle_s3_key(run_id),
-        description="run diagnostic bundle",
+
+def _install_immutable_file_archive(
+    reference: ArtifactReference,
+    *,
+    temporary_archive: Path,
+    destination: Path,
+) -> ArtifactReference:
+    try:
+        os.link(temporary_archive, destination)
+    except FileExistsError:
+        existing = local_artifact_reference(destination)
+        if (
+            existing.digest != reference.digest
+            or existing.size_bytes != reference.size_bytes
+        ):
+            raise RuntimeError(
+                "Existing run diagnostic bundle differs from immutable publication."
+            ) from None
+    else:
+        _fsync_directory(destination.parent)
+    return ArtifactReference(
+        uri=destination.as_uri(),
+        digest=reference.digest,
+        media_type=reference.media_type,
+        size_bytes=reference.size_bytes,
     )
+
+
+def _fsync_directory(directory: Path) -> None:
+    descriptor = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_CLOEXEC)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def _manifest_units(
