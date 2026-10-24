@@ -376,11 +376,12 @@ export function StateMachineDiagram({
             <path d="M0,0 L9,3.5 L0,7 Z" fill="currentColor" />
           </marker>
         </defs>
-        {machine.transitions.map((edge) => {
+        {machine.transitions.map((edge, index) => {
           const from = center(edge.from)
           const to = center(edge.to)
-          const key = `${edge.from}->${edge.to}`
-          const emphasised = traversed.has(key)
+          const pathKey = `${edge.from}->${edge.to}`
+          const key = `${pathKey}:${edge.reason ?? ''}:${edge.label ?? ''}:${index}`
+          const emphasised = traversed.has(pathKey)
           const selfLoop = edge.from === edge.to
           const revert = isReverting(columns, edge.from, edge.to)
           const className = [
