@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from datetime import timedelta
 from typing import Any
 
 from temporalio import activity, workflow
@@ -16,7 +17,7 @@ from sec_review_agents.run_diagnostics.publication import (
 )
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
-    execute_activity,
+    activity_retry_policy,
     prepare_internal_workflow_activity,
 )
 from sec_review_agents.utils.paths import required_path
@@ -284,36 +285,37 @@ def build_pull_request_review_result_activity(
 class PullRequestReviewWorkflow:
     @workflow.run
     async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
-        await execute_activity(
+        await workflow.execute_activity(
             prepare_internal_workflow_activity,
-            request.workflow,
-            request.run_id,
-            timeout_seconds=request.timeout_seconds,
+            args=[request.workflow, request.run_id],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
         )
         prepared_input = request.prepared_input
         runtime_context = request.runtime_context
-        analysis_result = await execute_activity(
+        analysis_result = await workflow.execute_activity(
             analyze_pull_request_activity,
-            prepared_input,
-            runtime_context,
-            timeout_seconds=request.timeout_seconds,
+            args=[prepared_input, runtime_context],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
         )
-        mitigation_result = await execute_activity(
+        mitigation_result = await workflow.execute_activity(
             mitigate_pull_request_activity,
-            prepared_input,
-            analysis_result,
-            None,
-            runtime_context,
-            timeout_seconds=request.timeout_seconds,
+            args=[prepared_input, analysis_result, None, runtime_context],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
         )
-        verifier_result = await execute_activity(
+        verifier_result = await workflow.execute_activity(
             verify_pull_request_activity,
-            prepared_input,
-            analysis_result,
-            mitigation_result,
-            None,
-            runtime_context,
-            timeout_seconds=request.timeout_seconds,
+            args=[
+                prepared_input,
+                analysis_result,
+                mitigation_result,
+                None,
+                runtime_context,
+            ],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
         )
         retry_count = 0
         history: list[dict[str, Any]] = []
@@ -329,55 +331,58 @@ class PullRequestReviewWorkflow:
                 history=history,
             )
             history = retry_context["history"]
-            await execute_activity(
+            await workflow.execute_activity(
                 archive_pull_request_feedback_attempt_activity,
-                prepared_input,
-                retry_context,
-                timeout_seconds=request.timeout_seconds,
+                args=[prepared_input, retry_context],
+                schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+                retry_policy=activity_retry_policy(),
             )
-            mitigation_result = await execute_activity(
+            mitigation_result = await workflow.execute_activity(
                 mitigate_pull_request_activity,
-                prepared_input,
-                analysis_result,
-                retry_context,
-                runtime_context,
-                timeout_seconds=request.timeout_seconds,
+                args=[prepared_input, analysis_result, retry_context, runtime_context],
+                schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+                retry_policy=activity_retry_policy(),
             )
-            verifier_result = await execute_activity(
+            verifier_result = await workflow.execute_activity(
                 verify_pull_request_activity,
-                prepared_input,
-                analysis_result,
-                mitigation_result,
-                retry_context,
-                runtime_context,
-                timeout_seconds=request.timeout_seconds,
+                args=[
+                    prepared_input,
+                    analysis_result,
+                    mitigation_result,
+                    retry_context,
+                    runtime_context,
+                ],
+                schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+                retry_policy=activity_retry_policy(),
             )
-        result = await execute_activity(
+        result = await workflow.execute_activity(
             build_pull_request_review_result_activity,
-            analysis_result,
-            mitigation_result,
-            verifier_result,
-            timeout_seconds=request.timeout_seconds,
+            args=[analysis_result, mitigation_result, verifier_result],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
         )
         artifact_root = required_path(
             request.prepared_input.get("artifact_root_path"),
             label="artifact_root_path",
         )
-        finalized = await execute_activity(
+        finalized = await workflow.execute_activity(
             publish_run_diagnostic_activity,
-            RunDiagnosticPublicationRequest(
-                run_id=request.run_id,
-                artifact_root_path=str(artifact_root),
-                review_units=[
-                    {
-                        "review_unit_id": "review",
-                        "transcript_root": str(artifact_root / "transcripts"),
-                    }
-                ],
-                result=result,
-                publication=request.post_processing.diagnostic_publication,
-            ),
-            timeout_seconds=request.timeout_seconds,
+            args=[
+                RunDiagnosticPublicationRequest(
+                    run_id=request.run_id,
+                    artifact_root_path=str(artifact_root),
+                    review_units=[
+                        {
+                            "review_unit_id": "review",
+                            "transcript_root": str(artifact_root / "transcripts"),
+                        }
+                    ],
+                    result=result,
+                    publication=request.post_processing.diagnostic_publication,
+                )
+            ],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
         )
         memory_processing = await schedule_memory_extractions(
             source_workflow=request.workflow,

@@ -1,7 +1,6 @@
 from datetime import timedelta
-from typing import Any
 
-from temporalio import activity, workflow
+from temporalio import activity
 from temporalio.common import RetryPolicy
 
 ACTIVITY_RETRY_MAXIMUM_ATTEMPTS = 3
@@ -23,22 +22,8 @@ def activity_retry_policy() -> RetryPolicy:
     )
 
 
-async def execute_activity(
-    activity_fn: Any,
-    *args: Any,
-    timeout_seconds: int,
-) -> Any:
-    return await workflow.execute_activity(
-        activity_fn,
-        args=list(args),
-        schedule_to_close_timeout=timedelta(seconds=timeout_seconds),
-        retry_policy=activity_retry_policy(),
-    )
-
-
 __all__ = [
     "ACTIVITY_RETRY_MAXIMUM_ATTEMPTS",
     "activity_retry_policy",
-    "execute_activity",
     "prepare_internal_workflow_activity",
 ]

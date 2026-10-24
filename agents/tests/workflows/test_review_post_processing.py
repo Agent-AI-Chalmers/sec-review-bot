@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 import pytest
 
 from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
@@ -53,15 +55,18 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
     publications: list[RunDiagnosticPublicationRequest] = []
     public_result = {"contract_version": CONTRACT_VERSION}
 
-    async def fake_execute_activity(activity_fn, *args, **_kwargs):
+    async def fake_execute_activity(activity_fn, *args, **kwargs):
+        activity_args = kwargs.get("args", args)
         if activity_fn.__name__.startswith("build_"):
             return public_result
         if activity_fn is workflow_module.publish_run_diagnostic_activity:
-            publications.append(args[0])
+            publications.append(activity_args[0])
             return _finalized("review")
         return {}
 
-    monkeypatch.setattr(workflow_module, "execute_activity", fake_execute_activity)
+    monkeypatch.setattr(
+        workflow_module.workflow, "execute_activity", fake_execute_activity
+    )
 
     result = await workflow_class().run(
         ReviewWorkflowRequest(
@@ -113,12 +118,13 @@ async def test_single_review_publishes_before_scheduling_memory(
     publications: list[RunDiagnosticPublicationRequest] = []
 
     async def fake_execute_activity(activity_fn, *args, **kwargs):
+        activity_args = kwargs.get("args", args)
         if activity_fn.__name__.startswith("build_"):
             return {"contract_version": CONTRACT_VERSION}
         if activity_fn is workflow_module.publish_run_diagnostic_activity:
-            assert kwargs["timeout_seconds"] == 30
+            assert kwargs["schedule_to_close_timeout"] == timedelta(seconds=30)
             events.append("publish")
-            publications.append(args[0])
+            publications.append(activity_args[0])
             return _finalized("review")
         return {}
 
@@ -127,7 +133,9 @@ async def test_single_review_publishes_before_scheduling_memory(
         assert kwargs["review_unit_ids"] == ["review"]
         return {"extractions": []}
 
-    monkeypatch.setattr(workflow_module, "execute_activity", fake_execute_activity)
+    monkeypatch.setattr(
+        workflow_module.workflow, "execute_activity", fake_execute_activity
+    )
     monkeypatch.setattr(workflow_module, "schedule_memory_extractions", fake_schedule)
 
     result = await workflow_class().run(
@@ -166,11 +174,12 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
     )
     publications: list[RunDiagnosticPublicationRequest] = []
 
-    async def fake_execute_activity(activity_fn, *args, **_kwargs):
+    async def fake_execute_activity(activity_fn, *args, **kwargs):
+        activity_args = kwargs.get("args", args)
         if activity_fn is repository_workflow.build_repository_review_result_activity:
             return {"contract_version": CONTRACT_VERSION}
         if activity_fn is repository_workflow.publish_run_diagnostic_activity:
-            publications.append(args[0])
+            publications.append(activity_args[0])
             return _finalized("case-a", "case-b")
         return {}
 
@@ -181,7 +190,9 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
         assert kwargs["review_unit_ids"] == ["case-a", "case-b"]
         return {"extractions": []}
 
-    monkeypatch.setattr(repository_workflow, "execute_activity", fake_execute_activity)
+    monkeypatch.setattr(
+        repository_workflow.workflow, "execute_activity", fake_execute_activity
+    )
     monkeypatch.setattr(
         repository_workflow.workflow,
         "execute_child_workflow",
@@ -218,11 +229,12 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
 async def test_repository_without_cases_still_publishes_run_diagnostic(
     monkeypatch,
 ) -> None:
-    async def fake_execute_activity(activity_fn, *args, **_kwargs):
+    async def fake_execute_activity(activity_fn, *args, **kwargs):
+        activity_args = kwargs.get("args", args)
         if activity_fn is repository_workflow.build_repository_review_result_activity:
             return {"contract_version": CONTRACT_VERSION}
         if activity_fn is repository_workflow.publish_run_diagnostic_activity:
-            publications.append(args[0])
+            publications.append(activity_args[0])
             return _finalized()
         return {}
 
@@ -231,7 +243,9 @@ async def test_repository_without_cases_still_publishes_run_diagnostic(
 
     publications: list[RunDiagnosticPublicationRequest] = []
 
-    monkeypatch.setattr(repository_workflow, "execute_activity", fake_execute_activity)
+    monkeypatch.setattr(
+        repository_workflow.workflow, "execute_activity", fake_execute_activity
+    )
     monkeypatch.setattr(
         repository_workflow.workflow,
         "execute_child_workflow",
@@ -270,7 +284,9 @@ async def test_disabling_memory_does_not_skip_review_publication(monkeypatch) ->
         assert kwargs["enabled"] is False
         return {"extractions": []}
 
-    monkeypatch.setattr(issue_workflow, "execute_activity", fake_execute_activity)
+    monkeypatch.setattr(
+        issue_workflow.workflow, "execute_activity", fake_execute_activity
+    )
     monkeypatch.setattr(issue_workflow, "schedule_memory_extractions", fake_schedule)
 
     await issue_workflow.IssueReviewWorkflow().run(
@@ -301,7 +317,9 @@ async def test_publication_failure_fails_review_before_memory_scheduling(
     async def unexpected_schedule(**_kwargs):
         raise AssertionError("memory scheduling must follow successful publication")
 
-    monkeypatch.setattr(issue_workflow, "execute_activity", fake_execute_activity)
+    monkeypatch.setattr(
+        issue_workflow.workflow, "execute_activity", fake_execute_activity
+    )
     monkeypatch.setattr(
         issue_workflow,
         "schedule_memory_extractions",
