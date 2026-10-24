@@ -21,12 +21,13 @@ from sec_review_agents.review_stages.record import (
 )
 from sec_review_agents.review_stages.single_agent import SingleAgentFixOutcome
 from sec_review_agents.review_stages.types import (
-    CVSS_OUTCOME_VALUES,
-    PATCH_COVERAGE_VALUES,
-    REGRESSION_STATUS_VALUES,
-    RESOLUTION_NEXT_STEP_VALUES,
-    VALIDATION_LEVEL_VALUES,
-    VERDICT_VALUES,
+    CvssOutcome,
+    PatchCoverage,
+    RegressionStatus,
+    ResolutionNextStep,
+    ValidationLevel,
+    Verdict,
+    literal_values,
 )
 from sec_review_agents.workflows.issue.single_agent import (
     execute_issue_single_agent,
@@ -63,25 +64,25 @@ def test_review_record_enum_allowlists_match_shared_schema() -> None:
     verification = review_record["properties"]["verification"]["properties"]
     cvss = review_record["properties"]["cvss"]["anyOf"][1]["properties"]
 
-    expected = {
-        "verdict": (VERDICT_VALUES, analysis["verdict"]["enum"]),
+    expected: dict[str, tuple[tuple[str, ...], list[Any]]] = {
+        "verdict": (literal_values(Verdict), analysis["verdict"]["enum"]),
         "validation_level": (
-            VALIDATION_LEVEL_VALUES,
+            literal_values(ValidationLevel),
             verification["validation_level"]["enum"],
         ),
         "patch_coverage": (
-            PATCH_COVERAGE_VALUES,
+            literal_values(PatchCoverage),
             verification["patch_coverage"]["enum"],
         ),
         "regression_status": (
-            REGRESSION_STATUS_VALUES,
+            literal_values(RegressionStatus),
             verification["regression_status"]["enum"],
         ),
         "resolution_next_step": (
-            RESOLUTION_NEXT_STEP_VALUES,
+            literal_values(ResolutionNextStep),
             verification["resolution_next_step"]["enum"],
         ),
-        "cvss_outcome": (CVSS_OUTCOME_VALUES, cvss["outcome"]["enum"]),
+        "cvss_outcome": (literal_values(CvssOutcome), cvss["outcome"]["enum"]),
     }
     for name, (runtime_values, schema_values) in expected.items():
         assert set(runtime_values) == {
