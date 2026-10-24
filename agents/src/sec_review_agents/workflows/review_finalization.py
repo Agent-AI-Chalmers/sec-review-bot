@@ -36,18 +36,14 @@ def publish_run_diagnostic_activity(
         )
         for unit in request.review_units
     ]
-    reference = publish_run_diagnostic_bundle(
+    publication = publish_run_diagnostic_bundle(
         run_id=request.run_id,
         artifact_root=Path(request.artifact_root_path),
         review_units=units,
         result=request.result,
         remote=request.publication == "managed",
     )
-    included_ids = [
-        unit.review_unit_id
-        for unit in units
-        if list(unit.transcript_root.glob("*.jsonl"))
-    ]
+    reference = publication.reference
     return {
         "artifact_storage": {
             "status": "available",
@@ -57,7 +53,7 @@ def publish_run_diagnostic_activity(
             },
         },
         "diagnostic_bundle": reference.as_dict(),
-        "review_unit_ids": included_ids,
+        "review_unit_ids": list(publication.review_unit_ids),
     }
 
 

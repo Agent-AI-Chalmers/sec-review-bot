@@ -1,1 +1,1 @@
-"""Artifact transport boundaries used by the Execution Worker."""
+"""Artifact transport boundaries shared by review and memory workers."""

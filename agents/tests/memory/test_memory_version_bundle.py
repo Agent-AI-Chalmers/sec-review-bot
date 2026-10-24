@@ -25,7 +25,7 @@ def test_memory_version_round_trip(tmp_path: Path) -> None:
         )
     archive_path = tmp_path / "published" / "memory-tree.v1.tar.zst"
     with patch(
-        "sec_review_agents.artifacts.reference.download_s3_input_bundle",
+        "sec_review_agents.artifacts.materialize.download_s3_object",
         return_value=archive_path,
     ):
         materialized = materialize_memory_version(

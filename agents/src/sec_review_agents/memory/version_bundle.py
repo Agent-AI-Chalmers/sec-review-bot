@@ -8,11 +8,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from sec_review_agents.artifacts.archive import extract_archive
-from sec_review_agents.artifacts.immutable_s3 import publish_immutable_s3_artifact
+from sec_review_agents.artifacts.materialize import materialize_artifact
+from sec_review_agents.artifacts.object_storage import publish_immutable_s3_artifact
 from sec_review_agents.artifacts.reference import (
     ArtifactReference,
     local_artifact_reference,
-    materialize_artifact,
 )
 
 MEMORY_VERSION_FILENAME = "memory-tree.v1.tar.zst"

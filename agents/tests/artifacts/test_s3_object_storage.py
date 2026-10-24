@@ -6,7 +6,7 @@ import boto3  # type: ignore[import-untyped]
 import pytest
 from botocore.config import Config  # type: ignore[import-untyped]
 
-from sec_review_agents.artifacts.input_storage import download_s3_input_bundle
+from sec_review_agents.artifacts.object_storage import download_s3_object
 
 pytestmark = pytest.mark.integration
 
@@ -28,7 +28,7 @@ def test_s3_input_download_round_trip(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", bucket)
     monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_ENDPOINT", endpoint)
     try:
-        destination = download_s3_input_bundle(
+        destination = download_s3_object(
             f"s3://{bucket}/{key}",
             tmp_path / "input-bundle.tar.zst",
             expected_size=len(body),

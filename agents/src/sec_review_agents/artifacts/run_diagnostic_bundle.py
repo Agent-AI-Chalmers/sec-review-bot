@@ -10,11 +10,11 @@ from typing import Any
 from urllib.parse import urlparse
 
 from sec_review_agents.artifacts.archive import extract_archive
-from sec_review_agents.artifacts.immutable_s3 import publish_immutable_s3_artifact
+from sec_review_agents.artifacts.materialize import materialize_artifact
+from sec_review_agents.artifacts.object_storage import publish_immutable_s3_artifact
 from sec_review_agents.artifacts.reference import (
     ArtifactReference,
     local_artifact_reference,
-    materialize_artifact,
 )
 from sec_review_agents.runtime.transcripts import TRANSCRIPT_SUFFIX
 
@@ -38,6 +38,12 @@ class MaterializedTranscriptUnit:
     transcript_paths: tuple[Path, ...]
 
 
+@dataclass(frozen=True)
+class PublishedDiagnosticBundle:
+    reference: ArtifactReference
+    review_unit_ids: tuple[str, ...]
+
+
 def diagnostic_bundle_s3_key(run_id: str) -> str:
     _validate_path_component(run_id, label="run_id")
     return f"runs/{run_id}/artifacts/{DIAGNOSTIC_BUNDLE_FILENAME}"
@@ -56,7 +62,7 @@ def publish_run_diagnostic_bundle(
     review_units: list[DiagnosticReviewUnit],
     result: dict[str, Any],
     remote: bool = True,
-) -> ArtifactReference:
+) -> PublishedDiagnosticBundle:
     """Archive one complete review run and optionally publish it to object storage."""
     _validate_path_component(run_id, label="run_id")
     artifact_root = artifact_root.resolve()
@@ -84,12 +90,15 @@ def publish_run_diagnostic_bundle(
             temporary_archive.unlink()
             _fsync_directory(output_dir)
 
-    if not remote:
-        return reference
-    return publish_immutable_s3_artifact(
-        reference,
-        key=diagnostic_bundle_s3_key(run_id),
-        description="run diagnostic bundle",
+    if remote:
+        reference = publish_immutable_s3_artifact(
+            reference,
+            key=diagnostic_bundle_s3_key(run_id),
+            description="run diagnostic bundle",
+        )
+    return PublishedDiagnosticBundle(
+        reference=reference,
+        review_unit_ids=tuple(str(unit["id"]) for unit in manifest_units),
     )
 
 
@@ -305,6 +314,7 @@ def materialize_diagnostic_transcript_unit(
 __all__ = [
     "DiagnosticReviewUnit",
     "MaterializedTranscriptUnit",
+    "PublishedDiagnosticBundle",
     "diagnostic_bundle_s3_key",
     "materialize_diagnostic_transcript_unit",
     "publish_run_diagnostic_bundle",
