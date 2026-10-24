@@ -30,9 +30,3 @@ export class ExecutionRunConflictError extends Error {
     super(`Execution run_id ${runId} is already bound to another request.`)
   }
 }
-
-export interface ExecutionStore {
-  start(request: ExecutionRequest): Promise<ExecutionRecord>
-  get(runId: string): Promise<ExecutionRecord | undefined>
-  close(): Promise<void>
-}

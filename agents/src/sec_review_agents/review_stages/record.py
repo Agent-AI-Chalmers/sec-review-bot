@@ -4,18 +4,13 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from sec_review_agents.review_stages.types import (
-    CVSS_OUTCOME_VALUES,
-    PATCH_COVERAGE_VALUES,
-    REGRESSION_STATUS_VALUES,
-    RESOLUTION_NEXT_STEP_VALUES,
-    VALIDATION_LEVEL_VALUES,
-    VERDICT_VALUES,
     CvssOutcome,
     PatchCoverage,
     RegressionStatus,
     ResolutionNextStep,
     ValidationLevel,
     Verdict,
+    literal_values,
 )
 from sec_review_agents.utils.payloads import mapping_payload
 from sec_review_agents.workspace.file_changes import FileChange
@@ -31,7 +26,7 @@ class ReviewRecordAnalysis(BaseModel):
     @field_validator("verdict", mode="before")
     @classmethod
     def known_verdict(cls, value: Any) -> Verdict | None:
-        return value if value in VERDICT_VALUES else None
+        return value if value in literal_values(Verdict) else None
 
     @field_validator("overview", mode="before")
     @classmethod
@@ -89,22 +84,22 @@ class ReviewRecordVerification(BaseModel):
     @field_validator("validation_level", mode="before")
     @classmethod
     def known_validation_level(cls, value: Any) -> ValidationLevel | None:
-        return value if value in VALIDATION_LEVEL_VALUES else None
+        return value if value in literal_values(ValidationLevel) else None
 
     @field_validator("patch_coverage", mode="before")
     @classmethod
     def known_patch_coverage(cls, value: Any) -> PatchCoverage | None:
-        return value if value in PATCH_COVERAGE_VALUES else None
+        return value if value in literal_values(PatchCoverage) else None
 
     @field_validator("regression_status", mode="before")
     @classmethod
     def known_regression_status(cls, value: Any) -> RegressionStatus | None:
-        return value if value in REGRESSION_STATUS_VALUES else None
+        return value if value in literal_values(RegressionStatus) else None
 
     @field_validator("resolution_next_step", mode="before")
     @classmethod
     def known_resolution_next_step(cls, value: Any) -> ResolutionNextStep | None:
-        return value if value in RESOLUTION_NEXT_STEP_VALUES else None
+        return value if value in literal_values(ResolutionNextStep) else None
 
     @field_validator(
         "patch_findings",
@@ -132,7 +127,7 @@ class ReviewRecordCvss(BaseModel):
     @field_validator("outcome", mode="before")
     @classmethod
     def known_outcome(cls, value: Any) -> CvssOutcome | None:
-        return value if value in CVSS_OUTCOME_VALUES else None
+        return value if value in literal_values(CvssOutcome) else None
 
     @field_validator(
         "severity",
