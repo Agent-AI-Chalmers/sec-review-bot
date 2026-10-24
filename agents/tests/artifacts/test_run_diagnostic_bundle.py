@@ -55,6 +55,7 @@ def test_diagnostic_bundle_contains_artifacts_and_selects_one_review_unit(
 
 
 def test_diagnostic_bundle_is_byte_stable_across_retries(tmp_path: Path) -> None:
+    """A retry must reuse the published archive rather than replace it."""
     artifact_root = tmp_path / "artifacts"
     transcripts = artifact_root / "transcripts"
     transcripts.mkdir(parents=True)
@@ -69,7 +70,9 @@ def test_diagnostic_bundle_is_byte_stable_across_retries(tmp_path: Path) -> None
         result={"z": 1, "a": 2},
         remote=False,
     )
-    first_bytes = Path(first.uri.removeprefix("file://")).read_bytes()
+    first_path = Path(first.uri.removeprefix("file://"))
+    first_bytes = first_path.read_bytes()
+    first_inode = first_path.stat().st_ino
     second = publish_run_diagnostic_bundle(
         run_id="run-1",
         artifact_root=artifact_root,
@@ -80,6 +83,75 @@ def test_diagnostic_bundle_is_byte_stable_across_retries(tmp_path: Path) -> None
 
     assert second.digest == first.digest
     assert Path(second.uri.removeprefix("file://")).read_bytes() == first_bytes
+    assert first_path.stat().st_ino == first_inode
+
+
+def test_diagnostic_bundle_publishes_owner_only_archive(tmp_path: Path) -> None:
+    """Diagnostics contain transcripts, so the published archive stays private."""
+    artifact_root = tmp_path / "artifacts"
+    artifact_root.mkdir()
+    (artifact_root / "result.json").write_text("{}\n", encoding="utf-8")
+
+    reference = publish_run_diagnostic_bundle(
+        run_id="run-1",
+        artifact_root=artifact_root,
+        review_units=[],
+        result={},
+        remote=False,
+    )
+
+    archive = Path(reference.uri.removeprefix("file://"))
+    assert archive.stat().st_mode & 0o777 == 0o600
+
+
+def test_diagnostic_bundle_rejects_conflicting_existing_file(tmp_path: Path) -> None:
+    """A different existing archive must fail without replacing the original."""
+    artifact_root = tmp_path / "artifacts"
+    artifact_root.mkdir()
+    destination = artifact_root / "published" / "diagnostic-tree.v1.tar.zst"
+    destination.parent.mkdir()
+    destination.write_bytes(b"existing")
+
+    with pytest.raises(RuntimeError, match="differs from immutable publication"):
+        publish_run_diagnostic_bundle(
+            run_id="run-1",
+            artifact_root=artifact_root,
+            review_units=[],
+            result={"review_record": {}},
+            remote=False,
+        )
+
+    assert destination.read_bytes() == b"existing"
+    assert list(destination.parent.glob(".*.tmp")) == []
+
+
+def test_diagnostic_bundle_build_failure_preserves_existing_file(
+    tmp_path: Path,
+) -> None:
+    """A failed rebuild must not damage the archive already published."""
+    artifact_root = tmp_path / "artifacts"
+    artifact_root.mkdir()
+    destination = artifact_root / "published" / "diagnostic-tree.v1.tar.zst"
+    destination.parent.mkdir()
+    destination.write_bytes(b"existing")
+
+    with (
+        patch(
+            "sec_review_agents.artifacts.run_diagnostic_bundle.tarfile.open",
+            side_effect=OSError("archive failed"),
+        ),
+        pytest.raises(OSError, match="archive failed"),
+    ):
+        publish_run_diagnostic_bundle(
+            run_id="run-1",
+            artifact_root=artifact_root,
+            review_units=[],
+            result={},
+            remote=False,
+        )
+
+    assert destination.read_bytes() == b"existing"
+    assert list(destination.parent.glob(".*.tmp")) == []
 
 
 def test_diagnostic_bundle_rejects_review_unit_path_traversal(tmp_path: Path) -> None:
