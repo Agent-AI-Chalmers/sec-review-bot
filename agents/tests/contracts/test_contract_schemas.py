@@ -88,13 +88,13 @@ def test_execution_worker_rejects_extra_input_bundle_manifest_property() -> None
         ("repository-review", "repository-review-result.json"),
     ],
 )
-def test_runner_accepts_shared_v6_workflow_result_fixtures(
+def test_execution_result_accepts_shared_v6_workflow_result_fixtures(
     workflow: str, fixture_name: str
 ) -> None:
     validate_v6_workflow_result(contract_fixture(fixture_name), workflow)
 
 
-def test_runner_rejects_result_missing_required_fields() -> None:
+def test_execution_result_rejects_missing_required_fields() -> None:
     with pytest.raises(ValueError, match="Execution result does not match contract"):
         validate_v6_workflow_result(
             {"contract_version": CONTRACT_VERSION},
@@ -400,12 +400,12 @@ def test_v6_scan_scope_bounds_the_inlined_changed_file_list() -> None:
 
 
 def test_setup_declaration_limit_matches_the_schema() -> None:
-    """The runner's byte limit has to be the schema's `maxLength`.
+    """The execution input preparation byte limit has to be the schema's `maxLength`.
 
-    The declaration travels inline in the workflow input, so the schema carries the bound and
-    the runner enforces it before building the input. Two numbers that drift apart would let the
-    runner accept text the contract rejects, which surfaces as a validation failure far from the
-    cause.
+    The declaration travels inline in the workflow input, so the schema carries
+    the bound and input preparation enforces it before building the input. Two
+    numbers that drift apart would let input preparation accept text the
+    contract rejects, which surfaces as a validation failure far from the cause.
     """
     from sec_review_agents.entrypoints.setup_declaration import (
         MAX_SETUP_DECLARATION_BYTES,

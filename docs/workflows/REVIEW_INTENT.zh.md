@@ -4,11 +4,12 @@
 
 本文是 [REVIEW_INTENT.md](REVIEW_INTENT.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-`review_intent` 记录**调用方**要求 runner 服务哪一种 review 目标，外加一个对最终 mitigation patch 的可选约束。
+`review_intent` 记录**调用方**要求**被调用方**服务哪一种 review 目标，外加一个对最终 mitigation patch 的可选约束。
 
-**调用方**与**最终用户**是两个不同角色，这个区分在这里很关键：
+**调用方**、**被调用方**与**最终用户**是三个不同角色，这个区分在这里很关键：
 
-- **调用方（caller）**是真正调用 runner、设置 `review_intent` 的程序：GitHub integration、PatchEval harness，或本地 CLI 运行。
+- **调用方（caller）**是真正调用 review 执行侧、设置 `review_intent` 的程序：GitHub integration、PatchEval harness，或本地 CLI 运行。
+- **被调用方（callee）**是 review 执行侧：接收请求、校验 `review_intent` 并运行 review workflow 的 Execution Worker。
 - **最终用户（end user）**通过调用方交互——例如在 GitHub issue 下评论 `@<app-slug> review`。最终用户从不选择 `objective`；在 GitHub 上他们仍然可以设置 `test_changes`，方法是在评论里加上 `--test-changes deny`。
 
 调用方如何选择 objective 是它自己的产品决策，不是 `review_intent` 决定的。GitHub integration 恒送 `audit`，因为它转发的是别人写的 issue 或 pull request——一个未经证实的说法。PatchEval harness 可以送 `repair`，因为它的输入是已知 CVE。契约两者都接受；由每个调用方各选其一。
@@ -25,7 +26,7 @@
 ```
 
 - `objective`：review 目标，取值为 `audit` 或 `repair`。
-- `test_changes`：对最终 mitigation patch 的可选约束，取值为 `allow` 或 `deny`。省略时 runner 按 `allow` 处理。
+- `test_changes`：对最终 mitigation patch 的可选约束，取值为 `allow` 或 `deny`。省略时执行侧按 `allow` 处理。
 
 这两个字段相关，但不是同一个决策。`objective` 改变 workflow 如何对待输入 claim；`test_changes` 只约束进入 mitigation 之后的最终 patch。
 
@@ -70,4 +71,4 @@ Objective 改变的是 analyzer 的调查立场，不改变其结构化结果的
 
 `test_changes` 不决定是否应该相信输入 claim。它只约束进入 mitigation 之后的阶段。
 
-这是写进 prompt 的 mitigation 约束，不是程序层面的强制校验。runner 不会判断哪些路径算测试文件，也不会按路径规则拒绝文件改动。
+这是写进 prompt 的 mitigation 约束，不是程序层面的强制校验。执行侧不会判断哪些路径算测试文件，也不会按路径规则拒绝文件改动。

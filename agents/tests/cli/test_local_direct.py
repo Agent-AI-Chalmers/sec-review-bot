@@ -91,7 +91,7 @@ def _prepared_issue_ablation_request(
     return build_local_workflow_request(bundle, timeout_seconds=60)
 
 
-def test_local_default_routes_to_direct_runners() -> None:
+def test_local_default_routes_to_direct_execution() -> None:
     assert direct_run_for_bundle(_bundle("issue-review")) is run_issue_review_direct
     assert (
         direct_run_for_bundle(_bundle("pull-request-review"))

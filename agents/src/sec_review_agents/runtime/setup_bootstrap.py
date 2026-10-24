@@ -142,7 +142,7 @@ async def bootstrap_environment(
     # forbids. (This is distinct from a step that runs and fails, below: a
     # failed install may be a transient network problem and the review can still
     # proceed best-effort.) A parse failure here means the producer and the
-    # runner disagree about the format, or an out-of-band caller supplied
+    # worker disagree about the format, or an out-of-band caller supplied
     # unvalidated text; both should fail loudly.
     declaration: SetupDeclaration = parse_setup_declaration(setup_declaration_content)
 

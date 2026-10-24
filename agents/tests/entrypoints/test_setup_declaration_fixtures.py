@@ -1,4 +1,4 @@
-"""Run the shared setup-declaration corpus through the runner's parser.
+"""Run the shared setup-declaration corpus through the execution parser.
 
 The corpus lives under `contracts/setup-declaration/v1/corpus/` and is also
 executed by the GitHub integration's `setup-declaration` validator. Both sides

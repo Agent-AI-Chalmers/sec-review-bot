@@ -17,7 +17,7 @@ from sec_review_agents.temporal.config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 
 def run_local_direct_workflow(bundle: ReviewBundle) -> dict[str, Any]:
     print(
-        "LOCAL_DIRECT_WARNING=direct runner calls Temporal activity functions "
+        "LOCAL_DIRECT_WARNING=local direct execution calls Temporal activity functions "
         "directly as local Python functions; it does not provide Temporal retries, "
         "scheduling, or failure handling. Use --temporal to exercise the Temporal "
         "workflow path.",

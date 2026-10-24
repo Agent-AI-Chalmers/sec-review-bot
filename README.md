@@ -66,9 +66,9 @@ Each contract family under [`contracts/`](contracts/README.md) owns the tool tha
 
 ## Project Status
 
-This project is experimental and intended for local development, integration testing, and workflow research. The public execution contract is documented, but internal package layout and agent workflows may still change.
+This project is experimental and intended for local development, integration testing, and workflow research. Internal package layout and agent workflows may still change.
 
-The agent's final behavior depends heavily on the underlying LLM's code understanding, reasoning, and patch-generation ability, as well as input quality and the tool/runtime environment. The workflow and runner design is not a model-independent performance guarantee.
+The agent's final behavior depends heavily on the underlying LLM's code understanding, reasoning, and patch-generation ability, as well as input quality and the tool/runtime environment. The workflow and execution design is not a model-independent performance guarantee.
 
 ## Agent-Focused Entry Points
 

@@ -30,7 +30,7 @@ analyzer 的输出不是“随手列几个发现”，而是围绕 narrative 来
 
 | Priority | 审查方向 | 主要问题 | 代表性边界 |
 | --- | --- | --- | --- |
-| 1 | 输入进入危险 sink | Runner 或 repository 影响的数据能否造成 SQL injection、路径越界、branch injection 或 Markdown breakout？ | 参数化 SQL、branch segment 规范化、敏感路径策略、Markdown code fence |
+| 1 | 输入进入危险 sink | 不可信输入或仓库内容能否造成 SQL injection、路径越界、branch injection 或 Markdown breakout？ | 参数化 SQL、branch segment 规范化、敏感路径策略、Markdown code fence |
 | 2 | 并发与远端副作用 | 超时、接管和重试期间，stale worker 能提交什么状态，远端 GitHub 操作如何恢复？ | claim token、heartbeat、publication step、marker 和稳定 branch identity |
 
 两条 narrative 的关系可以表示为：

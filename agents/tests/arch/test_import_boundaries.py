@@ -54,7 +54,7 @@ def test_capability_packages_do_not_import_legacy_domain_shims() -> None:
 
 def test_foundational_packages_do_not_import_upper_layers() -> None:
     # Keep this as a one-way layering check. Foundational packages may share
-    # small helpers, but they should not pull in workflows, runners, or stages.
+    # small helpers, but they should not pull in workflows, execution workers, or stages.
     foundational_roots = [
         PACKAGE_ROOT / "utils",
         PACKAGE_ROOT / "resources",
@@ -268,7 +268,7 @@ def test_workspace_package_does_not_import_observability() -> None:
     assert violations == []
 
 
-def test_foundational_packages_do_not_import_runner_runtime_input_preparation() -> None:
+def test_foundational_packages_do_not_import_execution_input_preparation() -> None:
     foundational_roots = [
         PACKAGE_ROOT / "filesystem",
         PACKAGE_ROOT / "workspace",

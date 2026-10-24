@@ -105,8 +105,8 @@ def parse_args() -> argparse.Namespace:
         "--temporal",
         action="store_true",
         help=(
-            "Run through local Temporal instead of the default direct runner. "
-            "The default direct runner is for local replay and does not provide "
+            "Run through local Temporal instead of the default local direct execution. "
+            "The default local direct execution is for local replay and does not provide "
             "Temporal retries, scheduling, or failure handling."
         ),
     )

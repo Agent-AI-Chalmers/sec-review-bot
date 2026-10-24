@@ -36,7 +36,7 @@ def test_local_issue_bundle_passes_the_v6_input_schema(
 ) -> None:
     """A local issue run starts the same workflow the GitHub path starts.
 
-    The runner validates input against the v6 schema, which forbids additional properties, so a
+    Input preparation validates input against the v6 schema, which forbids additional properties, so a
     bundle carrying extra identity fields would fail every local run at startup -- invisible to
     a test that only checks the bundle was written.
     """

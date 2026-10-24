@@ -193,7 +193,7 @@ def test_preview_notes_shared_modified_files_across_deliveries(tmp_path: Path) -
     assert "## Coordination Notes" not in pr_content
     assert "# Repository Delivery Previews" in readme_content
     assert "Local-only preview files" in readme_content
-    assert "not part of the runner or app contract" in readme_content
+    assert "not part of the execution or application contract" in readme_content
     assert "## Coordination Notes" in readme_content
     assert "Shared modified file `src/server.js`" in readme_content
     assert "[`case-1`](./case-1.md)" in readme_content

@@ -281,7 +281,7 @@ def build_local_pull_request_bundle(
     commit_shas = [
         line.strip() for line in commit_shas_output.splitlines() if line.strip()
     ]
-    # The runner validates this object against the v6 pull request schema, so it carries exactly
+    # Input preparation validates this object against the v6 pull request schema, so it carries exactly
     # the subject the GitHub producer builds and nothing else: the contract forbids additional
     # properties, and the local path has no webhook payload to explain extra fields.
     #
@@ -309,7 +309,7 @@ def build_local_pull_request_bundle(
         "review_window": review_window,
     }
 
-    # The agent reads the window and the commit list only; identity fields stay in the runner
+    # The agent reads the window and the commit list only; identity fields stay in the execution
     # input, matching what the GitHub producer writes here.
     write_json(
         history_root / "pr-metadata.json",

@@ -40,7 +40,7 @@ def test_local_pull_request_bundle_passes_the_v6_input_schema(
 ) -> None:
     """A local PR run starts the same workflow the GitHub path starts.
 
-    The runner validates input against the v6 schema before the workflow runs, and that schema
+    Input preparation validates input against the v6 schema before the workflow runs, and that schema
     forbids additional properties. A locally materialized bundle that carried extra identity
     fields, or that omitted the review window, would fail every local run at startup -- which is
     invisible to a test that only checks the bundle was written.
