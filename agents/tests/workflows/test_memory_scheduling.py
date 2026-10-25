@@ -4,10 +4,10 @@ import pytest
 from temporalio.common import WorkflowIDReusePolicy
 
 from sec_review_agents.artifacts.reference import ArtifactReference
-from sec_review_agents.memory.extraction_workflow import memory_extraction_workflow_id
-from sec_review_agents.temporal.config import DEFAULT_MEMORY_TASK_QUEUE
-from sec_review_agents.workflows import memory_scheduling
-from sec_review_agents.workflows.memory_scheduling import schedule_memory_extractions
+from sec_review_agents.temporal.config import DEFAULT_MEMORY_EXTRACTION_TASK_QUEUE
+from sec_review_agents.workflows.memory import scheduling as memory_scheduling
+from sec_review_agents.workflows.memory.extraction import memory_extraction_workflow_id
+from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
 
 
 def _reference() -> ArtifactReference:
@@ -57,7 +57,10 @@ async def test_scheduling_starts_one_abandoned_child_per_review_unit(
         call[1]["id_reuse_policy"] is WorkflowIDReusePolicy.REJECT_DUPLICATE
         for call in started
     )
-    assert all(call[1]["task_queue"] == DEFAULT_MEMORY_TASK_QUEUE for call in started)
+    assert all(
+        call[1]["task_queue"] == DEFAULT_MEMORY_EXTRACTION_TASK_QUEUE
+        for call in started
+    )
 
 
 @pytest.mark.asyncio
@@ -87,7 +90,7 @@ async def test_scheduling_reports_an_existing_extraction(monkeypatch) -> None:
         {
             "review_unit_id": "case-a",
             "workflow_id": memory_extraction_workflow_id(
-                transcript_digest=_reference().digest,
+                diagnostic_bundle_digest=_reference().digest,
                 review_unit_id="case-a",
             ),
             "status": "already_started",

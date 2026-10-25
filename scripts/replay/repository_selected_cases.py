@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from sec_review_agents.contract_version import CONTRACT_VERSION
-from sec_review_agents.runtime.transcripts import (
+from sec_review_agents.review_stages.transcripts import (
     review_transcripts_root,
 )
 from sec_review_agents.temporal.config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS

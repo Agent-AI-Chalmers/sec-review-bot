@@ -50,7 +50,8 @@ dev = [
 
 [project.scripts]
 sec-review-execution-worker = "sec_review_agents.entrypoints.execution_worker.main:main"
-sec-review-memory-worker = "sec_review_agents.entrypoints.memory_worker.main:main"
+sec-review-memory-extraction-worker = "sec_review_agents.entrypoints.memory_extraction_worker.main:main"
+sec-review-memory-maintenance-worker = "sec_review_agents.entrypoints.memory_maintenance_worker.main:main"
 sec-review-agents-check-llm-deployments = "sec_review_agents.cli.check_llm_deployments:main"
 sec-review-agents-run-local-issue = "sec_review_agents.cli.run_local_issue:main"
 sec-review-agents-run-local-pr = "sec_review_agents.cli.run_local_pr:main"

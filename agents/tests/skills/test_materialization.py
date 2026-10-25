@@ -9,9 +9,30 @@ from sec_review_agents.runtime.skills import materialize_agent_skills_view
 
 @pytest.fixture(autouse=True)
 def reset_default_skills_materialized_root():
-    runtime_skills._DEFAULT_SKILLS_MATERIALIZED_ROOT = None
+    owner = runtime_skills._DEFAULT_SKILLS_MATERIALIZED_DIRECTORY
+    if owner is not None:
+        owner.cleanup()
+    runtime_skills._DEFAULT_SKILLS_MATERIALIZED_DIRECTORY = None
     yield
-    runtime_skills._DEFAULT_SKILLS_MATERIALIZED_ROOT = None
+    owner = runtime_skills._DEFAULT_SKILLS_MATERIALIZED_DIRECTORY
+    if owner is not None:
+        owner.cleanup()
+    runtime_skills._DEFAULT_SKILLS_MATERIALIZED_DIRECTORY = None
+
+
+def test_skills_materialized_root_is_reused_and_owned() -> None:
+    first = runtime_skills.skills_materialized_base_root()
+    second = runtime_skills.skills_materialized_base_root()
+
+    assert first == second
+    assert first.is_dir()
+    owner = runtime_skills._DEFAULT_SKILLS_MATERIALIZED_DIRECTORY
+    assert owner is not None
+
+    owner.cleanup()
+
+    assert not first.exists()
+    runtime_skills._DEFAULT_SKILLS_MATERIALIZED_DIRECTORY = None
 
 
 def test_materialize_agent_skills_view_uses_declared_view_shape(tmp_path: Path) -> None:

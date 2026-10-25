@@ -1,26 +1,29 @@
 # System Architecture
 
-Sec Review Bot contains seven runtime entities with separate responsibilities and deployment boundaries: GitHub Integration, Review Control Plane, Control Plane UI, Execution Gateway, Execution Worker, Memory Worker, and Memory Catalog Server.
+Sec Review Bot has eight runtime roles: GitHub Integration, Review Control Plane, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server.
 
 ## Runtime topology
 
 ![Sec Review Bot runtime topology](../../assets/architecture/runtime-topology.svg)
 
-Temporal Server is infrastructure, but it directly dispatches work to both worker pools, so the topology presents it with the runtime services. PostgreSQL and Object Storage remain separate persistence facilities. The main review path and the asynchronous memory path use separate task queues and worker processes.
+Temporal Server is infrastructure, but it directly dispatches work to the worker processes, so the topology presents it with the runtime services. PostgreSQL and Object Storage remain separate persistence facilities. Review execution, memory extraction, and memory maintenance use independent worker processes and task queues.
+
+The memory path has one deployment-independent state model. Memory Catalog owns coordination state in PostgreSQL, Object Storage owns immutable memory-tree and transcript artifacts, and Temporal owns workflow execution. Each review invocation materializes the current memory tree into a temporary directory for its agent backend and removes that directory afterward.
 
 ## Runtime ownership map
 
-| Runtime entity | Code | Owns | Local guide |
+| Runtime role | Code | Owns | Local guide |
 | --- | --- | --- | --- |
 | GitHub Integration | `apps/github-integration/` | GitHub ingress, input preparation, Control Plane client, and GitHub publication | [README](../../apps/github-integration/README.md) |
 | Review Control Plane | `control-plane/` | Admission, durable run state, recovery, execution observation, and publication coordination | [README](../../control-plane/README.md) |
 | Control Plane UI | `apps/control-plane-ui/` | Authenticated operator console and read-only Control Plane projection | [README](../../apps/control-plane-ui/README.md) |
 | Execution Gateway | `execution-gateway/` | Authenticated Execution API and HTTP-to-Temporal translation | [README](../../execution-gateway/README.md) |
 | Execution Worker | `agents/` | Review workflows, activities, agent runtime, stage artifacts, and run diagnostic publication | [README](../../agents/README.md) |
-| Memory Worker | `agents/` | Asynchronous memory extraction and maintenance workflows | [README](../../agents/README.md) |
+| Memory Extraction Worker | `agents/` | Per-run diagnostic consumption, extractor invocation, transcript publication, and extraction registration | [README](../../agents/README.md) |
+| Memory Maintenance Worker | `agents/` | Bounded maintenance input consumption, maintainer invocation, memory tree publication, and revision commit | [README](../../agents/README.md) |
 | Memory Catalog Server | `memory-catalog/` | Observation catalog, immutable memory revision history, and active revision coordination | [README](../../memory-catalog/README.md) |
 
-The runtime entities communicate through project-owned boundaries under [`contracts/`](../../contracts/README.md). Package location does not imply shared runtime ownership: the two workers are separate processes even though they are implemented in the same Python package, while the two applications under `apps/` are independently deployed services.
+The runtime roles communicate through project-owned boundaries under [`contracts/`](../../contracts/README.md). Package location does not determine process topology: `agents/` implements three independent Temporal workers. The two applications under `apps/` remain independently deployed services.
 
 ## Main review path
 
@@ -62,21 +65,35 @@ sequenceDiagram
 sequenceDiagram
   participant Temporal as Temporal Server
   participant ExecutionWorker as Execution Worker
-  participant MemoryWorker as Memory Worker
+  participant ExtractionWorker as Memory Extraction Worker
+  participant MaintenanceWorker as Memory Maintenance Worker
   participant Catalog as Memory Catalog Server
   participant Storage as Object Storage
 
   ExecutionWorker->>Temporal: Request asynchronous memory processing
-  Temporal->>MemoryWorker: Dispatch memory extraction work
-  MemoryWorker->>Storage: Read review transcripts from run diagnostic bundle
-  Note over MemoryWorker: Extract memory and record Memory Agent transcripts
-  MemoryWorker->>Storage: Publish Memory Agent audit bundle
-  MemoryWorker->>Catalog: Register pending observation
+  Temporal->>ExtractionWorker: Dispatch memory extraction work
+  ExtractionWorker->>Storage: Download run diagnostic bundle
+  Storage-->>ExtractionWorker: Run diagnostic bundle
+  Note over ExtractionWorker: Read review transcripts and run extractor
+  ExtractionWorker->>Storage: Store extractor transcript
+  ExtractionWorker->>Catalog: Save extraction result, transcript reference, and observation (if any) in one transaction
   loop Scheduled memory maintenance
-    Temporal->>MemoryWorker: Dispatch maintenance work
-    MemoryWorker->>Catalog: Read pending observations and active revision
-    Catalog-->>MemoryWorker: Observations and active revision reference
-    MemoryWorker->>Storage: Read active memory and publish immutable revision
-    MemoryWorker->>Catalog: Commit revision and active pointer with compare-and-swap
+    Temporal->>MaintenanceWorker: Dispatch maintenance work
+    Note over Temporal,MaintenanceWorker: One fixed workflow ID permits only one maintainer
+    MaintenanceWorker->>Catalog: Select a batch of pending observations
+    Catalog-->>MaintenanceWorker: Observations, extraction IDs, base revision, and current memory tree reference
+    opt Current memory tree exists
+      MaintenanceWorker->>Storage: Download current memory tree artifact
+      Storage-->>MaintenanceWorker: Memory tree artifact
+      Note over MaintenanceWorker: Materialize current memory tree as this activity's temporary maintenance input/worktree
+    end
+    Note over MaintenanceWorker: Run maintainer
+    MaintenanceWorker->>Storage: Store maintainer transcript
+    MaintenanceWorker->>Storage: Store new memory tree artifact
+    MaintenanceWorker-->>Temporal: Artifact references, extraction IDs, and base revision
+    Note over Temporal: Later commit retries reuse this activity result
+    Temporal->>MaintenanceWorker: Dispatch revision commit
+    MaintenanceWorker->>Catalog: Create memory tree revision with maintenance ID and base-revision CAS
+    Catalog-->>MaintenanceWorker: Created or idempotently replayed revision, or revision conflict
   end
 ```

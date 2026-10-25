@@ -9,8 +9,10 @@ from sec_review_agents.agents.mitigation.agent import (
     create_mitigation_agent_graph,
 )
 from sec_review_agents.agents.mitigation.mcp import MITIGATION_AGENT_MCP_TOOLS
+from sec_review_agents.filesystem.path_views import PathView
 from sec_review_agents.mcp.client import managed_mcp_tools_async
 from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
+from sec_review_agents.memory.runtime_view import materialized_memory_view
 from sec_review_agents.review_stages.feedback_loop import MAX_FEEDBACK_RETRY_ATTEMPTS
 from sec_review_agents.review_stages.mitigation.result import (
     build_mitigation_stage_result,
@@ -24,7 +26,7 @@ from sec_review_agents.runtime.setup_bootstrap import (
 )
 from sec_review_agents.runtime.transcripts import (
     remove_transcripts,
-    stage_attempt_transcript_path,
+    transcript_path,
 )
 from sec_review_agents.utils.files import (
     persist_json_artifact,
@@ -121,9 +123,9 @@ def reset_mitigation_attempt_artifacts(
         else [attempt_label]
     )
     remove_transcripts(
-        stage_attempt_transcript_path(
-            mitigator_artifacts_path,
-            attempt=transcript_attempt,
+        transcript_path(
+            mitigator_artifacts_path / "transcripts",
+            name=transcript_attempt,
         )
         for transcript_attempt in transcript_attempts
     )
@@ -167,14 +169,19 @@ async def run_mitigation_stage(
     published_transcript_path: Path | None = None,
     baseline_snapshot_tar_path: Path,
     retry_context: Mapping[str, Any] | None,
-    build_backend: Callable[[Path], Any],
+    build_backend: Callable[[Path, PathView | None], Any],
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     attempt_label = mitigation_attempt_label(retry_context)
-    with tempfile.TemporaryDirectory(prefix="sec-review-mitigation-") as tempdir:
+    # The backend mounts both resources, so their lifetimes must cover backend
+    # construction, graph construction, and the complete agent invocation.
+    with (
+        tempfile.TemporaryDirectory(prefix="sec-review-mitigation-") as tempdir,
+        materialized_memory_view() as memory_path_view,
+    ):
         reset_mitigation_attempt_artifacts(
             mitigator_artifacts_path=mitigator_artifacts_path,
             attempt_label=attempt_label,
@@ -189,7 +196,7 @@ async def run_mitigation_stage(
             published_transcript_path=published_transcript_path,
             attempt_label=attempt_label,
         )
-        backend = build_backend(workspace_path)
+        backend = build_backend(workspace_path, memory_path_view)
         # Keep backend lifetime around both agent construction and invocation; some
         # middleware resolves tools against backend resources during graph creation.
         async with amanaged_backend(backend):
@@ -215,6 +222,7 @@ async def run_mitigation_stage(
                     baseline_snapshot_tar_path=baseline_snapshot_tar_path,
                     workspace_root_path=workspace_path,
                     mcp_tools=mcp_tools,
+                    memory_enabled=memory_path_view is not None,
                 )
                 agent_output = await invoke_agent_runtime_graph(
                     agent=agent,
@@ -258,9 +266,9 @@ def prepare_mitigation_transcript(
     published_transcript_path: Path | None,
     attempt_label: str,
 ) -> tuple[Path, ...]:
-    local_transcript_path = stage_attempt_transcript_path(
-        mitigator_artifacts_path,
-        attempt=attempt_label,
+    local_transcript_path = transcript_path(
+        mitigator_artifacts_path / "transcripts",
+        name=attempt_label,
     )
     if published_transcript_path is None:
         return (local_transcript_path,)

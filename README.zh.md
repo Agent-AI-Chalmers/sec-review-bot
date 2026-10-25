@@ -40,20 +40,20 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
 
 ## 架构
 
-这个仓库包含七个运行实体：GitHub Integration、Review Control Plane、Control Plane UI、Execution Gateway、Execution Worker、Memory Worker 和 Memory Catalog Server。它们通过受认证的 HTTP、Temporal、对象存储和持久化 PostgreSQL 状态协作，同时保持各自独立的职责、配置和部署边界。
+这个仓库包含八个运行角色：GitHub Integration、Review Control Plane、Control Plane UI、Execution Gateway、Execution Worker、Memory Extraction Worker、Memory Maintenance Worker 和 Memory Catalog Server。它们通过受认证的 HTTP、Temporal、对象存储和持久化 PostgreSQL 状态协作。
 
 - [`apps/github-integration/`](apps/github-integration/README.zh.md)：TypeScript 编写的 GitHub integration service，负责 GitHub App webhook、由 GitHub Actions 鉴权的 HTTP dispatch、输入材料准备和 GitHub 发布
 - [`control-plane/`](control-plane/README.zh.md)：独立部署的 TypeScript 服务，负责 review run 接纳和持久化协调
 - [`apps/control-plane-ui/`](apps/control-plane-ui/README.zh.md)：独立部署的 Control Plane 运维界面
 - [`execution-gateway/`](execution-gateway/README.zh.md)：独立的 TypeScript HTTP 服务，负责校验请求并提交 Temporal execution
-- [`agents/`](agents/README.zh.md)：Python 编写的 Execution Worker 与 Memory Worker 进程、agent runtime、workflow 和审查逻辑
+- [`agents/`](agents/README.zh.md)：Python 编写的 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker
 - [`memory-catalog/`](memory-catalog/README.zh.md)：独立的 TypeScript HTTP 服务，负责 managed memory catalog 状态和 revision 提交
 
 ![Sec Review Bot 运行拓扑](assets/architecture/runtime-topology.zh.svg)
 
 ## 运行技术栈
 
-- **语言**：[TypeScript](https://www.typescriptlang.org/)（[Node.js](https://nodejs.org/)）用于集成、Control Plane、Execution Gateway、Memory Catalog 和 UI 服务端；[Python](https://www.python.org/) 3.14 用于 Execution Worker、Memory Worker 和 agent runtime。
+- **语言**：[TypeScript](https://www.typescriptlang.org/)（[Node.js](https://nodejs.org/)）用于集成、Control Plane、Execution Gateway、Memory Catalog 和 UI 服务端；[Python](https://www.python.org/) 3.14 用于 Execution Worker、memory extraction 与 maintenance 角色和 agent runtime。
 - **Web 与 UI**：[Fastify](https://fastify.dev/) 提供 Control Plane、Execution Gateway 和 Memory Catalog API；[Vite](https://vitejs.dev/) + [React](https://react.dev/) + [Mantine](https://mantine.dev/) 构成控制台。
 - **Agent 运行时**：[LangChain](https://www.langchain.com/) / [LangGraph](https://langchain-ai.github.io/langgraph/)（[deepagents](https://github.com/langchain-ai/deepagents)），负责模型适配、结构化输出和工具调用。
 - **持久执行**：[Temporal](https://temporal.io/) 负责 workflow/activity 调度、worker 分发、重试、超时和失败状态。

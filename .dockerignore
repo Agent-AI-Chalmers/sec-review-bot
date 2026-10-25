@@ -21,7 +21,6 @@ __pycache__
 .agent-artifacts
 .agent-postgres-state
 .agent-temporal-state
-.agent-memory
 evaluation_output
 evaluation_input
 

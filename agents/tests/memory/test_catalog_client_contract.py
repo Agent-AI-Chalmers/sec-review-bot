@@ -48,73 +48,114 @@ class _RecordingClient(MemoryCatalogClient):
         return self.responses.pop(0)
 
 
-def _artifact(name: str) -> ArtifactReference:
+def _artifact(
+    name: str,
+    *,
+    media_type: str = "application/tar+zstd",
+) -> ArtifactReference:
     return ArtifactReference(
-        uri=f"s3://sec-review/{name}.tar.zst",
+        uri=f"s3://sec-review/{name}",
         digest=f"sha256:{'a' * 64}",
-        media_type="application/tar+zstd",
+        media_type=media_type,
         size_bytes=42,
     )
 
 
 def test_client_wire_values_match_memory_catalog_contract() -> None:
-    active_version = {
+    memory_tree = {
         "revision": 1,
-        "artifact_reference": _artifact("memory").as_dict(),
+        "memory_tree_reference": _artifact("memory").as_dict(),
     }
     revision = {
         "revision": 1,
-        "artifact_reference": _artifact("memory").as_dict(),
-        "maintenance_audit_reference": _artifact("maintenance-audit").as_dict(),
+        "maintenance_id": "maintenance-1",
+        "base_revision": 0,
+        "extraction_ids": ["extraction-1"],
+        "memory_tree_reference": _artifact("memory").as_dict(),
+        "maintenance_transcript_reference": _artifact(
+            "maintenance-transcript.jsonl.zst",
+            media_type="application/zstd",
+        ).as_dict(),
         "created_at": "2026-10-23T00:00:00Z",
     }
-    batch = {
+    maintenance_input = {
         "base_revision": 1,
-        "active_memory": _artifact("memory").as_dict(),
+        "active_memory_tree_reference": _artifact("memory").as_dict(),
         "observations": [
-            {"observation_id": "observation-1", "body_markdown": "Remember this."}
+            {"extraction_id": "observation-1", "body_markdown": "Remember this."}
         ],
+    }
+    extraction = {
+        "extraction_id": "extraction-1",
+        "source_workflow": "issue-review",
+        "source_run_id": "run-1",
+        "source_review_unit_id": "review",
+        "diagnostic_bundle_digest": f"sha256:{'b' * 64}",
+        "transcript_reference": _artifact(
+            "extraction-transcript.jsonl.zst",
+            media_type="application/zstd",
+        ).as_dict(),
+        "observation": {"body_markdown": "Remember this."},
+        "created_at": "2026-10-23T00:00:00Z",
     }
     client = _RecordingClient(
         [
             {"ok": True, "created": True},
+            extraction,
             {"pending_count": 1, "oldest_pending_created_at": None},
-            {"batch": batch},
-            {"completed": True},
-            active_version,
+            {"input": maintenance_input},
+            {"created": True, "revision": 2, "maintenance_id": "maintenance-2"},
+            memory_tree,
             revision,
             {"revisions": [revision], "next_before_revision": None},
         ]
     )
 
-    assert client.register_observation(
-        observation_id="observation-1",
+    assert client.register_extraction(
+        extraction_id="extraction-1",
         source_workflow="issue-review",
         source_run_id="run-1",
         source_review_unit_id="review",
-        transcript_digest=f"sha256:{'b' * 64}",
-        body_markdown="Remember this.",
-        audit_reference=_artifact("extraction-audit"),
+        diagnostic_bundle_digest=f"sha256:{'b' * 64}",
+        transcript_reference=_artifact(
+            "extraction-transcript.jsonl.zst",
+            media_type="application/zstd",
+        ),
+        observation_markdown="Remember this.",
     )
-    assert client.pending_observation_summary()["pending_count"] == 1
-    assert client.select_maintenance_batch(limit=10) == batch
-    assert client.complete_maintenance(
+    assert client.get_extraction("extraction-1") == extraction
+    assert client.get_observation_backlog()["pending_count"] == 1
+    assert client.get_maintenance_input(limit=10) == maintenance_input
+    assert client.create_memory_tree_revision(
+        maintenance_id="maintenance-2",
         base_revision=1,
-        observation_ids=["observation-1"],
-        memory_version=_artifact("memory-2"),
-        audit_reference=_artifact("maintenance-audit"),
-    )
-    assert client.active_version() == active_version
-    assert client.get_revision(1) == revision
-    assert client.list_revisions(before_revision=2, limit=10) == {
+        extraction_ids=["extraction-1"],
+        memory_tree_reference=_artifact("memory-2"),
+        maintenance_transcript_reference=_artifact(
+            "maintenance-transcript.jsonl.zst",
+            media_type="application/zstd",
+        ),
+    ) == {"created": True, "revision": 2, "maintenance_id": "maintenance-2"}
+    assert client.get_memory_tree() == memory_tree
+    assert client.get_memory_tree_revision(1) == revision
+    assert client.list_memory_tree_revisions(before_revision=2, limit=10) == {
         "revisions": [revision],
         "next_before_revision": None,
     }
+    assert [(method, path) for method, path, _body in client.requests] == [
+        ("POST", "/v1/extractions"),
+        ("GET", "/v1/extractions/extraction-1"),
+        ("GET", "/v1/observation-backlog"),
+        ("GET", "/v1/maintenance-input?limit=10"),
+        ("POST", "/v1/memory-tree/revisions"),
+        ("GET", "/v1/memory-tree"),
+        ("GET", "/v1/memory-tree/revisions/1"),
+        ("GET", "/v1/memory-tree/revisions?limit=10&before_revision=2"),
+    ]
 
     request_schemas = {
-        "/v1/observations": "ObservationRegistration",
-        "/v1/maintenance/batches/select": "MaintenanceBatchSelection",
-        "/v1/maintenance/complete": "MaintenanceCompletion",
+        "/v1/extractions": "ExtractionRegistration",
+        "/v1/memory-tree/revisions": "MemoryTreeRevisionCreation",
     }
     for _method, path, body in client.requests:
         schema_name = request_schemas.get(path)
@@ -122,27 +163,31 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
             _validator(schema_name).validate(body)
 
     for schema_name, value in (
-        ("ObservationRegistrationResult", {"ok": True, "created": True}),
+        ("ExtractionRegistrationResult", {"ok": True, "created": True}),
+        ("ExtractionRecord", extraction),
         (
-            "PendingObservationSummary",
+            "ObservationBacklog",
             {"pending_count": 1, "oldest_pending_created_at": None},
         ),
-        ("MaintenanceBatchResult", {"batch": batch}),
-        ("MaintenanceCompletionResult", {"completed": True}),
-        ("ActiveVersion", active_version),
-        ("MemoryRevision", revision),
+        ("MaintenanceInputResult", {"input": maintenance_input}),
         (
-            "MemoryRevisionList",
+            "MemoryTreeRevisionCreationResult",
+            {"created": True, "revision": 2, "maintenance_id": "maintenance-2"},
+        ),
+        ("MemoryTree", memory_tree),
+        ("MemoryTreeRevision", revision),
+        (
+            "MemoryTreeRevisionList",
             {"revisions": [revision], "next_before_revision": None},
         ),
     ):
         _validator(schema_name).validate(value)
 
 
-def test_observation_conflict_preserves_non_retryable_catalog_semantics() -> None:
+def test_extraction_conflict_preserves_non_retryable_catalog_semantics() -> None:
     client = MemoryCatalogClient(base_url="http://catalog", token="secret")
     conflict = HTTPError(
-        "http://catalog/v1/observations",
+        "http://catalog/v1/extractions",
         409,
         "Conflict",
         Message(),
@@ -156,12 +201,15 @@ def test_observation_conflict_preserves_non_retryable_catalog_semantics() -> Non
         ),
         pytest.raises(MemoryCatalogConflictError, match="HTTP 409"),
     ):
-        client.register_observation(
-            observation_id="observation-1",
+        client.register_extraction(
+            extraction_id="extraction-1",
             source_workflow="issue-review",
             source_run_id="run-1",
             source_review_unit_id="review",
-            transcript_digest=f"sha256:{'b' * 64}",
-            body_markdown="Different content.",
-            audit_reference=_artifact("extraction-audit"),
+            diagnostic_bundle_digest=f"sha256:{'b' * 64}",
+            transcript_reference=_artifact(
+                "extraction-transcript.jsonl.zst",
+                media_type="application/zstd",
+            ),
+            observation_markdown="Different content.",
         )

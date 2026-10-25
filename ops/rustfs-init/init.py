@@ -11,8 +11,8 @@ The resulting ownership model is:
 * GitHub integration can read and write immutable input bundles.
 * The execution worker reads input bundles, writes run diagnostic bundles, and
   reads active immutable memory versions.
-* The memory worker reads run diagnostic bundles and reads/writes immutable memory
-  versions and Memory Agent audit bundles.
+* The memory extraction and maintenance workers share a storage identity that
+  reads run diagnostics and reads/writes immutable memory artifacts.
 * Control Plane UI can only read terminal result artifacts.
 
 All provisioning operations are safe to repeat. Rerunning the container also

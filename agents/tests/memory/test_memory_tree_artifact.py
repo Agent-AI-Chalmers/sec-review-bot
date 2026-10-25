@@ -4,13 +4,13 @@ from unittest.mock import patch
 
 import pytest
 
-from sec_review_agents.memory.version_bundle import (
-    materialize_memory_version,
-    publish_memory_version,
+from sec_review_agents.memory.memory_tree_artifact import (
+    materialize_memory_tree,
+    publish_memory_tree_artifact,
 )
 
 
-def test_memory_version_round_trip(tmp_path: Path) -> None:
+def test_memory_tree_artifact_round_trip(tmp_path: Path) -> None:
     memory = tmp_path / "memory"
     topics = memory / "topics"
     topics.mkdir(parents=True)
@@ -18,7 +18,7 @@ def test_memory_version_round_trip(tmp_path: Path) -> None:
     (topics / "parsing.md").write_text("# Parsing\n", encoding="utf-8")
 
     with patch.dict("os.environ", {}, clear=True):
-        reference = publish_memory_version(
+        reference = publish_memory_tree_artifact(
             memory_content_root=memory,
             output_dir=tmp_path / "published",
             remote=False,
@@ -28,10 +28,10 @@ def test_memory_version_round_trip(tmp_path: Path) -> None:
         "sec_review_agents.artifacts.materialize.download_s3_object",
         return_value=archive_path,
     ):
-        materialized = materialize_memory_version(
+        materialized = materialize_memory_tree(
             replace(
                 reference,
-                uri=f"s3://artifacts/memory/versions/{reference.digest.removeprefix('sha256:')}/memory-tree.v1.tar.zst",
+                uri=f"s3://artifacts/memory/trees/{reference.digest.removeprefix('sha256:')}/memory-tree.v1.tar.zst",
             ),
             destination=tmp_path / "materialized",
         )
@@ -42,19 +42,21 @@ def test_memory_version_round_trip(tmp_path: Path) -> None:
     ) == "# Parsing\n"
 
 
-def test_memory_version_digest_depends_on_content_not_mtime(tmp_path: Path) -> None:
+def test_memory_tree_artifact_digest_depends_on_content_not_mtime(
+    tmp_path: Path,
+) -> None:
     memory = tmp_path / "memory"
     (memory / "topics").mkdir(parents=True)
     index = memory / "MEMORY.md"
     index.write_text("# Index\n", encoding="utf-8")
 
-    first = publish_memory_version(
+    first = publish_memory_tree_artifact(
         memory_content_root=memory,
         output_dir=tmp_path / "first",
         remote=False,
     )
     index.touch()
-    second = publish_memory_version(
+    second = publish_memory_tree_artifact(
         memory_content_root=memory,
         output_dir=tmp_path / "second",
         remote=False,
@@ -63,7 +65,7 @@ def test_memory_version_digest_depends_on_content_not_mtime(tmp_path: Path) -> N
     assert first.digest == second.digest
 
 
-def test_coordinated_memory_version_requires_s3_configuration(tmp_path: Path) -> None:
+def test_memory_tree_artifact_requires_s3_configuration(tmp_path: Path) -> None:
     memory = tmp_path / "memory"
     memory.mkdir()
     (memory / "MEMORY.md").write_text("# Index\n", encoding="utf-8")
@@ -72,7 +74,7 @@ def test_coordinated_memory_version_requires_s3_configuration(tmp_path: Path) ->
         patch.dict("os.environ", {}, clear=True),
         pytest.raises(RuntimeError, match="SEC_REVIEW_ARTIFACT_S3_BUCKET"),
     ):
-        publish_memory_version(
+        publish_memory_tree_artifact(
             memory_content_root=memory,
             output_dir=tmp_path / "published",
         )

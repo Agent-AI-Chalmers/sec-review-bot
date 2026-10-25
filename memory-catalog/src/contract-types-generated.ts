@@ -17,7 +17,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/observations": {
+    "/v1/extractions": {
         parameters: {
             query?: never;
             header?: never;
@@ -26,23 +26,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Register one durable memory observation or replay an identical registration. */
-        post: operations["registerObservation"];
+        /** @description Register one completed extraction and its optional observation, or replay identical content. */
+        post: operations["registerExtraction"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/v1/observations/pending-summary": {
+    "/v1/extractions/{extraction_id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description Summarize observations that have not yet entered a memory version. */
-        get: operations["pendingObservationSummary"];
+        /** @description Return one completed extraction, its transcript reference, and its optional observation. */
+        get: operations["getExtraction"];
         put?: never;
         post?: never;
         delete?: never;
@@ -51,49 +51,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/maintenance/batches/select": {
+    "/v1/observation-backlog": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
-        /** @description Select a bounded observation batch against the current memory revision. */
-        post: operations["selectMaintenanceBatch"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/maintenance/complete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** @description Atomically publish a memory version and consume its source observations. */
-        post: operations["completeMaintenance"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/active-version": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** @description Return the currently active immutable memory version, if one exists. */
-        get: operations["activeVersion"];
+        /** @description Summarize observations that have not yet been consumed by a memory revision. */
+        get: operations["getObservationBacklog"];
         put?: never;
         post?: never;
         delete?: never;
@@ -102,15 +68,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/revisions": {
+    "/v1/maintenance-input": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description List immutable memory revisions in descending revision order. */
-        get: operations["listRevisions"];
+        /** @description Return a bounded observation set and the active memory state it must be maintained against. */
+        get: operations["getMaintenanceInput"];
         put?: never;
         post?: never;
         delete?: never;
@@ -119,15 +85,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/revisions/{revision}": {
+    "/v1/memory-tree/revisions": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description Return one immutable memory revision and its maintenance audit. */
-        get: operations["getRevision"];
+        /** @description List immutable memory tree revisions in descending revision order. */
+        get: operations["listMemoryTreeRevisions"];
+        put?: never;
+        /** @description Create an immutable memory tree revision with compare-and-swap and consume its source observations. */
+        post: operations["createMemoryTreeRevision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/memory-tree": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Return the current memory tree revision and its artifact reference, if one exists. */
+        get: operations["getMemoryTree"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/memory-tree/revisions/{revision}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Return one immutable memory tree revision and its maintenance transcript. */
+        get: operations["getMemoryTreeRevision"];
         put?: never;
         post?: never;
         delete?: never;
@@ -146,62 +147,81 @@ export interface components {
             media_type: string;
             size_bytes: number;
         };
-        ObservationRegistration: {
-            observation_id: string;
+        ExtractionId: string;
+        MaintenanceId: string;
+        ExtractionObservation: {
+            body_markdown: string;
+        };
+        ExtractionRegistration: {
+            extraction_id: components["schemas"]["ExtractionId"];
             source_workflow: string;
             source_run_id: string;
             source_review_unit_id: string;
-            transcript_digest: string;
-            body_markdown: string;
-            audit_reference: components["schemas"]["ArtifactReference"];
+            diagnostic_bundle_digest: string;
+            transcript_reference: components["schemas"]["ArtifactReference"];
+            observation: components["schemas"]["ExtractionObservation"] | null;
         };
-        ObservationRegistrationResult: {
+        ExtractionRegistrationResult: {
             /** @constant */
             ok: true;
             created: boolean;
         };
-        PendingObservationSummary: {
+        ExtractionRecord: {
+            extraction_id: components["schemas"]["ExtractionId"];
+            source_workflow: string;
+            source_run_id: string;
+            source_review_unit_id: string;
+            diagnostic_bundle_digest: string;
+            transcript_reference: components["schemas"]["ArtifactReference"];
+            observation: components["schemas"]["ExtractionObservation"] | null;
+            /** Format: date-time */
+            created_at: string;
+        };
+        ObservationBacklog: {
             pending_count: number;
             /** Format: date-time */
             oldest_pending_created_at: string | null;
         };
-        MaintenanceBatchSelection: {
-            limit: number;
-        };
         MaintenanceObservation: {
-            observation_id: string;
+            extraction_id: components["schemas"]["ExtractionId"];
             body_markdown: string;
         };
-        MaintenanceBatch: {
+        MaintenanceInput: {
             base_revision: number;
-            active_memory: components["schemas"]["ArtifactReference"] | null;
+            active_memory_tree_reference: components["schemas"]["ArtifactReference"] | null;
             observations: components["schemas"]["MaintenanceObservation"][];
         };
-        MaintenanceBatchResult: {
-            batch: components["schemas"]["MaintenanceBatch"] | null;
+        MaintenanceInputResult: {
+            input: components["schemas"]["MaintenanceInput"] | null;
         };
-        MaintenanceCompletion: {
+        MemoryTreeRevisionCreation: {
+            maintenance_id: components["schemas"]["MaintenanceId"];
             base_revision: number;
-            observation_ids: string[];
-            memory_version: components["schemas"]["ArtifactReference"];
-            audit_reference: components["schemas"]["ArtifactReference"];
+            extraction_ids: components["schemas"]["ExtractionId"][];
+            memory_tree_reference: components["schemas"]["ArtifactReference"];
+            maintenance_transcript_reference: components["schemas"]["ArtifactReference"];
         };
-        MaintenanceCompletionResult: {
-            completed: boolean;
-        };
-        ActiveVersion: {
+        MemoryTreeRevisionCreationResult: {
+            created: boolean;
             revision: number;
-            artifact_reference: components["schemas"]["ArtifactReference"] | null;
+            maintenance_id: components["schemas"]["MaintenanceId"];
         };
-        MemoryRevision: {
+        MemoryTree: {
             revision: number;
-            artifact_reference: components["schemas"]["ArtifactReference"];
-            maintenance_audit_reference: components["schemas"]["ArtifactReference"];
+            memory_tree_reference: components["schemas"]["ArtifactReference"] | null;
+        };
+        MemoryTreeRevision: {
+            revision: number;
+            maintenance_id: components["schemas"]["MaintenanceId"];
+            base_revision: number;
+            extraction_ids: components["schemas"]["ExtractionId"][];
+            memory_tree_reference: components["schemas"]["ArtifactReference"];
+            maintenance_transcript_reference: components["schemas"]["ArtifactReference"];
             /** Format: date-time */
             created_at: string;
         };
-        MemoryRevisionList: {
-            revisions: components["schemas"]["MemoryRevision"][];
+        MemoryTreeRevisionList: {
+            revisions: components["schemas"]["MemoryTreeRevision"][];
             next_before_revision: number | null;
         };
         Health: {
@@ -233,7 +253,7 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description The observation identity already exists with different content. */
+        /** @description An immutable identity differs from existing content, or a revision compare-and-swap precondition failed. */
         Conflict: {
             headers: {
                 [name: string]: unknown;
@@ -298,7 +318,7 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
-    registerObservation: {
+    registerExtraction: {
         parameters: {
             query?: never;
             header?: never;
@@ -307,17 +327,17 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ObservationRegistration"];
+                "application/json": components["schemas"]["ExtractionRegistration"];
             };
         };
         responses: {
-            /** @description Observation accepted or identically replayed. */
+            /** @description Extraction accepted or identically replayed. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ObservationRegistrationResult"];
+                    "application/json": components["schemas"]["ExtractionRegistrationResult"];
                 };
             };
             400: components["responses"]["InvalidBody"];
@@ -327,7 +347,33 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
-    pendingObservationSummary: {
+    getExtraction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                extraction_id: components["schemas"]["ExtractionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The requested extraction. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtractionRecord"];
+                };
+            };
+            400: components["responses"]["InvalidBody"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getObservationBacklog: {
         parameters: {
             query?: never;
             header?: never;
@@ -342,92 +388,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PendingObservationSummary"];
+                    "application/json": components["schemas"]["ObservationBacklog"];
                 };
             };
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };
     };
-    selectMaintenanceBatch: {
+    getMaintenanceInput: {
         parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MaintenanceBatchSelection"];
+            query: {
+                limit: string;
             };
-        };
-        responses: {
-            /** @description Current revision and one pending observation batch. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MaintenanceBatchResult"];
-                };
-            };
-            400: components["responses"]["InvalidBody"];
-            401: components["responses"]["Unauthorized"];
-            413: components["responses"]["PayloadTooLarge"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    completeMaintenance: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["MaintenanceCompletion"];
-            };
-        };
-        responses: {
-            /** @description Whether the revision CAS and observation consumption committed. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MaintenanceCompletionResult"];
-                };
-            };
-            400: components["responses"]["InvalidBody"];
-            401: components["responses"]["Unauthorized"];
-            413: components["responses"]["PayloadTooLarge"];
-            500: components["responses"]["InternalError"];
-        };
-    };
-    activeVersion: {
-        parameters: {
-            query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description Current active immutable memory version. */
+            /** @description Current memory state and bounded pending observations, or null when none are pending. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ActiveVersion"];
+                    "application/json": components["schemas"]["MaintenanceInputResult"];
                 };
             };
+            400: components["responses"]["InvalidBody"];
             401: components["responses"]["Unauthorized"];
             500: components["responses"]["InternalError"];
         };
     };
-    listRevisions: {
+    listMemoryTreeRevisions: {
         parameters: {
             query?: {
                 before_revision?: string;
@@ -439,13 +432,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description One page of immutable memory revision history. */
+            /** @description One page of immutable memory tree revision history. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MemoryRevisionList"];
+                    "application/json": components["schemas"]["MemoryTreeRevisionList"];
                 };
             };
             400: components["responses"]["InvalidBody"];
@@ -453,7 +446,68 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
-    getRevision: {
+    createMemoryTreeRevision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemoryTreeRevisionCreation"];
+            };
+        };
+        responses: {
+            /** @description An identical maintenance submission had already created this revision. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryTreeRevisionCreationResult"];
+                };
+            };
+            /** @description The revision was created. */
+            201: {
+                headers: {
+                    Location?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryTreeRevisionCreationResult"];
+                };
+            };
+            400: components["responses"]["InvalidBody"];
+            401: components["responses"]["Unauthorized"];
+            409: components["responses"]["Conflict"];
+            413: components["responses"]["PayloadTooLarge"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getMemoryTree: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current memory tree revision and artifact reference. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MemoryTree"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getMemoryTreeRevision: {
         parameters: {
             query?: never;
             header?: never;
@@ -464,13 +518,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The requested immutable memory revision. */
+            /** @description The requested immutable memory tree revision. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["MemoryRevision"];
+                    "application/json": components["schemas"]["MemoryTreeRevision"];
                 };
             };
             400: components["responses"]["InvalidBody"];

@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-`agents/` is the Python side of the project. It contains the Execution Worker entrypoints, workflow execution, filesystem and workspace runtime, delivery result generation, and observability.
+`agents/` is the Python side of the project. It implements the Execution Worker, Memory Extraction Worker, and Memory Maintenance Worker as separate Temporal runtimes, together with workflow execution, filesystem and workspace runtime, delivery result generation, and observability.
 
 ## Setup
 
@@ -50,7 +50,7 @@ When running from this repository, local commands read `agents/.env` and `agents
 
 The local `run-local-*` CLIs and `sec-review-agents-check-llm-deployments` load `agents/.env`, but never overwrite environment variables already set in the process.
 
-`sec-review-execution-worker` and `sec-review-memory-worker` do not load `.env` themselves. Pass their environment through the shell, process supervisor, or CI. Execution Gateway is a separate TypeScript service under [`execution-gateway/`](../execution-gateway/README.md).
+`sec-review-execution-worker`, `sec-review-memory-extraction-worker`, and `sec-review-memory-maintenance-worker` do not load `.env` themselves. Pass their environment through the shell, process supervisor, or CI. Execution Gateway is a separate TypeScript service under [`execution-gateway/`](../execution-gateway/README.md).
 
 There is no `.env` path override. `MODEL_PROVIDERS_CONFIG_TOML` has the highest priority for model config; set it only when using another TOML location or when the run layout does not preserve the project-relative path.
 
@@ -121,7 +121,7 @@ flowchart LR
     direct --> execution
 ```
 
-The external TypeScript Gateway receives HTTP run requests and uses the Temporal client to start and query workflows; it does not execute agents. Temporal Server persists workflow state and dispatches review and memory tasks to their separate polling workers. Direct local execution bypasses both the HTTP service and Temporal while reusing activity functions; `run-local-* --temporal` bypasses the HTTP service but uses Temporal Server and Execution Worker.
+The external TypeScript Gateway receives HTTP run requests and uses the Temporal client to start and query workflows; it does not execute agents. Temporal Server persists workflow state and dispatches review work, memory extraction, and memory maintenance to their separate workers and task queues. Direct local execution bypasses both the HTTP service and Temporal while reusing activity functions; `run-local-* --temporal` bypasses the HTTP service but uses Temporal Server and Execution Worker.
 
 ## Local Runs
 
@@ -219,7 +219,7 @@ Use `--temporal` only when you specifically want to exercise internal Temporal w
 
 With `--temporal`, the same local command still prepares input on the developer machine, but the workflow stages run through Temporal workflow / activity scheduling. This is useful when debugging workflow orchestration, retries, activity boundaries, or Temporal-visible state. It still bypasses the HTTP Execution Gateway, so it is not the same as the full service path.
 
-Local Temporal execution keeps the run diagnostic bundle on the local filesystem and passes a verified `file://` reference between workers. The local Execution and Memory Workers must therefore share the artifact filesystem and see it at the same absolute path. This mode does not require S3-compatible object storage.
+Local Temporal execution keeps the run diagnostic bundle on the local filesystem and passes a verified `file://` reference between the Execution Worker and Memory Extraction Worker. Those workers must therefore share that artifact filesystem and see it at the same absolute path.
 
 Before running a `--temporal` local command, start a local Temporal dev server:
 
@@ -247,7 +247,7 @@ sec-review-execution-worker
 
 ### Run the Workers Manually
 
-Start Temporal and both workers in separate terminals. Run the independent HTTP service from [`execution-gateway/`](../execution-gateway/README.md).
+Start Temporal and the three workers in separate terminals.
 
 Minimal local startup shape:
 
@@ -265,22 +265,49 @@ TEMPORAL_EXECUTION_TASK_QUEUE=sec-review-execution \
 sec-review-execution-worker
 ```
 
-Terminal 3, Memory Worker:
+Terminal 3, Memory Extraction Worker:
 
 ```bash
 TEMPORAL_ADDRESS=127.0.0.1:7233 \
-sec-review-memory-worker
+TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES=4 \
+sec-review-memory-extraction-worker
 ```
 
-Execution Worker handles review workflows, sandboxed activities, and run diagnostic publication. Memory Worker reads the published diagnostic to perform asynchronous extraction and maintenance. They use separate task queues and concurrency limits.
+Terminal 4, Memory Maintenance Worker:
+
+```bash
+TEMPORAL_ADDRESS=127.0.0.1:7233 \
+TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES=1 \
+sec-review-memory-maintenance-worker
+```
+
+Execution Worker handles review workflows, sandboxed activities, and run diagnostic publication. Memory Extraction Worker reads published diagnostics and produces observations; additional processes can poll the same extraction task queue. Memory Maintenance Worker serially updates the shared memory tree and owns maintenance schedule repair; it rejects any activity concurrency other than `1` and must run as a single process. Each worker has its own task queue and concurrency limit.
 
 Docker Compose control-plane startup and host worker operation are documented in the [local integrated deployment guide](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md).
 
 ## Agent Runtime Configuration
 
+### Skills
+
 Agents can declare the skills they need. The worker prepares and mounts the declared skills when it starts an agent. See [Agent Skills](../docs/agent/SKILLS.md) for details.
 
-Memory has two mutually exclusive state modes. In local mode, `AGENT_MEMORY_DIR` owns curated memory, observations, and the SQLite ledger; main agents receive a snapshot of its `memory/` subtree at `/memory`. In coordinated mode, workers set `AGENT_MEMORY_CATALOG_URL` and `AGENT_MEMORY_CATALOG_TOKEN`; external services persist shared observations and revisions, the catalog provides the compare-and-swap commit boundary, and workers materialize the active immutable version from object storage as the same read-only `/memory` view. Coordinated mode never falls back to `AGENT_MEMORY_DIR`. `AGENT_MEMORY_CONSUMPTION_ENABLED` controls whether review agents read that view, while `AGENT_MEMORY_PROCESSING_ENABLED` controls transcript extraction and maintenance. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the design principles and lifecycle.
+### Memory
+
+Memory requires Temporal, a Memory Catalog backed by PostgreSQL, and S3-compatible object storage.
+
+| Variable | Purpose |
+| --- | --- |
+| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog base URL. Without it, review agents have no memory view and memory processing cannot run. |
+| `AGENT_MEMORY_CATALOG_TOKEN` | Bearer token for Memory Catalog. Required when `AGENT_MEMORY_CATALOG_URL` is set. |
+| `AGENT_MEMORY_CONSUMPTION_ENABLED` | Whether review agents load the active memory tree. Defaults to `true`. |
+| `AGENT_MEMORY_PROCESSING_ENABLED` | Whether extraction and maintenance activities run. Defaults to `true`. |
+
+Each review invocation materializes the active memory tree in a temporary directory and removes it afterward. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the architecture and lifecycle.
+
+- `sec-review-agents-memory maintain` asks Temporal Server to start one memory maintenance workflow.
+- `sec-review-agents-memory schedules maintenance ensure` creates or updates the periodic maintenance schedule in Temporal Server.
+
+### Structured Output
 
 Agents that require structured output check whether the final state contains `structured_response`. If the model only returns plain text and does not produce a structured result, agent middleware appends a correction message inside the LangChain agent loop and retries. Retry count is controlled by `AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES`, default `2`. This fallback is separate from provider/API request retry and does not handle schema-parameter validation errors; those remain under LangChain structured-output retry behavior.
 

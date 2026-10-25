@@ -22,7 +22,9 @@ repository-review 阶段内部的并发另见
 
 Execution Gateway 会为 app 提交的 run 启动 Temporal workflow。Temporal 不会把一个完整 run 当成一个 worker slot。一个 run 会被拆成 workflow tasks、activity tasks，有时还有 child workflows。
 
-`TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` 限制一个 Execution Worker 进程同时执行的 review activities 数量，`TEMPORAL_MEMORY_MAX_CONCURRENT_ACTIVITIES` 则独立限制一个 Memory Worker 的 extraction 和 maintenance activities。两者都不是“允许多少个 app 提交的 runs 处于 active”。
+`TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` 限制一个 Execution Worker 进程同时执行的 review activities 数量；`TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES` 独立控制 Memory Extraction Worker；Memory Maintenance Worker 使用 `TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES`，并因 maintenance 的单例语义而被约束为 `1`。这些值都不是“允许多少个 app 提交的 runs 处于 active”。
+
+Execution 与 memory extraction 可以通过增加轮询各自队列的 worker 进程来扩容。Memory maintenance 则刻意不同：集成部署只运行一个非 template service，并固定为一个 activity slot，不提供该 pool 的扩容路径。
 
 例如 `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES=8` 时：
 

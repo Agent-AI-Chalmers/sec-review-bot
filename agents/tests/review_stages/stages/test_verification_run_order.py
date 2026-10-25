@@ -34,7 +34,7 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
         call_order.append("apply")
         assert kwargs["workspace_patch"] == "diff --git a/a b/a\n"
 
-    def _build_backend(workspace_root: Path) -> object:
+    def _build_backend(workspace_root: Path, _memory_view) -> object:
         call_order.append("backend")
         assert workspace_root.name.startswith("sec-review-verifier-")
         return object()
@@ -89,7 +89,7 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
 async def test_run_verification_stage_uses_unpatched_workspace_when_no_patch() -> None:
     captured_workspace_roots: list[Path] = []
 
-    def _build_backend(workspace_root: Path) -> object:
+    def _build_backend(workspace_root: Path, _memory_view) -> object:
         captured_workspace_roots.append(workspace_root)
         return object()
 

@@ -4,7 +4,31 @@ from pathlib import Path
 import pytest
 
 from sec_review_agents.artifacts.materialize import materialize_artifact
-from sec_review_agents.artifacts.reference import local_artifact_reference
+from sec_review_agents.artifacts.reference import (
+    ZSTD_MEDIA_TYPE,
+    ArtifactReference,
+    local_artifact_reference,
+    require_artifact_media_type,
+)
+
+
+def test_artifact_reference_accepts_non_archive_media_type(tmp_path: Path) -> None:
+    artifact = tmp_path / "transcript.jsonl.zst"
+    artifact.write_bytes(b"compressed transcript")
+
+    reference = local_artifact_reference(artifact, media_type=ZSTD_MEDIA_TYPE)
+
+    assert reference.media_type == ZSTD_MEDIA_TYPE
+    assert ArtifactReference.from_mapping(reference.as_dict()) == reference
+
+
+def test_concrete_consumer_rejects_unsupported_media_type(tmp_path: Path) -> None:
+    artifact = tmp_path / "transcript.jsonl.zst"
+    artifact.write_bytes(b"compressed transcript")
+    reference = local_artifact_reference(artifact, media_type=ZSTD_MEDIA_TYPE)
+
+    with pytest.raises(ValueError, match="expected 'application/tar\\+zstd'"):
+        require_artifact_media_type(reference, "application/tar+zstd")
 
 
 def test_materialize_artifact_accepts_verified_shared_file_reference(

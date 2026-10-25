@@ -4,27 +4,30 @@
 
 本文是 [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-Sec Review Bot 包含七个运行实体，各自拥有独立的职责和部署边界：GitHub Integration、Review Control Plane、Control Plane UI、Execution Gateway、Execution Worker、Memory Worker 和 Memory Catalog Server。
+Sec Review Bot 包含八个运行角色：GitHub Integration、Review Control Plane、Control Plane UI、Execution Gateway、Execution Worker、Memory Extraction Worker、Memory Maintenance Worker 和 Memory Catalog Server。
 
 ## 运行拓扑
 
 ![Sec Review Bot 运行拓扑](../../assets/architecture/runtime-topology.zh.svg)
 
-Temporal Server 属于基础设施，但它会直接向两个 worker pool 分发工作，因此拓扑图将它与运行服务放在一起。PostgreSQL 和对象存储则单独作为持久化设施呈现。主 review 链路与异步 memory 链路使用不同的 task queue 和 worker 进程。
+Temporal Server 属于基础设施，但它会直接向 worker 进程分发工作，因此拓扑图将它与运行服务放在一起。PostgreSQL 和对象存储则单独作为持久化设施呈现。Review execution、memory extraction 与 memory maintenance 分别使用独立的 worker 进程和 task queue。
 
-## 运行实体职责地图
+Memory 链路只有一套与部署位置无关的状态模型：Memory Catalog 负责 PostgreSQL 中的协调状态，对象存储负责不可变 memory-tree 和 transcript artifacts，Temporal 负责 workflow 执行。每次 review invocation 都会把当前 memory tree 物化到临时目录供 agent backend 使用，并在结束后删除该目录。
 
-| 运行实体 | 代码 | 负责内容 | 本地指南 |
+## 运行角色职责地图
+
+| 运行角色 | 代码 | 负责内容 | 本地指南 |
 | --- | --- | --- | --- |
 | GitHub Integration | `apps/github-integration/` | GitHub 入口、input 准备、Control Plane client 与 GitHub publication | [README](../../apps/github-integration/README.zh.md) |
 | Review Control Plane | `control-plane/` | 接纳、持久化 run 状态、恢复、execution 观察与 publication 协调 | [README](../../control-plane/README.zh.md) |
 | Control Plane UI | `apps/control-plane-ui/` | 经过鉴权的运维控制台与只读 Control Plane 投影 | [README](../../apps/control-plane-ui/README.md) |
 | Execution Gateway | `execution-gateway/` | 经过鉴权的 Execution API 与 HTTP-to-Temporal 转换 | [README](../../execution-gateway/README.zh.md) |
 | Execution Worker | `agents/` | Review workflow、activity、agent runtime、stage artifact 与 run diagnostic publication | [README](../../agents/README.zh.md) |
-| Memory Worker | `agents/` | 异步 memory extraction 与 maintenance workflow | [README](../../agents/README.zh.md) |
+| Memory Extraction Worker | `agents/` | 按 run 消费 diagnostic、调用 extractor、发布 transcript 并登记 extraction | [README](../../agents/README.zh.md) |
+| Memory Maintenance Worker | `agents/` | 消费有界 maintenance input、调用 maintainer、发布 memory tree 并提交 revision | [README](../../agents/README.zh.md) |
 | Memory Catalog Server | `memory-catalog/` | Observation catalog、不可变 memory revision history 与 active revision 协调 | [README](../../memory-catalog/README.zh.md) |
 
-这些运行实体通过 [`contracts/`](../../contracts/README.zh.md) 下由项目维护的边界通信。目录位置不代表共享运行时所有权：两个 worker 虽然实现在同一个 Python package 中，却是独立进程；`apps/` 下的两个应用也分别独立部署。
+这些运行角色通过 [`contracts/`](../../contracts/README.zh.md) 下由项目维护的边界通信。Package 位置并不决定进程拓扑：`agents/` 实现三个独立的 Temporal worker。`apps/` 下的两个应用则仍分别独立部署。
 
 ## 主 Review 链路
 
@@ -66,21 +69,35 @@ sequenceDiagram
 sequenceDiagram
   participant Temporal as Temporal Server
   participant ExecutionWorker as Execution Worker
-  participant MemoryWorker as Memory Worker
+  participant ExtractionWorker as Memory Extraction Worker
+  participant MaintenanceWorker as Memory Maintenance Worker
   participant Catalog as Memory Catalog Server
   participant Storage as 对象存储
 
   ExecutionWorker->>Temporal: 请求异步 memory 处理
-  Temporal->>MemoryWorker: 分发 memory extraction 工作
-  MemoryWorker->>Storage: 从 run diagnostic bundle 读取 review transcript
-  Note over MemoryWorker: 提取 memory 并记录 Memory Agent transcript
-  MemoryWorker->>Storage: 发布 Memory Agent 审计包
-  MemoryWorker->>Catalog: 注册待处理 observation
+  Temporal->>ExtractionWorker: 分发 memory extraction 工作
+  ExtractionWorker->>Storage: 下载 run diagnostic bundle
+  Storage-->>ExtractionWorker: run diagnostic bundle
+  Note over ExtractionWorker: 读取 review transcripts 并运行 extractor
+  ExtractionWorker->>Storage: 保存 extractor transcript
+  ExtractionWorker->>Catalog: 在同一事务中保存 extraction 结果、transcript reference 和 observation（如果有）
   loop 定期 memory maintenance
-    Temporal->>MemoryWorker: 分发 maintenance 工作
-    MemoryWorker->>Catalog: 读取待处理 observations 和 active revision
-    Catalog-->>MemoryWorker: 返回 observations 和 active revision 引用
-    MemoryWorker->>Storage: 读取 active memory 并发布不可变 revision
-    MemoryWorker->>Catalog: 通过 compare-and-swap 提交 revision 和 active pointer
+    Temporal->>MaintenanceWorker: 分发 maintenance 工作
+    Note over Temporal,MaintenanceWorker: 固定 workflow ID 确保同一时间只有一个 maintainer
+    MaintenanceWorker->>Catalog: 选择一批待处理 observations
+    Catalog-->>MaintenanceWorker: 返回 observations、extraction IDs、base revision 和当前 memory tree reference
+    opt 存在当前 memory tree
+      MaintenanceWorker->>Storage: 下载当前 memory tree artifact
+      Storage-->>MaintenanceWorker: memory tree artifact
+      Note over MaintenanceWorker: 将当前 memory tree 物化为本次 activity 的临时 maintenance input/worktree
+    end
+    Note over MaintenanceWorker: 运行 maintainer
+    MaintenanceWorker->>Storage: 保存 maintainer transcript
+    MaintenanceWorker->>Storage: 保存新的 memory tree artifact
+    MaintenanceWorker-->>Temporal: 返回 artifact references、extraction IDs 和 base revision
+    Note over Temporal: 后续 commit 重试复用该 activity 结果
+    Temporal->>MaintenanceWorker: 调度 revision commit
+    MaintenanceWorker->>Catalog: 使用 maintenance ID 和 base revision CAS 创建 memory tree revision
+    Catalog-->>MaintenanceWorker: 返回新建或幂等重放的 revision，或 revision conflict
   end
 ```

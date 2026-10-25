@@ -39,8 +39,9 @@ trap 'rm -f "$rendered_deployment_env"' EXIT HUP INT TERM
 
 # Fail before installing units that cannot run under the selected service user.
 if [ ! -x "$repository_root/agents/.venv/bin/sec-review-execution-worker" ] ||
-    [ ! -x "$repository_root/agents/.venv/bin/sec-review-memory-worker" ]; then
-    echo "Missing execution or memory worker executable." >&2
+    [ ! -x "$repository_root/agents/.venv/bin/sec-review-memory-extraction-worker" ] ||
+    [ ! -x "$repository_root/agents/.venv/bin/sec-review-memory-maintenance-worker" ]; then
+    echo "Missing execution, memory extraction, or memory maintenance worker executable." >&2
     echo "Run 'uv sync --frozen --no-dev' in $repository_root/agents first." >&2
     exit 1
 fi
@@ -50,8 +51,13 @@ if ! /usr/sbin/runuser -u "$service_user" -- \
     exit 1
 fi
 if ! /usr/sbin/runuser -u "$service_user" -- \
-    test -x "$repository_root/agents/.venv/bin/sec-review-memory-worker"; then
-    echo "The service user cannot execute the memory worker." >&2
+    test -x "$repository_root/agents/.venv/bin/sec-review-memory-extraction-worker"; then
+    echo "The service user cannot execute the memory extraction worker." >&2
+    exit 1
+fi
+if ! /usr/sbin/runuser -u "$service_user" -- \
+    test -x "$repository_root/agents/.venv/bin/sec-review-memory-maintenance-worker"; then
+    echo "The service user cannot execute the memory maintenance worker." >&2
     exit 1
 fi
 if ! /usr/sbin/runuser -u "$service_user" -- \
@@ -180,8 +186,11 @@ render_unit \
     "$script_dir/sec-review-execution-worker@.service.in" \
     "$unit_dir/sec-review-execution-worker@.service"
 render_unit \
-    "$script_dir/sec-review-memory-worker@.service.in" \
-    "$unit_dir/sec-review-memory-worker@.service"
+    "$script_dir/sec-review-memory-extraction-worker@.service.in" \
+    "$unit_dir/sec-review-memory-extraction-worker@.service"
+render_unit \
+    "$script_dir/sec-review-memory-maintenance-worker.service.in" \
+    "$unit_dir/sec-review-memory-maintenance-worker.service"
 
 systemctl daemon-reload
 

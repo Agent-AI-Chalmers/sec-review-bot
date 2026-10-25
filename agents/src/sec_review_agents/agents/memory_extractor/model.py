@@ -1,12 +1,4 @@
-from dataclasses import dataclass
-from pathlib import Path
-
 from pydantic import BaseModel, Field
-
-
-@dataclass(frozen=True)
-class StagedTranscripts:
-    entries: list[tuple[str, Path]]
 
 
 class MemoryObservationOutput(BaseModel):

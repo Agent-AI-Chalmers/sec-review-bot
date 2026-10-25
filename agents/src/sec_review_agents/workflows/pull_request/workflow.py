@@ -21,7 +21,7 @@ from sec_review_agents.temporal.support import (
     prepare_internal_workflow_activity,
 )
 from sec_review_agents.utils.paths import required_path
-from sec_review_agents.workflows.memory_scheduling import schedule_memory_extractions
+from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
 from sec_review_agents.workflows.review_intent import (
     REVIEW_OBJECTIVE_AUDIT,
     require_review_intent,
@@ -34,10 +34,13 @@ async def analyze_pull_request_activity(
     prepared_input: dict[str, Any],
     runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
+    from sec_review_agents.review_stages.transcripts import (
+        review_transcript_path,
+        review_transcripts_root,
+    )
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
     )
-    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -73,8 +76,8 @@ async def analyze_pull_request_activity(
             prepared_input["artifact_paths"],
             "analyzer",
         ),
-        published_transcript_path=review_stage_transcript_path(
-            run_artifacts_root,
+        published_transcript_path=review_transcript_path(
+            review_transcripts_root(run_artifacts_root),
             order=1,
             stage="analyzer",
         ),
@@ -95,10 +98,13 @@ async def mitigate_pull_request_activity(
         create_skipped_mitigation_result,
         mitigation_attempt_label,
     )
+    from sec_review_agents.review_stages.transcripts import (
+        review_transcript_path,
+        review_transcripts_root,
+    )
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
     )
-    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -120,8 +126,8 @@ async def mitigate_pull_request_activity(
         label="artifact_root_path",
     )
     if not has_confirmed_repair_target(analysis_result):
-        review_stage_transcript_path(
-            run_artifacts_root,
+        review_transcript_path(
+            review_transcripts_root(run_artifacts_root),
             order=review_stage_attempt_order(
                 stage="mitigator", retry_context=retry_context
             ),
@@ -149,8 +155,8 @@ async def mitigate_pull_request_activity(
             label="bundle_paths.incremental_window_path",
         ),
         mitigator_artifacts_path=mitigator_artifacts_path,
-        published_transcript_path=review_stage_transcript_path(
-            run_artifacts_root,
+        published_transcript_path=review_transcript_path(
+            review_transcripts_root(run_artifacts_root),
             order=review_stage_attempt_order(
                 stage="mitigator", retry_context=retry_context
             ),
@@ -174,6 +180,10 @@ async def verify_pull_request_activity(
     runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
+    from sec_review_agents.review_stages.transcripts import (
+        review_transcript_path,
+        review_transcripts_root,
+    )
     from sec_review_agents.review_stages.verification.stage import (
         create_skipped_verification_result,
         verification_attempt_label,
@@ -181,7 +191,6 @@ async def verify_pull_request_activity(
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
     )
-    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -199,8 +208,8 @@ async def verify_pull_request_activity(
         "verifier",
     )
     if not has_confirmed_repair_target(analysis_result):
-        review_stage_transcript_path(
-            run_artifacts_root,
+        review_transcript_path(
+            review_transcripts_root(run_artifacts_root),
             order=review_stage_attempt_order(
                 stage="verifier", retry_context=retry_context
             ),
@@ -229,8 +238,8 @@ async def verify_pull_request_activity(
             label="bundle_paths.incremental_window_path",
         ),
         verifier_artifacts_path=verifier_artifacts_path,
-        published_transcript_path=review_stage_transcript_path(
-            run_artifacts_root,
+        published_transcript_path=review_transcript_path(
+            review_transcripts_root(run_artifacts_root),
             order=review_stage_attempt_order(
                 stage="verifier", retry_context=retry_context
             ),

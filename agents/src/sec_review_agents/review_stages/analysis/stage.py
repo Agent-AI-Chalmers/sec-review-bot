@@ -9,8 +9,10 @@ from sec_review_agents.agents.analysis.agent import (
     create_analysis_agent_graph,
 )
 from sec_review_agents.agents.analysis.mcp import ANALYSIS_AGENT_MCP_TOOLS
+from sec_review_agents.filesystem.path_views import PathView
 from sec_review_agents.mcp.client import managed_mcp_tools_async
 from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
+from sec_review_agents.memory.runtime_view import materialized_memory_view
 from sec_review_agents.review_stages.analysis.result import build_analysis_stage_result
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
@@ -35,13 +37,18 @@ async def run_analysis_stage(
     published_transcript_path: Path | None = None,
     agent_name: str,
     baseline_snapshot_tar_path: Path,
-    build_backend: Callable[[Path], Any],
+    build_backend: Callable[[Path, PathView | None], Any],
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(prefix="sec-review-analyzer-") as tempdir:
+    # The backend mounts both resources, so their lifetimes must cover backend
+    # construction, graph construction, and the complete agent invocation.
+    with (
+        tempfile.TemporaryDirectory(prefix="sec-review-analyzer-") as tempdir,
+        materialized_memory_view() as memory_path_view,
+    ):
         reset_analysis_artifacts(
             analyzer_artifacts_path=analyzer_artifacts_path,
         )
@@ -54,7 +61,7 @@ async def run_analysis_stage(
             analyzer_artifacts_path=analyzer_artifacts_path,
             published_transcript_path=published_transcript_path,
         )
-        backend = build_backend(workspace_path)
+        backend = build_backend(workspace_path, memory_path_view)
         async with amanaged_backend(backend):
             record_bootstrap_result(
                 analyzer_artifacts_path,
@@ -76,6 +83,7 @@ async def run_analysis_stage(
                     system_prompt=system_prompt,
                     filesystem_system_prompt=filesystem_system_prompt,
                     mcp_tools=mcp_tools,
+                    memory_enabled=memory_path_view is not None,
                 )
                 agent_output = await invoke_agent_runtime_graph(
                     agent=agent_graph,

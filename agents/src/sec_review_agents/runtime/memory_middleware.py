@@ -8,10 +8,10 @@ from langchain.agents.middleware.types import ModelRequest, ModelResponse
 from sec_review_agents.runtime.system_messages import append_to_system_message
 
 MEMORY_INDEX_PATH = "/memory/MEMORY.md"
+MEMORY_INDEX_MAX_LINES = 200
+MEMORY_INDEX_MAX_CHARS = 25_000
 # Mirror the Claude Code-style memory shape: eagerly expose only a bounded
 # MEMORY.md startup index, then let the agent read topic files on demand.
-DEFAULT_MEMORY_INDEX_MAX_LINES = 200
-DEFAULT_MEMORY_INDEX_MAX_CHARS = 25_000
 
 DEFAULT_MEMORY_SYSTEM_PROMPT = """
 ## Experience Memory
@@ -25,8 +25,8 @@ authoritative sources.
 
 The memory index below is the progressive-disclosure entry point. Read topic
 files only when they are relevant to the current task or uncertainty. Do not
-treat source material or backing-store state as memory. Do not write to
-`/memory`. Do not use memory to start a conclusion without current evidence.
+write to `/memory`. Do not use memory to start a conclusion without current
+evidence.
 
 ### Memory Index
 
@@ -49,9 +49,8 @@ callers, tests, and runtime path.
 
 The memory index below is the progressive-disclosure entry point. Read topic
 files only when they are relevant to the current stage, uncertainty, or review
-discipline question. Do not treat observation files or SQLite state as memory.
-Do not write to `/memory`. Do not use memory to start a finding without current
-repository evidence.
+discipline question. Do not write to `/memory`. Do not use memory to start a
+finding without current repository evidence.
 
 ### Memory Index
 
@@ -92,8 +91,8 @@ class MemoryMiddleware(AgentMiddleware):
         *,
         backend: BackendProtocol | None = None,
         index_path: str = MEMORY_INDEX_PATH,
-        index_max_lines: int = DEFAULT_MEMORY_INDEX_MAX_LINES,
-        index_max_chars: int = DEFAULT_MEMORY_INDEX_MAX_CHARS,
+        index_max_lines: int = MEMORY_INDEX_MAX_LINES,
+        index_max_chars: int = MEMORY_INDEX_MAX_CHARS,
         system_prompt_template: str = DEFAULT_MEMORY_SYSTEM_PROMPT,
     ) -> None:
         self.backend = backend

@@ -2,7 +2,7 @@
 
 Language: English | [中文](LOCAL_INTEGRATED_DEPLOYMENT.zh.md)
 
-This guide covers local deployment of the GitHub integration, Review Control Plane, Execution Gateway, Temporal, object storage, and the host Execution and Memory Workers.
+This guide covers local deployment of the GitHub integration, Review Control Plane, Execution Gateway, Temporal, object storage, and the host Execution, Memory Extraction, and Memory Maintenance Workers.
 
 Use it to run the complete integrated path locally. For running agents directly without the HTTP Execution Gateway, or for debugging with `run-local-* --temporal`, see the [agents local running guide](../../agents/README.md).
 
@@ -10,7 +10,7 @@ Use it to run the complete integrated path locally. For running agents directly 
 
 ![Local integrated deployment shape](../../assets/operations/local-integrated-deployment.svg)
 
-Cloudflare Tunnel sends GitHub traffic to the integration service. Control Plane coordinates each review run, while Temporal dispatches review work to Execution Worker and asynchronous memory work to Memory Worker. PostgreSQL stores control and catalog state, while RustFS stores run inputs, transcripts, memory revisions, and artifacts.
+Cloudflare Tunnel sends GitHub traffic to the integration service. Control Plane coordinates each review run, while Temporal dispatches review, memory extraction, and memory maintenance work to three independent worker pools. PostgreSQL stores control and catalog state, while RustFS stores run inputs, transcripts, memory revisions, and artifacts.
 
 Control Plane UI is a separately deployed console. Its same-origin server reads run state from Control Plane and proxies artifact downloads, so service and storage credentials remain outside browser code. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for public endpoint configuration.
 
@@ -105,9 +105,9 @@ The samples contain both usable defaults and empty or placeholder values that mu
 
 Compose-level defaults are documented in [compose.env.sample](../../compose.env.sample). This file controls how Compose starts containers, mounts local directories, and exposes ports.
 
-Set `EXECUTION_API_TOKEN`, `AGENT_MEMORY_CATALOG_TOKEN`, and the PostgreSQL/RustFS passwords to independently generated secrets, for example with `openssl rand -hex 32`. Copy the same Memory Catalog token into `ops/systemd/deployment.env`; Compose gives it to the independent Memory Catalog Server container, while both host workers use it as a narrow client credential. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
+Set `EXECUTION_API_TOKEN`, `AGENT_MEMORY_CATALOG_TOKEN`, and the PostgreSQL/RustFS passwords to independently generated secrets, for example with `openssl rand -hex 32`. Copy the same Memory Catalog token into `ops/systemd/deployment.env`; Compose gives it to the independent Memory Catalog Server container, while both memory worker pools use it as a narrow client credential. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
 
-RustFS uses a separate workload identity for each responsibility: the integration writes input objects; Execution Worker reads inputs, writes run diagnostic bundles, and reads active memory revisions; Memory Worker reads run diagnostics and reads/writes memory revisions and Memory Agent audit bundles; and the UI BFF reads stored diagnostics for authenticated downloads. The corresponding secret keys in `compose.env.sample` belong to those identities and should be generated independently.
+RustFS uses a separate workload identity for each storage responsibility: the integration writes input objects; Execution Worker reads inputs, writes run diagnostic bundles, and reads active memory revisions; the Memory Extraction and Memory Maintenance Workers share one memory-storage identity for run diagnostics, memory revisions, and compressed memory-agent transcripts; and the UI BFF reads stored diagnostics for authenticated downloads. Extraction and maintenance remain separate Temporal worker identities, processes, and task queues. Their shared S3 credential is retained because the current object-store policy covers one common memory artifact namespace; splitting that policy is outside this deployment change and would not improve process isolation by itself.
 
 ### 2. GitHub Integration `.env`
 
@@ -172,13 +172,13 @@ Core fields:
 | `AGENT_MEMORY_PROCESSING_ENABLED` | Allow transcript extraction and memory maintenance; defaults to `true`. |
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Host-worker endpoint for RustFS; the Compose default is exposed at `http://127.0.0.1:9100`. |
 | `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`, `SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker credential; it can read run inputs, write run diagnostic bundles, and read active memory revisions. |
-| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`, `SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Worker credential; it can read run diagnostic bundles and read/write memory revisions and Memory Agent audit bundles. |
-| `AGENT_MEMORY_CATALOG_URL` | Independent API for coordinated memory state; the Compose default is `http://127.0.0.1:8092`. |
+| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`, `SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Shared storage credential for both memory workers; it can read run diagnostic bundles and read/write memory revisions and compressed memory-agent transcripts. |
+| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog coordination API; the Compose default is `http://127.0.0.1:8092`. |
 | `AGENT_MEMORY_CATALOG_TOKEN` | Must match the repository `.env`; it authorizes memory coordination but grants no direct PostgreSQL access. |
 
 Execution Worker publishes the authoritative run diagnostic under `runs/*/artifacts/*` before the workflow succeeds. Execution Gateway only validates and forwards that immutable reference; it has neither object-storage credentials nor a mount of the worker artifact tree. Agent sandboxes receive no workload storage credentials.
 
-The Memory Catalog Server is a separate TypeScript service, not part of Control Plane. Compose runs one PostgreSQL instance with separate `sec_review_control_plane` and `sec_review_memory_catalog` databases. Only Memory Catalog receives `MEMORY_CATALOG_DATABASE_URL`; it stores observations plus the active memory pointer in its database. Temporal owns extraction execution and the singleton maintenance workflow; PostgreSQL is only the durable catalog and compare-and-swap commit boundary. Host workers call the service with `AGENT_MEMORY_CATALOG_TOKEN`; they materialize transcripts and active memory locally for each activity, and agent sandboxes only see the resulting filesystem mounts. A worker in coordinated memory mode must not also set `AGENT_MEMORY_DIR`.
+The Memory Catalog Server is a separate TypeScript service, not part of Control Plane. Compose runs one PostgreSQL instance with separate `sec_review_control_plane` and `sec_review_memory_catalog` databases. Only Memory Catalog receives `MEMORY_CATALOG_DATABASE_URL`; it stores extraction records and their optional observations, memory-tree revision history, and the active revision pointer. Each revision records its maintenance identity and maintainer transcript reference. Temporal owns extraction execution and the singleton maintenance workflow; PostgreSQL is the durable catalog and compare-and-swap commit boundary. Host workers call the service with `AGENT_MEMORY_CATALOG_TOKEN`; memory-tree revisions and memory-agent transcripts remain immutable objects in RustFS. Workers materialize those objects into invocation-scoped temporary worktrees, and agent sandboxes only see the resulting filesystem mounts.
 
 PostgreSQL initialization scripts run only when `.agent-postgres-state` is empty. After adopting or changing the database names, stop the deployment and remove that directory before starting Compose again. This deletes existing Control Plane and Memory Catalog data.
 
@@ -227,7 +227,7 @@ AGENT_PLAYWRIGHT_ENABLED=false
 AGENT_MCP_ENABLED=false
 ```
 
-With `AGENT_SANDBOX_BACKEND=docker`, Execution Worker fails during startup when Docker is unavailable. Memory Worker does not initialize or require the Docker sandbox boundary.
+With `AGENT_SANDBOX_BACKEND=docker`, Execution Worker fails during startup when Docker is unavailable. The two memory workers do not initialize or require the Docker sandbox boundary.
 
 To expose the Joern and Playwright CLIs through the provided Docker image, build the workspace tools image and update `ops/systemd/deployment.env`:
 
@@ -252,12 +252,12 @@ With the sample configuration, the integrated deployment stores runtime data in 
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
-| `.agent-rustfs-state` | RustFS | Persistent object storage for input archives exchanged between integration and the Execution Worker |
+| `.agent-rustfs-state` | RustFS | Persistent object storage for run inputs, diagnostics, memory-tree revisions, memory-agent transcripts, and other artifacts |
 | `.agent-run-inputs` | Host worker | Materialized input for active runs; never included in published diagnostic bundles |
 | `.agent-artifacts` | Host worker | Agent artifacts and workflow output for each task |
-| `.agent-postgres-state` | PostgreSQL | Admission, execution observation, and publication step coordination |
+| `.agent-postgres-state` | PostgreSQL | Control Plane run state and Memory Catalog coordination state |
 | `.agent-temporal-state` | Temporal | Workflow history and pending task state |
-| `.agent-memory` | Host worker | Persistent agent memory store, when memory is enabled |
+
 
 ## Run The Deployment
 
@@ -285,9 +285,9 @@ Start the complete integrated service and enable it at boot:
 sudo systemctl enable --now sec-review-bot.target
 ```
 
-`sec-review-bot.target` is the single systemd entry point for the complete deployment. It groups the Compose control plane with `sec-review-execution-worker@1.service` and `sec-review-memory-worker@1.service` so they can be managed together.
+`sec-review-bot.target` is the single systemd entry point for the complete deployment. It groups the Compose control plane with `sec-review-execution-worker@1.service`, `sec-review-memory-extraction-worker@1.service`, and the singleton `sec-review-memory-maintenance-worker.service` so they can be managed together.
 
-The control plane contains GitHub integration, Execution Gateway, and Temporal. Execution Worker runs review workflows, creates Docker sandboxes, and publishes run diagnostics. Memory Worker consumes those diagnostics for asynchronous extraction and maintenance without owning the review sandbox boundary.
+The control plane contains GitHub integration, Execution Gateway, and Temporal. Execution Worker runs review workflows, creates Docker sandboxes, and publishes run diagnostics. Memory Extraction Worker consumes those diagnostics and records observations. Memory Maintenance Worker serially updates the shared memory tree and owns maintenance schedule repair. Neither memory worker owns the review sandbox boundary.
 
 Startup and runtime failures are supervised differently, and it matters when diagnosing a run:
 
@@ -310,11 +310,13 @@ Inspect the deployment status and logs:
 sudo systemctl status sec-review-bot.target
 sudo systemctl status sec-review-bot-control-plane.service
 sudo systemctl status sec-review-execution-worker@1.service
-sudo systemctl status sec-review-memory-worker@1.service
+sudo systemctl status sec-review-memory-extraction-worker@1.service
+sudo systemctl status sec-review-memory-maintenance-worker.service
 sudo journalctl \
   -u sec-review-bot-control-plane.service \
   -u sec-review-execution-worker@1.service \
-  -u sec-review-memory-worker@1.service \
+  -u sec-review-memory-extraction-worker@1.service \
+  -u sec-review-memory-maintenance-worker.service \
   -f
 ```
 
@@ -366,12 +368,13 @@ curl -sS http://127.0.0.1:8090/readyz
 
 ### Component-Level Operations
 
-For troubleshooting or updating one component, restart the control plane or either worker separately:
+For troubleshooting or updating one component, restart the control plane or any worker separately:
 
 ```bash
 sudo systemctl restart sec-review-bot-control-plane.service
 sudo systemctl restart sec-review-execution-worker@1.service
-sudo systemctl restart sec-review-memory-worker@1.service
+sudo systemctl restart sec-review-memory-extraction-worker@1.service
+sudo systemctl restart sec-review-memory-maintenance-worker.service
 ```
 
 For development, you can bypass systemd and run the Compose control plane in the foreground:
@@ -380,21 +383,22 @@ For development, you can bypass systemd and run the Compose control plane in the
 docker compose --profile app up --build
 ```
 
-This command does not start either host worker.
+This command does not start any host worker.
 
 ### Worker Concurrency
 
-`TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` limits review activities in each Execution Worker and defaults to `2`. Each review activity may create a sandbox and make multiple model calls, so a single-node deployment should start with this conservative value. `TEMPORAL_MEMORY_MAX_CONCURRENT_ACTIVITIES` independently limits extraction and maintenance activities in each Memory Worker and defaults to `1`.
+`TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` limits review activities in each Execution Worker and defaults to `2`. Each review activity may create a sandbox and make multiple model calls, so a single-node deployment should start with this conservative value. `TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES` independently limits activities in each Memory Extraction Worker and defaults to `4`. The Memory Maintenance Worker always uses `TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES=1`; its unit is deliberately not a template and must not be scaled out.
 
-The systemd templates scale the two worker pools independently:
+The systemd templates scale the Execution and Memory Extraction pools independently:
 
 ```bash
 sudo systemctl enable --now sec-review-execution-worker@2.service
 sudo systemctl enable --now sec-review-execution-worker@3.service
-sudo systemctl enable --now sec-review-memory-worker@2.service
+sudo systemctl enable --now sec-review-memory-extraction-worker@2.service
+sudo systemctl enable --now sec-review-memory-extraction-worker@3.service
 ```
 
-Temporal distributes tasks among instances that share a task queue. Keep at least one process in each pool. Add Execution Workers when review work queues, and add Memory Workers when extraction or maintenance queues; the two pools need not use the same instance count or machine specification.
+Temporal distributes tasks among instances that share a task queue. Keep at least one process in each pool. Add Execution Workers when review work queues and Memory Extraction Workers when extraction work queues; the two scalable pools need not use the same instance count or machine specification. Maintenance remains one process with one activity slot; its fixed workflow ID, schedule overlap policy, and Catalog compare-and-swap boundary provide the durable singleton guarantees.
 
 ## Cleanup
 
@@ -418,12 +422,6 @@ This permanently deletes workflow history, pending tasks, polling state, and pub
 
 ```bash
 sudo rm -rf .agent-rustfs-state .agent-run-inputs .agent-artifacts
-```
-
-The `.agent-memory` directory is persistent across runs and is not part of routine cleanup. To deliberately reset agent memory, stop the worker first and remove `.agent-memory` separately. This permanently deletes extracted observations and maintained memory.
-
-```bash
-sudo rm -rf .agent-memory
 ```
 
 ### Backup and recovery
@@ -470,11 +468,11 @@ Each git and snapshot command is bounded by `GITHUB_INTEGRATION_GIT_TIMEOUT_MS` 
 
 ## Why The Deployment Looks Like This
 
-Two runtimes carry this deployment: Compose runs the services that coordinate a review, and a systemd unit runs the worker that executes one. Which runtime hosts which component follows from what that component does, and it also decides where supervision ends.
+Two runtimes carry this deployment: Compose runs the coordinating services, while systemd runs three host worker pools. Which runtime hosts each component follows from what that component does, and it also decides where supervision ends.
 
-### The worker runs on the host
+### The workers run on the host
 
-Execution Worker is the only component that runs code from a reviewed repository. It starts a Docker container per agent invocation, so it needs access to the host Docker daemon. Putting it inside Compose would mean either mounting the Docker socket into a container that already runs untrusted code, or running a privileged nested daemon. Both let a compromised review reach past the sandbox. On the host it uses the daemon directly and is supervised by systemd, which gives it a real unit state, a bounded restart policy, and a dependency on the control plane. Memory Worker runs beside it under systemd but does not initialize Docker sandboxes.
+Execution Worker is the only component that runs code from a reviewed repository. It starts a Docker container per agent invocation, so it needs access to the host Docker daemon. Putting it inside Compose would mean either mounting the Docker socket into a container that already runs untrusted code, or running a privileged nested daemon. Both let a compromised review reach past the sandbox. On the host it uses the daemon directly and is supervised by systemd, which gives it a real unit state, a bounded restart policy, and a dependency on the control plane. The Memory Extraction and Memory Maintenance Workers run beside it under separate systemd units but do not initialize Docker sandboxes.
 
 Temporal's task-queue model makes this placement natural rather than a workaround: a worker polls the queue, and its location does not matter to the workflows it advances. Losing the worker delays work; it does not lose workflow state.
 

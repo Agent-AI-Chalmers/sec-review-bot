@@ -1,477 +1,113 @@
-import asyncio
-import fcntl
+"""Run the memory-maintainer agent against explicit tree and observation inputs."""
+
 import shutil
-import tempfile
-from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlparse
 
 from sec_review_agents.agents.memory_maintainer.agent import (
     MEMORY_MAINTAINER_AGENT_NAME,
     create_memory_maintainer_agent_graph,
 )
-from sec_review_agents.agents.memory_maintainer.model import (
-    MemoryMaintenanceObservation,
-)
 from sec_review_agents.agents.memory_maintainer.prompts import (
     MEMORY_MAINTAINER_SYSTEM_PROMPT,
     build_maintenance_prompt,
 )
-from sec_review_agents.filesystem.backend_factory import (
-    create_backend_with_path_views,
-)
-from sec_review_agents.filesystem.path_views import (
-    writable_memory_view,
-)
+from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
+from sec_review_agents.filesystem.path_views import writable_memory_view
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.memory.catalog_client import MemoryCatalogClient
-from sec_review_agents.memory.middleware import (
-    DEFAULT_MEMORY_INDEX_MAX_CHARS,
-    DEFAULT_MEMORY_INDEX_MAX_LINES,
-)
-from sec_review_agents.memory.state import (
-    OBSERVATION_STATUS_PENDING,
-    ObservationRow,
-    fetch_observations_by_ids,
-    fetch_observations_by_status,
-    mark_observations_processed_if_unchanged,
-    open_memory_state,
-)
-from sec_review_agents.memory.store import (
-    DEFAULT_MEMORY_INDEX,
-    initialize_memory_store,
-    memory_agent_transcript_path,
-    memory_content_dir,
-    memory_observations_dir,
-    memory_store_lock,
-    resolve_memory_store_dir,
-)
+from sec_review_agents.memory.memory_tree_artifact import DEFAULT_MEMORY_INDEX
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
-
-MEMORY_MAINTENANCE_LOCK_FILENAME = ".maintenance.lock"
-MEMORY_MAINTENANCE_LOCK_POLL_SECONDS = 0.1
 
 
 @dataclass(frozen=True)
 class MemoryMaintenanceResult:
-    summary: str
-    processed_count: int
-    skipped: bool = False
+    """Candidate memory tree and invocation transcript produced by the agent."""
+
+    memory_tree_path: Path
+    maintainer_transcript_path: Path
 
 
-def _memory_index_hygiene_warning(memory_store_dir: Path) -> str | None:
-    index_path = memory_content_dir(memory_store_dir) / "MEMORY.md"
-    if not index_path.is_file():
-        return f"Memory index missing: {index_path}"
-    content = index_path.read_text(encoding="utf-8")
-    line_count = len(content.splitlines())
-    char_count = len(content)
-    if (
-        line_count <= DEFAULT_MEMORY_INDEX_MAX_LINES
-        and char_count <= DEFAULT_MEMORY_INDEX_MAX_CHARS
-    ):
-        return None
-    return (
-        "Memory index exceeds startup cap: "
-        f"{line_count}/{DEFAULT_MEMORY_INDEX_MAX_LINES} lines, "
-        f"{char_count}/{DEFAULT_MEMORY_INDEX_MAX_CHARS} chars. "
-        "Keep MEMORY.md as a compact routing index and move details to topics."
-    )
-
-
-def _summary_with_memory_hygiene(memory_store_dir: Path, summary: str) -> str:
-    warning = _memory_index_hygiene_warning(memory_store_dir)
-    return f"{summary} {warning}" if warning else summary
-
-
-def _validate_selected_observation_files(
+def _prepare_worktree(
     *,
-    memory_store_dir: Path,
-    observation_rows: list[ObservationRow],
-) -> None:
-    """Require selected ledger observations to still have readable bodies."""
-    # A ledger row is not maintainable unless its observation body is still present.
-    observations_root = memory_observations_dir(memory_store_dir).resolve()
-    for row in observation_rows:
-        path = Path(row.path).expanduser().resolve()
-        try:
-            path.relative_to(observations_root)
-        except ValueError as error:
-            raise ValueError(
-                "Pending memory observation path is outside the observations "
-                f"directory: {row.observation_id}"
-            ) from error
-        if not path.is_file():
-            raise FileNotFoundError(
-                "Pending memory observation file is missing: "
-                f"{row.observation_id} ({path})"
-            )
+    base_memory_tree: Path | None,
+    observations: list[tuple[str, Path]],
+    worktree_root: Path,
+) -> list[tuple[str, str]]:
+    if not observations:
+        raise ValueError("Memory maintenance requires at least one observation.")
+    extraction_ids = [extraction_id for extraction_id, _path in observations]
+    if len(extraction_ids) != len(set(extraction_ids)):
+        raise ValueError("Memory maintenance extraction ids must be unique.")
 
-
-def _maintenance_prompt_observations(
-    observation_rows: list[ObservationRow],
-) -> list[MemoryMaintenanceObservation]:
-    return [
-        MemoryMaintenanceObservation(
-            observation_id=row.observation_id,
-            mounted_path=f"/memory/observations/{Path(row.path).name}",
+    if base_memory_tree is None:
+        (worktree_root / "topics").mkdir(parents=True)
+        (worktree_root / "MEMORY.md").write_text(
+            DEFAULT_MEMORY_INDEX,
+            encoding="utf-8",
         )
-        for row in observation_rows
-    ]
-
-
-def _copy_memory_maintenance_worktree(
-    memory_store_dir: Path,
-    destination: Path,
-    observation_rows: list[ObservationRow],
-) -> None:
-    """Copy curated memory and only the observations selected for this run."""
-    destination.mkdir(parents=True, exist_ok=True)
-    content_dir = memory_content_dir(memory_store_dir)
-    index_path = content_dir / "MEMORY.md"
-    if index_path.is_file():
-        shutil.copy2(index_path, destination / "MEMORY.md")
-    topics_source = content_dir / "topics"
-    topics_destination = destination / "topics"
-    if topics_source.is_dir():
-        shutil.copytree(topics_source, topics_destination, dirs_exist_ok=True)
     else:
-        topics_destination.mkdir(exist_ok=True)
-    observations_destination = destination / "observations"
-    observations_destination.mkdir(exist_ok=True)
-    for row in observation_rows:
-        source = Path(row.path)
-        shutil.copy2(source, observations_destination / source.name)
+        resolved_base = base_memory_tree.expanduser().resolve()
+        if not (resolved_base / "MEMORY.md").is_file():
+            raise ValueError(f"Base memory tree index is missing: {resolved_base}")
+        shutil.copytree(resolved_base, worktree_root)
+
+    observations_root = worktree_root / "observations"
+    observations_root.mkdir()
+    prompt_observations: list[tuple[str, str]] = []
+    for index, (extraction_id, path) in enumerate(observations, start=1):
+        source = path.expanduser().resolve()
+        if not source.is_file():
+            raise FileNotFoundError(source)
+        filename = f"observation-{index:04d}.md"
+        shutil.copy2(source, observations_root / filename)
+        prompt_observations.append((extraction_id, f"/memory/observations/{filename}"))
+    return prompt_observations
 
 
-def _publish_maintained_memory(*, source: Path, memory_store_dir: Path) -> None:
-    content_dir = memory_content_dir(memory_store_dir)
-    content_dir.mkdir(exist_ok=True)
-    index_source = source / "MEMORY.md"
-    if index_source.is_file():
-        shutil.copy2(index_source, content_dir / "MEMORY.md")
-
-    topics_source = source / "topics"
-    topics_target = content_dir / "topics"
-    replacement = Path(tempfile.mkdtemp(prefix=".topics.", dir=content_dir))
-    try:
-        if topics_source.is_dir():
-            shutil.copytree(topics_source, replacement, dirs_exist_ok=True)
-        if topics_target.exists():
-            shutil.rmtree(topics_target)
-        replacement.rename(topics_target)
-    finally:
-        if replacement.exists():
-            shutil.rmtree(replacement)
-
-
-@asynccontextmanager
-async def _maintenance_singleton_lock(memory_store_dir: Path) -> AsyncGenerator[None]:
-    """Serialize direct maintenance calls for one memory store."""
-    lock_path = memory_store_dir / MEMORY_MAINTENANCE_LOCK_FILENAME
-    with lock_path.open("a+", encoding="utf-8") as lock_file:
-        while True:
-            try:
-                # Temporal workflow ids prevent duplicate scheduled maintenance,
-                # but direct callers can still race. Without this lock, two
-                # processes could select the same pending observations, edit
-                # separate worktrees, and let the later publish overwrite the
-                # earlier result.
-                # Use non-blocking flock in async code: a blocking wait here can
-                # stall the event loop while another maintenance run is awaiting.
-                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-                break
-            except BlockingIOError:
-                await asyncio.sleep(MEMORY_MAINTENANCE_LOCK_POLL_SECONDS)
-        try:
-            yield
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
-
-
-async def maintain_memory_with_result(
+async def maintain_memory_tree(
     *,
-    memory_store_dir: Path | None = None,
-    deployment: str | None = None,
-    batch_size: int | None = None,
-    observation_ids: list[str] | None = None,
-) -> MemoryMaintenanceResult:
-    if batch_size is not None and batch_size < 1:
-        raise ValueError("batch_size must be positive when provided.")
-    if batch_size is not None and observation_ids is not None:
-        raise ValueError("batch_size and observation_ids cannot be used together.")
-    if observation_ids is not None and len(observation_ids) != len(
-        set(observation_ids)
-    ):
-        raise ValueError("observation_ids must be unique.")
-    memory_store_dir = resolve_memory_store_dir(memory_store_dir, required=True)
-    initialize_memory_store(memory_store_dir)
-
-    # Temporal serializes workflow-triggered maintenance. The file lock protects
-    # direct cross-process calls to this public helper for the same memory store.
-    async with _maintenance_singleton_lock(memory_store_dir):
-        return await _maintain_memory_with_result_locked(
-            memory_store_dir=memory_store_dir,
-            deployment=deployment,
-            batch_size=batch_size,
-            observation_ids=observation_ids,
-        )
-
-
-async def _maintain_memory_with_result_locked(
-    *,
-    memory_store_dir: Path,
-    deployment: str | None,
-    batch_size: int | None,
-    observation_ids: list[str] | None,
-) -> MemoryMaintenanceResult:
-    selected_rows: list[ObservationRow] = []
-    processed_count = 0
-    with tempfile.TemporaryDirectory(prefix="sec-review-memory-maintainer-") as tempdir:
-        worktree_root = Path(tempdir) / "memory"
-
-        with memory_store_lock(memory_store_dir, exclusive=True):
-            with open_memory_state(memory_store_dir) as connection:
-                selected_rows = (
-                    fetch_observations_by_ids(
-                        connection,
-                        observation_ids=observation_ids,
-                    )
-                    if observation_ids is not None
-                    else fetch_observations_by_status(
-                        connection,
-                        status=OBSERVATION_STATUS_PENDING,
-                        limit=batch_size,
-                    )
-                )
-                if observation_ids is not None:
-                    selected_ids = {row.observation_id for row in selected_rows}
-                    missing_ids = [
-                        observation_id
-                        for observation_id in observation_ids
-                        if observation_id not in selected_ids
-                    ]
-                    if missing_ids:
-                        raise ValueError(
-                            "Unknown memory observation ids: " + ", ".join(missing_ids)
-                        )
-                    non_pending = [
-                        f"{row.observation_id} ({row.status})"
-                        for row in selected_rows
-                        if row.status != OBSERVATION_STATUS_PENDING
-                    ]
-                    if non_pending:
-                        raise ValueError(
-                            "Selected memory observations must be pending: "
-                            + ", ".join(non_pending)
-                        )
-                if not selected_rows:
-                    # No-pending runs are often the only time index bloat is noticed.
-                    return MemoryMaintenanceResult(
-                        summary=_summary_with_memory_hygiene(
-                            memory_store_dir,
-                            "No pending memory observations selected.",
-                        ),
-                        processed_count=0,
-                    )
-                _validate_selected_observation_files(
-                    memory_store_dir=memory_store_dir,
-                    observation_rows=selected_rows,
-                )
-            _copy_memory_maintenance_worktree(
-                memory_store_dir,
-                worktree_root,
-                selected_rows,
-            )
-
-        backend = create_backend_with_path_views(
-            container_name_prefix="memory-maintainer",
-            path_views=[
-                writable_memory_view(host_path=worktree_root),
-            ],
-            backend_kind="local",
-        )
-        model = create_chat_model(
-            agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-            deployment_override=deployment,
-        )
-        async with amanaged_backend(backend):
-            agent = await create_memory_maintainer_agent_graph(
-                model=model,
-                backend=backend,
-                worktree_root=worktree_root,
-            )
-            await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-                system_prompt=MEMORY_MAINTAINER_SYSTEM_PROMPT,
-                user_prompt=build_maintenance_prompt(
-                    _maintenance_prompt_observations(selected_rows)
-                ),
-                transcript_paths=(
-                    memory_agent_transcript_path(
-                        memory_store_dir,
-                        agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-                        run_label="maintenance",
-                    ),
-                ),
-            )
-
-        with memory_store_lock(memory_store_dir, exclusive=True):
-            _publish_maintained_memory(
-                source=worktree_root,
-                memory_store_dir=memory_store_dir,
-            )
-            with open_memory_state(memory_store_dir) as connection:
-                # Only finalize the rows that still match the snapshot reviewed by the LLM.
-                processed_count = mark_observations_processed_if_unchanged(
-                    connection,
-                    observations=selected_rows,
-                )
-
-    return MemoryMaintenanceResult(
-        summary=_summary_with_memory_hygiene(
-            memory_store_dir,
-            f"Processed {processed_count} memory observations.",
-        ),
-        processed_count=processed_count,
-    )
-
-
-async def maintain_coordinated_memory_with_result(
-    *,
-    catalog_client: MemoryCatalogClient,
-    batch_size: int,
+    base_memory_tree: Path | None,
+    observations: list[tuple[str, Path]],
+    worktree_root: Path,
+    maintainer_transcript_path: Path,
     deployment: str | None = None,
 ) -> MemoryMaintenanceResult:
-    """Maintain one coordinated batch and commit it with a revision CAS."""
-    from sec_review_agents.artifacts.reference import ArtifactReference
-    from sec_review_agents.memory.audit_bundle import publish_memory_audit_bundle
-    from sec_review_agents.memory.version_bundle import (
-        materialize_memory_version,
-        publish_memory_version,
+    """Generate a candidate memory tree from explicit immutable inputs."""
+    prompt_observations = _prepare_worktree(
+        base_memory_tree=base_memory_tree,
+        observations=observations,
+        worktree_root=worktree_root,
     )
-
-    batch = catalog_client.select_maintenance_batch(limit=batch_size)
-    if batch is None:
-        return MemoryMaintenanceResult(
-            summary="No pending memory observations selected.",
-            processed_count=0,
-            skipped=True,
+    backend = create_backend_with_path_views(
+        container_name_prefix="memory-maintainer",
+        path_views=[writable_memory_view(host_path=worktree_root)],
+        backend_kind="local",
+    )
+    model = create_chat_model(
+        agent_name=MEMORY_MAINTAINER_AGENT_NAME,
+        deployment_override=deployment,
+    )
+    async with amanaged_backend(backend):
+        agent = await create_memory_maintainer_agent_graph(
+            model=model,
+            backend=backend,
+            worktree_root=worktree_root,
         )
-    observations = batch.get("observations")
-    if not isinstance(observations, list) or not observations:
-        raise RuntimeError("Catalog maintenance batch has no observations.")
-
-    with tempfile.TemporaryDirectory(
-        prefix="sec-review-coordinated-memory-maintainer-"
-    ) as tempdir:
-        temp_root = Path(tempdir)
-        worktree_root = temp_root / "memory"
-        active_memory = batch.get("active_memory")
-        if isinstance(active_memory, dict):
-            active_reference = ArtifactReference.from_mapping(active_memory)
-            if urlparse(active_reference.uri).scheme != "s3":
-                raise ValueError(
-                    "Catalog active memory must use an S3 artifact reference."
-                )
-            materialized = materialize_memory_version(
-                active_reference,
-                destination=temp_root / "active-version",
-            )
-            shutil.copytree(materialized, worktree_root)
-        else:
-            (worktree_root / "topics").mkdir(parents=True)
-            (worktree_root / "MEMORY.md").write_text(
-                DEFAULT_MEMORY_INDEX,
-                encoding="utf-8",
-            )
-
-        observations_root = worktree_root / "observations"
-        observations_root.mkdir()
-        prompt_observations: list[MemoryMaintenanceObservation] = []
-        observation_ids: list[str] = []
-        for index, item in enumerate(observations, start=1):
-            if not isinstance(item, dict):
-                raise ValueError("Catalog observation must be an object.")
-            observation_id = str(item["observation_id"])
-            observation_ids.append(observation_id)
-            body = str(item["body_markdown"])
-            filename = f"observation-{index:04d}.md"
-            (observations_root / filename).write_text(body, encoding="utf-8")
-            prompt_observations.append(
-                MemoryMaintenanceObservation(
-                    observation_id=observation_id,
-                    mounted_path=f"/memory/observations/{filename}",
-                )
-            )
-
-        backend = create_backend_with_path_views(
-            container_name_prefix="memory-maintainer",
-            path_views=[writable_memory_view(host_path=worktree_root)],
-            backend_kind="local",
-        )
-        model = create_chat_model(
+        await invoke_agent_runtime_graph(
+            agent=agent,
             agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-            deployment_override=deployment,
+            system_prompt=MEMORY_MAINTAINER_SYSTEM_PROMPT,
+            user_prompt=build_maintenance_prompt(prompt_observations),
+            transcript_paths=(maintainer_transcript_path,),
         )
-        base_revision = int(batch["base_revision"])
-        audit_path = memory_agent_transcript_path(
-            temp_root / "audit",
-            agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-            run_label=f"revision-{base_revision + 1}",
-        )
-        async with amanaged_backend(backend):
-            agent = await create_memory_maintainer_agent_graph(
-                model=model,
-                backend=backend,
-                worktree_root=worktree_root,
-            )
-            await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-                system_prompt=MEMORY_MAINTAINER_SYSTEM_PROMPT,
-                user_prompt=build_maintenance_prompt(prompt_observations),
-                transcript_paths=(audit_path,),
-            )
-
-        audit_reference = publish_memory_audit_bundle(
-            agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-            transcript_paths=[audit_path],
-            output_dir=temp_root / "published-audit",
-        )
-        if urlparse(audit_reference.uri).scheme != "s3":
-            raise RuntimeError(
-                "Coordinated memory audit publication requires configured S3 storage."
-            )
-        version = publish_memory_version(
-            memory_content_root=worktree_root,
-            output_dir=temp_root / "published",
-        )
-        if urlparse(version.uri).scheme != "s3":
-            raise RuntimeError(
-                "Coordinated memory publication requires configured S3 storage."
-            )
-        completed = catalog_client.complete_maintenance(
-            base_revision=base_revision,
-            observation_ids=observation_ids,
-            memory_version=version,
-            audit_reference=audit_reference,
-        )
-        if not completed:
-            raise RuntimeError("Memory revision changed before coordinated commit.")
-
     return MemoryMaintenanceResult(
-        summary=f"Processed {len(observations)} memory observations.",
-        processed_count=len(observations),
+        memory_tree_path=worktree_root,
+        maintainer_transcript_path=maintainer_transcript_path,
     )
 
 
 __all__ = [
     "MemoryMaintenanceResult",
-    "maintain_coordinated_memory_with_result",
-    "maintain_memory_with_result",
+    "maintain_memory_tree",
 ]

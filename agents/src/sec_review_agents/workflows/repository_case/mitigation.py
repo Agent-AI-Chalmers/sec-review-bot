@@ -2,8 +2,11 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from sec_review_agents.agents.mitigation import (
-    repository as repository_mitigation_agent,
+from sec_review_agents.agents.mitigation.repository import (
+    build_repository_mitigation_filesystem_system_prompt,
+    build_repository_mitigation_system_prompt,
+    build_repository_mitigation_user_prompt,
+    create_repository_mitigation_backend,
 )
 from sec_review_agents.review_stages.mitigation.stage import run_mitigation_stage
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
@@ -35,22 +38,21 @@ async def mitigate_repository_case(
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=retry_context,
         setup_declaration_content=setup_declaration_content,
-        build_backend=lambda workspace_root: repository_mitigation_agent.create_repository_mitigation_backend(
+        build_backend=lambda workspace_root, memory_path_view: create_repository_mitigation_backend(
             workspace_root=workspace_root,
             history_path=history_path,
             incremental_window_path=incremental_window_path,
             scan_mode=scan_mode,
+            memory_path_view=memory_path_view,
             runtime_context=runtime_context,
         ),
-        system_prompt=repository_mitigation_agent.build_repository_mitigation_system_prompt(
+        system_prompt=build_repository_mitigation_system_prompt(
             test_changes=test_changes, is_retry=isinstance(retry_context, Mapping)
         ),
-        filesystem_system_prompt=(
-            repository_mitigation_agent.build_repository_mitigation_filesystem_system_prompt(
-                scan_mode
-            )
+        filesystem_system_prompt=build_repository_mitigation_filesystem_system_prompt(
+            scan_mode
         ),
-        user_prompt=repository_mitigation_agent.build_repository_mitigation_user_prompt(
+        user_prompt=build_repository_mitigation_user_prompt(
             review_input=review_input,
             scan_mode=scan_mode,
             retry_context=retry_context,

@@ -4,7 +4,7 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-`agents/` 是项目里的 Python 侧。它包含 Execution Worker 入口、workflow 执行、filesystem / workspace runtime、delivery 产物生成和 observability。
+`agents/` 是项目里的 Python 侧。它把 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker 实现为三个独立的 Temporal runtime，并提供 workflow 执行、filesystem / workspace runtime、delivery 产物生成和 observability。
 
 ## 安装
 
@@ -52,7 +52,7 @@ LLM 配置按 deployment 选择 provider。
 
 本地 `run-local-*` CLI 和 `sec-review-agents-check-llm-deployments` 会加载 `agents/.env`，但不会覆盖进程里已有的环境变量。
 
-`sec-review-execution-worker` 和 `sec-review-memory-worker` 不会自己加载 `.env`，需要由 shell、process supervisor 或 CI 注入环境变量。Execution Gateway 是 [`execution-gateway/`](../execution-gateway/README.zh.md) 下独立的 TypeScript 服务。
+`sec-review-execution-worker`、`sec-review-memory-extraction-worker` 和 `sec-review-memory-maintenance-worker` 不会自己加载 `.env`，需要由 shell、process supervisor 或 CI 注入环境变量。Execution Gateway 是 [`execution-gateway/`](../execution-gateway/README.zh.md) 下独立的 TypeScript 服务。
 
 没有 `.env` 文件路径 override。`MODEL_PROVIDERS_CONFIG_TOML` 是模型配置路径的最高优先级入口；只有想把 TOML 放到其他位置，或运行方式不保留当前项目相对目录结构时，才需要显式设置它。
 
@@ -123,7 +123,7 @@ flowchart LR
     direct --> execution
 ```
 
-外部 TypeScript Gateway 接收 HTTP run 请求，并通过 Temporal client 启动和查询 workflow；它不执行 agent。Temporal Server 持久化 workflow 状态，并把任务派发给主动轮询的 worker。Direct local execution 绕过 HTTP service 和 Temporal，但会复用 activity functions；`run-local-* --temporal` 绕过 HTTP service，但会经过 Temporal Server 和 worker。
+外部 TypeScript Gateway 接收 HTTP run 请求，并通过 Temporal client 启动和查询 workflow；它不执行 agent。Temporal Server 持久化 workflow 状态，并通过独立的 worker 和 task queue 分发 review、memory extraction 与 memory maintenance 工作。Direct local execution 绕过 HTTP service 和 Temporal，但会复用 activity functions；`run-local-* --temporal` 绕过 HTTP service，但会经过 Temporal Server 和 Execution Worker。
 
 ## 本地运行
 
@@ -221,7 +221,7 @@ sec-review-agents-run-local-repository \
 
 显式传 `--temporal` 时，同一个本地命令仍然在开发机上准备输入，但后续 workflow stages 会通过 Temporal workflow / activity 调度执行。这个模式适合调试 workflow 编排、retry、activity 边界或 Temporal 中可见的状态。它仍然绕过 HTTP Execution Gateway，因此不等同于完整 service path。
 
-本地 Temporal 执行会把 run diagnostic bundle 保存在本地文件系统中，并通过经过校验的 `file://` 引用在 worker 之间传递。因此，本地 Execution Worker 与 Memory Worker 必须共享 artifact 文件系统，并以相同的绝对路径访问该文件；这种运行方式不需要 S3 兼容对象存储。
+本地 Temporal 执行会把 run diagnostic bundle 保存在本地文件系统中，并通过经过校验的 `file://` 引用在 Execution Worker 与 Memory Extraction Worker 之间传递。因此，这两个 worker 必须共享该 artifact 文件系统，并以相同的绝对路径访问它。
 
 运行 `--temporal` local command 前，先启动本地 Temporal dev server：
 
@@ -249,7 +249,7 @@ sec-review-execution-worker
 
 ### 手动启动 Workers
 
-分别启动 Temporal 和两个 worker。独立 HTTP 服务从 [`execution-gateway/`](../execution-gateway/README.zh.md) 启动。
+分别启动 Temporal 和三个 worker。
 
 最小本地启动形状：
 
@@ -267,22 +267,49 @@ TEMPORAL_EXECUTION_TASK_QUEUE=sec-review-execution \
 sec-review-execution-worker
 ```
 
-终端 3，Memory Worker：
+终端 3，Memory Extraction Worker：
 
 ```bash
 TEMPORAL_ADDRESS=127.0.0.1:7233 \
-sec-review-memory-worker
+TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES=4 \
+sec-review-memory-extraction-worker
 ```
 
-Execution Worker 负责 review workflow、sandbox activity 和 run diagnostic 发布；Memory Worker 读取已发布的诊断包，负责异步 extraction 与 maintenance。两者使用独立的 task queue 和并发限制。
+终端 4，Memory Maintenance Worker：
+
+```bash
+TEMPORAL_ADDRESS=127.0.0.1:7233 \
+TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES=1 \
+sec-review-memory-maintenance-worker
+```
+
+Execution Worker 负责 review workflow、sandbox activity 和 run diagnostic 发布；Memory Extraction Worker 读取已发布的诊断包并产出 observations，可以增加轮询同一 extraction task queue 的进程；Memory Maintenance Worker 串行更新共享 memory tree，并负责维护 maintenance schedule，它拒绝 `1` 以外的 activity concurrency，且必须保持单进程。三个 worker 分别使用独立的 task queue 和并发限制。
 
 Docker Compose 控制平面和宿主机 worker 的运行方式见[本地集成部署](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
 
 ## Agent 运行时配置
 
+### Skills
+
 Agent 可以声明自己需要的 skills。worker 启动 agent 时会自动准备并挂载声明的 skills。更多设计细节见 [Agent Skills](../docs/agent/SKILLS.zh.md)。
 
-Memory 有两种互斥的状态模式。在 local mode 中，`AGENT_MEMORY_DIR` 持有整理后的 memory、observations 和 SQLite ledger，主 agent 会把其中 `memory/` 子树的快照挂载为 `/memory`。在 coordinated mode 中，worker 设置 `AGENT_MEMORY_CATALOG_URL` 和 `AGENT_MEMORY_CATALOG_TOKEN`；外部服务持久化共享 observations 和 revisions，catalog 提供 compare-and-swap 提交边界，worker 再从对象存储物化 active immutable version，形成同样的本地只读 `/memory` 视图。Coordinated mode 不会回退读取 `AGENT_MEMORY_DIR`。`AGENT_MEMORY_CONSUMPTION_ENABLED` 控制 review agent 是否读取该视图，`AGENT_MEMORY_PROCESSING_ENABLED` 控制 transcript extraction 和 maintenance。设计原则和生命周期见 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)。
+### Memory
+
+Memory 依赖 Temporal、使用 PostgreSQL 的 Memory Catalog，以及 S3 兼容对象存储。
+
+| 变量 | 用途 |
+| --- | --- |
+| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 的基础 URL。未配置时，review agent 不加载 memory，memory processing 也无法运行。 |
+| `AGENT_MEMORY_CATALOG_TOKEN` | Memory Catalog 的 bearer token。配置 `AGENT_MEMORY_CATALOG_URL` 时必须同时配置。 |
+| `AGENT_MEMORY_CONSUMPTION_ENABLED` | 是否让 review agent 加载 active memory tree。默认为 `true`。 |
+| `AGENT_MEMORY_PROCESSING_ENABLED` | 是否运行 extraction 和 maintenance activities。默认为 `true`。 |
+
+每次 review invocation 都会在临时目录中物化 active memory tree，并在结束后删除。架构和生命周期见 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)。
+
+- `sec-review-agents-memory maintain`：请求 Temporal Server 启动一次 memory maintenance workflow。
+- `sec-review-agents-memory schedules maintenance ensure`：在 Temporal Server 中创建或更新周期性 maintenance schedule。
+
+### 结构化输出
 
 需要结构化输出的 agent 会检查最终 state 是否包含 `structured_response`。如果模型只返回普通文本、没有产出结构化结果，agent middleware 会在 LangChain agent loop 内追加一条纠偏消息并重试；重试次数由 `AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES` 控制，默认 `2`。这层兜底独立于 provider/API 请求重试，不处理 schema 参数校验错误；参数校验错误仍交给 LangChain structured output 自身的 retry 机制。
 

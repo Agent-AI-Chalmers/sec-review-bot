@@ -43,7 +43,7 @@ async def _run_mitigation_stage_for_workspace_capture(
 ) -> list[Path]:
     captured_workspace_paths: list[Path] = []
 
-    def build_backend(workspace_path: Path) -> object:
+    def build_backend(workspace_path: Path, _memory_view) -> object:
         assert (workspace_path / "src" / "app.js").exists()
         captured_workspace_paths.append(workspace_path)
         return object()

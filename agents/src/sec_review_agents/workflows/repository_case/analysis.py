@@ -1,7 +1,12 @@
 from pathlib import Path
 from typing import Any
 
-from sec_review_agents.agents.analysis import repository as repository_analysis_agent
+from sec_review_agents.agents.analysis.repository import (
+    build_repository_analyzer_filesystem_system_prompt,
+    build_repository_analyzer_system_prompt,
+    build_repository_analyzer_user_prompt,
+    create_repository_analyzer_backend,
+)
 from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 
@@ -24,20 +29,19 @@ async def analyze_repository_case(
         agent_name="repository-analyzer",
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         setup_declaration_content=setup_declaration_content,
-        build_backend=lambda stage_workspace_path: repository_analysis_agent.create_repository_analyzer_backend(
+        build_backend=lambda stage_workspace_path, memory_path_view: create_repository_analyzer_backend(
             workspace_root_path=stage_workspace_path,
             history_path=history_path,
             incremental_window_path=incremental_window_path,
             scan_mode=scan_mode,
+            memory_path_view=memory_path_view,
             runtime_context=runtime_context,
         ),
-        system_prompt=repository_analysis_agent.build_repository_analyzer_system_prompt(),
-        filesystem_system_prompt=(
-            repository_analysis_agent.build_repository_analyzer_filesystem_system_prompt(
-                scan_mode
-            )
+        system_prompt=build_repository_analyzer_system_prompt(),
+        filesystem_system_prompt=build_repository_analyzer_filesystem_system_prompt(
+            scan_mode
         ),
-        user_prompt=repository_analysis_agent.build_repository_analyzer_user_prompt(
+        user_prompt=build_repository_analyzer_user_prompt(
             review_input=review_input,
             scan_mode=scan_mode,
         ),

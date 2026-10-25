@@ -1,4 +1,4 @@
-"""Persist observed agent messages as append-only JSONL.
+"""Domain-independent JSONL transcript writing and reading.
 
 Removal updates are intentionally omitted: transcripts preserve messages once
 observed and are not replayable snapshots of the current LangGraph state.
@@ -13,16 +13,10 @@ from uuid import uuid4
 
 from langchain_core.messages import RemoveMessage
 
-from sec_review_agents.utils.files import slug_filename_component
 from sec_review_agents.utils.serialization import json_safe
 
-TRANSCRIPTS_DIRNAME = "transcripts"
 TRANSCRIPT_BASENAME = "transcript"
 TRANSCRIPT_SUFFIX = ".jsonl"
-
-
-def review_transcripts_root(artifact_root_path: Path) -> Path:
-    return artifact_root_path / TRANSCRIPTS_DIRNAME
 
 
 def transcript_path(directory: Path, *, name: str = TRANSCRIPT_BASENAME) -> Path:
@@ -32,46 +26,9 @@ def transcript_path(directory: Path, *, name: str = TRANSCRIPT_BASENAME) -> Path
     return directory / f"{normalized}{TRANSCRIPT_SUFFIX}"
 
 
-def stage_attempt_transcript_path(artifact_path: Path, *, attempt: str) -> Path:
-    return transcript_path(review_transcripts_root(artifact_path), name=attempt)
-
-
 def remove_transcripts(paths: Iterable[Path]) -> None:
     for path in paths:
         path.unlink(missing_ok=True)
-
-
-def transcript_file(
-    transcripts_dir: Path,
-    *,
-    order: int,
-    stage: str,
-    attempt: str = "initial",
-) -> Path:
-    if order < 1:
-        raise ValueError("Transcript order must be >= 1.")
-    suffix = "-".join(
-        (
-            slug_filename_component(stage, fallback="unknown"),
-            slug_filename_component(attempt, fallback="unknown"),
-        )
-    )
-    return transcript_path(transcripts_dir, name=f"{order:04d}-{suffix}")
-
-
-def review_stage_transcript_path(
-    artifact_root_path: Path,
-    *,
-    order: int,
-    stage: str,
-    attempt: str = "initial",
-) -> Path:
-    return transcript_file(
-        review_transcripts_root(artifact_root_path),
-        order=order,
-        stage=stage,
-        attempt=attempt,
-    )
 
 
 def _message_type(message: Any) -> str:
@@ -239,16 +196,11 @@ class TranscriptWriter:
 
 
 __all__ = [
-    "TRANSCRIPTS_DIRNAME",
     "TRANSCRIPT_BASENAME",
     "TRANSCRIPT_SUFFIX",
     "TranscriptWriter",
     "read_transcript_events",
     "read_transcript_messages",
     "remove_transcripts",
-    "review_stage_transcript_path",
-    "review_transcripts_root",
-    "stage_attempt_transcript_path",
-    "transcript_file",
     "transcript_path",
 ]

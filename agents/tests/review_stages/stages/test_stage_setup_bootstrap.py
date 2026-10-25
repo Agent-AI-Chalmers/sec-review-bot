@@ -73,7 +73,7 @@ async def _run(
             analyzer_artifacts_path=artifacts,
             agent_name="analyzer",
             baseline_snapshot_tar_path=_seed(tmp_path),
-            build_backend=lambda _ws: backend,
+            build_backend=lambda _ws, _memory_view: backend,
             system_prompt="system",
             filesystem_system_prompt="filesystem",
             user_prompt="user",

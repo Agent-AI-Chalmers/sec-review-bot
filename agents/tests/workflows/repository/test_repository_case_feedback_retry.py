@@ -75,7 +75,7 @@ async def _mitigation_error_stage_result(tmp_path: Path) -> dict[str, Any]:
 
     with (
         patch(
-            "sec_review_agents.agents.mitigation.repository.create_repository_mitigation_backend",
+            "sec_review_agents.workflows.repository_case.mitigation.create_repository_mitigation_backend",
             return_value=object(),
         ),
         patch(
@@ -115,7 +115,7 @@ async def test_repository_case_verifier_exception_is_raised_for_activity_retry(
 
     with (
         patch(
-            "sec_review_agents.agents.verification.repository.create_repository_verification_backend",
+            "sec_review_agents.workflows.repository_case.verification.create_repository_verification_backend",
             return_value=object(),
         ),
         patch(

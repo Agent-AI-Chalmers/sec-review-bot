@@ -19,7 +19,6 @@ from sec_review_agents.cli.local_previewing.issue import (
     write_issue_previews,
 )
 from sec_review_agents.cli.local_temporal import run_local_temporal_workflow
-from sec_review_agents.memory.store import initialize_configured_memory_store
 from sec_review_agents.utils.env import bootstrap_agents_env
 
 
@@ -121,7 +120,6 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     bootstrap_agents_env()
-    initialize_configured_memory_store()
     args = parse_args()
     issue_strategy: IssueReviewStrategy = args.strategy
     repo_path = Path(args.repo).resolve()

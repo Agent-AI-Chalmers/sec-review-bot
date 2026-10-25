@@ -16,18 +16,17 @@ from temporalio.client import (
 from temporalio.service import RPCError, RPCStatusCode
 
 from sec_review_agents.features import memory_processing_enabled
-from sec_review_agents.memory.maintenance_workflow import (
+from sec_review_agents.observability.log_config import logger
+from sec_review_agents.temporal.config import (
+    DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE,
+    DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
+)
+from sec_review_agents.utils.env import int_env
+from sec_review_agents.workflows.memory.maintenance import (
     MEMORY_MAINTENANCE_WORKFLOW_ID,
     MemoryMaintenanceRequest,
     MemoryMaintenanceWorkflow,
 )
-from sec_review_agents.memory.store import initialize_configured_memory_store
-from sec_review_agents.observability.log_config import logger
-from sec_review_agents.temporal.config import (
-    DEFAULT_MEMORY_TASK_QUEUE,
-    DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
-)
-from sec_review_agents.utils.env import int_env
 
 MEMORY_MAINTENANCE_SCHEDULE_ID = "memory-maintenance"
 MEMORY_MAINTENANCE_SCHEDULE_DEFAULT_INTERVAL_SECONDS = 60 * 60
@@ -42,8 +41,7 @@ class MemoryMaintenanceScheduleRequest:
     timeout_seconds: int
     interval_seconds: int = MEMORY_MAINTENANCE_SCHEDULE_DEFAULT_INTERVAL_SECONDS
     schedule_id: str = MEMORY_MAINTENANCE_SCHEDULE_ID
-    workflow_id: str = MEMORY_MAINTENANCE_WORKFLOW_ID
-    task_queue: str = DEFAULT_MEMORY_TASK_QUEUE
+    task_queue: str = DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE
     trigger_immediately: bool = False
 
 
@@ -61,7 +59,7 @@ def build_memory_maintenance_schedule(
                 timeout_seconds=request.timeout_seconds,
                 require_threshold=True,
             ),
-            id=request.workflow_id,
+            id=MEMORY_MAINTENANCE_WORKFLOW_ID,
             task_queue=request.task_queue,
         ),
         spec=ScheduleSpec(
@@ -102,7 +100,7 @@ async def ensure_memory_maintenance_schedule(
         "ok": True,
         "action": action,
         "schedule_id": request.schedule_id,
-        "workflow_id": request.workflow_id,
+        "workflow_id": MEMORY_MAINTENANCE_WORKFLOW_ID,
         "interval_seconds": request.interval_seconds,
         "trigger_immediately": request.trigger_immediately,
     }
@@ -136,11 +134,26 @@ async def ensure_configured_memory_schedules(
     )
 
     if not memory_processing_enabled():
+        for schedule_id in (
+            MEMORY_MAINTENANCE_SCHEDULE_ID,
+            *OBSOLETE_MEMORY_SCHEDULE_IDS,
+        ):
+            try:
+                await client.get_schedule_handle(schedule_id).delete()
+            except RPCError as error:
+                if error.status is not RPCStatusCode.NOT_FOUND:
+                    raise
+            else:
+                logger.info(
+                    "memory_schedule_deleted",
+                    schedule_id=schedule_id,
+                    reason="memory_processing_disabled",
+                )
         return
     if configured_memory_catalog_client() is None:
-        memory_store_dir = initialize_configured_memory_store()
-        if memory_store_dir is None:
-            return
+        raise ValueError(
+            "AGENT_MEMORY_CATALOG_URL is required when memory processing is enabled."
+        )
     for schedule_id in OBSOLETE_MEMORY_SCHEDULE_IDS:
         try:
             await client.get_schedule_handle(schedule_id).delete()

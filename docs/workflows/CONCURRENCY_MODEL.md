@@ -18,7 +18,9 @@ These layers are related, but they are not the same knob.
 
 The execution gateway starts Temporal workflows for app-submitted runs. Temporal does not treat one whole run as one worker slot. A run is decomposed into workflow tasks, activity tasks, and sometimes child workflows.
 
-`TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` limits how many review activities one Execution Worker process can execute at once. `TEMPORAL_MEMORY_MAX_CONCURRENT_ACTIVITIES` independently limits extraction and maintenance activities in one Memory Worker. Neither value means "how many app-submitted runs may be active."
+`TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` limits how many review activities one Execution Worker process can execute at once. `TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES` independently controls the Memory Extraction Worker. The Memory Maintenance Worker uses `TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES`, which is constrained to `1` because maintenance is a singleton operation. None of these values means "how many app-submitted runs may be active."
+
+Execution and memory extraction capacity can grow by adding worker processes that poll their respective queues. Memory maintenance is deliberately different: the integrated deployment runs one non-template service with one activity slot, and provides no scale-out path for that pool.
 
 For example, with `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES=8`:
 

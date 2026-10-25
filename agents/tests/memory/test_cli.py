@@ -1,54 +1,51 @@
 from argparse import Namespace
-from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
 
 from sec_review_agents.cli import memory
-from sec_review_agents.memory.maintenance_workflow import (
+from sec_review_agents.entrypoints.memory_maintenance_worker.schedules import (
+    MEMORY_MAINTENANCE_SCHEDULE_ID,
+)
+from sec_review_agents.temporal.config import DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE
+from sec_review_agents.workflows.memory.maintenance import (
     MEMORY_MAINTENANCE_WORKFLOW_ID,
     MemoryMaintenanceRequest,
     MemoryMaintenanceWorkflow,
 )
-from sec_review_agents.memory.schedule import MEMORY_MAINTENANCE_SCHEDULE_ID
-from sec_review_agents.memory.state import (
-    OBSERVATION_STATUS_PENDING,
-    initialize_memory_state,
-    open_memory_state,
-    upsert_observation,
-)
 
 
-def test_cli_exposes_observations_maintenance_and_schedule_only() -> None:
-    assert memory.parse_args(["observations", "list"]).command == "observations"
+def test_cli_exposes_temporal_execution_commands_only() -> None:
     assert memory.parse_args(["maintain"]).command == "maintain"
     assert (
         memory.parse_args(["schedules", "maintenance", "ensure"]).schedule_kind
         == "maintenance"
     )
     with pytest.raises(SystemExit):
+        memory.parse_args(["observations", "list"])
+    with pytest.raises(SystemExit):
         memory.parse_args(["extraction", "list"])
 
 
-def test_cli_lists_local_observations(tmp_path: Path, capsys) -> None:
-    store = tmp_path / "memory"
-    store.mkdir()
-    initialize_memory_state(store)
-    observation = store / "observations" / "one.md"
-    observation.parent.mkdir()
-    observation.write_text("body", encoding="utf-8")
-    with open_memory_state(store) as connection:
-        upsert_observation(
-            connection,
-            observation_id="one",
-            path=str(observation),
-            status=OBSERVATION_STATUS_PENDING,
-        )
+def test_cli_help_describes_temporal_execution_not_state_browsing(capsys) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        memory.parse_args(["--help"])
 
-    assert memory.main(["observations", "list", "--memory-store-dir", str(store)]) == 0
+    assert exit_info.value.code == 0
     output = capsys.readouterr().out
-    assert "one\tpending" in output
-    assert "observations/one.md" in output
+    assert "Start and repair Temporal memory-maintenance execution." in output
+    assert "{maintain,schedules}" in output
+
+
+def test_temporal_commands_default_to_maintenance_task_queue() -> None:
+    assert (
+        memory.parse_args(["maintain"]).task_queue
+        == DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE
+    )
+    assert (
+        memory.parse_args(["schedules", "maintenance", "ensure"]).task_queue
+        == DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE
+    )
 
 
 @pytest.mark.asyncio
@@ -92,7 +89,6 @@ async def test_schedule_ensure_uses_maintenance_contract(monkeypatch) -> None:
         timeout_seconds=30,
         interval_seconds=60,
         schedule_id=MEMORY_MAINTENANCE_SCHEDULE_ID,
-        workflow_id=MEMORY_MAINTENANCE_WORKFLOW_ID,
         task_queue="memory",
         trigger_immediately=False,
         schedule_kind="maintenance",
@@ -102,4 +98,4 @@ async def test_schedule_ensure_uses_maintenance_contract(monkeypatch) -> None:
     assert ensure.await_args is not None
     request = ensure.await_args.args[1]
     assert request.schedule_id == MEMORY_MAINTENANCE_SCHEDULE_ID
-    assert request.workflow_id == MEMORY_MAINTENANCE_WORKFLOW_ID
+    assert not hasattr(request, "workflow_id")

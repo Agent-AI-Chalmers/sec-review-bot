@@ -4,7 +4,7 @@
 
 本文是 [LOCAL_INTEGRATED_DEPLOYMENT.md](LOCAL_INTEGRATED_DEPLOYMENT.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-这是 GitHub integration、Review Control Plane、运行服务、Temporal、对象存储以及宿主机 Execution Worker 和 Memory Worker 的本地部署说明。
+这是 GitHub integration、Review Control Plane、运行服务、Temporal、对象存储以及宿主机 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker 的本地部署说明。
 
 如果你要在本地跑完整集成链路，读本文。不经过 HTTP 运行服务、直接在本地运行 agent，或使用 `run-local-* --temporal` 调试时，见 [agents 本地运行说明](../../agents/README.zh.md)。
 
@@ -12,7 +12,7 @@
 
 ![本地集成部署结构](../../assets/operations/local-integrated-deployment.zh.svg)
 
-Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Control Plane 协调每个 review run；Temporal 把 review 工作分发给 Execution Worker，把异步 memory 工作分发给 Memory Worker。PostgreSQL 保存控制和 catalog 状态，RustFS 保存运行输入、transcript、memory revision 和 artifact。
+Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Control Plane 协调每个 review run；Temporal 把 review、memory extraction 和 memory maintenance 工作分发给三个独立的 worker pool。PostgreSQL 保存控制和 catalog 状态，RustFS 保存运行输入、transcript、memory revision 和 artifact。
 
 Control Plane UI 是独立部署的控制台。它的同源服务端从 Control Plane 读取运行状态并代理 artifact 下载，因此服务凭据和存储凭据都不会进入浏览器代码。公网 endpoint 的配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
@@ -107,9 +107,9 @@ Sample 中既有可直接使用的默认值，也有必须替换的空值和占�
 
 Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个文件只管 Compose 怎么启动容器、挂载哪些本地目录、暴露哪些端口。
 
-将 `EXECUTION_API_TOKEN`、`AGENT_MEMORY_CATALOG_TOKEN` 以及 PostgreSQL/RustFS 密码分别设置为独立生成的 secret，例如使用 `openssl rand -hex 32`。把同一枚 Memory Catalog token 也写入 `ops/systemd/deployment.env`：Compose 把它交给独立 Memory Catalog Server 容器，两个宿主机 worker 用它作为窄客户端凭据。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
+将 `EXECUTION_API_TOKEN`、`AGENT_MEMORY_CATALOG_TOKEN` 以及 PostgreSQL/RustFS 密码分别设置为独立生成的 secret，例如使用 `openssl rand -hex 32`。把同一枚 Memory Catalog token 也写入 `ops/systemd/deployment.env`：Compose 把它交给独立 Memory Catalog Server 容器，两个 memory worker pool 用它作为窄客户端凭据。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
 
-RustFS 按职责为各组件分配独立身份：integration 写入 input object；Execution Worker 读取 input、写入 run diagnostic bundle 并读取 active memory revision；Memory Worker 读取 run diagnostic，并读写 memory revision 和 Memory Agent 审计包；UI BFF 为经过认证的下载读取已存储 diagnostic。`compose.env.sample` 中对应的 secret key 属于这些不同身份，应当分别生成。
+RustFS 按存储职责分配身份：integration 写入 input object；Execution Worker 读取 input、写入 run diagnostic bundle 并读取 active memory revision；Memory Extraction Worker 和 Memory Maintenance Worker 共用一套 memory storage identity，用于访问 run diagnostic、memory revision 和压缩后的 memory-agent transcript；UI BFF 为经过认证的下载读取已存储 diagnostic。Extraction 与 maintenance 仍然是独立的 Temporal worker identity、进程和 task queue。这里保留共享 S3 credential，是因为当前对象存储 policy 覆盖同一个 memory artifact namespace；在本次部署拆分中进一步拆 IAM contract 不会单独改善进程隔离。
 
 ### 2. GitHub integration `.env`
 
@@ -174,13 +174,13 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `AGENT_MEMORY_PROCESSING_ENABLED` | 允许 transcript extraction 和 memory maintenance；默认是 `true`。 |
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9100`。 |
 | `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入 run diagnostic bundle，并读取 active memory revision。 |
-| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Worker 凭据；可读取 run diagnostic bundle，并读写 memory revision 和 Memory Agent 审计包。 |
-| `AGENT_MEMORY_CATALOG_URL` | coordinated memory state 的独立 API；Compose 默认是 `http://127.0.0.1:8092`。 |
+| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | 两个 memory worker 共用的存储凭据；可读取 run diagnostic bundle，并读写 memory revision 和压缩后的 memory-agent transcript。 |
+| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 协调状态 API；Compose 默认是 `http://127.0.0.1:8092`。 |
 | `AGENT_MEMORY_CATALOG_TOKEN` | 必须与仓库 `.env` 一致；它只授权 memory 协调，不提供 PostgreSQL 直连权限。 |
 
 Execution Worker 会在 workflow 成功前把权威 run diagnostic 发布到 `runs/*/artifacts/*`。Execution Gateway 只校验并转发该不可变引用，不持有对象存储凭据，也不挂载 worker artifact tree。Agent sandbox 不会收到任何 workload storage 凭据。
 
-Memory Catalog Server 是独立 TypeScript 服务，不属于 Control Plane。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_control_plane` 和 `sec_review_memory_catalog` database。只有 Memory Catalog 收到 `MEMORY_CATALOG_DATABASE_URL`，并在自己的 database 中保存 observations 和 active memory pointer。提取执行和单例维护 workflow 由 Temporal 管理，PostgreSQL 只负责持久目录以及 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；transcript 和 active memory 仍由 worker 在每次 activity 中物化到本地，agent sandbox 只看到最终 filesystem mount。使用 coordinated memory mode 的 worker 不要同时设置 `AGENT_MEMORY_DIR`。
+Memory Catalog Server 是独立 TypeScript 服务，不属于 Control Plane。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_control_plane` 和 `sec_review_memory_catalog` database。只有 Memory Catalog 收到 `MEMORY_CATALOG_DATABASE_URL`，并在自己的 database 中保存 extraction records 及其可选 observations、memory-tree revision history 和 active revision pointer。每个 revision 记录对应的 maintenance identity 和 maintainer transcript reference。Temporal 负责 extraction 执行和单例 maintenance workflow；PostgreSQL 是持久 catalog 与 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；memory-tree revisions 和 memory-agent transcripts 以不可变对象保存在 RustFS 中。Worker 将这些对象物化到 invocation 级临时 worktree，agent sandbox 只看到最终 filesystem mount。
 
 PostgreSQL 初始化脚本只会在 `.agent-postgres-state` 为空时执行。采用或修改 database 名称后，应先停止部署并删除该目录，再重新启动 Compose。此操作会删除已有的 Control Plane 和 Memory Catalog 数据。
 
@@ -229,7 +229,7 @@ AGENT_PLAYWRIGHT_ENABLED=false
 AGENT_MCP_ENABLED=false
 ```
 
-执行节点使用 `AGENT_SANDBOX_BACKEND=docker` 后，Docker 不可用时 Execution Worker 会在启动阶段失败；Memory Worker 不会初始化或依赖 Docker sandbox 边界。
+执行节点使用 `AGENT_SANDBOX_BACKEND=docker` 后，Docker 不可用时 Execution Worker 会在启动阶段失败；两个 memory worker 都不会初始化或依赖 Docker sandbox 边界。
 
 要通过仓库提供的 Docker 镜像使用 Joern 和 Playwright CLI，先构建 workspace tools 镜像，再修改 `ops/systemd/deployment.env`：
 
@@ -254,12 +254,12 @@ CodeGraph 在 sandbox 内运行，因此需要一个能执行命令的 backend�
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
-| `.agent-rustfs-state` | RustFS | integration 与 Execution Worker 交换 input archive 的持久对象存储 |
+| `.agent-rustfs-state` | RustFS | run inputs、diagnostics、memory-tree revisions、memory-agent transcripts 及其他 artifacts 的持久对象存储 |
 | `.agent-run-inputs` | 宿主机 worker | 活跃运行所需的本地输入；不会进入对外发布的诊断材料 |
 | `.agent-artifacts` | 宿主机 worker | 每次运行的 agent 产物和 workflow 输出 |
-| `.agent-postgres-state` | PostgreSQL | admission、execution observation 与 publication step 协调状态 |
+| `.agent-postgres-state` | PostgreSQL | Control Plane run 状态与 Memory Catalog 协调状态 |
 | `.agent-temporal-state` | Temporal | workflow history 和待处理 task state |
-| `.agent-memory` | 宿主机 worker | 启用 memory 时的持久 agent memory store |
+
 
 ## 运行部署
 
@@ -287,9 +287,9 @@ sudo ops/systemd/install.sh "$USER"
 sudo systemctl enable --now sec-review-bot.target
 ```
 
-`sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 Compose 控制平面、`sec-review-execution-worker@1.service` 和 `sec-review-memory-worker@1.service` 组合起来统一管理。
+`sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 Compose 控制平面、`sec-review-execution-worker@1.service`、`sec-review-memory-extraction-worker@1.service` 和单例 `sec-review-memory-maintenance-worker.service` 组合起来统一管理。
 
-控制平面包括 GitHub integration、Execution Gateway 和 Temporal。Execution Worker 运行 review workflow、创建 Docker sandbox 并发布 run diagnostic；Memory Worker 消费该诊断包执行异步 extraction 和 maintenance，不拥有 review sandbox 边界。
+控制平面包括 GitHub integration、Execution Gateway 和 Temporal。Execution Worker 运行 review workflow、创建 Docker sandbox 并发布 run diagnostic；Memory Extraction Worker 消费诊断包并登记 observations；Memory Maintenance Worker 串行更新共享 memory tree，并负责修复 maintenance schedule。两个 memory worker 都不拥有 review sandbox 边界。
 
 启动期失败和运行期失败的监督方式不同，排查时这个区别很关键：
 
@@ -312,11 +312,13 @@ Temporal development server 的状态保存在 `.agent-temporal-state` 下，因
 sudo systemctl status sec-review-bot.target
 sudo systemctl status sec-review-bot-control-plane.service
 sudo systemctl status sec-review-execution-worker@1.service
-sudo systemctl status sec-review-memory-worker@1.service
+sudo systemctl status sec-review-memory-extraction-worker@1.service
+sudo systemctl status sec-review-memory-maintenance-worker.service
 sudo journalctl \
   -u sec-review-bot-control-plane.service \
   -u sec-review-execution-worker@1.service \
-  -u sec-review-memory-worker@1.service \
+  -u sec-review-memory-extraction-worker@1.service \
+  -u sec-review-memory-maintenance-worker.service \
   -f
 ```
 
@@ -368,12 +370,13 @@ curl -sS http://127.0.0.1:8090/readyz
 
 ### 组件级操作
 
-排障或只更新一个组件时，可以分别重启控制平面或任一 worker：
+排障或只更新一个组件时，可以分别重启控制平面或任一个 worker：
 
 ```bash
 sudo systemctl restart sec-review-bot-control-plane.service
 sudo systemctl restart sec-review-execution-worker@1.service
-sudo systemctl restart sec-review-memory-worker@1.service
+sudo systemctl restart sec-review-memory-extraction-worker@1.service
+sudo systemctl restart sec-review-memory-maintenance-worker.service
 ```
 
 也可以绕过 systemd，在前台启动 Compose 控制平面进行开发调试：
@@ -382,21 +385,22 @@ sudo systemctl restart sec-review-memory-worker@1.service
 docker compose --profile app up --build
 ```
 
-这个命令不会启动两个宿主机 worker。
+这个命令不会启动任何宿主机 worker。
 
 ### Worker 并发
 
-`TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` 限制每个 Execution Worker 同时执行的 review activities 数量，默认值为 `2`。每个 review activity 都可能创建 sandbox 并发出多次模型请求，因此单机部署应从这个保守值开始。`TEMPORAL_MEMORY_MAX_CONCURRENT_ACTIVITIES` 独立限制每个 Memory Worker 同时执行的 extraction 和 maintenance activities 数量，默认值为 `1`。
+`TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` 限制每个 Execution Worker 同时执行的 review activities 数量，默认值为 `2`。每个 review activity 都可能创建 sandbox 并发出多次模型请求，因此单机部署应从这个保守值开始。`TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES` 独立限制每个 Memory Extraction Worker 的 activity 数量，默认值为 `4`。Memory Maintenance Worker 始终使用 `TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES=1`；其 unit 特意不是 template，不应扩容。
 
-两套 systemd template 可以分别扩展两个 worker pool：
+两套 systemd template 可以分别扩展 Execution 和 Memory Extraction worker pool：
 
 ```bash
 sudo systemctl enable --now sec-review-execution-worker@2.service
 sudo systemctl enable --now sec-review-execution-worker@3.service
-sudo systemctl enable --now sec-review-memory-worker@2.service
+sudo systemctl enable --now sec-review-memory-extraction-worker@2.service
+sudo systemctl enable --now sec-review-memory-extraction-worker@3.service
 ```
 
-Temporal 会在共用同一 task queue 的实例之间分配任务。每个 worker pool 至少保留一个进程；review 工作排队时增加 Execution Worker，extraction 或 maintenance 排队时增加 Memory Worker。两个 pool 不必使用相同的实例数量或机器规格。
+Temporal 会在共用同一 task queue 的实例之间分配任务。每个 worker pool 至少保留一个进程；review 工作排队时增加 Execution Worker，extraction 工作排队时增加 Memory Extraction Worker。两个可扩容 pool 不必使用相同的实例数量或机器规格。Maintenance 始终只有一个进程和一个 activity slot；固定 workflow ID、schedule overlap policy 与 Catalog compare-and-swap 边界共同提供持久的单例保证。
 
 ## 清理
 
@@ -420,12 +424,6 @@ sudo systemctl start sec-review-bot.target
 
 ```bash
 sudo rm -rf .agent-rustfs-state .agent-run-inputs .agent-artifacts
-```
-
-`.agent-memory` 会跨多次运行持续保存，不属于常规清理范围。只有在确实需要重置 agent memory 时，才应先停止 worker，再单独删除 `.agent-memory`。该操作会永久删除已提取的 observations 和维护后的 memory。
-
-```bash
-sudo rm -rf .agent-memory
 ```
 
 ### 备份与恢复
@@ -472,11 +470,11 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 
 ## 为何这样部署
 
-这套部署由两个运行时承担：Compose 跑负责协调 review 的服务，systemd 跑执行 review 的 worker。哪个组件由哪个运行时承载，取决于该组件要做什么，这也决定了监督能覆盖到哪里。
+这套部署由两个运行时承担：Compose 跑协调服务，systemd 跑三个宿主机 worker pool。哪个组件由哪个运行时承载，取决于该组件要做什么，这也决定了监督能覆盖到哪里。
 
-### worker 跑在宿主机上
+### workers 跑在宿主机上
 
-Execution Worker 是整条链路里唯一会运行被审查仓库代码的组件。它为每次 agent 调用启动一个 Docker 容器，因此需要访问宿主机的 Docker daemon。把它放进 Compose 只有两种做法：把 Docker socket 挂进一个本来就在运行不可信代码的容器，或者在容器内再跑一个特权 daemon。无论哪种，只要某次 review 出了事，影响都会超出沙箱。放在宿主机上，它直接使用 daemon，并由 systemd 监督，因此具备真实的 unit 状态、有上限的重启策略，以及对控制平面的依赖关系。Memory Worker 同样由 systemd 在宿主机运行，但不会初始化 Docker sandbox。
+Execution Worker 是整条链路里唯一会运行被审查仓库代码的组件。它为每次 agent 调用启动一个 Docker 容器，因此需要访问宿主机的 Docker daemon。把它放进 Compose 只有两种做法：把 Docker socket 挂进一个本来就在运行不可信代码的容器，或者在容器内再跑一个特权 daemon。无论哪种，只要某次 review 出了事，影响都会超出沙箱。放在宿主机上，它直接使用 daemon，并由 systemd 监督，因此具备真实的 unit 状态、有上限的重启策略，以及对控制平面的依赖关系。Memory Extraction Worker 和 Memory Maintenance Worker 通过各自的 systemd unit 在宿主机并列运行，但不会初始化 Docker sandbox。
 
 在 Temporal 的任务队列模型里，worker 部署在宿主上属于常规做法，算不上变通：worker 主动轮询队列，部署在哪里并不影响 workflow 的推进。worker 消失只会让任务延后，不会丢失 workflow 状态。
 

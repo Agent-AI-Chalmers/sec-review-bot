@@ -97,7 +97,7 @@ async def test_repository_verification_does_not_prepare_workspace_when_prompt_bu
             "sec_review_agents.workflows.repository_case.verification.run_verification_stage"
         ) as run_verification_stage_mock,
         patch(
-            "sec_review_agents.agents.verification.repository.build_repository_verification_user_prompt",
+            "sec_review_agents.workflows.repository_case.verification.build_repository_verification_user_prompt",
             side_effect=RuntimeError("prompt failed"),
         ),
         pytest.raises(RuntimeError, match="prompt failed"),
@@ -128,7 +128,7 @@ async def test_repository_verification_preserves_patch_terminal_newline(
             "sec_review_agents.workflows.repository_case.verification.reset_verification_attempt_artifacts"
         ),
         patch(
-            "sec_review_agents.agents.verification.repository.build_repository_verification_user_prompt",
+            "sec_review_agents.workflows.repository_case.verification.build_repository_verification_user_prompt",
             return_value="user prompt",
         ) as build_prompt,
         patch(

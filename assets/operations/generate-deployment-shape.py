@@ -62,17 +62,37 @@ def add_path(
     bidirectional: bool = False,
     dashed: bool = False,
 ) -> None:
-    commands = [f"M {points[0][0]} {points[0][1]}"]
-    commands.extend(f"L {x} {y}" for x, y in points[1:])
+    commands = rounded_path(points)
     classes = "edge dashed" if dashed else "edge"
     attributes: dict[str, object] = {
-        "d": " ".join(commands),
+        "d": commands,
         "class_": classes,
         "marker_end": "url(#arrow)",
     }
     if bidirectional:
         attributes["marker_start"] = "url(#arrow)"
     element(parent, "path", **attributes)
+
+
+def rounded_path(points: list[tuple[int, int]], radius: int = 10) -> str:
+    commands = [f"M {points[0][0]} {points[0][1]}"]
+    for index in range(1, len(points) - 1):
+        previous = points[index - 1]
+        current = points[index]
+        following = points[index + 1]
+        incoming = min(radius, abs(current[0] - previous[0]) // 2 + abs(current[1] - previous[1]) // 2)
+        outgoing = min(radius, abs(following[0] - current[0]) // 2 + abs(following[1] - current[1]) // 2)
+        before = (
+            current[0] - (incoming if current[0] != previous[0] else 0),
+            current[1] - (incoming if current[1] != previous[1] else 0),
+        )
+        after = (
+            current[0] + (outgoing if following[0] != current[0] else 0),
+            current[1] + (outgoing if following[1] != current[1] else 0),
+        )
+        commands.extend((f"L {before[0]} {before[1]}", f"Q {current[0]} {current[1]} {after[0]} {after[1]}"))
+    commands.append(f"L {points[-1][0]} {points[-1][1]}")
+    return " ".join(commands)
 
 
 def render(filename: str, labels: dict[str, str]) -> None:
@@ -99,8 +119,8 @@ def render(filename: str, labels: dict[str, str]) -> None:
         viewBox="0 0 10 10",
         refX=9,
         refY=5,
-        markerWidth=5,
-        markerHeight=5,
+        markerWidth=4,
+        markerHeight=4,
         markerUnits="userSpaceOnUse",
         orient="auto-start-reverse",
     )
@@ -112,7 +132,7 @@ def render(filename: str, labels: dict[str, str]) -> None:
       .external-zone { fill: #f8fafc; stroke: #d8dee8; }
       .compose-zone { fill: #f8fbfa; stroke: #c7d8d2; }
       .host-zone { fill: #fffaf6; stroke: #e2d3c6; }
-      .zone-label { font-size: 21px; font-weight: 650; fill: #475569; }
+      .zone-label { font-size: 21px; font-weight: 650; fill: #475569; paint-order: stroke; stroke: #ffffff; stroke-width: 10; stroke-linejoin: round; }
       .node { filter: url(#shadow); }
       .node-surface { fill: #ffffff; stroke: #d6dce5; stroke-width: 1.25; }
       .node-accent { fill: none; stroke-width: 3; stroke-linecap: round; }
@@ -122,10 +142,10 @@ def render(filename: str, labels: dict[str, str]) -> None:
       .memory-node .node-accent { stroke: #2f806a; }
       .storage-node .node-accent { stroke: #9a6a22; }
       .sandbox-node .node-accent { stroke: #7c5c9e; }
-      .node-label { font-size: 17px; font-weight: 550; }
-      .edge { fill: none; stroke: #718096; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+      .node-label { font-size: 16px; font-weight: 550; }
+      .edge { fill: none; stroke: #94a3b8; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; opacity: 0.76; }
       .edge.dashed { stroke-dasharray: 6 5; }
-      .arrow-head { fill: #718096; }
+      .arrow-head { fill: #94a3b8; opacity: 0.76; }
     """
 
     element(root, "rect", x=20, y=24, width=220, height=760, rx=7, class_="zone external-zone")
@@ -140,9 +160,10 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_path(root, [(680, 151), (720, 151)], bidirectional=True)
     add_path(root, [(900, 151), (940, 151)], bidirectional=True)
     add_path(root, [(1025, 187), (1025, 315)])
-    add_path(root, [(1110, 351), (1260, 351)], bidirectional=True)
-    add_path(root, [(1110, 369), (1160, 369), (1160, 478), (1260, 478)], bidirectional=True)
-    add_path(root, [(1260, 333), (1245, 333), (1245, 691), (1260, 691)])
+    add_path(root, [(1110, 333), (1180, 333), (1180, 301), (1260, 301)], bidirectional=True)
+    add_path(root, [(1110, 351), (1190, 351), (1190, 426), (1260, 426)], bidirectional=True)
+    add_path(root, [(1110, 369), (1200, 369), (1200, 551), (1260, 551)], bidirectional=True)
+    add_path(root, [(1260, 283), (1245, 283), (1245, 691), (1260, 691)])
     add_path(root, [(210, 351), (300, 351)])
     add_path(root, [(470, 351), (490, 351), (490, 205), (720, 205), (720, 169)])
     add_path(root, [(680, 169), (700, 169), (700, 560), (975, 560), (975, 590)])
@@ -150,9 +171,11 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_path(root, [(600, 387), (600, 560), (740, 560), (740, 590)])
     add_path(root, [(1110, 169), (1140, 169), (1140, 560), (1070, 560), (1070, 590)])
     add_path(root, [(1025, 387), (1025, 590)], bidirectional=True)
-    add_path(root, [(1260, 369), (1190, 369), (1190, 631), (1130, 631)], bidirectional=True)
-    add_path(root, [(1260, 514), (1210, 514), (1210, 631), (1130, 631)], bidirectional=True)
-    add_path(root, [(1260, 496), (1180, 496), (1180, 420), (710, 420), (710, 369), (690, 369)], bidirectional=True, dashed=True)
+    add_path(root, [(1260, 319), (1170, 319), (1170, 631), (1130, 631)], bidirectional=True)
+    add_path(root, [(1260, 444), (1160, 444), (1160, 613), (1130, 613)], bidirectional=True)
+    add_path(root, [(1260, 569), (1150, 569), (1150, 649), (1130, 649)], bidirectional=True)
+    add_path(root, [(1260, 426), (1180, 426), (1180, 420), (710, 420), (710, 369), (690, 369)], bidirectional=True, dashed=True)
+    add_path(root, [(1260, 551), (1170, 551), (1170, 440), (730, 440), (730, 369), (690, 369)], bidirectional=True, dashed=True)
 
     add_node(root, "github", 50, 115, 160, 72, "GitHub", "external-node")
     add_node(root, "browser", 50, 315, 160, 72, labels["browser"], "external-node")
@@ -165,9 +188,10 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_node(root, "catalog", 510, 315, 180, 72, "Memory Catalog\nServer", "memory-node")
     add_node(root, "postgres", 700, 590, 190, 82, "PostgreSQL", "storage-node")
     add_node(root, "storage", 940, 590, 190, 82, labels["storage"], "storage-node")
-    add_node(root, "execution-worker", 1260, 315, 180, 72, "Execution Worker", "execution-node")
-    add_node(root, "memory-worker", 1260, 455, 180, 82, "Memory Worker", "memory-node")
-    add_node(root, "sandbox", 1260, 650, 180, 82, "Docker sandbox", "sandbox-node")
+    add_node(root, "execution-worker", 1250, 265, 200, 72, "Execution Worker", "execution-node")
+    add_node(root, "memory-extraction-worker", 1250, 390, 200, 72, "Memory Extraction\nWorker", "memory-node")
+    add_node(root, "memory-maintenance-worker", 1250, 515, 200, 72, "Memory Maintenance\nWorker", "memory-node")
+    add_node(root, "sandbox", 1250, 650, 200, 82, "Docker sandbox", "sandbox-node")
 
     tree = ET.ElementTree(root)
     ET.indent(tree, space="  ")
@@ -178,7 +202,7 @@ render(
     "local-integrated-deployment.svg",
     {
         "title": "Local integrated deployment shape",
-        "description": "GitHub and an operator browser connect to Docker Compose services, while separate host workers execute reviews and asynchronous memory processing.",
+        "description": "GitHub and an operator browser connect to Docker Compose services, while three host worker pools execute reviews, memory extraction, and memory maintenance.",
         "external": "External",
         "host": "Host",
         "browser": "Operator\nbrowser",
@@ -190,7 +214,7 @@ render(
     "local-integrated-deployment.zh.svg",
     {
         "title": "本地集成部署结构",
-        "description": "GitHub 和运维人员浏览器连接 Docker Compose 服务，宿主机上的两个 worker 分别执行 review 和异步 memory 工作。",
+        "description": "GitHub 和运维人员浏览器连接 Docker Compose 服务，宿主机上的三个 worker pool 分别执行 review、memory extraction 和 memory maintenance。",
         "external": "外部",
         "host": "宿主机",
         "browser": "运维人员\n浏览器",

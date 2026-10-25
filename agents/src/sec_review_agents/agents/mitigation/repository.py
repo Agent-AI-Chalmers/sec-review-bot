@@ -9,16 +9,16 @@ from sec_review_agents.agents.mitigation.skills import MITIGATION_AGENT_SKILLS
 from sec_review_agents.external_tools import (
     external_tool_prompt_paths_for,
 )
-from sec_review_agents.features import agent_skills_enabled, memory_consumption_enabled
+from sec_review_agents.features import agent_skills_enabled
 from sec_review_agents.filesystem import backend_selection
 from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.filesystem.path_views import (
+    PathView,
     read_only_path_view,
     skill_view,
     tmp_view_for_backend,
     workspace_view,
 )
-from sec_review_agents.memory.store import configured_memory_path_view
 from sec_review_agents.resources.loader import (
     join_prompt_sections,
     load_prompt_resource,
@@ -63,13 +63,11 @@ def create_repository_mitigation_backend(
     history_path: Path | None,
     incremental_window_path: Path | None,
     scan_mode: str,
+    memory_path_view: PathView | None = None,
     runtime_context: ExecutionRuntimeContext | None = None,
 ):
     workspace_image = runtime_workspace_image(runtime_context)
     backend_kind = backend_selection.selected_sandbox_backend_kind()
-    memory_view = (
-        configured_memory_path_view() if memory_consumption_enabled() else None
-    )
     tmp_view = tmp_view_for_backend(backend_kind)
     path_views = [
         workspace_view(host_path=workspace_root, writable=True),
@@ -78,8 +76,8 @@ def create_repository_mitigation_backend(
         path_views.append(
             skill_view(host_path=materialize_agent_skills_view(MITIGATION_AGENT_SKILLS))
         )
-    if memory_view is not None:
-        path_views.append(memory_view)
+    if memory_path_view is not None:
+        path_views.append(memory_path_view)
     if tmp_view is not None:
         path_views.append(tmp_view)
     if scan_mode == "incremental":

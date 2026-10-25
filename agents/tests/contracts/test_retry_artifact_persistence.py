@@ -250,7 +250,7 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
             mitigator_artifacts_path=mitigator_root,
             baseline_snapshot_tar_path=root / WORKSPACE_SNAPSHOT_TAR_NAME,
             retry_context=retry_context,
-            build_backend=lambda _workspace_path: object(),
+            build_backend=lambda _workspace_path, _memory_view: object(),
             system_prompt="base",
             filesystem_system_prompt="fs",
             user_prompt="user",

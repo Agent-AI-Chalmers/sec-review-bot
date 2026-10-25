@@ -2,7 +2,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from sec_review_agents.agents.analysis import issue as issue_analysis_agent
+from sec_review_agents.agents.analysis.issue import (
+    build_issue_analyzer_filesystem_system_prompt,
+    build_issue_analyzer_system_prompt,
+    build_issue_analyzer_user_prompt,
+    create_issue_analyzer_backend,
+)
 from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.workflows.review_intent import ReviewObjective
@@ -25,18 +30,15 @@ async def analyze_issue(
         agent_name="issue-analyzer",
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         setup_declaration_content=setup_declaration_content,
-        build_backend=lambda stage_workspace_path: issue_analysis_agent.create_issue_analyzer_backend(
+        build_backend=lambda stage_workspace_path, memory_path_view: create_issue_analyzer_backend(
             workspace_root_path=stage_workspace_path,
             history_path=history_path,
+            memory_path_view=memory_path_view,
             runtime_context=runtime_context,
         ),
-        system_prompt=issue_analysis_agent.build_issue_analyzer_system_prompt(
-            review_objective
-        ),
-        filesystem_system_prompt=(
-            issue_analysis_agent.build_issue_analyzer_filesystem_system_prompt()
-        ),
-        user_prompt=issue_analysis_agent.build_issue_analyzer_user_prompt(
+        system_prompt=build_issue_analyzer_system_prompt(review_objective),
+        filesystem_system_prompt=build_issue_analyzer_filesystem_system_prompt(),
+        user_prompt=build_issue_analyzer_user_prompt(
             issue=issue,
         ),
     )

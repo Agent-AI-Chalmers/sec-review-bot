@@ -1,4 +1,4 @@
-"""Resolve shared artifact references to verified local archives."""
+"""Resolve shared artifact references to verified local objects."""
 
 import hashlib
 from pathlib import Path
@@ -15,20 +15,20 @@ def materialize_artifact(
     maximum_size: int,
     expected_s3_key: str | None = None,
 ) -> Path:
-    """Resolve one shared artifact reference to a verified local archive."""
+    """Resolve one shared artifact reference to a verified local object."""
     if reference.size_bytes > maximum_size:
-        raise ValueError("Artifact archive exceeds the compressed size limit.")
+        raise ValueError("Artifact object exceeds the size limit.")
 
     parsed = urlparse(reference.uri)
     if parsed.scheme == "file":
         if parsed.netloc or parsed.query or parsed.fragment:
             raise ValueError("Local artifact URI must be an absolute file URI.")
-        archive_path = Path(unquote(parsed.path))
-        if not archive_path.is_absolute():
+        artifact_path = Path(unquote(parsed.path))
+        if not artifact_path.is_absolute():
             raise ValueError("Local artifact URI path must be absolute.")
-        archive_path = archive_path.resolve()
+        artifact_path = artifact_path.resolve()
     elif parsed.scheme == "s3":
-        archive_path = download_s3_object(
+        artifact_path = download_s3_object(
             reference.uri,
             destination,
             expected_size=reference.size_bytes,
@@ -38,17 +38,17 @@ def materialize_artifact(
     else:
         raise ValueError(f"Unsupported artifact URI scheme: {parsed.scheme}")
 
-    if not archive_path.is_file():
-        raise ValueError(f"Artifact archive not found: {archive_path}")
-    if archive_path.stat().st_size != reference.size_bytes:
-        raise ValueError("Artifact archive size does not match reference.")
+    if not artifact_path.is_file():
+        raise ValueError(f"Artifact object not found: {artifact_path}")
+    if artifact_path.stat().st_size != reference.size_bytes:
+        raise ValueError("Artifact object size does not match reference.")
     digest = hashlib.sha256()
-    with archive_path.open("rb") as archive_file:
-        while chunk := archive_file.read(1024 * 1024):
+    with artifact_path.open("rb") as artifact_file:
+        while chunk := artifact_file.read(1024 * 1024):
             digest.update(chunk)
     if f"sha256:{digest.hexdigest()}" != reference.digest:
-        raise ValueError("Artifact archive digest does not match reference.")
-    return archive_path
+        raise ValueError("Artifact object digest does not match reference.")
+    return artifact_path
 
 
 __all__ = ["materialize_artifact"]

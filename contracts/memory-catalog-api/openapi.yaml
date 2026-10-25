@@ -30,36 +30,84 @@ components:
         size_bytes:
           type: integer
           minimum: 0
-    ObservationRegistration:
+    ExtractionId:
+      type: string
+      minLength: 1
+      pattern: '^[A-Za-z0-9._:-]+$'
+    MaintenanceId:
+      type: string
+      minLength: 1
+      pattern: '^[A-Za-z0-9._:-]+$'
+    ExtractionObservation:
+      type: object
+      additionalProperties: false
+      required: [body_markdown]
+      properties:
+        body_markdown: { type: string, minLength: 1 }
+    ExtractionRegistration:
       type: object
       additionalProperties: false
       required:
-        - observation_id
+        - extraction_id
         - source_workflow
         - source_run_id
         - source_review_unit_id
-        - transcript_digest
-        - body_markdown
-        - audit_reference
+        - diagnostic_bundle_digest
+        - transcript_reference
+        - observation
       properties:
-        observation_id: { type: string, minLength: 1 }
+        extraction_id:
+          $ref: '#/components/schemas/ExtractionId'
         source_workflow: { type: string, minLength: 1 }
         source_run_id: { type: string, minLength: 1 }
         source_review_unit_id: { type: string, minLength: 1 }
-        transcript_digest:
+        diagnostic_bundle_digest:
           type: string
           pattern: ^sha256:[0-9a-f]{64}$
-        body_markdown: { type: string, minLength: 1 }
-        audit_reference:
+        transcript_reference:
           $ref: '#/components/schemas/ArtifactReference'
-    ObservationRegistrationResult:
+        observation:
+          oneOf:
+            - $ref: '#/components/schemas/ExtractionObservation'
+            - type: 'null'
+    ExtractionRegistrationResult:
       type: object
       additionalProperties: false
       required: [ok, created]
       properties:
         ok: { type: boolean, const: true }
         created: { type: boolean }
-    PendingObservationSummary:
+    ExtractionRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - extraction_id
+        - source_workflow
+        - source_run_id
+        - source_review_unit_id
+        - diagnostic_bundle_digest
+        - transcript_reference
+        - observation
+        - created_at
+      properties:
+        extraction_id:
+          $ref: '#/components/schemas/ExtractionId'
+        source_workflow: { type: string, minLength: 1 }
+        source_run_id: { type: string, minLength: 1 }
+        source_review_unit_id: { type: string, minLength: 1 }
+        diagnostic_bundle_digest:
+          type: string
+          pattern: ^sha256:[0-9a-f]{64}$
+        transcript_reference:
+          $ref: '#/components/schemas/ArtifactReference'
+        observation:
+          oneOf:
+            - $ref: '#/components/schemas/ExtractionObservation'
+            - type: 'null'
+        created_at:
+          type: string
+          format: date-time
+    ObservationBacklog:
       type: object
       additionalProperties: false
       required: [pending_count, oldest_pending_created_at]
@@ -68,26 +116,21 @@ components:
         oldest_pending_created_at:
           type: [string, 'null']
           format: date-time
-    MaintenanceBatchSelection:
-      type: object
-      additionalProperties: false
-      required: [limit]
-      properties:
-        limit: { type: integer, minimum: 1, maximum: 100 }
     MaintenanceObservation:
       type: object
       additionalProperties: false
-      required: [observation_id, body_markdown]
+      required: [extraction_id, body_markdown]
       properties:
-        observation_id: { type: string, minLength: 1 }
+        extraction_id:
+          $ref: '#/components/schemas/ExtractionId'
         body_markdown: { type: string, minLength: 1 }
-    MaintenanceBatch:
+    MaintenanceInput:
       type: object
       additionalProperties: false
-      required: [base_revision, active_memory, observations]
+      required: [base_revision, active_memory_tree_reference, observations]
       properties:
         base_revision: { type: integer, minimum: 0 }
-        active_memory:
+        active_memory_tree_reference:
           oneOf:
             - $ref: '#/components/schemas/ArtifactReference'
             - type: 'null'
@@ -96,64 +139,87 @@ components:
           minItems: 1
           items:
             $ref: '#/components/schemas/MaintenanceObservation'
-    MaintenanceBatchResult:
+    MaintenanceInputResult:
       type: object
       additionalProperties: false
-      required: [batch]
+      required: [input]
       properties:
-        batch:
+        input:
           oneOf:
-            - $ref: '#/components/schemas/MaintenanceBatch'
+            - $ref: '#/components/schemas/MaintenanceInput'
             - type: 'null'
-    MaintenanceCompletion:
+    MemoryTreeRevisionCreation:
       type: object
       additionalProperties: false
-      required: [base_revision, observation_ids, memory_version, audit_reference]
+      required:
+        - maintenance_id
+        - base_revision
+        - extraction_ids
+        - memory_tree_reference
+        - maintenance_transcript_reference
       properties:
+        maintenance_id:
+          $ref: '#/components/schemas/MaintenanceId'
         base_revision: { type: integer, minimum: 0 }
-        observation_ids:
+        extraction_ids:
           type: array
           minItems: 1
           uniqueItems: true
-          items: { type: string, minLength: 1 }
-        memory_version:
+          items:
+            $ref: '#/components/schemas/ExtractionId'
+        memory_tree_reference:
           $ref: '#/components/schemas/ArtifactReference'
-        audit_reference:
+        maintenance_transcript_reference:
           $ref: '#/components/schemas/ArtifactReference'
-    MaintenanceCompletionResult:
+    MemoryTreeRevisionCreationResult:
       type: object
       additionalProperties: false
-      required: [completed]
+      required: [created, revision, maintenance_id]
       properties:
-        completed: { type: boolean }
-    ActiveVersion:
+        created: { type: boolean }
+        revision: { type: integer, minimum: 1 }
+        maintenance_id:
+          $ref: '#/components/schemas/MaintenanceId'
+    MemoryTree:
       type: object
       additionalProperties: false
-      required: [revision, artifact_reference]
+      required: [revision, memory_tree_reference]
       properties:
         revision: { type: integer, minimum: 0 }
-        artifact_reference:
+        memory_tree_reference:
           oneOf:
             - $ref: '#/components/schemas/ArtifactReference'
             - type: 'null'
-    MemoryRevision:
+    MemoryTreeRevision:
       type: object
       additionalProperties: false
       required:
         - revision
-        - artifact_reference
-        - maintenance_audit_reference
+        - maintenance_id
+        - base_revision
+        - extraction_ids
+        - memory_tree_reference
+        - maintenance_transcript_reference
         - created_at
       properties:
         revision: { type: integer, minimum: 1 }
-        artifact_reference:
+        maintenance_id:
+          $ref: '#/components/schemas/MaintenanceId'
+        base_revision: { type: integer, minimum: 0 }
+        extraction_ids:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/ExtractionId'
+        memory_tree_reference:
           $ref: '#/components/schemas/ArtifactReference'
-        maintenance_audit_reference:
+        maintenance_transcript_reference:
           $ref: '#/components/schemas/ArtifactReference'
         created_at:
           type: string
           format: date-time
-    MemoryRevisionList:
+    MemoryTreeRevisionList:
       type: object
       additionalProperties: false
       required: [revisions, next_before_revision]
@@ -161,7 +227,7 @@ components:
         revisions:
           type: array
           items:
-            $ref: '#/components/schemas/MemoryRevision'
+            $ref: '#/components/schemas/MemoryTreeRevision'
         next_before_revision:
           type: [integer, 'null']
           minimum: 1
@@ -192,7 +258,7 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
     Conflict:
-      description: The observation identity already exists with different content.
+      description: An immutable identity differs from existing content, or a revision compare-and-swap precondition failed.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ErrorResponse' }
@@ -224,97 +290,111 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Health' }
         '500': { $ref: '#/components/responses/InternalError' }
-  /v1/observations:
+  /v1/extractions:
     post:
-      description: Register one durable memory observation or replay an identical registration.
-      operationId: registerObservation
+      description: Register one completed extraction and its optional observation, or replay identical content.
+      operationId: registerExtraction
       security: [{ catalogToken: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/ObservationRegistration' }
+            schema: { $ref: '#/components/schemas/ExtractionRegistration' }
       responses:
         '200':
-          description: Observation accepted or identically replayed.
+          description: Extraction accepted or identically replayed.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/ObservationRegistrationResult' }
+              schema: { $ref: '#/components/schemas/ExtractionRegistrationResult' }
         '400': { $ref: '#/components/responses/InvalidBody' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '409': { $ref: '#/components/responses/Conflict' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '500': { $ref: '#/components/responses/InternalError' }
-  /v1/observations/pending-summary:
+  /v1/extractions/{extraction_id}:
     get:
-      description: Summarize observations that have not yet entered a memory version.
-      operationId: pendingObservationSummary
+      description: Return one completed extraction, its transcript reference, and its optional observation.
+      operationId: getExtraction
+      security: [{ catalogToken: [] }]
+      parameters:
+        - in: path
+          name: extraction_id
+          required: true
+          schema: { $ref: '#/components/schemas/ExtractionId' }
+      responses:
+        '200':
+          description: The requested extraction.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExtractionRecord' }
+        '400': { $ref: '#/components/responses/InvalidBody' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /v1/observation-backlog:
+    get:
+      description: Summarize observations that have not yet been consumed by a memory revision.
+      operationId: getObservationBacklog
       security: [{ catalogToken: [] }]
       responses:
         '200':
           description: Pending observation count and age.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/PendingObservationSummary' }
+              schema: { $ref: '#/components/schemas/ObservationBacklog' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '500': { $ref: '#/components/responses/InternalError' }
-  /v1/maintenance/batches/select:
+  /v1/maintenance-input:
+    get:
+      description: Return a bounded observation set and the active memory state it must be maintained against.
+      operationId: getMaintenanceInput
+      security: [{ catalogToken: [] }]
+      parameters:
+        - in: query
+          name: limit
+          required: true
+          schema: { type: string, pattern: '^[1-9][0-9]*$' }
+      responses:
+        '200':
+          description: Current memory state and bounded pending observations, or null when none are pending.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MaintenanceInputResult' }
+        '400': { $ref: '#/components/responses/InvalidBody' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /v1/memory-tree/revisions:
     post:
-      description: Select a bounded observation batch against the current memory revision.
-      operationId: selectMaintenanceBatch
+      description: Create an immutable memory tree revision with compare-and-swap and consume its source observations.
+      operationId: createMemoryTreeRevision
       security: [{ catalogToken: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: '#/components/schemas/MaintenanceBatchSelection' }
+            schema: { $ref: '#/components/schemas/MemoryTreeRevisionCreation' }
       responses:
-        '200':
-          description: Current revision and one pending observation batch.
+        '201':
+          description: The revision was created.
+          headers:
+            Location:
+              schema: { type: string }
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MaintenanceBatchResult' }
+              schema: { $ref: '#/components/schemas/MemoryTreeRevisionCreationResult' }
+        '200':
+          description: An identical maintenance submission had already created this revision.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemoryTreeRevisionCreationResult' }
         '400': { $ref: '#/components/responses/InvalidBody' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '413': { $ref: '#/components/responses/PayloadTooLarge' }
         '500': { $ref: '#/components/responses/InternalError' }
-  /v1/maintenance/complete:
-    post:
-      description: Atomically publish a memory version and consume its source observations.
-      operationId: completeMaintenance
-      security: [{ catalogToken: [] }]
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema: { $ref: '#/components/schemas/MaintenanceCompletion' }
-      responses:
-        '200':
-          description: Whether the revision CAS and observation consumption committed.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/MaintenanceCompletionResult' }
-        '400': { $ref: '#/components/responses/InvalidBody' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '413': { $ref: '#/components/responses/PayloadTooLarge' }
-        '500': { $ref: '#/components/responses/InternalError' }
-  /v1/active-version:
     get:
-      description: Return the currently active immutable memory version, if one exists.
-      operationId: activeVersion
-      security: [{ catalogToken: [] }]
-      responses:
-        '200':
-          description: Current active immutable memory version.
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ActiveVersion' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '500': { $ref: '#/components/responses/InternalError' }
-  /v1/revisions:
-    get:
-      description: List immutable memory revisions in descending revision order.
-      operationId: listRevisions
+      description: List immutable memory tree revisions in descending revision order.
+      operationId: listMemoryTreeRevisions
       security: [{ catalogToken: [] }]
       parameters:
         - in: query
@@ -327,17 +407,30 @@ paths:
           schema: { type: string, pattern: '^[1-9][0-9]*$' }
       responses:
         '200':
-          description: One page of immutable memory revision history.
+          description: One page of immutable memory tree revision history.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MemoryRevisionList' }
+              schema: { $ref: '#/components/schemas/MemoryTreeRevisionList' }
         '400': { $ref: '#/components/responses/InvalidBody' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '500': { $ref: '#/components/responses/InternalError' }
-  /v1/revisions/{revision}:
+  /v1/memory-tree:
     get:
-      description: Return one immutable memory revision and its maintenance audit.
-      operationId: getRevision
+      description: Return the current memory tree revision and its artifact reference, if one exists.
+      operationId: getMemoryTree
+      security: [{ catalogToken: [] }]
+      responses:
+        '200':
+          description: Current memory tree revision and artifact reference.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MemoryTree' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '500': { $ref: '#/components/responses/InternalError' }
+  /v1/memory-tree/revisions/{revision}:
+    get:
+      description: Return one immutable memory tree revision and its maintenance transcript.
+      operationId: getMemoryTreeRevision
       security: [{ catalogToken: [] }]
       parameters:
         - in: path
@@ -346,10 +439,10 @@ paths:
           schema: { type: string, pattern: '^[1-9][0-9]*$' }
       responses:
         '200':
-          description: The requested immutable memory revision.
+          description: The requested immutable memory tree revision.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/MemoryRevision' }
+              schema: { $ref: '#/components/schemas/MemoryTreeRevision' }
         '400': { $ref: '#/components/responses/InvalidBody' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }

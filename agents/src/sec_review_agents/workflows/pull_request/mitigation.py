@@ -2,7 +2,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from sec_review_agents.agents.mitigation import pull_request as pr_mitigation_agent
+from sec_review_agents.agents.mitigation.pull_request import (
+    build_pr_mitigation_filesystem_system_prompt,
+    build_pr_mitigation_system_prompt,
+    build_pr_mitigation_user_prompt,
+    create_pr_mitigation_backend,
+)
 from sec_review_agents.review_stages.mitigation.stage import run_mitigation_stage
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.workflows.review_intent import (
@@ -32,19 +37,18 @@ async def mitigate_pull_request(
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=retry_context,
         setup_declaration_content=setup_declaration_content,
-        build_backend=lambda workspace_root: pr_mitigation_agent.create_pr_mitigation_backend(
+        build_backend=lambda workspace_root, memory_path_view: create_pr_mitigation_backend(
             workspace_root=workspace_root,
             history_path=history_path,
             incremental_window_path=incremental_window_path,
+            memory_path_view=memory_path_view,
             runtime_context=runtime_context,
         ),
-        system_prompt=pr_mitigation_agent.build_pr_mitigation_system_prompt(
+        system_prompt=build_pr_mitigation_system_prompt(
             test_changes=test_changes, is_retry=isinstance(retry_context, dict)
         ),
-        filesystem_system_prompt=(
-            pr_mitigation_agent.build_pr_mitigation_filesystem_system_prompt()
-        ),
-        user_prompt=pr_mitigation_agent.build_pr_mitigation_user_prompt(
+        filesystem_system_prompt=build_pr_mitigation_filesystem_system_prompt(),
+        user_prompt=build_pr_mitigation_user_prompt(
             pr=pr,
             retry_context=retry_context,
             analysis_result=analysis_result,

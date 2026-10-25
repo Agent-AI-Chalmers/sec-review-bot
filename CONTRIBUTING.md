@@ -11,7 +11,7 @@ Before editing code, use the maintained documentation in this order:
 3. Read the [documentation map](docs/README.md) for workflow, agent, and operations design notes.
 4. For cross-package data, read the [contracts guide](contracts/README.md) and the affected contract-family README before changing a schema, fixture, generated projection, artifact, or API shape.
 
-Do not infer ownership from directory size or document length. The seven runtime entities are independently owned even where two entities share one source package.
+Do not infer ownership from directory size or document length. The eight runtime roles have explicit ownership even when multiple roles share one source package.
 
 ## Prepare A Change
 
@@ -27,7 +27,7 @@ Run checks from every affected package, not only from the package where the firs
 
 | Area | Development guide | Baseline validation |
 | --- | --- | --- |
-| Execution Worker and Memory Worker | [`agents/README.md`](agents/README.md) | Ruff, Black, mypy, Pyright, pytest |
+| Execution, Memory Extraction, and Memory Maintenance Workers | [`agents/README.md`](agents/README.md) | Ruff, Black, mypy, Pyright, pytest |
 | GitHub Integration | [`apps/github-integration/README.md`](apps/github-integration/README.md) | format, lint, typecheck, unit tests; integration tests when the database boundary changes |
 | Review Control Plane | [`control-plane/README.md`](control-plane/README.md) | format, lint, typecheck, tests, PostgreSQL integration tests |
 | Control Plane UI | [`apps/control-plane-ui/README.md`](apps/control-plane-ui/README.md) | format, lint, typecheck, tests, build, browser smoke test for user-visible flows |

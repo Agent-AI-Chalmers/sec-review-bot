@@ -16,7 +16,7 @@ with project-specific rules:
 _AGENTS_ENV_BOOTSTRAPPED = False
 # These `.env` path settings use config-file-relative semantics so they stay
 # stable across different start commands and working directories.
-_DOTENV_RELATIVE_PATH_KEYS = {"AGENT_MEMORY_DIR", "MODEL_PROVIDERS_CONFIG_TOML"}
+_DOTENV_RELATIVE_PATH_KEYS = {"MODEL_PROVIDERS_CONFIG_TOML"}
 _DECIMAL_INTEGER = re.compile(r"[+-]?[0-9]+")
 _TRUE_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
 _FALSE_ENV_VALUES = frozenset({"0", "false", "no", "off"})

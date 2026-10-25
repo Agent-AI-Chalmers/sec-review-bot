@@ -11,7 +11,7 @@
       "Action": ["s3:GetObject", "s3:PutObject"],
       "Resource": [
         "arn:aws:s3:::sec-review/memory/versions/*",
-        "arn:aws:s3:::sec-review/memory/audit/*"
+        "arn:aws:s3:::sec-review/memory/transcripts/*"
       ]
     }
   ]

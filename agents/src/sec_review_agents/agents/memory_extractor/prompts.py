@@ -1,13 +1,14 @@
-from sec_review_agents.agents.memory_extractor.model import StagedTranscripts
+from pathlib import Path
+
 from sec_review_agents.resources.loader import load_prompt_resource
 
 MEMORY_EXTRACTOR_SYSTEM_PROMPT = load_prompt_resource("memory/extract-system.md")
 
 
-def build_extractor_prompt(staged_transcripts: StagedTranscripts) -> str:
+def build_extractor_prompt(staged_transcripts: list[tuple[str, Path]]) -> str:
     """Build the ordered transcript-reading task for one extraction attempt."""
     transcript_lines = [
-        f"- {label}: `{mounted}`" for label, mounted in staged_transcripts.entries
+        f"- {label}: `{mounted}`" for label, mounted in staged_transcripts
     ]
     return "\n".join(
         [
