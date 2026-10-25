@@ -9,10 +9,7 @@ from sec_review_agents.agents.memory_maintainer.agent import (
 )
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.memory.catalog_client import MemoryCatalogClient
-from sec_review_agents.memory.maintainer import (
-    MemoryMaintenanceInput,
-    maintain_memory_tree,
-)
+from sec_review_agents.memory.maintainer import maintain_memory_tree
 from sec_review_agents.memory.memory_tree_artifact import (
     materialize_memory_tree,
     publish_memory_tree_artifact,
@@ -79,7 +76,7 @@ async def prepare_coordinated_memory_revision(
 
         observations_root = temp_root / "observations"
         observations_root.mkdir()
-        maintenance_observations: list[MemoryMaintenanceInput] = []
+        maintenance_observations: list[tuple[str, Path]] = []
         extraction_ids: list[str] = []
         for index, item in enumerate(observations, start=1):
             if not isinstance(item, dict):
@@ -98,10 +95,7 @@ async def prepare_coordinated_memory_revision(
             filename = f"observation-{index:04d}.md"
             (observations_root / filename).write_text(body, encoding="utf-8")
             maintenance_observations.append(
-                MemoryMaintenanceInput(
-                    extraction_id=extraction_id,
-                    path=observations_root / filename,
-                )
+                (extraction_id, observations_root / filename)
             )
 
         maintainer_transcript_path = transcript_path(

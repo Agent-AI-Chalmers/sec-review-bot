@@ -21,14 +21,6 @@ from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 
 @dataclass(frozen=True)
-class MemoryMaintenanceInput:
-    """One observation selected by the coordination layer."""
-
-    extraction_id: str
-    path: Path
-
-
-@dataclass(frozen=True)
 class MemoryMaintenanceResult:
     """Candidate memory tree and invocation transcript produced by the agent."""
 
@@ -39,12 +31,12 @@ class MemoryMaintenanceResult:
 def _prepare_worktree(
     *,
     base_memory_tree: Path | None,
-    observations: list[MemoryMaintenanceInput],
+    observations: list[tuple[str, Path]],
     worktree_root: Path,
 ) -> list[tuple[str, str]]:
     if not observations:
         raise ValueError("Memory maintenance requires at least one observation.")
-    extraction_ids = [observation.extraction_id for observation in observations]
+    extraction_ids = [extraction_id for extraction_id, _path in observations]
     if len(extraction_ids) != len(set(extraction_ids)):
         raise ValueError("Memory maintenance extraction ids must be unique.")
 
@@ -63,22 +55,20 @@ def _prepare_worktree(
     observations_root = worktree_root / "observations"
     observations_root.mkdir()
     prompt_observations: list[tuple[str, str]] = []
-    for index, observation in enumerate(observations, start=1):
-        source = observation.path.expanduser().resolve()
+    for index, (extraction_id, path) in enumerate(observations, start=1):
+        source = path.expanduser().resolve()
         if not source.is_file():
             raise FileNotFoundError(source)
         filename = f"observation-{index:04d}.md"
         shutil.copy2(source, observations_root / filename)
-        prompt_observations.append(
-            (observation.extraction_id, f"/memory/observations/{filename}")
-        )
+        prompt_observations.append((extraction_id, f"/memory/observations/{filename}"))
     return prompt_observations
 
 
 async def maintain_memory_tree(
     *,
     base_memory_tree: Path | None,
-    observations: list[MemoryMaintenanceInput],
+    observations: list[tuple[str, Path]],
     worktree_root: Path,
     maintainer_transcript_path: Path,
     deployment: str | None = None,
@@ -118,7 +108,6 @@ async def maintain_memory_tree(
 
 
 __all__ = [
-    "MemoryMaintenanceInput",
     "MemoryMaintenanceResult",
     "maintain_memory_tree",
 ]

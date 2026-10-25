@@ -3,10 +3,7 @@ from uuid import uuid4
 
 import pytest
 
-from sec_review_agents.memory.maintainer import (
-    MemoryMaintenanceInput,
-    maintain_memory_tree,
-)
+from sec_review_agents.memory.maintainer import maintain_memory_tree
 from tests.llm_probe import llm_probe, llm_test_deployment
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
@@ -85,12 +82,7 @@ async def test_llm_maintenance_reorganizes_messy_memory_without_transcripts() ->
     )
     result = await maintain_memory_tree(
         base_memory_tree=runtime_memory_root,
-        observations=[
-            MemoryMaintenanceInput(
-                extraction_id="maintenance-probe",
-                path=observation,
-            )
-        ],
+        observations=[("maintenance-probe", observation)],
         worktree_root=root / "candidate-memory",
         maintainer_transcript_path=root / "memory-maintainer.jsonl",
         deployment=llm_test_deployment(),

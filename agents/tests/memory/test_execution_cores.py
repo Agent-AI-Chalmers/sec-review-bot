@@ -9,10 +9,7 @@ from sec_review_agents.memory.coordinated_maintenance import (
     prepare_coordinated_memory_revision,
 )
 from sec_review_agents.memory.extractor import preview_memory_observation_from_paths
-from sec_review_agents.memory.maintainer import (
-    MemoryMaintenanceInput,
-    maintain_memory_tree,
-)
+from sec_review_agents.memory.maintainer import maintain_memory_tree
 from sec_review_agents.memory.memory_tree_artifact import (
     materialize_memory_tree,
     publish_memory_tree_artifact,
@@ -168,12 +165,7 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
     ):
         result = await maintain_memory_tree(
             base_memory_tree=base_tree,
-            observations=[
-                MemoryMaintenanceInput(
-                    extraction_id="extraction-1",
-                    path=observation,
-                )
-            ],
+            observations=[("extraction-1", observation)],
             worktree_root=candidate,
             maintainer_transcript_path=agent_transcript,
         )
@@ -226,12 +218,12 @@ async def test_maintainer_rejects_invalid_explicit_inputs_before_agent_execution
     base_tree.mkdir()
     if base_index is not None:
         (base_tree / "MEMORY.md").write_text(base_index, encoding="utf-8")
-    inputs = []
+    inputs: list[tuple[str, Path]] = []
     for index, (extraction_id, body) in enumerate(observations):
         path = tmp_path / f"observation-{index}.md"
         if body is not None:
             path.write_text(body, encoding="utf-8")
-        inputs.append(MemoryMaintenanceInput(extraction_id=extraction_id, path=path))
+        inputs.append((extraction_id, path))
     create_agent = AsyncMock()
     invoke = AsyncMock()
 
