@@ -5,13 +5,15 @@ from deepagents.backends.protocol import BackendProtocol
 from langchain.agents.middleware import AgentMiddleware
 from langchain.agents.middleware.types import ModelRequest, ModelResponse
 
+from sec_review_agents.memory.local_store import (
+    MEMORY_INDEX_MAX_CHARS,
+    MEMORY_INDEX_MAX_LINES,
+)
 from sec_review_agents.runtime.system_messages import append_to_system_message
 
 MEMORY_INDEX_PATH = "/memory/MEMORY.md"
 # Mirror the Claude Code-style memory shape: eagerly expose only a bounded
 # MEMORY.md startup index, then let the agent read topic files on demand.
-DEFAULT_MEMORY_INDEX_MAX_LINES = 200
-DEFAULT_MEMORY_INDEX_MAX_CHARS = 25_000
 
 DEFAULT_MEMORY_SYSTEM_PROMPT = """
 ## Experience Memory
@@ -92,8 +94,8 @@ class MemoryMiddleware(AgentMiddleware):
         *,
         backend: BackendProtocol | None = None,
         index_path: str = MEMORY_INDEX_PATH,
-        index_max_lines: int = DEFAULT_MEMORY_INDEX_MAX_LINES,
-        index_max_chars: int = DEFAULT_MEMORY_INDEX_MAX_CHARS,
+        index_max_lines: int = MEMORY_INDEX_MAX_LINES,
+        index_max_chars: int = MEMORY_INDEX_MAX_CHARS,
         system_prompt_template: str = DEFAULT_MEMORY_SYSTEM_PROMPT,
     ) -> None:
         self.backend = backend

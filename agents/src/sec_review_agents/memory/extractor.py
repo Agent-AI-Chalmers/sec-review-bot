@@ -19,20 +19,20 @@ from sec_review_agents.agents.memory_extractor.prompts import (
     build_extractor_prompt,
 )
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.memory.state import (
+from sec_review_agents.memory.local_state import (
     OBSERVATION_STATUS_PENDING,
     OBSERVATION_STATUS_PROCESSED,
     fetch_observation_by_id,
     open_memory_state,
     upsert_observation,
 )
-from sec_review_agents.memory.store import (
+from sec_review_agents.memory.local_store import (
     initialize_memory_store,
-    memory_agent_transcript_path,
     memory_observations_dir,
     memory_store_lock,
     resolve_memory_store_dir,
 )
+from sec_review_agents.memory.transcripts import memory_agent_transcript_path
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.transcripts import (

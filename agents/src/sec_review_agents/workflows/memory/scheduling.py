@@ -4,12 +4,12 @@ from temporalio import workflow
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import WorkflowAlreadyStartedError
 
-from sec_review_agents.memory.extraction_workflow import (
+from sec_review_agents.temporal.config import DEFAULT_MEMORY_TASK_QUEUE
+from sec_review_agents.workflows.memory.extraction import (
     MemoryExtractionRequest,
     MemoryExtractionWorkflow,
     memory_extraction_workflow_id,
 )
-from sec_review_agents.temporal.config import DEFAULT_MEMORY_TASK_QUEUE
 
 
 async def schedule_memory_extractions(

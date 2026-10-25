@@ -10,7 +10,7 @@ import pytest
 from pydantic import BaseModel, ConfigDict
 
 from sec_review_agents.memory.extractor import extract_memory_observations_from_paths
-from sec_review_agents.memory.store import (
+from sec_review_agents.memory.local_store import (
     initialize_memory_store,
     memory_content_dir,
     memory_observations_dir,

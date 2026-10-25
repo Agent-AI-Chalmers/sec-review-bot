@@ -21,7 +21,7 @@ from sec_review_agents.temporal.support import (
     prepare_internal_workflow_activity,
 )
 from sec_review_agents.utils.paths import required_path
-from sec_review_agents.workflows.memory_scheduling import schedule_memory_extractions
+from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
 from sec_review_agents.workflows.review_intent import (
     REVIEW_OBJECTIVE_AUDIT,
     require_review_intent,

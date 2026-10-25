@@ -6,7 +6,6 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from urllib.parse import urlparse
 
 from sec_review_agents.agents.memory_maintainer.agent import (
     MEMORY_MAINTAINER_AGENT_NAME,
@@ -26,12 +25,7 @@ from sec_review_agents.filesystem.path_views import (
     writable_memory_view,
 )
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.memory.catalog_client import MemoryCatalogClient
-from sec_review_agents.memory.middleware import (
-    DEFAULT_MEMORY_INDEX_MAX_CHARS,
-    DEFAULT_MEMORY_INDEX_MAX_LINES,
-)
-from sec_review_agents.memory.state import (
+from sec_review_agents.memory.local_state import (
     OBSERVATION_STATUS_PENDING,
     ObservationRow,
     fetch_observations_by_ids,
@@ -39,15 +33,16 @@ from sec_review_agents.memory.state import (
     mark_observations_processed_if_unchanged,
     open_memory_state,
 )
-from sec_review_agents.memory.store import (
-    DEFAULT_MEMORY_INDEX,
+from sec_review_agents.memory.local_store import (
+    MEMORY_INDEX_MAX_CHARS,
+    MEMORY_INDEX_MAX_LINES,
     initialize_memory_store,
-    memory_agent_transcript_path,
     memory_content_dir,
     memory_observations_dir,
     memory_store_lock,
     resolve_memory_store_dir,
 )
+from sec_review_agents.memory.transcripts import memory_agent_transcript_path
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
@@ -69,15 +64,12 @@ def _memory_index_hygiene_warning(memory_store_dir: Path) -> str | None:
     content = index_path.read_text(encoding="utf-8")
     line_count = len(content.splitlines())
     char_count = len(content)
-    if (
-        line_count <= DEFAULT_MEMORY_INDEX_MAX_LINES
-        and char_count <= DEFAULT_MEMORY_INDEX_MAX_CHARS
-    ):
+    if line_count <= MEMORY_INDEX_MAX_LINES and char_count <= MEMORY_INDEX_MAX_CHARS:
         return None
     return (
         "Memory index exceeds startup cap: "
-        f"{line_count}/{DEFAULT_MEMORY_INDEX_MAX_LINES} lines, "
-        f"{char_count}/{DEFAULT_MEMORY_INDEX_MAX_CHARS} chars. "
+        f"{line_count}/{MEMORY_INDEX_MAX_LINES} lines, "
+        f"{char_count}/{MEMORY_INDEX_MAX_CHARS} chars. "
         "Keep MEMORY.md as a compact routing index and move details to topics."
     )
 
@@ -128,7 +120,7 @@ def _copy_memory_maintenance_worktree(
     destination: Path,
     observation_rows: list[ObservationRow],
 ) -> None:
-    """Copy curated memory and only the observations selected for this run."""
+    """Copy the memory tree and only the observations selected for this run."""
     destination.mkdir(parents=True, exist_ok=True)
     content_dir = memory_content_dir(memory_store_dir)
     index_path = content_dir / "MEMORY.md"
@@ -341,139 +333,7 @@ async def _maintain_memory_with_result_locked(
     )
 
 
-async def maintain_coordinated_memory_with_result(
-    *,
-    catalog_client: MemoryCatalogClient,
-    batch_size: int,
-    deployment: str | None = None,
-) -> MemoryMaintenanceResult:
-    """Maintain one coordinated batch and commit it with a revision CAS."""
-    from sec_review_agents.artifacts.reference import ArtifactReference
-    from sec_review_agents.memory.transcript_artifact import (
-        publish_memory_agent_transcript,
-    )
-    from sec_review_agents.memory.version_bundle import (
-        materialize_memory_version,
-        publish_memory_version,
-    )
-
-    batch = catalog_client.select_maintenance_batch(limit=batch_size)
-    if batch is None:
-        return MemoryMaintenanceResult(
-            summary="No pending memory observations selected.",
-            processed_count=0,
-            skipped=True,
-        )
-    observations = batch.get("observations")
-    if not isinstance(observations, list) or not observations:
-        raise RuntimeError("Catalog maintenance batch has no observations.")
-
-    with tempfile.TemporaryDirectory(
-        prefix="sec-review-coordinated-memory-maintainer-"
-    ) as tempdir:
-        temp_root = Path(tempdir)
-        worktree_root = temp_root / "memory"
-        active_memory = batch.get("active_memory")
-        if isinstance(active_memory, dict):
-            active_reference = ArtifactReference.from_mapping(active_memory)
-            if urlparse(active_reference.uri).scheme != "s3":
-                raise ValueError(
-                    "Catalog active memory must use an S3 artifact reference."
-                )
-            materialized = materialize_memory_version(
-                active_reference,
-                destination=temp_root / "active-version",
-            )
-            shutil.copytree(materialized, worktree_root)
-        else:
-            (worktree_root / "topics").mkdir(parents=True)
-            (worktree_root / "MEMORY.md").write_text(
-                DEFAULT_MEMORY_INDEX,
-                encoding="utf-8",
-            )
-
-        observations_root = worktree_root / "observations"
-        observations_root.mkdir()
-        prompt_observations: list[MemoryMaintenanceObservation] = []
-        observation_ids: list[str] = []
-        for index, item in enumerate(observations, start=1):
-            if not isinstance(item, dict):
-                raise ValueError("Catalog observation must be an object.")
-            observation_id = str(item["observation_id"])
-            observation_ids.append(observation_id)
-            body = str(item["body_markdown"])
-            filename = f"observation-{index:04d}.md"
-            (observations_root / filename).write_text(body, encoding="utf-8")
-            prompt_observations.append(
-                MemoryMaintenanceObservation(
-                    observation_id=observation_id,
-                    mounted_path=f"/memory/observations/{filename}",
-                )
-            )
-
-        backend = create_backend_with_path_views(
-            container_name_prefix="memory-maintainer",
-            path_views=[writable_memory_view(host_path=worktree_root)],
-            backend_kind="local",
-        )
-        model = create_chat_model(
-            agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-            deployment_override=deployment,
-        )
-        base_revision = int(batch["base_revision"])
-        maintenance_transcript_path = memory_agent_transcript_path(
-            temp_root / "memory-agent-transcripts",
-            agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-            run_label=f"revision-{base_revision + 1}",
-        )
-        async with amanaged_backend(backend):
-            agent = await create_memory_maintainer_agent_graph(
-                model=model,
-                backend=backend,
-                worktree_root=worktree_root,
-            )
-            await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-                system_prompt=MEMORY_MAINTAINER_SYSTEM_PROMPT,
-                user_prompt=build_maintenance_prompt(prompt_observations),
-                transcript_paths=(maintenance_transcript_path,),
-            )
-
-        maintenance_transcript_reference = publish_memory_agent_transcript(
-            agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-            transcript_path=maintenance_transcript_path,
-            output_dir=temp_root / "published-transcripts",
-        )
-        if urlparse(maintenance_transcript_reference.uri).scheme != "s3":
-            raise RuntimeError(
-                "Maintenance transcript publication requires configured S3 storage."
-            )
-        version = publish_memory_version(
-            memory_content_root=worktree_root,
-            output_dir=temp_root / "published",
-        )
-        if urlparse(version.uri).scheme != "s3":
-            raise RuntimeError(
-                "Coordinated memory publication requires configured S3 storage."
-            )
-        completed = catalog_client.complete_maintenance(
-            base_revision=base_revision,
-            observation_ids=observation_ids,
-            memory_version=version,
-            maintenance_transcript_reference=maintenance_transcript_reference,
-        )
-        if not completed:
-            raise RuntimeError("Memory revision changed before coordinated commit.")
-
-    return MemoryMaintenanceResult(
-        summary=f"Processed {len(observations)} memory observations.",
-        processed_count=len(observations),
-    )
-
-
 __all__ = [
     "MemoryMaintenanceResult",
-    "maintain_coordinated_memory_with_result",
     "maintain_memory_with_result",
 ]

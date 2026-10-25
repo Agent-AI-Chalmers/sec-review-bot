@@ -6,18 +6,13 @@ from pathlib import Path
 from temporalio.client import Client
 from temporalio.exceptions import WorkflowAlreadyStartedError
 
-from sec_review_agents.memory.maintenance_workflow import (
-    MEMORY_MAINTENANCE_WORKFLOW_ID,
-    MemoryMaintenanceRequest,
-    MemoryMaintenanceWorkflow,
-)
-from sec_review_agents.memory.schedule import (
+from sec_review_agents.entrypoints.memory_worker.schedules import (
     MEMORY_MAINTENANCE_SCHEDULE_DEFAULT_INTERVAL_SECONDS,
     MEMORY_MAINTENANCE_SCHEDULE_ID,
     MemoryMaintenanceScheduleRequest,
     ensure_memory_maintenance_schedule,
 )
-from sec_review_agents.memory.state import (
+from sec_review_agents.memory.local_state import (
     MEMORY_STATE_FILENAME,
     OBSERVATION_STATUSES,
     ObservationRow,
@@ -25,7 +20,7 @@ from sec_review_agents.memory.state import (
     fetch_observations_by_status,
     open_memory_state,
 )
-from sec_review_agents.memory.store import (
+from sec_review_agents.memory.local_store import (
     AGENT_MEMORY_DIR_ENV,
     resolve_memory_store_dir,
 )
@@ -36,6 +31,11 @@ from sec_review_agents.temporal.config import (
     DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
 )
 from sec_review_agents.utils.env import bootstrap_agents_env, env_value, int_env
+from sec_review_agents.workflows.memory.maintenance import (
+    MEMORY_MAINTENANCE_WORKFLOW_ID,
+    MemoryMaintenanceRequest,
+    MemoryMaintenanceWorkflow,
+)
 
 DEFAULT_MAINTENANCE_BATCH_SIZE = 10
 

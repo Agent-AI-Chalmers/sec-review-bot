@@ -74,22 +74,26 @@ sequenceDiagram
   Temporal->>MemoryWorker: 分发 memory extraction 工作
   MemoryWorker->>Storage: 获取 run diagnostic bundle
   Storage-->>MemoryWorker: 返回包含 review transcripts 的 run diagnostic bundle
-  Note over MemoryWorker: 运行 extractor 并记录 extraction transcript
-  MemoryWorker->>Storage: 发布压缩后的 extraction transcript
-  opt 产出 observation
-    MemoryWorker->>Catalog: 登记 observation 和 extraction transcript reference
+  Note over MemoryWorker: 运行 extractor 并记录 extractor invocation transcript
+  MemoryWorker->>Storage: 发布压缩后的 extractor transcript
+  alt 产出 observation
+    MemoryWorker->>Catalog: 登记 observation 及其 extractor transcript reference
+  else 未产出 observation
+    Note over MemoryWorker: 不登记 observation
   end
   loop 定期 memory maintenance
     Temporal->>MemoryWorker: 分发 maintenance 工作
-    MemoryWorker->>Catalog: 选择 observation batch 和 active revision
-    Catalog-->>MemoryWorker: 返回 observation batch 和 active memory reference
-    opt 存在 active memory
-      MemoryWorker->>Storage: 获取 active memory version
-      Storage-->>MemoryWorker: 返回 active memory tree
+    MemoryWorker->>Catalog: 选择 maintenance batch
+    Catalog-->>MemoryWorker: 返回 observations、base revision 和 active memory tree artifact reference
+    opt 存在 active memory tree
+      MemoryWorker->>Storage: 获取 active memory tree artifact
+      Storage-->>MemoryWorker: 返回 memory tree artifact
+      Note over MemoryWorker: 物化 active memory tree
     end
-    Note over MemoryWorker: 运行 maintainer 并记录 maintenance transcript
-    MemoryWorker->>Storage: 发布 memory version 和压缩后的 maintenance transcript
-    MemoryWorker->>Catalog: 通过 compare-and-swap 提交 revision、consumed observations 和 maintenance transcript reference
-    Catalog-->>MemoryWorker: 返回提交结果
+    Note over MemoryWorker: 运行 maintainer 并记录 maintainer invocation transcript
+    MemoryWorker->>Storage: 发布压缩后的 maintainer transcript
+    MemoryWorker->>Storage: 发布新的 memory tree artifact
+    MemoryWorker->>Catalog: 使用 base revision CAS 提交 artifact references 和 consumed observation IDs
+    Catalog-->>MemoryWorker: 返回新的 active revision 或 revision conflict
   end
 ```

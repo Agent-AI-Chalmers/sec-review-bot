@@ -7,17 +7,17 @@ from temporalio.client import (
 )
 
 from sec_review_agents.cli.memory import parse_args
-from sec_review_agents.memory.maintenance_workflow import (
-    MEMORY_MAINTENANCE_WORKFLOW_ID,
-    MemoryMaintenanceRequest,
-)
-from sec_review_agents.memory.schedule import (
+from sec_review_agents.entrypoints.memory_worker.schedules import (
     MEMORY_MAINTENANCE_SCHEDULE_ID,
     MemoryMaintenanceScheduleRequest,
     build_memory_maintenance_schedule,
     ensure_configured_memory_schedules,
     ensure_default_memory_maintenance_schedule,
     ensure_memory_maintenance_schedule,
+)
+from sec_review_agents.workflows.memory.maintenance import (
+    MEMORY_MAINTENANCE_WORKFLOW_ID,
+    MemoryMaintenanceRequest,
 )
 
 
@@ -139,7 +139,7 @@ async def test_default_schedule_uses_worker_task_queue(monkeypatch) -> None:
         return {"ok": True}
 
     monkeypatch.setattr(
-        "sec_review_agents.memory.schedule.ensure_memory_maintenance_schedule",
+        "sec_review_agents.entrypoints.memory_worker.schedules.ensure_memory_maintenance_schedule",
         fake_ensure,
     )
     client = _FakeScheduleClient()
@@ -162,7 +162,7 @@ async def test_configured_schedules_ensure_only_maintenance(monkeypatch) -> None
     monkeypatch.setenv("AGENT_MEMORY_CATALOG_URL", "http://memory")
     monkeypatch.setenv("AGENT_MEMORY_CATALOG_TOKEN", "secret")
     monkeypatch.setattr(
-        "sec_review_agents.memory.schedule.ensure_default_memory_maintenance_schedule",
+        "sec_review_agents.entrypoints.memory_worker.schedules.ensure_default_memory_maintenance_schedule",
         fake_ensure,
     )
     client = _FakeScheduleClient()

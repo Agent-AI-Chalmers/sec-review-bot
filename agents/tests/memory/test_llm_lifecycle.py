@@ -5,13 +5,13 @@ from uuid import uuid4
 import pytest
 
 from sec_review_agents.memory.extractor import extract_memory_observations_from_paths
-from sec_review_agents.memory.maintainer import maintain_memory_with_result
-from sec_review_agents.memory.state import open_memory_state
-from sec_review_agents.memory.store import (
+from sec_review_agents.memory.local_state import open_memory_state
+from sec_review_agents.memory.local_store import (
     initialize_memory_store,
     memory_content_dir,
     memory_observations_dir,
 )
+from sec_review_agents.memory.maintainer import maintain_memory_with_result
 from tests.llm_probe import llm_probe, llm_test_deployment
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]

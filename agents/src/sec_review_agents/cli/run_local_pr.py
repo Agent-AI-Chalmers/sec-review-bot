@@ -17,7 +17,7 @@ from sec_review_agents.cli.local_previewing.pull_request import (
     write_pull_request_previews,
 )
 from sec_review_agents.cli.local_temporal import run_local_temporal_workflow
-from sec_review_agents.memory.store import initialize_configured_memory_store
+from sec_review_agents.memory.local_store import initialize_configured_memory_store
 from sec_review_agents.utils.env import bootstrap_agents_env
 
 

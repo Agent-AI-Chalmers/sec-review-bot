@@ -153,7 +153,7 @@ def test_memory_package_does_not_own_run_diagnostic_publication() -> None:
     violations = import_violations(
         memory_root,
         (
-            "sec_review_agents.workflows.memory_scheduling",
+            "sec_review_agents.workflows.memory.scheduling",
             "sec_review_agents.run_diagnostics.publication",
         ),
     )

@@ -4,10 +4,10 @@ import pytest
 from temporalio.common import WorkflowIDReusePolicy
 
 from sec_review_agents.artifacts.reference import ArtifactReference
-from sec_review_agents.memory.extraction_workflow import memory_extraction_workflow_id
 from sec_review_agents.temporal.config import DEFAULT_MEMORY_TASK_QUEUE
-from sec_review_agents.workflows import memory_scheduling
-from sec_review_agents.workflows.memory_scheduling import schedule_memory_extractions
+from sec_review_agents.workflows.memory import scheduling as memory_scheduling
+from sec_review_agents.workflows.memory.extraction import memory_extraction_workflow_id
+from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
 
 
 def _reference() -> ArtifactReference:

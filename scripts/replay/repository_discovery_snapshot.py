@@ -15,7 +15,7 @@ import tempfile
 from fractions import Fraction
 from pathlib import Path
 
-from sec_review_agents.memory.store import initialize_configured_memory_store
+from sec_review_agents.memory.local_store import initialize_configured_memory_store
 from sec_review_agents.scan_stages.discovery.stage import (
     build_discovery_result_from_chunks,
     persist_discovery_result,

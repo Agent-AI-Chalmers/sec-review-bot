@@ -5,17 +5,19 @@ from unittest.mock import AsyncMock
 import pytest
 
 from sec_review_agents.cli import memory
-from sec_review_agents.memory.maintenance_workflow import (
-    MEMORY_MAINTENANCE_WORKFLOW_ID,
-    MemoryMaintenanceRequest,
-    MemoryMaintenanceWorkflow,
+from sec_review_agents.entrypoints.memory_worker.schedules import (
+    MEMORY_MAINTENANCE_SCHEDULE_ID,
 )
-from sec_review_agents.memory.schedule import MEMORY_MAINTENANCE_SCHEDULE_ID
-from sec_review_agents.memory.state import (
+from sec_review_agents.memory.local_state import (
     OBSERVATION_STATUS_PENDING,
     initialize_memory_state,
     open_memory_state,
     upsert_observation,
+)
+from sec_review_agents.workflows.memory.maintenance import (
+    MEMORY_MAINTENANCE_WORKFLOW_ID,
+    MemoryMaintenanceRequest,
+    MemoryMaintenanceWorkflow,
 )
 
 

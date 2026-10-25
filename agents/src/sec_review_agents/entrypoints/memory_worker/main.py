@@ -5,8 +5,10 @@ from concurrent.futures import ThreadPoolExecutor
 
 from temporalio.worker import Worker
 
+from sec_review_agents.entrypoints.memory_worker.schedules import (
+    ensure_configured_memory_schedules,
+)
 from sec_review_agents.entrypoints.memory_worker.workflows import ACTIVITIES, WORKFLOWS
-from sec_review_agents.memory.schedule import ensure_configured_memory_schedules
 from sec_review_agents.temporal.config import DEFAULT_MEMORY_TASK_QUEUE
 from sec_review_agents.temporal.worker_runtime import connect_temporal_client
 from sec_review_agents.utils.env import int_env

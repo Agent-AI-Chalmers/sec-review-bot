@@ -25,7 +25,7 @@ from sec_review_agents.temporal.support import (
     activity_retry_policy,
     prepare_internal_workflow_activity,
 )
-from sec_review_agents.workflows.memory_scheduling import schedule_memory_extractions
+from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
 from sec_review_agents.workflows.repository.case_execution_input import (
     RepositoryCaseExecutionInput,
 )

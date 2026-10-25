@@ -16,7 +16,7 @@ from sec_review_agents.filesystem.path_views import (
     tmp_view_for_backend,
     workspace_view,
 )
-from sec_review_agents.memory.store import configured_memory_path_view
+from sec_review_agents.memory.runtime_view import configured_memory_path_view
 from sec_review_agents.resources.loader import (
     join_prompt_sections,
     load_prompt_resource,

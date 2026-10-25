@@ -5,14 +5,19 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from sec_review_agents.artifacts.reference import ArtifactReference
-from sec_review_agents.memory import extraction_workflow, maintenance_workflow
-from sec_review_agents.memory.extraction_workflow import (
+from sec_review_agents.workflows.memory import (
+    extraction as extraction_workflow,
+)
+from sec_review_agents.workflows.memory import (
+    maintenance as maintenance_workflow,
+)
+from sec_review_agents.workflows.memory.extraction import (
     MemoryExtractionRequest,
     MemoryExtractionWorkflow,
     memory_extraction_workflow_id,
     run_memory_extraction,
 )
-from sec_review_agents.memory.maintenance_workflow import (
+from sec_review_agents.workflows.memory.maintenance import (
     MemoryMaintenanceRequest,
     MemoryMaintenanceWorkflow,
 )
@@ -126,7 +131,7 @@ async def test_catalog_observation_conflict_is_not_retried(monkeypatch) -> None:
     from temporalio.exceptions import ApplicationError
 
     from sec_review_agents.memory.catalog_client import MemoryCatalogConflictError
-    from sec_review_agents.memory.extraction_workflow import (
+    from sec_review_agents.workflows.memory.extraction import (
         run_memory_extraction_activity,
     )
 

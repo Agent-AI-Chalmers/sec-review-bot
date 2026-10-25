@@ -27,11 +27,13 @@ async def run_memory_maintenance_activity(
     from sec_review_agents.memory.catalog_client import (
         configured_memory_catalog_client,
     )
-    from sec_review_agents.memory.maintainer import (
+    from sec_review_agents.memory.coordinated_maintenance import (
         maintain_coordinated_memory_with_result,
+    )
+    from sec_review_agents.memory.local_store import resolve_memory_store_dir
+    from sec_review_agents.memory.maintainer import (
         maintain_memory_with_result,
     )
-    from sec_review_agents.memory.store import resolve_memory_store_dir
     from sec_review_agents.utils.env import bootstrap_agents_env
 
     bootstrap_agents_env()
@@ -83,14 +85,14 @@ def count_pending_memory_observations_activity() -> dict[str, Any]:
     from sec_review_agents.memory.catalog_client import (
         configured_memory_catalog_client,
     )
-    from sec_review_agents.memory.state import (
+    from sec_review_agents.memory.local_state import (
         OBSERVATION_STATUS_PENDING,
         count_observations_by_status,
         initialize_memory_state,
         oldest_observation_created_at_by_status,
         open_memory_state,
     )
-    from sec_review_agents.memory.store import resolve_memory_store_dir
+    from sec_review_agents.memory.local_store import resolve_memory_store_dir
     from sec_review_agents.utils.env import bootstrap_agents_env
 
     bootstrap_agents_env()

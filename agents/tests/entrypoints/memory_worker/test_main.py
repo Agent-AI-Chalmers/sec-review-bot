@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock
 import pytest
 
 from sec_review_agents.entrypoints.memory_worker import main as worker_module
-from sec_review_agents.memory.extraction_workflow import MemoryExtractionWorkflow
-from sec_review_agents.memory.maintenance_workflow import MemoryMaintenanceWorkflow
+from sec_review_agents.workflows.memory.extraction import MemoryExtractionWorkflow
+from sec_review_agents.workflows.memory.maintenance import MemoryMaintenanceWorkflow
 
 
 @pytest.mark.asyncio

@@ -47,7 +47,7 @@ async def run_memory_extraction(
         extract_memory_observations_from_paths,
         preview_memory_observation_from_paths,
     )
-    from sec_review_agents.memory.store import resolve_memory_store_dir
+    from sec_review_agents.memory.local_store import resolve_memory_store_dir
     from sec_review_agents.memory.transcript_artifact import (
         publish_memory_agent_transcript,
     )

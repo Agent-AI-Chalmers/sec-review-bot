@@ -1,4 +1,4 @@
-"""Publish and materialize immutable curated-memory versions."""
+"""Build, publish, and materialize immutable memory tree artifacts."""
 
 import json
 import shutil
@@ -17,17 +17,17 @@ from sec_review_agents.artifacts.reference import (
     require_artifact_media_type,
 )
 
-MEMORY_VERSION_FILENAME = "memory-tree.v1.tar.zst"
-MEMORY_VERSION_MANIFEST = "manifest.json"
-MAX_MEMORY_VERSION_BYTES = 64 * 1024 * 1024
-MAX_MEMORY_VERSION_ENTRIES = 10_000
+MEMORY_TREE_ARTIFACT_FILENAME = "memory-tree.v1.tar.zst"
+MEMORY_TREE_ARTIFACT_MANIFEST = "manifest.json"
+MAX_MEMORY_TREE_ARTIFACT_BYTES = 64 * 1024 * 1024
+MAX_MEMORY_TREE_ARTIFACT_ENTRIES = 10_000
 MAX_EXTRACTED_MEMORY_BYTES = 256 * 1024 * 1024
 
 
 def _add_regular_tree(archive: tarfile.TarFile, root: Path) -> None:
     for path in [root, *sorted(root.rglob("*"))]:
         if path.is_symlink() or (not path.is_dir() and not path.is_file()):
-            raise ValueError(f"Memory version contains unsupported entry: {path}")
+            raise ValueError(f"Memory tree contains unsupported entry: {path}")
         relative = path.relative_to(root.parent).as_posix()
         info = tarfile.TarInfo(relative + ("/" if path.is_dir() else ""))
         info.mtime = 0
@@ -46,25 +46,27 @@ def _add_regular_tree(archive: tarfile.TarFile, root: Path) -> None:
             archive.addfile(info, source)
 
 
-def memory_version_s3_key(digest: str) -> str:
+def memory_tree_artifact_s3_key(digest: str) -> str:
     sha256 = digest.removeprefix("sha256:")
     if len(sha256) != 64 or any(char not in "0123456789abcdef" for char in sha256):
-        raise ValueError("Memory version key requires a lowercase SHA-256 digest.")
-    return f"memory/versions/{sha256}/{MEMORY_VERSION_FILENAME}"
+        raise ValueError(
+            "Memory tree artifact key requires a lowercase SHA-256 digest."
+        )
+    return f"memory/versions/{sha256}/{MEMORY_TREE_ARTIFACT_FILENAME}"
 
 
-def build_memory_version(
+def build_memory_tree_artifact(
     *, memory_content_root: Path, output_dir: Path
 ) -> ArtifactReference:
-    """Build one deterministic-shape archive from curated memory content."""
+    """Build a deterministic archive from a memory tree."""
     index = memory_content_root / "MEMORY.md"
     if not index.is_file():
-        raise ValueError(f"Memory version index is missing: {index}")
+        raise ValueError(f"Memory tree index is missing: {index}")
     output_dir.mkdir(parents=True, exist_ok=True)
-    archive_path = output_dir / MEMORY_VERSION_FILENAME
-    with tempfile.TemporaryDirectory(prefix="sec-review-memory-version-") as tempdir:
-        bundle_root = Path(tempdir) / "bundle"
-        memory_root = bundle_root / "memory"
+    archive_path = output_dir / MEMORY_TREE_ARTIFACT_FILENAME
+    with tempfile.TemporaryDirectory(prefix="sec-review-memory-tree-") as tempdir:
+        artifact_root = Path(tempdir) / "artifact"
+        memory_root = artifact_root / "memory"
         memory_root.mkdir(parents=True)
         shutil.copy2(index, memory_root / "MEMORY.md")
         topics = memory_content_root / "topics"
@@ -72,13 +74,13 @@ def build_memory_version(
             shutil.copytree(topics, memory_root / "topics")
         else:
             (memory_root / "topics").mkdir()
-        (bundle_root / MEMORY_VERSION_MANIFEST).write_text(
+        (artifact_root / MEMORY_TREE_ARTIFACT_MANIFEST).write_text(
             json.dumps({"version": 1}, separators=(",", ":")) + "\n",
             encoding="utf-8",
         )
         with tarfile.open(archive_path, mode="w:zst") as archive:
-            manifest_path = bundle_root / MEMORY_VERSION_MANIFEST
-            manifest_info = tarfile.TarInfo(MEMORY_VERSION_MANIFEST)
+            manifest_path = artifact_root / MEMORY_TREE_ARTIFACT_MANIFEST
+            manifest_info = tarfile.TarInfo(MEMORY_TREE_ARTIFACT_MANIFEST)
             manifest_info.mtime = 0
             manifest_info.uid = 0
             manifest_info.gid = 0
@@ -90,27 +92,27 @@ def build_memory_version(
     return local_artifact_reference(archive_path)
 
 
-def publish_memory_version(
+def publish_memory_tree_artifact(
     *,
     memory_content_root: Path,
     output_dir: Path,
     remote: bool = True,
 ) -> ArtifactReference:
-    reference = build_memory_version(
+    reference = build_memory_tree_artifact(
         memory_content_root=memory_content_root,
         output_dir=output_dir,
     )
     if not remote:
         return reference
-    key = memory_version_s3_key(reference.digest)
+    key = memory_tree_artifact_s3_key(reference.digest)
     return publish_immutable_s3_artifact(
         reference,
         key=key,
-        description="coordinated memory version",
+        description="memory tree artifact",
     )
 
 
-def materialize_memory_version(
+def materialize_memory_tree(
     reference: ArtifactReference,
     *,
     destination: Path,
@@ -119,9 +121,9 @@ def materialize_memory_version(
     archive_path = materialize_artifact(
         reference,
         destination.with_suffix(".tar.zst"),
-        maximum_size=MAX_MEMORY_VERSION_BYTES,
+        maximum_size=MAX_MEMORY_TREE_ARTIFACT_BYTES,
         expected_s3_key=(
-            memory_version_s3_key(reference.digest)
+            memory_tree_artifact_s3_key(reference.digest)
             if urlparse(reference.uri).scheme == "s3"
             else None
         ),
@@ -129,20 +131,22 @@ def materialize_memory_version(
     root = extract_archive(
         archive_path,
         destination,
-        maximum_entries=MAX_MEMORY_VERSION_ENTRIES,
+        maximum_entries=MAX_MEMORY_TREE_ARTIFACT_ENTRIES,
         maximum_extracted_bytes=MAX_EXTRACTED_MEMORY_BYTES,
     )
-    manifest = json.loads((root / MEMORY_VERSION_MANIFEST).read_text(encoding="utf-8"))
+    manifest = json.loads(
+        (root / MEMORY_TREE_ARTIFACT_MANIFEST).read_text(encoding="utf-8")
+    )
     memory_root = root / "memory"
     if manifest != {"version": 1} or not (memory_root / "MEMORY.md").is_file():
-        raise ValueError("Memory version manifest or content is invalid.")
+        raise ValueError("Memory tree artifact manifest or content is invalid.")
     return memory_root
 
 
 __all__ = [
-    "MEMORY_VERSION_FILENAME",
-    "build_memory_version",
-    "materialize_memory_version",
-    "memory_version_s3_key",
-    "publish_memory_version",
+    "MEMORY_TREE_ARTIFACT_FILENAME",
+    "build_memory_tree_artifact",
+    "materialize_memory_tree",
+    "memory_tree_artifact_s3_key",
+    "publish_memory_tree_artifact",
 ]

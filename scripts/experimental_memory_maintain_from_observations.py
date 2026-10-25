@@ -10,18 +10,18 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from sec_review_agents.memory.maintainer import maintain_memory_with_result
-from sec_review_agents.memory.state import (
+from sec_review_agents.memory.local_state import (
     OBSERVATION_STATUS_PENDING,
     fetch_observation_by_id,
     open_memory_state,
     upsert_observation,
 )
-from sec_review_agents.memory.store import (
+from sec_review_agents.memory.local_store import (
     initialize_memory_store,
     memory_observations_dir,
     memory_store_lock,
 )
+from sec_review_agents.memory.maintainer import maintain_memory_with_result
 from sec_review_agents.utils.env import bootstrap_agents_env
 
 WARNING = (

@@ -36,20 +36,23 @@ from sec_review_agents.filesystem.path_views import (
     writable_memory_view,
 )
 from sec_review_agents.memory import extractor as memory_extraction
+from sec_review_agents.memory import local_store as memory_store
 from sec_review_agents.memory import maintainer as memory_maintenance
-from sec_review_agents.memory import store as memory_store
-from sec_review_agents.memory.middleware import (
-    DEFAULT_MEMORY_INDEX_MAX_CHARS,
-    DEFAULT_MEMORY_INDEX_MAX_LINES,
-    DEFAULT_MEMORY_SYSTEM_PROMPT,
-    SECURITY_REVIEW_MEMORY_SYSTEM_PROMPT,
-    MemoryMiddleware,
-)
-from sec_review_agents.memory.store import (
+from sec_review_agents.memory.local_store import (
     AGENT_MEMORY_DIR_ENV,
+    MEMORY_INDEX_MAX_CHARS,
+    MEMORY_INDEX_MAX_LINES,
+)
+from sec_review_agents.memory.runtime_view import (
     AGENT_MEMORY_MATERIALIZED_ROOT_ENV,
     materialize_configured_memory_view,
     memory_runtime_available,
+)
+from sec_review_agents.memory.transcripts import memory_agent_transcript_path
+from sec_review_agents.runtime.memory_middleware import (
+    DEFAULT_MEMORY_SYSTEM_PROMPT,
+    SECURITY_REVIEW_MEMORY_SYSTEM_PROMPT,
+    MemoryMiddleware,
 )
 from sec_review_agents.utils.env import load_dotenv_file
 from tests.project_paths import AGENTS_ROOT
@@ -87,7 +90,7 @@ def _fetch_observations_by_ids(connection, observation_ids: list[str]):
         """,
         observation_ids,
     ).fetchall()
-    from sec_review_agents.memory.state import ObservationRow
+    from sec_review_agents.memory.local_state import ObservationRow
 
     return [ObservationRow(*row) for row in rows]
 
@@ -354,12 +357,12 @@ def test_memory_agent_transcript_paths_are_unique_and_non_overwriting(
 ) -> None:
     memory_root = memory_store.initialize_memory_store(tmp_path / "memory")
 
-    first = memory_store.memory_agent_transcript_path(
+    first = memory_agent_transcript_path(
         memory_root,
         agent_name="memory-extractor",
         run_label="Issue Review/run-1",
     )
-    second = memory_store.memory_agent_transcript_path(
+    second = memory_agent_transcript_path(
         memory_root,
         agent_name="memory-extractor",
         run_label="Issue Review/run-1",
@@ -526,8 +529,8 @@ def test_security_review_agents_select_specialized_memory_prompt(
 
 
 def test_memory_middleware_default_index_cap_matches_claude_code_style() -> None:
-    assert DEFAULT_MEMORY_INDEX_MAX_LINES == 200
-    assert DEFAULT_MEMORY_INDEX_MAX_CHARS == 25_000
+    assert MEMORY_INDEX_MAX_LINES == 200
+    assert MEMORY_INDEX_MAX_CHARS == 25_000
 
 
 def test_memory_middleware_injects_memory_index_from_backend(tmp_path: Path) -> None:
@@ -716,7 +719,7 @@ def test_materialize_configured_memory_view_locks_source_during_snapshot(
         yield True
 
     with patch(
-        "sec_review_agents.memory.store.memory_store_lock",
+        "sec_review_agents.memory.runtime_view.memory_store_lock",
         side_effect=fake_memory_store_lock,
     ):
         snapshot = materialize_configured_memory_view()
@@ -764,14 +767,14 @@ def test_materialize_coordinated_active_memory_by_digest(
             return_value=catalog_client,
         ),
         patch(
-            "sec_review_agents.memory.version_bundle.materialize_memory_version",
+            "sec_review_agents.memory.memory_tree_artifact.materialize_memory_tree",
             side_effect=fake_materialize,
         ),
     ):
         first = materialize_configured_memory_view()
         second = materialize_configured_memory_view()
 
-    expected = materialized_root / f"version-{'a' * 64}" / "memory"
+    expected = materialized_root / f"memory-tree-{'a' * 64}" / "memory"
     assert first == expected
     assert second == expected
     assert (expected / "MEMORY.md").read_text(encoding="utf-8") == "# Coordinated\n"
@@ -950,7 +953,7 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
     assert "## Source" not in observation_text
     assert "Reusable lesson: keep verifier corrections visible." in observation_text
 
-    from sec_review_agents.memory.state import open_memory_state
+    from sec_review_agents.memory.local_state import open_memory_state
 
     with open_memory_state(memory_root) as connection:
         rows = _fetch_observations_by_ids(connection, ["issue-review-run-1"])
@@ -996,7 +999,7 @@ async def test_extract_memory_observations_repeated_id_updates_pending_row(
         encoding="utf-8"
     )
 
-    from sec_review_agents.memory.state import open_memory_state
+    from sec_review_agents.memory.local_state import open_memory_state
 
     with open_memory_state(memory_root) as connection:
         rows = _fetch_observations_by_ids(connection, ["same-run"])
@@ -1038,7 +1041,7 @@ async def test_extract_memory_observations_sanitizes_explicit_observation_id(
     assert not (memory_root / "Unsafe").exists()
     assert not (memory_root.parent / "Unsafe").exists()
 
-    from sec_review_agents.memory.state import open_memory_state
+    from sec_review_agents.memory.local_state import open_memory_state
 
     with open_memory_state(memory_root) as connection:
         rows = _fetch_observations_by_ids(connection, ["unsafe-observation-id"])
@@ -1059,7 +1062,10 @@ async def test_extract_memory_observations_skips_processed_observation_by_defaul
     observation.parent.mkdir(parents=True, exist_ok=True)
     observation.write_text("Original durable lesson.\n", encoding="utf-8")
 
-    from sec_review_agents.memory.state import open_memory_state, upsert_observation
+    from sec_review_agents.memory.local_state import (
+        open_memory_state,
+        upsert_observation,
+    )
 
     with open_memory_state(memory_root) as connection:
         upsert_observation(
@@ -1161,7 +1167,7 @@ async def test_maintain_memory_marks_observations_processed(tmp_path: Path) -> N
     observation = _memory_observations_dir(memory_root) / "issue-review-run-1.md"
     observation.write_text("Reusable lesson: lower confidence.\n", encoding="utf-8")
 
-    from sec_review_agents.memory.state import (
+    from sec_review_agents.memory.local_state import (
         open_memory_state,
         upsert_observation,
     )
@@ -1216,7 +1222,10 @@ async def test_maintain_memory_selected_ids_limit_prompt_and_worktree(
     memory_store.initialize_memory_store(memory_root)
     observations_root = _memory_observations_dir(memory_root)
 
-    from sec_review_agents.memory.state import open_memory_state, upsert_observation
+    from sec_review_agents.memory.local_state import (
+        open_memory_state,
+        upsert_observation,
+    )
 
     with open_memory_state(memory_root) as connection:
         for observation_id in ("first", "second", "unselected"):
@@ -1285,7 +1294,10 @@ async def test_maintain_memory_selected_ids_reject_unknown_or_processed(
     observation = _memory_observations_dir(memory_root) / "processed.md"
     observation.write_text("Processed lesson.\n", encoding="utf-8")
 
-    from sec_review_agents.memory.state import open_memory_state, upsert_observation
+    from sec_review_agents.memory.local_state import (
+        open_memory_state,
+        upsert_observation,
+    )
 
     with open_memory_state(memory_root) as connection:
         upsert_observation(
@@ -1343,7 +1355,7 @@ async def test_maintain_memory_does_not_process_rewritten_observation(
     observation = _memory_observations_dir(memory_root) / "same-run.md"
     observation.write_text("Old lesson selected by maintenance.\n", encoding="utf-8")
 
-    from sec_review_agents.memory.state import (
+    from sec_review_agents.memory.local_state import (
         open_memory_state,
         upsert_observation,
     )
@@ -1403,7 +1415,7 @@ async def test_maintain_memory_updates_worktree_then_publishes_memory(
     observation = _memory_observations_dir(memory_root) / "issue-review-run-1.md"
     observation.write_text("Reusable lesson.\n", encoding="utf-8")
 
-    from sec_review_agents.memory.state import (
+    from sec_review_agents.memory.local_state import (
         open_memory_state,
         upsert_observation,
     )
@@ -1474,7 +1486,7 @@ async def test_maintain_memory_summary_warns_when_index_exceeds_startup_cap(
     observation = _memory_observations_dir(memory_root) / "issue-review-run-1.md"
     observation.write_text("Reusable lesson.\n", encoding="utf-8")
 
-    from sec_review_agents.memory.state import (
+    from sec_review_agents.memory.local_state import (
         open_memory_state,
         upsert_observation,
     )
@@ -1536,7 +1548,7 @@ async def test_maintain_memory_releases_source_lock_while_agent_runs(
     observation = _memory_observations_dir(memory_root) / "issue-review-run-1.md"
     observation.write_text("Reusable lesson.\n", encoding="utf-8")
 
-    from sec_review_agents.memory.state import (
+    from sec_review_agents.memory.local_state import (
         open_memory_state,
         upsert_observation,
     )
@@ -1616,7 +1628,7 @@ async def test_maintain_memory_respects_batch_size(tmp_path: Path) -> None:
     first.write_text("First lesson.\n", encoding="utf-8")
     second.write_text("Second lesson.\n", encoding="utf-8")
 
-    from sec_review_agents.memory.state import (
+    from sec_review_agents.memory.local_state import (
         open_memory_state,
         upsert_observation,
     )
@@ -1670,7 +1682,7 @@ async def test_maintain_memory_rejects_missing_pending_observation_file(
     memory_store.initialize_memory_store(memory_root)
     missing = _memory_observations_dir(memory_root) / "missing.md"
 
-    from sec_review_agents.memory.state import (
+    from sec_review_agents.memory.local_state import (
         open_memory_state,
         upsert_observation,
     )
@@ -1713,7 +1725,7 @@ async def test_maintain_memory_leaves_observations_pending_on_exception(
     observation = _memory_observations_dir(memory_root) / "issue-review-run-1.md"
     observation.write_text("Reusable lesson: lower confidence.\n", encoding="utf-8")
 
-    from sec_review_agents.memory.state import (
+    from sec_review_agents.memory.local_state import (
         open_memory_state,
         upsert_observation,
     )
@@ -1760,7 +1772,7 @@ async def test_maintain_memory_retries_pending_observation_after_failure(
     observation = _memory_observations_dir(memory_root) / "issue-review-run-1.md"
     observation.write_text("Reusable lesson: lower confidence.\n", encoding="utf-8")
 
-    from sec_review_agents.memory.state import (
+    from sec_review_agents.memory.local_state import (
         open_memory_state,
         upsert_observation,
     )

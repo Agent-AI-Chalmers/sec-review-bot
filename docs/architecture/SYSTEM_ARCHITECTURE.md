@@ -70,22 +70,26 @@ sequenceDiagram
   Temporal->>MemoryWorker: Dispatch memory extraction work
   MemoryWorker->>Storage: Fetch run diagnostic bundle
   Storage-->>MemoryWorker: Run diagnostic bundle with review transcripts
-  Note over MemoryWorker: Run extractor and record extraction transcript
-  MemoryWorker->>Storage: Publish compressed extraction transcript
-  opt Observation produced
-    MemoryWorker->>Catalog: Register observation and extraction transcript reference
+  Note over MemoryWorker: Run extractor and record extractor invocation transcript
+  MemoryWorker->>Storage: Publish compressed extractor transcript
+  alt Observation produced
+    MemoryWorker->>Catalog: Register observation with extractor transcript reference
+  else No observation produced
+    Note over MemoryWorker: Do not register an observation
   end
   loop Scheduled memory maintenance
     Temporal->>MemoryWorker: Dispatch maintenance work
-    MemoryWorker->>Catalog: Select observation batch and active revision
-    Catalog-->>MemoryWorker: Observation batch and active memory reference
-    opt Active memory exists
-      MemoryWorker->>Storage: Fetch active memory version
-      Storage-->>MemoryWorker: Active memory tree
+    MemoryWorker->>Catalog: Select maintenance batch
+    Catalog-->>MemoryWorker: Observations, base revision, and active memory tree artifact reference
+    opt Active memory tree exists
+      MemoryWorker->>Storage: Fetch active memory tree artifact
+      Storage-->>MemoryWorker: Memory tree artifact
+      Note over MemoryWorker: Materialize active memory tree
     end
-    Note over MemoryWorker: Run maintainer and record maintenance transcript
-    MemoryWorker->>Storage: Publish memory version and compressed maintenance transcript
-    MemoryWorker->>Catalog: Commit revision, consumed observations, and maintenance transcript reference with compare-and-swap
-    Catalog-->>MemoryWorker: Commit result
+    Note over MemoryWorker: Run maintainer and record maintainer invocation transcript
+    MemoryWorker->>Storage: Publish compressed maintainer transcript
+    MemoryWorker->>Storage: Publish new memory tree artifact
+    MemoryWorker->>Catalog: Commit artifact references and consumed observation IDs using base-revision CAS
+    Catalog-->>MemoryWorker: New active revision or revision conflict
   end
 ```

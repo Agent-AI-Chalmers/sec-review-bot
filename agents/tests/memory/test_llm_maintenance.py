@@ -3,17 +3,17 @@ from uuid import uuid4
 
 import pytest
 
-from sec_review_agents.memory.maintainer import maintain_memory_with_result
-from sec_review_agents.memory.state import (
+from sec_review_agents.memory.local_state import (
     OBSERVATION_STATUS_PENDING,
     open_memory_state,
     upsert_observation,
 )
-from sec_review_agents.memory.store import (
+from sec_review_agents.memory.local_store import (
     initialize_memory_store,
     memory_content_dir,
     memory_observations_dir,
 )
+from sec_review_agents.memory.maintainer import maintain_memory_with_result
 from tests.llm_probe import llm_probe, llm_test_deployment
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
@@ -42,7 +42,7 @@ def _fetch_observations_by_ids(connection, observation_ids: list[str]):
         """,
         observation_ids,
     ).fetchall()
-    from sec_review_agents.memory.state import ObservationRow
+    from sec_review_agents.memory.local_state import ObservationRow
 
     return [ObservationRow(*row) for row in rows]
 
