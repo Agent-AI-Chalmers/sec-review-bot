@@ -23,6 +23,7 @@ ops:
   - 'ops/**'
   - 'compose.yaml'
   - 'compose.env.sample'
+  - 'compose.memory.env.sample'
   # A CI change can affect how ops is validated.
   - '.github/workflows/ci.yml'
 
