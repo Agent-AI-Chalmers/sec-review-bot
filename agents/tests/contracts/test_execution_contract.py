@@ -6,6 +6,8 @@ from sec_review_agents.entrypoints.execution_contract import (
     EXECUTION_WORKFLOW_TYPE,
     RUN_ID_PATTERN_TEXT,
     ExecutionRequest,
+)
+from sec_review_agents.entrypoints.execution_contract_validation import (
     validate_execution_request,
 )
 

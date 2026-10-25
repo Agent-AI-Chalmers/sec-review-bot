@@ -26,6 +26,7 @@ dist-ssr
 
 # secret files
 .env
+compose.memory.env
 *.pem
 agents/config/model-providers.toml
 ops/systemd/deployment.env

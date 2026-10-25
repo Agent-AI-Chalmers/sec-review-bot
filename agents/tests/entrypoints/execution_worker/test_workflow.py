@@ -1,9 +1,21 @@
 import pytest
+from temporalio import workflow
+from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
 from sec_review_agents.entrypoints.execution_contract import ExecutionRequest
 from sec_review_agents.entrypoints.execution_worker import (
     workflow as execution_workflow,
 )
+
+
+@pytest.mark.asyncio
+async def test_execution_workflow_can_be_prepared_in_temporal_sandbox() -> None:
+    """Protect worker startup from restricted work performed during imports."""
+    definition = workflow._Definition.must_from_class(
+        execution_workflow.ExecutionWorkflow
+    )
+
+    SandboxedWorkflowRunner().prepare_workflow(definition)
 
 
 @pytest.mark.asyncio

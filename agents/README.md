@@ -295,6 +295,40 @@ Agents can declare the skills they need. The worker prepares and mounts the decl
 
 Memory requires Temporal, a Memory Catalog backed by PostgreSQL, and S3-compatible object storage.
 
+For local Memory development, Compose runs the infrastructure and the three workers run as host processes.
+
+> [!WARNING]
+> The checked-in development credentials are fixed loopback-only values. They are not secrets and must not be used on a shared machine or any deployment reachable from another host.
+
+From the **repository root**, create the ignored local env file and start the infrastructure:
+
+```bash
+cp compose.memory.env.sample compose.memory.env
+# Compose runs RustFS and Temporal with the current host UID/GID. Creating
+# their bind-mount roots first keeps those directories writable.
+install -d .agent-rustfs-state .agent-temporal-state
+docker compose \
+  --env-file compose.memory.env \
+  --profile memory \
+  up -d --build --wait \
+  rustfs postgres temporal memory-catalog-server
+docker compose \
+  --env-file compose.memory.env \
+  --profile memory \
+  run --rm rustfs-init
+curl --fail http://127.0.0.1:8092/healthz
+```
+
+Configure `agents/.env` and `agents/config/model-providers.toml` for model access, then start the Execution, Memory Extraction, and Memory Maintenance workers together:
+
+```bash
+cd agents
+uv run sec-review-agents-memory dev-workers \
+  --env-file ../compose.memory.env
+```
+
+The launcher maps the separate object-storage identities to their workers, keeps Memory Maintenance Worker activity concurrency at `1`, and stops the worker group when one worker exits or the launcher receives `SIGINT`/`SIGTERM`. It does not start or stop Compose services.
+
 | Variable | Purpose |
 | --- | --- |
 | `AGENT_MEMORY_CATALOG_URL` | Memory Catalog base URL. Without it, review agents have no memory view and memory processing cannot run. |

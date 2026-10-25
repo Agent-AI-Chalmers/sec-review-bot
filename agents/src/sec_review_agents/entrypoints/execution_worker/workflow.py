@@ -8,7 +8,6 @@ from temporalio import activity, workflow
 from sec_review_agents.entrypoints.execution_contract import (
     EXECUTION_WORKFLOW_TYPE,
     ExecutionRequest,
-    validate_execution_request,
 )
 from sec_review_agents.entrypoints.execution_protocol import (
     EXECUTION_REQUEST_INVALID,
@@ -30,6 +29,9 @@ from sec_review_agents.workflows.review_request import (
 
 @activity.defn
 def prepare_execution_run_activity(request: ExecutionRequest) -> dict[str, Any]:
+    from sec_review_agents.entrypoints.execution_contract_validation import (
+        validate_execution_request,
+    )
     from sec_review_agents.entrypoints.execution_protocol import build_execution_error
     from sec_review_agents.entrypoints.input_preparation import prepare_run_input
     from sec_review_agents.features import memory_processing_enabled
