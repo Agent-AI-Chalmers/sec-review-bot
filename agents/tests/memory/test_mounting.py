@@ -8,6 +8,7 @@ from sec_review_agents.agents.mitigation.repository import (
 from sec_review_agents.agents.verification.pull_request import (
     create_pr_verification_backend,
 )
+from sec_review_agents.filesystem.path_views import memory_view
 
 
 def _default_routes_for(backend) -> dict:
@@ -42,55 +43,47 @@ def test_review_backends_mount_materialized_memory_view_when_configured(
     workspace = tmp_path / "local" / "workspace"
     history = tmp_path / "local" / "history"
     incremental = tmp_path / "local" / "incremental-window"
-    memory_source = tmp_path / "memory-source"
     memory_materialized = tmp_path / "memory-materialized"
-    for path in (workspace, history, incremental, memory_source / "memory" / "topics"):
+    for path in (workspace, history, incremental, memory_materialized / "topics"):
         path.mkdir(parents=True, exist_ok=True)
-    (memory_source / "memory" / "MEMORY.md").write_text(
+    (memory_materialized / "MEMORY.md").write_text(
         "# Memory\n\n- Mounted memory lesson.\n",
         encoding="utf-8",
     )
 
-    with (
+    with patch(
         # The memory view is what this test checks, so the sandbox is pinned rather
         # than resolved: `local` is not a deployment value, and the real
         # resolution would look for Docker.
-        patch(
-            "sec_review_agents.filesystem.backend_selection."
-            "selected_sandbox_backend_kind",
-            return_value="local",
-        ),
-        patch.dict(
-            "os.environ",
-            {
-                "AGENT_MEMORY_DIR": str(memory_source),
-                "AGENT_MEMORY_MATERIALIZED_ROOT": str(memory_materialized),
-            },
-            clear=False,
-        ),
+        "sec_review_agents.filesystem.backend_selection."
+        "selected_sandbox_backend_kind",
+        return_value="local",
     ):
+        mounted_memory = memory_view(host_path=memory_materialized)
         backends = (
             create_issue_analyzer_backend(
                 workspace_root_path=workspace,
                 history_path=history,
+                memory_path_view=mounted_memory,
             ),
             create_pr_verification_backend(
                 workspace_root_path=workspace,
                 history_path=history,
                 incremental_window_path=incremental,
+                memory_path_view=mounted_memory,
             ),
             create_repository_mitigation_backend(
                 workspace_root=workspace,
                 history_path=None,
                 incremental_window_path=None,
                 scan_mode="full",
+                memory_path_view=mounted_memory,
             ),
         )
 
     for backend in backends:
         memory_root = _default_route_root(backend, "/memory/")
-        assert memory_root.parent == memory_materialized.resolve()
-        assert memory_root != memory_source.resolve()
+        assert memory_root == memory_materialized.resolve()
         assert (memory_root / "MEMORY.md").read_text(encoding="utf-8") == (
             "# Memory\n\n- Mounted memory lesson.\n"
         )

@@ -1,5 +1,4 @@
 from argparse import Namespace
-from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
@@ -7,12 +6,6 @@ import pytest
 from sec_review_agents.cli import memory
 from sec_review_agents.entrypoints.memory_maintenance_worker.schedules import (
     MEMORY_MAINTENANCE_SCHEDULE_ID,
-)
-from sec_review_agents.memory.local_state import (
-    OBSERVATION_STATUS_PENDING,
-    initialize_memory_state,
-    open_memory_state,
-    upsert_observation,
 )
 from sec_review_agents.temporal.config import DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE
 from sec_review_agents.workflows.memory.maintenance import (
@@ -22,15 +15,26 @@ from sec_review_agents.workflows.memory.maintenance import (
 )
 
 
-def test_cli_exposes_observations_maintenance_and_schedule_only() -> None:
-    assert memory.parse_args(["observations", "list"]).command == "observations"
+def test_cli_exposes_temporal_execution_commands_only() -> None:
     assert memory.parse_args(["maintain"]).command == "maintain"
     assert (
         memory.parse_args(["schedules", "maintenance", "ensure"]).schedule_kind
         == "maintenance"
     )
     with pytest.raises(SystemExit):
+        memory.parse_args(["observations", "list"])
+    with pytest.raises(SystemExit):
         memory.parse_args(["extraction", "list"])
+
+
+def test_cli_help_describes_temporal_execution_not_state_browsing(capsys) -> None:
+    with pytest.raises(SystemExit) as exit_info:
+        memory.parse_args(["--help"])
+
+    assert exit_info.value.code == 0
+    output = capsys.readouterr().out
+    assert "Start and repair Temporal memory-maintenance execution." in output
+    assert "{maintain,schedules}" in output
 
 
 def test_temporal_commands_default_to_maintenance_task_queue() -> None:
@@ -42,27 +46,6 @@ def test_temporal_commands_default_to_maintenance_task_queue() -> None:
         memory.parse_args(["schedules", "maintenance", "ensure"]).task_queue
         == DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE
     )
-
-
-def test_cli_lists_local_observations(tmp_path: Path, capsys) -> None:
-    store = tmp_path / "memory"
-    store.mkdir()
-    initialize_memory_state(store)
-    observation = store / "observations" / "one.md"
-    observation.parent.mkdir()
-    observation.write_text("body", encoding="utf-8")
-    with open_memory_state(store) as connection:
-        upsert_observation(
-            connection,
-            extraction_id="one",
-            path=str(observation),
-            status=OBSERVATION_STATUS_PENDING,
-        )
-
-    assert memory.main(["observations", "list", "--memory-store-dir", str(store)]) == 0
-    output = capsys.readouterr().out
-    assert "one\tpending" in output
-    assert "observations/one.md" in output
 
 
 @pytest.mark.asyncio

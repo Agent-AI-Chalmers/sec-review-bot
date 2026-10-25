@@ -101,21 +101,24 @@ def _repository_case_review_timeout_seconds(
     return timeout_seconds
 
 
-def _repository_case_published_transcript_path(
+def _repository_case_transcript_path(
     prepared_case: dict[str, Any],
     *,
     order: int,
     stage: str,
     attempt: str = "initial",
 ) -> Path:
-    from sec_review_agents.runtime.transcripts import transcript_file
+    from sec_review_agents.review_stages.transcripts import (
+        review_transcript_path,
+    )
     from sec_review_agents.utils.paths import required_path
 
-    return transcript_file(
-        required_path(
-            prepared_case.get("published_transcripts_path"),
-            label="published_transcripts_path",
-        ),
+    published_root = required_path(
+        prepared_case.get("published_transcripts_path"),
+        label="published_transcripts_path",
+    )
+    return review_transcript_path(
+        published_root,
         order=order,
         stage=stage,
         attempt=attempt,
@@ -242,10 +245,12 @@ def prepare_repository_case_review_inputs_activity(
     request: ReviewWorkflowRequest,
     cases: Sequence[Mapping[str, Any]],
 ) -> RepositoryCaseRequestBatch:
+    from sec_review_agents.review_stages.transcripts import (
+        review_transcripts_root,
+    )
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
     )
-    from sec_review_agents.runtime.transcripts import review_transcripts_root
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -373,7 +378,7 @@ async def analyze_repository_case_activity(
             prepared_case["artifact_paths"],
             "analyzer",
         ),
-        published_transcript_path=_repository_case_published_transcript_path(
+        published_transcript_path=_repository_case_transcript_path(
             prepared_case,
             order=1,
             stage="analyzer",
@@ -429,7 +434,7 @@ async def mitigate_repository_case_activity(
         "mitigator",
     )
     if not has_confirmed_repair_target(analysis_result):
-        _repository_case_published_transcript_path(
+        _repository_case_transcript_path(
             prepared_case,
             order=review_stage_attempt_order(
                 stage="mitigator", retry_context=retry_context
@@ -448,7 +453,7 @@ async def mitigate_repository_case_activity(
         retry_context,
         runtime_context,
         mitigator_artifacts_path=mitigator_artifacts_path,
-        published_transcript_path=_repository_case_published_transcript_path(
+        published_transcript_path=_repository_case_transcript_path(
             prepared_case,
             order=review_stage_attempt_order(
                 stage="mitigator", retry_context=retry_context
@@ -484,7 +489,7 @@ async def verify_repository_case_activity(
         "verifier",
     )
     if not has_confirmed_repair_target(analysis_result):
-        _repository_case_published_transcript_path(
+        _repository_case_transcript_path(
             prepared_case,
             order=review_stage_attempt_order(
                 stage="verifier", retry_context=retry_context
@@ -504,7 +509,7 @@ async def verify_repository_case_activity(
         retry_context,
         runtime_context,
         verifier_artifacts_path=verifier_artifacts_path,
-        published_transcript_path=_repository_case_published_transcript_path(
+        published_transcript_path=_repository_case_transcript_path(
             prepared_case,
             order=review_stage_attempt_order(
                 stage="verifier", retry_context=retry_context

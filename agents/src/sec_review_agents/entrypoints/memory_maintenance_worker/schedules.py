@@ -16,7 +16,6 @@ from temporalio.client import (
 from temporalio.service import RPCError, RPCStatusCode
 
 from sec_review_agents.features import memory_processing_enabled
-from sec_review_agents.memory.local_store import initialize_configured_memory_store
 from sec_review_agents.observability.log_config import logger
 from sec_review_agents.temporal.config import (
     DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE,
@@ -135,11 +134,26 @@ async def ensure_configured_memory_schedules(
     )
 
     if not memory_processing_enabled():
+        for schedule_id in (
+            MEMORY_MAINTENANCE_SCHEDULE_ID,
+            *OBSOLETE_MEMORY_SCHEDULE_IDS,
+        ):
+            try:
+                await client.get_schedule_handle(schedule_id).delete()
+            except RPCError as error:
+                if error.status is not RPCStatusCode.NOT_FOUND:
+                    raise
+            else:
+                logger.info(
+                    "memory_schedule_deleted",
+                    schedule_id=schedule_id,
+                    reason="memory_processing_disabled",
+                )
         return
     if configured_memory_catalog_client() is None:
-        memory_store_dir = initialize_configured_memory_store()
-        if memory_store_dir is None:
-            return
+        raise ValueError(
+            "AGENT_MEMORY_CATALOG_URL is required when memory processing is enabled."
+        )
     for schedule_id in OBSOLETE_MEMORY_SCHEDULE_IDS:
         try:
             await client.get_schedule_handle(schedule_id).delete()

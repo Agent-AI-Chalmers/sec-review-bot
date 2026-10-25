@@ -43,7 +43,14 @@ async def run_issue_single_agent(
     Shared by the Temporal activity and the direct/public entrypoints so the
     stage wiring lives in one place.
     """
-    from sec_review_agents.agents.single_agent import issue as issue_single_agent
+    from sec_review_agents.agents.single_agent.issue import (
+        build_issue_single_agent_filesystem_system_prompt,
+        build_issue_single_agent_system_prompt,
+        build_issue_single_agent_todo_system_prompt,
+        build_issue_single_agent_todo_tool_description,
+        build_issue_single_agent_user_prompt,
+        create_issue_single_agent_backend,
+    )
     from sec_review_agents.review_stages.single_agent.stage import (
         run_single_agent_stage,
     )
@@ -53,25 +60,22 @@ async def run_issue_single_agent(
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         single_agent_artifacts_path=single_agent_artifacts_path,
         setup_declaration_content=setup_declaration_content,
-        build_backend=lambda workspace_root: issue_single_agent.create_issue_single_agent_backend(
+        build_backend=lambda workspace_root, memory_path_view: create_issue_single_agent_backend(
             workspace_root=workspace_root,
             history_path=history_path,
+            memory_path_view=memory_path_view,
             runtime_context=runtime_context,
         ),
-        system_prompt=issue_single_agent.build_issue_single_agent_system_prompt(
+        system_prompt=build_issue_single_agent_system_prompt(
             review_objective=review_objective,
             test_changes=test_changes,
         ),
-        filesystem_system_prompt=(
-            issue_single_agent.build_issue_single_agent_filesystem_system_prompt()
-        ),
-        user_prompt=issue_single_agent.build_issue_single_agent_user_prompt(
+        filesystem_system_prompt=build_issue_single_agent_filesystem_system_prompt(),
+        user_prompt=build_issue_single_agent_user_prompt(
             issue=issue,
         ),
-        todo_system_prompt=issue_single_agent.build_issue_single_agent_todo_system_prompt(),
-        todo_tool_description=(
-            issue_single_agent.build_issue_single_agent_todo_tool_description()
-        ),
+        todo_system_prompt=build_issue_single_agent_todo_system_prompt(),
+        todo_tool_description=build_issue_single_agent_todo_tool_description(),
     )
 
 

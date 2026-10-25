@@ -14,10 +14,6 @@ from sec_review_agents.filesystem.path_views import (
     memory_view,
 )
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.memory.local_store import (
-    initialize_memory_store,
-    memory_content_dir,
-)
 from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
@@ -53,9 +49,9 @@ MIDDLEWARE_PROBE = llm_probe(
 @pytest.mark.asyncio
 async def test_llm_uses_memory_index_to_read_relevant_topic(tmp_path: Path) -> None:
     sentinel = "MEMORY_MIDDLEWARE_SENTINEL_7F3A91"
-    memory_root = initialize_memory_store(tmp_path / "memory")
-    runtime_memory_root = memory_content_dir(memory_root)
+    runtime_memory_root = tmp_path / "memory"
     topic_root = runtime_memory_root / "topics"
+    topic_root.mkdir(parents=True)
     (runtime_memory_root / "MEMORY.md").write_text(
         "\n".join(
             [

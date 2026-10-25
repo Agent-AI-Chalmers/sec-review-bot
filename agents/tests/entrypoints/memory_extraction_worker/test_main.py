@@ -6,7 +6,8 @@ import pytest
 from sec_review_agents.entrypoints.memory_extraction_worker import main as worker_module
 from sec_review_agents.workflows.memory.extraction import (
     MemoryExtractionWorkflow,
-    run_memory_extraction_activity,
+    prepare_memory_extraction_activity,
+    register_memory_extraction_activity,
 )
 
 
@@ -39,7 +40,10 @@ async def test_extraction_worker_owns_only_extraction_registration(monkeypatch) 
 
     assert captured["task_queue"] == "sec-review-memory-extraction"
     assert captured["workflows"] == [MemoryExtractionWorkflow]
-    assert captured["activities"] == [run_memory_extraction_activity]
+    assert captured["activities"] == [
+        prepare_memory_extraction_activity,
+        register_memory_extraction_activity,
+    ]
     assert captured["max_concurrent_activities"] == 4
 
 

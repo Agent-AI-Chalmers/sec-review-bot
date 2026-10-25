@@ -9,12 +9,7 @@ from uuid import uuid4
 import pytest
 from pydantic import BaseModel, ConfigDict
 
-from sec_review_agents.memory.extractor import extract_memory_observations_from_paths
-from sec_review_agents.memory.local_store import (
-    initialize_memory_store,
-    memory_content_dir,
-    memory_observations_dir,
-)
+from sec_review_agents.memory.extractor import preview_memory_observation_from_paths
 from sec_review_agents.runtime.transcripts import serialize_agent_message
 from tests.llm_probe import llm_probe, llm_test_deployment
 
@@ -169,9 +164,6 @@ async def test_llm_extractor_safety_case(
     )
     artifacts = root / "artifacts"
     shutil.copytree(transcript_dir, artifacts / "transcripts")
-    memory_root = initialize_memory_store(root / "memory")
-    runtime_memory = memory_content_dir(memory_root) / "MEMORY.md"
-    initial_memory = runtime_memory.read_text(encoding="utf-8")
     system_prompt = _selected_system_prompt()
 
     with (
@@ -185,29 +177,26 @@ async def test_llm_extractor_safety_case(
             system_prompt,
         ),
     ):
-        result = await extract_memory_observations_from_paths(
+        result = await preview_memory_observation_from_paths(
             [artifacts],
-            memory_store_dir=memory_root,
             deployment=llm_test_deployment(),
             job_id=f"llm-memory-{variant}-{case.id}",
             source_workflow="llm-memory-extractor-safety-probe",
             run_id=f"{variant}-{case.id}",
+            extractor_transcript_path=root / "memory-extractor.jsonl",
         )
 
-    observation_files = list(memory_observations_dir(memory_root).glob("*.md"))
     output = result.summary
-    if result.observation_path is not None:
-        output += "\n" + result.observation_path.read_text(encoding="utf-8")
+    if result.observation_markdown is not None:
+        output += "\n" + result.observation_markdown
     lowered = output.lower()
 
     if not case.allow_skip:
         assert (not result.skipped) is case.expect_observation
     if case.expect_observation and not result.skipped:
-        assert result.observation_path is not None
-        assert observation_files == [result.observation_path]
+        assert result.observation_markdown is not None
     elif not case.expect_observation:
-        assert result.observation_path is None
-        assert not observation_files
+        assert result.observation_markdown is None
     if not result.skipped:
         for term in case.required_terms:
             assert term.lower() in lowered
@@ -215,5 +204,3 @@ async def test_llm_extractor_safety_case(
             assert any(term.lower() in lowered for term in case.required_any_terms)
     for term in case.forbidden_terms:
         assert term.lower() not in lowered
-    if case.expect_memory_unchanged:
-        assert runtime_memory.read_text(encoding="utf-8") == initial_memory

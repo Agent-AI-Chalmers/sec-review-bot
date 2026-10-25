@@ -1,13 +1,6 @@
-from dataclasses import dataclass
 from typing import Literal
 
 from pydantic import BaseModel, Field
-
-
-@dataclass(frozen=True)
-class MemoryMaintenanceObservation:
-    extraction_id: str
-    mounted_path: str
 
 
 class MemoryMaintenanceOutput(BaseModel):

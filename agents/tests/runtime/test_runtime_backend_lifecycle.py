@@ -455,18 +455,12 @@ def test_repository_analyzer_backend_omits_memory_when_globally_disabled(
 ) -> None:
     local_root = tmp_path / "local"
     workspace = local_root / "workspace"
-    memory_root = local_root / "memory"
     workspace.mkdir(parents=True)
-    (memory_root / "memory").mkdir(parents=True)
-    (memory_root / "memory" / "MEMORY.md").write_text("# Memory\n", encoding="utf-8")
 
     with (
         patch.dict(
             "os.environ",
-            {
-                "AGENT_MEMORY_CONSUMPTION_ENABLED": "false",
-                "AGENT_MEMORY_DIR": str(memory_root),
-            },
+            {"AGENT_MEMORY_CONSUMPTION_ENABLED": "false"},
         ),
         patch(
             "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",

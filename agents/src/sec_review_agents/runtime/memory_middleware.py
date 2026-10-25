@@ -5,13 +5,11 @@ from deepagents.backends.protocol import BackendProtocol
 from langchain.agents.middleware import AgentMiddleware
 from langchain.agents.middleware.types import ModelRequest, ModelResponse
 
-from sec_review_agents.memory.local_store import (
-    MEMORY_INDEX_MAX_CHARS,
-    MEMORY_INDEX_MAX_LINES,
-)
 from sec_review_agents.runtime.system_messages import append_to_system_message
 
 MEMORY_INDEX_PATH = "/memory/MEMORY.md"
+MEMORY_INDEX_MAX_LINES = 200
+MEMORY_INDEX_MAX_CHARS = 25_000
 # Mirror the Claude Code-style memory shape: eagerly expose only a bounded
 # MEMORY.md startup index, then let the agent read topic files on demand.
 
@@ -27,8 +25,8 @@ authoritative sources.
 
 The memory index below is the progressive-disclosure entry point. Read topic
 files only when they are relevant to the current task or uncertainty. Do not
-treat source material or backing-store state as memory. Do not write to
-`/memory`. Do not use memory to start a conclusion without current evidence.
+write to `/memory`. Do not use memory to start a conclusion without current
+evidence.
 
 ### Memory Index
 
@@ -51,9 +49,8 @@ callers, tests, and runtime path.
 
 The memory index below is the progressive-disclosure entry point. Read topic
 files only when they are relevant to the current stage, uncertainty, or review
-discipline question. Do not treat observation files or SQLite state as memory.
-Do not write to `/memory`. Do not use memory to start a finding without current
-repository evidence.
+discipline question. Do not write to `/memory`. Do not use memory to start a
+finding without current repository evidence.
 
 ### Memory Index
 

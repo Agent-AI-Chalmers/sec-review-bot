@@ -3,17 +3,10 @@ from uuid import uuid4
 
 import pytest
 
-from sec_review_agents.memory.local_state import (
-    OBSERVATION_STATUS_PENDING,
-    open_memory_state,
-    upsert_observation,
+from sec_review_agents.memory.maintainer import (
+    MemoryMaintenanceInput,
+    maintain_memory_tree,
 )
-from sec_review_agents.memory.local_store import (
-    initialize_memory_store,
-    memory_content_dir,
-    memory_observations_dir,
-)
-from sec_review_agents.memory.maintainer import maintain_memory_with_result
 from tests.llm_probe import llm_probe, llm_test_deployment
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
@@ -24,29 +17,6 @@ MAINTENANCE_PROBE = llm_probe(
 )
 
 
-def _fetch_observations_by_extraction_ids(connection, extraction_ids: list[str]):
-    if not extraction_ids:
-        return []
-    placeholders = ",".join("?" for _ in extraction_ids)
-    rows = connection.execute(
-        f"""
-        select
-          extraction_id,
-          path,
-          status,
-          created_at,
-          updated_at
-        from observations
-        where extraction_id in ({placeholders})
-        order by created_at asc, extraction_id asc
-        """,
-        extraction_ids,
-    ).fetchall()
-    from sec_review_agents.memory.local_state import ObservationRow
-
-    return [ObservationRow(*row) for row in rows]
-
-
 @pytest.mark.skipif(
     not MAINTENANCE_PROBE.enabled(),
     reason=MAINTENANCE_PROBE.skip_reason(),
@@ -54,9 +24,9 @@ def _fetch_observations_by_extraction_ids(connection, extraction_ids: list[str])
 @pytest.mark.asyncio
 async def test_llm_maintenance_reorganizes_messy_memory_without_transcripts() -> None:
     root = Path(".agent-artifacts") / "memory-probes" / f"maintenance-{uuid4().hex[:8]}"
-    memory_root = initialize_memory_store(root / "memory")
-    runtime_memory_root = memory_content_dir(memory_root)
+    runtime_memory_root = root / "base-memory"
     topics_root = runtime_memory_root / "topics"
+    topics_root.mkdir(parents=True)
     (runtime_memory_root / "MEMORY.md").write_text(
         "\n".join(
             [
@@ -101,7 +71,7 @@ async def test_llm_maintenance_reorganizes_messy_memory_without_transcripts() ->
         encoding="utf-8",
     )
 
-    observation = memory_observations_dir(memory_root) / "maintenance-probe.md"
+    observation = root / "maintenance-probe.md"
     observation.write_text(
         "\n".join(
             [
@@ -113,31 +83,31 @@ async def test_llm_maintenance_reorganizes_messy_memory_without_transcripts() ->
         + "\n",
         encoding="utf-8",
     )
-    with open_memory_state(memory_root) as connection:
-        upsert_observation(
-            connection,
-            extraction_id="maintenance-probe",
-            path=str(observation),
-            status=OBSERVATION_STATUS_PENDING,
-        )
-
-    result = await maintain_memory_with_result(
-        memory_store_dir=memory_root,
+    result = await maintain_memory_tree(
+        base_memory_tree=runtime_memory_root,
+        observations=[
+            MemoryMaintenanceInput(
+                extraction_id="maintenance-probe",
+                path=observation,
+            )
+        ],
+        worktree_root=root / "candidate-memory",
+        maintainer_transcript_path=root / "memory-maintainer.jsonl",
         deployment=llm_test_deployment(),
     )
 
-    memory_index = (runtime_memory_root / "MEMORY.md").read_text(encoding="utf-8")
+    candidate = result.memory_tree_path
+    memory_index = (candidate / "MEMORY.md").read_text(encoding="utf-8")
     topic_text = "\n".join(
         path.read_text(encoding="utf-8")
-        for path in sorted((runtime_memory_root / "topics").glob("*.md"))
+        for path in sorted((candidate / "topics").glob("*.md"))
     )
     print(
         "\n".join(
             [
                 "memory maintenance probe:",
                 f"- artifact root: {root.resolve()}",
-                f"- summary: {result.summary}",
-                f"- memory files: {[str(path.relative_to(memory_root)) for path in sorted(memory_root.rglob('*.md'))]}",
+                f"- memory files: {[str(path.relative_to(candidate)) for path in sorted(candidate.rglob('*.md'))]}",
                 f"- MEMORY.md chars: {len(memory_index)}",
                 "",
                 "MEMORY.md:",
@@ -152,10 +122,7 @@ async def test_llm_maintenance_reorganizes_messy_memory_without_transcripts() ->
     assert "topics/" in memory_index
     assert len(memory_index) < 450
     assert "grown into a notebook" not in memory_index
-    assert not (topics_root / "retry-confidence.md").exists()
+    assert not (candidate / "topics" / "retry-confidence.md").exists()
     assert "source-to-sink" in topic_text.lower()
     assert "confidence" in topic_text.lower()
     assert observation.exists()
-    with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_extraction_ids(connection, ["maintenance-probe"])
-    assert rows[0].status == "processed"

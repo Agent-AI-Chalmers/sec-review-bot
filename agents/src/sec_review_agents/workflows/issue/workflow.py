@@ -33,10 +33,13 @@ async def analyze_issue_activity(
     prepared_input: dict[str, Any],
     runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
+    from sec_review_agents.review_stages.transcripts import (
+        review_transcript_path,
+        review_transcripts_root,
+    )
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
     )
-    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -64,8 +67,8 @@ async def analyze_issue_activity(
             prepared_input["artifact_paths"],
             "analyzer",
         ),
-        published_transcript_path=review_stage_transcript_path(
-            run_artifacts_root,
+        published_transcript_path=review_transcript_path(
+            review_transcripts_root(run_artifacts_root),
             order=1,
             stage="analyzer",
         ),
@@ -87,10 +90,13 @@ async def mitigate_issue_activity(
         create_skipped_mitigation_result,
         mitigation_attempt_label,
     )
+    from sec_review_agents.review_stages.transcripts import (
+        review_transcript_path,
+        review_transcripts_root,
+    )
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
     )
-    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -107,8 +113,8 @@ async def mitigate_issue_activity(
     )
     review_intent = require_review_intent(prepared_input.get("review_intent"))
     if not has_confirmed_repair_target(analysis_result):
-        review_stage_transcript_path(
-            run_artifacts_root,
+        review_transcript_path(
+            review_transcripts_root(run_artifacts_root),
             order=review_stage_attempt_order(
                 stage="mitigator", retry_context=retry_context
             ),
@@ -132,8 +138,8 @@ async def mitigate_issue_activity(
             label="bundle_paths.history_path",
         ),
         mitigator_artifacts_path=mitigator_artifacts_path,
-        published_transcript_path=review_stage_transcript_path(
-            run_artifacts_root,
+        published_transcript_path=review_transcript_path(
+            review_transcripts_root(run_artifacts_root),
             order=review_stage_attempt_order(
                 stage="mitigator", retry_context=retry_context
             ),
@@ -157,6 +163,10 @@ async def verify_issue_activity(
     runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
+    from sec_review_agents.review_stages.transcripts import (
+        review_transcript_path,
+        review_transcripts_root,
+    )
     from sec_review_agents.review_stages.verification.stage import (
         create_skipped_verification_result,
         verification_attempt_label,
@@ -164,7 +174,6 @@ async def verify_issue_activity(
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
     )
-    from sec_review_agents.runtime.transcripts import review_stage_transcript_path
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -180,8 +189,8 @@ async def verify_issue_activity(
         "verifier",
     )
     if not has_confirmed_repair_target(analysis_result):
-        review_stage_transcript_path(
-            run_artifacts_root,
+        review_transcript_path(
+            review_transcripts_root(run_artifacts_root),
             order=review_stage_attempt_order(
                 stage="verifier", retry_context=retry_context
             ),
@@ -206,8 +215,8 @@ async def verify_issue_activity(
             label="bundle_paths.history_path",
         ),
         verifier_artifacts_path=verifier_artifacts_path,
-        published_transcript_path=review_stage_transcript_path(
-            run_artifacts_root,
+        published_transcript_path=review_transcript_path(
+            review_transcripts_root(run_artifacts_root),
             order=review_stage_attempt_order(
                 stage="verifier", retry_context=retry_context
             ),

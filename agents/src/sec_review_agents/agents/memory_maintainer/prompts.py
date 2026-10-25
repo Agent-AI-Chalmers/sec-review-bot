@@ -1,19 +1,16 @@
-from sec_review_agents.agents.memory_maintainer.model import (
-    MemoryMaintenanceObservation,
-)
 from sec_review_agents.resources.loader import load_prompt_resource
 
 MEMORY_MAINTAINER_SYSTEM_PROMPT = load_prompt_resource("memory/maintain-system.md")
 
 
 def build_maintenance_prompt(
-    observations: list[MemoryMaintenanceObservation],
+    observations: list[tuple[str, str]],
 ) -> str:
     if not observations:
         raise ValueError("Memory maintenance requires at least one observation.")
     selected = "\n".join(
-        f"- `{observation.extraction_id}`: `{observation.mounted_path}`"
-        for observation in observations
+        f"- `{extraction_id}`: `{mounted_path}`"
+        for extraction_id, mounted_path in observations
     )
     return "\n".join(
         [

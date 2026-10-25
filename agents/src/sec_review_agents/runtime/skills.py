@@ -10,7 +10,7 @@ from pathlib import Path
 from sec_review_agents.resources.materialization import materialize_resource_tree
 from sec_review_agents.resources.paths import AGENT_SKILLS
 
-_DEFAULT_SKILLS_MATERIALIZED_ROOT: Path | None = None
+_DEFAULT_SKILLS_MATERIALIZED_DIRECTORY: tempfile.TemporaryDirectory[str] | None = None
 
 
 def bundled_agent_skill_names() -> tuple[str, ...]:
@@ -31,12 +31,12 @@ def bundled_agent_skill_names() -> tuple[str, ...]:
 
 def skills_materialized_base_root() -> Path:
     """Return the process-local cache root used for materialized skill views."""
-    global _DEFAULT_SKILLS_MATERIALIZED_ROOT
-    if _DEFAULT_SKILLS_MATERIALIZED_ROOT is None:
-        _DEFAULT_SKILLS_MATERIALIZED_ROOT = Path(
-            tempfile.mkdtemp(prefix="sec-review-agents-skills-")
-        ).resolve()
-    return _DEFAULT_SKILLS_MATERIALIZED_ROOT
+    global _DEFAULT_SKILLS_MATERIALIZED_DIRECTORY
+    if _DEFAULT_SKILLS_MATERIALIZED_DIRECTORY is None:
+        _DEFAULT_SKILLS_MATERIALIZED_DIRECTORY = tempfile.TemporaryDirectory(
+            prefix="sec-review-agents-skills-"
+        )
+    return Path(_DEFAULT_SKILLS_MATERIALIZED_DIRECTORY.name).resolve()
 
 
 def _normalize_component(value: str, label: str) -> str:

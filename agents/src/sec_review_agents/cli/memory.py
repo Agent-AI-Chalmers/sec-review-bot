@@ -1,7 +1,6 @@
 import argparse
 import asyncio
 import sys
-from pathlib import Path
 
 from temporalio.client import Client
 from temporalio.exceptions import WorkflowAlreadyStartedError
@@ -11,18 +10,6 @@ from sec_review_agents.entrypoints.memory_maintenance_worker.schedules import (
     MEMORY_MAINTENANCE_SCHEDULE_ID,
     MemoryMaintenanceScheduleRequest,
     ensure_memory_maintenance_schedule,
-)
-from sec_review_agents.memory.local_state import (
-    MEMORY_STATE_FILENAME,
-    OBSERVATION_STATUSES,
-    ObservationRow,
-    fetch_all_observations,
-    fetch_observations_by_status,
-    open_memory_state,
-)
-from sec_review_agents.memory.local_store import (
-    AGENT_MEMORY_DIR_ENV,
-    resolve_memory_store_dir,
 )
 from sec_review_agents.temporal.config import (
     DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE,
@@ -38,15 +25,6 @@ from sec_review_agents.workflows.memory.maintenance import (
 )
 
 DEFAULT_MAINTENANCE_BATCH_SIZE = 10
-
-
-def _add_memory_store_dir(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument(
-        "--memory-store-dir",
-        type=Path,
-        default=None,
-        help=("Writable memory store. Overrides " f"{AGENT_MEMORY_DIR_ENV}."),
-    )
 
 
 def _add_temporal_options(parser: argparse.ArgumentParser) -> None:
@@ -103,31 +81,9 @@ def _add_maintenance_schedule_options(parser: argparse.ArgumentParser) -> None:
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Operate security-review experience memory."
+        description="Start and repair Temporal memory-maintenance execution."
     )
     subcommands = parser.add_subparsers(dest="command", required=True)
-
-    observations = subcommands.add_parser(
-        "observations",
-        help="Inspect durable memory observations.",
-    )
-    observation_commands = observations.add_subparsers(
-        dest="observation_command",
-        required=True,
-    )
-
-    list_observations = observation_commands.add_parser(
-        "list",
-        help="List observation ledger rows without reading observation bodies.",
-    )
-    _add_memory_store_dir(list_observations)
-    list_observations.add_argument(
-        "--status",
-        choices=sorted(OBSERVATION_STATUSES),
-        default=None,
-        help="Filter observations by status.",
-    )
-    list_observations.set_defaults(handler=_run_list_observations)
 
     maintain = subcommands.add_parser(
         "maintain",
@@ -171,46 +127,6 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     maintenance_schedule_ensure.set_defaults(handler=_run_schedule_ensure)
 
     return parser.parse_args(argv)
-
-
-def _display_memory_path(path: Path | str, *, memory_store_dir: Path) -> str:
-    candidate = Path(path)
-    try:
-        return candidate.expanduser().resolve().relative_to(memory_store_dir).as_posix()
-    except ValueError:
-        # Keep the operator-visible ledger output useful without exposing host paths.
-        return "<outside-memory-dir>"
-
-
-def _print_observation_rows(
-    rows: list[ObservationRow], *, memory_store_dir: Path
-) -> None:
-    if not rows:
-        print("No observations.")
-        return
-    print("id\tstatus\tupdated_at\tpath")
-    for row in rows:
-        display_path = _display_memory_path(
-            row.path,
-            memory_store_dir=memory_store_dir,
-        )
-        print(f"{row.extraction_id}\t{row.status}\t{row.updated_at}\t{display_path}")
-
-
-def _run_list_observations(args: argparse.Namespace) -> int:
-    memory_store_dir = resolve_memory_store_dir(args.memory_store_dir, required=True)
-    assert memory_store_dir is not None
-    if not (memory_store_dir / MEMORY_STATE_FILENAME).is_file():
-        print(f"Memory state does not exist: {memory_store_dir}", file=sys.stderr)
-        return 1
-    with open_memory_state(memory_store_dir) as connection:
-        rows = (
-            fetch_observations_by_status(connection, status=args.status)
-            if args.status
-            else fetch_all_observations(connection)
-        )
-    _print_observation_rows(rows, memory_store_dir=memory_store_dir)
-    return 0
 
 
 def _run_maintain(args: argparse.Namespace) -> int:

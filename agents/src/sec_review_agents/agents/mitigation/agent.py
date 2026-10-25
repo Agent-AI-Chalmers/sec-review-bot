@@ -9,9 +9,8 @@ from langchain.agents.middleware.todo import TodoListMiddleware
 from langgraph.graph.state import CompiledStateGraph
 
 from sec_review_agents.agents.mitigation.model import MitigationOutput
-from sec_review_agents.features import agent_skills_enabled, memory_consumption_enabled
+from sec_review_agents.features import agent_skills_enabled
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.memory.runtime_view import memory_runtime_available
 from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
 from sec_review_agents.runtime.changed_files_acceptance_middleware import (
     ChangedFilesAcceptanceMiddleware,
@@ -43,9 +42,9 @@ async def create_mitigation_agent_graph(
     baseline_snapshot_tar_path: Path,
     workspace_root_path: Path,
     mcp_tools: list[Any],
+    memory_enabled: bool,
 ) -> CompiledStateGraph:
     model = create_chat_model(agent_name=agent_name)
-    memory_enabled = memory_consumption_enabled() and memory_runtime_available()
     agent_middleware: list[AgentMiddleware[Any, Any, Any]] = [
         MissingStructuredResponseMiddleware(
             max_retries=missing_structured_response_max_retries(),

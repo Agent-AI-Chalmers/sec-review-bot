@@ -9,8 +9,10 @@ from sec_review_agents.agents.single_agent.agent import (
     create_single_agent_graph,
 )
 from sec_review_agents.agents.single_agent.mcp import SINGLE_AGENT_MCP_TOOLS
+from sec_review_agents.filesystem.path_views import PathView
 from sec_review_agents.mcp.client import managed_mcp_tools_async
 from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
+from sec_review_agents.memory.runtime_view import materialized_memory_view
 from sec_review_agents.review_stages.single_agent.result import (
     build_single_agent_fix_outcome,
 )
@@ -39,7 +41,7 @@ async def run_single_agent_stage(
     agent_name: str,
     baseline_snapshot_tar_path: Path,
     single_agent_artifacts_path: Path,
-    build_backend: Callable[[Path], Any],
+    build_backend: Callable[[Path, PathView | None], Any],
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
@@ -47,7 +49,12 @@ async def run_single_agent_stage(
     todo_tool_description: str,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
-    with tempfile.TemporaryDirectory(prefix="sec-review-single-agent-") as tempdir:
+    # The backend mounts both resources, so their lifetimes must cover backend
+    # construction, graph construction, and the complete agent invocation.
+    with (
+        tempfile.TemporaryDirectory(prefix="sec-review-single-agent-") as tempdir,
+        materialized_memory_view() as memory_path_view,
+    ):
         reset_stage_attempt_artifacts(
             single_agent_artifacts_path,
             filenames=("workspace.patch",),
@@ -59,7 +66,7 @@ async def run_single_agent_stage(
             destination_path=workspace_path,
         )
         transcript = transcript_path(single_agent_artifacts_path)
-        backend = build_backend(workspace_path)
+        backend = build_backend(workspace_path, memory_path_view)
         # Keep backend lifetime around both agent construction and invocation; some
         # middleware resolves tools against backend resources during graph creation.
         async with amanaged_backend(backend):
@@ -87,6 +94,7 @@ async def run_single_agent_stage(
                     baseline_snapshot_tar_path=baseline_snapshot_tar_path,
                     workspace_root_path=workspace_path,
                     mcp_tools=mcp_tools,
+                    memory_enabled=memory_path_view is not None,
                 )
                 agent_output = await invoke_agent_runtime_graph(
                     agent=agent,

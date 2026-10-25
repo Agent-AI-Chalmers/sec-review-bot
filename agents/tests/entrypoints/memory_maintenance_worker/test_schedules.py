@@ -1,3 +1,5 @@
+from unittest.mock import AsyncMock
+
 import pytest
 from temporalio.client import (
     Client,
@@ -5,6 +7,7 @@ from temporalio.client import (
     ScheduleAlreadyRunningError,
     ScheduleOverlapPolicy,
 )
+from temporalio.service import RPCError, RPCStatusCode
 
 from sec_review_agents.cli.memory import parse_args
 from sec_review_agents.entrypoints.memory_maintenance_worker.schedules import (
@@ -52,10 +55,11 @@ def test_build_schedule_rejects_invalid_interval() -> None:
 
 
 class _FakeScheduleHandle:
-    def __init__(self) -> None:
+    def __init__(self, *, delete_error: RPCError | None = None) -> None:
         self.updated = False
         self.triggered = False
         self.deleted = False
+        self.delete_error = delete_error
 
     async def update(self, updater):
         self.updated = True
@@ -66,14 +70,22 @@ class _FakeScheduleHandle:
         assert overlap is ScheduleOverlapPolicy.SKIP
 
     async def delete(self):
+        if self.delete_error is not None:
+            raise self.delete_error
         self.deleted = True
 
 
 class _FakeScheduleClient:
-    def __init__(self, *, already_exists: bool = False) -> None:
+    def __init__(
+        self,
+        *,
+        already_exists: bool = False,
+        delete_error: RPCError | None = None,
+    ) -> None:
         self.already_exists = already_exists
         self.created = False
-        self.handle = _FakeScheduleHandle()
+        self.handle = _FakeScheduleHandle(delete_error=delete_error)
+        self.requested_schedule_ids: list[str] = []
 
     async def create_schedule(self, schedule_id, schedule, *, trigger_immediately):
         if self.already_exists:
@@ -84,6 +96,7 @@ class _FakeScheduleClient:
         assert trigger_immediately is False
 
     def get_schedule_handle(self, schedule_id):
+        self.requested_schedule_ids.append(schedule_id)
         return self.handle
 
 
@@ -168,3 +181,73 @@ async def test_configured_schedules_ensure_only_maintenance(monkeypatch) -> None
     client = _FakeScheduleClient()
     await ensure_configured_memory_schedules(_client(client), task_queue="memory-test")
     assert calls == [(client, "memory-test")]
+
+
+@pytest.mark.asyncio
+async def test_configured_schedules_require_catalog_when_processing_is_enabled(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "true")
+    monkeypatch.delenv("AGENT_MEMORY_CATALOG_URL", raising=False)
+
+    with pytest.raises(ValueError, match="AGENT_MEMORY_CATALOG_URL"):
+        await ensure_configured_memory_schedules(
+            _client(_FakeScheduleClient()),
+            task_queue="memory-test",
+        )
+
+
+@pytest.mark.asyncio
+async def test_configured_schedules_delete_existing_schedules_when_processing_disabled(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "false")
+    ensure = AsyncMock()
+    monkeypatch.setattr(
+        "sec_review_agents.entrypoints.memory_maintenance_worker.schedules.ensure_default_memory_maintenance_schedule",
+        ensure,
+    )
+    client = _FakeScheduleClient()
+
+    await ensure_configured_memory_schedules(_client(client), task_queue="memory-test")
+
+    assert client.requested_schedule_ids == [
+        MEMORY_MAINTENANCE_SCHEDULE_ID,
+        "memory-extraction-batch",
+        "memory-maintenance-pending-trigger",
+    ]
+    assert client.handle.deleted is True
+    ensure.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_disabled_schedule_cleanup_ignores_not_found(monkeypatch) -> None:
+    monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "false")
+    client = _FakeScheduleClient(
+        delete_error=RPCError("missing", RPCStatusCode.NOT_FOUND, b""),
+    )
+
+    await ensure_configured_memory_schedules(_client(client), task_queue="memory-test")
+
+    assert client.requested_schedule_ids == [
+        MEMORY_MAINTENANCE_SCHEDULE_ID,
+        "memory-extraction-batch",
+        "memory-maintenance-pending-trigger",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_disabled_schedule_cleanup_propagates_other_rpc_errors(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "false")
+    error = RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b"")
+    client = _FakeScheduleClient(delete_error=error)
+
+    with pytest.raises(RPCError) as captured:
+        await ensure_configured_memory_schedules(
+            _client(client),
+            task_queue="memory-test",
+        )
+
+    assert captured.value is error

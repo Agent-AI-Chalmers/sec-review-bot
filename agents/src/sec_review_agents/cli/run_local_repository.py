@@ -22,7 +22,6 @@ from sec_review_agents.cli.local_previewing.repository import (
     write_repository_draft_pr_previews,
 )
 from sec_review_agents.cli.local_temporal import run_local_temporal_workflow
-from sec_review_agents.memory.local_store import initialize_configured_memory_store
 from sec_review_agents.utils.env import bootstrap_agents_env
 
 
@@ -142,7 +141,6 @@ def _resolve_incremental_refs(
 
 def main() -> None:
     bootstrap_agents_env()
-    initialize_configured_memory_store()
     args = parse_args()
     scan_mode = str(args.scan_mode)
     repo_path = Path(args.repo).resolve()

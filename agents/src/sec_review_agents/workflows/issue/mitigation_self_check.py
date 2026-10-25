@@ -2,7 +2,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from sec_review_agents.agents.mitigation import issue as issue_mitigation_agent
+from sec_review_agents.agents.mitigation.issue import (
+    build_issue_self_check_mitigation_filesystem_system_prompt,
+    build_issue_self_check_mitigation_system_prompt,
+    build_issue_self_check_mitigation_user_prompt,
+    create_issue_mitigation_backend,
+)
 from sec_review_agents.review_stages.mitigation.stage import (
     run_mitigation_stage,
 )
@@ -32,18 +37,17 @@ async def mitigate_issue_with_self_check(
         published_transcript_path=published_transcript_path,
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=None,
-        build_backend=lambda workspace_root: issue_mitigation_agent.create_issue_mitigation_backend(
+        build_backend=lambda workspace_root, memory_path_view: create_issue_mitigation_backend(
             workspace_root=workspace_root,
             history_path=history_path,
+            memory_path_view=memory_path_view,
             runtime_context=runtime_context,
         ),
-        system_prompt=issue_mitigation_agent.build_issue_self_check_mitigation_system_prompt(
+        system_prompt=build_issue_self_check_mitigation_system_prompt(
             test_changes=test_changes
         ),
-        filesystem_system_prompt=(
-            issue_mitigation_agent.build_issue_self_check_mitigation_filesystem_system_prompt()
-        ),
-        user_prompt=issue_mitigation_agent.build_issue_self_check_mitigation_user_prompt(
+        filesystem_system_prompt=build_issue_self_check_mitigation_filesystem_system_prompt(),
+        user_prompt=build_issue_self_check_mitigation_user_prompt(
             issue=issue,
             analysis_result=analysis_result,
             retry_context=None,
