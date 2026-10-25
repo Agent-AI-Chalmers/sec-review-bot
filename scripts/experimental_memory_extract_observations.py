@@ -3,22 +3,26 @@
 # APIs, and may not fit current run artifacts. Review and adapt this script for
 # your own inputs and risk tolerance before use.
 
-"""Preview memory observation extraction without modifying a memory store."""
+"""Preview memory observation extraction from explicit transcript inputs."""
 
 import argparse
 import asyncio
 from pathlib import Path
+from uuid import uuid4
 
 from sec_review_agents.memory.extractor import (
     preview_memory_observation_from_paths,
 )
+from sec_review_agents.runtime.transcripts import transcript_path
 from sec_review_agents.utils.env import bootstrap_agents_env
+from sec_review_agents.utils.files import slug_filename_component
 
 WARNING = (
-    "Experimental local script. This is not an operational memory ingestion path. "
-    "It does not use Temporal, does not write the memory DB, and does not validate "
-    "that inputs came from a real review. It may not track the latest package "
-    "APIs. Review and adapt the script before use; inspect outputs manually."
+    "Experimental preview script. This is not an operational memory ingestion "
+    "path. It does not use Temporal, register an extraction with the Memory "
+    "Catalog, publish artifacts, or validate that inputs came from a real review. "
+    "It may not track the latest package APIs. Review and adapt the script before "
+    "use; inspect outputs manually."
 )
 
 
@@ -57,7 +61,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--source-workflow",
-        default="experimental-local-preview",
+        default="experimental-preview",
         help="Provenance label written into observation headers.",
     )
     id_group.add_argument(
@@ -80,11 +84,19 @@ def _write_observation(path: Path, content: str) -> None:
 
 
 async def main() -> int:
-    """Run one local extraction attempt over the supplied transcript sequence."""
+    """Run one preview extraction attempt over the supplied transcript sequence."""
     bootstrap_agents_env()
     args = _parse_args()
     output_dir = args.output_dir.expanduser().resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
+    run_label = slug_filename_component(
+        args.extraction_id or args.job_id or args.source_workflow,
+        fallback="preview",
+    )
+    transcript_output = transcript_path(
+        output_dir,
+        name=f"memory-extractor-{run_label}-{uuid4().hex}",
+    )
 
     result = await preview_memory_observation_from_paths(
         args.inputs,
@@ -93,15 +105,17 @@ async def main() -> int:
         job_id=args.job_id,
         source_workflow=args.source_workflow,
         run_id=args.run_id,
-        agent_transcript_root=output_dir,
+        extractor_transcript_path=transcript_output,
     )
     if result.skipped or result.observation_markdown is None:
         print(f"No observation written: {result.summary}")
+        print(f"Extractor transcript: {transcript_output}")
         return 1
 
     target = output_dir / f"{result.extraction_id}.md"
     _write_observation(target, result.observation_markdown)
-    print(f"Wrote {target}")
+    print(f"Observation: {target}")
+    print(f"Extractor transcript: {transcript_output}")
     print(WARNING)
     return 0
 

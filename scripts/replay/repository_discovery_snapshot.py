@@ -15,7 +15,6 @@ import tempfile
 from fractions import Fraction
 from pathlib import Path
 
-from sec_review_agents.memory.local_store import initialize_configured_memory_store
 from sec_review_agents.scan_stages.discovery.stage import (
     build_discovery_result_from_chunks,
     persist_discovery_result,
@@ -147,7 +146,6 @@ async def _main() -> None:
         raise SystemExit("--chunk-target-ratio must be between 0 and 1.")
 
     bootstrap_agents_env()
-    initialize_configured_memory_store()
     output_dir = (
         args.output_dir.resolve()
         if args.output_dir

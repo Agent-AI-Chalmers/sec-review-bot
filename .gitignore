@@ -40,7 +40,6 @@ ops/systemd/deployment.env
 .agent-run-inputs/
 .agent-postgres-state/
 .agent-temporal-state/
-.agent-memory/
 
 evaluation_input
 

@@ -11,7 +11,6 @@ dist
 .agent-input-bundles
 .agent-artifacts
 .agent-temporal-state
-.agent-memory
 
 .env
 *.pem
