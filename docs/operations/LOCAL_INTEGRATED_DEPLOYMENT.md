@@ -144,7 +144,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 ### 4. systemd Integrated Service Configuration
 
-`ops/systemd/deployment.env` is the editable source configuration. Every time the installer runs, it combines that file with paths derived from the current checkout and replaces `/etc/sec-review-bot/deployment.env`. Both the control-plane service and host worker read the installed file.
+`ops/systemd/deployment.env` is the editable source configuration. Every time the installer runs, it combines that file with paths derived from the current checkout and replaces `/etc/sec-review-bot/deployment.env`. Both the Compose stack service and host workers read the installed file.
 
 The installer owns `SEC_REVIEW_BOT_DIR` and `SEC_REVIEW_AGENTS_DIR`. Do not add them to the editable source file. The installer removes stale values and regenerates them from its own repository location. Input archives are exchanged through RustFS, so the integration container and host worker no longer share `.agent-input-bundles`.
 
@@ -281,7 +281,7 @@ Start the complete integrated service and enable it at boot:
 sudo systemctl enable --now sec-review-bot.target
 ```
 
-`sec-review-bot.target` is the single systemd entry point for the complete deployment. It groups the Compose control plane with `sec-review-execution-worker@1.service`, `sec-review-memory-extraction-worker@1.service`, and the singleton `sec-review-memory-maintenance-worker.service` so they can be managed together.
+`sec-review-bot.target` is the single systemd entry point for the complete deployment. It groups `sec-review-bot-compose-stack.service` with `sec-review-execution-worker@1.service`, `sec-review-memory-extraction-worker@1.service`, and the singleton `sec-review-memory-maintenance-worker.service` so they can be managed together.
 
 The control plane contains GitHub integration, Execution Gateway, and Temporal. Execution Worker runs review workflows, creates Docker sandboxes, and publishes run diagnostics. Memory Extraction Worker consumes those diagnostics and records observations. Memory Maintenance Worker serially updates the shared memory tree and owns maintenance schedule repair. Neither memory worker owns the review sandbox boundary.
 
@@ -304,12 +304,12 @@ Inspect the deployment status and logs:
 
 ```bash
 sudo systemctl status sec-review-bot.target
-sudo systemctl status sec-review-bot-control-plane.service
+sudo systemctl status sec-review-bot-compose-stack.service
 sudo systemctl status sec-review-execution-worker@1.service
 sudo systemctl status sec-review-memory-extraction-worker@1.service
 sudo systemctl status sec-review-memory-maintenance-worker.service
 sudo journalctl \
-  -u sec-review-bot-control-plane.service \
+  -u sec-review-bot-compose-stack.service \
   -u sec-review-execution-worker@1.service \
   -u sec-review-memory-extraction-worker@1.service \
   -u sec-review-memory-maintenance-worker.service \
@@ -327,7 +327,7 @@ Read the result as:
 If the unit stopped after repeated startup failures, fixing the cause is not enough on its own: systemd remembers the failure and refuses to start it again. Clear that record first:
 
 ```bash
-sudo systemctl reset-failed sec-review-bot-control-plane.service
+sudo systemctl reset-failed sec-review-bot-compose-stack.service
 sudo systemctl start sec-review-bot.target
 ```
 
@@ -367,7 +367,7 @@ curl -sS http://127.0.0.1:8090/readyz
 For troubleshooting or updating one component, restart the control plane or any worker separately:
 
 ```bash
-sudo systemctl restart sec-review-bot-control-plane.service
+sudo systemctl restart sec-review-bot-compose-stack.service
 sudo systemctl restart sec-review-execution-worker@1.service
 sudo systemctl restart sec-review-memory-extraction-worker@1.service
 sudo systemctl restart sec-review-memory-maintenance-worker.service

@@ -180,8 +180,8 @@ install -m 0644 \
     "$script_dir/sec-review-bot.target" \
     "$unit_dir/sec-review-bot.target"
 render_unit \
-    "$script_dir/sec-review-bot-control-plane.service.in" \
-    "$unit_dir/sec-review-bot-control-plane.service"
+    "$script_dir/sec-review-bot-compose-stack.service.in" \
+    "$unit_dir/sec-review-bot-compose-stack.service"
 render_unit \
     "$script_dir/sec-review-execution-worker@.service.in" \
     "$unit_dir/sec-review-execution-worker@.service"

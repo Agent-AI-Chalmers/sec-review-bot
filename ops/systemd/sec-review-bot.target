@@ -1,7 +1,7 @@
 [Unit]
 Description=Sec Review Bot local integrated deployment
-Requires=sec-review-bot-control-plane.service sec-review-execution-worker@1.service sec-review-memory-extraction-worker@1.service sec-review-memory-maintenance-worker.service
-After=sec-review-bot-control-plane.service sec-review-execution-worker@1.service sec-review-memory-extraction-worker@1.service sec-review-memory-maintenance-worker.service
+Requires=sec-review-bot-compose-stack.service sec-review-execution-worker@1.service sec-review-memory-extraction-worker@1.service sec-review-memory-maintenance-worker.service
+After=sec-review-bot-compose-stack.service sec-review-execution-worker@1.service sec-review-memory-extraction-worker@1.service sec-review-memory-maintenance-worker.service
 
 [Install]
 WantedBy=multi-user.target

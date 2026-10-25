@@ -1,5 +1,5 @@
 [Unit]
-Description=Sec Review Bot local control plane
+Description=Sec Review Bot local Compose stack
 Wants=network-online.target
 After=network-online.target
 PartOf=sec-review-bot.target

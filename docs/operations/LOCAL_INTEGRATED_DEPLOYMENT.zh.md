@@ -146,7 +146,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 ### 4. systemd 集成服务配置
 
-`ops/systemd/deployment.env` 是供用户编辑的源配置。每次运行安装脚本时，都会将该文件与当前 checkout 推导出的路径合并，并替换 `/etc/sec-review-bot/deployment.env`。控制平面 service 和宿主机 worker 都读取安装后的文件。
+`ops/systemd/deployment.env` 是供用户编辑的源配置。每次运行安装脚本时，都会将该文件与当前 checkout 推导出的路径合并，并替换 `/etc/sec-review-bot/deployment.env`。Compose stack service 和宿主机 worker 都读取安装后的文件。
 
 `SEC_REVIEW_BOT_DIR` 和 `SEC_REVIEW_AGENTS_DIR` 由安装脚本负责，不要把它们加入可编辑的源文件。安装脚本会删除旧值，并根据自身所在的仓库重新生成。Input archive 改由 RustFS 交换，因此 integration 容器和宿主 worker 不再共享 `.agent-input-bundles`。
 
@@ -283,7 +283,7 @@ sudo ops/systemd/install.sh "$USER"
 sudo systemctl enable --now sec-review-bot.target
 ```
 
-`sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 Compose 控制平面、`sec-review-execution-worker@1.service`、`sec-review-memory-extraction-worker@1.service` 和单例 `sec-review-memory-maintenance-worker.service` 组合起来统一管理。
+`sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 `sec-review-bot-compose-stack.service`、`sec-review-execution-worker@1.service`、`sec-review-memory-extraction-worker@1.service` 和单例 `sec-review-memory-maintenance-worker.service` 组合起来统一管理。
 
 控制平面包括 GitHub integration、Execution Gateway 和 Temporal。Execution Worker 运行 review workflow、创建 Docker sandbox 并发布 run diagnostic；Memory Extraction Worker 消费诊断包并登记 observations；Memory Maintenance Worker 串行更新共享 memory tree，并负责修复 maintenance schedule。两个 memory worker 都不拥有 review sandbox 边界。
 
@@ -306,12 +306,12 @@ Temporal development server 的状态保存在 `.agent-temporal-state` 下，因
 
 ```bash
 sudo systemctl status sec-review-bot.target
-sudo systemctl status sec-review-bot-control-plane.service
+sudo systemctl status sec-review-bot-compose-stack.service
 sudo systemctl status sec-review-execution-worker@1.service
 sudo systemctl status sec-review-memory-extraction-worker@1.service
 sudo systemctl status sec-review-memory-maintenance-worker.service
 sudo journalctl \
-  -u sec-review-bot-control-plane.service \
+  -u sec-review-bot-compose-stack.service \
   -u sec-review-execution-worker@1.service \
   -u sec-review-memory-extraction-worker@1.service \
   -u sec-review-memory-maintenance-worker.service \
@@ -329,7 +329,7 @@ sudo journalctl \
 如果 unit 因反复启动失败而停止，仅修好原因还不够：systemd 记着这次失败，会拒绝再次启动。先清除该记录：
 
 ```bash
-sudo systemctl reset-failed sec-review-bot-control-plane.service
+sudo systemctl reset-failed sec-review-bot-compose-stack.service
 sudo systemctl start sec-review-bot.target
 ```
 
@@ -369,7 +369,7 @@ curl -sS http://127.0.0.1:8090/readyz
 排障或只更新一个组件时，可以分别重启控制平面或任一个 worker：
 
 ```bash
-sudo systemctl restart sec-review-bot-control-plane.service
+sudo systemctl restart sec-review-bot-compose-stack.service
 sudo systemctl restart sec-review-execution-worker@1.service
 sudo systemctl restart sec-review-memory-extraction-worker@1.service
 sudo systemctl restart sec-review-memory-maintenance-worker.service

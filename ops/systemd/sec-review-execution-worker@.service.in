@@ -1,8 +1,8 @@
 [Unit]
 Description=Sec Review execution worker %i
-Requires=sec-review-bot-control-plane.service
-After=sec-review-bot-control-plane.service
-PartOf=sec-review-bot.target sec-review-bot-control-plane.service
+Requires=sec-review-bot-compose-stack.service
+After=sec-review-bot-compose-stack.service
+PartOf=sec-review-bot.target sec-review-bot-compose-stack.service
 StartLimitIntervalSec=60
 StartLimitBurst=5
 

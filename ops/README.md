@@ -2,7 +2,7 @@
 
 This directory contains runtime provisioning and host-service integration that is not owned by one application package.
 
-- `systemd/` installs and configures the host-managed Control Plane plus the execution, memory extraction, and memory maintenance worker services.
+- `systemd/` installs and configures the Compose stack plus the execution, memory extraction, and memory maintenance worker services.
 - `rustfs-init/` provisions the local RustFS bucket, runtime identities, and least-privilege policies used by the integrated stack.
 - `init-local-deployment-config.sh` creates a fresh local configuration and generates the internal credentials shared by Compose and host workers.
 
