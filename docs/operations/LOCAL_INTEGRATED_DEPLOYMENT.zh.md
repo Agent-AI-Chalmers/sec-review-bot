@@ -26,6 +26,8 @@ Control Plane UI 是独立部署的控制台。它的同源服务端从 Control 
 | Review Control Plane | `http://127.0.0.1:8090` |
 | Control Plane UI | `http://127.0.0.1:8091` |
 | Execution Gateway | `http://127.0.0.1:8000` |
+| Memory Catalog Server | `http://127.0.0.1:8092` |
+| PostgreSQL | `postgresql://127.0.0.1:5432` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |
 | RustFS API | `http://127.0.0.1:9100` |
@@ -89,17 +91,10 @@ Repository review workflow 使用 GitHub Actions OIDC 向 App 鉴权。workflow 
 先在仓库根目录创建这四份配置：
 
 ```bash
-cp compose.env.sample .env
-cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
-cp apps/github-integration/.env.sample apps/github-integration/.env
-cp ops/systemd/deployment.env.sample ops/systemd/deployment.env
-chmod 600 .env \
-  agents/config/model-providers.toml \
-  apps/github-integration/.env \
-  ops/systemd/deployment.env
+ops/init-local-deployment-config.sh
 ```
 
-Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Execution API token、GitHub App 凭据和模型 deployment 凭据。systemd 安装脚本会将部署设置与仓库路径合并后写入 `/etc`，见下文。
+初始化命令会复制维护中的 sample，为内部服务生成彼此独立的凭据，同步 Compose 与宿主 worker 共同使用的值，并将四个文件的权限设为 `0600`。它不会覆盖已有配置。执行完成后，只需填写 GitHub App 身份、webhook secret、私钥和模型 deployment；Langfuse 等可选外部服务仍需填写各自的凭据。systemd 安装脚本会将部署设置与仓库路径合并后写入 `/etc`，见下文。
 
 `agents/.env` 供 `run-local-*` 和其他本地 CLI 使用，不会被 Compose 或 systemd worker 自动读取。本地 CLI 的配置方式见 [agents 本地运行说明](../../agents/README.zh.md)。
 
@@ -107,7 +102,7 @@ Sample 中既有可直接使用的默认值，也有必须替换的空值和占�
 
 Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个文件只管 Compose 怎么启动容器、挂载哪些本地目录、暴露哪些端口。
 
-将 `EXECUTION_API_TOKEN`、`AGENT_MEMORY_CATALOG_TOKEN` 以及 PostgreSQL/RustFS 密码分别设置为独立生成的 secret，例如使用 `openssl rand -hex 32`。把同一枚 Memory Catalog token 也写入 `ops/systemd/deployment.env`：Compose 把它交给独立 Memory Catalog Server 容器，两个 memory worker pool 用它作为窄客户端凭据。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
+初始化命令会用彼此独立的随机值填充服务 token 与 PostgreSQL/RustFS 凭据，并把宿主 worker 所需的 Memory Catalog token 和各角色存储凭据同步写入 `ops/systemd/deployment.env`，无需手工复制。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
 
 RustFS 按存储职责分配身份：integration 写入 input object；Execution Worker 读取 input、写入 run diagnostic bundle 并读取 active memory revision；Memory Extraction Worker 和 Memory Maintenance Worker 共用一套 memory storage identity，用于访问 run diagnostic、memory revision 和压缩后的 memory-agent transcript；UI BFF 为经过认证的下载读取已存储 diagnostic。Extraction 与 maintenance 仍然是独立的 Temporal worker identity、进程和 task queue。这里保留共享 S3 credential，是因为当前对象存储 policy 覆盖同一个 memory artifact namespace；在本次部署拆分中进一步拆 IAM contract 不会单独改善进程隔离。
 
@@ -122,6 +117,8 @@ PORT=30000
 ```
 
 Compose 只把 Execution API 地址和 token 注入 Control Plane，用于初次提交、提交恢复和终态观察。该地址当前解析到 Execution Gateway 服务，但 Control Plane 的配置只使用 API 术语。Integration 只接收容器内私钥路径、Control Plane 地址和 token，以及 RustFS input storage 配置，不持有 PostgreSQL 或 execution 凭据。这些值不需要在 `apps/github-integration/.env` 中重复配置。
+
+将私钥放在 `apps/github-integration/private-key.pem`。Compose 会把这个宿主机文件挂载到容器中并覆盖 `PRIVATE_KEY_PATH`；初始化命令同时把 `PRIVATE_KEY_PATH` 设置为该文件在宿主机上的绝对路径，仅用于让 `apps/github-integration/.env` 也能支持非 Compose 直接启动。
 
 ### 3. 模型配置
 
@@ -151,7 +148,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 ### 4. systemd 集成服务配置
 
-`ops/systemd/deployment.env` 是供用户编辑的源配置。每次运行安装脚本时，都会将该文件与当前 checkout 推导出的路径合并，并替换 `/etc/sec-review-bot/deployment.env`。控制平面 service 和宿主机 worker 都读取安装后的文件。
+`ops/systemd/deployment.env` 是供用户编辑的源配置。每次运行安装脚本时，都会将该文件与当前 checkout 推导出的路径合并，并替换 `/etc/sec-review-bot/deployment.env`。Compose stack service 和宿主机 worker 都读取安装后的文件。
 
 `SEC_REVIEW_BOT_DIR` 和 `SEC_REVIEW_AGENTS_DIR` 由安装脚本负责，不要把它们加入可编辑的源文件。安装脚本会删除旧值，并根据自身所在的仓库重新生成。Input archive 改由 RustFS 交换，因此 integration 容器和宿主 worker 不再共享 `.agent-input-bundles`。
 
@@ -168,6 +165,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `TEMPORAL_ADDRESS` | 必须使用根目录 `.env` 中 `TEMPORAL_PORT` 暴露的宿主机端口；默认是 `127.0.0.1:7233`。 |
 | `TEMPORAL_NAMESPACE`、`TEMPORAL_EXECUTION_TASK_QUEUE` | 必须与根目录 `.env` 中的同名值一致。 |
 | `AGENT_DOCKER_IMAGE` | Docker sandbox 使用的镜像；默认使用通用镜像。 |
+| `AGENT_SKILLS_ENABLED` | 为声明了 bundled skills 的 agent 物化对应 skills；默认是 `true`。 |
 | `AGENT_JOERN_ENABLED`、`AGENT_PLAYWRIGHT_ENABLED` | 向适用的 agent 提示镜像中已安装的相应 CLI；两者默认均为 `false`。 |
 | `AGENT_MCP_ENABLED` | 启用已配置的 MCP 集成；默认是 `false`。 |
 | `AGENT_MEMORY_CONSUMPTION_ENABLED` | 允许 review agent 读取整理后的 memory；默认是 `true`。 |
@@ -287,13 +285,15 @@ sudo ops/systemd/install.sh "$USER"
 sudo systemctl enable --now sec-review-bot.target
 ```
 
-`sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 Compose 控制平面、`sec-review-execution-worker@1.service`、`sec-review-memory-extraction-worker@1.service` 和单例 `sec-review-memory-maintenance-worker.service` 组合起来统一管理。
+> 此命令会等待 Compose 启动健康门控，通常需要几十秒。可在另一个终端运行 `sudo journalctl -u sec-review-bot-compose-stack.service -f` 查看进度。
+
+`sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 `sec-review-bot-compose-stack.service`、`sec-review-execution-worker@1.service`、`sec-review-memory-extraction-worker@1.service` 和单例 `sec-review-memory-maintenance-worker.service` 组合起来统一管理。
 
 控制平面包括 GitHub integration、Execution Gateway 和 Temporal。Execution Worker 运行 review workflow、创建 Docker sandbox 并发布 run diagnostic；Memory Extraction Worker 消费诊断包并登记 observations；Memory Maintenance Worker 串行更新共享 memory tree，并负责修复 maintenance schedule。两个 memory worker 都不拥有 review sandbox 边界。
 
 启动期失败和运行期失败的监督方式不同，排查时这个区别很关键：
 
-- **启动期。** unit 带健康门控启动 Compose，因此只要某个服务始终无法变为健康、或某个一次性 init 服务（如 `rustfs-init`）失败，这次启动就失败。systemd 会停掉依赖它的 unit 并重试，重试次数有上限；达到上限后 unit 保持 failed，直到运维介入。unit 在其进程一建立时就被视为已启动，而不是在健康门控通过时，因此依赖它的 unit 可能在 Compose 仍在等待期间就启动；宿主机 worker 通过自行重连来度过这段等待。
+- **启动期。** unit 会等待 Compose 健康门控通过，systemd 随后才启动依赖它的 worker。某个服务始终无法变为健康、或某个一次性 init 服务（如 `rustfs-init`）失败时，本次启动会失败，尚未就绪的 stack 不会暴露给 worker。失败的尝试会先被清理，再由 systemd 进行有上限的重试；达到上限后 unit 保持 failed，直到运维介入。
 - **运行期。** 崩溃的服务会自行重启，重启次数有上限，且不影响栈内其余服务（尤其是 PostgreSQL）。某个服务用尽重启次数后就会停在停止状态，而 **unit 仍显示 `active (running)`**，因为维持日志转发的进程只负责跟随日志，并不监督健康状态。
 
 日常启停和重启只操作 target：
@@ -310,12 +310,12 @@ Temporal development server 的状态保存在 `.agent-temporal-state` 下，因
 
 ```bash
 sudo systemctl status sec-review-bot.target
-sudo systemctl status sec-review-bot-control-plane.service
+sudo systemctl status sec-review-bot-compose-stack.service
 sudo systemctl status sec-review-execution-worker@1.service
 sudo systemctl status sec-review-memory-extraction-worker@1.service
 sudo systemctl status sec-review-memory-maintenance-worker.service
 sudo journalctl \
-  -u sec-review-bot-control-plane.service \
+  -u sec-review-bot-compose-stack.service \
   -u sec-review-execution-worker@1.service \
   -u sec-review-memory-extraction-worker@1.service \
   -u sec-review-memory-maintenance-worker.service \
@@ -333,7 +333,7 @@ sudo journalctl \
 如果 unit 因反复启动失败而停止，仅修好原因还不够：systemd 记着这次失败，会拒绝再次启动。先清除该记录：
 
 ```bash
-sudo systemctl reset-failed sec-review-bot-control-plane.service
+sudo systemctl reset-failed sec-review-bot-compose-stack.service
 sudo systemctl start sec-review-bot.target
 ```
 
@@ -355,9 +355,7 @@ sudo systemctl restart sec-review-bot.target
 验证 Execution Gateway：
 
 ```bash
-EXECUTION_API_TOKEN=<paste-your-token>
-curl -sS http://127.0.0.1:8000/healthz \
-  -H "Authorization: Bearer ${EXECUTION_API_TOKEN}"
+curl -sS http://127.0.0.1:8000/healthz
 ```
 
 验证 Control Plane 是否可以安全接收协调请求：
@@ -373,13 +371,13 @@ curl -sS http://127.0.0.1:8090/readyz
 排障或只更新一个组件时，可以分别重启控制平面或任一个 worker：
 
 ```bash
-sudo systemctl restart sec-review-bot-control-plane.service
+sudo systemctl restart sec-review-bot-compose-stack.service
 sudo systemctl restart sec-review-execution-worker@1.service
 sudo systemctl restart sec-review-memory-extraction-worker@1.service
 sudo systemctl restart sec-review-memory-maintenance-worker.service
 ```
 
-也可以绕过 systemd，在前台启动 Compose 控制平面进行开发调试：
+开发调试时，也可以绕过 systemd，在前台启动 Compose stack：
 
 ```bash
 docker compose --profile app up --build
@@ -444,11 +442,7 @@ pnpm 默认从 `https://registry.npmjs.org` 下载项目依赖。该地址不可
 NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 ```
 
-这个变量只在镜像构建阶段传给 pnpm，不会改变 Docker 拉取 pnpm 基础镜像的位置。修改后需要重新构建 Node 服务镜像：
-
-```bash
-docker compose --profile app build control-plane control-plane-ui execution-gateway github-integration memory-catalog
-```
+这个变量只在镜像构建阶段传给 pnpm，不会改变 Docker 拉取 pnpm 基础镜像的位置。修改后使用 `docker compose --profile app build` 重新构建 Node 服务镜像。
 
 ### Git fetch
 

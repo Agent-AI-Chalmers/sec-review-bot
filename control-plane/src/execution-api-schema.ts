@@ -12,7 +12,7 @@ export interface paths {
     }
     /**
      * Healthz
-     * @description Report whether the Execution API process is serving requests.
+     * @description Report whether the Execution API process is serving requests. Requires no credential.
      */
     get: operations['health']
     put?: never

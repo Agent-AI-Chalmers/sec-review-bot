@@ -1,0 +1,35 @@
+[Unit]
+Description=Sec Review Bot local Compose stack
+Wants=network-online.target
+After=network-online.target
+PartOf=sec-review-bot.target
+# Bound startup retries: a slow health gate makes one attempt take minutes, so the window has to
+# be wide enough to contain three consecutive attempts.
+StartLimitIntervalSec=20min
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=@SEC_REVIEW_BOT_USER@
+EnvironmentFile=/etc/sec-review-bot/deployment.env
+
+ExecStartPre=/usr/bin/env docker info
+ExecStartPre=/usr/bin/env docker compose version
+
+# Complete the Compose health gate before systemd starts dependent worker units.
+ExecStartPre=/bin/sh -c 'cd "$SEC_REVIEW_BOT_DIR" && exec docker compose --profile app up -d --no-build --remove-orphans --no-color --wait --wait-timeout 300'
+
+# Each Compose service owns its bounded runtime restart policy. This foreground process only keeps
+# the unit attached to the stack logs; it does not turn an individual service crash into a restart
+# of PostgreSQL or the rest of the stack.
+ExecStart=/bin/sh -c 'cd "$SEC_REVIEW_BOT_DIR" && exec docker compose --profile app logs -f --no-color'
+ExecStop=/bin/sh -c 'cd "$SEC_REVIEW_BOT_DIR" && exec docker compose --profile app down --remove-orphans'
+# ExecStop= is skipped when startup fails or times out. Clean up that partial stack before the
+# bounded restart so the next attempt always begins from the same state.
+ExecStopPost=/bin/sh -c 'if [ "$SERVICE_RESULT" != success ]; then cd "$SEC_REVIEW_BOT_DIR" && exec docker compose --profile app down --remove-orphans; fi'
+
+Restart=always
+RestartSec=5s
+# The Compose health gate waits up to five minutes; leave time for Docker startup around that gate.
+TimeoutStartSec=6min
+TimeoutStopSec=120s

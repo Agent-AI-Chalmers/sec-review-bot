@@ -94,12 +94,10 @@ Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和
 创建集成部署配置：
 
 ```bash
-cp compose.env.sample .env
-cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
-cp apps/github-integration/.env.sample apps/github-integration/.env
-cp ops/systemd/deployment.env.sample ops/systemd/deployment.env
-# 填好 .env、agents/config/model-providers.toml、apps/github-integration/.env 和
-# ops/systemd/deployment.env，并把私钥放到 apps/github-integration/private-key.pem
+ops/init-local-deployment-config.sh
+# 填好 apps/github-integration/.env 中的 GitHub App 配置，把私钥放到
+# apps/github-integration/private-key.pem，并在
+# agents/config/model-providers.toml 中配置至少一个模型 deployment。
 ```
 
 构建所有需要的镜像并安装集成服务：

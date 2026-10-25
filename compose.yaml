@@ -117,7 +117,7 @@ services:
 
   memory-catalog-server:
     restart: "on-failure:5"
-    profiles: ["app"]
+    profiles: ["app", "memory"]
     build:
       context: memory-catalog
       dockerfile: Dockerfile

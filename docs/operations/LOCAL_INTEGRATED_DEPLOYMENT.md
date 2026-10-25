@@ -24,6 +24,8 @@ Default local endpoints:
 | Review Control Plane | `http://127.0.0.1:8090` |
 | Control Plane UI | `http://127.0.0.1:8091` |
 | Execution Gateway | `http://127.0.0.1:8000` |
+| Memory Catalog Server | `http://127.0.0.1:8092` |
+| PostgreSQL | `postgresql://127.0.0.1:5432` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |
 | RustFS API | `http://127.0.0.1:9100` |
@@ -87,17 +89,10 @@ The installer combines these settings with checkout-derived paths and writes the
 Create the configuration files from the repository root:
 
 ```bash
-cp compose.env.sample .env
-cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
-cp apps/github-integration/.env.sample apps/github-integration/.env
-cp ops/systemd/deployment.env.sample ops/systemd/deployment.env
-chmod 600 .env \
-  agents/config/model-providers.toml \
-  apps/github-integration/.env \
-  ops/systemd/deployment.env
+ops/init-local-deployment-config.sh
 ```
 
-The samples contain both usable defaults and empty or placeholder values that must be replaced. At minimum, configure the Execution API token, GitHub App credentials, and model deployment credentials. The systemd installer combines the deployment settings with repository paths and writes the result to `/etc` as described below.
+The initialization command copies the maintained samples, generates independent internal credentials, synchronizes values shared by Compose and the host workers, and gives all four files mode `0600`. It refuses to overwrite an existing configuration. After it completes, configure the GitHub App identity, webhook secret, private key, and model deployments. Optional external services such as Langfuse still require their own credentials. The systemd installer combines the deployment settings with repository paths and writes the result to `/etc` as described below.
 
 `agents/.env` is used by `run-local-*` and other local CLIs. Compose and the systemd worker do not load it automatically. See the [agents local running guide](../../agents/README.md) for local CLI configuration.
 
@@ -105,7 +100,7 @@ The samples contain both usable defaults and empty or placeholder values that mu
 
 Compose-level defaults are documented in [compose.env.sample](../../compose.env.sample). This file controls how Compose starts containers, mounts local directories, and exposes ports.
 
-Set `EXECUTION_API_TOKEN`, `AGENT_MEMORY_CATALOG_TOKEN`, and the PostgreSQL/RustFS passwords to independently generated secrets, for example with `openssl rand -hex 32`. Copy the same Memory Catalog token into `ops/systemd/deployment.env`; Compose gives it to the independent Memory Catalog Server container, while both memory worker pools use it as a narrow client credential. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
+The initialization command fills the service tokens and PostgreSQL/RustFS credentials with independently generated values. It also copies the Memory Catalog and role-specific storage credentials needed by host workers into `ops/systemd/deployment.env`; no manual token synchronization is required. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
 
 RustFS uses a separate workload identity for each storage responsibility: the integration writes input objects; Execution Worker reads inputs, writes run diagnostic bundles, and reads active memory revisions; the Memory Extraction and Memory Maintenance Workers share one memory-storage identity for run diagnostics, memory revisions, and compressed memory-agent transcripts; and the UI BFF reads stored diagnostics for authenticated downloads. Extraction and maintenance remain separate Temporal worker identities, processes, and task queues. Their shared S3 credential is retained because the current object-store policy covers one common memory artifact namespace; splitting that policy is outside this deployment change and would not improve process isolation by itself.
 
@@ -120,6 +115,8 @@ PORT=30000
 ```
 
 Compose injects the Execution API address and token only into Control Plane for initial submission, submission recovery, and terminal observation. The address currently resolves to the Execution Gateway service, but Control Plane is configured only in API terms. Compose injects the container private-key path, Control Plane address and token, and RustFS input storage configuration into the integration. PostgreSQL and execution credentials are not available to the integration. These values do not need to be repeated in `apps/github-integration/.env`.
+
+Place the private key at `apps/github-integration/private-key.pem`. Compose mounts that host file into the container and overrides `PRIVATE_KEY_PATH`; the initialization command sets `PRIVATE_KEY_PATH` to the same file's absolute host path only so `apps/github-integration/.env` also works for direct, non-Compose startup.
 
 ### 3. Model Configuration
 
@@ -149,7 +146,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 ### 4. systemd Integrated Service Configuration
 
-`ops/systemd/deployment.env` is the editable source configuration. Every time the installer runs, it combines that file with paths derived from the current checkout and replaces `/etc/sec-review-bot/deployment.env`. Both the control-plane service and host worker read the installed file.
+`ops/systemd/deployment.env` is the editable source configuration. Every time the installer runs, it combines that file with paths derived from the current checkout and replaces `/etc/sec-review-bot/deployment.env`. Both the Compose stack service and host workers read the installed file.
 
 The installer owns `SEC_REVIEW_BOT_DIR` and `SEC_REVIEW_AGENTS_DIR`. Do not add them to the editable source file. The installer removes stale values and regenerates them from its own repository location. Input archives are exchanged through RustFS, so the integration container and host worker no longer share `.agent-input-bundles`.
 
@@ -166,6 +163,7 @@ Core fields:
 | `TEMPORAL_ADDRESS` | Must use the host port exposed by `TEMPORAL_PORT` in the repository `.env`; the default is `127.0.0.1:7233`. |
 | `TEMPORAL_NAMESPACE`, `TEMPORAL_EXECUTION_TASK_QUEUE` | Must match the same-named values in the repository `.env`. |
 | `AGENT_DOCKER_IMAGE` | Image used for Docker sandboxes; the default is a general-purpose image. |
+| `AGENT_SKILLS_ENABLED` | Materialize bundled skills for agents that declare them; defaults to `true`. |
 | `AGENT_JOERN_ENABLED`, `AGENT_PLAYWRIGHT_ENABLED` | Advertise the corresponding installed CLI to eligible agents; both default to `false`. |
 | `AGENT_MCP_ENABLED` | Enable configured MCP integrations; defaults to `false`. |
 | `AGENT_MEMORY_CONSUMPTION_ENABLED` | Allow review agents to read curated memory; defaults to `true`. |
@@ -285,13 +283,15 @@ Start the complete integrated service and enable it at boot:
 sudo systemctl enable --now sec-review-bot.target
 ```
 
-`sec-review-bot.target` is the single systemd entry point for the complete deployment. It groups the Compose control plane with `sec-review-execution-worker@1.service`, `sec-review-memory-extraction-worker@1.service`, and the singleton `sec-review-memory-maintenance-worker.service` so they can be managed together.
+> This command waits for the Compose startup health gate and normally takes tens of seconds. Follow progress from another terminal with `sudo journalctl -u sec-review-bot-compose-stack.service -f`.
+
+`sec-review-bot.target` is the single systemd entry point for the complete deployment. It groups `sec-review-bot-compose-stack.service` with `sec-review-execution-worker@1.service`, `sec-review-memory-extraction-worker@1.service`, and the singleton `sec-review-memory-maintenance-worker.service` so they can be managed together.
 
 The control plane contains GitHub integration, Execution Gateway, and Temporal. Execution Worker runs review workflows, creates Docker sandboxes, and publishes run diagnostics. Memory Extraction Worker consumes those diagnostics and records observations. Memory Maintenance Worker serially updates the shared memory tree and owns maintenance schedule repair. Neither memory worker owns the review sandbox boundary.
 
 Startup and runtime failures are supervised differently, and it matters when diagnosing a run:
 
-- **Startup.** The unit starts Compose with a health gate, so a service that never becomes healthy, or a one-shot init service like `rustfs-init` that fails, fails the start. systemd stops dependent units and retries a bounded number of times; after that the unit stays failed until an operator intervenes. The unit is considered started as soon as its process exists, not when the health gate passes, so dependent units can start while Compose is still waiting; the host worker rides that out by retrying its own connection.
+- **Startup.** The unit waits for the Compose health gate before systemd starts dependent workers. A service that never becomes healthy, or a one-shot init service like `rustfs-init` that fails, therefore fails the start without exposing a partially ready stack to workers. The failed attempt is cleaned up before systemd performs a bounded retry; after the retry limit, the unit stays failed until an operator intervenes.
 - **Runtime.** A crashing service restarts on its own, up to a bounded number of attempts, without affecting the rest of the stack — PostgreSQL in particular. Once a service exhausts its attempts it stays stopped, and **the unit still reports `active (running)`**, because the process keeping the journal fed follows logs rather than supervising health.
 
 For routine lifecycle operations, use only the target:
@@ -308,12 +308,12 @@ Inspect the deployment status and logs:
 
 ```bash
 sudo systemctl status sec-review-bot.target
-sudo systemctl status sec-review-bot-control-plane.service
+sudo systemctl status sec-review-bot-compose-stack.service
 sudo systemctl status sec-review-execution-worker@1.service
 sudo systemctl status sec-review-memory-extraction-worker@1.service
 sudo systemctl status sec-review-memory-maintenance-worker.service
 sudo journalctl \
-  -u sec-review-bot-control-plane.service \
+  -u sec-review-bot-compose-stack.service \
   -u sec-review-execution-worker@1.service \
   -u sec-review-memory-extraction-worker@1.service \
   -u sec-review-memory-maintenance-worker.service \
@@ -331,7 +331,7 @@ Read the result as:
 If the unit stopped after repeated startup failures, fixing the cause is not enough on its own: systemd remembers the failure and refuses to start it again. Clear that record first:
 
 ```bash
-sudo systemctl reset-failed sec-review-bot-control-plane.service
+sudo systemctl reset-failed sec-review-bot-compose-stack.service
 sudo systemctl start sec-review-bot.target
 ```
 
@@ -353,9 +353,7 @@ After changing installation files under `ops/systemd`, run the installer again b
 Check Execution Gateway:
 
 ```bash
-EXECUTION_API_TOKEN=<paste-your-token>
-curl -sS http://127.0.0.1:8000/healthz \
-  -H "Authorization: Bearer ${EXECUTION_API_TOKEN}"
+curl -sS http://127.0.0.1:8000/healthz
 ```
 
 Check whether Control Plane can safely accept coordination requests:
@@ -371,13 +369,13 @@ curl -sS http://127.0.0.1:8090/readyz
 For troubleshooting or updating one component, restart the control plane or any worker separately:
 
 ```bash
-sudo systemctl restart sec-review-bot-control-plane.service
+sudo systemctl restart sec-review-bot-compose-stack.service
 sudo systemctl restart sec-review-execution-worker@1.service
 sudo systemctl restart sec-review-memory-extraction-worker@1.service
 sudo systemctl restart sec-review-memory-maintenance-worker.service
 ```
 
-For development, you can bypass systemd and run the Compose control plane in the foreground:
+For development, you can bypass systemd and run the Compose stack in the foreground:
 
 ```bash
 docker compose --profile app up --build
@@ -442,11 +440,7 @@ pnpm uses `https://registry.npmjs.org` by default for project dependencies. If t
 NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 ```
 
-This variable is passed only to pnpm during the image build; it does not change where Docker pulls the pnpm base image. Rebuild the Node service images after changing it:
-
-```bash
-docker compose --profile app build control-plane control-plane-ui execution-gateway github-integration memory-catalog
-```
+This variable is passed only to pnpm during the image build; it does not change where Docker pulls the pnpm base image. After changing it, rebuild the Node service images with `docker compose --profile app build`.
 
 ### Git Fetch
 
