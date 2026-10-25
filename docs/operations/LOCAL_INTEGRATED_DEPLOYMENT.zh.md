@@ -26,6 +26,8 @@ Control Plane UI 是独立部署的控制台。它的同源服务端从 Control 
 | Review Control Plane | `http://127.0.0.1:8090` |
 | Control Plane UI | `http://127.0.0.1:8091` |
 | Execution Gateway | `http://127.0.0.1:8000` |
+| Memory Catalog Server | `http://127.0.0.1:8092` |
+| PostgreSQL | `postgresql://127.0.0.1:5432` |
 | Temporal gRPC | `127.0.0.1:7233` |
 | Temporal Web UI | `http://127.0.0.1:8233` |
 | RustFS API | `http://127.0.0.1:9100` |
