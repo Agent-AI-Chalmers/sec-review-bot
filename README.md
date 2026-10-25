@@ -96,7 +96,7 @@ Full trigger behavior is documented in the [GitHub integration triggers guide](a
 Create the integrated deployment configuration:
 
 ```bash
-ops/bootstrap-local-deployment.sh
+ops/init-local-deployment-config.sh
 # Fill the GitHub App fields in apps/github-integration/.env, place the private
 # key at apps/github-integration/private-key.pem, and configure at least one
 # model deployment in agents/config/model-providers.toml.

@@ -94,7 +94,7 @@ Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和
 创建集成部署配置：
 
 ```bash
-ops/bootstrap-local-deployment.sh
+ops/init-local-deployment-config.sh
 # 填好 apps/github-integration/.env 中的 GitHub App 配置，把私钥放到
 # apps/github-integration/private-key.pem，并在
 # agents/config/model-providers.toml 中配置至少一个模型 deployment。

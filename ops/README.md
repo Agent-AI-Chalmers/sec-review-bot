@@ -4,6 +4,6 @@ This directory contains runtime provisioning and host-service integration that i
 
 - `systemd/` installs and configures the host-managed Control Plane plus the execution, memory extraction, and memory maintenance worker services.
 - `rustfs-init/` provisions the local RustFS bucket, runtime identities, and least-privilege policies used by the integrated stack.
-- `bootstrap-local-deployment.sh` creates a fresh local configuration and generates the internal credentials shared by Compose and host workers.
+- `init-local-deployment-config.sh` creates a fresh local configuration and generates the internal credentials shared by Compose and host workers.
 
 The repository-level [`compose.yaml`](../compose.yaml) remains the integrated local orchestration entry point. Service Dockerfiles remain beside the applications they build, and operational procedures live in [`docs/operations/`](../docs/operations/).
