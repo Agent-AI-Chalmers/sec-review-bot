@@ -116,6 +116,8 @@ PORT=30000
 
 Compose 只把 Execution API 地址和 token 注入 Control Plane，用于初次提交、提交恢复和终态观察。该地址当前解析到 Execution Gateway 服务，但 Control Plane 的配置只使用 API 术语。Integration 只接收容器内私钥路径、Control Plane 地址和 token，以及 RustFS input storage 配置，不持有 PostgreSQL 或 execution 凭据。这些值不需要在 `apps/github-integration/.env` 中重复配置。
 
+将私钥放在 `apps/github-integration/private-key.pem`。Compose 会把这个宿主机文件挂载到容器中并覆盖 `PRIVATE_KEY_PATH`；初始化命令同时把 `PRIVATE_KEY_PATH` 设置为该文件在宿主机上的绝对路径，仅用于让 `apps/github-integration/.env` 也能支持非 Compose 直接启动。
+
 ### 3. 模型配置
 
 模型 deployment 配置见 [agents/config/model-providers.sample.toml](../../agents/config/model-providers.sample.toml)。Systemd worker 通过 `MODEL_PROVIDERS_CONFIG_TOML` 读取复制后的 `agents/config/model-providers.toml`。

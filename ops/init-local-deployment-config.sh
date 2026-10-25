@@ -110,6 +110,7 @@ replace_assignment "$deployment_tmp" AGENT_MEMORY_CATALOG_TOKEN "$memory_catalog
 # Compose overrides this value, but keeping the generated source file coherent
 # also makes it usable for focused non-Compose integration runs.
 replace_assignment "$github_tmp" CONTROL_PLANE_SERVICE_TOKEN "$control_plane_service_token"
+replace_assignment "$github_tmp" PRIVATE_KEY_PATH "\"$repository_root/apps/github-integration/private-key.pem\""
 
 mv "$compose_tmp" "$compose_env"
 mv "$model_tmp" "$model_config"

@@ -114,6 +114,8 @@ PORT=30000
 
 Compose injects the Execution API address and token only into Control Plane for initial submission, submission recovery, and terminal observation. The address currently resolves to the Execution Gateway service, but Control Plane is configured only in API terms. Compose injects the container private-key path, Control Plane address and token, and RustFS input storage configuration into the integration. PostgreSQL and execution credentials are not available to the integration. These values do not need to be repeated in `apps/github-integration/.env`.
 
+Place the private key at `apps/github-integration/private-key.pem`. Compose mounts that host file into the container and overrides `PRIVATE_KEY_PATH`; the initialization command sets `PRIVATE_KEY_PATH` to the same file's absolute host path only so `apps/github-integration/.env` also works for direct, non-Compose startup.
+
 ### 3. Model Configuration
 
 Model deployment configuration is documented in [agents/config/model-providers.sample.toml](../../agents/config/model-providers.sample.toml). The systemd worker reads the copied `agents/config/model-providers.toml` through `MODEL_PROVIDERS_CONFIG_TOML`.
