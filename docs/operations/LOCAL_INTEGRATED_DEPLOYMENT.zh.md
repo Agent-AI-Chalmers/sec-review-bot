@@ -291,7 +291,7 @@ sudo systemctl enable --now sec-review-bot.target
 
 启动期失败和运行期失败的监督方式不同，排查时这个区别很关键：
 
-- **启动期。** unit 带健康门控启动 Compose，因此只要某个服务始终无法变为健康、或某个一次性 init 服务（如 `rustfs-init`）失败，这次启动就失败。systemd 会停掉依赖它的 unit 并重试，重试次数有上限；达到上限后 unit 保持 failed，直到运维介入。unit 在其进程一建立时就被视为已启动，而不是在健康门控通过时，因此依赖它的 unit 可能在 Compose 仍在等待期间就启动；宿主机 worker 通过自行重连来度过这段等待。
+- **启动期。** unit 会等待 Compose 健康门控通过，systemd 随后才启动依赖它的 worker。某个服务始终无法变为健康、或某个一次性 init 服务（如 `rustfs-init`）失败时，本次启动会失败，尚未就绪的 stack 不会暴露给 worker。失败的尝试会先被清理，再由 systemd 进行有上限的重试；达到上限后 unit 保持 failed，直到运维介入。
 - **运行期。** 崩溃的服务会自行重启，重启次数有上限，且不影响栈内其余服务（尤其是 PostgreSQL）。某个服务用尽重启次数后就会停在停止状态，而 **unit 仍显示 `active (running)`**，因为维持日志转发的进程只负责跟随日志，并不监督健康状态。
 
 日常启停和重启只操作 target：

@@ -289,7 +289,7 @@ The control plane contains GitHub integration, Execution Gateway, and Temporal. 
 
 Startup and runtime failures are supervised differently, and it matters when diagnosing a run:
 
-- **Startup.** The unit starts Compose with a health gate, so a service that never becomes healthy, or a one-shot init service like `rustfs-init` that fails, fails the start. systemd stops dependent units and retries a bounded number of times; after that the unit stays failed until an operator intervenes. The unit is considered started as soon as its process exists, not when the health gate passes, so dependent units can start while Compose is still waiting; the host worker rides that out by retrying its own connection.
+- **Startup.** The unit waits for the Compose health gate before systemd starts dependent workers. A service that never becomes healthy, or a one-shot init service like `rustfs-init` that fails, therefore fails the start without exposing a partially ready stack to workers. The failed attempt is cleaned up before systemd performs a bounded retry; after the retry limit, the unit stays failed until an operator intervenes.
 - **Runtime.** A crashing service restarts on its own, up to a bounded number of attempts, without affecting the rest of the stack — PostgreSQL in particular. Once a service exhausts its attempts it stays stopped, and **the unit still reports `active (running)`**, because the process keeping the journal fed follows logs rather than supervising health.
 
 For routine lifecycle operations, use only the target:
