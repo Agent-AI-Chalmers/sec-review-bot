@@ -35,6 +35,10 @@ async def test_extractor_returns_preview_and_records_to_explicit_transcript(
 
     with (
         patch(
+            "sec_review_agents.memory.extractor.create_chat_model",
+            return_value=Mock(name="memory-extractor-model"),
+        ) as create_model,
+        patch(
             "sec_review_agents.memory.extractor.create_memory_extractor_agent_graph",
             AsyncMock(return_value=Mock()),
         ),
@@ -59,6 +63,10 @@ async def test_extractor_returns_preview_and_records_to_explicit_transcript(
     assert result.extractor_transcript_path == agent_transcript
     assert result.observation_markdown is not None
     assert "Reuse the verified boundary." in result.observation_markdown
+    create_model.assert_called_once_with(
+        agent_name="memory-extractor",
+        deployment_override=None,
+    )
     assert invoke.await_args is not None
     assert invoke.await_args.kwargs["transcript_paths"] == (agent_transcript,)
 
@@ -106,6 +114,10 @@ async def test_extractor_skips_when_agent_produces_no_observation(
 
     with (
         patch(
+            "sec_review_agents.memory.extractor.create_chat_model",
+            return_value=Mock(name="memory-extractor-model"),
+        ) as create_model,
+        patch(
             "sec_review_agents.memory.extractor.create_memory_extractor_agent_graph",
             AsyncMock(return_value=Mock()),
         ),
@@ -128,6 +140,10 @@ async def test_extractor_skips_when_agent_produces_no_observation(
     assert result.skipped is True
     assert result.observation_markdown is None
     assert result.extractor_transcript_path == agent_transcript
+    create_model.assert_called_once_with(
+        agent_name="memory-extractor",
+        deployment_override=None,
+    )
 
 
 @pytest.mark.asyncio
@@ -155,6 +171,10 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
 
     with (
         patch(
+            "sec_review_agents.memory.maintainer.create_chat_model",
+            return_value=Mock(name="memory-maintainer-model"),
+        ) as create_model,
+        patch(
             "sec_review_agents.memory.maintainer.create_memory_maintainer_agent_graph",
             AsyncMock(return_value=Mock()),
         ),
@@ -174,6 +194,10 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
     assert result.maintainer_transcript_path == agent_transcript
     assert (candidate / "MEMORY.md").read_text(encoding="utf-8") == "# Updated\n"
     assert (candidate / "topics" / "existing.md").is_file()
+    create_model.assert_called_once_with(
+        agent_name="memory-maintainer",
+        deployment_override=None,
+    )
     assert invoke.await_args is not None
     assert invoke.await_args.kwargs["transcript_paths"] == (agent_transcript,)
     assert (
