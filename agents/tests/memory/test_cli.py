@@ -94,7 +94,6 @@ async def test_schedule_ensure_uses_maintenance_contract(monkeypatch) -> None:
         timeout_seconds=30,
         interval_seconds=60,
         schedule_id=MEMORY_MAINTENANCE_SCHEDULE_ID,
-        workflow_id=MEMORY_MAINTENANCE_WORKFLOW_ID,
         task_queue="memory",
         trigger_immediately=False,
         schedule_kind="maintenance",
@@ -104,4 +103,4 @@ async def test_schedule_ensure_uses_maintenance_contract(monkeypatch) -> None:
     assert ensure.await_args is not None
     request = ensure.await_args.args[1]
     assert request.schedule_id == MEMORY_MAINTENANCE_SCHEDULE_ID
-    assert request.workflow_id == MEMORY_MAINTENANCE_WORKFLOW_ID
+    assert not hasattr(request, "workflow_id")

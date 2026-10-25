@@ -98,11 +98,6 @@ def _add_maintenance_schedule_options(parser: argparse.ArgumentParser) -> None:
         default=MEMORY_MAINTENANCE_SCHEDULE_ID,
         help="Temporal maintenance schedule id to create or update.",
     )
-    parser.add_argument(
-        "--workflow-id",
-        default=MEMORY_MAINTENANCE_WORKFLOW_ID,
-        help="Workflow id used by scheduled maintenance runs.",
-    )
     _add_schedule_common_options(parser)
 
 
@@ -290,7 +285,6 @@ async def _ensure_memory_schedule(args: argparse.Namespace) -> dict[str, object]
             timeout_seconds=args.timeout_seconds,
             interval_seconds=args.interval_seconds,
             schedule_id=args.schedule_id,
-            workflow_id=args.workflow_id,
             task_queue=args.task_queue,
             trigger_immediately=args.trigger_immediately,
         ),

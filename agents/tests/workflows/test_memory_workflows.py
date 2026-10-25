@@ -270,7 +270,10 @@ async def test_manual_maintenance_runs_without_threshold(monkeypatch) -> None:
     results = iter(
         [
             {"ok": True, "pending_count": 1, "oldest_pending_created_at": None},
-            {"ok": True, "processed_count": 1},
+            {
+                "kind": "complete",
+                "result": {"ok": True, "processed_count": 1},
+            },
             {"ok": True, "pending_count": 0, "oldest_pending_created_at": None},
         ]
     )
@@ -282,3 +285,105 @@ async def test_manual_maintenance_runs_without_threshold(monkeypatch) -> None:
     assert await MemoryMaintenanceWorkflow().run(
         MemoryMaintenanceRequest(timeout_seconds=30)
     ) == {"ok": True, "processed_count": 1}
+
+
+@pytest.mark.asyncio
+async def test_coordinated_maintenance_commits_recorded_preparation(
+    monkeypatch,
+) -> None:
+    prepared_revision = {
+        "maintenance_id": "maintenance-run-1",
+        "base_revision": 3,
+        "extraction_ids": ["extraction-1"],
+        "memory_tree_reference": _reference().as_dict(),
+        "maintenance_transcript_reference": _reference().as_dict(),
+    }
+    results = iter(
+        [
+            {"ok": True, "pending_count": 1, "oldest_pending_created_at": None},
+            {"kind": "coordinated_revision", "revision": prepared_revision},
+            {"ok": True, "processed_count": 1},
+            {"ok": True, "pending_count": 0, "oldest_pending_created_at": None},
+        ]
+    )
+    calls: list[tuple[object, object | None]] = []
+
+    async def execute(activity_fn, argument=None, **_kwargs):
+        calls.append((activity_fn, argument))
+        return next(results)
+
+    monkeypatch.setattr(maintenance_workflow.workflow, "execute_activity", execute)
+
+    result = await MemoryMaintenanceWorkflow().run(
+        MemoryMaintenanceRequest(timeout_seconds=30)
+    )
+
+    assert result == {"ok": True, "processed_count": 1}
+    assert calls[1] == (
+        maintenance_workflow.prepare_memory_maintenance_activity,
+        MemoryMaintenanceRequest(timeout_seconds=30),
+    )
+    assert calls[2] == (
+        maintenance_workflow.commit_memory_tree_revision_activity,
+        prepared_revision,
+    )
+
+
+@pytest.mark.asyncio
+async def test_catalog_revision_conflict_is_not_retried(monkeypatch) -> None:
+    from temporalio.exceptions import ApplicationError
+
+    from sec_review_agents.memory.catalog_client import MemoryCatalogConflictError
+
+    def conflict(**_kwargs):
+        raise MemoryCatalogConflictError("stale base revision")
+
+    monkeypatch.setattr(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        Mock(return_value=SimpleNamespace(create_memory_tree_revision=conflict)),
+    )
+
+    with pytest.raises(ApplicationError) as captured:
+        maintenance_workflow.commit_memory_tree_revision_activity(
+            {
+                "maintenance_id": "maintenance-run-1",
+                "base_revision": 3,
+                "extraction_ids": ["extraction-1"],
+                "memory_tree_reference": _reference().as_dict(),
+                "maintenance_transcript_reference": _reference().as_dict(),
+            }
+        )
+
+    assert captured.value.type == "MEMORY_CATALOG_REVISION_CONFLICT"
+    assert captured.value.non_retryable is True
+
+
+def test_commit_memory_tree_revision_replays_prepared_references(monkeypatch) -> None:
+    client = Mock()
+    client.create_memory_tree_revision.return_value = {
+        "created": False,
+        "revision": 4,
+        "maintenance_id": "maintenance-run-1",
+    }
+    monkeypatch.setattr(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        Mock(return_value=client),
+    )
+    prepared = {
+        "maintenance_id": "maintenance-run-1",
+        "base_revision": 3,
+        "extraction_ids": ["extraction-1", "extraction-2"],
+        "memory_tree_reference": _reference().as_dict(),
+        "maintenance_transcript_reference": _reference().as_dict(),
+    }
+
+    result = maintenance_workflow.commit_memory_tree_revision_activity(prepared)
+
+    assert result["processed_count"] == 2
+    client.create_memory_tree_revision.assert_called_once_with(
+        maintenance_id="maintenance-run-1",
+        base_revision=3,
+        extraction_ids=["extraction-1", "extraction-2"],
+        memory_tree_reference=_reference(),
+        maintenance_transcript_reference=_reference(),
+    )

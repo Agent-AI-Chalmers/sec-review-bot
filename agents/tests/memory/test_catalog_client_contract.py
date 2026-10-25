@@ -62,12 +62,15 @@ def _artifact(
 
 
 def test_client_wire_values_match_memory_catalog_contract() -> None:
-    active_revision = {
+    memory_tree = {
         "revision": 1,
         "memory_tree_reference": _artifact("memory").as_dict(),
     }
     revision = {
         "revision": 1,
+        "maintenance_id": "maintenance-1",
+        "base_revision": 0,
+        "extraction_ids": ["extraction-1"],
         "memory_tree_reference": _artifact("memory").as_dict(),
         "maintenance_transcript_reference": _artifact(
             "maintenance-transcript.jsonl.zst",
@@ -75,7 +78,7 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         ).as_dict(),
         "created_at": "2026-10-23T00:00:00Z",
     }
-    batch = {
+    maintenance_input = {
         "base_revision": 1,
         "active_memory_tree_reference": _artifact("memory").as_dict(),
         "observations": [
@@ -100,9 +103,9 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
             {"ok": True, "created": True},
             extraction,
             {"pending_count": 1, "oldest_pending_created_at": None},
-            {"batch": batch},
-            {"completed": True},
-            active_revision,
+            {"input": maintenance_input},
+            {"created": True, "revision": 2, "maintenance_id": "maintenance-2"},
+            memory_tree,
             revision,
             {"revisions": [revision], "next_before_revision": None},
         ]
@@ -121,9 +124,10 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         observation_markdown="Remember this.",
     )
     assert client.get_extraction("extraction-1") == extraction
-    assert client.pending_observation_summary()["pending_count"] == 1
-    assert client.select_maintenance_batch(limit=10) == batch
-    assert client.complete_maintenance(
+    assert client.get_observation_backlog()["pending_count"] == 1
+    assert client.get_maintenance_input(limit=10) == maintenance_input
+    assert client.create_memory_tree_revision(
+        maintenance_id="maintenance-2",
         base_revision=1,
         extraction_ids=["extraction-1"],
         memory_tree_reference=_artifact("memory-2"),
@@ -131,18 +135,27 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
             "maintenance-transcript.jsonl.zst",
             media_type="application/zstd",
         ),
-    )
-    assert client.active_revision() == active_revision
-    assert client.get_revision(1) == revision
-    assert client.list_revisions(before_revision=2, limit=10) == {
+    ) == {"created": True, "revision": 2, "maintenance_id": "maintenance-2"}
+    assert client.get_memory_tree() == memory_tree
+    assert client.get_memory_tree_revision(1) == revision
+    assert client.list_memory_tree_revisions(before_revision=2, limit=10) == {
         "revisions": [revision],
         "next_before_revision": None,
     }
+    assert [(method, path) for method, path, _body in client.requests] == [
+        ("POST", "/v1/extractions"),
+        ("GET", "/v1/extractions/extraction-1"),
+        ("GET", "/v1/observation-backlog"),
+        ("GET", "/v1/maintenance-input?limit=10"),
+        ("POST", "/v1/memory-tree/revisions"),
+        ("GET", "/v1/memory-tree"),
+        ("GET", "/v1/memory-tree/revisions/1"),
+        ("GET", "/v1/memory-tree/revisions?limit=10&before_revision=2"),
+    ]
 
     request_schemas = {
         "/v1/extractions": "ExtractionRegistration",
-        "/v1/maintenance/batches/select": "MaintenanceBatchSelection",
-        "/v1/maintenance/complete": "MaintenanceCompletion",
+        "/v1/memory-tree/revisions": "MemoryTreeRevisionCreation",
     }
     for _method, path, body in client.requests:
         schema_name = request_schemas.get(path)
@@ -153,15 +166,18 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         ("ExtractionRegistrationResult", {"ok": True, "created": True}),
         ("ExtractionRecord", extraction),
         (
-            "PendingObservationSummary",
+            "ObservationBacklog",
             {"pending_count": 1, "oldest_pending_created_at": None},
         ),
-        ("MaintenanceBatchResult", {"batch": batch}),
-        ("MaintenanceCompletionResult", {"completed": True}),
-        ("ActiveRevision", active_revision),
-        ("MemoryRevision", revision),
+        ("MaintenanceInputResult", {"input": maintenance_input}),
         (
-            "MemoryRevisionList",
+            "MemoryTreeRevisionCreationResult",
+            {"created": True, "revision": 2, "maintenance_id": "maintenance-2"},
+        ),
+        ("MemoryTree", memory_tree),
+        ("MemoryTreeRevision", revision),
+        (
+            "MemoryTreeRevisionList",
             {"revisions": [revision], "next_before_revision": None},
         ),
     ):

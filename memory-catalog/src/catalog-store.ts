@@ -6,12 +6,15 @@ import { applySchemaVersions } from './database/schema-version-runner.js'
 type ArtifactReference = components['schemas']['ArtifactReference']
 type ExtractionRegistration = components['schemas']['ExtractionRegistration']
 type ExtractionRecord = components['schemas']['ExtractionRecord']
-type PendingObservationSummary =
-  components['schemas']['PendingObservationSummary']
-type MaintenanceBatch = components['schemas']['MaintenanceBatch']
-type ActiveRevision = components['schemas']['ActiveRevision']
-type MemoryRevision = components['schemas']['MemoryRevision']
-type MemoryRevisionList = components['schemas']['MemoryRevisionList']
+type ObservationBacklog = components['schemas']['ObservationBacklog']
+type MaintenanceInput = components['schemas']['MaintenanceInput']
+type MemoryTreeRevisionCreation =
+  components['schemas']['MemoryTreeRevisionCreation']
+type MemoryTreeRevisionCreationResult =
+  components['schemas']['MemoryTreeRevisionCreationResult']
+type MemoryTree = components['schemas']['MemoryTree']
+type MemoryTreeRevision = components['schemas']['MemoryTreeRevision']
+type MemoryTreeRevisionList = components['schemas']['MemoryTreeRevisionList']
 
 async function inTransaction<T>(
   pool: Pool,
@@ -36,23 +39,23 @@ export interface MemoryCatalogStore {
   close(): Promise<void>
   registerExtraction(input: ExtractionRegistration): Promise<boolean>
   getExtraction(extractionId: string): Promise<ExtractionRecord | undefined>
-  pendingObservationSummary(): Promise<PendingObservationSummary>
-  selectMaintenanceBatch(limit: number): Promise<MaintenanceBatch | null>
-  completeMaintenance(input: {
-    base_revision: number
-    extraction_ids: string[]
-    memory_tree_reference: ArtifactReference
-    maintenance_transcript_reference: ArtifactReference
-  }): Promise<boolean>
-  activeRevision(): Promise<ActiveRevision>
-  getRevision(revision: number): Promise<MemoryRevision | undefined>
-  listRevisions(
+  getObservationBacklog(): Promise<ObservationBacklog>
+  getMaintenanceInput(limit: number): Promise<MaintenanceInput | null>
+  createMemoryTreeRevision(
+    input: MemoryTreeRevisionCreation,
+  ): Promise<MemoryTreeRevisionCreationResult>
+  getMemoryTree(): Promise<MemoryTree>
+  getMemoryTreeRevision(
+    revision: number,
+  ): Promise<MemoryTreeRevision | undefined>
+  listMemoryTreeRevisions(
     beforeRevision: number | undefined,
     limit: number,
-  ): Promise<MemoryRevisionList>
+  ): Promise<MemoryTreeRevisionList>
 }
 
 export class ExtractionConflictError extends Error {}
+export class MemoryTreeRevisionConflictError extends Error {}
 
 export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
   readonly #pool: Pool
@@ -164,7 +167,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       : undefined
   }
 
-  async pendingObservationSummary(): Promise<PendingObservationSummary> {
+  async getObservationBacklog(): Promise<ObservationBacklog> {
     const result = await this.#pool.query<{
       pending_count: string
       oldest_pending_created_at: Date | null
@@ -173,7 +176,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         from observations where consumed_revision is null`)
     const row = result.rows[0]
     if (row === undefined)
-      throw new Error('Pending summary query returned no row.')
+      throw new Error('Observation backlog query returned no row.')
     return {
       pending_count: Number(row.pending_count),
       oldest_pending_created_at:
@@ -181,9 +184,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
     }
   }
 
-  async selectMaintenanceBatch(
-    limit: number,
-  ): Promise<MaintenanceBatch | null> {
+  async getMaintenanceInput(limit: number): Promise<MaintenanceInput | null> {
     return await inTransaction(this.#pool, async (client) => {
       const observations = await client.query<{
         extraction_id: string
@@ -199,13 +200,14 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       const active = await client.query<{
         revision: string
         memory_tree_reference: ArtifactReference | null
-      }>(`select active.revision, revision.memory_tree_reference
-          from active_revision active
-          left join revisions revision
-            on revision.revision=active.revision
-          where active.singleton=true`)
+      }>(`select state.active_revision as revision, revision.memory_tree_reference
+          from memory_tree_state state
+          left join memory_tree_revisions revision
+            on revision.revision=state.active_revision
+          where state.singleton=true`)
       const row = active.rows[0]
-      if (row === undefined) throw new Error('Active memory row is missing.')
+      if (row === undefined)
+        throw new Error('Memory tree state row is missing.')
       return {
         base_revision: Number(row.revision),
         active_memory_tree_reference: row.memory_tree_reference,
@@ -214,18 +216,57 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
     })
   }
 
-  async completeMaintenance(input: {
-    base_revision: number
-    extraction_ids: string[]
-    memory_tree_reference: ArtifactReference
-    maintenance_transcript_reference: ArtifactReference
-  }): Promise<boolean> {
+  async createMemoryTreeRevision(
+    input: MemoryTreeRevisionCreation,
+  ): Promise<MemoryTreeRevisionCreationResult> {
     return await inTransaction(this.#pool, async (client) => {
+      const replay = await client.query<{
+        revision: string
+        identical: boolean
+      }>(
+        `select revision.revision,
+                revision.base_revision=$2 and
+                revision.memory_tree_reference=$3::jsonb and
+                revision.maintenance_transcript_reference=$4::jsonb and
+                coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
+                  filter (where observation.extraction_id is not null), '{}')=$5::text[]
+                  as identical
+         from memory_tree_revisions revision
+         left join observations observation
+           on observation.consumed_revision=revision.revision
+         where revision.maintenance_id=$1
+         group by revision.revision`,
+        [
+          input.maintenance_id,
+          input.base_revision,
+          JSON.stringify(input.memory_tree_reference),
+          JSON.stringify(input.maintenance_transcript_reference),
+          [...input.extraction_ids].sort(),
+        ],
+      )
+      const existing = replay.rows[0]
+      if (existing !== undefined) {
+        if (!existing.identical) {
+          throw new MemoryTreeRevisionConflictError(
+            `Maintenance id already exists with different content: ${input.maintenance_id}`,
+          )
+        }
+        return {
+          created: false,
+          revision: Number(existing.revision),
+          maintenance_id: input.maintenance_id,
+        }
+      }
+
       const active = await client.query<{ revision: string }>(
-        `select revision from active_revision
+        `select active_revision as revision from memory_tree_state
          where singleton=true for update`,
       )
-      if (Number(active.rows[0]?.revision) !== input.base_revision) return false
+      if (Number(active.rows[0]?.revision) !== input.base_revision) {
+        throw new MemoryTreeRevisionConflictError(
+          `Active revision no longer matches base revision ${input.base_revision}.`,
+        )
+      }
       const selected = await client.query<{ extraction_id: string }>(
         `select extraction_id from observations
          where extraction_id=any($1) and consumed_revision is null for update`,
@@ -237,15 +278,20 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           selected.rows.some((row) => row.extraction_id === id),
         )
       ) {
-        return false
+        throw new MemoryTreeRevisionConflictError(
+          'One or more source observations are no longer pending.',
+        )
       }
       const nextRevision = input.base_revision + 1
       await client.query(
-        `insert into revisions (
-           revision, memory_tree_reference, maintenance_transcript_reference
-         ) values ($1,$2,$3)`,
+        `insert into memory_tree_revisions (
+           revision, maintenance_id, base_revision, memory_tree_reference,
+           maintenance_transcript_reference
+         ) values ($1,$2,$3,$4,$5)`,
         [
           nextRevision,
+          input.maintenance_id,
+          input.base_revision,
           input.memory_tree_reference,
           input.maintenance_transcript_reference,
         ],
@@ -256,61 +302,88 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         [nextRevision, input.extraction_ids],
       )
       await client.query(
-        `update active_revision
-         set revision=$1, updated_at=clock_timestamp()
+        `update memory_tree_state
+         set active_revision=$1, updated_at=clock_timestamp()
          where singleton=true`,
         [nextRevision],
       )
-      return true
+      return {
+        created: true,
+        revision: nextRevision,
+        maintenance_id: input.maintenance_id,
+      }
     })
   }
 
-  async activeRevision(): Promise<ActiveRevision> {
+  async getMemoryTree(): Promise<MemoryTree> {
     const result = await this.#pool.query<{
       revision: string
       memory_tree_reference: ArtifactReference | null
-    }>(`select active.revision, revision.memory_tree_reference
-        from active_revision active
-        left join revisions revision
-          on revision.revision=active.revision
-        where active.singleton=true`)
+    }>(`select state.active_revision as revision, revision.memory_tree_reference
+        from memory_tree_state state
+        left join memory_tree_revisions revision
+          on revision.revision=state.active_revision
+        where state.singleton=true`)
     const row = result.rows[0]
-    if (row === undefined) throw new Error('Active memory row is missing.')
+    if (row === undefined) throw new Error('Memory tree state row is missing.')
     return {
       revision: Number(row.revision),
       memory_tree_reference: row.memory_tree_reference,
     }
   }
 
-  async getRevision(revision: number): Promise<MemoryRevision | undefined> {
+  async getMemoryTreeRevision(
+    revision: number,
+  ): Promise<MemoryTreeRevision | undefined> {
     const result = await this.#pool.query<{
       revision: string
+      maintenance_id: string
+      base_revision: string
+      extraction_ids: string[]
       memory_tree_reference: ArtifactReference
       maintenance_transcript_reference: ArtifactReference
       created_at: Date
     }>(
-      `select revision, memory_tree_reference, maintenance_transcript_reference, created_at
-        from revisions where revision=$1`,
+      `select revision.revision, revision.maintenance_id, revision.base_revision,
+              coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
+                filter (where observation.extraction_id is not null), '{}') as extraction_ids,
+              revision.memory_tree_reference,
+              revision.maintenance_transcript_reference, revision.created_at
+       from memory_tree_revisions revision
+       left join observations observation
+         on observation.consumed_revision=revision.revision
+       where revision.revision=$1
+       group by revision.revision`,
       [revision],
     )
     const row = result.rows[0]
     return row ? projectRevision(row) : undefined
   }
 
-  async listRevisions(
+  async listMemoryTreeRevisions(
     beforeRevision: number | undefined,
     limit: number,
-  ): Promise<MemoryRevisionList> {
+  ): Promise<MemoryTreeRevisionList> {
     const result = await this.#pool.query<{
       revision: string
+      maintenance_id: string
+      base_revision: string
+      extraction_ids: string[]
       memory_tree_reference: ArtifactReference
       maintenance_transcript_reference: ArtifactReference
       created_at: Date
     }>(
-      `select revision, memory_tree_reference, maintenance_transcript_reference, created_at
-        from revisions
-        where ($1::bigint is null or revision < $1)
-        order by revision desc limit $2`,
+      `select revision.revision, revision.maintenance_id, revision.base_revision,
+              coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
+                filter (where observation.extraction_id is not null), '{}') as extraction_ids,
+              revision.memory_tree_reference,
+              revision.maintenance_transcript_reference, revision.created_at
+       from memory_tree_revisions revision
+       left join observations observation
+         on observation.consumed_revision=revision.revision
+       where ($1::bigint is null or revision.revision < $1)
+       group by revision.revision
+       order by revision.revision desc limit $2`,
       [beforeRevision ?? null, limit + 1],
     )
     const rows = result.rows.slice(0, limit)
@@ -326,12 +399,18 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
 
 function projectRevision(row: {
   revision: string
+  maintenance_id: string
+  base_revision: string
+  extraction_ids: string[]
   memory_tree_reference: ArtifactReference
   maintenance_transcript_reference: ArtifactReference
   created_at: Date
-}): MemoryRevision {
+}): MemoryTreeRevision {
   return {
     revision: Number(row.revision),
+    maintenance_id: row.maintenance_id,
+    base_revision: Number(row.base_revision),
+    extraction_ids: row.extraction_ids,
     memory_tree_reference: row.memory_tree_reference,
     maintenance_transcript_reference: row.maintenance_transcript_reference,
     created_at: row.created_at.toISOString(),

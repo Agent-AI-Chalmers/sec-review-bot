@@ -33,37 +33,45 @@ comment on column observations.consumed_revision is
 
 -- Immutable memory history. Every successful maintenance commit inserts one row; active state
 -- advances by moving a separate pointer and never overwrites these artifact references.
-create table revisions (
+create table memory_tree_revisions (
   revision bigint primary key check (revision > 0),
+  maintenance_id text not null unique,
+  base_revision bigint not null check (
+    base_revision >= 0 and revision = base_revision + 1
+  ),
   memory_tree_reference jsonb not null,
   maintenance_transcript_reference jsonb not null,
   created_at timestamptz not null default clock_timestamp()
 );
 
-comment on table revisions is
+comment on table memory_tree_revisions is
   'Immutable history of successfully committed memory tree revisions and the maintainer transcript that produced each one.';
-comment on column revisions.memory_tree_reference is
+comment on column memory_tree_revisions.maintenance_id is
+  'Stable idempotency and provenance identity of the logical maintainer invocation.';
+comment on column memory_tree_revisions.base_revision is
+  'Active revision against which the maintainer produced this revision.';
+comment on column memory_tree_revisions.memory_tree_reference is
   'Content-addressed memory tree artifact published before this revision committed.';
-comment on column revisions.maintenance_transcript_reference is
+comment on column memory_tree_revisions.maintenance_transcript_reference is
   'Content-addressed compressed transcript for the maintainer invocation that produced this revision.';
 
 alter table observations
   add constraint observations_consumed_revision_fkey
-  foreign key (consumed_revision) references revisions(revision);
+  foreign key (consumed_revision) references memory_tree_revisions(revision);
 
 create index observations_pending_order
   on observations (created_at, extraction_id)
   where consumed_revision is null;
 
 -- This singleton is only the mutable active pointer. Revision zero represents an empty catalog
--- before the first maintenance commit and deliberately has no revisions row.
-create table active_revision (
+-- before the first maintenance commit and deliberately has no memory_tree_revisions row.
+create table memory_tree_state (
   singleton boolean primary key default true check (singleton),
-  revision bigint not null check (revision >= 0),
+  active_revision bigint not null check (active_revision >= 0),
   updated_at timestamptz not null default clock_timestamp()
 );
 
-comment on table active_revision is
+comment on table memory_tree_state is
   'Mutable pointer to the active immutable memory revision; revision zero means no memory tree has been committed.';
 
-insert into active_revision (singleton, revision) values (true, 0);
+insert into memory_tree_state (singleton, active_revision) values (true, 0);

@@ -20,15 +20,13 @@ class MemoryMaintenanceRequest:
 
 
 @activity.defn
-async def run_memory_maintenance_activity(
+async def prepare_memory_maintenance_activity(
     request: MemoryMaintenanceRequest,
 ) -> dict[str, Any]:
     from sec_review_agents.features import memory_processing_enabled
-    from sec_review_agents.memory.catalog_client import (
-        configured_memory_catalog_client,
-    )
+    from sec_review_agents.memory.catalog_client import configured_memory_catalog_client
     from sec_review_agents.memory.coordinated_maintenance import (
-        maintain_coordinated_memory_with_result,
+        prepare_coordinated_memory_revision,
     )
     from sec_review_agents.memory.local_store import resolve_memory_store_dir
     from sec_review_agents.memory.maintainer import (
@@ -41,28 +39,40 @@ async def run_memory_maintenance_activity(
     if request.batch_size < 1:
         raise ValueError("Memory maintenance batch_size must be positive.")
     if catalog_client is not None:
-        result = await maintain_coordinated_memory_with_result(
+        revision = await prepare_coordinated_memory_revision(
             catalog_client=catalog_client,
+            maintenance_id=f"maintenance-{activity.info().workflow_run_id}",
             deployment=None,
             batch_size=request.batch_size,
         )
+        if revision is None:
+            return {
+                "kind": "complete",
+                "result": {
+                    "ok": True,
+                    "skipped": True,
+                    "summary": "No pending memory observations selected.",
+                    "processed_count": 0,
+                    "memory_store_dir": None,
+                },
+            }
         return {
-            "ok": True,
-            "skipped": result.skipped,
-            "summary": result.summary,
-            "processed_count": result.processed_count,
-            "memory_store_dir": None,
+            "kind": "coordinated_revision",
+            "revision": revision,
         }
     memory_store_dir = resolve_memory_store_dir(None, required=False)
     if memory_store_dir is None:
         return {
-            "ok": True,
-            "skipped": True,
-            "reason": (
-                "AGENT_MEMORY_PROCESSING_ENABLED is false."
-                if not memory_processing_enabled()
-                else "AGENT_MEMORY_DIR is not configured."
-            ),
+            "kind": "complete",
+            "result": {
+                "ok": True,
+                "skipped": True,
+                "reason": (
+                    "AGENT_MEMORY_PROCESSING_ENABLED is false."
+                    if not memory_processing_enabled()
+                    else "AGENT_MEMORY_DIR is not configured."
+                ),
+            },
         }
 
     result = await maintain_memory_with_result(
@@ -71,11 +81,68 @@ async def run_memory_maintenance_activity(
         batch_size=request.batch_size,
     )
     return {
+        "kind": "complete",
+        "result": {
+            "ok": True,
+            "skipped": result.skipped,
+            "summary": result.summary,
+            "processed_count": result.processed_count,
+            "memory_store_dir": str(memory_store_dir),
+        },
+    }
+
+
+@activity.defn
+def commit_memory_tree_revision_activity(
+    revision: dict[str, Any],
+) -> dict[str, Any]:
+    from temporalio.exceptions import ApplicationError
+
+    from sec_review_agents.artifacts.reference import ArtifactReference
+    from sec_review_agents.memory.catalog_client import (
+        MemoryCatalogConflictError,
+        configured_memory_catalog_client,
+    )
+    from sec_review_agents.utils.env import bootstrap_agents_env
+
+    bootstrap_agents_env()
+    catalog_client = configured_memory_catalog_client()
+    if catalog_client is None:
+        raise RuntimeError(
+            "Memory catalog is required to commit a coordinated revision."
+        )
+    maintenance_id = str(revision["maintenance_id"])
+    extraction_ids = revision["extraction_ids"]
+    if not isinstance(extraction_ids, list) or not all(
+        isinstance(value, str) for value in extraction_ids
+    ):
+        raise ValueError("Prepared memory revision has invalid extraction identities.")
+    try:
+        committed = catalog_client.create_memory_tree_revision(
+            maintenance_id=maintenance_id,
+            base_revision=int(revision["base_revision"]),
+            extraction_ids=extraction_ids,
+            memory_tree_reference=ArtifactReference.from_mapping(
+                revision["memory_tree_reference"]
+            ),
+            maintenance_transcript_reference=ArtifactReference.from_mapping(
+                revision["maintenance_transcript_reference"]
+            ),
+        )
+    except MemoryCatalogConflictError as error:
+        raise ApplicationError(
+            str(error),
+            type="MEMORY_CATALOG_REVISION_CONFLICT",
+            non_retryable=True,
+        ) from error
+    if committed.get("maintenance_id") != maintenance_id:
+        raise RuntimeError("Catalog returned a different maintenance identity.")
+    return {
         "ok": True,
-        "skipped": result.skipped,
-        "summary": result.summary,
-        "processed_count": result.processed_count,
-        "memory_store_dir": str(memory_store_dir),
+        "skipped": False,
+        "summary": f"Processed {len(extraction_ids)} memory observations.",
+        "processed_count": len(extraction_ids),
+        "memory_store_dir": None,
     }
 
 
@@ -101,7 +168,7 @@ def count_pending_memory_observations_activity() -> dict[str, Any]:
         return {
             "ok": True,
             "skipped": False,
-            **catalog_client.pending_observation_summary(),
+            **catalog_client.get_observation_backlog(),
             "memory_store_dir": None,
         }
     memory_store_dir = resolve_memory_store_dir(None, required=False)
@@ -184,12 +251,26 @@ class MemoryMaintenanceWorkflow:
                 "reason": "below_threshold",
             }
 
-        result = await workflow.execute_activity(
-            run_memory_maintenance_activity,
+        prepared = await workflow.execute_activity(
+            prepare_memory_maintenance_activity,
             request,
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
+        kind = prepared.get("kind")
+        if kind == "complete":
+            result = prepared["result"]
+        elif kind == "coordinated_revision":
+            result = await workflow.execute_activity(
+                commit_memory_tree_revision_activity,
+                prepared["revision"],
+                schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+                retry_policy=activity_retry_policy(),
+            )
+        else:
+            raise RuntimeError(
+                "Memory maintenance activity returned an invalid result."
+            )
         after = await _pending_summary(request)
         if int(after.get("pending_count") or 0) >= (
             MEMORY_MAINTENANCE_PENDING_THRESHOLD
@@ -205,6 +286,7 @@ __all__ = [
     "MEMORY_MAINTENANCE_WORKFLOW_ID",
     "MemoryMaintenanceRequest",
     "MemoryMaintenanceWorkflow",
+    "commit_memory_tree_revision_activity",
     "count_pending_memory_observations_activity",
-    "run_memory_maintenance_activity",
+    "prepare_memory_maintenance_activity",
 ]

@@ -15,7 +15,7 @@ AGENT_MEMORY_CATALOG_TOKEN_ENV = "AGENT_MEMORY_CATALOG_TOKEN"
 
 
 class MemoryCatalogConflictError(RuntimeError):
-    """The requested immutable catalog identity already has different content."""
+    """A catalog identity or revision precondition conflicts with stored state."""
 
 
 @dataclass(frozen=True)
@@ -93,34 +93,35 @@ class MemoryCatalogClient:
     def get_extraction(self, extraction_id: str) -> dict[str, Any]:
         return self._request("GET", f"/v1/extractions/{quote(extraction_id, safe='')}")
 
-    def pending_observation_summary(self) -> dict[str, Any]:
-        return self._request("GET", "/v1/observations/pending-summary")
+    def get_observation_backlog(self) -> dict[str, Any]:
+        return self._request("GET", "/v1/observation-backlog")
 
-    def select_maintenance_batch(self, *, limit: int) -> dict[str, Any] | None:
+    def get_maintenance_input(self, *, limit: int) -> dict[str, Any] | None:
         value = self._request(
-            "POST",
-            "/v1/maintenance/batches/select",
-            {"limit": limit},
+            "GET",
+            f"/v1/maintenance-input?limit={limit}",
         )
-        batch = value.get("batch")
-        if batch is None:
+        maintenance_input = value.get("input")
+        if maintenance_input is None:
             return None
-        if not isinstance(batch, dict):
-            raise RuntimeError("Memory catalog returned an invalid maintenance batch.")
-        return dict(batch)
+        if not isinstance(maintenance_input, dict):
+            raise RuntimeError("Memory catalog returned invalid maintenance input.")
+        return dict(maintenance_input)
 
-    def complete_maintenance(
+    def create_memory_tree_revision(
         self,
         *,
+        maintenance_id: str,
         base_revision: int,
         extraction_ids: list[str],
         memory_tree_reference: ArtifactReference,
         maintenance_transcript_reference: ArtifactReference,
-    ) -> bool:
-        value = self._request(
+    ) -> dict[str, Any]:
+        return self._request(
             "POST",
-            "/v1/maintenance/complete",
+            "/v1/memory-tree/revisions",
             {
+                "maintenance_id": maintenance_id,
                 "base_revision": base_revision,
                 "extraction_ids": extraction_ids,
                 "memory_tree_reference": memory_tree_reference.as_dict(),
@@ -129,15 +130,14 @@ class MemoryCatalogClient:
                 ),
             },
         )
-        return value.get("completed") is True
 
-    def active_revision(self) -> dict[str, Any]:
-        return self._request("GET", "/v1/active-revision")
+    def get_memory_tree(self) -> dict[str, Any]:
+        return self._request("GET", "/v1/memory-tree")
 
-    def get_revision(self, revision: int) -> dict[str, Any]:
-        return self._request("GET", f"/v1/revisions/{revision}")
+    def get_memory_tree_revision(self, revision: int) -> dict[str, Any]:
+        return self._request("GET", f"/v1/memory-tree/revisions/{revision}")
 
-    def list_revisions(
+    def list_memory_tree_revisions(
         self,
         *,
         before_revision: int | None = None,
@@ -146,7 +146,7 @@ class MemoryCatalogClient:
         parameters = [f"limit={limit}"]
         if before_revision is not None:
             parameters.append(f"before_revision={before_revision}")
-        return self._request("GET", f"/v1/revisions?{'&'.join(parameters)}")
+        return self._request("GET", f"/v1/memory-tree/revisions?{'&'.join(parameters)}")
 
 
 def configured_memory_catalog_client() -> MemoryCatalogClient | None:
@@ -166,5 +166,6 @@ __all__ = [
     "AGENT_MEMORY_CATALOG_TOKEN_ENV",
     "AGENT_MEMORY_CATALOG_URL_ENV",
     "MemoryCatalogClient",
+    "MemoryCatalogConflictError",
     "configured_memory_catalog_client",
 ]

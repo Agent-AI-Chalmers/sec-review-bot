@@ -79,7 +79,8 @@ sequenceDiagram
   MemoryWorker->>Catalog: 原子登记 extraction、transcript reference 和可选 observation
   loop 定期 memory maintenance
     Temporal->>MemoryWorker: 分发 maintenance 工作
-    MemoryWorker->>Catalog: 选择 maintenance batch
+    Note over Temporal,MemoryWorker: 固定 workflow ID 确保同一时间只有一个 maintainer
+    MemoryWorker->>Catalog: 读取有界 maintenance input
     Catalog-->>MemoryWorker: 返回带 extraction IDs 的 observations、base revision 和 active memory tree reference
     opt 存在 active memory tree
       MemoryWorker->>Storage: 获取 active memory tree artifact
@@ -89,7 +90,10 @@ sequenceDiagram
     Note over MemoryWorker: 运行 maintainer 并记录 maintainer invocation transcript
     MemoryWorker->>Storage: 发布压缩后的 maintainer transcript
     MemoryWorker->>Storage: 发布新的 memory tree artifact
-    MemoryWorker->>Catalog: 使用 base revision CAS 提交 memory tree reference、maintainer transcript reference 和 consumed extraction IDs
-    Catalog-->>MemoryWorker: 返回新的 active revision 或 revision conflict
+    MemoryWorker-->>Temporal: 返回 artifact references、consumed extraction IDs 和 base revision
+    Note over Temporal: 将待提交内容持久化到 workflow history
+    Temporal->>MemoryWorker: 使用已记录内容调度 revision 提交
+    MemoryWorker->>Catalog: 使用 maintenance ID 和 base revision CAS 创建 memory tree revision
+    Catalog-->>MemoryWorker: 返回新建或幂等重放的 revision，或 revision conflict
   end
 ```

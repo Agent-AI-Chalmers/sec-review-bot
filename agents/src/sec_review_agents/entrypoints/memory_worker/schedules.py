@@ -42,7 +42,6 @@ class MemoryMaintenanceScheduleRequest:
     timeout_seconds: int
     interval_seconds: int = MEMORY_MAINTENANCE_SCHEDULE_DEFAULT_INTERVAL_SECONDS
     schedule_id: str = MEMORY_MAINTENANCE_SCHEDULE_ID
-    workflow_id: str = MEMORY_MAINTENANCE_WORKFLOW_ID
     task_queue: str = DEFAULT_MEMORY_TASK_QUEUE
     trigger_immediately: bool = False
 
@@ -61,7 +60,7 @@ def build_memory_maintenance_schedule(
                 timeout_seconds=request.timeout_seconds,
                 require_threshold=True,
             ),
-            id=request.workflow_id,
+            id=MEMORY_MAINTENANCE_WORKFLOW_ID,
             task_queue=request.task_queue,
         ),
         spec=ScheduleSpec(
@@ -102,7 +101,7 @@ async def ensure_memory_maintenance_schedule(
         "ok": True,
         "action": action,
         "schedule_id": request.schedule_id,
-        "workflow_id": request.workflow_id,
+        "workflow_id": MEMORY_MAINTENANCE_WORKFLOW_ID,
         "interval_seconds": request.interval_seconds,
         "trigger_immediately": request.trigger_immediately,
     }

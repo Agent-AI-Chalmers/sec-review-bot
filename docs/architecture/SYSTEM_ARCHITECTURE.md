@@ -75,7 +75,8 @@ sequenceDiagram
   MemoryWorker->>Catalog: Atomically register extraction, transcript reference, and optional observation
   loop Scheduled memory maintenance
     Temporal->>MemoryWorker: Dispatch maintenance work
-    MemoryWorker->>Catalog: Select maintenance batch
+    Note over Temporal,MemoryWorker: One fixed workflow ID permits only one maintainer
+    MemoryWorker->>Catalog: Read bounded maintenance input
     Catalog-->>MemoryWorker: Observations with extraction IDs, base revision, and active memory tree reference
     opt Active memory tree exists
       MemoryWorker->>Storage: Fetch active memory tree artifact
@@ -85,7 +86,10 @@ sequenceDiagram
     Note over MemoryWorker: Run maintainer and record maintainer invocation transcript
     MemoryWorker->>Storage: Publish compressed maintainer transcript
     MemoryWorker->>Storage: Publish new memory tree artifact
-    MemoryWorker->>Catalog: Commit memory tree reference, maintainer transcript reference, and consumed extraction IDs using base-revision CAS
-    Catalog-->>MemoryWorker: New active revision or revision conflict
+    MemoryWorker-->>Temporal: Artifact references, consumed extraction IDs, and base revision
+    Note over Temporal: Persist the prepared commit input in workflow history
+    Temporal->>MemoryWorker: Dispatch revision commit with the recorded input
+    MemoryWorker->>Catalog: Create memory tree revision with maintenance ID and base-revision CAS
+    Catalog-->>MemoryWorker: Created or idempotently replayed revision, or revision conflict
   end
 ```

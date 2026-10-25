@@ -32,7 +32,9 @@ await test('applies the initial catalog schema and records its checksum', async 
   await applySchemaVersions(poolWithAppliedVersions([], statements))
 
   assert.ok(
-    statements.some(({ sql }) => sql.includes('create table revisions')),
+    statements.some(({ sql }) =>
+      sql.includes('create table memory_tree_revisions'),
+    ),
   )
   const ledgerInsert = statements.find(({ sql }) =>
     sql.includes('insert into schema_versions'),

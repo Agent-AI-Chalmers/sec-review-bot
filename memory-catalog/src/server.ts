@@ -13,6 +13,7 @@ import Fastify, {
 import {
   ExtractionConflictError,
   PostgresMemoryCatalogStore,
+  MemoryTreeRevisionConflictError,
   type MemoryCatalogStore,
 } from './catalog-store.js'
 import type {
@@ -54,7 +55,11 @@ function specPath(): string {
 }
 
 function errorStatusCode(error: unknown): number {
-  if (error instanceof ExtractionConflictError) return 409
+  if (
+    error instanceof ExtractionConflictError ||
+    error instanceof MemoryTreeRevisionConflictError
+  )
+    return 409
   if (
     typeof error === 'object' &&
     error !== null &&
@@ -91,43 +96,70 @@ export async function registerMemoryCatalogRoutes(
           code: 'NOT_FOUND',
         })
       },
-      pendingObservationSummary: async () =>
-        await store.pendingObservationSummary(),
-      selectMaintenanceBatch: async (request: FastifyRequest) => ({
-        batch: await store.selectMaintenanceBatch(
-          (request.body as RequestBody<'selectMaintenanceBatch'>).limit,
-        ),
-      }),
-      completeMaintenance: async (request: FastifyRequest) => ({
-        completed: await store.completeMaintenance(
-          request.body as RequestBody<'completeMaintenance'>,
-        ),
-      }),
-      activeRevision: async () => await store.activeRevision(),
-      getRevision: async (request: FastifyRequest, reply: FastifyReply) => {
-        const revision = Number(
-          (request.params as PathParameters<'getRevision'>).revision,
+      getObservationBacklog: async () => await store.getObservationBacklog(),
+      getMaintenanceInput: async (
+        request: FastifyRequest,
+        reply: FastifyReply,
+      ) => {
+        const limit = Number(
+          (request.query as QueryParameters<'getMaintenanceInput'>).limit,
         )
-        const record = await store.getRevision(revision)
+        if (limit > 100) {
+          return await reply.status(400).send({
+            error: 'Maintenance input limit must not exceed 100.',
+            code: 'INVALID_BODY',
+          })
+        }
+        return { input: await store.getMaintenanceInput(limit) }
+      },
+      createMemoryTreeRevision: async (
+        request: FastifyRequest,
+        reply: FastifyReply,
+      ) => {
+        const result = await store.createMemoryTreeRevision(
+          request.body as RequestBody<'createMemoryTreeRevision'>,
+        )
+        if (result.created) {
+          void reply.header(
+            'Location',
+            `/v1/memory-tree/revisions/${result.revision}`,
+          )
+          void reply.status(201)
+        }
+        return result
+      },
+      getMemoryTree: async () => await store.getMemoryTree(),
+      getMemoryTreeRevision: async (
+        request: FastifyRequest,
+        reply: FastifyReply,
+      ) => {
+        const revision = Number(
+          (request.params as PathParameters<'getMemoryTreeRevision'>).revision,
+        )
+        const record = await store.getMemoryTreeRevision(revision)
         if (record) return record
         return await reply.status(404).send({
-          error: `Memory revision not found: ${revision}`,
+          error: `Memory tree revision not found: ${revision}`,
           code: 'NOT_FOUND',
         })
       },
-      listRevisions: async (request: FastifyRequest, reply: FastifyReply) => {
-        const query = request.query as QueryParameters<'listRevisions'>
+      listMemoryTreeRevisions: async (
+        request: FastifyRequest,
+        reply: FastifyReply,
+      ) => {
+        const query =
+          request.query as QueryParameters<'listMemoryTreeRevisions'>
         const beforeRevision = query.before_revision
           ? Number(query.before_revision)
           : undefined
         const limit = query.limit ? Number(query.limit) : 50
         if (limit > 100) {
           return await reply.status(400).send({
-            error: 'Revision history limit must not exceed 100.',
+            error: 'Memory tree revision history limit must not exceed 100.',
             code: 'INVALID_BODY',
           })
         }
-        return await store.listRevisions(beforeRevision, limit)
+        return await store.listMemoryTreeRevisions(beforeRevision, limit)
       },
     },
     securityHandlers: {

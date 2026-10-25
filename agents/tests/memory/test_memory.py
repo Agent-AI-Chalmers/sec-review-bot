@@ -797,7 +797,7 @@ def test_materialize_coordinated_active_memory_tree_reference_by_digest(
         size_bytes=42,
     )
     catalog_client = Mock(
-        active_revision=Mock(
+        get_memory_tree=Mock(
             return_value={"revision": 3, "memory_tree_reference": reference.as_dict()}
         )
     )
@@ -834,14 +834,14 @@ def test_materialize_coordinated_active_memory_tree_reference_by_digest(
     assert materialize_calls == [(reference, expected.parent)]
 
 
-def test_coordinated_memory_without_active_revision_does_not_fall_back_locally(
+def test_coordinated_memory_without_get_memory_tree_does_not_fall_back_locally(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     local_memory = memory_store.initialize_memory_store(tmp_path / "local-memory")
     monkeypatch.setenv(AGENT_MEMORY_DIR_ENV, str(local_memory))
     catalog_client = Mock(
-        active_revision=Mock(
+        get_memory_tree=Mock(
             return_value={"revision": 0, "memory_tree_reference": None}
         )
     )

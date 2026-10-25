@@ -22,7 +22,6 @@ from sec_review_agents.filesystem.path_views import writable_memory_view
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.memory.catalog_client import MemoryCatalogClient
 from sec_review_agents.memory.local_store import DEFAULT_MEMORY_INDEX
-from sec_review_agents.memory.maintainer import MemoryMaintenanceResult
 from sec_review_agents.memory.memory_tree_artifact import (
     materialize_memory_tree,
     publish_memory_tree_artifact,
@@ -35,30 +34,29 @@ from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_g
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 
-async def maintain_coordinated_memory_with_result(
+async def prepare_coordinated_memory_revision(
     *,
     catalog_client: MemoryCatalogClient,
+    maintenance_id: str,
     batch_size: int,
     deployment: str | None = None,
-) -> MemoryMaintenanceResult:
-    """Maintain one coordinated batch and commit it with a revision CAS."""
-    batch = catalog_client.select_maintenance_batch(limit=batch_size)
-    if batch is None:
-        return MemoryMaintenanceResult(
-            summary="No pending memory observations selected.",
-            processed_count=0,
-            skipped=True,
-        )
-    observations = batch.get("observations")
+) -> dict[str, object] | None:
+    """Run the maintainer and publish immutable inputs for a later revision commit."""
+    maintenance_input = catalog_client.get_maintenance_input(limit=batch_size)
+    if maintenance_input is None:
+        return None
+    observations = maintenance_input.get("observations")
     if not isinstance(observations, list) or not observations:
-        raise RuntimeError("Catalog maintenance batch has no observations.")
+        raise RuntimeError("Catalog maintenance input has no observations.")
 
     with tempfile.TemporaryDirectory(
         prefix="sec-review-coordinated-memory-maintainer-"
     ) as tempdir:
         temp_root = Path(tempdir)
         worktree_root = temp_root / "memory"
-        active_memory_tree_reference = batch.get("active_memory_tree_reference")
+        active_memory_tree_reference = maintenance_input.get(
+            "active_memory_tree_reference"
+        )
         if isinstance(active_memory_tree_reference, dict):
             active_reference = ArtifactReference.from_mapping(
                 active_memory_tree_reference
@@ -107,11 +105,11 @@ async def maintain_coordinated_memory_with_result(
             agent_name=MEMORY_MAINTAINER_AGENT_NAME,
             deployment_override=deployment,
         )
-        base_revision = int(batch["base_revision"])
+        base_revision = int(maintenance_input["base_revision"])
         maintenance_transcript_path = memory_agent_transcript_path(
             temp_root / "memory-agent-transcripts",
             agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-            run_label=f"revision-{base_revision + 1}",
+            run_label=maintenance_id,
         )
         async with amanaged_backend(backend):
             agent = await create_memory_maintainer_agent_graph(
@@ -144,16 +142,13 @@ async def maintain_coordinated_memory_with_result(
             raise RuntimeError(
                 "Coordinated memory publication requires configured S3 storage."
             )
-        completed = catalog_client.complete_maintenance(
-            base_revision=base_revision,
-            extraction_ids=extraction_ids,
-            memory_tree_reference=memory_tree_reference,
-            maintenance_transcript_reference=maintenance_transcript_reference,
-        )
-        if not completed:
-            raise RuntimeError("Memory revision changed before coordinated commit.")
+    return {
+        "maintenance_id": maintenance_id,
+        "base_revision": base_revision,
+        "extraction_ids": extraction_ids,
+        "memory_tree_reference": memory_tree_reference.as_dict(),
+        "maintenance_transcript_reference": maintenance_transcript_reference.as_dict(),
+    }
 
-    return MemoryMaintenanceResult(
-        summary=f"Processed {len(observations)} memory observations.",
-        processed_count=len(observations),
-    )
+
+__all__ = ["prepare_coordinated_memory_revision"]
