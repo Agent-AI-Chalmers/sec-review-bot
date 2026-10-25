@@ -54,8 +54,11 @@ function fixture(name: string): Record<string, unknown> {
   ) as Record<string, unknown>
 }
 
-await test('health endpoint follows the OpenAPI route', async () => {
-  const app = await createApp({ store: new FakeExecutionRunClient() })
+await test('health endpoint remains public when API authentication is configured', async () => {
+  const app = await createApp({
+    store: new FakeExecutionRunClient(),
+    token: 'secret',
+  })
   const response = await app.inject({ method: 'GET', url: '/healthz' })
   assert.equal(response.statusCode, 200)
   assert.deepEqual(response.json(), { status: 'ok' })

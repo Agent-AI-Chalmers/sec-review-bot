@@ -353,9 +353,7 @@ sudo systemctl restart sec-review-bot.target
 验证 Execution Gateway：
 
 ```bash
-EXECUTION_API_TOKEN=<paste-your-token>
-curl -sS http://127.0.0.1:8000/healthz \
-  -H "Authorization: Bearer ${EXECUTION_API_TOKEN}"
+curl -sS http://127.0.0.1:8000/healthz
 ```
 
 验证 Control Plane 是否可以安全接收协调请求：

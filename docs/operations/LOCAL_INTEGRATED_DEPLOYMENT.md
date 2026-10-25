@@ -351,9 +351,7 @@ After changing installation files under `ops/systemd`, run the installer again b
 Check Execution Gateway:
 
 ```bash
-EXECUTION_API_TOKEN=<paste-your-token>
-curl -sS http://127.0.0.1:8000/healthz \
-  -H "Authorization: Bearer ${EXECUTION_API_TOKEN}"
+curl -sS http://127.0.0.1:8000/healthz
 ```
 
 Check whether Control Plane can safely accept coordination requests:
