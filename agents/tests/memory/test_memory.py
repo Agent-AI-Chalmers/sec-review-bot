@@ -840,6 +840,10 @@ async def test_analysis_agent_enables_memory_when_runtime_memory_exists(
             return_value=False,
         ),
         patch(
+            "sec_review_agents.agents.analysis.agent.create_summarization_middleware",
+            return_value=Mock(),
+        ),
+        patch(
             "sec_review_agents.agents.analysis.agent.build_agent_runtime_graph",
             side_effect=fake_build_agent_runtime_graph,
         ),
@@ -1836,6 +1840,10 @@ async def test_analysis_agent_leaves_memory_disabled_when_runtime_memory_is_miss
         patch(
             "sec_review_agents.agents.analysis.agent.model_turn_diagnostics_enabled",
             return_value=False,
+        ),
+        patch(
+            "sec_review_agents.agents.analysis.agent.create_summarization_middleware",
+            return_value=Mock(),
         ),
         patch(
             "sec_review_agents.agents.analysis.agent.build_agent_runtime_graph",
