@@ -175,12 +175,12 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9100`。 |
 | `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入 run diagnostic bundle，并读取 active memory revision。 |
 | `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | 两个 memory worker 共用的存储凭据；可读取 run diagnostic bundle，并读写 memory revision 和压缩后的 memory-agent transcript。 |
-| `AGENT_MEMORY_CATALOG_URL` | coordinated memory state 的独立 API；Compose 默认是 `http://127.0.0.1:8092`。 |
+| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 协调状态 API；Compose 默认是 `http://127.0.0.1:8092`。 |
 | `AGENT_MEMORY_CATALOG_TOKEN` | 必须与仓库 `.env` 一致；它只授权 memory 协调，不提供 PostgreSQL 直连权限。 |
 
 Execution Worker 会在 workflow 成功前把权威 run diagnostic 发布到 `runs/*/artifacts/*`。Execution Gateway 只校验并转发该不可变引用，不持有对象存储凭据，也不挂载 worker artifact tree。Agent sandbox 不会收到任何 workload storage 凭据。
 
-Memory Catalog Server 是独立 TypeScript 服务，不属于 Control Plane。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_control_plane` 和 `sec_review_memory_catalog` database。只有 Memory Catalog 收到 `MEMORY_CATALOG_DATABASE_URL`，并在自己的 database 中保存 observations 和 active memory pointer。提取执行和单例维护 workflow 由 Temporal 管理，PostgreSQL 只负责持久目录以及 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；transcript 和 active memory 仍由 worker 在每次 activity 中物化到本地，agent sandbox 只看到最终 filesystem mount。使用 coordinated memory mode 的 worker 不要同时设置 `AGENT_MEMORY_DIR`。
+Memory Catalog Server 是独立 TypeScript 服务，不属于 Control Plane。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_control_plane` 和 `sec_review_memory_catalog` database。只有 Memory Catalog 收到 `MEMORY_CATALOG_DATABASE_URL`，并在自己的 database 中保存 extraction records 及其可选 observations、memory-tree revision history 和 active revision pointer。每个 revision 记录对应的 maintenance identity 和 maintainer transcript reference。Temporal 负责 extraction 执行和单例 maintenance workflow；PostgreSQL 是持久 catalog 与 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；memory-tree revisions 和 memory-agent transcripts 以不可变对象保存在 RustFS 中。Worker 将这些对象物化到 invocation 级临时 worktree，agent sandbox 只看到最终 filesystem mount。
 
 PostgreSQL 初始化脚本只会在 `.agent-postgres-state` 为空时执行。采用或修改 database 名称后，应先停止部署并删除该目录，再重新启动 Compose。此操作会删除已有的 Control Plane 和 Memory Catalog 数据。
 
@@ -254,12 +254,12 @@ CodeGraph 在 sandbox 内运行，因此需要一个能执行命令的 backend�
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
-| `.agent-rustfs-state` | RustFS | integration 与 Execution Worker 交换 input archive 的持久对象存储 |
+| `.agent-rustfs-state` | RustFS | run inputs、diagnostics、memory-tree revisions、memory-agent transcripts 及其他 artifacts 的持久对象存储 |
 | `.agent-run-inputs` | 宿主机 worker | 活跃运行所需的本地输入；不会进入对外发布的诊断材料 |
 | `.agent-artifacts` | 宿主机 worker | 每次运行的 agent 产物和 workflow 输出 |
-| `.agent-postgres-state` | PostgreSQL | admission、execution observation 与 publication step 协调状态 |
+| `.agent-postgres-state` | PostgreSQL | Control Plane run 状态与 Memory Catalog 协调状态 |
 | `.agent-temporal-state` | Temporal | workflow history 和待处理 task state |
-| `.agent-memory` | 宿主机 worker | 启用 memory 时的持久 agent memory store |
+
 
 ## 运行部署
 
@@ -424,12 +424,6 @@ sudo systemctl start sec-review-bot.target
 
 ```bash
 sudo rm -rf .agent-rustfs-state .agent-run-inputs .agent-artifacts
-```
-
-`.agent-memory` 会跨多次运行持续保存，不属于常规清理范围。只有在确实需要重置 agent memory 时，才应先停止 worker，再单独删除 `.agent-memory`。该操作会永久删除已提取的 observations 和维护后的 memory。
-
-```bash
-sudo rm -rf .agent-memory
 ```
 
 ### 备份与恢复

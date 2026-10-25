@@ -31,13 +31,13 @@ Here, `MEMORY.md` is the startup-injected routing index, while `topics/*.md` sto
 This project implements a subset of Claude Code Memory:
 
 - We only collect **security-review experience**. In LangMem terms, this is procedural memory: reusable review procedures and judgment experience. We do not collect user preferences or profile-like memory.
-- Main agents currently only read curated memory and do not write memory directly; writing, filtering, and maintenance happen later through asynchronous workflows.
+- Main agents currently only read maintained memory and do not write memory directly; writing, filtering, and maintenance happen later through asynchronous workflows.
 
 ## Core Artifacts
 
 - `transcripts`: process records left by main agents after completing a review.
 - `observations`: reusable experience extracted from transcripts.
-- `memory`: curated experience material.
+- `memory`: maintained experience material.
 
 > Here, `transcripts` means the archival process record left by an agent while doing one task. Other systems or contexts often call similar artifacts `trace`, `trajectory` (SWE-agent), or `rollout` (Codex).
 
@@ -66,7 +66,7 @@ Maintenance reads observations produced by extraction and folds useful experienc
 
 ## Lifecycle
 
-Main agents only read the curated memory view and do not write memory directly. The prompt includes only the usage rule and a bounded `MEMORY.md` startup index; relevant topic files can then be read on demand through normal filesystem tools.
+Main agents only read the maintained memory view and do not write memory directly. The prompt includes only the usage rule and a bounded `MEMORY.md` startup index; relevant topic files can then be read on demand through normal filesystem tools.
 
 Experience production runs through an asynchronous path and does not affect the normal flow, meaning the review itself.
 
@@ -81,15 +81,6 @@ Roughly, the flow is a set of asynchronous checks:
 
 > The threshold of 10 is an empirical design choice and can be adjusted.
 
-## Feature switches
-
-Two switches are independent, so operators can stop reading without stopping production, or the reverse:
-
-- `AGENT_MEMORY_CONSUMPTION_ENABLED` controls whether review agents read memory. It does not gate extraction or maintenance, and it does not stop the workers from querying Memory Catalog.
-- `AGENT_MEMORY_PROCESSING_ENABLED` controls extraction and maintenance. It does not apply to review agents, which keep treating memory as unavailable so that they stay deterministic in step with the memory that is being produced.
-
-Disabling consumption does not forbid processing or catalog coordination, and disabling processing does not change what review agents read.
-
 ## Governance
 
 Memory does not make extracted experience trustworthy by itself. Important experience still needs human audit, secondary cleanup, and a decision about whether it should remain in memory.
@@ -98,7 +89,7 @@ Memory should stay small and inspectable. Once it becomes a pile of notes, it sh
 
 > Note: for a **formal product**, this behavior needs caution even from a prompt-engineering perspective, because the improvement has to be demonstrated. But for a personal assistant agent, automatic skill generation can be considered; in that setting it can become a good self-governing system.
 
-Retrieval belongs on purpose-built systems once material has outgrown memory. Customer records, user profiles, and documentation corpora need explicit schema, owners, permissions, retention policy, evaluation, and operating procedures; search or RAG does not make an oversized agent memory directory healthy.
+Retrieval belongs on purpose-built systems once material has outgrown memory. Customer records, user profiles, and documentation corpora need explicit schema, owners, permissions, retention policy, evaluation, and operating procedures; search or RAG does not make an oversized memory tree healthy.
 
 `MEMORY.md` has a startup-injection cap. Exceeding that cap means memory already needs cleanup: maintenance should shorten the index and move details down into topic files, rather than treating truncation as a normal retrieval path.
 

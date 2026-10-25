@@ -12,6 +12,8 @@ Sec Review Bot 包含八个运行角色：GitHub Integration、Review Control Pl
 
 Temporal Server 属于基础设施，但它会直接向 worker 进程分发工作，因此拓扑图将它与运行服务放在一起。PostgreSQL 和对象存储则单独作为持久化设施呈现。Review execution、memory extraction 与 memory maintenance 分别使用独立的 worker 进程和 task queue。
 
+Memory 链路只有一套与部署位置无关的状态模型：Memory Catalog 负责 PostgreSQL 中的协调状态，对象存储负责不可变 memory-tree 和 transcript artifacts，Temporal 负责 workflow 执行。每次 review invocation 都会把当前 memory tree 物化到临时目录供 agent backend 使用，并在结束后删除该目录。
+
 ## 运行角色职责地图
 
 | 运行角色 | 代码 | 负责内容 | 本地指南 |
@@ -74,27 +76,27 @@ sequenceDiagram
 
   ExecutionWorker->>Temporal: 请求异步 memory 处理
   Temporal->>ExtractionWorker: 分发 memory extraction 工作
-  ExtractionWorker->>Storage: 获取 run diagnostic bundle
-  Storage-->>ExtractionWorker: 返回包含 review transcripts 的 run diagnostic bundle
-  Note over ExtractionWorker: 运行 extractor 并记录 extractor invocation transcript
-  ExtractionWorker->>Storage: 发布压缩后的 extractor transcript
-  ExtractionWorker->>Catalog: 原子登记 extraction、transcript reference 和可选 observation
+  ExtractionWorker->>Storage: 下载 run diagnostic bundle
+  Storage-->>ExtractionWorker: run diagnostic bundle
+  Note over ExtractionWorker: 读取 review transcripts 并运行 extractor
+  ExtractionWorker->>Storage: 保存 extractor transcript
+  ExtractionWorker->>Catalog: 在同一事务中保存 extraction 结果、transcript reference 和 observation（如果有）
   loop 定期 memory maintenance
     Temporal->>MaintenanceWorker: 分发 maintenance 工作
     Note over Temporal,MaintenanceWorker: 固定 workflow ID 确保同一时间只有一个 maintainer
-    MaintenanceWorker->>Catalog: 读取有界 maintenance input
-    Catalog-->>MaintenanceWorker: 返回带 extraction IDs 的 observations、base revision 和 active memory tree reference
-    opt 存在 active memory tree
-      MaintenanceWorker->>Storage: 获取 active memory tree artifact
-      Storage-->>MaintenanceWorker: 返回 memory tree artifact
-      Note over MaintenanceWorker: 物化 active memory tree
+    MaintenanceWorker->>Catalog: 选择一批待处理 observations
+    Catalog-->>MaintenanceWorker: 返回 observations、extraction IDs、base revision 和当前 memory tree reference
+    opt 存在当前 memory tree
+      MaintenanceWorker->>Storage: 下载当前 memory tree artifact
+      Storage-->>MaintenanceWorker: memory tree artifact
+      Note over MaintenanceWorker: 将当前 memory tree 物化为本次 activity 的临时 maintenance input/worktree
     end
-    Note over MaintenanceWorker: 运行 maintainer 并记录 maintainer invocation transcript
-    MaintenanceWorker->>Storage: 发布压缩后的 maintainer transcript
-    MaintenanceWorker->>Storage: 发布新的 memory tree artifact
-    MaintenanceWorker-->>Temporal: 返回 artifact references、consumed extraction IDs 和 base revision
-    Note over Temporal: 将待提交内容持久化到 workflow history
-    Temporal->>MaintenanceWorker: 使用已记录内容调度 revision 提交
+    Note over MaintenanceWorker: 运行 maintainer
+    MaintenanceWorker->>Storage: 保存 maintainer transcript
+    MaintenanceWorker->>Storage: 保存新的 memory tree artifact
+    MaintenanceWorker-->>Temporal: 返回 artifact references、extraction IDs 和 base revision
+    Note over Temporal: 后续 commit 重试复用该 activity 结果
+    Temporal->>MaintenanceWorker: 调度 revision commit
     MaintenanceWorker->>Catalog: 使用 maintenance ID 和 base revision CAS 创建 memory tree revision
     Catalog-->>MaintenanceWorker: 返回新建或幂等重放的 revision，或 revision conflict
   end

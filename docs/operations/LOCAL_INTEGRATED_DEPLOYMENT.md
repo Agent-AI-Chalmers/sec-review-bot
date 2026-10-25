@@ -173,12 +173,12 @@ Core fields:
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Host-worker endpoint for RustFS; the Compose default is exposed at `http://127.0.0.1:9100`. |
 | `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`, `SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker credential; it can read run inputs, write run diagnostic bundles, and read active memory revisions. |
 | `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`, `SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Shared storage credential for both memory workers; it can read run diagnostic bundles and read/write memory revisions and compressed memory-agent transcripts. |
-| `AGENT_MEMORY_CATALOG_URL` | Independent API for coordinated memory state; the Compose default is `http://127.0.0.1:8092`. |
+| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog coordination API; the Compose default is `http://127.0.0.1:8092`. |
 | `AGENT_MEMORY_CATALOG_TOKEN` | Must match the repository `.env`; it authorizes memory coordination but grants no direct PostgreSQL access. |
 
 Execution Worker publishes the authoritative run diagnostic under `runs/*/artifacts/*` before the workflow succeeds. Execution Gateway only validates and forwards that immutable reference; it has neither object-storage credentials nor a mount of the worker artifact tree. Agent sandboxes receive no workload storage credentials.
 
-The Memory Catalog Server is a separate TypeScript service, not part of Control Plane. Compose runs one PostgreSQL instance with separate `sec_review_control_plane` and `sec_review_memory_catalog` databases. Only Memory Catalog receives `MEMORY_CATALOG_DATABASE_URL`; it stores observations plus the active memory pointer in its database. Temporal owns extraction execution and the singleton maintenance workflow; PostgreSQL is only the durable catalog and compare-and-swap commit boundary. Host workers call the service with `AGENT_MEMORY_CATALOG_TOKEN`; they materialize transcripts and active memory locally for each activity, and agent sandboxes only see the resulting filesystem mounts. A worker in coordinated memory mode must not also set `AGENT_MEMORY_DIR`.
+The Memory Catalog Server is a separate TypeScript service, not part of Control Plane. Compose runs one PostgreSQL instance with separate `sec_review_control_plane` and `sec_review_memory_catalog` databases. Only Memory Catalog receives `MEMORY_CATALOG_DATABASE_URL`; it stores extraction records and their optional observations, memory-tree revision history, and the active revision pointer. Each revision records its maintenance identity and maintainer transcript reference. Temporal owns extraction execution and the singleton maintenance workflow; PostgreSQL is the durable catalog and compare-and-swap commit boundary. Host workers call the service with `AGENT_MEMORY_CATALOG_TOKEN`; memory-tree revisions and memory-agent transcripts remain immutable objects in RustFS. Workers materialize those objects into invocation-scoped temporary worktrees, and agent sandboxes only see the resulting filesystem mounts.
 
 PostgreSQL initialization scripts run only when `.agent-postgres-state` is empty. After adopting or changing the database names, stop the deployment and remove that directory before starting Compose again. This deletes existing Control Plane and Memory Catalog data.
 
@@ -252,12 +252,12 @@ With the sample configuration, the integrated deployment stores runtime data in 
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
-| `.agent-rustfs-state` | RustFS | Persistent object storage for input archives exchanged between integration and the Execution Worker |
+| `.agent-rustfs-state` | RustFS | Persistent object storage for run inputs, diagnostics, memory-tree revisions, memory-agent transcripts, and other artifacts |
 | `.agent-run-inputs` | Host worker | Materialized input for active runs; never included in published diagnostic bundles |
 | `.agent-artifacts` | Host worker | Agent artifacts and workflow output for each task |
-| `.agent-postgres-state` | PostgreSQL | Admission, execution observation, and publication step coordination |
+| `.agent-postgres-state` | PostgreSQL | Control Plane run state and Memory Catalog coordination state |
 | `.agent-temporal-state` | Temporal | Workflow history and pending task state |
-| `.agent-memory` | Host worker | Persistent agent memory store, when memory is enabled |
+
 
 ## Run The Deployment
 
@@ -422,12 +422,6 @@ This permanently deletes workflow history, pending tasks, polling state, and pub
 
 ```bash
 sudo rm -rf .agent-rustfs-state .agent-run-inputs .agent-artifacts
-```
-
-The `.agent-memory` directory is persistent across runs and is not part of routine cleanup. To deliberately reset agent memory, stop the worker first and remove `.agent-memory` separately. This permanently deletes extracted observations and maintained memory.
-
-```bash
-sudo rm -rf .agent-memory
 ```
 
 ### Backup and recovery

@@ -8,6 +8,8 @@ Sec Review Bot has eight runtime roles: GitHub Integration, Review Control Plane
 
 Temporal Server is infrastructure, but it directly dispatches work to the worker processes, so the topology presents it with the runtime services. PostgreSQL and Object Storage remain separate persistence facilities. Review execution, memory extraction, and memory maintenance use independent worker processes and task queues.
 
+The memory path has one deployment-independent state model. Memory Catalog owns coordination state in PostgreSQL, Object Storage owns immutable memory-tree and transcript artifacts, and Temporal owns workflow execution. Each review invocation materializes the current memory tree into a temporary directory for its agent backend and removes that directory afterward.
+
 ## Runtime ownership map
 
 | Runtime role | Code | Owns | Local guide |
@@ -70,27 +72,27 @@ sequenceDiagram
 
   ExecutionWorker->>Temporal: Request asynchronous memory processing
   Temporal->>ExtractionWorker: Dispatch memory extraction work
-  ExtractionWorker->>Storage: Fetch run diagnostic bundle
-  Storage-->>ExtractionWorker: Run diagnostic bundle with review transcripts
-  Note over ExtractionWorker: Run extractor and record extractor invocation transcript
-  ExtractionWorker->>Storage: Publish compressed extractor transcript
-  ExtractionWorker->>Catalog: Atomically register extraction, transcript reference, and optional observation
+  ExtractionWorker->>Storage: Download run diagnostic bundle
+  Storage-->>ExtractionWorker: Run diagnostic bundle
+  Note over ExtractionWorker: Read review transcripts and run extractor
+  ExtractionWorker->>Storage: Store extractor transcript
+  ExtractionWorker->>Catalog: Save extraction result, transcript reference, and observation (if any) in one transaction
   loop Scheduled memory maintenance
     Temporal->>MaintenanceWorker: Dispatch maintenance work
     Note over Temporal,MaintenanceWorker: One fixed workflow ID permits only one maintainer
-    MaintenanceWorker->>Catalog: Read bounded maintenance input
-    Catalog-->>MaintenanceWorker: Observations with extraction IDs, base revision, and active memory tree reference
-    opt Active memory tree exists
-      MaintenanceWorker->>Storage: Fetch active memory tree artifact
+    MaintenanceWorker->>Catalog: Select a batch of pending observations
+    Catalog-->>MaintenanceWorker: Observations, extraction IDs, base revision, and current memory tree reference
+    opt Current memory tree exists
+      MaintenanceWorker->>Storage: Download current memory tree artifact
       Storage-->>MaintenanceWorker: Memory tree artifact
-      Note over MaintenanceWorker: Materialize active memory tree
+      Note over MaintenanceWorker: Materialize current memory tree as this activity's temporary maintenance input/worktree
     end
-    Note over MaintenanceWorker: Run maintainer and record maintainer invocation transcript
-    MaintenanceWorker->>Storage: Publish compressed maintainer transcript
-    MaintenanceWorker->>Storage: Publish new memory tree artifact
-    MaintenanceWorker-->>Temporal: Artifact references, consumed extraction IDs, and base revision
-    Note over Temporal: Persist the prepared commit input in workflow history
-    Temporal->>MaintenanceWorker: Dispatch revision commit with the recorded input
+    Note over MaintenanceWorker: Run maintainer
+    MaintenanceWorker->>Storage: Store maintainer transcript
+    MaintenanceWorker->>Storage: Store new memory tree artifact
+    MaintenanceWorker-->>Temporal: Artifact references, extraction IDs, and base revision
+    Note over Temporal: Later commit retries reuse this activity result
+    Temporal->>MaintenanceWorker: Dispatch revision commit
     MaintenanceWorker->>Catalog: Create memory tree revision with maintenance ID and base-revision CAS
     Catalog-->>MaintenanceWorker: Created or idempotently replayed revision, or revision conflict
   end

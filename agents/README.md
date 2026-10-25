@@ -219,7 +219,7 @@ Use `--temporal` only when you specifically want to exercise internal Temporal w
 
 With `--temporal`, the same local command still prepares input on the developer machine, but the workflow stages run through Temporal workflow / activity scheduling. This is useful when debugging workflow orchestration, retries, activity boundaries, or Temporal-visible state. It still bypasses the HTTP Execution Gateway, so it is not the same as the full service path.
 
-Local Temporal execution keeps the run diagnostic bundle on the local filesystem and passes a verified `file://` reference between workers. The local Execution Worker and Memory Extraction Worker must therefore share that artifact filesystem and see it at the same absolute path. When coordinated memory uses local artifact references, the Memory Maintenance Worker must share the same paths as well. This mode does not require S3-compatible object storage.
+Local Temporal execution keeps the run diagnostic bundle on the local filesystem and passes a verified `file://` reference between the Execution Worker and Memory Extraction Worker. Those workers must therefore share that artifact filesystem and see it at the same absolute path.
 
 Before running a `--temporal` local command, start a local Temporal dev server:
 
@@ -247,7 +247,7 @@ sec-review-execution-worker
 
 ### Run the Workers Manually
 
-Start Temporal and the three workers in separate terminals. Run the independent HTTP service from [`execution-gateway/`](../execution-gateway/README.md).
+Start Temporal and the three workers in separate terminals.
 
 Minimal local startup shape:
 
@@ -287,9 +287,27 @@ Docker Compose control-plane startup and host worker operation are documented in
 
 ## Agent Runtime Configuration
 
+### Skills
+
 Agents can declare the skills they need. The worker prepares and mounts the declared skills when it starts an agent. See [Agent Skills](../docs/agent/SKILLS.md) for details.
 
-Memory has two mutually exclusive state modes. In local mode, `AGENT_MEMORY_DIR` owns curated memory, observations, and the SQLite ledger; main agents receive a snapshot of its `memory/` subtree at `/memory`. In coordinated mode, workers set `AGENT_MEMORY_CATALOG_URL` and `AGENT_MEMORY_CATALOG_TOKEN`; external services persist shared observations and revisions, the catalog provides the compare-and-swap commit boundary, and workers materialize the active immutable version from object storage as the same read-only `/memory` view. Coordinated mode never falls back to `AGENT_MEMORY_DIR`. `AGENT_MEMORY_CONSUMPTION_ENABLED` controls whether review agents read that view, while `AGENT_MEMORY_PROCESSING_ENABLED` controls transcript extraction and maintenance. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the design principles and lifecycle.
+### Memory
+
+Memory requires Temporal, a Memory Catalog backed by PostgreSQL, and S3-compatible object storage.
+
+| Variable | Purpose |
+| --- | --- |
+| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog base URL. Without it, review agents have no memory view and memory processing cannot run. |
+| `AGENT_MEMORY_CATALOG_TOKEN` | Bearer token for Memory Catalog. Required when `AGENT_MEMORY_CATALOG_URL` is set. |
+| `AGENT_MEMORY_CONSUMPTION_ENABLED` | Whether review agents load the active memory tree. Defaults to `true`. |
+| `AGENT_MEMORY_PROCESSING_ENABLED` | Whether extraction and maintenance activities run. Defaults to `true`. |
+
+Each review invocation materializes the active memory tree in a temporary directory and removes it afterward. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the architecture and lifecycle.
+
+- `sec-review-agents-memory maintain` asks Temporal Server to start one memory maintenance workflow.
+- `sec-review-agents-memory schedules maintenance ensure` creates or updates the periodic maintenance schedule in Temporal Server.
+
+### Structured Output
 
 Agents that require structured output check whether the final state contains `structured_response`. If the model only returns plain text and does not produce a structured result, agent middleware appends a correction message inside the LangChain agent loop and retries. Retry count is controlled by `AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES`, default `2`. This fallback is separate from provider/API request retry and does not handle schema-parameter validation errors; those remain under LangChain structured-output retry behavior.
 

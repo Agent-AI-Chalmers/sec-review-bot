@@ -33,13 +33,13 @@ memory/
 本项目实现的是 Claude Code Memory 的一个子集：
 
 - 我们只收集**安全审查经验**。按 LangMem 的分类，这属于 procedural memory，也就是可复用的审查流程和判断经验；不收集用户偏好（画像）。
-- 主 agent 当前只读取整理后的 memory，不直接写 memory；写入、筛选和维护由后续异步流程完成。
+- 主 agent 当前只读取维护后的 memory，不直接写 memory；写入、筛选和维护由后续异步流程完成。
 
 ## 核心产物
 
 - `transcripts`：主 agent 完成审查后留下的过程记录。
 - `observations`：从 transcripts 中提取出的可复用经验。
-- `memory`：整理后的经验材料。
+- `memory`：维护后的经验材料。
 
 > 这里的 `transcripts` 指一次 agent 执行任务时留下的、可归档的过程记录；其他系统或语境里也常把类似产物称为 `trace`、`trajectory`（SWE-agent）或 `rollout`（Codex）。
 
@@ -68,7 +68,7 @@ maintenance 会读取 extraction 产生的 observations，并把有用经验并�
 
 ## 生命周期
 
-主 agent 只读取整理后的 memory 视图，不直接写 memory。prompt 里只注入使用规则和有界的 `MEMORY.md` 启动索引；相关 topic 文件可以再按需通过普通 filesystem tools 读取。
+主 agent 只读取维护后的 memory 视图，不直接写 memory。prompt 里只注入使用规则和有界的 `MEMORY.md` 启动索引；相关 topic 文件可以再按需通过普通 filesystem tools 读取。
 
 经验产出走异步链路，无论如何都不影响正常流程（指 review）。
 
@@ -83,15 +83,6 @@ maintenance 会读取 extraction 产生的 observations，并把有用经验并�
 
 > 10 条是经验设计，可调整
 
-## 功能开关
-
-两个开关互相独立，可以只停读取不停生产，反之亦然：
-
-- `AGENT_MEMORY_CONSUMPTION_ENABLED` 控制 review agent 是否读取 memory。它不控制 extraction 和 maintenance，也不会阻止 worker 查询 Memory Catalog。
-- `AGENT_MEMORY_PROCESSING_ENABLED` 控制 extraction 和 maintenance。它不影响 review agent；关闭时 review agent 仍然把 memory 当作不可用，以便与正在产出的 memory 保持确定性。
-
-关闭 consumption 不等于禁止 processing 或 catalog 协调；关闭 processing 也不改变 review agent 读取的内容。
-
 ## 治理
 
 memory 不会让提取出的经验自动变可靠。重要经验仍然需要人审计、二次整理，并判断它是否应该继续留在 memory。
@@ -100,7 +91,7 @@ memory 应该保持小而可审计。它一旦长成笔记堆，就应该通过�
 
 > 注：如果是**正式产品**，仅从 prompt engineering 的角度来看，这种行为也是需要审慎的，因为必须要证明改动是有提升的。但是如果是个人助理的 agent，可以考虑如自动 skills 生成，这样就是一个自治理的好系统了。
 
-当材料已经超出 memory 的职责时，检索应该建立在专门系统上。客户记录、用户画像和文档库需要明确的 schema、owner、权限、保留策略、评估和运维流程；search 或 RAG 不能让一个膨胀的 agent memory 目录变健康。
+当材料已经超出 memory 的职责时，检索应该建立在专门系统上。客户记录、用户画像和文档库需要明确的 schema、owner、权限、保留策略、评估和运维流程；search 或 RAG 不能让一个膨胀的 memory tree 变健康。
 
 `MEMORY.md` 有启动注入上限。超过这个上限，说明 memory 已经欠整理了：maintenance 应该缩短索引、把细节下沉到 topic 文件，而不是把截断当成正常检索路径。
 
