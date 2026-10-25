@@ -89,17 +89,10 @@ Repository review workflow 使用 GitHub Actions OIDC 向 App 鉴权。workflow 
 先在仓库根目录创建这四份配置：
 
 ```bash
-cp compose.env.sample .env
-cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
-cp apps/github-integration/.env.sample apps/github-integration/.env
-cp ops/systemd/deployment.env.sample ops/systemd/deployment.env
-chmod 600 .env \
-  agents/config/model-providers.toml \
-  apps/github-integration/.env \
-  ops/systemd/deployment.env
+ops/bootstrap-local-deployment.sh
 ```
 
-Sample 中既有可直接使用的默认值，也有必须替换的空值和占位值。至少需要填写 Execution API token、GitHub App 凭据和模型 deployment 凭据。systemd 安装脚本会将部署设置与仓库路径合并后写入 `/etc`，见下文。
+Bootstrap 命令会复制维护中的 sample，为内部服务生成彼此独立的凭据，同步 Compose 与宿主 worker 共同使用的值，并将四个文件的权限设为 `0600`。它不会覆盖已有配置。执行完成后，只需填写 GitHub App 身份、webhook secret、私钥和模型 deployment；Langfuse 等可选外部服务仍需填写各自的凭据。systemd 安装脚本会将部署设置与仓库路径合并后写入 `/etc`，见下文。
 
 `agents/.env` 供 `run-local-*` 和其他本地 CLI 使用，不会被 Compose 或 systemd worker 自动读取。本地 CLI 的配置方式见 [agents 本地运行说明](../../agents/README.zh.md)。
 
@@ -107,7 +100,7 @@ Sample 中既有可直接使用的默认值，也有必须替换的空值和占�
 
 Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个文件只管 Compose 怎么启动容器、挂载哪些本地目录、暴露哪些端口。
 
-将 `EXECUTION_API_TOKEN`、`AGENT_MEMORY_CATALOG_TOKEN` 以及 PostgreSQL/RustFS 密码分别设置为独立生成的 secret，例如使用 `openssl rand -hex 32`。把同一枚 Memory Catalog token 也写入 `ops/systemd/deployment.env`：Compose 把它交给独立 Memory Catalog Server 容器，两个 memory worker pool 用它作为窄客户端凭据。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
+Bootstrap 命令会用彼此独立的随机值填充服务 token 与 PostgreSQL/RustFS 凭据，并把宿主 worker 所需的 Memory Catalog token 和各角色存储凭据同步写入 `ops/systemd/deployment.env`，无需手工复制。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
 
 RustFS 按存储职责分配身份：integration 写入 input object；Execution Worker 读取 input、写入 run diagnostic bundle 并读取 active memory revision；Memory Extraction Worker 和 Memory Maintenance Worker 共用一套 memory storage identity，用于访问 run diagnostic、memory revision 和压缩后的 memory-agent transcript；UI BFF 为经过认证的下载读取已存储 diagnostic。Extraction 与 maintenance 仍然是独立的 Temporal worker identity、进程和 task queue。这里保留共享 S3 credential，是因为当前对象存储 policy 覆盖同一个 memory artifact namespace；在本次部署拆分中进一步拆 IAM contract 不会单独改善进程隔离。
 

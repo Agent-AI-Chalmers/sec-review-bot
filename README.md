@@ -96,13 +96,10 @@ Full trigger behavior is documented in the [GitHub integration triggers guide](a
 Create the integrated deployment configuration:
 
 ```bash
-cp compose.env.sample .env
-cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
-cp apps/github-integration/.env.sample apps/github-integration/.env
-cp ops/systemd/deployment.env.sample ops/systemd/deployment.env
-# Fill .env, agents/config/model-providers.toml, apps/github-integration/.env,
-# and ops/systemd/deployment.env, then place the private key at
-# apps/github-integration/private-key.pem.
+ops/bootstrap-local-deployment.sh
+# Fill the GitHub App fields in apps/github-integration/.env, place the private
+# key at apps/github-integration/private-key.pem, and configure at least one
+# model deployment in agents/config/model-providers.toml.
 ```
 
 Build all required images and install the integrated service:

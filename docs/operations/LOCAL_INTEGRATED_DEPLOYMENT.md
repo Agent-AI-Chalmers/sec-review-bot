@@ -87,17 +87,10 @@ The installer combines these settings with checkout-derived paths and writes the
 Create the configuration files from the repository root:
 
 ```bash
-cp compose.env.sample .env
-cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
-cp apps/github-integration/.env.sample apps/github-integration/.env
-cp ops/systemd/deployment.env.sample ops/systemd/deployment.env
-chmod 600 .env \
-  agents/config/model-providers.toml \
-  apps/github-integration/.env \
-  ops/systemd/deployment.env
+ops/bootstrap-local-deployment.sh
 ```
 
-The samples contain both usable defaults and empty or placeholder values that must be replaced. At minimum, configure the Execution API token, GitHub App credentials, and model deployment credentials. The systemd installer combines the deployment settings with repository paths and writes the result to `/etc` as described below.
+The bootstrap command copies the maintained samples, generates independent internal credentials, synchronizes values shared by Compose and the host workers, and gives all four files mode `0600`. It refuses to overwrite an existing configuration. After it completes, configure the GitHub App identity, webhook secret, private key, and model deployments. Optional external services such as Langfuse still require their own credentials. The systemd installer combines the deployment settings with repository paths and writes the result to `/etc` as described below.
 
 `agents/.env` is used by `run-local-*` and other local CLIs. Compose and the systemd worker do not load it automatically. See the [agents local running guide](../../agents/README.md) for local CLI configuration.
 
@@ -105,7 +98,7 @@ The samples contain both usable defaults and empty or placeholder values that mu
 
 Compose-level defaults are documented in [compose.env.sample](../../compose.env.sample). This file controls how Compose starts containers, mounts local directories, and exposes ports.
 
-Set `EXECUTION_API_TOKEN`, `AGENT_MEMORY_CATALOG_TOKEN`, and the PostgreSQL/RustFS passwords to independently generated secrets, for example with `openssl rand -hex 32`. Copy the same Memory Catalog token into `ops/systemd/deployment.env`; Compose gives it to the independent Memory Catalog Server container, while both memory worker pools use it as a narrow client credential. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
+The bootstrap command fills the service tokens and PostgreSQL/RustFS credentials with independently generated values. It also copies the Memory Catalog and role-specific storage credentials needed by host workers into `ops/systemd/deployment.env`; no manual token synchronization is required. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
 
 RustFS uses a separate workload identity for each storage responsibility: the integration writes input objects; Execution Worker reads inputs, writes run diagnostic bundles, and reads active memory revisions; the Memory Extraction and Memory Maintenance Workers share one memory-storage identity for run diagnostics, memory revisions, and compressed memory-agent transcripts; and the UI BFF reads stored diagnostics for authenticated downloads. Extraction and maintenance remain separate Temporal worker identities, processes, and task queues. Their shared S3 credential is retained because the current object-store policy covers one common memory artifact namespace; splitting that policy is outside this deployment change and would not improve process isolation by itself.
 
