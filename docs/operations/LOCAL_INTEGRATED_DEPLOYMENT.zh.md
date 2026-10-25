@@ -375,7 +375,7 @@ sudo systemctl restart sec-review-memory-extraction-worker@1.service
 sudo systemctl restart sec-review-memory-maintenance-worker.service
 ```
 
-也可以绕过 systemd，在前台启动 Compose 控制平面进行开发调试：
+开发调试时，也可以绕过 systemd，在前台启动 Compose stack：
 
 ```bash
 docker compose --profile app up --build
@@ -440,11 +440,7 @@ pnpm 默认从 `https://registry.npmjs.org` 下载项目依赖。该地址不可
 NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 ```
 
-这个变量只在镜像构建阶段传给 pnpm，不会改变 Docker 拉取 pnpm 基础镜像的位置。修改后需要重新构建 Node 服务镜像：
-
-```bash
-docker compose --profile app build control-plane control-plane-ui execution-gateway github-integration memory-catalog
-```
+这个变量只在镜像构建阶段传给 pnpm，不会改变 Docker 拉取 pnpm 基础镜像的位置。修改后使用 `docker compose --profile app build` 重新构建 Node 服务镜像。
 
 ### Git fetch
 

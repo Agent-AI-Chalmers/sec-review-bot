@@ -373,7 +373,7 @@ sudo systemctl restart sec-review-memory-extraction-worker@1.service
 sudo systemctl restart sec-review-memory-maintenance-worker.service
 ```
 
-For development, you can bypass systemd and run the Compose control plane in the foreground:
+For development, you can bypass systemd and run the Compose stack in the foreground:
 
 ```bash
 docker compose --profile app up --build
@@ -438,11 +438,7 @@ pnpm uses `https://registry.npmjs.org` by default for project dependencies. If t
 NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 ```
 
-This variable is passed only to pnpm during the image build; it does not change where Docker pulls the pnpm base image. Rebuild the Node service images after changing it:
-
-```bash
-docker compose --profile app build control-plane control-plane-ui execution-gateway github-integration memory-catalog
-```
+This variable is passed only to pnpm during the image build; it does not change where Docker pulls the pnpm base image. After changing it, rebuild the Node service images with `docker compose --profile app build`.
 
 ### Git Fetch
 
