@@ -126,7 +126,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Return one immutable memory revision and its maintenance audit. */
+        /** @description Return one immutable memory revision and its maintenance transcript. */
         get: operations["getRevision"];
         put?: never;
         post?: never;
@@ -153,7 +153,7 @@ export interface components {
             source_review_unit_id: string;
             transcript_digest: string;
             body_markdown: string;
-            audit_reference: components["schemas"]["ArtifactReference"];
+            extraction_transcript_reference: components["schemas"]["ArtifactReference"];
         };
         ObservationRegistrationResult: {
             /** @constant */
@@ -184,7 +184,7 @@ export interface components {
             base_revision: number;
             observation_ids: string[];
             memory_version: components["schemas"]["ArtifactReference"];
-            audit_reference: components["schemas"]["ArtifactReference"];
+            maintenance_transcript_reference: components["schemas"]["ArtifactReference"];
         };
         MaintenanceCompletionResult: {
             completed: boolean;
@@ -196,7 +196,7 @@ export interface components {
         MemoryRevision: {
             revision: number;
             artifact_reference: components["schemas"]["ArtifactReference"];
-            maintenance_audit_reference: components["schemas"]["ArtifactReference"];
+            maintenance_transcript_reference: components["schemas"]["ArtifactReference"];
             /** Format: date-time */
             created_at: string;
         };

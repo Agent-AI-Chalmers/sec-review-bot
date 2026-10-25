@@ -44,9 +44,9 @@ def initialize_memory_store(memory_store_dir: Path) -> Path:
     content_dir.mkdir(exist_ok=True)
     (content_dir / "topics").mkdir(exist_ok=True)
     (resolved_store_dir / MEMORY_OBSERVATIONS_DIRNAME).mkdir(exist_ok=True)
-    audit_root = resolved_store_dir / MEMORY_AGENT_TRANSCRIPTS_DIRNAME
-    (audit_root / "memory-extractor").mkdir(parents=True, exist_ok=True)
-    (audit_root / "memory-maintainer").mkdir(exist_ok=True)
+    transcript_root = resolved_store_dir / MEMORY_AGENT_TRANSCRIPTS_DIRNAME
+    (transcript_root / "memory-extractor").mkdir(parents=True, exist_ok=True)
+    (transcript_root / "memory-maintainer").mkdir(exist_ok=True)
     initialize_memory_state(resolved_store_dir)
     index_path = content_dir / "MEMORY.md"
     if not index_path.exists():

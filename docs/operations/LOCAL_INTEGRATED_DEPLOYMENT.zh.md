@@ -109,7 +109,7 @@ Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个�
 
 将 `EXECUTION_API_TOKEN`、`AGENT_MEMORY_CATALOG_TOKEN` 以及 PostgreSQL/RustFS 密码分别设置为独立生成的 secret，例如使用 `openssl rand -hex 32`。把同一枚 Memory Catalog token 也写入 `ops/systemd/deployment.env`：Compose 把它交给独立 Memory Catalog Server 容器，两个宿主机 worker 用它作为窄客户端凭据。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
 
-RustFS 按职责为各组件分配独立身份：integration 写入 input object；Execution Worker 读取 input、写入 run diagnostic bundle 并读取 active memory revision；Memory Worker 读取 run diagnostic，并读写 memory revision 和 Memory Agent 审计包；UI BFF 为经过认证的下载读取已存储 diagnostic。`compose.env.sample` 中对应的 secret key 属于这些不同身份，应当分别生成。
+RustFS 按职责为各组件分配独立身份：integration 写入 input object；Execution Worker 读取 input、写入 run diagnostic bundle 并读取 active memory revision；Memory Worker 读取 run diagnostic，并读写 memory revision 和压缩后的 memory-agent transcript；UI BFF 为经过认证的下载读取已存储 diagnostic。`compose.env.sample` 中对应的 secret key 属于这些不同身份，应当分别生成。
 
 ### 2. GitHub integration `.env`
 
@@ -174,7 +174,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `AGENT_MEMORY_PROCESSING_ENABLED` | 允许 transcript extraction 和 memory maintenance；默认是 `true`。 |
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9100`。 |
 | `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入 run diagnostic bundle，并读取 active memory revision。 |
-| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Worker 凭据；可读取 run diagnostic bundle，并读写 memory revision 和 Memory Agent 审计包。 |
+| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Worker 凭据；可读取 run diagnostic bundle，并读写 memory revision 和压缩后的 memory-agent transcript。 |
 | `AGENT_MEMORY_CATALOG_URL` | coordinated memory state 的独立 API；Compose 默认是 `http://127.0.0.1:8092`。 |
 | `AGENT_MEMORY_CATALOG_TOKEN` | 必须与仓库 `.env` 一致；它只授权 memory 协调，不提供 PostgreSQL 直连权限。 |
 

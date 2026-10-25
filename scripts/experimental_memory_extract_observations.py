@@ -93,7 +93,7 @@ async def main() -> int:
         job_id=args.job_id,
         source_workflow=args.source_workflow,
         run_id=args.run_id,
-        audit_root=output_dir,
+        agent_transcript_root=output_dir,
     )
     if result.skipped or result.observation_markdown is None:
         print(f"No observation written: {result.summary}")

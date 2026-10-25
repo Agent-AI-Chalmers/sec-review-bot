@@ -40,7 +40,7 @@ components:
         - source_review_unit_id
         - transcript_digest
         - body_markdown
-        - audit_reference
+        - extraction_transcript_reference
       properties:
         observation_id: { type: string, minLength: 1 }
         source_workflow: { type: string, minLength: 1 }
@@ -50,7 +50,7 @@ components:
           type: string
           pattern: ^sha256:[0-9a-f]{64}$
         body_markdown: { type: string, minLength: 1 }
-        audit_reference:
+        extraction_transcript_reference:
           $ref: '#/components/schemas/ArtifactReference'
     ObservationRegistrationResult:
       type: object
@@ -108,7 +108,11 @@ components:
     MaintenanceCompletion:
       type: object
       additionalProperties: false
-      required: [base_revision, observation_ids, memory_version, audit_reference]
+      required:
+        - base_revision
+        - observation_ids
+        - memory_version
+        - maintenance_transcript_reference
       properties:
         base_revision: { type: integer, minimum: 0 }
         observation_ids:
@@ -118,7 +122,7 @@ components:
           items: { type: string, minLength: 1 }
         memory_version:
           $ref: '#/components/schemas/ArtifactReference'
-        audit_reference:
+        maintenance_transcript_reference:
           $ref: '#/components/schemas/ArtifactReference'
     MaintenanceCompletionResult:
       type: object
@@ -142,13 +146,13 @@ components:
       required:
         - revision
         - artifact_reference
-        - maintenance_audit_reference
+        - maintenance_transcript_reference
         - created_at
       properties:
         revision: { type: integer, minimum: 1 }
         artifact_reference:
           $ref: '#/components/schemas/ArtifactReference'
-        maintenance_audit_reference:
+        maintenance_transcript_reference:
           $ref: '#/components/schemas/ArtifactReference'
         created_at:
           type: string
@@ -336,7 +340,7 @@ paths:
         '500': { $ref: '#/components/responses/InternalError' }
   /v1/revisions/{revision}:
     get:
-      description: Return one immutable memory revision and its maintenance audit.
+      description: Return one immutable memory revision and its maintenance transcript.
       operationId: getRevision
       security: [{ catalogToken: [] }]
       parameters:

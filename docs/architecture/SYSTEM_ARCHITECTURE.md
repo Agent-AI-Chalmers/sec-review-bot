@@ -68,15 +68,24 @@ sequenceDiagram
 
   ExecutionWorker->>Temporal: Request asynchronous memory processing
   Temporal->>MemoryWorker: Dispatch memory extraction work
-  MemoryWorker->>Storage: Read review transcripts from run diagnostic bundle
-  Note over MemoryWorker: Extract memory and record Memory Agent transcripts
-  MemoryWorker->>Storage: Publish Memory Agent audit bundle
-  MemoryWorker->>Catalog: Register pending observation
+  MemoryWorker->>Storage: Fetch run diagnostic bundle
+  Storage-->>MemoryWorker: Run diagnostic bundle with review transcripts
+  Note over MemoryWorker: Run extractor and record extraction transcript
+  MemoryWorker->>Storage: Publish compressed extraction transcript
+  opt Observation produced
+    MemoryWorker->>Catalog: Register observation and extraction transcript reference
+  end
   loop Scheduled memory maintenance
     Temporal->>MemoryWorker: Dispatch maintenance work
-    MemoryWorker->>Catalog: Read pending observations and active revision
-    Catalog-->>MemoryWorker: Observations and active revision reference
-    MemoryWorker->>Storage: Read active memory and publish immutable revision
-    MemoryWorker->>Catalog: Commit revision and active pointer with compare-and-swap
+    MemoryWorker->>Catalog: Select observation batch and active revision
+    Catalog-->>MemoryWorker: Observation batch and active memory reference
+    opt Active memory exists
+      MemoryWorker->>Storage: Fetch active memory version
+      Storage-->>MemoryWorker: Active memory tree
+    end
+    Note over MemoryWorker: Run maintainer and record maintenance transcript
+    MemoryWorker->>Storage: Publish memory version and compressed maintenance transcript
+    MemoryWorker->>Catalog: Commit revision, consumed observations, and maintenance transcript reference with compare-and-swap
+    Catalog-->>MemoryWorker: Commit result
   end
 ```

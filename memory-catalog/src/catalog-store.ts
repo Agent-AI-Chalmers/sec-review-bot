@@ -40,7 +40,7 @@ export interface MemoryCatalogStore {
     base_revision: number
     observation_ids: string[]
     memory_version: ArtifactReference
-    audit_reference: ArtifactReference
+    maintenance_transcript_reference: ArtifactReference
   }): Promise<boolean>
   activeVersion(): Promise<ActiveVersion>
   getRevision(revision: number): Promise<MemoryRevision | undefined>
@@ -72,7 +72,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       const inserted = await client.query(
         `insert into observations (
            observation_id, source_workflow, source_run_id, source_review_unit_id,
-           transcript_digest, body_markdown, audit_reference
+           transcript_digest, body_markdown, extraction_transcript_reference
          ) values ($1,$2,$3,$4,$5,$6,$7)
          on conflict (observation_id) do nothing`,
         [
@@ -82,14 +82,14 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           input.source_review_unit_id,
           input.transcript_digest,
           input.body_markdown,
-          input.audit_reference,
+          input.extraction_transcript_reference,
         ],
       )
       if (inserted.rowCount === 1) return true
       const existing = await client.query<{ identical: boolean }>(
         `select source_workflow=$2 and source_run_id=$3 and
                 source_review_unit_id=$4 and transcript_digest=$5 and
-                body_markdown=$6 and audit_reference=$7::jsonb as identical
+                body_markdown=$6 and extraction_transcript_reference=$7::jsonb as identical
          from observations where observation_id=$1`,
         [
           input.observation_id,
@@ -98,7 +98,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           input.source_review_unit_id,
           input.transcript_digest,
           input.body_markdown,
-          JSON.stringify(input.audit_reference),
+          JSON.stringify(input.extraction_transcript_reference),
         ],
       )
       if (existing.rows[0]?.identical !== true) {
@@ -164,7 +164,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
     base_revision: number
     observation_ids: string[]
     memory_version: ArtifactReference
-    audit_reference: ArtifactReference
+    maintenance_transcript_reference: ArtifactReference
   }): Promise<boolean> {
     return await inTransaction(this.#pool, async (client) => {
       const active = await client.query<{ revision: string }>(
@@ -188,9 +188,13 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       const nextRevision = input.base_revision + 1
       await client.query(
         `insert into revisions (
-           revision, artifact_reference, maintenance_audit_reference
+           revision, artifact_reference, maintenance_transcript_reference
          ) values ($1,$2,$3)`,
-        [nextRevision, input.memory_version, input.audit_reference],
+        [
+          nextRevision,
+          input.memory_version,
+          input.maintenance_transcript_reference,
+        ],
       )
       await client.query(
         `update observations set consumed_revision=$1
@@ -228,10 +232,10 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
     const result = await this.#pool.query<{
       revision: string
       artifact_reference: ArtifactReference
-      maintenance_audit_reference: ArtifactReference
+      maintenance_transcript_reference: ArtifactReference
       created_at: Date
     }>(
-      `select revision, artifact_reference, maintenance_audit_reference, created_at
+      `select revision, artifact_reference, maintenance_transcript_reference, created_at
         from revisions where revision=$1`,
       [revision],
     )
@@ -246,10 +250,10 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
     const result = await this.#pool.query<{
       revision: string
       artifact_reference: ArtifactReference
-      maintenance_audit_reference: ArtifactReference
+      maintenance_transcript_reference: ArtifactReference
       created_at: Date
     }>(
-      `select revision, artifact_reference, maintenance_audit_reference, created_at
+      `select revision, artifact_reference, maintenance_transcript_reference, created_at
         from revisions
         where ($1::bigint is null or revision < $1)
         order by revision desc limit $2`,
@@ -269,13 +273,13 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
 function projectRevision(row: {
   revision: string
   artifact_reference: ArtifactReference
-  maintenance_audit_reference: ArtifactReference
+  maintenance_transcript_reference: ArtifactReference
   created_at: Date
 }): MemoryRevision {
   return {
     revision: Number(row.revision),
     artifact_reference: row.artifact_reference,
-    maintenance_audit_reference: row.maintenance_audit_reference,
+    maintenance_transcript_reference: row.maintenance_transcript_reference,
     created_at: row.created_at.toISOString(),
   }
 }

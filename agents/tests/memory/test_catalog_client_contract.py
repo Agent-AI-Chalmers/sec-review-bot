@@ -48,11 +48,15 @@ class _RecordingClient(MemoryCatalogClient):
         return self.responses.pop(0)
 
 
-def _artifact(name: str) -> ArtifactReference:
+def _artifact(
+    name: str,
+    *,
+    media_type: str = "application/tar+zstd",
+) -> ArtifactReference:
     return ArtifactReference(
-        uri=f"s3://sec-review/{name}.tar.zst",
+        uri=f"s3://sec-review/{name}",
         digest=f"sha256:{'a' * 64}",
-        media_type="application/tar+zstd",
+        media_type=media_type,
         size_bytes=42,
     )
 
@@ -65,7 +69,10 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
     revision = {
         "revision": 1,
         "artifact_reference": _artifact("memory").as_dict(),
-        "maintenance_audit_reference": _artifact("maintenance-audit").as_dict(),
+        "maintenance_transcript_reference": _artifact(
+            "maintenance-transcript.jsonl.zst",
+            media_type="application/zstd",
+        ).as_dict(),
         "created_at": "2026-10-23T00:00:00Z",
     }
     batch = {
@@ -94,7 +101,10 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         source_review_unit_id="review",
         transcript_digest=f"sha256:{'b' * 64}",
         body_markdown="Remember this.",
-        audit_reference=_artifact("extraction-audit"),
+        extraction_transcript_reference=_artifact(
+            "extraction-transcript.jsonl.zst",
+            media_type="application/zstd",
+        ),
     )
     assert client.pending_observation_summary()["pending_count"] == 1
     assert client.select_maintenance_batch(limit=10) == batch
@@ -102,7 +112,10 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         base_revision=1,
         observation_ids=["observation-1"],
         memory_version=_artifact("memory-2"),
-        audit_reference=_artifact("maintenance-audit"),
+        maintenance_transcript_reference=_artifact(
+            "maintenance-transcript.jsonl.zst",
+            media_type="application/zstd",
+        ),
     )
     assert client.active_version() == active_version
     assert client.get_revision(1) == revision
@@ -163,5 +176,8 @@ def test_observation_conflict_preserves_non_retryable_catalog_semantics() -> Non
             source_review_unit_id="review",
             transcript_digest=f"sha256:{'b' * 64}",
             body_markdown="Different content.",
-            audit_reference=_artifact("extraction-audit"),
+            extraction_transcript_reference=_artifact(
+                "extraction-transcript.jsonl.zst",
+                media_type="application/zstd",
+            ),
         )

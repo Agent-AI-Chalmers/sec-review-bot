@@ -93,6 +93,7 @@ class MemoryObservationPreviewResult:
     skipped: bool
     summary: str
     observation_markdown: str | None = None
+    agent_transcript_path: Path | None = None
 
 
 def observation_id(
@@ -250,12 +251,14 @@ async def _generate_memory_observation_for_refs(
     resolved_observation_id: str,
     source_workflow: str | None,
     run_id: str | None,
-    audit_root: Path | None,
+    agent_transcript_root: Path | None,
 ) -> MemoryObservationPreviewResult:
     with tempfile.TemporaryDirectory(prefix="sec-review-memory-extractor-") as tempdir:
-        transcript_root = Path(tempdir) / TRANSCRIPTS_DIRNAME
-        staged_transcripts = stage_transcripts(transcript_refs, transcript_root)
-        backend = create_memory_extractor_backend(transcript_root=transcript_root)
+        staged_transcript_root = Path(tempdir) / TRANSCRIPTS_DIRNAME
+        staged_transcripts = stage_transcripts(transcript_refs, staged_transcript_root)
+        backend = create_memory_extractor_backend(
+            transcript_root=staged_transcript_root
+        )
         model = create_chat_model(
             agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
             deployment_override=deployment,
@@ -265,20 +268,23 @@ async def _generate_memory_observation_for_refs(
                 model=model,
                 backend=backend,
             )
+            agent_transcript_path = (
+                memory_agent_transcript_path(
+                    agent_transcript_root,
+                    agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
+                    run_label=resolved_observation_id,
+                )
+                if agent_transcript_root is not None
+                else None
+            )
             structured_result = await invoke_agent_runtime_graph(
                 agent=agent,
                 agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
                 system_prompt=MEMORY_EXTRACTOR_SYSTEM_PROMPT,
                 user_prompt=build_extractor_prompt(staged_transcripts),
                 transcript_paths=(
-                    (
-                        memory_agent_transcript_path(
-                            audit_root,
-                            agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
-                            run_label=resolved_observation_id,
-                        ),
-                    )
-                    if audit_root is not None
+                    (agent_transcript_path,)
+                    if agent_transcript_path is not None
                     else ()
                 ),
             )
@@ -291,12 +297,14 @@ async def _generate_memory_observation_for_refs(
                 observation_id=resolved_observation_id,
                 skipped=True,
                 summary="No durable memory observation produced.",
+                agent_transcript_path=agent_transcript_path,
             )
 
         return MemoryObservationPreviewResult(
             observation_id=resolved_observation_id,
             skipped=False,
             summary="Durable memory observation produced.",
+            agent_transcript_path=agent_transcript_path,
             observation_markdown=build_observation_document(
                 source_workflow=source_workflow,
                 run_id=run_id,
@@ -353,7 +361,7 @@ async def _extract_memory_observation_for_refs(
         resolved_observation_id=resolved_observation_id,
         source_workflow=source_workflow,
         run_id=run_id,
-        audit_root=memory_root,
+        agent_transcript_root=memory_root,
     )
     if preview.skipped or preview.observation_markdown is None:
         return MemoryObservationResult(skipped=True, summary=preview.summary)
@@ -398,15 +406,16 @@ async def preview_memory_observation_from_paths(
     job_id: str | None = None,
     source_workflow: str | None = None,
     run_id: str | None = None,
-    audit_root: Path | None = None,
+    agent_transcript_root: Path | None = None,
 ) -> MemoryObservationPreviewResult:
     """Run an experimental extraction without publishing to the memory store.
 
     This entry point is intended for model probes, prompt experiments, and
     operator inspection. It runs the real extractor and returns its candidate
     observation, but does not write an observation file, register pending state,
-    update ``MEMORY.md``, or invoke memory maintenance. When ``audit_root`` is
-    provided, only the extractor's own run transcript is persisted there.
+    update ``MEMORY.md``, or invoke memory maintenance. When
+    ``agent_transcript_root`` is provided, only the extractor's own run transcript
+    is persisted there.
     """
     transcript_refs = collect_transcript_refs(transcript_paths)
     resolved_observation_id = resolve_observation_id(
@@ -426,7 +435,7 @@ async def preview_memory_observation_from_paths(
         resolved_observation_id=resolved_observation_id,
         source_workflow=source_workflow,
         run_id=run_id,
-        audit_root=audit_root,
+        agent_transcript_root=agent_transcript_root,
     )
 
 

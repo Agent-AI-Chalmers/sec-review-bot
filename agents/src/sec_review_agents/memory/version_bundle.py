@@ -11,8 +11,10 @@ from sec_review_agents.artifacts.archive import extract_archive
 from sec_review_agents.artifacts.materialize import materialize_artifact
 from sec_review_agents.artifacts.object_storage import publish_immutable_s3_artifact
 from sec_review_agents.artifacts.reference import (
+    ARCHIVE_MEDIA_TYPE,
     ArtifactReference,
     local_artifact_reference,
+    require_artifact_media_type,
 )
 
 MEMORY_VERSION_FILENAME = "memory-tree.v1.tar.zst"
@@ -113,6 +115,7 @@ def materialize_memory_version(
     *,
     destination: Path,
 ) -> Path:
+    require_artifact_media_type(reference, ARCHIVE_MEDIA_TYPE)
     archive_path = materialize_artifact(
         reference,
         destination.with_suffix(".tar.zst"),

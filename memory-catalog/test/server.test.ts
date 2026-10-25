@@ -13,10 +13,10 @@ const revision = {
     media_type: 'application/tar+zstd',
     size_bytes: 42,
   },
-  maintenance_audit_reference: {
-    uri: 's3://sec-review/memory/audit/1.tar.zst',
+  maintenance_transcript_reference: {
+    uri: 's3://sec-review/memory/transcripts/memory-maintainer/transcript.v1.jsonl.zst',
     digest: `sha256:${'b'.repeat(64)}`,
-    media_type: 'application/tar+zstd',
+    media_type: 'application/zstd',
     size_bytes: 21,
   },
   created_at: '2026-10-23T00:00:00.000Z',
@@ -49,10 +49,10 @@ await test('the contract authenticates and validates observation registration', 
     source_review_unit_id: 'review',
     transcript_digest: `sha256:${'b'.repeat(64)}`,
     body_markdown: 'Remember this.',
-    audit_reference: {
-      uri: 's3://sec-review/memory/audit/extraction.tar.zst',
+    extraction_transcript_reference: {
+      uri: 's3://sec-review/memory/transcripts/memory-extractor/transcript.v1.jsonl.zst',
       digest: `sha256:${'a'.repeat(64)}`,
-      media_type: 'application/tar+zstd',
+      media_type: 'application/zstd',
       size_bytes: 42,
     },
   }
@@ -110,10 +110,10 @@ await test('an observation identity conflict is a declared 409', async () => {
       source_review_unit_id: 'review',
       transcript_digest: `sha256:${'b'.repeat(64)}`,
       body_markdown: 'Remember this.',
-      audit_reference: {
-        uri: 's3://sec-review/audit.tar.zst',
+      extraction_transcript_reference: {
+        uri: 's3://sec-review/memory/transcripts/memory-extractor/transcript.v1.jsonl.zst',
         digest: `sha256:${'a'.repeat(64)}`,
-        media_type: 'application/tar+zstd',
+        media_type: 'application/zstd',
         size_bytes: 42,
       },
     },

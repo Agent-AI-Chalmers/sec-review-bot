@@ -349,7 +349,9 @@ async def maintain_coordinated_memory_with_result(
 ) -> MemoryMaintenanceResult:
     """Maintain one coordinated batch and commit it with a revision CAS."""
     from sec_review_agents.artifacts.reference import ArtifactReference
-    from sec_review_agents.memory.audit_bundle import publish_memory_audit_bundle
+    from sec_review_agents.memory.transcript_artifact import (
+        publish_memory_agent_transcript,
+    )
     from sec_review_agents.memory.version_bundle import (
         materialize_memory_version,
         publish_memory_version,
@@ -419,8 +421,8 @@ async def maintain_coordinated_memory_with_result(
             deployment_override=deployment,
         )
         base_revision = int(batch["base_revision"])
-        audit_path = memory_agent_transcript_path(
-            temp_root / "audit",
+        maintenance_transcript_path = memory_agent_transcript_path(
+            temp_root / "memory-agent-transcripts",
             agent_name=MEMORY_MAINTAINER_AGENT_NAME,
             run_label=f"revision-{base_revision + 1}",
         )
@@ -435,17 +437,17 @@ async def maintain_coordinated_memory_with_result(
                 agent_name=MEMORY_MAINTAINER_AGENT_NAME,
                 system_prompt=MEMORY_MAINTAINER_SYSTEM_PROMPT,
                 user_prompt=build_maintenance_prompt(prompt_observations),
-                transcript_paths=(audit_path,),
+                transcript_paths=(maintenance_transcript_path,),
             )
 
-        audit_reference = publish_memory_audit_bundle(
+        maintenance_transcript_reference = publish_memory_agent_transcript(
             agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-            transcript_paths=[audit_path],
-            output_dir=temp_root / "published-audit",
+            transcript_path=maintenance_transcript_path,
+            output_dir=temp_root / "published-transcripts",
         )
-        if urlparse(audit_reference.uri).scheme != "s3":
+        if urlparse(maintenance_transcript_reference.uri).scheme != "s3":
             raise RuntimeError(
-                "Coordinated memory audit publication requires configured S3 storage."
+                "Maintenance transcript publication requires configured S3 storage."
             )
         version = publish_memory_version(
             memory_content_root=worktree_root,
@@ -459,7 +461,7 @@ async def maintain_coordinated_memory_with_result(
             base_revision=base_revision,
             observation_ids=observation_ids,
             memory_version=version,
-            audit_reference=audit_reference,
+            maintenance_transcript_reference=maintenance_transcript_reference,
         )
         if not completed:
             raise RuntimeError("Memory revision changed before coordinated commit.")

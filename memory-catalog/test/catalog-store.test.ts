@@ -12,10 +12,10 @@ const artifact = {
   size_bytes: 42,
 }
 
-const audit = {
-  uri: 's3://sec-review/memory/audit.tar.zst',
+const maintenanceTranscript = {
+  uri: 's3://sec-review/memory/transcripts/memory-maintainer/transcript.v1.jsonl.zst',
   digest: `sha256:${'b'.repeat(64)}`,
-  media_type: 'application/tar+zstd',
+  media_type: 'application/zstd',
   size_bytes: 21,
 }
 
@@ -46,7 +46,7 @@ await test('maintenance commit records immutable history before moving the activ
       base_revision: 3,
       observation_ids: ['observation-1'],
       memory_version: artifact,
-      audit_reference: audit,
+      maintenance_transcript_reference: maintenanceTranscript,
     }),
     true,
   )
@@ -73,19 +73,19 @@ await test('revision history pagination returns an exclusive descending cursor',
           {
             revision: '4',
             artifact_reference: artifact,
-            maintenance_audit_reference: audit,
+            maintenance_transcript_reference: maintenanceTranscript,
             created_at: new Date('2026-10-23T04:00:00Z'),
           },
           {
             revision: '3',
             artifact_reference: artifact,
-            maintenance_audit_reference: audit,
+            maintenance_transcript_reference: maintenanceTranscript,
             created_at: new Date('2026-10-23T03:00:00Z'),
           },
           {
             revision: '2',
             artifact_reference: artifact,
-            maintenance_audit_reference: audit,
+            maintenance_transcript_reference: maintenanceTranscript,
             created_at: new Date('2026-10-23T02:00:00Z'),
           },
         ],

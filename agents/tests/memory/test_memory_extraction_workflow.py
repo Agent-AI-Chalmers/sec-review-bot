@@ -74,11 +74,12 @@ async def test_coordinated_extraction_registers_observation_with_provenance(
         observation_markdown="Remember this.",
         skipped=False,
         summary="Produced observation.",
+        agent_transcript_path=tmp_path / "memory-extractor.jsonl",
     )
-    audit = ArtifactReference(
-        uri="s3://sec-review/memory/audit/extraction.tar.zst",
+    extraction_transcript = ArtifactReference(
+        uri="s3://sec-review/memory/transcripts/memory-extractor/transcript.v1.jsonl.zst",
         digest=f"sha256:{'b' * 64}",
-        media_type="application/tar+zstd",
+        media_type="application/zstd",
         size_bytes=10,
     )
 
@@ -95,8 +96,8 @@ async def test_coordinated_extraction_registers_observation_with_provenance(
         AsyncMock(return_value=preview),
     )
     monkeypatch.setattr(
-        "sec_review_agents.memory.audit_bundle.publish_memory_audit_bundle",
-        lambda **_kwargs: audit,
+        "sec_review_agents.memory.transcript_artifact.publish_memory_agent_transcript",
+        lambda **_kwargs: extraction_transcript,
     )
     request = MemoryExtractionRequest(
         source_workflow="issue-review",
@@ -116,7 +117,7 @@ async def test_coordinated_extraction_registers_observation_with_provenance(
         source_review_unit_id="review",
         transcript_digest=_reference().digest,
         body_markdown="Remember this.",
-        audit_reference=audit,
+        extraction_transcript_reference=extraction_transcript,
     )
 
 

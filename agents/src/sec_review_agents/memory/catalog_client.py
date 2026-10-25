@@ -66,7 +66,7 @@ class MemoryCatalogClient:
         source_review_unit_id: str,
         transcript_digest: str,
         body_markdown: str,
-        audit_reference: ArtifactReference,
+        extraction_transcript_reference: ArtifactReference,
     ) -> bool:
         value = self._request(
             "POST",
@@ -78,7 +78,9 @@ class MemoryCatalogClient:
                 "source_review_unit_id": source_review_unit_id,
                 "transcript_digest": transcript_digest,
                 "body_markdown": body_markdown,
-                "audit_reference": audit_reference.as_dict(),
+                "extraction_transcript_reference": (
+                    extraction_transcript_reference.as_dict()
+                ),
             },
         )
         if value.get("ok") is not True:
@@ -107,7 +109,7 @@ class MemoryCatalogClient:
         base_revision: int,
         observation_ids: list[str],
         memory_version: ArtifactReference,
-        audit_reference: ArtifactReference,
+        maintenance_transcript_reference: ArtifactReference,
     ) -> bool:
         value = self._request(
             "POST",
@@ -116,7 +118,9 @@ class MemoryCatalogClient:
                 "base_revision": base_revision,
                 "observation_ids": observation_ids,
                 "memory_version": memory_version.as_dict(),
-                "audit_reference": audit_reference.as_dict(),
+                "maintenance_transcript_reference": (
+                    maintenance_transcript_reference.as_dict()
+                ),
             },
         )
         return value.get("completed") is True

@@ -40,7 +40,6 @@ async def run_memory_extraction(
         MEMORY_EXTRACTOR_AGENT_NAME,
     )
     from sec_review_agents.artifacts.reference import ArtifactReference
-    from sec_review_agents.memory.audit_bundle import publish_memory_audit_bundle
     from sec_review_agents.memory.catalog_client import (
         configured_memory_catalog_client,
     )
@@ -49,6 +48,9 @@ async def run_memory_extraction(
         preview_memory_observation_from_paths,
     )
     from sec_review_agents.memory.store import resolve_memory_store_dir
+    from sec_review_agents.memory.transcript_artifact import (
+        publish_memory_agent_transcript,
+    )
     from sec_review_agents.run_diagnostics.bundle import (
         materialize_diagnostic_transcript_unit,
     )
@@ -86,7 +88,7 @@ async def run_memory_extraction(
                 "extraction_id": extraction_id,
             }
 
-        audit_root = temp_root / "audit"
+        transcript_root = temp_root / "memory-agent-transcripts"
         preview = await preview_memory_observation_from_paths(
             list(materialized.transcript_paths),
             deployment=deployment,
@@ -94,12 +96,14 @@ async def run_memory_extraction(
             job_id=extraction_id,
             source_workflow=request.source_workflow,
             run_id=request.run_id,
-            audit_root=audit_root,
+            agent_transcript_root=transcript_root,
         )
-        audit_reference = publish_memory_audit_bundle(
+        if preview.agent_transcript_path is None:
+            raise RuntimeError("Memory extraction did not record its transcript.")
+        extraction_transcript_reference = publish_memory_agent_transcript(
             agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
-            transcript_paths=sorted(audit_root.rglob("*.jsonl")),
-            output_dir=temp_root / "published-audit",
+            transcript_path=preview.agent_transcript_path,
+            output_dir=temp_root / "published-transcripts",
         )
         if preview.observation_markdown is not None:
             catalog_client.register_observation(
@@ -109,7 +113,7 @@ async def run_memory_extraction(
                 source_review_unit_id=request.review_unit_id,
                 transcript_digest=reference.digest,
                 body_markdown=preview.observation_markdown,
-                audit_reference=audit_reference,
+                extraction_transcript_reference=extraction_transcript_reference,
             )
         return {
             "ok": True,
@@ -120,7 +124,9 @@ async def run_memory_extraction(
                 if preview.observation_markdown is not None
                 else None
             ),
-            "audit_reference": audit_reference.as_dict(),
+            "extraction_transcript_reference": (
+                extraction_transcript_reference.as_dict()
+            ),
             "extraction_id": extraction_id,
         }
 

@@ -72,15 +72,24 @@ sequenceDiagram
 
   ExecutionWorker->>Temporal: 请求异步 memory 处理
   Temporal->>MemoryWorker: 分发 memory extraction 工作
-  MemoryWorker->>Storage: 从 run diagnostic bundle 读取 review transcript
-  Note over MemoryWorker: 提取 memory 并记录 Memory Agent transcript
-  MemoryWorker->>Storage: 发布 Memory Agent 审计包
-  MemoryWorker->>Catalog: 注册待处理 observation
+  MemoryWorker->>Storage: 获取 run diagnostic bundle
+  Storage-->>MemoryWorker: 返回包含 review transcripts 的 run diagnostic bundle
+  Note over MemoryWorker: 运行 extractor 并记录 extraction transcript
+  MemoryWorker->>Storage: 发布压缩后的 extraction transcript
+  opt 产出 observation
+    MemoryWorker->>Catalog: 登记 observation 和 extraction transcript reference
+  end
   loop 定期 memory maintenance
     Temporal->>MemoryWorker: 分发 maintenance 工作
-    MemoryWorker->>Catalog: 读取待处理 observations 和 active revision
-    Catalog-->>MemoryWorker: 返回 observations 和 active revision 引用
-    MemoryWorker->>Storage: 读取 active memory 并发布不可变 revision
-    MemoryWorker->>Catalog: 通过 compare-and-swap 提交 revision 和 active pointer
+    MemoryWorker->>Catalog: 选择 observation batch 和 active revision
+    Catalog-->>MemoryWorker: 返回 observation batch 和 active memory reference
+    opt 存在 active memory
+      MemoryWorker->>Storage: 获取 active memory version
+      Storage-->>MemoryWorker: 返回 active memory tree
+    end
+    Note over MemoryWorker: 运行 maintainer 并记录 maintenance transcript
+    MemoryWorker->>Storage: 发布 memory version 和压缩后的 maintenance transcript
+    MemoryWorker->>Catalog: 通过 compare-and-swap 提交 revision、consumed observations 和 maintenance transcript reference
+    Catalog-->>MemoryWorker: 返回提交结果
   end
 ```

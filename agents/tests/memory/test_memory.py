@@ -349,7 +349,7 @@ def test_initialize_memory_store_seeds_external_memory(tmp_path: Path) -> None:
     )
 
 
-def test_memory_agent_transcript_paths_are_auditable_and_non_overwriting(
+def test_memory_agent_transcript_paths_are_unique_and_non_overwriting(
     tmp_path: Path,
 ) -> None:
     memory_root = memory_store.initialize_memory_store(tmp_path / "memory")
@@ -927,12 +927,12 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
         )
 
     run_agent.assert_called_once()
-    audit_paths = run_agent.call_args.kwargs["transcript_paths"]
-    assert len(audit_paths) == 1
-    assert audit_paths[0].parent == (
+    transcript_paths = run_agent.call_args.kwargs["transcript_paths"]
+    assert len(transcript_paths) == 1
+    assert transcript_paths[0].parent == (
         memory_root / "agent-transcripts" / "memory-extractor"
     )
-    assert audit_paths[0].name.startswith("issue-review-run-1-")
+    assert transcript_paths[0].name.startswith("issue-review-run-1-")
     assert result.skipped is False
     assert (
         result.observation_path
