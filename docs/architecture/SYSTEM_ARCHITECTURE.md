@@ -72,15 +72,11 @@ sequenceDiagram
   Storage-->>MemoryWorker: Run diagnostic bundle with review transcripts
   Note over MemoryWorker: Run extractor and record extractor invocation transcript
   MemoryWorker->>Storage: Publish compressed extractor transcript
-  alt Observation produced
-    MemoryWorker->>Catalog: Register observation with extractor transcript reference
-  else No observation produced
-    Note over MemoryWorker: Do not register an observation
-  end
+  MemoryWorker->>Catalog: Atomically register extraction, transcript reference, and optional observation
   loop Scheduled memory maintenance
     Temporal->>MemoryWorker: Dispatch maintenance work
     MemoryWorker->>Catalog: Select maintenance batch
-    Catalog-->>MemoryWorker: Observations, base revision, and active memory tree artifact reference
+    Catalog-->>MemoryWorker: Observations with extraction IDs, base revision, and active memory tree reference
     opt Active memory tree exists
       MemoryWorker->>Storage: Fetch active memory tree artifact
       Storage-->>MemoryWorker: Memory tree artifact
@@ -89,7 +85,7 @@ sequenceDiagram
     Note over MemoryWorker: Run maintainer and record maintainer invocation transcript
     MemoryWorker->>Storage: Publish compressed maintainer transcript
     MemoryWorker->>Storage: Publish new memory tree artifact
-    MemoryWorker->>Catalog: Commit artifact references and consumed observation IDs using base-revision CAS
+    MemoryWorker->>Catalog: Commit memory tree reference, maintainer transcript reference, and consumed extraction IDs using base-revision CAS
     Catalog-->>MemoryWorker: New active revision or revision conflict
   end
 ```

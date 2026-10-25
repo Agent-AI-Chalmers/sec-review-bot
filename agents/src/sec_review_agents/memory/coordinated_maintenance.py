@@ -58,9 +58,11 @@ async def maintain_coordinated_memory_with_result(
     ) as tempdir:
         temp_root = Path(tempdir)
         worktree_root = temp_root / "memory"
-        active_memory = batch.get("active_memory")
-        if isinstance(active_memory, dict):
-            active_reference = ArtifactReference.from_mapping(active_memory)
+        active_memory_tree_reference = batch.get("active_memory_tree_reference")
+        if isinstance(active_memory_tree_reference, dict):
+            active_reference = ArtifactReference.from_mapping(
+                active_memory_tree_reference
+            )
             if urlparse(active_reference.uri).scheme != "s3":
                 raise ValueError(
                     "Catalog active memory must use an S3 artifact reference."
@@ -80,18 +82,18 @@ async def maintain_coordinated_memory_with_result(
         observations_root = worktree_root / "observations"
         observations_root.mkdir()
         prompt_observations: list[MemoryMaintenanceObservation] = []
-        observation_ids: list[str] = []
+        extraction_ids: list[str] = []
         for index, item in enumerate(observations, start=1):
             if not isinstance(item, dict):
                 raise ValueError("Catalog observation must be an object.")
-            observation_id = str(item["observation_id"])
-            observation_ids.append(observation_id)
+            extraction_id = str(item["extraction_id"])
+            extraction_ids.append(extraction_id)
             body = str(item["body_markdown"])
             filename = f"observation-{index:04d}.md"
             (observations_root / filename).write_text(body, encoding="utf-8")
             prompt_observations.append(
                 MemoryMaintenanceObservation(
-                    observation_id=observation_id,
+                    extraction_id=extraction_id,
                     mounted_path=f"/memory/observations/{filename}",
                 )
             )
@@ -144,8 +146,8 @@ async def maintain_coordinated_memory_with_result(
             )
         completed = catalog_client.complete_maintenance(
             base_revision=base_revision,
-            observation_ids=observation_ids,
-            memory_version=memory_tree_reference,
+            extraction_ids=extraction_ids,
+            memory_tree_reference=memory_tree_reference,
             maintenance_transcript_reference=maintenance_transcript_reference,
         )
         if not completed:

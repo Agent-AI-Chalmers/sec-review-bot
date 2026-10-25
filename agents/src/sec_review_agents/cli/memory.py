@@ -199,7 +199,7 @@ def _print_observation_rows(
             row.path,
             memory_store_dir=memory_store_dir,
         )
-        print(f"{row.observation_id}\t{row.status}\t{row.updated_at}\t{display_path}")
+        print(f"{row.extraction_id}\t{row.status}\t{row.updated_at}\t{display_path}")
 
 
 def _run_list_observations(args: argparse.Namespace) -> int:

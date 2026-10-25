@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 from urllib.error import HTTPError, URLError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from sec_review_agents.artifacts.reference import ArtifactReference
@@ -57,35 +58,40 @@ class MemoryCatalogClient:
             raise RuntimeError("Memory catalog returned a non-object response.")
         return value
 
-    def register_observation(
+    def register_extraction(
         self,
         *,
-        observation_id: str,
+        extraction_id: str,
         source_workflow: str,
         source_run_id: str,
         source_review_unit_id: str,
-        transcript_digest: str,
-        body_markdown: str,
-        extraction_transcript_reference: ArtifactReference,
+        diagnostic_bundle_digest: str,
+        transcript_reference: ArtifactReference,
+        observation_markdown: str | None,
     ) -> bool:
         value = self._request(
             "POST",
-            "/v1/observations",
+            "/v1/extractions",
             {
-                "observation_id": observation_id,
+                "extraction_id": extraction_id,
                 "source_workflow": source_workflow,
                 "source_run_id": source_run_id,
                 "source_review_unit_id": source_review_unit_id,
-                "transcript_digest": transcript_digest,
-                "body_markdown": body_markdown,
-                "extraction_transcript_reference": (
-                    extraction_transcript_reference.as_dict()
+                "diagnostic_bundle_digest": diagnostic_bundle_digest,
+                "transcript_reference": transcript_reference.as_dict(),
+                "observation": (
+                    {"body_markdown": observation_markdown}
+                    if observation_markdown is not None
+                    else None
                 ),
             },
         )
         if value.get("ok") is not True:
-            raise RuntimeError("Memory catalog did not accept the observation.")
+            raise RuntimeError("Memory catalog did not accept the extraction.")
         return value.get("created") is True
+
+    def get_extraction(self, extraction_id: str) -> dict[str, Any]:
+        return self._request("GET", f"/v1/extractions/{quote(extraction_id, safe='')}")
 
     def pending_observation_summary(self) -> dict[str, Any]:
         return self._request("GET", "/v1/observations/pending-summary")
@@ -107,8 +113,8 @@ class MemoryCatalogClient:
         self,
         *,
         base_revision: int,
-        observation_ids: list[str],
-        memory_version: ArtifactReference,
+        extraction_ids: list[str],
+        memory_tree_reference: ArtifactReference,
         maintenance_transcript_reference: ArtifactReference,
     ) -> bool:
         value = self._request(
@@ -116,8 +122,8 @@ class MemoryCatalogClient:
             "/v1/maintenance/complete",
             {
                 "base_revision": base_revision,
-                "observation_ids": observation_ids,
-                "memory_version": memory_version.as_dict(),
+                "extraction_ids": extraction_ids,
+                "memory_tree_reference": memory_tree_reference.as_dict(),
                 "maintenance_transcript_reference": (
                     maintenance_transcript_reference.as_dict()
                 ),
@@ -125,8 +131,8 @@ class MemoryCatalogClient:
         )
         return value.get("completed") is True
 
-    def active_version(self) -> dict[str, Any]:
-        return self._request("GET", "/v1/active-version")
+    def active_revision(self) -> dict[str, Any]:
+        return self._request("GET", "/v1/active-revision")
 
     def get_revision(self, revision: int) -> dict[str, Any]:
         return self._request("GET", f"/v1/revisions/{revision}")

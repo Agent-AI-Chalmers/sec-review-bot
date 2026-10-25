@@ -52,7 +52,7 @@ def memory_tree_artifact_s3_key(digest: str) -> str:
         raise ValueError(
             "Memory tree artifact key requires a lowercase SHA-256 digest."
         )
-    return f"memory/versions/{sha256}/{MEMORY_TREE_ARTIFACT_FILENAME}"
+    return f"memory/trees/{sha256}/{MEMORY_TREE_ARTIFACT_FILENAME}"
 
 
 def build_memory_tree_artifact(

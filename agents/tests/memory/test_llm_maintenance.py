@@ -24,23 +24,23 @@ MAINTENANCE_PROBE = llm_probe(
 )
 
 
-def _fetch_observations_by_ids(connection, observation_ids: list[str]):
-    if not observation_ids:
+def _fetch_observations_by_extraction_ids(connection, extraction_ids: list[str]):
+    if not extraction_ids:
         return []
-    placeholders = ",".join("?" for _ in observation_ids)
+    placeholders = ",".join("?" for _ in extraction_ids)
     rows = connection.execute(
         f"""
         select
-          observation_id,
+          extraction_id,
           path,
           status,
           created_at,
           updated_at
         from observations
-        where observation_id in ({placeholders})
-        order by created_at asc, observation_id asc
+        where extraction_id in ({placeholders})
+        order by created_at asc, extraction_id asc
         """,
-        observation_ids,
+        extraction_ids,
     ).fetchall()
     from sec_review_agents.memory.local_state import ObservationRow
 
@@ -116,7 +116,7 @@ async def test_llm_maintenance_reorganizes_messy_memory_without_transcripts() ->
     with open_memory_state(memory_root) as connection:
         upsert_observation(
             connection,
-            observation_id="maintenance-probe",
+            extraction_id="maintenance-probe",
             path=str(observation),
             status=OBSERVATION_STATUS_PENDING,
         )
@@ -157,5 +157,5 @@ async def test_llm_maintenance_reorganizes_messy_memory_without_transcripts() ->
     assert "confidence" in topic_text.lower()
     assert observation.exists()
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["maintenance-probe"])
+        rows = _fetch_observations_by_extraction_ids(connection, ["maintenance-probe"])
     assert rows[0].status == "processed"

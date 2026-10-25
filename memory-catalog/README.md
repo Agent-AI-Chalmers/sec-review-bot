@@ -2,18 +2,19 @@
 
 Language: English | [中文](README.zh.md)
 
-`memory-catalog/` exposes the HTTP API that coordinates observation processing and memory tree revision commits. Coordination state is stored in PostgreSQL. Workers publish immutable memory trees and compressed memory-agent transcripts to object storage, and the catalog stores their artifact references.
+`memory-catalog/` exposes the HTTP API that records completed memory extractions, coordinates observation processing, and commits memory tree revisions. Coordination state is stored in PostgreSQL. Workers publish immutable memory trees and compressed memory-agent transcripts to object storage, and the catalog stores their artifact references.
 
 ## API
 
 | Method | Path                               | Purpose                                                                                                |
 | ------ | ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | `GET`  | `/healthz`                         | Report service health.                                                                                 |
-| `POST` | `/v1/observations`                 | Register an observation or replay an identical registration.                                           |
+| `POST` | `/v1/extractions`                  | Atomically register a completed extraction, its transcript reference, and its optional observation.    |
+| `GET`  | `/v1/extractions/{extraction_id}`  | Return one extraction, its transcript reference, and its optional observation.                         |
 | `GET`  | `/v1/observations/pending-summary` | Return the count and oldest age of pending observations.                                               |
 | `POST` | `/v1/maintenance/batches/select`   | Select a bounded observation batch against the active revision.                                        |
 | `POST` | `/v1/maintenance/complete`         | Commit a new memory tree revision with compare-and-swap and mark its source observations as processed. |
-| `GET`  | `/v1/active-version`               | Return the artifact reference for the active memory tree.                                              |
+| `GET`  | `/v1/active-revision`              | Return the active revision and its memory tree reference.                                              |
 | `GET`  | `/v1/revisions`                    | List memory tree revision history.                                                                     |
 | `GET`  | `/v1/revisions/{revision}`         | Return one revision and its maintenance transcript reference.                                          |
 

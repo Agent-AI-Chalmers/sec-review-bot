@@ -34,15 +34,15 @@ def _reference() -> ArtifactReference:
 
 def test_extraction_workflow_id_is_stable_per_transcript_unit() -> None:
     first = memory_extraction_workflow_id(
-        transcript_digest=_reference().digest,
+        diagnostic_bundle_digest=_reference().digest,
         review_unit_id="case-a",
     )
     assert first == memory_extraction_workflow_id(
-        transcript_digest=_reference().digest,
+        diagnostic_bundle_digest=_reference().digest,
         review_unit_id="case-a",
     )
     assert first != memory_extraction_workflow_id(
-        transcript_digest=_reference().digest,
+        diagnostic_bundle_digest=_reference().digest,
         review_unit_id="case-b",
     )
 
@@ -75,7 +75,7 @@ async def test_coordinated_extraction_registers_observation_with_provenance(
     transcript.write_text("{}\n", encoding="utf-8")
     client = Mock()
     preview = SimpleNamespace(
-        observation_id="observation-1",
+        extraction_id="observation-1",
         observation_markdown="Remember this.",
         skipped=False,
         summary="Produced observation.",
@@ -114,20 +114,83 @@ async def test_coordinated_extraction_registers_observation_with_provenance(
 
     result = await run_memory_extraction(request)
 
-    assert result["observation_id"] == "observation-1"
-    client.register_observation.assert_called_once_with(
-        observation_id="observation-1",
+    assert result["extraction_id"] == memory_extraction_workflow_id(
+        diagnostic_bundle_digest=_reference().digest,
+        review_unit_id="review",
+    )
+    assert result["observation_produced"] is True
+    client.register_extraction.assert_called_once_with(
+        extraction_id=result["extraction_id"],
         source_workflow="issue-review",
         source_run_id="run-1",
         source_review_unit_id="review",
-        transcript_digest=_reference().digest,
-        body_markdown="Remember this.",
-        extraction_transcript_reference=extraction_transcript,
+        diagnostic_bundle_digest=_reference().digest,
+        transcript_reference=extraction_transcript,
+        observation_markdown="Remember this.",
     )
 
 
 @pytest.mark.asyncio
-async def test_catalog_observation_conflict_is_not_retried(monkeypatch) -> None:
+async def test_coordinated_extraction_registers_no_observation_outcome(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    transcript = tmp_path / "transcript.jsonl"
+    transcript.write_text("{}\n", encoding="utf-8")
+    client = Mock()
+    preview = SimpleNamespace(
+        extraction_id="ignored-preview-id",
+        observation_markdown=None,
+        skipped=True,
+        summary="No durable memory observation produced.",
+        agent_transcript_path=tmp_path / "memory-extractor.jsonl",
+    )
+    transcript_reference = ArtifactReference(
+        uri="s3://sec-review/memory/transcripts/memory-extractor/transcript.v1.jsonl.zst",
+        digest=f"sha256:{'b' * 64}",
+        media_type="application/zstd",
+        size_bytes=10,
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        lambda: client,
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.run_diagnostics.bundle.materialize_diagnostic_transcript_unit",
+        lambda *_args, **_kwargs: SimpleNamespace(transcript_paths=(transcript,)),
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.memory.extractor.preview_memory_observation_from_paths",
+        AsyncMock(return_value=preview),
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.memory.transcript_artifact.publish_memory_agent_transcript",
+        lambda **_kwargs: transcript_reference,
+    )
+    request = MemoryExtractionRequest(
+        source_workflow="issue-review",
+        run_id="run-1",
+        review_unit_id="review",
+        diagnostic_bundle=_reference().as_dict(),
+        timeout_seconds=30,
+    )
+
+    result = await run_memory_extraction(request)
+
+    assert result["observation_produced"] is False
+    client.register_extraction.assert_called_once_with(
+        extraction_id=result["extraction_id"],
+        source_workflow="issue-review",
+        source_run_id="run-1",
+        source_review_unit_id="review",
+        diagnostic_bundle_digest=_reference().digest,
+        transcript_reference=transcript_reference,
+        observation_markdown=None,
+    )
+
+
+@pytest.mark.asyncio
+async def test_catalog_extraction_conflict_is_not_retried(monkeypatch) -> None:
     from temporalio.exceptions import ApplicationError
 
     from sec_review_agents.memory.catalog_client import MemoryCatalogConflictError
@@ -136,7 +199,7 @@ async def test_catalog_observation_conflict_is_not_retried(monkeypatch) -> None:
     )
 
     async def conflict(_request):
-        raise MemoryCatalogConflictError("observation content differs")
+        raise MemoryCatalogConflictError("extraction content differs")
 
     monkeypatch.setattr(extraction_workflow, "run_memory_extraction", conflict)
     request = MemoryExtractionRequest(
@@ -150,7 +213,7 @@ async def test_catalog_observation_conflict_is_not_retried(monkeypatch) -> None:
     with pytest.raises(ApplicationError) as captured:
         await run_memory_extraction_activity(request)
 
-    assert captured.value.type == "MEMORY_CATALOG_OBSERVATION_CONFLICT"
+    assert captured.value.type == "MEMORY_CATALOG_EXTRACTION_CONFLICT"
     assert captured.value.non_retryable is True
 
 

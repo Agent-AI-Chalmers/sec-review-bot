@@ -99,8 +99,8 @@ def materialize_configured_memory_view() -> Path | None:
 
     catalog_client = configured_memory_catalog_client()
     if catalog_client is not None:
-        active = catalog_client.active_version()
-        raw_reference = active.get("artifact_reference")
+        active = catalog_client.active_revision()
+        raw_reference = active.get("memory_tree_reference")
         if raw_reference is None:
             return None
         reference = ArtifactReference.from_mapping(raw_reference)

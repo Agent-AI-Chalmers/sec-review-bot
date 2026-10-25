@@ -22,7 +22,7 @@ from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.memory.local_state import (
     OBSERVATION_STATUS_PENDING,
     OBSERVATION_STATUS_PROCESSED,
-    fetch_observation_by_id,
+    fetch_observation_by_extraction_id,
     open_memory_state,
     upsert_observation,
 )
@@ -89,19 +89,19 @@ class MemoryObservationResult:
 class MemoryObservationPreviewResult:
     """Outcome of extraction before any observation is published."""
 
-    observation_id: str
+    extraction_id: str
     skipped: bool
     summary: str
     observation_markdown: str | None = None
     agent_transcript_path: Path | None = None
 
 
-def observation_id(
+def extraction_id(
     transcript_paths: list[Path],
     *,
     job_id: str | None = None,
 ) -> str:
-    """Derive a filesystem-safe observation ID from a job ID or transcript paths."""
+    """Derive a filesystem-safe extraction ID from a job ID or transcript paths."""
     if job_id:
         return slug_filename_component(job_id, fallback="transcript")
 
@@ -112,16 +112,16 @@ def observation_id(
     return f"transcripts-{hasher.hexdigest()[:16]}"
 
 
-def resolve_observation_id(
+def resolve_extraction_id(
     transcript_refs: list[TranscriptRef],
     *,
-    explicit_observation_id: str | None,
+    explicit_extraction_id: str | None,
     job_id: str | None,
 ) -> str:
     """Resolve the final ID, giving an explicit operator value highest priority."""
-    if explicit_observation_id:
-        return slug_filename_component(explicit_observation_id, fallback="transcript")
-    return observation_id([ref.path for ref in transcript_refs], job_id=job_id)
+    if explicit_extraction_id:
+        return slug_filename_component(explicit_extraction_id, fallback="transcript")
+    return extraction_id([ref.path for ref in transcript_refs], job_id=job_id)
 
 
 def collect_review_memory_transcripts(
@@ -248,7 +248,7 @@ async def _generate_memory_observation_for_refs(
     transcript_refs: list[TranscriptRef],
     *,
     deployment: str | None,
-    resolved_observation_id: str,
+    resolved_extraction_id: str,
     source_workflow: str | None,
     run_id: str | None,
     agent_transcript_root: Path | None,
@@ -272,7 +272,7 @@ async def _generate_memory_observation_for_refs(
                 memory_agent_transcript_path(
                     agent_transcript_root,
                     agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
-                    run_label=resolved_observation_id,
+                    run_label=resolved_extraction_id,
                 )
                 if agent_transcript_root is not None
                 else None
@@ -294,14 +294,14 @@ async def _generate_memory_observation_for_refs(
         ).strip()
         if not structured_result.get("has_observation") or not observation_body:
             return MemoryObservationPreviewResult(
-                observation_id=resolved_observation_id,
+                extraction_id=resolved_extraction_id,
                 skipped=True,
                 summary="No durable memory observation produced.",
                 agent_transcript_path=agent_transcript_path,
             )
 
         return MemoryObservationPreviewResult(
-            observation_id=resolved_observation_id,
+            extraction_id=resolved_extraction_id,
             skipped=False,
             summary="Durable memory observation produced.",
             agent_transcript_path=agent_transcript_path,
@@ -317,17 +317,17 @@ async def _generate_memory_observation_for_refs(
 def _publish_observation(
     *,
     memory_root: Path,
-    observation_id_value: str,
+    extraction_id_value: str,
     content: str,
 ) -> Path:
     observations_root = memory_observations_dir(memory_root)
     observations_root.mkdir(parents=True, exist_ok=True)
-    target = observations_root / f"{observation_id_value}.md"
+    target = observations_root / f"{extraction_id_value}.md"
     with tempfile.NamedTemporaryFile(
         "w",
         encoding="utf-8",
         dir=observations_root,
-        prefix=f".{observation_id_value}.",
+        prefix=f".{extraction_id_value}.",
         suffix=".tmp",
         delete=False,
     ) as temp_file:
@@ -342,12 +342,14 @@ async def _extract_memory_observation_for_refs(
     *,
     memory_root: Path,
     deployment: str | None = None,
-    resolved_observation_id: str,
+    resolved_extraction_id: str,
     source_workflow: str | None = None,
     run_id: str | None = None,
 ) -> MemoryObservationResult:
     with open_memory_state(memory_root) as connection:
-        existing = fetch_observation_by_id(connection, resolved_observation_id)
+        existing = fetch_observation_by_extraction_id(
+            connection, resolved_extraction_id
+        )
     if existing is not None and existing.status == OBSERVATION_STATUS_PROCESSED:
         return MemoryObservationResult(
             skipped=True,
@@ -358,7 +360,7 @@ async def _extract_memory_observation_for_refs(
     preview = await _generate_memory_observation_for_refs(
         transcript_refs,
         deployment=deployment,
-        resolved_observation_id=resolved_observation_id,
+        resolved_extraction_id=resolved_extraction_id,
         source_workflow=source_workflow,
         run_id=run_id,
         agent_transcript_root=memory_root,
@@ -368,7 +370,9 @@ async def _extract_memory_observation_for_refs(
 
     with memory_store_lock(memory_root, exclusive=True):
         with open_memory_state(memory_root) as connection:
-            existing = fetch_observation_by_id(connection, resolved_observation_id)
+            existing = fetch_observation_by_extraction_id(
+                connection, resolved_extraction_id
+            )
         if existing is not None and existing.status == OBSERVATION_STATUS_PROCESSED:
             return MemoryObservationResult(
                 skipped=True,
@@ -380,13 +384,13 @@ async def _extract_memory_observation_for_refs(
             )
         observation_path = _publish_observation(
             memory_root=memory_root,
-            observation_id_value=resolved_observation_id,
+            extraction_id_value=resolved_extraction_id,
             content=preview.observation_markdown,
         )
         with open_memory_state(memory_root) as connection:
             upsert_observation(
                 connection,
-                observation_id=resolved_observation_id,
+                extraction_id=resolved_extraction_id,
                 path=str(observation_path),
                 status=OBSERVATION_STATUS_PENDING,
             )
@@ -402,7 +406,7 @@ async def preview_memory_observation_from_paths(
     transcript_paths: list[Path],
     *,
     deployment: str | None = None,
-    observation_id_value: str | None = None,
+    extraction_id_value: str | None = None,
     job_id: str | None = None,
     source_workflow: str | None = None,
     run_id: str | None = None,
@@ -418,21 +422,21 @@ async def preview_memory_observation_from_paths(
     is persisted there.
     """
     transcript_refs = collect_transcript_refs(transcript_paths)
-    resolved_observation_id = resolve_observation_id(
+    resolved_extraction_id = resolve_extraction_id(
         transcript_refs,
-        explicit_observation_id=observation_id_value,
+        explicit_extraction_id=extraction_id_value,
         job_id=job_id,
     )
     if not transcript_refs:
         return MemoryObservationPreviewResult(
-            observation_id=resolved_observation_id,
+            extraction_id=resolved_extraction_id,
             skipped=True,
             summary="No transcript files found.",
         )
     return await _generate_memory_observation_for_refs(
         transcript_refs,
         deployment=deployment,
-        resolved_observation_id=resolved_observation_id,
+        resolved_extraction_id=resolved_extraction_id,
         source_workflow=source_workflow,
         run_id=run_id,
         agent_transcript_root=agent_transcript_root,
@@ -444,7 +448,7 @@ async def extract_memory_observations_from_paths(
     *,
     memory_store_dir: Path | None = None,
     deployment: str | None = None,
-    observation_id_value: str | None = None,
+    extraction_id_value: str | None = None,
     job_id: str | None = None,
     source_workflow: str | None = None,
     run_id: str | None = None,
@@ -468,9 +472,9 @@ async def extract_memory_observations_from_paths(
         transcript_refs,
         memory_root=memory_store_dir,
         deployment=deployment,
-        resolved_observation_id=resolve_observation_id(
+        resolved_extraction_id=resolve_extraction_id(
             transcript_refs,
-            explicit_observation_id=observation_id_value,
+            explicit_extraction_id=extraction_id_value,
             job_id=job_id,
         ),
         source_workflow=source_workflow,
@@ -487,8 +491,8 @@ __all__ = [
     "collect_review_memory_transcripts",
     "collect_transcript_refs",
     "extract_memory_observations_from_paths",
-    "observation_id",
+    "extraction_id",
     "preview_memory_observation_from_paths",
-    "resolve_observation_id",
+    "resolve_extraction_id",
     "stage_transcripts",
 ]

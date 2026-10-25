@@ -42,7 +42,7 @@ async def schedule_memory_extractions(
     digest = str(diagnostic_bundle["digest"])
     for review_unit_id in review_unit_ids:
         extraction_id = memory_extraction_workflow_id(
-            transcript_digest=digest,
+            diagnostic_bundle_digest=digest,
             review_unit_id=review_unit_id,
         )
         extraction = {

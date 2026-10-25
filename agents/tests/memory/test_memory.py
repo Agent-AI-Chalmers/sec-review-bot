@@ -4,6 +4,7 @@ import contextlib
 import fcntl
 import json
 import os
+import sqlite3
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -72,27 +73,79 @@ def _stub_memory_agent_model(monkeypatch) -> None:
     )
 
 
-def _fetch_observations_by_ids(connection, observation_ids: list[str]):
-    if not observation_ids:
+def _fetch_observations_by_extraction_ids(connection, extraction_ids: list[str]):
+    if not extraction_ids:
         return []
-    placeholders = ",".join("?" for _ in observation_ids)
+    placeholders = ",".join("?" for _ in extraction_ids)
     rows = connection.execute(
         f"""
         select
-          observation_id,
+          extraction_id,
           path,
           status,
           created_at,
           updated_at
         from observations
-        where observation_id in ({placeholders})
-        order by created_at asc, observation_id asc
+        where extraction_id in ({placeholders})
+        order by created_at asc, extraction_id asc
         """,
-        observation_ids,
+        extraction_ids,
     ).fetchall()
     from sec_review_agents.memory.local_state import ObservationRow
 
     return [ObservationRow(*row) for row in rows]
+
+
+def test_local_state_migrates_pre_extraction_identity_schema(tmp_path: Path) -> None:
+    memory_root = tmp_path / "memory"
+    memory_root.mkdir()
+    state_path = memory_root / "memory_state.sqlite"
+    with sqlite3.connect(state_path) as connection:
+        connection.execute("""create table observations (
+                observation_id text primary key,
+                path text not null,
+                status text not null,
+                created_at text not null,
+                updated_at text not null
+            )""")
+        connection.execute(
+            "insert into observations values (?, ?, ?, ?, ?)",
+            ("legacy-id", "observations/legacy.md", "pending", "created", "updated"),
+        )
+
+    memory_store.initialize_memory_store(memory_root)
+
+    with sqlite3.connect(state_path) as connection:
+        row = connection.execute(
+            "select extraction_id, path from observations where extraction_id = ?",
+            ("legacy-id",),
+        ).fetchone()
+        schema_version = connection.execute("pragma user_version").fetchone()[0]
+
+    assert tuple(row) == ("legacy-id", "observations/legacy.md")
+    assert schema_version == 2
+
+
+def test_local_state_rejects_unknown_observation_schema(tmp_path: Path) -> None:
+    memory_root = tmp_path / "memory"
+    memory_root.mkdir()
+    state_path = memory_root / "memory_state.sqlite"
+    with sqlite3.connect(state_path) as connection:
+        connection.execute("create table observations (unknown_id text primary key)")
+
+    with pytest.raises(RuntimeError, match="unknown observations schema"):
+        memory_store.initialize_memory_store(memory_root)
+
+
+def test_local_state_rejects_newer_schema_version(tmp_path: Path) -> None:
+    memory_root = tmp_path / "memory"
+    memory_root.mkdir()
+    state_path = memory_root / "memory_state.sqlite"
+    with sqlite3.connect(state_path) as connection:
+        connection.execute("pragma user_version=3")
+
+    with pytest.raises(RuntimeError, match="newer schema version: 3 > 2"):
+        memory_store.initialize_memory_store(memory_root)
 
 
 def _memory_content_dir(memory_store_dir: Path) -> Path:
@@ -728,7 +781,7 @@ def test_materialize_configured_memory_view_locks_source_during_snapshot(
     assert lock_calls == [(memory_root.resolve(), False)]
 
 
-def test_materialize_coordinated_active_memory_by_digest(
+def test_materialize_coordinated_active_memory_tree_reference_by_digest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -738,14 +791,14 @@ def test_materialize_coordinated_active_memory_by_digest(
     monkeypatch.setenv(AGENT_MEMORY_DIR_ENV, str(local_memory))
     monkeypatch.setenv(AGENT_MEMORY_MATERIALIZED_ROOT_ENV, str(materialized_root))
     reference = ArtifactReference(
-        uri=f"s3://sec-review/memory/versions/{'a' * 64}/memory-tree.v1.tar.zst",
+        uri=f"s3://sec-review/memory/trees/{'a' * 64}/memory-tree.v1.tar.zst",
         digest=f"sha256:{'a' * 64}",
         media_type="application/tar+zstd",
         size_bytes=42,
     )
     catalog_client = Mock(
-        active_version=Mock(
-            return_value={"revision": 3, "artifact_reference": reference.as_dict()}
+        active_revision=Mock(
+            return_value={"revision": 3, "memory_tree_reference": reference.as_dict()}
         )
     )
     materialize_calls: list[tuple[ArtifactReference, Path]] = []
@@ -781,14 +834,16 @@ def test_materialize_coordinated_active_memory_by_digest(
     assert materialize_calls == [(reference, expected.parent)]
 
 
-def test_coordinated_memory_without_active_version_does_not_fall_back_locally(
+def test_coordinated_memory_without_active_revision_does_not_fall_back_locally(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     local_memory = memory_store.initialize_memory_store(tmp_path / "local-memory")
     monkeypatch.setenv(AGENT_MEMORY_DIR_ENV, str(local_memory))
     catalog_client = Mock(
-        active_version=Mock(return_value={"revision": 0, "artifact_reference": None})
+        active_revision=Mock(
+            return_value={"revision": 0, "memory_tree_reference": None}
+        )
     )
 
     with patch(
@@ -862,9 +917,9 @@ async def test_analysis_agent_enables_memory_when_runtime_memory_exists(
     assert any(isinstance(item, MemoryMiddleware) for item in captured_middleware)
 
 
-def test_observation_id_slugs_job_id() -> None:
+def test_extraction_id_slugs_job_id() -> None:
     assert (
-        memory_extraction.observation_id(
+        memory_extraction.extraction_id(
             [Path("/tmp/a.json")],
             job_id="Issue Review-run-1",
         )
@@ -872,28 +927,26 @@ def test_observation_id_slugs_job_id() -> None:
     )
 
 
-def test_observation_id_falls_back_to_transcript_hash() -> None:
-    obs_id = memory_extraction.observation_id(
-        [Path("/tmp/a.json"), Path("/tmp/b.json")]
-    )
+def test_extraction_id_falls_back_to_transcript_hash() -> None:
+    obs_id = memory_extraction.extraction_id([Path("/tmp/a.json"), Path("/tmp/b.json")])
 
     assert obs_id.startswith("transcripts-")
     assert len(obs_id) == len("transcripts-") + 16
 
 
-def test_observation_id_distinguishes_extraction_jobs() -> None:
+def test_extraction_id_distinguishes_extraction_jobs() -> None:
     # The workflow layer owns uniqueness: it builds one job_id per case, so the
-    # memory layer only slugs the opaque job_id into the observation id.
+    # The memory layer only slugs the opaque job_id into the extraction id.
     assert (
-        memory_extraction.observation_id(
+        memory_extraction.extraction_id(
             [Path("/tmp/case.json")],
             job_id="repository-review-run-1-case-a",
         )
         == "repository-review-run-1-case-a"
     )
-    assert memory_extraction.observation_id(
+    assert memory_extraction.extraction_id(
         [Path("/tmp/case.json")], job_id="repository-review-run-1-case-b"
-    ) != memory_extraction.observation_id(
+    ) != memory_extraction.extraction_id(
         [Path("/tmp/case.json")], job_id="repository-review-run-1-case-a"
     )
 
@@ -956,7 +1009,7 @@ async def test_extract_memory_observations_writes_observation_and_pending_state(
     from sec_review_agents.memory.local_state import open_memory_state
 
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["issue-review-run-1"])
+        rows = _fetch_observations_by_extraction_ids(connection, ["issue-review-run-1"])
     assert rows[0].status == "pending"
     assert rows[0].path == str(result.observation_path)
 
@@ -985,12 +1038,12 @@ async def test_extract_memory_observations_repeated_id_updates_pending_row(
         first = await memory_extraction.extract_memory_observations_from_paths(
             [transcript.parent.parent],
             memory_store_dir=memory_root,
-            observation_id_value="same-run",
+            extraction_id_value="same-run",
         )
         second = await memory_extraction.extract_memory_observations_from_paths(
             [transcript.parent.parent],
             memory_store_dir=memory_root,
-            observation_id_value="same-run",
+            extraction_id_value="same-run",
         )
 
     assert first.observation_path == second.observation_path
@@ -1002,13 +1055,13 @@ async def test_extract_memory_observations_repeated_id_updates_pending_row(
     from sec_review_agents.memory.local_state import open_memory_state
 
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["same-run"])
+        rows = _fetch_observations_by_extraction_ids(connection, ["same-run"])
     assert len(rows) == 1
     assert rows[0].status == "pending"
 
 
 @pytest.mark.asyncio
-async def test_extract_memory_observations_sanitizes_explicit_observation_id(
+async def test_extract_memory_observations_sanitizes_explicit_extraction_id(
     tmp_path: Path,
 ) -> None:
     memory_root = tmp_path / "memory"
@@ -1030,11 +1083,11 @@ async def test_extract_memory_observations_sanitizes_explicit_observation_id(
         result = await memory_extraction.extract_memory_observations_from_paths(
             [transcript.parent.parent],
             memory_store_dir=memory_root,
-            observation_id_value="../Unsafe/Observation ID",
+            extraction_id_value="../Unsafe/Extraction ID",
         )
 
     assert result.observation_path == (
-        _memory_observations_dir(memory_root) / "unsafe-observation-id.md"
+        _memory_observations_dir(memory_root) / "unsafe-extraction-id.md"
     )
     assert result.observation_path is not None
     assert result.observation_path.is_file()
@@ -1044,7 +1097,9 @@ async def test_extract_memory_observations_sanitizes_explicit_observation_id(
     from sec_review_agents.memory.local_state import open_memory_state
 
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["unsafe-observation-id"])
+        rows = _fetch_observations_by_extraction_ids(
+            connection, ["unsafe-extraction-id"]
+        )
     assert len(rows) == 1
     assert rows[0].path == str(result.observation_path)
 
@@ -1070,7 +1125,7 @@ async def test_extract_memory_observations_skips_processed_observation_by_defaul
     with open_memory_state(memory_root) as connection:
         upsert_observation(
             connection,
-            observation_id="same-run",
+            extraction_id="same-run",
             path=str(observation),
             status="processed",
         )
@@ -1086,7 +1141,7 @@ async def test_extract_memory_observations_skips_processed_observation_by_defaul
         result = await memory_extraction.extract_memory_observations_from_paths(
             [transcript.parent.parent],
             memory_store_dir=memory_root,
-            observation_id_value="same-run",
+            extraction_id_value="same-run",
         )
 
     create_agent.assert_not_called()
@@ -1095,7 +1150,7 @@ async def test_extract_memory_observations_skips_processed_observation_by_defaul
     assert result.observation_paths == (observation,)
     assert observation.read_text(encoding="utf-8") == "Original durable lesson.\n"
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["same-run"])
+        rows = _fetch_observations_by_extraction_ids(connection, ["same-run"])
     assert rows[0].status == "processed"
 
 
@@ -1125,7 +1180,7 @@ async def test_extract_memory_observations_skips_publish_when_observation_proces
         with memory_extraction.open_memory_state(memory_root) as connection:
             memory_extraction.upsert_observation(
                 connection,
-                observation_id="same-run",
+                extraction_id="same-run",
                 path=str(observation),
                 status="processed",
             )
@@ -1148,7 +1203,7 @@ async def test_extract_memory_observations_skips_publish_when_observation_proces
         result = await memory_extraction.extract_memory_observations_from_paths(
             [transcript.parent.parent],
             memory_store_dir=memory_root,
-            observation_id_value="same-run",
+            extraction_id_value="same-run",
         )
 
     run_agent.assert_called_once()
@@ -1156,7 +1211,7 @@ async def test_extract_memory_observations_skips_publish_when_observation_proces
     assert result.observation_paths == (observation,)
     assert observation.read_text(encoding="utf-8") == "Maintained lesson.\n"
     with memory_extraction.open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["same-run"])
+        rows = _fetch_observations_by_extraction_ids(connection, ["same-run"])
     assert rows[0].status == "processed"
 
 
@@ -1175,7 +1230,7 @@ async def test_maintain_memory_marks_observations_processed(tmp_path: Path) -> N
     with open_memory_state(memory_root) as connection:
         upsert_observation(
             connection,
-            observation_id="issue-review-run-1",
+            extraction_id="issue-review-run-1",
             path=str(observation),
             status="pending",
         )
@@ -1210,7 +1265,7 @@ async def test_maintain_memory_marks_observations_processed(tmp_path: Path) -> N
     assert result.processed_count == 1
     assert observation.exists()
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["issue-review-run-1"])
+        rows = _fetch_observations_by_extraction_ids(connection, ["issue-review-run-1"])
     assert rows[0].status == "processed"
 
 
@@ -1228,12 +1283,12 @@ async def test_maintain_memory_selected_ids_limit_prompt_and_worktree(
     )
 
     with open_memory_state(memory_root) as connection:
-        for observation_id in ("first", "second", "unselected"):
-            path = observations_root / f"{observation_id}.md"
-            path.write_text(f"{observation_id} lesson.\n", encoding="utf-8")
+        for extraction_id in ("first", "second", "unselected"):
+            path = observations_root / f"{extraction_id}.md"
+            path.write_text(f"{extraction_id} lesson.\n", encoding="utf-8")
             upsert_observation(
                 connection,
-                observation_id=observation_id,
+                extraction_id=extraction_id,
                 path=str(path),
                 status="pending",
             )
@@ -1268,16 +1323,16 @@ async def test_maintain_memory_selected_ids_limit_prompt_and_worktree(
         result = await memory_maintenance.maintain_memory_with_result(
             memory_store_dir=memory_root,
             deployment="test-deployment",
-            observation_ids=["second", "first"],
+            extraction_ids=["second", "first"],
         )
 
     assert result.processed_count == 2
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(
+        rows = _fetch_observations_by_extraction_ids(
             connection,
             ["first", "second", "unselected"],
         )
-    statuses = {row.observation_id: row.status for row in rows}
+    statuses = {row.extraction_id: row.status for row in rows}
     assert statuses == {
         "first": "processed",
         "second": "processed",
@@ -1302,15 +1357,15 @@ async def test_maintain_memory_selected_ids_reject_unknown_or_processed(
     with open_memory_state(memory_root) as connection:
         upsert_observation(
             connection,
-            observation_id="processed",
+            extraction_id="processed",
             path=str(observation),
             status="processed",
         )
 
-    with pytest.raises(ValueError, match="Unknown memory observation ids: missing"):
+    with pytest.raises(ValueError, match="Unknown memory extraction ids: missing"):
         await memory_maintenance.maintain_memory_with_result(
             memory_store_dir=memory_root,
-            observation_ids=["missing"],
+            extraction_ids=["missing"],
         )
     with pytest.raises(
         ValueError,
@@ -1318,7 +1373,7 @@ async def test_maintain_memory_selected_ids_reject_unknown_or_processed(
     ):
         await memory_maintenance.maintain_memory_with_result(
             memory_store_dir=memory_root,
-            observation_ids=["processed"],
+            extraction_ids=["processed"],
         )
 
 
@@ -1336,7 +1391,7 @@ async def test_maintain_memory_empty_selected_ids_is_noop(tmp_path: Path) -> Non
     ):
         result = await memory_maintenance.maintain_memory_with_result(
             memory_store_dir=memory_root,
-            observation_ids=[],
+            extraction_ids=[],
         )
 
     assert result.processed_count == 0
@@ -1363,7 +1418,7 @@ async def test_maintain_memory_does_not_process_rewritten_observation(
     with open_memory_state(memory_root) as connection:
         upsert_observation(
             connection,
-            observation_id="same-run",
+            extraction_id="same-run",
             path=str(observation),
             status="pending",
         )
@@ -1373,7 +1428,7 @@ async def test_maintain_memory_does_not_process_rewritten_observation(
         with open_memory_state(memory_root) as connection:
             upsert_observation(
                 connection,
-                observation_id="same-run",
+                extraction_id="same-run",
                 path=str(observation),
                 status="pending",
             )
@@ -1397,7 +1452,7 @@ async def test_maintain_memory_does_not_process_rewritten_observation(
         observation.read_text(encoding="utf-8") == "New lesson from rerun extraction.\n"
     )
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["same-run"])
+        rows = _fetch_observations_by_extraction_ids(connection, ["same-run"])
     assert rows[0].status == "pending"
 
 
@@ -1423,7 +1478,7 @@ async def test_maintain_memory_updates_worktree_then_publishes_memory(
     with open_memory_state(memory_root) as connection:
         upsert_observation(
             connection,
-            observation_id="issue-review-run-1",
+            extraction_id="issue-review-run-1",
             path=str(observation),
             status="pending",
         )
@@ -1469,7 +1524,7 @@ async def test_maintain_memory_updates_worktree_then_publishes_memory(
     ) == ("new topic\n")
     assert observation.exists()
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["issue-review-run-1"])
+        rows = _fetch_observations_by_extraction_ids(connection, ["issue-review-run-1"])
     assert rows[0].status == "processed"
 
 
@@ -1494,7 +1549,7 @@ async def test_maintain_memory_summary_warns_when_index_exceeds_startup_cap(
     with open_memory_state(memory_root) as connection:
         upsert_observation(
             connection,
-            observation_id="issue-review-run-1",
+            extraction_id="issue-review-run-1",
             path=str(observation),
             status="pending",
         )
@@ -1556,7 +1611,7 @@ async def test_maintain_memory_releases_source_lock_while_agent_runs(
     with open_memory_state(memory_root) as connection:
         upsert_observation(
             connection,
-            observation_id="issue-review-run-1",
+            extraction_id="issue-review-run-1",
             path=str(observation),
             status="pending",
         )
@@ -1636,13 +1691,13 @@ async def test_maintain_memory_respects_batch_size(tmp_path: Path) -> None:
     with open_memory_state(memory_root) as connection:
         upsert_observation(
             connection,
-            observation_id="first",
+            extraction_id="first",
             path=str(first),
             status="pending",
         )
         upsert_observation(
             connection,
-            observation_id="second",
+            extraction_id="second",
             path=str(second),
             status="pending",
         )
@@ -1669,8 +1724,8 @@ async def test_maintain_memory_respects_batch_size(tmp_path: Path) -> None:
 
     assert result.processed_count == 1
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["first", "second"])
-    statuses = {row.observation_id: row.status for row in rows}
+        rows = _fetch_observations_by_extraction_ids(connection, ["first", "second"])
+    statuses = {row.extraction_id: row.status for row in rows}
     assert statuses == {"first": "processed", "second": "pending"}
 
 
@@ -1690,7 +1745,7 @@ async def test_maintain_memory_rejects_missing_pending_observation_file(
     with open_memory_state(memory_root) as connection:
         upsert_observation(
             connection,
-            observation_id="missing",
+            extraction_id="missing",
             path=str(missing),
             status="pending",
         )
@@ -1712,7 +1767,7 @@ async def test_maintain_memory_rejects_missing_pending_observation_file(
     create_agent.assert_not_called()
     run_agent.assert_not_called()
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["missing"])
+        rows = _fetch_observations_by_extraction_ids(connection, ["missing"])
     assert rows[0].status == "pending"
 
 
@@ -1733,7 +1788,7 @@ async def test_maintain_memory_leaves_observations_pending_on_exception(
     with open_memory_state(memory_root) as connection:
         upsert_observation(
             connection,
-            observation_id="issue-review-run-1",
+            extraction_id="issue-review-run-1",
             path=str(observation),
             status="pending",
         )
@@ -1759,7 +1814,7 @@ async def test_maintain_memory_leaves_observations_pending_on_exception(
 
     assert observation.exists()
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["issue-review-run-1"])
+        rows = _fetch_observations_by_extraction_ids(connection, ["issue-review-run-1"])
     assert rows[0].status == "pending"
 
 
@@ -1780,7 +1835,7 @@ async def test_maintain_memory_retries_pending_observation_after_failure(
     with open_memory_state(memory_root) as connection:
         upsert_observation(
             connection,
-            observation_id="issue-review-run-1",
+            extraction_id="issue-review-run-1",
             path=str(observation),
             status="pending",
         )
@@ -1823,7 +1878,7 @@ async def test_maintain_memory_retries_pending_observation_after_failure(
 
     assert result.processed_count == 1
     with open_memory_state(memory_root) as connection:
-        rows = _fetch_observations_by_ids(connection, ["issue-review-run-1"])
+        rows = _fetch_observations_by_extraction_ids(connection, ["issue-review-run-1"])
     assert rows[0].status == "processed"
 
 

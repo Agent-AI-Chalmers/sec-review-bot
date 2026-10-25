@@ -17,7 +17,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/observations": {
+    "/v1/extractions": {
         parameters: {
             query?: never;
             header?: never;
@@ -26,8 +26,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Register one durable memory observation or replay an identical registration. */
-        post: operations["registerObservation"];
+        /** @description Register one completed extraction and its optional observation, or replay identical content. */
+        post: operations["registerExtraction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/extractions/{extraction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Return one completed extraction, its transcript reference, and its optional observation. */
+        get: operations["getExtraction"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -41,7 +58,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Summarize observations that have not yet entered a memory version. */
+        /** @description Summarize observations that have not yet been consumed by a memory revision. */
         get: operations["pendingObservationSummary"];
         put?: never;
         post?: never;
@@ -77,7 +94,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Atomically publish a memory version and consume its source observations. */
+        /** @description Atomically publish a memory tree revision and consume its source observations. */
         post: operations["completeMaintenance"];
         delete?: never;
         options?: never;
@@ -85,15 +102,15 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/active-version": {
+    "/v1/active-revision": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** @description Return the currently active immutable memory version, if one exists. */
-        get: operations["activeVersion"];
+        /** @description Return the active revision and its memory tree artifact reference, if one exists. */
+        get: operations["activeRevision"];
         put?: never;
         post?: never;
         delete?: never;
@@ -146,19 +163,34 @@ export interface components {
             media_type: string;
             size_bytes: number;
         };
-        ObservationRegistration: {
-            observation_id: string;
+        ExtractionId: string;
+        ExtractionObservation: {
+            body_markdown: string;
+        };
+        ExtractionRegistration: {
+            extraction_id: components["schemas"]["ExtractionId"];
             source_workflow: string;
             source_run_id: string;
             source_review_unit_id: string;
-            transcript_digest: string;
-            body_markdown: string;
-            extraction_transcript_reference: components["schemas"]["ArtifactReference"];
+            diagnostic_bundle_digest: string;
+            transcript_reference: components["schemas"]["ArtifactReference"];
+            observation: components["schemas"]["ExtractionObservation"] | null;
         };
-        ObservationRegistrationResult: {
+        ExtractionRegistrationResult: {
             /** @constant */
             ok: true;
             created: boolean;
+        };
+        ExtractionRecord: {
+            extraction_id: components["schemas"]["ExtractionId"];
+            source_workflow: string;
+            source_run_id: string;
+            source_review_unit_id: string;
+            diagnostic_bundle_digest: string;
+            transcript_reference: components["schemas"]["ArtifactReference"];
+            observation: components["schemas"]["ExtractionObservation"] | null;
+            /** Format: date-time */
+            created_at: string;
         };
         PendingObservationSummary: {
             pending_count: number;
@@ -169,12 +201,12 @@ export interface components {
             limit: number;
         };
         MaintenanceObservation: {
-            observation_id: string;
+            extraction_id: components["schemas"]["ExtractionId"];
             body_markdown: string;
         };
         MaintenanceBatch: {
             base_revision: number;
-            active_memory: components["schemas"]["ArtifactReference"] | null;
+            active_memory_tree_reference: components["schemas"]["ArtifactReference"] | null;
             observations: components["schemas"]["MaintenanceObservation"][];
         };
         MaintenanceBatchResult: {
@@ -182,20 +214,20 @@ export interface components {
         };
         MaintenanceCompletion: {
             base_revision: number;
-            observation_ids: string[];
-            memory_version: components["schemas"]["ArtifactReference"];
+            extraction_ids: components["schemas"]["ExtractionId"][];
+            memory_tree_reference: components["schemas"]["ArtifactReference"];
             maintenance_transcript_reference: components["schemas"]["ArtifactReference"];
         };
         MaintenanceCompletionResult: {
             completed: boolean;
         };
-        ActiveVersion: {
+        ActiveRevision: {
             revision: number;
-            artifact_reference: components["schemas"]["ArtifactReference"] | null;
+            memory_tree_reference: components["schemas"]["ArtifactReference"] | null;
         };
         MemoryRevision: {
             revision: number;
-            artifact_reference: components["schemas"]["ArtifactReference"];
+            memory_tree_reference: components["schemas"]["ArtifactReference"];
             maintenance_transcript_reference: components["schemas"]["ArtifactReference"];
             /** Format: date-time */
             created_at: string;
@@ -233,7 +265,7 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
-        /** @description The observation identity already exists with different content. */
+        /** @description The extraction identity already exists with different content. */
         Conflict: {
             headers: {
                 [name: string]: unknown;
@@ -298,7 +330,7 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
-    registerObservation: {
+    registerExtraction: {
         parameters: {
             query?: never;
             header?: never;
@@ -307,23 +339,49 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ObservationRegistration"];
+                "application/json": components["schemas"]["ExtractionRegistration"];
             };
         };
         responses: {
-            /** @description Observation accepted or identically replayed. */
+            /** @description Extraction accepted or identically replayed. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ObservationRegistrationResult"];
+                    "application/json": components["schemas"]["ExtractionRegistrationResult"];
                 };
             };
             400: components["responses"]["InvalidBody"];
             401: components["responses"]["Unauthorized"];
             409: components["responses"]["Conflict"];
             413: components["responses"]["PayloadTooLarge"];
+            500: components["responses"]["InternalError"];
+        };
+    };
+    getExtraction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                extraction_id: components["schemas"]["ExtractionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The requested extraction. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtractionRecord"];
+                };
+            };
+            400: components["responses"]["InvalidBody"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
             500: components["responses"]["InternalError"];
         };
     };
@@ -405,7 +463,7 @@ export interface operations {
             500: components["responses"]["InternalError"];
         };
     };
-    activeVersion: {
+    activeRevision: {
         parameters: {
             query?: never;
             header?: never;
@@ -414,13 +472,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Current active immutable memory version. */
+            /** @description Current active revision and memory tree artifact reference. */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ActiveVersion"];
+                    "application/json": components["schemas"]["ActiveRevision"];
                 };
             };
             401: components["responses"]["Unauthorized"];

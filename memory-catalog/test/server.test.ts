@@ -2,13 +2,13 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import type { MemoryCatalogStore } from '../src/catalog-store.js'
-import { ObservationConflictError } from '../src/catalog-store.js'
+import { ExtractionConflictError } from '../src/catalog-store.js'
 import { createApp } from '../src/server.js'
 
 const revision = {
   revision: 1,
-  artifact_reference: {
-    uri: 's3://sec-review/memory/versions/1.tar.zst',
+  memory_tree_reference: {
+    uri: 's3://sec-review/memory/trees/1.tar.zst',
     digest: `sha256:${'a'.repeat(64)}`,
     media_type: 'application/tar+zstd',
     size_bytes: 42,
@@ -22,78 +22,80 @@ const revision = {
   created_at: '2026-10-23T00:00:00.000Z',
 }
 
-await test('the contract authenticates and validates observation registration', async () => {
-  const observations: unknown[] = []
+const extraction = {
+  extraction_id: 'extraction-1',
+  source_workflow: 'issue-review',
+  source_run_id: 'run-1',
+  source_review_unit_id: 'review',
+  diagnostic_bundle_digest: `sha256:${'b'.repeat(64)}`,
+  transcript_reference: {
+    uri: 's3://sec-review/memory/transcripts/memory-extractor/transcript.v1.jsonl.zst',
+    digest: `sha256:${'a'.repeat(64)}`,
+    media_type: 'application/zstd',
+    size_bytes: 42,
+  },
+  observation: { body_markdown: 'Remember this.' },
+}
+
+await test('the contract authenticates and validates extraction registration', async () => {
+  const extractions: unknown[] = []
   const store: MemoryCatalogStore = {
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
-    registerObservation: (input) => {
-      observations.push(input)
+    registerExtraction: (input) => {
+      extractions.push(input)
       return Promise.resolve(true)
     },
+    getExtraction: () => Promise.resolve(undefined),
     pendingObservationSummary: () =>
       Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
     selectMaintenanceBatch: () => Promise.resolve(null),
     completeMaintenance: () => Promise.resolve(true),
-    activeVersion: () =>
-      Promise.resolve({ revision: 0, artifact_reference: null }),
+    activeRevision: () =>
+      Promise.resolve({ revision: 0, memory_tree_reference: null }),
     getRevision: () => Promise.resolve(undefined),
     listRevisions: () =>
       Promise.resolve({ revisions: [], next_before_revision: null }),
   }
   const app = await createApp({ store, token: 'secret' })
-  const body = {
-    observation_id: 'observation-1',
-    source_workflow: 'issue-review',
-    source_run_id: 'run-1',
-    source_review_unit_id: 'review',
-    transcript_digest: `sha256:${'b'.repeat(64)}`,
-    body_markdown: 'Remember this.',
-    extraction_transcript_reference: {
-      uri: 's3://sec-review/memory/transcripts/memory-extractor/transcript.v1.jsonl.zst',
-      digest: `sha256:${'a'.repeat(64)}`,
-      media_type: 'application/zstd',
-      size_bytes: 42,
-    },
-  }
-
   const unauthorized = await app.inject({
     method: 'POST',
-    url: '/v1/observations',
-    payload: body,
+    url: '/v1/extractions',
+    payload: extraction,
   })
   const invalid = await app.inject({
     method: 'POST',
-    url: '/v1/observations',
+    url: '/v1/extractions',
     headers: { authorization: 'Bearer secret' },
-    payload: { ...body, unknown: true },
+    payload: { ...extraction, unknown: true },
   })
   const registered = await app.inject({
     method: 'POST',
-    url: '/v1/observations',
+    url: '/v1/extractions',
     headers: { authorization: 'Bearer secret' },
-    payload: body,
+    payload: extraction,
   })
 
   assert.equal(unauthorized.statusCode, 401)
   assert.equal(invalid.statusCode, 400)
   assert.deepEqual(registered.json(), { ok: true, created: true })
-  assert.deepEqual(observations, [body])
+  assert.deepEqual(extractions, [extraction])
   await app.close()
 })
 
-await test('an observation identity conflict is a declared 409', async () => {
+await test('an extraction identity conflict is a declared 409', async () => {
   const store: MemoryCatalogStore = {
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
-    registerObservation: () =>
-      Promise.reject(new ObservationConflictError('different content')),
+    registerExtraction: () =>
+      Promise.reject(new ExtractionConflictError('different content')),
+    getExtraction: () => Promise.resolve(undefined),
     pendingObservationSummary: () =>
       Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
     selectMaintenanceBatch: () => Promise.resolve(null),
     completeMaintenance: () => Promise.resolve(true),
-    activeVersion: () =>
-      Promise.resolve({ revision: 0, artifact_reference: null }),
+    activeRevision: () =>
+      Promise.resolve({ revision: 0, memory_tree_reference: null }),
     getRevision: () => Promise.resolve(undefined),
     listRevisions: () =>
       Promise.resolve({ revisions: [], next_before_revision: null }),
@@ -101,22 +103,9 @@ await test('an observation identity conflict is a declared 409', async () => {
   const app = await createApp({ store, token: 'secret' })
   const response = await app.inject({
     method: 'POST',
-    url: '/v1/observations',
+    url: '/v1/extractions',
     headers: { authorization: 'Bearer secret' },
-    payload: {
-      observation_id: 'observation-1',
-      source_workflow: 'issue-review',
-      source_run_id: 'run-1',
-      source_review_unit_id: 'review',
-      transcript_digest: `sha256:${'b'.repeat(64)}`,
-      body_markdown: 'Remember this.',
-      extraction_transcript_reference: {
-        uri: 's3://sec-review/memory/transcripts/memory-extractor/transcript.v1.jsonl.zst',
-        digest: `sha256:${'a'.repeat(64)}`,
-        media_type: 'application/zstd',
-        size_bytes: 42,
-      },
-    },
+    payload: extraction,
   })
 
   assert.equal(response.statusCode, 409)
@@ -130,20 +119,78 @@ await test('an observation identity conflict is a declared 409', async () => {
   await app.close()
 })
 
+await test('completed extractions are queryable with or without an observation', async () => {
+  const records = new Map([
+    ['extraction-1', { ...extraction, created_at: '2026-10-23T00:00:00.000Z' }],
+    [
+      'extraction-2',
+      {
+        ...extraction,
+        extraction_id: 'extraction-2',
+        observation: null,
+        created_at: '2026-10-23T00:01:00.000Z',
+      },
+    ],
+  ])
+  const store: MemoryCatalogStore = {
+    initialize: () => Promise.resolve(),
+    close: () => Promise.resolve(),
+    registerExtraction: () => Promise.resolve(true),
+    getExtraction: (extractionId) => Promise.resolve(records.get(extractionId)),
+    pendingObservationSummary: () =>
+      Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
+    selectMaintenanceBatch: () => Promise.resolve(null),
+    completeMaintenance: () => Promise.resolve(true),
+    activeRevision: () =>
+      Promise.resolve({ revision: 0, memory_tree_reference: null }),
+    getRevision: () => Promise.resolve(undefined),
+    listRevisions: () =>
+      Promise.resolve({ revisions: [], next_before_revision: null }),
+  }
+  const app = await createApp({ store, token: 'secret' })
+  const headers = { authorization: 'Bearer secret' }
+
+  const produced = await app.inject({
+    method: 'GET',
+    url: '/v1/extractions/extraction-1',
+    headers,
+  })
+  const empty = await app.inject({
+    method: 'GET',
+    url: '/v1/extractions/extraction-2',
+    headers,
+  })
+  const missing = await app.inject({
+    method: 'GET',
+    url: '/v1/extractions/missing',
+    headers,
+  })
+
+  assert.deepEqual(produced.json(), records.get('extraction-1'))
+  assert.deepEqual(empty.json(), records.get('extraction-2'))
+  assert.equal(missing.statusCode, 404)
+  assert.deepEqual(missing.json(), {
+    error: 'Memory extraction not found: missing',
+    code: 'NOT_FOUND',
+  })
+  await app.close()
+})
+
 await test('revision history is queryable through the public contract', async () => {
   const calls: unknown[] = []
   const store: MemoryCatalogStore = {
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
-    registerObservation: () => Promise.resolve(true),
+    registerExtraction: () => Promise.resolve(true),
+    getExtraction: () => Promise.resolve(undefined),
     pendingObservationSummary: () =>
       Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
     selectMaintenanceBatch: () => Promise.resolve(null),
     completeMaintenance: () => Promise.resolve(true),
-    activeVersion: () =>
+    activeRevision: () =>
       Promise.resolve({
         revision: revision.revision,
-        artifact_reference: revision.artifact_reference,
+        memory_tree_reference: revision.memory_tree_reference,
       }),
     getRevision: (requested) =>
       Promise.resolve(requested === revision.revision ? revision : undefined),

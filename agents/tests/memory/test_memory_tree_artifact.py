@@ -31,7 +31,7 @@ def test_memory_tree_artifact_round_trip(tmp_path: Path) -> None:
         materialized = materialize_memory_tree(
             replace(
                 reference,
-                uri=f"s3://artifacts/memory/versions/{reference.digest.removeprefix('sha256:')}/memory-tree.v1.tar.zst",
+                uri=f"s3://artifacts/memory/trees/{reference.digest.removeprefix('sha256:')}/memory-tree.v1.tar.zst",
             ),
             destination=tmp_path / "materialized",
         )

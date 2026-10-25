@@ -62,13 +62,13 @@ def _artifact(
 
 
 def test_client_wire_values_match_memory_catalog_contract() -> None:
-    active_version = {
+    active_revision = {
         "revision": 1,
-        "artifact_reference": _artifact("memory").as_dict(),
+        "memory_tree_reference": _artifact("memory").as_dict(),
     }
     revision = {
         "revision": 1,
-        "artifact_reference": _artifact("memory").as_dict(),
+        "memory_tree_reference": _artifact("memory").as_dict(),
         "maintenance_transcript_reference": _artifact(
             "maintenance-transcript.jsonl.zst",
             media_type="application/zstd",
@@ -77,47 +77,62 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
     }
     batch = {
         "base_revision": 1,
-        "active_memory": _artifact("memory").as_dict(),
+        "active_memory_tree_reference": _artifact("memory").as_dict(),
         "observations": [
-            {"observation_id": "observation-1", "body_markdown": "Remember this."}
+            {"extraction_id": "observation-1", "body_markdown": "Remember this."}
         ],
+    }
+    extraction = {
+        "extraction_id": "extraction-1",
+        "source_workflow": "issue-review",
+        "source_run_id": "run-1",
+        "source_review_unit_id": "review",
+        "diagnostic_bundle_digest": f"sha256:{'b' * 64}",
+        "transcript_reference": _artifact(
+            "extraction-transcript.jsonl.zst",
+            media_type="application/zstd",
+        ).as_dict(),
+        "observation": {"body_markdown": "Remember this."},
+        "created_at": "2026-10-23T00:00:00Z",
     }
     client = _RecordingClient(
         [
             {"ok": True, "created": True},
+            extraction,
             {"pending_count": 1, "oldest_pending_created_at": None},
             {"batch": batch},
             {"completed": True},
-            active_version,
+            active_revision,
             revision,
             {"revisions": [revision], "next_before_revision": None},
         ]
     )
 
-    assert client.register_observation(
-        observation_id="observation-1",
+    assert client.register_extraction(
+        extraction_id="extraction-1",
         source_workflow="issue-review",
         source_run_id="run-1",
         source_review_unit_id="review",
-        transcript_digest=f"sha256:{'b' * 64}",
-        body_markdown="Remember this.",
-        extraction_transcript_reference=_artifact(
+        diagnostic_bundle_digest=f"sha256:{'b' * 64}",
+        transcript_reference=_artifact(
             "extraction-transcript.jsonl.zst",
             media_type="application/zstd",
         ),
+        observation_markdown="Remember this.",
     )
+    assert client.get_extraction("extraction-1") == extraction
     assert client.pending_observation_summary()["pending_count"] == 1
     assert client.select_maintenance_batch(limit=10) == batch
     assert client.complete_maintenance(
         base_revision=1,
-        observation_ids=["observation-1"],
-        memory_version=_artifact("memory-2"),
+        extraction_ids=["extraction-1"],
+        memory_tree_reference=_artifact("memory-2"),
         maintenance_transcript_reference=_artifact(
             "maintenance-transcript.jsonl.zst",
             media_type="application/zstd",
         ),
     )
-    assert client.active_version() == active_version
+    assert client.active_revision() == active_revision
     assert client.get_revision(1) == revision
     assert client.list_revisions(before_revision=2, limit=10) == {
         "revisions": [revision],
@@ -125,7 +140,7 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
     }
 
     request_schemas = {
-        "/v1/observations": "ObservationRegistration",
+        "/v1/extractions": "ExtractionRegistration",
         "/v1/maintenance/batches/select": "MaintenanceBatchSelection",
         "/v1/maintenance/complete": "MaintenanceCompletion",
     }
@@ -135,14 +150,15 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
             _validator(schema_name).validate(body)
 
     for schema_name, value in (
-        ("ObservationRegistrationResult", {"ok": True, "created": True}),
+        ("ExtractionRegistrationResult", {"ok": True, "created": True}),
+        ("ExtractionRecord", extraction),
         (
             "PendingObservationSummary",
             {"pending_count": 1, "oldest_pending_created_at": None},
         ),
         ("MaintenanceBatchResult", {"batch": batch}),
         ("MaintenanceCompletionResult", {"completed": True}),
-        ("ActiveVersion", active_version),
+        ("ActiveRevision", active_revision),
         ("MemoryRevision", revision),
         (
             "MemoryRevisionList",
@@ -152,10 +168,10 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         _validator(schema_name).validate(value)
 
 
-def test_observation_conflict_preserves_non_retryable_catalog_semantics() -> None:
+def test_extraction_conflict_preserves_non_retryable_catalog_semantics() -> None:
     client = MemoryCatalogClient(base_url="http://catalog", token="secret")
     conflict = HTTPError(
-        "http://catalog/v1/observations",
+        "http://catalog/v1/extractions",
         409,
         "Conflict",
         Message(),
@@ -169,15 +185,15 @@ def test_observation_conflict_preserves_non_retryable_catalog_semantics() -> Non
         ),
         pytest.raises(MemoryCatalogConflictError, match="HTTP 409"),
     ):
-        client.register_observation(
-            observation_id="observation-1",
+        client.register_extraction(
+            extraction_id="extraction-1",
             source_workflow="issue-review",
             source_run_id="run-1",
             source_review_unit_id="review",
-            transcript_digest=f"sha256:{'b' * 64}",
-            body_markdown="Different content.",
-            extraction_transcript_reference=_artifact(
+            diagnostic_bundle_digest=f"sha256:{'b' * 64}",
+            transcript_reference=_artifact(
                 "extraction-transcript.jsonl.zst",
                 media_type="application/zstd",
             ),
+            observation_markdown="Different content.",
         )

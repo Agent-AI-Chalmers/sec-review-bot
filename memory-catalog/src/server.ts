@@ -11,7 +11,7 @@ import Fastify, {
 } from 'fastify'
 
 import {
-  ObservationConflictError,
+  ExtractionConflictError,
   PostgresMemoryCatalogStore,
   type MemoryCatalogStore,
 } from './catalog-store.js'
@@ -54,7 +54,7 @@ function specPath(): string {
 }
 
 function errorStatusCode(error: unknown): number {
-  if (error instanceof ObservationConflictError) return 409
+  if (error instanceof ExtractionConflictError) return 409
   if (
     typeof error === 'object' &&
     error !== null &&
@@ -75,12 +75,22 @@ export async function registerMemoryCatalogRoutes(
     specification: specPath(),
     serviceHandlers: {
       health: () => ({ status: 'ok' }),
-      registerObservation: async (request: FastifyRequest) => ({
+      registerExtraction: async (request: FastifyRequest) => ({
         ok: true,
-        created: await store.registerObservation(
-          request.body as RequestBody<'registerObservation'>,
+        created: await store.registerExtraction(
+          request.body as RequestBody<'registerExtraction'>,
         ),
       }),
+      getExtraction: async (request: FastifyRequest, reply: FastifyReply) => {
+        const extractionId = (request.params as PathParameters<'getExtraction'>)
+          .extraction_id
+        const record = await store.getExtraction(extractionId)
+        if (record) return record
+        return await reply.status(404).send({
+          error: `Memory extraction not found: ${extractionId}`,
+          code: 'NOT_FOUND',
+        })
+      },
       pendingObservationSummary: async () =>
         await store.pendingObservationSummary(),
       selectMaintenanceBatch: async (request: FastifyRequest) => ({
@@ -93,7 +103,7 @@ export async function registerMemoryCatalogRoutes(
           request.body as RequestBody<'completeMaintenance'>,
         ),
       }),
-      activeVersion: async () => await store.activeVersion(),
+      activeRevision: async () => await store.activeRevision(),
       getRevision: async (request: FastifyRequest, reply: FastifyReply) => {
         const revision = Number(
           (request.params as PathParameters<'getRevision'>).revision,

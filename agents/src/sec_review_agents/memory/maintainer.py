@@ -28,7 +28,7 @@ from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.memory.local_state import (
     OBSERVATION_STATUS_PENDING,
     ObservationRow,
-    fetch_observations_by_ids,
+    fetch_observations_by_extraction_ids,
     fetch_observations_by_status,
     mark_observations_processed_if_unchanged,
     open_memory_state,
@@ -94,12 +94,12 @@ def _validate_selected_observation_files(
         except ValueError as error:
             raise ValueError(
                 "Pending memory observation path is outside the observations "
-                f"directory: {row.observation_id}"
+                f"directory: {row.extraction_id}"
             ) from error
         if not path.is_file():
             raise FileNotFoundError(
                 "Pending memory observation file is missing: "
-                f"{row.observation_id} ({path})"
+                f"{row.extraction_id} ({path})"
             )
 
 
@@ -108,7 +108,7 @@ def _maintenance_prompt_observations(
 ) -> list[MemoryMaintenanceObservation]:
     return [
         MemoryMaintenanceObservation(
-            observation_id=row.observation_id,
+            extraction_id=row.extraction_id,
             mounted_path=f"/memory/observations/{Path(row.path).name}",
         )
         for row in observation_rows
@@ -189,16 +189,14 @@ async def maintain_memory_with_result(
     memory_store_dir: Path | None = None,
     deployment: str | None = None,
     batch_size: int | None = None,
-    observation_ids: list[str] | None = None,
+    extraction_ids: list[str] | None = None,
 ) -> MemoryMaintenanceResult:
     if batch_size is not None and batch_size < 1:
         raise ValueError("batch_size must be positive when provided.")
-    if batch_size is not None and observation_ids is not None:
-        raise ValueError("batch_size and observation_ids cannot be used together.")
-    if observation_ids is not None and len(observation_ids) != len(
-        set(observation_ids)
-    ):
-        raise ValueError("observation_ids must be unique.")
+    if batch_size is not None and extraction_ids is not None:
+        raise ValueError("batch_size and extraction_ids cannot be used together.")
+    if extraction_ids is not None and len(extraction_ids) != len(set(extraction_ids)):
+        raise ValueError("extraction_ids must be unique.")
     memory_store_dir = resolve_memory_store_dir(memory_store_dir, required=True)
     initialize_memory_store(memory_store_dir)
 
@@ -209,7 +207,7 @@ async def maintain_memory_with_result(
             memory_store_dir=memory_store_dir,
             deployment=deployment,
             batch_size=batch_size,
-            observation_ids=observation_ids,
+            extraction_ids=extraction_ids,
         )
 
 
@@ -218,7 +216,7 @@ async def _maintain_memory_with_result_locked(
     memory_store_dir: Path,
     deployment: str | None,
     batch_size: int | None,
-    observation_ids: list[str] | None,
+    extraction_ids: list[str] | None,
 ) -> MemoryMaintenanceResult:
     selected_rows: list[ObservationRow] = []
     processed_count = 0
@@ -228,30 +226,30 @@ async def _maintain_memory_with_result_locked(
         with memory_store_lock(memory_store_dir, exclusive=True):
             with open_memory_state(memory_store_dir) as connection:
                 selected_rows = (
-                    fetch_observations_by_ids(
+                    fetch_observations_by_extraction_ids(
                         connection,
-                        observation_ids=observation_ids,
+                        extraction_ids=extraction_ids,
                     )
-                    if observation_ids is not None
+                    if extraction_ids is not None
                     else fetch_observations_by_status(
                         connection,
                         status=OBSERVATION_STATUS_PENDING,
                         limit=batch_size,
                     )
                 )
-                if observation_ids is not None:
-                    selected_ids = {row.observation_id for row in selected_rows}
+                if extraction_ids is not None:
+                    selected_ids = {row.extraction_id for row in selected_rows}
                     missing_ids = [
-                        observation_id
-                        for observation_id in observation_ids
-                        if observation_id not in selected_ids
+                        extraction_id
+                        for extraction_id in extraction_ids
+                        if extraction_id not in selected_ids
                     ]
                     if missing_ids:
                         raise ValueError(
-                            "Unknown memory observation ids: " + ", ".join(missing_ids)
+                            "Unknown memory extraction ids: " + ", ".join(missing_ids)
                         )
                     non_pending = [
-                        f"{row.observation_id} ({row.status})"
+                        f"{row.extraction_id} ({row.status})"
                         for row in selected_rows
                         if row.status != OBSERVATION_STATUS_PENDING
                     ]

@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 @dataclass(frozen=True)
 class MemoryMaintenanceObservation:
-    observation_id: str
+    extraction_id: str
     mounted_path: str
 
 

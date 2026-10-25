@@ -12,7 +12,7 @@ from pathlib import Path
 
 from sec_review_agents.memory.local_state import (
     OBSERVATION_STATUS_PENDING,
-    fetch_observation_by_id,
+    fetch_observation_by_extraction_id,
     open_memory_state,
     upsert_observation,
 )
@@ -67,7 +67,7 @@ def _parse_args() -> argparse.Namespace:
         "--replace-existing",
         action="store_true",
         help=(
-            "Replace observation ids already present in the memory ledger and "
+            "Replace extraction ids already present in the observation ledger and "
             "mark them pending again."
         ),
     )
@@ -111,17 +111,17 @@ def _import_observations(
 ) -> None:
     """Publish new observations, rejecting existing ledger ids by default."""
     observations_root = memory_observations_dir(memory_store_dir)
-    observation_ids = [source.stem for source in observation_paths]
-    if len(observation_ids) != len(set(observation_ids)):
+    extraction_ids = [source.stem for source in observation_paths]
+    if len(extraction_ids) != len(set(extraction_ids)):
         raise ValueError("Observation input file stems must be unique.")
     with (
         memory_store_lock(memory_store_dir, exclusive=True),
         open_memory_state(memory_store_dir) as connection,
     ):
         existing_ids = [
-            observation_id
-            for observation_id in observation_ids
-            if fetch_observation_by_id(connection, observation_id) is not None
+            extraction_id
+            for extraction_id in extraction_ids
+            if fetch_observation_by_extraction_id(connection, extraction_id) is not None
         ]
         if existing_ids and not replace_existing:
             formatted_ids = ", ".join(sorted(existing_ids))
@@ -131,13 +131,13 @@ def _import_observations(
             )
 
         for source in observation_paths:
-            observation_id = source.stem
-            target = observations_root / f"{observation_id}.md"
+            extraction_id = source.stem
+            target = observations_root / f"{extraction_id}.md"
             content = source.read_bytes()
             with tempfile.NamedTemporaryFile(
                 "wb",
                 dir=observations_root,
-                prefix=f".{observation_id}.",
+                prefix=f".{extraction_id}.",
                 suffix=".tmp",
                 delete=False,
             ) as temp_file:
@@ -146,7 +146,7 @@ def _import_observations(
             temp_path.replace(target)
             upsert_observation(
                 connection,
-                observation_id=observation_id,
+                extraction_id=extraction_id,
                 path=str(target),
                 status=OBSERVATION_STATUS_PENDING,
             )
@@ -173,7 +173,7 @@ async def main() -> int:
     result = await maintain_memory_with_result(
         memory_store_dir=memory_store_dir,
         deployment=args.deployment,
-        observation_ids=[path.stem for path in observation_paths],
+        extraction_ids=[path.stem for path in observation_paths],
     )
 
     print(result.summary)

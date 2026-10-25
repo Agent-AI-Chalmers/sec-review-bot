@@ -9,6 +9,7 @@ from pathlib import Path
 from sec_review_agents.utils.time import utc_now_iso
 
 MEMORY_STATE_FILENAME = "memory_state.sqlite"
+MEMORY_STATE_SCHEMA_VERSION = 2
 
 OBSERVATION_STATUS_PENDING = "pending"
 OBSERVATION_STATUS_PROCESSED = "processed"
@@ -17,20 +18,34 @@ OBSERVATION_STATUSES = {
     OBSERVATION_STATUS_PROCESSED,
 }
 
-_SCHEMA = """
+_CURRENT_SCHEMA = """
 create table if not exists observations (
-  observation_id text primary key,
+  extraction_id text primary key,
   path text not null,
   status text not null,
   created_at text not null,
   updated_at text not null
 );
 """
+_LEGACY_OBSERVATION_COLUMNS = {
+    "observation_id",
+    "path",
+    "status",
+    "created_at",
+    "updated_at",
+}
+_CURRENT_OBSERVATION_COLUMNS = {
+    "extraction_id",
+    "path",
+    "status",
+    "created_at",
+    "updated_at",
+}
 
 
 @dataclass(frozen=True)
 class ObservationRow:
-    observation_id: str
+    extraction_id: str
     path: str
     status: str
     created_at: str
@@ -41,29 +56,52 @@ def initialize_memory_state(memory_store_dir: Path) -> Path:
     state_path = memory_store_dir / MEMORY_STATE_FILENAME
     with sqlite3.connect(state_path) as connection:
         connection.execute("pragma journal_mode=wal")
-        connection.executescript(_SCHEMA)
+        columns = {
+            str(row[1])
+            for row in connection.execute("pragma table_info(observations)").fetchall()
+        }
+        schema_version = int(connection.execute("pragma user_version").fetchone()[0])
+
+        if schema_version > MEMORY_STATE_SCHEMA_VERSION:
+            raise RuntimeError(
+                "Local memory state was created by a newer schema version: "
+                f"{schema_version} > {MEMORY_STATE_SCHEMA_VERSION}."
+            )
+
+        if not columns:
+            connection.executescript(_CURRENT_SCHEMA)
+        elif columns == _LEGACY_OBSERVATION_COLUMNS and schema_version in {0, 1}:
+            connection.execute(
+                "alter table observations rename column observation_id to extraction_id"
+            )
+        elif columns != _CURRENT_OBSERVATION_COLUMNS:
+            raise RuntimeError(
+                f"Local memory state at {state_path} has an unknown observations schema."
+            )
+
+        connection.execute(f"pragma user_version={MEMORY_STATE_SCHEMA_VERSION}")
         connection.commit()
     return state_path
 
 
-def observation_id_exists(connection: sqlite3.Connection, observation_id: str) -> bool:
+def extraction_id_exists(connection: sqlite3.Connection, extraction_id: str) -> bool:
     row = connection.execute(
-        "select 1 from observations where observation_id = ?",
-        (observation_id,),
+        "select 1 from observations where extraction_id = ?",
+        (extraction_id,),
     ).fetchone()
     return row is not None
 
 
-def fetch_observation_by_id(
+def fetch_observation_by_extraction_id(
     connection: sqlite3.Connection,
-    observation_id: str,
+    extraction_id: str,
 ) -> ObservationRow | None:
     row = connection.execute(
         """
-        select observation_id, path, status, created_at, updated_at
-        from observations where observation_id = ?
+        select extraction_id, path, status, created_at, updated_at
+        from observations where extraction_id = ?
         """,
-        (observation_id,),
+        (extraction_id,),
     ).fetchone()
     return None if row is None else ObservationRow(*row)
 
@@ -71,29 +109,29 @@ def fetch_observation_by_id(
 def upsert_observation(
     connection: sqlite3.Connection,
     *,
-    observation_id: str,
+    extraction_id: str,
     path: str,
     status: str,
 ) -> None:
     if status not in OBSERVATION_STATUSES:
         raise ValueError(f"Invalid observation status: {status}")
     now = utc_now_iso()
-    if observation_id_exists(connection, observation_id):
+    if extraction_id_exists(connection, extraction_id):
         connection.execute(
             """
             update observations set path=?, status=?, updated_at=?
-            where observation_id=?
+            where extraction_id=?
             """,
-            (path, status, now, observation_id),
+            (path, status, now, extraction_id),
         )
         return
     connection.execute(
         """
         insert into observations (
-          observation_id, path, status, created_at, updated_at
+          extraction_id, path, status, created_at, updated_at
         ) values (?, ?, ?, ?, ?)
         """,
-        (observation_id, path, status, now, now),
+        (extraction_id, path, status, now, now),
     )
 
 
@@ -110,9 +148,9 @@ def fetch_observations_by_status(
     limit_clause = f"limit {int(limit)}" if limit is not None else ""
     rows = connection.execute(
         f"""
-        select observation_id, path, status, created_at, updated_at
+        select extraction_id, path, status, created_at, updated_at
         from observations where status = ?
-        order by created_at asc, observation_id asc
+        order by created_at asc, extraction_id asc
         {limit_clause}
         """,
         (status,),
@@ -120,27 +158,27 @@ def fetch_observations_by_status(
     return [ObservationRow(*row) for row in rows]
 
 
-def fetch_observations_by_ids(
+def fetch_observations_by_extraction_ids(
     connection: sqlite3.Connection,
     *,
-    observation_ids: list[str],
+    extraction_ids: list[str],
 ) -> list[ObservationRow]:
     """Fetch existing observations in caller-supplied order."""
-    if not observation_ids:
+    if not extraction_ids:
         return []
-    placeholders = ",".join("?" for _ in observation_ids)
+    placeholders = ",".join("?" for _ in extraction_ids)
     rows = connection.execute(
         f"""
-        select observation_id, path, status, created_at, updated_at
-        from observations where observation_id in ({placeholders})
+        select extraction_id, path, status, created_at, updated_at
+        from observations where extraction_id in ({placeholders})
         """,
-        observation_ids,
+        extraction_ids,
     ).fetchall()
-    rows_by_id = {str(row["observation_id"]): ObservationRow(*row) for row in rows}
+    rows_by_id = {str(row["extraction_id"]): ObservationRow(*row) for row in rows}
     return [
-        rows_by_id[observation_id]
-        for observation_id in observation_ids
-        if observation_id in rows_by_id
+        rows_by_id[extraction_id]
+        for extraction_id in extraction_ids
+        if extraction_id in rows_by_id
     ]
 
 
@@ -155,12 +193,12 @@ def mark_observations_processed_if_unchanged(
         cursor = connection.execute(
             """
             update observations set status=?, updated_at=?
-            where observation_id=? and status=? and path=? and updated_at=?
+            where extraction_id=? and status=? and path=? and updated_at=?
             """,
             (
                 OBSERVATION_STATUS_PROCESSED,
                 now,
-                observation.observation_id,
+                observation.extraction_id,
                 OBSERVATION_STATUS_PENDING,
                 observation.path,
                 observation.updated_at,
@@ -172,8 +210,8 @@ def mark_observations_processed_if_unchanged(
 
 def fetch_all_observations(connection: sqlite3.Connection) -> list[ObservationRow]:
     rows = connection.execute("""
-        select observation_id, path, status, created_at, updated_at
-        from observations order by created_at asc, observation_id asc
+        select extraction_id, path, status, created_at, updated_at
+        from observations order by created_at asc, extraction_id asc
         """).fetchall()
     return [ObservationRow(*row) for row in rows]
 
@@ -202,7 +240,7 @@ def oldest_observation_created_at_by_status(
     row = connection.execute(
         """
         select created_at from observations where status = ?
-        order by created_at asc, observation_id asc limit 1
+        order by created_at asc, extraction_id asc limit 1
         """,
         (status,),
     ).fetchone()

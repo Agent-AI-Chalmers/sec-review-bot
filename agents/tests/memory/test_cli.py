@@ -42,7 +42,7 @@ def test_cli_lists_local_observations(tmp_path: Path, capsys) -> None:
     with open_memory_state(store) as connection:
         upsert_observation(
             connection,
-            observation_id="one",
+            extraction_id="one",
             path=str(observation),
             status=OBSERVATION_STATUS_PENDING,
         )

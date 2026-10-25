@@ -87,7 +87,7 @@ async def test_scheduling_reports_an_existing_extraction(monkeypatch) -> None:
         {
             "review_unit_id": "case-a",
             "workflow_id": memory_extraction_workflow_id(
-                transcript_digest=_reference().digest,
+                diagnostic_bundle_digest=_reference().digest,
                 review_unit_id="case-a",
             ),
             "status": "already_started",

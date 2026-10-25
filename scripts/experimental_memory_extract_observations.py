@@ -51,9 +51,9 @@ def _parse_args() -> argparse.Namespace:
     )
     id_group = parser.add_mutually_exclusive_group(required=True)
     id_group.add_argument(
-        "--observation-id",
+        "--extraction-id",
         default=None,
-        help="Stable observation id for the collected transcript sequence.",
+        help="Stable extraction id for the collected transcript sequence.",
     )
     parser.add_argument(
         "--source-workflow",
@@ -63,7 +63,7 @@ def _parse_args() -> argparse.Namespace:
     id_group.add_argument(
         "--job-id",
         default=None,
-        help="Stable extraction id used to derive the observation id.",
+        help="Stable job id used to derive the extraction id.",
     )
     parser.add_argument(
         "--run-id",
@@ -89,7 +89,7 @@ async def main() -> int:
     result = await preview_memory_observation_from_paths(
         args.inputs,
         deployment=args.deployment,
-        observation_id_value=args.observation_id,
+        extraction_id_value=args.extraction_id,
         job_id=args.job_id,
         source_workflow=args.source_workflow,
         run_id=args.run_id,
@@ -99,7 +99,7 @@ async def main() -> int:
         print(f"No observation written: {result.summary}")
         return 1
 
-    target = output_dir / f"{result.observation_id}.md"
+    target = output_dir / f"{result.extraction_id}.md"
     _write_observation(target, result.observation_markdown)
     print(f"Wrote {target}")
     print(WARNING)

@@ -47,11 +47,11 @@ def _write_transcript(path: Path, records: list[dict]) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _fetch_observation_status(memory_root: Path, observation_id: str) -> str | None:
+def _fetch_observation_status(memory_root: Path, extraction_id: str) -> str | None:
     with open_memory_state(memory_root) as connection:
         row = connection.execute(
-            "select status from observations where observation_id = ?",
-            (observation_id,),
+            "select status from observations where extraction_id = ?",
+            (extraction_id,),
         ).fetchone()
     return None if row is None else str(row[0])
 

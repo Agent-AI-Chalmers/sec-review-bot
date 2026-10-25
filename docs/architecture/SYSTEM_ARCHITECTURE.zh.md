@@ -76,15 +76,11 @@ sequenceDiagram
   Storage-->>MemoryWorker: 返回包含 review transcripts 的 run diagnostic bundle
   Note over MemoryWorker: 运行 extractor 并记录 extractor invocation transcript
   MemoryWorker->>Storage: 发布压缩后的 extractor transcript
-  alt 产出 observation
-    MemoryWorker->>Catalog: 登记 observation 及其 extractor transcript reference
-  else 未产出 observation
-    Note over MemoryWorker: 不登记 observation
-  end
+  MemoryWorker->>Catalog: 原子登记 extraction、transcript reference 和可选 observation
   loop 定期 memory maintenance
     Temporal->>MemoryWorker: 分发 maintenance 工作
     MemoryWorker->>Catalog: 选择 maintenance batch
-    Catalog-->>MemoryWorker: 返回 observations、base revision 和 active memory tree artifact reference
+    Catalog-->>MemoryWorker: 返回带 extraction IDs 的 observations、base revision 和 active memory tree reference
     opt 存在 active memory tree
       MemoryWorker->>Storage: 获取 active memory tree artifact
       Storage-->>MemoryWorker: 返回 memory tree artifact
@@ -93,7 +89,7 @@ sequenceDiagram
     Note over MemoryWorker: 运行 maintainer 并记录 maintainer invocation transcript
     MemoryWorker->>Storage: 发布压缩后的 maintainer transcript
     MemoryWorker->>Storage: 发布新的 memory tree artifact
-    MemoryWorker->>Catalog: 使用 base revision CAS 提交 artifact references 和 consumed observation IDs
+    MemoryWorker->>Catalog: 使用 base revision CAS 提交 memory tree reference、maintainer transcript reference 和 consumed extraction IDs
     Catalog-->>MemoryWorker: 返回新的 active revision 或 revision conflict
   end
 ```

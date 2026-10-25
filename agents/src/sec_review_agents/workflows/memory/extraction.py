@@ -23,11 +23,11 @@ class MemoryExtractionRequest:
 
 def memory_extraction_workflow_id(
     *,
-    transcript_digest: str,
+    diagnostic_bundle_digest: str,
     review_unit_id: str,
 ) -> str:
     """Return the stable Temporal identity for one transcript unit."""
-    identity = f"{transcript_digest}\0{review_unit_id}".encode()
+    identity = f"{diagnostic_bundle_digest}\0{review_unit_id}".encode()
     return f"memory-extraction:{hashlib.sha256(identity).hexdigest()}"
 
 
@@ -57,7 +57,7 @@ async def run_memory_extraction(
 
     reference = ArtifactReference.from_mapping(request.diagnostic_bundle)
     extraction_id = memory_extraction_workflow_id(
-        transcript_digest=reference.digest,
+        diagnostic_bundle_digest=reference.digest,
         review_unit_id=request.review_unit_id,
     )
     catalog_client = configured_memory_catalog_client()
@@ -92,7 +92,7 @@ async def run_memory_extraction(
         preview = await preview_memory_observation_from_paths(
             list(materialized.transcript_paths),
             deployment=deployment,
-            observation_id_value=extraction_id,
+            extraction_id_value=extraction_id,
             job_id=extraction_id,
             source_workflow=request.source_workflow,
             run_id=request.run_id,
@@ -105,29 +105,22 @@ async def run_memory_extraction(
             transcript_path=preview.agent_transcript_path,
             output_dir=temp_root / "published-transcripts",
         )
-        if preview.observation_markdown is not None:
-            catalog_client.register_observation(
-                observation_id=preview.observation_id,
-                source_workflow=request.source_workflow,
-                source_run_id=request.run_id,
-                source_review_unit_id=request.review_unit_id,
-                transcript_digest=reference.digest,
-                body_markdown=preview.observation_markdown,
-                extraction_transcript_reference=extraction_transcript_reference,
-            )
+        catalog_client.register_extraction(
+            extraction_id=extraction_id,
+            source_workflow=request.source_workflow,
+            source_run_id=request.run_id,
+            source_review_unit_id=request.review_unit_id,
+            diagnostic_bundle_digest=reference.digest,
+            transcript_reference=extraction_transcript_reference,
+            observation_markdown=preview.observation_markdown,
+        )
         return {
             "ok": True,
             "skipped": preview.skipped,
             "summary": preview.summary,
-            "observation_id": (
-                preview.observation_id
-                if preview.observation_markdown is not None
-                else None
-            ),
-            "extraction_transcript_reference": (
-                extraction_transcript_reference.as_dict()
-            ),
             "extraction_id": extraction_id,
+            "observation_produced": preview.observation_markdown is not None,
+            "transcript_reference": extraction_transcript_reference.as_dict(),
         }
 
 
@@ -153,7 +146,7 @@ async def run_memory_extraction_activity(
     except MemoryCatalogConflictError as error:
         raise ApplicationError(
             str(error),
-            type="MEMORY_CATALOG_OBSERVATION_CONFLICT",
+            type="MEMORY_CATALOG_EXTRACTION_CONFLICT",
             non_retryable=True,
         ) from error
 
