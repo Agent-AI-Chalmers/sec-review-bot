@@ -161,6 +161,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `TEMPORAL_ADDRESS` | 必须使用根目录 `.env` 中 `TEMPORAL_PORT` 暴露的宿主机端口；默认是 `127.0.0.1:7233`。 |
 | `TEMPORAL_NAMESPACE`、`TEMPORAL_EXECUTION_TASK_QUEUE` | 必须与根目录 `.env` 中的同名值一致。 |
 | `AGENT_DOCKER_IMAGE` | Docker sandbox 使用的镜像；默认使用通用镜像。 |
+| `AGENT_SKILLS_ENABLED` | 为声明了 bundled skills 的 agent 物化对应 skills；默认是 `true`。 |
 | `AGENT_JOERN_ENABLED`、`AGENT_PLAYWRIGHT_ENABLED` | 向适用的 agent 提示镜像中已安装的相应 CLI；两者默认均为 `false`。 |
 | `AGENT_MCP_ENABLED` | 启用已配置的 MCP 集成；默认是 `false`。 |
 | `AGENT_MEMORY_CONSUMPTION_ENABLED` | 允许 review agent 读取整理后的 memory；默认是 `true`。 |

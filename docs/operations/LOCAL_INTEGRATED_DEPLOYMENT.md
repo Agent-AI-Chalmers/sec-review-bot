@@ -159,6 +159,7 @@ Core fields:
 | `TEMPORAL_ADDRESS` | Must use the host port exposed by `TEMPORAL_PORT` in the repository `.env`; the default is `127.0.0.1:7233`. |
 | `TEMPORAL_NAMESPACE`, `TEMPORAL_EXECUTION_TASK_QUEUE` | Must match the same-named values in the repository `.env`. |
 | `AGENT_DOCKER_IMAGE` | Image used for Docker sandboxes; the default is a general-purpose image. |
+| `AGENT_SKILLS_ENABLED` | Materialize bundled skills for agents that declare them; defaults to `true`. |
 | `AGENT_JOERN_ENABLED`, `AGENT_PLAYWRIGHT_ENABLED` | Advertise the corresponding installed CLI to eligible agents; both default to `false`. |
 | `AGENT_MCP_ENABLED` | Enable configured MCP integrations; defaults to `false`. |
 | `AGENT_MEMORY_CONSUMPTION_ENABLED` | Allow review agents to read curated memory; defaults to `true`. |

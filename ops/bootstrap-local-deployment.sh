@@ -107,10 +107,9 @@ replace_assignment "$deployment_tmp" SEC_REVIEW_MEMORY_S3_SECRET_KEY "$memory_st
 replace_assignment "$deployment_tmp" SEC_REVIEW_UI_S3_SECRET_KEY "$ui_storage_password"
 replace_assignment "$deployment_tmp" AGENT_MEMORY_CATALOG_TOKEN "$memory_catalog_token"
 
-# Compose overrides these values, but keeping the generated source file
-# coherent also makes it usable for focused non-Compose integration runs.
+# Compose overrides this value, but keeping the generated source file coherent
+# also makes it usable for focused non-Compose integration runs.
 replace_assignment "$github_tmp" CONTROL_PLANE_SERVICE_TOKEN "$control_plane_service_token"
-replace_assignment "$github_tmp" SEC_REVIEW_INPUT_BUNDLE_ROOT "/tmp/sec-review-input-bundles"
 
 mv "$compose_tmp" "$compose_env"
 mv "$model_tmp" "$model_config"
