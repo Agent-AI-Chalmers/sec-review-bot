@@ -111,7 +111,7 @@ def write_pull_request_previews(
     readme.write_text(
         "# Pull Request Preview\n\n"
         "Local-only preview files for inspecting the publishable pull request workflow output.\n"
-        "These files are generated for local inspection and are not part of the runner or app contract.\n\n"
+        "These files are generated for local inspection and are not part of the execution or application contract.\n\n"
         "- `review-body`: [review-body.md](./review-body.md)\n",
         encoding="utf-8",
     )

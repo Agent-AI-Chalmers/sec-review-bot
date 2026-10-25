@@ -28,7 +28,7 @@ A review of a PR that changed how review results are published to GitHub ended w
 
 | Priority | Review direction | Main question | Representative boundaries |
 | --- | --- | --- | --- |
-| 1 | Input reaching dangerous sinks | Can Runner- or repository-influenced data cause SQL injection, path escape, branch injection, or Markdown breakout? | Parameterized SQL, branch-segment normalization, sensitive-path policy, Markdown code fences |
+| 1 | Input reaching dangerous sinks | Can untrusted input or repository content cause SQL injection, path escape, branch injection, or Markdown breakout? | Parameterized SQL, branch-segment normalization, sensitive-path policy, Markdown code fences |
 | 2 | Concurrency and remote side effects | During timeout, takeover, and retry, what state can a stale worker commit and how are remote GitHub operations recovered? | Claim tokens, heartbeats, publication steps, markers, and stable branch identity |
 
 Their relationship can be represented as:

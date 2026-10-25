@@ -5,7 +5,7 @@ import json
 import tarfile
 from pathlib import Path
 
-from sec_review_agents.artifacts.immutable_s3 import publish_immutable_s3_artifact
+from sec_review_agents.artifacts.object_storage import publish_immutable_s3_artifact
 from sec_review_agents.artifacts.reference import (
     ArtifactReference,
     local_artifact_reference,
@@ -81,7 +81,7 @@ def publish_memory_audit_bundle(
     return publish_immutable_s3_artifact(
         reference,
         key=key,
-        description="managed memory audit bundle",
+        description="coordinated memory audit bundle",
     )
 
 

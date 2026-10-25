@@ -4,7 +4,7 @@
 
 本文是 [FRAMEWORK_SELECTION.md](FRAMEWORK_SELECTION.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-本文记录 runner 为什么现在使用 LangChain `create_agent` 加项目自己的 middleware 来构造各阶段 agent，而不是直接使用高层的 `deepagents.create_deep_agent`，也不是直接下沉到原始 LangGraph。
+本文记录 agent 框架为什么现在使用 LangChain `create_agent` 加项目自己的 middleware 来构造各阶段 agent，而不是直接使用高层的 `deepagents.create_deep_agent`，也不是直接下沉到原始 LangGraph。
 
 ## 当前定位
 
@@ -65,12 +65,12 @@ LangGraph 是这一类 agent 系统下面更底层的图运行时，同时它也
 
 > *Timeline 截图仅用于说明调度形态；图中的 workflow / activity 名称可能来自旧运行或早期命名，不代表当前 API 名称。*
 
-这张 timeline 展示了一次 repository review 中，runner workflow 如何准备多个 repository case workflow，以及 Temporal 如何跟踪滑动窗口下 workflow / activity 随时间推进的过程。
+这张 timeline 展示了一次 repository review 中，review workflow 如何准备多个 repository case workflow，以及 Temporal 如何跟踪滑动窗口下 workflow / activity 随时间推进的过程。
 
 选择 Temporal 的原因：
 
-- runner run 是长流程，排队、运行中、完成和失败状态应该由执行系统持有。
-- Temporal task queue 是 runner 执行的唯一队列。
+- review run 是长流程，排队、运行中、完成和失败状态应该由执行系统持有。
+- Temporal task queue 是 review 执行的唯一队列。
 - Temporal workflow history 是后续拆分持久化步骤的事实来源，不再需要手写 checkpoint 文件。
 - 内部 workflow / activity 编排需要跨 prepare / analysis / mitigation / verification / delivery 阶段的持久化调度、重试、超时和失败传播。
 

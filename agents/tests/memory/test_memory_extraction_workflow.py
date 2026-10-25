@@ -62,7 +62,7 @@ async def test_extraction_workflow_executes_one_activity(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_managed_extraction_registers_observation_with_provenance(
+async def test_coordinated_extraction_registers_observation_with_provenance(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
@@ -87,7 +87,7 @@ async def test_managed_extraction_registers_observation_with_provenance(
         lambda: client,
     )
     monkeypatch.setattr(
-        "sec_review_agents.artifacts.run_diagnostic_bundle.materialize_diagnostic_transcript_unit",
+        "sec_review_agents.run_diagnostics.bundle.materialize_diagnostic_transcript_unit",
         lambda *_args, **_kwargs: SimpleNamespace(transcript_paths=(transcript,)),
     )
     monkeypatch.setattr(

@@ -441,7 +441,7 @@ def test_workflow_input_preparation_materializes_s3_archive(
         destination.write_bytes(source_archive.read_bytes())
         return destination
 
-    monkeypatch.setattr(input_preparation, "download_s3_input_bundle", download)
+    monkeypatch.setattr(input_preparation, "download_s3_object", download)
     prepared = prepare_workflow_input(
         payload,
         "issue-review",
@@ -474,7 +474,7 @@ def test_prepare_run_input_rejects_s3_bundle_from_another_run(
     monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
     monkeypatch.setenv(input_preparation.RUN_INPUT_ROOT_ENV, str(tmp_path / "inputs"))
 
-    with pytest.raises(ValueError, match="does not belong to this run"):
+    with pytest.raises(ValueError, match="does not match the expected object key"):
         prepare_run_input(payload, run_id="run-1", workflow="issue-review")
 
 

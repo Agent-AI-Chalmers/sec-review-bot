@@ -50,7 +50,7 @@ def test_memory_audit_bundle_contains_manifest_and_jsonl(tmp_path: Path) -> None
         assert archive.getnames() == ["manifest.json", "transcripts/0001.jsonl"]
 
 
-def test_managed_memory_audit_bundle_requires_s3_configuration(
+def test_coordinated_memory_audit_bundle_requires_s3_configuration(
     tmp_path: Path,
 ) -> None:
     transcript = tmp_path / "audit.jsonl"

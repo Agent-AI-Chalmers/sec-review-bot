@@ -414,7 +414,7 @@ def _build_repository_preview_index_readme(
         "# Repository Delivery Previews",
         "",
         "Local-only preview files for publishable repository delivery artifacts.",
-        "These files are generated for local inspection and are not part of the runner or app contract.",
+        "These files are generated for local inspection and are not part of the execution or application contract.",
         "",
     ]
     if blocked_confirmed_preview:

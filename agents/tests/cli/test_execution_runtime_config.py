@@ -26,7 +26,7 @@ def _issue_input() -> dict:
     }
 
 
-def test_runner_runtime_config_is_applied_after_workflow_input_preparation(
+def test_execution_runtime_config_is_applied_after_workflow_input_preparation(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE", "true")
@@ -68,7 +68,7 @@ def test_execution_input_preparation_does_not_mutate_payload_input() -> None:
     assert "run_id" not in input_data
 
 
-def test_runner_runtime_config_rejects_workspace_image_override_by_default(
+def test_execution_runtime_config_rejects_workspace_image_override_by_default(
     monkeypatch,
 ) -> None:
     monkeypatch.delenv("EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE", raising=False)
@@ -77,7 +77,7 @@ def test_runner_runtime_config_rejects_workspace_image_override_by_default(
         runtime_context_from_config({"workspace_image": "benchmark-image:latest"})
 
 
-def test_runner_runtime_config_rejects_invalid_workspace_image(monkeypatch) -> None:
+def test_execution_runtime_config_rejects_invalid_workspace_image(monkeypatch) -> None:
     monkeypatch.setenv("EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE", "true")
 
     with pytest.raises(ValueError, match="workspace_image"):
@@ -87,7 +87,7 @@ def test_runner_runtime_config_rejects_invalid_workspace_image(monkeypatch) -> N
         runtime_context_from_config({"workspace_image": False})
 
 
-def test_runner_runtime_config_rejects_unknown_keys() -> None:
+def test_execution_runtime_config_rejects_unknown_keys() -> None:
     with pytest.raises(ValueError, match="unsupported key"):
         runtime_context_from_config({"extraRuntimeKnob": True})
 

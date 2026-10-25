@@ -341,13 +341,13 @@ async def _maintain_memory_with_result_locked(
     )
 
 
-async def maintain_managed_memory_with_result(
+async def maintain_coordinated_memory_with_result(
     *,
     catalog_client: MemoryCatalogClient,
     batch_size: int,
     deployment: str | None = None,
 ) -> MemoryMaintenanceResult:
-    """Maintain one managed batch and commit it with a revision CAS."""
+    """Maintain one coordinated batch and commit it with a revision CAS."""
     from sec_review_agents.artifacts.reference import ArtifactReference
     from sec_review_agents.memory.audit_bundle import publish_memory_audit_bundle
     from sec_review_agents.memory.version_bundle import (
@@ -364,10 +364,10 @@ async def maintain_managed_memory_with_result(
         )
     observations = batch.get("observations")
     if not isinstance(observations, list) or not observations:
-        raise RuntimeError("Managed maintenance batch has no observations.")
+        raise RuntimeError("Catalog maintenance batch has no observations.")
 
     with tempfile.TemporaryDirectory(
-        prefix="sec-review-managed-memory-maintainer-"
+        prefix="sec-review-coordinated-memory-maintainer-"
     ) as tempdir:
         temp_root = Path(tempdir)
         worktree_root = temp_root / "memory"
@@ -376,7 +376,7 @@ async def maintain_managed_memory_with_result(
             active_reference = ArtifactReference.from_mapping(active_memory)
             if urlparse(active_reference.uri).scheme != "s3":
                 raise ValueError(
-                    "Managed active memory must use an S3 artifact reference."
+                    "Catalog active memory must use an S3 artifact reference."
                 )
             materialized = materialize_memory_version(
                 active_reference,
@@ -396,7 +396,7 @@ async def maintain_managed_memory_with_result(
         observation_ids: list[str] = []
         for index, item in enumerate(observations, start=1):
             if not isinstance(item, dict):
-                raise ValueError("Managed observation must be an object.")
+                raise ValueError("Catalog observation must be an object.")
             observation_id = str(item["observation_id"])
             observation_ids.append(observation_id)
             body = str(item["body_markdown"])
@@ -445,7 +445,7 @@ async def maintain_managed_memory_with_result(
         )
         if urlparse(audit_reference.uri).scheme != "s3":
             raise RuntimeError(
-                "Managed memory audit publication requires configured S3 storage."
+                "Coordinated memory audit publication requires configured S3 storage."
             )
         version = publish_memory_version(
             memory_content_root=worktree_root,
@@ -453,7 +453,7 @@ async def maintain_managed_memory_with_result(
         )
         if urlparse(version.uri).scheme != "s3":
             raise RuntimeError(
-                "Managed memory publication requires configured S3 storage."
+                "Coordinated memory publication requires configured S3 storage."
             )
         completed = catalog_client.complete_maintenance(
             base_revision=base_revision,
@@ -462,7 +462,7 @@ async def maintain_managed_memory_with_result(
             audit_reference=audit_reference,
         )
         if not completed:
-            raise RuntimeError("Managed memory revision changed before commit.")
+            raise RuntimeError("Memory revision changed before coordinated commit.")
 
     return MemoryMaintenanceResult(
         summary=f"Processed {len(observations)} memory observations.",
@@ -472,6 +472,6 @@ async def maintain_managed_memory_with_result(
 
 __all__ = [
     "MemoryMaintenanceResult",
-    "maintain_managed_memory_with_result",
+    "maintain_coordinated_memory_with_result",
     "maintain_memory_with_result",
 ]

@@ -175,12 +175,12 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9100`。 |
 | `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入 run diagnostic bundle，并读取 active memory revision。 |
 | `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Worker 凭据；可读取 run diagnostic bundle，并读写 memory revision 和 Memory Agent 审计包。 |
-| `AGENT_MEMORY_CATALOG_URL` | 独立的 managed-memory API；Compose 默认是 `http://127.0.0.1:8092`。 |
+| `AGENT_MEMORY_CATALOG_URL` | coordinated memory state 的独立 API；Compose 默认是 `http://127.0.0.1:8092`。 |
 | `AGENT_MEMORY_CATALOG_TOKEN` | 必须与仓库 `.env` 一致；它只授权 memory 协调，不提供 PostgreSQL 直连权限。 |
 
 Execution Worker 会在 workflow 成功前把权威 run diagnostic 发布到 `runs/*/artifacts/*`。Execution Gateway 只校验并转发该不可变引用，不持有对象存储凭据，也不挂载 worker artifact tree。Agent sandbox 不会收到任何 workload storage 凭据。
 
-Memory Catalog Server 是独立 TypeScript 服务，不属于 Control Plane。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_control_plane` 和 `sec_review_memory_catalog` database。只有 Memory Catalog 收到 `MEMORY_CATALOG_DATABASE_URL`，并在自己的 database 中保存 observations 和 active memory pointer。提取执行和单例维护 workflow 由 Temporal 管理，PostgreSQL 只负责持久目录以及 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；transcript 和 active memory 仍由 worker 在每次 activity 中物化到本地，agent sandbox 只看到最终 filesystem mount。Managed worker 不要同时设置 `AGENT_MEMORY_DIR`。
+Memory Catalog Server 是独立 TypeScript 服务，不属于 Control Plane。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_control_plane` 和 `sec_review_memory_catalog` database。只有 Memory Catalog 收到 `MEMORY_CATALOG_DATABASE_URL`，并在自己的 database 中保存 observations 和 active memory pointer。提取执行和单例维护 workflow 由 Temporal 管理，PostgreSQL 只负责持久目录以及 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；transcript 和 active memory 仍由 worker 在每次 activity 中物化到本地，agent sandbox 只看到最终 filesystem mount。使用 coordinated memory mode 的 worker 不要同时设置 `AGENT_MEMORY_DIR`。
 
 PostgreSQL 初始化脚本只会在 `.agent-postgres-state` 为空时执行。采用或修改 database 名称后，应先停止部署并删除该目录，再重新启动 Compose。此操作会删除已有的 Control Plane 和 Memory Catalog 数据。
 

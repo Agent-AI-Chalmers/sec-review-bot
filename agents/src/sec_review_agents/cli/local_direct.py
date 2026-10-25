@@ -3,21 +3,21 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from sec_review_agents.artifacts.run_diagnostic_bundle import (
-    DiagnosticReviewUnit,
-    publish_run_diagnostic_bundle,
-)
 from sec_review_agents.cli.local_execution import (
     build_local_workflow_request,
     direct_run_for_bundle,
 )
 from sec_review_agents.cli.local_materialization.common import ReviewBundle
+from sec_review_agents.run_diagnostics.bundle import (
+    DiagnosticReviewUnit,
+    publish_run_diagnostic_bundle,
+)
 from sec_review_agents.temporal.config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 
 
 def run_local_direct_workflow(bundle: ReviewBundle) -> dict[str, Any]:
     print(
-        "LOCAL_DIRECT_WARNING=direct runner calls Temporal activity functions "
+        "LOCAL_DIRECT_WARNING=local direct execution calls Temporal activity functions "
         "directly as local Python functions; it does not provide Temporal retries, "
         "scheduling, or failure handling. Use --temporal to exercise the Temporal "
         "workflow path.",

@@ -54,12 +54,13 @@ def test_capability_packages_do_not_import_legacy_domain_shims() -> None:
 
 def test_foundational_packages_do_not_import_upper_layers() -> None:
     # Keep this as a one-way layering check. Foundational packages may share
-    # small helpers, but they should not pull in workflows, runners, or stages.
+    # small helpers, but they should not pull in workflows, execution workers, or stages.
     foundational_roots = [
         PACKAGE_ROOT / "utils",
         PACKAGE_ROOT / "resources",
         PACKAGE_ROOT / "workspace",
         PACKAGE_ROOT / "filesystem",
+        PACKAGE_ROOT / "artifacts",
     ]
     forbidden_prefixes = (
         "sec_review_agents.cli",
@@ -129,18 +130,31 @@ def test_runtime_package_does_not_import_domain_or_workflow_packages() -> None:
     assert violations == []
 
 
+def test_run_diagnostics_package_does_not_import_orchestration_packages() -> None:
+    violations = import_violations(
+        PACKAGE_ROOT / "run_diagnostics",
+        (
+            "sec_review_agents.cli",
+            "sec_review_agents.entrypoints",
+            "sec_review_agents.memory",
+            "sec_review_agents.workflows",
+        ),
+    )
+
+    assert violations == []
+
+
 def test_memory_package_does_not_own_run_diagnostic_publication() -> None:
     memory_root = PACKAGE_ROOT / "memory"
     forbidden_symbols = {
         "RunDiagnosticPublicationRequest",
-        "finalize_review_run",
         "publish_run_diagnostic_activity",
     }
     violations = import_violations(
         memory_root,
         (
             "sec_review_agents.workflows.memory_scheduling",
-            "sec_review_agents.workflows.review_finalization",
+            "sec_review_agents.run_diagnostics.publication",
         ),
     )
 
@@ -254,7 +268,7 @@ def test_workspace_package_does_not_import_observability() -> None:
     assert violations == []
 
 
-def test_foundational_packages_do_not_import_runner_runtime_input_preparation() -> None:
+def test_foundational_packages_do_not_import_execution_input_preparation() -> None:
     foundational_roots = [
         PACKAGE_ROOT / "filesystem",
         PACKAGE_ROOT / "workspace",
@@ -272,7 +286,7 @@ def test_foundational_packages_do_not_import_runner_runtime_input_preparation() 
     assert violations == []
 
 
-def test_run_protocol_does_not_leak_into_workflow_input_consumers() -> None:
+def test_execution_protocol_does_not_leak_into_workflow_input_consumers() -> None:
     roots = [
         PACKAGE_ROOT / "cli",
         PACKAGE_ROOT / "workflows",
@@ -283,7 +297,7 @@ def test_run_protocol_does_not_leak_into_workflow_input_consumers() -> None:
         violations.extend(
             import_violations(
                 root,
-                ("sec_review_agents.entrypoints.run_protocol",),
+                ("sec_review_agents.entrypoints.execution_protocol",),
             )
         )
 
@@ -324,8 +338,8 @@ print(json.dumps(sorted(name for name in sys.modules if name.startswith(prefixes
     assert result.stdout.strip() == "[]"
 
 
-def test_run_protocol_does_not_import_stage_modules() -> None:
-    protocol_path = PACKAGE_ROOT / "entrypoints" / "run_protocol.py"
+def test_execution_protocol_does_not_import_stage_modules() -> None:
+    protocol_path = PACKAGE_ROOT / "entrypoints" / "execution_protocol.py"
     assert protocol_path.exists()
     violations = import_violations(
         protocol_path,

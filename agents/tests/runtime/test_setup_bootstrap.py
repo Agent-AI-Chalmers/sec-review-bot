@@ -70,7 +70,7 @@ async def test_unparseable_declaration_raises_instead_of_degrading() -> None:
     # A declaration that is present but does not parse can never prepare the
     # environment it asked for, so it fails the run loudly rather than silently
     # degrading to an unbootstrapped one. This case can only come from a
-    # producer/runner format disagreement or an unvalidated out-of-band caller.
+    # producer/worker format disagreement or an unvalidated out-of-band caller.
     backend = _FakeBackend()
     with pytest.raises(SetupDeclarationError):
         await bootstrap_environment(

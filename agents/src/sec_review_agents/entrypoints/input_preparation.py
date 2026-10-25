@@ -9,15 +9,15 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from sec_review_agents.artifacts.input_storage import (
+from sec_review_agents.artifacts.object_storage import (
     ARTIFACT_S3_BUCKET_ENV,
-    download_s3_input_bundle,
+    download_s3_object,
 )
 from sec_review_agents.entrypoints.contract_schema import (
     validate_v6_input_bundle_manifest,
     validate_v6_workflow_input,
 )
-from sec_review_agents.entrypoints.run_protocol import validate_run_id
+from sec_review_agents.entrypoints.execution_protocol import validate_run_id
 from sec_review_agents.utils.env import env_value
 
 ISSUE_ARTIFACT_PATHS = {
@@ -165,7 +165,7 @@ def _materialize_input_bundle(
                     f"{INPUT_BUNDLE_ROOT_ENV}."
                 ) from error
     elif parsed.scheme == "s3":
-        resolved_archive = download_s3_input_bundle(
+        resolved_archive = download_s3_object(
             uri.strip(),
             destination.with_suffix(".tar.zst"),
             expected_size=size_bytes,

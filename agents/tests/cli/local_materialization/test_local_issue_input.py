@@ -34,7 +34,9 @@ def _create_repo(repo_path: Path) -> None:
     _run_git(repo_path, "commit", "-m", "init")
 
 
-def test_build_local_issue_bundle_omits_runner_artifacts_path(tmp_path: Path) -> None:
+def test_build_local_issue_bundle_omits_execution_artifacts_path(
+    tmp_path: Path,
+) -> None:
     repo_path = tmp_path / "repo"
     output_dir = tmp_path / "out"
     output_dir.mkdir()

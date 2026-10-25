@@ -1,1 +1,1 @@
-"""Artifact transport boundaries used by the Execution Worker."""
+"""Shared immutable artifact transport primitives."""

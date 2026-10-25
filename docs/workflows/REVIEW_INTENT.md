@@ -2,11 +2,12 @@
 
 Language: English | [中文](REVIEW_INTENT.zh.md)
 
-`review_intent` records the review objective a *caller* asks the runner to serve, plus an optional constraint on the final mitigation patch.
+`review_intent` records the review objective a *caller* asks the *callee* to serve, plus an optional constraint on the final mitigation patch.
 
-The caller and the end user are different roles, and the distinction matters here:
+The caller, callee, and end user are different roles, and the distinction matters here:
 
-- The **caller** is whatever program invokes the runner and sets `review_intent`: the GitHub integration, the PatchEval harness, or a local CLI run.
+- The **caller** is whatever program invokes review execution and sets `review_intent`: the GitHub integration, the PatchEval harness, or a local CLI run.
+- The **callee** is the review execution: the Execution Worker that accepts the request and runs the review workflow.
 - The **end user** interacts with that caller — for example, commenting `@<app-slug> review` on a GitHub issue. An end user never chooses the `objective`; on GitHub they can still set `test_changes`, by adding `--test-changes deny` to the comment.
 
 How a caller chooses the objective is its own product decision, not something `review_intent` decides. The GitHub integration always sends `audit`, because the input it forwards (an issue or pull request someone wrote) is an unverified claim. The PatchEval harness may send `repair`, because its input is a known CVE. The contract accepts both; each caller picks one.
@@ -23,7 +24,7 @@ How a caller chooses the objective is its own product decision, not something `r
 ```
 
 - `objective`: the review objective, either `audit` or `repair`.
-- `test_changes`: an optional constraint on the final mitigation patch, either `allow` or `deny`. If omitted, the runner uses `allow`.
+- `test_changes`: an optional constraint on the final mitigation patch, either `allow` or `deny`. If omitted, review execution uses `allow`.
 
 These fields are related, but they are not the same decision. `objective` changes how the workflow treats the input claim. `test_changes` constrains the final patch once mitigation runs.
 
@@ -68,4 +69,4 @@ The objective changes analyzer investigation policy, not the meaning of its stru
 
 `test_changes` does not decide whether the input claim should be trusted. It only constrains the mitigation stage once mitigation is reached.
 
-This is a prompt-level mitigation constraint, not mechanical enforcement. The runner does not classify repository files as tests or reject file changes based on path heuristics.
+This is a prompt-level mitigation constraint, not mechanical enforcement. Review execution does not classify repository files as tests or reject file changes based on path heuristics.

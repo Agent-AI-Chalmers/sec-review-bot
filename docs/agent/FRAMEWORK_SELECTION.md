@@ -2,7 +2,7 @@
 
 Language: English | [中文](FRAMEWORK_SELECTION.zh.md)
 
-This note records why the runner currently builds stage agents with LangChain `create_agent` plus project middleware, instead of directly using the high-level `deepagents.create_deep_agent` entry point or dropping all the way down to LangGraph.
+This note records why the agent framework currently builds stage agents with LangChain `create_agent` plus project middleware, instead of directly using the high-level `deepagents.create_deep_agent` entry point or dropping all the way down to LangGraph.
 
 ## Current Position
 
@@ -63,12 +63,12 @@ The execution system uses Temporal.
 
 > *Timeline screenshot is for scheduling-shape reference only; workflow and activity labels may come from an older run and are not the current API names.*
 
-This timeline shows a repository review where the runner workflow prepares repository case workflows and Temporal tracks sliding-window workflow / activity execution over time.
+This timeline shows a repository review where the review workflow prepares repository case workflows and Temporal tracks sliding-window workflow / activity execution over time.
 
 Reasons for using Temporal:
 
-- Runner runs are long-running flows, so queued, running, completed, and failed states should be owned by the execution system.
-- The Temporal task queue is the only queue for runner execution.
+- Review runs are long-running flows, so queued, running, completed, and failed states should be owned by the execution system.
+- The Temporal task queue is the only queue for review execution.
 - Temporal workflow history is the source of truth for later durable step splitting; handwritten checkpoint files are no longer used.
 - Internal workflow / activity orchestration needs durable scheduling, retry, timeout, and failure propagation across prepare / analysis / mitigation / verification / delivery stages.
 

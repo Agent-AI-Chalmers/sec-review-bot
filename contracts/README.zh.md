@@ -34,7 +34,7 @@ contracts/
 | [integration-contract](integration-contract/README.zh.md) | 公开 Execution API 与 workflow `input` / `result` 数据 | Execution API provider、调用方与下游发布方 | [v6](integration-contract/v6/CONTRACT.zh.md) |
 | [execution-contract](execution-contract/README.zh.md) | 私有 Temporal dispatch envelope | Execution Gateway 与 Execution Worker | v1 |
 | [control-plane-api](control-plane-api/README.zh.md) | Control Plane HTTP API 与 observed run 形状 | Control Plane 与其调用方 | [v1](control-plane-api/README.zh.md) |
-| [memory-catalog-api](memory-catalog-api/README.zh.md) | Managed-memory catalog HTTP API | Memory Catalog Server 与 workers | v1 |
+| [memory-catalog-api](memory-catalog-api/README.zh.md) | Memory coordination HTTP API | Memory Catalog Server 与 workers | v1 |
 | [setup-declaration](setup-declaration/README.zh.md) | 受信任的 `.sec-review/setup.yml` 格式 | 被审查仓库、GitHub Integration 与 Execution Worker | [v1](setup-declaration/v1/SPEC.zh.md) |
 
 ## 适用于每个族的规则

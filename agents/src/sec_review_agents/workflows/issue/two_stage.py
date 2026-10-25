@@ -1,6 +1,7 @@
 """Two-stage issue ablation strategy for local comparison."""
 
 from collections.abc import Mapping
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -8,18 +9,18 @@ from temporalio import activity, workflow
 
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
+from sec_review_agents.run_diagnostics.publication import (
+    RunDiagnosticPublicationRequest,
+    publish_run_diagnostic_activity,
+)
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
-    execute_activity,
+    activity_retry_policy,
     prepare_internal_workflow_activity,
 )
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.issue.workflow import (
     analyze_issue_activity,
-)
-from sec_review_agents.workflows.review_finalization import (
-    RunDiagnosticPublicationRequest,
-    finalize_review_run,
 )
 from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_ALLOW,
@@ -111,53 +112,59 @@ def build_issue_two_stage_result_activity(
 class IssueTwoStageWorkflow:
     @workflow.run
     async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
-        await execute_activity(
+        await workflow.execute_activity(
             prepare_internal_workflow_activity,
-            request.workflow,
-            request.run_id,
-            timeout_seconds=request.timeout_seconds,
+            args=[request.workflow, request.run_id],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
         )
         prepared_input = request.prepared_input
         runtime_context = request.runtime_context
-        analysis_result = await execute_activity(
+        analysis_result = await workflow.execute_activity(
             analyze_issue_activity,
-            prepared_input,
-            runtime_context,
-            timeout_seconds=request.timeout_seconds,
+            args=[prepared_input, runtime_context],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
         )
-        mitigation_result = await execute_activity(
+        mitigation_result = await workflow.execute_activity(
             mitigate_issue_self_check_activity,
-            prepared_input,
-            analysis_result,
-            runtime_context,
-            timeout_seconds=request.timeout_seconds,
+            args=[prepared_input, analysis_result, runtime_context],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
         )
-        public_result = await execute_activity(
+        public_result = await workflow.execute_activity(
             build_issue_two_stage_result_activity,
-            {
-                "analysis_result": analysis_result,
-                "mitigation_result": mitigation_result,
-            },
-            timeout_seconds=request.timeout_seconds,
+            args=[
+                {
+                    "analysis_result": analysis_result,
+                    "mitigation_result": mitigation_result,
+                }
+            ],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
         )
         artifact_root = required_path(
             prepared_input.get("artifact_root_path"),
             label="artifact_root_path",
         )
-        finalized = await finalize_review_run(
-            RunDiagnosticPublicationRequest(
-                run_id=request.run_id,
-                artifact_root_path=str(artifact_root),
-                review_units=[
-                    {
-                        "review_unit_id": "review",
-                        "transcript_root": str(artifact_root / "transcripts"),
-                    }
-                ],
-                result=public_result,
-                timeout_seconds=request.timeout_seconds,
-                publication=request.post_processing.diagnostic_publication,
-            )
+        finalized = await workflow.execute_activity(
+            publish_run_diagnostic_activity,
+            args=[
+                RunDiagnosticPublicationRequest(
+                    run_id=request.run_id,
+                    artifact_root_path=str(artifact_root),
+                    review_units=[
+                        {
+                            "review_unit_id": "review",
+                            "transcript_root": str(artifact_root / "transcripts"),
+                        }
+                    ],
+                    result=public_result,
+                    publication=request.post_processing.diagnostic_publication,
+                )
+            ],
+            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            retry_policy=activity_retry_policy(),
         )
         return {
             "ok": True,

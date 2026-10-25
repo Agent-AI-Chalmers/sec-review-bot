@@ -78,10 +78,10 @@ async def _run_local_temporal_workflow(bundle: ReviewBundle) -> dict[str, Any]:
     except WorkflowAlreadyStartedError:
         handle = client.get_workflow_handle(workflow_id)
     response = await handle.result()
-    return _unwrap_runner_response(response)
+    return _unwrap_execution_response(response)
 
 
-def _unwrap_runner_response(response: Any) -> dict[str, Any]:
+def _unwrap_execution_response(response: Any) -> dict[str, Any]:
     if not isinstance(response, dict):
         raise RuntimeError("Local Temporal workflow returned a non-object response.")
     if response.get("ok") is True and isinstance(response.get("result"), dict):

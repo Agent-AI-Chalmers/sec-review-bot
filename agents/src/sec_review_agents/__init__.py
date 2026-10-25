@@ -1,1 +1,1 @@
-"""Default Python review runner for sec-review-agents."""
+"""Python implementation of the Execution Worker, Memory Worker, and agent runtime."""

@@ -96,7 +96,7 @@ def build_local_issue_bundle(
     )
     write_input_bundle_manifest(paths, include_incremental_window=False)
 
-    # The runner validates this against the v6 issue schema, which forbids additional
+    # Input preparation validates this against the v6 issue schema, which forbids additional
     # properties, so it carries identity plus what the prompts render and nothing else.
     issue_metadata = {
         "owner": repo_name.split("/", 1)[0],

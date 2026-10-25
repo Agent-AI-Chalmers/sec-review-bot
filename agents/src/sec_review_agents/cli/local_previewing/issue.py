@@ -207,7 +207,7 @@ def write_issue_previews(
         "# Issue Previews",
         "",
         "Local-only preview files for inspecting the publishable issue workflow output.",
-        "These files are generated for local inspection and are not part of the runner or app contract.",
+        "These files are generated for local inspection and are not part of the execution or application contract.",
         "",
         *_preview_index_lines(items),
     ]

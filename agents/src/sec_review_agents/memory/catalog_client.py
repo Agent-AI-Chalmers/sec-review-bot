@@ -1,4 +1,4 @@
-"""Strict HTTP client for the managed memory catalog."""
+"""Strict HTTP client for coordinated memory state and revision commits."""
 
 import json
 from dataclasses import dataclass

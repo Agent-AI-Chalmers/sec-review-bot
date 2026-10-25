@@ -98,7 +98,7 @@ def test_writes_issue_comment_and_draft_pr_previews(tmp_path: Path) -> None:
         encoding="utf-8"
     )
     assert "Local-only preview files" in readme_content
-    assert "not part of the runner or app contract" in readme_content
+    assert "not part of the execution or application contract" in readme_content
     assert "## Security Review" in comment.read_text(encoding="utf-8")
     draft_content = draft_pr.read_text(encoding="utf-8")
     assert "Narratives:" in draft_content
@@ -142,7 +142,7 @@ def test_writes_pull_request_review_body_preview(tmp_path: Path) -> None:
         encoding="utf-8"
     )
     assert "Local-only preview files" in readme_content
-    assert "not part of the runner or app contract" in readme_content
+    assert "not part of the execution or application contract" in readme_content
     content = review_body.read_text(encoding="utf-8")
     assert "## PR Security Review" in content
     assert "## Final Patch Preview" in content

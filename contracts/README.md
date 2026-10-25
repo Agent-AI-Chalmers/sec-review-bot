@@ -31,7 +31,7 @@ A family may also hold documents that apply to every version, such as a transpor
 | [integration-contract](integration-contract/README.md) | Public Execution API and workflow `input` / `result` data | Execution API providers, callers, and downstream publishers | [v6](integration-contract/v6/CONTRACT.md) |
 | [execution-contract](execution-contract/README.md) | Private Temporal dispatch envelope | Execution Gateway and Execution Worker | v1 |
 | [control-plane-api](control-plane-api/README.md) | Control Plane HTTP API and observed run shapes | Control Plane and its callers | [v1](control-plane-api/README.md) |
-| [memory-catalog-api](memory-catalog-api/README.md) | Managed-memory catalog HTTP API | Memory Catalog Server and workers | v1 |
+| [memory-catalog-api](memory-catalog-api/README.md) | Memory coordination HTTP API | Memory Catalog Server and workers | v1 |
 | [setup-declaration](setup-declaration/README.md) | Trusted `.sec-review/setup.yml` format | Reviewed repositories, GitHub Integration, and Execution Worker | [v1](setup-declaration/v1/SPEC.md) |
 
 ## Rules For Every Family

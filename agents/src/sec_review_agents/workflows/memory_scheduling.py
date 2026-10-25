@@ -21,7 +21,20 @@ async def schedule_memory_extractions(
     timeout_seconds: int,
     enabled: bool,
 ) -> dict[str, Any]:
-    """Start independent memory consumers for a finalized review artifact."""
+    """Schedule best-effort memory extraction after a review artifact is final.
+
+    Start one child workflow per review unit and wait only for Temporal to accept
+    each start, not for extraction to finish. The children use ``ABANDON`` so
+    they can outlive the review workflow, and a failure to start one unit is
+    recorded without failing the review or preventing the remaining starts.
+
+    The workflow ID is derived from the artifact digest and review unit. Along
+    with ``REJECT_DUPLICATE``, this makes repeated scheduling report an existing
+    extraction instead of starting duplicate work. This helper must therefore
+    run in workflow context: it records child-workflow lifecycle commands in the
+    parent's deterministic history rather than delegating orchestration to an
+    activity.
+    """
     result: dict[str, Any] = {"extractions": []}
     if not enabled:
         return result

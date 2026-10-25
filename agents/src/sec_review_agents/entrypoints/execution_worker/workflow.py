@@ -10,7 +10,7 @@ from sec_review_agents.entrypoints.execution_contract import (
     ExecutionRequest,
     validate_execution_request,
 )
-from sec_review_agents.entrypoints.run_protocol import (
+from sec_review_agents.entrypoints.execution_protocol import (
     EXECUTION_REQUEST_INVALID,
     EXECUTION_WORKFLOW_UNSUPPORTED,
 )
@@ -30,8 +30,8 @@ from sec_review_agents.workflows.review_request import (
 
 @activity.defn
 def prepare_execution_run_activity(request: ExecutionRequest) -> dict[str, Any]:
+    from sec_review_agents.entrypoints.execution_protocol import build_execution_error
     from sec_review_agents.entrypoints.input_preparation import prepare_run_input
-    from sec_review_agents.entrypoints.run_protocol import build_execution_error
     from sec_review_agents.features import memory_processing_enabled
     from sec_review_agents.observability.diagnostics import (
         bind_workflow_context,

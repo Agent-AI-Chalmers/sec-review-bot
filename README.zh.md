@@ -64,7 +64,7 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
 
 ## 项目状态
 
-本项目仍处于实验阶段，主要用于本地开发、集成测试和 workflow 研究。Runner 的公开契约有文档约束，但内部 package layout 和 agent workflow 仍可能调整。
+本项目仍处于实验阶段，主要用于本地开发、集成测试和 workflow 研究。内部 package layout 和 agent workflow 仍可能调整。
 
 Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和补丁生成能力，也取决于输入质量和工具 / 运行时环境。本文中的 workflow 设计和运行链路不是独立于模型能力的固定性能保证。
 

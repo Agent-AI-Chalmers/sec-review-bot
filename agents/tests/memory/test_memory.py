@@ -12,6 +12,7 @@ from deepagents.backends import CompositeBackend
 from langchain.agents.middleware.types import ModelRequest
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 
+from sec_review_agents.agents.analysis.agent import create_analysis_agent_graph
 from sec_review_agents.agents.memory_extractor.backend import (
     create_memory_extractor_backend,
 )
@@ -50,9 +51,7 @@ from sec_review_agents.memory.store import (
     materialize_configured_memory_view,
     memory_runtime_available,
 )
-from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
 from sec_review_agents.utils.env import load_dotenv_file
-from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 from tests.project_paths import AGENTS_ROOT
 
 
@@ -726,7 +725,7 @@ def test_materialize_configured_memory_view_locks_source_during_snapshot(
     assert lock_calls == [(memory_root.resolve(), False)]
 
 
-def test_materialize_managed_active_memory_by_digest(
+def test_materialize_coordinated_active_memory_by_digest(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -756,7 +755,7 @@ def test_materialize_managed_active_memory_by_digest(
         materialize_calls.append((value, destination))
         content_root = destination / "memory"
         (content_root / "topics").mkdir(parents=True)
-        (content_root / "MEMORY.md").write_text("# Managed\n", encoding="utf-8")
+        (content_root / "MEMORY.md").write_text("# Coordinated\n", encoding="utf-8")
         return content_root
 
     with (
@@ -772,14 +771,14 @@ def test_materialize_managed_active_memory_by_digest(
         first = materialize_configured_memory_view()
         second = materialize_configured_memory_view()
 
-    expected = materialized_root / f"managed-{'a' * 64}" / "memory"
+    expected = materialized_root / f"version-{'a' * 64}" / "memory"
     assert first == expected
     assert second == expected
-    assert (expected / "MEMORY.md").read_text(encoding="utf-8") == "# Managed\n"
+    assert (expected / "MEMORY.md").read_text(encoding="utf-8") == "# Coordinated\n"
     assert materialize_calls == [(reference, expected.parent)]
 
 
-def test_managed_memory_without_active_version_does_not_fall_back_locally(
+def test_coordinated_memory_without_active_version_does_not_fall_back_locally(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -810,7 +809,7 @@ def test_memory_runtime_unavailable_without_initialized_index(
 
 
 @pytest.mark.asyncio
-async def test_review_stage_enables_memory_when_runtime_memory_exists(
+async def test_analysis_agent_enables_memory_when_runtime_memory_exists(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -820,49 +819,44 @@ async def test_review_stage_enables_memory_when_runtime_memory_exists(
         "# Memory\n", encoding="utf-8"
     )
     monkeypatch.setenv(AGENT_MEMORY_DIR_ENV, str(memory_root))
-    workspace = tmp_path / "workspace"
-    workspace.mkdir()
-    snapshot_tar = tmp_path / "workspace.snapshot.tar"
-    create_workspace_snapshot_tar(
-        workspace_path=workspace,
-        tar_path=snapshot_tar,
-    )
-    captured_kwargs: dict = {}
+    monkeypatch.setenv(AGENT_MEMORY_CONSUMPTION_ENABLED_ENV, "true")
+    captured_middleware = []
 
-    async def fake_create_agent_graph(**kwargs):
-        captured_kwargs.update(kwargs)
+    async def fake_build_agent_runtime_graph(**kwargs):
+        captured_middleware.extend(kwargs["middleware"])
         return object()
-
-    async def fake_invoke_agent_runtime_graph(**_kwargs):
-        return {
-            "overview": "ok",
-            "narratives": [],
-            "overall_verdict": "no-actionable-finding",
-        }
 
     with (
         patch(
-            "sec_review_agents.review_stages.analysis.stage.create_analysis_agent_graph",
-            side_effect=fake_create_agent_graph,
+            "sec_review_agents.agents.analysis.agent.create_chat_model",
+            return_value=Mock(),
         ),
         patch(
-            "sec_review_agents.review_stages.analysis.stage.invoke_agent_runtime_graph",
-            side_effect=fake_invoke_agent_runtime_graph,
+            "sec_review_agents.agents.analysis.agent.agent_skills_enabled",
+            return_value=False,
+        ),
+        patch(
+            "sec_review_agents.agents.analysis.agent.model_turn_diagnostics_enabled",
+            return_value=False,
+        ),
+        patch(
+            "sec_review_agents.agents.analysis.agent.create_summarization_middleware",
+            return_value=Mock(),
+        ),
+        patch(
+            "sec_review_agents.agents.analysis.agent.build_agent_runtime_graph",
+            side_effect=fake_build_agent_runtime_graph,
         ),
     ):
-        await run_analysis_stage(
-            analyzer_artifacts_path=tmp_path / "artifacts",
+        await create_analysis_agent_graph(
             agent_name="issue-analyzer",
-            baseline_snapshot_tar_path=snapshot_tar,
-            build_backend=lambda stage_workspace_path: LocalFilesystemBackend(
-                stage_workspace_path
-            ),
+            backend=LocalFilesystemBackend(tmp_path / "workspace"),
             system_prompt="system",
             filesystem_system_prompt="filesystem",
-            user_prompt="user",
+            mcp_tools=[],
         )
 
-    assert captured_kwargs["agent_name"] == "issue-analyzer"
+    assert any(isinstance(item, MemoryMiddleware) for item in captured_middleware)
 
 
 def test_observation_id_slugs_job_id() -> None:
@@ -1822,51 +1816,46 @@ async def test_maintain_memory_retries_pending_observation_after_failure(
 
 
 @pytest.mark.asyncio
-async def test_review_stage_leaves_memory_disabled_when_runtime_memory_is_missing(
+async def test_analysis_agent_leaves_memory_disabled_when_runtime_memory_is_missing(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
     monkeypatch.delenv(AGENT_MEMORY_DIR_ENV, raising=False)
-    workspace = tmp_path / "workspace"
-    workspace.mkdir()
-    snapshot_tar = tmp_path / "workspace.snapshot.tar"
-    create_workspace_snapshot_tar(
-        workspace_path=workspace,
-        tar_path=snapshot_tar,
-    )
-    captured_kwargs: dict = {}
+    monkeypatch.setenv(AGENT_MEMORY_CONSUMPTION_ENABLED_ENV, "true")
+    captured_middleware = []
 
-    async def fake_create_agent_graph(**kwargs):
-        captured_kwargs.update(kwargs)
+    async def fake_build_agent_runtime_graph(**kwargs):
+        captured_middleware.extend(kwargs["middleware"])
         return object()
-
-    async def fake_invoke_agent_runtime_graph(**_kwargs):
-        return {
-            "overview": "ok",
-            "narratives": [],
-            "overall_verdict": "no-actionable-finding",
-        }
 
     with (
         patch(
-            "sec_review_agents.review_stages.analysis.stage.create_analysis_agent_graph",
-            side_effect=fake_create_agent_graph,
+            "sec_review_agents.agents.analysis.agent.create_chat_model",
+            return_value=Mock(),
         ),
         patch(
-            "sec_review_agents.review_stages.analysis.stage.invoke_agent_runtime_graph",
-            side_effect=fake_invoke_agent_runtime_graph,
+            "sec_review_agents.agents.analysis.agent.agent_skills_enabled",
+            return_value=False,
+        ),
+        patch(
+            "sec_review_agents.agents.analysis.agent.model_turn_diagnostics_enabled",
+            return_value=False,
+        ),
+        patch(
+            "sec_review_agents.agents.analysis.agent.create_summarization_middleware",
+            return_value=Mock(),
+        ),
+        patch(
+            "sec_review_agents.agents.analysis.agent.build_agent_runtime_graph",
+            side_effect=fake_build_agent_runtime_graph,
         ),
     ):
-        await run_analysis_stage(
-            analyzer_artifacts_path=tmp_path / "artifacts",
+        await create_analysis_agent_graph(
             agent_name="issue-analyzer",
-            baseline_snapshot_tar_path=snapshot_tar,
-            build_backend=lambda stage_workspace_path: LocalFilesystemBackend(
-                stage_workspace_path
-            ),
+            backend=LocalFilesystemBackend(tmp_path / "workspace"),
             system_prompt="system",
             filesystem_system_prompt="filesystem",
-            user_prompt="user",
+            mcp_tools=[],
         )
 
-    assert captured_kwargs["agent_name"] == "issue-analyzer"
+    assert not any(isinstance(item, MemoryMiddleware) for item in captured_middleware)

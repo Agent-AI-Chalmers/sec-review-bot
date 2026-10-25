@@ -7,7 +7,7 @@ Both the runtime (``entrypoints/contract_schema.py``) and the build read the
 version from here, so it is defined exactly once.
 """
 
-# CONTRACT_VERSION is the version this runner produces and expects.
+# CONTRACT_VERSION is the version this package produces and expects.
 CONTRACT_VERSION = "v6"
 
 __all__ = ["CONTRACT_VERSION"]
