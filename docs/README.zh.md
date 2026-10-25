@@ -12,20 +12,21 @@
 
 ### architecture/
 
-- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：运行实体、部署边界、职责所有权，以及主 review 与异步 memory 链路。
+- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：逻辑运行角色、当前部署边界、职责所有权，以及主 review 与异步 memory 链路。
 
 ### Packages 与服务
 
-Package README 负责本地 setup、命令、配置与实现布局。运行实体和源码 package 并非一一对应：`agents/` 同时实现两个 worker 进程。
+Package README 负责本地 setup、命令、配置与实现布局。运行角色和源码 package 并非一一对应：`agents/` 实现 Execution Worker、Memory Extraction Worker 与 Memory Maintenance Worker。
 
-| 运行实体 | Package 指南 |
+| 运行角色 | Package 指南 |
 | --- | --- |
 | GitHub Integration | [`apps/github-integration/README.md`](../apps/github-integration/README.zh.md) |
 | Review Control Plane | [`control-plane/README.md`](../control-plane/README.zh.md) |
 | Control Plane UI | [`apps/control-plane-ui/README.md`](../apps/control-plane-ui/README.md) |
 | Execution Gateway | [`execution-gateway/README.md`](../execution-gateway/README.zh.md) |
 | Execution Worker | [`agents/README.md`](../agents/README.zh.md) |
-| Memory Worker | [`agents/README.md`](../agents/README.zh.md) |
+| Memory Extraction Worker | [`agents/README.md`](../agents/README.zh.md) |
+| Memory Maintenance Worker | [`agents/README.md`](../agents/README.zh.md) |
 | Memory Catalog Server | [`memory-catalog/README.md`](../memory-catalog/README.zh.md) |
 
 ### agent/

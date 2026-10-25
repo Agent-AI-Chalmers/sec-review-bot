@@ -4,7 +4,7 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-`agents/` 是项目里的 Python 侧。它包含 Execution Worker 入口、workflow 执行、filesystem / workspace runtime、delivery 产物生成和 observability。
+`agents/` 是项目里的 Python 侧。它把 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker 实现为三个独立的 Temporal runtime，并提供 workflow 执行、filesystem / workspace runtime、delivery 产物生成和 observability。
 
 ## 安装
 
@@ -52,7 +52,7 @@ LLM 配置按 deployment 选择 provider。
 
 本地 `run-local-*` CLI 和 `sec-review-agents-check-llm-deployments` 会加载 `agents/.env`，但不会覆盖进程里已有的环境变量。
 
-`sec-review-execution-worker` 和 `sec-review-memory-worker` 不会自己加载 `.env`，需要由 shell、process supervisor 或 CI 注入环境变量。Execution Gateway 是 [`execution-gateway/`](../execution-gateway/README.zh.md) 下独立的 TypeScript 服务。
+`sec-review-execution-worker`、`sec-review-memory-extraction-worker` 和 `sec-review-memory-maintenance-worker` 不会自己加载 `.env`，需要由 shell、process supervisor 或 CI 注入环境变量。Execution Gateway 是 [`execution-gateway/`](../execution-gateway/README.zh.md) 下独立的 TypeScript 服务。
 
 没有 `.env` 文件路径 override。`MODEL_PROVIDERS_CONFIG_TOML` 是模型配置路径的最高优先级入口；只有想把 TOML 放到其他位置，或运行方式不保留当前项目相对目录结构时，才需要显式设置它。
 
@@ -123,7 +123,7 @@ flowchart LR
     direct --> execution
 ```
 
-外部 TypeScript Gateway 接收 HTTP run 请求，并通过 Temporal client 启动和查询 workflow；它不执行 agent。Temporal Server 持久化 workflow 状态，并把任务派发给主动轮询的 worker。Direct local execution 绕过 HTTP service 和 Temporal，但会复用 activity functions；`run-local-* --temporal` 绕过 HTTP service，但会经过 Temporal Server 和 worker。
+外部 TypeScript Gateway 接收 HTTP run 请求，并通过 Temporal client 启动和查询 workflow；它不执行 agent。Temporal Server 持久化 workflow 状态，并通过独立的 worker 和 task queue 分发 review、memory extraction 与 memory maintenance 工作。Direct local execution 绕过 HTTP service 和 Temporal，但会复用 activity functions；`run-local-* --temporal` 绕过 HTTP service，但会经过 Temporal Server 和 Execution Worker。
 
 ## 本地运行
 
@@ -221,7 +221,7 @@ sec-review-agents-run-local-repository \
 
 显式传 `--temporal` 时，同一个本地命令仍然在开发机上准备输入，但后续 workflow stages 会通过 Temporal workflow / activity 调度执行。这个模式适合调试 workflow 编排、retry、activity 边界或 Temporal 中可见的状态。它仍然绕过 HTTP Execution Gateway，因此不等同于完整 service path。
 
-本地 Temporal 执行会把 run diagnostic bundle 保存在本地文件系统中，并通过经过校验的 `file://` 引用在 worker 之间传递。因此，本地 Execution Worker 与 Memory Worker 必须共享 artifact 文件系统，并以相同的绝对路径访问该文件；这种运行方式不需要 S3 兼容对象存储。
+本地 Temporal 执行会把 run diagnostic bundle 保存在本地文件系统中，并通过经过校验的 `file://` 引用在 worker 之间传递。因此，本地 Execution Worker 与 Memory Extraction Worker 必须共享该 artifact 文件系统，并以相同的绝对路径访问它。Coordinated memory 使用本地 artifact reference 时，Memory Maintenance Worker 也必须共享相同路径。这种运行方式不需要 S3 兼容对象存储。
 
 运行 `--temporal` local command 前，先启动本地 Temporal dev server：
 
@@ -249,7 +249,7 @@ sec-review-execution-worker
 
 ### 手动启动 Workers
 
-分别启动 Temporal 和两个 worker。独立 HTTP 服务从 [`execution-gateway/`](../execution-gateway/README.zh.md) 启动。
+分别启动 Temporal 和三个 worker。独立 HTTP 服务从 [`execution-gateway/`](../execution-gateway/README.zh.md) 启动。
 
 最小本地启动形状：
 
@@ -267,14 +267,23 @@ TEMPORAL_EXECUTION_TASK_QUEUE=sec-review-execution \
 sec-review-execution-worker
 ```
 
-终端 3，Memory Worker：
+终端 3，Memory Extraction Worker：
 
 ```bash
 TEMPORAL_ADDRESS=127.0.0.1:7233 \
-sec-review-memory-worker
+TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES=4 \
+sec-review-memory-extraction-worker
 ```
 
-Execution Worker 负责 review workflow、sandbox activity 和 run diagnostic 发布；Memory Worker 读取已发布的诊断包，负责异步 extraction 与 maintenance。两者使用独立的 task queue 和并发限制。
+终端 4，Memory Maintenance Worker：
+
+```bash
+TEMPORAL_ADDRESS=127.0.0.1:7233 \
+TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES=1 \
+sec-review-memory-maintenance-worker
+```
+
+Execution Worker 负责 review workflow、sandbox activity 和 run diagnostic 发布；Memory Extraction Worker 读取已发布的诊断包并产出 observations，可以增加轮询同一 extraction task queue 的进程；Memory Maintenance Worker 串行更新共享 memory tree，并负责维护 maintenance schedule，它拒绝 `1` 以外的 activity concurrency，且必须保持单进程。三个 worker 分别使用独立的 task queue 和并发限制。
 
 Docker Compose 控制平面和宿主机 worker 的运行方式见[本地集成部署](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
 

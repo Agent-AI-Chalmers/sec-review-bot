@@ -6,7 +6,7 @@
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
       <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.1" />
     </filter>
-    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="4" markerHeight="4" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" class="arrow-head" />
     </marker>
     <style>
@@ -15,7 +15,7 @@
       .external { fill: #f8fafc; stroke: #d8dee8; }
       .runtime { fill: #f8fbfa; stroke: #c7d8d2; }
       .persistence { fill: #fbfaf8; stroke: #ded8ce; }
-      .group-label { font-size: 21px; font-weight: 650; fill: #475569; }
+      .group-label { font-size: 21px; font-weight: 650; fill: #475569; paint-order: stroke; stroke: #fbfaf8; stroke-width: 10; stroke-linejoin: round; }
       .node, .store { filter: url(#shadow); }
       .node-surface { fill: #ffffff; stroke: #d6dce5; stroke-width: 1.25; }
       .node-accent { fill: none; stroke-width: 3; stroke-linecap: round; }
@@ -27,9 +27,9 @@
       .store-icon { fill: #f5f1e9; stroke: #8b6b3f; stroke-width: 1.4; }
       .store-icon.no-fill { fill: none; }
       .object-icon { fill: #f5f1e9; stroke: #8b6b3f; stroke-width: 1.4; }
-      .node-label { font-size: 17px; font-weight: 550; }
-      .edge { fill: none; stroke: #718096; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-      .arrow-head { fill: #718096; }
+      .node-label { font-size: 16px; font-weight: 550; }
+      .edge { fill: none; stroke: #94a3b8; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; opacity: 0.78; }
+      .arrow-head { fill: #94a3b8; opacity: 0.78; }
     </style>
   </defs>
   <g>
@@ -50,18 +50,21 @@
   <path d="M 195 130 L 280 130" class="edge" marker-end="url(#arrow)" />
   <path d="M 195 290 L 280 290" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
   <path d="M 440 130 L 495 130" class="edge" marker-end="url(#arrow)" />
-  <path d="M 440 290 L 470 290 L 470 148 L 495 148" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 440 290 L 460 290 Q 470 290 470 300 L 470 138 Q 470 148 480 148 L 495 148" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
   <path d="M 665 130 L 710 130" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
   <path d="M 870 130 L 895 130" class="edge" marker-end="url(#arrow)" />
   <path d="M 1055 130 L 1080 130" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 975 166 L 975 254" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 975 166 L 975 208 Q 975 218 985 218 L 780 218 Q 790 218 790 228 L 790 254" class="edge" marker-end="url(#arrow)" />
+  <path d="M 975 166 L 975 254" class="edge" marker-end="url(#arrow)" />
+  <path d="M 870 290 L 895 290" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
   <path d="M 1055 290 L 1080 290" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
   <path d="M 580 166 L 580 515" class="edge" marker-end="url(#arrow)" />
-  <path d="M 1160 326 L 1160 485 L 655 485 L 655 515" class="edge" marker-end="url(#arrow)" />
-  <path d="M 360 326 L 360 625 L 930 625 L 930 561 L 970 561" class="edge" marker-end="url(#arrow)" />
-  <path d="M 790 166 L 790 400 L 950 400 L 950 475 L 1075 475 L 1075 515" class="edge" marker-end="url(#arrow)" />
-  <path d="M 1240 130 L 1310 130 L 1310 561 L 1180 561" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 975 326 L 975 515" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1160 326 L 1160 475 Q 1160 485 1170 485 L 645 485 Q 655 485 655 495 L 655 515" class="edge" marker-end="url(#arrow)" />
+  <path d="M 360 326 L 360 615 Q 360 625 370 625 L 920 625 Q 930 625 930 635 L 930 551 Q 930 561 940 561 L 970 561" class="edge" marker-end="url(#arrow)" />
+  <path d="M 790 166 L 790 390 Q 790 400 800 400 L 940 400 Q 950 400 950 410 L 950 465 Q 950 475 960 475 L 1065 475 Q 1075 475 1075 485 L 1075 515" class="edge" marker-end="url(#arrow)" />
+  <path d="M 1240 130 L 1300 130 Q 1310 130 1310 140 L 1310 551 Q 1310 561 1320 561 L 1180 561" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 790 326 L 790 440 Q 790 450 800 450 L 1020 450 Q 1030 450 1030 460 L 1030 515" class="edge" marker-end="url(#arrow)" />
+  <path d="M 975 326 L 975 465 Q 975 475 985 475 L 1080 475 Q 1090 475 1090 485 L 1090 515" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
   <g id="operator" class="node external-node">
     <rect x="45" y="94" width="150" height="72" rx="8" class="node-surface" />
     <path d="M 53 95 H 187" class="node-accent" />
@@ -123,20 +126,28 @@
       <tspan x="1160" dy="18">Worker</tspan>
     </text>
   </g>
-  <g id="memory-worker" class="node memory-node">
-    <rect x="895" y="254" width="160" height="72" rx="8" class="node-surface" />
-    <path d="M 903 255 H 1047" class="node-accent" />
+  <g id="extraction-worker" class="node memory-node">
+    <rect x="700" y="254" width="180" height="72" rx="8" class="node-surface" />
+    <path d="M 708 255 H 872" class="node-accent" />
+    <text x="790" y="286" class="node-label" text-anchor="middle">
+      <tspan x="790" dy="0">Memory Extraction</tspan>
+      <tspan x="790" dy="18">Worker</tspan>
+    </text>
+  </g>
+  <g id="maintenance-worker" class="node memory-node">
+    <rect x="885" y="254" width="180" height="72" rx="8" class="node-surface" />
+    <path d="M 893 255 H 1057" class="node-accent" />
     <text x="975" y="286" class="node-label" text-anchor="middle">
-      <tspan x="975" dy="0">Memory</tspan>
+      <tspan x="975" dy="0">Memory Maintenance</tspan>
       <tspan x="975" dy="18">Worker</tspan>
     </text>
   </g>
   <g id="catalog" class="node memory-node">
-    <rect x="1080" y="254" width="160" height="72" rx="8" class="node-surface" />
-    <path d="M 1088 255 H 1232" class="node-accent" />
-    <text x="1160" y="286" class="node-label" text-anchor="middle">
-      <tspan x="1160" dy="0">Memory Catalog</tspan>
-      <tspan x="1160" dy="18">Server</tspan>
+    <rect x="1080" y="254" width="180" height="72" rx="8" class="node-surface" />
+    <path d="M 1088 255 H 1252" class="node-accent" />
+    <text x="1170" y="286" class="node-label" text-anchor="middle">
+      <tspan x="1170" dy="0">Memory Catalog</tspan>
+      <tspan x="1170" dy="18">Server</tspan>
     </text>
   </g>
   <g id="postgres" class="store storage-node">

@@ -19,7 +19,7 @@ from sec_review_agents.features import memory_processing_enabled
 from sec_review_agents.memory.local_store import initialize_configured_memory_store
 from sec_review_agents.observability.log_config import logger
 from sec_review_agents.temporal.config import (
-    DEFAULT_MEMORY_TASK_QUEUE,
+    DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE,
     DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
 )
 from sec_review_agents.utils.env import int_env
@@ -42,7 +42,7 @@ class MemoryMaintenanceScheduleRequest:
     timeout_seconds: int
     interval_seconds: int = MEMORY_MAINTENANCE_SCHEDULE_DEFAULT_INTERVAL_SECONDS
     schedule_id: str = MEMORY_MAINTENANCE_SCHEDULE_ID
-    task_queue: str = DEFAULT_MEMORY_TASK_QUEUE
+    task_queue: str = DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE
     trigger_immediately: bool = False
 
 

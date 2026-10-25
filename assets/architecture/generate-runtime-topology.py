@@ -90,16 +90,36 @@ def add_path(
     *,
     bidirectional: bool = False,
 ) -> None:
-    commands = [f"M {points[0][0]} {points[0][1]}"]
-    commands.extend(f"L {x} {y}" for x, y in points[1:])
+    commands = rounded_path(points)
     attributes: dict[str, object] = {
-        "d": " ".join(commands),
+        "d": commands,
         "class_": "edge",
         "marker_end": "url(#arrow)",
     }
     if bidirectional:
         attributes["marker_start"] = "url(#arrow)"
     element(parent, "path", **attributes)
+
+
+def rounded_path(points: list[tuple[int, int]], radius: int = 10) -> str:
+    commands = [f"M {points[0][0]} {points[0][1]}"]
+    for index in range(1, len(points) - 1):
+        previous = points[index - 1]
+        current = points[index]
+        following = points[index + 1]
+        incoming = min(radius, abs(current[0] - previous[0]) // 2 + abs(current[1] - previous[1]) // 2)
+        outgoing = min(radius, abs(following[0] - current[0]) // 2 + abs(following[1] - current[1]) // 2)
+        before = (
+            current[0] - (incoming if current[0] != previous[0] else 0),
+            current[1] - (incoming if current[1] != previous[1] else 0),
+        )
+        after = (
+            current[0] + (outgoing if following[0] != current[0] else 0),
+            current[1] + (outgoing if following[1] != current[1] else 0),
+        )
+        commands.extend((f"L {before[0]} {before[1]}", f"Q {current[0]} {current[1]} {after[0]} {after[1]}"))
+    commands.append(f"L {points[-1][0]} {points[-1][1]}")
+    return " ".join(commands)
 
 
 def render(filename: str, labels: dict[str, str]) -> None:
@@ -126,8 +146,8 @@ def render(filename: str, labels: dict[str, str]) -> None:
         viewBox="0 0 10 10",
         refX=9,
         refY=5,
-        markerWidth=5,
-        markerHeight=5,
+        markerWidth=4,
+        markerHeight=4,
         markerUnits="userSpaceOnUse",
         orient="auto-start-reverse",
     )
@@ -139,7 +159,7 @@ def render(filename: str, labels: dict[str, str]) -> None:
       .external { fill: #f8fafc; stroke: #d8dee8; }
       .runtime { fill: #f8fbfa; stroke: #c7d8d2; }
       .persistence { fill: #fbfaf8; stroke: #ded8ce; }
-      .group-label { font-size: 21px; font-weight: 650; fill: #475569; }
+      .group-label { font-size: 21px; font-weight: 650; fill: #475569; paint-order: stroke; stroke: #fbfaf8; stroke-width: 10; stroke-linejoin: round; }
       .node, .store { filter: url(#shadow); }
       .node-surface { fill: #ffffff; stroke: #d6dce5; stroke-width: 1.25; }
       .node-accent { fill: none; stroke-width: 3; stroke-linecap: round; }
@@ -151,9 +171,9 @@ def render(filename: str, labels: dict[str, str]) -> None:
       .store-icon { fill: #f5f1e9; stroke: #8b6b3f; stroke-width: 1.4; }
       .store-icon.no-fill { fill: none; }
       .object-icon { fill: #f5f1e9; stroke: #8b6b3f; stroke-width: 1.4; }
-      .node-label { font-size: 17px; font-weight: 550; }
-      .edge { fill: none; stroke: #718096; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-      .arrow-head { fill: #718096; }
+      .node-label { font-size: 16px; font-weight: 550; }
+      .edge { fill: none; stroke: #94a3b8; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; opacity: 0.78; }
+      .arrow-head { fill: #94a3b8; opacity: 0.78; }
     """
 
     external = element(root, "g")
@@ -183,7 +203,9 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_path(root, [(665, 130), (710, 130)], bidirectional=True)
     add_path(root, [(870, 130), (895, 130)])
     add_path(root, [(1055, 130), (1080, 130)], bidirectional=True)
-    add_path(root, [(975, 166), (975, 254)], bidirectional=True)
+    add_path(root, [(975, 166), (975, 218), (790, 218), (790, 254)])
+    add_path(root, [(975, 166), (975, 254)])
+    add_path(root, [(870, 290), (895, 290)], bidirectional=True)
     add_path(root, [(1055, 290), (1080, 290)], bidirectional=True)
 
     add_path(root, [(580, 166), (580, 515)])
@@ -191,7 +213,8 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_path(root, [(360, 326), (360, 625), (930, 625), (930, 561), (970, 561)])
     add_path(root, [(790, 166), (790, 400), (950, 400), (950, 475), (1075, 475), (1075, 515)])
     add_path(root, [(1240, 130), (1310, 130), (1310, 561), (1180, 561)], bidirectional=True)
-    add_path(root, [(975, 326), (975, 515)], bidirectional=True)
+    add_path(root, [(790, 326), (790, 450), (1030, 450), (1030, 515)])
+    add_path(root, [(975, 326), (975, 475), (1090, 475), (1090, 515)], bidirectional=True)
 
     add_node(root, "operator", 45, 94, 150, 72, labels["operator"], "external-node")
     add_node(root, "github", 45, 254, 150, 72, "GitHub", "external-node")
@@ -201,8 +224,9 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_node(root, "gateway", 710, 94, 160, 72, "Execution\nGateway", "execution-node")
     add_node(root, "temporal", 895, 94, 160, 72, "Temporal Server", "execution-node")
     add_node(root, "execution-worker", 1080, 94, 160, 72, "Execution\nWorker", "execution-node")
-    add_node(root, "memory-worker", 895, 254, 160, 72, "Memory\nWorker", "memory-node")
-    add_node(root, "catalog", 1080, 254, 160, 72, "Memory Catalog\nServer", "memory-node")
+    add_node(root, "extraction-worker", 700, 254, 180, 72, "Memory Extraction\nWorker", "memory-node")
+    add_node(root, "maintenance-worker", 885, 254, 180, 72, "Memory Maintenance\nWorker", "memory-node")
+    add_node(root, "catalog", 1080, 254, 180, 72, "Memory Catalog\nServer", "memory-node")
 
     add_store(root, "postgres", 500, 515, 210, 92, "PostgreSQL", "storage-node", "database")
     add_store(root, "storage", 970, 515, 210, 92, labels["storage"], "storage-node", "objects")

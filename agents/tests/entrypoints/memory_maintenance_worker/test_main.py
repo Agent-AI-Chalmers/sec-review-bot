@@ -3,13 +3,21 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from sec_review_agents.entrypoints.memory_worker import main as worker_module
-from sec_review_agents.workflows.memory.extraction import MemoryExtractionWorkflow
-from sec_review_agents.workflows.memory.maintenance import MemoryMaintenanceWorkflow
+from sec_review_agents.entrypoints.memory_maintenance_worker import (
+    main as worker_module,
+)
+from sec_review_agents.workflows.memory.maintenance import (
+    MemoryMaintenanceWorkflow,
+    commit_memory_tree_revision_activity,
+    count_pending_memory_observations_activity,
+    prepare_memory_maintenance_activity,
+)
 
 
 @pytest.mark.asyncio
-async def test_memory_worker_owns_memory_registration_and_schedule(monkeypatch) -> None:
+async def test_maintenance_worker_owns_maintenance_registration_and_schedule(
+    monkeypatch,
+) -> None:
     captured: dict[str, Any] = {}
 
     class FakeExecutor:
@@ -35,34 +43,43 @@ async def test_memory_worker_owns_memory_registration_and_schedule(monkeypatch) 
     monkeypatch.setattr(worker_module, "ThreadPoolExecutor", FakeExecutor)
     monkeypatch.setattr(worker_module, "Worker", FakeWorker)
     monkeypatch.setattr(
-        worker_module, "ensure_configured_memory_schedules", ensure_schedules
+        worker_module,
+        "ensure_configured_memory_schedules",
+        ensure_schedules,
     )
 
     await worker_module.run_worker()
 
-    assert captured["task_queue"] == "sec-review-memory"
-    assert captured["workflows"] == [
-        MemoryExtractionWorkflow,
-        MemoryMaintenanceWorkflow,
+    assert captured["task_queue"] == "sec-review-memory-maintenance"
+    assert captured["workflows"] == [MemoryMaintenanceWorkflow]
+    assert captured["activities"] == [
+        count_pending_memory_observations_activity,
+        commit_memory_tree_revision_activity,
+        prepare_memory_maintenance_activity,
     ]
     assert captured["max_concurrent_activities"] == 1
     ensure_schedules.assert_awaited_once_with(
         connect.return_value,
-        task_queue="sec-review-memory",
+        task_queue="sec-review-memory-maintenance",
     )
 
 
 @pytest.mark.asyncio
-async def test_memory_worker_rejects_invalid_concurrency_before_connecting(
+async def test_maintenance_worker_rejects_concurrency_above_one_before_connecting(
     monkeypatch,
 ) -> None:
-    monkeypatch.setenv("TEMPORAL_MEMORY_MAX_CONCURRENT_ACTIVITIES", "many")
+    monkeypatch.setenv(
+        "TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES",
+        "2",
+    )
     connect = AsyncMock()
     monkeypatch.setattr(worker_module, "connect_temporal_client", connect)
 
     with pytest.raises(
         ValueError,
-        match="TEMPORAL_MEMORY_MAX_CONCURRENT_ACTIVITIES must be a decimal integer",
+        match=(
+            "TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES " "must be at most 1"
+        ),
     ):
         await worker_module.run_worker()
 

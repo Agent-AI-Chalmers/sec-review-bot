@@ -6,7 +6,7 @@ from pathlib import Path
 from temporalio.client import Client
 from temporalio.exceptions import WorkflowAlreadyStartedError
 
-from sec_review_agents.entrypoints.memory_worker.schedules import (
+from sec_review_agents.entrypoints.memory_maintenance_worker.schedules import (
     MEMORY_MAINTENANCE_SCHEDULE_DEFAULT_INTERVAL_SECONDS,
     MEMORY_MAINTENANCE_SCHEDULE_ID,
     MemoryMaintenanceScheduleRequest,
@@ -25,7 +25,7 @@ from sec_review_agents.memory.local_store import (
     resolve_memory_store_dir,
 )
 from sec_review_agents.temporal.config import (
-    DEFAULT_MEMORY_TASK_QUEUE,
+    DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE,
     DEFAULT_TEMPORAL_ADDRESS,
     DEFAULT_TEMPORAL_NAMESPACE,
     DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
@@ -62,8 +62,8 @@ def _add_temporal_options(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--task-queue",
-        default=DEFAULT_MEMORY_TASK_QUEUE,
-        help="Temporal task queue for the memory workflow.",
+        default=DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE,
+        help="Temporal task queue for the memory maintenance workflow.",
     )
     parser.add_argument(
         "--temporal-address",

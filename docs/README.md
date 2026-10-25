@@ -10,20 +10,21 @@ For a project overview, start with the repository [README](../README.md).
 
 ### architecture/
 
-- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md): Runtime entities, deployment boundaries, ownership, and the main review and asynchronous memory paths.
+- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md): Logical runtime roles, current deployment boundaries, ownership, and the main review and asynchronous memory paths.
 
 ### Packages and services
 
-Package READMEs own local setup, commands, configuration, and implementation layout. Runtime entities and source packages are not one-to-one: `agents/` implements both worker processes.
+Package READMEs own local setup, commands, configuration, and implementation layout. Runtime roles and source packages are not one-to-one: `agents/` implements the Execution Worker, Memory Extraction Worker, and Memory Maintenance Worker.
 
-| Runtime entity | Package guide |
+| Runtime role | Package guide |
 | --- | --- |
 | GitHub Integration | [`apps/github-integration/README.md`](../apps/github-integration/README.md) |
 | Review Control Plane | [`control-plane/README.md`](../control-plane/README.md) |
 | Control Plane UI | [`apps/control-plane-ui/README.md`](../apps/control-plane-ui/README.md) |
 | Execution Gateway | [`execution-gateway/README.md`](../execution-gateway/README.md) |
 | Execution Worker | [`agents/README.md`](../agents/README.md) |
-| Memory Worker | [`agents/README.md`](../agents/README.md) |
+| Memory Extraction Worker | [`agents/README.md`](../agents/README.md) |
+| Memory Maintenance Worker | [`agents/README.md`](../agents/README.md) |
 | Memory Catalog Server | [`memory-catalog/README.md`](../memory-catalog/README.md) |
 
 ### agent/

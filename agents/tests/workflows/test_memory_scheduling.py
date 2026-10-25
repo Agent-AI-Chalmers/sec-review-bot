@@ -4,7 +4,7 @@ import pytest
 from temporalio.common import WorkflowIDReusePolicy
 
 from sec_review_agents.artifacts.reference import ArtifactReference
-from sec_review_agents.temporal.config import DEFAULT_MEMORY_TASK_QUEUE
+from sec_review_agents.temporal.config import DEFAULT_MEMORY_EXTRACTION_TASK_QUEUE
 from sec_review_agents.workflows.memory import scheduling as memory_scheduling
 from sec_review_agents.workflows.memory.extraction import memory_extraction_workflow_id
 from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
@@ -57,7 +57,10 @@ async def test_scheduling_starts_one_abandoned_child_per_review_unit(
         call[1]["id_reuse_policy"] is WorkflowIDReusePolicy.REJECT_DUPLICATE
         for call in started
     )
-    assert all(call[1]["task_queue"] == DEFAULT_MEMORY_TASK_QUEUE for call in started)
+    assert all(
+        call[1]["task_queue"] == DEFAULT_MEMORY_EXTRACTION_TASK_QUEUE
+        for call in started
+    )
 
 
 @pytest.mark.asyncio

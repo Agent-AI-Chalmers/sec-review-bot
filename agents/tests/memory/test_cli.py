@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from sec_review_agents.cli import memory
-from sec_review_agents.entrypoints.memory_worker.schedules import (
+from sec_review_agents.entrypoints.memory_maintenance_worker.schedules import (
     MEMORY_MAINTENANCE_SCHEDULE_ID,
 )
 from sec_review_agents.memory.local_state import (
@@ -14,6 +14,7 @@ from sec_review_agents.memory.local_state import (
     open_memory_state,
     upsert_observation,
 )
+from sec_review_agents.temporal.config import DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE
 from sec_review_agents.workflows.memory.maintenance import (
     MEMORY_MAINTENANCE_WORKFLOW_ID,
     MemoryMaintenanceRequest,
@@ -30,6 +31,17 @@ def test_cli_exposes_observations_maintenance_and_schedule_only() -> None:
     )
     with pytest.raises(SystemExit):
         memory.parse_args(["extraction", "list"])
+
+
+def test_temporal_commands_default_to_maintenance_task_queue() -> None:
+    assert (
+        memory.parse_args(["maintain"]).task_queue
+        == DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE
+    )
+    assert (
+        memory.parse_args(["schedules", "maintenance", "ensure"]).task_queue
+        == DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE
+    )
 
 
 def test_cli_lists_local_observations(tmp_path: Path, capsys) -> None:

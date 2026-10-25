@@ -1,1 +1,1 @@
-"""Python implementation of the Execution Worker, Memory Worker, and agent runtime."""
+"""Python workers for review execution, memory extraction, and memory maintenance."""
