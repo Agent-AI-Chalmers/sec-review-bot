@@ -12,16 +12,20 @@ StartLimitBurst=3
 Type=simple
 User=@SEC_REVIEW_BOT_USER@
 EnvironmentFile=/etc/sec-review-bot/deployment.env
+
 ExecStartPre=/usr/bin/env docker info
 ExecStartPre=/usr/bin/env docker compose version
-# `up --wait` turns a failed startup into a failed unit. Runtime crashes are deliberately not
-# handled here: each service has its own restart policy, so a crash restarts that service alone
-# instead of tearing down PostgreSQL with it. `logs -f` only keeps the unit in the foreground and
-# forwards output to the journal; it is not a health supervisor, so a service that later gives up
-# shows up in `docker compose ps --all`, not in this unit's state. `Type=simple` does not wait for the
-# health gate, so dependents may start early and retry.
-ExecStart=/bin/sh -c 'cd "$SEC_REVIEW_BOT_DIR" && docker compose --profile app up -d --no-build --remove-orphans --no-color --wait --wait-timeout 300 && exec docker compose --profile app logs -f --no-color'
+
+# Complete the Compose health gate before systemd starts dependent worker units. A failed startup
+# is cleaned up here so the bounded service restart does not inherit a partially started stack.
+ExecStartPre=/bin/sh -c 'cd "$SEC_REVIEW_BOT_DIR" && if ! docker compose --profile app up -d --no-build --remove-orphans --no-color --wait --wait-timeout 300; then docker compose --profile app down --remove-orphans; exit 1; fi'
+
+# Each Compose service owns its bounded runtime restart policy. This foreground process only keeps
+# the unit attached to the stack logs; it does not turn an individual service crash into a restart
+# of PostgreSQL or the rest of the stack.
+ExecStart=/bin/sh -c 'cd "$SEC_REVIEW_BOT_DIR" && exec docker compose --profile app logs -f --no-color'
 ExecStop=/bin/sh -c 'cd "$SEC_REVIEW_BOT_DIR" && exec docker compose --profile app down --remove-orphans'
+
 Restart=always
 RestartSec=5s
 TimeoutStopSec=120s
