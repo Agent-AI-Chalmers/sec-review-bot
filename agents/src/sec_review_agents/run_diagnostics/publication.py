@@ -29,7 +29,7 @@ def publish_run_diagnostic_activity(
     bootstrap_agents_env()
     units = [
         DiagnosticReviewUnit(
-            review_unit_id=str(unit["review_unit_id"]),
+            unit_id=str(unit["unit_id"]),
             transcript_root=Path(unit["transcript_root"]),
         )
         for unit in request.review_units
@@ -51,7 +51,7 @@ def publish_run_diagnostic_activity(
             },
         },
         "diagnostic_bundle": reference.as_dict(),
-        "review_unit_ids": list(publication.review_unit_ids),
+        "unit_ids": list(publication.unit_ids),
     }
 
 

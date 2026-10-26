@@ -4,6 +4,8 @@ import shutil
 import tarfile
 from pathlib import Path
 
+from sec_review_agents.artifacts.tar_zstd import validate_restricted_pax_archive
+
 
 def extract_archive(
     archive_path: Path,
@@ -12,6 +14,7 @@ def extract_archive(
     maximum_entries: int,
     maximum_extracted_bytes: int,
 ) -> Path:
+    validate_restricted_pax_archive(archive_path)
     if destination.exists():
         shutil.rmtree(destination)
     destination.mkdir(parents=True)

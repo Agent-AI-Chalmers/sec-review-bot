@@ -82,6 +82,11 @@ async def prepare_memory_maintenance_activity(
     catalog_client = configured_memory_catalog_client()
     if catalog_client is None:
         raise ValueError("AGENT_MEMORY_CATALOG_URL is required for memory maintenance.")
+    if catalog_client.get_maintenance_control().get("state") == "paused":
+        return MemoryMaintenancePreparationResult(
+            kind="complete",
+            summary="Automatic memory maintenance is paused.",
+        )
     revision_creation = await prepare_coordinated_memory_revision(
         catalog_client=catalog_client,
         maintenance_id=f"maintenance-{activity.info().workflow_run_id}",
@@ -120,7 +125,7 @@ def commit_memory_tree_revision_activity(
     try:
         committed = catalog_client.create_memory_tree_revision(
             maintenance_id=creation.maintenance_id,
-            base_revision=creation.base_revision,
+            expected_active_revision=creation.expected_active_revision,
             extraction_ids=list(creation.extraction_ids),
             memory_tree_reference=creation.memory_tree_reference,
             maintenance_transcript_reference=creation.maintenance_transcript_reference,
@@ -131,7 +136,12 @@ def commit_memory_tree_revision_activity(
             type="MEMORY_CATALOG_REVISION_CONFLICT",
             non_retryable=True,
         ) from error
-    if committed.get("maintenance_id") != creation.maintenance_id:
+    source = committed.get("source")
+    if (
+        not isinstance(source, dict)
+        or source.get("kind") != "maintenance"
+        or source.get("maintenance_id") != creation.maintenance_id
+    ):
         raise RuntimeError("Catalog returned a different maintenance identity.")
     return {
         "ok": True,

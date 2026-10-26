@@ -171,7 +171,7 @@ class IssueSingleAgentWorkflow:
                     artifact_root_path=str(artifact_root),
                     review_units=[
                         {
-                            "review_unit_id": "review",
+                            "unit_id": "review",
                             "transcript_root": str(artifact_root / "transcripts"),
                         }
                     ],

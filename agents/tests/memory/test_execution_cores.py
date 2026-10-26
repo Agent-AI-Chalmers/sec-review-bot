@@ -275,17 +275,17 @@ async def test_maintainer_rejects_invalid_explicit_inputs_before_agent_execution
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("base_revision", "active_reference"),
+    ("expected_active_revision", "active_reference"),
     [(0, None), (1, _s3_reference("memory-tree").as_dict())],
 )
 async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
     tmp_path: Path,
-    base_revision: int,
+    expected_active_revision: int,
     active_reference: dict[str, object] | None,
 ) -> None:
     client = Mock()
     client.get_maintenance_input.return_value = {
-        "base_revision": base_revision,
+        "expected_active_revision": expected_active_revision,
         "active_memory_tree_reference": active_reference,
         "observations": [
             {"extraction_id": "extraction-1", "body_markdown": "Remember this."}
@@ -325,7 +325,7 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
         )
 
     assert prepared is not None
-    assert prepared.base_revision == base_revision
+    assert prepared.expected_active_revision == expected_active_revision
     assert prepared.extraction_ids == ("extraction-1",)
     assert maintain.await_args is not None
     assert maintain.await_args.kwargs["base_memory_tree"] == (
@@ -343,7 +343,7 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
     [
         (
             {
-                "base_revision": "0",
+                "expected_active_revision": "0",
                 "active_memory_tree_reference": None,
                 "observations": [
                     {
@@ -352,11 +352,11 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
                     }
                 ],
             },
-            "base revision",
+            "expected active revision",
         ),
         (
             {
-                "base_revision": 0,
+                "expected_active_revision": 0,
                 "active_memory_tree_reference": [],
                 "observations": [
                     {
@@ -369,7 +369,7 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
         ),
         (
             {
-                "base_revision": 0,
+                "expected_active_revision": 0,
                 "active_memory_tree_reference": _s3_reference(
                     "unexpected-memory-tree"
                 ).as_dict(),
@@ -384,7 +384,7 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
         ),
         (
             {
-                "base_revision": 1,
+                "expected_active_revision": 1,
                 "active_memory_tree_reference": None,
                 "observations": [
                     {
@@ -397,7 +397,7 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
         ),
         (
             {
-                "base_revision": 0,
+                "expected_active_revision": 0,
                 "active_memory_tree_reference": None,
                 "observations": [
                     {"extraction_id": 1, "body_markdown": "Remember this."}
@@ -407,7 +407,7 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
         ),
         (
             {
-                "base_revision": 0,
+                "expected_active_revision": 0,
                 "active_memory_tree_reference": None,
                 "observations": [{"extraction_id": "extraction-1", "body_markdown": 1}],
             },

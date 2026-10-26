@@ -8,7 +8,7 @@ from sec_review_agents.run_diagnostics.publication import (
 )
 
 
-def test_publication_activity_uses_publisher_review_unit_ids(
+def test_publication_activity_uses_publisher_unit_ids(
     tmp_path: Path, monkeypatch
 ) -> None:
     """The activity must not re-glob transcripts and drift from the manifest."""
@@ -22,7 +22,7 @@ def test_publication_activity_uses_publisher_review_unit_ids(
     )
     publication = PublishedDiagnosticBundle(
         reference=reference,
-        review_unit_ids=("case-a",),
+        unit_ids=("case-a",),
     )
     monkeypatch.setattr(
         "sec_review_agents.run_diagnostics.bundle.publish_run_diagnostic_bundle",
@@ -34,11 +34,11 @@ def test_publication_activity_uses_publisher_review_unit_ids(
             run_id="run-1",
             artifact_root_path=str(tmp_path / "artifacts"),
             review_units=[
-                {"review_unit_id": "empty", "transcript_root": str(empty)},
+                {"unit_id": "empty", "transcript_root": str(empty)},
             ],
             result={},
             publication="local",
         )
     )
 
-    assert result["review_unit_ids"] == ["case-a"]
+    assert result["unit_ids"] == ["case-a"]

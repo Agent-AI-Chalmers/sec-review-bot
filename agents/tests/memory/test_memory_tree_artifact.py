@@ -1,3 +1,4 @@
+import json
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
@@ -5,9 +6,14 @@ from unittest.mock import patch
 import pytest
 
 from sec_review_agents.memory.memory_tree_artifact import (
+    _validate_archive,
+    build_memory_tree_artifact,
     materialize_memory_tree,
     publish_memory_tree_artifact,
 )
+from tests.project_paths import CONTRACTS_ROOT
+
+CORPUS = CONTRACTS_ROOT / "memory-tree-artifact" / "v1" / "corpus"
 
 
 def test_memory_tree_artifact_round_trip(tmp_path: Path) -> None:
@@ -78,3 +84,57 @@ def test_memory_tree_artifact_requires_s3_configuration(tmp_path: Path) -> None:
             memory_content_root=memory,
             output_dir=tmp_path / "published",
         )
+
+
+def test_memory_tree_artifact_entry_limit_includes_directories(
+    tmp_path: Path,
+) -> None:
+    memory = tmp_path / "memory"
+    (memory / "topics" / "first").mkdir(parents=True)
+    (memory / "topics" / "second").mkdir(parents=True)
+    (memory / "MEMORY.md").write_text("# Index\n", encoding="utf-8")
+    (memory / "topics" / "first" / "topic.md").write_text("# First\n", encoding="utf-8")
+    (memory / "topics" / "second" / "topic.md").write_text(
+        "# Second\n", encoding="utf-8"
+    )
+
+    with (
+        patch(
+            "sec_review_agents.memory.memory_tree_artifact.MAX_MEMORY_TREE_ARTIFACT_ENTRIES",
+            7,
+        ),
+        pytest.raises(ValueError, match="entry count limit"),
+    ):
+        build_memory_tree_artifact(
+            memory_content_root=memory,
+            output_dir=tmp_path / "published",
+        )
+
+
+def test_memory_tree_artifact_supports_paths_that_require_pax(
+    tmp_path: Path,
+) -> None:
+    memory = tmp_path / "memory"
+    topics = memory / "topics"
+    topics.mkdir(parents=True)
+    (memory / "MEMORY.md").write_text("# Index\n", encoding="utf-8")
+    (topics / ("a" * 101 + ".md")).write_text("# Topic\n", encoding="utf-8")
+
+    reference = build_memory_tree_artifact(
+        memory_content_root=memory,
+        output_dir=tmp_path / "published",
+    )
+
+    _validate_archive(Path(reference.uri.removeprefix("file://")))
+
+
+def test_python_reader_matches_shared_memory_tree_corpus() -> None:
+    manifest = json.loads((CORPUS / "manifest.json").read_text(encoding="utf-8"))
+
+    for fixture in manifest["corpus"]:
+        archive = CORPUS / fixture["file"]
+        if fixture["expected"] == "valid":
+            _validate_archive(archive)
+        else:
+            with pytest.raises(ValueError):
+                _validate_archive(archive)

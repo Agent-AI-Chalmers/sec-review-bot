@@ -382,7 +382,7 @@ class PullRequestReviewWorkflow:
                     artifact_root_path=str(artifact_root),
                     review_units=[
                         {
-                            "review_unit_id": "review",
+                            "unit_id": "review",
                             "transcript_root": str(artifact_root / "transcripts"),
                         }
                     ],
@@ -397,7 +397,7 @@ class PullRequestReviewWorkflow:
             source_workflow=request.workflow,
             run_id=request.run_id,
             diagnostic_bundle=dict(finalized["diagnostic_bundle"]),
-            review_unit_ids=[str(value) for value in finalized["review_unit_ids"]],
+            unit_ids=[str(value) for value in finalized["unit_ids"]],
             timeout_seconds=request.timeout_seconds,
             enabled=request.post_processing.memory_processing_enabled,
         )

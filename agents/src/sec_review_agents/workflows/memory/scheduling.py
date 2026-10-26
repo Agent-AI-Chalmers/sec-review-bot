@@ -17,7 +17,7 @@ async def schedule_memory_extractions(
     source_workflow: str,
     run_id: str,
     diagnostic_bundle: dict[str, Any],
-    review_unit_ids: list[str],
+    unit_ids: list[str],
     timeout_seconds: int,
     enabled: bool,
 ) -> dict[str, Any]:
@@ -40,13 +40,13 @@ async def schedule_memory_extractions(
         return result
 
     digest = str(diagnostic_bundle["digest"])
-    for review_unit_id in review_unit_ids:
+    for unit_id in unit_ids:
         extraction_id = memory_extraction_workflow_id(
             diagnostic_bundle_digest=digest,
-            review_unit_id=review_unit_id,
+            unit_id=unit_id,
         )
         extraction = {
-            "review_unit_id": review_unit_id,
+            "unit_id": unit_id,
             "workflow_id": extraction_id,
         }
         try:
@@ -55,7 +55,7 @@ async def schedule_memory_extractions(
                 MemoryExtractionRequest(
                     source_workflow=source_workflow,
                     run_id=run_id,
-                    review_unit_id=review_unit_id,
+                    unit_id=unit_id,
                     diagnostic_bundle=diagnostic_bundle,
                     timeout_seconds=timeout_seconds,
                 ),

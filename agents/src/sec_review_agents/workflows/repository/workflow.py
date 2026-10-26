@@ -1217,7 +1217,7 @@ class RepositoryReviewWorkflow:
         artifact_root = Path(str(request.prepared_input["artifact_root_path"]))
         review_units = [
             {
-                "review_unit_id": str(case_result["case_id"]),
+                "unit_id": str(case_result["case_id"]),
                 "transcript_root": str(
                     artifact_root
                     / "cases"
@@ -1248,7 +1248,7 @@ class RepositoryReviewWorkflow:
                 source_workflow=request.workflow,
                 run_id=request.run_id,
                 diagnostic_bundle=dict(finalized["diagnostic_bundle"]),
-                review_unit_ids=[str(value) for value in finalized["review_unit_ids"]],
+                unit_ids=[str(value) for value in finalized["unit_ids"]],
                 timeout_seconds=request.timeout_seconds,
                 enabled=request.post_processing.memory_processing_enabled,
             )

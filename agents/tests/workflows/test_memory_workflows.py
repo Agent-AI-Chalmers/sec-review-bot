@@ -47,7 +47,7 @@ def _revision_creation(
 ) -> MemoryTreeRevisionCreation:
     return MemoryTreeRevisionCreation(
         maintenance_id="maintenance-run-1",
-        base_revision=3,
+        expected_active_revision=3,
         extraction_ids=extraction_ids,
         memory_tree_reference=_reference(),
         maintenance_transcript_reference=_reference(),
@@ -58,8 +58,8 @@ def _revision_creation(
     ("overrides", "message"),
     [
         ({"maintenance_id": ""}, "maintenance_id"),
-        ({"base_revision": True}, "base_revision"),
-        ({"base_revision": -1}, "base_revision"),
+        ({"expected_active_revision": True}, "expected_active_revision"),
+        ({"expected_active_revision": -1}, "expected_active_revision"),
         ({"extraction_ids": ()}, "extraction_ids"),
         ({"extraction_ids": ("extraction-1", "extraction-1")}, "unique"),
     ],
@@ -70,7 +70,7 @@ def test_memory_tree_revision_creation_rejects_invalid_invariants(
 ) -> None:
     values: dict[str, object] = {
         "maintenance_id": "maintenance-run-1",
-        "base_revision": 3,
+        "expected_active_revision": 3,
         "extraction_ids": ("extraction-1",),
         "memory_tree_reference": _reference(),
         "maintenance_transcript_reference": _reference(),
@@ -143,15 +143,15 @@ def test_maintenance_preparation_result_rejects_mixed_variants() -> None:
 def test_extraction_workflow_id_is_stable_per_transcript_unit() -> None:
     first = memory_extraction_workflow_id(
         diagnostic_bundle_digest=_reference().digest,
-        review_unit_id="case-a",
+        unit_id="case-a",
     )
     assert first == memory_extraction_workflow_id(
         diagnostic_bundle_digest=_reference().digest,
-        review_unit_id="case-a",
+        unit_id="case-a",
     )
     assert first != memory_extraction_workflow_id(
         diagnostic_bundle_digest=_reference().digest,
-        review_unit_id="case-b",
+        unit_id="case-b",
     )
 
 
@@ -162,7 +162,7 @@ async def test_extraction_workflow_prepares_then_registers_fixed_payload(
     request = MemoryExtractionRequest(
         source_workflow="issue-review",
         run_id="run-1",
-        review_unit_id="review",
+        unit_id="review",
         diagnostic_bundle=_reference().as_dict(),
         timeout_seconds=30,
     )
@@ -170,7 +170,7 @@ async def test_extraction_workflow_prepares_then_registers_fixed_payload(
         extraction_id="extraction-1",
         source_workflow="issue-review",
         source_run_id="run-1",
-        source_review_unit_id="review",
+        source_unit_id="review",
         diagnostic_bundle_digest=_reference().digest,
         transcript_reference=_reference(),
         observation_markdown="Remember this.",
@@ -232,7 +232,7 @@ async def test_prepare_extraction_returns_complete_serializable_payload(
     request = MemoryExtractionRequest(
         source_workflow="issue-review",
         run_id="run-1",
-        review_unit_id="review",
+        unit_id="review",
         diagnostic_bundle=_reference().as_dict(),
         timeout_seconds=30,
     )
@@ -242,11 +242,11 @@ async def test_prepare_extraction_returns_complete_serializable_payload(
     assert result == MemoryExtractionRegistrationPayload(
         extraction_id=memory_extraction_workflow_id(
             diagnostic_bundle_digest=_reference().digest,
-            review_unit_id="review",
+            unit_id="review",
         ),
         source_workflow="issue-review",
         source_run_id="run-1",
-        source_review_unit_id="review",
+        source_unit_id="review",
         diagnostic_bundle_digest=_reference().digest,
         transcript_reference=extraction_transcript,
         observation_markdown="Remember this.",
@@ -262,7 +262,7 @@ async def test_extraction_payload_round_trips_through_temporal_converter() -> No
         extraction_id="extraction-1",
         source_workflow="issue-review",
         source_run_id="run-1",
-        source_review_unit_id="review",
+        source_unit_id="review",
         diagnostic_bundle_digest=_reference().digest,
         transcript_reference=_reference(),
         observation_markdown=None,
@@ -287,7 +287,7 @@ async def test_extraction_payload_rejects_wrong_field_type_during_conversion() -
                 "extraction_id": "extraction-1",
                 "source_workflow": "issue-review",
                 "source_run_id": "run-1",
-                "source_review_unit_id": "review",
+                "source_unit_id": "review",
                 "diagnostic_bundle_digest": _reference().digest,
                 "transcript_reference": _reference().as_dict(),
                 "observation_markdown": None,
@@ -312,7 +312,7 @@ async def test_extraction_payload_rejects_inconsistent_observation_flags() -> No
                 "extraction_id": "extraction-1",
                 "source_workflow": "issue-review",
                 "source_run_id": "run-1",
-                "source_review_unit_id": "review",
+                "source_unit_id": "review",
                 "diagnostic_bundle_digest": _reference().digest,
                 "transcript_reference": _reference().as_dict(),
                 "observation_markdown": "Remember this.",
@@ -352,7 +352,7 @@ def test_register_extraction_retries_with_identical_payload_and_no_observation(
         extraction_id="extraction-1",
         source_workflow="issue-review",
         source_run_id="run-1",
-        source_review_unit_id="review",
+        source_unit_id="review",
         diagnostic_bundle_digest=_reference().digest,
         transcript_reference=transcript_reference,
         observation_markdown=None,
@@ -381,7 +381,7 @@ def test_register_extraction_retries_with_identical_payload_and_no_observation(
         "extraction_id": "extraction-1",
         "source_workflow": "issue-review",
         "source_run_id": "run-1",
-        "source_review_unit_id": "review",
+        "source_unit_id": "review",
         "diagnostic_bundle_digest": _reference().digest,
         "transcript_reference": transcript_reference,
         "observation_markdown": None,
@@ -397,7 +397,7 @@ async def test_extraction_workflow_retries_registration_with_history_payload() -
         extraction_id="extraction-1",
         source_workflow="issue-review",
         source_run_id="run-1",
-        source_review_unit_id="review",
+        source_unit_id="review",
         diagnostic_bundle_digest=_reference().digest,
         transcript_reference=_reference(),
         observation_markdown=None,
@@ -437,7 +437,7 @@ async def test_extraction_workflow_retries_registration_with_history_payload() -
     request = MemoryExtractionRequest(
         source_workflow="issue-review",
         run_id="run-1",
-        review_unit_id="review",
+        unit_id="review",
         diagnostic_bundle=_reference().as_dict(),
         timeout_seconds=30,
     )
@@ -479,7 +479,7 @@ def test_catalog_extraction_conflict_is_not_retried(monkeypatch) -> None:
         extraction_id="extraction-1",
         source_workflow="issue-review",
         source_run_id="run-1",
-        source_review_unit_id="review",
+        source_unit_id="review",
         diagnostic_bundle_digest=_reference().digest,
         transcript_reference=_reference(),
         observation_markdown=None,
@@ -502,7 +502,7 @@ async def test_extraction_activity_requires_catalog_when_processing_is_enabled(
     request = MemoryExtractionRequest(
         source_workflow="issue-review",
         run_id="run-1",
-        review_unit_id="review",
+        unit_id="review",
         diagnostic_bundle=_reference().as_dict(),
         timeout_seconds=30,
     )
@@ -520,7 +520,7 @@ async def test_extraction_activity_skips_when_processing_is_disabled(
     request = MemoryExtractionRequest(
         source_workflow="issue-review",
         run_id="run-1",
-        review_unit_id="review",
+        unit_id="review",
         diagnostic_bundle=_reference().as_dict(),
         timeout_seconds=30,
     )
@@ -798,7 +798,7 @@ async def test_coordinated_maintenance_commits_recorded_preparation(
 async def test_maintenance_workflow_retries_commit_with_history_revision() -> None:
     revision_creation = MemoryTreeRevisionCreation(
         maintenance_id="maintenance-run-1",
-        base_revision=3,
+        expected_active_revision=3,
         extraction_ids=("extraction-1", "extraction-2"),
         memory_tree_reference=_reference(),
         maintenance_transcript_reference=ArtifactReference(
@@ -880,7 +880,7 @@ async def test_catalog_revision_conflict_is_not_retried(monkeypatch) -> None:
     from sec_review_agents.memory.catalog_client import MemoryCatalogConflictError
 
     def conflict(**_kwargs):
-        raise MemoryCatalogConflictError("stale base revision")
+        raise MemoryCatalogConflictError("stale expected active revision")
 
     monkeypatch.setattr(
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
@@ -901,7 +901,10 @@ def test_commit_memory_tree_revision_uses_prepared_payload_after_processing_is_d
     client.create_memory_tree_revision.return_value = {
         "created": True,
         "revision": 4,
-        "maintenance_id": "maintenance-run-1",
+        "source": {
+            "kind": "maintenance",
+            "maintenance_id": "maintenance-run-1",
+        },
     }
     monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "false")
     monkeypatch.setattr(
@@ -918,11 +921,33 @@ def test_commit_memory_tree_revision_uses_prepared_payload_after_processing_is_d
     }
     client.create_memory_tree_revision.assert_called_once_with(
         maintenance_id="maintenance-run-1",
-        base_revision=3,
+        expected_active_revision=3,
         extraction_ids=["extraction-1", "extraction-2"],
         memory_tree_reference=_reference(),
         maintenance_transcript_reference=_reference(),
     )
+
+
+@pytest.mark.asyncio
+async def test_prepare_memory_maintenance_exits_while_control_is_paused(
+    monkeypatch,
+) -> None:
+    client = Mock()
+    client.get_maintenance_control.return_value = {"state": "paused"}
+    monkeypatch.setattr(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        Mock(return_value=client),
+    )
+
+    result = await maintenance_workflow.prepare_memory_maintenance_activity(
+        MemoryMaintenanceRequest(timeout_seconds=30, batch_size=10)
+    )
+
+    assert result == MemoryMaintenancePreparationResult(
+        kind="complete",
+        summary="Automatic memory maintenance is paused.",
+    )
+    client.get_maintenance_input.assert_not_called()
 
 
 def test_commit_memory_tree_revision_retry_reuses_prepared_references(
@@ -932,7 +957,10 @@ def test_commit_memory_tree_revision_retry_reuses_prepared_references(
     client.create_memory_tree_revision.return_value = {
         "created": False,
         "revision": 4,
-        "maintenance_id": "maintenance-run-1",
+        "source": {
+            "kind": "maintenance",
+            "maintenance_id": "maintenance-run-1",
+        },
     }
     monkeypatch.setattr(
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
@@ -946,7 +974,7 @@ def test_commit_memory_tree_revision_retry_reuses_prepared_references(
     assert first["processed_count"] == second["processed_count"] == 2
     expected = {
         "maintenance_id": "maintenance-run-1",
-        "base_revision": 3,
+        "expected_active_revision": 3,
         "extraction_ids": ["extraction-1", "extraction-2"],
         "memory_tree_reference": _reference(),
         "maintenance_transcript_reference": _reference(),

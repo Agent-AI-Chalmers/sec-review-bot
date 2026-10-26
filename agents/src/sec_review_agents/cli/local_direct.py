@@ -42,7 +42,7 @@ def _publish_local_diagnostic(
     if bundle.workflow == "repository-review":
         units = [
             DiagnosticReviewUnit(
-                review_unit_id=case_root.name,
+                unit_id=case_root.name,
                 transcript_root=case_root / "transcripts",
             )
             for case_root in sorted((artifact_root / "cases").glob("*"))
