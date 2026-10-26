@@ -1,0 +1,13 @@
+{
+  "files": {
+    "manifest.json": "{\n  \"version\": 1,\n  \"run_id\": \"__RUN_ID__\",\n  \"result\": \"result.json\",\n  \"review_units\": [\n    {\n      \"id\": \"repository\",\n      \"transcripts\": [\n        \"artifact-tree/repository/transcripts/review.jsonl\"\n      ]\n    }\n  ]\n}",
+    "result.json": "{\n  \"status\": \"completed\",\n  \"summary\": \"The review completed with one evidence-backed finding.\"\n}",
+    "artifact-tree/repository/findings.md": "# Findings\n\nValidate authorization before resource lookup.\n",
+    "artifact-tree/repository/transcripts/review.jsonl": "{\"seq\":1,\"event\":\"message\",\"message\":{\"type\":\"human\",\"content\":\"Review the prepared repository.\"}}\n{\"seq\":2,\"event\":\"message\",\"message\":{\"type\":\"ai\",\"content\":\"I found one evidence-backed issue.\"}}"
+  },
+  "unpreviewable_files": {
+    "artifact-tree/repository/evidence/request.bin": {
+      "sizeBytes": 18432
+    }
+  }
+}

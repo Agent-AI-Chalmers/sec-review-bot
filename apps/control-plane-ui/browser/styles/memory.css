@@ -1,0 +1,390 @@
+.memory-table {
+  overflow-x: auto;
+}
+
+.memory-table table {
+  min-width: 720px;
+}
+
+.revision-graph-section {
+  display: grid;
+  gap: var(--mantine-spacing-md);
+}
+
+.revision-graph-scroll {
+  display: flex;
+  max-height: min(68vh, 720px);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: light-dark(
+    var(--mantine-color-gray-0),
+    var(--mantine-color-dark-8)
+  );
+  cursor: grab;
+  user-select: none;
+}
+
+.revision-graph-scroll[data-panning] {
+  cursor: grabbing;
+}
+
+.revision-graph {
+  position: relative;
+  margin-inline: auto;
+  flex: 0 0 auto;
+}
+
+.revision-graph-edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.revision-graph-edges path {
+  fill: none;
+  stroke: light-dark(var(--mantine-color-gray-5), var(--mantine-color-dark-3));
+  stroke-width: 2;
+}
+
+.revision-graph-edges path[data-active-line] {
+  stroke: light-dark(
+    var(--mantine-color-green-7),
+    var(--mantine-color-green-5)
+  );
+  stroke-width: 3;
+}
+
+.revision-graph-node {
+  position: absolute;
+  z-index: 1;
+  display: flex;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  flex-direction: column;
+  justify-content: center;
+  color: var(--mantine-color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  background: var(--mantine-color-body);
+  box-shadow: var(--shadow-sm);
+}
+
+.revision-graph-node:hover,
+.revision-graph-node[data-selected] {
+  border-color: var(--mantine-primary-color-filled);
+}
+
+.revision-graph-node[data-selected] {
+  box-shadow: inset 0 0 0 1px var(--mantine-primary-color-filled);
+}
+
+.revision-graph-node[data-current] {
+  border-color: light-dark(
+    var(--mantine-color-green-7),
+    var(--mantine-color-green-5)
+  );
+  background: light-dark(var(--mantine-color-green-0), rgb(34 55 43 / 48%));
+}
+
+.revision-graph-node strong {
+  font-size: var(--mantine-font-size-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.revision-graph-node span {
+  margin-top: 4px;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+}
+
+.revision-graph-selection {
+  min-width: 0;
+}
+
+/* Mantine aligns table headers with its own logical `start` rule, and the English
+   predecessor label is wider than the revision label. Keep both numeric relationship
+   columns explicitly identical so the header and values stay visually comparable. */
+.memory-table .memory-revision-cell,
+.memory-table .memory-predecessor-cell {
+  width: 120px;
+  min-width: 120px;
+  max-width: 120px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.memory-current-row > td {
+  background-color: light-dark(
+    var(--mantine-color-green-0),
+    rgba(47, 158, 68, 0.12)
+  );
+}
+
+.memory-current-row .memory-revision-cell {
+  color: light-dark(var(--mantine-color-green-8), var(--mantine-color-green-4));
+  font-weight: 700;
+}
+
+.memory-revision-link {
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+
+.memory-incorporation {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35em;
+  font: inherit;
+  white-space: nowrap;
+}
+
+.memory-incorporation .memory-revision-link {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
+
+.revision-graph-node[data-highlighted] {
+  outline: 2px solid transparent;
+  outline-offset: 3px;
+  animation: memory-revision-highlight 1.6s ease-out;
+}
+
+@keyframes memory-revision-highlight {
+  0%,
+  24% {
+    background-color: light-dark(
+      var(--mantine-color-yellow-2),
+      rgba(250, 176, 5, 0.24)
+    );
+    outline-color: var(--mantine-color-yellow-6);
+    box-shadow: 0 0 0 3px
+      light-dark(rgba(250, 176, 5, 0.2), rgba(250, 176, 5, 0.16));
+  }
+
+  100% {
+    background-color: transparent;
+    outline-color: transparent;
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+
+.memory-current-action {
+  box-sizing: border-box;
+  flex: 0 0 140px;
+  width: 140px;
+  min-width: 140px;
+  max-width: 140px;
+}
+
+.memory-current-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  padding-inline: 10px;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+}
+
+.memory-current-action .mantine-Button-inner {
+  justify-content: flex-start;
+}
+
+/* Revision rows have optional process actions, but the current-state control must not drift
+   between rows. Fixed semantic slots keep every command aligned without adding fake controls. */
+.memory-revision-actions {
+  display: grid;
+  grid-template-columns: 72px 84px 84px 140px;
+  align-items: center;
+  column-gap: var(--mantine-spacing-xs);
+  width: max-content;
+}
+
+.memory-revision-actions > .mantine-Button-root {
+  justify-self: start;
+}
+
+.memory-markdown {
+  min-width: 280px;
+  overflow-wrap: anywhere;
+}
+
+.memory-table .memory-observation-index {
+  width: 88px;
+  min-width: 88px;
+  max-width: 88px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.memory-markdown-full {
+  min-width: 0;
+}
+
+.memory-markdown > :first-child {
+  margin-top: 0;
+}
+
+.memory-markdown > :last-child {
+  margin-bottom: 0;
+}
+
+.memory-markdown pre {
+  overflow-x: auto;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-raised);
+}
+
+.memory-markdown code {
+  font-family: var(--mantine-font-family-monospace);
+}
+.memory-overview {
+  display: grid;
+  gap: 24px;
+}
+
+.memory-overview-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-block: 1px solid var(--mantine-color-default-border);
+}
+
+.memory-overview-metric {
+  display: grid;
+  align-content: center;
+  min-height: 126px;
+  padding: 18px 22px;
+  border-inline-start: 1px solid var(--mantine-color-default-border);
+}
+
+.memory-overview-metric:first-child {
+  border-inline-start: 0;
+}
+
+.memory-overview-metric > span,
+.memory-overview-metric small {
+  color: var(--mantine-color-dimmed);
+}
+
+.memory-overview-metric strong {
+  font-size: 2rem;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.memory-overview-label,
+.memory-overview-legend,
+.memory-overview-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.memory-overview-section {
+  min-width: 0;
+}
+
+.memory-overview-section h2 {
+  margin: 0 0 14px;
+  font-size: var(--mantine-font-size-lg);
+}
+
+.memory-overview-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.memory-overview-legend {
+  flex-wrap: wrap;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.memory-overview-trend-controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.memory-overview-swatch {
+  width: 18px;
+  height: 3px;
+}
+
+.memory-overview-swatch.extracted {
+  background: var(--mantine-color-orange-6);
+}
+
+.memory-overview-swatch.observed {
+  background: var(--mantine-color-green-6);
+}
+
+.memory-overview-trend-scroll {
+  overflow-x: auto;
+}
+
+.memory-overview-trend {
+  display: block;
+  width: 100%;
+  height: 220px;
+  min-width: 620px;
+  color: var(--mantine-color-dimmed);
+}
+
+.memory-overview-trend text {
+  fill: currentColor;
+  font-size: 12px;
+}
+
+.memory-overview-gridline {
+  stroke: var(--mantine-color-default-border);
+  stroke-width: 0.75;
+}
+
+.memory-overview-line {
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.memory-overview-line-extracted {
+  stroke: var(--mantine-color-orange-6);
+}
+
+.memory-overview-line-observed {
+  stroke: var(--mantine-color-green-6);
+}
+
+.memory-overview-lower {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 2fr);
+  gap: 36px;
+  align-items: start;
+}
+
+.memory-overview-outcome {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-block-end: 1px solid var(--mantine-color-default-border);
+}
+
+.memory-overview-outcome strong,
+.memory-overview-workflows td:not(:first-child) {
+  font-variant-numeric: tabular-nums;
+}

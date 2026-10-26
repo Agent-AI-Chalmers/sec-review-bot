@@ -15,7 +15,7 @@
 import fixture from '../../../contracts/review-runs-api/v1/fixtures/observed-run.json' with { type: 'json' }
 import schema from '../../../contracts/review-runs-api/v1/observed-run.schema.json' with { type: 'json' }
 
-import type { ArtifactStorage, Run } from '../src/api.js'
+import type { ArtifactStorage, Run } from '../browser/features/runs/api.js'
 
 /** Every key of `A` is also a key of `B`. */
 type KeysWithin<A, B> = [keyof A] extends [keyof B] ? true : false

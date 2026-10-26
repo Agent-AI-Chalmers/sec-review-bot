@@ -3,8 +3,62 @@ import crypto from 'node:crypto'
 import { createServer } from 'node:http'
 import { Readable } from 'node:stream'
 import test from 'node:test'
+import { zstdCompressSync } from 'node:zlib'
+
+import tar from 'tar-stream'
 
 import { createControlPlaneUiServer } from '../server/index.js'
+
+async function diagnosticBundle(runId: string): Promise<Buffer> {
+  const pack = tar.pack()
+  const chunks: Buffer[] = []
+  const collecting = (async (): Promise<void> => {
+    for await (const chunk of pack as unknown as AsyncIterable<Uint8Array>)
+      chunks.push(Buffer.from(chunk))
+  })()
+  const entries = [
+    [
+      'manifest.json',
+      JSON.stringify({
+        version: 1,
+        run_id: runId,
+        result: 'result.json',
+        review_units: [
+          {
+            id: 'unit-1',
+            transcripts: ['artifact-tree/unit-1/review.jsonl']
+          }
+        ]
+      })
+    ],
+    ['result.json', '{"status":"completed"}'],
+    ['artifact-tree/unit-1/review.jsonl', '{"event":"message"}\n']
+  ] as const
+  for (const [name, value] of entries) {
+    const body = Buffer.from(value)
+    await new Promise<void>((resolve, reject) => {
+      pack.entry(
+        { name, type: 'file', size: body.length, mtime: new Date(0) },
+        body,
+        (error) => (error ? reject(error) : resolve())
+      )
+    })
+  }
+  pack.finalize()
+  await collecting
+  return zstdCompressSync(Buffer.concat(chunks))
+}
+
+async function loginCookie(base: string): Promise<string> {
+  const login = await fetch(`${base}/api/session`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{"token":"login-secret"}'
+  })
+  const cookie = login.headers.get('set-cookie')
+  assert(cookie !== null)
+  return cookie
+}
 
 test('BFF authenticates sessions and proxies only read queries', async () => {
   let authorization = ''
@@ -163,6 +217,456 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),
       new Promise<void>((resolve) => upstream.close(() => resolve()))
+    ])
+  }
+})
+
+test('memory writes are absent unless loopback maintenance mode is explicit', async () => {
+  const reviewRuns = createServer((_request, response) => response.end('{}'))
+  await new Promise<void>((resolve) =>
+    reviewRuns.listen(0, '127.0.0.1', resolve)
+  )
+  const reviewAddress = reviewRuns.address()
+  assert(reviewAddress && typeof reviewAddress === 'object')
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: `http://127.0.0.1:${reviewAddress.port}`,
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    memoryCatalogUrl: 'http://127.0.0.1:1',
+    memoryCatalogToken: 'catalog-secret'
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  try {
+    const cookie = await loginCookie(base)
+    const response = await fetch(`${base}/api/memory/pause`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        operation_id: 'op-1',
+        expected_generation: 1
+      })
+    })
+    assert.strictEqual(response.status, 404)
+    assert.deepStrictEqual(await response.json(), {
+      error: 'memory_write_unavailable'
+    })
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => reviewRuns.close(() => resolve()))
+    ])
+  }
+})
+
+test('BFF maps memory tree reads to the catalog memory-tree resource', async () => {
+  const paths: string[] = []
+  const catalog = createServer((request, response) => {
+    paths.push(request.url ?? '')
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.end('{}')
+  })
+  await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
+  const catalogAddress = catalog.address()
+  assert(catalogAddress && typeof catalogAddress === 'object')
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
+    memoryCatalogToken: 'catalog-secret'
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  try {
+    const cookie = await loginCookie(base)
+    for (const path of [
+      '/api/memory/tree',
+      '/api/memory/overview?range=90d',
+      '/api/memory/revisions?limit=50',
+      '/api/memory/revisions/2'
+    ])
+      assert.strictEqual(
+        (await fetch(`${base}${path}`, { headers: { cookie } })).status,
+        200
+      )
+    assert.deepStrictEqual(paths, [
+      '/v1/memory-tree',
+      '/v1/overview?range=90d',
+      '/v1/memory-tree/revisions?limit=50',
+      '/v1/memory-tree/revisions/2'
+    ])
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => catalog.close(() => resolve()))
+    ])
+  }
+})
+
+test('local memory edit creates a revision while restore only moves the pointer', async () => {
+  const requests: Array<{ path: string; body: Record<string, unknown> }> = []
+  const catalog = createServer(async (request, response) => {
+    const chunks: Buffer[] = []
+    for await (const chunk of request) chunks.push(Buffer.from(chunk))
+    requests.push({
+      path: request.url ?? '',
+      body: JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<
+        string,
+        unknown
+      >
+    })
+    response.writeHead(201, { 'content-type': 'application/json' })
+    response.end('{"revision":3}')
+  })
+  await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
+  const catalogAddress = catalog.address()
+  assert(catalogAddress && typeof catalogAddress === 'object')
+  const reviewRuns = createServer((_request, response) => response.end('{}'))
+  await new Promise<void>((resolve) =>
+    reviewRuns.listen(0, '127.0.0.1', resolve)
+  )
+  const reviewAddress = reviewRuns.address()
+  assert(reviewAddress && typeof reviewAddress === 'object')
+  let uploads = 0
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: `http://127.0.0.1:${reviewAddress.port}`,
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
+    memoryCatalogToken: 'catalog-secret',
+    localMemoryWrites: true,
+    artifactStore: {
+      getObject: () => Promise.reject(new Error('not used')),
+      putMemoryArtifact: async () => {
+        uploads += 1
+      }
+    }
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  try {
+    const cookie = await loginCookie(base)
+    const headers = { cookie, origin: base, 'content-type': 'application/json' }
+    assert.strictEqual(
+      (
+        await fetch(`${base}/api/memory/edit`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            operation_id: 'edit-1',
+            expected_active_revision: 2,
+            files: { 'MEMORY.md': '# Memory\n' }
+          })
+        })
+      ).status,
+      201
+    )
+    assert.strictEqual(uploads, 1)
+    const editSource = requests[0]!.body.source as Record<string, unknown>
+    assert.deepStrictEqual(editSource.actor, {
+      kind: 'service',
+      id: 'local-control-plane-ui'
+    })
+    assert.strictEqual(editSource.operation_id, 'edit-1')
+
+    assert.strictEqual(
+      (
+        await fetch(`${base}/api/memory/restore`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            operation_id: 'restore-1',
+            expected_active_revision: 3,
+            restored_revision: 1
+          })
+        })
+      ).status,
+      201
+    )
+    assert.strictEqual(uploads, 1, 'restore must not publish another object')
+    assert.strictEqual(requests[1]!.path, '/v1/memory-tree/restore')
+    assert.deepStrictEqual(requests[1]!.body, {
+      operation_id: 'restore-1',
+      expected_active_revision: 3,
+      restored_revision: 1,
+      actor: { kind: 'service', id: 'local-control-plane-ui' }
+    })
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => reviewRuns.close(() => resolve())),
+      new Promise<void>((resolve) => catalog.close(() => resolve()))
+    ])
+  }
+})
+
+test('BFF verifies and strictly parses memory transcripts for the viewer', async () => {
+  const transcript = zstdCompressSync(
+    Buffer.from(
+      [
+        JSON.stringify({
+          seq: 1,
+          event: 'message',
+          message: { type: 'system', content: 'Maintain memory.' }
+        }),
+        JSON.stringify({
+          seq: 2,
+          event: 'message',
+          message: { type: 'ai', content: 'Done.', tool_calls: [] }
+        })
+      ].join('\n') + '\n'
+    )
+  )
+  const digest = `sha256:${crypto.createHash('sha256').update(transcript).digest('hex')}`
+  const catalog = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.end(
+      JSON.stringify({
+        revision: 2,
+        source: {
+          kind: 'maintenance',
+          transcript_reference: {
+            uri: 's3://sec-review/memory/transcripts/memory-maintainer/example/transcript.v1.jsonl.zst',
+            digest,
+            media_type: 'application/zstd',
+            size_bytes: transcript.length
+          }
+        }
+      })
+    )
+  })
+  await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
+  const catalogAddress = catalog.address()
+  assert(catalogAddress && typeof catalogAddress === 'object')
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
+    memoryCatalogToken: 'catalog-secret',
+    artifactStore: {
+      getObject: async () => ({ body: Readable.from([transcript]) })
+    }
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  try {
+    const cookie = await loginCookie(base)
+    const response = await fetch(
+      `${base}/api/memory/revisions/2/transcript/content`,
+      { headers: { cookie } }
+    )
+    assert.strictEqual(response.status, 200)
+    assert.deepStrictEqual(await response.json(), {
+      events: [
+        {
+          seq: 1,
+          event: 'message',
+          message: { type: 'system', content: 'Maintain memory.' }
+        },
+        {
+          seq: 2,
+          event: 'message',
+          message: { type: 'ai', content: 'Done.', tool_calls: [] }
+        }
+      ]
+    })
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => catalog.close(() => resolve()))
+    ])
+  }
+})
+
+test('BFF rejects a memory tree reference whose object key is not derived from its digest', async () => {
+  const digest = `sha256:${'a'.repeat(64)}`
+  const catalog = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.end(
+      JSON.stringify({
+        revision: 2,
+        memory_tree_reference: {
+          uri: `s3://sec-review/memory/trees/${'b'.repeat(64)}/memory-tree.v1.tar.zst`,
+          digest,
+          media_type: 'application/tar+zstd',
+          size_bytes: 1
+        },
+        source: {
+          kind: 'operator',
+          operation_id: 'edit-1',
+          actor: { kind: 'service', id: 'local-control-plane-ui' }
+        }
+      })
+    )
+  })
+  await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
+  const catalogAddress = catalog.address()
+  assert(catalogAddress && typeof catalogAddress === 'object')
+  let objectReads = 0
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
+    memoryCatalogToken: 'catalog-secret',
+    artifactStore: {
+      getObject: async () => {
+        objectReads += 1
+        return { body: Readable.from(['x']) }
+      }
+    }
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  try {
+    const cookie = await loginCookie(base)
+    const response = await fetch(`${base}/api/memory/revisions/2/artifact`, {
+      headers: { cookie }
+    })
+    assert.strictEqual(response.status, 409)
+    assert.deepStrictEqual(await response.json(), {
+      error: 'memory_artifact_unavailable'
+    })
+    assert.strictEqual(objectReads, 0)
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => catalog.close(() => resolve()))
+    ])
+  }
+})
+
+test('BFF rejects oversized memory artifacts before reading object storage', async () => {
+  const digest = `sha256:${'a'.repeat(64)}`
+  const catalog = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.end(
+      JSON.stringify({
+        revision: 2,
+        memory_tree_reference: {
+          uri: `s3://sec-review/memory/trees/${'a'.repeat(64)}/memory-tree.v1.tar.zst`,
+          digest,
+          media_type: 'application/tar+zstd',
+          size_bytes: 64 * 1024 * 1024 + 1
+        },
+        source: {
+          kind: 'operator',
+          operation_id: 'edit-1',
+          actor: { kind: 'service', id: 'local-control-plane-ui' }
+        }
+      })
+    )
+  })
+  await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
+  const catalogAddress = catalog.address()
+  assert(catalogAddress && typeof catalogAddress === 'object')
+  let objectReads = 0
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
+    memoryCatalogToken: 'catalog-secret',
+    artifactStore: {
+      getObject: async () => {
+        objectReads += 1
+        return { body: Readable.from([]) }
+      }
+    }
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  try {
+    const cookie = await loginCookie(base)
+    const response = await fetch(`${base}/api/memory/revisions/2/artifact`, {
+      headers: { cookie }
+    })
+    assert.strictEqual(response.status, 409)
+    assert.strictEqual(objectReads, 0)
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => catalog.close(() => resolve()))
+    ])
+  }
+})
+
+test('BFF rejects oversized memory objects before buffering their body', async () => {
+  const digest = `sha256:${'a'.repeat(64)}`
+  const catalog = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.end(
+      JSON.stringify({
+        revision: 2,
+        memory_tree_reference: {
+          uri: `s3://sec-review/memory/trees/${'a'.repeat(64)}/memory-tree.v1.tar.zst`,
+          digest,
+          media_type: 'application/tar+zstd',
+          size_bytes: 1
+        },
+        source: {
+          kind: 'operator',
+          operation_id: 'edit-1',
+          actor: { kind: 'service', id: 'local-control-plane-ui' }
+        }
+      })
+    )
+  })
+  await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
+  const catalogAddress = catalog.address()
+  assert(catalogAddress && typeof catalogAddress === 'object')
+  let bodyRead = false
+  const body = new Readable({
+    read(): void {
+      bodyRead = true
+      this.push(null)
+    }
+  })
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
+    memoryCatalogToken: 'catalog-secret',
+    artifactStore: {
+      getObject: async () => ({
+        body,
+        contentLength: 64 * 1024 * 1024 + 1
+      })
+    }
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  try {
+    const cookie = await loginCookie(base)
+    const response = await fetch(`${base}/api/memory/revisions/2/artifact`, {
+      headers: { cookie }
+    })
+    assert.strictEqual(response.status, 502)
+    assert.deepStrictEqual(await response.json(), {
+      error: 'artifact_identity_mismatch'
+    })
+    assert.strictEqual(bodyRead, false)
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => catalog.close(() => resolve()))
     ])
   }
 })
@@ -382,6 +886,82 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
       download.headers.get('x-content-type-options'),
       'nosniff'
     )
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => upstream.close(() => resolve()))
+    ])
+  }
+})
+
+test('BFF verifies and reads a diagnostic bundle for the run files viewer', async () => {
+  const runId = 'run-files-1'
+  const artifactBody = await diagnosticBundle(runId)
+  const upstream = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.end(
+      JSON.stringify({
+        run: {
+          run_id: runId,
+          artifact_storage: {
+            status: 'available',
+            artifact: {
+              kind: 'diagnostic_bundle',
+              uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
+              media_type: 'application/tar+zstd',
+              digest: `sha256:${crypto.createHash('sha256').update(artifactBody).digest('hex')}`,
+              size_bytes: artifactBody.length
+            }
+          }
+        }
+      })
+    )
+  })
+  await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
+  const upstreamAddress = upstream.address()
+  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    artifactStore: {
+      async getObject(): Promise<{ body: Readable; contentLength: number }> {
+        return {
+          body: Readable.from([artifactBody]),
+          contentLength: artifactBody.length
+        }
+      }
+    }
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  try {
+    const cookie = await loginCookie(base)
+    const response = await fetch(`${base}/api/runs/${runId}/artifact/content`, {
+      headers: { cookie }
+    })
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('cache-control'), 'private, no-store')
+    assert.deepEqual(await response.json(), {
+      files: {
+        'manifest.json': JSON.stringify({
+          version: 1,
+          run_id: runId,
+          result: 'result.json',
+          review_units: [
+            {
+              id: 'unit-1',
+              transcripts: ['artifact-tree/unit-1/review.jsonl']
+            }
+          ]
+        }),
+        'result.json': '{"status":"completed"}',
+        'artifact-tree/unit-1/review.jsonl': '{"event":"message"}\n'
+      },
+      unpreviewable_files: {}
+    })
   } finally {
     await Promise.all([
       new Promise<void>((resolve) => ui.close(() => resolve())),

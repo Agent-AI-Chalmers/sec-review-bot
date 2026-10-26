@@ -1,0 +1,75 @@
+/* ---------------------------------------------------------------- app shell */
+
+.mantine-AppShell-header {
+  background: var(--surface-raised);
+  border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: saturate(180%) blur(8px);
+}
+
+/* A thin brand-coloured rule under the header: the only decorative chrome, and it
+   gives the otherwise grey console a single deliberate accent. */
+.mantine-AppShell-header::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -1px 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--brand) 0%,
+    var(--brand-2) 45%,
+    var(--brand-3) 70%,
+    transparent 100%
+  );
+  opacity: 0.85;
+}
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.brand::before {
+  content: '';
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: linear-gradient(
+    135deg,
+    var(--brand),
+    var(--brand-2) 55%,
+    var(--brand-3)
+  );
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--brand) 35%, transparent);
+}
+
+.mantine-AppShell-main {
+  background:
+    radial-gradient(
+      1100px 380px at 12% -8%,
+      var(--brand-soft),
+      transparent 62%
+    ),
+    radial-gradient(
+      900px 320px at 88% -12%,
+      color-mix(in srgb, var(--brand-3) 7%, transparent),
+      transparent 60%
+    );
+  min-height: calc(100vh - 58px);
+}
+.open-run {
+  flex: 0 1 320px;
+  min-width: 0;
+}
+
+.open-run .mantine-TextInput-root {
+  flex: 1;
+  min-width: 0;
+}

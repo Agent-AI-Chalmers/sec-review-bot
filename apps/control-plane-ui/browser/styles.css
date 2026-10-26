@@ -1,0 +1,20 @@
+/*
+ * Single ordered stylesheet entry point:
+ * - base: global tokens, element defaults, and shared utilities
+ * - shell: application header, navigation, and page frame
+ * - runs-detail: run list, run status, and run detail views
+ * - memory: memory tables, revision graph, and overview
+ * - workspace-editor: file workspace, previews, and code editors
+ * - transcript-viewer: transcript timeline and message content
+ * - responsive: reduced-motion, touch, and narrow-screen overrides
+ *
+ * Keep feature ownership in one domain file. Responsive overrides load last so
+ * their precedence is explicit rather than depending on rules scattered mid-file.
+ */
+@import './styles/base.css';
+@import './styles/shell.css';
+@import './styles/runs-detail.css';
+@import './styles/memory.css';
+@import './styles/workspace-editor.css';
+@import './styles/transcript-viewer.css';
+@import './styles/responsive.css';

@@ -253,7 +253,7 @@ export const LIST_RUN_QUERY_PARAMS_PATH = path.resolve(
   REPO_ROOT,
   'apps',
   'control-plane-ui',
-  'src',
+  'shared',
   'list-run-query-params.ts'
 )
 
@@ -313,7 +313,7 @@ export function listRunQueryParameters(spec: OpenAPI3): string[] {
   )
 }
 
-/** The committed content of `apps/control-plane-ui/src/list-run-query-params.ts`. */
+/** The committed content of `apps/control-plane-ui/shared/list-run-query-params.ts`. */
 export async function renderListRunQueryParams(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
   const names = listRunQueryParameters(spec)
@@ -346,8 +346,10 @@ export const UI_TYPES_PATH = path.resolve(
   REPO_ROOT,
   'apps',
   'control-plane-ui',
-  'src',
-  'review-runs-api-types.ts'
+  'browser',
+  'features',
+  'runs',
+  'api-types.generated.ts'
 )
 
 const UI_SHAPE_ALIASES: ReadonlyArray<readonly [string, string]> = [
@@ -358,7 +360,7 @@ const UI_SHAPE_ALIASES: ReadonlyArray<readonly [string, string]> = [
   ['ParkedRun', 'ParkedRun']
 ]
 
-/** The committed content of `apps/control-plane-ui/src/review-runs-api-types.ts`. */
+/** The committed content of `apps/control-plane-ui/browser/features/runs/api-types.generated.ts`. */
 export async function renderUiContractTypes(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
   const ast = await openapiTS(spec)

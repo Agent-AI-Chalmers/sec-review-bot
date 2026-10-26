@@ -237,7 +237,14 @@ export function stateMachine(axis: StateAxis): StateMachine | undefined {
 }
 `
   const options = await prettier.resolveConfig(
-    path.resolve(REPO_ROOT, 'apps', 'control-plane-ui', 'src')
+    path.resolve(
+      REPO_ROOT,
+      'apps',
+      'control-plane-ui',
+      'browser',
+      'features',
+      'runs'
+    )
   )
   return await prettier.format(rendered, {
     ...options,
@@ -245,7 +252,9 @@ export function stateMachine(axis: StateAxis): StateMachine | undefined {
       REPO_ROOT,
       'apps',
       'control-plane-ui',
-      'src',
+      'browser',
+      'features',
+      'runs',
       'state-machines.generated.ts'
     )
   })
@@ -258,7 +267,9 @@ export function generatedArtifacts(): GeneratedArtifact[] {
         REPO_ROOT,
         'apps',
         'control-plane-ui',
-        'src',
+        'browser',
+        'features',
+        'runs',
         'state-machines.generated.ts'
       ),
       render: renderStateMachinesModule

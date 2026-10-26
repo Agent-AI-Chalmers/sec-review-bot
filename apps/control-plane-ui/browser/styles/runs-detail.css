@@ -1,0 +1,542 @@
+/* -------------------------------------------------------------------- status */
+
+.status-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  white-space: nowrap;
+}
+
+.status-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.status-dot-waiting {
+  background: var(--border-strong);
+}
+
+@keyframes status-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* Status is carried by the dot alone. The label keeps its natural width, so a row's
+   text stays flush with its neighbours instead of shifting with the word length. */
+.status-dot-active {
+  background: var(--status-active);
+  animation: status-pulse 1.4s ease-in-out infinite;
+}
+
+.status-dot-complete {
+  background: var(--status-complete);
+}
+
+.status-dot-failed {
+  background: var(--status-failed);
+}
+
+.status-dot-neutral {
+  background: var(--border-strong);
+}
+
+/* ----------------------------------------------------------------- run list */
+
+.run-id {
+  overflow-wrap: anywhere;
+}
+
+/* A run coordination refused to conclude on its own. Mantine's Alert supplies the surface and
+   the accent; these rules only keep the explanation readable at a wide viewport. */
+.blocked-run .blocked-run-body {
+  max-width: 62ch;
+}
+
+/* The decision sits beside the explanation rather than after it, so it is visible without
+   reading to the end, and it does not wrap onto its own line at a narrow width. */
+.blocked-run .blocked-run-action {
+  flex-shrink: 0;
+}
+
+.run-heading {
+  margin-bottom: 32px;
+  padding: 22px 24px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--mantine-radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.workflow-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  color: var(--brand);
+  background: var(--brand-soft);
+  border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent);
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+[data-theme='dark'] .workflow-chip {
+  color: var(--mantine-color-brand-3);
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+}
+
+.run-state-summary {
+  overflow-wrap: anywhere;
+}
+
+.run-state-summary .status-text {
+  font-size: var(--mantine-font-size-sm);
+}
+
+.operations-bar {
+  padding: 16px 18px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--mantine-radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* One row: content filters on the left, the refresh cluster fixed to the right. The filter
+   group may wrap onto further lines when space is tight; the refresh cluster keeps its shape
+   and stays pinned right, the way a toolbar's time controls do. */
+.operations-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 16px;
+}
+
+.operations-row .refresh-controls {
+  margin-left: auto;
+}
+
+a {
+  color: var(--brand);
+}
+
+/* Run ids are the list's primary identity; make them read as data, not prose. */
+.table-wrap table td:first-child a {
+  text-decoration: none;
+}
+
+.table-wrap table td:first-child a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table-wrap table {
+  min-width: 680px;
+}
+
+.table-wrap .mantine-Table-thead th {
+  color: var(--muted);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.table-wrap .mantine-Table-tr:hover td {
+  background: var(--brand-soft);
+}
+
+/* ------------------------------------------------------------- run detail */
+
+/* Neutral rail cue. Mantine paints the rail from the Timeline.Item `::before`
+   pseudo-element and couples it to the bullet colour, so this override is the
+   only way to decouple them. If Mantine changes that element, the rail silently
+   reverts to the status colour. */
+.run-progress-timeline .mantine-Timeline-item::before {
+  border-left-color: var(--border-strong);
+  border-left-style: dashed;
+}
+
+.run-progress-timeline .mantine-Timeline-itemBullet {
+  box-shadow: 0 0 0 3px var(--surface-raised);
+}
+
+.artifact-section {
+  display: grid;
+  gap: 6px;
+  /* The execution timestamp and the artifact row were touching; space them like the
+     publication summary and its rows. */
+  padding-top: 10px;
+}
+
+.artifact-panel {
+  overflow: hidden;
+}
+
+.artifact-state {
+  padding: 8px 0;
+}
+
+/* The artifact reads as one row: its facts together, the download trailing. */
+.artifact-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 16px;
+}
+
+.artifact-facts {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
+}
+
+.artifact-digest-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.artifact-digest-row code {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  overflow-wrap: anywhere;
+  font-family: var(
+    --mantine-font-family-monospace,
+    ui-monospace,
+    SFMono-Regular,
+    monospace
+  );
+}
+
+.artifact-digest-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.artifact-digest-toggle:hover code {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.delivery-list {
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.publication-summary {
+  display: grid;
+  gap: 4px;
+}
+
+.delivery-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  padding: 4px 0 10px;
+}
+
+.delivery-item + .delivery-item {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+/* State machines are reference material, collapsed by default like History. */
+.state-machines {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.state-machine-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+  color: var(--mantine-color-dimmed);
+  list-style: none;
+}
+
+.state-machine-summary::-webkit-details-marker {
+  display: none;
+}
+
+.state-machine-summary:hover {
+  color: var(--mantine-color-text);
+}
+
+.state-machine-chevron {
+  transition: transform 120ms ease;
+}
+
+.state-machines[open] .state-machine-chevron {
+  transform: rotate(90deg);
+}
+
+.state-machines-body {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.state-machine-title {
+  display: block;
+  margin-bottom: 2px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.state-machine-svg {
+  /* Rendered at a fixed pixel size so node widths, labels, and strokes are identical across
+     every axis. A wider axis (execution has more states) stays wider rather than being shrunk
+     to fit, which would otherwise make its text smaller than the other diagrams'. The
+     container scrolls horizontally if an axis does not fit. */
+  display: block;
+  flex: none;
+  color: var(--mantine-color-dimmed);
+  overflow: visible;
+}
+
+.state-machine {
+  overflow-x: auto;
+}
+
+/* Nodes: quiet by default, brand-tinted when current, with a readable label in both themes. */
+.state-machine-node rect {
+  fill: var(--surface-raised);
+  stroke: var(--border);
+  stroke-width: 1;
+  transition: stroke 120ms ease;
+}
+
+.state-machine-node text {
+  fill: var(--mantine-color-text);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.state-machine-node:hover rect {
+  stroke: var(--brand);
+}
+
+.state-machine-node.is-current rect {
+  fill: var(--brand);
+  stroke: var(--brand);
+}
+
+.state-machine-node.is-current text {
+  fill: #fff;
+  font-weight: 600;
+}
+
+.state-machine-node:focus-visible {
+  outline: none;
+}
+
+.state-machine-node:focus-visible rect {
+  stroke: var(--brand);
+  stroke-width: 2;
+}
+
+.state-machine-edge-path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.3;
+  opacity: 0.55;
+}
+
+.state-machine-edge.is-traversed .state-machine-edge-path {
+  stroke: var(--brand);
+  opacity: 1;
+  stroke-width: 1.6;
+}
+
+.state-machine-edge.is-revert .state-machine-edge-path {
+  stroke-dasharray: 4 3;
+}
+
+/* A self-loop repeats a state rather than moving to another one. It keeps the dashed
+   back-edge treatment so it reads as "this can happen again", not as forward progress. */
+.state-machine-edge.is-self-loop .state-machine-edge-path {
+  stroke-dasharray: 4 3;
+}
+
+/* The invisible hover/focus target over an edge: a wide transparent stroke that makes the thin
+   line easy to point at, and a faint ring when focused from the keyboard. */
+.state-machine-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: help;
+  outline: none;
+}
+
+.state-machine-edge-hit:focus-visible {
+  stroke: var(--brand);
+  stroke-opacity: 0.25;
+}
+
+/* The floating transition label shown on edge hover/focus, positioned at the pointer. */
+.state-machine-edge-tip {
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 10px));
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  color: var(--mantine-color-text);
+  font-size: var(--mantine-font-size-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 400;
+}
+
+/* Run history is an operator detail, collapsed by default. It sits below the timeline as a
+   quiet disclosure rather than a full table, so the primary run view stays uncluttered. */
+.run-history {
+  margin-top: 20px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.run-history-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+  color: var(--mantine-color-dimmed);
+  list-style: none;
+}
+
+.run-history-summary::-webkit-details-marker {
+  display: none;
+}
+
+.run-history-summary:hover {
+  color: var(--mantine-color-text);
+}
+
+.run-history-chevron {
+  transition: transform 120ms ease;
+}
+
+.run-history[open] .run-history-chevron {
+  transform: rotate(90deg);
+}
+
+.run-history-count {
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 9px;
+  background: var(--mantine-color-default-hover);
+  font-size: 11px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.run-history-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.run-history-item {
+  display: grid;
+  grid-template-columns: 150px 92px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+  font-size: var(--mantine-font-size-xs);
+}
+
+.run-history-time {
+  color: var(--mantine-color-dimmed);
+  white-space: nowrap;
+}
+
+.run-history-axis {
+  font-weight: 500;
+}
+
+.run-history-transition,
+.run-history-reason {
+  font-family: var(--mantine-font-family-monospace);
+}
+
+.run-history-reason {
+  color: var(--mantine-color-red-6);
+}
+
+.delivery-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.delivery-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  justify-self: end;
+}
+
+.delivery-error {
+  grid-column: 1 / -1;
+}
+
+.delivery-step-key {
+  min-width: 0;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  overflow-wrap: anywhere;
+}
+
+/* Row actions appear on demand: the table exists to be scanned, and a permanent icon on
+   every row is noise for an action that is used rarely. */
+tbody tr .row-action {
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+tbody tr:hover .row-action,
+tbody tr:focus-within .row-action {
+  opacity: 1;
+}

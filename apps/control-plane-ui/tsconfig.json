@@ -10,5 +10,5 @@
     "skipLibCheck": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["src", "dev-fixtures.ts", "vite.config.ts"]
+  "include": ["browser", "shared", "scripts", "vite.config.ts"]
 }
