@@ -13,104 +13,105 @@
 
 automation-config:
   # Dependabot configuration and the workflow definitions themselves.
-  - '.github/dependabot.yml'
-  - '.github/workflows/**'
+  - ".github/dependabot.yml"
+  - ".github/workflows/**"
   # The changed-area model and its validator.
-  - '.github/ci/**'
+  - ".github/ci/**"
 
 ops:
   # Deployment scripts and the Compose topology.
-  - 'ops/**'
-  - 'compose.yaml'
-  - 'compose.env.sample'
-  - 'compose.memory.env.sample'
+  - "ops/**"
+  - "compose.yaml"
+  - "compose.env.sample"
+  - "compose.memory.env.sample"
   # A CI change can affect how ops is validated.
-  - '.github/workflows/ci.yml'
+  - ".github/workflows/ci.yml"
 
 contract-tools:
   # The per-family tools and the contract trees they own.
-  - 'contracts/**'
+  - "contracts/**"
   # Every projection a contract tool renders into another package. The validator derives this
   # set from the tools' generated-artifacts.json manifests, so a new projection cannot be added
   # without wiring it here.
-  - 'review-runs/src/contract-types-generated.ts'
-  - 'review-runs/src/error-codes-generated.ts'
-  - 'review-runs/src/execution-api-schema.ts'
-  - 'apps/github-integration/src/review-runs/review-runs-api.ts'
-  - 'apps/control-plane-ui/src/list-run-query-params.ts'
-  - 'apps/control-plane-ui/src/review-runs-api-types.ts'
-  - 'apps/control-plane-ui/src/state-machines.generated.ts'
-  - 'review-runs/src/state-machines.generated.ts'
-  - 'apps/github-integration/src/execution/execution-api-types-generated.ts'
-  - 'apps/github-integration/src/execution/execution-api-version.ts'
-  - 'execution-gateway/src/execution-api-types-generated.ts'
-  - 'execution-gateway/src/execution-api-version.ts'
-  - 'memory-catalog/src/contract-types-generated.ts'
+  - "review-runs/src/contract-types-generated.ts"
+  - "review-runs/src/error-codes-generated.ts"
+  - "review-runs/src/execution-api-schema.ts"
+  - "apps/github-integration/src/review-runs/review-runs-api.ts"
+  - "apps/control-plane-ui/shared/list-run-query-params.ts"
+  - "apps/control-plane-ui/browser/features/runs/api-types.generated.ts"
+  - "apps/control-plane-ui/browser/features/runs/state-machines.generated.ts"
+  - "review-runs/src/state-machines.generated.ts"
+  - "apps/github-integration/src/execution/execution-api-types-generated.ts"
+  - "apps/github-integration/src/execution/execution-api-version.ts"
+  - "execution-gateway/src/execution-api-types-generated.ts"
+  - "execution-gateway/src/execution-api-version.ts"
+  - "memory-catalog/src/contract-types-generated.ts"
+  - "apps/control-plane-ui/browser/features/memory/api-types.generated.ts"
   # CI tooling.
-  - '.github/ci/**'
-  - '.github/workflows/ci.yml'
+  - ".github/ci/**"
+  - ".github/workflows/ci.yml"
 
 review-runs:
-  - 'review-runs/**'
+  - "review-runs/**"
   # It validates requests against the shared contract schemas.
-  - 'contracts/**'
+  - "contracts/**"
   # Its integration suite's client<->server seam test drives the GitHub integration client
   # against the real server, so a client change must re-run this job.
-  - 'apps/github-integration/src/review-runs/client.ts'
-  - 'apps/github-integration/src/review-runs/review-runs-api.ts'
+  - "apps/github-integration/src/review-runs/client.ts"
+  - "apps/github-integration/src/review-runs/review-runs-api.ts"
   # CI tooling.
-  - '.github/ci/**'
-  - '.github/workflows/ci.yml'
+  - ".github/ci/**"
+  - ".github/workflows/ci.yml"
 
 execution-gateway:
-  - 'execution-gateway/**'
-  - 'contracts/execution-api/**'
-  - 'contracts/execution-workflow/**'
-  - '.github/workflows/ci.yml'
+  - "execution-gateway/**"
+  - "contracts/execution-api/**"
+  - "contracts/execution-workflow/**"
+  - ".github/workflows/ci.yml"
 
 memory-catalog:
-  - 'memory-catalog/**'
-  - 'contracts/memory-catalog-api/**'
-  - '.github/workflows/ci.yml'
+  - "memory-catalog/**"
+  - "contracts/memory-catalog-api/**"
+  - ".github/workflows/ci.yml"
 
 github-integration:
   # The repo-level trigger configuration the service reads.
-  - '.sec-review/**'
-  - 'apps/github-integration/**'
+  - ".sec-review/**"
+  - "apps/github-integration/**"
   # Its tests validate the shared contract fixtures.
-  - 'contracts/**'
+  - "contracts/**"
   # CI tooling.
-  - '.github/workflows/ci.yml'
+  - ".github/workflows/ci.yml"
 
 control-plane-ui:
-  - 'apps/control-plane-ui/**'
+  - "apps/control-plane-ui/**"
   # It pins its response type to the shared contract fixture.
-  - 'contracts/**'
+  - "contracts/**"
   # CI tooling.
-  - '.github/workflows/ci.yml'
+  - ".github/workflows/ci.yml"
 
 agents:
-  - 'agents/**'
+  - "agents/**"
   # The wheel packages the canonical contract schemas.
-  - 'contracts/**'
+  - "contracts/**"
   # `.sec-review/setup.yml` is parsed and executed by the Execution Worker, so a change to
   # it can affect the agents suite's contract (and the repository's own setup).
-  - '.sec-review/**'
+  - ".sec-review/**"
   # CI tooling.
-  - '.github/workflows/ci.yml'
+  - ".github/workflows/ci.yml"
 
 scripts:
-  - 'scripts/**'
+  - "scripts/**"
   # CI tooling.
-  - '.github/workflows/ci.yml'
+  - ".github/workflows/ci.yml"
 
 documentation:
   # Documentation.
-  - '**/*.md'
+  - "**/*.md"
   # The documentation checkers.
-  - 'scripts/check_markdown_links.py'
-  - 'scripts/check_markdown_wrapping.py'
-  - 'scripts/check_translated_doc_headings.py'
-  - 'scripts/markdown_check_utils.py'
+  - "scripts/check_markdown_links.py"
+  - "scripts/check_markdown_wrapping.py"
+  - "scripts/check_translated_doc_headings.py"
+  - "scripts/markdown_check_utils.py"
   # CI tooling.
-  - '.github/workflows/ci.yml'
+  - ".github/workflows/ci.yml"

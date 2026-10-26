@@ -40,9 +40,9 @@ const UNCOVERED = [
   ['.dockerignore', 'Docker ignore rules for the root context, which no service uses.']
 ]
 
-/** Parse the changed-areas file: top-level `area:` keys whose values are `- 'glob'` lists. The
- * format is fixed and simple (it is also `dorny/paths-filter`'s YAML), so this needs no
- * dependency and tolerates the free-form `#` comments between entries. */
+/** Parse the changed-areas file: top-level `area:` keys whose values are scalar glob lists. The
+ * format is deliberately narrower than general YAML, but scalar quoting is presentation rather
+ * than policy, so both quote styles and unquoted values are accepted. */
 function parseChangedAreas(text) {
   const areas = {}
   let current = null
@@ -55,10 +55,12 @@ function parseChangedAreas(text) {
       areas[current] = []
       continue
     }
-    const globMatch = line.match(/^-\s*'([^']+)'$/)
+    const globMatch = line.match(
+      /^-\s*(?:'([^']+)'|"([^"]+)"|([^#\s][^#]*?))$/
+    )
     if (globMatch) {
       assert.notEqual(current, null, `a glob appears outside any area: ${raw}`)
-      areas[current].push(globMatch[1])
+      areas[current].push(globMatch[1] ?? globMatch[2] ?? globMatch[3].trim())
       continue
     }
     assert.fail(`unparsable line in changed-areas.yml: ${raw}`)
@@ -133,11 +135,18 @@ test("every contract tool's generated artifact is covered by the contract-tools 
   // without this area being wired to it.
   const manifests = [
     'contracts/review-runs-api/tools/generated-artifacts.json',
-    'contracts/execution-api/tools/generated-artifacts.json'
+    'contracts/execution-api/tools/generated-artifacts.json',
+    'contracts/memory-catalog-api/tools/generated-artifacts.json'
   ]
   const outputs = manifests.flatMap((manifestPath) => {
     const manifest = JSON.parse(readFileSync(path.join(REPO_ROOT, manifestPath), 'utf8'))
-    return manifest.generators.flatMap((generator) => generator.outputs)
+    if (Array.isArray(manifest.generators))
+      return manifest.generators.flatMap((generator) => generator.outputs)
+    if (Array.isArray(manifest.artifacts))
+      return manifest.artifacts.map((artifact) =>
+        path.normalize(path.join(path.dirname(manifestPath), artifact.output))
+      )
+    assert.fail(`${manifestPath} has no generated artifact entries`)
   })
   assert.ok(outputs.length > 0, 'expected at least one generated artifact')
   for (const output of outputs) {
