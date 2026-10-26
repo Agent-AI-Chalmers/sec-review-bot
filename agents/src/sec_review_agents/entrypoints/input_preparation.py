@@ -13,9 +13,9 @@ from sec_review_agents.artifacts.object_storage import (
     ARTIFACT_S3_BUCKET_ENV,
     download_s3_object,
 )
-from sec_review_agents.entrypoints.contract_schema import (
-    validate_v6_input_bundle_manifest,
-    validate_v6_workflow_input,
+from sec_review_agents.entrypoints.execution_api_schema import (
+    validate_execution_api_input,
+    validate_execution_api_input_bundle_manifest,
 )
 from sec_review_agents.entrypoints.execution_protocol import validate_run_id
 from sec_review_agents.utils.env import env_value
@@ -86,7 +86,7 @@ def prepare_workflow_input(
 
     # Validate before adding worker-owned fields, which are not part of the public
     # workflow input contract.
-    validate_v6_workflow_input(input_data, workflow)
+    validate_execution_api_input(input_data, workflow)
     prepared = deepcopy(input_data)
 
     # Resolve the caller's bundle URI at the trusted filesystem boundary.
@@ -304,7 +304,7 @@ def _set_bundle_paths_from_manifest(
     if not manifest_path.is_file():
         raise ValueError(f"Input bundle manifest not found: {manifest_path}")
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    validate_v6_input_bundle_manifest(manifest)
+    validate_execution_api_input_bundle_manifest(manifest)
 
     bundle_paths: dict[str, str] = {
         "workspace_snapshot_tar_path": str(

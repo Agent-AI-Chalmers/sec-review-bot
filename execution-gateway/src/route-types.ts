@@ -1,4 +1,4 @@
-import type { operations } from './contract-types-generated.js'
+import type { operations } from './execution-api-types-generated.js'
 
 type OperationId = keyof operations
 type Operation<Id extends OperationId> = operations[Id]

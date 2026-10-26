@@ -1,4 +1,4 @@
-import { CONTRACT_VERSION } from '../../execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../execution/execution-api-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -60,7 +60,7 @@ async function materializeHistoryArtifacts({
     ReturnType<typeof fetchTimelineLinkedPullRequests>
   >
 }> {
-  // The Execution Worker validates this against the v6 issue schema, which forbids additional
+  // The Execution Worker validates this against the v1 issue schema, which forbids additional
   // properties. Identity fields plus what the prompts render; `default_branch` and
   // `workspace_ref` are already consumed when the bundle is built, so recording them here
   // would add fields no consumer reads.
@@ -160,7 +160,7 @@ export async function prepareIssueReviewInput({
     run_id,
     workflow: 'issue review',
     build_input: (reference: InputBundleArtifactRef): IssueReviewInput => ({
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_intent: {
         objective: review_objective,
         ...(test_changes ? { test_changes } : {})

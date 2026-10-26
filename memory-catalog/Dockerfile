@@ -16,7 +16,7 @@ RUN pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
 
 COPY tsconfig.json tsconfig.build.json eslint.config.js .prettierrc.json ./
 COPY src ./src
-COPY --from=contracts memory-catalog-api/openapi.yaml /contracts/memory-catalog-api/openapi.yaml
+COPY --from=contracts memory-catalog-api/v1/openapi.yaml /contracts/memory-catalog-api/v1/openapi.yaml
 RUN pnpm run build \
     && pnpm deploy --filter . --prod /prod
 

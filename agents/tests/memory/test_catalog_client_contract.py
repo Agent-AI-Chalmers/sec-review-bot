@@ -10,13 +10,15 @@ import yaml
 from jsonschema import Draft202012Validator
 
 from sec_review_agents.artifacts.reference import ArtifactReference
+from sec_review_agents.contract_versions import MEMORY_CATALOG_API_VERSION
 from sec_review_agents.memory.catalog_client import (
     MemoryCatalogClient,
     MemoryCatalogConflictError,
 )
 from tests.project_paths import CONTRACTS_ROOT
 
-CONTRACT_PATH = CONTRACTS_ROOT / "memory-catalog-api" / "openapi.yaml"
+CONTRACT_PATH = CONTRACTS_ROOT / "memory-catalog-api" / "v1" / "openapi.yaml"
+API_ROOT = f"/{MEMORY_CATALOG_API_VERSION}"
 
 
 def _validator(schema_name: str) -> Draft202012Validator:
@@ -143,19 +145,22 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         "next_before_revision": None,
     }
     assert [(method, path) for method, path, _body in client.requests] == [
-        ("POST", "/v1/extractions"),
-        ("GET", "/v1/extractions/extraction-1"),
-        ("GET", "/v1/observation-backlog"),
-        ("GET", "/v1/maintenance-input?limit=10"),
-        ("POST", "/v1/memory-tree/revisions"),
-        ("GET", "/v1/memory-tree"),
-        ("GET", "/v1/memory-tree/revisions/1"),
-        ("GET", "/v1/memory-tree/revisions?limit=10&before_revision=2"),
+        ("POST", f"{API_ROOT}/extractions"),
+        ("GET", f"{API_ROOT}/extractions/extraction-1"),
+        ("GET", f"{API_ROOT}/observation-backlog"),
+        ("GET", f"{API_ROOT}/maintenance-input?limit=10"),
+        ("POST", f"{API_ROOT}/memory-tree/revisions"),
+        ("GET", f"{API_ROOT}/memory-tree"),
+        ("GET", f"{API_ROOT}/memory-tree/revisions/1"),
+        (
+            "GET",
+            f"{API_ROOT}/memory-tree/revisions?limit=10&before_revision=2",
+        ),
     ]
 
     request_schemas = {
-        "/v1/extractions": "ExtractionRegistration",
-        "/v1/memory-tree/revisions": "MemoryTreeRevisionCreation",
+        f"{API_ROOT}/extractions": "ExtractionRegistration",
+        f"{API_ROOT}/memory-tree/revisions": "MemoryTreeRevisionCreation",
     }
     for _method, path, body in client.requests:
         schema_name = request_schemas.get(path)
@@ -187,7 +192,7 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
 def test_extraction_conflict_preserves_non_retryable_catalog_semantics() -> None:
     client = MemoryCatalogClient(base_url="http://catalog", token="secret")
     conflict = HTTPError(
-        "http://catalog/v1/extractions",
+        f"http://catalog{API_ROOT}/extractions",
         409,
         "Conflict",
         Message(),

@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.utils.payloads import mapping_payload
 
@@ -53,7 +53,7 @@ class ScanSummary(BaseModel):
 
 
 class RepositoryWorkflowResult(BaseModel):
-    contract_version: str = CONTRACT_VERSION
+    api_version: str = EXECUTION_API_VERSION
     scan_summary: ScanSummary
     deliveries: list[dict[str, Any]] = Field(default_factory=list)
     case_results: list[RepositoryCaseResult] = Field(default_factory=list)
@@ -166,7 +166,7 @@ def build_repository_workflow_result(
     # numbers cannot mistake an unreviewed window for a reviewed one.
     return RepositoryWorkflowResult.model_validate(
         {
-            "contract_version": CONTRACT_VERSION,
+            "api_version": EXECUTION_API_VERSION,
             "scan_summary": build_scan_summary(scan_result=scan_result),
             "deliveries": _repository_deliveries(delivery_result),
             "case_results": _repository_case_results(case_results),

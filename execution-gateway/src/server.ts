@@ -13,7 +13,7 @@ import Fastify, {
 import {
   supportedWorkflows,
   validateExecutionInput,
-} from './contract-validation.js'
+} from './execution-api-validation.js'
 import { ExecutionRunConflictError, type ExecutionRecord } from './execution.js'
 import type { PathParameters, RequestBody } from './route-types.js'
 import { integerEnv } from './env.js'
@@ -31,7 +31,8 @@ function specPath(): string {
     '..',
     '..',
     'contracts',
-    'integration-contract',
+    'execution-api',
+    'v1',
     'openapi.yaml',
   )
 }
@@ -107,7 +108,7 @@ export async function registerExecutionGatewayRoutes(
               await store.start({
                 workflow,
                 run_id: body.run_id,
-                input_data: body.input,
+                input: body.input,
                 timeout_seconds: workflowTimeoutSeconds,
                 ...('runtime' in body ? { runtime: body.runtime } : {}),
               }),

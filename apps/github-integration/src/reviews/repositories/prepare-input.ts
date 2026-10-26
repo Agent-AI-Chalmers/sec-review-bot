@@ -1,4 +1,4 @@
-import { CONTRACT_VERSION } from '../../execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../execution/execution-api-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -224,7 +224,7 @@ export async function prepareRepositoryReviewInput({
     // Refuse an oversized window here rather than at transport. Every entry below is inlined
     // into the workflow input, so an unbounded list would cross Temporal and be persisted, and
     // the failure would surface as an infrastructure error far from its cause. The limits match
-    // `maxItems` in the v6 schemas, which is where the boundary is defined.
+    // `maxItems` in the v1 schemas, which is where the boundary is defined.
     if (
       incrementalResult.changed_files.length >
       MAX_SCAN_SCOPE_INCREMENTAL_CHANGED_FILES
@@ -283,7 +283,7 @@ export async function prepareRepositoryReviewInput({
     build_input: (
       reference: InputBundleArtifactRef
     ): RepositoryReviewInput => ({
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       input_bundle: reference,
       review_intent: {
         objective: 'audit',

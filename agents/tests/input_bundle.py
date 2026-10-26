@@ -3,7 +3,7 @@ import json
 import tarfile
 from pathlib import Path
 
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 
 
 def write_test_input_bundle(
@@ -14,7 +14,7 @@ def write_test_input_bundle(
         (root / "manifest.json").write_text(
             json.dumps(
                 {
-                    "contract_version": CONTRACT_VERSION,
+                    "api_version": EXECUTION_API_VERSION,
                     "workspace": {"snapshot": "workspace.snapshot.tar"},
                     "history": {"path": "history"},
                 }

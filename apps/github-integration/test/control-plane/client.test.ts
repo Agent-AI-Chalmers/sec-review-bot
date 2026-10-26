@@ -7,7 +7,7 @@ import {
   controlPlaneClient,
   type ReviewRunRecord
 } from '../../src/control-plane/client.js'
-import { CONTRACT_VERSION } from '../../src/execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../src/execution/execution-api-version.js'
 import { asErrorWithResponse, errorCode } from '../../src/utils/error-utils.js'
 
 const preparingRun: ReviewRunRecord = {
@@ -136,7 +136,7 @@ test('repository preparation can replace the admitted empty publish context', as
       },
       event_type: 'manual'
     },
-    { contract_version: CONTRACT_VERSION }
+    { api_version: EXECUTION_API_VERSION }
   )
 })
 

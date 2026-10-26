@@ -981,7 +981,7 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
       runId,
       admission.preparation_token,
       {},
-      { contract_version: 'v6' }
+      { api_version: 'v1' }
     )
     await store.failPreparation(runId, admission.preparation_token, {
       code: 'SUBMISSION_STATE_UNCERTAIN',
@@ -1025,7 +1025,7 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
 test('a restarted coordinator replays persisted uncertain submission input', async () => {
   const sharedConnector = `recovery:${randomUUID()}`
   const runId = `run-restarted-recovery-${randomUUID()}`
-  const input = { contract_version: 'v6', replay: true }
+  const input = { api_version: 'v1', replay: true }
   const owner = await createStore({ connectorId: sharedConnector })
   try {
     const admission = await owner.createPreparingReviewRun({
@@ -2940,7 +2940,7 @@ test('savePreparedSubmission rolls the publication write back when the execution
         runId,
         admission.preparation_token,
         { target: 'overwritten' },
-        { contract_version: 'v6' }
+        { api_version: 'v1' }
       ),
       /cannot save prepared submission outside pending/,
       'a missed execution arm must reject the save'
@@ -4338,7 +4338,7 @@ test('an uncertain submission queues no notice until the run is conclusively fai
       runId,
       admission.preparation_token as string,
       {},
-      { contract_version: 'v6' }
+      { api_version: 'v1' }
     )
     await store.failPreparation(
       runId,
@@ -4395,7 +4395,7 @@ test('a rejected replay announces the failure that actually happened', async () 
       runId,
       admission.preparation_token as string,
       {},
-      { contract_version: 'v6' }
+      { api_version: 'v1' }
     )
     await store.failPreparation(
       runId,
@@ -4447,7 +4447,7 @@ test('an uncertain submission that never resolves is concluded once its budget i
       runId,
       admission.preparation_token as string,
       {},
-      { contract_version: 'v6' }
+      { api_version: 'v1' }
     )
     await store.failPreparation(
       runId,

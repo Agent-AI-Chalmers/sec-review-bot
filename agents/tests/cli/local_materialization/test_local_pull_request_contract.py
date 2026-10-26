@@ -7,7 +7,9 @@ import pytest
 from sec_review_agents.cli.local_materialization.pull_request import (
     build_local_pull_request_bundle,
 )
-from sec_review_agents.entrypoints.contract_schema import validate_v6_workflow_input
+from sec_review_agents.entrypoints.execution_api_schema import (
+    validate_execution_api_input,
+)
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -40,7 +42,7 @@ def test_local_pull_request_bundle_passes_the_v6_input_schema(
 ) -> None:
     """A local PR run starts the same workflow the GitHub path starts.
 
-    Input preparation validates input against the v6 schema before the workflow runs, and that schema
+    Input preparation validates input against the v1 schema before the workflow runs, and that schema
     forbids additional properties. A locally materialized bundle that carried extra identity
     fields, or that omitted the review window, would fail every local run at startup -- which is
     invisible to a test that only checks the bundle was written.
@@ -55,7 +57,7 @@ def test_local_pull_request_bundle_passes_the_v6_input_schema(
         base_ref="HEAD~1",
     )
 
-    validate_v6_workflow_input(bundle.input, "pull-request-review")
+    validate_execution_api_input(bundle.input, "pull-request-review")
     input_data = bundle.input
 
     review_window = input_data["pr"]["review_window"]

@@ -1,12 +1,12 @@
 import type {
   ExecutionWorkflow,
   WorkflowInputByName,
-} from './contract-types-generated.js'
+} from './execution-api-types-generated.js'
 
-export interface ExecutionRequest {
+export interface ExecutionWorkflowInput {
   workflow: ExecutionWorkflow
   run_id: string
-  input_data: WorkflowInputByName[ExecutionWorkflow]
+  input: WorkflowInputByName[ExecutionWorkflow]
   timeout_seconds: number
   runtime?: { workspace_image?: string } | null
 }

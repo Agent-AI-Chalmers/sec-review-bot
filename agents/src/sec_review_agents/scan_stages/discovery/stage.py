@@ -277,7 +277,7 @@ def _build_scan_manifest(
     return entries, skipped
 
 
-# The scan scope's change vocabulary, mirroring `changedFileStatus` in the integration contract.
+# The scan scope's change vocabulary, mirroring `changedFileStatus` in the Execution API.
 # `deleted` is the only status that removes a file from discovery; the rest describe how a file
 # changed and all of them are scanned.
 INCREMENTAL_CHANGED_FILE_STATUSES = frozenset(

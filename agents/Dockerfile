@@ -23,16 +23,16 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY . ./
-# Copy the integration-contract family and let the resolver use CONTRACT_VERSION from
-# `sec_review_agents/contract_version.py`. Naming the version here instead is what let a v5 -> v6
+# Copy the execution-api family and let the resolver use EXECUTION_API_VERSION from
+# `sec_review_agents/contract_versions.py`. Naming the version here instead can
 # bump leave the image pointing at stale schemas. Compose
 # supplies `contracts/` as a separate named context; this lands under
-# `/contracts/integration-contract/`, and `SEC_REVIEW_CONTRACTS_ROOT=/contracts` above names the
+# `/contracts/execution-api/`, and `SEC_REVIEW_CONTRACTS_ROOT=/contracts` above names the
 # root explicitly — the resolver reads that variable rather than searching the filesystem for a
 # directory that happens to match. The build-only `tools/` working tree never reaches this
 # COPY because `contracts/.dockerignore` keeps it out of the build context.
-COPY --from=contracts integration-contract /contracts/integration-contract
-COPY --from=contracts execution-contract /contracts/execution-contract
+COPY --from=contracts execution-api /contracts/execution-api
+COPY --from=contracts execution-workflow /contracts/execution-workflow
 RUN uv sync --frozen --no-dev
 
 CMD ["sec-review-execution-worker"]

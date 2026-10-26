@@ -6,7 +6,7 @@
  * `publication-error-code-alignment.test.ts`).
  *
  * The *strings* are owned by the hand-written OpenAPI contract
- * (`contracts/control-plane-api/openapi.yaml`, `ErrorResponse.code` enum); this module keeps
+ * (`contracts/control-plane-api/v1/openapi.yaml`, `ErrorResponse.code` enum); this module keeps
  * only the semantic keys and pins the values to that contract with `satisfies`, so a value
  * that is not a contract code fails to compile. Coverage — that no contract code is missing a
  * key here — is checked by `error-codes.test.ts`, because the semantic keys are not the code

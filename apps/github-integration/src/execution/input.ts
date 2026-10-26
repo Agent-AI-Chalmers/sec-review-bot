@@ -6,11 +6,11 @@ import type {
   RepositoryScanScope,
   RepositoryScanTarget,
   ReviewIntent
-} from './integration-contract-types-generated.js'
+} from './execution-api-types-generated.js'
 
 // GitHub integration prepared input shapes.
 //
-// The transport shapes are generated from `contracts/integration-contract/v6/schemas`; this
+// The transport shapes are generated from `contracts/execution-api/v1/schemas`; this
 // module re-exports them and adds the local vocabulary the integration needs. Do not restate a
 // transport field here: a hand-maintained copy is how the producer and the schemas drifted apart
 // before the projection existed.
@@ -22,7 +22,7 @@ export {
   MAX_WORKFLOW_INPUT_BYTES,
   MAX_SCAN_SCOPE_INCREMENTAL_CHANGED_FILES,
   MAX_SCAN_TARGET_COMMIT_SHAS
-} from './integration-contract-types-generated.js'
+} from './execution-api-types-generated.js'
 
 export type {
   InputBundleArtifactRef,

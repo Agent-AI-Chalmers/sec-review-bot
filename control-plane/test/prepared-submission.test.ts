@@ -57,7 +57,7 @@ test('prepared submission persists input before crossing the Execution boundary'
       runId: 'run-1',
       preparationToken: 'claim-1',
       publishContext: { issue: 7 },
-      input: { contract_version: 'v6' }
+      input: { api_version: 'v1' }
     },
     async (request) => {
       events.push('submit')
@@ -93,7 +93,7 @@ test('uncertain Execution submission is persisted for recovery', async () => {
         runId: 'run-1',
         preparationToken: 'claim-1',
         publishContext: {},
-        input: { contract_version: 'v6' }
+        input: { api_version: 'v1' }
       },
       async () => {
         throw error
@@ -127,7 +127,7 @@ test('a queued-state write failure after Execution accepts is recoverable uncert
         runId: 'run-1',
         preparationToken: 'claim-1',
         publishContext: {},
-        input: { contract_version: 'v6' }
+        input: { api_version: 'v1' }
       },
       async () => {}
     ),

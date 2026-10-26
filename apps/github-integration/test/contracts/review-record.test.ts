@@ -55,14 +55,14 @@ function validReviewRecord(): ReviewRecordFixture {
   }
 }
 
-test('parseReviewRecord accepts a complete v6 review_record', () => {
+test('parseReviewRecord accepts a complete v1 review_record', () => {
   const record = parseReviewRecord(validReviewRecord())
 
   assert.strictEqual(record.analysis.verdict, 'confirmed-vulnerability')
   assert.deepStrictEqual(record.mitigation.file_changes, [])
 })
 
-test('parseReviewRecord accepts the shared v6 review_record fixture', () => {
+test('parseReviewRecord accepts the shared v1 review_record fixture', () => {
   const record = parseReviewRecord(contractFixture('review-record.json'))
 
   assert.strictEqual(record.analysis.verdict, 'confirmed-vulnerability')
@@ -70,7 +70,7 @@ test('parseReviewRecord accepts the shared v6 review_record fixture', () => {
   assert.strictEqual(record.cvss?.severity, 'medium')
 })
 
-test('parseReviewRecord accepts the shared v6 deleted-file review_record fixture', () => {
+test('parseReviewRecord accepts the shared v1 deleted-file review_record fixture', () => {
   const record = parseReviewRecord(
     contractFixture('review-record-deleted-file.json')
   )
@@ -80,7 +80,7 @@ test('parseReviewRecord accepts the shared v6 deleted-file review_record fixture
   assert.strictEqual(record.cvss?.outcome, 'not-scored')
 })
 
-test('parseReviewRecord accepts every shared v6 review_record schema fixture', () => {
+test('parseReviewRecord accepts every shared v1 review_record schema fixture', () => {
   for (const fixtureName of reviewRecordFixtureNames()) {
     assert.doesNotThrow(
       () => parseReviewRecord(contractFixture(fixtureName)),
@@ -119,7 +119,7 @@ test('parseReviewRecord rejects deleted file changes with content', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v6/
+    /review_record does not match API v1/
   )
 })
 
@@ -135,7 +135,7 @@ test('parseReviewRecord rejects upsert file changes without content encoding', (
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v6/
+    /review_record does not match API v1/
   )
 })
 
@@ -153,7 +153,7 @@ test('parseReviewRecord rejects file changes with unsupported fields', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v6/
+    /review_record does not match API v1/
   )
 })
 
@@ -168,7 +168,7 @@ test('parseReviewRecord rejects unsafe file change paths', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v6/
+    /review_record does not match API v1/
   )
 })
 
@@ -183,7 +183,7 @@ test('parseReviewRecord rejects file change paths with surrounding whitespace', 
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v6/
+    /review_record does not match API v1/
   )
 })
 
@@ -193,7 +193,7 @@ test('parseReviewRecord rejects unsupported public fields', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v6/
+    /review_record does not match API v1/
   )
 })
 
@@ -210,11 +210,11 @@ test('parseReviewRecord rejects invalid cvss field types', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v6/
+    /review_record does not match API v1/
   )
 })
 
-test('parseReviewRecord rejects malformed v6 review_record', () => {
+test('parseReviewRecord rejects malformed v1 review_record', () => {
   assert.throws(
     () =>
       parseReviewRecord({
@@ -224,7 +224,7 @@ test('parseReviewRecord rejects malformed v6 review_record', () => {
           narratives: []
         }
       }),
-    /review_record does not match contract v6/
+    /review_record does not match API v1/
   )
 })
 
@@ -234,7 +234,7 @@ test('parseReviewRecord rejects unknown public enum values', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v6/
+    /review_record does not match API v1/
   )
 })
 
@@ -244,7 +244,7 @@ test('parseReviewRecord rejects removed public status fields', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v6/
+    /review_record does not match API v1/
   )
 })
 
@@ -254,6 +254,6 @@ test('parseReviewRecord rejects the removed changed_files field', () => {
 
   assert.throws(
     () => parseReviewRecord(record),
-    /review_record does not match contract v6/
+    /review_record does not match API v1/
   )
 })

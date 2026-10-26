@@ -10,7 +10,7 @@ const CONTRACT_ROOT = path.join(REPO_ROOT, 'contracts', 'memory-catalog-api')
 
 test('the HTTP contract is a hand-maintained YAML source, not a service projection', () => {
   const contract = parse(
-    readFileSync(path.join(CONTRACT_ROOT, 'openapi.yaml'), 'utf8')
+    readFileSync(path.join(CONTRACT_ROOT, 'v1', 'openapi.yaml'), 'utf8')
   ) as { openapi?: unknown; 'x-contract-source'?: unknown }
 
   assert.equal(contract.openapi, '3.1.0')

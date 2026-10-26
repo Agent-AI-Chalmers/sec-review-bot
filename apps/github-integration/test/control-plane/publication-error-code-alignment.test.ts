@@ -26,6 +26,7 @@ function publicationStepCodesFromContract(): string[] {
         workspaceRoot(),
         'contracts',
         'control-plane-api',
+        'v1',
         'openapi.yaml'
       ),
       'utf8'

@@ -7,7 +7,7 @@
       "script": "contracts/control-plane-api/tools/src/generate-types.ts",
       "command": "pnpm --dir contracts/control-plane-api/tools run generate",
       "inputs": [
-        "contracts/control-plane-api/openapi.yaml",
+        "contracts/control-plane-api/v1/openapi.yaml",
         "control-plane/.prettierrc.json",
         "apps/github-integration/.prettierrc.json",
         "apps/control-plane-ui/.prettierrc.json"
@@ -24,7 +24,7 @@
       "name": "schemas",
       "script": "contracts/control-plane-api/tools/src/generate-schemas.ts",
       "command": "pnpm --dir contracts/control-plane-api/tools run generate",
-      "inputs": ["contracts/control-plane-api/openapi.yaml"],
+      "inputs": ["contracts/control-plane-api/v1/openapi.yaml"],
       "outputs": [
         "contracts/control-plane-api/v1/observed-run.schema.json",
         "contracts/control-plane-api/v1/review-run-record.schema.json"
@@ -34,7 +34,7 @@
       "name": "state-machines",
       "script": "contracts/control-plane-api/tools/src/generate-state-machines.ts",
       "command": "pnpm --dir contracts/control-plane-api/tools run generate",
-      "inputs": ["contracts/control-plane-api/openapi.yaml"],
+      "inputs": ["contracts/control-plane-api/v1/openapi.yaml"],
       "outputs": [
         "apps/control-plane-ui/src/state-machines.generated.ts",
         "control-plane/src/state-machines.generated.ts"

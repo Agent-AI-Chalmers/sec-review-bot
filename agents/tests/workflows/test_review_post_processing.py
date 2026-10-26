@@ -2,7 +2,7 @@ from datetime import timedelta
 
 import pytest
 
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.run_diagnostics.publication import (
     RunDiagnosticPublicationRequest,
 )
@@ -53,7 +53,7 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
     workflow_class,
 ) -> None:
     publications: list[RunDiagnosticPublicationRequest] = []
-    public_result = {"contract_version": CONTRACT_VERSION}
+    public_result = {"api_version": EXECUTION_API_VERSION}
 
     async def fake_execute_activity(activity_fn, *args, **kwargs):
         activity_args = kwargs.get("args", args)
@@ -120,7 +120,7 @@ async def test_single_review_publishes_before_scheduling_memory(
     async def fake_execute_activity(activity_fn, *args, **kwargs):
         activity_args = kwargs.get("args", args)
         if activity_fn.__name__.startswith("build_"):
-            return {"contract_version": CONTRACT_VERSION}
+            return {"api_version": EXECUTION_API_VERSION}
         if activity_fn is workflow_module.publish_run_diagnostic_activity:
             assert kwargs["schedule_to_close_timeout"] == timedelta(seconds=30)
             events.append("publish")
@@ -148,7 +148,7 @@ async def test_single_review_publishes_before_scheduling_memory(
         )
     )
 
-    assert result["result"] == {"contract_version": CONTRACT_VERSION}
+    assert result["result"] == {"api_version": EXECUTION_API_VERSION}
     assert events == ["publish", "schedule"]
     assert publications[0].review_units == [
         {
@@ -177,7 +177,7 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
     async def fake_execute_activity(activity_fn, *args, **kwargs):
         activity_args = kwargs.get("args", args)
         if activity_fn is repository_workflow.build_repository_review_result_activity:
-            return {"contract_version": CONTRACT_VERSION}
+            return {"api_version": EXECUTION_API_VERSION}
         if activity_fn is repository_workflow.publish_run_diagnostic_activity:
             publications.append(activity_args[0])
             return _finalized("case-a", "case-b")
@@ -232,7 +232,7 @@ async def test_repository_without_cases_still_publishes_run_diagnostic(
     async def fake_execute_activity(activity_fn, *args, **kwargs):
         activity_args = kwargs.get("args", args)
         if activity_fn is repository_workflow.build_repository_review_result_activity:
-            return {"contract_version": CONTRACT_VERSION}
+            return {"api_version": EXECUTION_API_VERSION}
         if activity_fn is repository_workflow.publish_run_diagnostic_activity:
             publications.append(activity_args[0])
             return _finalized()
@@ -273,7 +273,7 @@ async def test_disabling_memory_does_not_skip_review_publication(monkeypatch) ->
 
     async def fake_execute_activity(activity_fn, *args, **_kwargs):
         if activity_fn is issue_workflow.build_issue_review_result_activity:
-            return {"contract_version": CONTRACT_VERSION}
+            return {"api_version": EXECUTION_API_VERSION}
         if activity_fn is issue_workflow.publish_run_diagnostic_activity:
             events.append("publish")
             return _finalized("review")
@@ -309,7 +309,7 @@ async def test_publication_failure_fails_review_before_memory_scheduling(
 ) -> None:
     async def fake_execute_activity(activity_fn, *args, **_kwargs):
         if activity_fn is issue_workflow.build_issue_review_result_activity:
-            return {"contract_version": CONTRACT_VERSION}
+            return {"api_version": EXECUTION_API_VERSION}
         if activity_fn is issue_workflow.publish_run_diagnostic_activity:
             raise RuntimeError("storage unavailable")
         return {}

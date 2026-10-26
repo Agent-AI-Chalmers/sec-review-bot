@@ -88,7 +88,7 @@ function repositoryResult(
   } = {}
 ): RepositoryWorkflowResult {
   return {
-    contract_version: 'v6',
+    api_version: 'v1',
     scan_summary: scanSummary(options.scan_summary),
     case_results,
     deliveries: [],

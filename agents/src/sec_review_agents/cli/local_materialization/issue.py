@@ -18,7 +18,7 @@ from sec_review_agents.cli.local_materialization.common import (
     workspace_path,
     write_input_bundle_manifest,
 )
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.utils.files import write_json
 from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workspace.snapshots import (
@@ -60,7 +60,7 @@ def build_local_issue_bundle(
     setup_declaration_content: str | None = None,
 ) -> ReviewBundle:
     run_id = create_local_run_id()
-    # The v6 issue schema types `number` as an integer; the pull request path does the same.
+    # The v1 issue schema types `number` as an integer; the pull request path does the same.
     issue_number_value = int(issue_number)
     default_branch = repo_default_branch(repo_path)
     branch_for_snapshot = (target_branch or default_branch).strip() or default_branch
@@ -96,7 +96,7 @@ def build_local_issue_bundle(
     )
     write_input_bundle_manifest(paths, include_incremental_window=False)
 
-    # Input preparation validates this against the v6 issue schema, which forbids additional
+    # Input preparation validates this against the v1 issue schema, which forbids additional
     # properties, so it carries identity plus what the prompts render and nothing else.
     issue_metadata = {
         "owner": repo_name.split("/", 1)[0],
@@ -120,7 +120,7 @@ def build_local_issue_bundle(
     )
     input_bundle = archive_input_bundle(paths, include_incremental_window=False)
     input_data = {
-        "contract_version": CONTRACT_VERSION,
+        "api_version": EXECUTION_API_VERSION,
         "review_intent": {
             "objective": review_objective,
             "test_changes": test_changes,

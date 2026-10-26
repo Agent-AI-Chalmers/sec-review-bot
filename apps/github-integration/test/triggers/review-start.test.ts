@@ -9,7 +9,7 @@ import type { SubmittedPullRequestReviewRun } from '../../src/reviews/pull-reque
 import type { IssueContext } from '../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../src/github/pull-request-service.js'
 import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
-import { CONTRACT_VERSION } from '../../src/execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../src/execution/execution-api-version.js'
 import { SetupDeclarationError } from '../../src/github/setup-declaration.js'
 import type {
   IssueReviewInput,
@@ -136,7 +136,7 @@ function pullRequestContext(): PullRequestContext {
  */
 function issueReviewInput(): IssueReviewInput & Record<string, unknown> {
   return {
-    contract_version: CONTRACT_VERSION,
+    api_version: EXECUTION_API_VERSION,
     input_bundle: {
       uri: 's3://bucket/input.tar.zst',
       digest: `sha256:${'a'.repeat(64)}`,
@@ -159,7 +159,7 @@ function issueReviewInput(): IssueReviewInput & Record<string, unknown> {
 function pullRequestReviewInput(): PullRequestReviewInput &
   Record<string, unknown> {
   return {
-    contract_version: CONTRACT_VERSION,
+    api_version: EXECUTION_API_VERSION,
     input_bundle: {
       uri: 's3://bucket/input.tar.zst',
       digest: `sha256:${'a'.repeat(64)}`,

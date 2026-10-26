@@ -2,14 +2,14 @@
 
 Language: English
 
-This package renders and checks every artifact derived from [this family's OpenAPI contract](../openapi.yaml): the TypeScript projections and committed v1 JSON Schemas. It lives beside the contract it reads, so the tool that owns a projection is not the package the projection lands in.
+This package renders and checks every artifact derived from [this family's OpenAPI contract](../v1/openapi.yaml): the TypeScript projections and committed v1 JSON Schemas. It lives beside the contract it reads, so the tool that owns a projection is not the package the projection lands in.
 
 ## Commands
 
 ```bash
 pnpm run generate        # render every artifact and write it in place
 pnpm run check           # compare every committed artifact to a fresh render
-pnpm run lint:contract   # Spectral-lint ../openapi.yaml against ../.spectral.yaml
+pnpm run lint:contract   # Spectral-lint ../v1/openapi.yaml against ../.spectral.yaml
 pnpm run test            # generator guards, manifest match, and CI-filter coverage
 ```
 

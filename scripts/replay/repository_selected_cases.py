@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from sec_review_agents.contract_version import CONTRACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.review_stages.transcripts import (
     review_transcripts_root,
 )
@@ -284,7 +284,7 @@ def _repository_result_from_replay(
 ) -> dict[str, Any]:
     scan_summary = result.get("scan_summary")
     return {
-        "contract_version": CONTRACT_VERSION,
+        "api_version": EXECUTION_API_VERSION,
         "scan_summary": (
             scan_summary
             if isinstance(scan_summary, dict)

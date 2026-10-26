@@ -12,7 +12,7 @@ from sec_review_agents.cli.local_materialization.common import (
     workspace_path,
     write_input_bundle_manifest,
 )
-from sec_review_agents.contract_version import CONTRACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.utils.files import write_json
 from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workspace.snapshots import (
@@ -138,13 +138,13 @@ def build_patcheval_issue_bundle_from_case(
     )
     write_input_bundle_manifest(paths, include_incremental_window=False)
 
-    # The runner validates this against the v6 issue schema, which forbids additional
+    # The runner validates this against the v1 issue schema, which forbids additional
     # properties, so it carries identity plus what the prompts render and nothing else.
     issue_metadata = {
         "owner": public_repo_name.split("/", 1)[0],
         "repo": public_repo_name.split("/", 1)[-1],
         "repo_full_name": public_repo_name,
-        # The v6 issue schema types `number` as an integer.
+        # The v1 issue schema types `number` as an integer.
         "number": 1,
         "title": case.issue_title(issue_mode),
         "body": case.issue_body(issue_mode),
@@ -162,7 +162,7 @@ def build_patcheval_issue_bundle_from_case(
         },
     )
     input_data = {
-        "contract_version": CONTRACT_VERSION,
+        "api_version": EXECUTION_API_VERSION,
         "review_intent": {
             "objective": "repair",
             "test_changes": "deny",

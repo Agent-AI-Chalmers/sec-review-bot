@@ -1,7 +1,7 @@
-// Generated from contracts/integration-contract/openapi.yaml (path relative to the repository root). Do not edit.
+// Generated from contracts/execution-api/v1/openapi.yaml (path relative to the repository root). Do not edit.
 //
 // This file is a generated projection of the contract. Regenerate it with
-// `pnpm --dir contracts/integration-contract/tools run generate`.
+// `pnpm --dir contracts/execution-api/tools run generate`.
 export interface paths {
   '/healthz': {
     parameters: {
@@ -477,7 +477,7 @@ export interface RepositoryScanScope {
 }
 
 export interface IssueReviewInput {
-  contract_version: 'v6'
+  api_version: 'v1'
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   issue: {
@@ -492,7 +492,7 @@ export interface IssueReviewInput {
 }
 
 export interface PullRequestReviewInput {
-  contract_version: 'v6'
+  api_version: 'v1'
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   pr: {
@@ -518,7 +518,7 @@ export interface PullRequestReviewInput {
 }
 
 export interface RepositoryReviewInput {
-  contract_version: 'v6'
+  api_version: 'v1'
   input_bundle: InputBundleArtifactRef
   review_intent: ReviewIntent
   scan_target: RepositoryScanTarget

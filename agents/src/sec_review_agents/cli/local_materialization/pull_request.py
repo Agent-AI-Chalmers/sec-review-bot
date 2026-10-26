@@ -16,7 +16,7 @@ from sec_review_agents.cli.local_materialization.common import (
     workspace_path,
     write_input_bundle_manifest,
 )
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.utils.files import write_json
 from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workspace.snapshots import (
@@ -281,7 +281,7 @@ def build_local_pull_request_bundle(
     commit_shas = [
         line.strip() for line in commit_shas_output.splitlines() if line.strip()
     ]
-    # Input preparation validates this object against the v6 pull request schema, so it carries exactly
+    # Input preparation validates this object against the v1 pull request schema, so it carries exactly
     # the subject the GitHub producer builds and nothing else: the contract forbids additional
     # properties, and the local path has no webhook payload to explain extra fields.
     #
@@ -322,7 +322,7 @@ def build_local_pull_request_bundle(
 
     input_bundle = archive_input_bundle(manifest_paths, include_incremental_window=True)
     input_data = {
-        "contract_version": CONTRACT_VERSION,
+        "api_version": EXECUTION_API_VERSION,
         "review_intent": {
             "objective": "audit",
             "test_changes": test_changes,

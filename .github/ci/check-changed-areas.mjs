@@ -133,7 +133,7 @@ test("every contract tool's generated artifact is covered by the contract-tools 
   // without this area being wired to it.
   const manifests = [
     'contracts/control-plane-api/tools/generated-artifacts.json',
-    'contracts/integration-contract/tools/generated-artifacts.json'
+    'contracts/execution-api/tools/generated-artifacts.json'
   ]
   const outputs = manifests.flatMap((manifestPath) => {
     const manifest = JSON.parse(readFileSync(path.join(REPO_ROOT, manifestPath), 'utf8'))
@@ -167,6 +167,15 @@ test('the client<->server seam stays wired to both packages', () => {
       `the github-integration area must trigger on ${candidate}`
     )
   }
+})
+
+test('the Execution Workflow contract triggers the Gateway job', () => {
+  const schema =
+    'contracts/execution-workflow/v1/execution-workflow-input.schema.json'
+  assert.ok(
+    covers(areas['execution-gateway'], schema),
+    `the execution-gateway area must trigger on ${schema}`
+  )
 })
 
 test('every tracked file is covered by an area or declared as intentionally uncovered', () => {

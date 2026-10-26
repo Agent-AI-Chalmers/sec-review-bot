@@ -1,4 +1,4 @@
-import type { FileChange } from '../execution/integration-contract-types-generated.js'
+import type { FileChange } from '../execution/execution-api-types-generated.js'
 
 type UpsertFileChange = Extract<FileChange, { status: 'upsert' }>
 

@@ -10,7 +10,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "copy:schema": "mkdir -p dist/database && cp -R src/database/schema-versions dist/database/",
-    "copy:spec": "cp ../contracts/memory-catalog-api/openapi.yaml dist/openapi.yaml",
+    "copy:spec": "cp ../contracts/memory-catalog-api/v1/openapi.yaml dist/openapi.yaml",
     "build": "pnpm run clean && tsc -p tsconfig.build.json && pnpm run copy:schema && pnpm run copy:spec",
     "server": "pnpm run build && node dist/server.js",
     "lint": "eslint .",

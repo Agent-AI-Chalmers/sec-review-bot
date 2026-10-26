@@ -8,7 +8,7 @@ import test from 'node:test'
 import { handlePullRequestReviewRun } from '../../../src/reviews/pull-requests/publish.js'
 import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
 import type { PublicationStepStore } from '../../../src/control-plane/client.js'
-import { CONTRACT_VERSION } from '../../../src/execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../../src/execution/execution-api-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 
 // Publish paths now share the fail-closed attribution check, so the app must know its own bot
@@ -157,7 +157,7 @@ test('pull request publish leaves confirmed risks as non-blocking comments witho
       }
     },
     result: {
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_record: review_record()
     },
     store: store,
@@ -234,7 +234,7 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
       }
     },
     result: {
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_record: review_record({
         analysis: {
           verdict: 'plausible-risk',
@@ -296,7 +296,7 @@ test('pull request publish approves when analysis is not confirmed', async () =>
       }
     },
     result: {
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_record: review_record({
         analysis: {
           verdict: 'no-actionable-finding',
@@ -361,7 +361,7 @@ test('pull request publish comments instead of approving a PR authored by the ap
         }
       },
       result: {
-        contract_version: CONTRACT_VERSION,
+        api_version: EXECUTION_API_VERSION,
         review_record: review_record({
           analysis: {
             verdict: 'no-actionable-finding',
@@ -423,7 +423,7 @@ test('pull request publish falls back to comment when GitHub rejects own PR appr
       }
     },
     result: {
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_record: review_record({
         analysis: {
           verdict: 'no-actionable-finding',
@@ -480,7 +480,7 @@ test('pull request publish falls back to comment when own PR approval error is i
       }
     },
     result: {
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_record: review_record({
         analysis: {
           verdict: 'no-actionable-finding',
@@ -533,7 +533,7 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
       }
     },
     result: {
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_record: review_record({
         mitigation: {
           overview: 'Remove the unsafe default.',
@@ -599,7 +599,7 @@ test('pull request publish does not create a fallback review after an uncertain 
         }
       },
       result: {
-        contract_version: CONTRACT_VERSION,
+        api_version: EXECUTION_API_VERSION,
         review_record: review_record({
           mitigation: {
             overview: 'Remove the unsafe default.',
@@ -661,7 +661,7 @@ test('an unattributable PR author is never approved', async () => {
           }
         },
         result: {
-          contract_version: CONTRACT_VERSION,
+          api_version: EXECUTION_API_VERSION,
           review_record: review_record({
             analysis: {
               verdict: 'no-actionable-finding',
@@ -747,7 +747,7 @@ test('an exhausted PR review step is concluded from the review already on the pu
       }
     },
     result: {
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_record: review_record()
     },
     store,

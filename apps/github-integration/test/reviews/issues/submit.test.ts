@@ -7,7 +7,7 @@ import type {
   IssueReviewInput,
   TestChangesPolicy
 } from '../../../src/execution/input.js'
-import { CONTRACT_VERSION } from '../../../src/execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../../src/execution/execution-api-version.js'
 import type { prepareIssueReviewInput } from '../../../src/reviews/issues/prepare-input.js'
 import { unusedGitHub } from '../../github-client.js'
 
@@ -47,7 +47,7 @@ function fakePrepareInput() {
     return {
       run_id: 'run-issue-1',
       input: {
-        contract_version: CONTRACT_VERSION,
+        api_version: EXECUTION_API_VERSION,
         review_intent: {},
         issue: {}
       } as IssueReviewInput,

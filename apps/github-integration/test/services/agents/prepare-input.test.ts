@@ -12,7 +12,7 @@ import type { Octokit } from 'octokit'
 import type { IssueContext } from '../../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../../src/github/pull-request-service.js'
 import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../../../src/artifacts/git-workspace.js'
-import { CONTRACT_VERSION } from '../../../src/execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../../src/execution/execution-api-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 
 const execFileAsync = promisify(execFile)
@@ -326,7 +326,7 @@ test(
         issue,
         trusted_default_branch: { default_branch: 'main', head_sha }
       })
-      assert.strictEqual(prepared.input.contract_version, 'v6')
+      assert.strictEqual(prepared.input.api_version, 'v1')
       assert.deepStrictEqual(prepared.input.review_intent, {
         objective: 'audit'
       })
@@ -344,7 +344,7 @@ test(
         )
       ) as Record<string, unknown>
       assert.deepStrictEqual(manifest, {
-        contract_version: CONTRACT_VERSION,
+        api_version: EXECUTION_API_VERSION,
         workspace: { snapshot: WORKSPACE_SNAPSHOT_TAR_NAME },
         history: { path: 'history' }
       })

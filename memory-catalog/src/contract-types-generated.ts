@@ -1,4 +1,4 @@
-// Generated from contracts/memory-catalog-api/openapi.yaml. Do not edit.
+// Generated from contracts/memory-catalog-api/v1/openapi.yaml. Do not edit.
 export interface paths {
     "/healthz": {
         parameters: {

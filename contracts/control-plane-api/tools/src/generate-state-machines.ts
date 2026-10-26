@@ -16,6 +16,7 @@ const SPEC_PATH = path.resolve(
   REPO_ROOT,
   'contracts',
   'control-plane-api',
+  'v1',
   'openapi.yaml'
 )
 
@@ -184,7 +185,7 @@ function asString(value: unknown, where: string): string {
   return value
 }
 
-const HEADER = `// Generated from contracts/control-plane-api/openapi.yaml (path relative to the repository
+const HEADER = `// Generated from contracts/control-plane-api/v1/openapi.yaml (path relative to the repository
 // root). Do not edit. The contract's \`x-state-machines\` block is the single source of truth;
 // this file is its TypeScript view. Regenerate it with
 // \`pnpm --dir contracts/control-plane-api/tools run generate\`.

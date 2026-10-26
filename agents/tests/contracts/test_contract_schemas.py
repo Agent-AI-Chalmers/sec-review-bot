@@ -4,11 +4,11 @@ from typing import Any
 
 import pytest
 
-from sec_review_agents.entrypoints import contract_schema
-from sec_review_agents.entrypoints.contract_schema import (
-    CONTRACT_VERSION,
-    validate_v6_input_bundle_manifest,
-    validate_v6_workflow_result,
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
+from sec_review_agents.entrypoints import execution_api_schema
+from sec_review_agents.entrypoints.execution_api_schema import (
+    validate_execution_api_input_bundle_manifest,
+    validate_execution_api_result,
 )
 from tests.contract_fixtures import (
     contract_fixture,
@@ -36,7 +36,9 @@ def invalid_fixture_schemas() -> dict[str, str]:
     return schema_fixtures
 
 
-def test_v6_contract_fixture_manifest_covers_fixture_and_schema_files() -> None:
+def test_execution_api_v1_contract_fixture_manifest_covers_fixture_and_schema_files() -> (
+    None
+):
     schema_fixtures = fixture_schemas()
     fixture_names = {
         fixture_file.name
@@ -53,7 +55,7 @@ def test_v6_contract_fixture_manifest_covers_fixture_and_schema_files() -> None:
     )
 
 
-def test_v6_contract_fixtures_match_json_schemas() -> None:
+def test_execution_api_v1_contract_fixtures_match_json_schemas() -> None:
     for fixture_name, schema_name in fixture_schemas().items():
         validator = contract_validator(schema_name)
         errors = sorted(
@@ -67,15 +69,17 @@ def test_v6_contract_fixtures_match_json_schemas() -> None:
 
 
 def test_execution_worker_accepts_shared_input_bundle_manifest_fixture() -> None:
-    validate_v6_input_bundle_manifest(contract_fixture("input-bundle-manifest.json"))
+    validate_execution_api_input_bundle_manifest(
+        contract_fixture("input-bundle-manifest.json")
+    )
 
 
 def test_execution_worker_rejects_extra_input_bundle_manifest_property() -> None:
     with pytest.raises(
         ValueError,
-        match="Execution input bundle manifest does not match contract v6",
+        match="Execution input bundle manifest does not match API v1",
     ):
-        validate_v6_input_bundle_manifest(
+        validate_execution_api_input_bundle_manifest(
             contract_fixture("invalid-input-bundle-manifest-extra-property.json")
         )
 
@@ -91,13 +95,13 @@ def test_execution_worker_rejects_extra_input_bundle_manifest_property() -> None
 def test_execution_result_accepts_shared_v6_workflow_result_fixtures(
     workflow: str, fixture_name: str
 ) -> None:
-    validate_v6_workflow_result(contract_fixture(fixture_name), workflow)
+    validate_execution_api_result(contract_fixture(fixture_name), workflow)
 
 
 def test_execution_result_rejects_missing_required_fields() -> None:
-    with pytest.raises(ValueError, match="Execution result does not match contract"):
-        validate_v6_workflow_result(
-            {"contract_version": CONTRACT_VERSION},
+    with pytest.raises(ValueError, match="Execution result does not match API v1"):
+        validate_execution_api_result(
+            {"api_version": EXECUTION_API_VERSION},
             "issue-review",
         )
 
@@ -108,7 +112,9 @@ def invalid_fixture_error_paths() -> dict[str, str]:
     return error_paths
 
 
-def test_v6_invalid_contract_fixtures_fail_where_their_name_says() -> None:
+def test_execution_api_v1_invalid_contract_fixtures_fail_where_their_name_says() -> (
+    None
+):
     """Each invalid fixture must isolate the rule its name states.
 
     "It was rejected" is too weak: a fixture that also violates an unrelated required field
@@ -142,7 +148,7 @@ def test_v6_invalid_contract_fixtures_fail_where_their_name_says() -> None:
 
 
 @pytest.mark.parametrize("value", ["allow", "deny"])
-def test_v6_issue_input_schema_accepts_test_changes(value: str) -> None:
+def test_execution_api_v1_issue_input_schema_accepts_test_changes(value: str) -> None:
     validator = contract_validator("issue-review-input.schema.json")
     payload = contract_fixture("issue-review-input.json")
     payload["review_intent"]["test_changes"] = value
@@ -152,7 +158,9 @@ def test_v6_issue_input_schema_accepts_test_changes(value: str) -> None:
     assert errors == []
 
 
-def test_v6_issue_input_schema_rejects_test_changes_outside_enum() -> None:
+def test_execution_api_v1_issue_input_schema_rejects_test_changes_outside_enum() -> (
+    None
+):
     validator = contract_validator("issue-review-input.schema.json")
     payload = contract_fixture("issue-review-input.json")
     payload["review_intent"]["test_changes"] = "no-test-changes"
@@ -162,7 +170,9 @@ def test_v6_issue_input_schema_rejects_test_changes_outside_enum() -> None:
     assert errors != []
 
 
-def test_v6_issue_input_schema_rejects_renamed_repair_mode_field() -> None:
+def test_execution_api_v1_issue_input_schema_rejects_renamed_repair_mode_field() -> (
+    None
+):
     # reviewIntent sets additionalProperties: false, so the field the rename replaced
     # must not validate under its old name.
     validator = contract_validator("issue-review-input.schema.json")
@@ -174,7 +184,7 @@ def test_v6_issue_input_schema_rejects_renamed_repair_mode_field() -> None:
     assert errors != []
 
 
-def test_v6_pull_request_input_schema_requires_audit_objective() -> None:
+def test_execution_api_v1_pull_request_input_schema_requires_audit_objective() -> None:
     validator = contract_validator("pull-request-review-input.schema.json")
     payload = contract_fixture("pull-request-review-input.json")
     payload["review_intent"]["objective"] = "repair"
@@ -184,7 +194,7 @@ def test_v6_pull_request_input_schema_requires_audit_objective() -> None:
     assert errors != []
 
 
-def test_v6_repository_input_schema_requires_audit_objective() -> None:
+def test_execution_api_v1_repository_input_schema_requires_audit_objective() -> None:
     validator = contract_validator("repository-review-input.schema.json")
     payload = contract_fixture("repository-review-input-incremental.json")
     payload["review_intent"]["objective"] = "repair"
@@ -194,7 +204,9 @@ def test_v6_repository_input_schema_requires_audit_objective() -> None:
     assert errors != []
 
 
-def test_v6_repository_full_scan_schema_rejects_incremental_window_fields() -> None:
+def test_execution_api_v1_repository_full_scan_schema_rejects_incremental_window_fields() -> (
+    None
+):
     validator = contract_validator("repository-review-input.schema.json")
     payload = contract_fixture("repository-review-input-full.json")
     payload["scan_target"]["base_sha"] = "1111111111111111111111111111111111111111"
@@ -215,7 +227,7 @@ def test_v6_repository_full_scan_schema_rejects_incremental_window_fields() -> N
         {"commit_shas": []},
     ],
 )
-def test_v6_repository_incremental_schema_rejects_missing_window_fields(
+def test_execution_api_v1_repository_incremental_schema_rejects_missing_window_fields(
     scan_target_patch: dict[str, object],
 ) -> None:
     validator = contract_validator("repository-review-input.schema.json")
@@ -227,7 +239,9 @@ def test_v6_repository_incremental_schema_rejects_missing_window_fields(
     assert errors != []
 
 
-def test_v6_repository_incremental_schema_allows_empty_changed_file_scope() -> None:
+def test_execution_api_v1_repository_incremental_schema_allows_empty_changed_file_scope() -> (
+    None
+):
     validator = contract_validator("repository-review-input.schema.json")
     payload = deepcopy(contract_fixture("repository-review-input-incremental.json"))
     payload["scan_scope"]["incremental_changed_files"] = []
@@ -237,7 +251,9 @@ def test_v6_repository_incremental_schema_allows_empty_changed_file_scope() -> N
     assert errors == []
 
 
-def test_v6_review_record_schema_rejects_unsafe_file_change_paths() -> None:
+def test_execution_api_v1_review_record_schema_rejects_unsafe_file_change_paths() -> (
+    None
+):
     validator = contract_validator("review-record.schema.json")
     payload = deepcopy(contract_fixture("review-record-deleted-file.json"))
 
@@ -259,14 +275,12 @@ def test_v6_review_record_schema_rejects_unsafe_file_change_paths() -> None:
 
 def test_contracts_root_env_var_is_authoritative(monkeypatch, tmp_path: Path) -> None:
     # A set root must be used as-is: the operator names where the schemas are.
-    schemas = (
-        tmp_path / "integration-contract" / contract_schema.CONTRACT_VERSION / "schemas"
-    )
+    schemas = tmp_path / "execution-api" / EXECUTION_API_VERSION / "schemas"
     schemas.mkdir(parents=True)
     (schemas / "common.schema.json").write_text("{}", encoding="utf-8")
 
     monkeypatch.setenv("SEC_REVIEW_CONTRACTS_ROOT", str(tmp_path))
-    assert contract_schema._schema_root() == schemas
+    assert execution_api_schema._schema_root() == schemas
 
 
 def test_contracts_root_env_var_that_lacks_schemas_fails_loudly(
@@ -276,7 +290,7 @@ def test_contracts_root_env_var_that_lacks_schemas_fails_loudly(
     # copy: the resolver must reject it rather than fall through to the source layout.
     monkeypatch.setenv("SEC_REVIEW_CONTRACTS_ROOT", str(tmp_path))
     with pytest.raises(RuntimeError, match="SEC_REVIEW_CONTRACTS_ROOT"):
-        contract_schema._schema_root()
+        execution_api_schema._schema_root()
 
 
 # The fixture and the schema it validates against are separate names; resolve the schema from the
@@ -300,7 +314,7 @@ def _repository_input_with_changed_files(
     "status",
     ["added", "modified", "deleted", "renamed", "copied", "type_changed"],
 )
-def test_v6_incremental_changed_file_accepts_every_contract_status(
+def test_execution_api_v1_incremental_changed_file_accepts_every_contract_status(
     status: str,
 ) -> None:
     """The scan scope's status is a closed vocabulary, and every value in it must validate.
@@ -321,7 +335,7 @@ def test_v6_incremental_changed_file_accepts_every_contract_status(
 
 
 @pytest.mark.parametrize("status", ["removed", "Renamed", "unknown", ""])
-def test_v6_incremental_changed_file_rejects_status_outside_the_contract(
+def test_execution_api_v1_incremental_changed_file_rejects_status_outside_the_contract(
     status: str,
 ) -> None:
     """Upstream vocabulary must not travel as-is.
@@ -341,7 +355,7 @@ def test_v6_incremental_changed_file_rejects_status_outside_the_contract(
 
 
 @pytest.mark.parametrize("status", ["renamed", "copied"])
-def test_v6_incremental_changed_file_requires_previous_path_for_a_move(
+def test_execution_api_v1_incremental_changed_file_requires_previous_path_for_a_move(
     status: str,
 ) -> None:
     fixture = _repository_input_with_changed_files(
@@ -356,7 +370,7 @@ def test_v6_incremental_changed_file_requires_previous_path_for_a_move(
 
 
 @pytest.mark.parametrize("status", ["added", "modified", "deleted", "type_changed"])
-def test_v6_incremental_changed_file_rejects_previous_path_without_a_move(
+def test_execution_api_v1_incremental_changed_file_rejects_previous_path_without_a_move(
     status: str,
 ) -> None:
     """Only a move has a source path; on any other status it would be a meaningless field."""
@@ -371,7 +385,7 @@ def test_v6_incremental_changed_file_rejects_previous_path_without_a_move(
     assert errors, f"status {status!r} was accepted with a previous path"
 
 
-def test_v6_scan_scope_bounds_the_inlined_changed_file_list() -> None:
+def test_execution_api_v1_scan_scope_bounds_the_inlined_changed_file_list() -> None:
     """The scan scope is inlined into the workflow input, so it needs a size boundary.
 
     Without one, a wide window produces an arbitrarily large input that fails during transport

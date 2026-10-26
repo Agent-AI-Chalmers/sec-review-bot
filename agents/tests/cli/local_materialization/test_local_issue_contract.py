@@ -5,7 +5,9 @@ from pathlib import Path
 import pytest
 
 from sec_review_agents.cli.local_materialization.issue import build_local_issue_bundle
-from sec_review_agents.entrypoints.contract_schema import validate_v6_workflow_input
+from sec_review_agents.entrypoints.execution_api_schema import (
+    validate_execution_api_input,
+)
 
 
 def _git(repo: Path, *args: str) -> str:
@@ -36,7 +38,7 @@ def test_local_issue_bundle_passes_the_v6_input_schema(
 ) -> None:
     """A local issue run starts the same workflow the GitHub path starts.
 
-    Input preparation validates input against the v6 schema, which forbids additional properties, so a
+    Input preparation validates input against the v1 schema, which forbids additional properties, so a
     bundle carrying extra identity fields would fail every local run at startup -- invisible to
     a test that only checks the bundle was written.
     """
@@ -49,7 +51,7 @@ def test_local_issue_bundle_passes_the_v6_input_schema(
         output_dir=tmp_path / "out",
     )
 
-    validate_v6_workflow_input(bundle.input, "issue-review")
+    validate_execution_api_input(bundle.input, "issue-review")
 
     assert sorted(bundle.input["issue"]) == [
         "body",

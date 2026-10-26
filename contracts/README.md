@@ -28,15 +28,15 @@ A family may also hold documents that apply to every version, such as a transpor
 
 | Family | Boundary | Parties | Current version |
 | --- | --- | --- | --- |
-| [integration-contract](integration-contract/README.md) | Public Execution API and workflow `input` / `result` data | Execution API providers, callers, and downstream publishers | [v6](integration-contract/v6/CONTRACT.md) |
-| [execution-contract](execution-contract/README.md) | Private Temporal dispatch envelope | Execution Gateway and Execution Worker | v1 |
-| [control-plane-api](control-plane-api/README.md) | Control Plane HTTP API and observed run shapes | Control Plane and its callers | [v1](control-plane-api/README.md) |
-| [memory-catalog-api](memory-catalog-api/README.md) | Memory coordination HTTP API | Memory Catalog Server and workers | v1 |
+| [execution-api](execution-api/README.md) | Public HTTP operations, workflow inputs, results, and errors | Execution API providers, callers, and downstream publishers | [v1](execution-api/v1/CONTRACT.md) |
+| [execution-workflow](execution-workflow/README.md) | Temporal Execution Workflow input | Execution Gateway and Execution Worker | [v1](execution-workflow/v1/CONTRACT.md) |
+| [control-plane-api](control-plane-api/README.md) | Control Plane HTTP API and observed run shapes | Control Plane and its callers | [v1](control-plane-api/v1/openapi.yaml) |
+| [memory-catalog-api](memory-catalog-api/README.md) | Memory coordination HTTP API | Memory Catalog Server and workers | [v1](memory-catalog-api/v1/openapi.yaml) |
 | [setup-declaration](setup-declaration/README.md) | Trusted `.sec-review/setup.yml` format | Reviewed repositories, GitHub Integration, and Execution Worker | [v1](setup-declaration/v1/SPEC.md) |
 
 ## Rules For Every Family
 
-A family is named for what it covers. If one component owns every shape in it, name it after that component — `control-plane-api` is Control Plane's own shapes. If the shapes span several parties, name it after where they meet — `integration-contract` spans Execution providers, callers, and downstream publishers.
+A family is named for what it covers. If one component owns every shape in it, name it after that component — `control-plane-api` is Control Plane's own shapes. If the shapes span several parties, name it after where they meet — `execution-api` spans Execution providers, callers, and downstream publishers.
 
 Do not name a family after one of its consumers: consumers change, the provider does not. And do not reuse a word that another family already uses for a different meaning.
 
@@ -57,7 +57,7 @@ Each family README records who owns which side of its boundary and what callers 
 
 Some artifacts are generated from a hand-written contract rather than maintained by hand — a TypeScript projection of an API, committed JSON Schemas, a generated parameter list. Each family owns the tool that renders and checks its projections, under `<family>/tools/`, so the tool that reads a contract lives beside it and where its outputs land (which may be another package) does not change who owns the check. A family's `tools/generated-artifacts.json` lists what it derives and where it lands.
 
-Name a stable package entry point for the responsibility callers consume, even when a generator maintains it (`contract-version.ts`, for example). Raw mechanical projections may carry `generated` in the filename when that helps distinguish files that should not accumulate hand-written behavior (`contract-types-generated.ts`, for example). The filename is not the enforcement boundary: every committed generated artifact must identify itself in its header, appear in the family manifest, and be covered by the freshness and CI checks below.
+Name a stable package entry point for the responsibility callers consume, even when a generator maintains it (`execution-api-version.ts`, for example). Raw mechanical projections may carry `generated` in the filename when that helps distinguish files that should not accumulate hand-written behavior (`contract-types-generated.ts`, for example). The filename is not the enforcement boundary: every committed generated artifact must identify itself in its header, appear in the family manifest, and be covered by the freshness and CI checks below.
 
 Each tool provides `pnpm --dir contracts/<family>/tools run generate` to render every artifact and `pnpm --dir contracts/<family>/tools run check` to prove the committed copies match. A family's test asserts the manifest matches the generators' own declared outputs and that the CI change filter triggers on every listed artifact, so a new projection is covered by being listed, not by remembering to wire up a check.
 

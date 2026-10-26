@@ -1,4 +1,4 @@
-// Generated from contracts/control-plane-api/openapi.yaml (path relative to the repository
+// Generated from contracts/control-plane-api/v1/openapi.yaml (path relative to the repository
 // root). Do not edit. The contract's `x-state-machines` block is the single source of truth;
 // this file is its TypeScript view. Regenerate it with
 // `pnpm --dir contracts/control-plane-api/tools run generate`.

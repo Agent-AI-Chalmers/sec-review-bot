@@ -1,4 +1,4 @@
-import { CONTRACT_VERSION } from '../../execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../execution/execution-api-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
@@ -69,7 +69,7 @@ function buildPrMetadata(
 ): PullRequestReviewSubject {
   return {
     // These names are the wire contract shared with the local materializer and
-    // the v6 fixture; they are not the names of the fields they are read from.
+    // the v1 fixture; they are not the names of the fields they are read from.
     owner: pr.owner_login,
     repo: pr.repo_name,
     repo_full_name: pr.repo_full_name,
@@ -341,7 +341,7 @@ export async function preparePullRequestReviewInput({
   })
   // Every SHA is inlined into the workflow input, and the commit list is paginated, so nothing
   // else bounds it. Refuse here, with a message that names the limit, instead of failing later
-  // in transport. The value matches `maxItems` on `pr.commit_shas` in the v6 schema.
+  // in transport. The value matches `maxItems` on `pr.commit_shas` in the v1 schema.
   if (commit_shas.length > MAX_PR_COMMIT_SHAS) {
     throw new Error(
       `pull request has too many commits: ${commit_shas.length} exceeds the limit of ` +
@@ -399,7 +399,7 @@ export async function preparePullRequestReviewInput({
     build_input: (
       reference: InputBundleArtifactRef
     ): PullRequestReviewInput => ({
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_intent: {
         objective: 'audit',
         ...(test_changes ? { test_changes } : {})

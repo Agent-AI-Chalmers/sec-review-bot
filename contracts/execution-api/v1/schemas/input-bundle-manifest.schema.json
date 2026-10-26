@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sec-review-bot.local/contracts/execution-api/v1/schemas/input-bundle-manifest.schema.json",
+  "title": "Execution input bundle manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "api_version",
+    "workspace",
+    "history"
+  ],
+  "properties": {
+    "api_version": {
+      "const": "v1"
+    },
+    "workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "snapshot"
+      ],
+      "properties": {
+        "snapshot": {
+          "$ref": "common.schema.json#/$defs/bundleRelativePath"
+        }
+      }
+    },
+    "history": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "common.schema.json#/$defs/bundleRelativePath"
+        }
+      }
+    },
+    "incremental_window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path"
+      ],
+      "properties": {
+        "path": {
+          "$ref": "common.schema.json#/$defs/bundleRelativePath"
+        }
+      }
+    }
+  }
+}

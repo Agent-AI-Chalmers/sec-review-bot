@@ -8,7 +8,7 @@ const toolsRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '..'
 )
-const contractPath = path.resolve(toolsRoot, '..', 'openapi.yaml')
+const contractPath = path.resolve(toolsRoot, '..', 'v1', 'openapi.yaml')
 const outputPath = path.resolve(
   toolsRoot,
   '..',
@@ -22,7 +22,7 @@ export async function renderGeneratedTypes(): Promise<string> {
   const generated = astToString(
     await openapiTS(new URL(`file://${contractPath}`))
   )
-  return `// Generated from contracts/memory-catalog-api/openapi.yaml. Do not edit.\n${generated}`
+  return `// Generated from contracts/memory-catalog-api/v1/openapi.yaml. Do not edit.\n${generated}`
 }
 
 export { outputPath }

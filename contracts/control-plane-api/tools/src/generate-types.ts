@@ -1,11 +1,11 @@
 // Project the Control Plane's OpenAPI document into TypeScript for github-integration.
 //
-// The document is the hand-written single source of truth (contracts/control-plane-api/
-// openapi.yaml); this module only produces its TypeScript view, so the client derives its
+// The document is the hand-written single source of truth
+// (`contracts/control-plane-api/v1/openapi.yaml`); this module only produces its TypeScript view, so the client derives its
 // types from the contract rather than a hand-authored copy.
 //
-// Mirrors the integration-contract family's generator
-// (`contracts/integration-contract/tools/src/generate-types.ts`): the generator and the
+// Mirrors the execution-api family's generator
+// (`contracts/execution-api/tools/src/generate-types.ts`): the generator and the
 // stale-check test both call `renderControlPlaneApiTypes`, so they cannot disagree about what
 // "current" means.
 import { readFileSync } from 'node:fs'
@@ -24,6 +24,7 @@ export const SPEC_PATH = path.resolve(
   REPO_ROOT,
   'contracts',
   'control-plane-api',
+  'v1',
   'openapi.yaml'
 )
 export const OUTPUT_PATH = path.resolve(

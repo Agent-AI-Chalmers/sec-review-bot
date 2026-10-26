@@ -1,7 +1,7 @@
 import {
-  CONTRACT_VERSION,
-  type ContractVersion
-} from '../../execution/contract-version.js'
+  EXECUTION_API_VERSION,
+  type ExecutionApiVersion
+} from '../../execution/execution-api-version.js'
 import {
   createPullRequestReviewUnlessMarkerExists,
   findPullRequestReviewByMarker,
@@ -28,7 +28,7 @@ import {
 } from '../shared/settle-exhausted-step.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { isCurrentAppBotLogin } from '../../github/github-app-metadata-service.js'
-import { assertWorkflowResult } from '../../execution/contract-schema.js'
+import { assertWorkflowResult } from '../../execution/execution-api-schema.js'
 import type { PublicationStepStore } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
@@ -68,7 +68,7 @@ interface SuggestionManifestLike {
 }
 
 export interface PullRequestReviewWorkflowResult {
-  contract_version: ContractVersion
+  api_version: ExecutionApiVersion
   review_record: ReviewRecord
   [key: string]: unknown
 }
@@ -85,11 +85,11 @@ function pullRequestReviewResultFromWorkflowResult(
   try {
     assertWorkflowResult('pull-request-review', result)
     const rawResult = result as {
-      contract_version: ContractVersion
+      api_version: ExecutionApiVersion
       review_record: unknown
     }
     return {
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_record: parseReviewRecord(rawResult.review_record)
     }
   } catch (error) {

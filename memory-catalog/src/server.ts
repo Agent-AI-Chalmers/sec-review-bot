@@ -50,6 +50,7 @@ function specPath(): string {
     '..',
     'contracts',
     'memory-catalog-api',
+    'v1',
     'openapi.yaml',
   )
 }

@@ -1,7 +1,7 @@
 import {
-  CONTRACT_VERSION,
-  type ContractVersion
-} from '../../execution/contract-version.js'
+  EXECUTION_API_VERSION,
+  type ExecutionApiVersion
+} from '../../execution/execution-api-version.js'
 import {
   createIssueCommentUnlessMarkerExists,
   findIssueCommentByMarker
@@ -27,7 +27,7 @@ import {
   settleExhaustedStep
 } from '../shared/settle-exhausted-step.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
-import { assertWorkflowResult } from '../../execution/contract-schema.js'
+import { assertWorkflowResult } from '../../execution/execution-api-schema.js'
 import type { PublicationStepStore } from '../../control-plane/client.js'
 import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
 import {
@@ -53,7 +53,7 @@ function issueReviewRunMarker(run_id: string): string {
 }
 
 export interface IssueReviewWorkflowResult {
-  contract_version: ContractVersion
+  api_version: ExecutionApiVersion
   review_record: ReviewRecord
   [key: string]: unknown
 }
@@ -70,11 +70,11 @@ function issueReviewResultFromWorkflowResult(
   try {
     assertWorkflowResult('issue-review', result)
     const rawResult = result as {
-      contract_version: ContractVersion
+      api_version: ExecutionApiVersion
       review_record: unknown
     }
     return {
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_record: parseReviewRecord(rawResult.review_record)
     }
   } catch (error) {

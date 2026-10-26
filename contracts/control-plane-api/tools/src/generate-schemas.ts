@@ -1,5 +1,5 @@
 // Generate the Control Plane data-shape JSON Schemas from the hand-written OpenAPI contract
-// (`contracts/control-plane-api/openapi.yaml`). Each schema is committed to
+// (`contracts/control-plane-api/v1/openapi.yaml`). Each schema is committed to
 // contracts/control-plane-api/v1/ and is a projection of the contract's `components.schemas`,
 // so the console-fixture schemas and the contract cannot drift. Regenerate with
 // `pnpm --dir contracts/control-plane-api/tools run generate`.
@@ -17,6 +17,7 @@ export const SPEC_PATH = path.resolve(
   REPO_ROOT,
   'contracts',
   'control-plane-api',
+  'v1',
   'openapi.yaml'
 )
 export const SCHEMA_DIR = path.resolve(
