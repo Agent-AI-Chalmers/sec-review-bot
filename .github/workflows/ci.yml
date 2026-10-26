@@ -101,7 +101,7 @@ jobs:
         run: docker compose -f compose.yaml config -q --no-interpolate
 
   contract-tools:
-    name: Contract Tools (${{ matrix.family }})
+    name: Contract Tools (${{ matrix.name }})
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
@@ -110,10 +110,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: [review-runs-api, execution-api, memory-catalog-api]
+        include:
+          - name: review-runs-api
+            tools_directory: contracts/review-runs-api/tools
+          - name: execution-api
+            tools_directory: contracts/execution-api/tools
+          - name: memory-catalog-api
+            tools_directory: contracts/memory-catalog-api/tools
+          - name: tar-zstd-envelope
+            tools_directory: contracts/tar-zstd-artifact/envelope/tools
+          - name: memory-tree-profile
+            tools_directory: contracts/tar-zstd-artifact/profiles/memory-tree/tools
+          - name: run-diagnostic-profile
+            tools_directory: contracts/tar-zstd-artifact/profiles/run-diagnostic/tools
     defaults:
       run:
-        working-directory: contracts/${{ matrix.family }}/tools
+        working-directory: ${{ matrix.tools_directory }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -127,10 +139,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version-file: contracts/${{ matrix.family }}/tools/package.json
+          node-version-file: ${{ matrix.tools_directory }}/package.json
           check-latest: true
           cache: pnpm
-          cache-dependency-path: contracts/${{ matrix.family }}/tools/pnpm-lock.yaml
+          cache-dependency-path: ${{ matrix.tools_directory }}/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -142,10 +154,10 @@ jobs:
 
       - name: Check
         run: |
-          pnpm run format:check
-          pnpm run lint
+          pnpm --if-present run format:check
+          pnpm --if-present run lint
           pnpm --if-present run lint:contract
-          pnpm run typecheck
+          pnpm --if-present run typecheck
           pnpm test
 
   review-runs:

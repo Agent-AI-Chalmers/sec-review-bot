@@ -1,0 +1,21 @@
+{
+  "$comment": "Generated corpus for the shared tar+zstd envelope. Paths are relative to the repository root.",
+  "family": "tar-zstd-artifact/envelope",
+  "generators": [
+    {
+      "name": "corpus",
+      "script": "contracts/tar-zstd-artifact/envelope/tools/generate.mjs",
+      "code_inputs": [],
+      "command": "pnpm --dir contracts/tar-zstd-artifact/envelope/tools run generate",
+      "inputs": [],
+      "outputs": [
+        "contracts/tar-zstd-artifact/envelope/v1/corpus/manifest.json",
+        "contracts/tar-zstd-artifact/envelope/v1/corpus/valid-ustar.tar.zst",
+        "contracts/tar-zstd-artifact/envelope/v1/corpus/valid-pax-path.tar.zst",
+        "contracts/tar-zstd-artifact/envelope/v1/corpus/invalid-global-pax.tar.zst",
+        "contracts/tar-zstd-artifact/envelope/v1/corpus/invalid-pax-key.tar.zst",
+        "contracts/tar-zstd-artifact/envelope/v1/corpus/invalid-gnu-longname.tar.zst"
+      ]
+    }
+  ]
+}

@@ -11,7 +11,7 @@ import test from 'node:test'
 import ts from 'typescript'
 import { parse } from 'yaml'
 
-import { staleGeneratedArtifacts } from '../src/check-generated-artifacts.js'
+import { staleGeneratedArtifacts } from '../src/check.js'
 import {
   generatedArtifacts as payloadTypes,
   renderExecutionApiDeclarations,

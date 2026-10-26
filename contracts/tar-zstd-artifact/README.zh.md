@@ -1,10 +1,22 @@
-# Tar+Zstandard Artifact Envelope
+# Tar+Zstandard Artifacts
 
 语言：[English](README.md) | 中文
 
-本 family 定义项目自有、media type 为 `application/tar+zstd` 的 artifact 所共享的 archive envelope。它不规定 artifact 的内部文件、manifest、限制或存储 key；这些规则仍由各 artifact profile 拥有。
+本 family 定义项目自有、media type 为 `application/tar+zstd` 的 artifact 所共享的 archive envelope，以及规定每种 artifact 内部组织的 profiles。
 
-- [v1/SPEC.zh.md](v1/SPEC.zh.md) 定义受限 POSIX PAX 方言。
-- [v1/corpus](v1/corpus) 包含由所有 archive reader 共同执行的编码互操作与拒绝用例。
+- [envelope/v1/SPEC.zh.md](envelope/v1/SPEC.zh.md) 定义受限 POSIX PAX 方言。
+- [envelope/v1/corpus](envelope/v1/corpus) 包含由所有 archive reader 共同执行的编码互操作与拒绝用例。
+- [profiles/memory-tree](profiles/memory-tree/README.zh.md) 定义不可变 memory-tree archive。
+- [profiles/run-diagnostic](profiles/run-diagnostic/README.zh.md) 定义 completed-run diagnostic archive。
 
-Memory-tree 与 run-diagnostic contract 都是此 envelope 之上的 profile。profile version 与 envelope version 相互独立。
+Envelope 与 profile version 相互独立。每个 profile specification 都明确声明自己使用的 envelope version。
+
+## 工具
+
+从拥有对应层的目录运行其工具：
+
+```bash
+pnpm --dir contracts/tar-zstd-artifact/envelope/tools run check
+pnpm --dir contracts/tar-zstd-artifact/profiles/memory-tree/tools run check
+pnpm --dir contracts/tar-zstd-artifact/profiles/run-diagnostic/tools run check
+```

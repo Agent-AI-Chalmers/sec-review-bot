@@ -74,7 +74,7 @@ The production server requires `REVIEW_RUNS_READ_TOKEN` and `CONTROL_PLANE_UI_AC
 
 The BFF also proxies terminal artifact downloads from private RustFS storage. It receives a dedicated `s3:GetObject` credential restricted to `sec-review/runs/*/artifacts/*`; the browser supplies only a run ID and never receives storage credentials or an object URI. Before responding to the browser, the BFF writes the object to a temporary file and verifies its size and SHA-256 digest against Review Runs metadata. Downloads are attachment-only, bounded by a storage idle timeout, and protected by the same HTTP-only session.
 
-The server-side memory tree reader and builder implement the versioned [memory-tree-artifact contract](../../contracts/memory-tree-artifact/README.md). They remain outside the browser bundle; the BFF is responsible for validation, digest calculation, and canonical object keys.
+The server-side memory tree reader and builder implement the versioned [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.md). They remain outside the browser bundle; the BFF is responsible for validation, digest calculation, and canonical object keys.
 
 Set `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_READ_TOKEN` to enable memory reads. The BFF strips storage URIs from Catalog JSON, fetches artifacts itself, and verifies their size and SHA-256 digest before returning content or downloads.
 

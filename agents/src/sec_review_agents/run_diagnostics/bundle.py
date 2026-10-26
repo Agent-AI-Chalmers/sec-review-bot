@@ -19,10 +19,14 @@ from sec_review_agents.artifacts.reference import (
     require_artifact_media_type,
 )
 from sec_review_agents.artifacts.tar_zstd import validate_restricted_pax_archive
+from sec_review_agents.contract_versions import RUN_DIAGNOSTIC_ARTIFACT_VERSION
 from sec_review_agents.runtime.transcripts import TRANSCRIPT_SUFFIX
 
-DIAGNOSTIC_BUNDLE_FILENAME = "diagnostic-tree.v1.tar.zst"
+DIAGNOSTIC_BUNDLE_FILENAME = (
+    f"diagnostic-tree.{RUN_DIAGNOSTIC_ARTIFACT_VERSION}.tar.zst"
+)
 DIAGNOSTIC_BUNDLE_MANIFEST = "manifest.json"
+DIAGNOSTIC_BUNDLE_MANIFEST_VERSION = 1
 DIAGNOSTIC_TREE_DIR = "artifact-tree"
 MAX_DIAGNOSTIC_BUNDLE_BYTES = 1024 * 1024 * 1024
 MAX_DIAGNOSTIC_BUNDLE_ENTRIES = 100_000
@@ -128,7 +132,7 @@ def _build_diagnostic_archive(
         manifest_path.write_text(
             json.dumps(
                 {
-                    "version": 1,
+                    "version": DIAGNOSTIC_BUNDLE_MANIFEST_VERSION,
                     "run_id": run_id,
                     "result": "result.json",
                     "review_units": manifest_units,
@@ -281,39 +285,78 @@ def materialize_diagnostic_transcript_unit(
         maximum_entries=MAX_DIAGNOSTIC_BUNDLE_ENTRIES,
         maximum_extracted_bytes=MAX_EXTRACTED_DIAGNOSTIC_BYTES,
     )
-    manifest = json.loads(
-        (root / DIAGNOSTIC_BUNDLE_MANIFEST).read_text(encoding="utf-8")
-    )
-    if manifest.get("version") != 1 or manifest.get("run_id") != run_id:
+    units = _validate_materialized_bundle(root, run_id=run_id)
+    for current_unit_id, transcript_paths in units.items():
+        if current_unit_id == unit_id:
+            return MaterializedTranscriptUnit(
+                unit_id=unit_id,
+                transcript_paths=transcript_paths,
+            )
+    raise ValueError(f"Diagnostic review unit not found: {unit_id}")
+
+
+def _validate_materialized_bundle(
+    root: Path, *, run_id: str
+) -> dict[str, tuple[Path, ...]]:
+    try:
+        manifest = json.loads(
+            (root / DIAGNOSTIC_BUNDLE_MANIFEST).read_text(encoding="utf-8")
+        )
+        json.loads((root / "result.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("Diagnostic bundle JSON documents are invalid.") from error
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("version") != DIAGNOSTIC_BUNDLE_MANIFEST_VERSION
+        or manifest.get("run_id") != run_id
+        or manifest.get("result") != "result.json"
+    ):
         raise ValueError(
             "Diagnostic bundle manifest does not match extraction request."
         )
     units = manifest.get("review_units")
     if not isinstance(units, list):
         raise ValueError("Diagnostic bundle manifest has no review units.")
+    resolved_root = root.resolve()
+    validated: dict[str, tuple[Path, ...]] = {}
     for unit in units:
-        if not isinstance(unit, dict) or unit.get("id") != unit_id:
-            continue
+        if not isinstance(unit, dict):
+            raise ValueError("Diagnostic review unit is invalid.")
+        current_unit_id = unit.get("id")
         paths = unit.get("transcripts")
-        if not isinstance(paths, list) or not paths:
-            raise ValueError("Diagnostic review unit has no transcript files.")
+        if (
+            not isinstance(current_unit_id, str)
+            or not current_unit_id
+            or current_unit_id in validated
+            or not isinstance(paths, list)
+            or not paths
+        ):
+            raise ValueError("Diagnostic review unit is invalid.")
         resolved_paths: list[Path] = []
         for value in paths:
-            if not isinstance(value, str):
-                raise ValueError("Diagnostic manifest path must be a string.")
+            if not isinstance(value, str) or not _is_transcript_manifest_path(value):
+                raise ValueError("Diagnostic manifest path is invalid.")
             path = (root / value).resolve()
             try:
-                path.relative_to(root.resolve())
+                path.relative_to(resolved_root)
             except ValueError as error:
                 raise ValueError("Diagnostic manifest path escapes bundle.") from error
             if not path.is_file() or path.suffix != TRANSCRIPT_SUFFIX:
                 raise ValueError(f"Diagnostic bundle file is missing: {value}")
             resolved_paths.append(path)
-        return MaterializedTranscriptUnit(
-            unit_id=unit_id,
-            transcript_paths=tuple(resolved_paths),
-        )
-    raise ValueError(f"Diagnostic review unit not found: {unit_id}")
+        validated[current_unit_id] = tuple(resolved_paths)
+    return validated
+
+
+def _is_transcript_manifest_path(value: str) -> bool:
+    parts = value.split("/")
+    return (
+        "\\" not in value
+        and len(parts) > 1
+        and parts[0] == DIAGNOSTIC_TREE_DIR
+        and all(part not in {"", ".", ".."} for part in parts)
+        and value.endswith(TRANSCRIPT_SUFFIX)
+    )
 
 
 __all__ = [

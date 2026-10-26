@@ -139,20 +139,26 @@ export async function readDiagnosticBundle(
     !Array.isArray(record.review_units)
   )
     throw new Error('invalid_diagnostic_bundle')
+  const unitIds = new Set<string>()
   for (const unit of record.review_units) {
     if (typeof unit !== 'object' || unit === null || Array.isArray(unit))
       throw new Error('invalid_diagnostic_bundle')
     const reviewUnit = unit as Record<string, unknown>
     if (
       typeof reviewUnit.id !== 'string' ||
-      !Array.isArray(reviewUnit.transcripts)
+      reviewUnit.id === '' ||
+      unitIds.has(reviewUnit.id) ||
+      !Array.isArray(reviewUnit.transcripts) ||
+      reviewUnit.transcripts.length === 0
     )
       throw new Error('invalid_diagnostic_bundle')
+    unitIds.add(reviewUnit.id)
     for (const transcript of reviewUnit.transcripts) {
       if (
         typeof transcript !== 'string' ||
         !safePath(transcript) ||
         !transcript.startsWith('artifact-tree/') ||
+        !transcript.endsWith('.jsonl') ||
         !entries.has(transcript)
       )
         throw new Error('invalid_diagnostic_bundle')

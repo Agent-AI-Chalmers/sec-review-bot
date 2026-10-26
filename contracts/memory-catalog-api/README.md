@@ -14,10 +14,16 @@ Memory revisions use a tagged `source`: `maintenance` carries the maintainer ide
 
 Maintenance control exposes only `enabled` and `paused`. Pause and resume requests use an idempotent `operation_id` and `expected_generation` compare-and-swap. An identical replay returns the original resulting control snapshot even if current state has since changed.
 
-Generate committed projections from `tools/`:
+## Tooling
+
+Run from `tools/`:
 
 ```bash
-pnpm install
 pnpm run generate
+pnpm run check
+pnpm run format:check
+pnpm run lint
+pnpm run lint:contract
+pnpm run typecheck
 pnpm test
 ```

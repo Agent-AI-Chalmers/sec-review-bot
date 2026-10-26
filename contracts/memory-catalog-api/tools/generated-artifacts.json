@@ -1,12 +1,16 @@
 {
-  "artifacts": [
+  "$comment": "Every artifact generated from this family's contract. Paths are relative to the repository root.",
+  "family": "memory-catalog-api",
+  "generators": [
     {
-      "generator": "src/generate.ts",
-      "output": "../../../memory-catalog/src/contract-types-generated.ts"
-    },
-    {
-      "generator": "src/generate.ts",
-      "output": "../../../apps/control-plane-ui/browser/features/memory/api-types.generated.ts"
+      "name": "types",
+      "script": "contracts/memory-catalog-api/tools/src/generate.ts",
+      "command": "pnpm --dir contracts/memory-catalog-api/tools run generate",
+      "inputs": ["contracts/memory-catalog-api/v1/openapi.yaml"],
+      "outputs": [
+        "memory-catalog/src/contract-types-generated.ts",
+        "apps/control-plane-ui/browser/features/memory/api-types.generated.ts"
+      ]
     }
   ]
 }

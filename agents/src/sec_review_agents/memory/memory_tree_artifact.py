@@ -15,9 +15,14 @@ from sec_review_agents.artifacts.reference import (
     require_artifact_media_type,
 )
 from sec_review_agents.artifacts.tar_zstd import validate_restricted_pax_archive
+from sec_review_agents.contract_versions import MEMORY_TREE_ARTIFACT_VERSION
 
-MEMORY_TREE_ARTIFACT_FILENAME = "memory-tree.v1.tar.zst"
+MEMORY_TREE_ARTIFACT_FILENAME = f"memory-tree.{MEMORY_TREE_ARTIFACT_VERSION}.tar.zst"
 MEMORY_TREE_ARTIFACT_MANIFEST = "manifest.json"
+MEMORY_TREE_ARTIFACT_MANIFEST_VERSION = 1
+MEMORY_TREE_ARTIFACT_MANIFEST_BYTES = (
+    f'{{"version":{MEMORY_TREE_ARTIFACT_MANIFEST_VERSION}}}\n'.encode()
+)
 MAX_MEMORY_TREE_ARTIFACT_BYTES = 64 * 1024 * 1024
 MAX_MEMORY_TREE_ARTIFACT_ENTRIES = 10_000
 MAX_MEMORY_TREE_FILE_BYTES = 16 * 1024 * 1024
@@ -90,7 +95,7 @@ def _collect_memory_content(root: Path) -> dict[str, bytes]:
     entries = _archive_tree_entries(content)
     if len(entries) + 2 > MAX_MEMORY_TREE_ARTIFACT_ENTRIES:
         raise ValueError("Memory tree exceeds the entry count limit.")
-    if sum(map(len, content.values())) + len('{"version":1}\n') > (
+    if sum(map(len, content.values())) + len(MEMORY_TREE_ARTIFACT_MANIFEST_BYTES) > (
         MAX_EXTRACTED_MEMORY_BYTES
     ):
         raise ValueError("Memory tree exceeds the extracted size limit.")
@@ -127,7 +132,11 @@ def _add_file(archive: tarfile.TarFile, name: str, content: bytes) -> None:
 def _write_memory_tree_archive(
     archive: tarfile.TarFile, content: dict[str, bytes]
 ) -> None:
-    _add_file(archive, MEMORY_TREE_ARTIFACT_MANIFEST, b'{"version":1}\n')
+    _add_file(
+        archive,
+        MEMORY_TREE_ARTIFACT_MANIFEST,
+        MEMORY_TREE_ARTIFACT_MANIFEST_BYTES,
+    )
     _add_directory(archive, "memory/")
     entries = _archive_tree_entries(content)
     for name in sorted(entries):
@@ -187,7 +196,7 @@ def _validate_archive(archive_path: Path) -> None:
                     not member.isfile()
                     or member.mode != 0o644
                     or source is None
-                    or source.read() != b'{"version":1}\n'
+                    or source.read() != MEMORY_TREE_ARTIFACT_MANIFEST_BYTES
                 ):
                     raise ValueError("Memory tree manifest is invalid.")
                 total_size += member.size

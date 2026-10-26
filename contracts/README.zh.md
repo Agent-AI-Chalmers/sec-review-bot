@@ -19,6 +19,9 @@ contracts/
       fixtures/*.json  可执行示例，以及配对它们的 manifest
       corpus/*         共享的非 JSON 输入，外加 manifest（当契约是由代码强制的格式、
                        而不是数据形状时）
+  <layered-family>/
+    envelope/<version>/{SPEC.md,corpus/}
+    profiles/<name>/<version>/{SPEC.md,corpus/}
 ```
 
 并非每个族都使用每一种资产。若契约的规则是决策逻辑而非结构形状，它会携带 `corpus/`
@@ -27,18 +30,18 @@ contracts/
 
 一个族也可以存放适用于所有版本的文档，例如传输层参考。
 
+当多个格式确实共享一个更底层表示时，同一 family 可以用独立版本的 `envelope/` 与 `profiles/<name>/` 目录显式表达该关系。每一层分别拥有自己的 specification、corpus 与 tooling；目录嵌套不绑定其 version number。参见 [tar-zstd-artifact](tar-zstd-artifact/README.zh.md)。
+
 ## 契约族
 
-| 契约族 | 边界 | 参与方 | 当前版本 |
-| --- | --- | --- | --- |
-| [execution-api](execution-api/README.zh.md) | 公开 HTTP 操作、workflow 输入、结果与错误 | Execution API provider、调用方与下游发布方 | [v1](execution-api/v1/CONTRACT.zh.md) |
-| [execution-workflow](execution-workflow/README.zh.md) | Temporal Execution Workflow 输入 | Execution Gateway 与 Execution Worker | [v1](execution-workflow/v1/CONTRACT.md) |
-| [review-runs-api](review-runs-api/README.zh.md) | Review Runs HTTP API 与 observed run 形状 | Review Runs 与其调用方 | [v1](review-runs-api/v1/openapi.yaml) |
-| [memory-catalog-api](memory-catalog-api/README.zh.md) | Memory coordination HTTP API | Memory Catalog Server 与 workers | [v1](memory-catalog-api/v1/openapi.yaml) |
-| [memory-tree-artifact](memory-tree-artifact/README.zh.md) | 不可变 memory tree archive 格式 | Memory Maintenance Worker 与 Control Plane UI BFF | [v1](memory-tree-artifact/v1/SPEC.zh.md) |
-| [run-diagnostic-artifact](run-diagnostic-artifact/README.zh.md) | Completed-run diagnostic archive profile | Execution Worker、Memory Extraction Worker 与 Control Plane UI BFF | [v1](run-diagnostic-artifact/v1/SPEC.zh.md) |
-| [tar-zstd-artifact](tar-zstd-artifact/README.zh.md) | 共享的受限 POSIX PAX envelope | 所有项目自有 tar+zstd producer 与 consumer | [v1](tar-zstd-artifact/v1/SPEC.zh.md) |
-| [setup-declaration](setup-declaration/README.zh.md) | 受信任的 `.sec-review/setup.yml` 格式 | 被审查仓库、GitHub Integration 与 Execution Worker | [v1](setup-declaration/v1/SPEC.zh.md) |
+| 契约族                                                | 边界                                         | 参与方                                             | 当前版本                                                                                                                                                                                                      |
+| ----------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [execution-api](execution-api/README.zh.md)           | 公开 HTTP 操作、workflow 输入、结果与错误    | Execution API provider、调用方与下游发布方         | [v1](execution-api/v1/CONTRACT.zh.md)                                                                                                                                                                         |
+| [execution-workflow](execution-workflow/README.zh.md) | Temporal Execution Workflow 输入             | Execution Gateway 与 Execution Worker              | [v1](execution-workflow/v1/CONTRACT.md)                                                                                                                                                                       |
+| [review-runs-api](review-runs-api/README.zh.md)       | Review Runs HTTP API 与 observed run 形状    | Review Runs 与其调用方                             | [v1](review-runs-api/v1/openapi.yaml)                                                                                                                                                                         |
+| [memory-catalog-api](memory-catalog-api/README.zh.md) | Memory coordination HTTP API                 | Memory Catalog Server 与 workers                   | [v1](memory-catalog-api/v1/openapi.yaml)                                                                                                                                                                      |
+| [tar-zstd-artifact](tar-zstd-artifact/README.zh.md)   | 共享 archive envelope 及其 artifact profiles | 所有项目自有 tar+zstd producer 与 consumer         | [envelope v1](tar-zstd-artifact/envelope/v1/SPEC.zh.md)、[memory-tree v1](tar-zstd-artifact/profiles/memory-tree/v1/SPEC.zh.md)、[run-diagnostic v1](tar-zstd-artifact/profiles/run-diagnostic/v1/SPEC.zh.md) |
+| [setup-declaration](setup-declaration/README.zh.md)   | 受信任的 `.sec-review/setup.yml` 格式        | 被审查仓库、GitHub Integration 与 Execution Worker | [v1](setup-declaration/v1/SPEC.zh.md)                                                                                                                                                                         |
 
 ## 适用于每个族的规则
 
@@ -71,11 +74,11 @@ Fixture 是契约校验的一部分。Manifest 记录每个 schema 必须接受�
 
 ## 派生产物
 
-有些产物是从手写契约生成的，而不是手工维护——例如 API 的 TypeScript 投影、提交的 JSON Schema、生成的参数列表。每个族拥有渲染并校验其投影的工具，放在 `<family>/tools/` 下：读取契约的工具就挨着契约，而它的产物落在哪里（可能在别的包中）不影响谁拥有该检查。每个族的 `tools/generated-artifacts.json` 列出它派生什么、落到哪里。
+有些产物是从手写契约生成的，而不是手工维护——例如 API 的 TypeScript 投影、提交的 JSON Schema、生成的参数列表。每个 owning family 或 layered-family component 都把渲染并校验其投影的工具放在本地 `tools/` 目录中：读取契约的工具就挨着契约，而它的产物落在哪里（可能在别的包中）不影响谁拥有该检查。该工具的 `generated-artifacts.json` 列出它派生什么、落到哪里。
 
 稳定的包内入口按调用方消费的职责命名，即使它由生成器维护，例如 `execution-api-version.ts`。原始机械投影可以在文件名中保留 `generated`，用于提示该文件不应逐渐承载手写行为，例如 `contract-types-generated.ts`。文件名不是强制边界：每个提交到仓库的生成产物都必须在文件头标明其生成身份、列入该族的 manifest，并由下述 freshness 与 CI 检查覆盖。
 
-每个工具提供 `pnpm --dir contracts/<family>/tools run generate` 重新生成全部产物，以及 `pnpm --dir contracts/<family>/tools run check` 校验已提交副本是否一致。每个族的测试会断言 manifest 与生成器自身声明的输出一致，并断言 CI 的变更过滤器覆盖清单中每一个产物；因此新增一个投影只需把它列进清单，而不必记得再接一个检查。
+每个工具在本地提供 `generate` 命令重新生成全部产物，以及 `check` 校验已提交副本是否一致。每个族的测试会断言 manifest 与生成器自身声明的输出一致，并断言 CI 的变更过滤器覆盖清单中每一个产物；因此新增一个投影只需把它列进清单，而不必记得再接一个检查。
 
 ## 变更清单
 
@@ -84,6 +87,6 @@ Fixture 是契约校验的一部分。Manifest 记录每个 schema 必须接受�
 - 更新受影响版本的规范；
 - 更新它的 schema；
 - 更新或新增它的 fixture 与 manifest 条目；
-- 用该族的工具重新生成任何派生产物（例如 Review Runs 提交的 `v1` schema 与生成的类型）：`pnpm --dir contracts/<family>/tools run generate`，再用 `... run check` 确认；
+- 用 owning family 或 layer 的本地工具重新生成任何派生产物（例如 Review Runs 提交的 `v1` schema 与生成的类型），再运行该工具的 `check` 命令；
 - 让 Python 和 TypeScript 测试校验同一批文件。
 - 对二进制 artifact，运行生产者测试、每个消费者的共享 corpus 测试，以及至少一条从 reference 到字节验证的端到端路径。
