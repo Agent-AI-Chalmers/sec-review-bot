@@ -29,7 +29,7 @@ test('the generated artifact manifest covers the generator output and CI filter'
   )
   const generatedModule = await import('../src/generate.js')
 
-  assert.deepEqual(outputs, [path.normalize(generatedModule.outputPath)])
+  assert.deepEqual(outputs, generatedModule.outputPaths.map(path.normalize))
 
   const filters = parse(
     readFileSync(
@@ -37,9 +37,11 @@ test('the generated artifact manifest covers the generator output and CI filter'
       'utf8'
     )
   ) as Record<string, string[]>
-  const relativeOutput = path.relative(REPO_ROOT, generatedModule.outputPath)
-  assert.ok(
-    (filters['contract-tools'] ?? []).includes(relativeOutput),
-    `contract-tools CI filter does not cover ${relativeOutput}`
-  )
+  for (const outputPath of generatedModule.outputPaths) {
+    const relativeOutput = path.relative(REPO_ROOT, outputPath)
+    assert.ok(
+      (filters['contract-tools'] ?? []).includes(relativeOutput),
+      `contract-tools CI filter does not cover ${relativeOutput}`
+    )
+  }
 })

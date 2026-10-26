@@ -3,6 +3,10 @@
     {
       "generator": "src/generate.ts",
       "output": "../../../memory-catalog/src/contract-types-generated.ts"
+    },
+    {
+      "generator": "src/generate.ts",
+      "output": "../../../apps/control-plane-ui/browser/features/memory/api-types.generated.ts"
     }
   ]
 }

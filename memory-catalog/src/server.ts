@@ -12,6 +12,7 @@ import Fastify, {
 
 import {
   ExtractionConflictError,
+  MaintenanceControlConflictError,
   PostgresMemoryCatalogStore,
   MemoryTreeRevisionConflictError,
   type MemoryCatalogStore,
@@ -58,6 +59,7 @@ function specPath(): string {
 function errorStatusCode(error: unknown): number {
   if (
     error instanceof ExtractionConflictError ||
+    error instanceof MaintenanceControlConflictError ||
     error instanceof MemoryTreeRevisionConflictError
   )
     return 409
@@ -97,7 +99,72 @@ export async function registerMemoryCatalogRoutes(
           code: 'NOT_FOUND',
         })
       },
+      listExtractions: async (request: FastifyRequest, reply: FastifyReply) => {
+        const query = request.query as QueryParameters<'listExtractions'>
+        const limit = query.limit ? Number(query.limit) : 50
+        if (limit > 100) {
+          return await reply.status(400).send({
+            error: 'Extraction list limit must not exceed 100.',
+            code: 'INVALID_BODY',
+          })
+        }
+        return await store.listExtractions(query.cursor, limit, {
+          ...(query.source_workflow
+            ? { sourceWorkflow: query.source_workflow }
+            : {}),
+          ...(query.source_run_id ? { sourceRunId: query.source_run_id } : {}),
+          ...(query.has_observation
+            ? { hasObservation: query.has_observation === 'true' }
+            : {}),
+        })
+      },
+      listObservations: async (
+        request: FastifyRequest,
+        reply: FastifyReply,
+      ) => {
+        const query = request.query as QueryParameters<'listObservations'>
+        const limit = query.limit ? Number(query.limit) : 50
+        if (limit > 100) {
+          return await reply.status(400).send({
+            error: 'Observation list limit must not exceed 100.',
+            code: 'INVALID_BODY',
+          })
+        }
+        return await store.listObservations(query.cursor, limit, {
+          ...(query.status ? { status: query.status } : {}),
+          ...(query.consumed_revision
+            ? { consumedRevision: Number(query.consumed_revision) }
+            : {}),
+        })
+      },
       getObservationBacklog: async () => await store.getObservationBacklog(),
+      getCatalogOverview: async (request: FastifyRequest) => {
+        const query = request.query as QueryParameters<'getCatalogOverview'>
+        return await store.getCatalogOverview(query.range ?? '30d')
+      },
+      getMaintenanceControl: async () => await store.getMaintenanceControl(),
+      pauseMaintenance: async (
+        request: FastifyRequest,
+        reply: FastifyReply,
+      ) => {
+        const result = await store.changeMaintenanceControl(
+          'paused',
+          request.body as RequestBody<'pauseMaintenance'>,
+        )
+        if (result.created) void reply.status(201)
+        return result
+      },
+      resumeMaintenance: async (
+        request: FastifyRequest,
+        reply: FastifyReply,
+      ) => {
+        const result = await store.changeMaintenanceControl(
+          'enabled',
+          request.body as RequestBody<'resumeMaintenance'>,
+        )
+        if (result.created) void reply.status(201)
+        return result
+      },
       getMaintenanceInput: async (
         request: FastifyRequest,
         reply: FastifyReply,
@@ -127,6 +194,16 @@ export async function registerMemoryCatalogRoutes(
           )
           void reply.status(201)
         }
+        return result
+      },
+      restoreMemoryTree: async (
+        request: FastifyRequest,
+        reply: FastifyReply,
+      ) => {
+        const result = await store.restoreMemoryTree(
+          request.body as RequestBody<'restoreMemoryTree'>,
+        )
+        if (result.created) void reply.status(201)
         return result
       },
       getMemoryTree: async () => await store.getMemoryTree(),
