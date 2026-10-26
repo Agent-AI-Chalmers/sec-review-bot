@@ -221,7 +221,7 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
   }
 })
 
-test('memory writes are absent unless loopback maintenance mode is explicit', async () => {
+test('memory writes require configured catalog access', async () => {
   const reviewRuns = createServer((_request, response) => response.end('{}'))
   await new Promise<void>((resolve) =>
     reviewRuns.listen(0, '127.0.0.1', resolve)
@@ -231,9 +231,7 @@ test('memory writes are absent unless loopback maintenance mode is explicit', as
   const ui = createControlPlaneUiServer({
     reviewRunsUrl: `http://127.0.0.1:${reviewAddress.port}`,
     reviewRunsToken: 'read-secret',
-    accessToken: 'login-secret',
-    memoryCatalogUrl: 'http://127.0.0.1:1',
-    memoryCatalogToken: 'catalog-secret'
+    accessToken: 'login-secret'
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
@@ -249,9 +247,9 @@ test('memory writes are absent unless loopback maintenance mode is explicit', as
         expected_generation: 1
       })
     })
-    assert.strictEqual(response.status, 404)
+    assert.strictEqual(response.status, 503)
     assert.deepStrictEqual(await response.json(), {
-      error: 'memory_write_unavailable'
+      error: 'memory_catalog_unavailable'
     })
   } finally {
     await Promise.all([
@@ -308,7 +306,7 @@ test('BFF maps memory tree reads to the catalog memory-tree resource', async () 
   }
 })
 
-test('local memory edit creates a revision while restore only moves the pointer', async () => {
+test('memory edit creates a revision while restore only moves the pointer', async () => {
   const requests: Array<{ path: string; body: Record<string, unknown> }> = []
   const catalog = createServer(async (request, response) => {
     const chunks: Buffer[] = []
@@ -339,7 +337,6 @@ test('local memory edit creates a revision while restore only moves the pointer'
     accessToken: 'login-secret',
     memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
     memoryCatalogToken: 'catalog-secret',
-    localMemoryWrites: true,
     artifactStore: {
       getObject: () => Promise.reject(new Error('not used')),
       putMemoryArtifact: async () => {
@@ -372,7 +369,7 @@ test('local memory edit creates a revision while restore only moves the pointer'
     const editSource = requests[0]!.body.source as Record<string, unknown>
     assert.deepStrictEqual(editSource.actor, {
       kind: 'service',
-      id: 'local-control-plane-ui'
+      id: 'control-plane-ui'
     })
     assert.strictEqual(editSource.operation_id, 'edit-1')
 
@@ -396,7 +393,7 @@ test('local memory edit creates a revision while restore only moves the pointer'
       operation_id: 'restore-1',
       expected_active_revision: 3,
       restored_revision: 1,
-      actor: { kind: 'service', id: 'local-control-plane-ui' }
+      actor: { kind: 'service', id: 'control-plane-ui' }
     })
   } finally {
     await Promise.all([
@@ -504,7 +501,7 @@ test('BFF rejects a memory tree reference whose object key is not derived from i
         source: {
           kind: 'operator',
           operation_id: 'edit-1',
-          actor: { kind: 'service', id: 'local-control-plane-ui' }
+          actor: { kind: 'service', id: 'control-plane-ui' }
         }
       })
     )
@@ -564,7 +561,7 @@ test('BFF rejects oversized memory artifacts before reading object storage', asy
         source: {
           kind: 'operator',
           operation_id: 'edit-1',
-          actor: { kind: 'service', id: 'local-control-plane-ui' }
+          actor: { kind: 'service', id: 'control-plane-ui' }
         }
       })
     )
@@ -621,7 +618,7 @@ test('BFF rejects oversized memory objects before buffering their body', async (
         source: {
           kind: 'operator',
           operation_id: 'edit-1',
-          actor: { kind: 'service', id: 'local-control-plane-ui' }
+          actor: { kind: 'service', id: 'control-plane-ui' }
         }
       })
     )

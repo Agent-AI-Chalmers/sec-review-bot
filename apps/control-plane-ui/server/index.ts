@@ -431,7 +431,6 @@ export function createControlPlaneUiServer({
   accessToken,
   memoryCatalogUrl,
   memoryCatalogToken,
-  localMemoryWrites = false,
   artifactStore,
   artifactDownloadIdleTimeoutMs = ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS,
   reviewRunsRequestTimeoutMs = REVIEW_RUNS_REQUEST_TIMEOUT_MS,
@@ -442,7 +441,6 @@ export function createControlPlaneUiServer({
   accessToken: string
   memoryCatalogUrl?: string
   memoryCatalogToken?: string
-  localMemoryWrites?: boolean
   artifactStore?: ArtifactStore
   artifactDownloadIdleTimeoutMs?: number
   reviewRunsRequestTimeoutMs?: number
@@ -539,10 +537,6 @@ export function createControlPlaneUiServer({
       const memoryWriteMatch =
         /^\/api\/memory\/(pause|resume|edit|restore)$/.exec(request.url ?? '')
       if (request.method === 'POST' && memoryWriteMatch !== null) {
-        if (!localMemoryWrites) {
-          sendJson(response, 404, { error: 'memory_write_unavailable' })
-          return
-        }
         if (!sameOrigin(request)) {
           sendJson(response, 403, { error: 'cross_site_request' })
           return
@@ -567,7 +561,7 @@ export function createControlPlaneUiServer({
             Buffer.concat(chunks).toString('utf8')
           ) as Record<string, unknown>
           const action = memoryWriteMatch[1]
-          const actor = { kind: 'service', id: 'local-control-plane-ui' }
+          const actor = { kind: 'service', id: 'control-plane-ui' }
           let catalogPath: string
           let catalogBody: Record<string, unknown>
           if (action === 'pause' || action === 'resume') {
@@ -1238,13 +1232,10 @@ if (
     reviewRunsToken,
     accessToken,
     memoryCatalogUrl: process.env.MEMORY_CATALOG_URL,
-    memoryCatalogToken: process.env.MEMORY_CATALOG_READ_TOKEN,
-    localMemoryWrites: process.env.CONTROL_PLANE_UI_LOCAL_MEMORY_WRITES === '1',
+    memoryCatalogToken: process.env.MEMORY_CATALOG_TOKEN,
     artifactStore: artifactStoreFromEnvironment()
   }).listen(
     Number.parseInt(process.env.CONTROL_PLANE_UI_PORT ?? '8091', 10),
-    process.env.CONTROL_PLANE_UI_LOCAL_MEMORY_WRITES === '1'
-      ? '127.0.0.1'
-      : '0.0.0.0'
+    '0.0.0.0'
   )
 }
