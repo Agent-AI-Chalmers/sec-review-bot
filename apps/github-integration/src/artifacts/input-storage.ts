@@ -7,6 +7,7 @@ import { createReadStream } from 'fs'
 import { fileURLToPath } from 'url'
 
 import {
+  artifact_s3_addressing_style,
   artifact_s3_bucket,
   artifact_s3_endpoint,
   artifact_s3_region,
@@ -21,9 +22,11 @@ function inputObjectKey(runId: string): string {
 function configuredClient(): S3Client {
   return new S3Client({
     region: artifact_s3_region,
-    ...(artifact_s3_endpoint
-      ? { endpoint: artifact_s3_endpoint, forcePathStyle: true }
-      : {})
+    ...(artifact_s3_endpoint ? { endpoint: artifact_s3_endpoint } : {}),
+    // Omitting forcePathStyle preserves the SDK's native endpoint behavior for auto mode.
+    ...(artifact_s3_addressing_style === 'auto'
+      ? {}
+      : { forcePathStyle: artifact_s3_addressing_style === 'path' })
   })
 }
 

@@ -170,7 +170,8 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `AGENT_MCP_ENABLED` | 启用已配置的 MCP 集成；默认是 `false`。 |
 | `AGENT_MEMORY_CONSUMPTION_ENABLED` | 允许 review agent 读取整理后的 memory；默认是 `true`。 |
 | `AGENT_MEMORY_PROCESSING_ENABLED` | 允许 transcript extraction 和 memory maintenance；默认是 `true`。 |
-| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9100`。 |
+| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 可选的自定义 S3-compatible endpoint。本地 RustFS 部署使用 `http://127.0.0.1:9100`；使用由 `AWS_REGION` 选择的 AWS endpoint 时省略该项。 |
+| `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` | S3 请求寻址方式：`auto`、`path` 或 `virtual`。本地 RustFS 部署使用 `path`；外部存储可以使用 `auto` 或 `virtual`，无需改变 artifact reference。 |
 | `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入 run diagnostic bundle，并读取 active memory revision。 |
 | `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | 两个 memory worker 共用的存储凭据；可读取 run diagnostic bundle，并读写 memory revision 和压缩后的 memory-agent transcript。 |
 | `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 协调状态 API；Compose 默认是 `http://127.0.0.1:8092`。 |

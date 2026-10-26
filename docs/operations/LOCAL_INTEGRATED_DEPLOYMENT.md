@@ -168,7 +168,8 @@ Core fields:
 | `AGENT_MCP_ENABLED` | Enable configured MCP integrations; defaults to `false`. |
 | `AGENT_MEMORY_CONSUMPTION_ENABLED` | Allow review agents to read curated memory; defaults to `true`. |
 | `AGENT_MEMORY_PROCESSING_ENABLED` | Allow transcript extraction and memory maintenance; defaults to `true`. |
-| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Host-worker endpoint for RustFS; the Compose default is exposed at `http://127.0.0.1:9100`. |
+| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Optional custom S3-compatible endpoint. The local RustFS deployment uses `http://127.0.0.1:9100`; omit it to use the AWS endpoint selected from `AWS_REGION`. |
+| `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` | S3 request addressing: `auto`, `path`, or `virtual`. The local RustFS deployment uses `path`; external storage can use `auto` or `virtual` without changing artifact references. |
 | `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`, `SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker credential; it can read run inputs, write run diagnostic bundles, and read active memory revisions. |
 | `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`, `SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Shared storage credential for both memory workers; it can read run diagnostic bundles and read/write memory revisions and compressed memory-agent transcripts. |
 | `AGENT_MEMORY_CATALOG_URL` | Memory Catalog coordination API; the Compose default is `http://127.0.0.1:8092`. |

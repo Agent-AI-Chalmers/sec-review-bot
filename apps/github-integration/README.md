@@ -45,6 +45,8 @@ A complete review also needs the execution gateway and worker. To run the whole 
 
 For non-Compose startup, fill `apps/github-integration/.env` from `apps/github-integration/.env.sample`; at minimum set `APP_ID`, `PRIVATE_KEY_PATH`, `WEBHOOK_SECRET`, `REVIEW_RUNS_SERVICE_URL`, and `REVIEW_RUNS_SERVICE_TOKEN`.
 
+When `SEC_REVIEW_ARTIFACT_STORE=s3`, configure the bucket and AWS credentials. `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` is optional for AWS and required for a custom S3-compatible endpoint. `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` accepts `auto` (default), `path`, or `virtual`; the local RustFS deployment uses `path`. This transport setting does not change the submitted `s3://bucket/key` artifact reference.
+
 `REVIEW_RUNS_REQUEST_TIMEOUT_MS` bounds every Review Runs request and defaults to 30 seconds. In particular, a publication lease renewal that fails or times out is treated as lost ownership: the publisher stops before starting another GitHub mutation and leaves recovery to lease takeover.
 
 ```bash

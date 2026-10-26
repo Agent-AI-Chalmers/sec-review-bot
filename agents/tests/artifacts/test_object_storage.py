@@ -11,6 +11,47 @@ from sec_review_agents.artifacts.object_storage import (
 from sec_review_agents.artifacts.reference import local_artifact_reference
 
 
+@pytest.mark.parametrize("style", ["auto", "path", "virtual"])
+def test_configures_s3_addressing_style(
+    monkeypatch, tmp_path: Path, style: str
+) -> None:
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE", style)
+    client = Mock()
+    client.head_object.return_value = {"ContentLength": 7}
+    client.download_fileobj.side_effect = lambda _bucket, _key, output: output.write(
+        b"archive"
+    )
+
+    with patch(
+        "sec_review_agents.artifacts.object_storage.boto3.client",
+        return_value=client,
+    ) as create_client:
+        download_s3_object(
+            "s3://sec-review/runs/run-1/input/input-bundle.v1.tar.zst",
+            tmp_path / "input-bundle.tar.zst",
+            expected_size=7,
+            maximum_size=100,
+        )
+
+    assert create_client.call_args.kwargs["config"].s3["addressing_style"] == style
+
+
+def test_rejects_invalid_s3_addressing_style(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE", "hostname")
+
+    with pytest.raises(
+        ValueError, match="SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE must"
+    ):
+        download_s3_object(
+            "s3://sec-review/runs/run-1/input/input-bundle.v1.tar.zst",
+            tmp_path / "input-bundle.tar.zst",
+            expected_size=7,
+            maximum_size=100,
+        )
+
+
 def test_downloads_configured_s3_object_to_complete_local_file(
     monkeypatch, tmp_path: Path
 ) -> None:

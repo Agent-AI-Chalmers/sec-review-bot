@@ -56,7 +56,7 @@ Then start Vite in another terminal:
 pnpm run dev
 ```
 
-Vite proxies `/api` requests to the BFF at `http://127.0.0.1:8091`. The BFF connects to Review Runs at `http://127.0.0.1:8090` by default; set `REVIEW_RUNS_URL` when it runs elsewhere. Artifact downloads additionally require the RustFS settings documented in [Local Integrated Deployment](../../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md).
+Vite proxies `/api` requests to the BFF at `http://127.0.0.1:8091`. The BFF connects to Review Runs at `http://127.0.0.1:8090` by default; set `REVIEW_RUNS_URL` when it runs elsewhere. Artifact downloads additionally require the S3 settings documented in [Local Integrated Deployment](../../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md). AWS can use its default endpoint with `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE=auto`; the local RustFS deployment supplies its endpoint and uses `path`.
 
 The complete Compose deployment is available at `http://127.0.0.1:8091` by default.
 

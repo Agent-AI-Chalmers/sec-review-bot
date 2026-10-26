@@ -52,6 +52,17 @@ const artifact_s3_bucket = process.env['SEC_REVIEW_ARTIFACT_S3_BUCKET']?.trim()
 const artifact_s3_endpoint =
   process.env['SEC_REVIEW_ARTIFACT_S3_ENDPOINT']?.trim()
 const artifact_s3_region = process.env['AWS_REGION']?.trim() || 'us-east-1'
+const configured_artifact_s3_addressing_style =
+  process.env['SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE']?.trim() || 'auto'
+if (
+  !['auto', 'path', 'virtual'].includes(configured_artifact_s3_addressing_style)
+) {
+  throw new Error(
+    'SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE must be auto, path, or virtual.'
+  )
+}
+const artifact_s3_addressing_style = configured_artifact_s3_addressing_style as
+  'auto' | 'path' | 'virtual'
 
 export {
   app_id,
@@ -68,5 +79,6 @@ export {
   artifact_store,
   artifact_s3_bucket,
   artifact_s3_endpoint,
-  artifact_s3_region
+  artifact_s3_region,
+  artifact_s3_addressing_style
 }
