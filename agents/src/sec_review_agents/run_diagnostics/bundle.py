@@ -18,6 +18,7 @@ from sec_review_agents.artifacts.reference import (
     local_artifact_reference,
     require_artifact_media_type,
 )
+from sec_review_agents.artifacts.tar_zstd import validate_restricted_pax_archive
 from sec_review_agents.runtime.transcripts import TRANSCRIPT_SUFFIX
 
 DIAGNOSTIC_BUNDLE_FILENAME = "diagnostic-tree.v1.tar.zst"
@@ -30,20 +31,20 @@ MAX_EXTRACTED_DIAGNOSTIC_BYTES = 8 * 1024 * 1024 * 1024
 
 @dataclass(frozen=True)
 class DiagnosticReviewUnit:
-    review_unit_id: str
+    unit_id: str
     transcript_root: Path
 
 
 @dataclass(frozen=True)
 class MaterializedTranscriptUnit:
-    review_unit_id: str
+    unit_id: str
     transcript_paths: tuple[Path, ...]
 
 
 @dataclass(frozen=True)
 class PublishedDiagnosticBundle:
     reference: ArtifactReference
-    review_unit_ids: tuple[str, ...]
+    unit_ids: tuple[str, ...]
 
 
 def diagnostic_bundle_s3_key(run_id: str) -> str:
@@ -100,7 +101,7 @@ def publish_run_diagnostic_bundle(
         )
     return PublishedDiagnosticBundle(
         reference=reference,
-        review_unit_ids=tuple(str(unit["id"]) for unit in manifest_units),
+        unit_ids=tuple(str(unit["id"]) for unit in manifest_units),
     )
 
 
@@ -143,7 +144,9 @@ def _build_diagnostic_archive(
             json.dumps(result, separators=(",", ":"), sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        with tarfile.open(archive_path, mode="w:zst") as archive:
+        with tarfile.open(
+            archive_path, mode="w:zst", format=tarfile.PAX_FORMAT
+        ) as archive:
             archive.add(
                 manifest_path,
                 arcname=DIAGNOSTIC_BUNDLE_MANIFEST,
@@ -155,6 +158,7 @@ def _build_diagnostic_archive(
                 filter=_normalize_tar_info,
             )
             _add_artifact_tree(archive, artifact_root)
+    validate_restricted_pax_archive(archive_path)
     with archive_path.open("rb") as archive_file:
         os.fsync(archive_file.fileno())
 
@@ -201,12 +205,12 @@ def _manifest_units(
     manifest_units: list[dict[str, Any]] = []
     seen_unit_ids: set[str] = set()
     for unit in review_units:
-        _validate_path_component(unit.review_unit_id, label="review_unit_id")
-        if unit.review_unit_id in seen_unit_ids:
+        _validate_path_component(unit.unit_id, label="unit_id")
+        if unit.unit_id in seen_unit_ids:
             raise ValueError(
-                f"Diagnostic bundle review unit is duplicated: {unit.review_unit_id}"
+                f"Diagnostic bundle review unit is duplicated: {unit.unit_id}"
             )
-        seen_unit_ids.add(unit.review_unit_id)
+        seen_unit_ids.add(unit.unit_id)
         transcript_root = unit.transcript_root.resolve()
         try:
             transcript_root.relative_to(artifact_root)
@@ -220,9 +224,7 @@ def _manifest_units(
             if path.is_file()
         ]
         if transcript_paths:
-            manifest_units.append(
-                {"id": unit.review_unit_id, "transcripts": transcript_paths}
-            )
+            manifest_units.append({"id": unit.unit_id, "transcripts": transcript_paths})
     return manifest_units
 
 
@@ -259,7 +261,7 @@ def materialize_diagnostic_transcript_unit(
     reference: ArtifactReference,
     *,
     run_id: str,
-    review_unit_id: str,
+    unit_id: str,
     destination: Path,
 ) -> MaterializedTranscriptUnit:
     require_artifact_media_type(reference, ARCHIVE_MEDIA_TYPE)
@@ -290,7 +292,7 @@ def materialize_diagnostic_transcript_unit(
     if not isinstance(units, list):
         raise ValueError("Diagnostic bundle manifest has no review units.")
     for unit in units:
-        if not isinstance(unit, dict) or unit.get("id") != review_unit_id:
+        if not isinstance(unit, dict) or unit.get("id") != unit_id:
             continue
         paths = unit.get("transcripts")
         if not isinstance(paths, list) or not paths:
@@ -308,10 +310,10 @@ def materialize_diagnostic_transcript_unit(
                 raise ValueError(f"Diagnostic bundle file is missing: {value}")
             resolved_paths.append(path)
         return MaterializedTranscriptUnit(
-            review_unit_id=review_unit_id,
+            unit_id=unit_id,
             transcript_paths=tuple(resolved_paths),
         )
-    raise ValueError(f"Diagnostic review unit not found: {review_unit_id}")
+    raise ValueError(f"Diagnostic review unit not found: {unit_id}")
 
 
 __all__ = [

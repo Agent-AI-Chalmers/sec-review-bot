@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 
 from sec_review_agents.artifacts.reference import ArtifactReference
@@ -66,7 +66,7 @@ class MemoryCatalogClient:
         extraction_id: str,
         source_workflow: str,
         source_run_id: str,
-        source_review_unit_id: str,
+        source_unit_id: str,
         diagnostic_bundle_digest: str,
         transcript_reference: ArtifactReference,
         observation_markdown: str | None,
@@ -78,7 +78,7 @@ class MemoryCatalogClient:
                 "extraction_id": extraction_id,
                 "source_workflow": source_workflow,
                 "source_run_id": source_run_id,
-                "source_review_unit_id": source_review_unit_id,
+                "source_unit_id": source_unit_id,
                 "diagnostic_bundle_digest": diagnostic_bundle_digest,
                 "transcript_reference": transcript_reference.as_dict(),
                 "observation": (
@@ -97,8 +97,69 @@ class MemoryCatalogClient:
             "GET", f"{_API_ROOT}/extractions/{quote(extraction_id, safe='')}"
         )
 
+    def list_extractions(
+        self,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+        source_workflow: str | None = None,
+        source_run_id: str | None = None,
+        has_observation: bool | None = None,
+    ) -> dict[str, Any]:
+        parameters: dict[str, str | int] = {"limit": limit}
+        if cursor is not None:
+            parameters["cursor"] = cursor
+        if source_workflow is not None:
+            parameters["source_workflow"] = source_workflow
+        if source_run_id is not None:
+            parameters["source_run_id"] = source_run_id
+        if has_observation is not None:
+            parameters["has_observation"] = str(has_observation).lower()
+        return self._request("GET", f"{_API_ROOT}/extractions?{urlencode(parameters)}")
+
+    def list_observations(
+        self,
+        *,
+        cursor: str | None = None,
+        limit: int = 50,
+        status: str | None = None,
+        consumed_revision: int | None = None,
+    ) -> dict[str, Any]:
+        parameters: dict[str, str | int] = {"limit": limit}
+        if cursor is not None:
+            parameters["cursor"] = cursor
+        if status is not None:
+            parameters["status"] = status
+        if consumed_revision is not None:
+            parameters["consumed_revision"] = consumed_revision
+        return self._request("GET", f"{_API_ROOT}/observations?{urlencode(parameters)}")
+
     def get_observation_backlog(self) -> dict[str, Any]:
         return self._request("GET", f"{_API_ROOT}/observation-backlog")
+
+    def get_maintenance_control(self) -> dict[str, Any]:
+        return self._request("GET", f"{_API_ROOT}/maintenance-control")
+
+    def change_maintenance_control(
+        self,
+        *,
+        target_state: str,
+        operation_id: str,
+        expected_generation: int,
+        actor: dict[str, str],
+    ) -> dict[str, Any]:
+        if target_state not in {"enabled", "paused"}:
+            raise ValueError("Maintenance control target state is invalid.")
+        action = "resume" if target_state == "enabled" else "pause"
+        return self._request(
+            "POST",
+            f"{_API_ROOT}/maintenance-control/{action}",
+            {
+                "operation_id": operation_id,
+                "expected_generation": expected_generation,
+                "actor": actor,
+            },
+        )
 
     def get_maintenance_input(self, *, limit: int) -> dict[str, Any] | None:
         value = self._request(
@@ -116,7 +177,7 @@ class MemoryCatalogClient:
         self,
         *,
         maintenance_id: str,
-        base_revision: int,
+        expected_active_revision: int,
         extraction_ids: list[str],
         memory_tree_reference: ArtifactReference,
         maintenance_transcript_reference: ArtifactReference,
@@ -125,13 +186,14 @@ class MemoryCatalogClient:
             "POST",
             f"{_API_ROOT}/memory-tree/revisions",
             {
-                "maintenance_id": maintenance_id,
-                "base_revision": base_revision,
-                "extraction_ids": extraction_ids,
+                "expected_active_revision": expected_active_revision,
                 "memory_tree_reference": memory_tree_reference.as_dict(),
-                "maintenance_transcript_reference": (
-                    maintenance_transcript_reference.as_dict()
-                ),
+                "source": {
+                    "kind": "maintenance",
+                    "maintenance_id": maintenance_id,
+                    "extraction_ids": extraction_ids,
+                    "transcript_reference": maintenance_transcript_reference.as_dict(),
+                },
             },
         )
 

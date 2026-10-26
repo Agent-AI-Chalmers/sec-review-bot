@@ -1,0 +1,373 @@
+import type { IncomingMessage, ServerResponse } from 'node:http'
+
+import memoryTranscript from '../data/memory-transcript.json' with { type: 'json' }
+import { BASE_TIME } from '../runs/generate.js'
+
+export function createMemoryHandler(
+  sourceRunIds: readonly string[]
+): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
+  let memoryControl = {
+    state: 'enabled' as 'enabled' | 'paused',
+    generation: 1,
+    changed_by: { kind: 'service', id: 'memory-catalog' },
+    changed_at: new Date(BASE_TIME).toISOString()
+  }
+  let activeMemoryRevision = 2
+  const memoryFilesByRevision = new Map<number, Record<string, string>>([
+    [
+      1,
+      {
+        'MEMORY.md':
+          '# Security Review Experience Memory\n\nUse this index to load only the topic relevant to the current review. Memory is guidance, not evidence for the current repository.\n\n- [Triage and reachability](topics/triage.md) - Establish attacker reachability before assigning severity.\n- [Evidence quality](topics/evidence.md) - Separate repository evidence from inherited claims.\n',
+        'topics/evidence.md':
+          '# Evidence quality\n\n## Repository grounding\n\nTreat issue text and prior summaries as leads. Confirm material claims against the current code, configuration, or focused runtime evidence.\n\n## Validation labels\n\nUse the strongest validation level actually reached and record concrete proof gaps instead of upgrading partial evidence.\n',
+        'topics/triage.md':
+          '# Triage and reachability\n\n## Reachability first\n\nTrace untrusted input to the claimed boundary before assigning severity. A dangerous helper is not exploitable when every reachable caller enforces the missing invariant.\n\n## Scope control\n\nKeep adjacent independent weaknesses separate from the reviewed claim.\n'
+      }
+    ],
+    [
+      2,
+      {
+        'MEMORY.md':
+          '# Security Review Experience Memory\n\nUse this short index to select relevant experience. Memory is guidance only; verify every claim against the current review target.\n\n- [Triage and reachability](topics/triage.md) - Scope the reachable attack path and affected boundary.\n- [Evidence quality](topics/evidence.md) - Ground findings and validation claims in current evidence.\n- [Authentication comparisons](topics/authentication.md) - Review secret comparison and failure behavior.\n',
+        'topics/authentication.md':
+          '# Authentication comparisons\n\n## Constant-time comparison\n\nBefore calling a constant-time comparison primitive, validate that both byte sequences have equal length. Some runtimes throw on unequal lengths, turning malformed credentials into a distinct failure path.\n\nReturn the same authentication failure response for length mismatch and value mismatch.\n',
+        'topics/evidence.md':
+          '# Evidence quality\n\n## Keep evidence layers separate\n\nDistinguish input claims, prior-stage summaries, repository facts, and runtime observations. Do not let a confident summary substitute for evidence from the prepared workspace.\n\n## Focused validation\n\nPrefer a small probe with a stable oracle. Report environmental failures as validation limits unless repository evidence connects them to the reviewed behavior.\n',
+        'topics/triage.md':
+          '# Triage and reachability\n\n## Confirm the path\n\nFollow attacker-controlled data through parsing, normalization, authorization, and the final sink. Name the first boundary that fails to enforce the required invariant.\n\n## Bound the claim\n\nDo not expand one repository-local defect into a broader vulnerability class without evidence that the adjacent surfaces share the same reachable behavior.\n'
+      }
+    ],
+    [
+      3,
+      {
+        'MEMORY.md':
+          '# Security Review Experience Memory\n\nThis operator branch keeps the index intentionally narrow.\n\n- [Triage and reachability](topics/triage.md) - Confirm the reachable path before expanding scope.\n- [Evidence quality](topics/evidence.md) - Keep inherited claims separate from current evidence.\n',
+        'topics/evidence.md':
+          '# Evidence quality\n\n## Operator branch\n\nRecord the exact evidence that supports each conclusion and preserve explicit validation limits.\n',
+        'topics/triage.md':
+          '# Triage and reachability\n\n## Operator branch\n\nPrefer a bounded claim tied to a demonstrated path over a broader speculative class.\n'
+      }
+    ]
+  ])
+  const memoryRevisions: Array<Record<string, unknown>> = [
+    {
+      revision: 3,
+      predecessor_revision: 1,
+      created_at: new Date(BASE_TIME + 120_000).toISOString(),
+      source: { kind: 'operator' }
+    },
+    {
+      revision: 2,
+      predecessor_revision: 1,
+      created_at: new Date(BASE_TIME + 60_000).toISOString(),
+      source: {
+        kind: 'maintenance',
+        maintenance_id: 'fixture-maintenance-2',
+        extraction_ids: ['fixture-extraction-2'],
+        transcript_reference: {}
+      }
+    },
+    {
+      revision: 1,
+      predecessor_revision: null,
+      created_at: new Date(BASE_TIME).toISOString(),
+      source: {
+        kind: 'maintenance',
+        maintenance_id: 'fixture-maintenance-1',
+        extraction_ids: ['fixture-extraction-1'],
+        transcript_reference: {}
+      }
+    }
+  ]
+  return async (request, response): Promise<void> => {
+    const requestUrl = request.url
+    if (requestUrl === undefined) return
+    if (
+      requestUrl === '/api/memory/maintenance-control' &&
+      request.method === 'GET'
+    ) {
+      response.end(JSON.stringify(memoryControl))
+      return
+    }
+    if (requestUrl === '/api/memory/tree' && request.method === 'GET') {
+      response.end(JSON.stringify({ revision: activeMemoryRevision }))
+      return
+    }
+    if (
+      requestUrl.startsWith('/api/memory/overview') &&
+      request.method === 'GET'
+    ) {
+      const range = new URL(
+        requestUrl,
+        'http://control-plane-ui.local'
+      ).searchParams.get('range')
+      const pointCount = range === '90d' ? 90 : range === 'all' ? 12 : 30
+      const activePoints = new Map([
+        [pointCount - 7, [1, 1]],
+        [pointCount - 4, [2, 1]],
+        [pointCount - 1, [2, 1]]
+      ])
+      response.end(
+        JSON.stringify({
+          totals: {
+            completed_extraction_count: 6,
+            extracted_unit_count: 5,
+            units_with_observation_count: 3,
+            units_without_observation_count: 2,
+            observation_count: 3,
+            pending_observation_count: 2,
+            consumed_observation_count: 1
+          },
+          trend_granularity: range === 'all' ? 'month' : 'day',
+          trend_points: Array.from({ length: pointCount }, (_, index) => {
+            const outcome = activePoints.get(index) ?? [0, 0]
+            const date = new Date(BASE_TIME)
+            if (range === 'all') {
+              date.setUTCDate(1)
+              date.setUTCMonth(date.getUTCMonth() - (pointCount - 1 - index))
+            } else {
+              date.setUTCDate(date.getUTCDate() - (pointCount - 1 - index))
+            }
+            return {
+              period_start: date.toISOString().slice(0, 10),
+              extracted_unit_count: outcome[0],
+              units_with_observation_count: outcome[1]
+            }
+          }),
+          workflows: [
+            {
+              source_workflow: 'repository-review',
+              extracted_unit_count: 2,
+              units_with_observation_count: 1,
+              units_without_observation_count: 1
+            },
+            {
+              source_workflow: 'pull-request-review',
+              extracted_unit_count: 2,
+              units_with_observation_count: 1,
+              units_without_observation_count: 1
+            },
+            {
+              source_workflow: 'issue-review',
+              extracted_unit_count: 1,
+              units_with_observation_count: 1,
+              units_without_observation_count: 0
+            }
+          ]
+        })
+      )
+      return
+    }
+    if (
+      requestUrl.startsWith('/api/memory/revisions?') &&
+      request.method === 'GET'
+    ) {
+      response.end(
+        JSON.stringify({
+          revisions: memoryRevisions,
+          next_before_revision: null
+        })
+      )
+      return
+    }
+    if (
+      requestUrl.startsWith('/api/memory/observations?') &&
+      request.method === 'GET'
+    ) {
+      response.end(
+        JSON.stringify({
+          observations: [
+            {
+              extraction_id: 'fixture-extraction-2',
+              source_run_id: sourceRunIds[0]!,
+              source_unit_id: 'repository',
+              body_markdown:
+                '**Reject unequal input lengths before calling `timingSafeEqual`.** Comparing buffers of different lengths throws instead of returning false, so validate the length first and fail authentication without exposing a distinct error path.',
+              consumed_revision: 2,
+              created_at: new Date(BASE_TIME).toISOString()
+            },
+            {
+              extraction_id: 'fixture-extraction-3',
+              source_run_id: sourceRunIds[1]!,
+              source_unit_id: 'pull-request',
+              body_markdown:
+                '**Perform tenant authorization before any lookup whose result reveals resource existence.** A post-lookup guard still permits status, timing, or error differences to disclose whether another tenant owns the requested object.',
+              consumed_revision: null,
+              created_at: new Date(BASE_TIME + 120_000).toISOString()
+            },
+            {
+              extraction_id: 'fixture-extraction-4',
+              source_run_id: sourceRunIds[2]!,
+              source_unit_id: 'issue',
+              body_markdown:
+                '**Strip internal debugging headers when proxying upstream responses.** Forward only an explicit response-header allowlist so private identifiers and credentials cannot cross the service boundary.',
+              consumed_revision: null,
+              created_at: new Date(BASE_TIME + 180_000).toISOString()
+            }
+          ],
+          next_cursor: null
+        })
+      )
+      return
+    }
+    if (
+      requestUrl.startsWith('/api/memory/extractions?') &&
+      request.method === 'GET'
+    ) {
+      response.end(
+        JSON.stringify({
+          extractions: [
+            {
+              extraction_id: 'fixture-extraction-2',
+              source_workflow: 'repository-review',
+              source_run_id: sourceRunIds[0]!,
+              created_at: new Date(BASE_TIME).toISOString(),
+              observation: {}
+            },
+            {
+              extraction_id: 'fixture-extraction-3',
+              source_workflow: 'pull-request-review',
+              source_run_id: sourceRunIds[1]!,
+              created_at: new Date(BASE_TIME + 120_000).toISOString(),
+              observation: {}
+            }
+          ],
+          next_cursor: null
+        })
+      )
+      return
+    }
+    const memoryRevisionMatch =
+      /^\/api\/memory\/revisions\/([1-9][0-9]*)$/.exec(requestUrl)
+    if (request.method === 'GET' && memoryRevisionMatch !== null) {
+      const revision = Number(memoryRevisionMatch[1])
+      const record = memoryRevisions.find(
+        (item) => Number(item.revision) === revision
+      )
+      if (record === undefined) response.statusCode = 404
+      response.end(JSON.stringify(record ?? { error: 'revision_not_found' }))
+      return
+    }
+    const memoryTranscriptContentMatch =
+      /^\/api\/memory\/(revisions|extractions)\/([^/?]+)\/transcript\/content$/.exec(
+        requestUrl
+      )
+    if (request.method === 'GET' && memoryTranscriptContentMatch !== null) {
+      response.end(JSON.stringify(memoryTranscript))
+      return
+    }
+    const memoryDownloadMatch =
+      /^\/api\/memory\/(revisions|extractions)\/([^/?]+)\/(artifact|transcript)$/.exec(
+        requestUrl
+      )
+    if (request.method === 'GET' && memoryDownloadMatch !== null) {
+      const collection = memoryDownloadMatch[1]
+      const identity = memoryDownloadMatch[2] ?? ''
+      const kind = memoryDownloadMatch[3]
+      const revision = Number(identity)
+      const available =
+        collection === 'revisions'
+          ? memoryFilesByRevision.has(revision)
+          : /^fixture-extraction-[23]$/.test(identity)
+      if (
+        !available ||
+        (collection === 'extractions' && kind !== 'transcript')
+      ) {
+        response.statusCode = 404
+        response.end(JSON.stringify({ error: 'memory_artifact_not_found' }))
+        return
+      }
+      const filename =
+        kind === 'artifact'
+          ? 'memory-tree.v1.tar.zst'
+          : 'memory-transcript.v1.jsonl.zst'
+      const content = Buffer.from(`fixture ${collection} ${identity} ${kind}\n`)
+      response.setHeader('content-type', 'application/octet-stream')
+      response.setHeader(
+        'content-disposition',
+        `attachment; filename="${filename}"`
+      )
+      response.setHeader('content-length', String(content.length))
+      response.end(content)
+      return
+    }
+    const memoryContentMatch =
+      /^\/api\/memory\/revisions\/([1-9][0-9]*)\/content$/.exec(requestUrl)
+    if (request.method === 'GET' && memoryContentMatch !== null) {
+      const files = memoryFilesByRevision.get(Number(memoryContentMatch[1]))
+      if (files === undefined) response.statusCode = 404
+      response.end(
+        JSON.stringify(files === undefined ? { error: 'not_found' } : { files })
+      )
+      return
+    }
+    const memoryWriteMatch =
+      /^\/api\/memory\/(pause|resume|edit|restore)$/.exec(requestUrl)
+    if (request.method === 'POST' && memoryWriteMatch !== null) {
+      const chunks: Buffer[] = []
+      for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<
+        string,
+        unknown
+      >
+      const action = memoryWriteMatch[1]
+      if (action === 'pause' || action === 'resume') {
+        if (body.expected_generation !== memoryControl.generation) {
+          response.statusCode = 409
+          response.end(JSON.stringify({ error: 'generation_conflict' }))
+          return
+        }
+        memoryControl = {
+          state: action === 'pause' ? 'paused' : 'enabled',
+          generation: memoryControl.generation + 1,
+          changed_by: { kind: 'service', id: 'local-control-plane-ui' },
+          changed_at: new Date().toISOString()
+        }
+        response.end(JSON.stringify(memoryControl))
+        return
+      }
+      if (body.expected_active_revision !== activeMemoryRevision) {
+        response.statusCode = 409
+        response.end(JSON.stringify({ error: 'revision_conflict' }))
+        return
+      }
+      if (action === 'restore') {
+        const restoredRevision = Number(body.restored_revision)
+        if (!memoryFilesByRevision.has(restoredRevision)) {
+          response.statusCode = 404
+          response.end(JSON.stringify({ error: 'restore_target_unavailable' }))
+          return
+        }
+        activeMemoryRevision = restoredRevision
+        response.statusCode = 201
+        response.end(
+          JSON.stringify({
+            created: true,
+            active_revision: restoredRevision,
+            operation_id: body.operation_id
+          })
+        )
+        return
+      }
+      const nextRevision =
+        Math.max(...memoryRevisions.map((item) => Number(item.revision))) + 1
+      const files = body.files as Record<string, string>
+      memoryFilesByRevision.set(nextRevision, { ...files })
+      memoryRevisions.unshift({
+        revision: nextRevision,
+        predecessor_revision: activeMemoryRevision,
+        created_at: new Date().toISOString(),
+        source: {
+          kind: 'operator',
+          operation_id: body.operation_id,
+          actor: { kind: 'service', id: 'local-control-plane-ui' }
+        }
+      })
+      activeMemoryRevision = nextRevision
+      response.statusCode = 201
+      response.end(JSON.stringify(memoryRevisions[0]))
+      return
+    }
+  }
+}

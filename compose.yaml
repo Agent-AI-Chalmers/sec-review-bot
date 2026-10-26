@@ -202,6 +202,8 @@ services:
       REVIEW_RUNS_URL: "http://review-runs:8090"
       REVIEW_RUNS_READ_TOKEN: "${REVIEW_RUNS_READ_TOKEN:?REVIEW_RUNS_READ_TOKEN is required}"
       CONTROL_PLANE_UI_ACCESS_TOKEN: "${CONTROL_PLANE_UI_ACCESS_TOKEN:?CONTROL_PLANE_UI_ACCESS_TOKEN is required}"
+      MEMORY_CATALOG_URL: "http://memory-catalog-server:8092"
+      MEMORY_CATALOG_READ_TOKEN: "${AGENT_MEMORY_CATALOG_TOKEN:?AGENT_MEMORY_CATALOG_TOKEN is required}"
       SEC_REVIEW_ARTIFACT_S3_ENDPOINT: "http://rustfs:9000"
       SEC_REVIEW_ARTIFACT_S3_BUCKET: "sec-review"
       AWS_REGION: "us-east-1"
@@ -222,6 +224,8 @@ services:
       retries: 20
     depends_on:
       review-runs:
+        condition: service_healthy
+      memory-catalog-server:
         condition: service_healthy
       rustfs-init:
         condition: service_completed_successfully

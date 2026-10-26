@@ -1,0 +1,65 @@
+{
+  "events": [
+    {
+      "seq": 1,
+      "event": "message",
+      "message": {
+        "type": "system",
+        "id": "fixture-system",
+        "content": "Maintain concise, evidence-backed review memory."
+      }
+    },
+    {
+      "seq": 2,
+      "event": "message",
+      "message": {
+        "type": "human",
+        "id": "fixture-human",
+        "content": "Update the memory from the supplied review evidence."
+      }
+    },
+    {
+      "seq": 3,
+      "event": "message",
+      "message": {
+        "type": "ai",
+        "id": "fixture-assistant",
+        "content": [
+          {
+            "type": "thinking",
+            "thinking": "Inspect the current memory before deciding what to preserve."
+          },
+          {
+            "type": "text",
+            "text": "I will compare the observation with the existing guidance."
+          }
+        ],
+        "tool_calls": [
+          {
+            "id": "fixture-read-memory",
+            "name": "read_memory_file",
+            "args": {
+              "file_path": "/memory/MEMORY.md"
+            }
+          }
+        ],
+        "usage_metadata": {
+          "input_tokens": 384,
+          "output_tokens": 72,
+          "total_tokens": 456
+        }
+      }
+    },
+    {
+      "seq": 4,
+      "event": "message",
+      "message": {
+        "type": "tool",
+        "id": "fixture-tool-result",
+        "tool_call_id": "fixture-read-memory",
+        "name": "read_memory_file",
+        "content": "# Review memory\n\nGround conclusions in current repository evidence."
+      }
+    }
+  ]
+}

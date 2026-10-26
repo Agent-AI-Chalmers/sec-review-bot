@@ -17,7 +17,7 @@ from sec_review_agents.workflows.review_request import (
 )
 
 
-def _finalized(*review_unit_ids: str) -> dict[str, object]:
+def _finalized(*unit_ids: str) -> dict[str, object]:
     return {
         "diagnostic_bundle": {
             "uri": "s3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst",
@@ -35,7 +35,7 @@ def _finalized(*review_unit_ids: str) -> dict[str, object]:
                 "size_bytes": 42,
             },
         },
-        "review_unit_ids": list(review_unit_ids),
+        "unit_ids": list(unit_ids),
     }
 
 
@@ -90,7 +90,7 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
             artifact_root_path="/tmp/run-1/artifacts",
             review_units=[
                 {
-                    "review_unit_id": "review",
+                    "unit_id": "review",
                     "transcript_root": "/tmp/run-1/artifacts/transcripts",
                 }
             ],
@@ -130,7 +130,7 @@ async def test_single_review_publishes_before_scheduling_memory(
 
     async def fake_schedule(**kwargs):
         events.append("schedule")
-        assert kwargs["review_unit_ids"] == ["review"]
+        assert kwargs["unit_ids"] == ["review"]
         return {"extractions": []}
 
     monkeypatch.setattr(
@@ -152,7 +152,7 @@ async def test_single_review_publishes_before_scheduling_memory(
     assert events == ["publish", "schedule"]
     assert publications[0].review_units == [
         {
-            "review_unit_id": "review",
+            "unit_id": "review",
             "transcript_root": "/tmp/run-1/artifacts/transcripts",
         }
     ]
@@ -187,7 +187,7 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
         return next(child_results)
 
     async def fake_schedule(**kwargs):
-        assert kwargs["review_unit_ids"] == ["case-a", "case-b"]
+        assert kwargs["unit_ids"] == ["case-a", "case-b"]
         return {"extractions": []}
 
     monkeypatch.setattr(
@@ -215,11 +215,11 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
     assert len(publications) == 1
     assert publications[0].review_units == [
         {
-            "review_unit_id": "case-a",
+            "unit_id": "case-a",
             "transcript_root": "/tmp/run-1/artifacts/cases/case-a/transcripts",
         },
         {
-            "review_unit_id": "case-b",
+            "unit_id": "case-b",
             "transcript_root": "/tmp/run-1/artifacts/cases/case-b/transcripts",
         },
     ]

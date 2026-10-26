@@ -1,0 +1,34 @@
+{
+  "corpus": [
+    {
+      "file": "valid-ustar.tar.zst",
+      "expected": "valid",
+      "sha256": "e071fe9c9a2da0125b55b7e0bc0db21ed90c8d1849c56d5c40f9ae377071f1e6",
+      "size": 88
+    },
+    {
+      "file": "valid-pax-path.tar.zst",
+      "expected": "valid",
+      "sha256": "dcd77250a8e17dd157495f4c808565408051194ef44a7285d245375c13a65809",
+      "size": 140
+    },
+    {
+      "file": "invalid-global-pax.tar.zst",
+      "expected": "invalid",
+      "sha256": "744cd1dd0145514cdb7a485c075c7be69a9118689deb5d3e9d45d1327fa42237",
+      "size": 139
+    },
+    {
+      "file": "invalid-pax-key.tar.zst",
+      "expected": "invalid",
+      "sha256": "a47757d512a1de7b4e99f7c037e40f38f9a20c86eb113f9680a744646b902ec4",
+      "size": 129
+    },
+    {
+      "file": "invalid-gnu-longname.tar.zst",
+      "expected": "invalid",
+      "sha256": "27bfa61b3b381bd56b969adf9d3602cead7013ea8983e28108b763be62cfb076",
+      "size": 124
+    }
+  ]
+}

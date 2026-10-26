@@ -41,7 +41,7 @@ def test_diagnostic_bundle_contains_artifacts_and_selects_one_review_unit(
     materialized = materialize_diagnostic_transcript_unit(
         publication.reference,
         run_id="run-1",
-        review_unit_id="case-b",
+        unit_id="case-b",
         destination=tmp_path / "materialized",
     )
 
@@ -208,7 +208,7 @@ def test_publication_reports_only_units_included_in_manifest(tmp_path: Path) -> 
         remote=False,
     )
 
-    assert publication.review_unit_ids == ("included",)
+    assert publication.unit_ids == ("included",)
 
 
 def test_diagnostic_bundle_can_have_no_memory_units(tmp_path: Path) -> None:
@@ -225,4 +225,4 @@ def test_diagnostic_bundle_can_have_no_memory_units(tmp_path: Path) -> None:
     )
 
     assert publication.reference.uri.endswith("/published/diagnostic-tree.v1.tar.zst")
-    assert publication.review_unit_ids == ()
+    assert publication.unit_ids == ()

@@ -1,0 +1,159 @@
+.transcript-timeline {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding-left: 24px;
+}
+
+.transcript-toolbar {
+  position: sticky;
+  top: 8px;
+  z-index: 2;
+  background: light-dark(rgb(255 255 255 / 96%), rgb(38 34 32 / 96%));
+  backdrop-filter: blur(8px);
+}
+
+/* The line is chronology, not decoration. Each message marker sits on the same axis so
+   a long tool result can be collapsed without making the conversation order ambiguous. */
+.transcript-timeline::before {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 7px;
+  width: 2px;
+  background: var(--border-strong);
+  content: '';
+}
+
+.transcript-message {
+  position: relative;
+  overflow: visible;
+}
+
+.transcript-message::before {
+  position: absolute;
+  top: 20px;
+  left: -22px;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--surface-raised);
+  border-radius: 50%;
+  background: var(--muted);
+  content: '';
+}
+
+.transcript-ai::before {
+  background: var(--status-active);
+}
+
+.transcript-tool::before {
+  background: var(--status-complete);
+}
+
+.transcript-message-toggle {
+  min-width: 0;
+  padding-inline: 4px;
+}
+
+.transcript-message-body {
+  display: grid;
+  gap: 12px;
+  padding: 12px 16px 16px 44px;
+  border-top: 1px solid var(--border);
+}
+
+.transcript-section {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.transcript-section-header {
+  min-height: 38px;
+  padding-right: 6px;
+  background: light-dark(
+    var(--mantine-color-gray-0),
+    var(--mantine-color-dark-7)
+  );
+}
+
+.transcript-section-header > button:first-child {
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-start;
+}
+
+.transcript-section-content {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.transcript-tool-call,
+.transcript-linked-call {
+  min-width: 0;
+  background: light-dark(var(--mantine-color-green-0), rgb(34 55 43 / 35%));
+}
+
+.transcript-linked-call {
+  padding: 12px;
+  border: 1px solid
+    light-dark(var(--mantine-color-green-2), var(--mantine-color-green-9));
+  border-radius: 6px;
+}
+
+.transcript-args-table {
+  display: grid;
+  grid-template-columns: minmax(100px, max-content) minmax(0, 1fr);
+  gap: 8px 14px;
+  align-items: start;
+}
+
+.transcript-args-table > :nth-child(2n + 1) {
+  padding-top: 4px;
+}
+
+.transcript-diff > div {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 6px;
+}
+
+.transcript-diff-old {
+  border: 1px solid
+    light-dark(var(--mantine-color-red-2), var(--mantine-color-red-9));
+  background: light-dark(var(--mantine-color-red-0), rgb(70 35 35 / 30%));
+}
+
+.transcript-diff-new {
+  border: 1px solid
+    light-dark(var(--mantine-color-green-2), var(--mantine-color-green-9));
+  background: light-dark(var(--mantine-color-green-0), rgb(34 55 43 / 30%));
+}
+
+.transcript-tool-output {
+  max-height: 520px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.transcript-token-metrics {
+  margin-left: auto;
+}
+
+.transcript-message mark {
+  padding: 0 2px;
+  border-radius: 2px;
+  color: inherit;
+  background: light-dark(
+    var(--mantine-color-yellow-2),
+    var(--mantine-color-yellow-8)
+  );
+}
+
+.viewer-input textarea {
+  font-family: var(--mantine-font-family-monospace);
+}

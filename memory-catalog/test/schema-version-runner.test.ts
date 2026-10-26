@@ -26,7 +26,7 @@ function poolWithAppliedVersions(
   } as unknown as Pool
 }
 
-await test('applies the initial catalog schema and records its checksum', async () => {
+await test('applies the complete catalog schema as version 1', async () => {
   const statements: Array<{ sql: string; parameters?: unknown[] }> = []
 
   await applySchemaVersions(poolWithAppliedVersions([], statements))
@@ -36,12 +36,26 @@ await test('applies the initial catalog schema and records its checksum', async 
       sql.includes('create table memory_tree_revisions'),
     ),
   )
-  const ledgerInsert = statements.find(({ sql }) =>
+  assert.ok(
+    statements.some(({ sql }) =>
+      sql.includes('create table maintenance_control'),
+    ),
+  )
+  assert.ok(statements.some(({ sql }) => sql.includes('source_kind text')))
+  assert.ok(
+    statements.some(({ sql }) =>
+      sql.includes('create table maintenance_control_operations'),
+    ),
+  )
+  const ledgerInserts = statements.filter(({ sql }) =>
     sql.includes('insert into schema_versions'),
   )
-  assert.equal(ledgerInsert?.parameters?.[0], 1)
-  assert.equal(ledgerInsert?.parameters?.[1], 'initial_catalog')
-  assert.match(String(ledgerInsert?.parameters?.[2]), /^[a-f0-9]{64}$/)
+  assert.deepEqual(
+    ledgerInserts.map(({ parameters }) => parameters?.slice(0, 2)),
+    [[1, 'initial_catalog']],
+  )
+  for (const insert of ledgerInserts)
+    assert.match(String(insert.parameters?.[2]), /^[a-f0-9]{64}$/)
 })
 
 await test('rejects a database schema newer than this catalog understands', async () => {

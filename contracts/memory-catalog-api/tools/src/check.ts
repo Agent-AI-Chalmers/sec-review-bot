@@ -1,11 +1,14 @@
 import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 
-import { outputPath, renderGeneratedTypes } from './generate.js'
+import { outputPaths, renderGeneratedTypes } from './generate.js'
 
-const expected = await renderGeneratedTypes()
-const actual = await readFile(outputPath, 'utf8')
-if (actual !== expected) {
-  throw new Error(
-    'memory-catalog/src/contract-types-generated.ts is stale; run pnpm run generate.'
-  )
+for (const outputPath of outputPaths) {
+  const expected = await renderGeneratedTypes(outputPath)
+  const actual = await readFile(outputPath, 'utf8')
+  if (actual !== expected) {
+    throw new Error(
+      `${path.relative(process.cwd(), outputPath)} is stale; run pnpm run generate.`
+    )
+  }
 }

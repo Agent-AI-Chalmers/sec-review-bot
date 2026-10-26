@@ -4,7 +4,7 @@ create table extractions (
   extraction_id text primary key,
   source_workflow text not null,
   source_run_id text not null,
-  source_review_unit_id text not null,
+  source_unit_id text not null,
   diagnostic_bundle_digest text not null,
   transcript_reference jsonb not null,
   created_at timestamptz not null default clock_timestamp()
@@ -31,29 +31,52 @@ comment on table observations is
 comment on column observations.consumed_revision is
   'NULL while pending; otherwise the immutable memory revision that consumed this observation.';
 
--- Immutable memory history. Every successful maintenance commit inserts one row; active state
--- advances by moving a separate pointer and never overwrites these artifact references.
+-- Immutable memory history. Automatic maintenance and authenticated operator actions share the
+-- same revision sequence; active state advances through a separate pointer.
 create table memory_tree_revisions (
   revision bigint primary key check (revision > 0),
-  maintenance_id text not null unique,
-  base_revision bigint not null check (
-    base_revision >= 0 and revision = base_revision + 1
-  ),
+  predecessor_revision bigint references memory_tree_revisions(revision),
   memory_tree_reference jsonb not null,
-  maintenance_transcript_reference jsonb not null,
-  created_at timestamptz not null default clock_timestamp()
+  source_kind text not null check (source_kind in ('maintenance', 'operator')),
+  maintenance_id text unique,
+  maintenance_transcript_reference jsonb,
+  operation_id text,
+  actor jsonb,
+  created_at timestamptz not null default clock_timestamp(),
+  constraint memory_tree_revisions_source_shape_check check (
+    (
+      source_kind = 'maintenance' and
+      maintenance_id is not null and
+      maintenance_transcript_reference is not null and
+      operation_id is null and actor is null
+    ) or (
+      source_kind = 'operator' and
+      maintenance_id is null and maintenance_transcript_reference is null and
+      operation_id is not null and actor is not null
+    )
+  )
 );
 
 comment on table memory_tree_revisions is
-  'Immutable history of successfully committed memory tree revisions and the maintainer transcript that produced each one.';
+  'Immutable history of automatic maintenance and authenticated operator memory tree revisions.';
 comment on column memory_tree_revisions.maintenance_id is
   'Stable idempotency and provenance identity of the logical maintainer invocation.';
-comment on column memory_tree_revisions.base_revision is
-  'Active revision against which the maintainer produced this revision.';
+comment on column memory_tree_revisions.predecessor_revision is
+  'Revision that was active when this revision was created; NULL for the first revision.';
 comment on column memory_tree_revisions.memory_tree_reference is
   'Content-addressed memory tree artifact published before this revision committed.';
 comment on column memory_tree_revisions.maintenance_transcript_reference is
   'Content-addressed compressed transcript for the maintainer invocation that produced this revision.';
+comment on column memory_tree_revisions.source_kind is
+  'Tagged provenance kind: automatic maintenance or an authenticated operator action.';
+comment on column memory_tree_revisions.operation_id is
+  'Stable idempotency identity for an operator edit.';
+comment on column memory_tree_revisions.actor is
+  'Server-authenticated actor identity for an operator revision.';
+
+create unique index memory_tree_revisions_operation_id_unique
+  on memory_tree_revisions (operation_id)
+  where operation_id is not null;
 
 alter table observations
   add constraint observations_consumed_revision_fkey
@@ -75,3 +98,44 @@ comment on table memory_tree_state is
   'Mutable pointer to the active immutable memory revision; revision zero means no memory tree has been committed.';
 
 insert into memory_tree_state (singleton, active_revision) values (true, 0);
+
+create table memory_tree_restore_operations (
+  operation_id text primary key,
+  expected_active_revision bigint not null references memory_tree_revisions(revision),
+  restored_revision bigint not null references memory_tree_revisions(revision),
+  actor jsonb not null,
+  created_at timestamptz not null default clock_timestamp()
+);
+
+comment on table memory_tree_restore_operations is
+  'Idempotent audit ledger for active-pointer restores; restores never create revisions.';
+
+create table maintenance_control (
+  singleton boolean primary key default true check (singleton),
+  state text not null check (state in ('enabled', 'paused')),
+  generation bigint not null check (generation >= 0),
+  changed_by jsonb not null,
+  changed_at timestamptz not null default clock_timestamp()
+);
+
+comment on table maintenance_control is
+  'Durable singleton controlling whether automatic memory maintenance may commit revisions.';
+
+insert into maintenance_control (
+  singleton, state, generation, changed_by
+) values (
+  true, 'enabled', 0, '{"kind":"service","id":"memory-catalog"}'
+);
+
+create table maintenance_control_operations (
+  operation_id text primary key,
+  target_state text not null check (target_state in ('enabled', 'paused')),
+  expected_generation bigint not null check (expected_generation >= 0),
+  actor jsonb not null,
+  resulting_state text not null check (resulting_state in ('enabled', 'paused')),
+  resulting_generation bigint not null check (resulting_generation > 0),
+  changed_at timestamptz not null
+);
+
+comment on table maintenance_control_operations is
+  'Idempotency ledger for explicit pause and resume transitions.';

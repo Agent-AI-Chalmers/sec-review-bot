@@ -9,9 +9,9 @@ import {
   abandonFailureMessageKey,
   failureCodeLabel,
   KNOWN_FAILURE_CODE_KEYS
-} from '../src/format.js'
-import { ApiError } from '../src/api.js'
-import { messages, type Message } from '../src/i18n.js'
+} from '../browser/features/runs/format.js'
+import { ApiError } from '../browser/shared/api-client.js'
+import { messages, type Message } from '../browser/shared/i18n.js'
 
 const t = (key: keyof typeof messages.en): string => messages.en[key]
 

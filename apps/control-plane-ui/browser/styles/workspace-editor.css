@@ -1,0 +1,277 @@
+.file-workspace-modal {
+  min-height: min(72vh, 760px);
+}
+
+.file-workspace {
+  display: grid;
+  grid-template-columns:
+    var(--file-workspace-sidebar-width, 240px) 7px
+    minmax(0, 1fr);
+  min-height: min(68vh, 720px);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.file-workspace-sidebar {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--surface-raised);
+}
+
+.file-workspace-files {
+  min-height: 0;
+  padding: 12px;
+  flex: 1;
+}
+
+.file-workspace-sidebar > .mantine-Group-root + .file-workspace-files {
+  padding-top: 6px;
+}
+
+.file-workspace-splitter {
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+  background: var(--border);
+}
+
+.file-workspace-splitter::after {
+  position: absolute;
+  inset: 0 2px;
+  content: '';
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.file-workspace-splitter:hover::after,
+.file-workspace-splitter:focus-visible::after {
+  background: var(--mantine-primary-color-filled);
+}
+
+.file-workspace-splitter:focus-visible {
+  outline: none;
+}
+
+.file-workspace-node {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 34px;
+  padding-block: 6px;
+  padding-right: 8px;
+  border-radius: 4px;
+  color: inherit;
+  font-size: var(--mantine-font-size-sm);
+  text-align: left;
+  overflow: hidden;
+}
+
+.file-workspace-node:hover {
+  background: light-dark(
+    var(--mantine-color-gray-1),
+    var(--mantine-color-dark-6)
+  );
+}
+
+.file-workspace-node[data-active] {
+  background: light-dark(var(--mantine-color-orange-1), rgb(100 62 18 / 45%));
+  font-weight: 600;
+}
+
+.file-workspace-node svg {
+  flex: 0 0 auto;
+}
+
+.file-workspace-node span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-workspace-node .file-workspace-marker {
+  width: auto;
+  min-width: max-content;
+  margin-left: auto;
+  overflow: visible;
+  flex: 0 0 auto;
+}
+
+.file-workspace-file[data-modified]::after {
+  width: 7px;
+  height: 7px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--mantine-primary-color-filled);
+  content: '';
+  flex: 0 0 auto;
+}
+
+.file-workspace-directory {
+  font-weight: 600;
+}
+
+.file-workspace-content {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  padding: 16px 20px;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.file-workspace-source,
+.file-workspace-preview {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.file-workspace-source {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.file-workspace-editor-modal {
+  min-height: min(74vh, 780px);
+}
+
+.file-workspace-editor {
+  min-height: min(64vh, 680px);
+}
+
+.file-workspace-content > .code-editor {
+  flex: 1;
+}
+
+.memory-diff-workspace {
+  min-height: min(72vh, 760px);
+}
+
+.memory-diff-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35em;
+  flex-wrap: wrap;
+}
+
+.memory-diff-state {
+  display: grid;
+  min-height: min(60vh, 640px);
+  padding: var(--mantine-spacing-xl);
+  place-items: center;
+}
+
+.memory-diff-editor {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.memory-diff-editor > .cm-editor,
+.memory-diff-editor > .cm-mergeView {
+  height: 100%;
+}
+
+.memory-diff-editor .cm-mergeViewEditors {
+  height: 100%;
+}
+
+.memory-diff-editor .cm-editor {
+  min-width: 0;
+  height: 100%;
+  color: var(--mantine-color-text);
+  background: var(--mantine-color-body);
+}
+
+.memory-diff-editor .cm-scroller {
+  overflow: auto;
+  font-family: var(--mantine-font-family-monospace);
+  line-height: 1.55;
+}
+
+.memory-diff-editor .cm-gutters {
+  color: var(--mantine-color-dimmed);
+  background: var(--surface-raised);
+  border-right-color: var(--border);
+}
+
+.memory-diff-editor .cm-mergeViewEditors > .cm-editor:first-child {
+  border-right-color: var(--border);
+}
+
+.jsonl-preview {
+  display: grid;
+  gap: 8px;
+}
+
+.jsonl-record {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--mantine-color-body);
+}
+
+.jsonl-record > summary {
+  padding: 9px 12px;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-sm);
+  cursor: pointer;
+  user-select: none;
+}
+
+.jsonl-record[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.jsonl-record > ul,
+.jsonl-record > pre {
+  margin: 0 !important;
+  padding: 12px !important;
+}
+
+.file-workspace-editor-actions {
+  position: sticky;
+  z-index: 1;
+  bottom: 0;
+  margin-top: var(--mantine-spacing-md);
+  padding-top: var(--mantine-spacing-md);
+  border-top: 1px solid var(--border);
+  background: var(--mantine-color-body);
+}
+.code-editor {
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.code-editor .cm-editor {
+  height: 100%;
+  color: var(--mantine-color-text);
+  background: var(--mantine-color-body);
+}
+
+.code-editor .cm-scroller {
+  overflow: auto;
+  font-family: var(--mantine-font-family-monospace);
+  line-height: 1.55;
+}
+
+.code-editor .cm-gutters {
+  color: var(--mantine-color-dimmed);
+  background: var(--surface-raised);
+  border-right-color: var(--border);
+}
+
+.code-editor .cm-activeLine,
+.code-editor .cm-activeLineGutter {
+  background: light-dark(
+    var(--mantine-color-gray-0),
+    var(--mantine-color-dark-6)
+  );
+}

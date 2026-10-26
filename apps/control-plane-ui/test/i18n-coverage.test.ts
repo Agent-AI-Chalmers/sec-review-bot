@@ -10,8 +10,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { STATE_MACHINES } from '../src/state-machines.generated.js'
-import { messages } from '../src/i18n.js'
+import { STATE_MACHINES } from '../browser/features/runs/state-machines.generated.js'
+import { messages } from '../browser/shared/i18n.js'
 
 test('an edge pair the contract has not split is worded for all of its decisions', () => {
   // The console looks an edge label up by its state pair, so two declared transitions that share

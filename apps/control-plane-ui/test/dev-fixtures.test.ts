@@ -7,7 +7,7 @@ import {
 } from 'node:http'
 import type { Plugin } from 'vite'
 
-import { devFixtures } from '../dev-fixtures.js'
+import { devFixtures } from '../scripts/dev-fixtures/index.js'
 
 /**
  * The fixture plugin registers one connect-style middleware. Capturing it lets a real
@@ -74,12 +74,14 @@ async function startFixtureServer(): Promise<{
 }
 
 test('dev fixtures only describe reachable run states', async () => {
-  // dev-fixtures.ts validates every generated run at import time and throws on a
+  // runs/generate.ts validates every generated run at import time and throws on a
   // combination Review Runs cannot produce (for example a failed execution
   // whose publication is still `pending`). Importing it is therefore the assertion:
   // this test exists so an unreachable fixture fails CI instead of silently
   // showing operators a state that cannot happen.
-  await assert.doesNotReject(() => import('../dev-fixtures.js'))
+  await assert.doesNotReject(
+    () => import('../scripts/dev-fixtures/runs/generate.js')
+  )
 })
 
 test('dev fixtures track sign-out so the console reaches the sign-in form', async () => {
@@ -121,6 +123,37 @@ test('dev fixtures leave non-API requests to the next middleware', async () => {
   try {
     const asset = await fetch(`${fixture.base}/index.html`)
     assert.strictEqual(asset.status, 404)
+  } finally {
+    await fixture.close()
+  }
+})
+
+test('dev fixtures serve memory actions as downloads', async () => {
+  const fixture = await startFixtureServer()
+  try {
+    for (const [path, filename] of [
+      [
+        '/api/memory/revisions/2/artifact',
+        'attachment; filename="memory-tree.v1.tar.zst"'
+      ],
+      [
+        '/api/memory/revisions/2/transcript',
+        'attachment; filename="memory-transcript.v1.jsonl.zst"'
+      ],
+      [
+        '/api/memory/extractions/fixture-extraction-2/transcript',
+        'attachment; filename="memory-transcript.v1.jsonl.zst"'
+      ]
+    ] as const) {
+      const response = await fetch(`${fixture.base}${path}`)
+      assert.strictEqual(response.status, 200)
+      assert.strictEqual(
+        response.headers.get('content-type'),
+        'application/octet-stream'
+      )
+      assert.strictEqual(response.headers.get('content-disposition'), filename)
+      assert.ok((await response.arrayBuffer()).byteLength > 0)
+    }
   } finally {
     await fixture.close()
   }

@@ -10,13 +10,15 @@ Temporal Server is infrastructure, but it directly dispatches work to the worker
 
 The memory path has one deployment-independent state model. Memory Catalog owns coordination state in PostgreSQL, Object Storage owns immutable memory-tree and transcript artifacts, and Temporal owns workflow execution. Each review invocation materializes the current memory tree into a temporary directory for its agent backend and removes that directory afterward.
 
+Control Plane UI reads Memory Catalog through its BFF and never exposes Catalog tokens, storage credentials, or `s3://` references to the browser. The BFF fetches and identity-checks artifact downloads. Normal deployments expose no memory write route. An explicit loopback-only mode can pause or resume automatic maintenance, create operator edit revisions, and restore the active pointer to an existing revision. New revisions retain that active revision as their predecessor while revision identities remain globally increasing.
+
 ## Runtime ownership map
 
 | Runtime role | Code | Owns | Local guide |
 | --- | --- | --- | --- |
 | GitHub Integration | `apps/github-integration/` | GitHub ingress, input preparation, Review Runs client, and GitHub publication | [README](../../apps/github-integration/README.md) |
 | Review Runs | `review-runs/` | Admission, durable run state, recovery, execution observation, and publication coordination | [README](../../review-runs/README.md) |
-| Control Plane UI | `apps/control-plane-ui/` | Authenticated operator console and read-only Review Runs projection | [README](../../apps/control-plane-ui/README.md) |
+| Control Plane UI | `apps/control-plane-ui/` | Authenticated operator console for Review Runs and memory inspection; optional loopback-only memory maintenance | [README](../../apps/control-plane-ui/README.md) |
 | Execution Gateway | `execution-gateway/` | Authenticated Execution API and HTTP-to-Temporal translation | [README](../../execution-gateway/README.md) |
 | Execution Worker | `agents/` | Review workflows, activities, agent runtime, stage artifacts, and run diagnostic publication | [README](../../agents/README.md) |
 | Memory Extraction Worker | `agents/` | Per-run diagnostic consumption, extractor invocation, transcript publication, and extraction registration | [README](../../agents/README.md) |
@@ -81,7 +83,7 @@ sequenceDiagram
     Temporal->>MaintenanceWorker: Dispatch maintenance work
     Note over Temporal,MaintenanceWorker: One fixed workflow ID permits only one maintainer
     MaintenanceWorker->>Catalog: Select a batch of pending observations
-    Catalog-->>MaintenanceWorker: Observations, extraction IDs, base revision, and current memory tree reference
+    Catalog-->>MaintenanceWorker: Observations, extraction IDs, expected active revision, and current memory tree reference
     opt Current memory tree exists
       MaintenanceWorker->>Storage: Download current memory tree artifact
       Storage-->>MaintenanceWorker: Memory tree artifact
@@ -90,10 +92,10 @@ sequenceDiagram
     Note over MaintenanceWorker: Run maintainer
     MaintenanceWorker->>Storage: Store maintainer transcript
     MaintenanceWorker->>Storage: Store new memory tree artifact
-    MaintenanceWorker-->>Temporal: Artifact references, extraction IDs, and base revision
+    MaintenanceWorker-->>Temporal: Artifact references, extraction IDs, and expected active revision
     Note over Temporal: Later commit retries reuse this activity result
     Temporal->>MaintenanceWorker: Dispatch revision commit
-    MaintenanceWorker->>Catalog: Create memory tree revision with maintenance ID and base-revision CAS
+    MaintenanceWorker->>Catalog: Create memory tree revision with maintenance ID and expected-active-revision CAS
     Catalog-->>MaintenanceWorker: Created or idempotently replayed revision, or revision conflict
   end
 ```

@@ -1,0 +1,248 @@
+[
+  {
+    "execution_status": "pending",
+    "publication_status": "pending",
+    "failure_code": null,
+    "artifact": null,
+    "executionMs": 95000,
+    "step": null,
+    "preparation_status": "preparing",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "pending",
+    "publication_status": "pending",
+    "failure_code": null,
+    "artifact": null,
+    "executionMs": 95000,
+    "step": null,
+    "preparation_status": "pending",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "queued",
+    "publication_status": "pending",
+    "failure_code": null,
+    "artifact": null,
+    "executionMs": 48000,
+    "step": null,
+    "preparation_status": "submitted",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "running",
+    "publication_status": "pending",
+    "failure_code": null,
+    "artifact": null,
+    "executionMs": 320000,
+    "step": null,
+    "preparation_status": "submitted",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "succeeded",
+    "publication_status": "pending",
+    "failure_code": null,
+    "artifact": "available",
+    "executionMs": 184000,
+    "step": null,
+    "preparation_status": "submitted",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "succeeded",
+    "publication_status": "publishing",
+    "failure_code": null,
+    "artifact": "available",
+    "executionMs": 152000,
+    "publicationMs": 418000,
+    "step": "running",
+    "preparation_status": "submitted",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "succeeded",
+    "publication_status": "published",
+    "failure_code": null,
+    "artifact": "available",
+    "executionMs": 166000,
+    "publicationMs": 503000,
+    "step": "succeeded",
+    "preparation_status": "submitted",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "succeeded",
+    "publication_status": "failed",
+    "failure_code": "GITHUB_VALIDATION_REJECTED",
+    "artifact": "available",
+    "executionMs": 131000,
+    "publicationMs": 377000,
+    "step": "terminal_failed",
+    "preparation_status": "submitted",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "uncertain",
+    "publication_status": "pending",
+    "failure_code": "SUBMISSION_STATE_UNCERTAIN",
+    "artifact": null,
+    "executionMs": 143000,
+    "step": null,
+    "preparation_status": "submitted",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "disconnected",
+    "publication_status": "pending",
+    "failure_code": "SUBMISSION_STATE_UNCERTAIN",
+    "artifact": null,
+    "executionMs": 221000,
+    "step": null,
+    "preparation_status": "submitted",
+    "preparation_notice": null,
+    "execution_attention_notice": "pending"
+  },
+  {
+    "execution_status": "disconnected",
+    "publication_status": "pending",
+    "failure_code": "SUBMISSION_STATE_UNCERTAIN",
+    "artifact": null,
+    "executionMs": 221000,
+    "step": null,
+    "preparation_status": "submitted",
+    "preparation_notice": null,
+    "execution_attention_notice": "delivering"
+  },
+  {
+    "execution_status": "disconnected",
+    "publication_status": "pending",
+    "failure_code": "SUBMISSION_STATE_UNCERTAIN",
+    "artifact": null,
+    "executionMs": 221000,
+    "step": null,
+    "preparation_status": "submitted",
+    "preparation_notice": null,
+    "execution_attention_notice": "delivered"
+  },
+  {
+    "execution_status": "disconnected",
+    "publication_status": "pending",
+    "failure_code": "SUBMISSION_STATE_UNCERTAIN",
+    "artifact": null,
+    "executionMs": 221000,
+    "step": null,
+    "preparation_status": "submitted",
+    "preparation_notice": null,
+    "execution_attention_notice": "failed"
+  },
+  {
+    "execution_status": "skipped",
+    "publication_status": "skipped",
+    "failure_code": "PREPARATION_RETRY_EXHAUSTED",
+    "artifact": null,
+    "executionMs": 601000,
+    "publicationMs": 601000,
+    "step": null,
+    "preparation_status": "failed",
+    "preparation_notice": "pending"
+  },
+  {
+    "execution_status": "skipped",
+    "publication_status": "skipped",
+    "failure_code": "PREPARATION_RETRY_EXHAUSTED",
+    "artifact": null,
+    "executionMs": 601000,
+    "publicationMs": 601000,
+    "step": null,
+    "preparation_status": "failed",
+    "preparation_notice": "delivering"
+  },
+  {
+    "execution_status": "skipped",
+    "publication_status": "skipped",
+    "failure_code": "PREPARATION_RETRY_EXHAUSTED",
+    "artifact": null,
+    "executionMs": 601000,
+    "publicationMs": 601000,
+    "step": null,
+    "preparation_status": "failed",
+    "preparation_notice": "delivered"
+  },
+  {
+    "execution_status": "skipped",
+    "publication_status": "skipped",
+    "failure_code": "PREPARATION_RETRY_EXHAUSTED",
+    "artifact": null,
+    "executionMs": 601000,
+    "publicationMs": 601000,
+    "step": null,
+    "preparation_status": "failed",
+    "preparation_notice": "failed"
+  },
+  {
+    "execution_status": "queued",
+    "publication_status": "pending",
+    "failure_code": null,
+    "artifact": null,
+    "executionMs": 32000,
+    "step": null,
+    "preparation_status": "submitted",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "failed",
+    "publication_status": "skipped",
+    "failure_code": "EXECUTION_FAILED",
+    "artifact": "unavailable",
+    "executionMs": 74000,
+    "publicationMs": 74000,
+    "step": null,
+    "preparation_status": "submitted",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "succeeded",
+    "publication_status": "published",
+    "failure_code": null,
+    "artifact": "available",
+    "executionMs": 247000,
+    "publicationMs": 612000,
+    "step": "succeeded",
+    "preparation_status": "submitted",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "pending",
+    "publication_status": "pending",
+    "failure_code": null,
+    "artifact": null,
+    "executionMs": 95000,
+    "step": null,
+    "preparation_status": "uncertain",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "succeeded",
+    "publication_status": "uncertain",
+    "failure_code": null,
+    "artifact": "available",
+    "executionMs": 158000,
+    "publicationMs": 402000,
+    "step": "uncertain",
+    "preparation_status": "submitted",
+    "preparation_notice": null
+  },
+  {
+    "execution_status": "succeeded",
+    "publication_status": "disconnected",
+    "failure_code": null,
+    "artifact": "available",
+    "executionMs": 158000,
+    "publicationMs": 402000,
+    "step": "disconnected",
+    "preparation_status": "submitted",
+    "preparation_notice": null,
+    "publication_attention_notice": "pending"
+  }
+]

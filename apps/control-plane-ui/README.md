@@ -1,6 +1,6 @@
 # Control Plane UI
 
-Internal web console for review runs. The browser talks only to this application's same-origin server; the server holds Review Runs read credential and proxies an explicit allowlist of GET paths, forwarding the query string unchanged.
+Internal web console for review runs and memory operations. The browser talks only to this application's same-origin server; the server holds upstream credentials and proxies explicit route allowlists.
 
 ## Local development
 
@@ -11,7 +11,33 @@ pnpm install
 pnpm run dev:fixtures
 ```
 
-Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies representative successful, active, recovering, publishing, and failed runs without requiring Review Runs, PostgreSQL, or RustFS. Artifact metadata is visible, but there are no stored objects to download.
+Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies representative run and memory states without requiring Review Runs, Memory Catalog, PostgreSQL, or RustFS. Memory pause, resume, edit, and restore controls are stateful fixtures. Memory tree and transcript actions return small fixture attachments so their browser download behavior can be exercised without stored objects.
+
+The Viewer page is entirely local to the browser. It accepts one JSON or JSONL transcript file, or pasted transcript content, and renders the messages without uploading the input to the BFF.
+
+## Source layout
+
+The package is organized by runtime first, then by browser feature ownership:
+
+```text
+browser/
+  app/                application shell, session UI, preferences, and theme
+  features/
+    runs/             run list, detail, status, and Review Runs projections
+    memory/           memory inspection and Memory Catalog projections
+    workspace/        file browsing and editing used by runs and memory
+    transcript/       transcript model and renderer
+    viewer/           local transcript viewer page
+  shared/             browser-only infrastructure and small utilities
+  styles/             ordered stylesheet sections
+  main.tsx            browser entry point
+server/               Node BFF
+shared/               values imported by both browser and server
+scripts/              development-time package tooling
+test/                 browser and server tests
+```
+
+Feature domains must not import one another. Reusable browser capabilities live under `browser/features/` or `browser/shared/`, while package-level `shared/` is reserved for code that genuinely crosses the browser/server runtime boundary.
 
 The fixtures serve a few dozen runs at Review Runs' default page size and implement its cursor contract, so paging, the status filters, and the detail timeline are all exercised without a backend. Every generated run is checked against the states the store can actually produce, so an unreachable combination fails the module import instead of appearing as plausible-looking demo data.
 
@@ -47,3 +73,9 @@ pnpm run build
 The production server requires `REVIEW_RUNS_READ_TOKEN` and `CONTROL_PLANE_UI_ACCESS_TOKEN`, and they answer different questions. The access token decides who may open the console: the browser exchanges it for an HTTP-only session cookie, and the token itself never reaches browser code or Vite variables. The read token is what the backend then uses to call Review Runs query routes on the signed-in user's behalf; it never leaves the server either. Keeping them separate means a console account and a read key can be issued, rotated, and revoked independently — a read-only consumer such as a dashboard holds only the read token and has no console access.
 
 The BFF also proxies terminal artifact downloads from private RustFS storage. It receives a dedicated `s3:GetObject` credential restricted to `sec-review/runs/*/artifacts/*`; the browser supplies only a run ID and never receives storage credentials or an object URI. Before responding to the browser, the BFF writes the object to a temporary file and verifies its size and SHA-256 digest against Review Runs metadata. Downloads are attachment-only, bounded by a storage idle timeout, and protected by the same HTTP-only session.
+
+The server-side memory tree reader and builder implement the versioned [memory-tree-artifact contract](../../contracts/memory-tree-artifact/README.md). They remain outside the browser bundle; the BFF is responsible for validation, digest calculation, and canonical object keys.
+
+Set `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_READ_TOKEN` to enable memory reads. The BFF strips storage URIs from Catalog JSON, fetches artifacts itself, and verifies their size and SHA-256 digest before returning content or downloads.
+
+Memory writes are intentionally absent by default. For loopback-only local maintenance, set `CONTROL_PLANE_UI_LOCAL_MEMORY_WRITES=1`, provide a Catalog token that can operate on memory, and provide an S3 credential with immutable write access to `memory/trees/*`. In this mode the server binds `127.0.0.1`; it derives actor identity server-side, uses expected-active-revision and control-generation compare-and-swap, and never resumes maintenance automatically after a failed edit. The normal Compose service does not enable this mode and retains a read-only S3 policy.

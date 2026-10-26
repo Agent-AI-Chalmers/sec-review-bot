@@ -8,23 +8,36 @@
 
 ## API
 
-| 方法   | 路径                                   | 用途                                                                                      |
-| ------ | -------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `GET`  | `/healthz`                             | 返回服务健康状态。                                                                        |
-| `POST` | `/v1/extractions`                      | 原子登记已完成 extraction、transcript reference 和可选 observation。                      |
-| `GET`  | `/v1/extractions/{extraction_id}`      | 返回指定 extraction、transcript reference 和可选 observation。                            |
-| `GET`  | `/v1/observation-backlog`              | 返回 pending observations 的数量和最早等待时间。                                          |
-| `GET`  | `/v1/maintenance-input?limit=...`      | 返回有界 observations，以及 maintainer 必须基于的 active memory 状态。                    |
-| `POST` | `/v1/memory-tree/revisions`            | 通过 compare-and-swap 创建 memory tree revision，并把来源 observations 标记为 processed。 |
-| `GET`  | `/v1/memory-tree`                      | 返回当前 memory tree 及其 revision。                                                      |
-| `GET`  | `/v1/memory-tree/revisions`            | 列出 memory tree revision 历史。                                                          |
-| `GET`  | `/v1/memory-tree/revisions/{revision}` | 返回指定 memory tree revision、maintenance identity 和 artifact references。              |
+| 方法   | 路径                                   | 用途                                                                                             |
+| ------ | -------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `GET`  | `/healthz`                             | 返回服务健康状态。                                                                               |
+| `POST` | `/v1/extractions`                      | 原子登记已完成 extraction、transcript reference 和可选 observation。                             |
+| `GET`  | `/v1/extractions`                      | 使用稳定 cursor 分页和 provenance 过滤列出已完成 extractions。                                   |
+| `GET`  | `/v1/extractions/{extraction_id}`      | 返回指定 extraction、transcript reference 和可选 observation。                                   |
+| `GET`  | `/v1/overview`                         | 返回已完成 extraction 的单元覆盖、observation 产出、可选范围趋势和工作流汇总。                   |
+| `GET`  | `/v1/observations`                     | 使用稳定 cursor 分页和消费状态过滤列出 observations。                                            |
+| `GET`  | `/v1/observation-backlog`              | 返回 pending observations 的数量和最早等待时间。                                                 |
+| `GET`  | `/v1/maintenance-control`              | 返回持久的自动 maintenance `enabled` 或 `paused` 状态。                                          |
+| `POST` | `/v1/maintenance-control/pause`        | 使用 operation 幂等与 generation compare-and-swap 暂停自动 maintenance。                         |
+| `POST` | `/v1/maintenance-control/resume`       | 使用 operation 幂等与 generation compare-and-swap 恢复自动 maintenance。                         |
+| `GET`  | `/v1/maintenance-input?limit=...`      | 返回有界 observations，以及 maintainer 必须基于的 active memory 状态。                           |
+| `POST` | `/v1/memory-tree/revisions`            | 通过幂等身份和 expected-active-revision compare-and-swap 创建 maintenance 或 operator revision。 |
+| `GET`  | `/v1/memory-tree`                      | 返回当前 memory tree 及其 revision。                                                             |
+| `POST` | `/v1/memory-tree/restore`              | 把 active pointer 移到已有 revision，不创建 revision。                                           |
+| `GET`  | `/v1/memory-tree/revisions`            | 列出 memory tree revision 历史。                                                                 |
+| `GET`  | `/v1/memory-tree/revisions/{revision}` | 返回指定 memory tree revision、maintenance identity 和 artifact references。                     |
 
 该服务独占自己的 PostgreSQL database 和 `schema_versions` ledger。默认集成部署将它与 Review Runs database 放在同一个 PostgreSQL 实例中，但两者是相互独立的 database。
+
+列表 cursor 是不透明且排他的。Extractions 和 observations 均按 `created_at`、`extraction_id` 降序排列，因此相同时间戳的记录也能稳定翻页。Maintenance-control 单例是持久状态，初始值为 generation `0` 的 `enabled`；Phase 1 只开放读取。
 
 任何时刻只允许一个 maintainer 执行。Temporal 使用固定 workflow ID 和 `SKIP` schedule overlap policy 强制该约束，因此 catalog 不实现 batch lease 或并发 claim。
 
 Temporal 会先记录已发布的 artifact references，再调度 revision 提交 activity。因此提交重试会使用相同内容重复执行幂等 `POST`，而不会再次运行 maintainer。
+
+Revision provenance 使用带标签的 maintenance/operator source。每个 revision 通过 `predecessor_revision` 记录创建时的 active revision；即使 active pointer 回退，revision 编号仍保持全局递增。Operator `operation_id` 全局唯一：相同内容重放返回原 revision，不同内容则冲突。Operator edit 不消费 observations。Restore 使用独立的幂等 ledger，只移动 active pointer；下一次自动或人工 revision 会把恢复后的 revision 记录为前驱。
+
+Pause 与 resume 使用独立的幂等 ledger。相同重放会在检查当前 generation 前返回该 operation 保存的结果；新 operation 锁定 control 单例，检查 `expected_generation` 与合法转换后增加 generation。新的 maintenance revision 在提交事务中锁定同一行，并在 paused 时被拒绝；operator revision 不受影响。Worker 的开始前读取只用于避免无效工作，不能替代该事务边界。
 
 ## 本地运行
 

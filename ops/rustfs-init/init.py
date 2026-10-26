@@ -13,7 +13,7 @@ The resulting ownership model is:
   reads active immutable memory versions.
 * The memory extraction and maintenance workers share a storage identity that
   reads run diagnostics and reads/writes immutable memory artifacts.
-* Control Plane UI can only read terminal result artifacts.
+* Control Plane UI can only read terminal result and memory artifacts.
 
 All provisioning operations are safe to repeat. Rerunning the container also
 rotates configured user secrets and replaces policy documents with the checked-in

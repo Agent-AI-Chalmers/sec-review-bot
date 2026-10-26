@@ -12,14 +12,34 @@ import { pipeline } from 'node:stream/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { pathToFileURL } from 'node:url'
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { zstdDecompressSync } from 'node:zlib'
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client
+} from '@aws-sdk/client-s3'
 
-import { LIST_RUN_QUERY_PARAMS } from '../src/list-run-query-params.js'
+import { LIST_RUN_QUERY_PARAMS } from '../shared/list-run-query-params.js'
+import {
+  buildMemoryTreeArtifact,
+  MAX_MEMORY_TREE_ARTIFACT_BYTES,
+  memoryTreeObjectKey,
+  readMemoryTreeArtifact
+} from './memory/memory-tree-artifact.js'
+import {
+  MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES,
+  readDiagnosticBundle
+} from './run/diagnostic-bundle.js'
 
 const MAX_SESSION_BODY_BYTES = 1024 * 1024
 const REVIEW_RUNS_REQUEST_TIMEOUT_MS = 10_000
 const ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS = 30_000
 const ARTIFACT_BUCKET = 'sec-review'
+const MAX_TRANSCRIPT_ARTIFACT_BYTES = 16 * 1024 * 1024
+const MAX_TRANSCRIPT_CONTENT_BYTES = 8 * 1024 * 1024
+const MAX_TRANSCRIPT_LINE_BYTES = 512 * 1024
+const MAX_TRANSCRIPT_MESSAGES = 2000
 
 interface ArtifactObject {
   body: Readable
@@ -28,12 +48,67 @@ interface ArtifactObject {
 
 export interface ArtifactStore {
   getObject(key: string, signal: AbortSignal): Promise<ArtifactObject>
+  putMemoryArtifact?(artifact: {
+    bytes: Buffer
+    digest: string
+    mediaType: string
+    objectKey: string
+    sizeBytes: number
+  }): Promise<void>
 }
 
 interface AvailableArtifact {
   digest: string
   key: string
+  maximumSize: number
   sizeBytes: number
+}
+
+interface TranscriptEvent {
+  seq: number
+  event: 'message'
+  message: Record<string, unknown>
+}
+
+/** Parse only the append-only transcript shape produced by TranscriptWriter.
+ *
+ * This deliberately does not accept arbitrary JSON arrays or Python reprs. The viewer is an
+ * operational reader for one owned artifact format, so format drift must fail visibly instead
+ * of being guessed into a plausible but inaccurate conversation.
+ */
+function readTranscriptArtifact(bytes: Buffer): TranscriptEvent[] {
+  const content = zstdDecompressSync(bytes, {
+    maxOutputLength: MAX_TRANSCRIPT_CONTENT_BYTES
+  })
+  const events: TranscriptEvent[] = []
+  let previousSeq = 0
+  for (const rawLine of content.toString('utf8').split('\n')) {
+    if (!rawLine.trim()) continue
+    if (Buffer.byteLength(rawLine, 'utf8') > MAX_TRANSCRIPT_LINE_BYTES)
+      throw new Error('invalid_transcript_artifact')
+    const parsed: unknown = JSON.parse(rawLine)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
+      throw new Error('invalid_transcript_artifact')
+    const event = parsed as Record<string, unknown>
+    if (
+      !Number.isSafeInteger(event.seq) ||
+      (event.seq as number) <= previousSeq ||
+      event.event !== 'message' ||
+      typeof event.message !== 'object' ||
+      event.message === null ||
+      Array.isArray(event.message)
+    )
+      throw new Error('invalid_transcript_artifact')
+    previousSeq = event.seq as number
+    events.push({
+      seq: previousSeq,
+      event: 'message',
+      message: event.message as Record<string, unknown>
+    })
+    if (events.length > MAX_TRANSCRIPT_MESSAGES)
+      throw new Error('invalid_transcript_artifact')
+  }
+  return events
 }
 
 function securityHeaders(response: ServerResponse): void {
@@ -132,6 +207,77 @@ function isAllowedReadPath(bffUrl: string): boolean {
   return segments[4] === 'publication-steps' || segments[4] === 'events'
 }
 
+function memoryCatalogPath(bffUrl: string): string | null {
+  const url = new URL(bffUrl, 'http://control-plane-ui.local')
+  const path = url.pathname
+  if (path === '/api/memory/tree') return `/v1/memory-tree${url.search}`
+  if (
+    path === '/api/memory/revisions' ||
+    /^\/api\/memory\/revisions\/[1-9][0-9]*$/.test(path)
+  )
+    return `/v1/memory-tree${path.slice('/api/memory'.length)}${url.search}`
+  const allowed =
+    path === '/api/memory/overview' ||
+    path === '/api/memory/extractions' ||
+    path === '/api/memory/observations' ||
+    path === '/api/memory/maintenance-control' ||
+    /^\/api\/memory\/extractions\/[A-Za-z0-9._:-]+$/.test(path)
+  if (!allowed) return null
+  return `/v1${path.slice('/api/memory'.length)}${url.search}`
+}
+
+function redactArtifactUris(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactArtifactUris)
+  if (typeof value !== 'object' || value === null) return value
+  const source = value as Record<string, unknown>
+  const result: Record<string, unknown> = {}
+  for (const [key, item] of Object.entries(source)) {
+    if (key === 'uri' && typeof item === 'string' && item.startsWith('s3://'))
+      continue
+    result[key] = redactArtifactUris(item)
+  }
+  return result
+}
+
+function catalogArtifactReference(
+  value: unknown,
+  kind: 'tree' | 'transcript'
+): AvailableArtifact | null {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    return null
+  const artifact = value as Record<string, unknown>
+  if (
+    typeof artifact.uri !== 'string' ||
+    typeof artifact.digest !== 'string' ||
+    !/^sha256:[0-9a-f]{64}$/.test(artifact.digest) ||
+    !Number.isSafeInteger(artifact.size_bytes) ||
+    (artifact.size_bytes as number) < 0 ||
+    (kind === 'tree'
+      ? artifact.media_type !== 'application/tar+zstd'
+      : artifact.media_type !== 'application/zstd')
+  )
+    return null
+  const maximumSize =
+    kind === 'tree'
+      ? MAX_MEMORY_TREE_ARTIFACT_BYTES
+      : MAX_TRANSCRIPT_ARTIFACT_BYTES
+  if ((artifact.size_bytes as number) > maximumSize) return null
+  const prefix = `s3://${ARTIFACT_BUCKET}/memory/${kind === 'tree' ? 'trees/' : 'transcripts/'}`
+  if (!artifact.uri.startsWith(prefix)) return null
+  if (
+    kind === 'tree' &&
+    artifact.uri !==
+      `s3://${ARTIFACT_BUCKET}/${memoryTreeObjectKey(artifact.digest)}`
+  )
+    return null
+  return {
+    digest: artifact.digest,
+    key: artifact.uri.slice(`s3://${ARTIFACT_BUCKET}/`.length),
+    maximumSize,
+    sizeBytes: artifact.size_bytes as number
+  }
+}
+
 /**
  * The `content-type` served for a proxied Review Runs response.
  *
@@ -184,6 +330,7 @@ function availableArtifact(
   return {
     digest: artifact.digest,
     key,
+    maximumSize: MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES,
     sizeBytes: artifact.size_bytes as number
   }
 }
@@ -223,6 +370,38 @@ function artifactStoreFromEnvironment(): ArtifactStore | undefined {
           ? {}
           : { contentLength: object.ContentLength })
       }
+    },
+    async putMemoryArtifact(artifact): Promise<void> {
+      try {
+        const existing = await client.send(
+          new HeadObjectCommand({
+            Bucket: ARTIFACT_BUCKET,
+            Key: artifact.objectKey
+          })
+        )
+        if (
+          existing.ContentLength !== artifact.sizeBytes ||
+          existing.ContentType !== artifact.mediaType ||
+          existing.Metadata?.sha256 !== artifact.digest.slice('sha256:'.length)
+        )
+          throw new Error('memory_artifact_identity_mismatch')
+        return
+      } catch (error) {
+        if (storageStatus(error) !== 404) throw error
+      }
+      await client.send(
+        new PutObjectCommand({
+          Bucket: ARTIFACT_BUCKET,
+          Key: artifact.objectKey,
+          Body: artifact.bytes,
+          ContentType: artifact.mediaType,
+          IfNoneMatch: '*',
+          Metadata: {
+            sha256: artifact.digest.slice('sha256:'.length),
+            'size-bytes': String(artifact.sizeBytes)
+          }
+        })
+      )
     }
   }
 }
@@ -245,6 +424,9 @@ export function createControlPlaneUiServer({
   reviewRunsUrl,
   reviewRunsToken,
   accessToken,
+  memoryCatalogUrl,
+  memoryCatalogToken,
+  localMemoryWrites = false,
   artifactStore,
   artifactDownloadIdleTimeoutMs = ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS,
   reviewRunsRequestTimeoutMs = REVIEW_RUNS_REQUEST_TIMEOUT_MS,
@@ -253,6 +435,9 @@ export function createControlPlaneUiServer({
   reviewRunsUrl: string
   reviewRunsToken: string
   accessToken: string
+  memoryCatalogUrl?: string
+  memoryCatalogToken?: string
+  localMemoryWrites?: boolean
   artifactStore?: ArtifactStore
   artifactDownloadIdleTimeoutMs?: number
   reviewRunsRequestTimeoutMs?: number
@@ -343,6 +528,401 @@ export function createControlPlaneUiServer({
       if (!authenticated(request.headers.cookie)) {
         response.writeHead(401, { 'content-type': 'application/json' })
         response.end('{"error":"unauthorized"}')
+        return
+      }
+      const memoryPath = memoryCatalogPath(request.url ?? '')
+      const memoryWriteMatch =
+        /^\/api\/memory\/(pause|resume|edit|restore)$/.exec(request.url ?? '')
+      if (request.method === 'POST' && memoryWriteMatch !== null) {
+        if (!localMemoryWrites) {
+          sendJson(response, 404, { error: 'memory_write_unavailable' })
+          return
+        }
+        if (!sameOrigin(request)) {
+          sendJson(response, 403, { error: 'cross_site_request' })
+          return
+        }
+        if (!memoryCatalogUrl || !memoryCatalogToken) {
+          sendJson(response, 503, { error: 'memory_catalog_unavailable' })
+          return
+        }
+        const chunks: Buffer[] = []
+        let size = 0
+        for await (const chunk of request) {
+          const bytes = Buffer.from(chunk)
+          size += bytes.length
+          if (size > MAX_SESSION_BODY_BYTES) {
+            sendJson(response, 413, { error: 'request_too_large' })
+            return
+          }
+          chunks.push(bytes)
+        }
+        try {
+          const body = JSON.parse(
+            Buffer.concat(chunks).toString('utf8')
+          ) as Record<string, unknown>
+          const action = memoryWriteMatch[1]
+          const actor = { kind: 'service', id: 'local-control-plane-ui' }
+          let catalogPath: string
+          let catalogBody: Record<string, unknown>
+          if (action === 'pause' || action === 'resume') {
+            catalogPath = `/v1/maintenance-control/${action}`
+            catalogBody = {
+              operation_id: body.operation_id,
+              expected_generation: body.expected_generation,
+              actor
+            }
+          } else {
+            if (action === 'edit') {
+              if (!artifactStore?.putMemoryArtifact)
+                throw new Error('memory_artifact_upload_unavailable')
+              if (
+                typeof body.files !== 'object' ||
+                body.files === null ||
+                Array.isArray(body.files)
+              )
+                throw new Error('invalid_memory_files')
+              const files = new Map<string, string>()
+              for (const [name, value] of Object.entries(body.files)) {
+                if (typeof value !== 'string')
+                  throw new Error('invalid_memory_files')
+                files.set(name, value)
+              }
+              const artifact = await buildMemoryTreeArtifact(files)
+              await artifactStore.putMemoryArtifact(artifact)
+              const reference = {
+                uri: `s3://${ARTIFACT_BUCKET}/${artifact.objectKey}`,
+                digest: artifact.digest,
+                media_type: artifact.mediaType,
+                size_bytes: artifact.sizeBytes
+              }
+              catalogPath = '/v1/memory-tree/revisions'
+              catalogBody = {
+                expected_active_revision: body.expected_active_revision,
+                memory_tree_reference: reference,
+                source: {
+                  kind: 'operator',
+                  operation_id: body.operation_id,
+                  actor
+                }
+              }
+            } else {
+              catalogPath = '/v1/memory-tree/restore'
+              catalogBody = {
+                operation_id: body.operation_id,
+                expected_active_revision: body.expected_active_revision,
+                restored_revision: body.restored_revision,
+                actor
+              }
+            }
+          }
+          const upstream = await fetch(`${memoryCatalogUrl}${catalogPath}`, {
+            method: 'POST',
+            headers: {
+              authorization: `Bearer ${memoryCatalogToken}`,
+              'content-type': 'application/json'
+            },
+            body: JSON.stringify(catalogBody),
+            signal: AbortSignal.timeout(REVIEW_RUNS_REQUEST_TIMEOUT_MS)
+          })
+          response.writeHead(upstream.status, {
+            'content-type': PROXIED_CONTENT_TYPE,
+            'cache-control': 'no-store'
+          })
+          response.end(Buffer.from(await upstream.arrayBuffer()))
+        } catch (error) {
+          sendJson(response, 400, {
+            error: error instanceof Error ? error.message : 'invalid_request'
+          })
+        }
+        return
+      }
+      const memoryArtifactMatch =
+        /^\/api\/memory\/(revisions|extractions)\/([^/?]+)\/(artifact|transcript|content|transcript\/content)$/.exec(
+          request.url ?? ''
+        )
+      if (request.method === 'GET' && memoryArtifactMatch !== null) {
+        if (!memoryCatalogUrl || !memoryCatalogToken || !artifactStore) {
+          sendJson(response, 503, { error: 'memory_artifact_unavailable' })
+          return
+        }
+        const collection = memoryArtifactMatch[1]
+        const identity = memoryArtifactMatch[2] ?? ''
+        const requestedKind = memoryArtifactMatch[3]
+        const transcriptContent = requestedKind === 'transcript/content'
+        if (
+          (collection === 'revisions' && !/^[1-9][0-9]*$/.test(identity)) ||
+          (collection === 'extractions' &&
+            !/^[A-Za-z0-9._:-]+$/.test(identity)) ||
+          (collection === 'extractions' &&
+            requestedKind !== 'transcript' &&
+            !transcriptContent)
+        ) {
+          sendJson(response, 404, { error: 'memory_artifact_not_found' })
+          return
+        }
+        try {
+          const upstream = await fetch(
+            `${memoryCatalogUrl}/v1/${collection === 'revisions' ? 'memory-tree/revisions' : 'extractions'}/${encodeURIComponent(identity)}`,
+            {
+              headers: { authorization: `Bearer ${memoryCatalogToken}` },
+              signal: AbortSignal.timeout(REVIEW_RUNS_REQUEST_TIMEOUT_MS)
+            }
+          )
+          if (!upstream.ok) {
+            sendJson(response, upstream.status === 404 ? 404 : 502, {
+              error:
+                upstream.status === 404
+                  ? 'memory_artifact_not_found'
+                  : 'memory_catalog_unavailable'
+            })
+            return
+          }
+          const record = (await upstream.json()) as Record<string, unknown>
+          const source = record.source as Record<string, unknown> | undefined
+          const rawReference =
+            collection === 'extractions'
+              ? record.transcript_reference
+              : requestedKind === 'artifact' || requestedKind === 'content'
+                ? record.memory_tree_reference
+                : source?.kind === 'maintenance'
+                  ? source.transcript_reference
+                  : undefined
+          const artifact = catalogArtifactReference(
+            rawReference,
+            requestedKind === 'artifact' || requestedKind === 'content'
+              ? 'tree'
+              : 'transcript'
+          )
+          if (artifact === null) {
+            sendJson(response, 409, { error: 'memory_artifact_unavailable' })
+            return
+          }
+          const object = await artifactStore.getObject(
+            artifact.key,
+            AbortSignal.timeout(ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS)
+          )
+          if (
+            object.contentLength !== undefined &&
+            (object.contentLength !== artifact.sizeBytes ||
+              object.contentLength > artifact.maximumSize)
+          ) {
+            object.body.destroy()
+            throw new Error('artifact_identity_mismatch')
+          }
+          const chunks: Buffer[] = []
+          let size = 0
+          const digest = crypto.createHash('sha256')
+          for await (const chunk of object.body) {
+            const bytes = Buffer.from(chunk)
+            size += bytes.length
+            if (size > artifact.sizeBytes || size > artifact.maximumSize)
+              throw new Error('artifact_identity_mismatch')
+            digest.update(bytes)
+            chunks.push(bytes)
+          }
+          if (
+            size !== artifact.sizeBytes ||
+            `sha256:${digest.digest('hex')}` !== artifact.digest
+          )
+            throw new Error('artifact_identity_mismatch')
+          const complete = Buffer.concat(chunks)
+          if (requestedKind === 'content') {
+            const files = await readMemoryTreeArtifact(complete)
+            response.writeHead(200, {
+              'content-type': PROXIED_CONTENT_TYPE,
+              'cache-control': 'no-store'
+            })
+            response.end(
+              JSON.stringify({
+                files: Object.fromEntries(
+                  [...files].map(([name, value]) => [
+                    name,
+                    value.toString('utf8')
+                  ])
+                )
+              })
+            )
+            return
+          }
+          if (transcriptContent) {
+            response.writeHead(200, {
+              'content-type': PROXIED_CONTENT_TYPE,
+              'cache-control': 'no-store'
+            })
+            response.end(
+              JSON.stringify({ events: readTranscriptArtifact(complete) })
+            )
+            return
+          }
+          response.writeHead(200, {
+            'content-type': 'application/octet-stream',
+            'content-disposition': `attachment; filename="${requestedKind === 'artifact' ? 'memory-tree.v1.tar.zst' : 'memory-transcript.v1.jsonl.zst'}"`,
+            'cache-control': 'no-store',
+            'content-length': String(size)
+          })
+          response.end(complete)
+        } catch (error) {
+          sendJson(response, 502, {
+            error:
+              error instanceof Error &&
+              error.message === 'artifact_identity_mismatch'
+                ? 'artifact_identity_mismatch'
+                : 'memory_artifact_download_failed'
+          })
+        }
+        return
+      }
+      if (request.method === 'GET' && memoryPath !== null) {
+        if (!memoryCatalogUrl || !memoryCatalogToken) {
+          sendJson(response, 503, { error: 'memory_catalog_unavailable' })
+          return
+        }
+        try {
+          const upstream = await fetch(`${memoryCatalogUrl}${memoryPath}`, {
+            headers: { authorization: `Bearer ${memoryCatalogToken}` },
+            signal: AbortSignal.timeout(REVIEW_RUNS_REQUEST_TIMEOUT_MS)
+          })
+          const bytes = Buffer.from(await upstream.arrayBuffer())
+          if (!upstream.ok) {
+            response.writeHead(upstream.status, {
+              'content-type': PROXIED_CONTENT_TYPE,
+              'cache-control': 'no-store'
+            })
+            response.end(bytes)
+            return
+          }
+          const parsed: unknown = JSON.parse(bytes.toString('utf8'))
+          response.writeHead(200, {
+            'content-type': PROXIED_CONTENT_TYPE,
+            'cache-control': 'no-store'
+          })
+          response.end(JSON.stringify(redactArtifactUris(parsed)))
+        } catch (error) {
+          const timedOut =
+            error instanceof Error &&
+            (error.name === 'AbortError' || error.name === 'TimeoutError')
+          sendJson(response, timedOut ? 504 : 502, {
+            error: timedOut
+              ? 'memory_catalog_timeout'
+              : 'memory_catalog_unavailable'
+          })
+        }
+        return
+      }
+      const artifactContentMatch =
+        /^\/api\/runs\/([^/?]+)\/artifact\/content$/.exec(request.url)
+      if (request.method === 'GET' && artifactContentMatch !== null) {
+        if (artifactStore === undefined) {
+          sendJson(response, 503, { error: 'artifact_view_unavailable' })
+          return
+        }
+        let runId: string
+        try {
+          runId = decodeURIComponent(artifactContentMatch[1] ?? '')
+        } catch {
+          sendJson(response, 400, { error: 'invalid_run_id' })
+          return
+        }
+        if (!runId || runId.includes('/')) {
+          sendJson(response, 400, { error: 'invalid_run_id' })
+          return
+        }
+        const controller = new AbortController()
+        let timedOut = false
+        const timeout = setTimeout(() => {
+          timedOut = true
+          controller.abort()
+        }, reviewRunsRequestTimeoutMs)
+        try {
+          const upstream = await fetch(
+            `${reviewRunsUrl}/v1/runs/${encodeURIComponent(runId)}`,
+            {
+              headers: { authorization: `Bearer ${reviewRunsToken}` },
+              signal: controller.signal
+            }
+          )
+          if (upstream.status === 404) {
+            sendJson(response, 404, { error: 'artifact_not_found' })
+            return
+          }
+          if (!upstream.ok) {
+            sendJson(response, 502, { error: 'review_runs_unavailable' })
+            return
+          }
+          const body = (await upstream.json()) as {
+            run?: { run_id?: unknown; artifact_storage?: unknown }
+          }
+          const artifact =
+            body.run?.run_id === runId
+              ? availableArtifact(
+                  body.run.artifact_storage,
+                  runId,
+                  ARTIFACT_BUCKET
+                )
+              : null
+          if (artifact === null) {
+            sendJson(response, 409, { error: 'artifact_unavailable' })
+            return
+          }
+          if (artifact.sizeBytes > MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES) {
+            sendJson(response, 413, { error: 'artifact_preview_too_large' })
+            return
+          }
+          const object = await artifactStore.getObject(
+            artifact.key,
+            controller.signal
+          )
+          if (
+            object.contentLength !== undefined &&
+            object.contentLength !== artifact.sizeBytes
+          ) {
+            object.body.destroy()
+            sendJson(response, 502, { error: 'artifact_identity_mismatch' })
+            return
+          }
+          const chunks: Buffer[] = []
+          const digest = crypto.createHash('sha256')
+          let sizeBytes = 0
+          for await (const chunk of object.body) {
+            const bytes = Buffer.from(chunk)
+            sizeBytes += bytes.length
+            if (sizeBytes > artifact.sizeBytes)
+              throw new Error('artifact_identity_mismatch')
+            digest.update(bytes)
+            chunks.push(bytes)
+          }
+          if (
+            sizeBytes !== artifact.sizeBytes ||
+            `sha256:${digest.digest('hex')}` !== artifact.digest
+          )
+            throw new Error('artifact_identity_mismatch')
+          const view = await readDiagnosticBundle(Buffer.concat(chunks), runId)
+          response.writeHead(200, {
+            'content-type': PROXIED_CONTENT_TYPE,
+            'cache-control': 'private, no-store'
+          })
+          response.end(
+            JSON.stringify({
+              files: view.files,
+              unpreviewable_files: view.unpreviewableFiles
+            })
+          )
+        } catch (error) {
+          if (response.headersSent || response.destroyed) return
+          const message = error instanceof Error ? error.message : ''
+          sendJson(response, timedOut ? 504 : 502, {
+            error: timedOut
+              ? 'artifact_view_timeout'
+              : message === 'artifact_identity_mismatch'
+                ? 'artifact_identity_mismatch'
+                : message === 'diagnostic_bundle_too_large'
+                  ? 'artifact_preview_too_large'
+                  : 'invalid_diagnostic_bundle'
+          })
+        } finally {
+          clearTimeout(timeout)
+        }
         return
       }
       const artifactMatch = /^\/api\/runs\/([^/?]+)\/artifact$/.exec(
@@ -652,9 +1232,14 @@ if (
     reviewRunsUrl: process.env.REVIEW_RUNS_URL ?? 'http://127.0.0.1:8090',
     reviewRunsToken,
     accessToken,
+    memoryCatalogUrl: process.env.MEMORY_CATALOG_URL,
+    memoryCatalogToken: process.env.MEMORY_CATALOG_READ_TOKEN,
+    localMemoryWrites: process.env.CONTROL_PLANE_UI_LOCAL_MEMORY_WRITES === '1',
     artifactStore: artifactStoreFromEnvironment()
   }).listen(
     Number.parseInt(process.env.CONTROL_PLANE_UI_PORT ?? '8091', 10),
-    '0.0.0.0'
+    process.env.CONTROL_PLANE_UI_LOCAL_MEMORY_WRITES === '1'
+      ? '127.0.0.1'
+      : '0.0.0.0'
   )
 }

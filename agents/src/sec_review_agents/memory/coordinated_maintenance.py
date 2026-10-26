@@ -33,13 +33,15 @@ async def prepare_coordinated_memory_revision(
     if maintenance_input is None:
         return None
 
-    base_revision = maintenance_input.get("base_revision")
+    expected_active_revision = maintenance_input.get("expected_active_revision")
     if (
-        not isinstance(base_revision, int)
-        or isinstance(base_revision, bool)
-        or base_revision < 0
+        not isinstance(expected_active_revision, int)
+        or isinstance(expected_active_revision, bool)
+        or expected_active_revision < 0
     ):
-        raise ValueError("Catalog base revision must be a non-negative integer.")
+        raise ValueError(
+            "Catalog expected active revision must be a non-negative integer."
+        )
     if "active_memory_tree_reference" not in maintenance_input:
         raise ValueError("Catalog maintenance input is missing active memory.")
     active_memory_tree_reference = maintenance_input["active_memory_tree_reference"]
@@ -47,7 +49,7 @@ async def prepare_coordinated_memory_revision(
         active_memory_tree_reference, dict
     ):
         raise ValueError("Catalog active memory reference must be an object or null.")
-    if (base_revision == 0) != (active_memory_tree_reference is None):
+    if (expected_active_revision == 0) != (active_memory_tree_reference is None):
         raise ValueError(
             "Catalog active memory reference must be null exactly at revision 0."
         )
@@ -129,7 +131,7 @@ async def prepare_coordinated_memory_revision(
             )
     return MemoryTreeRevisionCreation(
         maintenance_id=maintenance_id,
-        base_revision=base_revision,
+        expected_active_revision=expected_active_revision,
         extraction_ids=tuple(extraction_ids),
         memory_tree_reference=memory_tree_reference,
         maintenance_transcript_reference=maintenance_transcript_reference,

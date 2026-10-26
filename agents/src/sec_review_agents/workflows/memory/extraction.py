@@ -17,7 +17,7 @@ class MemoryExtractionRequest:
 
     source_workflow: str
     run_id: str
-    review_unit_id: str
+    unit_id: str
     diagnostic_bundle: dict[str, Any]
     timeout_seconds: int
 
@@ -27,7 +27,7 @@ class MemoryExtractionRegistrationPayload:
     extraction_id: str
     source_workflow: str
     source_run_id: str
-    source_review_unit_id: str
+    source_unit_id: str
     diagnostic_bundle_digest: str
     transcript_reference: ArtifactReference
     observation_markdown: str | None
@@ -40,7 +40,7 @@ class MemoryExtractionRegistrationPayload:
             self.extraction_id,
             self.source_workflow,
             self.source_run_id,
-            self.source_review_unit_id,
+            self.source_unit_id,
             self.diagnostic_bundle_digest,
             self.summary,
         )
@@ -103,10 +103,10 @@ class MemoryExtractionPreparationResult:
 def memory_extraction_workflow_id(
     *,
     diagnostic_bundle_digest: str,
-    review_unit_id: str,
+    unit_id: str,
 ) -> str:
     """Return the stable Temporal identity for one transcript unit."""
-    identity = f"{diagnostic_bundle_digest}\0{review_unit_id}".encode()
+    identity = f"{diagnostic_bundle_digest}\0{unit_id}".encode()
     return f"memory-extraction:{hashlib.sha256(identity).hexdigest()}"
 
 
@@ -132,14 +132,14 @@ async def prepare_memory_extraction(
     reference = ArtifactReference.from_mapping(request.diagnostic_bundle)
     extraction_id = memory_extraction_workflow_id(
         diagnostic_bundle_digest=reference.digest,
-        review_unit_id=request.review_unit_id,
+        unit_id=request.unit_id,
     )
     with tempfile.TemporaryDirectory(prefix="sec-review-extraction-input-") as tempdir:
         temp_root = Path(tempdir)
         materialized = materialize_diagnostic_transcript_unit(
             reference,
             run_id=request.run_id,
-            review_unit_id=request.review_unit_id,
+            unit_id=request.unit_id,
             destination=temp_root / "diagnostic-bundle",
         )
         extractor_transcript_path = transcript_path(
@@ -166,7 +166,7 @@ async def prepare_memory_extraction(
             extraction_id=extraction_id,
             source_workflow=request.source_workflow,
             source_run_id=request.run_id,
-            source_review_unit_id=request.review_unit_id,
+            source_unit_id=request.unit_id,
             diagnostic_bundle_digest=reference.digest,
             transcript_reference=extraction_transcript_reference,
             observation_markdown=preview.observation_markdown,
@@ -223,7 +223,7 @@ def register_memory_extraction_activity(
             extraction_id=payload.extraction_id,
             source_workflow=payload.source_workflow,
             source_run_id=payload.source_run_id,
-            source_review_unit_id=payload.source_review_unit_id,
+            source_unit_id=payload.source_unit_id,
             diagnostic_bundle_digest=payload.diagnostic_bundle_digest,
             transcript_reference=payload.transcript_reference,
             observation_markdown=payload.observation_markdown,

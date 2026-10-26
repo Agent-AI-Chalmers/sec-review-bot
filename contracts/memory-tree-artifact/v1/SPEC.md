@@ -1,0 +1,83 @@
+# Memory Tree Artifact - v1
+
+Language: English | [中文](SPEC.zh.md)
+
+## Envelope
+
+A v1 memory tree artifact uses the restricted POSIX PAX [tar-zstd-artifact v1 envelope](../../tar-zstd-artifact/v1/SPEC.md).
+
+| Property | Required value |
+| --- | --- |
+| Media type | `application/tar+zstd` |
+| Digest | lowercase `sha256` of the actual compressed archive bytes |
+| Object key | `memory/trees/<hex>/memory-tree.v1.tar.zst`, where `<hex>` is the 64-character digest without a prefix |
+| Maximum compressed archive size | 64 MiB (`67,108,864` bytes) |
+| Maximum entry count | 10,000, including files and directories |
+| Maximum total regular-file size | 256 MiB (`268,435,456` bytes) |
+| Maximum single regular-file size | 16 MiB (`16,777,216` bytes) |
+
+The single-file limit is deliberately below both aggregate limits. A memory tree is a collection of bounded Markdown resources; one file must not consume the compressed archive budget or dominate extraction memory.
+
+Consumers must verify the compressed-byte size and digest before decompression, then enforce entry count and uncompressed limits while parsing. They must not extract an entry before validating its path, type, declared size, and metadata.
+
+When an artifact is referenced from object storage, consumers must also require the URI to identify exactly the object key derived from the declared digest. A bucket or directory-prefix match is insufficient: the reference URI, digest, and compressed bytes are one identity.
+
+## Required Tree
+
+The archive contains exactly this structural root:
+
+```text
+manifest.json
+memory/
+memory/MEMORY.md
+memory/topics/
+memory/topics/**/*.md  (optional)
+```
+
+`manifest.json` is a UTF-8 JSON file whose bytes are exactly:
+
+```json
+{"version":1}
+```
+
+followed by one LF byte. Its parsed value must validate against [manifest.schema.json](manifest.schema.json): an object with exactly the integer field `version`, whose value is `1`.
+
+`memory/MEMORY.md` and every regular file below `memory/topics/` must be valid UTF-8 Markdown. Topic files must end in `.md`. Directories may exist below `memory/topics/` to group topics, but empty path segments, `.` and `..` segments, absolute paths, backslashes, NUL bytes, and duplicate paths are forbidden. Paths use `/`, are relative to the archive root, and are in canonical form: regular-file paths have no trailing slash and directory paths have exactly one trailing slash.
+
+No other path is allowed. In particular, files directly below `memory/` other than `MEMORY.md`, and non-Markdown files below `memory/topics/`, are invalid.
+
+## Entry Types And Metadata
+
+Only regular files and directories are allowed. Symlinks, hard links, devices, FIFOs, sockets, sparse files, and every other special type are invalid. Consumers must classify the tar header type directly and must never follow links.
+
+Every entry has canonical metadata:
+
+| Field | Regular file | Directory |
+| --- | --- | --- |
+| `mtime` | `0` | `0` |
+| `uid`, `gid` | `0`, `0` | `0`, `0` |
+| `uname`, `gname` | empty | empty |
+| mode | `0644` | `0755` |
+| size | actual byte length | `0` |
+
+The envelope's local PAX `path` header is allowed when a path does not fit the ustar `name` and `prefix` fields. No PAX key changes this profile's metadata requirements; all other PAX and GNU extensions remain invalid.
+
+## Ordering
+
+`manifest.json` is the first entry. All remaining entries are ordered by ascending bytewise lexical order of their canonical paths. Required parent directories must appear as entries, but an entry is not required to precede its children beyond the lexical ordering rule.
+
+The archive terminates with at least two zero-filled 512-byte blocks. Bytes after the tar terminator are invalid unless they are zero padding.
+
+## Canonical Production
+
+Producers must emit exactly the required entry set, metadata, ordering, and JSON bytes, using a local PAX `path` header only when the effective path does not fit ustar fields, then compress the tar stream as one Zstandard frame. The contract does not pin a compressor implementation or compression level: identity is the SHA-256 digest of the actual compressed bytes, and the object key is derived from that digest.
+
+Consumers may accept any standards-compliant Zstandard frame whose decompressed tar satisfies this specification. They must reject concatenated frames or trailing non-frame data when their decoder exposes those conditions.
+
+Producer and consumer responsibilities are intentionally distinct. Producers must constrain archive-library output to the shared restricted PAX dialect. Consumers must validate the representation actually stored, including extension headers that a high-level archive API may hide while projecting members.
+
+## Shared Corpus
+
+[corpus/manifest.json](corpus/manifest.json) records every committed `.tar.zst` case with its purpose, logical entry count, compressed-byte SHA-256 digest, exact compressed size, and expected result. Ordinary cases include their ordered effective-entry list. Large stress cases may omit that repetitive list while retaining the real archive and aggregate count. The corpus includes valid minimal, topic-bearing, byte-order, and long-path PAX trees, plus invalid archives covering byte order, a missing index, malformed manifest, path traversal, symlink, unexpected path, unexpected entry type, unsupported PAX metadata, and the entry-count limit.
+
+The corpus archives are generated by `tools/src/generate.ts`. Contract tests validate the actual compressed bytes and archive semantics; filenames or manifest labels are not an oracle by themselves.

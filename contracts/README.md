@@ -32,6 +32,9 @@ A family may also hold documents that apply to every version, such as a transpor
 | [execution-workflow](execution-workflow/README.md) | Temporal Execution Workflow input | Execution Gateway and Execution Worker | [v1](execution-workflow/v1/CONTRACT.md) |
 | [review-runs-api](review-runs-api/README.md) | Review Runs HTTP API and observed run shapes | Review Runs and its callers | [v1](review-runs-api/v1/openapi.yaml) |
 | [memory-catalog-api](memory-catalog-api/README.md) | Memory coordination HTTP API | Memory Catalog Server and workers | [v1](memory-catalog-api/v1/openapi.yaml) |
+| [memory-tree-artifact](memory-tree-artifact/README.md) | Immutable memory tree archive format | Memory Maintenance Worker and Control Plane UI BFF | [v1](memory-tree-artifact/v1/SPEC.md) |
+| [run-diagnostic-artifact](run-diagnostic-artifact/README.md) | Completed-run diagnostic archive profile | Execution Worker, Memory Extraction Worker, and Control Plane UI BFF | [v1](run-diagnostic-artifact/v1/SPEC.md) |
+| [tar-zstd-artifact](tar-zstd-artifact/README.md) | Shared restricted POSIX PAX envelope | All project-owned tar+zstd producers and consumers | [v1](tar-zstd-artifact/v1/SPEC.md) |
 | [setup-declaration](setup-declaration/README.md) | Trusted `.sec-review/setup.yml` format | Reviewed repositories, GitHub Integration, and Execution Worker | [v1](setup-declaration/v1/SPEC.md) |
 
 ## Rules For Every Family
@@ -45,6 +48,16 @@ The specification, its schemas, its fixtures, and the fixture manifest change to
 Schemas own the structural shape: required fields, JSON types, enums, tagged variants, and additional-field policy. They do not replace domain code. Cross-field rules stay with the workflow that makes the decision, and side-effect policy such as safe repository paths, platform permissions, publishing eligibility, and retry behavior stays with the consumer.
 
 Fixtures are part of contract validation. The manifest records which valid fixtures each schema must accept and which invalid fixtures it must reject, so every implementation exercises the same structural boundary.
+
+### Binary And Content-Addressed Artifacts
+
+For an archive, compressed stream, or other content-addressed artifact, the specification must separate producer obligations from consumer obligations. State which representation producers must emit, which alternate representations consumers may accept, and which inputs every consumer must reject. Library defaults are implementation details, not contract rules.
+
+An artifact reference must bind the declared media type, compressed-byte size, digest, and canonical storage location when the contract defines one. Consumers verify that reference shape and location first, then compressed size and digest, before decompression or semantic parsing. A trusted object store or matching digest does not replace validation of archive paths, entry types, metadata, limits, or internal manifests.
+
+The contract family owns a shared corpus of real encoded bytes. It should cover valid interoperability cases, malformed structure, representation extensions, duplicate or ambiguous names, links and special entries, and concrete resource limits. Every consumer runs the same corpus. Every producer also has focused tests proving that it emits valid corpus-equivalent output and rejects inputs it cannot encode without leaving the canonical format.
+
+Stress fixtures remain real artifacts, but their readable manifest may record aggregate facts such as `entryCount` instead of expanding thousands of repetitive entries. The fixture bytes and validator result remain the oracle.
 
 Tests read fixtures through their package-local helper instead of hard-coding paths:
 
@@ -70,3 +83,4 @@ For any contract change:
 - update or add its fixtures and manifest entries;
 - regenerate any derived artifact (such as the Review Runs's committed `v1` schemas and generated types) with its family's tool: `pnpm --dir contracts/<family>/tools run generate`, then confirm with `... run check`;
 - make both the Python and TypeScript tests validate the same files.
+- for binary artifacts, run producer tests, every consumer's shared-corpus tests, and at least one end-to-end reference-to-bytes validation path.
