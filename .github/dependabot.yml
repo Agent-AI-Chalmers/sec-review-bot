@@ -64,7 +64,7 @@ updates:
       prefix-development: "build(deps-dev)"
 
   - package-ecosystem: "npm"
-    directory: "/control-plane"
+    directory: "/review-runs"
     schedule:
       interval: "monthly"
       time: "06:00"
@@ -73,7 +73,7 @@ updates:
       prefix: "build(deps)"
       prefix-development: "build(deps-dev)"
     groups:
-      control-plane:
+      review-runs:
         patterns:
           - "*"
     ignore:

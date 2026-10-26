@@ -7,7 +7,7 @@ import {
 } from '../../../src/reviews/issues/draft-pr.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
 import type { FileMode } from '../../../src/reviews/file-change.js'
-import { PublicationClaimLostError } from '../../../src/control-plane/publication-claim.js'
+import { PublicationClaimLostError } from '../../../src/review-runs/publication-claim.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 
 type CreateDraftPrParams = Parameters<typeof createDraftPullRequestWithClaim>[0]
@@ -263,7 +263,7 @@ test('issue draft PR retry reuses a branch left by a partial prior attempt witho
 test('two runs of the same issue never share a draft branch', () => {
   // The branch is verified and reused on a retry, so a shared name makes one run adopt the
   // other's branch. Run ids that agree on their last 8 characters are exactly the case a slice
-  // produced, and Control Plane hands out enough of them for that to happen in a busy deployment.
+  // produced, and Review Runs hands out enough of them for that to happen in a busy deployment.
   const issue = {
     issue_number: 42,
     owner_login: 'octo-org',

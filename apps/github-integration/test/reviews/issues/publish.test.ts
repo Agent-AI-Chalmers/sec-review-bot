@@ -6,7 +6,7 @@ import type { ReviewRecord } from '../../../src/reviews/review-record.js'
 import type {
   PublicationStepRecord,
   PublicationStepStore
-} from '../../../src/control-plane/client.js'
+} from '../../../src/review-runs/client.js'
 import { EXECUTION_API_VERSION } from '../../../src/execution/execution-api-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 

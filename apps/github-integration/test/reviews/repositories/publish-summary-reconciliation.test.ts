@@ -10,7 +10,7 @@ import test from 'node:test'
 import { handleRepositoryReviewRun } from '../../../src/reviews/repositories/publish.js'
 import { REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE } from '../../../src/reviews/repositories/renderer.js'
 import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
-import type { PublicationStepStore } from '../../../src/control-plane/client.js'
+import type { PublicationStepStore } from '../../../src/review-runs/client.js'
 import { EXECUTION_API_VERSION } from '../../../src/execution/execution-api-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 

@@ -132,7 +132,7 @@ test("every contract tool's generated artifact is covered by the contract-tools 
   // required set is derived from the tools' manifests, so a new projection cannot be added
   // without this area being wired to it.
   const manifests = [
-    'contracts/control-plane-api/tools/generated-artifacts.json',
+    'contracts/review-runs-api/tools/generated-artifacts.json',
     'contracts/execution-api/tools/generated-artifacts.json'
   ]
   const outputs = manifests.flatMap((manifestPath) => {
@@ -150,17 +150,17 @@ test("every contract tool's generated artifact is covered by the contract-tools 
 })
 
 test('the client<->server seam stays wired to both packages', () => {
-  // The seam test lives in Control Plane but drives the GitHub-integration client, so a change
+  // The seam test lives in Review Runs but drives the GitHub-integration client, so a change
   // to either side must re-run it. This coupling is why the seam is listed under both areas, and
   // its absence is what let the empty-200 bug land.
   const seamPaths = [
-    'apps/github-integration/src/control-plane/client.ts',
-    'apps/github-integration/src/control-plane/control-plane-api.ts'
+    'apps/github-integration/src/review-runs/client.ts',
+    'apps/github-integration/src/review-runs/review-runs-api.ts'
   ]
   for (const candidate of seamPaths) {
     assert.ok(
-      covers(areas['control-plane'], candidate),
-      `the control-plane area must trigger on ${candidate} (the seam test loads it)`
+      covers(areas['review-runs'], candidate),
+      `the review-runs area must trigger on ${candidate} (the seam test loads it)`
     )
     assert.ok(
       covers(areas['github-integration'], candidate),

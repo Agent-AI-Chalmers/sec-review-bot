@@ -1,0 +1,17 @@
+# Docker reads only the build context's own .dockerignore, and this service's context is now
+# `review-runs/` alone (compose narrows it). Without this file the host's `node_modules`,
+# `dist`, and agent state would be sent in the context and then copied over the freshly
+# installed tree by `COPY . ./` — a wrong-platform `node_modules` from a dev machine would
+# replace the container's, so the build would succeed in CI and fail on a developer's box.
+node_modules
+dist
+
+# Local runtime state that lives beside the service when the stack is run from here.
+.agent-postgres-state
+.agent-input-bundles
+.agent-artifacts
+.agent-temporal-state
+
+.env
+*.pem
+*.log

@@ -14,7 +14,7 @@ import {
   parsePullRequestReviewPublishContext,
   type PersistedPullRequest,
   type PersistedPullRequestFile
-} from '../../control-plane/publish-context.js'
+} from '../../review-runs/publish-context.js'
 import { renderAnalysisSummaryCommentFromReviewRecord } from './renderer.js'
 import {
   generateSuggestionCandidatesFromReviewRecord,
@@ -29,12 +29,12 @@ import {
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { isCurrentAppBotLogin } from '../../github/github-app-metadata-service.js'
 import { assertWorkflowResult } from '../../execution/execution-api-schema.js'
-import type { PublicationStepStore } from '../../control-plane/client.js'
-import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
+import type { PublicationStepStore } from '../../review-runs/client.js'
+import { classifyPublicationFailure } from '../../review-runs/publication-failure.js'
 import {
   isPublicationClaimLostError,
   PublicationClaimLostError
-} from '../../control-plane/publication-claim.js'
+} from '../../review-runs/publication-claim.js'
 
 interface SuggestionReviewResult {
   review_id: number

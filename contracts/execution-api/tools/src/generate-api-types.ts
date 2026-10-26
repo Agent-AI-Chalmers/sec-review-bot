@@ -2,7 +2,7 @@
 //
 // The selected schemas under `contracts/execution-api/<version>/schemas` are the
 // hand-written source of
-// truth for workflow transport shapes. The Control Plane and Execution Gateway need workflow
+// truth for workflow transport shapes. The Review Runs and Execution Gateway need workflow
 // inputs, while the GitHub integration also consumes review results. Hand-maintained copies are
 // how those shapes drifted before; this generator projects only what each consumer needs.
 //

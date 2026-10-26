@@ -2,7 +2,7 @@ import type { ReviewRecord } from '../review-record.js'
 
 import { publishPullRequestSuggestionReview } from './suggestion-comments.js'
 import type { PullRequestReviewEvent } from '../../github/comment-service.js'
-import type { PersistedPullRequest } from '../../control-plane/publish-context.js'
+import type { PersistedPullRequest } from '../../review-runs/publish-context.js'
 import type { Octokit } from 'octokit'
 
 // This file is the pull-request suggestion pipeline.

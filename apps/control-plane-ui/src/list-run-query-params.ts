@@ -1,7 +1,7 @@
-// Generated from contracts/control-plane-api/v1/openapi.yaml (path relative to the repository root). Do not edit.
+// Generated from contracts/review-runs-api/v1/openapi.yaml (path relative to the repository root). Do not edit.
 //
 // That document is the hand-written contract; this file is a projection of it, not a second
-// copy. Regenerate it with `pnpm --dir contracts/control-plane-api/tools run generate`.
+// copy. Regenerate it with `pnpm --dir contracts/review-runs-api/tools run generate`.
 //
 // The contract's `listRuns` operation declares these query parameters (as one form-exploded
 // object). The console builds each request, and the BFF proxies it, from this one list, so

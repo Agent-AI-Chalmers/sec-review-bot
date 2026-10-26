@@ -21,7 +21,7 @@ Package README 负责本地 setup、命令、配置与实现布局。运行角�
 | 运行角色 | Package 指南 |
 | --- | --- |
 | GitHub Integration | [`apps/github-integration/README.md`](../apps/github-integration/README.zh.md) |
-| Review Control Plane | [`control-plane/README.md`](../control-plane/README.zh.md) |
+| Review Runs | [`review-runs/README.md`](../review-runs/README.zh.md) |
 | Control Plane UI | [`apps/control-plane-ui/README.md`](../apps/control-plane-ui/README.md) |
 | Execution Gateway | [`execution-gateway/README.md`](../execution-gateway/README.zh.md) |
 | Execution Worker | [`agents/README.md`](../agents/README.zh.md) |

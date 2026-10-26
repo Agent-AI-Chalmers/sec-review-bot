@@ -40,11 +40,11 @@ A draft PR includes modified files, case details, analyzer / verifier output, an
 
 ## Architecture
 
-This repository has eight runtime roles: GitHub Integration, Review Control Plane, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server. They cooperate through authenticated HTTP, Temporal, object storage, and durable PostgreSQL state.
+This repository has eight runtime roles: GitHub Integration, Review Runs, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server. They cooperate through authenticated HTTP, Temporal, object storage, and durable PostgreSQL state.
 
 - [`apps/github-integration/`](apps/github-integration/README.md): TypeScript GitHub integration service for webhooks, Actions-authenticated HTTP dispatch, input bundle preparation, and GitHub publishing
-- [`control-plane/`](control-plane/README.md): independently deployed TypeScript service for review-run admission and durable coordination
-- [`apps/control-plane-ui/`](apps/control-plane-ui/README.md): independently deployed web console for inspecting Control Plane runs
+- [`review-runs/`](review-runs/README.md): independently deployed TypeScript service for review-run admission and durable coordination
+- [`apps/control-plane-ui/`](apps/control-plane-ui/README.md): independently deployed web console for inspecting review runs
 - [`execution-gateway/`](execution-gateway/README.md): independent TypeScript HTTP service that validates requests and submits Temporal executions
 - [`agents/`](agents/README.md): Python Execution Worker, Memory Extraction Worker, and Memory Maintenance Worker
 - [`memory-catalog/`](memory-catalog/README.md): independent TypeScript HTTP service for managed-memory catalog state and revision commits
@@ -55,8 +55,8 @@ Each contract family under [`contracts/`](contracts/README.md) owns the tool tha
 
 ## Runtime Stack
 
-- **Languages**: [TypeScript](https://www.typescriptlang.org/) ([Node.js](https://nodejs.org/)) for the integration, Control Plane, Execution Gateway, Memory Catalog, and UI server; [Python](https://www.python.org/) 3.14 for the Execution Worker, the memory extraction and maintenance roles, and the agent runtime.
-- **Web and UI**: [Fastify](https://fastify.dev/) serves the Control Plane, Execution Gateway, and Memory Catalog APIs; [Vite](https://vitejs.dev/) + [React](https://react.dev/) + [Mantine](https://mantine.dev/) make up the console.
+- **Languages**: [TypeScript](https://www.typescriptlang.org/) ([Node.js](https://nodejs.org/)) for the integration, Review Runs, Execution Gateway, Memory Catalog, and UI server; [Python](https://www.python.org/) 3.14 for the Execution Worker, the memory extraction and maintenance roles, and the agent runtime.
+- **Web and UI**: [Fastify](https://fastify.dev/) serves Review Runs, Execution Gateway, and Memory Catalog APIs; [Vite](https://vitejs.dev/) + [React](https://react.dev/) + [Mantine](https://mantine.dev/) make up the console.
 - **Agent runtime**: [LangChain](https://www.langchain.com/) / [LangGraph](https://langchain-ai.github.io/langgraph/) ([deepagents](https://github.com/langchain-ai/deepagents)) for chat-model adapters, structured output, and tool calls.
 - **Durable execution**: [Temporal](https://temporal.io/) owns workflow / activity scheduling, worker dispatch, retry, timeout, and failure state.
 - **State and storage**: [PostgreSQL](https://www.postgresql.org/) for coordination state; S3-compatible object storage ([RustFS](https://github.com/rustfs/rustfs) locally) for input bundles and diagnostic artifacts.

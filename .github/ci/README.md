@@ -15,9 +15,9 @@ A static `outputs:` map on the `changes` job is a GitHub Actions requirement, so
 
 CI cannot see a cross-package dependency in an import graph, so the couplings are declared as extra globs under the area they affect, and the checker verifies them:
 
-- **Shared contract.** `contracts/**` is read by every consumer of a contract family, so it is listed under `contract-tools`, `control-plane`, `github-integration`, `control-plane-ui`, and `agents`.
+- **Shared contract.** `contracts/**` is read by every consumer of a contract family, so it is listed under `contract-tools`, `review-runs`, `github-integration`, `control-plane-ui`, and `agents`.
 - **Generated artifacts.** A contract tool renders a projection into another package, so `contract-tools` lists each one. The checker derives that set from the tools' `generated-artifacts.json` manifests, so a new projection cannot be added without wiring it up.
-- **Cross-package tests.** `control-plane`'s integration suite includes the client↔server seam test, which loads the GitHub-integration client, so a client change must re-run it; both the `control-plane` and `github-integration` areas list the client.
+- **Cross-package tests.** `review-runs`'s integration suite includes the client↔server seam test, which loads the GitHub-integration client, so a client change must re-run it; both the `review-runs` and `github-integration` areas list the client.
 
 A missed path means a change runs **no job at all** — silent, green CI. That is the class of defect that let an empty-200 response break the client: the job that would have caught it was not wired to the file that changed.
 

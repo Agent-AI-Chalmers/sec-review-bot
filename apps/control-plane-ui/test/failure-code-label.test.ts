@@ -59,10 +59,10 @@ test('an abandon failure names the credential that was actually rejected', () =>
   const cases: Array<[unknown, string]> = [
     [new ApiError(401, 'admin_token_required'), 'abandonWrongToken'],
     [new ApiError(401, 'unauthorized'), 'sessionExpired'],
-    // The Control Plane's own 401, proxied through the BFF without a BFF error code.
+    // Review Runs' own 401, proxied through the BFF without a BFF error code.
     [new ApiError(401), 'abandonFailed'],
-    [new ApiError(401, 'control_plane_unavailable'), 'abandonFailed'],
-    [new ApiError(502, 'control_plane_unavailable'), 'abandonFailed'],
+    [new ApiError(401, 'review_runs_unavailable'), 'abandonFailed'],
+    [new ApiError(502, 'review_runs_unavailable'), 'abandonFailed'],
     [new Error('network down'), 'abandonFailed']
   ]
   for (const [error, expected] of cases) {

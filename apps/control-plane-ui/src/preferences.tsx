@@ -60,7 +60,7 @@ export function Preferences({
   children: React.ReactNode
 }): React.JSX.Element {
   // Keep browser preferences local to this console; they are presentation state,
-  // not Control Plane account settings.
+  // not Review Runs account settings.
   const hasAppliedTheme = React.useRef(false)
   const [theme, setTheme] = React.useState<Theme>(
     () =>

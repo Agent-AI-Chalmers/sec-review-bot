@@ -19,7 +19,7 @@ Package READMEs own local setup, commands, configuration, and implementation lay
 | Runtime role | Package guide |
 | --- | --- |
 | GitHub Integration | [`apps/github-integration/README.md`](../apps/github-integration/README.md) |
-| Review Control Plane | [`control-plane/README.md`](../control-plane/README.md) |
+| Review Runs | [`review-runs/README.md`](../review-runs/README.md) |
 | Control Plane UI | [`apps/control-plane-ui/README.md`](../apps/control-plane-ui/README.md) |
 | Execution Gateway | [`execution-gateway/README.md`](../execution-gateway/README.md) |
 | Execution Worker | [`agents/README.md`](../agents/README.md) |

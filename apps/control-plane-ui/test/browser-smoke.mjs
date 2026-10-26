@@ -416,7 +416,7 @@ try {
         state: 'visible'
       })
       assert.strictEqual(
-        await page.getByText('Unable to load Control Plane').count(),
+        await page.getByText('Unable to load Review Runs').count(),
         0,
         `${name} an unknown run id must not show the generic error page`
       )
@@ -904,7 +904,7 @@ try {
       route.fulfill({
         status: 502,
         contentType: 'application/json',
-        body: '{"error":"control_plane_unavailable"}'
+        body: '{"error":"review_runs_unavailable"}'
       })
     )
     await page.getByRole('button', { name: 'Refresh', exact: true }).click()
@@ -913,7 +913,7 @@ try {
         /unreachable/.test(
           (await page.locator('[role="alert"]').first().textContent()) ?? ''
         ),
-      `${name} an unreachable Control Plane must say so`
+      `${name} an unreachable Review Runs must say so`
     )
     await page.unroute('**/api/runs*')
 

@@ -1,6 +1,6 @@
 # System Architecture
 
-Sec Review Bot has eight runtime roles: GitHub Integration, Review Control Plane, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server.
+Sec Review Bot has eight runtime roles: GitHub Integration, Review Runs, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server.
 
 ## Runtime topology
 
@@ -14,9 +14,9 @@ The memory path has one deployment-independent state model. Memory Catalog owns 
 
 | Runtime role | Code | Owns | Local guide |
 | --- | --- | --- | --- |
-| GitHub Integration | `apps/github-integration/` | GitHub ingress, input preparation, Control Plane client, and GitHub publication | [README](../../apps/github-integration/README.md) |
-| Review Control Plane | `control-plane/` | Admission, durable run state, recovery, execution observation, and publication coordination | [README](../../control-plane/README.md) |
-| Control Plane UI | `apps/control-plane-ui/` | Authenticated operator console and read-only Control Plane projection | [README](../../apps/control-plane-ui/README.md) |
+| GitHub Integration | `apps/github-integration/` | GitHub ingress, input preparation, Review Runs client, and GitHub publication | [README](../../apps/github-integration/README.md) |
+| Review Runs | `review-runs/` | Admission, durable run state, recovery, execution observation, and publication coordination | [README](../../review-runs/README.md) |
+| Control Plane UI | `apps/control-plane-ui/` | Authenticated operator console and read-only Review Runs projection | [README](../../apps/control-plane-ui/README.md) |
 | Execution Gateway | `execution-gateway/` | Authenticated Execution API and HTTP-to-Temporal translation | [README](../../execution-gateway/README.md) |
 | Execution Worker | `agents/` | Review workflows, activities, agent runtime, stage artifacts, and run diagnostic publication | [README](../../agents/README.md) |
 | Memory Extraction Worker | `agents/` | Per-run diagnostic consumption, extractor invocation, transcript publication, and extraction registration | [README](../../agents/README.md) |
@@ -31,7 +31,7 @@ The runtime roles communicate through project-owned boundaries under [`contracts
 sequenceDiagram
   participant GitHub
   participant Integration as GitHub Integration
-  participant Control as Review Control Plane
+  participant Control as Review Runs
   participant Storage as Object Storage
   participant Gateway as Execution Gateway
   participant Temporal as Temporal Server

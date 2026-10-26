@@ -6,7 +6,7 @@ import {
   createPullRequestReviewUnlessMarkerExists
 } from '../../src/github/comment-service.js'
 import { setGitHubAppMetadata } from '../../src/github/github-app-metadata-service.js'
-import { PublicationClaimLostError } from '../../src/control-plane/publication-claim.js'
+import { PublicationClaimLostError } from '../../src/review-runs/publication-claim.js'
 import { fakeGitHub, githubJson } from '../github-client.js'
 
 /** Records how many times a comment- or review-creating request reached the API. */

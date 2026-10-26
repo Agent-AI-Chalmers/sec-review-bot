@@ -45,7 +45,7 @@ const RANGE_MINUTES: Record<string, number> = {
   '7d': 10_080
 }
 const PAGE_SIZES: readonly number[] = [10, 20, 50, 100]
-/** Mirrors the Control Plane's own default, so an unadorned `/runs` asks for what
+/** Mirrors Review Runs' own default, so an unadorned `/runs` asks for what
  * the server would have returned anyway. */
 const DEFAULT_PAGE_SIZE = 50
 /** sessionStorage key for the visited-page trail, so it survives navigation to a
@@ -63,7 +63,7 @@ export function Runs(): React.JSX.Element {
   // change made moments ago.
   const latestSearch = React.useRef(search)
   latestSearch.current = search
-  // The Control Plane walks pages forward by cursor only, so remember which cursor
+  // Review Runs walks pages forward by cursor only, so remember which cursor
   // each page was opened from in order to offer a previous page. Keyed by cursor
   // rather than by position, so the browser back button cannot desynchronise it.
   // Persisted in sessionStorage because navigating to a run detail unmounts this
@@ -121,9 +121,9 @@ export function Runs(): React.JSX.Element {
   // server's own default changing underneath a bookmarked or shared link. A size
   // that the console does not offer is still honoured as an extra option.
   //
-  // Copy only the parameters Control Plane declares (generated from `openapi.yaml`), never
+  // Copy only the parameters Review Runs declares (generated from `openapi.yaml`), never
   // the whole URL. The URL also carries UI-only state (`range`), which the API does not
-  // accept; forwarding it would send Control Plane a parameter outside its contract.
+  // accept; forwarding it would send Review Runs a parameter outside its contract.
   const pageQuery = new URLSearchParams()
   for (const name of LIST_RUN_QUERY_PARAMS) {
     const value = search.get(name)

@@ -17,7 +17,7 @@ import { renderWorkflowInputDeclarations } from './generate-api-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
-export const CONTROL_PLANE_ROOT = path.join(REPO_ROOT, 'control-plane')
+export const REVIEW_RUNS_ROOT = path.join(REPO_ROOT, 'review-runs')
 export const SPEC_PATH = path.resolve(
   REPO_ROOT,
   'contracts',
@@ -25,8 +25,8 @@ export const SPEC_PATH = path.resolve(
   'v1',
   'openapi.yaml'
 )
-export const CONTROL_PLANE_OUTPUT_PATH = path.join(
-  CONTROL_PLANE_ROOT,
+export const REVIEW_RUNS_OUTPUT_PATH = path.join(
+  REVIEW_RUNS_ROOT,
   'src',
   'execution-api-schema.ts'
 )
@@ -74,7 +74,7 @@ export type CreateRunRequestFor<Workflow extends ExecutionWorkflow> =
 
 /** This generator's outputs as the shared descriptor the checker walks. */
 export function generatedArtifacts(): GeneratedArtifact[] {
-  return [CONTROL_PLANE_OUTPUT_PATH, GATEWAY_OUTPUT_PATH].map((output) => ({
+  return [REVIEW_RUNS_OUTPUT_PATH, GATEWAY_OUTPUT_PATH].map((output) => ({
     output,
     render: async () => await renderExecutionApiTypes(output)
   }))

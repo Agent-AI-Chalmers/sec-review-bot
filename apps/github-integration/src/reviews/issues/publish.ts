@@ -6,7 +6,7 @@ import {
   createIssueCommentUnlessMarkerExists,
   findIssueCommentByMarker
 } from '../../github/comment-service.js'
-import type { PersistedIssue } from '../../control-plane/publish-context.js'
+import type { PersistedIssue } from '../../review-runs/publish-context.js'
 import type { Octokit } from 'octokit'
 import {
   buildDraftBranchName,
@@ -14,7 +14,7 @@ import {
 } from './draft-pr.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../../execution/publish-error-code.js'
 import { DeterministicExecutionPublishError } from '../../execution/publish-error.js'
-import { parseIssueReviewPublishContext } from '../../control-plane/publish-context.js'
+import { parseIssueReviewPublishContext } from '../../review-runs/publish-context.js'
 import {
   buildSuggestedDraftPrPlanFromReviewRecord,
   renderIssueReviewCommentFromReviewRecord
@@ -28,12 +28,12 @@ import {
 } from '../shared/settle-exhausted-step.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { assertWorkflowResult } from '../../execution/execution-api-schema.js'
-import type { PublicationStepStore } from '../../control-plane/client.js'
-import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
+import type { PublicationStepStore } from '../../review-runs/client.js'
+import { classifyPublicationFailure } from '../../review-runs/publication-failure.js'
 import {
   isPublicationClaimLostError,
   PublicationClaimLostError
-} from '../../control-plane/publication-claim.js'
+} from '../../review-runs/publication-claim.js'
 
 interface IssueDraftPullRequest {
   number: number

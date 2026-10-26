@@ -6,15 +6,15 @@
 
 这个 package 是项目里的 GitHub integration service。
 
-它不直接执行 agent workflow；它负责准备输入，通过 Control Plane 提交和观察 review run，并把终态结果发布回 GitHub。
+它不直接执行 agent workflow；它负责准备输入，通过 Review Runs 提交和观察 review run，并把终态结果发布回 GitHub。
 
 ## 安装
 
-本地开发时，在仓库根目录安装 Control Plane 服务和 integration 的依赖：
+本地开发时，在仓库根目录安装 Review Runs 服务和 integration 的依赖：
 
 ```bash
 corepack install --global pnpm@12
-pnpm --dir control-plane install
+pnpm --dir review-runs install
 pnpm --dir apps/github-integration install
 ```
 
@@ -33,7 +33,7 @@ pnpm run build
 pnpm test
 ```
 
-`pnpm test` 运行不依赖外部服务的测试。集成测试使用 Control Plane 测试数据库验证 publisher 边界：
+`pnpm test` 运行不依赖外部服务的测试。集成测试使用 Review Runs 测试数据库验证 publisher 边界：
 
 ```bash
 TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
@@ -44,9 +44,9 @@ pnpm run test:integration
 
 完整 review 还需要 execution gateway 和 worker。要在本地跑完整链路，请使用仓库级 Docker Compose 部署。下面的命令只启动 GitHub integration service。
 
-非 Compose 启动时，先按 `apps/github-integration/.env.sample` 填好 `apps/github-integration/.env`；至少需要设置 `APP_ID`、`PRIVATE_KEY_PATH`、`WEBHOOK_SECRET`、`CONTROL_PLANE_SERVICE_URL` 和 `CONTROL_PLANE_SERVICE_TOKEN`。
+非 Compose 启动时，先按 `apps/github-integration/.env.sample` 填好 `apps/github-integration/.env`；至少需要设置 `APP_ID`、`PRIVATE_KEY_PATH`、`WEBHOOK_SECRET`、`REVIEW_RUNS_SERVICE_URL` 和 `REVIEW_RUNS_SERVICE_TOKEN`。
 
-`CONTROL_PLANE_REQUEST_TIMEOUT_MS` 限制每次 Control Plane 请求的最长等待时间，默认 30 秒。publication lease 续租失败或超时会被视为 ownership 已丢失：publisher 不再启动新的 GitHub mutation，而是等待 lease takeover 恢复。
+`REVIEW_RUNS_REQUEST_TIMEOUT_MS` 限制每次 Review Runs 请求的最长等待时间，默认 30 秒。publication lease 续租失败或超时会被视为 ownership 已丢失：publisher 不再启动新的 GitHub mutation，而是等待 lease takeover 恢复。
 
 ```bash
 pnpm run server
@@ -92,7 +92,7 @@ GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 
 - 准备 issue / pull request review input
 - 准备 repository review input
 
-- 向 Control Plane 提交已准备的输入并领取发布任务
+- 向 Review Runs 提交已准备的输入并领取发布任务
 - 把结构化结果发布回 GitHub
 
 ## 目录
@@ -102,11 +102,11 @@ GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 
   - `reviews/pull-requests/` - PR review、建议评论
   - `reviews/repositories/` - repository review、摘要 issue 与修复 draft PR
 - `github/` - GitHub API 薄封装和 webhook 辅助函数
-- `control-plane/` - Control Plane client、claim 处理与发布协调
+- `review-runs/` - Review Runs client、claim 处理与发布协调
 - `execution/` - 此 connector 消费的 Execution input、result 与错误契约
 - `artifacts/` - input bundle 存储与 Git workspace 准备
 - `ingress/` - HTTP、GitHub Actions 和 GitHub webhook 的入站处理
-- `triggers/` - 把 webhook / Actions / comment 请求转换为提交给 Control Plane 的 review 请求
+- `triggers/` - 把 webhook / Actions / comment 请求转换为提交给 Review Runs 的 review 请求
 - `utils/` - 轻量日志与辅助函数
 
 ## 触发

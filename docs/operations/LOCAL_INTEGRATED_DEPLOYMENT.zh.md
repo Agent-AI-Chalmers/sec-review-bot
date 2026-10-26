@@ -4,7 +4,7 @@
 
 本文是 [LOCAL_INTEGRATED_DEPLOYMENT.md](LOCAL_INTEGRATED_DEPLOYMENT.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-这是 GitHub integration、Review Control Plane、运行服务、Temporal、对象存储以及宿主机 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker 的本地部署说明。
+这是 GitHub integration、Review Runs、运行服务、Temporal、对象存储以及宿主机 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker 的本地部署说明。
 
 如果你要在本地跑完整集成链路，读本文。不经过 HTTP 运行服务、直接在本地运行 agent，或使用 `run-local-* --temporal` 调试时，见 [agents 本地运行说明](../../agents/README.zh.md)。
 
@@ -12,9 +12,9 @@
 
 ![本地集成部署结构](../../assets/operations/local-integrated-deployment.zh.svg)
 
-Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Control Plane 协调每个 review run；Temporal 把 review、memory extraction 和 memory maintenance 工作分发给三个独立的 worker pool。PostgreSQL 保存控制和 catalog 状态，RustFS 保存运行输入、transcript、memory revision 和 artifact。
+Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Review Runs 协调每个 review run；Temporal 把 review、memory extraction 和 memory maintenance 工作分发给三个独立的 worker pool。PostgreSQL 保存控制和 catalog 状态，RustFS 保存运行输入、transcript、memory revision 和 artifact。
 
-Control Plane UI 是独立部署的控制台。它的同源服务端从 Control Plane 读取运行状态并代理 artifact 下载，因此服务凭据和存储凭据都不会进入浏览器代码。公网 endpoint 的配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
+Control Plane UI 是独立部署的控制台。它的同源服务端从 Review Runs 读取运行状态并代理 artifact 下载，因此服务凭据和存储凭据都不会进入浏览器代码。公网 endpoint 的配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
 负责某条 task queue 的 worker 不存在时，该队列中的任务会停留在 Temporal 中等待执行。
 
@@ -23,7 +23,7 @@ Control Plane UI 是独立部署的控制台。它的同源服务端从 Control 
 | Service | URL |
 | --- | --- |
 | GitHub integration | `http://127.0.0.1:30000` |
-| Review Control Plane | `http://127.0.0.1:8090` |
+| Review Runs | `http://127.0.0.1:8090` |
 | Control Plane UI | `http://127.0.0.1:8091` |
 | Execution Gateway | `http://127.0.0.1:8000` |
 | Memory Catalog Server | `http://127.0.0.1:8092` |
@@ -116,7 +116,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose 只把 Execution API 地址和 token 注入 Control Plane，用于初次提交、提交恢复和终态观察。该地址当前解析到 Execution Gateway 服务，但 Control Plane 的配置只使用 API 术语。Integration 只接收容器内私钥路径、Control Plane 地址和 token，以及 RustFS input storage 配置，不持有 PostgreSQL 或 execution 凭据。这些值不需要在 `apps/github-integration/.env` 中重复配置。
+Compose 只把 Execution API 地址和 token 注入 Review Runs，用于初次提交、提交恢复和终态观察。该地址当前解析到 Execution Gateway 服务，但 Review Runs 的配置只使用 API 术语。Integration 只接收容器内私钥路径、Review Runs 地址和 token，以及 RustFS input storage 配置，不持有 PostgreSQL 或 execution 凭据。这些值不需要在 `apps/github-integration/.env` 中重复配置。
 
 将私钥放在 `apps/github-integration/private-key.pem`。Compose 会把这个宿主机文件挂载到容器中并覆盖 `PRIVATE_KEY_PATH`；初始化命令同时把 `PRIVATE_KEY_PATH` 设置为该文件在宿主机上的绝对路径，仅用于让 `apps/github-integration/.env` 也能支持非 Compose 直接启动。
 
@@ -178,9 +178,9 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 Execution Worker 会在 workflow 成功前把权威 run diagnostic 发布到 `runs/*/artifacts/*`。Execution Gateway 只校验并转发该不可变引用，不持有对象存储凭据，也不挂载 worker artifact tree。Agent sandbox 不会收到任何 workload storage 凭据。
 
-Memory Catalog Server 是独立 TypeScript 服务，不属于 Control Plane。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_control_plane` 和 `sec_review_memory_catalog` database。只有 Memory Catalog 收到 `MEMORY_CATALOG_DATABASE_URL`，并在自己的 database 中保存 extraction records 及其可选 observations、memory-tree revision history 和 active revision pointer。每个 revision 记录对应的 maintenance identity 和 maintainer transcript reference。Temporal 负责 extraction 执行和单例 maintenance workflow；PostgreSQL 是持久 catalog 与 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；memory-tree revisions 和 memory-agent transcripts 以不可变对象保存在 RustFS 中。Worker 将这些对象物化到 invocation 级临时 worktree，agent sandbox 只看到最终 filesystem mount。
+Memory Catalog Server 是独立 TypeScript 服务，不属于 Review Runs。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_review_runs` 和 `sec_review_memory_catalog` database。只有 Memory Catalog 收到 `MEMORY_CATALOG_DATABASE_URL`，并在自己的 database 中保存 extraction records 及其可选 observations、memory-tree revision history 和 active revision pointer。每个 revision 记录对应的 maintenance identity 和 maintainer transcript reference。Temporal 负责 extraction 执行和单例 maintenance workflow；PostgreSQL 是持久 catalog 与 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；memory-tree revisions 和 memory-agent transcripts 以不可变对象保存在 RustFS 中。Worker 将这些对象物化到 invocation 级临时 worktree，agent sandbox 只看到最终 filesystem mount。
 
-PostgreSQL 初始化脚本只会在 `.agent-postgres-state` 为空时执行。采用或修改 database 名称后，应先停止部署并删除该目录，再重新启动 Compose。此操作会删除已有的 Control Plane 和 Memory Catalog 数据。
+PostgreSQL 初始化脚本只会在 `.agent-postgres-state` 为空时执行。采用或修改 database 名称后，应先停止部署并删除该目录，再重新启动 Compose。此操作会删除已有的 Review Runs 和 Memory Catalog 数据。
 
 大多数本地部署可以保留这些默认值。移动 checkout 后，重新运行安装脚本。
 
@@ -255,7 +255,7 @@ CodeGraph 在 sandbox 内运行，因此需要一个能执行命令的 backend�
 | `.agent-rustfs-state` | RustFS | run inputs、diagnostics、memory-tree revisions、memory-agent transcripts 及其他 artifacts 的持久对象存储 |
 | `.agent-run-inputs` | 宿主机 worker | 活跃运行所需的本地输入；不会进入对外发布的诊断材料 |
 | `.agent-artifacts` | 宿主机 worker | 每次运行的 agent 产物和 workflow 输出 |
-| `.agent-postgres-state` | PostgreSQL | Control Plane run 状态与 Memory Catalog 协调状态 |
+| `.agent-postgres-state` | PostgreSQL | Review Runs run 状态与 Memory Catalog 协调状态 |
 | `.agent-temporal-state` | Temporal | workflow history 和待处理 task state |
 
 
@@ -358,7 +358,7 @@ sudo systemctl restart sec-review-bot.target
 curl -sS http://127.0.0.1:8000/healthz
 ```
 
-验证 Control Plane 是否可以安全接收协调请求：
+验证 Review Runs 是否可以安全接收协调请求：
 
 ```bash
 curl -sS http://127.0.0.1:8090/readyz

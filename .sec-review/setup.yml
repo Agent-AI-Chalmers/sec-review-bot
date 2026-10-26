@@ -19,10 +19,10 @@ setup:
     working-directory: apps/control-plane-ui
     timeout_seconds: 600
   - run: pnpm install --frozen-lockfile
-    working-directory: control-plane
+    working-directory: review-runs
     timeout_seconds: 600
   - run: pnpm install --frozen-lockfile
-    working-directory: contracts/control-plane-api/tools
+    working-directory: contracts/review-runs-api/tools
     timeout_seconds: 600
   - run: pnpm install --frozen-lockfile
     working-directory: contracts/integration-contract/tools

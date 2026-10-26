@@ -1,11 +1,11 @@
 // Accepts repository-dispatch reviews, validates their local contract, and
 // prepares a durable Execution submission under a fenced preparation claim.
 import type { App } from 'octokit'
-import { admitReviewRun } from '../control-plane/admission.js'
+import { admitReviewRun } from '../review-runs/admission.js'
 import {
   PreparationClaimLostError,
   startPreparationClaimHeartbeat
-} from '../control-plane/preparation-claim.js'
+} from '../review-runs/preparation-claim.js'
 
 import type { Octokit } from 'octokit'
 import {
@@ -17,11 +17,11 @@ import {
   type SubmittedRepositoryReviewRun
 } from '../reviews/repositories/submit.js'
 import type { TestChangesPolicy } from '../execution/input.js'
-import { repositoryReviewPublishContext } from '../control-plane/publish-context.js'
-import { controlPlaneClient } from '../control-plane/client.js'
+import { repositoryReviewPublishContext } from '../review-runs/publish-context.js'
+import { reviewRunsClient } from '../review-runs/client.js'
 import { isSetupDeclarationError } from '../github/setup-declaration.js'
-import { ControlPlaneSubmissionError } from '../control-plane/client.js'
-import { classifyPreparationFailure } from '../control-plane/preparation-failure.js'
+import { ReviewRunsSubmissionError } from '../review-runs/client.js'
+import { classifyPreparationFailure } from '../review-runs/preparation-failure.js'
 import { logInfo } from '../utils/logger.js'
 import { asErrorMessage } from '../utils/error-utils.js'
 import { installationOctokitForRepo } from '../github/installation-client.js'
@@ -220,20 +220,20 @@ interface DispatchRepositoryReviewCommandDeps {
   submit_run: typeof startRepositoryReviewRun
   store: {
     admitReviewRun: (
-      ...args: Parameters<typeof controlPlaneClient.admitReviewRun>
+      ...args: Parameters<typeof reviewRunsClient.admitReviewRun>
     ) =>
-      | Awaited<ReturnType<typeof controlPlaneClient.admitReviewRun>>
-      | ReturnType<typeof controlPlaneClient.admitReviewRun>
+      | Awaited<ReturnType<typeof reviewRunsClient.admitReviewRun>>
+      | ReturnType<typeof reviewRunsClient.admitReviewRun>
     failPreparation: (
-      ...args: Parameters<typeof controlPlaneClient.failPreparation>
+      ...args: Parameters<typeof reviewRunsClient.failPreparation>
     ) => unknown
     submitPreparedRun: (
-      ...args: Parameters<typeof controlPlaneClient.submitPreparedRun>
+      ...args: Parameters<typeof reviewRunsClient.submitPreparedRun>
     ) => unknown
     renewPreparationClaim: (
-      ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
+      ...args: Parameters<typeof reviewRunsClient.renewPreparationClaim>
     ) => Promise<boolean>
-    preparationHeartbeatIntervalMs: typeof controlPlaneClient.preparationHeartbeatIntervalMs
+    preparationHeartbeatIntervalMs: typeof reviewRunsClient.preparationHeartbeatIntervalMs
   }
 }
 
@@ -250,7 +250,7 @@ export async function dispatchRepositoryReview({
       installationOctokitForRepo(app, repo_full_name),
     resolve_dispatch = resolveRepositoryReviewDispatch,
     submit_run = startRepositoryReviewRun,
-    store = controlPlaneClient
+    store = reviewRunsClient
   } = deps
   let validated: ValidatedRepositoryReviewDispatch
   try {
@@ -339,7 +339,7 @@ export async function dispatchRepositoryReview({
       ...resolved,
       on_prepared: async (prepared, input) => {
         // Confirm the lease immediately before crossing the durable submission
-        // boundary; the submission itself remains token-fenced by Control Plane.
+        // boundary; the submission itself remains token-fenced by Review Runs.
         await heartbeat.assertOwned()
         await store.submitPreparedRun(
           run_id,
@@ -353,7 +353,7 @@ export async function dispatchRepositoryReview({
     const ownsClaim = await heartbeat.stop()
     if (
       ownsClaim &&
-      !(error instanceof ControlPlaneSubmissionError) &&
+      !(error instanceof ReviewRunsSubmissionError) &&
       !(error instanceof PreparationClaimLostError)
     ) {
       const classification = classifyPreparationFailure(

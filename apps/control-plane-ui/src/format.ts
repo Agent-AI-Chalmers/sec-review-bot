@@ -95,7 +95,7 @@ export function isDownloadableArtifact(
 /** The failure codes coordination itself assigns, and what each one means for the operator.
  *
  * The set is open: a connector may report its own code, and those are shown verbatim because the
- * console cannot know what they mean. These are the ones the Control Plane writes, so leaving
+ * console cannot know what they mean. These are the ones Review Runs writes, so leaving
  * them unexplained would make an operator read `PREPARATION_RETRY_EXHAUSTED` as jargon when the
  * console already knows the sentence behind it. */
 export const KNOWN_FAILURE_CODE_KEYS: Readonly<Record<string, Message>> = {
@@ -119,7 +119,7 @@ export const KNOWN_FAILURE_CODE_KEYS: Readonly<Record<string, Message>> = {
  *
  * The abandon route can answer 401 for three unrelated reasons: the BFF rejected the supplied
  * admin token (`admin_token_required`), the operator's session cookie is no longer valid
- * (`unauthorized`, emitted by the BFF's own /api/* gate), or the Control Plane itself answered
+ * (`unauthorized`, emitted by the BFF's own /api/* gate), or Review Runs itself answered
  * 401 and the BFF proxied that status through. Only the first means the token was wrong; the
  * others would send the operator to re-type a token that was fine. */
 export function abandonFailureMessageKey(error: unknown): Message {
@@ -153,8 +153,8 @@ export function failureReason(
   t: Translator
 ): string | undefined {
   if (!(error instanceof ApiError)) return undefined
-  if (error.code === 'control_plane_timeout') return t('errorTimeout')
-  if (error.code === 'control_plane_unavailable') return t('errorUnreachable')
+  if (error.code === 'review_runs_timeout') return t('errorTimeout')
+  if (error.code === 'review_runs_unavailable') return t('errorUnreachable')
   return error.status >= 500
     ? `${t('errorUpstream')} (${error.status})`
     : undefined

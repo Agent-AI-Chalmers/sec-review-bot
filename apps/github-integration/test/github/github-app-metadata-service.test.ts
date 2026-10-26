@@ -9,7 +9,7 @@ import {
   wasAuthoredByCurrentAppBot
 } from '../../src/github/github-app-metadata-service.js'
 import { isSelfOriginatedWebhookEvent } from '../../src/github/webhook-origin-guard.js'
-import { classifyPublicationFailure } from '../../src/control-plane/publication-failure.js'
+import { classifyPublicationFailure } from '../../src/review-runs/publication-failure.js'
 
 test.beforeEach(() => {
   setGitHubAppMetadata({ slug: 'sec-review-bot' })

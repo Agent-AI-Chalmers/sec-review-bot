@@ -5,14 +5,14 @@ import {
 import { findRepositorySecuritySummaryIssue } from '../../github/repository-service.js'
 import type { Octokit } from 'octokit'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../../execution/publish-error-code.js'
-import type { PublicationStepStore } from '../../control-plane/client.js'
-import { classifyPublicationFailure } from '../../control-plane/publication-failure.js'
+import type { PublicationStepStore } from '../../review-runs/client.js'
+import { classifyPublicationFailure } from '../../review-runs/publication-failure.js'
 import {
   isPublicationClaimLostError,
   PublicationClaimLostError
-} from '../../control-plane/publication-claim.js'
+} from '../../review-runs/publication-claim.js'
 import { DeterministicExecutionPublishError } from '../../execution/publish-error.js'
-import { parseRepositoryReviewPublishContext } from '../../control-plane/publish-context.js'
+import { parseRepositoryReviewPublishContext } from '../../review-runs/publish-context.js'
 import {
   buildRepositoryDeliveryBranchName,
   createRepositoryDeliveryDraftPr
@@ -38,7 +38,7 @@ import {
   type RepositoryWorkflowResult
 } from './result.js'
 import type { RepositoryContext } from './submit.js'
-import type { PersistedRepositoryScanTarget } from '../../control-plane/publish-context.js'
+import type { PersistedRepositoryScanTarget } from '../../review-runs/publish-context.js'
 
 interface PublishedDeliveryEntry {
   // Publish-time view for the summary renderer. It is not an agent result:

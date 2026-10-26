@@ -8,7 +8,7 @@ import { startPullRequestReviewCommand } from '../../src/triggers/pull-request-r
 import type { SubmittedPullRequestReviewRun } from '../../src/reviews/pull-requests/submit.js'
 import type { IssueContext } from '../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../src/github/pull-request-service.js'
-import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
+import { ReviewRunsSubmissionError } from '../../src/review-runs/client.js'
 import { EXECUTION_API_VERSION } from '../../src/execution/execution-api-version.js'
 import { SetupDeclarationError } from '../../src/github/setup-declaration.js'
 import type {
@@ -18,10 +18,10 @@ import type {
 import type {
   ReviewRunAdmission,
   ReviewRunRecord
-} from '../../src/control-plane/client.js'
+} from '../../src/review-runs/client.js'
 import { unusedGitHub } from '../github-client.js'
 
-/** An admitted run record as the Control Plane returns it, with the axis shapes spelled once.
+/** An admitted run record as Review Runs returns it, with the axis shapes spelled once.
  *
  * The tests below stub `admitReviewRun`, and each stub used to write out the whole record shape
  * and then cast it with `as never`. That cast switched off every check on the shape, so a field
@@ -409,7 +409,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
 
 test('startIssueReviewCommand preserves an uncertain Execution submission for replay', async () => {
   const transitions: unknown[] = []
-  const error = new ControlPlaneSubmissionError(
+  const error = new ReviewRunsSubmissionError(
     'Execution response was lost.',
     'SUBMISSION_STATE_UNCERTAIN'
   )
@@ -460,7 +460,7 @@ test('startIssueReviewCommand preserves an uncertain Execution submission for re
 
 test('startPullRequestReviewCommand preserves an uncertain Execution submission for replay', async () => {
   const transitions: unknown[] = []
-  const error = new ControlPlaneSubmissionError(
+  const error = new ReviewRunsSubmissionError(
     'Execution response was lost.',
     'SUBMISSION_STATE_UNCERTAIN'
   )

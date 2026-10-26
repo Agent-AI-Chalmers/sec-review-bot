@@ -4,7 +4,7 @@
 
 本文是 [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-Sec Review Bot 包含八个运行角色：GitHub Integration、Review Control Plane、Control Plane UI、Execution Gateway、Execution Worker、Memory Extraction Worker、Memory Maintenance Worker 和 Memory Catalog Server。
+Sec Review Bot 包含八个运行角色：GitHub Integration、Review Runs、Control Plane UI、Execution Gateway、Execution Worker、Memory Extraction Worker、Memory Maintenance Worker 和 Memory Catalog Server。
 
 ## 运行拓扑
 
@@ -18,9 +18,9 @@ Memory 链路只有一套与部署位置无关的状态模型：Memory Catalog �
 
 | 运行角色 | 代码 | 负责内容 | 本地指南 |
 | --- | --- | --- | --- |
-| GitHub Integration | `apps/github-integration/` | GitHub 入口、input 准备、Control Plane client 与 GitHub publication | [README](../../apps/github-integration/README.zh.md) |
-| Review Control Plane | `control-plane/` | 接纳、持久化 run 状态、恢复、execution 观察与 publication 协调 | [README](../../control-plane/README.zh.md) |
-| Control Plane UI | `apps/control-plane-ui/` | 经过鉴权的运维控制台与只读 Control Plane 投影 | [README](../../apps/control-plane-ui/README.md) |
+| GitHub Integration | `apps/github-integration/` | GitHub 入口、input 准备、Review Runs client 与 GitHub publication | [README](../../apps/github-integration/README.zh.md) |
+| Review Runs | `review-runs/` | 接纳、持久化 run 状态、恢复、execution 观察与 publication 协调 | [README](../../review-runs/README.zh.md) |
+| Control Plane UI | `apps/control-plane-ui/` | 经过鉴权的运维控制台与只读 Review Runs 投影 | [README](../../apps/control-plane-ui/README.md) |
 | Execution Gateway | `execution-gateway/` | 经过鉴权的 Execution API 与 HTTP-to-Temporal 转换 | [README](../../execution-gateway/README.zh.md) |
 | Execution Worker | `agents/` | Review workflow、activity、agent runtime、stage artifact 与 run diagnostic publication | [README](../../agents/README.zh.md) |
 | Memory Extraction Worker | `agents/` | 按 run 消费 diagnostic、调用 extractor、发布 transcript 并登记 extraction | [README](../../agents/README.zh.md) |
@@ -35,7 +35,7 @@ Memory 链路只有一套与部署位置无关的状态模型：Memory Catalog �
 sequenceDiagram
   participant GitHub
   participant Integration as GitHub Integration
-  participant Control as Review Control Plane
+  participant Control as Review Runs
   participant Storage as 对象存储
   participant Gateway as Execution Gateway
   participant Temporal as Temporal Server

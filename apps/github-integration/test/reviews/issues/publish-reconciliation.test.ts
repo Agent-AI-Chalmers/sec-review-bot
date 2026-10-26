@@ -1,7 +1,7 @@
 // A publication step with no attempts left is reconciled against GitHub, not declared failed.
 //
 // The regression this protects: a publisher started a side effect (posted the summary comment, or
-// opened the draft PR), then died or lost the response before recording it. Control Plane spends
+// opened the draft PR), then died or lost the response before recording it. Review Runs spends
 // the step's attempts and reports "no attempts left". Before reconciliation existed, that report
 // was itself the conclusion, so the run failed and the requester was told nothing was published
 // while the comment or PR was already on GitHub.
@@ -11,7 +11,7 @@ import test from 'node:test'
 import { handleIssueReviewRun } from '../../../src/reviews/issues/publish.js'
 import { settleExhaustedStep } from '../../../src/reviews/shared/settle-exhausted-step.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../../../src/execution/publish-error-code.js'
-import type { PublicationStepStore } from '../../../src/control-plane/client.js'
+import type { PublicationStepStore } from '../../../src/review-runs/client.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
 import { EXECUTION_API_VERSION } from '../../../src/execution/execution-api-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
@@ -64,7 +64,7 @@ function postedComment(): {
   }
 }
 
-/** The error Control Plane raises when a step has no attempts left. */
+/** The error Review Runs raises when a step has no attempts left. */
 function exhaustedError(): Error {
   return Object.assign(new Error('no attempts left'), {
     code: EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted

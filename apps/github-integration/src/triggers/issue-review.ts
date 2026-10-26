@@ -1,47 +1,47 @@
 // Turns an issue review request into a durable run, fencing preparation until
 // the Execution submission boundary has been crossed.
-import { admitReviewRun } from '../control-plane/admission.js'
+import { admitReviewRun } from '../review-runs/admission.js'
 import {
   PreparationClaimLostError,
   startPreparationClaimHeartbeat
-} from '../control-plane/preparation-claim.js'
+} from '../review-runs/preparation-claim.js'
 
 import type { IssueContext } from '../github/issue-service.js'
-import { issueReviewPublishContext } from '../control-plane/publish-context.js'
+import { issueReviewPublishContext } from '../review-runs/publish-context.js'
 import {
   startIssueReviewRun,
   type SubmittedIssueReviewRun
 } from '../reviews/issues/submit.js'
 import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
 import type { TestChangesPolicy } from '../execution/input.js'
-import { controlPlaneClient } from '../control-plane/client.js'
+import { reviewRunsClient } from '../review-runs/client.js'
 import { isSetupDeclarationError } from '../github/setup-declaration.js'
-import { ControlPlaneSubmissionError } from '../control-plane/client.js'
-import { classifyPreparationFailure } from '../control-plane/preparation-failure.js'
+import { ReviewRunsSubmissionError } from '../review-runs/client.js'
+import { classifyPreparationFailure } from '../review-runs/preparation-failure.js'
 import type { Octokit } from 'octokit'
 
 type IssueReviewEventType = 'opened' | 'manual_review'
 type StartIssueReview = typeof startIssueReviewRun
-type IssueReviewControlPlaneClient = {
+type IssueReviewReviewRunsClient = {
   admitReviewRun: (
-    ...args: Parameters<typeof controlPlaneClient.admitReviewRun>
+    ...args: Parameters<typeof reviewRunsClient.admitReviewRun>
   ) =>
-    | Awaited<ReturnType<typeof controlPlaneClient.admitReviewRun>>
-    | ReturnType<typeof controlPlaneClient.admitReviewRun>
+    | Awaited<ReturnType<typeof reviewRunsClient.admitReviewRun>>
+    | ReturnType<typeof reviewRunsClient.admitReviewRun>
   failPreparation: (
-    ...args: Parameters<typeof controlPlaneClient.failPreparation>
+    ...args: Parameters<typeof reviewRunsClient.failPreparation>
   ) => unknown
   submitPreparedRun: (
-    ...args: Parameters<typeof controlPlaneClient.submitPreparedRun>
+    ...args: Parameters<typeof reviewRunsClient.submitPreparedRun>
   ) => unknown
   renewPreparationClaim: (
-    ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
+    ...args: Parameters<typeof reviewRunsClient.renewPreparationClaim>
   ) => Promise<boolean>
-  preparationHeartbeatIntervalMs: typeof controlPlaneClient.preparationHeartbeatIntervalMs
+  preparationHeartbeatIntervalMs: typeof reviewRunsClient.preparationHeartbeatIntervalMs
 }
 interface StartIssueReviewCommandDeps {
   start_review: StartIssueReview
-  store: IssueReviewControlPlaneClient
+  store: IssueReviewReviewRunsClient
 }
 
 interface StartIssueReviewCommandArgs {
@@ -83,8 +83,7 @@ export async function startIssueReviewCommand({
   on_admitted,
   deps = {}
 }: StartIssueReviewCommandArgs): Promise<StartedIssueReview> {
-  const { start_review = startIssueReviewRun, store = controlPlaneClient } =
-    deps
+  const { start_review = startIssueReviewRun, store = reviewRunsClient } = deps
   const admission =
     claimed_preparation === undefined
       ? await admitReviewRun(store, {
@@ -140,7 +139,7 @@ export async function startIssueReviewCommand({
       open_pr: event_type === 'opened' ? false : open_pr,
       on_prepared: async (prepared, input) => {
         // Confirm the lease immediately before crossing the durable submission
-        // boundary; the submission itself remains token-fenced by Control Plane.
+        // boundary; the submission itself remains token-fenced by Review Runs.
         await heartbeat.assertOwned()
         await store.submitPreparedRun(
           run_id,
@@ -154,7 +153,7 @@ export async function startIssueReviewCommand({
     const ownsClaim = await heartbeat.stop()
     if (
       ownsClaim &&
-      !(error instanceof ControlPlaneSubmissionError) &&
+      !(error instanceof ReviewRunsSubmissionError) &&
       !(error instanceof PreparationClaimLostError)
     ) {
       const classification = classifyPreparationFailure(

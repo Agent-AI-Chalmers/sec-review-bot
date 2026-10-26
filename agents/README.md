@@ -283,7 +283,7 @@ sec-review-memory-maintenance-worker
 
 Execution Worker handles review workflows, sandboxed activities, and run diagnostic publication. Memory Extraction Worker reads published diagnostics and produces observations; additional processes can poll the same extraction task queue. Memory Maintenance Worker serially updates the shared memory tree and owns maintenance schedule repair; it rejects any activity concurrency other than `1` and must run as a single process. Each worker has its own task queue and concurrency limit.
 
-Docker Compose control-plane startup and host worker operation are documented in the [local integrated deployment guide](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md).
+Docker Compose review-runs startup and host worker operation are documented in the [local integrated deployment guide](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md).
 
 ## Agent Runtime Configuration
 

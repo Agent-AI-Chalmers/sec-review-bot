@@ -8,7 +8,7 @@ import { publishDeliveryDraftPrs } from '../../../src/reviews/repositories/publi
 import type {
   PublicationStepRecord,
   PublicationStepStore
-} from '../../../src/control-plane/client.js'
+} from '../../../src/review-runs/client.js'
 import type { RepositoryDelivery } from '../../../src/reviews/repositories/result.js'
 import { fakeGitHub, githubJson, unusedGitHub } from '../../github-client.js'
 
