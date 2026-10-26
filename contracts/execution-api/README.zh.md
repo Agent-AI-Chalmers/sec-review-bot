@@ -58,6 +58,20 @@ GitHub integration 是调用方一侧的一种实现：它把 GitHub 事件与�
 
 生成的 TypeScript 投影会把 HTTP envelope 与 v1 workflow input schema 组合起来，使 provider 在编译期拥有 `workflow` 到 `input` 的对应关系，同时不引入共享运行时 package。
 
+## 工具
+
+在 `tools/` 中运行：
+
+```bash
+pnpm run generate
+pnpm run check
+pnpm run format:check
+pnpm run lint
+pnpm run lint:contract
+pnpm run typecheck
+pnpm test
+```
+
 ## Execution 错误码
 
 以下是调用方可以据以分支的稳定机器可读错误码。这个集合是**开放**的：服务暂时无法归类的失败会以 `EXECUTION_FAILED` 到达，而新增含义时会新增错误码，而不是复用旧码。

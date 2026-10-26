@@ -23,10 +23,35 @@ test('the generated artifact manifest covers the generator output and CI filter'
       path.join(CONTRACT_ROOT, 'tools', 'generated-artifacts.json'),
       'utf8'
     )
-  ) as { artifacts: Array<{ generator: string; output: string }> }
-  const outputs = manifest.artifacts.map(({ output }) =>
-    path.normalize(path.join(CONTRACT_ROOT, 'tools', output))
+  ) as {
+    family: string
+    generators: Array<{
+      name: string
+      script: string
+      inputs: string[]
+      outputs: string[]
+    }>
+  }
+  assert.equal(manifest.family, 'memory-catalog-api')
+  assert.deepEqual(
+    manifest.generators.map(({ name }) => name),
+    ['types']
   )
+  const outputs = manifest.generators.flatMap(({ outputs }) =>
+    outputs.map((output) => path.join(REPO_ROOT, output))
+  )
+  for (const generator of manifest.generators) {
+    for (const declaredPath of [
+      generator.script,
+      ...generator.inputs,
+      ...generator.outputs
+    ]) {
+      assert.doesNotThrow(
+        () => readFileSync(path.join(REPO_ROOT, declaredPath)),
+        `${declaredPath} is listed in the manifest but cannot be read`
+      )
+    }
+  }
   const generatedModule = await import('../src/generate.js')
 
   assert.deepEqual(outputs, generatedModule.outputPaths.map(path.normalize))

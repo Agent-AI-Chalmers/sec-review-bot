@@ -17,6 +17,9 @@ contracts/
       fixtures/*.json  executable examples, plus the manifest that pairs them
       corpus/*         shared non-JSON inputs, plus a manifest, when the contract
                        is a format enforced by code rather than a data shape
+  <layered-family>/
+    envelope/<version>/{SPEC.md,corpus/}
+    profiles/<name>/<version>/{SPEC.md,corpus/}
 ```
 
 Not every family uses every kind of asset. A contract whose rules are decision logic rather than a structural shape carries a `corpus/` instead of `schemas/` and `fixtures/`, and enforces the format in code. See
@@ -24,18 +27,18 @@ Not every family uses every kind of asset. A contract whose rules are decision l
 
 A family may also hold documents that apply to every version, such as a transport reference.
 
+When several formats share a real lower-level representation, one family may make that relationship explicit with independently versioned `envelope/` and `profiles/<name>/` directories. Each layer owns its own specification, corpus, and tooling; nesting does not couple their version numbers. See [tar-zstd-artifact](tar-zstd-artifact/README.md).
+
 ## Families
 
-| Family | Boundary | Parties | Current version |
-| --- | --- | --- | --- |
-| [execution-api](execution-api/README.md) | Public HTTP operations, workflow inputs, results, and errors | Execution API providers, callers, and downstream publishers | [v1](execution-api/v1/CONTRACT.md) |
-| [execution-workflow](execution-workflow/README.md) | Temporal Execution Workflow input | Execution Gateway and Execution Worker | [v1](execution-workflow/v1/CONTRACT.md) |
-| [review-runs-api](review-runs-api/README.md) | Review Runs HTTP API and observed run shapes | Review Runs and its callers | [v1](review-runs-api/v1/openapi.yaml) |
-| [memory-catalog-api](memory-catalog-api/README.md) | Memory coordination HTTP API | Memory Catalog Server and workers | [v1](memory-catalog-api/v1/openapi.yaml) |
-| [memory-tree-artifact](memory-tree-artifact/README.md) | Immutable memory tree archive format | Memory Maintenance Worker and Control Plane UI BFF | [v1](memory-tree-artifact/v1/SPEC.md) |
-| [run-diagnostic-artifact](run-diagnostic-artifact/README.md) | Completed-run diagnostic archive profile | Execution Worker, Memory Extraction Worker, and Control Plane UI BFF | [v1](run-diagnostic-artifact/v1/SPEC.md) |
-| [tar-zstd-artifact](tar-zstd-artifact/README.md) | Shared restricted POSIX PAX envelope | All project-owned tar+zstd producers and consumers | [v1](tar-zstd-artifact/v1/SPEC.md) |
-| [setup-declaration](setup-declaration/README.md) | Trusted `.sec-review/setup.yml` format | Reviewed repositories, GitHub Integration, and Execution Worker | [v1](setup-declaration/v1/SPEC.md) |
+| Family                                             | Boundary                                                     | Parties                                                         | Current version                                                                                                                                                                                      |
+| -------------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [execution-api](execution-api/README.md)           | Public HTTP operations, workflow inputs, results, and errors | Execution API providers, callers, and downstream publishers     | [v1](execution-api/v1/CONTRACT.md)                                                                                                                                                                   |
+| [execution-workflow](execution-workflow/README.md) | Temporal Execution Workflow input                            | Execution Gateway and Execution Worker                          | [v1](execution-workflow/v1/CONTRACT.md)                                                                                                                                                              |
+| [review-runs-api](review-runs-api/README.md)       | Review Runs HTTP API and observed run shapes                 | Review Runs and its callers                                     | [v1](review-runs-api/v1/openapi.yaml)                                                                                                                                                                |
+| [memory-catalog-api](memory-catalog-api/README.md) | Memory coordination HTTP API                                 | Memory Catalog Server and workers                               | [v1](memory-catalog-api/v1/openapi.yaml)                                                                                                                                                             |
+| [tar-zstd-artifact](tar-zstd-artifact/README.md)   | Shared archive envelope and its artifact profiles            | All project-owned tar+zstd producers and consumers              | [envelope v1](tar-zstd-artifact/envelope/v1/SPEC.md), [memory-tree v1](tar-zstd-artifact/profiles/memory-tree/v1/SPEC.md), [run-diagnostic v1](tar-zstd-artifact/profiles/run-diagnostic/v1/SPEC.md) |
+| [setup-declaration](setup-declaration/README.md)   | Trusted `.sec-review/setup.yml` format                       | Reviewed repositories, GitHub Integration, and Execution Worker | [v1](setup-declaration/v1/SPEC.md)                                                                                                                                                                   |
 
 ## Rules For Every Family
 
@@ -68,11 +71,11 @@ Each family README records who owns which side of its boundary and what callers 
 
 ## Derived Artifacts
 
-Some artifacts are generated from a hand-written contract rather than maintained by hand — a TypeScript projection of an API, committed JSON Schemas, a generated parameter list. Each family owns the tool that renders and checks its projections, under `<family>/tools/`, so the tool that reads a contract lives beside it and where its outputs land (which may be another package) does not change who owns the check. A family's `tools/generated-artifacts.json` lists what it derives and where it lands.
+Some artifacts are generated from a hand-written contract rather than maintained by hand — a TypeScript projection of an API, committed JSON Schemas, a generated parameter list. Each owning family or layered-family component keeps the tool that renders and checks its projections in its local `tools/` directory, so the tool that reads a contract lives beside it and where its outputs land (which may be another package) does not change who owns the check. That tool's `generated-artifacts.json` lists what it derives and where it lands.
 
 Name a stable package entry point for the responsibility callers consume, even when a generator maintains it (`execution-api-version.ts`, for example). Raw mechanical projections may carry `generated` in the filename when that helps distinguish files that should not accumulate hand-written behavior (`contract-types-generated.ts`, for example). The filename is not the enforcement boundary: every committed generated artifact must identify itself in its header, appear in the family manifest, and be covered by the freshness and CI checks below.
 
-Each tool provides `pnpm --dir contracts/<family>/tools run generate` to render every artifact and `pnpm --dir contracts/<family>/tools run check` to prove the committed copies match. A family's test asserts the manifest matches the generators' own declared outputs and that the CI change filter triggers on every listed artifact, so a new projection is covered by being listed, not by remembering to wire up a check.
+Each tool provides a local `generate` command to render every artifact and `check` to prove the committed copies match. A family's test asserts the manifest matches the generators' own declared outputs and that the CI change filter triggers on every listed artifact, so a new projection is covered by being listed, not by remembering to wire up a check.
 
 ## Change Checklist
 
@@ -81,6 +84,6 @@ For any contract change:
 - update the specification for the affected version;
 - update its schemas;
 - update or add its fixtures and manifest entries;
-- regenerate any derived artifact (such as the Review Runs's committed `v1` schemas and generated types) with its family's tool: `pnpm --dir contracts/<family>/tools run generate`, then confirm with `... run check`;
+- regenerate any derived artifact (such as the Review Runs's committed `v1` schemas and generated types) with the owning family or layer's local tool, then run its `check` command;
 - make both the Python and TypeScript tests validate the same files.
 - for binary artifacts, run producer tests, every consumer's shared-corpus tests, and at least one end-to-end reference-to-bytes validation path.

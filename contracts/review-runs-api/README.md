@@ -34,6 +34,20 @@ The following are not part of this contract:
 - connector-owned preparation input, claim tokens, connector identities, and full reconciliation identities;
 - anything the console derives for display, such as relative times or phase durations.
 
+## Tooling
+
+Run from `tools/`:
+
+```bash
+pnpm run generate
+pnpm run check
+pnpm run format:check
+pnpm run lint
+pnpm run lint:contract
+pnpm run typecheck
+pnpm test
+```
+
 ## Enforcement
 
 The console's `Run` type is generated from the contract, and a committed fixture pins it at build time: if the fixture gains, loses, or renames a field, the console stops compiling until the generated type and the fixture agree again. That check compares key sets rather than values, because TypeScript widens JSON strings and a value-level assignment would reject a correct fixture.

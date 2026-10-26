@@ -16,10 +16,16 @@ Memory revision 使用带标签的 `source`：`maintenance` 包含 maintainer id
 
 Maintenance control 只提供 `enabled` 与 `paused`。Pause 和 resume 请求使用幂等 `operation_id` 与 `expected_generation` compare-and-swap。相同重放返回原 operation 的结果 control snapshot，即使当前状态后来已经改变。
 
-在 `tools/` 中生成并检查已提交的投影：
+## 工具
+
+在 `tools/` 中运行：
 
 ```bash
-pnpm install
 pnpm run generate
+pnpm run check
+pnpm run format:check
+pnpm run lint
+pnpm run lint:contract
+pnpm run typecheck
 pnpm test
 ```

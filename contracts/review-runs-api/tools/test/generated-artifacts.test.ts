@@ -10,7 +10,7 @@ import test from 'node:test'
 
 import { parse } from 'yaml'
 
-import { staleGeneratedArtifacts } from '../src/check-generated-artifacts.js'
+import { staleGeneratedArtifacts } from '../src/check.js'
 import { generatedArtifacts as schemas } from '../src/generate-schemas.js'
 import { generatedArtifacts as stateMachines } from '../src/generate-state-machines.js'
 import { generatedArtifacts as types } from '../src/generate-types.js'

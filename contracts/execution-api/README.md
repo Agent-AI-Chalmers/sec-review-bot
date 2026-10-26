@@ -59,6 +59,20 @@ This split is also a security boundary. GitHub identity, permissions, API calls,
 
 The generated TypeScript projection composes the HTTP envelope with the v1 workflow input schemas. This gives the provider a compile-time `workflow`-to-`input` relationship without introducing a shared runtime package.
 
+## Tooling
+
+Run from `tools/`:
+
+```bash
+pnpm run generate
+pnpm run check
+pnpm run format:check
+pnpm run lint
+pnpm run lint:contract
+pnpm run typecheck
+pnpm test
+```
+
 ## Execution Error Codes
 
 These are the stable machine-readable codes a caller may branch on. The set is open: a failure the service cannot classify yet arrives as `EXECUTION_FAILED`, and new codes are added rather than reusing an existing one for a different meaning.

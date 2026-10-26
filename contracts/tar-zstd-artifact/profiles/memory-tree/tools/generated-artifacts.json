@@ -1,0 +1,33 @@
+{
+  "$comment": "Every artifact generated for this family's shared corpus. Paths are relative to the repository root.",
+  "family": "tar-zstd-artifact/profiles/memory-tree",
+  "generators": [
+    {
+      "name": "corpus",
+      "script": "contracts/tar-zstd-artifact/profiles/memory-tree/tools/src/generate.ts",
+      "code_inputs": [
+        "contracts/tar-zstd-artifact/profiles/memory-tree/tools/src/archive.ts",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/tools/src/corpus.ts",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/tools/src/paths.ts"
+      ],
+      "command": "pnpm --dir contracts/tar-zstd-artifact/profiles/memory-tree/tools run generate",
+      "inputs": [],
+      "outputs": [
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/manifest.json",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/valid-minimal.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/valid-topics.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/valid-byte-order.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/invalid-byte-order.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/invalid-missing-index.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/invalid-bad-manifest.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/invalid-traversal.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/invalid-symlink.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/invalid-unexpected-path.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/invalid-unexpected-type.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/valid-pax-path.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/invalid-pax-key.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/memory-tree/v1/corpus/invalid-too-many-entries.tar.zst"
+      ]
+    }
+  ]
+}

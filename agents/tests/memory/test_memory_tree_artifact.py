@@ -5,7 +5,9 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.contract_versions import MEMORY_TREE_ARTIFACT_VERSION
 from sec_review_agents.memory.memory_tree_artifact import (
+    MEMORY_TREE_ARTIFACT_FILENAME,
     _validate_archive,
     build_memory_tree_artifact,
     materialize_memory_tree,
@@ -13,7 +15,14 @@ from sec_review_agents.memory.memory_tree_artifact import (
 )
 from tests.project_paths import CONTRACTS_ROOT
 
-CORPUS = CONTRACTS_ROOT / "memory-tree-artifact" / "v1" / "corpus"
+CORPUS = (
+    CONTRACTS_ROOT
+    / "tar-zstd-artifact"
+    / "profiles"
+    / "memory-tree"
+    / MEMORY_TREE_ARTIFACT_VERSION
+    / "corpus"
+)
 
 
 def test_memory_tree_artifact_round_trip(tmp_path: Path) -> None:
@@ -29,7 +38,7 @@ def test_memory_tree_artifact_round_trip(tmp_path: Path) -> None:
             output_dir=tmp_path / "published",
             remote=False,
         )
-    archive_path = tmp_path / "published" / "memory-tree.v1.tar.zst"
+    archive_path = tmp_path / "published" / MEMORY_TREE_ARTIFACT_FILENAME
     with patch(
         "sec_review_agents.artifacts.materialize.download_s3_object",
         return_value=archive_path,
@@ -37,7 +46,11 @@ def test_memory_tree_artifact_round_trip(tmp_path: Path) -> None:
         materialized = materialize_memory_tree(
             replace(
                 reference,
-                uri=f"s3://artifacts/memory/trees/{reference.digest.removeprefix('sha256:')}/memory-tree.v1.tar.zst",
+                uri=(
+                    "s3://artifacts/memory/trees/"
+                    f"{reference.digest.removeprefix('sha256:')}/"
+                    f"{MEMORY_TREE_ARTIFACT_FILENAME}"
+                ),
             ),
             destination=tmp_path / "materialized",
         )

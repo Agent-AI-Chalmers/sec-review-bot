@@ -1,12 +1,26 @@
+import json
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.artifacts.reference import local_artifact_reference
+from sec_review_agents.contract_versions import RUN_DIAGNOSTIC_ARTIFACT_VERSION
 from sec_review_agents.run_diagnostics.bundle import (
+    DIAGNOSTIC_BUNDLE_FILENAME,
     DiagnosticReviewUnit,
     materialize_diagnostic_transcript_unit,
     publish_run_diagnostic_bundle,
+)
+from tests.project_paths import CONTRACTS_ROOT
+
+CORPUS = (
+    CONTRACTS_ROOT
+    / "tar-zstd-artifact"
+    / "profiles"
+    / "run-diagnostic"
+    / RUN_DIAGNOSTIC_ARTIFACT_VERSION
+    / "corpus"
 )
 
 
@@ -108,7 +122,7 @@ def test_diagnostic_bundle_rejects_conflicting_existing_file(tmp_path: Path) -> 
     """A different existing archive must fail without replacing the original."""
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir()
-    destination = artifact_root / "published" / "diagnostic-tree.v1.tar.zst"
+    destination = artifact_root / "published" / DIAGNOSTIC_BUNDLE_FILENAME
     destination.parent.mkdir()
     destination.write_bytes(b"existing")
 
@@ -131,7 +145,7 @@ def test_diagnostic_bundle_build_failure_preserves_existing_file(
     """A failed rebuild must not damage the archive already published."""
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir()
-    destination = artifact_root / "published" / "diagnostic-tree.v1.tar.zst"
+    destination = artifact_root / "published" / DIAGNOSTIC_BUNDLE_FILENAME
     destination.parent.mkdir()
     destination.write_bytes(b"existing")
 
@@ -224,5 +238,34 @@ def test_diagnostic_bundle_can_have_no_memory_units(tmp_path: Path) -> None:
         remote=False,
     )
 
-    assert publication.reference.uri.endswith("/published/diagnostic-tree.v1.tar.zst")
+    assert publication.reference.uri.endswith(
+        f"/published/{DIAGNOSTIC_BUNDLE_FILENAME}"
+    )
     assert publication.unit_ids == ()
+
+
+def test_python_reader_matches_shared_run_diagnostic_corpus(tmp_path: Path) -> None:
+    manifest = json.loads((CORPUS / "manifest.json").read_text(encoding="utf-8"))
+
+    for case in manifest["corpus"]:
+        archive = CORPUS / case["file"]
+        run_id = case["runId"]
+        unit_id = case["unitId"]
+        destination = tmp_path / case["file"]
+
+        if case["expected"] == "valid":
+            result = materialize_diagnostic_transcript_unit(
+                local_artifact_reference(archive),
+                run_id=run_id,
+                unit_id=unit_id,
+                destination=destination,
+            )
+            assert result.transcript_paths
+        else:
+            with pytest.raises(ValueError):
+                materialize_diagnostic_transcript_unit(
+                    local_artifact_reference(archive),
+                    run_id=run_id,
+                    unit_id=unit_id,
+                    destination=destination,
+                )

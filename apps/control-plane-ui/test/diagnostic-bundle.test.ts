@@ -1,10 +1,20 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { zstdCompressSync } from 'node:zlib'
 
 import tar from 'tar-stream'
 
 import { readDiagnosticBundle } from '../server/run/diagnostic-bundle.js'
+
+const repositoryRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..',
+  '..'
+)
 
 async function bundle(
   entries: Array<{
@@ -133,6 +143,36 @@ test('diagnostic bundle reader rejects links and missing manifest entries', asyn
     ),
     /invalid_diagnostic_bundle/
   )
+})
+
+test('diagnostic bundle reader matches the shared profile corpus', async () => {
+  const corpus = path.join(
+    repositoryRoot,
+    'contracts',
+    'tar-zstd-artifact',
+    'profiles',
+    'run-diagnostic',
+    'v1',
+    'corpus'
+  )
+  const manifest = JSON.parse(
+    await readFile(path.join(corpus, 'manifest.json'), 'utf8')
+  ) as {
+    corpus: Array<{
+      file: string
+      expected: 'valid' | 'invalid'
+      runId: string
+    }>
+  }
+
+  for (const item of manifest.corpus) {
+    const read = readDiagnosticBundle(
+      await readFile(path.join(corpus, item.file)),
+      item.runId
+    )
+    if (item.expected === 'valid') await read
+    else await assert.rejects(read, /invalid_diagnostic_bundle/, item.file)
+  }
 })
 
 test('diagnostic bundle reader rejects duplicate directory paths', async () => {

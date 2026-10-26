@@ -10,12 +10,12 @@
   "scripts": {
     "generate": "node --import tsx src/generate.ts",
     "check": "node --import tsx src/check.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "lint": "eslint .",
-    "lint:contract": "spectral lint ../v1/openapi.yaml --ruleset ../../.spectral.yaml",
-    "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "lint:contract": "spectral lint ../v1/openapi.yaml --ruleset ../../.spectral.yaml",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {

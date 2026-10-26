@@ -13,6 +13,7 @@ from sec_review_agents.cli.local_materialization.common import (
     ReviewWorkflow,
 )
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
+from sec_review_agents.run_diagnostics.bundle import DIAGNOSTIC_BUNDLE_FILENAME
 from sec_review_agents.workflows.issue.direct import run_issue_review_direct
 from sec_review_agents.workflows.issue.single_agent import (
     run_issue_single_agent_direct,
@@ -152,7 +153,7 @@ def test_local_direct_runs_review_only(
     assert result == {"ok": True}
     assert calls == ["direct:run-1"]
     assert (
-        bundle.artifact_root_path / "published" / "diagnostic-tree.v1.tar.zst"
+        bundle.artifact_root_path / "published" / DIAGNOSTIC_BUNDLE_FILENAME
     ).is_file()
 
 

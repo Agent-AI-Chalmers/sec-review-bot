@@ -137,7 +137,9 @@ await test('TypeScript reader matches the shared memory tree corpus', async () =
   const fixtureRoot = path.join(
     repositoryRoot,
     'contracts',
-    'memory-tree-artifact',
+    'tar-zstd-artifact',
+    'profiles',
+    'memory-tree',
     'v1',
     'corpus'
   )

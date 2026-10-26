@@ -14,6 +14,7 @@ const corpus = path.resolve(
   '..',
   'contracts',
   'tar-zstd-artifact',
+  'envelope',
   'v1',
   'corpus'
 )

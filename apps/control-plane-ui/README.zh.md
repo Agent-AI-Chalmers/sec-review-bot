@@ -76,7 +76,7 @@ pnpm run build
 
 BFF 还负责代理下载私有 RustFS 中的终态 artifact。它使用单独的 `s3:GetObject` 凭据，该凭据仅可读取 `sec-review/runs/*/artifacts/*`；浏览器只提交 run ID，不会收到存储凭据或对象 URI。BFF 会先将对象写入临时文件，并根据 Review Runs 元数据校验大小和 SHA-256 摘要，再向浏览器返回下载。下载使用同一个 HTTP-only session 鉴权，固定作为附件返回，并受存储空闲超时限制。
 
-服务端 memory tree reader 与 builder 实现版本化的 [memory-tree-artifact contract](../../contracts/memory-tree-artifact/README.zh.md)。它们不会进入 browser bundle；BFF 负责校验、digest 计算和规范 object key。
+服务端 memory tree reader 与 builder 实现版本化的 [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.zh.md)。它们不会进入 browser bundle；BFF 负责校验、digest 计算和规范 object key。
 
 设置 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_READ_TOKEN` 后启用 memory 读取。BFF 会从 Catalog JSON 中移除存储 URI，自行读取 artifact，并在返回内容或下载前校验 size 和 SHA-256 digest。
 

@@ -9,10 +9,13 @@
 ## 命令
 
 ```bash
-pnpm run generate        # 渲染全部产物并就地写入
-pnpm run check           # 将每个已提交产物与重新渲染结果比对
-pnpm run lint:contract   # 用 Spectral 依据 ../.spectral.yaml 检查 ../v1/openapi.yaml
-pnpm run test            # 生成器守则、manifest 一致性、CI 过滤器覆盖
+pnpm run generate
+pnpm run check
+pnpm run format:check
+pnpm run lint
+pnpm run lint:contract
+pnpm run typecheck
+pnpm test
 ```
 
 `generate` 与 `check` 共享同一份"什么被生成"的描述（各生成器中的 `generatedArtifacts()`），因此二者不可能不一致。`tools/generated-artifacts.json` 记录本族派生什么、落到哪里；一个测试会断言它与生成器一致，并断言 CI 覆盖清单中每个产物。
@@ -24,7 +27,7 @@ tools/
   generated-artifacts.json   本族派生什么、落到哪里
   src/
     generate.ts              pnpm run generate
-    check-generated-artifacts.ts  pnpm run check
+    check.ts                 pnpm run check
     generated-artifact.ts    { output, render } 形状
     repo-root.ts             仓库根，用于构造产物绝对路径
     generate-types.ts        API 投影（类型、错误码、控制台参数）
