@@ -7,7 +7,7 @@ import test from 'node:test'
 
 import { handlePullRequestReviewRun } from '../../../src/reviews/pull-requests/publish.js'
 import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
-import type { PublicationStepStore } from '../../../src/control-plane/client.js'
+import type { PublicationStepStore } from '../../../src/review-runs/client.js'
 import { EXECUTION_API_VERSION } from '../../../src/execution/execution-api-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 

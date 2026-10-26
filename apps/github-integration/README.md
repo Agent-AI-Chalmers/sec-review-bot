@@ -4,15 +4,15 @@ Language: English | [中文](README.zh.md)
 
 This package contains the GitHub integration service for the project.
 
-It does not execute agent workflows directly. It prepares inputs, submits and observes review runs through Control Plane, and publishes terminal results back to GitHub.
+It does not execute agent workflows directly. It prepares inputs, submits and observes review runs through Review Runs, and publishes terminal results back to GitHub.
 
 ## Setup
 
-For local development, install the Control Plane service and integration dependencies from the repository root:
+For local development, install Review Runs service and integration dependencies from the repository root:
 
 ```bash
 corepack install --global pnpm@12
-pnpm --dir control-plane install
+pnpm --dir review-runs install
 pnpm --dir apps/github-integration install
 ```
 
@@ -32,7 +32,7 @@ pnpm test
 ```
 
 `pnpm test` runs tests that do not require external services. The integration
-suite uses the Control Plane test database for publisher boundary tests:
+suite uses Review Runs test database for publisher boundary tests:
 
 ```bash
 TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
@@ -43,9 +43,9 @@ pnpm run test:integration
 
 A complete review also needs the execution gateway and worker. To run the whole stack locally, use the repository-level Docker Compose deployment. The commands below only start the GitHub integration service.
 
-For non-Compose startup, fill `apps/github-integration/.env` from `apps/github-integration/.env.sample`; at minimum set `APP_ID`, `PRIVATE_KEY_PATH`, `WEBHOOK_SECRET`, `CONTROL_PLANE_SERVICE_URL`, and `CONTROL_PLANE_SERVICE_TOKEN`.
+For non-Compose startup, fill `apps/github-integration/.env` from `apps/github-integration/.env.sample`; at minimum set `APP_ID`, `PRIVATE_KEY_PATH`, `WEBHOOK_SECRET`, `REVIEW_RUNS_SERVICE_URL`, and `REVIEW_RUNS_SERVICE_TOKEN`.
 
-`CONTROL_PLANE_REQUEST_TIMEOUT_MS` bounds every Control Plane request and defaults to 30 seconds. In particular, a publication lease renewal that fails or times out is treated as lost ownership: the publisher stops before starting another GitHub mutation and leaves recovery to lease takeover.
+`REVIEW_RUNS_REQUEST_TIMEOUT_MS` bounds every Review Runs request and defaults to 30 seconds. In particular, a publication lease renewal that fails or times out is treated as lost ownership: the publisher stops before starting another GitHub mutation and leaves recovery to lease takeover.
 
 ```bash
 pnpm run server
@@ -91,7 +91,7 @@ For local GitHub App webhook and Actions dispatch routing, see the [local GitHub
 - Prepare issue / pull request review input
 - Prepare repository review input
 
-- Submit prepared inputs to Control Plane and claim publication work
+- Submit prepared inputs to Review Runs and claim publication work
 - Publish structured results back to GitHub
 
 ## Layout
@@ -101,11 +101,11 @@ For local GitHub App webhook and Actions dispatch routing, see the [local GitHub
   - `reviews/pull-requests/` - pull request review and suggestion comments
   - `reviews/repositories/` - repository review, summary issue, and repair draft PR
 - `github/` - thin GitHub API wrappers and webhook helpers
-- `control-plane/` - Control Plane client, claim handling, and publication coordination
+- `review-runs/` - Review Runs client, claim handling, and publication coordination
 - `execution/` - Execution input, result, and error contracts consumed by this connector
 - `artifacts/` - input bundle storage and Git workspace preparation
 - `ingress/` - inbound HTTP, GitHub Actions, and GitHub webhook handling
-- `triggers/` - turns webhook / Actions / comment requests into Control Plane review submissions
+- `triggers/` - turns webhook / Actions / comment requests into Review Runs review submissions
 - `utils/` - lightweight logging and helpers
 
 ## Triggers

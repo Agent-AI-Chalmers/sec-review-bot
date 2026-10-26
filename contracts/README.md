@@ -30,13 +30,13 @@ A family may also hold documents that apply to every version, such as a transpor
 | --- | --- | --- | --- |
 | [execution-api](execution-api/README.md) | Public HTTP operations, workflow inputs, results, and errors | Execution API providers, callers, and downstream publishers | [v1](execution-api/v1/CONTRACT.md) |
 | [execution-workflow](execution-workflow/README.md) | Temporal Execution Workflow input | Execution Gateway and Execution Worker | [v1](execution-workflow/v1/CONTRACT.md) |
-| [control-plane-api](control-plane-api/README.md) | Control Plane HTTP API and observed run shapes | Control Plane and its callers | [v1](control-plane-api/v1/openapi.yaml) |
+| [review-runs-api](review-runs-api/README.md) | Review Runs HTTP API and observed run shapes | Review Runs and its callers | [v1](review-runs-api/v1/openapi.yaml) |
 | [memory-catalog-api](memory-catalog-api/README.md) | Memory coordination HTTP API | Memory Catalog Server and workers | [v1](memory-catalog-api/v1/openapi.yaml) |
 | [setup-declaration](setup-declaration/README.md) | Trusted `.sec-review/setup.yml` format | Reviewed repositories, GitHub Integration, and Execution Worker | [v1](setup-declaration/v1/SPEC.md) |
 
 ## Rules For Every Family
 
-A family is named for what it covers. If one component owns every shape in it, name it after that component — `control-plane-api` is Control Plane's own shapes. If the shapes span several parties, name it after where they meet — `execution-api` spans Execution providers, callers, and downstream publishers.
+A family is named for what it covers. If one component owns every shape in it, name it after that component — `review-runs-api` is Review Runs's own shapes. If the shapes span several parties, name it after where they meet — `execution-api` spans Execution providers, callers, and downstream publishers.
 
 Do not name a family after one of its consumers: consumers change, the provider does not. And do not reuse a word that another family already uses for a different meaning.
 
@@ -68,5 +68,5 @@ For any contract change:
 - update the specification for the affected version;
 - update its schemas;
 - update or add its fixtures and manifest entries;
-- regenerate any derived artifact (such as the Control Plane's committed `v1` schemas and generated types) with its family's tool: `pnpm --dir contracts/<family>/tools run generate`, then confirm with `... run check`;
+- regenerate any derived artifact (such as the Review Runs's committed `v1` schemas and generated types) with its family's tool: `pnpm --dir contracts/<family>/tools run generate`, then confirm with `... run check`;
 - make both the Python and TypeScript tests validate the same files.

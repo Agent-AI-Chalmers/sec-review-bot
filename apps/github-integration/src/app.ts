@@ -22,8 +22,8 @@ import { handlePullRequestReadyForReview } from './ingress/github/webhooks/pull-
 import { handlePullRequestSynchronize } from './ingress/github/webhooks/pull-request-synchronize.js'
 import { verifyGitWorkspaceRuntime } from './artifacts/git-workspace.js'
 import { verifyContractSchemasLoadable } from './execution/execution-api-schema.js'
-import { startPublicationCoordinator } from './control-plane/publication-coordinator.js'
-import { startPreparationCoordinator } from './control-plane/preparation-coordinator.js'
+import { startPublicationCoordinator } from './review-runs/publication-coordinator.js'
+import { startPreparationCoordinator } from './review-runs/preparation-coordinator.js'
 import { backgroundPreparations } from './reviews/background-preparations.js'
 import { logError, logInfo } from './utils/logger.js'
 

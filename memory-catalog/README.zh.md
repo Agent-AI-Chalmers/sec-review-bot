@@ -20,7 +20,7 @@
 | `GET`  | `/v1/memory-tree/revisions`            | 列出 memory tree revision 历史。                                                          |
 | `GET`  | `/v1/memory-tree/revisions/{revision}` | 返回指定 memory tree revision、maintenance identity 和 artifact references。              |
 
-该服务独占自己的 PostgreSQL database 和 `schema_versions` ledger。默认集成部署将它与 Control Plane database 放在同一个 PostgreSQL 实例中，但两者是相互独立的 database。
+该服务独占自己的 PostgreSQL database 和 `schema_versions` ledger。默认集成部署将它与 Review Runs database 放在同一个 PostgreSQL 实例中，但两者是相互独立的 database。
 
 任何时刻只允许一个 maintainer 执行。Temporal 使用固定 workflow ID 和 `SKIP` schedule overlap policy 强制该约束，因此 catalog 不实现 batch lease 或并发 claim。
 

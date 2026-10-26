@@ -26,8 +26,8 @@ The Node packages use `pnpm`, each with its own manifest and lockfile:
 
 - `apps/github-integration/`
 - `apps/control-plane-ui/`
-- `control-plane/`
-- `contracts/control-plane-api/tools/`
+- `review-runs/`
+- `contracts/review-runs-api/tools/`
 - `contracts/execution-api/tools/`
 
 | Goal | Command (run in a package directory) |

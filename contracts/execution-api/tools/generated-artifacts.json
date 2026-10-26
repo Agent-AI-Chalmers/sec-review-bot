@@ -7,7 +7,7 @@
       "script": "contracts/execution-api/tools/src/generate-types.ts",
       "code_inputs": [
         "contracts/execution-api/tools/src/generate-api-types.ts",
-        "control-plane/.prettierrc.json",
+        "review-runs/.prettierrc.json",
         "execution-gateway/.prettierrc.json"
       ],
       "command": "pnpm --dir contracts/execution-api/tools run generate",
@@ -19,7 +19,7 @@
         "contracts/execution-api/v1/schemas/common.schema.json"
       ],
       "outputs": [
-        "control-plane/src/execution-api-schema.ts",
+        "review-runs/src/execution-api-schema.ts",
         "execution-gateway/src/execution-api-types-generated.ts"
       ]
     },

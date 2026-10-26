@@ -4,7 +4,7 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-这是用于查看 Review Control Plane run 的内部控制台。浏览器只访问该应用的同源服务端；服务端持有 Control Plane 读取凭据，仅代理明确白名单内的 GET 路径，并原样转发查询串。
+这是用于查看 Review Runs run 的内部控制台。浏览器只访问该应用的同源服务端；服务端持有 Review Runs 读取凭据，仅代理明确白名单内的 GET 路径，并原样转发查询串。
 
 ## 本地运行
 
@@ -15,15 +15,15 @@ pnpm install
 pnpm run dev:fixtures
 ```
 
-打开 Vite 输出的地址，通常是 `http://localhost:5173`。这种模式提供有代表性的成功、进行中、恢复中、发布中和失败 run，不需要启动 Control Plane、PostgreSQL 或 RustFS；界面会显示 artifact 元数据，但没有可供下载的真实存储对象。
+打开 Vite 输出的地址，通常是 `http://localhost:5173`。这种模式提供有代表性的成功、进行中、恢复中、发布中和失败 run，不需要启动 Review Runs、PostgreSQL 或 RustFS；界面会显示 artifact 元数据，但没有可供下载的真实存储对象。
 
-fixture 按 Control Plane 的默认页大小提供数十条 run，并实现了它的游标契约，因此翻页、状态筛选和详情时间线都能在没有后端的情况下走通。每条生成的 run 都会对照 store 实际可能产生的状态做校验，所以不可能出现的组合会让模块导入直接失败，而不是变成看起来合理的演示数据。
+fixture 按 Review Runs 的默认页大小提供数十条 run，并实现了它的游标契约，因此翻页、状态筛选和详情时间线都能在没有后端的情况下走通。每条生成的 run 都会对照 store 实际可能产生的状态做校验，所以不可能出现的组合会让模块导入直接失败，而不是变成看起来合理的演示数据。
 
-如需连接正在运行的 Control Plane，先在一个终端中构建并启动 BFF：
+如需连接正在运行的 Review Runs，先在一个终端中构建并启动 BFF：
 
 ```bash
 pnpm run build
-CONTROL_PLANE_READ_TOKEN=local-read-token \
+REVIEW_RUNS_READ_TOKEN=local-read-token \
 CONTROL_PLANE_UI_ACCESS_TOKEN=local-ui-token \
 pnpm run server
 ```
@@ -34,7 +34,7 @@ pnpm run server
 pnpm run dev
 ```
 
-Vite 会将 `/api` 请求代理到 `http://127.0.0.1:8091` 上的 BFF。BFF 默认连接 `http://127.0.0.1:8090` 上的 Control Plane；若 Control Plane 位于其他地址，请设置 `CONTROL_PLANE_URL`。下载 artifact 还需要配置[本地集成部署](../../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)中列出的 RustFS 参数。
+Vite 会将 `/api` 请求代理到 `http://127.0.0.1:8091` 上的 BFF。BFF 默认连接 `http://127.0.0.1:8090` 上的 Review Runs；若 Review Runs 位于其他地址，请设置 `REVIEW_RUNS_URL`。下载 artifact 还需要配置[本地集成部署](../../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)中列出的 RustFS 参数。
 
 使用完整 Compose 部署时，默认访问地址为 `http://127.0.0.1:8091`。
 
@@ -48,6 +48,6 @@ pnpm test
 pnpm run build
 ```
 
-生产服务需要 `CONTROL_PLANE_READ_TOKEN` 和 `CONTROL_PLANE_UI_ACCESS_TOKEN`，它们回答的是两个不同的问题。访问 token 决定"谁能打开控制台"：浏览器用它换取 HTTP-only 会话 cookie，token 本身不会进入浏览器代码或 Vite 变量。read token 则是后端在用户登录后调用 Control Plane 查询路由时使用的凭证，同样只存在于服务端。两者分开，意味着控制台账号与读密钥可以独立签发、轮换和吊销——例如只读的监控面板只持有 read token，不具备任何控制台访问能力。
+生产服务需要 `REVIEW_RUNS_READ_TOKEN` 和 `CONTROL_PLANE_UI_ACCESS_TOKEN`，它们回答的是两个不同的问题。访问 token 决定"谁能打开控制台"：浏览器用它换取 HTTP-only 会话 cookie，token 本身不会进入浏览器代码或 Vite 变量。read token 则是后端在用户登录后调用 Review Runs 查询路由时使用的凭证，同样只存在于服务端。两者分开，意味着控制台账号与读密钥可以独立签发、轮换和吊销——例如只读的监控面板只持有 read token，不具备任何控制台访问能力。
 
-BFF 还负责代理下载私有 RustFS 中的终态 artifact。它使用单独的 `s3:GetObject` 凭据，该凭据仅可读取 `sec-review/runs/*/artifacts/*`；浏览器只提交 run ID，不会收到存储凭据或对象 URI。BFF 会先将对象写入临时文件，并根据 Control Plane 元数据校验大小和 SHA-256 摘要，再向浏览器返回下载。下载使用同一个 HTTP-only session 鉴权，固定作为附件返回，并受存储空闲超时限制。
+BFF 还负责代理下载私有 RustFS 中的终态 artifact。它使用单独的 `s3:GetObject` 凭据，该凭据仅可读取 `sec-review/runs/*/artifacts/*`；浏览器只提交 run ID，不会收到存储凭据或对象 URI。BFF 会先将对象写入临时文件，并根据 Review Runs 元数据校验大小和 SHA-256 摘要，再向浏览器返回下载。下载使用同一个 HTTP-only session 鉴权，固定作为附件返回，并受存储空闲超时限制。

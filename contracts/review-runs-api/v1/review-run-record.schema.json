@@ -1,0 +1,289 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sec-review-bot.local/contracts/review-runs-api/v1/review-run-record.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "workflow",
+    "publish_context",
+    "preparation",
+    "execution",
+    "publication",
+    "created_at",
+    "failure_code",
+    "failure_message",
+    "artifact_storage",
+    "notices"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflow": {
+      "type": "string",
+      "enum": ["issue-review", "pull-request-review", "repository-review"]
+    },
+    "publish_context": {
+      "type": "object",
+      "additionalProperties": {}
+    },
+    "execution_input": {
+      "type": "object",
+      "additionalProperties": {}
+    },
+    "preparation": {
+      "type": "object",
+      "description": "Durable preparation state for the run's preparation axis. This is an operational summary only; it never exposes connector-owned preparation input. It is not nullable: admission creates a run, its preparation, and its execution in one transaction and nothing deletes an axis on its own, so every readable run carries a summary. A row whose preparation is missing is corrupt — Review Runs drops it from list reads and answers 404 for a single-run read, logging the fault — rather than reported with a null summary.",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "attempt_count",
+        "started_at",
+        "finished_at",
+        "updated_at",
+        "failure_code",
+        "disconnect_reason"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Preparation lifecycle. `preparing` means a preparer currently owns the claim; it is the preparation axis's own \"in progress\" state and is unrelated to the Execution API provider, which is only submitted to once preparation reaches `submitted`.",
+          "enum": [
+            "pending",
+            "preparing",
+            "uncertain",
+            "disconnected",
+            "submitted",
+            "failed"
+          ]
+        },
+        "attempt_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "disconnect_reason": {
+          "type": ["string", "null"],
+          "description": "Non-null only while `status` is `disconnected`: the reason the run's own records do not admit the transition an expired lease would make, so automatic work cannot conclude it. It names that conflict and nothing else - what an operator may do about it is the `disconnected` state's business, not this field's. The value today is `EXECUTION_ALREADY_ADVANCED`."
+        },
+        "started_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Immutable instant the preparation phase began (a preparer first claimed the work); null while it is still pending. A retry that returns the row to pending and claims it again does not move it, so it is a safe start bound for the phase."
+        },
+        "finished_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Immutable instant the preparation phase reached a terminal state (`submitted` or `failed`); null while it is pending or preparing. Distinct from `updated_at`, which also moves on claim heartbeats and input checkpoints and cannot mark the phase end."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last time the preparation axis was written, including claim heartbeats and input checkpoints. This is the activity freshness the console reports, not a phase bound — use `started_at` and `finished_at` for that. A preparation that is still being built keeps advancing here even though its bounds do not."
+        },
+        "failure_code": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "ingress_kind": {
+      "type": "string",
+      "enum": ["github_webhook", "github_actions_dispatch"]
+    },
+    "ingress_key": {
+      "type": "string"
+    },
+    "execution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "started_at", "finished_at", "updated_at"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "The execution lifecycle as coordinated through Execution API provider. `pending` means the run has been admitted but its prepared input has not yet been submitted to the Execution API provider; preparation progress is reported separately by `preparation`. `skipped` means execution never ran because preparation failed; the reason is on `preparation`, not here. `uncertain` means a submission may have reached the Execution API provider but its result could not be confirmed; a recovery replays it under the same identity. `disconnected` means automatic recovery stopped after its finite budget without a conclusive answer, so it is not a failure.",
+          "enum": [
+            "pending",
+            "queued",
+            "running",
+            "uncertain",
+            "disconnected",
+            "succeeded",
+            "skipped",
+            "failed"
+          ]
+        },
+        "started_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Immutable instant the prepared Execution input was accepted and execution began; null while the run is still pending, and also null for `skipped`, which is concluded without ever having started. Written once, so a recovery replay does not move it."
+        },
+        "finished_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Immutable instant the execution axis reached a terminal state (`succeeded`, `failed`, or `skipped`); null while it is pending, queued, running, uncertain, or disconnected. Together with `started_at` it times the phase (only when `started_at` is non-null, since `skipped` has an end without a start)."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last time the execution axis was written: a polling confirmation, a state transition, or a submission/recovery write. This is the observation freshness the console reports (\"observed Ns ago\"), not a phase bound — use `started_at` and `finished_at` for that."
+        }
+      }
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "started_at", "finished_at", "updated_at"],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "publishing",
+            "uncertain",
+            "disconnected",
+            "published",
+            "failed",
+            "skipped"
+          ]
+        },
+        "started_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Immutable instant the publication phase began (the work was first claimed); null while it is pending, and null for `skipped`, which is concluded without ever having started. A retryable failure that returns the row to pending and claims it again does not move it."
+        },
+        "finished_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Immutable instant the publication axis reached a terminal state (`published`, `failed`, or `skipped`); null while it is pending or publishing. It is set for every terminal outcome. The instant the result became visible is this field read together with `status: published`."
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Last time the publication axis was written, including claim heartbeats. This is the activity freshness the console reports, not a phase bound — use `started_at` and `finished_at` for that. Unlike them it keeps advancing while a long publication runs."
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "failure_code": {
+      "type": ["string", "null"]
+    },
+    "failure_message": {
+      "type": ["string", "null"]
+    },
+    "artifact_storage": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["unavailable", "failed"]
+            },
+            "error_code": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "artifact"],
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["available"]
+            },
+            "artifact": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "uri", "media_type", "digest", "size_bytes"],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": ["diagnostic_bundle"]
+                },
+                "uri": {
+                  "type": "string",
+                  "pattern": "^s3://[^/]+/runs/[^/]+/artifacts/diagnostic-tree\\.v1\\.tar\\.zst$"
+                },
+                "media_type": {
+                  "type": "string",
+                  "enum": ["application/tar+zstd"]
+                },
+                "digest": {
+                  "type": "string",
+                  "pattern": "^sha256:[0-9a-f]{64}$"
+                },
+                "size_bytes": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "notices": {
+      "description": "User-visible notices caused by this run's coordination events, in creation order.",
+      "type": "array",
+      "items": {
+        "description": "Delivery state of one user-visible coordination notice.\n",
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "notice_id",
+          "kind",
+          "axis",
+          "status",
+          "reason_code",
+          "comment_url"
+        ],
+        "properties": {
+          "notice_id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["failure", "attention"]
+          },
+          "axis": {
+            "type": "string",
+            "enum": ["preparation", "execution", "publication"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "delivering", "delivered", "failed"]
+          },
+          "reason_code": {
+            "type": ["string", "null"]
+          },
+          "comment_url": {
+            "description": "Where the requester can read the outcome. Always an absolute URI when present, and null only when no message reached them.",
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "format": "uri"
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

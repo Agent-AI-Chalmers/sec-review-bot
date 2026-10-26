@@ -1,7 +1,7 @@
-// Generated from contracts/control-plane-api/v1/openapi.yaml (path relative to the repository
+// Generated from contracts/review-runs-api/v1/openapi.yaml (path relative to the repository
 // root). Do not edit. The contract's `x-state-machines` block is the single source of truth;
 // this file is its TypeScript view. Regenerate it with
-// `pnpm --dir contracts/control-plane-api/tools run generate`.
+// `pnpm --dir contracts/review-runs-api/tools run generate`.
 
 export type StateAxis = 'preparation' | 'execution' | 'publication'
 
@@ -60,7 +60,7 @@ export const STATE_MACHINES: readonly StateMachine[] = [
       uncertain: {
         label: 'Uncertain',
         description:
-          'The claim lapsed before the preparer reported, so it is unknown whether the prepared input reached Control Plane. This is not a failure: a claim may rebuild the input and resubmit it under the same identity, which is idempotent.'
+          'The claim lapsed before the preparer reported, so it is unknown whether the prepared input reached Review Runs. This is not a failure: a claim may rebuild the input and resubmit it under the same identity, which is idempotent.'
       },
       disconnected: {
         label: 'Disconnected',

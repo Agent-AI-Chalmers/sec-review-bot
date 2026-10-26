@@ -17,7 +17,7 @@ import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { LIST_RUN_QUERY_PARAMS } from '../src/list-run-query-params.js'
 
 const MAX_SESSION_BODY_BYTES = 1024 * 1024
-const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 10_000
+const REVIEW_RUNS_REQUEST_TIMEOUT_MS = 10_000
 const ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS = 30_000
 const ARTIFACT_BUCKET = 'sec-review'
 
@@ -71,10 +71,10 @@ function sameOrigin(request: IncomingMessage): boolean {
 
 /**
  * The upstream path a read proxy should request: the BFF path minus its `/api` prefix,
- * with the query reduced to the parameters Control Plane declares (generated from
+ * with the query reduced to the parameters Review Runs declares (generated from
  * `openapi.yaml`). Anything else the browser put in the URL (UI state such as `range`,
  * analytics parameters, typos) is dropped rather than forwarded, so this proxy cannot send
- * a request outside Control Plane's contract.
+ * a request outside Review Runs's contract.
  */
 function forwardedPath(bffUrl: string): string {
   const url = new URL(bffUrl, 'http://control-plane-ui.local')
@@ -87,13 +87,13 @@ function forwardedPath(bffUrl: string): string {
   return `${url.pathname.slice('/api'.length)}${query === '' ? '' : `?${query}`}`
 }
 
-/** The UUID a Control Plane run id is (see the contract's `runId` path parameter). */
+/** The UUID a Review Runs run id is (see the contract's `runId` path parameter). */
 const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 /** Whether this BFF path is one of the reads the console may proxy upstream.
  *
  * The run-id segment is matched against the contract's UUID shape after percent-decoding, not
- * with a catch-all. A catch-all would still be safe today - Control Plane rejects a malformed id
+ * with a catch-all. A catch-all would still be safe today - Review Runs rejects a malformed id
  * with a 400 - but it widens the reachable surface to whatever path a future upstream read
  * endpoint might parse, so the allow-list states the exact shape it means.
  */
@@ -101,7 +101,7 @@ const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  *
  * The admin credential is supplied by the operator for that one request and forwarded as-is; the
  * BFF never reads or stores it. Keeping it out of the server means a compromised BFF cannot
- * abandon or resume runs, and the Control Plane decides who is allowed to.
+ * abandon or resume runs, and Review Runs decides who is allowed to.
  */
 // Same shape check as the read allow-list: the id is a UUID or the request is not one this BFF
 // proxies. Sharing `RUN_ID` keeps the two policies from drifting apart.
@@ -133,11 +133,11 @@ function isAllowedReadPath(bffUrl: string): boolean {
 }
 
 /**
- * The `content-type` served for a proxied Control Plane response.
+ * The `content-type` served for a proxied Review Runs response.
  *
  * Every proxied route (the reads and the admin write) returns JSON, so the BFF answers with a
  * fixed JSON media type instead of echoing the upstream `content-type`. The upstream value is
- * only attacker-influenced if Control Plane is compromised, but copying it verbatim would serve
+ * only attacker-influenced if Review Runs is compromised, but copying it verbatim would serve
  * whatever that response claimed (for example `text/html`) from the console's own origin, where
  * a browser could run it as script. A constant cannot be mismatched with the body either: the
  * bytes are forwarded unchanged and the contract says they are JSON.
@@ -242,20 +242,20 @@ function storageStatus(error: unknown): number | undefined {
 }
 
 export function createControlPlaneUiServer({
-  controlPlaneUrl,
-  controlPlaneToken,
+  reviewRunsUrl,
+  reviewRunsToken,
   accessToken,
   artifactStore,
   artifactDownloadIdleTimeoutMs = ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS,
-  controlPlaneRequestTimeoutMs = CONTROL_PLANE_REQUEST_TIMEOUT_MS,
+  reviewRunsRequestTimeoutMs = REVIEW_RUNS_REQUEST_TIMEOUT_MS,
   assets = path.resolve('dist')
 }: {
-  controlPlaneUrl: string
-  controlPlaneToken: string
+  reviewRunsUrl: string
+  reviewRunsToken: string
   accessToken: string
   artifactStore?: ArtifactStore
   artifactDownloadIdleTimeoutMs?: number
-  controlPlaneRequestTimeoutMs?: number
+  reviewRunsRequestTimeoutMs?: number
   assets?: string
 }): Server {
   const sessionValue = crypto
@@ -369,7 +369,7 @@ export function createControlPlaneUiServer({
         const metadataTimeout = setTimeout(() => {
           metadataTimedOut = true
           metadataController.abort()
-        }, controlPlaneRequestTimeoutMs)
+        }, reviewRunsRequestTimeoutMs)
         const downloadController = new AbortController()
         request.once('aborted', () => downloadController.abort())
         response.once('close', () => {
@@ -388,9 +388,9 @@ export function createControlPlaneUiServer({
         let temporaryDirectory: string | undefined
         try {
           const upstream = await fetch(
-            `${controlPlaneUrl}/v1/runs/${encodeURIComponent(runId)}`,
+            `${reviewRunsUrl}/v1/runs/${encodeURIComponent(runId)}`,
             {
-              headers: { authorization: `Bearer ${controlPlaneToken}` },
+              headers: { authorization: `Bearer ${reviewRunsToken}` },
               signal: metadataController.signal
             }
           )
@@ -399,7 +399,7 @@ export function createControlPlaneUiServer({
             return
           }
           if (!upstream.ok) {
-            sendJson(response, 502, { error: 'control_plane_unavailable' })
+            sendJson(response, 502, { error: 'review_runs_unavailable' })
             return
           }
           const body = (await upstream.json()) as {
@@ -497,7 +497,7 @@ export function createControlPlaneUiServer({
                 status === 404
                   ? 'artifact_not_found'
                   : metadataTimedOut
-                    ? 'control_plane_timeout'
+                    ? 'review_runs_timeout'
                     : downloadTimedOut
                       ? 'artifact_download_timeout'
                       : identityMismatch
@@ -521,7 +521,7 @@ export function createControlPlaneUiServer({
           sendJson(response, 403, { error: 'cross_site_request' })
           return
         }
-        const adminToken = request.headers['x-control-plane-admin-token']
+        const adminToken = request.headers['x-review-runs-admin-token']
         if (typeof adminToken !== 'string' || adminToken.trim() === '') {
           // 401 rather than 400: the request is well-formed, it just carries no operator
           // credential. The console turns this into its admin-token prompt.
@@ -549,7 +549,7 @@ export function createControlPlaneUiServer({
                 ? 'give-up'
                 : 'abandon'
           const upstream = await fetch(
-            `${controlPlaneUrl}/v1/admin/runs/${encodeURIComponent(
+            `${reviewRunsUrl}/v1/admin/runs/${encodeURIComponent(
               decodeURIComponent(decision[1] ?? '')
             )}/${action}`,
             {
@@ -559,7 +559,7 @@ export function createControlPlaneUiServer({
                 'content-type': 'application/json'
               },
               body: Buffer.concat(chunks),
-              signal: AbortSignal.timeout(CONTROL_PLANE_REQUEST_TIMEOUT_MS)
+              signal: AbortSignal.timeout(REVIEW_RUNS_REQUEST_TIMEOUT_MS)
             }
           )
           response.writeHead(upstream.status, {
@@ -571,9 +571,7 @@ export function createControlPlaneUiServer({
             error instanceof Error &&
             (error.name === 'AbortError' || error.name === 'TimeoutError')
           sendJson(response, timedOut ? 504 : 502, {
-            error: timedOut
-              ? 'control_plane_timeout'
-              : 'control_plane_unavailable'
+            error: timedOut ? 'review_runs_timeout' : 'review_runs_unavailable'
           })
         }
         return
@@ -586,13 +584,13 @@ export function createControlPlaneUiServer({
       const controller = new AbortController()
       const timeout = setTimeout(
         () => controller.abort(),
-        CONTROL_PLANE_REQUEST_TIMEOUT_MS
+        REVIEW_RUNS_REQUEST_TIMEOUT_MS
       )
       try {
         const upstream = await fetch(
-          `${controlPlaneUrl}/v1${forwardedPath(request.url ?? '/')}`,
+          `${reviewRunsUrl}/v1${forwardedPath(request.url ?? '/')}`,
           {
-            headers: { authorization: `Bearer ${controlPlaneToken}` },
+            headers: { authorization: `Bearer ${reviewRunsToken}` },
             signal: controller.signal
           }
         )
@@ -607,9 +605,7 @@ export function createControlPlaneUiServer({
         })
         response.end(
           JSON.stringify({
-            error: timedOut
-              ? 'control_plane_timeout'
-              : 'control_plane_unavailable'
+            error: timedOut ? 'review_runs_timeout' : 'review_runs_unavailable'
           })
         )
       } finally {
@@ -647,15 +643,14 @@ if (
   process.argv[1] !== undefined &&
   import.meta.url === pathToFileURL(process.argv[1]).href
 ) {
-  const controlPlaneToken = process.env.CONTROL_PLANE_READ_TOKEN
+  const reviewRunsToken = process.env.REVIEW_RUNS_READ_TOKEN
   const accessToken = process.env.CONTROL_PLANE_UI_ACCESS_TOKEN
-  if (!controlPlaneToken)
-    throw new Error('CONTROL_PLANE_READ_TOKEN is required.')
+  if (!reviewRunsToken) throw new Error('REVIEW_RUNS_READ_TOKEN is required.')
   if (!accessToken)
     throw new Error('CONTROL_PLANE_UI_ACCESS_TOKEN is required.')
   createControlPlaneUiServer({
-    controlPlaneUrl: process.env.CONTROL_PLANE_URL ?? 'http://127.0.0.1:8090',
-    controlPlaneToken,
+    reviewRunsUrl: process.env.REVIEW_RUNS_URL ?? 'http://127.0.0.1:8090',
+    reviewRunsToken,
     accessToken,
     artifactStore: artifactStoreFromEnvironment()
   }).listen(

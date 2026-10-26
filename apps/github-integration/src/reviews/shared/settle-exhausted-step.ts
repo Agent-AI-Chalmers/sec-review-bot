@@ -1,6 +1,6 @@
 // Concluding a publication step that ran out of attempts, from what is actually on GitHub.
 //
-// A step reaches `retry_exhausted` when there is no attempt left to give it. Control Plane cannot
+// A step reaches `retry_exhausted` when there is no attempt left to give it. Review Runs cannot
 // read GitHub, so it deliberately does not decide what that means: a `running` step belongs to a
 // publisher that started the side effect and may have finished it before dying, and a `failed`
 // step's last attempt may also have taken effect before its response was lost. Concluding either
@@ -13,7 +13,7 @@
 // absent.
 import type { Octokit } from 'octokit'
 
-import type { PublicationStepStore } from '../../control-plane/client.js'
+import type { PublicationStepStore } from '../../review-runs/client.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../../execution/publish-error-code.js'
 import { errorCode } from '../../utils/error-utils.js'
 
@@ -37,7 +37,7 @@ export type ReconciledRemote = { id?: string | number | null; url?: string }
  * could not be performed is not evidence of absence, and treating it as such is the bug this
  * module exists to avoid.
  *
- * Every outcome after `find` returns says what Control Plane now stores, not merely what the
+ * Every outcome after `find` returns says what Review Runs now stores, not merely what the
  * remote system looked like. That is the point of the names: a caller never has to know which
  * branch wrote to the step to tell whether it did. The recorded states are the same words the
  * schema uses (`succeeded`, `terminal_failed`), so reading a call site does not require a

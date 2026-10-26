@@ -75,7 +75,7 @@ async function startFixtureServer(): Promise<{
 
 test('dev fixtures only describe reachable run states', async () => {
   // dev-fixtures.ts validates every generated run at import time and throws on a
-  // combination the Control Plane cannot produce (for example a failed execution
+  // combination Review Runs cannot produce (for example a failed execution
   // whose publication is still `pending`). Importing it is therefore the assertion:
   // this test exists so an unreachable fixture fails CI instead of silently
   // showing operators a state that cannot happen.

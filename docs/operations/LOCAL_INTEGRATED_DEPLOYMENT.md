@@ -2,7 +2,7 @@
 
 Language: English | [中文](LOCAL_INTEGRATED_DEPLOYMENT.zh.md)
 
-This guide covers local deployment of the GitHub integration, Review Control Plane, Execution Gateway, Temporal, object storage, and the host Execution, Memory Extraction, and Memory Maintenance Workers.
+This guide covers local deployment of the GitHub integration, Review Runs, Execution Gateway, Temporal, object storage, and the host Execution, Memory Extraction, and Memory Maintenance Workers.
 
 Use it to run the complete integrated path locally. For running agents directly without the HTTP Execution Gateway, or for debugging with `run-local-* --temporal`, see the [agents local running guide](../../agents/README.md).
 
@@ -10,9 +10,9 @@ Use it to run the complete integrated path locally. For running agents directly 
 
 ![Local integrated deployment shape](../../assets/operations/local-integrated-deployment.svg)
 
-Cloudflare Tunnel sends GitHub traffic to the integration service. Control Plane coordinates each review run, while Temporal dispatches review, memory extraction, and memory maintenance work to three independent worker pools. PostgreSQL stores control and catalog state, while RustFS stores run inputs, transcripts, memory revisions, and artifacts.
+Cloudflare Tunnel sends GitHub traffic to the integration service. Review Runs coordinates each review run, while Temporal dispatches review, memory extraction, and memory maintenance work to three independent worker pools. PostgreSQL stores control and catalog state, while RustFS stores run inputs, transcripts, memory revisions, and artifacts.
 
-Control Plane UI is a separately deployed console. Its same-origin server reads run state from Control Plane and proxies artifact downloads, so service and storage credentials remain outside browser code. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for public endpoint configuration.
+Control Plane UI is a separately deployed console. Its same-origin server reads run state from Review Runs and proxies artifact downloads, so service and storage credentials remain outside browser code. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for public endpoint configuration.
 
 Without the worker responsible for a task queue, tasks on that queue remain in Temporal waiting for execution.
 
@@ -21,7 +21,7 @@ Default local endpoints:
 | Service | URL |
 | --- | --- |
 | GitHub integration | `http://127.0.0.1:30000` |
-| Review Control Plane | `http://127.0.0.1:8090` |
+| Review Runs | `http://127.0.0.1:8090` |
 | Control Plane UI | `http://127.0.0.1:8091` |
 | Execution Gateway | `http://127.0.0.1:8000` |
 | Memory Catalog Server | `http://127.0.0.1:8092` |
@@ -114,7 +114,7 @@ WEBHOOK_SECRET=your_webhook_secret
 PORT=30000
 ```
 
-Compose injects the Execution API address and token only into Control Plane for initial submission, submission recovery, and terminal observation. The address currently resolves to the Execution Gateway service, but Control Plane is configured only in API terms. Compose injects the container private-key path, Control Plane address and token, and RustFS input storage configuration into the integration. PostgreSQL and execution credentials are not available to the integration. These values do not need to be repeated in `apps/github-integration/.env`.
+Compose injects the Execution API address and token only into Review Runs for initial submission, submission recovery, and terminal observation. The address currently resolves to the Execution Gateway service, but Review Runs is configured only in API terms. Compose injects the container private-key path, Review Runs address and token, and RustFS input storage configuration into the integration. PostgreSQL and execution credentials are not available to the integration. These values do not need to be repeated in `apps/github-integration/.env`.
 
 Place the private key at `apps/github-integration/private-key.pem`. Compose mounts that host file into the container and overrides `PRIVATE_KEY_PATH`; the initialization command sets `PRIVATE_KEY_PATH` to the same file's absolute host path only so `apps/github-integration/.env` also works for direct, non-Compose startup.
 
@@ -176,9 +176,9 @@ Core fields:
 
 Execution Worker publishes the authoritative run diagnostic under `runs/*/artifacts/*` before the workflow succeeds. Execution Gateway only validates and forwards that immutable reference; it has neither object-storage credentials nor a mount of the worker artifact tree. Agent sandboxes receive no workload storage credentials.
 
-The Memory Catalog Server is a separate TypeScript service, not part of Control Plane. Compose runs one PostgreSQL instance with separate `sec_review_control_plane` and `sec_review_memory_catalog` databases. Only Memory Catalog receives `MEMORY_CATALOG_DATABASE_URL`; it stores extraction records and their optional observations, memory-tree revision history, and the active revision pointer. Each revision records its maintenance identity and maintainer transcript reference. Temporal owns extraction execution and the singleton maintenance workflow; PostgreSQL is the durable catalog and compare-and-swap commit boundary. Host workers call the service with `AGENT_MEMORY_CATALOG_TOKEN`; memory-tree revisions and memory-agent transcripts remain immutable objects in RustFS. Workers materialize those objects into invocation-scoped temporary worktrees, and agent sandboxes only see the resulting filesystem mounts.
+The Memory Catalog Server is a separate TypeScript service, not part of Review Runs. Compose runs one PostgreSQL instance with separate `sec_review_review_runs` and `sec_review_memory_catalog` databases. Only Memory Catalog receives `MEMORY_CATALOG_DATABASE_URL`; it stores extraction records and their optional observations, memory-tree revision history, and the active revision pointer. Each revision records its maintenance identity and maintainer transcript reference. Temporal owns extraction execution and the singleton maintenance workflow; PostgreSQL is the durable catalog and compare-and-swap commit boundary. Host workers call the service with `AGENT_MEMORY_CATALOG_TOKEN`; memory-tree revisions and memory-agent transcripts remain immutable objects in RustFS. Workers materialize those objects into invocation-scoped temporary worktrees, and agent sandboxes only see the resulting filesystem mounts.
 
-PostgreSQL initialization scripts run only when `.agent-postgres-state` is empty. After adopting or changing the database names, stop the deployment and remove that directory before starting Compose again. This deletes existing Control Plane and Memory Catalog data.
+PostgreSQL initialization scripts run only when `.agent-postgres-state` is empty. After adopting or changing the database names, stop the deployment and remove that directory before starting Compose again. This deletes existing Review Runs and Memory Catalog data.
 
 Most local deployments can keep these defaults. Rerun the installer after moving the checkout.
 
@@ -253,7 +253,7 @@ With the sample configuration, the integrated deployment stores runtime data in 
 | `.agent-rustfs-state` | RustFS | Persistent object storage for run inputs, diagnostics, memory-tree revisions, memory-agent transcripts, and other artifacts |
 | `.agent-run-inputs` | Host worker | Materialized input for active runs; never included in published diagnostic bundles |
 | `.agent-artifacts` | Host worker | Agent artifacts and workflow output for each task |
-| `.agent-postgres-state` | PostgreSQL | Control Plane run state and Memory Catalog coordination state |
+| `.agent-postgres-state` | PostgreSQL | Review Runs run state and Memory Catalog coordination state |
 | `.agent-temporal-state` | Temporal | Workflow history and pending task state |
 
 
@@ -356,7 +356,7 @@ Check Execution Gateway:
 curl -sS http://127.0.0.1:8000/healthz
 ```
 
-Check whether Control Plane can safely accept coordination requests:
+Check whether Review Runs can safely accept coordination requests:
 
 ```bash
 curl -sS http://127.0.0.1:8090/readyz

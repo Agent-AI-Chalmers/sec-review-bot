@@ -28,8 +28,8 @@ Node 包使用 `pnpm`，每个都有自己的 manifest 和 lockfile：
 
 - `apps/github-integration/`
 - `apps/control-plane-ui/`
-- `control-plane/`
-- `contracts/control-plane-api/tools/`
+- `review-runs/`
+- `contracts/review-runs-api/tools/`
 - `contracts/execution-api/tools/`
 
 | 目标 | 命令（在包目录中运行） |

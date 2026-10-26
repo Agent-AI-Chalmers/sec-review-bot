@@ -1,5 +1,5 @@
 // Covers repository-dispatch admission, preparation, and submission boundaries
-// with controlled connector and Control Plane dependencies.
+// with controlled connector and Review Runs dependencies.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import type { App } from 'octokit'
@@ -11,9 +11,9 @@ import {
   RepositoryReviewDispatchValidationError
 } from '../../src/triggers/repository-review.js'
 import type { Octokit } from 'octokit'
-import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
+import { ReviewRunsSubmissionError } from '../../src/review-runs/client.js'
 
-/** An admitted run record as the Control Plane returns it, with the axis shapes spelled once.
+/** An admitted run record as Review Runs returns it, with the axis shapes spelled once.
  *
  * The tests below stub `admitReviewRun`, and each stub used to write out the whole record shape
  * and then cast it with `as never`. That cast switched off every check on the shape, so a field
@@ -91,7 +91,7 @@ import type { SubmittedRepositoryReviewRun } from '../../src/reviews/repositorie
 import type {
   ReviewRunRecord,
   ReviewRunAdmission
-} from '../../src/control-plane/client.js'
+} from '../../src/review-runs/client.js'
 import { EXECUTION_API_VERSION } from '../../src/execution/execution-api-version.js'
 import type { RepositoryReviewInput } from '../../src/execution/input.js'
 import { fakeGitHub, githubJson, unusedGitHub } from '../github-client.js'
@@ -544,7 +544,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
 
 test('dispatchRepositoryReview preserves an uncertain Execution submission for replay', async () => {
   const transitions: unknown[] = []
-  const error = new ControlPlaneSubmissionError(
+  const error = new ReviewRunsSubmissionError(
     'Execution response was lost.',
     'SUBMISSION_STATE_UNCERTAIN'
   )

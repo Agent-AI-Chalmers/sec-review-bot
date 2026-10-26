@@ -1,0 +1,2462 @@
+openapi: 3.1.0
+info:
+  title: Review Runs
+  version: v1
+  description: |
+    Review Runs coordination API. The read surface (runs listing/detail) is
+    consumed by the console; the write surface (admission, submission, publication)
+    and the internal full reads are consumed by the GitHub integration. This document
+    is the single source of truth: routes, validation, and client types are all derived
+    from it.
+components:
+  securitySchemes:
+    serviceToken:
+      type: http
+      scheme: bearer
+      description: Mutation and internal full-read access (GitHub integration).
+    readToken:
+      type: http
+      scheme: bearer
+      description: Redacted read access (console).
+    adminToken:
+      type: http
+      scheme: bearer
+      description: >-
+        Operator access to `/v1/admin/*`. Held by a person or an incident script, never by a
+        service component: the operations these routes expose are human decisions, not
+        coordination steps. The token is optional; when it is not configured the whole
+        `/v1/admin` surface is absent rather than merely unauthorized.
+  responses:
+    InvalidRequest:
+      description: >-
+        The request failed the contract's own schema. `code` names which part —
+        `INVALID_QUERY`, `INVALID_BODY`, or `INVALID_PATH_PARAMETER`.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Missing or invalid bearer credential for the operation's security scheme.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RunNotFound:
+      description: The referenced run was not found.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: >-
+        The run is not in a state this operation may act on, such as abandoning a run that is
+        not blocked.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    DeterministicPublicationFailure:
+      description: >-
+        A deterministic publication failure; `code` carries the terminal reason
+        (`PUBLICATION_STEP_*`).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    PayloadTooLarge:
+      description: >-
+        The request body exceeded the service's limit (1 MiB). Only operations that read a body
+        can return this; the body is rejected before the contract's own schema sees it.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    InternalError:
+      description: >-
+        An internal fault. The response is deliberately opaque (it never carries the fault's
+        message or `code`); the identity is logged server-side. Every operation can return it.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+          description: |
+            The machine-readable reason. `INVALID_QUERY`, `INVALID_BODY`, and
+            `INVALID_PATH_PARAMETER` identify which part of the request failed schema
+            validation; the `PUBLICATION_STEP_*` codes are terminal publication failures.
+          enum:
+            - INVALID_QUERY
+            - INVALID_BODY
+            - INVALID_PATH_PARAMETER
+            - PUBLICATION_STEP_SET_DUPLICATE
+            - PUBLICATION_STEP_SET_CHANGED
+            - PUBLICATION_STEP_RETRY_EXHAUSTED
+            - PUBLICATION_STEP_NOT_CLAIMABLE
+    ReviewRunRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - workflow
+        - publish_context
+        - preparation
+        - execution
+        - publication
+        - created_at
+        - failure_code
+        - failure_message
+        - artifact_storage
+        - notices
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        workflow:
+          type: string
+          enum:
+            - issue-review
+            - pull-request-review
+            - repository-review
+        publish_context:
+          type: object
+          additionalProperties: {}
+        execution_input:
+          type: object
+          additionalProperties: {}
+        preparation:
+          $ref: "#/components/schemas/PreparationSummary"
+        ingress_kind:
+          type: string
+          enum:
+            - github_webhook
+            - github_actions_dispatch
+        ingress_key:
+          type: string
+        execution:
+          $ref: "#/components/schemas/ExecutionSummary"
+        publication:
+          $ref: "#/components/schemas/PublicationSummary"
+        created_at:
+          type: string
+          format: date-time
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_message:
+          type:
+            - string
+            - "null"
+        artifact_storage:
+          $ref: "#/components/schemas/ArtifactStorage"
+        notices:
+          description: User-visible notices caused by this run's coordination events, in creation order.
+          type: array
+          items:
+            $ref: "#/components/schemas/RunNoticeSummary"
+    ReviewRunAdmission:
+      type: object
+      additionalProperties: false
+      required:
+        - record
+        - created
+        - preparation_token
+      properties:
+        record:
+          $ref: "#/components/schemas/ReviewRunRecord"
+        created:
+          type: boolean
+        preparation_token:
+          type:
+            - string
+            - "null"
+    PreparationWork:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - workflow
+        - input_version
+        - input
+        - claim_token
+        - attempt_count
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        workflow:
+          type: string
+          enum:
+            - issue-review
+            - pull-request-review
+            - repository-review
+        input_version:
+          type: string
+          minLength: 1
+        input:
+          type: object
+          additionalProperties: {}
+        claim_token:
+          type: string
+          minLength: 1
+        attempt_count:
+          type: integer
+          minimum: 1
+    RunNoticeWork:
+      description: |
+        One pending user-visible notice, claimed by the component that can deliver it.
+      type: object
+      additionalProperties: false
+      required:
+        - notice_id
+        - run_id
+        - input
+        - kind
+        - axis
+        - reason_code
+        - claim_token
+      properties:
+        notice_id:
+          type: string
+          minLength: 1
+        run_id:
+          type: string
+          minLength: 1
+        input:
+          type: object
+          additionalProperties: {}
+        kind:
+          type: string
+          enum: [failure, attention]
+        axis:
+          type: string
+          enum: [preparation, execution, publication]
+        reason_code:
+          type:
+            - string
+            - "null"
+        claim_token:
+          type: string
+          minLength: 1
+    RunNoticeSummary:
+      description: |
+        Delivery state of one user-visible coordination notice.
+      type: object
+      additionalProperties: false
+      required:
+        - notice_id
+        - kind
+        - axis
+        - status
+        - reason_code
+        - comment_url
+      properties:
+        notice_id:
+          type: string
+        kind:
+          type: string
+          enum: [failure, attention]
+        axis:
+          type: string
+          enum: [preparation, execution, publication]
+        status:
+          type: string
+          enum:
+            - pending
+            - delivering
+            - delivered
+            - failed
+        reason_code:
+          type:
+            - string
+            - "null"
+        comment_url:
+          description: >-
+            Where the requester can read the outcome. Always an absolute URI when present, and
+            null only when no message reached them.
+          oneOf:
+            - type: "null"
+            - type: string
+              format: uri
+    PublicationWork:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - workflow
+        - publish_context
+        - preparation
+        - execution
+        - publication
+        - created_at
+        - failure_code
+        - failure_message
+        - artifact_storage
+        - notices
+        - workflow_result
+        - claim_token
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        workflow:
+          type: string
+          enum:
+            - issue-review
+            - pull-request-review
+            - repository-review
+        publish_context:
+          type: object
+          additionalProperties: {}
+        execution_input:
+          type: object
+          additionalProperties: {}
+        preparation:
+          $ref: "#/components/schemas/PreparationSummary"
+        ingress_kind:
+          type: string
+          enum:
+            - github_webhook
+            - github_actions_dispatch
+        ingress_key:
+          type: string
+        execution:
+          $ref: "#/components/schemas/ExecutionSummary"
+        publication:
+          $ref: "#/components/schemas/PublicationSummary"
+        created_at:
+          type: string
+          format: date-time
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_message:
+          type:
+            - string
+            - "null"
+        artifact_storage:
+          $ref: "#/components/schemas/ArtifactStorage"
+        notices:
+          description: User-visible notices caused by this run's coordination events, in creation order.
+          type: array
+          items:
+            $ref: "#/components/schemas/RunNoticeSummary"
+        workflow_result: {}
+        claim_token:
+          type: string
+          minLength: 1
+    PublicationStepRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - step_key
+        - status
+        - attempt_count
+        - last_attempt_at
+        - remote_object_id
+        - remote_object_url
+        - failure_code
+        - failure_message
+      properties:
+        step_key:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum:
+            - pending
+            - running
+            - uncertain
+            - disconnected
+            - succeeded
+            - failed
+            - terminal_failed
+        attempt_count:
+          type: integer
+          minimum: 0
+          description: >-
+            How many times this step has been claimed and started. More than one means an
+            earlier owner began the side effect, so a reclaiming publisher must reconcile
+            against the remote object (`remote_object_id`/`remote_object_url`) instead of
+            assuming nothing happened.
+        last_attempt_at:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: >-
+            When the latest claim of this step started; null until the step is claimed once.
+            Together with `attempt_count` it distinguishes a step that never started from one
+            whose publisher died mid-effect.
+        remote_object_id:
+          type:
+            - string
+            - "null"
+        remote_object_url:
+          type:
+            - string
+            - "null"
+          format: uri
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_message:
+          type:
+            - string
+            - "null"
+    ObservedPublicationStep:
+      type: object
+      additionalProperties: false
+      required:
+        - step_key
+        - status
+        - attempt_count
+        - remote_object_url
+        - failure_code
+        - failure_message
+      properties:
+        step_key:
+          type: string
+          minLength: 1
+        status:
+          type: string
+          enum:
+            - pending
+            - running
+            - uncertain
+            - disconnected
+            - succeeded
+            - failed
+            - terminal_failed
+        attempt_count:
+          type: integer
+          minimum: 0
+          description: >-
+            How many attempts this step has started against its budget. A count above one on a
+            successful step means the side effect was reached after a retry or a recovery, not
+            on the first try.
+        remote_object_url:
+          type:
+            - string
+            - "null"
+          format: uri
+        failure_code:
+          type:
+            - string
+            - "null"
+        failure_message:
+          type:
+            - string
+            - "null"
+    ObservedRun:
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - workflow
+        - preparation
+        - execution
+        - publication
+        - created_at
+        - failure_code
+        - artifact_storage
+        - notices
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        workflow:
+          type: string
+          enum:
+            - issue-review
+            - pull-request-review
+            - repository-review
+        preparation:
+          $ref: "#/components/schemas/PreparationSummary"
+        execution:
+          $ref: "#/components/schemas/ExecutionSummary"
+        publication:
+          $ref: "#/components/schemas/PublicationSummary"
+        created_at:
+          type: string
+          format: date-time
+        failure_code:
+          type:
+            - string
+            - "null"
+        artifact_storage:
+          $ref: "#/components/schemas/ArtifactStorage"
+        notices:
+          description: User-visible notices caused by this run's coordination events, in creation order.
+          type: array
+          items:
+            $ref: "#/components/schemas/RunNoticeSummary"
+    ExecutionSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - started_at
+        - finished_at
+        - updated_at
+      properties:
+        status:
+          type: string
+          description: >-
+            The execution lifecycle as coordinated through Execution API provider. `pending` means the
+            run has been admitted but its prepared input has not yet been submitted to the
+            Execution API provider; preparation progress is reported separately by `preparation`. `skipped`
+            means execution never ran because preparation failed; the reason is on
+            `preparation`, not here. `uncertain` means a submission may have reached the Execution API provider
+            but its result could not be confirmed; a recovery replays it under the same identity.
+            `disconnected` means automatic recovery stopped after its finite budget without a
+            conclusive answer, so it is not a failure.
+          enum:
+            - pending
+            - queued
+            - running
+            - uncertain
+            - disconnected
+            - succeeded
+            - skipped
+            - failed
+        started_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: >-
+            Immutable instant the prepared Execution input was accepted and execution began; null
+            while the run is still pending, and also null for `skipped`, which is concluded
+            without ever having started. Written once, so a recovery replay does not move it.
+        finished_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: >-
+            Immutable instant the execution axis reached a terminal state (`succeeded`,
+            `failed`, or `skipped`); null while it is pending, queued, running, uncertain, or disconnected.
+            Together with `started_at` it times the phase (only when `started_at` is non-null,
+            since `skipped` has an end without a start).
+        updated_at:
+          type: string
+          format: date-time
+          description: >-
+            Last time the execution axis was written: a polling confirmation, a state
+            transition, or a submission/recovery write. This is the observation freshness the
+            console reports ("observed Ns ago"), not a phase bound — use `started_at` and
+            `finished_at` for that.
+    PublicationSummary:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - started_at
+        - finished_at
+        - updated_at
+      properties:
+        status:
+          type: string
+          enum:
+            - pending
+            - publishing
+            - uncertain
+            - disconnected
+            - published
+            - failed
+            - skipped
+        started_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: >-
+            Immutable instant the publication phase began (the work was first claimed); null
+            while it is pending, and null for `skipped`, which is concluded without ever having
+            started. A retryable failure that returns the row to pending and claims it again
+            does not move it.
+        finished_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: >-
+            Immutable instant the publication axis reached a terminal state (`published`,
+            `failed`, or `skipped`); null while it is pending or publishing. It is set for every
+            terminal outcome. The instant the result became visible is this field read together
+            with `status: published`.
+        updated_at:
+          type: string
+          format: date-time
+          description: >-
+            Last time the publication axis was written, including claim heartbeats. This is the
+            activity freshness the console reports, not a phase bound — use `started_at` and
+            `finished_at` for that. Unlike them it keeps advancing while a long publication runs.
+    ReviewRunEvent:
+      type: object
+      additionalProperties: false
+      required:
+        - event_id
+        - axis
+        - from_status
+        - to_status
+        - reason_code
+        - occurred_at
+      properties:
+        event_id:
+          type: integer
+          description: Monotonic identifier; also the tie-breaker within one occurred_at.
+        axis:
+          type: string
+          enum:
+            - execution
+            - preparation
+            - publication
+        from_status:
+          type:
+            - string
+            - "null"
+          description: State before the transition; null for the first event on an axis.
+        to_status:
+          type: string
+        reason_code:
+          type:
+            - string
+            - "null"
+          description: Machine-readable cause for a failure or reversion, when there is one.
+        occurred_at:
+          type: string
+          format: date-time
+    ParkedRun:
+      description: >-
+        One run the system stopped working on by itself, and the axis it is parked on. A queue
+        that listed only preparation left an operator unable to find a run whose execution or
+        publication stalled.
+      type: object
+      additionalProperties: false
+      required:
+        - run_id
+        - axis
+        - reason
+      properties:
+        run_id:
+          type: string
+          minLength: 1
+        axis:
+          type: string
+          enum:
+            - preparation
+            - execution
+            - publication
+        reason:
+          description: >-
+            Why automation stopped. A publication parks when a step's reconciliation budget is
+            spent; the steps themselves record which one and what its last failure was.
+          type: string
+          enum:
+            - EXECUTION_ALREADY_ADVANCED
+            - SUBMISSION_RECOVERY_EXHAUSTED
+            - PUBLICATION_RECONCILIATION_EXHAUSTED
+    PreparationSummary:
+      type: object
+      description: >-
+        Durable preparation state for the run's preparation axis. This is an operational
+        summary only; it never exposes connector-owned preparation input. It is not nullable:
+        admission creates a run, its preparation, and its execution in one transaction and
+        nothing deletes an axis on its own, so every readable run carries a summary. A row whose
+        preparation is missing is corrupt — Review Runs drops it from list reads and
+        answers 404 for a single-run read, logging the fault — rather than reported with a null
+        summary.
+      additionalProperties: false
+      required:
+        - status
+        - attempt_count
+        - started_at
+        - finished_at
+        - updated_at
+        - failure_code
+        - disconnect_reason
+      properties:
+        status:
+          type: string
+          description: >-
+            Preparation lifecycle. `preparing` means a preparer currently owns the claim;
+            it is the preparation axis's own "in progress" state and is unrelated to the
+            Execution API provider, which is only submitted to once preparation reaches `submitted`.
+          enum:
+            - pending
+            - preparing
+            - uncertain
+            - disconnected
+            - submitted
+            - failed
+        attempt_count:
+          type: integer
+          minimum: 0
+        disconnect_reason:
+          type:
+            - string
+            - "null"
+          description: >-
+            Non-null only while `status` is `disconnected`: the reason the run's own records do
+            not admit the transition an expired lease would make, so automatic work cannot
+            conclude it. It names that conflict and nothing else - what an operator may do about
+            it is the `disconnected` state's business, not this field's. The value today is
+            `EXECUTION_ALREADY_ADVANCED`.
+        started_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: >-
+            Immutable instant the preparation phase began (a preparer first claimed the work);
+            null while it is still pending. A retry that returns the row to pending and claims it
+            again does not move it, so it is a safe start bound for the phase.
+        finished_at:
+          type:
+            - string
+            - "null"
+          format: date-time
+          description: >-
+            Immutable instant the preparation phase reached a terminal state (`submitted` or
+            `failed`); null while it is pending or preparing. Distinct from `updated_at`, which
+            also moves on claim heartbeats and input checkpoints and cannot mark the phase end.
+        updated_at:
+          type: string
+          format: date-time
+          description: >-
+            Last time the preparation axis was written, including claim heartbeats and input
+            checkpoints. This is the activity freshness the console reports, not a phase bound —
+            use `started_at` and `finished_at` for that. A preparation that is still being built
+            keeps advancing here even though its bounds do not.
+        failure_code:
+          type:
+            - string
+            - "null"
+    ArtifactStorage:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - status
+          properties:
+            status:
+              type: string
+              enum:
+                - unavailable
+                - failed
+            error_code:
+              type: string
+            message:
+              type: string
+        - type: object
+          additionalProperties: false
+          required:
+            - status
+            - artifact
+          properties:
+            status:
+              type: string
+              enum:
+                - available
+            artifact:
+              type: object
+              additionalProperties: false
+              required:
+                - kind
+                - uri
+                - media_type
+                - digest
+                - size_bytes
+              properties:
+                kind:
+                  type: string
+                  enum:
+                    - diagnostic_bundle
+                uri:
+                  type: string
+                  pattern: ^s3://[^/]+/runs/[^/]+/artifacts/diagnostic-tree\.v1\.tar\.zst$
+                media_type:
+                  type: string
+                  enum:
+                    - application/tar+zstd
+                digest:
+                  type: string
+                  pattern: ^sha256:[0-9a-f]{64}$
+                size_bytes:
+                  type: integer
+                  minimum: 0
+        - type: "null"
+
+# State machine definitions. These are the single source of truth for the coordination
+# lifecycles: the console renders its state-machine and history views from a module generated
+# out of this block, and a test asserts every state here is an enum value on the corresponding
+# schema (and vice versa), so the diagram and the contract cannot drift apart. They are not part
+# of the HTTP surface; they describe the transitions the write paths perform.
+x-state-machines:
+  preparation:
+    order: 1
+    title: Preparation
+    # Which observed field carries this axis' current state.
+    field: preparation.status
+    initial: pending
+    terminal: [submitted, failed]
+    states:
+      pending:
+        label: Pending
+        description: Admitted, but no preparer has claimed the work yet.
+      preparing:
+        label: Preparing
+        description: A coordinator currently owns the claim and is building the Execution input.
+      uncertain:
+        label: Uncertain
+        description: >-
+          The claim lapsed before the preparer reported, so it is unknown whether the prepared
+          input reached Review Runs. This is not a failure: a claim may rebuild the input and
+          resubmit it under the same identity, which is idempotent.
+      disconnected:
+        label: Disconnected
+        description: >-
+          Automatic work stopped without a conclusion, because the run's persisted state no
+          longer admits the only transition expiry could make. Nothing retries this row on its
+          own; an operator resumes it into `uncertain` or abandons it.
+      submitted:
+        label: Submitted
+        description: The input was accepted and handed to the Execution API provider; preparation is done.
+      failed:
+        label: Failed
+        description: >-
+          Preparation failed permanently (retry budget exhausted or input could not be built).
+          The Execution API provider was never handed input, so execution is skipped.
+    transitions:
+      - { from: pending, to: preparing, label: claimed}
+      - { from: preparing, to: submitted, label: input accepted}
+      - { from: preparing, to: pending, label: retry}
+      # A lapsed lease is not evidence that nothing happened, so it does not return the row to
+      # `pending`; it becomes `uncertain` and a later claim re-establishes what was done.
+      - { from: preparing, to: uncertain, label: claim lapsed}
+      - { from: uncertain, to: preparing, label: reclaim to confirm}
+      # `disconnected` stops automation on a run whose own records contradict each other. What an
+      # operator may do about it is the state's outgoing edges below, not part of its meaning.
+      - { from: preparing, to: disconnected, reason: EXECUTION_ALREADY_ADVANCED, label: cannot be concluded automatically}
+      # The operator decisions off a disconnected preparation: hand it back, give up on the
+      # outcome, or abandon the run through the older blocked-run route. That route writes
+      # EXECUTION_ALREADY_ADVANCED, because the run it concludes is the contradicted one;
+      # PREPARATION_ABANDONED is kept declared because this state is reached from a stored row,
+      # and a reason a consumer sees must be one the contract names. Both end it as `failed`.
+      - { from: disconnected, to: uncertain, reason: PREPARATION_RESUMED_BY_OPERATOR, label: resumed by an operator}
+      - { from: disconnected, to: failed, reason: PREPARATION_GIVEN_UP_BY_OPERATOR, label: given up by an operator}
+      - { from: disconnected, to: failed, reason: EXECUTION_ALREADY_ADVANCED, label: abandoned by an operator}
+      - { from: disconnected, to: failed, reason: PREPARATION_ABANDONED, label: abandoned by an operator}
+      # Two write paths reach `failed`: a preparer reporting a terminal error (any
+      # connector-supplied failure code) and the lease expiring on the final allowed attempt.
+      # Only the second one carries a reason code, so the edge is declared without one; a
+      # consumer filtering by reason would otherwise miss every explicit preparation failure.
+      - { from: preparing, to: failed, label: failed}
+  execution:
+    order: 2
+    title: Execution
+    field: execution.status
+    initial: pending
+    terminal: [succeeded, skipped, failed]
+    states:
+      pending:
+        label: Pending
+        description: Admitted, but its prepared input has not been submitted to the Execution API provider yet.
+      queued:
+        label: Queued
+        description: The Execution API provider accepted the submission; polling has not yet seen it start.
+      running:
+        label: Running
+        description: >-
+          Polling observed that the Execution API provider is executing this run. A transient network blip while
+          polling does not change this state: the run keeps the last observed value and is polled
+          again, so this state may be slightly out of date.
+      succeeded:
+        label: Succeeded
+        description: The Execution API provider returned a result; it now becomes eligible for publication.
+      skipped:
+        label: Skipped
+        description: >-
+          Execution never ran because preparation failed. This is not an execution failure; the
+          reason is on the preparation axis.
+      uncertain:
+        label: Unconfirmed
+        description: >-
+          The task was submitted, but no response arrived, so it is unknown whether the Execution API provider
+          accepted it. This is not a failure: the submission is replayed under the same run_id.
+      disconnected:
+        label: Disconnected
+        description: >-
+          Automatic recovery used its budget without a conclusive Execution API provider answer. The run is
+          visible for operator action and is not reported as failed.
+      failed:
+        label: Failed
+        description: >-
+          A definite failure, in one of two ways: (1) polling produced a conclusive answer that
+          the task cannot succeed — the Execution API provider reported it failed, or the run could not be found,
+          returned no result, or the response broke the protocol; (2) a retried submission failed
+          conclusively. A transient network error (a timeout, a 5xx, a dropped connection) is not
+          a definite failure.
+    transitions:
+      # Submission (a write). `uncertain` only ever comes from a submission whose acceptance
+      # could not be confirmed — never from a run that was already queued or running.
+      - { from: pending, to: queued, label: input submitted}
+      - { from: pending, to: skipped, label: preparation failed}
+      - { from: pending, to: uncertain, reason: SUBMISSION_STATE_UNCERTAIN, label: submission unconfirmed }
+      # Taking the recovery claim is not a state change, but it is audited as a self-event so the
+      # timeline shows when a replay started. The edge is declared because the log writes it.
+      - { from: uncertain, to: uncertain, reason: SUBMISSION_RECOVERY_CLAIMED, label: replay claimed }
+      - { from: uncertain, to: queued, label: replay accepted}
+      - { from: uncertain, to: failed, label: replay rejected }
+      - { from: uncertain, to: disconnected, reason: SUBMISSION_RECOVERY_EXHAUSTED, label: recovery disconnected }
+      # The only way out of a disconnected recovery other than failing the run: an operator hands
+      # it back with a fresh replay budget, so automatic replay can try to resolve it again.
+      - { from: disconnected, to: uncertain, reason: SUBMISSION_RECOVERY_RESUMED_BY_OPERATOR, label: resumed by an operator }
+      # Giving up does NOT claim the task never ran: the Execution API provider may have accepted it. It records
+      # only that the outcome will not be waited for, so this axis ends as `failed` with a reason
+      # that says so, and the publication is skipped because there is no result to deliver.
+      - { from: disconnected, to: failed, reason: SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR, label: given up by an operator }
+      # Observation (a read): the console learns the Execution API provider's progress by polling. A short task
+      # can be observed as already finished on the first poll, so `queued` reaches `succeeded`
+      # without ever being seen `running`.
+      - { from: queued, to: running, label: execution started }
+      - { from: queued, to: succeeded, label: execution succeeded }
+      - { from: running, to: succeeded, label: execution succeeded }
+      - { from: queued, to: failed, label: polling concluded failure }
+      - { from: running, to: failed, label: polling concluded failure }
+  publication:
+    order: 3
+    title: Publication
+    field: publication.status
+    initial: pending
+    terminal: [published, failed, skipped]
+    states:
+      pending:
+        label: Pending
+        description: Waiting for a successful execution result before publishing.
+      publishing:
+        label: Publishing
+        description: A coordinator owns the publication claim and is performing the side effects.
+      uncertain:
+        label: Uncertain
+        description: >-
+          A step may have completed its side effect remotely and is being reconciled. The axis
+          reflects its strongest step; this is not a failure, and other steps keep publishing.
+      disconnected:
+        label: Disconnected
+        description: >-
+          Automatic reconciliation of a step stopped without an answer, so an operator has to
+          establish what is on the remote system. The axis reflects its strongest step.
+      published:
+        label: Published
+        description: All publication steps succeeded; the result is visible.
+      failed:
+        label: Failed
+        description: The publication failed after its retry budget was exhausted.
+      skipped:
+        label: Skipped
+        description: There was nothing to publish because execution did not succeed.
+    transitions:
+      - { from: pending, to: publishing, label: publishing started }
+      # The axis follows its steps: a step that may have taken effect makes the publication
+      # uncertain, and a step whose reconciliation could not conclude makes it disconnected.
+      - { from: publishing, to: uncertain, label: a step may have taken effect }
+      - { from: uncertain, to: publishing, label: step settled, publishing continues }
+      # The axis follows its strongest step. A reconciliation that keeps failing (an outage, a
+      # provider that answers 5xx every time) moves its step from `uncertain` to `disconnected`,
+      # and the axis then reports that too — an operator queue must be able to find it without
+      # walking every step. So `disconnected` is reachable only after at least one step was
+      # `uncertain`; a publisher whose steps all settled cleanly never passes through it.
+      - { from: uncertain, to: disconnected, label: reconciliation could not conclude }
+      # An operator hands a parked publication back to the normal claim queue. No hidden owner is
+      # created: the publisher that claims `pending` receives the token it needs to perform work.
+      - { from: disconnected, to: pending, reason: PUBLICATION_RESUMED_BY_OPERATOR, label: resumed by an operator }
+      # Giving up stops publishing what remains. It cannot say nothing was published: a step in
+      # this state may already have taken effect remotely, and the axis ends as `failed` rather
+      # than `skipped` precisely so that no reader concludes the result was never delivered.
+      - { from: disconnected, to: failed, reason: PUBLICATION_ABANDONED_BY_OPERATOR, label: given up by an operator }
+      - { from: publishing, to: published, label: published }
+      # Re-claiming an expired lease is audited as a self-event; there is no state change, but the
+      # log records that the previous owner's claim lapsed and a new one took over.
+      - { from: publishing, to: publishing, reason: PUBLICATION_LEASE_EXPIRED, label: publishing lease expired }
+      - { from: publishing, to: pending, label: retryable failure }
+      - { from: publishing, to: failed, label: terminal failure}
+      - { from: pending, to: skipped, label: execution not published}
+      # A publication can already be in flight when the execution axis is later found
+      # unusable, so the execution-failure paths converge it from `publishing` as well as from
+      # `pending`. Without this edge that row would stay `publishing` with no writer able to
+      # move it.
+      - { from: publishing, to: skipped, reason: PUBLICATION_ABANDONED, label: execution failed}
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      description: >-
+        Report process health. Requires no credential.
+      # Explicitly public: the liveness probe must answer an unauthenticated caller. The empty
+      # requirement is what says so; omitting the key would be indistinguishable from a
+      # forgotten requirement, which the `operation-requires-security` rule rejects.
+      security: []
+      responses:
+        "200":
+          description: Process health.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /readyz:
+    get:
+      operationId: getReadiness
+      description: >-
+        Report whether this instance can safely accept coordination requests. Requires no credential.
+      security: []
+      responses:
+        "200":
+          description: PostgreSQL is reachable through the pool and the startup schema is present.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+        "503":
+          description: PostgreSQL, the connection pool, or the applied startup schema is unavailable.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - status
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - unavailable
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs:
+    get:
+      operationId: listRuns
+      description: >-
+        List runs for the caller's connector, newest first, with cursor pagination. Returns the
+        redacted observed shape; internal inputs and publish context are omitted.
+      security:
+        - readToken: []
+      parameters:
+        # The filters are one `form`-exploded object rather than seven separate parameters
+        # so the route schema can say `additionalProperties: false`: an unknown query
+        # parameter is rejected (400 `INVALID_QUERY`) instead of being ignored, matching how
+        # the request bodies already refuse undeclared fields. When the parameters are
+        # separate there is no place to attach `additionalProperties`, so the contract would
+        # overstate the validation. The name below is only a schema holder; the client sends
+        # the properties themselves (`?limit=…&workflow=…`).
+        - in: query
+          name: filter
+          style: form
+          explode: true
+          description: >-
+            The list filters. Each declared property is a query parameter of the same name;
+            any other query parameter is rejected.
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              limit:
+                type: integer
+                minimum: 1
+                maximum: 100
+              cursor:
+                type: string
+              execution_status:
+                type: string
+                enum:
+                  - pending
+                  - queued
+                  - running
+                  - uncertain
+                  - succeeded
+                  - skipped
+                  - failed
+              publication_status:
+                type: string
+                enum:
+                  - pending
+                  - publishing
+                  - published
+                  - failed
+                  - skipped
+              preparation_status:
+                type: string
+                description: >-
+                  Matches the run's redacted preparation summary by state. Every readable run
+                  carries that summary, so the filter never has to decide what a missing one
+                  means: a stored run that lacks its preparation row is corrupt, is dropped from
+                  list reads, and therefore cannot appear under any value of this filter.
+                enum:
+                  - pending
+                  - preparing
+                  - submitted
+                  - failed
+              workflow:
+                type: string
+                enum:
+                  - issue-review
+                  - pull-request-review
+                  - repository-review
+              from:
+                type: string
+                format: date-time
+              to:
+                type: string
+                format: date-time
+      responses:
+        "200":
+          description: Paginated redacted runs.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - runs
+                  - next_cursor
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ObservedRun"
+                  next_cursor:
+                    type:
+                      - string
+                      - "null"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      operationId: admitRun
+      description: >-
+        Admit a review run, assigning its `run_id` before input preparation begins. Re-admitting
+        the same `ingress_kind`/`ingress_key` returns the original run instead of creating another.
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - workflow
+                - publish_context
+                - preparation_input_version
+                - preparation_input
+                - ingress_kind
+                - ingress_key
+              properties:
+                workflow:
+                  type: string
+                  enum:
+                    - issue-review
+                    - pull-request-review
+                    - repository-review
+                publish_context:
+                  type: object
+                  additionalProperties: {}
+                execution_input:
+                  type: object
+                  additionalProperties: {}
+                preparation_input_version:
+                  type: string
+                  minLength: 1
+                preparation_input:
+                  type: object
+                  additionalProperties: {}
+                ingress_kind:
+                  type: string
+                  enum:
+                    - github_webhook
+                    - github_actions_dispatch
+                ingress_key:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: The admitted (or re-admitted) run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRunAdmission"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}:
+    get:
+      operationId: getRun
+      description: >-
+        Read one run in the redacted observed shape. Requires the read token.
+      security:
+        - readToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      responses:
+        "200":
+          description: Redacted run detail.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - run
+                properties:
+                  run:
+                    $ref: "#/components/schemas/ObservedRun"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication-steps:
+    get:
+      operationId: listRunPublicationSteps
+      description: >-
+        Read the redacted publication-step summary for one run. Requires the read token.
+      security:
+        - readToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      responses:
+        "200":
+          description: Redacted publication-step summary.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - run_id
+                  - publication_steps
+                properties:
+                  run_id:
+                    type: string
+                  publication_steps:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ObservedPublicationStep"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/events:
+    get:
+      operationId: listRunEvents
+      description: >-
+        Read the append-only coordination event log for one run, oldest first. Each event is
+        a state transition on one coordination axis (execution, preparation, publication, or
+        notice). This is an audit trail over the snapshot tables, not the Execution API provider's execution
+        history, which lives in Temporal. Requires the read token.
+      security:
+        - readToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      responses:
+        "200":
+          description: The run's coordination events, oldest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - run_id
+                  - events
+                properties:
+                  run_id:
+                    type: string
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ReviewRunEvent"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/submission:
+    post:
+      operationId: submitPreparedRun
+      description: >-
+        Submit a prepared run to the Execution API provider, persisting the input and commit claim before the
+        Execution API provider call so an uncertain submission stays recoverable.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - preparation_token
+                - publish_context
+                - input
+              properties:
+                preparation_token:
+                  type: string
+                  minLength: 1
+                publish_context:
+                  type: object
+                  additionalProperties: {}
+                input:
+                  type: object
+                  additionalProperties: {}
+      responses:
+        "200":
+          description: Queued acknowledgement.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - run_id
+                  - workflow
+                  - status
+                properties:
+                  run_id:
+                    type: string
+                  workflow:
+                    type: string
+                    enum:
+                      - issue-review
+                      - pull-request-review
+                      - repository-review
+                  status:
+                    type: string
+                    enum:
+                      - queued
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/preparation/claim:
+    post:
+      operationId: renewPreparationClaim
+      description: >-
+        Renew the caller's preparation claim while input preparation is still active. Returns
+        whether the claim was renewed.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Whether the claim was renewed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/preparation/claims/next:
+    post:
+      operationId: claimNextPreparation
+      description: >-
+        Claim one connector-owned preparation whose durable input is available. Returns null
+        when no preparation is pending.
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: The claimed preparation, or null when none is available.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PreparationWork"
+                  - type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/preparation/checkpoint:
+    post:
+      operationId: checkpointPreparationInput
+      description: >-
+        Replace the connector-owned durable preparation input while the caller still owns its
+        preparation claim. Connectors use this to checkpoint data resolved during preparation
+        so a later owner resumes the same work rather than resolving it again.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - input
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                input:
+                  type: object
+                  additionalProperties: {}
+      responses:
+        "200":
+          description: The checkpoint was persisted.
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/preparation/failure:
+    post:
+      operationId: failPreparation
+      description: >-
+        Record a preparation failure for a run the caller still owns. A retryable
+        failure remains preparing and becomes claimable after the requested delay;
+        the finite Review Runs retry budget turns exhaustion into a terminal failure.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - failure
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                failure:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - message
+                  properties:
+                    code:
+                      type:
+                        - string
+                        - "null"
+                    message:
+                      type: string
+                retry:
+                  type: boolean
+                  default: false
+                retry_after_ms:
+                  type: integer
+                  minimum: 0
+                  description: Delay before the durable preparation is claimable again.
+      responses:
+        "200":
+          description: The preparation failure outcome.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - retry_scheduled
+                properties:
+                  retry_scheduled:
+                    type: boolean
+                    description: False when the failure is terminal or exhausted its retry budget.
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/run-notices/claims/next:
+    post:
+      operationId: claimNextRunNotice
+      description: >-
+        Claim one connector-owned user-visible notice. Returns null when no undelivered notice
+        is available; an expired notice claim is eligible again.
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: The claimed notice, or null when none is available.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/RunNoticeWork"
+                  - type: "null"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/run-notices/{noticeId}/complete:
+    post:
+      operationId: completeRunNotice
+      description: >-
+        Complete a notice the caller still owns. `delivered` is true only when the requester
+        can actually read the outcome; `comment_url` is the comment that carries it and is
+        required in that case, so a delivered notice always points at something. A delivery
+        that failed records `delivered: false`. A notice has no user-visible target when the
+        connector cannot resolve one (its input names neither a conversation nor a repository),
+        which the caller reports the same way, because a notice nobody can read is not delivered.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: noticeId
+          required: true
+          description: The claimed notice identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            # Two branches rather than a description that promises a rule the schema cannot
+            # express: a delivered notice must carry a URI, an undelivered one must not carry
+            # one at all. Stating it here keeps the contract and the server from disagreeing.
+            schema:
+              oneOf:
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - token
+                    - delivered
+                    - comment_url
+                  properties:
+                    token:
+                      type: string
+                      minLength: 1
+                    delivered:
+                      type: boolean
+                      enum: [true]
+                    comment_url:
+                      description: The comment the requester can read.
+                      type: string
+                      format: uri
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - token
+                    - delivered
+                  properties:
+                    token:
+                      type: string
+                      minLength: 1
+                    delivered:
+                      type: boolean
+                      enum: [false]
+      responses:
+        "200":
+          description: Whether the caller still owned the notice.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /v1/publication/claims/next:
+    post:
+      operationId: claimNextPublication
+      description: >-
+        Claim the next publishable run, optionally holding the request until one appears. Returns
+        `null` when the wait elapses with no work.
+      security:
+        - serviceToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                wait_ms:
+                  type: integer
+                  minimum: 0
+      responses:
+        "200":
+          description: The claimed publication work, or null if none.
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/PublicationWork"
+                  - type: "null"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/claim:
+    post:
+      operationId: renewPublicationClaim
+      description: >-
+        Renew the caller's publication claim. Returns whether the claim was renewed.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Whether the claim was renewed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/steps:
+    post:
+      operationId: initializePublicationSteps
+      description: >-
+        Initialize the run's publication step set. The set is fixed once written, so a duplicate or
+        changed set is rejected as a deterministic failure.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - step_keys
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                step_keys:
+                  type: array
+                  items:
+                    type: string
+                    minLength: 1
+      responses:
+        "200":
+          description: Initialization acknowledgement (empty).
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "409":
+          $ref: "#/components/responses/DeterministicPublicationFailure"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/steps/{stepKey}/claim:
+    post:
+      operationId: requirePublicationStepClaim
+      description: >-
+        Assert the caller still owns the run's publication claim before acting on one step.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        - in: path
+          name: stepKey
+          required: true
+          description: The publication step key, as supplied at initializePublicationSteps.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Claim acknowledgement (empty).
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "409":
+          $ref: "#/components/responses/DeterministicPublicationFailure"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/steps/{stepKey}/complete:
+    post:
+      operationId: completePublicationStep
+      description: >-
+        Record one publication step as succeeded, attaching the remote object it produced.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        - in: path
+          name: stepKey
+          required: true
+          description: The publication step key, as supplied at initializePublicationSteps.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                remote_object:
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    id:
+                      description: >-
+                        The created object's numeric id in its canonical string form. It is
+                        persisted as text and read back with `Number(...)`; a `null` id means
+                        the step produced no remote object.
+                      type:
+                        - string
+                        - "null"
+                    url:
+                      type:
+                        - string
+                        - "null"
+      responses:
+        "200":
+          description: Whether the step completed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/steps/{stepKey}/settle-exhausted:
+    post:
+      operationId: settleExhaustedPublicationStep
+      description: >-
+        Conclude a publication step that has no attempts left, from what the connector found on the
+        remote system. Exhaustion alone never concludes a step: an attempt that started may have
+        taken effect remotely before its owner died or its response was lost, and Review Runs
+        cannot see that system. The connector therefore reports either the effect it found (the
+        step becomes succeeded, using the same remote reference a live completion would have
+        written) or that it looked and found nothing (only then does the step become
+        terminal_failed). The caller must still own the publication claim.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        - in: path
+          name: stepKey
+          required: true
+          description: The publication step key, as supplied at initializePublicationSteps.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - found
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                found:
+                  description: >-
+                    Whether the connector found the side effect already present on the remote
+                    system. `false` means the connector looked and confirmed it is absent.
+                  type: boolean
+                remote_object:
+                  description: >-
+                    The remote object the connector matched when `found` is true; ignored
+                    otherwise.
+                  type: object
+                  additionalProperties: false
+                  properties:
+                    id:
+                      type:
+                        - string
+                        - "null"
+                    url:
+                      type:
+                        - string
+                        - "null"
+      responses:
+        "200":
+          description: Whether this call concluded the step.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/steps/{stepKey}/fail:
+    post:
+      operationId: failPublicationStep
+      description: >-
+        Record one publication step as failed, optionally spending retry budget.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        - in: path
+          name: stepKey
+          required: true
+          description: The publication step key, as supplied at initializePublicationSteps.
+          schema:
+            type: string
+            minLength: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - failure
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                failure:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - message
+                  properties:
+                    code:
+                      type:
+                        - string
+                        - "null"
+                    message:
+                      type: string
+                retry:
+                  type: boolean
+      responses:
+        "200":
+          description: Whether the step failed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/complete:
+    post:
+      operationId: completePublication
+      description: >-
+        Mark the run's publication as complete.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Whether publication completed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/publication/fail:
+    post:
+      operationId: failPublication
+      description: >-
+        Record the run's publication outcome as failed, choosing whether the failure is retryable.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+                - failure
+                - retry
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                failure:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - message
+                  properties:
+                    code:
+                      type:
+                        - string
+                        - "null"
+                    message:
+                      type: string
+                retry:
+                  type: boolean
+      responses:
+        "200":
+          description: Whether publication failed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/internal/runs/{runId}:
+    get:
+      operationId: getInternalRun
+      description: >-
+        Read the full run record, including `execution_input` and `publish_context`. Requires the
+        service token; never exposed to the console.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      responses:
+        "200":
+          description: Full run record (includes execution_input/publish_context).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRunRecord"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/internal/runs/{runId}/publication/steps:
+    get:
+      operationId: listInternalPublicationSteps
+      description: >-
+        Read the full publication-step records for one run, including reconciliation ids. Requires
+        the service token.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      responses:
+        "200":
+          description: Full publication-step records.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PublicationStepRecord"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/parked:
+    get:
+      operationId: listParkedRuns
+      description: >-
+        List the runs whose automatic work stopped without a conclusion, on any axis.
+        Coordination stops retrying these, so this is the queue of runs that need an operator
+        decision, and `axis` says which part of the run stopped. Reading it needs only the read
+        token: knowing that a run is stuck is not a privileged act, and the console should be
+        able to show it without holding operator credentials.
+      security:
+        - readToken: []
+      responses:
+        "200":
+          description: Parked runs, oldest first.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required:
+                  - blocks
+                properties:
+                  blocks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ParkedRun"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/admin/runs/{runId}/abandon:
+    post:
+      operationId: abandonBlockedPreparation
+      description: >-
+        An operator decision, not a repair: conclude a blocked run's open axes so it stops
+        holding unwinnable work. Execution is left untouched (a recorded result and its
+        `workflow_result` stay), nothing is deleted, and the run keeps its ingress identity so a
+        replay still resolves to it. Only a run whose preparation is parked by a contradiction
+        is eligible - the case this decision exists for; a run parked on execution or publication
+        is ended with `giveUp` instead. That single-eligibility restriction is what keeps this
+        from becoming a general state-jumping endpoint: the route can only finish a transition
+        coordination already proved impossible, and a leaked admin token can at most conclude
+        such a run. Requires the admin token; the route does not exist when none is configured.
+      security:
+        - adminToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  minLength: 1
+                  description: Why this run is being abandoned; recorded on every event it writes.
+      responses:
+        "200":
+          description: The run after its open axes were concluded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRunRecord"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/admin/runs/{runId}/give-up:
+    post:
+      operationId: giveUpDisconnectedRun
+      description: >-
+        An operator decision that stops waiting for a disconnected run instead of resuming it.
+        It never claims that nothing happened: a disconnected execution may already have been
+        accepted by the Execution API provider, and a disconnected publication may already have delivered some of
+        its steps. The decision is therefore recorded as "this outcome will not be waited for":
+        the disconnected axis ends as failed with a reason naming the operator, and whatever the
+        run would still have produced is not published. A disconnected preparation concludes as a
+        failure, an execution in flight is stopped, and a publication is skipped.
+        Only a run with a disconnected axis is eligible, and a reason is required so the decision
+        is never anonymous. Requires the admin token; the route does not exist when none is
+        configured.
+      security:
+        - adminToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - reason
+              properties:
+                reason:
+                  type: string
+                  minLength: 1
+                  description: Why this outcome is being given up on; recorded on every event it writes.
+      responses:
+        "200":
+          description: The run after the decision concluded its disconnected axis.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRunRecord"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/admin/runs/{runId}/resume:
+    post:
+      operationId: resumeDisconnectedRun
+      description: >-
+        An operator decision that hands a disconnected run back to automatic recovery.
+        Exactly one axis can be `disconnected` at a time, and this resumes whichever it is.
+        A disconnected preparation returns to `uncertain` and its attempt budget is reset,
+        because such a row has always spent that budget and would otherwise be concluded as
+        failed by the next command without ever being attempted again. A disconnected execution
+        returns to `uncertain` with its replay budget reset, for the same reason: the replays
+        stopped precisely because that budget was spent. A disconnected publication returns to
+        the normal claim queue: its parked steps become attemptable with both budgets reset, so the
+        side effects they name are issued once more. Steps that already succeeded are not reset -
+        the run resumes where it stopped instead of starting over. Nothing is repaired and no
+        outcome is asserted either way.
+        The decision is the operator's, and it is not capped: every resume is recorded as its own
+        `PUBLICATION_RESUMED_BY_OPERATOR` transition, so the exercise of that authority is
+        visible after the fact rather than limited in advance. Only a run with a disconnected
+        axis is eligible, so a leaked admin token can at most restart work the system already
+        stopped by itself. Requires the admin token; the route does not exist when none is
+        configured.
+      security:
+        - adminToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The run identifier Review Runs assigned at admission (a UUID).
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+      responses:
+        "200":
+          description: The run after its disconnected axis was handed back to automatic recovery.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRunRecord"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/RunNotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/config/preparation-heartbeat-interval:
+    get:
+      operationId: getPreparationHeartbeatInterval
+      description: >-
+        Report how often a preparation owner must renew its claim.
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: Preparation heartbeat interval in milliseconds.
+          content:
+            application/json:
+              schema:
+                type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/config/publication-heartbeat-interval:
+    get:
+      operationId: getPublicationHeartbeatInterval
+      description: >-
+        Report how often a publication owner must renew its claim.
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: Publication heartbeat interval in milliseconds.
+          content:
+            application/json:
+              schema:
+                type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"

@@ -370,7 +370,7 @@ function GiveUpDialog({
 
 /** The other operator decision for a blocked run: try again.
  *
- * Resuming is a request, not a repair: Control Plane puts the row back in `uncertain` with a
+ * Resuming is a request, not a repair: Review Runs puts the row back in `uncertain` with a
  * fresh attempt budget so automatic recovery can establish what the previous owner left behind.
  * It is offered next to abandonment because those are the only two decisions such a run is
  * waiting for. No reason is asked for: nothing is concluded, and the credential handling is the
@@ -650,9 +650,9 @@ export function Detail(): React.JSX.Element {
   const titleRunId = run?.run_id
   React.useEffect(() => {
     if (titleRunId === undefined) return
-    document.title = `${titleRunId} · Review Control Plane`
+    document.title = `${titleRunId} · Control Plane UI`
     return (): void => {
-      document.title = 'Review Control Plane'
+      document.title = 'Control Plane UI'
     }
   }, [titleRunId])
   if (error instanceof ApiError && error.status === 401) throw error

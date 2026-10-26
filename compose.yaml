@@ -54,7 +54,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} && psql -U $${POSTGRES_USER} -d $${POSTGRES_DB} -tAc \"select count(*) from pg_database where datname in ('sec_review_control_plane','sec_review_memory_catalog')\" | grep -q 2",
+          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} && psql -U $${POSTGRES_USER} -d $${POSTGRES_DB} -tAc \"select count(*) from pg_database where datname in ('sec_review_review_runs','sec_review_memory_catalog')\" | grep -q 2",
         ]
       interval: 2s
       timeout: 5s
@@ -149,29 +149,29 @@ services:
       postgres:
         condition: service_healthy
 
-  control-plane:
+  review-runs:
     restart: "on-failure:5"
     profiles: ["app"]
     build:
-      context: control-plane
+      context: review-runs
       dockerfile: Dockerfile
       additional_contexts:
         contracts: contracts
       args:
         NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
     environment:
-      CONTROL_PLANE_PORT: "8090"
-      CONTROL_PLANE_SERVICE_TOKEN: "${CONTROL_PLANE_SERVICE_TOKEN:?CONTROL_PLANE_SERVICE_TOKEN is required}"
-      CONTROL_PLANE_READ_TOKEN: "${CONTROL_PLANE_READ_TOKEN:?CONTROL_PLANE_READ_TOKEN is required}"
+      REVIEW_RUNS_PORT: "8090"
+      REVIEW_RUNS_SERVICE_TOKEN: "${REVIEW_RUNS_SERVICE_TOKEN:?REVIEW_RUNS_SERVICE_TOKEN is required}"
+      REVIEW_RUNS_READ_TOKEN: "${REVIEW_RUNS_READ_TOKEN:?REVIEW_RUNS_READ_TOKEN is required}"
       # Optional: an empty value disables the /v1/admin surface entirely (it answers 404).
-      CONTROL_PLANE_ADMIN_TOKEN: "${CONTROL_PLANE_ADMIN_TOKEN:-}"
+      REVIEW_RUNS_ADMIN_TOKEN: "${REVIEW_RUNS_ADMIN_TOKEN:-}"
       CONNECTOR_ID: "${CONNECTOR_ID:-github-app:default}"
-      DATABASE_URL: "postgresql://${POSTGRES_USER:-sec_review_bot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/sec_review_control_plane"
+      DATABASE_URL: "postgresql://${POSTGRES_USER:-sec_review_bot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/sec_review_review_runs"
       EXECUTION_API_URL: "http://execution-gateway:8000"
       EXECUTION_API_TOKEN: "${EXECUTION_API_TOKEN:?EXECUTION_API_TOKEN is required}"
       AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS: "${AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS:-15000}"
     ports:
-      - "127.0.0.1:${CONTROL_PLANE_HOST_PORT:-8090}:8090"
+      - "127.0.0.1:${REVIEW_RUNS_HOST_PORT:-8090}:8090"
     healthcheck:
       test:
         [
@@ -199,8 +199,8 @@ services:
         NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
     environment:
       CONTROL_PLANE_UI_PORT: "8091"
-      CONTROL_PLANE_URL: "http://control-plane:8090"
-      CONTROL_PLANE_READ_TOKEN: "${CONTROL_PLANE_READ_TOKEN:?CONTROL_PLANE_READ_TOKEN is required}"
+      REVIEW_RUNS_URL: "http://review-runs:8090"
+      REVIEW_RUNS_READ_TOKEN: "${REVIEW_RUNS_READ_TOKEN:?REVIEW_RUNS_READ_TOKEN is required}"
       CONTROL_PLANE_UI_ACCESS_TOKEN: "${CONTROL_PLANE_UI_ACCESS_TOKEN:?CONTROL_PLANE_UI_ACCESS_TOKEN is required}"
       SEC_REVIEW_ARTIFACT_S3_ENDPOINT: "http://rustfs:9000"
       SEC_REVIEW_ARTIFACT_S3_BUCKET: "sec-review"
@@ -221,7 +221,7 @@ services:
       timeout: 3s
       retries: 20
     depends_on:
-      control-plane:
+      review-runs:
         condition: service_healthy
       rustfs-init:
         condition: service_completed_successfully
@@ -242,9 +242,9 @@ services:
       - apps/github-integration/.env
     environment:
       PRIVATE_KEY_PATH: "/run/secrets/github-app-private-key.pem"
-      CONTROL_PLANE_PUBLICATION_POLL_INTERVAL_MS: "${CONTROL_PLANE_PUBLICATION_POLL_INTERVAL_MS:-15000}"
-      CONTROL_PLANE_SERVICE_URL: "http://control-plane:8090"
-      CONTROL_PLANE_SERVICE_TOKEN: "${CONTROL_PLANE_SERVICE_TOKEN:?CONTROL_PLANE_SERVICE_TOKEN is required}"
+      REVIEW_RUNS_PUBLICATION_POLL_INTERVAL_MS: "${REVIEW_RUNS_PUBLICATION_POLL_INTERVAL_MS:-15000}"
+      REVIEW_RUNS_SERVICE_URL: "http://review-runs:8090"
+      REVIEW_RUNS_SERVICE_TOKEN: "${REVIEW_RUNS_SERVICE_TOKEN:?REVIEW_RUNS_SERVICE_TOKEN is required}"
       GITHUB_INTEGRATION_GIT_HTTP_PROXY: "${GITHUB_INTEGRATION_GIT_HTTP_PROXY:-}"
       SEC_REVIEW_ARTIFACT_STORE: "s3"
       SEC_REVIEW_ARTIFACT_S3_BUCKET: "sec-review"
@@ -262,7 +262,7 @@ services:
     depends_on:
       rustfs-init:
         condition: service_completed_successfully
-      control-plane:
+      review-runs:
         condition: service_healthy
 
 secrets:

@@ -19,8 +19,8 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
   const upstreamAddress = upstream.address()
   assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiServer({
-    controlPlaneUrl: `http://127.0.0.1:${upstreamAddress.port}`,
-    controlPlaneToken: 'read-secret',
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
     accessToken: 'login-secret'
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
@@ -42,7 +42,7 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
     assert.strictEqual(query.status, 200)
     assert.strictEqual(authorization, 'Bearer read-secret')
     assert.strictEqual(upstreamPath, '/v1/runs')
-    // The BFF forwards only the parameters Control Plane declares: UI state (`range`) and
+    // The BFF forwards only the parameters Review Runs declares: UI state (`range`) and
     // anything else the browser adds (UTM, typos) are dropped rather than passed upstream.
     await fetch(`${base}/api/runs?range=1h&utm_source=twitter&limit=10`, {
       headers: { cookie }
@@ -65,7 +65,7 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       404
     )
     // The run-id segment must be the contract's UUID shape. A catch-all would still be safe
-    // today (Control Plane answers 400), but it would forward any future path shape upstream,
+    // today (Review Runs answers 400), but it would forward any future path shape upstream,
     // so the allow-list rejects a non-UUID id here instead of relaying it.
     const runUuid = '0123abcd-4567-89ef-0123-456789abcdef'
     await fetch(`${base}/api/runs/${runUuid}/events`, { headers: { cookie } })
@@ -96,7 +96,7 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
     assert.strictEqual(
       upstreamPath,
       '',
-      'a rejected path must never reach the upstream Control Plane'
+      'a rejected path must never reach the upstream Review Runs'
     )
     // The blocked-preparation queue is a fixed sub-resource of the run collection, not a run id,
     // so it must pass the allow-list before the UUID check rejects it.
@@ -121,7 +121,7 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
         cookie,
         origin: 'https://evil.example',
         'content-type': 'application/json',
-        'x-control-plane-admin-token': 'admin-value'
+        'x-review-runs-admin-token': 'admin-value'
       },
       body: '{"reason":"r"}'
     })
@@ -137,7 +137,7 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
         cookie,
         origin: base,
         'content-type': 'application/json',
-        'x-control-plane-admin-token': 'admin-value'
+        'x-review-runs-admin-token': 'admin-value'
       },
       body: '{"reason":"r"}'
     })
@@ -181,8 +181,8 @@ test('BFF sign-out expires the session cookie it issued', async () => {
   const upstreamAddress = upstream.address()
   assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiServer({
-    controlPlaneUrl: `http://127.0.0.1:${upstreamAddress.port}`,
-    controlPlaneToken: 'read-secret',
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
     accessToken: 'login-secret'
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
@@ -237,8 +237,8 @@ test('BFF sign-out expires the session cookie it issued', async () => {
  */
 test('BFF refuses a cross-site sign-out', async () => {
   const ui = createControlPlaneUiServer({
-    controlPlaneUrl: 'http://127.0.0.1:1',
-    controlPlaneToken: 'read-secret',
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
     accessToken: 'login-secret'
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
@@ -276,10 +276,10 @@ test('BFF refuses a cross-site sign-out', async () => {
   }
 })
 
-test('BFF returns a gateway error when Control Plane is unavailable', async () => {
+test('BFF returns a gateway error when Review Runs is unavailable', async () => {
   const ui = createControlPlaneUiServer({
-    controlPlaneUrl: 'http://127.0.0.1:1',
-    controlPlaneToken: 'read-secret',
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
     accessToken: 'login-secret'
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
@@ -297,7 +297,7 @@ test('BFF returns a gateway error when Control Plane is unavailable', async () =
     const query = await fetch(`${base}/api/runs`, { headers: { cookie } })
     assert.strictEqual(query.status, 502)
     assert.deepStrictEqual(await query.json(), {
-      error: 'control_plane_unavailable'
+      error: 'review_runs_unavailable'
     })
   } finally {
     await new Promise<void>((resolve) => ui.close(() => resolve()))
@@ -332,8 +332,8 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
   assert(upstreamAddress && typeof upstreamAddress === 'object')
   let requestedKey = ''
   const ui = createControlPlaneUiServer({
-    controlPlaneUrl: `http://127.0.0.1:${upstreamAddress.port}`,
-    controlPlaneToken: 'read-secret',
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
     accessToken: 'login-secret',
     artifactStore: {
       async getObject(key): Promise<{ body: Readable; contentLength: number }> {
@@ -416,8 +416,8 @@ test('BFF rejects artifact metadata that does not belong to the requested run', 
   assert(upstreamAddress && typeof upstreamAddress === 'object')
   let storageCalled = false
   const ui = createControlPlaneUiServer({
-    controlPlaneUrl: `http://127.0.0.1:${upstreamAddress.port}`,
-    controlPlaneToken: 'read-secret',
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
     accessToken: 'login-secret',
     artifactStore: {
       async getObject(): Promise<{ body: Readable }> {
@@ -476,8 +476,8 @@ test('BFF rejects an object whose size does not match the available artifact', a
   const upstreamAddress = upstream.address()
   assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiServer({
-    controlPlaneUrl: `http://127.0.0.1:${upstreamAddress.port}`,
-    controlPlaneToken: 'read-secret',
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
     accessToken: 'login-secret',
     artifactStore: {
       async getObject(): Promise<{ body: Readable; contentLength: number }> {
@@ -537,8 +537,8 @@ test('BFF rejects same-size artifact content that does not match the stored dige
   const upstreamAddress = upstream.address()
   assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiServer({
-    controlPlaneUrl: `http://127.0.0.1:${upstreamAddress.port}`,
-    controlPlaneToken: 'read-secret',
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
     accessToken: 'login-secret',
     artifactStore: {
       async getObject(): Promise<{ body: Readable; contentLength: number }> {
@@ -598,8 +598,8 @@ test('BFF times out a stalled artifact download', async () => {
   const upstreamAddress = upstream.address()
   assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiServer({
-    controlPlaneUrl: `http://127.0.0.1:${upstreamAddress.port}`,
-    controlPlaneToken: 'read-secret',
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
     accessToken: 'login-secret',
     artifactDownloadIdleTimeoutMs: 20,
     artifactStore: {
@@ -638,7 +638,7 @@ test('BFF times out a stalled artifact download', async () => {
   }
 })
 
-test('BFF reports a Control Plane metadata timeout separately', async () => {
+test('BFF reports a Review Runs metadata timeout separately', async () => {
   const upstream = createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' })
     response.write('{"run":')
@@ -647,10 +647,10 @@ test('BFF reports a Control Plane metadata timeout separately', async () => {
   const upstreamAddress = upstream.address()
   assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiServer({
-    controlPlaneUrl: `http://127.0.0.1:${upstreamAddress.port}`,
-    controlPlaneToken: 'read-secret',
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
     accessToken: 'login-secret',
-    controlPlaneRequestTimeoutMs: 20,
+    reviewRunsRequestTimeoutMs: 20,
     artifactStore: {
       async getObject(): Promise<{ body: Readable }> {
         throw new Error('must not be called')
@@ -673,7 +673,7 @@ test('BFF reports a Control Plane metadata timeout separately', async () => {
     })
     assert.strictEqual(download.status, 504)
     assert.deepStrictEqual(await download.json(), {
-      error: 'control_plane_timeout'
+      error: 'review_runs_timeout'
     })
   } finally {
     upstream.closeAllConnections()
@@ -685,7 +685,7 @@ test('BFF reports a Control Plane metadata timeout separately', async () => {
 })
 
 test('BFF does not echo an upstream content-type it would serve as script', async () => {
-  // The upstream `content-type` could be `text/html` if Control Plane were compromised or
+  // The upstream `content-type` could be `text/html` if Review Runs were compromised or
   // misconfigured. Echoing it from the console's own origin would let a browser run the body as
   // script; the BFF must answer with a fixed JSON type instead, regardless of what it is sent.
   const upstream = createServer((_request, response) => {
@@ -696,8 +696,8 @@ test('BFF does not echo an upstream content-type it would serve as script', asyn
   const upstreamAddress = upstream.address()
   assert(upstreamAddress && typeof upstreamAddress === 'object')
   const ui = createControlPlaneUiServer({
-    controlPlaneUrl: `http://127.0.0.1:${upstreamAddress.port}`,
-    controlPlaneToken: 'read-secret',
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
     accessToken: 'login-secret'
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))

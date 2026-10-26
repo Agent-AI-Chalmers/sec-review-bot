@@ -3,7 +3,7 @@ import {
   type PullRequestReviewEvent,
   type ReviewCommentSide
 } from '../../github/comment-service.js'
-import type { PersistedPullRequest } from '../../control-plane/publish-context.js'
+import type { PersistedPullRequest } from '../../review-runs/publish-context.js'
 import type { Octokit } from 'octokit'
 
 interface SuggestionCandidate {

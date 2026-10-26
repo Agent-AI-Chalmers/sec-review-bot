@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-`execution-gateway/` is the independently deployable TypeScript HTTP boundary between Review Control Plane and Temporal. It validates execution requests, starts the stable Temporal execution workflow, and projects workflow state for callers.
+`execution-gateway/` is the independently deployable TypeScript HTTP boundary between Review Runs and Temporal. It validates execution requests, starts the stable Temporal execution workflow, and projects workflow state for callers.
 
 Execution API v1 is defined by [`contracts/execution-api/v1`](../contracts/execution-api/v1/CONTRACT.md). The Temporal Execution Workflow input is defined by [`contracts/execution-workflow/v1`](../contracts/execution-workflow/v1/CONTRACT.md).
 

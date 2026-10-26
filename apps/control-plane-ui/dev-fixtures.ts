@@ -103,7 +103,7 @@ interface FixtureStep {
 
 /**
  * One reachable slice of a run's lifecycle. Every field here is implied by the
- * Control Plane's state machine; see `validateRun` for the invariants that make
+ * Review Runs's state machine; see `validateRun` for the invariants that make
  * the generated fixtures a truthful preview instead of arbitrary JSON.
  */
 interface Scenario {
@@ -137,11 +137,11 @@ interface Scenario {
   step: StepStatus | null
 }
 
-// Mirrors the Control Plane's own default page size, and holds more runs than one
+// Mirrors Review Runs' own default page size, and holds more runs than one
 // page so the console's paging is reachable without a backend.
 const DEV_PAGE_SIZE = 50
 
-/** The query parameters Control Plane's `listRuns` declares (generated from the contract).
+/** The query parameters Review Runs's `listRuns` declares (generated from the contract).
  * The fixture mirrors the API's strictness: a parameter outside this set is rejected, so
  * local development matches the deployed contract instead of quietly accepting fields
  * production refuses. */
@@ -298,7 +298,7 @@ const SCENARIOS: readonly Scenario[] = [
   },
   {
     // Recovery exhausted its replay budget without learning whether the Execution Gateway accepted this
-    // submission. The execution has not started from Control Plane's point of view, publication
+    // submission. The execution has not started from Review Runs's point of view, publication
     // remains pending, and the queued attention notice is deliberately not a failure report.
     execution_status: 'disconnected',
     publication_status: 'pending',
@@ -430,11 +430,11 @@ const SCENARIOS: readonly Scenario[] = [
     preparation_notice: null
   },
   // The states below are reachable but were not represented, which taught the console a
-  // narrower lifecycle than the Control Plane produces: an operator could never see what a
+  // narrower lifecycle than Review Runs produces: an operator could never see what a
   // parked publication looks like, or what a preparation does while it is being re-established.
   {
     // A preparation whose claim lapsed: nobody knows whether the prepared input reached the
-    // Control Plane, so the next claim has to re-establish that before rebuilding. Not a
+    // Review Runs, so the next claim has to re-establish that before rebuilding. Not a
     // failure, so the run stays pending on both later axes.
     execution_status: 'pending',
     publication_status: 'pending',
@@ -478,7 +478,7 @@ const SCENARIOS: readonly Scenario[] = [
 const iso = (milliseconds: number): string =>
   new Date(milliseconds).toISOString()
 /**
- * Deterministic pseudo-random ids in the shape the Control Plane actually assigns
+ * Deterministic pseudo-random ids in the shape Review Runs actually assigns
  * (`crypto.randomUUID()`, a v4 UUID). A time-ordered id would misrepresent what the
  * console receives and would falsely suggest that a prefix means something.
  */
@@ -535,7 +535,7 @@ function artifactFor(
 /**
  * A coherent coordination history for one fixture run, derived from its current state so the
  * console's History section has something truthful to show without a backend. The order and
- * axes mirror what the Control Plane writes: execution and preparation start at admission,
+ * axes mirror what Review Runs writes: execution and preparation start at admission,
  * publication starts once execution succeeds.
  */
 function eventsFor(run: FixtureRun): Array<{
@@ -585,7 +585,7 @@ function eventsFor(run: FixtureRun): Array<{
     run.execution.status === 'uncertain' ||
     run.execution.status === 'disconnected'
   ) {
-    // An unresolved submission never reached `queued`: Control Plane moves `pending` straight to
+    // An unresolved submission never reached `queued`: Review Runs moves `pending` straight to
     // `uncertain` when the Execution Gateway call's acceptance could not be confirmed. The recovery then
     // resolves it to `queued` or `failed`, which is why this originates at `pending`.
     events.push(
@@ -734,7 +734,7 @@ function stepsFor(
 }
 
 /**
- * Rejects any generated run that the Control Plane could never produce. The
+ * Rejects any generated run that Review Runs could never produce. The
  * checks mirror the store's write paths: publication only starts after a
  * succeeded execution, every terminal failure marks the publication
  * `skipped` in the same transaction, and the diagnostic artifact is
@@ -1031,7 +1031,7 @@ function validateRun(run: FixtureRun, steps: readonly FixtureStep[]): void {
       run.run_id
     )
   ) {
-    fail('run ids are UUID v4, as the Control Plane assigns them')
+    fail('run ids are UUID v4, as Review Runs assigns them')
   }
 
   if (steps.length > 0 && !startedPublication) {
@@ -1260,7 +1260,7 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
     // choice the fixture should make.
     // Any axis that ends a run queues a notice, so the fixture derives one from whichever axis
     // actually failed. Modelling only the preparation case taught the console a narrower world
-    // than the Control Plane produces.
+    // than Review Runs produces.
     notices: noticesFor(
       scenario,
       preparation,
@@ -1275,7 +1275,7 @@ const runs: FixtureRun[] = Array.from({ length: RUN_COUNT }, (_, index) => {
 // past `pending`: writing "the Execution Gateway never ran" would overwrite a real result. So the two runs
 // below are put into that contradictory state - preparation still `preparing`, execution advanced,
 // publication still waiting - rather than just being labelled with the code. A marker on a run
-// whose axes are consistent would teach the console a state the Control Plane cannot produce.
+// whose axes are consistent would teach the console a state Review Runs cannot produce.
 // The two runs standing in for the queue are chosen by scenario, not by position: the shape this
 // mutation needs is "execution really finished", so it borrows the first scenarios that already
 // describe a completed execution (with its own duration and artifact) rather than inheriting
@@ -1429,7 +1429,7 @@ function decodeCursor(value: string | null): Cursor | null {
   return { createdAt, runId }
 }
 
-/** Serve representative read-only states without a Control Plane or BFF. */
+/** Serve representative read-only states without a Review Runs or BFF. */
 export function devFixtures(): Plugin {
   return {
     name: 'control-plane-ui-dev-fixtures',
@@ -1612,7 +1612,7 @@ export function devFixtures(): Plugin {
           request.url
         )
         if (request.method === 'POST' && resumeMatch !== null) {
-          if (request.headers['x-control-plane-admin-token'] === undefined) {
+          if (request.headers['x-review-runs-admin-token'] === undefined) {
             response.statusCode = 401
             response.end(JSON.stringify({ error: 'admin_token_required' }))
             return
@@ -1633,7 +1633,7 @@ export function devFixtures(): Plugin {
             response.end(JSON.stringify({ error: 'not_found' }))
             return
           }
-          // The same transition Control Plane performs: preparation returns to `uncertain`
+          // The same transition Review Runs performs: preparation returns to `uncertain`
           // with a fresh attempt budget, and the reason that parked it is cleared. The axes are
           // left as they are, because resuming asserts nothing about them.
           run.preparation.status = 'uncertain'
@@ -1648,7 +1648,7 @@ export function devFixtures(): Plugin {
         if (request.method === 'POST' && abandonMatch !== null) {
           // Mirrors the real endpoint's contract closely enough for local use: an operator token
           // is required, the run must be in the queue, and success removes it from the queue.
-          if (request.headers['x-control-plane-admin-token'] === undefined) {
+          if (request.headers['x-review-runs-admin-token'] === undefined) {
             response.statusCode = 401
             response.end(JSON.stringify({ error: 'admin_token_required' }))
             return
@@ -1665,7 +1665,7 @@ export function devFixtures(): Plugin {
             response.end(JSON.stringify({ error: 'not_found' }))
             return
           }
-          // The same transition the Control Plane performs: conclude the axes that were still
+          // The same transition Review Runs performs: conclude the axes that were still
           // open, keep the execution result, and record why. Clearing only the marker would show
           // the operator a run that looks untouched after an irreversible decision.
           const now = new Date().toISOString()

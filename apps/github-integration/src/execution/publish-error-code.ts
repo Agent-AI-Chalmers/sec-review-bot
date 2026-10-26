@@ -7,11 +7,11 @@ export const EXECUTION_PUBLISH_ERROR_CODES = {
   github_not_found: 'GITHUB_NOT_FOUND',
   github_publish_rejected: 'GITHUB_PUBLISH_REJECTED',
   github_validation_rejected: 'GITHUB_VALIDATION_REJECTED',
-  // These four codes Control Plane emits as terminal (deterministic) publication
+  // These four codes Review Runs emits as terminal (deterministic) publication
   // step failures. They must match the `ErrorResponse.code` enum in the hand-written
-  // `contracts/control-plane-api/v1/openapi.yaml`; the alignment test reads Control Plane's
+  // `contracts/review-runs-api/v1/openapi.yaml`; the alignment test reads Review Runs's
   // single source and asserts each code is classified `retry: false`, so a new code on
-  // the Control Plane side cannot silently retry the publication forever.
+  // Review Runs side cannot silently retry the publication forever.
   publication_step_retry_exhausted: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
   publication_step_set_duplicate: 'PUBLICATION_STEP_SET_DUPLICATE',
   publication_step_set_changed: 'PUBLICATION_STEP_SET_CHANGED',

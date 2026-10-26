@@ -19,7 +19,7 @@ interface RunIssueReviewArgs {
   // Whether this run may open a draft PR when the review record contains a ready patch.
   // The end user opts in per comment; automatic triggers leave this false.
   open_pr?: boolean | null
-  // The caller hands the prepared input to Control Plane for durable submission.
+  // The caller hands the prepared input to Review Runs for durable submission.
   on_prepared?: (
     submitted: SubmittedIssueReviewRun,
     input: IssueReviewInput & Record<string, unknown>

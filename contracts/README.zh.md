@@ -33,13 +33,13 @@ contracts/
 | --- | --- | --- | --- |
 | [execution-api](execution-api/README.zh.md) | 公开 HTTP 操作、workflow 输入、结果与错误 | Execution API provider、调用方与下游发布方 | [v1](execution-api/v1/CONTRACT.zh.md) |
 | [execution-workflow](execution-workflow/README.zh.md) | Temporal Execution Workflow 输入 | Execution Gateway 与 Execution Worker | [v1](execution-workflow/v1/CONTRACT.md) |
-| [control-plane-api](control-plane-api/README.zh.md) | Control Plane HTTP API 与 observed run 形状 | Control Plane 与其调用方 | [v1](control-plane-api/v1/openapi.yaml) |
+| [review-runs-api](review-runs-api/README.zh.md) | Review Runs HTTP API 与 observed run 形状 | Review Runs 与其调用方 | [v1](review-runs-api/v1/openapi.yaml) |
 | [memory-catalog-api](memory-catalog-api/README.zh.md) | Memory coordination HTTP API | Memory Catalog Server 与 workers | [v1](memory-catalog-api/v1/openapi.yaml) |
 | [setup-declaration](setup-declaration/README.zh.md) | 受信任的 `.sec-review/setup.yml` 格式 | 被审查仓库、GitHub Integration 与 Execution Worker | [v1](setup-declaration/v1/SPEC.zh.md) |
 
 ## 适用于每个族的规则
 
-族名取自这个族覆盖的内容。若所有形状都属于同一个组件，就以该组件命名——`control-plane-api` 就是 Control Plane 自己的形状；若形状横跨多方，就以它们的交汇点命名——`execution-api` 横跨 Execution provider、调用方和下游发布方。
+族名取自这个族覆盖的内容。若所有形状都属于同一个组件，就以该组件命名——`review-runs-api` 就是 Review Runs 自己的形状；若形状横跨多方，就以它们的交汇点命名——`execution-api` 横跨 Execution provider、调用方和下游发布方。
 
 不要用某个消费方命名，因为消费方会变、提供方不会；也不要复用别的族已用于其他含义的词。
 
@@ -71,5 +71,5 @@ Fixture 是契约校验的一部分。Manifest 记录每个 schema 必须接受�
 - 更新受影响版本的规范；
 - 更新它的 schema；
 - 更新或新增它的 fixture 与 manifest 条目；
-- 用该族的工具重新生成任何派生产物（例如 Control Plane 提交的 `v1` schema 与生成的类型）：`pnpm --dir contracts/<family>/tools run generate`，再用 `... run check` 确认；
+- 用该族的工具重新生成任何派生产物（例如 Review Runs 提交的 `v1` schema 与生成的类型）：`pnpm --dir contracts/<family>/tools run generate`，再用 `... run check` 确认；
 - 让 Python 和 TypeScript 测试校验同一批文件。

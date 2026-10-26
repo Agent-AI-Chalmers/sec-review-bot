@@ -19,7 +19,7 @@ import {
   EXECUTION_API_VERSION
 } from '../src/generate-api-types.js'
 import {
-  CONTROL_PLANE_OUTPUT_PATH,
+  REVIEW_RUNS_OUTPUT_PATH,
   generatedArtifacts as types,
   renderExecutionApiTypes
 } from '../src/generate-types.js'
@@ -114,7 +114,7 @@ test('contract declaration projections expose only the types each consumer owns'
 
 test('the Execution API projection remains limited to workflow inputs', async () => {
   const names = exportedTypeNames(
-    await renderExecutionApiTypes(CONTROL_PLANE_OUTPUT_PATH)
+    await renderExecutionApiTypes(REVIEW_RUNS_OUTPUT_PATH)
   )
 
   assertHasWorkflowInputs(names)

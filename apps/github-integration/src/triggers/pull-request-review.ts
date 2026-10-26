@@ -1,19 +1,19 @@
 // Turns a pull-request review request into a durable run and preserves enough
 // connector input to resume preparation after an integration restart.
-import { admitReviewRun } from '../control-plane/admission.js'
+import { admitReviewRun } from '../review-runs/admission.js'
 import {
   PreparationClaimLostError,
   startPreparationClaimHeartbeat
-} from '../control-plane/preparation-claim.js'
+} from '../review-runs/preparation-claim.js'
 
 import type { PullRequestContext } from '../github/pull-request-service.js'
 import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
-import { pullRequestReviewPublishContext } from '../control-plane/publish-context.js'
-import { controlPlaneClient } from '../control-plane/client.js'
+import { pullRequestReviewPublishContext } from '../review-runs/publish-context.js'
+import { reviewRunsClient } from '../review-runs/client.js'
 import type { TestChangesPolicy } from '../execution/input.js'
 import { isSetupDeclarationError } from '../github/setup-declaration.js'
-import { ControlPlaneSubmissionError } from '../control-plane/client.js'
-import { classifyPreparationFailure } from '../control-plane/preparation-failure.js'
+import { ReviewRunsSubmissionError } from '../review-runs/client.js'
+import { classifyPreparationFailure } from '../review-runs/preparation-failure.js'
 import {
   startPullRequestReviewRun,
   type SubmittedPullRequestReviewRun
@@ -23,30 +23,30 @@ import type { Octokit } from 'octokit'
 type PullRequestReviewEventType =
   'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
 type StartPullRequestReview = typeof startPullRequestReviewRun
-type PullRequestReviewControlPlaneClient = {
+type PullRequestReviewReviewRunsClient = {
   admitReviewRun: (
-    ...args: Parameters<typeof controlPlaneClient.admitReviewRun>
+    ...args: Parameters<typeof reviewRunsClient.admitReviewRun>
   ) =>
-    | Awaited<ReturnType<typeof controlPlaneClient.admitReviewRun>>
-    | ReturnType<typeof controlPlaneClient.admitReviewRun>
+    | Awaited<ReturnType<typeof reviewRunsClient.admitReviewRun>>
+    | ReturnType<typeof reviewRunsClient.admitReviewRun>
   checkpointPreparationInput?: (
-    ...args: Parameters<typeof controlPlaneClient.checkpointPreparationInput>
+    ...args: Parameters<typeof reviewRunsClient.checkpointPreparationInput>
   ) => Promise<void>
   failPreparation: (
-    ...args: Parameters<typeof controlPlaneClient.failPreparation>
+    ...args: Parameters<typeof reviewRunsClient.failPreparation>
   ) => unknown
   submitPreparedRun: (
-    ...args: Parameters<typeof controlPlaneClient.submitPreparedRun>
+    ...args: Parameters<typeof reviewRunsClient.submitPreparedRun>
   ) => unknown
   renewPreparationClaim: (
-    ...args: Parameters<typeof controlPlaneClient.renewPreparationClaim>
+    ...args: Parameters<typeof reviewRunsClient.renewPreparationClaim>
   ) => Promise<boolean>
-  preparationHeartbeatIntervalMs: typeof controlPlaneClient.preparationHeartbeatIntervalMs
+  preparationHeartbeatIntervalMs: typeof reviewRunsClient.preparationHeartbeatIntervalMs
 }
 
 interface StartPullRequestReviewCommandDeps {
   start_review: StartPullRequestReview
-  store: PullRequestReviewControlPlaneClient
+  store: PullRequestReviewReviewRunsClient
 }
 
 interface StartPullRequestReviewCommandArgs {
@@ -91,10 +91,8 @@ export async function startPullRequestReviewCommand({
   on_admitted,
   deps = {}
 }: StartPullRequestReviewCommandArgs): Promise<StartedPullRequestReview> {
-  const {
-    start_review = startPullRequestReviewRun,
-    store = controlPlaneClient
-  } = deps
+  const { start_review = startPullRequestReviewRun, store = reviewRunsClient } =
+    deps
   const durableInput =
     preparation_input ??
     (pr === undefined
@@ -170,7 +168,7 @@ export async function startPullRequestReviewCommand({
       test_changes: event_type === 'manual_review' ? test_changes : null,
       on_prepared: async (prepared, input) => {
         // Confirm the lease immediately before crossing the durable submission
-        // boundary; the submission itself remains token-fenced by Control Plane.
+        // boundary; the submission itself remains token-fenced by Review Runs.
         await heartbeat.assertOwned()
         await store.submitPreparedRun(
           run_id,
@@ -184,7 +182,7 @@ export async function startPullRequestReviewCommand({
     const ownsClaim = await heartbeat.stop()
     if (
       ownsClaim &&
-      !(error instanceof ControlPlaneSubmissionError) &&
+      !(error instanceof ReviewRunsSubmissionError) &&
       !(error instanceof PreparationClaimLostError)
     ) {
       const classification = classifyPreparationFailure(

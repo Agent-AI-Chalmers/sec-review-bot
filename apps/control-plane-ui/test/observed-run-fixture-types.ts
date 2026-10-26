@@ -12,8 +12,8 @@
 // - An optional field appears in the schema's properties but not in every example, so
 //   equality is the wrong relation between an example and the schema. Each check below
 //   asserts only the containment that its pairing actually promises.
-import fixture from '../../../contracts/control-plane-api/v1/fixtures/observed-run.json' with { type: 'json' }
-import schema from '../../../contracts/control-plane-api/v1/observed-run.schema.json' with { type: 'json' }
+import fixture from '../../../contracts/review-runs-api/v1/fixtures/observed-run.json' with { type: 'json' }
+import schema from '../../../contracts/review-runs-api/v1/observed-run.schema.json' with { type: 'json' }
 
 import type { ArtifactStorage, Run } from '../src/api.js'
 
@@ -26,7 +26,7 @@ type Expect<T extends true> = T
 /**
  * The example must be one the schema accepts: every field it carries has to be a field the
  * contract knows about. This is what keeps the example from teaching the console a shape
- * the Control Plane would never send.
+ * Review Runs would never send.
  */
 export type FixtureIsAcceptableToTheSchema = Expect<
   KeysWithin<typeof fixture, (typeof schema)['properties']>

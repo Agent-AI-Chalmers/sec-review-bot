@@ -191,7 +191,7 @@ export async function startPullRequestReviewRun(args: {
   trusted_default_branch: TrustedDefaultBranch
   event_type: 'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
   test_changes?: TestChangesPolicy | null
-  // The caller hands the prepared input to Control Plane for durable submission.
+  // The caller hands the prepared input to Review Runs for durable submission.
   on_prepared?: (
     submitted: SubmittedPullRequestReviewRun,
     input: PullRequestReviewInput & Record<string, unknown>

@@ -29,7 +29,7 @@ Run checks from every affected package, not only from the package where the firs
 | --- | --- | --- |
 | Execution, Memory Extraction, and Memory Maintenance Workers | [`agents/README.md`](agents/README.md) | Ruff, Black, mypy, Pyright, pytest |
 | GitHub Integration | [`apps/github-integration/README.md`](apps/github-integration/README.md) | format, lint, typecheck, unit tests; integration tests when the database boundary changes |
-| Review Control Plane | [`control-plane/README.md`](control-plane/README.md) | format, lint, typecheck, tests, PostgreSQL integration tests |
+| Review Runs | [`review-runs/README.md`](review-runs/README.md) | format, lint, typecheck, tests, PostgreSQL integration tests |
 | Control Plane UI | [`apps/control-plane-ui/README.md`](apps/control-plane-ui/README.md) | format, lint, typecheck, tests, build, browser smoke test for user-visible flows |
 | Execution Gateway | [`execution-gateway/README.md`](execution-gateway/README.md) | format, lint, typecheck, tests |
 | Memory Catalog Server | [`memory-catalog/README.md`](memory-catalog/README.md) | format, lint, typecheck, tests |

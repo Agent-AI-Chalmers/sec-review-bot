@@ -18,7 +18,7 @@ Language: English | [中文](README.zh.md)
 | `GET`  | `/v1/memory-tree/revisions`            | List memory tree revision history.                                                                  |
 | `GET`  | `/v1/memory-tree/revisions/{revision}` | Return one memory tree revision, its maintenance identity, and its artifact references.             |
 
-The service owns its PostgreSQL database and its `schema_versions` ledger. The default integrated deployment places that database beside, but separate from, the Control Plane database in the same PostgreSQL instance.
+The service owns its PostgreSQL database and its `schema_versions` ledger. The default integrated deployment places that database beside, but separate from, Review Runs database in the same PostgreSQL instance.
 
 Only one maintainer may execute at a time. Temporal enforces that invariant with one fixed workflow ID and a schedule overlap policy of `SKIP`; the catalog therefore does not implement batch leases or concurrent claims.
 

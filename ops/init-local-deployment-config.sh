@@ -65,9 +65,9 @@ replace_assignment() {
 }
 
 control_plane_ui_access_token=$(random_secret)
-control_plane_read_token=$(random_secret)
-control_plane_service_token=$(random_secret)
-control_plane_admin_token=$(random_secret)
+review_runs_read_token=$(random_secret)
+review_runs_service_token=$(random_secret)
+review_runs_admin_token=$(random_secret)
 execution_api_token=$(random_secret)
 memory_catalog_token=$(random_secret)
 postgres_password=$(random_secret)
@@ -88,9 +88,9 @@ cp "$repository_root/apps/github-integration/.env.sample" "$github_tmp"
 cp "$repository_root/agents/config/model-providers.sample.toml" "$model_tmp"
 
 replace_assignment "$compose_tmp" CONTROL_PLANE_UI_ACCESS_TOKEN "$control_plane_ui_access_token"
-replace_assignment "$compose_tmp" CONTROL_PLANE_READ_TOKEN "$control_plane_read_token"
-replace_assignment "$compose_tmp" CONTROL_PLANE_SERVICE_TOKEN "$control_plane_service_token"
-replace_assignment "$compose_tmp" CONTROL_PLANE_ADMIN_TOKEN "$control_plane_admin_token"
+replace_assignment "$compose_tmp" REVIEW_RUNS_READ_TOKEN "$review_runs_read_token"
+replace_assignment "$compose_tmp" REVIEW_RUNS_SERVICE_TOKEN "$review_runs_service_token"
+replace_assignment "$compose_tmp" REVIEW_RUNS_ADMIN_TOKEN "$review_runs_admin_token"
 replace_assignment "$compose_tmp" EXECUTION_API_TOKEN "$execution_api_token"
 replace_assignment "$compose_tmp" AGENT_MEMORY_CATALOG_TOKEN "$memory_catalog_token"
 replace_assignment "$compose_tmp" POSTGRES_PASSWORD "$postgres_password"
@@ -109,7 +109,7 @@ replace_assignment "$deployment_tmp" AGENT_MEMORY_CATALOG_TOKEN "$memory_catalog
 
 # Compose overrides this value, but keeping the generated source file coherent
 # also makes it usable for focused non-Compose integration runs.
-replace_assignment "$github_tmp" CONTROL_PLANE_SERVICE_TOKEN "$control_plane_service_token"
+replace_assignment "$github_tmp" REVIEW_RUNS_SERVICE_TOKEN "$review_runs_service_token"
 replace_assignment "$github_tmp" PRIVATE_KEY_PATH "\"$repository_root/apps/github-integration/private-key.pem\""
 
 mv "$compose_tmp" "$compose_env"

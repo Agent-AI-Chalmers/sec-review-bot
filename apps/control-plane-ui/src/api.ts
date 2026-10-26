@@ -7,7 +7,7 @@ import type {
   PublicationStep,
   Run,
   RunEvent
-} from './control-plane-api-types.js'
+} from './review-runs-api-types.js'
 
 export type { ArtifactStorage, ParkedRun, PublicationStep, Run, RunEvent }
 
@@ -27,7 +27,7 @@ export async function abandonBlockedRun(
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-control-plane-admin-token': adminToken
+        'x-review-runs-admin-token': adminToken
       },
       body: JSON.stringify({ reason })
     }
@@ -51,7 +51,7 @@ export async function resumeDisconnectedRun(
     `/api/admin/runs/${encodeURIComponent(runId)}/resume`,
     {
       method: 'POST',
-      headers: { 'x-control-plane-admin-token': adminToken }
+      headers: { 'x-review-runs-admin-token': adminToken }
     }
   )
   if (!response.ok) {
@@ -75,7 +75,7 @@ export async function giveUpDisconnectedRun(
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        'x-control-plane-admin-token': adminToken
+        'x-review-runs-admin-token': adminToken
       },
       body: JSON.stringify({ reason })
     }

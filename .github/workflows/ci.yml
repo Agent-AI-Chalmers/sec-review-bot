@@ -28,7 +28,7 @@ jobs:
       automation-config: ${{ steps.filter.outputs.automation-config }}
       ops: ${{ steps.filter.outputs.ops }}
       contract-tools: ${{ steps.filter.outputs.contract-tools }}
-      control-plane: ${{ steps.filter.outputs.control-plane }}
+      review-runs: ${{ steps.filter.outputs.review-runs }}
       execution-gateway: ${{ steps.filter.outputs.execution-gateway }}
       memory-catalog: ${{ steps.filter.outputs.memory-catalog }}
       github-integration: ${{ steps.filter.outputs.github-integration }}
@@ -110,7 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: [control-plane-api, execution-api, memory-catalog-api]
+        family: [review-runs-api, execution-api, memory-catalog-api]
     defaults:
       run:
         working-directory: contracts/${{ matrix.family }}/tools
@@ -148,12 +148,12 @@ jobs:
           pnpm run typecheck
           pnpm test
 
-  control-plane:
-    name: Control Plane
+  review-runs:
+    name: Review Runs
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
-      needs.changes.outputs.control-plane == 'true'
+      needs.changes.outputs.review-runs == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -171,7 +171,7 @@ jobs:
           --health-retries 30
     defaults:
       run:
-        working-directory: control-plane
+        working-directory: review-runs
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -185,10 +185,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version-file: control-plane/package.json
+          node-version-file: review-runs/package.json
           check-latest: true
           cache: pnpm
-          cache-dependency-path: control-plane/pnpm-lock.yaml
+          cache-dependency-path: review-runs/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -324,9 +324,9 @@ jobs:
         run: pnpm test
       # Deliberately no `test:integration` step. The only integration test here is the opt-in S3
       # upload check, which self-skips without `SEC_REVIEW_TEST_S3_ENDPOINT`, so a CI step would
-      # pass vacuously. The integration↔control-plane boundary is covered by Control Plane's own
+      # pass vacuously. The integration↔review-runs boundary is covered by Review Runs's own
       # integration suite (real PostgreSQL store) and by
-      # `control-plane/test/integration/client-server-seam.test.ts`, which drives this package's
+      # `review-runs/test/integration/client-server-seam.test.ts`, which drives this package's
       # real client against the real server; both jobs provision what they need.
 
   control-plane-ui:
@@ -511,7 +511,7 @@ jobs:
       - automation-config
       - ops
       - contract-tools
-      - control-plane
+      - review-runs
       - execution-gateway
       - memory-catalog
       - github-integration
@@ -529,7 +529,7 @@ jobs:
           AUTOMATION_CONFIG_RESULT: ${{ needs.automation-config.result }}
           OPS_RESULT: ${{ needs.ops.result }}
           CONTRACT_TOOLS_RESULT: ${{ needs.contract-tools.result }}
-          CONTROL_PLANE_RESULT: ${{ needs.control-plane.result }}
+          REVIEW_RUNS_RESULT: ${{ needs.review-runs.result }}
           EXECUTION_GATEWAY_RESULT: ${{ needs.execution-gateway.result }}
           MEMORY_CATALOG_RESULT: ${{ needs.memory-catalog.result }}
           GITHUB_INTEGRATION_RESULT: ${{ needs.github-integration.result }}
@@ -547,7 +547,7 @@ jobs:
             "$AUTOMATION_CONFIG_RESULT" \
             "$OPS_RESULT" \
             "$CONTRACT_TOOLS_RESULT" \
-            "$CONTROL_PLANE_RESULT" \
+            "$REVIEW_RUNS_RESULT" \
             "$EXECUTION_GATEWAY_RESULT" \
             "$MEMORY_CATALOG_RESULT" \
             "$GITHUB_INTEGRATION_RESULT" \

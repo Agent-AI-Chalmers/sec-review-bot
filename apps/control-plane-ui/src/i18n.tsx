@@ -180,11 +180,11 @@ export const messages = {
     retryPending: 'Retry pending',
     failedAttempts: 'Failed attempts',
     failureCode: 'Failure code',
-    unable: 'Unable to load Control Plane',
+    unable: 'Unable to load Review Runs',
     requestFailed: 'The service could not complete this request.',
-    errorTimeout: 'The Control Plane did not respond in time.',
-    errorUnreachable: 'The Control Plane is unreachable.',
-    errorUpstream: 'The Control Plane returned an error.',
+    errorTimeout: 'Review Runs did not respond in time.',
+    errorUnreachable: 'Review Runs is unreachable.',
+    errorUpstream: 'Review Runs returned an error.',
     retry: 'Retry',
     goToRunId: 'Go to run ID',
     runIdPlaceholder: 'Paste a run ID',
@@ -199,7 +199,7 @@ export const messages = {
       'Preparing the input that will be sent to the Execution Gateway.',
     state_preparation_uncertain_label: 'Uncertain',
     state_preparation_uncertain_desc:
-      'The preparer\u2019s claim lapsed before it reported, so it is unknown whether the prepared input reached Control Plane. This is not a failure: the input can be rebuilt and resubmitted under the same identity.',
+      'The preparer\u2019s claim lapsed before it reported, so it is unknown whether the prepared input reached Review Runs. This is not a failure: the input can be rebuilt and resubmitted under the same identity.',
     state_preparation_disconnected_label: 'Disconnected',
     state_preparation_disconnected_desc:
       'Automatic work stopped because this run\u2019s own records no longer admit the transition expiry could make. Nothing retries it on its own.',
@@ -502,11 +502,11 @@ export const messages = {
     retryPending: '等待重试',
     failedAttempts: '失败次数',
     failureCode: '失败码',
-    unable: '无法加载 Control Plane',
+    unable: '无法加载 Review Runs',
     requestFailed: '服务无法完成此请求。',
-    errorTimeout: 'Control Plane 未在规定时间内响应。',
-    errorUnreachable: '无法连接到 Control Plane。',
-    errorUpstream: 'Control Plane 返回了错误。',
+    errorTimeout: 'Review Runs 未在规定时间内响应。',
+    errorUnreachable: '无法连接到 Review Runs。',
+    errorUpstream: 'Review Runs 返回了错误。',
     retry: '重试',
     goToRunId: '按 ID 跳转 run',
     runIdPlaceholder: '粘贴 run ID',
@@ -521,7 +521,7 @@ export const messages = {
       '正在准备要发送给 Execution Gateway 的输入。',
     state_preparation_uncertain_label: '待确认',
     state_preparation_uncertain_desc:
-      '准备者的认领在回报之前就过期了，因此不确定准备好的输入是否已经到达 Control Plane。这不是失败：可以用同一身份重建输入并重新提交。',
+      '准备者的认领在回报之前就过期了，因此不确定准备好的输入是否已经到达 Review Runs。这不是失败：可以用同一身份重建输入并重新提交。',
     state_preparation_disconnected_label: '失联',
     state_preparation_disconnected_desc:
       '这个 run 自身的记录已经不允许过期能做出的那个迁移，因此自动处理停在这里。不会有任何东西自动重试。',
@@ -656,7 +656,7 @@ export function LanguageProvider({
   children: React.ReactNode
 }): React.JSX.Element {
   // Keep the selected UI language local to this console; it is presentation
-  // state, not Control Plane account settings.
+  // state, not Review Runs account settings.
   const [language, setLanguage] = React.useState<Language>(
     () =>
       (localStorage.getItem('ui-language') as Language) ||

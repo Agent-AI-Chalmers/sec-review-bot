@@ -294,7 +294,7 @@ export function App(): React.JSX.Element {
             <Group h="100%" justify="space-between" wrap="nowrap" gap="md">
               <Group gap="md" wrap="nowrap">
                 <Link className="brand" to="/runs">
-                  Review Control Plane
+                  Control Plane UI
                 </Link>
               </Group>
               {/* Without a session every request 401s, so a run-id jump would only
