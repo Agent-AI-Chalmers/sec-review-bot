@@ -2,7 +2,7 @@
 //
 // The cross-package domain shapes (ReviewRunRecord, ReviewRunAdmission, PublicationWork,
 // PublicationStepRecord, ObservedStep, ObservedRun) are owned by
-// `contracts/control-plane-api/openapi.yaml` and re-exported here from
+// `contracts/control-plane-api/v1/openapi.yaml` and re-exported here from
 // `contract-types-generated.ts`. This module keeps only the server-internal bits that are
 // not part of that contract: the small vocabulary unions, the store's create args, and the
 // Execution artifact narrowing helper.

@@ -310,7 +310,10 @@ function resolveSpecPath(): string {
     return builtPath
   }
   const fromSource = fileURLToPath(
-    new URL('../../contracts/control-plane-api/openapi.yaml', import.meta.url)
+    new URL(
+      '../../contracts/control-plane-api/v1/openapi.yaml',
+      import.meta.url
+    )
   )
   if (existsSync(fromSource)) return fromSource
   throw new Error(
@@ -320,7 +323,7 @@ function resolveSpecPath(): string {
 }
 
 /** Register the Control Plane HTTP surface from the OpenAPI contract. Routes, request/response
- * schemas, and security all come from `contracts/control-plane-api/openapi.yaml` via
+ * schemas, and security all come from `contracts/control-plane-api/v1/openapi.yaml` via
  * fastify-openapi-glue; the handlers below only carry the domain logic against the store.
  * Kept separate from `startControlPlaneServer` so the routes can be registered with a stub
  * store (for tests) without a database.

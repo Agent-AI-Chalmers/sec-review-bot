@@ -110,7 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        family: [control-plane-api, integration-contract, memory-catalog-api]
+        family: [control-plane-api, execution-api, memory-catalog-api]
     defaults:
       run:
         working-directory: contracts/${{ matrix.family }}/tools

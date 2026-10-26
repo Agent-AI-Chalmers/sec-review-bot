@@ -1,9 +1,9 @@
-import { CONTRACT_VERSION } from './contract-version.js'
+import { EXECUTION_API_VERSION } from './execution-api-version.js'
 import fs from 'fs/promises'
 import path from 'path'
 
 import { WORKSPACE_SNAPSHOT_TAR_NAME } from '../artifacts/git-workspace.js'
-import { assertInputBundleManifest } from './contract-schema.js'
+import { assertInputBundleManifest } from './execution-api-schema.js'
 
 export const INPUT_BUNDLE_MANIFEST_NAME = 'manifest.json'
 
@@ -15,7 +15,7 @@ export async function writeInputBundleManifest({
   include_incremental_window: boolean
 }): Promise<void> {
   const manifest: Record<string, unknown> = {
-    contract_version: CONTRACT_VERSION,
+    api_version: EXECUTION_API_VERSION,
     workspace: {
       snapshot: WORKSPACE_SNAPSHOT_TAR_NAME
     },

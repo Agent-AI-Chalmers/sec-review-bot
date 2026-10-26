@@ -12,7 +12,7 @@ async function readManifest(root: string): Promise<Record<string, unknown>> {
   ) as Record<string, unknown>
 }
 
-test('writes the contract v6 manifest without a setup declaration field', async () => {
+test('writes the API v1 manifest without a setup declaration field', async () => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'manifest-test-'))
   try {
     await writeInputBundleManifest({
@@ -20,7 +20,7 @@ test('writes the contract v6 manifest without a setup declaration field', async 
       include_incremental_window: false
     })
     const manifest = await readManifest(root)
-    assert.strictEqual(manifest.contract_version, 'v6')
+    assert.strictEqual(manifest.api_version, 'v1')
     assert.strictEqual('kind' in manifest, false)
     // The setup declaration travels inline in the workflow input, not the manifest.
     assert.strictEqual('setup_declaration' in manifest, false)

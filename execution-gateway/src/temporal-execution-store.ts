@@ -9,18 +9,20 @@ import {
 } from '@temporalio/client'
 
 import {
-  executionWorkflowType,
   isExecutionError,
   validateExecutionResult,
-  validateExecutionRequest,
-} from './contract-validation.js'
+} from './execution-api-validation.js'
+import {
+  executionWorkflowType,
+  validateExecutionWorkflowInput,
+} from './execution-workflow-validation.js'
 import {
   ExecutionRunConflictError,
   type ExecutionRecord,
-  type ExecutionRequest,
+  type ExecutionWorkflowInput,
 } from './execution.js'
 
-function fingerprint(request: ExecutionRequest): string {
+function fingerprint(request: ExecutionWorkflowInput): string {
   return createHash('sha256')
     .update(JSON.stringify(canonicalValue(request)))
     .digest('hex')
@@ -66,8 +68,8 @@ export class TemporalExecutionStore {
     )
   }
 
-  async start(request: ExecutionRequest): Promise<ExecutionRecord> {
-    validateExecutionRequest(request)
+  async start(request: ExecutionWorkflowInput): Promise<ExecutionRecord> {
+    validateExecutionWorkflowInput(request)
     const requestFingerprint = fingerprint(request)
     try {
       await this.client.workflow.start(executionWorkflowType(), {

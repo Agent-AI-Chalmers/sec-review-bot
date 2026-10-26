@@ -2,8 +2,8 @@
 
 from typing import Any
 
-from sec_review_agents.entrypoints.contract_schema import INPUT_SCHEMA_BY_WORKFLOW
-from sec_review_agents.entrypoints.execution_contract import (
+from sec_review_agents.entrypoints.execution_api_schema import INPUT_SCHEMA_BY_WORKFLOW
+from sec_review_agents.entrypoints.execution_workflow import (
     RUN_ID_PATTERN,
     RUN_ID_PATTERN_TEXT,
 )

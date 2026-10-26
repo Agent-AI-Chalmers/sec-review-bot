@@ -121,7 +121,7 @@ export async function observeExecutionRun(
     return 'failed'
   }
   // Only a missing field is checked here, not a null one. A top-level `null` cannot arrive:
-  // the Execution validates the result against the v6 contract before it reports `succeeded`
+  // the Execution validates the result against the v1 contract before it reports `succeeded`
   // (`temporal_gateway.py`), and its response model serializes with `exclude_none`, so a null
   // would be omitted rather than sent as `"result": null`. Checking for null here would be
   // defensive code for an unreachable input. It matters that the assumption stays true: a

@@ -9,7 +9,7 @@
 //
 // These helpers replace the casts with a projection of the contract, so the handler's view
 // of a request is the operation's own type from
-// `contracts/control-plane-api/openapi.yaml`. Renaming a field in the contract now breaks
+// `contracts/control-plane-api/v1/openapi.yaml`. Renaming a field in the contract now breaks
 // the handler that reads it at compile time instead of at run time.
 import type { operations } from './contract-types-generated.js'
 

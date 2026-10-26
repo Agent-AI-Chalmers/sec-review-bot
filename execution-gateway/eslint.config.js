@@ -12,7 +12,7 @@ export default tseslint.config(
       'dist/**',
       'node_modules/**',
       'eslint.config.js',
-      'src/contract-types-generated.ts',
+      'src/execution-api-types-generated.ts',
     ],
   },
 )

@@ -12,7 +12,7 @@ from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
     ReviewWorkflow,
 )
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.workflows.issue.direct import run_issue_review_direct
 from sec_review_agents.workflows.issue.single_agent import (
     run_issue_single_agent_direct,
@@ -55,7 +55,7 @@ def _prepared_issue_bundle(
         workflow="issue-review",
         run_id="run-1",
         input={
-            "contract_version": CONTRACT_VERSION,
+            "api_version": EXECUTION_API_VERSION,
             "review_intent": review_intent
             or {
                 "objective": "repair",

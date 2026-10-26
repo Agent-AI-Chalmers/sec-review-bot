@@ -30,7 +30,7 @@ Node 包使用 `pnpm`，每个都有自己的 manifest 和 lockfile：
 - `apps/control-plane-ui/`
 - `control-plane/`
 - `contracts/control-plane-api/tools/`
-- `contracts/integration-contract/tools/`
+- `contracts/execution-api/tools/`
 
 | 目标 | 命令（在包目录中运行） |
 | --- | --- |

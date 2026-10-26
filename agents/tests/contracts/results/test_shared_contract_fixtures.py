@@ -5,7 +5,7 @@ from tests.contract_fixtures import contract_fixture
 
 
 def assert_public_workflow_result(result: Mapping[str, Any]) -> None:
-    assert result.get("contract_version") == "v6"
+    assert result.get("api_version") == "v1"
 
 
 def assert_review_record_shape(review_record: Mapping[str, Any]) -> None:

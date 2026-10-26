@@ -6,14 +6,14 @@ from typing import Any
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from referencing import Registry, Resource
 
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from tests.project_paths import CONTRACTS_ROOT
 
-# --- integration-contract family ------------------------------------------
+# --- execution-api family ------------------------------------------
 
-INTEGRATION_CONTRACT_ROOT = CONTRACTS_ROOT / "integration-contract"
-_FIXTURES_ROOT = INTEGRATION_CONTRACT_ROOT / CONTRACT_VERSION / "fixtures"
-_SCHEMAS_ROOT = INTEGRATION_CONTRACT_ROOT / CONTRACT_VERSION / "schemas"
+EXECUTION_API_ROOT = CONTRACTS_ROOT / "execution-api"
+_FIXTURES_ROOT = EXECUTION_API_ROOT / EXECUTION_API_VERSION / "fixtures"
+_SCHEMAS_ROOT = EXECUTION_API_ROOT / EXECUTION_API_VERSION / "schemas"
 
 
 def contract_fixture(name: str) -> dict[str, Any]:
@@ -30,7 +30,7 @@ def contract_fixture_files() -> list[Path]:
 
 # --- setup-declaration family ---------------------------------------------
 #
-# A sibling family, not part of integration-contract: its rules are decision
+# A sibling family, not part of execution-api: its rules are decision
 # logic enforced in code, so it carries a shared corpus rather than JSON Schema
 # fixtures. Derived from CONTRACTS_ROOT directly -- never from another family's
 # location.

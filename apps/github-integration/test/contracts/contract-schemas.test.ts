@@ -44,7 +44,7 @@ function contractValidator(schemaName: string): ReturnType<Ajv2020['compile']> {
   return ajv.compile(contractSchema(schemaName) as AnySchemaObject)
 }
 
-test('shared v6 contract fixtures match JSON schemas', () => {
+test('shared v1 contract fixtures match JSON schemas', () => {
   const ajv = contractAjv()
   const validators = new Map<string, ReturnType<Ajv2020['compile']>>()
 
@@ -64,7 +64,7 @@ test('shared v6 contract fixtures match JSON schemas', () => {
   }
 })
 
-test('shared v6 contract fixture manifest covers fixture and schema files', () => {
+test('shared v1 contract fixture manifest covers fixture and schema files', () => {
   const schemaFixtures = new Map(fixtureSchemas())
   const invalidSchemaFixtures = new Map(invalidFixtureSchemas())
   const fixtureNames = contractFixtureFiles().filter(
@@ -83,7 +83,7 @@ test('shared v6 contract fixture manifest covers fixture and schema files', () =
   )
 })
 
-test('shared v6 invalid contract fixtures are rejected by JSON schemas', () => {
+test('shared v1 invalid contract fixtures are rejected by JSON schemas', () => {
   const manifest = contractFixtureManifest() as FixtureManifest
   assert.deepStrictEqual(
     Object.keys(manifest.invalid_fixture_error_paths).sort(),
@@ -120,7 +120,7 @@ test('shared v6 invalid contract fixtures are rejected by JSON schemas', () => {
   }
 })
 
-test('v6 pull request input schema requires audit objective', () => {
+test('v1 pull request input schema requires audit objective', () => {
   const validate = contractValidator('pull-request-review-input.schema.json')
   const payload = contractFixture('pull-request-review-input.json') as {
     review_intent: { objective: string }
@@ -130,7 +130,7 @@ test('v6 pull request input schema requires audit objective', () => {
   assert.strictEqual(validate(payload), false)
 })
 
-test('v6 repository input schema requires audit objective', () => {
+test('v1 repository input schema requires audit objective', () => {
   const validate = contractValidator('repository-review-input.schema.json')
   const payload = contractFixture(
     'repository-review-input-incremental.json'
@@ -142,7 +142,7 @@ test('v6 repository input schema requires audit objective', () => {
   assert.strictEqual(validate(payload), false)
 })
 
-test('v6 repository input schema rejects the removed max_file_bytes field', () => {
+test('v1 repository input schema rejects the removed max_file_bytes field', () => {
   const validate = contractValidator('repository-review-input.schema.json')
   const payload = structuredClone(
     contractFixture('repository-review-input-full.json')
@@ -154,7 +154,7 @@ test('v6 repository input schema rejects the removed max_file_bytes field', () =
   assert.strictEqual(validate(payload), false)
 })
 
-test('v6 repository full scan schema rejects incremental window fields', () => {
+test('v1 repository full scan schema rejects incremental window fields', () => {
   const validate = contractValidator('repository-review-input.schema.json')
   const payload = contractFixture('repository-review-input-full.json') as {
     scan_target: {
@@ -174,7 +174,7 @@ test('v6 repository full scan schema rejects incremental window fields', () => {
   assert.strictEqual(validate(payload), false)
 })
 
-test('v6 repository incremental schema rejects missing window fields', () => {
+test('v1 repository incremental schema rejects missing window fields', () => {
   const validate = contractValidator('repository-review-input.schema.json')
 
   for (const scanTargetPatch of [{ base_sha: null }, { commit_shas: [] }]) {
@@ -196,7 +196,7 @@ test('v6 repository incremental schema rejects missing window fields', () => {
   }
 })
 
-test('v6 repository incremental schema allows empty changed file scope', () => {
+test('v1 repository incremental schema allows empty changed file scope', () => {
   const validate = contractValidator('repository-review-input.schema.json')
   const payload = structuredClone(
     contractFixture('repository-review-input-incremental.json')
@@ -210,7 +210,7 @@ test('v6 repository incremental schema allows empty changed file scope', () => {
   assert.strictEqual(validate(payload), true)
 })
 
-test('v6 review record schema rejects unsafe file change paths', () => {
+test('v1 review record schema rejects unsafe file change paths', () => {
   const validate = contractValidator('review-record.schema.json')
 
   for (const path of [

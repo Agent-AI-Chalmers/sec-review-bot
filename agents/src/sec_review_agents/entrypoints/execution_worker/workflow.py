@@ -1,17 +1,17 @@
-"""Worker-owned execution workflow and dispatch into review workflows."""
+"""Worker-owned execution workflow and routing into review workflows."""
 
 from datetime import timedelta
 from typing import Any
 
 from temporalio import activity, workflow
 
-from sec_review_agents.entrypoints.execution_contract import (
-    EXECUTION_WORKFLOW_TYPE,
-    ExecutionRequest,
-)
 from sec_review_agents.entrypoints.execution_protocol import (
     EXECUTION_REQUEST_INVALID,
     EXECUTION_WORKFLOW_UNSUPPORTED,
+)
+from sec_review_agents.entrypoints.execution_workflow import (
+    EXECUTION_WORKFLOW_TYPE,
+    ExecutionWorkflowInput,
 )
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
@@ -28,11 +28,11 @@ from sec_review_agents.workflows.review_request import (
 
 
 @activity.defn
-def prepare_execution_run_activity(request: ExecutionRequest) -> dict[str, Any]:
-    from sec_review_agents.entrypoints.execution_contract_validation import (
-        validate_execution_request,
-    )
+def prepare_execution_run_activity(request: ExecutionWorkflowInput) -> dict[str, Any]:
     from sec_review_agents.entrypoints.execution_protocol import build_execution_error
+    from sec_review_agents.entrypoints.execution_workflow_validation import (
+        validate_execution_workflow_input,
+    )
     from sec_review_agents.entrypoints.input_preparation import prepare_run_input
     from sec_review_agents.features import memory_processing_enabled
     from sec_review_agents.observability.diagnostics import (
@@ -43,11 +43,11 @@ def prepare_execution_run_activity(request: ExecutionRequest) -> dict[str, Any]:
     from sec_review_agents.runtime.runtime_config import runtime_context_from_config
 
     try:
-        validate_execution_request(request)
+        validate_execution_workflow_input(request)
         bind_workflow_context(workflow=request.workflow, run_id=request.run_id)
         log_diagnostic(
-            "execution_dispatch",
-            input_type=type(request.input_data).__name__,
+            "execution_workflow_input",
+            input_type=type(request.input).__name__,
             run_id=request.run_id,
         )
         return {
@@ -55,7 +55,7 @@ def prepare_execution_run_activity(request: ExecutionRequest) -> dict[str, Any]:
             "workflow": request.workflow,
             "run_id": request.run_id,
             "prepared_input": prepare_run_input(
-                request.input_data,
+                request.input,
                 run_id=request.run_id,
                 workflow=request.workflow,
             ),
@@ -89,7 +89,7 @@ def prepare_execution_run_activity(request: ExecutionRequest) -> dict[str, Any]:
 @workflow.defn(name=EXECUTION_WORKFLOW_TYPE)
 class ExecutionWorkflow:
     @workflow.run
-    async def run(self, request: ExecutionRequest) -> dict[str, Any]:
+    async def run(self, request: ExecutionWorkflowInput) -> dict[str, Any]:
         prepared = await workflow.execute_activity(
             prepare_execution_run_activity,
             request,
@@ -143,7 +143,7 @@ class ExecutionWorkflow:
         }
 
 
-def _child_workflow_id(request: ExecutionRequest) -> str:
+def _child_workflow_id(request: ExecutionWorkflowInput) -> str:
     return f"{request.run_id}:{request.workflow}"
 
 

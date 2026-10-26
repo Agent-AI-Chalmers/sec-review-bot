@@ -13,7 +13,7 @@ import { settleExhaustedStep } from '../../../src/reviews/shared/settle-exhauste
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../../../src/execution/publish-error-code.js'
 import type { PublicationStepStore } from '../../../src/control-plane/client.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
-import { CONTRACT_VERSION } from '../../../src/execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../../src/execution/execution-api-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
 
@@ -148,7 +148,7 @@ async function runPublish(
       }
     },
     result: {
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_record: reviewRecord()
     },
     store: harness.store,

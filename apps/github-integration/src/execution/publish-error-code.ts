@@ -9,7 +9,7 @@ export const EXECUTION_PUBLISH_ERROR_CODES = {
   github_validation_rejected: 'GITHUB_VALIDATION_REJECTED',
   // These four codes Control Plane emits as terminal (deterministic) publication
   // step failures. They must match the `ErrorResponse.code` enum in the hand-written
-  // `contracts/control-plane-api/openapi.yaml`; the alignment test reads Control Plane's
+  // `contracts/control-plane-api/v1/openapi.yaml`; the alignment test reads Control Plane's
   // single source and asserts each code is classified `retry: false`, so a new code on
   // the Control Plane side cannot silently retry the publication forever.
   publication_step_retry_exhausted: 'PUBLICATION_STEP_RETRY_EXHAUSTED',

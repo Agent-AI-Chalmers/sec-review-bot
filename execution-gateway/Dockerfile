@@ -16,8 +16,8 @@ RUN pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
 
 COPY tsconfig.json tsconfig.build.json eslint.config.js .prettierrc.json ./
 COPY src ./src
-COPY --from=contracts integration-contract /contracts/integration-contract
-COPY --from=contracts execution-contract /contracts/execution-contract
+COPY --from=contracts execution-api /contracts/execution-api
+COPY --from=contracts execution-workflow /contracts/execution-workflow
 RUN pnpm run build \
     && pnpm deploy --filter . --prod /prod
 

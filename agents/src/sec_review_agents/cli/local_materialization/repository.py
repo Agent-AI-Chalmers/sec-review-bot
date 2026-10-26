@@ -15,7 +15,7 @@ from sec_review_agents.cli.local_materialization.common import (
     workspace_path,
     write_input_bundle_manifest,
 )
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.utils.files import write_json
 from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workspace.snapshots import (
@@ -83,7 +83,7 @@ def _build_changed_files(repo_path: Path, base_ref: str, head_ref: str) -> list[
     return files
 
 
-# The scan scope's change vocabulary, mirroring `changedFileStatus` in the integration contract.
+# The scan scope's change vocabulary, mirroring `changedFileStatus` in the Execution API.
 # `T` is a type change (ordinary file to symlink, or a transition to or from a submodule), not a
 # content change, so it keeps its own name instead of collapsing into `modified`.
 _GIT_STATUS_TO_CHANGE = {
@@ -280,7 +280,7 @@ def build_local_repository_security_bundle(
         include_incremental_window=resolved_scan_mode == "incremental",
     )
     input_data = {
-        "contract_version": CONTRACT_VERSION,
+        "api_version": EXECUTION_API_VERSION,
         "input_bundle": input_bundle,
         "review_intent": {
             "objective": "audit",

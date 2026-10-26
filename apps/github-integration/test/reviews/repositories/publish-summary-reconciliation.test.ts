@@ -11,7 +11,7 @@ import { handleRepositoryReviewRun } from '../../../src/reviews/repositories/pub
 import { REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE } from '../../../src/reviews/repositories/renderer.js'
 import { setGitHubAppMetadata } from '../../../src/github/github-app-metadata-service.js'
 import type { PublicationStepStore } from '../../../src/control-plane/client.js'
-import { CONTRACT_VERSION } from '../../../src/execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../../src/execution/execution-api-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 
 // The summary comment is recognized by this app's bot, so the app identity must be set.
@@ -143,7 +143,7 @@ async function runPublish(
       }
     },
     result: {
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       scan_summary: {
         scannable_file_count: 0,
         scanned_file_count: 0,

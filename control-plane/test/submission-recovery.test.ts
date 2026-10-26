@@ -9,7 +9,7 @@ import {
 } from '../src/index.js'
 
 function run(
-  input: Record<string, unknown> | null = { contract_version: 'v6' }
+  input: Record<string, unknown> | null = { api_version: 'v1' }
 ): ReviewRunRecord {
   return {
     run_id: 'run-1',
@@ -98,7 +98,7 @@ test('submission recovery replays the persisted input and commits its claim', as
       {
         workflow: 'issue-review',
         run_id: 'run-1',
-        input: { contract_version: 'v6' }
+        input: { api_version: 'v1' }
       }
     ],
     ['complete', 'run-1', 'claim-1']

@@ -80,7 +80,7 @@ test('submission sends authentication and accepts only the expected identity', a
   await submitExecutionRun({
     workflow: 'issue-review',
     run_id: 'run-1',
-    input: { contract_version: 'v6' }
+    input: { api_version: 'v1' }
   })
 })
 

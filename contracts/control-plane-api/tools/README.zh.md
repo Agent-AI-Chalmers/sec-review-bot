@@ -4,14 +4,14 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-本包渲染并校验从[本族的 OpenAPI 契约](../openapi.yaml)派生的全部产物：TypeScript 投影与提交的 v1 JSON Schema。它住在所读契约旁边，因此"拥有某个投影的工具"不是"该投影落在的包"。
+本包渲染并校验从[本族的 OpenAPI 契约](../v1/openapi.yaml)派生的全部产物：TypeScript 投影与提交的 v1 JSON Schema。它住在所读契约旁边，因此"拥有某个投影的工具"不是"该投影落在的包"。
 
 ## 命令
 
 ```bash
 pnpm run generate        # 渲染全部产物并就地写入
 pnpm run check           # 将每个已提交产物与重新渲染结果比对
-pnpm run lint:contract   # 用 Spectral 依据 ../.spectral.yaml 检查 ../openapi.yaml
+pnpm run lint:contract   # 用 Spectral 依据 ../.spectral.yaml 检查 ../v1/openapi.yaml
 pnpm run test            # 生成器守则、manifest 一致性、CI 过滤器覆盖
 ```
 

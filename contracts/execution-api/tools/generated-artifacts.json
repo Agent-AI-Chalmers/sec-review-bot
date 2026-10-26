@@ -1,0 +1,45 @@
+{
+  "$comment": "Every artifact generated from this family's contract, with the file that renders it and the contract it derives from. Paths are relative to the repository root. The tool's test asserts this matches the generator's own declared outputs and that CI triggers on each. Regenerate with: pnpm --dir contracts/execution-api/tools run generate",
+  "family": "execution-api",
+  "generators": [
+    {
+      "name": "types",
+      "script": "contracts/execution-api/tools/src/generate-types.ts",
+      "code_inputs": [
+        "contracts/execution-api/tools/src/generate-api-types.ts",
+        "control-plane/.prettierrc.json",
+        "execution-gateway/.prettierrc.json"
+      ],
+      "command": "pnpm --dir contracts/execution-api/tools run generate",
+      "inputs": [
+        "contracts/execution-api/v1/openapi.yaml",
+        "contracts/execution-api/v1/schemas/issue-review-input.schema.json",
+        "contracts/execution-api/v1/schemas/pull-request-review-input.schema.json",
+        "contracts/execution-api/v1/schemas/repository-review-input.schema.json",
+        "contracts/execution-api/v1/schemas/common.schema.json"
+      ],
+      "outputs": [
+        "control-plane/src/execution-api-schema.ts",
+        "execution-gateway/src/execution-api-types-generated.ts"
+      ]
+    },
+    {
+      "name": "payload-types",
+      "script": "contracts/execution-api/tools/src/generate-api-types.ts",
+      "code_inputs": ["apps/github-integration/.prettierrc.json"],
+      "command": "pnpm --dir contracts/execution-api/tools run generate",
+      "inputs": [
+        "contracts/execution-api/v1/schemas/issue-review-input.schema.json",
+        "contracts/execution-api/v1/schemas/pull-request-review-input.schema.json",
+        "contracts/execution-api/v1/schemas/repository-review-input.schema.json",
+        "contracts/execution-api/v1/schemas/review-record.schema.json",
+        "contracts/execution-api/v1/schemas/common.schema.json"
+      ],
+      "outputs": [
+        "apps/github-integration/src/execution/execution-api-types-generated.ts",
+        "execution-gateway/src/execution-api-version.ts",
+        "apps/github-integration/src/execution/execution-api-version.ts"
+      ]
+    }
+  ]
+}

@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.entrypoints.setup_declaration import (
     SetupDeclarationError,
     is_blank_setup_declaration,
@@ -156,7 +156,7 @@ def write_input_bundle_manifest(
     include_incremental_window: bool,
 ) -> None:
     manifest: dict[str, Any] = {
-        "contract_version": CONTRACT_VERSION,
+        "api_version": EXECUTION_API_VERSION,
         "workspace": {
             "snapshot": "workspace.snapshot.tar",
         },

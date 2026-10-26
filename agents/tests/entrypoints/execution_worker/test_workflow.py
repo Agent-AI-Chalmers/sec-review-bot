@@ -2,10 +2,10 @@ import pytest
 from temporalio import workflow
 from temporalio.worker.workflow_sandbox import SandboxedWorkflowRunner
 
-from sec_review_agents.entrypoints.execution_contract import ExecutionRequest
 from sec_review_agents.entrypoints.execution_worker import (
     workflow as execution_workflow,
 )
+from sec_review_agents.entrypoints.execution_workflow import ExecutionWorkflowInput
 
 
 @pytest.mark.asyncio
@@ -51,7 +51,7 @@ async def test_managed_execution_requires_managed_diagnostic_publication(
     )
 
     await execution_workflow.ExecutionWorkflow().run(
-        ExecutionRequest("issue-review", "run-1", {}, 30)
+        ExecutionWorkflowInput("issue-review", "run-1", {}, 30)
     )
 
     assert captured[0].post_processing.diagnostic_publication == "managed"

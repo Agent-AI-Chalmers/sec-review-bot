@@ -129,7 +129,7 @@ def test_repository_workflow_contract_tracks_required_sections() -> None:
         "deleted_file_count",
     }
     assert set(RepositoryWorkflowResult.model_fields) == {
-        "contract_version",
+        "api_version",
         "scan_summary",
         "deliveries",
         "case_results",

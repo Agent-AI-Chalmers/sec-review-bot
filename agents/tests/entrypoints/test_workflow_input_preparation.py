@@ -7,8 +7,8 @@ from urllib.parse import unquote, urlparse
 
 import pytest
 
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.entrypoints import input_preparation
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
 from sec_review_agents.entrypoints.input_preparation import (
     prepare_run_input,
     prepare_workflow_input,
@@ -22,7 +22,7 @@ def _write_bundle_manifest(
     root = Path(local_root)
     root.mkdir(parents=True, exist_ok=True)
     manifest = {
-        "contract_version": CONTRACT_VERSION,
+        "api_version": EXECUTION_API_VERSION,
         "workspace": {"snapshot": "workspace.snapshot.tar"},
         "history": {"path": "history"},
     }
@@ -69,7 +69,7 @@ def test_prepare_run_input_derives_bundle_and_artifact_paths(tmp_path: Path) -> 
     try:
         prepared = prepare_run_input(
             {
-                "contract_version": CONTRACT_VERSION,
+                "api_version": EXECUTION_API_VERSION,
                 "input_bundle": input_bundle,
                 "review_intent": {"objective": "audit"},
                 "issue": {
@@ -111,7 +111,7 @@ def test_prepare_run_input_keeps_inline_setup_declaration(tmp_path: Path) -> Non
     try:
         prepared = prepare_run_input(
             {
-                "contract_version": CONTRACT_VERSION,
+                "api_version": EXECUTION_API_VERSION,
                 "input_bundle": input_bundle,
                 "review_intent": {"objective": "audit"},
                 "issue": {
@@ -146,7 +146,7 @@ def test_prepare_run_input_omits_setup_declaration_when_absent(tmp_path: Path) -
     try:
         prepared = prepare_run_input(
             {
-                "contract_version": CONTRACT_VERSION,
+                "api_version": EXECUTION_API_VERSION,
                 "input_bundle": input_bundle,
                 "review_intent": {"objective": "audit"},
                 "issue": {
@@ -172,7 +172,7 @@ def test_prepare_run_input_rejects_unsupported_workflow() -> None:
     with pytest.raises(ValueError, match="Unsupported workflow"):
         prepare_run_input(
             {
-                "contract_version": CONTRACT_VERSION,
+                "api_version": EXECUTION_API_VERSION,
                 "input_bundle": {},
             },
             run_id="run-input-preparation",
@@ -205,7 +205,7 @@ def _repository_scan_scope(overrides: dict[str, Any] | None = None) -> dict[str,
 
 def _issue_input(local_root: str = "/tmp/local-issue") -> dict:
     return {
-        "contract_version": CONTRACT_VERSION,
+        "api_version": EXECUTION_API_VERSION,
         "input_bundle": _write_bundle_manifest(local_root),
         "review_intent": {"objective": "audit"},
         "issue": {
@@ -221,7 +221,7 @@ def _issue_input(local_root: str = "/tmp/local-issue") -> dict:
 
 def _pull_request_input(local_root: str = "/tmp/local-pr") -> dict:
     return {
-        "contract_version": CONTRACT_VERSION,
+        "api_version": EXECUTION_API_VERSION,
         "input_bundle": _write_bundle_manifest(local_root, incremental=True),
         "review_intent": {"objective": "audit"},
         "pr": {
@@ -248,7 +248,7 @@ def _pull_request_input(local_root: str = "/tmp/local-pr") -> dict:
 
 def _repository_input(local_root: str = "/tmp/local-repository") -> dict:
     return {
-        "contract_version": CONTRACT_VERSION,
+        "api_version": EXECUTION_API_VERSION,
         "input_bundle": _write_bundle_manifest(local_root),
         "review_intent": {"objective": "audit"},
         "scan_target": _repository_scan_target(),
@@ -301,7 +301,7 @@ def test_shared_v6_issue_input_fixture_prepares() -> None:
         artifact_root_path="/tmp/sec-review-fixtures/issue-review-artifacts",
     )
 
-    assert prepared["contract_version"] == "v6"
+    assert prepared["api_version"] == "v1"
     assert prepared["review_intent"]["objective"] == "audit"
 
 
@@ -317,7 +317,7 @@ def test_shared_v6_pull_request_input_fixture_prepares() -> None:
         artifact_root_path="/tmp/sec-review-fixtures/pull-request-review-artifacts",
     )
 
-    assert prepared["contract_version"] == "v6"
+    assert prepared["api_version"] == "v1"
     assert prepared["pr"]["number"] == 42
 
 

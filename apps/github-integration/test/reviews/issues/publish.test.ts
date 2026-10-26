@@ -7,7 +7,7 @@ import type {
   PublicationStepRecord,
   PublicationStepStore
 } from '../../../src/control-plane/client.js'
-import { CONTRACT_VERSION } from '../../../src/execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../../src/execution/execution-api-version.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 
 function issueReviewRecordWithPatch(): ReviewRecord {
@@ -138,7 +138,7 @@ async function runPublish(open_pr: boolean) {
       }
     },
     result: {
-      contract_version: CONTRACT_VERSION,
+      api_version: EXECUTION_API_VERSION,
       review_record: issueReviewRecordWithPatch()
     },
     store: harness.store,

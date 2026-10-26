@@ -15,7 +15,7 @@ import { fakeApp } from '../github-app-stubs.js'
 import { fakeGitHub, githubJson } from '../github-client.js'
 import { settleExhaustedStep } from '../../src/reviews/shared/settle-exhausted-step.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../../src/execution/publish-error-code.js'
-import { CONTRACT_VERSION } from '../../src/execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../src/execution/execution-api-version.js'
 
 const RUN_ID = '6f1c2f9e-0000-4000-8000-000000000001'
 
@@ -56,7 +56,7 @@ function fakeInstallationOctokit() {
 
 /** A scan with no deliveries or cases: enough to publish the summary issue and comment. */
 const EMPTY_REPOSITORY_RESULT = {
-  contract_version: CONTRACT_VERSION,
+  api_version: EXECUTION_API_VERSION,
   scan_summary: {
     scannable_file_count: 0,
     scanned_file_count: 0,

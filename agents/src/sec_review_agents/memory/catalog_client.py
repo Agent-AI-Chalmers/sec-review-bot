@@ -8,10 +8,12 @@ from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 from sec_review_agents.artifacts.reference import ArtifactReference
+from sec_review_agents.contract_versions import MEMORY_CATALOG_API_VERSION
 from sec_review_agents.utils.env import env_value
 
 AGENT_MEMORY_CATALOG_URL_ENV = "AGENT_MEMORY_CATALOG_URL"
 AGENT_MEMORY_CATALOG_TOKEN_ENV = "AGENT_MEMORY_CATALOG_TOKEN"
+_API_ROOT = f"/{MEMORY_CATALOG_API_VERSION}"
 
 
 class MemoryCatalogConflictError(RuntimeError):
@@ -71,7 +73,7 @@ class MemoryCatalogClient:
     ) -> bool:
         value = self._request(
             "POST",
-            "/v1/extractions",
+            f"{_API_ROOT}/extractions",
             {
                 "extraction_id": extraction_id,
                 "source_workflow": source_workflow,
@@ -91,15 +93,17 @@ class MemoryCatalogClient:
         return value.get("created") is True
 
     def get_extraction(self, extraction_id: str) -> dict[str, Any]:
-        return self._request("GET", f"/v1/extractions/{quote(extraction_id, safe='')}")
+        return self._request(
+            "GET", f"{_API_ROOT}/extractions/{quote(extraction_id, safe='')}"
+        )
 
     def get_observation_backlog(self) -> dict[str, Any]:
-        return self._request("GET", "/v1/observation-backlog")
+        return self._request("GET", f"{_API_ROOT}/observation-backlog")
 
     def get_maintenance_input(self, *, limit: int) -> dict[str, Any] | None:
         value = self._request(
             "GET",
-            f"/v1/maintenance-input?limit={limit}",
+            f"{_API_ROOT}/maintenance-input?limit={limit}",
         )
         maintenance_input = value.get("input")
         if maintenance_input is None:
@@ -119,7 +123,7 @@ class MemoryCatalogClient:
     ) -> dict[str, Any]:
         return self._request(
             "POST",
-            "/v1/memory-tree/revisions",
+            f"{_API_ROOT}/memory-tree/revisions",
             {
                 "maintenance_id": maintenance_id,
                 "base_revision": base_revision,
@@ -132,10 +136,10 @@ class MemoryCatalogClient:
         )
 
     def get_memory_tree(self) -> dict[str, Any]:
-        return self._request("GET", "/v1/memory-tree")
+        return self._request("GET", f"{_API_ROOT}/memory-tree")
 
     def get_memory_tree_revision(self, revision: int) -> dict[str, Any]:
-        return self._request("GET", f"/v1/memory-tree/revisions/{revision}")
+        return self._request("GET", f"{_API_ROOT}/memory-tree/revisions/{revision}")
 
     def list_memory_tree_revisions(
         self,
@@ -146,7 +150,9 @@ class MemoryCatalogClient:
         parameters = [f"limit={limit}"]
         if before_revision is not None:
             parameters.append(f"before_revision={before_revision}")
-        return self._request("GET", f"/v1/memory-tree/revisions?{'&'.join(parameters)}")
+        return self._request(
+            "GET", f"{_API_ROOT}/memory-tree/revisions?{'&'.join(parameters)}"
+        )
 
 
 def configured_memory_catalog_client() -> MemoryCatalogClient | None:

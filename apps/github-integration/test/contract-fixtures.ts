@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { CONTRACT_VERSION } from '../src/execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../src/execution/execution-api-version.js'
 
 /** The repository root, located by walking up to the shared `contracts/` tree. Exported so the
  * package's tests anchor on one implementation of "where is the repo" rather than each
@@ -27,18 +27,15 @@ export function workspaceRoot(): string {
 
 export const CONTRACTS_ROOT = path.join(workspaceRoot(), 'contracts')
 
-const integrationContractRoot = path.join(
-  CONTRACTS_ROOT,
-  'integration-contract'
-)
+const executionApiRoot = path.join(CONTRACTS_ROOT, 'execution-api')
 const contractFixturesRoot = path.join(
-  integrationContractRoot,
-  CONTRACT_VERSION,
+  executionApiRoot,
+  EXECUTION_API_VERSION,
   'fixtures'
 )
-const contractSchemasRoot = path.join(
-  integrationContractRoot,
-  CONTRACT_VERSION,
+const executionApiSchemasRoot = path.join(
+  executionApiRoot,
+  EXECUTION_API_VERSION,
   'schemas'
 )
 
@@ -59,11 +56,13 @@ export function contractFixtureFiles(): string[] {
 }
 
 export function contractSchema(name: string): unknown {
-  return JSON.parse(readFileSync(path.join(contractSchemasRoot, name), 'utf8'))
+  return JSON.parse(
+    readFileSync(path.join(executionApiSchemasRoot, name), 'utf8')
+  )
 }
 
 export function contractSchemaFiles(): string[] {
-  return readdirSync(contractSchemasRoot)
+  return readdirSync(executionApiSchemasRoot)
     .filter((name) => name.endsWith('.schema.json'))
     .sort()
 }

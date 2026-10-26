@@ -26,7 +26,7 @@ import { ControlPlaneSubmissionError } from '../../src/control-plane/client.js'
 function repositoryReviewInput(): RepositoryReviewInput &
   Record<string, unknown> {
   return {
-    contract_version: CONTRACT_VERSION,
+    api_version: EXECUTION_API_VERSION,
     input_bundle: {
       uri: 's3://bucket/input.tar.zst',
       digest: `sha256:${'a'.repeat(64)}`,
@@ -92,7 +92,7 @@ import type {
   ReviewRunRecord,
   ReviewRunAdmission
 } from '../../src/control-plane/client.js'
-import { CONTRACT_VERSION } from '../../src/execution/contract-version.js'
+import { EXECUTION_API_VERSION } from '../../src/execution/execution-api-version.js'
 import type { RepositoryReviewInput } from '../../src/execution/input.js'
 import { fakeGitHub, githubJson, unusedGitHub } from '../github-client.js'
 

@@ -4,7 +4,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from sec_review_agents.entrypoints.contract_schema import CONTRACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
@@ -55,7 +55,7 @@ def not_run_review_record() -> dict[str, Any]:
 
 def assert_public_workflow_result(result: Mapping[str, Any]) -> None:
     assert FORBIDDEN_INTERNAL_PUBLIC_RESULT_KEYS.intersection(result) == set()
-    assert result.get("contract_version") == "v6"
+    assert result.get("api_version") == "v1"
 
 
 def assert_review_record_shape(review_record: Mapping[str, Any]) -> None:
@@ -85,7 +85,7 @@ def assert_matches_v6_schema(payload: Mapping[str, Any], schema_name: str) -> No
 
 def test_pull_request_result_public_shape() -> None:
     result: dict[str, Any] = {
-        "contract_version": CONTRACT_VERSION,
+        "api_version": EXECUTION_API_VERSION,
         "review_record": build_review_record(
             analysis_result={
                 "verdict": "no-actionable-finding",
@@ -431,7 +431,7 @@ def test_repository_case_result_defaults_missing_review_record_to_not_run() -> N
 def test_repository_case_result_rejects_a_null_public_identity(
     case: dict[str, Any],
 ) -> None:
-    """The v6 schema requires a non-empty case_id and disposition.
+    """The v1 schema requires a non-empty case_id and disposition.
 
     Serializing `null` for either makes the integration parser reject the whole run, so
     the builder must fail instead of emitting an invalid public result.

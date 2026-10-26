@@ -12,7 +12,7 @@
     "check": "node --import tsx src/check.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
-    "lint:contract": "spectral lint ../openapi.yaml --ruleset ../../.spectral.yaml",
+    "lint:contract": "spectral lint ../v1/openapi.yaml --ruleset ../../.spectral.yaml",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

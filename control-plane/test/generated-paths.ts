@@ -17,12 +17,14 @@ export const CONTROL_PLANE_API_SPEC_PATH = path.join(
   REPO_ROOT,
   'contracts',
   'control-plane-api',
+  'v1',
   'openapi.yaml'
 )
 export const EXECUTION_API_SPEC_PATH = path.join(
   REPO_ROOT,
   'contracts',
-  'integration-contract',
+  'execution-api',
+  'v1',
   'openapi.yaml'
 )
 export const EXECUTION_API_SCHEMA_PATH = path.join(

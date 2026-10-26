@@ -9,7 +9,7 @@
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "copy:spec": "cp ../contracts/integration-contract/openapi.yaml dist/openapi.yaml",
+    "copy:spec": "cp ../contracts/execution-api/v1/openapi.yaml dist/openapi.yaml",
     "build": "pnpm run clean && tsc -p tsconfig.build.json && pnpm run copy:spec",
     "server": "pnpm run build && node dist/server.js",
     "lint": "eslint .",

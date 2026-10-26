@@ -1,4 +1,4 @@
-import type { WorkflowName } from '../src/execution/integration-contract-types-generated.js'
+import type { WorkflowName } from '../src/execution/execution-api-types-generated.js'
 import type { PublishContext } from '../src/control-plane/publish-context.js'
 
 export function publishContextForWorkflow(

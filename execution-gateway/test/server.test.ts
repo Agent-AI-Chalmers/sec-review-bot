@@ -6,7 +6,7 @@ import test from 'node:test'
 import {
   ExecutionRunConflictError,
   type ExecutionRecord,
-  type ExecutionRequest,
+  type ExecutionWorkflowInput,
 } from '../src/execution.js'
 import { createApp } from '../src/server.js'
 
@@ -15,7 +15,7 @@ class FakeExecutionRunClient {
   conflict = false
   startError: Error | undefined
 
-  start(request: ExecutionRequest): Promise<ExecutionRecord> {
+  start(request: ExecutionWorkflowInput): Promise<ExecutionRecord> {
     if (this.startError) return Promise.reject(this.startError)
     if (this.conflict) {
       throw new ExecutionRunConflictError(
@@ -41,14 +41,7 @@ class FakeExecutionRunClient {
 function fixture(name: string): Record<string, unknown> {
   return JSON.parse(
     readFileSync(
-      path.resolve(
-        '..',
-        'contracts',
-        'integration-contract',
-        'v6',
-        'fixtures',
-        name,
-      ),
+      path.resolve('..', 'contracts', 'execution-api', 'v1', 'fixtures', name),
       'utf8',
     ),
   ) as Record<string, unknown>

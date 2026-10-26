@@ -19,6 +19,7 @@ export const SPEC_PATH = path.resolve(
   '..',
   'contracts',
   'control-plane-api',
+  'v1',
   'openapi.yaml'
 )
 export const DIST_DIR = path.resolve(CONTROL_PLANE_ROOT, 'dist')

@@ -31,15 +31,15 @@ contracts/
 
 | 契约族 | 边界 | 参与方 | 当前版本 |
 | --- | --- | --- | --- |
-| [integration-contract](integration-contract/README.zh.md) | 公开 Execution API 与 workflow `input` / `result` 数据 | Execution API provider、调用方与下游发布方 | [v6](integration-contract/v6/CONTRACT.zh.md) |
-| [execution-contract](execution-contract/README.zh.md) | 私有 Temporal dispatch envelope | Execution Gateway 与 Execution Worker | v1 |
-| [control-plane-api](control-plane-api/README.zh.md) | Control Plane HTTP API 与 observed run 形状 | Control Plane 与其调用方 | [v1](control-plane-api/README.zh.md) |
-| [memory-catalog-api](memory-catalog-api/README.zh.md) | Memory coordination HTTP API | Memory Catalog Server 与 workers | v1 |
+| [execution-api](execution-api/README.zh.md) | 公开 HTTP 操作、workflow 输入、结果与错误 | Execution API provider、调用方与下游发布方 | [v1](execution-api/v1/CONTRACT.zh.md) |
+| [execution-workflow](execution-workflow/README.zh.md) | Temporal Execution Workflow 输入 | Execution Gateway 与 Execution Worker | [v1](execution-workflow/v1/CONTRACT.md) |
+| [control-plane-api](control-plane-api/README.zh.md) | Control Plane HTTP API 与 observed run 形状 | Control Plane 与其调用方 | [v1](control-plane-api/v1/openapi.yaml) |
+| [memory-catalog-api](memory-catalog-api/README.zh.md) | Memory coordination HTTP API | Memory Catalog Server 与 workers | [v1](memory-catalog-api/v1/openapi.yaml) |
 | [setup-declaration](setup-declaration/README.zh.md) | 受信任的 `.sec-review/setup.yml` 格式 | 被审查仓库、GitHub Integration 与 Execution Worker | [v1](setup-declaration/v1/SPEC.zh.md) |
 
 ## 适用于每个族的规则
 
-族名取自这个族覆盖的内容。若所有形状都属于同一个组件，就以该组件命名——`control-plane-api` 就是 Control Plane 自己的形状；若形状横跨多方，就以它们的交汇点命名——`integration-contract` 横跨 Execution provider、调用方和下游发布方。
+族名取自这个族覆盖的内容。若所有形状都属于同一个组件，就以该组件命名——`control-plane-api` 就是 Control Plane 自己的形状；若形状横跨多方，就以它们的交汇点命名——`execution-api` 横跨 Execution provider、调用方和下游发布方。
 
 不要用某个消费方命名，因为消费方会变、提供方不会；也不要复用别的族已用于其他含义的词。
 
@@ -60,7 +60,7 @@ Fixture 是契约校验的一部分。Manifest 记录每个 schema 必须接受�
 
 有些产物是从手写契约生成的，而不是手工维护——例如 API 的 TypeScript 投影、提交的 JSON Schema、生成的参数列表。每个族拥有渲染并校验其投影的工具，放在 `<family>/tools/` 下：读取契约的工具就挨着契约，而它的产物落在哪里（可能在别的包中）不影响谁拥有该检查。每个族的 `tools/generated-artifacts.json` 列出它派生什么、落到哪里。
 
-稳定的包内入口按调用方消费的职责命名，即使它由生成器维护，例如 `contract-version.ts`。原始机械投影可以在文件名中保留 `generated`，用于提示该文件不应逐渐承载手写行为，例如 `contract-types-generated.ts`。文件名不是强制边界：每个提交到仓库的生成产物都必须在文件头标明其生成身份、列入该族的 manifest，并由下述 freshness 与 CI 检查覆盖。
+稳定的包内入口按调用方消费的职责命名，即使它由生成器维护，例如 `execution-api-version.ts`。原始机械投影可以在文件名中保留 `generated`，用于提示该文件不应逐渐承载手写行为，例如 `contract-types-generated.ts`。文件名不是强制边界：每个提交到仓库的生成产物都必须在文件头标明其生成身份、列入该族的 manifest，并由下述 freshness 与 CI 检查覆盖。
 
 每个工具提供 `pnpm --dir contracts/<family>/tools run generate` 重新生成全部产物，以及 `pnpm --dir contracts/<family>/tools run check` 校验已提交副本是否一致。每个族的测试会断言 manifest 与生成器自身声明的输出一致，并断言 CI 的变更过滤器覆盖清单中每一个产物；因此新增一个投影只需把它列进清单，而不必记得再接一个检查。
 
