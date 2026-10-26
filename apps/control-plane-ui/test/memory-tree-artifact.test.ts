@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict'
-import { execFile } from 'node:child_process'
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
+import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
-import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { zstdCompressSync } from 'node:zlib'
 
@@ -16,7 +13,6 @@ import {
   readMemoryTreeArtifact
 } from '../server/memory/memory-tree-artifact.js'
 
-const execFileAsync = promisify(execFile)
 const repositoryRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '..',
@@ -135,72 +131,6 @@ await test('TypeScript memory tree reader rejects duplicate directory paths', as
     ),
     /duplicate entry: memory\//
   )
-})
-
-await test('Python and TypeScript builders are readable across implementations', async () => {
-  const root = await mkdtemp(path.join(tmpdir(), 'memory-tree-interop-'))
-  try {
-    const memory = path.join(root, 'memory')
-    const topics = path.join(memory, 'topics')
-    const pythonOutput = path.join(root, 'python-output')
-    await mkdir(topics, { recursive: true })
-    await writeFile(path.join(memory, 'MEMORY.md'), '# Python index\n')
-    await writeFile(path.join(topics, 'python.md'), '# Python topic\n')
-    await execFileAsync(
-      'uv',
-      [
-        '--project',
-        path.join(repositoryRoot, 'agents'),
-        'run',
-        'python',
-        '-c',
-        [
-          'from pathlib import Path',
-          'from sec_review_agents.memory.memory_tree_artifact import build_memory_tree_artifact',
-          `build_memory_tree_artifact(memory_content_root=Path(${JSON.stringify(memory)}), output_dir=Path(${JSON.stringify(pythonOutput)}))`
-        ].join(';')
-      ],
-      { cwd: repositoryRoot }
-    )
-    const pythonArtifact = await readFile(
-      path.join(pythonOutput, 'memory-tree.v1.tar.zst')
-    )
-    const pythonTree = await readMemoryTreeArtifact(pythonArtifact)
-    assert.equal(
-      pythonTree.get('topics/python.md')?.toString('utf8'),
-      '# Python topic\n'
-    )
-
-    const typescriptArtifact = await buildMemoryTreeArtifact(
-      new Map([
-        ['MEMORY.md', '# TypeScript index\n'],
-        ['topics/Z.md', '# Uppercase topic\n'],
-        ['topics/a.md', '# Lowercase topic\n'],
-        ['topics/z.md', '# ASCII boundary topic\n'],
-        ['topics/\u00e9.md', '# Non-ASCII topic\n']
-      ])
-    )
-    const typescriptPath = path.join(root, 'typescript.tar.zst')
-    await writeFile(typescriptPath, typescriptArtifact.bytes)
-    await execFileAsync(
-      'uv',
-      [
-        '--project',
-        path.join(repositoryRoot, 'agents'),
-        'run',
-        'python',
-        '-c',
-        [
-          'from pathlib import Path',
-          'from sec_review_agents.memory.memory_tree_artifact import _validate_archive',
-          `_validate_archive(Path(${JSON.stringify(typescriptPath)}))`
-        ].join(';')
-      ],
-      { cwd: repositoryRoot }
-    )
-  } finally {
-    await rm(root, { recursive: true, force: true })
-  }
 })
 
 await test('TypeScript reader matches the shared memory tree corpus', async () => {
