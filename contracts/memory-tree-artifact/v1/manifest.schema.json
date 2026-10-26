@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sec-review-bot.invalid/contracts/memory-tree-artifact/v1/manifest.schema.json",
+  "title": "Memory Tree Artifact Manifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "version": {
+      "type": "integer",
+      "const": 1
+    }
+  }
+}

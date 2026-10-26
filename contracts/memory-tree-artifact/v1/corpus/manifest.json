@@ -1,0 +1,482 @@
+{
+  "corpus": [
+    {
+      "file": "valid-minimal.tar.zst",
+      "description": "The smallest valid memory tree.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "85589cacb29aaef1f144a19c05fe4af18915753a4c6f0fee4a25688567b56a20",
+      "size": 189,
+      "expected": "valid",
+      "expectedCode": null,
+      "objectKey": "memory/trees/85589cacb29aaef1f144a19c05fe4af18915753a4c6f0fee4a25688567b56a20/memory-tree.v1.tar.zst",
+      "entryCount": 4,
+      "entries": [
+        {
+          "path": "manifest.json",
+          "kind": "file",
+          "sizeBytes": 14
+        },
+        {
+          "path": "memory/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/MEMORY.md",
+          "kind": "file",
+          "sizeBytes": 9
+        },
+        {
+          "path": "memory/topics/",
+          "kind": "directory",
+          "sizeBytes": 0
+        }
+      ]
+    },
+    {
+      "file": "valid-topics.tar.zst",
+      "description": "A valid memory tree with nested and top-level topic files.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "c39615bb934751da4654fa271987794e9aeb0b0c09c6946452222185401c8313",
+      "size": 292,
+      "expected": "valid",
+      "expectedCode": null,
+      "objectKey": "memory/trees/c39615bb934751da4654fa271987794e9aeb0b0c09c6946452222185401c8313/memory-tree.v1.tar.zst",
+      "entryCount": 7,
+      "entries": [
+        {
+          "path": "manifest.json",
+          "kind": "file",
+          "sizeBytes": 14
+        },
+        {
+          "path": "memory/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/MEMORY.md",
+          "kind": "file",
+          "sizeBytes": 9
+        },
+        {
+          "path": "memory/topics/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/topics/security/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/topics/security/authentication.md",
+          "kind": "file",
+          "sizeBytes": 49
+        },
+        {
+          "path": "memory/topics/testing.md",
+          "kind": "file",
+          "sizeBytes": 10
+        }
+      ]
+    },
+    {
+      "file": "valid-byte-order.tar.zst",
+      "description": "Valid UTF-8 bytewise ordering across uppercase, lowercase, and non-ASCII paths.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "b5f21da9c4e318f4d395674a459f746727870b8339eb3c5026d76508171e6e3f",
+      "size": 289,
+      "expected": "valid",
+      "expectedCode": null,
+      "objectKey": "memory/trees/b5f21da9c4e318f4d395674a459f746727870b8339eb3c5026d76508171e6e3f/memory-tree.v1.tar.zst",
+      "entryCount": 8,
+      "entries": [
+        {
+          "path": "manifest.json",
+          "kind": "file",
+          "sizeBytes": 14
+        },
+        {
+          "path": "memory/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/MEMORY.md",
+          "kind": "file",
+          "sizeBytes": 9
+        },
+        {
+          "path": "memory/topics/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/topics/Z.md",
+          "kind": "file",
+          "sizeBytes": 12
+        },
+        {
+          "path": "memory/topics/a.md",
+          "kind": "file",
+          "sizeBytes": 12
+        },
+        {
+          "path": "memory/topics/z.md",
+          "kind": "file",
+          "sizeBytes": 17
+        },
+        {
+          "path": "memory/topics/é.md",
+          "kind": "file",
+          "sizeBytes": 12
+        }
+      ]
+    },
+    {
+      "file": "invalid-byte-order.tar.zst",
+      "description": "Locale-style lowercase-before-uppercase ordering violates UTF-8 bytewise order.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "6725c897e926bf19af71909cbd35e95b0d18d26662efc777fcda29e21208234d",
+      "size": 229,
+      "expected": "invalid",
+      "expectedCode": "INVALID_ORDER",
+      "objectKey": "memory/trees/6725c897e926bf19af71909cbd35e95b0d18d26662efc777fcda29e21208234d/memory-tree.v1.tar.zst",
+      "entryCount": 6,
+      "entries": [
+        {
+          "path": "manifest.json",
+          "kind": "file",
+          "sizeBytes": 14
+        },
+        {
+          "path": "memory/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/MEMORY.md",
+          "kind": "file",
+          "sizeBytes": 9
+        },
+        {
+          "path": "memory/topics/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/topics/a.md",
+          "kind": "file",
+          "sizeBytes": 12
+        },
+        {
+          "path": "memory/topics/Z.md",
+          "kind": "file",
+          "sizeBytes": 12
+        }
+      ]
+    },
+    {
+      "file": "invalid-missing-index.tar.zst",
+      "description": "The required memory/MEMORY.md file is absent.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "cfb264fb7cf7a41507640702c9752b36ad7dd348f436a5f32dfba478754a3544",
+      "size": 155,
+      "expected": "invalid",
+      "expectedCode": "MISSING_REQUIRED_PATH",
+      "objectKey": "memory/trees/cfb264fb7cf7a41507640702c9752b36ad7dd348f436a5f32dfba478754a3544/memory-tree.v1.tar.zst",
+      "entryCount": 3,
+      "entries": [
+        {
+          "path": "manifest.json",
+          "kind": "file",
+          "sizeBytes": 14
+        },
+        {
+          "path": "memory/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/topics/",
+          "kind": "directory",
+          "sizeBytes": 0
+        }
+      ]
+    },
+    {
+      "file": "invalid-bad-manifest.tar.zst",
+      "description": "The manifest declares an unsupported contract version.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "45c10b6eacd4fd1f8489b00ec0d713c6417fe49061ea13bbbde52c98a3e0d147",
+      "size": 189,
+      "expected": "invalid",
+      "expectedCode": "INVALID_MANIFEST",
+      "objectKey": "memory/trees/45c10b6eacd4fd1f8489b00ec0d713c6417fe49061ea13bbbde52c98a3e0d147/memory-tree.v1.tar.zst",
+      "entryCount": 4,
+      "entries": [
+        {
+          "path": "manifest.json",
+          "kind": "file",
+          "sizeBytes": 14
+        },
+        {
+          "path": "memory/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/MEMORY.md",
+          "kind": "file",
+          "sizeBytes": 9
+        },
+        {
+          "path": "memory/topics/",
+          "kind": "directory",
+          "sizeBytes": 0
+        }
+      ]
+    },
+    {
+      "file": "invalid-traversal.tar.zst",
+      "description": "A topic path contains a parent-directory traversal segment.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "2decbb98f1687fc2dc9f576acd3b9aab45d3d9e6f1e4e07a6d95b92faa707155",
+      "size": 216,
+      "expected": "invalid",
+      "expectedCode": "INVALID_PATH",
+      "objectKey": "memory/trees/2decbb98f1687fc2dc9f576acd3b9aab45d3d9e6f1e4e07a6d95b92faa707155/memory-tree.v1.tar.zst",
+      "entryCount": 5,
+      "entries": [
+        {
+          "path": "manifest.json",
+          "kind": "file",
+          "sizeBytes": 14
+        },
+        {
+          "path": "memory/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/MEMORY.md",
+          "kind": "file",
+          "sizeBytes": 9
+        },
+        {
+          "path": "memory/topics/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/topics/../escape.md",
+          "kind": "file",
+          "sizeBytes": 9
+        }
+      ]
+    },
+    {
+      "file": "invalid-symlink.tar.zst",
+      "description": "The archive contains a symbolic link.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "fad11f693f0b30249b3634595b026b4533ef9713cb9ec732ad20ee3f9feea3c2",
+      "size": 215,
+      "expected": "invalid",
+      "expectedCode": "UNSUPPORTED_TYPE",
+      "objectKey": "memory/trees/fad11f693f0b30249b3634595b026b4533ef9713cb9ec732ad20ee3f9feea3c2/memory-tree.v1.tar.zst",
+      "entryCount": 5,
+      "entries": [
+        {
+          "path": "manifest.json",
+          "kind": "file",
+          "sizeBytes": 14
+        },
+        {
+          "path": "memory/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/MEMORY.md",
+          "kind": "file",
+          "sizeBytes": 9
+        },
+        {
+          "path": "memory/topics/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/topics/link.md",
+          "kind": "symlink",
+          "sizeBytes": 0,
+          "linkPath": "../../outside"
+        }
+      ]
+    },
+    {
+      "file": "invalid-unexpected-path.tar.zst",
+      "description": "A non-Markdown file appears directly below memory/.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "faebcfba7400f03b823b16426d3c5ff47b4509f213867e6fcef0557b3d2f6b51",
+      "size": 212,
+      "expected": "invalid",
+      "expectedCode": "UNEXPECTED_PATH",
+      "objectKey": "memory/trees/faebcfba7400f03b823b16426d3c5ff47b4509f213867e6fcef0557b3d2f6b51/memory-tree.v1.tar.zst",
+      "entryCount": 5,
+      "entries": [
+        {
+          "path": "manifest.json",
+          "kind": "file",
+          "sizeBytes": 14
+        },
+        {
+          "path": "memory/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/MEMORY.md",
+          "kind": "file",
+          "sizeBytes": 9
+        },
+        {
+          "path": "memory/topics/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/private.txt",
+          "kind": "file",
+          "sizeBytes": 13
+        }
+      ]
+    },
+    {
+      "file": "invalid-unexpected-type.tar.zst",
+      "description": "The archive contains a character-device entry.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "014e3c976715546fb0ecead3f9ff72c2be379d0bbf8215a5488cc3023f9cddeb",
+      "size": 206,
+      "expected": "invalid",
+      "expectedCode": "UNSUPPORTED_TYPE",
+      "objectKey": "memory/trees/014e3c976715546fb0ecead3f9ff72c2be379d0bbf8215a5488cc3023f9cddeb/memory-tree.v1.tar.zst",
+      "entryCount": 5,
+      "entries": [
+        {
+          "path": "manifest.json",
+          "kind": "file",
+          "sizeBytes": 14
+        },
+        {
+          "path": "memory/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/MEMORY.md",
+          "kind": "file",
+          "sizeBytes": 9
+        },
+        {
+          "path": "memory/topics/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/topics/device.md",
+          "kind": "character-device",
+          "sizeBytes": 0
+        }
+      ]
+    },
+    {
+      "file": "valid-pax-path.tar.zst",
+      "description": "A local PAX path header carries a topic path that does not fit POSIX ustar fields.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "b33d4fe00d35e892f4ca6ce52f3aee93a4d245779d42bd18f7c6177219c49212",
+      "size": 271,
+      "expected": "valid",
+      "expectedCode": null,
+      "objectKey": "memory/trees/b33d4fe00d35e892f4ca6ce52f3aee93a4d245779d42bd18f7c6177219c49212/memory-tree.v1.tar.zst",
+      "entryCount": 5,
+      "entries": [
+        {
+          "path": "manifest.json",
+          "kind": "file",
+          "sizeBytes": 14
+        },
+        {
+          "path": "memory/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/MEMORY.md",
+          "kind": "file",
+          "sizeBytes": 9
+        },
+        {
+          "path": "memory/topics/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/topics/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.md",
+          "kind": "file",
+          "sizeBytes": 8
+        }
+      ]
+    },
+    {
+      "file": "invalid-pax-key.tar.zst",
+      "description": "A local PAX header uses an unsupported metadata key.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "6bf819e80c9dbf2f0e8664876c1514e68243458bfd3f8a7f9ed9e2a61605a57f",
+      "size": 251,
+      "expected": "invalid",
+      "expectedCode": "UNSUPPORTED_PAX",
+      "objectKey": "memory/trees/6bf819e80c9dbf2f0e8664876c1514e68243458bfd3f8a7f9ed9e2a61605a57f/memory-tree.v1.tar.zst",
+      "entryCount": 5,
+      "entries": [
+        {
+          "path": "manifest.json",
+          "kind": "file",
+          "sizeBytes": 14
+        },
+        {
+          "path": "memory/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/MEMORY.md",
+          "kind": "file",
+          "sizeBytes": 9
+        },
+        {
+          "path": "memory/topics/",
+          "kind": "directory",
+          "sizeBytes": 0
+        },
+        {
+          "path": "memory/topics/topic.md",
+          "kind": "file",
+          "sizeBytes": 8
+        }
+      ]
+    },
+    {
+      "file": "invalid-too-many-entries.tar.zst",
+      "description": "The archive exceeds the 10,000-entry limit using otherwise valid topic directories.",
+      "mediaType": "application/tar+zstd",
+      "sha256": "8890cc78b561023848c5fa23850fa5f5e5435cdfe8a453b328275c04bc87f184",
+      "size": 28975,
+      "expected": "invalid",
+      "expectedCode": "TOO_MANY_ENTRIES",
+      "objectKey": "memory/trees/8890cc78b561023848c5fa23850fa5f5e5435cdfe8a453b328275c04bc87f184/memory-tree.v1.tar.zst",
+      "entryCount": 10001
+    }
+  ]
+}

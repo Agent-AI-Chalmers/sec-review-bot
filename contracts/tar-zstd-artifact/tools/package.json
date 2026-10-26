@@ -1,0 +1,11 @@
+{
+  "name": "@sec-review-bot/tar-zstd-artifact-tools",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "generate": "node generate.mjs",
+    "check": "node generate.mjs --check",
+    "test": "node --test test.mjs"
+  }
+}
