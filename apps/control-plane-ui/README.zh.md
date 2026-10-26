@@ -58,7 +58,7 @@ pnpm run server
 pnpm run dev
 ```
 
-Vite 会将 `/api` 请求代理到 `http://127.0.0.1:8091` 上的 BFF。BFF 默认连接 `http://127.0.0.1:8090` 上的 Review Runs；若 Review Runs 位于其他地址，请设置 `REVIEW_RUNS_URL`。下载 artifact 还需要配置[本地集成部署](../../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)中列出的 RustFS 参数。
+Vite 会将 `/api` 请求代理到 `http://127.0.0.1:8091` 上的 BFF。BFF 默认连接 `http://127.0.0.1:8090` 上的 Review Runs；若 Review Runs 位于其他地址，请设置 `REVIEW_RUNS_URL`。下载 artifact 还需要配置[本地集成部署](../../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)中列出的 S3 参数。AWS 可以使用默认 endpoint 和 `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE=auto`；本地 RustFS 部署会提供 endpoint 并使用 `path`。
 
 使用完整 Compose 部署时，默认访问地址为 `http://127.0.0.1:8091`。
 
@@ -78,6 +78,6 @@ BFF 还负责代理下载私有 RustFS 中的终态 artifact。它使用单独�
 
 服务端 memory tree reader 与 builder 实现版本化的 [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.zh.md)。它们不会进入 browser bundle；BFF 负责校验、digest 计算和规范 object key。
 
-设置 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_READ_TOKEN` 后启用 memory 读取。BFF 会从 Catalog JSON 中移除存储 URI，自行读取 artifact，并在返回内容或下载前校验 size 和 SHA-256 digest。
+设置 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_TOKEN` 后启用 memory 管理。BFF 会从 Catalog JSON 中移除存储 URI，自行读取 artifact，并在返回内容或下载前校验 size 和 SHA-256 digest。
 
-Memory 写入默认不存在。仅在 loopback 本地维护场景中设置 `CONTROL_PLANE_UI_LOCAL_MEMORY_WRITES=1`，同时提供可操作 memory 的 Catalog token，以及对 `memory/trees/*` 具备不可变写权限的 S3 credential。此模式下服务端绑定 `127.0.0.1`；actor identity 由服务端确定，提交使用 expected active revision 和 control generation 的 compare-and-swap，编辑失败后绝不会自动恢复 maintenance。常规 Compose 服务不启用该模式，并继续使用只读 S3 policy。
+经过认证的 control plane 可以暂停或恢复 maintenance、编辑 active memory tree，以及恢复已有 revision。BFF 在服务端确定 actor identity，并使用 expected active revision 和 control generation 的 compare-and-swap。其 S3 identity 只能在 `memory/trees/*` 下创建不可变对象；run artifact 和 memory transcript 仍然只读。编辑或恢复失败后不会自动恢复 maintenance。

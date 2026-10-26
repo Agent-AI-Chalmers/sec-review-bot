@@ -106,7 +106,7 @@ class ExecutionWorkflow:
             runtime_context=prepared["runtime_context"],
             post_processing=ReviewPostProcessingPolicy(
                 memory_processing_enabled=prepared["memory_processing_enabled"],
-                diagnostic_publication="managed",
+                diagnostic_scheme="s3",
             ),
         )
         if request.workflow == "issue-review":

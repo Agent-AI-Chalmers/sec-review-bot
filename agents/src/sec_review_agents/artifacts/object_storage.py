@@ -13,13 +13,23 @@ from sec_review_agents.utils.env import env_value
 
 ARTIFACT_S3_BUCKET_ENV = "SEC_REVIEW_ARTIFACT_S3_BUCKET"
 ARTIFACT_S3_ENDPOINT_ENV = "SEC_REVIEW_ARTIFACT_S3_ENDPOINT"
+ARTIFACT_S3_ADDRESSING_STYLE_ENV = "SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE"
+
+
+def _s3_addressing_style() -> str:
+    style = env_value(ARTIFACT_S3_ADDRESSING_STYLE_ENV) or "auto"
+    if style not in {"auto", "path", "virtual"}:
+        raise ValueError(
+            f"{ARTIFACT_S3_ADDRESSING_STYLE_ENV} must be auto, path, or virtual."
+        )
+    return style
 
 
 def _s3_client() -> Any:
     return boto3.client(
         "s3",
         endpoint_url=env_value(ARTIFACT_S3_ENDPOINT_ENV),
-        config=Config(s3={"addressing_style": "path"}),
+        config=Config(s3={"addressing_style": _s3_addressing_style()}),
     )
 
 
@@ -128,6 +138,7 @@ def _assert_existing_object_matches(
 
 
 __all__ = [
+    "ARTIFACT_S3_ADDRESSING_STYLE_ENV",
     "ARTIFACT_S3_BUCKET_ENV",
     "ARTIFACT_S3_ENDPOINT_ENV",
     "download_s3_object",

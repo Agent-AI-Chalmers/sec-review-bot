@@ -102,7 +102,7 @@ Python package 按职责读最清楚：
    - `entrypoints/`：Temporal execution worker，以及它的 execution contract、run protocol 和 workflow input preparation 边界。
 
 6. Artifact 持久化与 run diagnostics。
-   - `artifacts/`：不可变 artifact reference、本地与 S3 传输、物化和安全 archive 解包。
+   - `artifacts/`：不可变 artifact reference、本地与 S3 传输、物化和安全 archive 解包。Reference 将 `file://` 或 `s3://` 位置与 media type、大小和 digest 绑定；consumer 持有传输配置，并在使用前校验和物化 reference。
    - `run_diagnostics/`：per-run diagnostic bundle 的格式、构建与物化逻辑，以及对应的 Temporal publication activity。
 
 7. Runtime support：agent 运行所需基础设施。

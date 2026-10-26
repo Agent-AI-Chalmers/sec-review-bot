@@ -321,7 +321,7 @@ export function createMemoryHandler(
         memoryControl = {
           state: action === 'pause' ? 'paused' : 'enabled',
           generation: memoryControl.generation + 1,
-          changed_by: { kind: 'service', id: 'local-control-plane-ui' },
+          changed_by: { kind: 'service', id: 'control-plane-ui' },
           changed_at: new Date().toISOString()
         }
         response.end(JSON.stringify(memoryControl))
@@ -361,7 +361,7 @@ export function createMemoryHandler(
         source: {
           kind: 'operator',
           operation_id: body.operation_id,
-          actor: { kind: 'service', id: 'local-control-plane-ui' }
+          actor: { kind: 'service', id: 'control-plane-ui' }
         }
       })
       activeMemoryRevision = nextRevision

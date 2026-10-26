@@ -75,7 +75,7 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
             prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
             timeout_seconds=30,
             runtime_context={},
-            post_processing=ReviewPostProcessingPolicy(diagnostic_publication="local"),
+            post_processing=ReviewPostProcessingPolicy(diagnostic_scheme="file"),
         )
     )
 
@@ -95,7 +95,7 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
                 }
             ],
             result=public_result,
-            publication="local",
+            destination_scheme="file",
         )
     ]
 

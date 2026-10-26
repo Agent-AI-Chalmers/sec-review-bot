@@ -13,7 +13,8 @@ The resulting ownership model is:
   reads active immutable memory versions.
 * The memory extraction and maintenance workers share a storage identity that
   reads run diagnostics and reads/writes immutable memory artifacts.
-* Control Plane UI can only read terminal result and memory artifacts.
+* Control Plane UI reads terminal result and memory artifacts, and can create
+  immutable memory-tree objects for operator edits.
 
 All provisioning operations are safe to repeat. Rerunning the container also
 rotates configured user secrets and replaces policy documents with the checked-in
@@ -151,17 +152,17 @@ def main() -> None:
     integration_secret_key = required_env("SEC_REVIEW_INTEGRATION_S3_SECRET_KEY")
     execution_worker_secret_key = required_env("SEC_REVIEW_EXECUTION_S3_SECRET_KEY")
     memory_worker_secret_key = required_env("SEC_REVIEW_MEMORY_S3_SECRET_KEY")
-    ui_reader_access_key = os.environ.get(
-        "SEC_REVIEW_UI_S3_ACCESS_KEY", "sec-review-ui-artifact-reader"
+    control_plane_ui_access_key = os.environ.get(
+        "SEC_REVIEW_UI_S3_ACCESS_KEY", "sec-review-control-plane-ui"
     )
-    ui_reader_secret_key = required_env("SEC_REVIEW_UI_S3_SECRET_KEY")
+    control_plane_ui_secret_key = required_env("SEC_REVIEW_UI_S3_SECRET_KEY")
     policy_root = Path("/policies")
 
     wait_for_rustfs()
     put_user(integration_access_key, integration_secret_key)
     put_user(execution_worker_access_key, execution_worker_secret_key)
     put_user(memory_worker_access_key, memory_worker_secret_key)
-    put_user(ui_reader_access_key, ui_reader_secret_key)
+    put_user(control_plane_ui_access_key, control_plane_ui_secret_key)
     put_policy("sec-review-input-writer", policy_root / "integration-policy.json")
     put_policy(
         "sec-review-execution-worker-storage",
@@ -172,13 +173,13 @@ def main() -> None:
         policy_root / "memory-worker-policy.json",
     )
     put_policy(
-        "sec-review-ui-artifact-reader",
-        policy_root / "ui-artifact-reader-policy.json",
+        "sec-review-control-plane-ui",
+        policy_root / "control-plane-ui-policy.json",
     )
     attach_policy("sec-review-input-writer", integration_access_key)
     attach_policy("sec-review-execution-worker-storage", execution_worker_access_key)
     attach_policy("sec-review-memory-worker-storage", memory_worker_access_key)
-    attach_policy("sec-review-ui-artifact-reader", ui_reader_access_key)
+    attach_policy("sec-review-control-plane-ui", control_plane_ui_access_key)
 
 
 if __name__ == "__main__":

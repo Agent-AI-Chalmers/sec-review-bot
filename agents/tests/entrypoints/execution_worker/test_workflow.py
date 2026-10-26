@@ -19,7 +19,7 @@ async def test_execution_workflow_can_be_prepared_in_temporal_sandbox() -> None:
 
 
 @pytest.mark.asyncio
-async def test_managed_execution_requires_managed_diagnostic_publication(
+async def test_execution_gateway_runs_publish_diagnostics_to_s3(
     monkeypatch,
 ) -> None:
     captured = []
@@ -54,4 +54,4 @@ async def test_managed_execution_requires_managed_diagnostic_publication(
         ExecutionWorkflowInput("issue-review", "run-1", {}, 30)
     )
 
-    assert captured[0].post_processing.diagnostic_publication == "managed"
+    assert captured[0].post_processing.diagnostic_scheme == "s3"

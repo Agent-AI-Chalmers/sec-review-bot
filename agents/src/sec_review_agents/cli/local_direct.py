@@ -56,13 +56,13 @@ def _publish_local_diagnostic(
             else []
         )
     # Direct mode is an offline producer even when the shell also carries
-    # managed-deployment S3 settings.
+    # object-storage settings.
     publish_run_diagnostic_bundle(
         run_id=bundle.run_id,
         artifact_root=Path(artifact_root),
         review_units=units,
         result=result,
-        remote=False,
+        destination_scheme="file",
     )
 
 

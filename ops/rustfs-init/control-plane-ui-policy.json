@@ -9,6 +9,11 @@
         "arn:aws:s3:::sec-review/memory/trees/*",
         "arn:aws:s3:::sec-review/memory/transcripts/*"
       ]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject"],
+      "Resource": ["arn:aws:s3:::sec-review/memory/trees/*"]
     }
   ]
 }

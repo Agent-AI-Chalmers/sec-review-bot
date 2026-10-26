@@ -170,7 +170,8 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `AGENT_MCP_ENABLED` | 启用已配置的 MCP 集成；默认是 `false`。 |
 | `AGENT_MEMORY_CONSUMPTION_ENABLED` | 允许 review agent 读取整理后的 memory；默认是 `true`。 |
 | `AGENT_MEMORY_PROCESSING_ENABLED` | 允许 transcript extraction 和 memory maintenance；默认是 `true`。 |
-| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 宿主 worker 使用的 RustFS endpoint；Compose 默认暴露在 `http://127.0.0.1:9100`。 |
+| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 可选的自定义 S3-compatible endpoint。本地 RustFS 部署使用 `http://127.0.0.1:9100`；使用由 `AWS_REGION` 选择的 AWS endpoint 时省略该项。 |
+| `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` | S3 请求寻址方式：`auto`、`path` 或 `virtual`。本地 RustFS 部署使用 `path`；外部存储可以使用 `auto` 或 `virtual`，无需改变 artifact reference。 |
 | `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入 run diagnostic bundle，并读取 active memory revision。 |
 | `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | 两个 memory worker 共用的存储凭据；可读取 run diagnostic bundle，并读写 memory revision 和压缩后的 memory-agent transcript。 |
 | `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 协调状态 API；Compose 默认是 `http://127.0.0.1:8092`。 |
@@ -180,7 +181,7 @@ Execution Worker 会在 workflow 成功前把权威 run diagnostic 发布到 `ru
 
 Memory Catalog Server 是独立 TypeScript 服务，不属于 Review Runs。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_review_runs` 和 `sec_review_memory_catalog` database。只有 Memory Catalog 收到 `MEMORY_CATALOG_DATABASE_URL`，并在自己的 database 中保存 extraction records 及其可选 observations、memory-tree revision history 和 active revision pointer。每个 revision 记录对应的 maintenance identity 和 maintainer transcript reference。Temporal 负责 extraction 执行和单例 maintenance workflow；PostgreSQL 是持久 catalog 与 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；memory-tree revisions 和 memory-agent transcripts 以不可变对象保存在 RustFS 中。Worker 将这些对象物化到 invocation 级临时 worktree，agent sandbox 只看到最终 filesystem mount。
 
-Compose 还会向 Control Plane UI 提供 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_READ_TOKEN`。其 RustFS identity 只读访问 run artifacts、memory trees 和 memory transcripts。Browser session 可以查看 memory 并下载经过校验的 artifacts，但 Compose 服务不启用 memory 写入。需要明确进行本地维护时，应直接运行 BFF，并设置 `CONTROL_PLANE_UI_LOCAL_MEMORY_WRITES=1`、可操作 Catalog 的 token 和具备 memory 写权限的存储凭据；该模式只绑定 `127.0.0.1`。编辑或回滚失败后，maintenance 会保持暂停，直到操作者显式恢复。系统不会自动清理未引用的 memory objects。
+Compose 会向 Control Plane UI 提供 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_TOKEN`。经过认证的 browser session 可以通过 BFF 查看和管理 memory，而不会获得 Catalog 或对象存储凭据。UI storage identity 可以读取 run artifact、memory tree 和 memory transcript，但只能在 `memory/trees/*` 下创建不可变对象。编辑或恢复失败后，maintenance 会保持暂停，直到 operator 显式恢复。系统不会自动清理未引用的 memory object。
 
 PostgreSQL 初始化脚本只会在 `.agent-postgres-state` 为空时执行。采用或修改 database 名称后，应先停止部署并删除该目录，再重新启动 Compose。此操作会删除已有的 Review Runs 和 Memory Catalog 数据。
 
