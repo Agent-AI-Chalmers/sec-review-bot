@@ -14,13 +14,15 @@ Temporal Server 属于基础设施，但它会直接向 worker 进程分发工�
 
 Memory 链路只有一套与部署位置无关的状态模型：Memory Catalog 负责 PostgreSQL 中的协调状态，对象存储负责不可变 memory-tree 和 transcript artifacts，Temporal 负责 workflow 执行。每次 review invocation 都会把当前 memory tree 物化到临时目录供 agent backend 使用，并在结束后删除该目录。
 
+Control Plane UI 通过自身 BFF 读取 Memory Catalog，browser 不会获得 Catalog token、对象存储凭据或 `s3://` reference。Artifact download 由 BFF 读取并校验 identity。常规部署不暴露 memory 写路由；显式启用的仅 loopback 模式可以暂停或恢复自动 maintenance、创建 operator edit revision，以及把 active pointer 恢复到已有 revision。后续新 revision 会把该 active revision 记录为前驱，同时 revision identity 保持全局递增。
+
 ## 运行角色职责地图
 
 | 运行角色 | 代码 | 负责内容 | 本地指南 |
 | --- | --- | --- | --- |
 | GitHub Integration | `apps/github-integration/` | GitHub 入口、input 准备、Review Runs client 与 GitHub publication | [README](../../apps/github-integration/README.zh.md) |
 | Review Runs | `review-runs/` | 接纳、持久化 run 状态、恢复、execution 观察与 publication 协调 | [README](../../review-runs/README.zh.md) |
-| Control Plane UI | `apps/control-plane-ui/` | 经过鉴权的运维控制台与只读 Review Runs 投影 | [README](../../apps/control-plane-ui/README.md) |
+| Control Plane UI | `apps/control-plane-ui/` | 用于 Review Runs 与 memory 查看、并可选择启用仅 loopback memory 维护的鉴权运维控制台 | [README](../../apps/control-plane-ui/README.md) |
 | Execution Gateway | `execution-gateway/` | 经过鉴权的 Execution API 与 HTTP-to-Temporal 转换 | [README](../../execution-gateway/README.zh.md) |
 | Execution Worker | `agents/` | Review workflow、activity、agent runtime、stage artifact 与 run diagnostic publication | [README](../../agents/README.zh.md) |
 | Memory Extraction Worker | `agents/` | 按 run 消费 diagnostic、调用 extractor、发布 transcript 并登记 extraction | [README](../../agents/README.zh.md) |
@@ -85,7 +87,7 @@ sequenceDiagram
     Temporal->>MaintenanceWorker: 分发 maintenance 工作
     Note over Temporal,MaintenanceWorker: 固定 workflow ID 确保同一时间只有一个 maintainer
     MaintenanceWorker->>Catalog: 选择一批待处理 observations
-    Catalog-->>MaintenanceWorker: 返回 observations、extraction IDs、base revision 和当前 memory tree reference
+    Catalog-->>MaintenanceWorker: 返回 observations、extraction IDs、expected active revision 和当前 memory tree reference
     opt 存在当前 memory tree
       MaintenanceWorker->>Storage: 下载当前 memory tree artifact
       Storage-->>MaintenanceWorker: memory tree artifact
@@ -94,10 +96,10 @@ sequenceDiagram
     Note over MaintenanceWorker: 运行 maintainer
     MaintenanceWorker->>Storage: 保存 maintainer transcript
     MaintenanceWorker->>Storage: 保存新的 memory tree artifact
-    MaintenanceWorker-->>Temporal: 返回 artifact references、extraction IDs 和 base revision
+    MaintenanceWorker-->>Temporal: 返回 artifact references、extraction IDs 和 expected active revision
     Note over Temporal: 后续 commit 重试复用该 activity 结果
     Temporal->>MaintenanceWorker: 调度 revision commit
-    MaintenanceWorker->>Catalog: 使用 maintenance ID 和 base revision CAS 创建 memory tree revision
+    MaintenanceWorker->>Catalog: 使用 maintenance ID 和 expected active revision CAS 创建 memory tree revision
     Catalog-->>MaintenanceWorker: 返回新建或幂等重放的 revision，或 revision conflict
   end
 ```

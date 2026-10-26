@@ -4,7 +4,11 @@
     {
       "Effect": "Allow",
       "Action": ["s3:GetObject"],
-      "Resource": ["arn:aws:s3:::sec-review/runs/*/artifacts/*"]
+      "Resource": [
+        "arn:aws:s3:::sec-review/runs/*/artifacts/*",
+        "arn:aws:s3:::sec-review/memory/trees/*",
+        "arn:aws:s3:::sec-review/memory/transcripts/*"
+      ]
     }
   ]
 }
