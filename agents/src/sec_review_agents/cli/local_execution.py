@@ -30,7 +30,7 @@ def build_local_workflow_request(
         runtime_context=runtime_context_from_config(bundle.runtime_config),
         post_processing=ReviewPostProcessingPolicy(
             memory_processing_enabled=memory_processing_enabled(),
-            diagnostic_publication="local",
+            diagnostic_scheme="file",
         ),
     )
 

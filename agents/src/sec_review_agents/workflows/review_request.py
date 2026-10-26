@@ -8,7 +8,7 @@ from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 class ReviewPostProcessingPolicy:
     # Execution policy stays separate from the review input and controls production.
     memory_processing_enabled: bool = True
-    diagnostic_publication: Literal["local", "managed"] = "local"
+    diagnostic_scheme: Literal["file", "s3"] = "file"
 
 
 @dataclass(frozen=True)

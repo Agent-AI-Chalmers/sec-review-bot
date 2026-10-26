@@ -50,7 +50,7 @@ def test_diagnostic_bundle_contains_artifacts_and_selects_one_review_unit(
                 DiagnosticReviewUnit("case-b", second),
             ],
             result={"review_record": {"overview": "done"}},
-            remote=False,
+            destination_scheme="file",
         )
     materialized = materialize_diagnostic_transcript_unit(
         publication.reference,
@@ -82,7 +82,7 @@ def test_diagnostic_bundle_is_byte_stable_across_retries(tmp_path: Path) -> None
         artifact_root=artifact_root,
         review_units=[DiagnosticReviewUnit("review", transcripts)],
         result={"z": 1, "a": 2},
-        remote=False,
+        destination_scheme="file",
     ).reference
     first_path = Path(first.uri.removeprefix("file://"))
     first_bytes = first_path.read_bytes()
@@ -92,7 +92,7 @@ def test_diagnostic_bundle_is_byte_stable_across_retries(tmp_path: Path) -> None
         artifact_root=artifact_root,
         review_units=[DiagnosticReviewUnit("review", transcripts)],
         result={"a": 2, "z": 1},
-        remote=False,
+        destination_scheme="file",
     ).reference
 
     assert second.digest == first.digest
@@ -111,7 +111,7 @@ def test_diagnostic_bundle_publishes_owner_only_archive(tmp_path: Path) -> None:
         artifact_root=artifact_root,
         review_units=[],
         result={},
-        remote=False,
+        destination_scheme="file",
     ).reference
 
     archive = Path(reference.uri.removeprefix("file://"))
@@ -132,7 +132,7 @@ def test_diagnostic_bundle_rejects_conflicting_existing_file(tmp_path: Path) -> 
             artifact_root=artifact_root,
             review_units=[],
             result={"review_record": {}},
-            remote=False,
+            destination_scheme="file",
         )
 
     assert destination.read_bytes() == b"existing"
@@ -161,7 +161,7 @@ def test_diagnostic_bundle_build_failure_preserves_existing_file(
             artifact_root=artifact_root,
             review_units=[],
             result={},
-            remote=False,
+            destination_scheme="file",
         )
 
     assert destination.read_bytes() == b"existing"
@@ -183,7 +183,9 @@ def test_diagnostic_bundle_rejects_review_unit_path_traversal(tmp_path: Path) ->
         )
 
 
-def test_managed_diagnostic_bundle_requires_s3_configuration(tmp_path: Path) -> None:
+def test_s3_diagnostic_bundle_requires_object_storage_configuration(
+    tmp_path: Path,
+) -> None:
     artifact_root = tmp_path / "artifacts"
     transcripts = artifact_root / "transcripts"
     transcripts.mkdir(parents=True)
@@ -199,6 +201,22 @@ def test_managed_diagnostic_bundle_requires_s3_configuration(tmp_path: Path) -> 
             review_units=[DiagnosticReviewUnit("review", transcripts)],
             result={},
         )
+
+
+def test_diagnostic_bundle_rejects_unknown_destination_scheme(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    artifact_root.mkdir()
+
+    with pytest.raises(ValueError, match="Unsupported diagnostic artifact scheme"):
+        publish_run_diagnostic_bundle(
+            run_id="run-1",
+            artifact_root=artifact_root,
+            review_units=[],
+            result={},
+            destination_scheme="https",  # type: ignore[arg-type]
+        )
+
+    assert not (artifact_root / "published").exists()
 
 
 def test_publication_reports_only_units_included_in_manifest(tmp_path: Path) -> None:
@@ -219,7 +237,7 @@ def test_publication_reports_only_units_included_in_manifest(tmp_path: Path) -> 
             DiagnosticReviewUnit("empty", empty),
         ],
         result={},
-        remote=False,
+        destination_scheme="file",
     )
 
     assert publication.unit_ids == ("included",)
@@ -235,7 +253,7 @@ def test_diagnostic_bundle_can_have_no_memory_units(tmp_path: Path) -> None:
         artifact_root=artifact_root,
         review_units=[],
         result={"review_record": {}},
-        remote=False,
+        destination_scheme="file",
     )
 
     assert publication.reference.uri.endswith(

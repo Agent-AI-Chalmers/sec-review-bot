@@ -100,7 +100,7 @@ The Python package is easiest to read by responsibility:
    - `entrypoints/`: the Temporal execution worker plus its execution contract, run protocol, and workflow input preparation boundaries.
 
 6. Artifact persistence and run diagnostics.
-   - `artifacts/`: immutable artifact references, local and S3 transport, materialization, and safe archive extraction.
+   - `artifacts/`: immutable artifact references, local and S3 transport, materialization, and safe archive extraction. References bind a `file://` or `s3://` location to its media type, size, and digest; consumers own transport configuration and materialize verified references before use.
    - `run_diagnostics/`: the per-run diagnostic bundle format, build and materialize logic, and its Temporal publication activity.
 
 7. Runtime support: infrastructure needed to run agents.

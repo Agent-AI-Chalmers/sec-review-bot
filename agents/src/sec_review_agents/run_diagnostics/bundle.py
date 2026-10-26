@@ -6,7 +6,7 @@ import tarfile
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlparse
 
 from sec_review_agents.artifacts.archive import extract_archive
@@ -68,9 +68,13 @@ def publish_run_diagnostic_bundle(
     artifact_root: Path,
     review_units: list[DiagnosticReviewUnit],
     result: dict[str, Any],
-    remote: bool = True,
+    destination_scheme: Literal["file", "s3"] = "s3",
 ) -> PublishedDiagnosticBundle:
-    """Archive one complete review run and optionally publish it to object storage."""
+    """Archive one complete review run and publish it through the selected scheme."""
+    if destination_scheme not in {"file", "s3"}:
+        raise ValueError(
+            f"Unsupported diagnostic artifact scheme: {destination_scheme}"
+        )
     _validate_path_component(run_id, label="run_id")
     artifact_root = artifact_root.resolve()
     output_dir = artifact_root / "published"
@@ -97,7 +101,7 @@ def publish_run_diagnostic_bundle(
             temporary_archive.unlink()
             _fsync_directory(output_dir)
 
-    if remote:
+    if destination_scheme == "s3":
         reference = publish_immutable_s3_artifact(
             reference,
             key=diagnostic_bundle_s3_key(run_id),

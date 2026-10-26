@@ -13,7 +13,7 @@ class RunDiagnosticPublicationRequest:
     artifact_root_path: str
     review_units: list[dict[str, str]]
     result: dict[str, Any]
-    publication: Literal["local", "managed"]
+    destination_scheme: Literal["file", "s3"]
 
 
 @activity.defn
@@ -39,7 +39,7 @@ def publish_run_diagnostic_activity(
         artifact_root=Path(request.artifact_root_path),
         review_units=units,
         result=request.result,
-        remote=request.publication == "managed",
+        destination_scheme=request.destination_scheme,
     )
     reference = publication.reference
     return {

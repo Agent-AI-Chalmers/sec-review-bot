@@ -163,7 +163,7 @@ class IssueTwoStageWorkflow:
                         }
                     ],
                     result=public_result,
-                    publication=request.post_processing.diagnostic_publication,
+                    destination_scheme=request.post_processing.diagnostic_scheme,
                 )
             ],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),

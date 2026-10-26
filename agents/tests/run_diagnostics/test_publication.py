@@ -37,7 +37,7 @@ def test_publication_activity_uses_publisher_unit_ids(
                 {"unit_id": "empty", "transcript_root": str(empty)},
             ],
             result={},
-            publication="local",
+            destination_scheme="file",
         )
     )
 
