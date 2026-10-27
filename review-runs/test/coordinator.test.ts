@@ -227,6 +227,92 @@ test('a single row the contract cannot represent degrades that run, not the pass
   ])
 })
 
+test('an unclassified submission recovery failure aborts the coordination pass', async () => {
+  const store = {
+    async expireStalePreparations() {
+      return { concluded: 0, blocked: [] }
+    },
+    async listSubmissionRecoveries() {
+      return projected([
+        { ...run, run_id: 'recover-failing' },
+        { ...run, run_id: 'recover-later' }
+      ])
+    },
+    async listActiveRuns() {
+      assert.fail('active runs must not be read after recovery aborts the pass')
+    }
+  }
+  const recovered: string[] = []
+
+  await assert.rejects(
+    coordinateReviewRunsOnce(store, {
+      async recoverSubmission(entry) {
+        recovered.push(entry.run_id)
+        throw new Error('database unavailable')
+      },
+      async readExecutionStatuses() {
+        assert.fail('Execution must not be read after recovery aborts the pass')
+      },
+      async observeActiveRun() {
+        assert.fail(
+          'no active run can be observed after recovery aborts the pass'
+        )
+      },
+      onDroppedRunRow() {
+        assert.fail('this pass drops no rows')
+      },
+      onBlockedPreparationExpiry() {
+        assert.fail('this pass blocks no expiries')
+      }
+    }),
+    /database unavailable/
+  )
+
+  assert.deepStrictEqual(recovered, ['recover-failing'])
+})
+
+test('an unclassified execution observation failure aborts the coordination pass', async () => {
+  const store = {
+    async expireStalePreparations() {
+      return { concluded: 0, blocked: [] }
+    },
+    async listSubmissionRecoveries() {
+      return projected([])
+    },
+    async listActiveRuns() {
+      return projected([
+        { ...run, run_id: 'active-failing' },
+        { ...run, run_id: 'active-later' }
+      ])
+    }
+  }
+  const observed: string[] = []
+
+  await assert.rejects(
+    coordinateReviewRunsOnce(store, {
+      async recoverSubmission() {
+        assert.fail('this pass has no submission recovery')
+      },
+      async readExecutionStatuses() {
+        return { runs: [], missing: [], byRunId: new Map() }
+      },
+      async observeActiveRun(entry) {
+        observed.push(entry.run_id)
+        throw new Error('transaction failed')
+      },
+      onDroppedRunRow() {
+        assert.fail('this pass drops no rows')
+      },
+      onBlockedPreparationExpiry() {
+        assert.fail('this pass blocks no expiries')
+      }
+    }),
+    /transaction failed/
+  )
+
+  assert.deepStrictEqual(observed, ['active-failing'])
+})
+
 test('coordinator loop does not overlap passes and stop drains the active pass', async () => {
   let release: () => void = () => {}
   const gate = new Promise<void>((resolve) => {
