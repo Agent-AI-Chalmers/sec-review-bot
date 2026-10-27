@@ -1,16 +1,16 @@
 // Implements Review Runs's durable review trunk and orchestrates cross-axis transitions that
-// must move more than one lifecycle axis in one transaction. The SQL row-to-record projection
-// lives in `run-record-projection.ts`; operator-only cross-axis decisions live in
-// `operator-decision-store.ts`.
+// must move more than one lifecycle axis in one transaction. Read-model queries live in
+// `review-run-queries.ts`; SQL row projection lives in `run-record-projection.ts`; and
+// operator-only cross-axis decisions live in `operator-decision-store.ts`.
 //
 // Axis ownership:
 // - `execution-store.ts` owns single-axis execution writes (status transitions, observation
 //   heartbeat, artifact/result, submission-recovery claims).
 // - `preparation-store.ts` / `publication-store.ts` own their own axes.
-// - This store owns the run trunk, queries that select run projections, and normal cross-axis
-//   transitions (submit -> queued, execution failure -> publication skipped, rejected replay ->
-//   publication skipped). A cross-axis transition is owned by the axis that initiates it;
-//   preparations initiating an execution skip is therefore in that store.
+// - This store owns the run trunk and normal cross-axis transitions (submit -> queued, execution
+//   failure -> publication skipped, rejected replay -> publication skipped). A cross-axis
+//   transition is owned by the axis that initiates it; preparations initiating an execution skip
+//   is therefore in that store.
 // - `publication-abandon.ts` holds the one transition shared by more than one axis: concluding a
 //   publication that can never publish. It is separate because both preparation and execution
 //   trigger it, and single-axis stores must not import each other (this store is what constructs
@@ -23,10 +23,7 @@
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
-import type {
-  ReviewRunWorkflow as WorkflowName,
-  ExecutionArtifactStorage
-} from '../contracts.js'
+import type { ExecutionArtifactStorage } from '../contracts.js'
 import {
   applySchemaVersions,
   KNOWN_SCHEMA_VERSIONS
@@ -37,14 +34,12 @@ import {
   type CreateReviewRunArgs,
   type PublicationStatus,
   type PublicationStepRecord,
-  type PreparationStatus,
   type PublicationWork,
   type ReviewRunAdmission,
   type ReviewRunEvent,
-  type ReviewRunRecord,
-  type ExecutionStatus
+  type ExecutionStatisticsSummary,
+  type ReviewRunRecord
 } from '../shapes.js'
-import type { ExecutionStatisticsSummary } from '../shapes.js'
 import {
   PreparationStore,
   type PreparationExpiryResult,
@@ -53,8 +48,15 @@ import {
 } from './preparation-store.js'
 import { PublicationStore } from './publication-store.js'
 import { abandonInFlightPublication } from './publication-abandon.js'
-import { appendEvent, listEvents } from './review-run-events.js'
+import { appendEvent } from './review-run-events.js'
 import { OperatorDecisionStore } from './operator-decision-store.js'
+import {
+  ReviewRunQueries,
+  type DroppedRunRow,
+  type ListRunsOptions,
+  type ParkedRun,
+  type RunRowsProjection
+} from './review-run-queries.js'
 import {
   RUN_SELECT,
   rowToRecord,
@@ -86,48 +88,12 @@ export type {
   RunNoticeWork,
   PreparationWork
 } from './preparation-store.js'
+export type {
+  DroppedRunRow,
+  ParkedRun,
+  RunRowsProjection
+} from './review-run-queries.js'
 
-/** One run the system stopped working on by itself, and the axis it is parked on. */
-export interface ParkedRun {
-  run_id: string
-  axis: 'preparation' | 'execution' | 'publication'
-  reason:
-    | 'EXECUTION_ALREADY_ADVANCED'
-    | 'SUBMISSION_RECOVERY_EXHAUSTED'
-    | 'PUBLICATION_RECONCILIATION_EXHAUSTED'
-    | null
-}
-
-/** A stored row the contract cannot represent, kept so a fan-out read can report it. */
-export interface DroppedRunRow {
-  run_id: string
-  error: unknown
-}
-
-/** A fan-out read's result: the rows that project cleanly, and the ones that do not.
- *
- * `rowToRecord` can throw (a stored shape the contract forbids, such as an `available`
- * artifact without its reference). Applying it with `.map` over a result set turns one bad
- * row into a failed read of *every* row, which for the coordinator's polling reads means the
- * whole pass stops and no run is observed. Returning the failures alongside the records lets
- * the caller keep making progress and still report each dropped row with its identity. */
-export interface RunRowsProjection {
-  runs: ReviewRunRecord[]
-  dropped: DroppedRunRow[]
-}
-
-function projectRunRows(rows: ReviewRunRow[]): RunRowsProjection {
-  const runs: ReviewRunRecord[] = []
-  const dropped: DroppedRunRow[] = []
-  for (const row of rows) {
-    try {
-      runs.push(rowToRecord(row))
-    } catch (error) {
-      dropped.push({ run_id: row.trunk.run_id, error })
-    }
-  }
-  return { runs, dropped }
-}
 export class ReviewRunStore {
   private readonly pool: Pool
   readonly connectorId: string
@@ -137,7 +103,7 @@ export class ReviewRunStore {
   private readonly publications: PublicationStore
   private readonly executions: ExecutionStore
   private readonly operatorDecisions: OperatorDecisionStore
-  private readonly onDroppedRunRow: (dropped: DroppedRunRow) => void
+  private readonly queries: ReviewRunQueries
   private initialized = false
 
   constructor({
@@ -159,7 +125,6 @@ export class ReviewRunStore {
      * such list and would otherwise discard the fault silently. */
     onDroppedRunRow?: (dropped: DroppedRunRow) => void
   } = {}) {
-    this.onDroppedRunRow = onDroppedRunRow
     this.pool = pool ?? new Pool({ connectionString })
     // `pg` emits `error` on the pool when an idle client loses its connection, and an
     // EventEmitter that emits `error` without a listener throws. A database restart, a
@@ -200,6 +165,12 @@ export class ReviewRunStore {
       this.connectorId,
       this.publications,
       this.executions
+    )
+    this.queries = new ReviewRunQueries(
+      this.pool,
+      this.connectorId,
+      this.claimTimeoutMs,
+      onDroppedRunRow
     )
   }
 
@@ -562,264 +533,39 @@ export class ReviewRunStore {
       })
     })
   }
-  /** Whether this connector owns a run trunk row with this id.
-   *
-   * The event log lives on the trunk, so answering "does this run exist?" must not go through the
-   * full record projection: that projection treats an unrepresentable axis row as a corrupt run
-   * and returns `null`, which would make the events endpoint answer 404 for a run whose history
-   * is in fact readable. */
   async runExists(runId: string): Promise<boolean> {
     this.ready()
-    const result = await this.pool.query(
-      'SELECT 1 FROM review_runs WHERE run_id=$1 AND connector_id=$2',
-      [runId, this.connectorId]
-    )
-    return result.rowCount === 1
+    return await this.queries.runExists(runId)
   }
   async listEvents(runId: string): Promise<ReviewRunEvent[]> {
     this.ready()
-    return await listEvents(this.pool, runId, this.connectorId)
+    return await this.queries.listEvents(runId)
   }
   async getRun(runId: string): Promise<ReviewRunRecord | null> {
     this.ready()
-    const result = await this.pool.query<ReviewRunRow>(
-      `${RUN_SELECT}
-      WHERE r.run_id=$1 AND r.connector_id=$2`,
-      [runId, this.connectorId]
-    )
-    const row = result.rows[0]
-    if (row === undefined) return null
-    // A row the record contract cannot represent (e.g. a run missing one of its axis rows) is
-    // treated as absent, matching the list projection that reports it in `dropped`. Unlike a
-    // genuinely unknown run id, this is corruption, so it is reported before being hidden
-    // behind the same `null`.
-    try {
-      return rowToRecord(row)
-    } catch (error) {
-      this.onDroppedRunRow({ run_id: row.trunk.run_id, error })
-      return null
-    }
+    return await this.queries.getRun(runId)
   }
-
-  /** Read execution statistics for a run page without making one query per run.
-   *
-   * Statistics are connector-fenced through the run trunk. Missing rows are omitted from the
-   * map; the observed read model turns that absence into `execution_statistics: null`, which is
-   * distinct from a settled snapshot containing zero observed calls. */
   async getExecutionStatistics(
     runIds: readonly string[]
   ): Promise<Map<string, ExecutionStatisticsSummary>> {
     this.ready()
-    if (runIds.length === 0) return new Map()
-    const result = await this.pool.query<{
-      run_id: string
-      statistics: ExecutionStatisticsSummary
-    }>(
-      `SELECT s.run_id,
-        json_build_object(
-          'reconciliation_status', s.status,
-          'ingestion_status', s.ingestion_status,
-          'usage_coverage', s.usage_coverage,
-          'root_trace_count', s.root_trace_count,
-          'excluded_non_review_root_count', s.excluded_non_review_root_count,
-          'observed_call_count', s.observed_call_count,
-          'usage_reported_call_count', s.usage_reported_call_count,
-          'token_usage', json_build_object(
-            'input_tokens', s.input_tokens,
-            'output_tokens', s.output_tokens,
-            'total_tokens', s.total_tokens,
-            'cache_read_input_tokens', s.cache_read_input_tokens,
-            'cache_creation_input_tokens', s.cache_creation_input_tokens,
-            'reasoning_tokens', s.reasoning_tokens
-          ),
-          'groups', COALESCE((
-            SELECT jsonb_agg(jsonb_build_object(
-              'agent_name', g.agent_name,
-              'case_id', g.case_id,
-              'delivery_id', g.delivery_id,
-              'pass_kind', g.pass_kind,
-              'pass_index', g.pass_index,
-              'batch_index', g.batch_index,
-              'chunk_id', g.chunk_id,
-              'provider', g.provider,
-              'model', g.model,
-              'model_call_count', g.model_call_count,
-              'usage_reported_call_count', g.usage_reported_call_count,
-              'token_usage', jsonb_build_object(
-                'input_tokens', g.input_tokens,
-                'output_tokens', g.output_tokens,
-                'total_tokens', g.total_tokens,
-                'cache_read_input_tokens', g.cache_read_input_tokens,
-                'cache_creation_input_tokens', g.cache_creation_input_tokens,
-                'reasoning_tokens', g.reasoning_tokens
-              )
-            ) ORDER BY g.case_id NULLS FIRST,g.delivery_id NULLS FIRST,
-              g.pass_index NULLS FIRST,g.batch_index NULLS FIRST,g.chunk_id NULLS FIRST,
-              g.agent_name,g.provider,g.model NULLS FIRST)
-            FROM execution_statistics_groups g WHERE g.run_id=s.run_id
-          ), '[]'::jsonb),
-          'settled_at', s.settled_at,
-          'updated_at', s.updated_at
-        ) AS statistics
-       FROM execution_statistics s
-       JOIN review_runs r ON r.run_id=s.run_id
-       WHERE r.connector_id=$1 AND s.run_id=ANY($2::text[])`,
-      [this.connectorId, runIds]
-    )
-    return new Map(
-      result.rows.map(({ run_id, statistics }) => [run_id, statistics])
-    )
+    return await this.queries.getExecutionStatistics(runIds)
   }
-
-  private async listRunRows(
-    options: {
-      limit?: number
-      cursor?: string
-      execution_status?: ExecutionStatus
-      publication_status?: PublicationStatus
-      preparation_status?: PreparationStatus
-      source_platform?: ReviewRunRecord['source_platform']
-      workflow?: WorkflowName
-      from?: string
-      to?: string
-    },
-    limit: number
-  ): Promise<ReviewRunRow[]> {
-    this.ready()
-    const values: unknown[] = [this.connectorId]
-    const clauses = ['r.connector_id=$1']
-    const add = (value: unknown): string => {
-      values.push(value)
-      return `$${values.length}`
-    }
-    if (options.workflow !== undefined)
-      clauses.push(`r.workflow=${add(options.workflow)}`)
-    if (options.source_platform !== undefined)
-      clauses.push(`r.source_platform=${add(options.source_platform)}`)
-    // An axis filter selects on that axis' state, but must not hide a row whose axis is missing:
-    // such a row is corrupt, and the projection reports it in `dropped`. Filtering it out here
-    // instead would make the filter the only reason corruption went unnoticed.
-    if (options.execution_status !== undefined) {
-      const status = add(options.execution_status)
-      clauses.push(`(e.status=${status} OR e.run_id IS NULL)`)
-    }
-    if (options.publication_status !== undefined) {
-      // Publication is an inner join, so a "missing" publication row means the whole row is
-      // absent from the read; only the LEFT JOINed axes can be reported this way.
-      clauses.push(`p.status=${add(options.publication_status)}`)
-    }
-    if (options.preparation_status !== undefined) {
-      const status = add(options.preparation_status)
-      clauses.push(`(pr.status=${status} OR pr.run_id IS NULL)`)
-    }
-    if (options.from !== undefined)
-      clauses.push(`r.created_at>=${add(options.from)}`)
-    if (options.to !== undefined)
-      clauses.push(`r.created_at<${add(options.to)}`)
-    // The keyset predicate and the ORDER BY below MUST stay the same ordering: the cursor names
-    // the last row of the previous page under that ordering, so comparing against a different
-    // one would silently re-read or skip rows. `run_id` is the tie-breaker because `created_at`
-    // alone is not unique, and it is compared with the same direction as the sort.
-    if (options.cursor !== undefined) {
-      const [createdAt, runId] = Buffer.from(options.cursor, 'base64url')
-        .toString('utf8')
-        .split('|')
-      if (!createdAt || !runId) throw new Error('Invalid run list cursor.')
-      clauses.push(
-        `(r.created_at, r.run_id)<(${add(createdAt)}, ${add(runId)})`
-      )
-    }
-    // Ordering lives here, not in `RUN_SELECT`: a projection constant cannot promise a result
-    // order, and `listRunsPage` builds its cursor from the last row of THIS result. Every join
-    // above is on a primary key (`run_id`), so a run contributes exactly one row and a filter
-    // cannot reorder or duplicate the boundary.
-    const result = await this.pool.query<ReviewRunRow>(
-      `${RUN_SELECT}
-      WHERE ${clauses.join(' AND ')} ORDER BY r.created_at DESC, r.run_id DESC LIMIT ${add(limit)}`,
-      values
-    )
-    return result.rows
-  }
-
-  /** Page of records plus a keyset cursor, for the HTTP list endpoint.
-   *
-   * Two cursor bugs are fixed together here:
-   * - The cursor carries `created_at_cursor` (microseconds). The public record's
-   *   `created_at` is a millisecond JS Date, so a cursor built from it skipped every
-   *   row sharing the cursor's millisecond.
-   * - It peeks `limit + 1` rows and emits a cursor only when the extra row exists, so
-   *   a full final page no longer hands out a cursor that strands the reader on an
-   *   empty page.
-   *
-   * A row the contract cannot represent is returned in `dropped` rather than aborting the
-   * page, so one corrupt row does not turn a listing into a 500. The cursor is still taken
-   * from the raw boundary row, so a dropped row is skipped once instead of stranding the
-   * reader on it. */
-
-  async listRunsPage(
-    options: {
-      limit?: number
-      cursor?: string
-      execution_status?: ExecutionStatus
-      publication_status?: PublicationStatus
-      preparation_status?: PreparationStatus
-      source_platform?: ReviewRunRecord['source_platform']
-      workflow?: WorkflowName
-      from?: string
-      to?: string
-    } = {}
-  ): Promise<{
+  async listRunsPage(options: ListRunsOptions = {}): Promise<{
     runs: ReviewRunRecord[]
     next_cursor: string | null
     dropped: DroppedRunRow[]
   }> {
-    const boundedLimit = Math.min(
-      Math.max(Math.trunc(options.limit ?? 50), 1),
-      100
-    )
-    const rows = await this.listRunRows(options, boundedLimit + 1)
-    const hasMore = rows.length > boundedLimit
-    const page = rows.slice(0, boundedLimit)
-    const last = page.at(-1)
-    const next_cursor =
-      hasMore && last !== undefined
-        ? Buffer.from(
-            `${last.trunk.created_at_cursor}|${last.trunk.run_id}`
-          ).toString('base64url')
-        : null
-    const { runs, dropped } = projectRunRows(page)
-    return { runs, next_cursor, dropped }
+    this.ready()
+    return await this.queries.listRunsPage(options)
   }
   async expireStalePreparations(): Promise<PreparationExpiryResult> {
     this.ready()
     return await this.preparations.expireStale()
   }
-  /** List the runs coordination has stopped retrying, because their persisted story
-   * contradicts an expiry conclusion. These are the rows an operator has to decide about; the
-   * read exists so that decision can start from the API instead of from a log search. */
   async listParkedRuns(): Promise<ParkedRun[]> {
     this.ready()
-    const result = await this.pool.query<ParkedRun>(
-      // All three axes, not only preparation. A run parked on execution or publication was
-      // equally invisible to an operator before, even though the console offered a decision for
-      // it - the decision existed but the queue that leads to it did not.
-      `SELECT run_id, axis, reason FROM (
-         SELECT run_id, 'preparation' AS axis, disconnect_reason AS reason, updated_at
-         FROM preparations
-         WHERE connector_id=$1 AND status='disconnected'
-         UNION ALL
-         SELECT run_id, 'execution' AS axis, 'SUBMISSION_RECOVERY_EXHAUSTED' AS reason, updated_at
-         FROM executions
-         WHERE connector_id=$1 AND status='disconnected'
-         UNION ALL
-         SELECT run_id, 'publication' AS axis, 'PUBLICATION_RECONCILIATION_EXHAUSTED' AS reason, updated_at
-         FROM publications
-         WHERE connector_id=$1 AND status='disconnected'
-       ) parked
-       ORDER BY updated_at, run_id`,
-      [this.connectorId]
-    )
-    return result.rows
+    return await this.queries.listParkedRuns()
   }
 
   async abandonBlockedPreparation(
@@ -860,18 +606,7 @@ export class ReviewRunStore {
 
   async listSubmissionRecoveries(): Promise<RunRowsProjection> {
     this.ready()
-    const result = await this.pool.query<ReviewRunRow>(
-      `${RUN_SELECT}
-      WHERE r.connector_id=$1
-        AND e.status='uncertain'
-        AND (
-          e.claim_token IS NULL
-          OR e.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')
-        )
-      ORDER BY e.updated_at`,
-      [this.connectorId, this.claimTimeoutMs]
-    )
-    return projectRunRows(result.rows)
+    return await this.queries.listSubmissionRecoveries()
   }
   async claimSubmissionRecovery(runId: string): Promise<string | null> {
     return await this.executions.claimSubmissionRecovery(runId)
@@ -1024,14 +759,7 @@ export class ReviewRunStore {
    * cannot represent is returned in `dropped` instead of aborting the read for every run. */
   async listActiveRuns(): Promise<RunRowsProjection> {
     this.ready()
-    const result = await this.pool.query<ReviewRunRow>(
-      `${RUN_SELECT}
-      WHERE r.connector_id=$1
-        AND e.status IN ('queued','running')
-      ORDER BY e.updated_at`,
-      [this.connectorId]
-    )
-    return projectRunRows(result.rows)
+    return await this.queries.listActiveRuns()
   }
   /** Record that the Execution was observed just now, without changing state. Writes only
    * `observed_at`, so a heartbeat can never extend the recovery lease. */

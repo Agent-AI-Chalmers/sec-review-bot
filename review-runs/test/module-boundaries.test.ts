@@ -89,3 +89,16 @@ test('operator decisions compose axis stores without creating a dependency cycle
     )
   }
 })
+
+test('the read model does not depend on write stores', () => {
+  const dependencies = importedModules('persistence/review-run-queries.ts')
+  assert.ok(dependencies.includes('run-record-projection.ts'))
+  assert.ok(dependencies.includes('review-run-events.ts'))
+  assert.ok(!dependencies.includes('review-store.ts'))
+  for (const store of AXIS_STORES) {
+    assert.ok(
+      !dependencies.includes(path.basename(store)),
+      `review-run-queries.ts imports write store ${store}`
+    )
+  }
+})
