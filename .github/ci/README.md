@@ -1,6 +1,18 @@
 # CI Checks
 
-## Pull Request Descriptions
+## Pull Requests
+
+The pull request validators use only the Python standard library and support Python 3.10 or newer. Their workflows intentionally use the hosted runner's `python3` instead of installing the agents package's Python version; these short metadata checks do not depend on the agents runtime.
+
+### Titles
+
+`validate-pr-title.py` validates the repository's pull request title convention. Pass a title as one quoted argument to run the same check locally:
+
+```bash
+python3 .github/ci/validate-pr-title.py 'fix(scope): describe the change'
+```
+
+### Descriptions
 
 `validate-pr-description.py` validates the required pull request sections and compatibility
 checkboxes. The template lists all supported classifications, and exactly one must be selected.
@@ -9,12 +21,10 @@ A breaking change must also explain what breaks and how callers or operators mig
 To validate a local Markdown file with the same entry point the workflow uses:
 
 ```bash
-python .github/ci/validate-pr-description.py /path/to/pr-body.md
+python3 .github/ci/validate-pr-description.py /path/to/pr-body.md
 ```
 
 Dependabot descriptions are exempt from the human-authored template but must be non-empty.
-
-The CI validators use only the Python standard library and support Python 3.10 or newer. Their workflows intentionally use the hosted runner's `python3` instead of installing the agents package's Python version; these short metadata checks do not depend on the agents runtime.
 
 ## Changed-Area Model
 
@@ -57,6 +67,7 @@ The one thing it is _not_ is a second opinion on the model's own contents — th
 | `changed-areas.yml`          | **The model.** The `dorny/paths-filter` filter set `ci.yml` reads. Edit this. |
 | `check-changed-areas.py`     | The completeness checker.                                                     |
 | `validate-pr-description.py` | The pull request description validator and local CLI.                         |
+| `validate-pr-title.py`       | The pull request title validator and local CLI.                               |
 
 ## Editing
 
