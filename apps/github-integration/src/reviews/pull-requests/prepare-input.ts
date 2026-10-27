@@ -220,7 +220,6 @@ async function materializeIncrementalWindowArtifacts({
       path.join(incremental_window_path, 'changed-files.json'),
       JSON.stringify(
         {
-          generated_at: new Date().toISOString(),
           // `changed-files.json` keeps the `path` field the agent-facing schema describes; the
           // suggestion set uses `filename`. Both come from one export.
           files: changed_files.map((file) => ({
@@ -279,7 +278,6 @@ async function materializeHistoryArtifacts({
     path.join(history_path, 'linked-context.json'),
     JSON.stringify(
       {
-        generated_at: new Date().toISOString(),
         relation_type: 'cross-referenced',
         source: 'timeline',
         sources_checked: ['timeline'],

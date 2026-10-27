@@ -18,7 +18,6 @@ from sec_review_agents.cli.local_materialization.common import (
 )
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.utils.files import write_json
-from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workspace.snapshots import (
     WORKSPACE_SNAPSHOT_TAR_NAME,
     create_workspace_snapshot_tar,
@@ -212,7 +211,6 @@ def _materialize_incremental_window_artifacts(
     write_json(
         incremental_window_path / "changed-files.json",
         {
-            "generated_at": utc_now_iso(),
             "files": changed_files,
         },
     )
@@ -263,7 +261,6 @@ def build_local_pull_request_bundle(
 
     _materialize_incremental_window_artifacts(files, incremental_window_root)
     linked_issues = {
-        "generated_at": utc_now_iso(),
         "relation_type": "cross-referenced",
         "source": "timeline",
         "sources_checked": ["timeline"],
