@@ -1,7 +1,7 @@
 import type {
   PublicationStepRecord,
   ReviewRunRecord
-} from './persistence/review-store.js'
+} from './persistence/review-run-store.js'
 import type {
   ExecutionStatisticsSummary,
   ObservedRun,

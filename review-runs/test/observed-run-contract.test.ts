@@ -18,7 +18,7 @@ import * as ajvFormats from 'ajv-formats'
 
 import { REPO_ROOT } from './generated-paths.js'
 import { observeRun } from '../src/observability.js'
-import type { ReviewRunRecord } from '../src/persistence/review-store.js'
+import type { ReviewRunRecord } from '../src/persistence/review-run-store.js'
 
 const CONTRACT_VERSION_DIR = path.join('contracts', 'review-runs-api', 'v1')
 const FIXTURES = path.join(CONTRACT_VERSION_DIR, 'fixtures')

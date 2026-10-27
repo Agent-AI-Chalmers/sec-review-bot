@@ -1,7 +1,7 @@
 import type {
   ReviewRunRecord,
   ReviewRunStore
-} from '../persistence/review-store.js'
+} from '../persistence/review-run-store.js'
 import type { ExecutionRunStatus } from '../execution-client.js'
 
 type ObservationStore = Pick<

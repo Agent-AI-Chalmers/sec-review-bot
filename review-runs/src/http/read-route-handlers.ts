@@ -5,7 +5,7 @@ import type {
   PreparationStatus,
   PublicationStatus,
   ReviewRunStore
-} from '../persistence/review-store.js'
+} from '../persistence/review-run-store.js'
 import type { OperationHandlers } from './route-handlers.js'
 import type { PathParams } from './route-types.js'
 

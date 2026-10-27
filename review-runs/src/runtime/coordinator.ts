@@ -5,7 +5,7 @@ import type {
   PreparationExpiryBlocked,
   ReviewRunRecord,
   ReviewRunStore
-} from '../persistence/review-store.js'
+} from '../persistence/review-run-store.js'
 import type { ExecutionRunStatusBatch } from '../execution-client.js'
 
 type CoordinationStore = Pick<

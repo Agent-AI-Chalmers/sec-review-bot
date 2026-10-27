@@ -23,7 +23,7 @@ export {
   type ReviewRunAdmission,
   type ReviewRunRecord,
   type RunRowsProjection
-} from './persistence/review-store.js'
+} from './persistence/review-run-store.js'
 export {
   concludeExhaustedSubmissionRecovery,
   recoverReviewRunSubmission,

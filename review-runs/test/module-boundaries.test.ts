@@ -43,10 +43,10 @@ test('single-axis stores do not depend on each other', () => {
         `${store} imports ${otherName}; a cross-axis write shared by two axes belongs in its own module so the stores stay independent`
       )
     }
-    // `review-store.ts` constructs the stores, so it must not be imported back.
+    // `review-run-store.ts` constructs the stores, so it must not be imported back.
     assert.ok(
-      !dependencies.includes('review-store.ts'),
-      `${store} imports review-store.ts, which constructs it`
+      !dependencies.includes('review-run-store.ts'),
+      `${store} imports review-run-store.ts, which constructs it`
     )
   }
 })
@@ -80,7 +80,7 @@ test('operator decisions compose axis stores without creating a dependency cycle
   assert.ok(dependencies.includes('preparation-store.ts') === false)
   assert.ok(dependencies.includes('publication-store.ts'))
   assert.ok(dependencies.includes('execution-store.ts'))
-  assert.ok(!dependencies.includes('review-store.ts'))
+  assert.ok(!dependencies.includes('review-run-store.ts'))
 
   for (const store of AXIS_STORES) {
     assert.ok(
@@ -94,7 +94,7 @@ test('the read model does not depend on write stores', () => {
   const dependencies = importedModules('persistence/review-run-queries.ts')
   assert.ok(dependencies.includes('run-record-projection.ts'))
   assert.ok(dependencies.includes('review-run-events.ts'))
-  assert.ok(!dependencies.includes('review-store.ts'))
+  assert.ok(!dependencies.includes('review-run-store.ts'))
   for (const store of AXIS_STORES) {
     assert.ok(
       !dependencies.includes(path.basename(store)),
@@ -110,7 +110,7 @@ test('submission transitions compose axes without depending on axis stores', () 
   assert.ok(dependencies.includes('publication-abandon.ts'))
   assert.ok(dependencies.includes('review-run-events.ts'))
   assert.ok(dependencies.includes('run-notices.ts'))
-  assert.ok(!dependencies.includes('review-store.ts'))
+  assert.ok(!dependencies.includes('review-run-store.ts'))
   for (const store of AXIS_STORES) {
     assert.ok(
       !dependencies.includes(path.basename(store)),
@@ -124,7 +124,7 @@ test('publication claims stay separate from single-axis publication writes', () 
   assert.ok(dependencies.includes('run-record-projection.ts'))
   assert.ok(dependencies.includes('review-run-events.ts'))
   assert.ok(!dependencies.includes('publication-store.ts'))
-  assert.ok(!dependencies.includes('review-store.ts'))
+  assert.ok(!dependencies.includes('review-run-store.ts'))
 })
 
 test('run admission owns aggregate creation without importing axis stores', () => {
@@ -133,7 +133,7 @@ test('run admission owns aggregate creation without importing axis stores', () =
   )
   assert.ok(dependencies.includes('run-record-projection.ts'))
   assert.ok(dependencies.includes('review-run-events.ts'))
-  assert.ok(!dependencies.includes('review-store.ts'))
+  assert.ok(!dependencies.includes('review-run-store.ts'))
   for (const store of AXIS_STORES) {
     assert.ok(
       !dependencies.includes(path.basename(store)),

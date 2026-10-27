@@ -4,7 +4,7 @@ import test from 'node:test'
 
 import { Pool } from 'pg'
 
-import { ReviewRunStore } from '../../src/persistence/review-store.js'
+import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 import { ExecutionStatisticsStore } from '../../src/statistics/execution-statistics-store.js'
 
 function databaseUrl(): string {

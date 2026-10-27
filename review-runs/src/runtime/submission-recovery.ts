@@ -1,7 +1,7 @@
 import type {
   ReviewRunRecord,
   ReviewRunStore
-} from '../persistence/review-store.js'
+} from '../persistence/review-run-store.js'
 
 type SubmissionRecoveryStore = Pick<
   ReviewRunStore,

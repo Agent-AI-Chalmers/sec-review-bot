@@ -16,7 +16,7 @@ import {
   type ExecutionRunStatus,
   type ExecutionRunStatusBatch
 } from '../execution-client.js'
-import { ReviewRunStore } from '../persistence/review-store.js'
+import { ReviewRunStore } from '../persistence/review-run-store.js'
 import { reconcileExecutionStatisticsPass } from '../statistics/execution-statistics-coordinator.js'
 import { ExecutionStatisticsStore } from '../statistics/execution-statistics-store.js'
 import { SUBMISSION_STATE_UNCERTAIN } from '../errors.js'
