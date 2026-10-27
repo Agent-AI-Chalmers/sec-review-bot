@@ -67,7 +67,7 @@ The port comes from `PORT`. Only the first endpoint is needed when debugging Git
 
 Many GitHub App / webhook tutorials use [`smee.io`](https://smee.io/) because it is good for getting the local development path working quickly.
 
-### How It Works
+### How `smee` Works
 
 1. Get a temporary public URL from `smee.io`.
 2. GitHub sends webhooks to that public URL.
@@ -84,7 +84,7 @@ Where:
 - `-u`: your public `smee` channel URL
 - `-t`: your local webhook service URL
 
-### Good for
+### When to Use `smee`
 
 - quick local webhook debugging
 - temporary GitHub App configuration validation
@@ -99,7 +99,7 @@ Where:
 
 If you already have a domain but no public inbound service, or if you do not want to manage port forwarding, TLS certificates, and exposing local ports, you can use Cloudflare Tunnel.
 
-### How It Works
+### How Cloudflare Tunnel Works
 
 1. Create a tunnel on a machine that can run `cloudflared`.
 2. Route a domain or subdomain to the local GitHub integration service.
@@ -144,7 +144,7 @@ The command is:
 sudo cloudflared service uninstall
 ```
 
-### Good for
+### When to Use Cloudflare Tunnel
 
 - stable, formal, reusable webhook URLs
 - setups that already use Cloudflare and a domain
