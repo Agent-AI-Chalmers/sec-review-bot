@@ -20,8 +20,7 @@
 // rather than skipping it, so neither an accepted nor a rejected replay has a publication
 // transition to undo.
 // Each concrete store fences its writes with the claim token for the axis it owns.
-import crypto from 'node:crypto'
-import { Pool, type PoolClient } from 'pg'
+import { Pool } from 'pg'
 
 import type { ExecutionArtifactStorage } from '../contracts.js'
 import {
@@ -50,6 +49,7 @@ import { PublicationClaimStore } from './publication-claim-store.js'
 import { abandonInFlightPublication } from './publication-abandon.js'
 import { appendEvent } from './review-run-events.js'
 import { OperatorDecisionStore } from './operator-decision-store.js'
+import { ReviewRunAdmissionStore } from './review-run-admission-store.js'
 import {
   ReviewRunQueries,
   type DroppedRunRow,
@@ -57,11 +57,6 @@ import {
   type ParkedRun,
   type RunRowsProjection
 } from './review-run-queries.js'
-import {
-  RUN_SELECT,
-  rowToRecord,
-  type ReviewRunRow
-} from './run-record-projection.js'
 import { queueRunNotice } from './run-notices.js'
 import { ExecutionStore } from './execution-store.js'
 import { SubmissionTransitionStore } from './submission-transition-store.js'
@@ -104,6 +99,7 @@ export class ReviewRunStore {
   private readonly publicationClaims: PublicationClaimStore
   private readonly executions: ExecutionStore
   private readonly operatorDecisions: OperatorDecisionStore
+  private readonly admissions: ReviewRunAdmissionStore
   private readonly queries: ReviewRunQueries
   private readonly submissionTransitions: SubmissionTransitionStore
   private initialized = false
@@ -173,6 +169,11 @@ export class ReviewRunStore {
       this.publications,
       this.executions
     )
+    this.admissions = new ReviewRunAdmissionStore(
+      this.pool,
+      this.connectorId,
+      this.sourcePlatform
+    )
     this.queries = new ReviewRunQueries(
       this.pool,
       this.connectorId,
@@ -213,160 +214,18 @@ export class ReviewRunStore {
       throw new Error('ReviewRunStore.initialize() must complete before use.')
   }
 
-  private async getWith(
-    client: PoolClient,
-    runId: string
-  ): Promise<ReviewRunRecord | null> {
-    const result = await client.query<ReviewRunRow>(
-      `${RUN_SELECT}
-      WHERE r.run_id=$1 AND r.connector_id=$2`,
-      [runId, this.connectorId]
-    )
-    return result.rows[0] === undefined ? null : rowToRecord(result.rows[0])
-  }
-  private async insertWith(
-    client: PoolClient,
-    run: CreateReviewRunArgs
-  ): Promise<ReviewRunAdmission> {
-    const preparationToken = crypto.randomUUID()
-    await client.query(
-      `INSERT INTO review_runs
-      (run_id,connector_id,workflow,source_platform,ingress_kind,ingress_key)
-      VALUES ($1,$2,$3,$4,$5,$6)`,
-      [
-        run.run_id,
-        this.connectorId,
-        run.workflow,
-        this.sourcePlatform,
-        run.ingress_kind ?? null,
-        run.ingress_key ?? null
-      ]
-    )
-    await client.query(
-      `INSERT INTO executions
-        (run_id,connector_id,status,input)
-       VALUES ($1,$2,'pending',$3::jsonb)`,
-      [
-        run.run_id,
-        this.connectorId,
-        run.execution_input === undefined
-          ? null
-          : JSON.stringify(run.execution_input)
-      ]
-    )
-    // Admission itself takes the first preparation claim, so the preparation phase starts here
-    // as well as in `claimNext`: a run admitted and prepared in one request must not show a null
-    // start just because it never went back through the pending queue.
-    await client.query(
-      `INSERT INTO preparations
-        (run_id,connector_id,input_version,input,status,claim_token,claimed_at,attempt_count,started_at)
-       VALUES ($1,$2,$3,$4::jsonb,'preparing',$5,clock_timestamp(),1,clock_timestamp())`,
-      [
-        run.run_id,
-        this.connectorId,
-        run.preparation_input_version ?? 'direct-v1',
-        JSON.stringify(run.preparation_input ?? {}),
-        preparationToken
-      ]
-    )
-    await client.query(
-      `
-      INSERT INTO publications (run_id,connector_id,input,status)
-      VALUES ($1,$2,$3::jsonb,'pending')
-    `,
-      [run.run_id, this.connectorId, JSON.stringify(run.publish_context)]
-    )
-    // Admission is the first transition on both axes: execution starts `pending` (input not
-    // yet submitted) and a preparation row is created already owned by this admission's claim.
-    await appendEvent(client, {
-      runId: run.run_id,
-      connectorId: this.connectorId,
-      axis: 'execution',
-      fromStatus: null,
-      toStatus: 'pending'
-    })
-    await appendEvent(client, {
-      runId: run.run_id,
-      connectorId: this.connectorId,
-      axis: 'preparation',
-      fromStatus: null,
-      toStatus: 'preparing'
-    })
-    await appendEvent(client, {
-      runId: run.run_id,
-      connectorId: this.connectorId,
-      axis: 'publication',
-      fromStatus: null,
-      toStatus: 'pending'
-    })
-    const record = await this.getWith(client, run.run_id)
-    if (record === null)
-      throw new Error(`Execution run was not persisted: ${run.run_id}`)
-    return { record, created: true, preparation_token: preparationToken }
-  }
   async createPreparingReviewRun(
     run: CreateReviewRunArgs
   ): Promise<ReviewRunAdmission> {
     this.ready()
-    return await transaction(
-      this.pool,
-      async (client) => await this.insertWith(client, run)
-    )
+    return await this.admissions.create(run)
   }
   async admitReviewRun(
     run: CreateReviewRunArgs &
       Required<Pick<CreateReviewRunArgs, 'ingress_kind' | 'ingress_key'>>
   ): Promise<ReviewRunAdmission> {
     this.ready()
-    try {
-      return await transaction(this.pool, async (client) => {
-        const existing = await client.query<ReviewRunRow>(
-          `${RUN_SELECT}
-          WHERE r.connector_id=$1 AND r.ingress_kind=$2 AND r.ingress_key=$3
-          FOR UPDATE OF r`,
-          [this.connectorId, run.ingress_kind, run.ingress_key]
-        )
-        const row = existing.rows[0]
-        if (row === undefined) return await this.insertWith(client, run)
-        // Ingress replay is an idempotent read. The preparation coordinator is
-        // the sole owner of post-admission claims, including lease recovery.
-        return {
-          record: rowToRecord(row),
-          created: false,
-          preparation_token: null
-        }
-      })
-    } catch (error: unknown) {
-      if (!(
-        typeof error === 'object' &&
-        error !== null &&
-        'code' in error &&
-        error.code === '23505'
-      ))
-        throw error
-      // A concurrent transaction won the ingress identity. Read its durable run
-      // after PostgreSQL rolls back this transaction.
-      const existing = await this.pool.query<ReviewRunRow>(
-        `${RUN_SELECT}
-        WHERE r.connector_id=$1 AND r.ingress_kind=$2 AND r.ingress_key=$3`,
-        [this.connectorId, run.ingress_kind, run.ingress_key]
-      )
-      if (existing.rows[0] === undefined) {
-        // The unique violation came from a concurrent admission that is not visible afterwards,
-        // which means it rolled back. Re-throwing the raw 23505 would report a database
-        // constraint to a caller that asked for an idempotent admission, so say what happened.
-        throw new Error(
-          `ingress replay for ${run.ingress_kind}:${run.ingress_key} lost a concurrent ` +
-            `admission that rolled back; the request can be retried`,
-          { cause: error }
-        )
-      }
-      return {
-        record: rowToRecord(existing.rows[0]),
-        created: false,
-        preparation_token: null
-      }
-    }
+    return await this.admissions.admit(run)
   }
   async savePreparedSubmission(
     runId: string,

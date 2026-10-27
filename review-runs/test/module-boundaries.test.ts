@@ -126,3 +126,18 @@ test('publication claims stay separate from single-axis publication writes', () 
   assert.ok(!dependencies.includes('publication-store.ts'))
   assert.ok(!dependencies.includes('review-store.ts'))
 })
+
+test('run admission owns aggregate creation without importing axis stores', () => {
+  const dependencies = importedModules(
+    'persistence/review-run-admission-store.ts'
+  )
+  assert.ok(dependencies.includes('run-record-projection.ts'))
+  assert.ok(dependencies.includes('review-run-events.ts'))
+  assert.ok(!dependencies.includes('review-store.ts'))
+  for (const store of AXIS_STORES) {
+    assert.ok(
+      !dependencies.includes(path.basename(store)),
+      `review-run-admission-store.ts imports axis store ${store}`
+    )
+  }
+})
