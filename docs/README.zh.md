@@ -34,7 +34,7 @@ Package README 负责本地 setup、命令、配置与实现布局。运行角�
 需要理解 agent 边界、能力或 framework 取舍时，看这里。
 
 - [CAPABILITY_BOUNDARIES.md](agent/CAPABILITY_BOUNDARIES.md) / [中文](agent/CAPABILITY_BOUNDARIES.zh.md)：Agent 能力边界，包括 git history 和外部状态限制。
-- [CONTEXT_DELIVERY.md](agent/CONTEXT_DELIVERY.md) / [中文](agent/CONTEXT_DELIVERY.zh.md)：哪些上下文进 prompt、哪些由 agent 按需读取，以及本项目各 agent 如何选择。
+- [CONTEXT_LOADING.md](agent/CONTEXT_LOADING.md) / [中文](agent/CONTEXT_LOADING.zh.md)：哪些上下文进 prompt、哪些由 agent 按需读取，以及本项目各 agent 如何选择。
 - [SKILLS.md](agent/SKILLS.md) / [中文](agent/SKILLS.zh.md)：Agent skills 的选择、准备和挂载。
 - [FRAMEWORK_SELECTION.md](agent/FRAMEWORK_SELECTION.md) / [中文](agent/FRAMEWORK_SELECTION.zh.md)：Agent framework 的选型。
 - [MEMORY_SYSTEM.md](agent/MEMORY_SYSTEM.md) / [中文](agent/MEMORY_SYSTEM.zh.md)：Agent memory system、经验提取和整理。
