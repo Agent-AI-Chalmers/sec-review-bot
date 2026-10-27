@@ -6,6 +6,7 @@ import test from 'node:test'
 
 import type { Octokit } from 'octokit'
 import {
+  archiveInputBundle,
   archiveInputBundleAndPublish,
   assertWorkflowInputFits,
   readSetupDeclaration
@@ -229,6 +230,60 @@ test('assertWorkflowInputFits allows an input whose entry count is near the limi
     Buffer.byteLength(JSON.stringify(fits), 'utf8') < MAX_WORKFLOW_INPUT_BYTES
   )
   assertWorkflowInputFits(fits, 'repository review')
+})
+
+test('archiveInputBundle reproduces bytes for the same logical tree', async () => {
+  const roots = await Promise.all([
+    fs.mkdtemp(path.join(os.tmpdir(), 'input-bundle-repeat-a-')),
+    fs.mkdtemp(path.join(os.tmpdir(), 'input-bundle-repeat-b-'))
+  ])
+  const archivePaths: string[] = []
+  try {
+    for (const [index, root] of roots.entries()) {
+      await fs.mkdir(path.join(root, 'history'), { recursive: true })
+      await fs.writeFile(
+        path.join(root, 'manifest.json'),
+        '{"api_version":"v1","workspace":{"snapshot":"workspace.snapshot.tar"},"history":{"path":"history"}}\n',
+        'utf8'
+      )
+      await fs.writeFile(
+        path.join(root, 'history', 'review.json'),
+        '{"kind":"review"}\n',
+        'utf8'
+      )
+      await fs.writeFile(
+        path.join(root, 'workspace.snapshot.tar'),
+        'snapshot',
+        'utf8'
+      )
+      const timestamp = new Date(Date.now() - index * 60_000)
+      await fs.utimes(path.join(root, 'manifest.json'), timestamp, timestamp)
+      await fs.utimes(path.join(root, 'history'), timestamp, timestamp)
+    }
+
+    const first = await archiveInputBundle({
+      input_bundle_root: roots[0]!,
+      include_incremental_window: false
+    })
+    const second = await archiveInputBundle({
+      input_bundle_root: roots[1]!,
+      include_incremental_window: false
+    })
+    archivePaths.push(new URL(first.uri).pathname, new URL(second.uri).pathname)
+
+    assert.strictEqual(first.digest, second.digest)
+    assert.strictEqual(first.size_bytes, second.size_bytes)
+    assert.deepStrictEqual(
+      await fs.readFile(new URL(first.uri)),
+      await fs.readFile(new URL(second.uri))
+    )
+  } finally {
+    await Promise.all(
+      [...roots, ...archivePaths].map((target) =>
+        fs.rm(target, { recursive: true, force: true })
+      )
+    )
+  }
 })
 
 test('archiveInputBundleAndPublish checks the input before publishing', async () => {

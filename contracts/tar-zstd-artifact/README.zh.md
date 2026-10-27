@@ -7,6 +7,7 @@
 - [envelope/v1/SPEC.zh.md](envelope/v1/SPEC.zh.md) 定义受限 POSIX PAX 方言。
 - [envelope/v1/corpus](envelope/v1/corpus) 包含由所有 archive reader 共同执行的编码互操作与拒绝用例。
 - [profiles/memory-tree](profiles/memory-tree/README.zh.md) 定义不可变 memory-tree archive。
+- [profiles/input-bundle](profiles/input-bundle/README.zh.md) 定义已准备的 execution input archive。
 - [profiles/run-diagnostic](profiles/run-diagnostic/README.zh.md) 定义 completed-run diagnostic archive。
 
 Envelope 与 profile version 相互独立。每个 profile specification 都明确声明自己使用的 envelope version。
@@ -18,5 +19,6 @@ Envelope 与 profile version 相互独立。每个 profile specification 都明�
 ```bash
 pnpm --dir contracts/tar-zstd-artifact/envelope/tools run check
 pnpm --dir contracts/tar-zstd-artifact/profiles/memory-tree/tools run check
+pnpm --dir contracts/tar-zstd-artifact/profiles/input-bundle/tools run check
 pnpm --dir contracts/tar-zstd-artifact/profiles/run-diagnostic/tools run check
 ```

@@ -1,0 +1,21 @@
+{
+  "$comment": "Generated corpus for the input-bundle profile. Paths are relative to the repository root.",
+  "family": "tar-zstd-artifact/profiles/input-bundle",
+  "generators": [
+    {
+      "script": "contracts/tar-zstd-artifact/profiles/input-bundle/tools/generate.mjs",
+      "inputs": [],
+      "command": "pnpm --dir contracts/tar-zstd-artifact/profiles/input-bundle/tools run generate",
+      "outputs": [
+        "contracts/tar-zstd-artifact/profiles/input-bundle/v1/corpus/manifest.json",
+        "contracts/tar-zstd-artifact/profiles/input-bundle/v1/corpus/valid-minimal.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/input-bundle/v1/corpus/valid-incremental.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/input-bundle/v1/corpus/invalid-order.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/input-bundle/v1/corpus/invalid-mtime.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/input-bundle/v1/corpus/invalid-missing-history.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/input-bundle/v1/corpus/invalid-unexpected-path.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/input-bundle/v1/corpus/invalid-symlink.tar.zst"
+      ]
+    }
+  ]
+}

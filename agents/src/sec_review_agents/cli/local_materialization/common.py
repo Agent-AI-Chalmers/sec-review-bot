@@ -182,17 +182,31 @@ def archive_input_bundle(
     archive_path = Path(f"{paths.local_root_path}.tar.zst")
     entries = [
         BUNDLE_MANIFEST_NAME,
-        "workspace.snapshot.tar",
         "history",
         *(["incremental-window"] if include_incremental_window else []),
+        "workspace.snapshot.tar",
     ]
     archive_path.unlink(missing_ok=True)
+
     # The live checkout is staging state, not bundle content. The uncompressed
     # workspace snapshot remains inside because the Execution Worker reuses it when creating
     # isolated stage workspaces; only the outer transport archive is compressed.
-    with tarfile.open(archive_path, mode="w:zst") as archive:
+    def canonical_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
+        info.mtime = 0
+        info.uid = 0
+        info.gid = 0
+        info.uname = ""
+        info.gname = ""
+        info.mode = 0o755 if info.isdir() else 0o644
+        return info
+
+    with tarfile.open(archive_path, mode="w:zst", format=tarfile.PAX_FORMAT) as archive:
         for entry in entries:
-            archive.add(paths.local_root_path / entry, arcname=entry)
+            archive.add(
+                paths.local_root_path / entry,
+                arcname=entry,
+                filter=canonical_tar_info,
+            )
     digest = hashlib.sha256()
     with archive_path.open("rb") as archive_file:
         while chunk := archive_file.read(1024 * 1024):

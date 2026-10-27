@@ -16,6 +16,16 @@ from sec_review_agents.entrypoints.input_preparation import (
 from tests.contract_fixtures import contract_fixture
 
 
+def _canonical_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
+    info.mtime = 0
+    info.uid = 0
+    info.gid = 0
+    info.uname = ""
+    info.gname = ""
+    info.mode = 0o755 if info.isdir() else 0o644
+    return info
+
+
 def _write_bundle_manifest(
     local_root: str, *, incremental: bool = False
 ) -> dict[str, object]:
@@ -34,12 +44,24 @@ def _write_bundle_manifest(
     if incremental:
         (root / "incremental-window").mkdir(exist_ok=True)
     archive_path = root.with_suffix(".tar.zst")
-    with tarfile.open(archive_path, mode="w:zst") as archive:
-        archive.add(root / "manifest.json", arcname="manifest.json")
-        archive.add(root / "workspace.snapshot.tar", arcname="workspace.snapshot.tar")
-        archive.add(root / "history", arcname="history")
+    with tarfile.open(archive_path, mode="w:zst", format=tarfile.PAX_FORMAT) as archive:
+        archive.add(
+            root / "manifest.json",
+            arcname="manifest.json",
+            filter=_canonical_tar_info,
+        )
+        archive.add(root / "history", arcname="history", filter=_canonical_tar_info)
         if incremental:
-            archive.add(root / "incremental-window", arcname="incremental-window")
+            archive.add(
+                root / "incremental-window",
+                arcname="incremental-window",
+                filter=_canonical_tar_info,
+            )
+        archive.add(
+            root / "workspace.snapshot.tar",
+            arcname="workspace.snapshot.tar",
+            filter=_canonical_tar_info,
+        )
     content = archive_path.read_bytes()
     return {
         "uri": archive_path.as_uri(),
@@ -400,7 +422,7 @@ def test_workflow_input_preparation_rejects_manifest_symlink_escape(
     (bundle_root / "workspace.snapshot.tar").symlink_to(outside_tar)
     monkeypatch.setenv(input_preparation.INPUT_BUNDLE_ROOT_ENV, str(allowed_root))
 
-    with pytest.raises(ValueError, match="contains unsafe entry"):
+    with pytest.raises(ValueError):
         prepare_workflow_input(
             _issue_input(str(bundle_root)),
             "issue-review",

@@ -235,9 +235,9 @@ export async function archiveInputBundle({
   const archivePath = `${tarPath}.zst`
   const entries = [
     'manifest.json',
-    WORKSPACE_SNAPSHOT_TAR_NAME,
     'history',
-    ...(include_incremental_window ? ['incremental-window'] : [])
+    ...(include_incremental_window ? ['incremental-window'] : []),
+    WORKSPACE_SNAPSHOT_TAR_NAME
   ]
   await fs.rm(tarPath, { force: true })
   await fs.rm(archivePath, { force: true })
@@ -245,6 +245,14 @@ export async function archiveInputBundle({
   // reuse it to create isolated workspaces. Only the transport bundle is zstd
   // compressed, and the live staging checkout is deliberately not included.
   await execFileAsync('tar', [
+    '--format=posix',
+    '--sort=name',
+    '--mtime=@0',
+    '--owner=0',
+    '--group=0',
+    '--numeric-owner',
+    '--mode=u+rwX,go+rX,go-w',
+    '--pax-option=delete=atime,delete=ctime',
     '-cf',
     tarPath,
     '-C',

@@ -18,6 +18,9 @@ from sec_review_agents.entrypoints.execution_api_schema import (
     validate_execution_api_input_bundle_manifest,
 )
 from sec_review_agents.entrypoints.execution_protocol import validate_run_id
+from sec_review_agents.entrypoints.input_bundle_artifact import (
+    validate_input_bundle_archive,
+)
 from sec_review_agents.utils.env import env_value
 
 ISSUE_ARTIFACT_PATHS = {
@@ -200,6 +203,7 @@ def _materialize_input_bundle(
     if destination.exists():
         shutil.rmtree(destination)
     destination.mkdir(parents=True)
+    validate_input_bundle_archive(resolved_archive)
     # The archive is fully local before extraction; agents never perform random
     # reads against object storage. Python 3.14 handles zstd natively here.
     with tarfile.open(resolved_archive, mode="r:zst") as archive:

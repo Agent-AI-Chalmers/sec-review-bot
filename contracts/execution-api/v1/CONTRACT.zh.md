@@ -31,7 +31,7 @@ v1 Execution 支持本地 `file:` 和持久的 `s3:` URI。Storage endpoint、re
 
 调用方负责 input bundle；Execution Worker 及其 stage 负责 `artifact_paths`、stage artifact roots、writable stage workspaces、retry state 和 delivery assignments 等运行态信息。
 
-`tar.zst` archive 必须包含 `manifest.json`、workspace snapshot、history 和声明的 incremental window。manifest 结构由 [`input-bundle-manifest.schema.json`](schemas/input-bundle-manifest.schema.json) 定义，声明 API version 和 bundle-relative path。Execution Worker 将这些路径解析成内部本地 `bundle_paths`。调用方不得直接提供 `bundle_paths`。
+`tar.zst` archive 必须符合 [input-bundle artifact v1 profile](../../tar-zstd-artifact/profiles/input-bundle/v1/SPEC.zh.md)，并包含 `manifest.json`、workspace snapshot、history 和声明的 incremental window。manifest 结构由 [`input-bundle-manifest.schema.json`](schemas/input-bundle-manifest.schema.json) 定义，声明 API version 和 bundle-relative path。Execution Worker 将这些路径解析成内部本地 `bundle_paths`。调用方不得直接提供 `bundle_paths`。
 
 `input_bundle` 的对象结构由 [`common.schema.json`](schemas/common.schema.json) 定义；`uri` 接受 `file:` 或 `s3:` 引用。
 

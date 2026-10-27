@@ -16,6 +16,12 @@ class TarEnvelopeEntry:
     path: str
     type_flag: bytes
     size: int
+    mode: int
+    uid: int
+    gid: int
+    mtime: int
+    uname: str
+    gname: str
 
 
 class _BinaryReader(Protocol):
@@ -40,6 +46,13 @@ def _header_path(block: bytes) -> str:
     except UnicodeDecodeError as error:
         raise ValueError("Artifact archive contains a non-UTF-8 tar path.") from error
     return f"{prefix}/{name}" if prefix else name
+
+
+def _text_field(block: bytes, offset: int, length: int) -> str:
+    try:
+        return _field(block, offset, length).decode("utf-8")
+    except UnicodeDecodeError as error:
+        raise ValueError("Artifact archive contains non-UTF-8 tar metadata.") from error
 
 
 def _parse_pax_path(body: bytes) -> str:
@@ -136,6 +149,12 @@ def validate_restricted_pax_archive(archive_path: Path) -> tuple[TarEnvelopeEntr
                     ),
                     type_flag=type_flag,
                     size=size,
+                    mode=_octal(header, 100, 8),
+                    uid=_octal(header, 108, 8),
+                    gid=_octal(header, 116, 8),
+                    mtime=_octal(header, 136, 12),
+                    uname=_text_field(header, 265, 32),
+                    gname=_text_field(header, 297, 32),
                 )
             )
             pending_path = None

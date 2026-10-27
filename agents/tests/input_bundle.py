@@ -6,6 +6,16 @@ from pathlib import Path
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 
 
+def _canonical_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
+    info.mtime = 0
+    info.uid = 0
+    info.gid = 0
+    info.uname = ""
+    info.gname = ""
+    info.mode = 0o755 if info.isdir() else 0o644
+    return info
+
+
 def write_test_input_bundle(
     root: Path, *, include_manifest: bool = True
 ) -> dict[str, object]:
@@ -24,9 +34,11 @@ def write_test_input_bundle(
     (root / "workspace.snapshot.tar").touch()
     (root / "history").mkdir(exist_ok=True)
     archive_path = Path(f"{root}.tar.zst")
-    with tarfile.open(archive_path, mode="w:zst") as archive:
-        for entry in root.iterdir():
-            archive.add(entry, arcname=entry.name)
+    with tarfile.open(archive_path, mode="w:zst", format=tarfile.PAX_FORMAT) as archive:
+        for name in ["manifest.json", "history", "workspace.snapshot.tar"]:
+            entry = root / name
+            if entry.exists():
+                archive.add(entry, arcname=name, filter=_canonical_tar_info)
     content = archive_path.read_bytes()
     return {
         "uri": archive_path.as_uri(),
