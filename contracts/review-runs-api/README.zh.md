@@ -19,7 +19,7 @@ Review Runs 通过 `observeRun()` 产出每个 observed run，通过 `rowToRecor
 
 GitHub 集成直接 import Review Runs 的形状，因此它对记录的视图就是同一个类型，而不是手写的副本。控制台则消费由同一份 schema 生成的类型，并由提交的 fixture 在编译期钉住它们，于是两个调用方各自对同一份 schema 保留自己的编译期绑定。
 
-请求的两侧也都由契约定型，而不只是响应：集成的客户端接收契约自己的 `operationId`，并据此推导每个请求体与成功返回值；Review Runs 的路由处理器则通过各自操作的类型（`review-runs/src/route-types.ts`）读取 `request.body` 与 `request.params`。因此在 [openapi.yaml](v1/openapi.yaml) 里改一个请求字段名会让两侧的 typecheck 都失败，而不是留下一个仍能编译、字段却被静默忽略的调用点。
+请求的两侧也都由契约定型，而不只是响应：集成的客户端接收契约自己的 `operationId`，并据此推导每个请求体与成功返回值；Review Runs 的路由处理器则通过各自操作的类型（`review-runs/src/http/route-types.ts`）读取 `request.body` 与 `request.params`。因此在 [openapi.yaml](v1/openapi.yaml) 里改一个请求字段名会让两侧的 typecheck 都失败，而不是留下一个仍能编译、字段却被静默忽略的调用点。
 
 ## 公开边界
 

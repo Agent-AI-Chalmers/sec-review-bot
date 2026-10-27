@@ -7,7 +7,7 @@
 // the Execution's own execution history lives in Temporal and is deliberately not duplicated.
 import type { PoolClient } from 'pg'
 
-import type { ReviewRunEvent } from './shapes.js'
+import type { ReviewRunEvent } from '../shapes.js'
 
 export type CoordinationAxis = 'execution' | 'preparation' | 'publication'
 

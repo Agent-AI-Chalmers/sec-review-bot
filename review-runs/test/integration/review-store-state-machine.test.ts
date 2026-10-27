@@ -889,6 +889,39 @@ test('ReviewRunStore atomically deduplicates concurrent ingress across connectio
   }
 })
 
+test('admission does not mistake a duplicate run id for an ingress replay race', async () => {
+  const store = await createStore()
+  const runId = `run-${randomUUID()}`
+  try {
+    await store.admitReviewRun({
+      workflow: 'issue-review',
+      run_id: runId,
+      publish_context: {},
+      ingress_kind: 'github_webhook',
+      ingress_key: `delivery-${randomUUID()}`
+    })
+
+    await assert.rejects(
+      store.admitReviewRun({
+        workflow: 'issue-review',
+        run_id: runId,
+        publish_context: {},
+        ingress_kind: 'github_webhook',
+        ingress_key: `delivery-${randomUUID()}`
+      }),
+      (error: unknown) =>
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === '23505' &&
+        'constraint' in error &&
+        error.constraint === 'review_runs_pkey'
+    )
+  } finally {
+    await store.close()
+  }
+})
+
 test('ReviewRunStore leaves ingress replay read-only and lets the coordinator take over preparation', async () => {
   const sharedConnector = connectorId()
   const ownerA = await createStore({

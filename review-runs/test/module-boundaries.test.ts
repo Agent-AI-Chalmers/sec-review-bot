@@ -14,9 +14,9 @@ import { fileURLToPath } from 'node:url'
 
 const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src')
 const AXIS_STORES = [
-  'preparation-store.ts',
-  'publication-store.ts',
-  'execution-store.ts'
+  'persistence/preparation-store.ts',
+  'persistence/publication-store.ts',
+  'persistence/execution-store.ts'
 ] as const
 
 /** The modules `file` imports, normalized to the `.ts` basename used by `AXIS_STORES`.
@@ -27,9 +27,9 @@ const AXIS_STORES = [
  */
 function importedModules(file: string): string[] {
   const source = readFileSync(path.join(SRC, file), 'utf8')
-  return [...source.matchAll(/^import[\s\S]*?from '(\.[^']+)'/gm)].map(
-    (match) => path.basename(match[1] ?? '').replace(/\.js$/, '.ts')
-  )
+  return [
+    ...source.matchAll(/^(?:import|export)[\s\S]*?from '(\.[^']+)'/gm)
+  ].map((match) => path.basename(match[1] ?? '').replace(/\.js$/, '.ts'))
 }
 
 test('single-axis stores do not depend on each other', () => {
@@ -37,15 +37,107 @@ test('single-axis stores do not depend on each other', () => {
     const dependencies = importedModules(store)
     for (const other of AXIS_STORES) {
       if (other === store) continue
+      const otherName = path.basename(other)
       assert.ok(
-        !dependencies.includes(other),
-        `${store} imports ${other}; a cross-axis write shared by two axes belongs in its own module so the stores stay independent`
+        !dependencies.includes(otherName),
+        `${store} imports ${otherName}; a cross-axis write shared by two axes belongs in its own module so the stores stay independent`
       )
     }
-    // `review-store.ts` constructs the stores, so it must not be imported back.
+    // `review-run-store.ts` constructs the stores, so it must not be imported back.
     assert.ok(
-      !dependencies.includes('review-store.ts'),
-      `${store} imports review-store.ts, which constructs it`
+      !dependencies.includes('review-run-store.ts'),
+      `${store} imports review-run-store.ts, which constructs it`
+    )
+  }
+})
+
+test('the process entry, HTTP surface, and runtime composition stay acyclic', () => {
+  const entry = importedModules('server.ts')
+  const surface = importedModules('http/server-surface.ts')
+  const runtime = importedModules('runtime/server-runtime.ts')
+
+  assert.ok(entry.includes('server-surface.ts'))
+  assert.ok(entry.includes('server-runtime.ts'))
+  assert.ok(runtime.includes('server-surface.ts'))
+  assert.ok(!runtime.includes('server.ts'))
+  assert.ok(!surface.includes('server.ts'))
+  assert.ok(!surface.includes('server-runtime.ts'))
+
+  for (const handler of [
+    'http/read-route-handlers.ts',
+    'http/coordination-route-handlers.ts',
+    'http/admin-route-handlers.ts'
+  ]) {
+    const dependencies = importedModules(handler)
+    assert.ok(!dependencies.includes('server.ts'))
+    assert.ok(!dependencies.includes('server-surface.ts'))
+    assert.ok(!dependencies.includes('server-runtime.ts'))
+  }
+})
+
+test('operator decisions compose axis stores without creating a dependency cycle', () => {
+  const dependencies = importedModules('persistence/operator-decision-store.ts')
+  assert.ok(dependencies.includes('preparation-store.ts') === false)
+  assert.ok(dependencies.includes('publication-store.ts'))
+  assert.ok(dependencies.includes('execution-store.ts'))
+  assert.ok(!dependencies.includes('review-run-store.ts'))
+
+  for (const store of AXIS_STORES) {
+    assert.ok(
+      !importedModules(store).includes('operator-decision-store.ts'),
+      `${store} imports the cross-axis operator decision store`
+    )
+  }
+})
+
+test('the read model does not depend on write stores', () => {
+  const dependencies = importedModules('persistence/review-run-queries.ts')
+  assert.ok(dependencies.includes('run-record-projection.ts'))
+  assert.ok(dependencies.includes('review-run-events.ts'))
+  assert.ok(!dependencies.includes('review-run-store.ts'))
+  for (const store of AXIS_STORES) {
+    assert.ok(
+      !dependencies.includes(path.basename(store)),
+      `review-run-queries.ts imports write store ${store}`
+    )
+  }
+})
+
+test('submission transitions compose axes without depending on axis stores', () => {
+  const dependencies = importedModules(
+    'persistence/submission-transition-store.ts'
+  )
+  assert.ok(dependencies.includes('publication-abandon.ts'))
+  assert.ok(dependencies.includes('review-run-events.ts'))
+  assert.ok(dependencies.includes('run-notices.ts'))
+  assert.ok(!dependencies.includes('review-run-store.ts'))
+  for (const store of AXIS_STORES) {
+    assert.ok(
+      !dependencies.includes(path.basename(store)),
+      `submission-transition-store.ts imports axis store ${store}`
+    )
+  }
+})
+
+test('publication claims stay separate from single-axis publication writes', () => {
+  const dependencies = importedModules('persistence/publication-claim-store.ts')
+  assert.ok(dependencies.includes('run-record-projection.ts'))
+  assert.ok(dependencies.includes('review-run-events.ts'))
+  assert.ok(!dependencies.includes('publication-store.ts'))
+  assert.ok(!dependencies.includes('review-run-store.ts'))
+})
+
+test('run admission owns aggregate creation without importing axis stores', () => {
+  const dependencies = importedModules(
+    'persistence/review-run-admission-store.ts'
+  )
+  assert.ok(dependencies.includes('run-record-projection.ts'))
+  assert.ok(dependencies.includes('review-run-events.ts'))
+  assert.ok(!dependencies.includes('review-run-store.ts'))
+  for (const store of AXIS_STORES) {
+    assert.ok(
+      !dependencies.includes(path.basename(store)),
+      `review-run-admission-store.ts imports axis store ${store}`
     )
   }
 })

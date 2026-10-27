@@ -5,8 +5,8 @@ import type {
   PreparationExpiryBlocked,
   ReviewRunRecord,
   ReviewRunStore
-} from './review-store.js'
-import type { ExecutionRunStatusBatch } from './execution-client.js'
+} from '../persistence/review-run-store.js'
+import type { ExecutionRunStatusBatch } from '../execution-client.js'
 
 type CoordinationStore = Pick<
   ReviewRunStore,
@@ -49,6 +49,9 @@ export async function coordinateReviewRunsOnce(
   for (const dropped of recoveries.dropped) {
     handlers.onDroppedRunRow(dropped)
   }
+  // Recovery handlers classify expected per-run Execution outcomes themselves. An exception that
+  // escapes here is an unclassified persistence or program failure, so abort the shared pass and
+  // let the loop-level error handler report it instead of pretending the pass converged.
   for (const run of recoveries.runs) {
     await handlers.recoverSubmission(run)
   }
@@ -62,6 +65,8 @@ export async function coordinateReviewRunsOnce(
   // number of requests grow with the number of runs in flight, so the busiest moments
   // were the ones that checked least often.
   const statuses = await handlers.readExecutionStatuses(active)
+  // Observation handlers already turn expected polling outcomes into durable state or a retry
+  // result. Escaping exceptions are therefore not known to be run-local and must fail the pass.
   for (const run of active) {
     await handlers.observeActiveRun(run, statuses)
   }
