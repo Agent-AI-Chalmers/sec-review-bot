@@ -121,7 +121,7 @@ def keep_api:
     },
     alerts: $clean_alerts
   }
-' > "$OUTPUT_FILE"
+' >"$OUTPUT_FILE"
 
 echo "Clean combined ZAP report written to: $OUTPUT_FILE"
 jq '.summary' "$OUTPUT_FILE"

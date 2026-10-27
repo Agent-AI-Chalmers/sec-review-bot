@@ -185,7 +185,7 @@ def merge_alerts:
     info: ([.alerts[] | select(.risk == "Informational")] | length),
     affected_urls: ([.alerts[].urls[]] | unique | length)
   }
-' > "$OUTPUT_FILE"
+' >"$OUTPUT_FILE"
 
 echo "Clean ZAP report written to: $OUTPUT_FILE"
 jq '.summary' "$OUTPUT_FILE"

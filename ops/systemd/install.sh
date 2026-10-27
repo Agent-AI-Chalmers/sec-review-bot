@@ -18,7 +18,7 @@ if ! id "$service_user" >/dev/null 2>&1; then
     exit 1
 fi
 case "$service_user" in
-    *[!A-Za-z0-9_.-]*|'')
+    *[!A-Za-z0-9_.-]* | '')
         echo "Unsupported service user name: $service_user" >&2
         exit 1
         ;;

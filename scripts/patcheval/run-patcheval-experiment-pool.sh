@@ -126,7 +126,7 @@ while [ $# -gt 0 ]; do
       MAX_FAILURES="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -215,9 +215,9 @@ run_experiment() {
     echo "OUT=$out_dir"
     echo "COMMAND=$(shell_join "${cmd[@]}")"
     echo
-  } > "$tmp_header"
+  } >"$tmp_header"
 
-  "${cmd[@]}" > "$tmp_stdout" 2> "$tmp_stderr"
+  "${cmd[@]}" >"$tmp_stdout" 2>"$tmp_stderr"
   status=$?
 
   local_root="$(grep -m1 '^LOCAL_ROOT=' "$tmp_stdout" | cut -d= -f2-)"
@@ -236,12 +236,12 @@ run_experiment() {
       echo
       echo "===== STDOUT (metadata) ====="
       grep -E '^(LOCAL_ROOT|WORKFLOW_RESULT)=' "$local_root/logs/run.stdout.log" || true
-    } > "$tmp_runlog"
+    } >"$tmp_runlog"
     mv "$tmp_runlog" "$local_root/logs/run.log"
     rm -f "$tmp_header"
 
-    printf '%s\n' "$experiment_name" > "$local_root/experiment-name.txt"
-    printf '%s\n' "$status" > "$local_root/exit-code.txt"
+    printf '%s\n' "$experiment_name" >"$local_root/experiment-name.txt"
+    printf '%s\n' "$status" >"$local_root/exit-code.txt"
     ln -sfn "$(basename "$local_root")" "$out_dir/$experiment_name"
 
     if [ "$status" -eq 0 ]; then
@@ -250,9 +250,9 @@ run_experiment() {
       echo "[$(date -u +%H:%M:%SZ)] FAIL  $experiment_name -> $(basename "$local_root") exit=$status"
     fi
   else
-    cat "$tmp_header" "$tmp_stderr" "$tmp_stdout" > "$tmp_log_dir/${experiment_name}.log"
+    cat "$tmp_header" "$tmp_stderr" "$tmp_stdout" >"$tmp_log_dir/${experiment_name}.log"
     rm -f "$tmp_header" "$tmp_stdout" "$tmp_stderr" "$tmp_runlog"
-    printf '%s\n' "$status" > "$tmp_log_dir/${experiment_name}.exit-code"
+    printf '%s\n' "$status" >"$tmp_log_dir/${experiment_name}.exit-code"
     echo "Could not resolve LOCAL_ROOT for $experiment_name; log left at $tmp_log_dir/${experiment_name}.log" >&2
     echo "[$(date -u +%H:%M:%SZ)] FAIL  $experiment_name exit=$status"
   fi
@@ -304,7 +304,7 @@ while IFS=$'\t' read -r spec_cve variant status; do
       blocked_count=$((blocked_count + 1))
       printf 'SKIP %s\t%s\t%s\n' "$effective_status" "$spec_cve" "$variant" >&2
       ;;
-    exit-*|missing-target|missing-exit-code|missing-patch|empty-patch)
+    exit-* | missing-target | missing-exit-code | missing-patch | empty-patch)
       if [ "$RESUME_INCOMPLETE" -eq 1 ]; then
         QUEUE+=("${spec_cve}|${variant}|${effective_status}")
         queued_count=$((queued_count + 1))
@@ -313,7 +313,7 @@ while IFS=$'\t' read -r spec_cve variant status; do
         printf 'SKIP %s\t%s\t%s\n' "$effective_status" "$spec_cve" "$variant" >&2
       fi
       ;;
-    missing-workspace|missing-symlink)
+    missing-workspace | missing-symlink)
       QUEUE+=("${spec_cve}|${variant}|${effective_status}")
       queued_count=$((queued_count + 1))
       ;;
@@ -322,7 +322,7 @@ while IFS=$'\t' read -r spec_cve variant status; do
       printf 'SKIP unknown:%s\t%s\t%s\n' "$effective_status" "$spec_cve" "$variant" >&2
       ;;
   esac
-done <<< "$WORKSPACE_STATES"
+done <<<"$WORKSPACE_STATES"
 
 if [ -n "$LIMIT" ] && [ "${#QUEUE[@]}" -gt "$LIMIT" ]; then
   QUEUE=("${QUEUE[@]:0:$LIMIT}")
@@ -348,7 +348,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo
   echo "Queued commands:"
   for spec in "${QUEUE[@]}"; do
-    IFS='|' read -r cve variant reason <<< "$spec"
+    IFS='|' read -r cve variant reason <<<"$spec"
     out_dir="$REPO_ROOT/.agent-workspace-patcheval-${cve}-${TAG}"
     cmd=("${RUN_PATCHEVAL[@]}" --cve "$cve" --dataset "$DATASET" --output-dir "$out_dir" --variant "$variant")
     printf '  # %s %s (%s)\n' "$cve" "$variant" "$reason"
@@ -361,7 +361,7 @@ MANIFEST_DIR="$REPO_ROOT/.patcheval-batch-manifests"
 RUN_LABEL="$(date -u +%Y%m%dT%H%M%SZ)"
 MANIFEST="$MANIFEST_DIR/experiment-pool-${TAG}-${RUN_LABEL}.tsv"
 mkdir -p "$MANIFEST_DIR"
-printf 'timestamp\tcve\tvariant\tbefore_status\tpid\n' > "$MANIFEST"
+printf 'timestamp\tcve\tvariant\tbefore_status\tpid\n' >"$MANIFEST"
 echo "Manifest: $MANIFEST"
 
 overall=0
@@ -395,10 +395,10 @@ for spec in "${QUEUE[@]}"; do
     break
   fi
 
-  IFS='|' read -r cve variant reason <<< "$spec"
+  IFS='|' read -r cve variant reason <<<"$spec"
   run_experiment "$cve" "$variant" &
   pid=$!
-  printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$cve" "$variant" "$reason" "$pid" >> "$MANIFEST"
+  printf '%s\t%s\t%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$cve" "$variant" "$reason" "$pid" >>"$MANIFEST"
 done
 
 while [ "$(jobs -rp | wc -l)" -gt 0 ]; do
