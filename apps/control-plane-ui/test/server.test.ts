@@ -102,12 +102,13 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
       headers: { cookie }
     })
     assert.strictEqual(upstreamPath, '/v1/runs?limit=10')
-    await fetch(`${base}/api/runs?workflow=issue-review&range=7d&cursor=abc`, {
-      headers: { cookie }
-    })
+    await fetch(
+      `${base}/api/runs?workflow=issue-review&source_platform=github&range=7d&cursor=abc`,
+      { headers: { cookie } }
+    )
     assert.strictEqual(
       upstreamPath,
-      '/v1/runs?cursor=abc&workflow=issue-review'
+      '/v1/runs?cursor=abc&source_platform=github&workflow=issue-review'
     )
     assert.strictEqual(
       (await fetch(`${base}/api/runs`, { method: 'POST', headers: { cookie } }))

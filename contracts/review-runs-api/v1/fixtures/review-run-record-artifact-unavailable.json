@@ -1,6 +1,8 @@
 {
   "run_id": "9d2b7c41-6e58-4a30-9f12-3b7c8d9e0a1b",
   "workflow": "pull-request-review",
+  "source_platform": "github",
+  "connector_id": "github-integration:default",
   "preparation": {
     "status": "submitted",
     "attempt_count": 1,

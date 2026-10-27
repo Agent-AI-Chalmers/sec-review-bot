@@ -5,11 +5,13 @@ export type { ObservedRun, PublicationStepSummary } from './shapes.js'
 
 export function observeRun(run: ReviewRunRecord): ObservedRun {
   // The record and observed-run shapes now agree on every axis, so this is a redaction rather
-  // than a projection: it drops the connector-owned context, the Execution input, the connector
-  // identity, and the failure detail, and keeps the rest verbatim.
+  // than a projection: it drops connector-owned context, the Execution input, and failure detail,
+  // while retaining the public platform and connector namespace used by operators.
   return {
     run_id: run.run_id,
     workflow: run.workflow,
+    source_platform: run.source_platform,
+    connector_id: run.connector_id,
     preparation: run.preparation,
     execution: run.execution,
     publication: run.publication,

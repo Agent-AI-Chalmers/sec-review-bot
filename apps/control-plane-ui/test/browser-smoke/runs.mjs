@@ -70,7 +70,7 @@ export async function smokeRuns({
 
   // The recency column leads with how long ago, so the feed can be scanned by eye.
   assert.match(
-    (await page.locator('tbody tr:first-child td').nth(5).textContent()) ?? '',
+    (await page.locator('tbody tr:first-child td').nth(6).textContent()) ?? '',
     /\d+[dhms]\s+ago/,
     `${name} last activity must read as elapsed time`
   )
@@ -93,6 +93,20 @@ export async function smokeRuns({
     await page.locator('tbody tr:first-child .status-text').count(),
     3,
     `${name} expected one dot+text status per lifecycle axis`
+  )
+
+  const platformMark = page.locator('tbody tr:first-child .platform-mark')
+  assert.strictEqual(
+    await platformMark.locator('svg').count(),
+    1,
+    `${name} a platform must render its recognizable mark`
+  )
+  assert.strictEqual(
+    await platformMark
+      .locator('.platform-mark-label')
+      .evaluate((element) => getComputedStyle(element).display === 'none'),
+    viewport.width <= 600,
+    `${name} platform text must collapse only at the narrow breakpoint`
   )
 
   if (server !== undefined) {
@@ -131,6 +145,7 @@ export async function smokeRuns({
 
     // The fixture spreads its runs over more than a week, so each range preset must
     // narrow the list by a distinct amount rather than silently filtering nothing.
+    await page.getByRole('button', { name: 'More filters' }).click()
     const timeRange = page.getByLabel('Time range')
     const allRows = (await rows()).length
     await timeRange.selectOption('1h')
@@ -301,7 +316,7 @@ export async function smokeRuns({
         (await firstRow.locator('td:nth-child(2)').textContent()) ?? ''
       ).trim()
       const publicationCell = (
-        (await firstRow.locator('td:nth-child(5)').textContent()) ?? ''
+        (await firstRow.locator('td:nth-child(6)').textContent()) ?? ''
       ).trim()
       return (
         workflowCell === 'Repository review' &&
@@ -580,7 +595,7 @@ export async function smokeRuns({
     async () =>
       (
         (await page
-          .locator('tbody tr:first-child td:nth-child(4)')
+          .locator('tbody tr:first-child td:nth-child(5)')
           .textContent?.()) ?? ''
       ).trim() === 'Running',
     `${name} the Execution filter must apply before opening a run`

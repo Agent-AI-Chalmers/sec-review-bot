@@ -53,6 +53,24 @@
   overflow-wrap: anywhere;
 }
 
+.platform-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  line-height: 1.25;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.platform-mark > svg {
+  display: block;
+  flex: none;
+}
+
+.platform-mark-sm {
+  font-size: var(--mantine-font-size-sm);
+}
+
 /* A run coordination refused to conclude on its own. Mantine's Alert supplies the surface and
    the accent; these rules only keep the explanation readable at a wide viewport. */
 .blocked-run .blocked-run-body {
@@ -74,31 +92,29 @@
   box-shadow: var(--shadow-sm);
 }
 
-.workflow-chip {
-  display: inline-flex;
+.run-summary-grid {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  gap: 14px 24px;
   align-items: center;
-  padding: 3px 10px;
-  color: var(--brand);
-  background: var(--brand-soft);
-  border: 1px solid color-mix(in srgb, var(--brand) 25%, transparent);
-  border-radius: 999px;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  margin-top: 16px;
+  min-width: 0;
 }
 
-[data-theme='dark'] .workflow-chip {
-  color: var(--mantine-color-brand-3);
-  background: color-mix(in srgb, var(--brand) 16%, transparent);
+.run-summary-item {
+  min-width: 0;
 }
 
-.run-state-summary {
+.integration-id {
   overflow-wrap: anywhere;
 }
 
-.run-state-summary .status-text {
+.run-summary-grid .status-text {
   font-size: var(--mantine-font-size-sm);
+}
+
+.run-summary-failure {
+  grid-column: 1 / -1;
 }
 
 .operations-bar {
@@ -109,19 +125,8 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* One row: content filters on the left, the refresh cluster fixed to the right. The filter
-   group may wrap onto further lines when space is tight; the refresh cluster keeps its shape
-   and stays pinned right, the way a toolbar's time controls do. */
 .operations-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px 16px;
-}
-
-.operations-row .refresh-controls {
-  margin-left: auto;
+  display: block;
 }
 
 a {

@@ -69,6 +69,7 @@ const CONTRAST = `(() => {
 const EXPECTED_HEADERS = [
   'Run',
   'Workflow',
+  'Platform',
   'Preparation',
   'Execution',
   'Publication',

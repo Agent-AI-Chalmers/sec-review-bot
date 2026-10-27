@@ -3,6 +3,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import {
   Alert,
   Box,
+  Button,
+  Collapse,
   Container,
   Group,
   NativeSelect,
@@ -15,7 +17,12 @@ import {
   Title,
   Tooltip
 } from '@mantine/core'
-import { IconAlertTriangle, IconInbox } from '@tabler/icons-react'
+import {
+  IconAdjustmentsHorizontal,
+  IconAlertTriangle,
+  IconChevronDown,
+  IconInbox
+} from '@tabler/icons-react'
 import {
   api,
   parkedRuns,
@@ -45,6 +52,7 @@ import {
   workflowLabel
 } from './format.js'
 import { LIST_RUN_QUERY_PARAMS } from '../../../shared/list-run-query-params.js'
+import { PlatformMark } from './PlatformMark.js'
 
 const RANGE_MINUTES: Record<string, number> = {
   '1h': 60,
@@ -63,6 +71,9 @@ export function Runs(): React.JSX.Element {
   const { language } = useLanguage()
   const t = useMessages()
   const [search, setSearch] = useSearchParams()
+  const [moreFiltersOpened, setMoreFiltersOpened] = React.useState(() =>
+    search.has('range')
+  )
   // Mirror the latest params so two filters changed in the same tick compose instead of
   // overwriting each other. `setSearchParams`'s functional form does not queue across calls
   // (its `previous` argument is the committed location), and the render closure's `search`
@@ -226,9 +237,19 @@ export function Runs(): React.JSX.Element {
   const totalPages = data?.next_cursor != null ? page + 1 : page
   return (
     <Container size="lg" py="xl">
-      <Title order={1} mb="lg">
-        {t('runs')}
-      </Title>
+      <Group
+        className="runs-heading"
+        justify="space-between"
+        align="center"
+        mb="lg"
+      >
+        <Title order={1}>{t('runs')}</Title>
+        <RefreshControls
+          refresh={refresh}
+          refreshing={refreshing}
+          lastChecked={lastChecked}
+        />
+      </Group>
       {blocked.length > 0 && (
         <Alert
           color="orange"
@@ -275,13 +296,20 @@ export function Runs(): React.JSX.Element {
         </Text>
       )}
       <Box className="operations-bar" mb="lg">
-        {/*
-          One row: the content filters on the left, the compact refresh cluster fixed to the
-          right. Page size is not here at all — it lives with the pager below the table, the
-          one place where "how many per page" is a meaningful question.
-        */}
+        {/* Page size lives with the pager below the table, where "how many per page" is asked. */}
         <div className="operations-row">
           <Group aria-label="Run list controls" align="flex-end" gap="md">
+            <NativeSelect
+              w={120}
+              label={t('platform')}
+              value={search.get('source_platform') ?? ''}
+              onChange={(event) =>
+                update('source_platform', event.target.value)
+              }
+            >
+              <option value="">{t('all')}</option>
+              <option value="github">{t('platformGithub')}</option>
+            </NativeSelect>
             <NativeSelect
               w={150}
               label={t('workflow')}
@@ -350,8 +378,29 @@ export function Runs(): React.JSX.Element {
                 </option>
               ))}
             </NativeSelect>
+            <Button
+              variant={search.has('range') ? 'light' : 'subtle'}
+              leftSection={<IconAdjustmentsHorizontal size={16} />}
+              rightSection={
+                <IconChevronDown
+                  size={14}
+                  style={{
+                    transform: moreFiltersOpened ? 'rotate(180deg)' : undefined,
+                    transition: 'transform 150ms ease'
+                  }}
+                />
+              }
+              onClick={() => setMoreFiltersOpened((opened) => !opened)}
+              aria-expanded={moreFiltersOpened}
+            >
+              {t('moreFilters')}
+            </Button>
+          </Group>
+        </div>
+        <Collapse expanded={moreFiltersOpened}>
+          <Group className="operations-more" mt="md" align="flex-end">
             <NativeSelect
-              w={110}
+              w={140}
               label={t('timeRange')}
               value={search.get('range') ?? ''}
               onChange={(event) => update('range', event.target.value)}
@@ -362,12 +411,7 @@ export function Runs(): React.JSX.Element {
               <option value="7d">{t('lastWeek')}</option>
             </NativeSelect>
           </Group>
-          <RefreshControls
-            refresh={refresh}
-            refreshing={refreshing}
-            lastChecked={lastChecked}
-          />
-        </div>
+        </Collapse>
       </Box>
       {data === undefined ? (
         <p>{t('loadingRuns')}</p>
@@ -388,6 +432,7 @@ export function Runs(): React.JSX.Element {
                 <Table.Tr>
                   <Table.Th>{t('run')}</Table.Th>
                   <Table.Th>{t('workflow')}</Table.Th>
+                  <Table.Th>{t('platform')}</Table.Th>
                   <Table.Th>{t('preparation')}</Table.Th>
                   <Table.Th>{t('execution')}</Table.Th>
                   <Table.Th>{t('publication')}</Table.Th>
@@ -423,6 +468,15 @@ export function Runs(): React.JSX.Element {
                       </Group>
                     </Table.Td>
                     <Table.Td>{workflowLabel(run.workflow, t)}</Table.Td>
+                    <Table.Td>
+                      <PlatformMark
+                        platform={run.source_platform}
+                        githubLabel={t('platformGithub')}
+                        gitlabLabel={t('platformGitlab')}
+                        unknownLabel={t('platformUnknown')}
+                        compactOnNarrow
+                      />
+                    </Table.Td>
                     <Table.Td>
                       <PreparationStatus preparation={run.preparation} />
                     </Table.Td>

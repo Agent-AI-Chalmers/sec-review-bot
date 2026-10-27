@@ -26,6 +26,7 @@ GitHub 集成直接 import Review Runs 的形状，因此它对记录的视图�
 消费者可以依赖：
 
 - observed run 的字段名与必填字段；
+- `source_platform`：用于稳定聚合的源码托管平台；以及 `connector_id`：admit 并拥有该 run 的 connector 类型与实例命名空间；
 - 以嵌套对象报告的三条生命周期轴：脱敏的 `preparation` 摘要，以及 `execution` / `publication`。每组各自报告 `status`、`started_at`、`finished_at` 与该轴的 `updated_at`（最后一次写入时间，不是阶段边界）；用于筛选它们的查询参数沿用既有的 `*_status` 拼写；
 - `notices`：当 run 的某个环节失败或需要关注时，应由集成展示给用户的消息。消息按产生时间从早到晚排列；同一 run 发生多次独立事件时会保留多条，不会合并；
 - `artifact_storage` 的变体：不存在；状态为 `unavailable` 或 `failed` 的错误变体，可带 `error_code` 与 `message`；或 `available` 且带有已存储的 bundle。
@@ -33,7 +34,7 @@ GitHub 集成直接 import Review Runs 的形状，因此它对记录的视图�
 以下不属于本契约：
 
 - 内部存储记录，例如持久化在 Postgres 里的行形状；
-- connector-owned preparation input、claim token、connector identity 和完整 reconciliation identity；
+- connector-owned preparation input、claim token 和完整 reconciliation identity；
 - 控制台为展示而派生的任何内容，例如相对时间或各阶段耗时。
 
 ## 执行方式

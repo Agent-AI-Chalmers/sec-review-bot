@@ -14,6 +14,7 @@ export const LIST_RUN_QUERY_PARAMS = [
   'execution_status',
   'publication_status',
   'preparation_status',
+  'source_platform',
   'workflow',
   'from',
   'to'

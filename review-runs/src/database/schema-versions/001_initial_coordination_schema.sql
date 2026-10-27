@@ -5,6 +5,7 @@ CREATE TABLE review_runs (
   run_id text PRIMARY KEY,
   connector_id text NOT NULL,
   workflow text NOT NULL,
+  source_platform text NOT NULL CHECK (source_platform IN ('github')),
   ingress_kind text,
   ingress_key text,
   created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -24,6 +25,8 @@ COMMENT ON COLUMN review_runs.connector_id IS
   'Coordination namespace that owns the run, such as one configured GitHub App connector.';
 COMMENT ON COLUMN review_runs.workflow IS
   'Workflow contract used to validate, submit, observe, and publish this review.';
+COMMENT ON COLUMN review_runs.source_platform IS
+  'Source code hosting platform used for stable aggregation across connector instances.';
 COMMENT ON COLUMN review_runs.ingress_kind IS
   'Class of external request that admitted the run, used with ingress_key for replay deduplication.';
 COMMENT ON COLUMN review_runs.ingress_key IS
