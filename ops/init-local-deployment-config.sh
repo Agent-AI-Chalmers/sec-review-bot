@@ -15,41 +15,41 @@ github_env=$repository_root/apps/github-integration/.env
 deployment_env=$repository_root/ops/systemd/deployment.env
 
 for target in "$compose_env" "$model_config" "$github_env" "$deployment_env"; do
-    if [ -e "$target" ]; then
-        echo "Refusing to overwrite existing configuration: $target" >&2
-        echo "Move or remove all existing deployment configuration files, then rerun." >&2
-        exit 1
-    fi
+  if [ -e "$target" ]; then
+    echo "Refusing to overwrite existing configuration: $target" >&2
+    echo "Move or remove all existing deployment configuration files, then rerun." >&2
+    exit 1
+  fi
 done
 
-if ! command -v openssl >/dev/null 2>&1; then
-    echo "openssl is required to generate local deployment credentials." >&2
-    exit 1
+if ! command -v openssl > /dev/null 2>&1; then
+  echo "openssl is required to generate local deployment credentials." >&2
+  exit 1
 fi
 
 umask 077
 work_dir=$(mktemp -d)
 complete=false
 cleanup() {
-    if [ "$complete" != true ]; then
-        # All targets were proven absent before generation, so removing them on
-        # failure cannot delete an operator-owned configuration.
-        rm -f "$compose_env" "$model_config" "$github_env" "$deployment_env"
-    fi
-    rm -rf "$work_dir"
+  if [ "$complete" != true ]; then
+    # All targets were proven absent before generation, so removing them on
+    # failure cannot delete an operator-owned configuration.
+    rm -f "$compose_env" "$model_config" "$github_env" "$deployment_env"
+  fi
+  rm -rf "$work_dir"
 }
 trap cleanup EXIT HUP INT TERM
 
 random_secret() {
-    openssl rand -hex 32
+  openssl rand -hex 32
 }
 
 replace_assignment() {
-    file=$1
-    name=$2
-    value=$3
-    temporary=$file.next
-    awk -v name="$name" -v value="$value" '
+  file=$1
+  name=$2
+  value=$3
+  temporary=$file.next
+  awk -v name="$name" -v value="$value" '
         BEGIN { replaced = 0 }
         index($0, name "=") == 1 {
             print name "=" value
@@ -60,8 +60,8 @@ replace_assignment() {
         END {
             if (!replaced) exit 1
         }
-    ' "$file" >"$temporary"
-    mv "$temporary" "$file"
+    ' "$file" > "$temporary"
+  mv "$temporary" "$file"
 }
 
 control_plane_ui_access_token=$(random_secret)
@@ -120,7 +120,7 @@ mv "$deployment_tmp" "$deployment_env"
 chmod 600 "$compose_env" "$model_config" "$github_env" "$deployment_env"
 complete=true
 
-cat <<EOF
+cat << EOF
 Created local integrated-deployment configuration:
   .env
   agents/config/model-providers.toml

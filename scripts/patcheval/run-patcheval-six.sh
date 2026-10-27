@@ -2,7 +2,7 @@
 set -uo pipefail
 
 usage() {
-  cat <<'EOF'
+  cat << 'EOF'
 Usage:
   scripts/patcheval/run-patcheval-six.sh CVE-ID [options]
 
@@ -115,14 +115,14 @@ run_exp() {
     echo "OUT=$OUT"
     echo "VARIANT=$variant"
     echo
-  } >"$tmp_header"
+  } > "$tmp_header"
 
   "${RUN_PATCHEVAL[@]}" \
     --cve "$CVE" \
     --dataset "$DATASET" \
     --output-dir "$OUT" \
     --variant "$variant" \
-    >>"$tmp_stdout" 2>>"$tmp_stderr"
+    >> "$tmp_stdout" 2>> "$tmp_stderr"
   status=$?
 
   local_root="$(grep -m1 '^LOCAL_ROOT=' "$tmp_stdout" | cut -d= -f2-)"
@@ -139,12 +139,12 @@ run_exp() {
       echo
       echo "===== STDOUT (metadata) ====="
       grep -E '^(LOCAL_ROOT|WORKFLOW_RESULT)=' "$local_root/logs/run.stdout.log" || true
-    } >"$tmp_runlog"
+    } > "$tmp_runlog"
     mv "$tmp_runlog" "$local_root/logs/run.log"
     rm -f "$tmp_header"
 
-    printf '%s\n' "$name" >"$local_root/experiment-name.txt"
-    printf '%s\n' "$status" >"$local_root/exit-code.txt"
+    printf '%s\n' "$name" > "$local_root/experiment-name.txt"
+    printf '%s\n' "$status" > "$local_root/exit-code.txt"
     ln -sfn "$(basename "$local_root")" "$OUT/$name"
     if [ "$status" -eq 0 ]; then
       echo "[$(date -u +%H:%M:%SZ)] DONE  $name -> $(basename "$local_root")"
@@ -152,9 +152,9 @@ run_exp() {
       echo "[$(date -u +%H:%M:%SZ)] FAIL  $name -> $(basename "$local_root") exit=$status"
     fi
   else
-    cat "$tmp_header" "$tmp_stderr" "$tmp_stdout" >"$TMP_LOG_DIR/${name}.log"
+    cat "$tmp_header" "$tmp_stderr" "$tmp_stdout" > "$TMP_LOG_DIR/${name}.log"
     rm -f "$tmp_header" "$tmp_stdout" "$tmp_stderr" "$tmp_runlog"
-    printf '%s\n' "$status" >"$TMP_LOG_DIR/${name}.exit-code"
+    printf '%s\n' "$status" > "$TMP_LOG_DIR/${name}.exit-code"
     echo "Could not resolve LOCAL_ROOT for $name; log left at $TMP_LOG_DIR/${name}.log" >&2
     echo "[$(date -u +%H:%M:%SZ)] FAIL  $name exit=$status"
   fi
@@ -176,7 +176,7 @@ if [ -z "$EXPERIMENT_MATRIX" ]; then
   echo "The PatchEval experiment matrix is empty." >&2
   exit 2
 fi
-mapfile -t EXPERIMENT_VARIANTS <<<"$EXPERIMENT_MATRIX"
+mapfile -t EXPERIMENT_VARIANTS <<< "$EXPERIMENT_MATRIX"
 
 pids=()
 for variant in "${EXPERIMENT_VARIANTS[@]}"; do
