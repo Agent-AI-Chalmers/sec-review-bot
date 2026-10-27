@@ -3,12 +3,14 @@ from dataclasses import dataclass
 
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.runnables import RunnableConfig
+from opentelemetry.sdk.trace import ReadableSpan
 
 from sec_review_agents.observability.diagnostics import log_diagnostic
 from sec_review_agents.observability.trace_context import current_trace_context
 from sec_review_agents.utils.env import env_value
 
 _LANGFUSE_IMPORT_WARNING_EMITTED = False
+_ANTHROPIC_SDK_INSTRUMENTATION_SCOPE = "com.anthropic.sdk.python"
 
 
 @dataclass(frozen=True)
@@ -115,10 +117,24 @@ def build_tracing_config(
         return _disabled_tracing_config(agent_name=agent_name, metadata=metadata)
 
     try:
-        from langfuse import get_client
+        from langfuse import Langfuse, is_default_export_span
         from langfuse.langchain import CallbackHandler
 
-        client = get_client()
+        def should_export_span(span: ReadableSpan) -> bool:
+            # ChatAnthropic's LangChain callback already emits the model generation. The
+            # Anthropic SDK emits the same request as a nested OpenTelemetry generation, so
+            # exporting both doubles call and token totals in Langfuse.
+            scope = getattr(span, "instrumentation_scope", None)
+            if (
+                scope is not None
+                and getattr(scope, "name", None) == _ANTHROPIC_SDK_INSTRUMENTATION_SCOPE
+            ):
+                return False
+            return is_default_export_span(span)
+
+        # Initialize the per-public-key singleton before CallbackHandler asks get_client()
+        # for it, so the exporter filter is installed on the shared span processor.
+        client = Langfuse(should_export_span=should_export_span)
         callback = CallbackHandler()
 
         return TracingConfig(

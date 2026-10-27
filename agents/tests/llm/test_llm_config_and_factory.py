@@ -145,6 +145,30 @@ def test_factory_builds_provider_native_models(tmp_path: Path) -> None:
         assert verifier_model.base_url == "https://google.example"
 
 
+def test_anthropic_factory_disables_native_telemetry_before_construction(
+    tmp_path: Path,
+) -> None:
+    config_path = _write_toml(tmp_path, _base_toml())
+    env = {"MODEL_PROVIDERS_CONFIG_TOML": config_path}
+    model = object()
+
+    def build_anthropic(**_kwargs: object) -> object:
+        assert os.environ["ANTHROPIC_OPEN_TELEMETRY"] == "false"
+        return model
+
+    with (
+        patch.dict(os.environ, env, clear=True),
+        patch(
+            "sec_review_agents.llm.factory.ChatAnthropic",
+            side_effect=build_anthropic,
+        ) as constructor,
+    ):
+        built_model = create_chat_model(agent_name="issue-analyzer")
+
+    assert built_model is model
+    constructor.assert_called_once()
+
+
 def test_factory_allows_call_level_deployment_override(tmp_path: Path) -> None:
     config_path = _write_toml(tmp_path, _base_toml())
     env = {"MODEL_PROVIDERS_CONFIG_TOML": config_path}

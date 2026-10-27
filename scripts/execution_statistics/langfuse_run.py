@@ -7,6 +7,7 @@ from sec_review_agents.runtime.agent_names import REVIEW_AGENT_NAMES
 
 ROOT_FIELDS = "basic,metadata"
 GENERATION_FIELDS = "basic,time,metadata,model,usage"
+LANGFUSE_SDK_INSTRUMENTATION_SCOPE = "langfuse-sdk"
 
 TOKEN_FIELDS = (
     "input",
@@ -22,12 +23,10 @@ TOKEN_FIELDS = (
 class ReadResult:
     # Root traces admitted by the maintained review-agent allowlist.
     roots: list[dict[str, Any]]
-    # Canonical LangChain model calls admitted by native ls_provider metadata.
+    # Canonical LangChain model calls emitted by the Langfuse callback.
     generations: list[dict[str, Any]]
     # Same-session roots belonging to memory agents or unknown agent names.
     excluded_non_review_root_count: int
-    # Provider-SDK generations excluded to avoid counting one request twice.
-    excluded_non_langchain_generation_count: int
 
 
 def _read_pages(
@@ -97,7 +96,6 @@ def read_run_observations(
     ]
 
     generations_by_id: dict[str, dict[str, Any]] = {}
-    excluded_non_langchain_generation_ids: set[str] = set()
     trace_ids = sorted(
         trace_id for root in review_roots if (trace_id := _trace_id(root)) is not None
     )
@@ -112,21 +110,21 @@ def read_run_observations(
             observation_id = _observation_id(generation)
             if observation_id is None:
                 continue
-            # Provider SDK auto-instrumentation can emit a second GENERATION for
-            # the same request. It has its own observation ID, so ID deduplication
-            # cannot remove it. The LangChain call is the one carrying ls_provider.
-            if _string_value(_metadata(generation).get("ls_provider")) is None:
-                excluded_non_langchain_generation_ids.add(observation_id)
-                continue
+            # Production suppresses provider-SDK duplicates before export. A different
+            # scope here means that invariant regressed, so the probe must fail loudly.
+            if (
+                _metadata(generation).get("scope.name")
+                != LANGFUSE_SDK_INSTRUMENTATION_SCOPE
+            ):
+                raise RuntimeError(
+                    f"Review generation {observation_id} has unexpected instrumentation scope."
+                )
             generations_by_id[observation_id] = generation
 
     return ReadResult(
         roots=review_roots,
         generations=list(generations_by_id.values()),
         excluded_non_review_root_count=len(candidate_roots) - len(review_roots),
-        excluded_non_langchain_generation_count=len(
-            excluded_non_langchain_generation_ids
-        ),
     )
 
 
@@ -168,7 +166,6 @@ def aggregate_run(
     generations: Iterable[Mapping[str, Any]],
     root_count: int,
     excluded_non_review_root_count: int,
-    excluded_non_langchain_generation_count: int,
 ) -> dict[str, Any]:
     """Aggregate only observed generation calls without claiming upload completeness."""
     calls = list(generations)
@@ -224,11 +221,8 @@ def aggregate_run(
     return {
         "run_id": run_id,
         "root_trace_count": root_count,
-        # Diagnostic counts explain why fetched Langfuse observations were not billed.
+        # This explains same-session roots that are intentionally outside review totals.
         "excluded_non_review_root_count": excluded_non_review_root_count,
-        "excluded_non_langchain_generation_count": (
-            excluded_non_langchain_generation_count
-        ),
         "observed_call_count": observed_call_count,
         "usage_reported_call_count": usage_reported_call_count,
         "observed_usage_coverage": coverage,

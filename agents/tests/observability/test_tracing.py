@@ -1,4 +1,6 @@
 from collections.abc import Generator
+from types import SimpleNamespace
+from unittest.mock import Mock
 
 import pytest
 
@@ -83,3 +85,32 @@ def test_trace_context_rejects_blank_strings() -> None:
 def test_trace_context_rejects_non_strings() -> None:
     with pytest.raises(TypeError, match="must be str or None"):
         bind_trace_context(run_id=1)  # type: ignore[arg-type]
+
+
+def test_tracing_excludes_duplicate_anthropic_sdk_spans(monkeypatch) -> None:
+    monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "public")
+    monkeypatch.setenv("LANGFUSE_SECRET_KEY", "secret")
+    monkeypatch.setenv("LANGFUSE_BASE_URL", "https://langfuse.example")
+    client = Mock(flush=Mock())
+    langfuse = Mock(return_value=client)
+    default_filter = Mock(return_value=True)
+    callback = Mock()
+
+    monkeypatch.setattr("langfuse.Langfuse", langfuse)
+    monkeypatch.setattr("langfuse.is_default_export_span", default_filter)
+    monkeypatch.setattr("langfuse.langchain.CallbackHandler", callback)
+
+    config = build_tracing_config(agent_name="issue-analyzer")
+
+    predicate = langfuse.call_args.kwargs["should_export_span"]
+    anthropic_span = SimpleNamespace(
+        instrumentation_scope=SimpleNamespace(name="com.anthropic.sdk.python")
+    )
+    langfuse_span = SimpleNamespace(
+        instrumentation_scope=SimpleNamespace(name="langfuse-sdk")
+    )
+    assert predicate(anthropic_span) is False
+    assert predicate(langfuse_span) is True
+    default_filter.assert_called_once_with(langfuse_span)
+    assert config.enabled is True
+    assert config.callback is callback.return_value

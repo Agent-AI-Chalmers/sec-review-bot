@@ -38,7 +38,7 @@ python -m scripts.replay.repository_triage --help
 
 ### Langfuse Run Statistics Probe
 
-`probe_langfuse_run_statistics.py` reads one review `run_id` from the [Langfuse Observations API v2](https://langfuse.com/docs/api-and-data-platform/features/public-api#v2) and prints a read-only JSON summary. It finds roots whose `sec_review_agent` belongs to the maintained review-agent allowlist, reads `GENERATION` observations under those traces with cursor pagination, and keeps the LangChain calls carrying native `ls_provider` metadata. Provider-SDK auto-instrumentation observations are reported as excluded instead of double-counted. Remaining calls are deduplicated by observation ID and grouped by agent and native provider/model.
+`probe_langfuse_run_statistics.py` reads one review `run_id` from the [Langfuse Observations API v2](https://langfuse.com/docs/api-and-data-platform/features/public-api#v2) and prints a read-only JSON summary. It finds roots whose `sec_review_agent` belongs to the maintained review-agent allowlist, reads `GENERATION` observations under those traces with cursor pagination, and accepts only calls emitted by the Langfuse callback scope. Provider-SDK duplicate spans are suppressed by the production exporter; encountering one here is treated as a tracing regression. Remaining calls are deduplicated by observation ID and grouped by agent and native provider/model.
 
 Run it with the agents environment so the repository's pinned Langfuse SDK is used:
 

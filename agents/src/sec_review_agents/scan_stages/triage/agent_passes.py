@@ -15,6 +15,7 @@ from sec_review_agents.agents.triage.prompts import (
     build_repository_triage_user_prompt,
 )
 from sec_review_agents.agents.triage.workbench_state import TriageWorkbenchState
+from sec_review_agents.observability.trace_context import bind_trace_context
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
@@ -234,6 +235,11 @@ async def _run_repository_triage_agent_pass(
     pass_meta: dict | None = None,
 ) -> dict | None:
     pass_kind: TriagePassKind = "draft" if pass_index <= 0 else "refinement"
+    batch_index = (
+        str(pass_meta["index"])
+        if pass_meta and pass_meta.get("kind") == "batch"
+        else None
+    )
     pass_artifacts_path = _triage_pass_artifacts_path(triage_root, pass_meta)
     remove_transcripts((transcript_path(pass_artifacts_path),))
     backend = create_repository_triage_backend()
@@ -243,17 +249,26 @@ async def _run_repository_triage_agent_pass(
             workbench_state=workbench_state,
             pass_kind=pass_kind,
         )
-        return await invoke_agent_runtime_graph(
-            agent=agent,
-            agent_name=REPOSITORY_TRIAGER_AGENT_NAME,
-            system_prompt=build_repository_triage_system_prompt(pass_kind=pass_kind),
-            user_prompt=build_repository_triage_user_prompt(
-                items=workbench_state.prompt_items(),
-                pass_kind=pass_kind,
-                draft_origins=draft_origins,
-            ),
-            transcript_paths=(transcript_path(pass_artifacts_path),),
-        )
+        # The activity-level context identifies the run. These local labels explain
+        # why one triage stage can produce several otherwise identical invocations.
+        with bind_trace_context(
+            pass_kind=pass_kind,
+            pass_index=str(pass_index),
+            batch_index=batch_index,
+        ):
+            return await invoke_agent_runtime_graph(
+                agent=agent,
+                agent_name=REPOSITORY_TRIAGER_AGENT_NAME,
+                system_prompt=build_repository_triage_system_prompt(
+                    pass_kind=pass_kind
+                ),
+                user_prompt=build_repository_triage_user_prompt(
+                    items=workbench_state.prompt_items(),
+                    pass_kind=pass_kind,
+                    draft_origins=draft_origins,
+                ),
+                transcript_paths=(transcript_path(pass_artifacts_path),),
+            )
 
 
 def _should_run_another_triage_pass(

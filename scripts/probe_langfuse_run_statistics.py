@@ -4,6 +4,7 @@ import os
 from typing import Any
 
 from langfuse import Langfuse
+
 from scripts.execution_statistics.langfuse_run import (
     aggregate_run,
     read_run_observations,
@@ -55,9 +56,6 @@ def main() -> None:
             generations=read_result.generations,
             root_count=len(read_result.roots),
             excluded_non_review_root_count=(read_result.excluded_non_review_root_count),
-            excluded_non_langchain_generation_count=(
-                read_result.excluded_non_langchain_generation_count
-            ),
         )
         print(json.dumps(snapshot, indent=2, sort_keys=True))
     finally:
