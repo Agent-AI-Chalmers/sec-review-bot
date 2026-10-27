@@ -3,11 +3,10 @@
 //
 // This store only performs single-axis transactions on `executions`. Transitions that must
 // also move another axis in the same transaction (submission -> queued, terminal failure ->
-// publication skipped) stay in `ReviewRunStore`, which owns cross-axis orchestration. A
-// resolved recovery moves no other axis: publication stayed `pending` throughout `uncertain`,
-// because a submission the Execution may have accepted could still produce a publishable result.
-// Reading the full run record is likewise not here: the record projection spans all three axes
-// and lives with `ReviewRunStore`.
+// publication skipped) live in concrete cross-axis transition stores behind `ReviewRunStore`.
+// A resolved recovery changes only execution, but its write still asserts that publication is
+// pending, so it belongs to `SubmissionTransitionStore`. Reading the full run record is likewise
+// not here: the record projection spans all three axes.
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 

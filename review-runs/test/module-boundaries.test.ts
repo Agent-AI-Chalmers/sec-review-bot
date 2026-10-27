@@ -102,3 +102,19 @@ test('the read model does not depend on write stores', () => {
     )
   }
 })
+
+test('submission transitions compose axes without depending on axis stores', () => {
+  const dependencies = importedModules(
+    'persistence/submission-transition-store.ts'
+  )
+  assert.ok(dependencies.includes('publication-abandon.ts'))
+  assert.ok(dependencies.includes('review-run-events.ts'))
+  assert.ok(dependencies.includes('run-notices.ts'))
+  assert.ok(!dependencies.includes('review-store.ts'))
+  for (const store of AXIS_STORES) {
+    assert.ok(
+      !dependencies.includes(path.basename(store)),
+      `submission-transition-store.ts imports axis store ${store}`
+    )
+  }
+})

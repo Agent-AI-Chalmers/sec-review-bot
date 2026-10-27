@@ -1,16 +1,16 @@
 // Implements Review Runs's durable review trunk and orchestrates cross-axis transitions that
 // must move more than one lifecycle axis in one transaction. Read-model queries live in
 // `review-run-queries.ts`; SQL row projection lives in `run-record-projection.ts`; and
-// operator-only cross-axis decisions live in `operator-decision-store.ts`.
+// submission and operator-only cross-axis decisions live in their concrete transition stores.
 //
 // Axis ownership:
 // - `execution-store.ts` owns single-axis execution writes (status transitions, observation
 //   heartbeat, artifact/result, submission-recovery claims).
 // - `preparation-store.ts` / `publication-store.ts` own their own axes.
-// - This store owns the run trunk and normal cross-axis transitions (submit -> queued, execution
-//   failure -> publication skipped, rejected replay -> publication skipped). A cross-axis
-//   transition is owned by the axis that initiates it; preparations initiating an execution skip
-//   is therefore in that store.
+// - This store owns the run trunk, composes the concrete stores, and retains the terminal
+//   execution-failure transition that skips publication. Submission transitions live in
+//   `submission-transition-store.ts`; preparations initiating an execution skip stay in the
+//   preparation store.
 // - `publication-abandon.ts` holds the one transition shared by more than one axis: concluding a
 //   publication that can never publish. It is separate because both preparation and execution
 //   trigger it, and single-axis stores must not import each other (this store is what constructs
@@ -19,7 +19,7 @@
 // Publication has no reversion into it: an uncertain submission leaves publication `pending`
 // rather than skipping it, so neither an accepted nor a rejected replay has a publication
 // transition to undo.
-// Claim tokens here are the sole fencing authority for writes.
+// Each concrete store fences its writes with the claim token for the axis it owns.
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
@@ -64,6 +64,7 @@ import {
 } from './run-record-projection.js'
 import { queueRunNotice } from './run-notices.js'
 import { ExecutionStore } from './execution-store.js'
+import { SubmissionTransitionStore } from './submission-transition-store.js'
 
 export type {
   CreateReviewRunArgs,
@@ -104,6 +105,7 @@ export class ReviewRunStore {
   private readonly executions: ExecutionStore
   private readonly operatorDecisions: OperatorDecisionStore
   private readonly queries: ReviewRunQueries
+  private readonly submissionTransitions: SubmissionTransitionStore
   private initialized = false
 
   constructor({
@@ -171,6 +173,10 @@ export class ReviewRunStore {
       this.connectorId,
       this.claimTimeoutMs,
       onDroppedRunRow
+    )
+    this.submissionTransitions = new SubmissionTransitionStore(
+      this.pool,
+      this.connectorId
     )
   }
 
@@ -363,59 +369,12 @@ export class ReviewRunStore {
     context: PublishContext,
     input: JsonObject
   ): Promise<void> {
-    // Both axes are written by one statement, but a single statement is not a transaction here:
-    // every data-modifying CTE runs, and the trailing `SELECT ... WHERE EXISTS` only decides how
-    // many rows are returned. So when the execution arm matches nothing, the publication arm has
-    // already changed `publications.input`, and checking `rowCount` on a bare `pool.query` would
-    // throw after that half-write had auto-committed. Wrapping the statement lets the same check
-    // roll the publication back, keeping the two axes atomic like every other cross-axis write.
-    await transaction(this.pool, async (client) => {
-      // Read the workflow inside the transaction, not before it: the value feeds a predicate the
-      // writes below depend on, and a read outside would be a separate snapshot from the one that
-      // decides whether they match.
-      const run = await this.getWith(client, runId)
-      if (run === null) throw new Error(`Review run does not exist: ${runId}`)
-      const result = await client.query(
-        `
-      WITH updated_publication AS (
-        UPDATE publications
-        SET input=$3::jsonb, updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$5
-          AND EXISTS (
-            SELECT 1 FROM review_runs r
-            WHERE r.run_id=publications.run_id AND r.connector_id=$5 AND r.workflow=$6
-          )
-        RETURNING run_id
-      ),
-      updated_execution AS (
-        UPDATE executions
-        SET input=$4::jsonb, updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$5
-          AND status='pending' AND EXISTS (
-            SELECT 1 FROM preparations
-            WHERE preparations.run_id=executions.run_id
-              AND preparations.connector_id=$5 AND preparations.status='preparing'
-              AND preparations.claim_token=$2
-          )
-        RETURNING run_id
-      )
-      SELECT run_id FROM updated_execution
-      WHERE EXISTS (SELECT 1 FROM updated_publication)
-    `,
-        [
-          runId,
-          token,
-          JSON.stringify(context),
-          JSON.stringify(input),
-          this.connectorId,
-          run.workflow
-        ]
-      )
-      if (result.rowCount !== 1)
-        throw new Error(
-          `Review run ${runId} cannot save prepared submission outside pending.`
-        )
-    })
+    await this.submissionTransitions.savePreparedSubmission(
+      runId,
+      token,
+      context,
+      input
+    )
   }
   async renewPreparationClaim(runId: string, token: string): Promise<boolean> {
     this.ready()
@@ -459,79 +418,7 @@ export class ReviewRunStore {
     token: string,
     context: PublishContext
   ): Promise<void> {
-    return await transaction(this.pool, async (client) => {
-      const run = await this.getWith(client, runId)
-      if (run === null)
-        // The run id came from the caller, so a missing run is a 4xx, not a server fault.
-        // Without `statusCode` the HTTP layer would report it as 500 and hide the real cause.
-        throw Object.assign(new Error(`Review run does not exist: ${runId}`), {
-          statusCode: 404
-        })
-      // Submitting the prepared input asserts the same premise a replay does: the publication is
-      // still pending, because the run may now succeed and its result must remain deliverable.
-      // Without the status check this row would accept the new input even after another path had
-      // concluded the publication, and the execution below would then queue a run whose result
-      // can never be published. Matching no row fails the whole transaction.
-      const result = await client.query(
-        `
-        UPDATE publications
-        SET input=$2::jsonb, updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$3
-          AND status='pending'
-          AND EXISTS (
-            SELECT 1 FROM review_runs r
-            WHERE r.run_id=publications.run_id AND r.connector_id=$3 AND r.workflow=$4
-          )
-      `,
-        [runId, JSON.stringify(context), this.connectorId, run.workflow]
-      )
-      const queued = await client.query(
-        `
-        UPDATE executions
-        SET status='queued', started_at=COALESCE(started_at, clock_timestamp()),
-            failure_code=NULL, failure_message=NULL,
-            observed_at=clock_timestamp(), updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$3
-          AND status='pending' AND EXISTS (
-            SELECT 1 FROM preparations
-            WHERE preparations.run_id=executions.run_id
-              AND preparations.connector_id=$3 AND preparations.status='preparing'
-              AND preparations.claim_token=$2
-          )
-      `,
-        [runId, token, this.connectorId]
-      )
-      if (result.rowCount !== 1 || queued.rowCount !== 1)
-        throw new Error(
-          `Review run ${runId} cannot transition from pending to queued.`
-        )
-      const completed = await client.query(
-        `UPDATE preparations
-         SET status='submitted', claim_token=NULL, claimed_at=NULL,
-             finished_at=clock_timestamp(), updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2 AND status='preparing'
-           AND claim_token=$3`,
-        [runId, this.connectorId, token]
-      )
-      if (completed.rowCount !== 1)
-        throw new Error(
-          `Preparation ${runId} lost its claim before the queued transition completed.`
-        )
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'execution',
-        fromStatus: 'pending',
-        toStatus: 'queued'
-      })
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'preparation',
-        fromStatus: 'preparing',
-        toStatus: 'submitted'
-      })
-    })
+    await this.submissionTransitions.markQueued(runId, token, context)
   }
   async runExists(runId: string): Promise<boolean> {
     this.ready()
@@ -648,40 +535,10 @@ export class ReviewRunStore {
     runId: string,
     token: string
   ): Promise<boolean> {
-    return await transaction(this.pool, async (client) => {
-      // An uncertain submission keeps publication pending, so a successful replay moves only the
-      // execution axis and needs no publication change. The EXISTS clause asserts that premise
-      // instead of assuming it: if some other path already concluded the publication (skipped or
-      // failed), queueing the execution would leave a run that is running while its result can no
-      // longer be delivered. Matching nothing returns false, which the caller reports as a lost
-      // claim instead of committing that inconsistent snapshot.
-      const result = await client.query(
-        `
-        UPDATE executions
-        SET status='queued', claim_token=NULL, claimed_at=NULL,
-            started_at=COALESCE(started_at, clock_timestamp()),
-            failure_code=NULL, failure_message=NULL,
-            observed_at=clock_timestamp(), updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$2
-          AND status='uncertain' AND claim_token=$3
-          AND EXISTS (
-            SELECT 1 FROM publications p
-            WHERE p.run_id=executions.run_id AND p.connector_id=executions.connector_id
-              AND p.status='pending'
-          )
-      `,
-        [runId, this.connectorId, token]
-      )
-      if (result.rowCount !== 1) return false
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'execution',
-        fromStatus: 'uncertain',
-        toStatus: 'queued'
-      })
-      return true
-    })
+    return await this.submissionTransitions.completeSubmissionRecovery(
+      runId,
+      token
+    )
   }
   /** Conclude an uncertain submission that will not resolve: the run really did not start.
    *
@@ -697,63 +554,11 @@ export class ReviewRunStore {
     token: string,
     error: { code?: string | null; message: string }
   ): Promise<boolean> {
-    return await transaction(this.pool, async (client) => {
-      const result = await client.query(
-        `
-        UPDATE executions
-        SET status='failed', claim_token=NULL, claimed_at=NULL,
-            failure_code=$4, failure_message=$5,
-            finished_at=clock_timestamp(),
-            observed_at=clock_timestamp(), updated_at=clock_timestamp()
-        WHERE run_id=$1 AND connector_id=$2
-          AND status='uncertain' AND claim_token=$3
-      `,
-        [runId, this.connectorId, token, error.code ?? null, error.message]
-      )
-      if (result.rowCount !== 1) return false
-      // A rejected replay proves there is nothing to publish: converge a publication that is
-      // still pending or in flight, in this same transaction.
-      const fromStatus = await abandonInFlightPublication(
-        client,
-        this.connectorId,
-        runId
-      )
-      // The requester is told here and nowhere earlier: entering `uncertain` queues no notice,
-      // so the comment a requester reads is never one the replay could contradict. The notice is
-      // keyed by this event, not by the run, so it cannot collide with a notice some other
-      // transition queued - the row is unique per source event, which is what makes a second
-      // write of this same transition a no-op instead of a second comment.
-      const executionEventId = await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'execution',
-        fromStatus: 'uncertain',
-        toStatus: 'failed',
-        reasonCode: error.code ?? null
-      })
-      await queueRunNotice(client, {
-        runId,
-        connectorId: this.connectorId,
-        sourceEventId: executionEventId,
-        kind: 'failure',
-        axis: 'execution',
-        reasonCode: error.code ?? null
-      })
-      if (fromStatus !== null) {
-        await appendEvent(client, {
-          runId,
-          connectorId: this.connectorId,
-          axis: 'publication',
-          fromStatus,
-          toStatus: 'skipped',
-          // The publication was abandoned because execution was conclusively rejected, not for
-          // the rejection's own reason: that code belongs to the execution event above. Keeping it
-          // constant is what lets the contract declare this edge's reason exactly.
-          reasonCode: 'PUBLICATION_ABANDONED'
-        })
-      }
-      return true
-    })
+    return await this.submissionTransitions.failSubmissionRecovery(
+      runId,
+      token,
+      error
+    )
   }
   /** Active (queued/running) runs for this connector, as a projection: a row the contract
    * cannot represent is returned in `dropped` instead of aborting the read for every run. */
