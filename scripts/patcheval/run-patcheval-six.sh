@@ -2,7 +2,7 @@
 set -uo pipefail
 
 usage() {
-  cat <<'EOF'
+  cat << 'EOF'
 Usage:
   scripts/patcheval/run-patcheval-six.sh CVE-ID [options]
 
@@ -68,7 +68,7 @@ while [ $# -gt 0 ]; do
       TAG="${2//\//-}"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;

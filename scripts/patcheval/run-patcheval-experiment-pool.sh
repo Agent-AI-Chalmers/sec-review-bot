@@ -2,7 +2,7 @@
 set -uo pipefail
 
 usage() {
-  cat <<'EOF'
+  cat << 'EOF'
 Usage:
   scripts/patcheval/run-patcheval-experiment-pool.sh [options]
 
@@ -126,7 +126,7 @@ while [ $# -gt 0 ]; do
       MAX_FAILURES="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
@@ -304,7 +304,7 @@ while IFS=$'\t' read -r spec_cve variant status; do
       blocked_count=$((blocked_count + 1))
       printf 'SKIP %s\t%s\t%s\n' "$effective_status" "$spec_cve" "$variant" >&2
       ;;
-    exit-*|missing-target|missing-exit-code|missing-patch|empty-patch)
+    exit-* | missing-target | missing-exit-code | missing-patch | empty-patch)
       if [ "$RESUME_INCOMPLETE" -eq 1 ]; then
         QUEUE+=("${spec_cve}|${variant}|${effective_status}")
         queued_count=$((queued_count + 1))
@@ -313,7 +313,7 @@ while IFS=$'\t' read -r spec_cve variant status; do
         printf 'SKIP %s\t%s\t%s\n' "$effective_status" "$spec_cve" "$variant" >&2
       fi
       ;;
-    missing-workspace|missing-symlink)
+    missing-workspace | missing-symlink)
       QUEUE+=("${spec_cve}|${variant}|${effective_status}")
       queued_count=$((queued_count + 1))
       ;;

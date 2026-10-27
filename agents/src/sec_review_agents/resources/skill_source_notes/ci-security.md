@@ -6,11 +6,11 @@ These sources support the `ci-security` references.
 
 Primary sources:
 
-- https://docs.github.com/en/actions/concepts/security/script-injections
-- https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions
-- https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows
-- https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/
-- https://cheatsheetseries.owasp.org/cheatsheets/GitHub_Actions_Security_Cheat_Sheet.html
+- <https://docs.github.com/en/actions/concepts/security/script-injections>
+- <https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions>
+- <https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows>
+- <https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/>
+- <https://cheatsheetseries.owasp.org/cheatsheets/GitHub_Actions_Security_Cheat_Sheet.html>
 
 Claim ledger:
 
@@ -31,11 +31,11 @@ Claim ledger:
 
 Primary sources:
 
-- https://docs.gitlab.com/ci/pipelines/merge_request_pipelines/
-- https://docs.gitlab.com/ci/variables/
-- https://docs.gitlab.com/ci/jobs/ci_job_token/
-- https://docs.gitlab.com/ci/pipelines/pipeline_security/
-- https://docs.gitlab.com/user/project/repository/branches/protected/
+- <https://docs.gitlab.com/ci/pipelines/merge_request_pipelines/>
+- <https://docs.gitlab.com/ci/variables/>
+- <https://docs.gitlab.com/ci/jobs/ci_job_token/>
+- <https://docs.gitlab.com/ci/pipelines/pipeline_security/>
+- <https://docs.gitlab.com/user/project/repository/branches/protected/>
 
 Claim ledger:
 
@@ -56,11 +56,11 @@ Claim ledger:
 
 Primary sources:
 
-- https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions
-- https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts
-- https://docs.gitlab.com/ci/variables/
-- https://docs.gitlab.com/ci/jobs/job_artifacts/
-- https://docs.docker.com/build/building/secrets/
+- <https://docs.github.com/en/actions/security-for-github-actions/security-guides/using-secrets-in-github-actions>
+- <https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts>
+- <https://docs.gitlab.com/ci/variables/>
+- <https://docs.gitlab.com/ci/jobs/job_artifacts/>
+- <https://docs.docker.com/build/building/secrets/>
 
 Claim ledger:
 

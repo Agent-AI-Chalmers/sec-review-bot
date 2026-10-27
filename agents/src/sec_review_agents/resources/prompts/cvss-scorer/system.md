@@ -97,6 +97,7 @@ After selecting a tentative vector, audit the vector before returning it.
 - Preconditions like on-path position, race/state/runtime conditions map to `AT:P`, while `AC` can still be `L`.
 
 Example anchors:
+
 - `CVE-2022-41741` - NGINX `ngx_http_mp4_module` memory corruption (`AT:P`, `AC:L`).
 - `CVE-2020-3549` - Cisco FMC/FTD sftunnel negotiation protection weakness (`AT:P`, `AC:L`).
 
@@ -105,6 +106,7 @@ Example anchors:
 - `UI:P` for routine or ordinary victim action; `UI:A` for conscious security-relevant action such as pasting attacker script or bypassing warning.
 
 Example anchors:
+
 - `CVE-2023-28311` - Microsoft Word remote code execution via document opening (`UI:P`).
 - `CVE-2022-21830` - Self-XSS requiring active script pasting (`UI:A`).
 
@@ -114,6 +116,7 @@ Example anchors:
 - Generic ability to pivot, read credentials, or reach other services is not enough by itself.
 
 Example anchors:
+
 - `CVE-2022-41741` - NGINX `ngx_http_mp4_module` memory corruption (`SC:N/SI:N/SA:N`).
 - `CVE-2020-3549` - Cisco FMC/FTD sftunnel negotiation protection weakness (`SC:N/SI:N/SA:N`).
 - `CVE-2021-44228` - Log4Shell is scored as full vulnerable-system impact with no subsequent-system impact in the common case (`VC:H/VI:H/VA:H/SC:N/SI:N/SA:N`).
@@ -124,6 +127,7 @@ Example anchors:
 - Prefer concrete system relationships over generic downstream speculation.
 
 Example anchors:
+
 - `CVE-2022-21830` - Self-XSS impacting user/browser context.
 - `CVE-2023-20048` - Cisco FMC management-system flaw affecting managed FTD devices.
 - `CVE-2020-3947` - virtualization boundary escape (guest-to-host style impact).

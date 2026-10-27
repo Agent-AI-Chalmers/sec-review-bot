@@ -1,6 +1,6 @@
-# Context Delivery
+# Context Loading
 
-Language: English | [中文](CONTEXT_DELIVERY.zh.md)
+Language: English | [中文](CONTEXT_LOADING.zh.md)
 
 Agents in this project receive context in two ways: some content arrives already rendered in the prompt, and some is left in the workspace for the agent to fetch with its own tools. Choosing between them per agent is a design decision, not a preference, and the two choices lead to different costs when the choice is wrong.
 

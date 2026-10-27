@@ -67,7 +67,7 @@ http://localhost:30000/api/repository-review/dispatch
 
 很多 GitHub App / webhook 教程都会使用 [`smee.io`](https://smee.io/)，因为它很适合“先把链路打通”的本地开发场景。
 
-### 怎么工作
+### `smee` 的工作方式
 
 1. 在 `smee.io` 获取一个临时公网 URL
 2. GitHub 把 webhook 发到这个公网 URL
@@ -84,7 +84,7 @@ npx smee -u https://smee.io/xxxxxxxxxxxx -t http://localhost:30000/api/webhook
 - `-u`: 你的公网 `smee` channel 地址
 - `-t`: 本地 webhook 服务地址
 
-### 适合场景
+### 适合使用 `smee` 的场景
 
 - 本地快速调试 webhook
 - 临时验证 GitHub App 配置
@@ -99,7 +99,7 @@ npx smee -u https://smee.io/xxxxxxxxxxxx -t http://localhost:30000/api/webhook
 
 如果你已经有域名，但没有现成的公网入站服务，或者不想自己处理端口转发、TLS 证书和公开暴露本机端口，也可以使用 Cloudflare Tunnel。
 
-### 怎么工作
+### Cloudflare Tunnel 的工作方式
 
 1. 在一台可运行 `cloudflared` 的机器上创建 tunnel
 2. 把某个域名或子域名路由到本地 GitHub integration 服务
@@ -143,7 +143,7 @@ https://your-subdomain.example.com/api/repository-review/dispatch
 sudo cloudflared service uninstall
 ```
 
-### 适合场景
+### 适合使用 Cloudflare Tunnel 的场景
 
 - 想要稳定、正式、可长期复用的 webhook URL
 - 已经有 Cloudflare 和域名

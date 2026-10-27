@@ -4,24 +4,24 @@ set -eu
 # Installation writes to /etc and normalizes repository state ownership. The
 # service itself still runs as the unprivileged user passed by the operator.
 if [ "$(id -u)" -ne 0 ]; then
-    echo "Run this installer as root: sudo ops/systemd/install.sh <service-user>" >&2
-    exit 1
+  echo "Run this installer as root: sudo ops/systemd/install.sh <service-user>" >&2
+  exit 1
 fi
 
 service_user=${1:-}
 if [ -z "$service_user" ]; then
-    echo "Usage: sudo ops/systemd/install.sh <service-user>" >&2
-    exit 1
+  echo "Usage: sudo ops/systemd/install.sh <service-user>" >&2
+  exit 1
 fi
-if ! id "$service_user" >/dev/null 2>&1; then
-    echo "Unknown service user: $service_user" >&2
-    exit 1
+if ! id "$service_user" > /dev/null 2>&1; then
+  echo "Unknown service user: $service_user" >&2
+  exit 1
 fi
 case "$service_user" in
-    *[!A-Za-z0-9_.-]*|'')
-        echo "Unsupported service user name: $service_user" >&2
-        exit 1
-        ;;
+  *[!A-Za-z0-9_.-]* | '')
+    echo "Unsupported service user name: $service_user" >&2
+    exit 1
+    ;;
 esac
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -39,31 +39,31 @@ trap 'rm -f "$rendered_deployment_env"' EXIT HUP INT TERM
 
 # Fail before installing units that cannot run under the selected service user.
 if [ ! -x "$repository_root/agents/.venv/bin/sec-review-execution-worker" ] ||
-    [ ! -x "$repository_root/agents/.venv/bin/sec-review-memory-extraction-worker" ] ||
-    [ ! -x "$repository_root/agents/.venv/bin/sec-review-memory-maintenance-worker" ]; then
-    echo "Missing execution, memory extraction, or memory maintenance worker executable." >&2
-    echo "Run 'uv sync --frozen --no-dev' in $repository_root/agents first." >&2
-    exit 1
+  [ ! -x "$repository_root/agents/.venv/bin/sec-review-memory-extraction-worker" ] ||
+  [ ! -x "$repository_root/agents/.venv/bin/sec-review-memory-maintenance-worker" ]; then
+  echo "Missing execution, memory extraction, or memory maintenance worker executable." >&2
+  echo "Run 'uv sync --frozen --no-dev' in $repository_root/agents first." >&2
+  exit 1
 fi
 if ! /usr/sbin/runuser -u "$service_user" -- \
-    test -x "$repository_root/agents/.venv/bin/sec-review-execution-worker"; then
-    echo "The service user cannot execute the execution worker." >&2
-    exit 1
+  test -x "$repository_root/agents/.venv/bin/sec-review-execution-worker"; then
+  echo "The service user cannot execute the execution worker." >&2
+  exit 1
 fi
 if ! /usr/sbin/runuser -u "$service_user" -- \
-    test -x "$repository_root/agents/.venv/bin/sec-review-memory-extraction-worker"; then
-    echo "The service user cannot execute the memory extraction worker." >&2
-    exit 1
+  test -x "$repository_root/agents/.venv/bin/sec-review-memory-extraction-worker"; then
+  echo "The service user cannot execute the memory extraction worker." >&2
+  exit 1
 fi
 if ! /usr/sbin/runuser -u "$service_user" -- \
-    test -x "$repository_root/agents/.venv/bin/sec-review-memory-maintenance-worker"; then
-    echo "The service user cannot execute the memory maintenance worker." >&2
-    exit 1
+  test -x "$repository_root/agents/.venv/bin/sec-review-memory-maintenance-worker"; then
+  echo "The service user cannot execute the memory maintenance worker." >&2
+  exit 1
 fi
 if ! /usr/sbin/runuser -u "$service_user" -- \
-    /usr/bin/env docker info >/dev/null 2>&1; then
-    echo "The service user cannot access the Docker daemon." >&2
-    exit 1
+  /usr/bin/env docker info > /dev/null 2>&1; then
+  echo "The service user cannot access the Docker daemon." >&2
+  exit 1
 fi
 
 install -d -m 0755 "$config_dir"
@@ -72,31 +72,31 @@ install -d -m 0755 "$config_dir"
 # Re-running the installer also restores these default directories to the
 # selected service user after an earlier root-owned deployment.
 install -d -m 0755 -o "$service_uid" -g "$service_gid" \
-    "$repository_root/.agent-temporal-state" \
-    "$repository_root/.agent-rustfs-state" \
-    "$repository_root/.agent-postgres-state" \
-    "$repository_root/.agent-artifacts" \
-    "$repository_root/.agent-run-inputs"
+  "$repository_root/.agent-temporal-state" \
+  "$repository_root/.agent-rustfs-state" \
+  "$repository_root/.agent-postgres-state" \
+  "$repository_root/.agent-artifacts" \
+  "$repository_root/.agent-run-inputs"
 # GNU install preserves the owner of directories that already exist. Correct
 # the bind-mount roots explicitly without traversing potentially large state.
 chown "$service_uid:$service_gid" \
-    "$repository_root/.agent-temporal-state" \
-    "$repository_root/.agent-rustfs-state" \
-    "$repository_root/.agent-postgres-state" \
-    "$repository_root/.agent-artifacts" \
-    "$repository_root/.agent-run-inputs"
+  "$repository_root/.agent-temporal-state" \
+  "$repository_root/.agent-rustfs-state" \
+  "$repository_root/.agent-postgres-state" \
+  "$repository_root/.agent-artifacts" \
+  "$repository_root/.agent-run-inputs"
 if [ ! -f "$deployment_env_source" ]; then
-    echo "Missing deployment config: $deployment_env_source" >&2
-    echo "Copy deployment.env.sample to deployment.env and fill in its values first." >&2
-    exit 1
+  echo "Missing deployment config: $deployment_env_source" >&2
+  echo "Copy deployment.env.sample to deployment.env and fill in its values first." >&2
+  exit 1
 fi
 # Checkout paths shared with Compose must move together. Artifact and model
 # paths have repository-local defaults, but remain independent worker choices.
 # The renderer therefore has three policies: replace installer-owned values,
 # preserve non-empty optional overrides, and copy every unrelated source line.
 awk -v repository_root="$repository_root" \
-    -v service_uid="$service_uid" \
-    -v service_gid="$service_gid" '
+  -v service_uid="$service_uid" \
+  -v service_gid="$service_gid" '
     BEGIN {
         fixed["SEC_REVIEW_BOT_DIR"] = 1
         fixed["SEC_REVIEW_AGENTS_DIR"] = 1
@@ -151,16 +151,16 @@ awk -v repository_root="$repository_root" \
             print retained[line_number]
         }
     }
-' "$deployment_env_source" >"$rendered_deployment_env"
+' "$deployment_env_source" > "$rendered_deployment_env"
 # POSTGRES_PASSWORD belongs in the project `.env` (Compose interpolation), not
 # here: the systemd unit exports this file into the Compose process environment,
 # where it shadows `.env` and leaves the data volume unauthenticated against a
 # later foreground compose run. Refuse a deployment.env that still sets it, so a
 # stale sample placeholder cannot be reinstalled silently.
 if grep -qE '^[[:space:]]*POSTGRES_PASSWORD=' "$rendered_deployment_env"; then
-    echo "Refusing to install: deployment.env sets POSTGRES_PASSWORD." >&2
-    echo "Remove it from $deployment_env_source and set the password in the project .env instead." >&2
-    exit 1
+  echo "Refusing to install: deployment.env sets POSTGRES_PASSWORD." >&2
+  echo "Remove it from $deployment_env_source and set the password in the project .env instead." >&2
+  exit 1
 fi
 # Copy only the completed merged file and keep deployment secrets private.
 install -m 0600 "$rendered_deployment_env" "$deployment_env"
@@ -168,29 +168,29 @@ install -m 0600 "$rendered_deployment_env" "$deployment_env"
 # Unit templates contain only the service-user placeholder. Deployment values
 # remain in the EnvironmentFile so changing them does not rewrite unit files.
 render_unit() {
-    source_path=$1
-    target_path=$2
-    escaped_service_user=$(printf '%s' "$service_user" | sed 's/[&|]/\\&/g')
-    sed "s|@SEC_REVIEW_BOT_USER@|$escaped_service_user|g" \
-        "$source_path" >"$target_path"
-    chmod 0644 "$target_path"
+  source_path=$1
+  target_path=$2
+  escaped_service_user=$(printf '%s' "$service_user" | sed 's/[&|]/\\&/g')
+  sed "s|@SEC_REVIEW_BOT_USER@|$escaped_service_user|g" \
+    "$source_path" > "$target_path"
+  chmod 0644 "$target_path"
 }
 
 install -m 0644 \
-    "$script_dir/sec-review-bot.target" \
-    "$unit_dir/sec-review-bot.target"
+  "$script_dir/sec-review-bot.target" \
+  "$unit_dir/sec-review-bot.target"
 render_unit \
-    "$script_dir/sec-review-bot-compose-stack.service.in" \
-    "$unit_dir/sec-review-bot-compose-stack.service"
+  "$script_dir/sec-review-bot-compose-stack.service.in" \
+  "$unit_dir/sec-review-bot-compose-stack.service"
 render_unit \
-    "$script_dir/sec-review-execution-worker@.service.in" \
-    "$unit_dir/sec-review-execution-worker@.service"
+  "$script_dir/sec-review-execution-worker@.service.in" \
+  "$unit_dir/sec-review-execution-worker@.service"
 render_unit \
-    "$script_dir/sec-review-memory-extraction-worker@.service.in" \
-    "$unit_dir/sec-review-memory-extraction-worker@.service"
+  "$script_dir/sec-review-memory-extraction-worker@.service.in" \
+  "$unit_dir/sec-review-memory-extraction-worker@.service"
 render_unit \
-    "$script_dir/sec-review-memory-maintenance-worker.service.in" \
-    "$unit_dir/sec-review-memory-maintenance-worker.service"
+  "$script_dir/sec-review-memory-maintenance-worker.service.in" \
+  "$unit_dir/sec-review-memory-maintenance-worker.service"
 
 systemctl daemon-reload
 

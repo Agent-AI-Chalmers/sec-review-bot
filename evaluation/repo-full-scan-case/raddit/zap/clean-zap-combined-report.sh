@@ -15,7 +15,7 @@ if [ ! -f "$API_REPORT" ]; then
   exit 1
 fi
 
-if ! command -v jq >/dev/null 2>&1; then
+if ! command -v jq > /dev/null 2>&1; then
   echo "jq is required but not installed." >&2
   exit 1
 fi

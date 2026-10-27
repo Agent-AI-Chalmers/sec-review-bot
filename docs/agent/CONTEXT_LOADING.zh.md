@@ -1,8 +1,8 @@
-# 上下文投递
+# 上下文加载
 
-语言：[English](CONTEXT_DELIVERY.md) | 中文
+语言：[English](CONTEXT_LOADING.md) | 中文
 
-本文是 [CONTEXT_DELIVERY.md](CONTEXT_DELIVERY.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文是 [CONTEXT_LOADING.md](CONTEXT_LOADING.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
 本项目中的 agent 通过两种方式获得上下文：一部分内容已经渲染进 prompt，另一部分留在 workspace 里，由 agent 用自己的工具去取。按 agent 在这两者之间做选择是设计决策，不是偏好，选错时代价也不同。
 

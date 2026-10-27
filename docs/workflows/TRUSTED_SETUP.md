@@ -17,7 +17,7 @@ The obvious fix is to let the repository declare how to prepare its own environm
 Trust is not a switch; it is **scarce**, and it is allocated per source. The design's whole shape follows from deciding, for each source that can reach the sandbox, how much it is trusted and what that permission buys.
 
 | Source | Why it stands where it does | Constraint it yields |
-|---|---|---|
+| --- | --- | --- |
 | The default branch (content a maintainer has merged) | Reviewed and merged; the repository's controlled surface | The **only** legitimate source of the declaration |
 | A PR head / a fork | The author controls it and it is not yet merged | Never a declaration source; an external fork needs explicit approval |
 | A webhook payload | It can name any branch | Never the source of the trusted ref |

@@ -79,11 +79,11 @@ If you only want to inspect or run the agent side, start from:
 
 ## Supported Workflows
 
-| Path                | Trigger                                       | Output                            |
-| ------------------- | --------------------------------------------- | --------------------------------- |
+| Path                | Trigger                                       | Output                                                                 |
+| ------------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
 | Issue review        | `issues.opened`, `@<app-slug> review`         | Issue comment (and a draft PR once a confirmed finding yields a patch) |
-| Pull request review | PR webhook, `@<app-slug> review`              | PR review / suggestions           |
-| Repository review   | scheduled / manually dispatched GitHub Action | Repository summary and deliveries |
+| Pull request review | PR webhook, `@<app-slug> review`              | PR review / suggestions                                                |
+| Repository review   | scheduled / manually dispatched GitHub Action | Repository summary and deliveries                                      |
 
 Every trigger reviews in `audit` mode; there is no `repair` option.
 
@@ -121,7 +121,7 @@ Package-specific setup and commands live in the package READMEs.
 
 | Goal                                           | Start here                                                                          |
 | ---------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Understand runtime roles and ownership         | [System architecture](docs/architecture/SYSTEM_ARCHITECTURE.md)                    |
+| Understand runtime roles and ownership         | [System architecture](docs/architecture/SYSTEM_ARCHITECTURE.md)                     |
 | Run the full local stack and execution workers | [Local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) |
 | Develop a package or service                   | [Documentation map](docs/README.md) and the package's README                        |
 | Contract and generated-artifact changes        | [Contracts guide](contracts/README.md)                                              |

@@ -72,6 +72,10 @@ Python targets 3.14. Do not add `from __future__ import annotations`; PEP 649 gi
 
 Follow [PEP 585](https://peps.python.org/pep-0585/) type style: prefer built-in generics such as `list[str]`/`dict[str, int]`, and import ABC generics such as `Callable`, `Iterable`, `Mapping`, and `Sequence` from `collections.abc`; keep typing-only constructs in `typing`.
 
+### Shell Code Style
+
+Follow the repository root `.editorconfig` when editing maintained shell scripts. Do not apply repository formatting rules to shell scripts embedded in agent test workspaces or other fixtures.
+
 ### Python Checks
 
 For Python changes under `agents/`, use the package-local checks from `agents/`:

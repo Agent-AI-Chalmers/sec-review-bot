@@ -842,30 +842,30 @@ x-state-machines:
           Preparation failed permanently (retry budget exhausted or input could not be built).
           The Execution API provider was never handed input, so execution is skipped.
     transitions:
-      - { from: pending, to: preparing, label: claimed}
-      - { from: preparing, to: submitted, label: input accepted}
-      - { from: preparing, to: pending, label: retry}
+      - { from: pending, to: preparing, label: claimed }
+      - { from: preparing, to: submitted, label: input accepted }
+      - { from: preparing, to: pending, label: retry }
       # A lapsed lease is not evidence that nothing happened, so it does not return the row to
       # `pending`; it becomes `uncertain` and a later claim re-establishes what was done.
-      - { from: preparing, to: uncertain, label: claim lapsed}
-      - { from: uncertain, to: preparing, label: reclaim to confirm}
+      - { from: preparing, to: uncertain, label: claim lapsed }
+      - { from: uncertain, to: preparing, label: reclaim to confirm }
       # `disconnected` stops automation on a run whose own records contradict each other. What an
       # operator may do about it is the state's outgoing edges below, not part of its meaning.
-      - { from: preparing, to: disconnected, reason: EXECUTION_ALREADY_ADVANCED, label: cannot be concluded automatically}
+      - { from: preparing, to: disconnected, reason: EXECUTION_ALREADY_ADVANCED, label: cannot be concluded automatically }
       # The operator decisions off a disconnected preparation: hand it back, give up on the
       # outcome, or abandon the run through the older blocked-run route. That route writes
       # EXECUTION_ALREADY_ADVANCED, because the run it concludes is the contradicted one;
       # PREPARATION_ABANDONED is kept declared because this state is reached from a stored row,
       # and a reason a consumer sees must be one the contract names. Both end it as `failed`.
-      - { from: disconnected, to: uncertain, reason: PREPARATION_RESUMED_BY_OPERATOR, label: resumed by an operator}
-      - { from: disconnected, to: failed, reason: PREPARATION_GIVEN_UP_BY_OPERATOR, label: given up by an operator}
-      - { from: disconnected, to: failed, reason: EXECUTION_ALREADY_ADVANCED, label: abandoned by an operator}
-      - { from: disconnected, to: failed, reason: PREPARATION_ABANDONED, label: abandoned by an operator}
+      - { from: disconnected, to: uncertain, reason: PREPARATION_RESUMED_BY_OPERATOR, label: resumed by an operator }
+      - { from: disconnected, to: failed, reason: PREPARATION_GIVEN_UP_BY_OPERATOR, label: given up by an operator }
+      - { from: disconnected, to: failed, reason: EXECUTION_ALREADY_ADVANCED, label: abandoned by an operator }
+      - { from: disconnected, to: failed, reason: PREPARATION_ABANDONED, label: abandoned by an operator }
       # Two write paths reach `failed`: a preparer reporting a terminal error (any
       # connector-supplied failure code) and the lease expiring on the final allowed attempt.
       # Only the second one carries a reason code, so the edge is declared without one; a
       # consumer filtering by reason would otherwise miss every explicit preparation failure.
-      - { from: preparing, to: failed, label: failed}
+      - { from: preparing, to: failed, label: failed }
   execution:
     order: 2
     title: Execution
@@ -914,13 +914,13 @@ x-state-machines:
     transitions:
       # Submission (a write). `uncertain` only ever comes from a submission whose acceptance
       # could not be confirmed — never from a run that was already queued or running.
-      - { from: pending, to: queued, label: input submitted}
-      - { from: pending, to: skipped, label: preparation failed}
+      - { from: pending, to: queued, label: input submitted }
+      - { from: pending, to: skipped, label: preparation failed }
       - { from: pending, to: uncertain, reason: SUBMISSION_STATE_UNCERTAIN, label: submission unconfirmed }
       # Taking the recovery claim is not a state change, but it is audited as a self-event so the
       # timeline shows when a replay started. The edge is declared because the log writes it.
       - { from: uncertain, to: uncertain, reason: SUBMISSION_RECOVERY_CLAIMED, label: replay claimed }
-      - { from: uncertain, to: queued, label: replay accepted}
+      - { from: uncertain, to: queued, label: replay accepted }
       - { from: uncertain, to: failed, label: replay rejected }
       - { from: uncertain, to: disconnected, reason: SUBMISSION_RECOVERY_EXHAUSTED, label: recovery disconnected }
       # The only way out of a disconnected recovery other than failing the run: an operator hands
@@ -994,13 +994,13 @@ x-state-machines:
       # log records that the previous owner's claim lapsed and a new one took over.
       - { from: publishing, to: publishing, reason: PUBLICATION_LEASE_EXPIRED, label: publishing lease expired }
       - { from: publishing, to: pending, label: retryable failure }
-      - { from: publishing, to: failed, label: terminal failure}
-      - { from: pending, to: skipped, label: execution not published}
+      - { from: publishing, to: failed, label: terminal failure }
+      - { from: pending, to: skipped, label: execution not published }
       # A publication can already be in flight when the execution axis is later found
       # unusable, so the execution-failure paths converge it from `publishing` as well as from
       # `pending`. Without this edge that row would stay `publishing` with no writer able to
       # move it.
-      - { from: publishing, to: skipped, reason: PUBLICATION_ABANDONED, label: execution failed}
+      - { from: publishing, to: skipped, reason: PUBLICATION_ABANDONED, label: execution failed }
 paths:
   /healthz:
     get:
