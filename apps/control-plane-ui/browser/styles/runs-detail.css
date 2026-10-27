@@ -165,6 +165,199 @@ a {
 
 /* ------------------------------------------------------------- run detail */
 
+.execution-statistics {
+  margin-top: 14px;
+  padding: 12px 14px;
+  background: var(--mantine-color-default-hover);
+  border: 1px solid var(--border);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.statistics-usage-details {
+  margin-top: 5px;
+}
+
+.statistics-groups {
+  margin-top: 16px;
+}
+
+.statistics-section + .statistics-section {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.statistics-workflow-stage + .statistics-workflow-stage {
+  margin-top: 10px;
+}
+
+.statistics-workflow-stage {
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.statistics-workflow-stage > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+
+.statistics-workflow-stage > summary::-webkit-details-marker {
+  display: none;
+}
+
+.statistics-workflow-stage > summary::before {
+  content: '›';
+  color: var(--mantine-color-anchor);
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.statistics-workflow-stage[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.statistics-stage-body {
+  padding: 4px 0 16px 20px;
+}
+
+.statistics-units {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.statistics-unit {
+  border: 1px solid var(--border);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-body);
+}
+
+.statistics-unit > summary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.statistics-unit > summary::-webkit-details-marker {
+  display: none;
+}
+
+.statistics-unit > summary::before {
+  content: '›';
+  color: var(--mantine-color-anchor);
+  font-size: 1rem;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.statistics-unit[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.statistics-unit[open] > summary {
+  border-bottom: 1px solid var(--border);
+}
+
+.statistics-unit-body {
+  padding: 12px;
+}
+
+.statistics-unit-metrics {
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.statistics-groups code {
+  overflow-wrap: anywhere;
+}
+
+.statistics-agent-breakdown {
+  font-size: var(--mantine-font-size-xs);
+}
+
+.statistics-agent-breakdown th,
+.statistics-agent-breakdown td {
+  padding: 5px 8px;
+}
+
+.statistics-agent-breakdown th:first-child,
+.statistics-agent-breakdown td:first-child {
+  padding-left: 0;
+}
+
+.statistics-agent-breakdown-total td {
+  border-top: 1px solid var(--border-strong);
+  font-weight: 600;
+}
+
+.statistics-section .mantine-Table-td,
+.statistics-section .mantine-Table-th {
+  padding-block: 8px;
+}
+
+.statistics-table {
+  table-layout: fixed;
+}
+
+.statistics-table th:nth-child(1) {
+  width: 38%;
+}
+
+.statistics-table th:nth-child(2) {
+  width: 42%;
+}
+
+.statistics-table th:nth-child(3) {
+  width: 9%;
+}
+
+.statistics-table th:nth-child(4) {
+  width: 11%;
+}
+
+.statistics-model-identity {
+  white-space: nowrap;
+}
+
+.statistics-mobile-model {
+  display: none;
+}
+
+.statistics-group-row {
+  cursor: pointer;
+}
+
+.statistics-group-row:hover td,
+.statistics-group-row:focus-visible td {
+  background: var(--brand-soft);
+}
+
+.statistics-group-row:focus-visible {
+  outline: 2px solid var(--mantine-color-anchor);
+  outline-offset: -2px;
+}
+
+.statistics-group-detail td {
+  background: var(--mantine-color-default-hover);
+}
+
+.statistics-group-detail .statistics-usage-details {
+  margin: 0;
+}
+
 /* Neutral rail cue. Mantine paints the rail from the Timeline.Item `::before`
    pseudo-element and couples it to the bullet colour, so this override is the
    only way to decouple them. If Mantine changes that element, the rail silently

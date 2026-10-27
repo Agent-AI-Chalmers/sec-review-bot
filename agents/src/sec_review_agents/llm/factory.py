@@ -1,3 +1,4 @@
+import os
 from typing import Any
 
 from langchain_anthropic import ChatAnthropic
@@ -81,6 +82,10 @@ def _build_anthropic_chat_model(
     timeout_seconds: float | None,
     max_retries: int,
 ):
+    # ChatAnthropic already reports model calls through the LangChain callback. Disable
+    # the Anthropic SDK's duplicate OpenTelemetry span before it creates its client.
+    os.environ.setdefault("ANTHROPIC_OPEN_TELEMETRY", "false")
+
     kwargs: dict[str, Any] = {
         "model": provider_model,
         "anthropic_api_key": reveal_secret(deployment.api_key),

@@ -3,12 +3,14 @@ from dataclasses import dataclass
 
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.runnables import RunnableConfig
+from opentelemetry.sdk.trace import ReadableSpan
 
 from sec_review_agents.observability.diagnostics import log_diagnostic
 from sec_review_agents.observability.trace_context import current_trace_context
 from sec_review_agents.utils.env import env_value
 
 _LANGFUSE_IMPORT_WARNING_EMITTED = False
+_ANTHROPIC_SDK_INSTRUMENTATION_SCOPE = "com.anthropic.sdk.python"
 
 
 @dataclass(frozen=True)
@@ -50,24 +52,32 @@ def _compact_string_metadata(values: Mapping[str, object]) -> dict[str, str]:
 
 
 def _build_metadata(agent_name: str) -> dict[str, str]:
-    """Project the current activity labels into stable Langfuse metadata."""
+    """Describe which review work produced an invocation in Langfuse."""
     trace_context = current_trace_context()
     return _compact_string_metadata(
         {
+            # Langfuse maps this special key to sessionId; statistics query it by run_id.
+            "langfuse_session_id": trace_context.get("run_id"),
+            # Stable runtime name used to admit review calls and group their usage.
             "sec_review_agent": agent_name,
+            # Product workflow that scheduled the invocation; used for diagnosis only.
             "sec_review_workflow": trace_context.get("workflow"),
-            "sec_review_run_id": trace_context.get("run_id"),
-            "sec_review_statistics_scope": trace_context.get("statistics_scope"),
+            # Repository case being reviewed, when the workflow is case-oriented.
             "sec_review_case_id": trace_context.get("case_id"),
+            # Discovery input chunk that produced the invocation.
             "sec_review_chunk_id": trace_context.get("chunk_id"),
+            # Position within a batched stage invocation.
             "sec_review_batch_index": trace_context.get("batch_index"),
+            # Delivery item being planned or synthesized.
             "sec_review_delivery_id": trace_context.get("delivery_id"),
+            # Initial or feedback pass; explains repeated agent invocations.
             "sec_review_pass_kind": trace_context.get("pass_kind"),
+            # Zero-based pass number within the same stage.
             "sec_review_pass_index": trace_context.get("pass_index"),
+            # Temporal retry attempt; distinguishes infrastructure retries.
             "sec_review_temporal_activity_attempt": trace_context.get(
                 "temporal_activity_attempt"
             ),
-            "langfuse_session_id": trace_context.get("run_id"),
         }
     )
 
@@ -107,10 +117,24 @@ def build_tracing_config(
         return _disabled_tracing_config(agent_name=agent_name, metadata=metadata)
 
     try:
-        from langfuse import get_client
+        from langfuse import Langfuse, is_default_export_span
         from langfuse.langchain import CallbackHandler
 
-        client = get_client()
+        def should_export_span(span: ReadableSpan) -> bool:
+            # ChatAnthropic's LangChain callback already emits the model generation. The
+            # Anthropic SDK emits the same request as a nested OpenTelemetry generation, so
+            # exporting both doubles call and token totals in Langfuse.
+            scope = getattr(span, "instrumentation_scope", None)
+            if (
+                scope is not None
+                and getattr(scope, "name", None) == _ANTHROPIC_SDK_INSTRUMENTATION_SCOPE
+            ):
+                return False
+            return is_default_export_span(span)
+
+        # Initialize the per-public-key singleton before CallbackHandler asks get_client()
+        # for it, so the exporter filter is installed on the shared span processor.
+        client = Langfuse(should_export_span=should_export_span)
         callback = CallbackHandler()
 
         return TracingConfig(

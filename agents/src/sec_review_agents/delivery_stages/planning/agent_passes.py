@@ -18,6 +18,7 @@ from sec_review_agents.agents.delivery_planning.workbench_state import (
     DeliveryWorkbenchState,
 )
 from sec_review_agents.delivery_stages.planning.batching import planning_case_id_batches
+from sec_review_agents.observability.trace_context import bind_trace_context
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
@@ -246,6 +247,11 @@ async def _run_delivery_planning_agent_pass(
         pass_kind: DeliveryPlanningPassKind = (
             "draft" if pass_index <= 0 else "refinement"
         )
+        batch_index = (
+            str(pass_meta["index"])
+            if pass_meta and pass_meta.get("kind") == "batch"
+            else None
+        )
         system_prompt = build_repository_delivery_planning_workbench_system_prompt(
             pass_kind=pass_kind
         )
@@ -254,17 +260,24 @@ async def _run_delivery_planning_agent_pass(
             workbench_state=workbench_state,
             system_prompt=system_prompt,
         )
-        return await invoke_agent_runtime_graph(
-            agent=agent,
-            agent_name=DELIVERY_PLANNING_AGENT_NAME,
-            system_prompt=system_prompt,
-            user_prompt=build_repository_delivery_planning_user_prompt(
-                planning_cases,
-                pass_kind=pass_kind,
-                draft_origins=draft_origins,
-            ),
-            transcript_paths=(transcript_path(pass_artifacts_path),),
-        )
+        # Planning may fan out into draft batches before one global refinement.
+        # Preserve that shape on every model call instead of flattening it later.
+        with bind_trace_context(
+            pass_kind=pass_kind,
+            pass_index=str(pass_index),
+            batch_index=batch_index,
+        ):
+            return await invoke_agent_runtime_graph(
+                agent=agent,
+                agent_name=DELIVERY_PLANNING_AGENT_NAME,
+                system_prompt=system_prompt,
+                user_prompt=build_repository_delivery_planning_user_prompt(
+                    planning_cases,
+                    pass_kind=pass_kind,
+                    draft_origins=draft_origins,
+                ),
+                transcript_paths=(transcript_path(pass_artifacts_path),),
+            )
 
 
 def _should_run_another_delivery_planning_pass(

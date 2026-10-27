@@ -1,12 +1,12 @@
 # System Architecture
 
-Sec Review Bot has eight runtime roles: GitHub Integration, Review Runs, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server.
+Sec Review Bot's repository-owned runtime roles are GitHub Integration, Review Runs, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server. Langfuse is a trusted observability dependency with an independent deployment and lifecycle, not a repository-owned runtime role.
 
 ## Runtime topology
 
 ![Sec Review Bot runtime topology](../../assets/architecture/runtime-topology.svg)
 
-Temporal Server is infrastructure, but it directly dispatches work to the worker processes, so the topology presents it with the runtime services. PostgreSQL and Object Storage remain separate persistence facilities. Review execution, memory extraction, and memory maintenance use independent worker processes and task queues.
+Temporal Server is infrastructure, but it directly dispatches work to the worker processes, so the topology presents it with the runtime services. PostgreSQL and Object Storage remain separate persistence facilities. Langfuse appears outside the repository deployment boundary: workers optionally export LLM observations to it, and Review Runs reads those observations asynchronously to persist model-usage snapshots. Review execution, memory extraction, and memory maintenance use independent worker processes and task queues.
 
 The memory path has one deployment-independent state model. Memory Catalog owns coordination state in PostgreSQL, Object Storage owns immutable memory-tree and transcript artifacts, and Temporal owns workflow execution. Each review invocation materializes the current memory tree into a temporary directory for its agent backend and removes that directory afterward.
 
@@ -26,6 +26,27 @@ Control Plane UI manages Memory Catalog through its BFF and never exposes Catalo
 | Memory Catalog Server | `memory-catalog/` | Observation catalog, immutable memory revision history, and active revision coordination | [README](../../memory-catalog/README.md) |
 
 The runtime roles communicate through project-owned boundaries under [`contracts/`](../../contracts/README.md). Package location does not determine process topology: `agents/` implements three independent Temporal workers. The two applications under `apps/` remain independently deployed services.
+
+## Observability and statistics path
+
+```mermaid
+sequenceDiagram
+  participant Workers as Agent Workers
+  participant Langfuse as Langfuse (independent deployment)
+  participant Runs as Review Runs
+  participant Database as PostgreSQL
+  participant UI as Control Plane UI
+
+  Workers-->>Langfuse: Export optional LLM traces and generations
+  Note over Workers,Langfuse: Review execution does not wait for observability delivery
+  Runs->>Langfuse: Read terminal run observations by run_id
+  Langfuse-->>Runs: Review roots and model generations
+  Runs->>Database: Persist reconciliation state and aggregate snapshot
+  UI->>Runs: Read run details
+  Runs-->>UI: Return snapshot, pending state, or no observation record
+```
+
+Langfuse stores the individual model-call observations. Review Runs reads and aggregates them into its own database for display in the Control Plane UI.
 
 ## Main review path
 

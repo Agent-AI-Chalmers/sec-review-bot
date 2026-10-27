@@ -24,6 +24,9 @@ import {
   coordinateReviewRunsOnce,
   startReviewRunCoordinatorLoop
 } from './coordinator.js'
+import { reconcileExecutionStatisticsPass } from './execution-statistics-coordinator.js'
+import { ExecutionStatisticsStore } from './execution-statistics-store.js'
+import { LangfuseObservationsClient } from './langfuse-observations-client.js'
 import { observeExecutionRun } from './terminal-coordination.js'
 import {
   getExecutionRunStatus,
@@ -157,6 +160,27 @@ function requiredEnv(name: string): string {
   const value = process.env[name]?.trim()
   if (!value) throw new Error(`${name} is required.`)
   return value
+}
+
+function langfuseConfiguration(): {
+  baseUrl: string
+  publicKey: string
+  secretKey: string
+} | null {
+  const values = {
+    baseUrl: process.env.LANGFUSE_BASE_URL?.trim() || undefined,
+    publicKey: process.env.LANGFUSE_PUBLIC_KEY?.trim() || undefined,
+    secretKey: process.env.LANGFUSE_SECRET_KEY?.trim() || undefined
+  }
+  const configured = Object.values(values).filter(
+    (value): value is string => value !== undefined
+  )
+  if (configured.length === 0) return null
+  if (configured.length !== 3)
+    throw new Error(
+      'LANGFUSE_BASE_URL, LANGFUSE_PUBLIC_KEY, and LANGFUSE_SECRET_KEY must be configured together.'
+    )
+  return values as { baseUrl: string; publicKey: string; secretKey: string }
 }
 
 function invalidQuery(message: string): Error {
@@ -363,19 +387,30 @@ export async function registerReviewRunsRoutes(
       const listOptions = parseListQuery(url)
       const { runs, next_cursor, dropped } =
         await store.listRunsPage(listOptions)
+      const statistics = await store.getExecutionStatistics(
+        runs.map((run) => run.run_id)
+      )
       // A single stored row the contract cannot represent is reported and omitted rather
       // than failing the whole page; the caller still gets a usable listing.
       for (const droppedRow of dropped) {
         logDroppedRunRow(store.connectorId, droppedRow)
       }
-      return { runs: runs.map(observeRun), next_cursor }
+      return {
+        runs: runs.map((run) =>
+          observeRun(run, statistics.get(run.run_id) ?? null)
+        ),
+        next_cursor
+      }
     },
 
     getRun: async (request, reply) => {
       const { runId } = request.params as PathParams<'getRun'>
       const run = await store.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
-      return { run: observeRun(run) }
+      const statistics = await store.getExecutionStatistics([run.run_id])
+      return {
+        run: observeRun(run, statistics.get(run.run_id) ?? null)
+      }
     },
 
     listRunPublicationSteps: async (request, reply) => {
@@ -810,8 +845,9 @@ export async function startReviewRunsServer(): Promise<{
   const adminToken = process.env.REVIEW_RUNS_ADMIN_TOKEN?.trim() || undefined
   const connectorId =
     process.env.CONNECTOR_ID?.trim() || 'github-integration:default'
+  const connectionString = requiredEnv('DATABASE_URL')
   const store = new ReviewRunStore({
-    connectionString: requiredEnv('DATABASE_URL'),
+    connectionString,
     connectorId,
     // The single-run read turns an unrepresentable row into `null` (the same answer as an
     // unknown id), so report it here; otherwise corruption would only ever surface as a 404.
@@ -899,6 +935,77 @@ export async function startReviewRunsServer(): Promise<{
       console.error('review_runs_execution_coordination_failed', error)
     }
   })
+  const langfuseConfig = langfuseConfiguration()
+  const statisticsStore =
+    langfuseConfig === null
+      ? null
+      : new ExecutionStatisticsStore({
+          connectionString,
+          connectorId,
+          claimTimeoutMs: integerEnv(
+            'EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS',
+            10 * 60_000
+          ),
+          initialDelayMs: integerEnv(
+            'EXECUTION_STATISTICS_INITIAL_DELAY_MS',
+            30_000,
+            0
+          ),
+          settlementWindowMs: integerEnv(
+            'EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS',
+            10 * 60_000
+          )
+        })
+  const statisticsCoordinator =
+    statisticsStore === null || langfuseConfig === null
+      ? null
+      : startReviewRunCoordinatorLoop({
+          intervalMs: integerEnv(
+            'EXECUTION_STATISTICS_POLL_INTERVAL_MS',
+            15_000
+          ),
+          runOnce: async () => {
+            await reconcileExecutionStatisticsPass({
+              maxItems: integerEnv(
+                'EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS',
+                20
+              ),
+              store: statisticsStore,
+              langfuse: new LangfuseObservationsClient(
+                langfuseConfig.baseUrl,
+                langfuseConfig.publicKey,
+                langfuseConfig.secretKey,
+                integerEnv('LANGFUSE_REQUEST_TIMEOUT_MS', 30_000)
+              ),
+              confirmationDelayMs: integerEnv(
+                'EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS',
+                30_000
+              ),
+              maxFailures: integerEnv('EXECUTION_STATISTICS_MAX_FAILURES', 8),
+              retryDelayMs: integerEnv(
+                'EXECUTION_STATISTICS_RETRY_DELAY_MS',
+                30_000
+              ),
+              onResult: (work, result) => {
+                logEvent('execution_statistics_reconciled', {
+                  connector_id: store.connectorId,
+                  run_id: work.runId,
+                  result
+                })
+              },
+              onError: (work, error) => {
+                console.error(
+                  'execution_statistics_langfuse_read_failed',
+                  work.runId,
+                  error instanceof Error ? error.message : String(error)
+                )
+              }
+            })
+          },
+          onError: (error) => {
+            console.error('execution_statistics_coordination_failed', error)
+          }
+        })
   const app = Fastify(REVIEW_RUNS_FASTIFY_OPTIONS)
 
   await registerReviewRunsRoutes(app, {
@@ -913,6 +1020,8 @@ export async function startReviewRunsServer(): Promise<{
     close: async () => {
       await app.close()
       await coordinator.stop()
+      if (statisticsCoordinator !== null) await statisticsCoordinator.stop()
+      if (statisticsStore !== null) await statisticsStore.close()
       await store.close()
     }
   }

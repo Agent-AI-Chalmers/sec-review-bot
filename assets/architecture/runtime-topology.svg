@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 680" role="img" aria-labelledby="title description">
   <title id="title">Sec Review Bot runtime topology</title>
-  <desc id="description">External systems connect to runtime services, with persistence infrastructure beneath the services.</desc>
+  <desc id="description">External systems connect to repository-owned runtime services, with persistence infrastructure below and independently deployed Langfuse observability alongside them.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
       <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.1" />
@@ -24,16 +24,18 @@
       .execution-node .node-accent { stroke: #b85c38; }
       .memory-node .node-accent { stroke: #2f806a; }
       .storage-node .node-accent { stroke: #9a6a22; }
+      .observability-node .node-accent { stroke: #8a5a9e; }
       .store-icon { fill: #f5f1e9; stroke: #8b6b3f; stroke-width: 1.4; }
       .store-icon.no-fill { fill: none; }
       .object-icon { fill: #f5f1e9; stroke: #8b6b3f; stroke-width: 1.4; }
       .node-label { font-size: 16px; font-weight: 550; }
       .edge { fill: none; stroke: #94a3b8; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; opacity: 0.78; }
+      .edge.dashed { stroke-dasharray: 6 5; }
       .arrow-head { fill: #94a3b8; opacity: 0.78; }
     </style>
   </defs>
   <g>
-    <rect x="20" y="24" width="200" height="360" rx="7" class="group external" />
+    <rect x="20" y="24" width="200" height="626" rx="7" class="group external" />
     <text x="120" y="54" class="group-label" text-anchor="middle">
       <tspan x="120" dy="0">External</tspan>
     </text>
@@ -65,6 +67,10 @@
   <path d="M 1240 130 L 1300 130 Q 1310 130 1310 140 L 1310 551 Q 1310 561 1320 561 L 1180 561" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
   <path d="M 790 326 L 790 440 Q 790 450 800 450 L 1020 450 Q 1030 450 1030 460 L 1030 515" class="edge" marker-end="url(#arrow)" />
   <path d="M 975 326 L 975 465 Q 975 475 985 475 L 1080 475 Q 1090 475 1090 485 L 1090 515" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 495 148 L 235 148 Q 220 148 220 163 L 220 545 Q 220 561 195 561" class="edge dashed" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1160 166 L 1160 390 L 245 390 Q 230 390 230 405 L 230 543 Q 230 561 195 561" class="edge dashed" marker-end="url(#arrow)" />
+  <path d="M 790 326 L 790 390" class="edge dashed" />
+  <path d="M 975 326 L 975 390" class="edge dashed" />
   <g id="operator" class="node external-node">
     <rect x="45" y="94" width="150" height="72" rx="8" class="node-surface" />
     <path d="M 53 95 H 187" class="node-accent" />
@@ -78,6 +84,14 @@
     <path d="M 53 255 H 187" class="node-accent" />
     <text x="120" y="295" class="node-label" text-anchor="middle">
       <tspan x="120" dy="0">GitHub</tspan>
+    </text>
+  </g>
+  <g id="langfuse" class="node observability-node">
+    <rect x="45" y="515" width="150" height="92" rx="8" class="node-surface" />
+    <path d="M 53 516 H 187" class="node-accent" />
+    <text x="120" y="552" class="node-label" text-anchor="middle">
+      <tspan x="120" dy="0">Langfuse</tspan>
+      <tspan x="120" dy="18">Observability</tspan>
     </text>
   </g>
   <g id="ui" class="node control-node">

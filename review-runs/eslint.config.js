@@ -24,6 +24,7 @@ export default [
         RequestInit: 'readonly',
         Response: 'readonly',
         AbortController: 'readonly',
+        AbortSignal: 'readonly',
         fetch: 'readonly',
         structuredClone: 'readonly',
         clearTimeout: 'readonly',

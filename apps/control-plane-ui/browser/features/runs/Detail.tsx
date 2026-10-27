@@ -40,6 +40,7 @@ import {
 } from './api.js'
 import { RunStateMachines } from './StateMachine.js'
 import { RunFilesViewer } from './RunFilesViewer.js'
+import { ExecutionStatistics } from './ExecutionStatistics.js'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { CopyAction } from '../../shared/CopyAction.js'
 import { useRefresh } from '../../shared/refresh.js'
@@ -1106,6 +1107,12 @@ export function Detail(): React.JSX.Element {
                         runId={run.run_id}
                       />
                     </div>
+                  )}
+                  {run.execution.started_at !== null && (
+                    <ExecutionStatistics
+                      statistics={run.execution_statistics}
+                      workflow={run.workflow}
+                    />
                   )}
                 </Timeline.Item>
                 <Timeline.Item

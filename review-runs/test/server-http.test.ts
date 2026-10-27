@@ -31,7 +31,10 @@ async function buildApp(store: Record<string, unknown>, adminToken?: string) {
   // registerReviewRunsRoutes installs the error/not-found handlers too, so this exercises
   // the same envelope the deployment returns.
   await registerReviewRunsRoutes(app, {
-    store: store as never,
+    store: {
+      getExecutionStatistics: async () => new Map(),
+      ...store
+    } as never,
     serviceToken: SERVICE_TOKEN,
     readToken: READ_TOKEN,
     ...(adminToken === undefined ? {} : { adminToken })

@@ -39,7 +39,7 @@ test/                 browser and server tests
 
 Feature domains must not import one another. Reusable browser capabilities live under `browser/features/` or `browser/shared/`, while package-level `shared/` is reserved for code that genuinely crosses the browser/server runtime boundary.
 
-The fixtures serve a few dozen runs at Review Runs' default page size and implement its cursor contract, so paging, the status filters, and the detail timeline are all exercised without a backend. Every generated run is checked against the states the store can actually produce, so an unreachable combination fails the module import instead of appearing as plausible-looking demo data.
+The fixtures serve a few dozen runs at Review Runs' default page size and implement its cursor contract, so paging, the status filters, the detail timeline, and settled model-usage snapshots are all exercised without a backend. Every generated run is checked against the states the store can actually produce, so an unreachable combination fails the module import instead of appearing as plausible-looking demo data.
 
 To develop against a running Review Runs, build and start the BFF in one terminal:
 

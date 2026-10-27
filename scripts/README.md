@@ -36,6 +36,21 @@ python -m scripts.token_usage.summarize /path/to/local-run
 python -m scripts.replay.repository_triage --help
 ```
 
+### Langfuse Run Statistics Probe
+
+`probe_langfuse_run_statistics.py` reads one review `run_id` from the [Langfuse Observations API v2](https://langfuse.com/docs/api-and-data-platform/features/public-api#v2) and prints a read-only JSON summary. It finds roots whose `sec_review_agent` belongs to the maintained review-agent allowlist, reads `GENERATION` observations under those traces with cursor pagination, and accepts only calls emitted by the Langfuse callback scope. Provider-SDK duplicate spans are suppressed by the production exporter; encountering one here is treated as a tracing regression. Remaining calls are deduplicated by observation ID and grouped by agent and native provider/model.
+
+Run it with the agents environment so the repository's pinned Langfuse SDK is used:
+
+```bash
+LANGFUSE_PUBLIC_KEY=... \
+LANGFUSE_SECRET_KEY=... \
+LANGFUSE_BASE_URL=https://your-langfuse.example \
+uv --project agents run python -m scripts.probe_langfuse_run_statistics <run_id>
+```
+
+The output describes calls observed by Langfuse. `complete_for_observed_calls` means every returned generation had usage; it does not prove that every call was uploaded.
+
 ## Experimental Memory Probe
 
 `experimental_memory_extract_observations.py` runs the memory extractor against explicit transcript files or review artifact directories and writes the observation preview and a uniquely named extractor transcript to a requested directory. It is a model-development probe, not an operational ingestion path: it does not use Temporal, register state with the Memory Catalog, or publish artifacts.

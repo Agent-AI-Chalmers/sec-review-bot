@@ -84,6 +84,76 @@ test('dev fixtures only describe reachable run states', async () => {
   )
 })
 
+test('dev fixtures distinguish a statistics snapshot from no snapshot', async () => {
+  const { runs, stepsByRun } =
+    await import('../scripts/dev-fixtures/runs/generate.js')
+  const completed = runs.filter((run) => run.execution.status === 'succeeded')
+  const active = runs.find((run) => run.execution.status === 'running')
+  const agentsFor = (
+    workflow: (typeof completed)[number]['workflow']
+  ): string[] => {
+    const run = completed.find((candidate) => candidate.workflow === workflow)
+    assert(run !== undefined)
+    const statistics = run.execution_statistics
+    assert(statistics !== null)
+    return [...new Set(statistics.groups.map((group) => group.agent_name))]
+  }
+  assert.deepStrictEqual(agentsFor('issue-review'), [
+    'issue-analyzer',
+    'issue-mitigator',
+    'issue-verifier'
+  ])
+  assert.deepStrictEqual(agentsFor('pull-request-review'), [
+    'pull-request-analyzer',
+    'pull-request-mitigator',
+    'pull-request-verifier'
+  ])
+  assert.deepStrictEqual(agentsFor('repository-review'), [
+    'repository-discovery',
+    'repository-triager',
+    'repository-analyzer',
+    'repository-cvss-v4-scorer',
+    'repository-mitigator',
+    'repository-verifier',
+    'repository-delivery-planner',
+    'patch-synthesizer'
+  ])
+  const repositoryRun = completed.find(
+    (run) => run.workflow === 'repository-review'
+  )
+  assert(repositoryRun !== undefined)
+  const patchDeliveryIds = repositoryRun.execution_statistics?.groups
+    .filter((group) => group.agent_name === 'patch-synthesizer')
+    .map((group) => group.delivery_id)
+  assert(patchDeliveryIds !== undefined)
+  assert(patchDeliveryIds.length >= 2)
+  const publicationDeliveryIds = (stepsByRun.get(repositoryRun.run_id) ?? [])
+    .map((step) => step.step_key.match(/^repository:delivery:(.+)$/)?.[1])
+    .filter((deliveryId): deliveryId is string => deliveryId !== undefined)
+  assert.deepStrictEqual(patchDeliveryIds, publicationDeliveryIds)
+  for (const workflow of ['issue-review', 'pull-request-review'] as const) {
+    const workflowRuns = completed.filter((run) => run.workflow === workflow)
+    assert(
+      workflowRuns.some((run) =>
+        run.execution_statistics?.groups.some(
+          (group) => group.pass_kind === 'feedback'
+        )
+      ),
+      `${workflow} fixtures must include a feedback loop`
+    )
+    assert(
+      workflowRuns.some(
+        (run) =>
+          !run.execution_statistics?.groups.some(
+            (group) => group.pass_kind === 'feedback'
+          )
+      ),
+      `${workflow} fixtures must include a run without feedback`
+    )
+  }
+  assert.strictEqual(active?.execution_statistics, null)
+})
+
 test('dev fixtures track sign-out so the console reaches the sign-in form', async () => {
   // The fixtures exist to show the console's real screens with no access token, so
   // they start signed in — a run list must be reachable before any session call.

@@ -58,7 +58,6 @@ async def test_repository_case_activity_binds_trace_context() -> None:
 
     assert bind_mock.call_args.kwargs["workflow"] == "repository-review"
     assert bind_mock.call_args.kwargs["run_id"] == "run-1"
-    assert bind_mock.call_args.kwargs["statistics_scope"] == "review-execution"
     assert bind_mock.call_args.kwargs["case_id"] == "case-1"
     assert analyzer_stage_mock.call_args.kwargs["published_transcript_path"] == (
         Path(published_transcripts_path) / "0001-analyzer-initial.jsonl"

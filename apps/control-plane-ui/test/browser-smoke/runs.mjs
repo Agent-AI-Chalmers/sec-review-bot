@@ -325,6 +325,152 @@ export async function smokeRuns({
     }, `${name} the repository-review and published filters must both apply to the list`)
     await page.locator('tbody tr:first-child td a').first().click()
     await page.waitForSelector('.run-progress-timeline')
+    const statistics = page.getByTestId('execution-statistics')
+    await statistics.waitFor()
+    assert.match(
+      (await statistics.textContent()) ?? '',
+      /25 Calls · 68,804 tokens/,
+      `${name} a completed run must show a compact usage summary`
+    )
+    assert.doesNotMatch(
+      (await statistics.textContent()) ?? '',
+      /Settled/,
+      `${name} a healthy statistics snapshot must not compete with execution status`
+    )
+    assert.match(
+      (await statistics.textContent()) ?? '',
+      /Input 58,020.*Output 10,784.*Cache read 18,280/,
+      `${name} the useful token breakdown must be visible without expanding details`
+    )
+    assert.match(
+      (await statistics.textContent()) ?? '',
+      /Scan stage.*6 Calls · 17,284 tokens.*Review stage.*2 cases · 14 Calls · 40,320 tokens.*Delivery stage.*5 Calls · 11,200 tokens/s,
+      `${name} collapsed repository stages must retain their usage summaries`
+    )
+    const workflowStages = statistics.locator('.statistics-workflow-stage')
+    assert.strictEqual(
+      await workflowStages.count(),
+      3,
+      `${name} repository usage must have scan, review, and delivery stages`
+    )
+    assert.strictEqual(
+      await statistics.locator('.statistics-workflow-stage[open]').count(),
+      0,
+      `${name} workflow stages must start collapsed`
+    )
+    await workflowStages.nth(0).locator('summary').first().click()
+    const discoveryRow = workflowStages
+      .nth(0)
+      .locator('.statistics-group-row')
+      .filter({ hasText: 'repository-discovery' })
+    await discoveryRow.click()
+    assert.match(
+      (await workflowStages.nth(0).textContent()) ?? '',
+      /Call breakdown.*Input.*Output.*Cache read.*discovery-chunk-0001.*2,800.*360.*1,100.*discovery-chunk-0002.*2,700.*354.*1,000.*discovery-chunk-0003.*2,700.*370.*1,000.*Total.*8,200.*1,084.*3,100/s,
+      `${name} discovery details must expose per-chunk calls and token dimensions`
+    )
+    const triageRow = workflowStages
+      .nth(0)
+      .locator('.statistics-group-row')
+      .filter({ hasText: 'repository-triager' })
+    await triageRow.click()
+    assert.match(
+      (await workflowStages.nth(0).textContent()) ?? '',
+      /Call breakdown.*Draft batch 1.*2,700.*400.*900.*Draft batch 2.*2,400.*400.*900.*Refinement.*1,800.*300.*600.*Total.*6,900.*1,100.*2,400/s,
+      `${name} triage details must explain its batches without adding hierarchy`
+    )
+    await workflowStages.nth(1).locator('summary').first().click()
+    const reviewUnits = workflowStages.nth(1).locator('.statistics-unit')
+    assert.strictEqual(
+      await reviewUnits.count(),
+      2,
+      `${name} the review stage must contain its cases`
+    )
+    assert.match(
+      (await reviewUnits.nth(0).textContent()) ?? '',
+      /Case 7d9a2f6c31b4e8.*9 Calls · 26,675 tokens/s,
+      `${name} a collapsed case must retain its usage summary`
+    )
+    await reviewUnits.nth(0).locator('summary').click()
+    assert.match(
+      (await reviewUnits.nth(0).textContent()) ?? '',
+      /Initial review.*Feedback pass 1/s,
+      `${name} a case must reveal its own initial and feedback passes`
+    )
+    if (viewport.width >= 768) {
+      const passColumnPositions = await reviewUnits
+        .nth(0)
+        .locator('.statistics-table')
+        .evaluateAll((tables) =>
+          tables
+            .slice(0, 2)
+            .map((table) =>
+              [...table.querySelectorAll('th')].map((cell) =>
+                Math.round(cell.getBoundingClientRect().left)
+              )
+            )
+        )
+      assert.deepStrictEqual(
+        passColumnPositions[0],
+        passColumnPositions[1],
+        `${name} initial and feedback tables must share fixed column tracks`
+      )
+    }
+    await reviewUnits.nth(1).locator('summary').click()
+    assert.doesNotMatch(
+      (await reviewUnits.nth(1).textContent()) ?? '',
+      /Initial review/,
+      `${name} a case without feedback must not label its only pass as initial`
+    )
+    await workflowStages.nth(2).locator('summary').first().click()
+    const deliveryRows = workflowStages.nth(2).locator('.statistics-group-row')
+    assert.strictEqual(
+      await deliveryRows.count(),
+      2,
+      `${name} delivery usage must stay flat at the agent level`
+    )
+    await deliveryRows
+      .filter({ hasText: 'repository-delivery-planner' })
+      .click()
+    await deliveryRows.filter({ hasText: 'patch-synthesizer' }).click()
+    assert.match(
+      (await workflowStages.nth(2).textContent()) ?? '',
+      /Call breakdown.*Draft batch 1.*Draft batch 2.*Refinement.*patch-synthesizer.*combined-[a-f0-9]+.*combined-[a-f0-9]+/s,
+      `${name} delivery details must explain planning and patch synthesis inline`
+    )
+    assert.match(
+      (await statistics.textContent()) ?? '',
+      /repository-discovery/,
+      `${name} a completed run must show its agent usage groups`
+    )
+    assert.match(
+      (await statistics.textContent()) ?? '',
+      /anthropic\/deepseek-v4-pro/,
+      `${name} provider and model must share one compact identity line`
+    )
+    const usageRows = statistics.locator(
+      '.statistics-group-row[aria-expanded="false"]'
+    )
+    const expandedBefore = await statistics
+      .locator('.statistics-group-row[aria-expanded="true"]')
+      .count()
+    await usageRows.filter({ hasText: 'repository-analyzer' }).first().click()
+    assert.match(
+      (await statistics.textContent()) ?? '',
+      /Input 5,200.*Output 1,000.*Cache read 1,600/,
+      `${name} an agent without subgroups must expose its token breakdown`
+    )
+    await usageRows
+      .filter({ hasText: 'repository-cvss-v4-scorer' })
+      .first()
+      .click()
+    assert.strictEqual(
+      await statistics
+        .locator('.statistics-group-row[aria-expanded="true"]')
+        .count(),
+      expandedBefore + 2,
+      `${name} expanding one usage group must not close another`
+    )
     const publicationBody =
       (await page
         .locator('.run-progress-timeline .mantine-Timeline-itemBody')

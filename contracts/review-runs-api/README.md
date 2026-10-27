@@ -28,6 +28,7 @@ Consumers can rely on:
   `connector_id`, the connector type and instance namespace that admitted and owns the run;
 - the three lifecycle axes as nested objects: the redacted `preparation` summary, and `execution` / `publication`. Each reports its own `status`, `started_at`, `finished_at`, and `updated_at` (the axis' last write, not a phase bound); the query parameters that filter them keep the established `*_status` spelling;
 - `notices`: messages that an integration should show when part of the run fails or needs attention. They are ordered from oldest to newest, and separate events remain separate entries;
+- `execution_statistics`: a nullable Review Runs snapshot of reconciliation state, observed model-call/token totals, and workflow-coordinate/agent/provider/model groups. Case, delivery, pass, draft-batch, and discovery-chunk coordinates are nullable because most stages do not have them. `null` means no snapshot row exists; it does not mean zero usage;
 - the `artifact_storage` variants: absent; an error variant whose status is `unavailable` or `failed`, with optional `error_code` and `message`; or `available` with a stored bundle.
 
 The following are not part of this contract:

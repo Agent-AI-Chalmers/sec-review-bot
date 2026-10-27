@@ -32,6 +32,46 @@
 }
 
 @media (max-width: 600px) {
+  .statistics-model-column,
+  .statistics-numeric-column {
+    display: none;
+  }
+
+  .statistics-table {
+    table-layout: auto;
+  }
+
+  .statistics-table th:first-child {
+    width: auto;
+  }
+
+  .statistics-mobile-model {
+    display: block;
+    margin-top: 4px;
+  }
+
+  .statistics-section .mantine-Table-td,
+  .statistics-section .mantine-Table-th {
+    padding-inline: 8px;
+  }
+
+  .statistics-unit > summary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .statistics-workflow-stage > summary {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .statistics-unit-metrics {
+    grid-column: 2;
+    white-space: normal;
+  }
+
+  .statistics-stage-body {
+    padding-left: 12px;
+  }
+
   .brand {
     display: none;
   }

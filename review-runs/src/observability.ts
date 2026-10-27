@@ -1,9 +1,16 @@
 import type { PublicationStepRecord, ReviewRunRecord } from './review-store.js'
-import type { ObservedRun, PublicationStepSummary } from './shapes.js'
+import type {
+  ExecutionStatisticsSummary,
+  ObservedRun,
+  PublicationStepSummary
+} from './shapes.js'
 
 export type { ObservedRun, PublicationStepSummary } from './shapes.js'
 
-export function observeRun(run: ReviewRunRecord): ObservedRun {
+export function observeRun(
+  run: ReviewRunRecord,
+  executionStatistics: ExecutionStatisticsSummary | null = null
+): ObservedRun {
   // The record and observed-run shapes now agree on every axis, so this is a redaction rather
   // than a projection: it drops connector-owned context, the Execution input, and failure detail,
   // while retaining the public platform and connector namespace used by operators.
@@ -14,6 +21,7 @@ export function observeRun(run: ReviewRunRecord): ObservedRun {
     connector_id: run.connector_id,
     preparation: run.preparation,
     execution: run.execution,
+    execution_statistics: executionStatistics,
     publication: run.publication,
     created_at: run.created_at,
     failure_code: run.failure_code,

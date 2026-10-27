@@ -120,14 +120,21 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
       code: 'REVIEW_START_FAILED',
       message: 'boom'
     })
+    const source = await pool.query<{ source_event_id: string }>(
+      'SELECT source_event_id::text FROM run_notices WHERE run_id=$1',
+      [runId]
+    )
+    const sourceEventId = source.rows[0]?.source_event_id
+    assert.ok(sourceEventId)
     // Clear the real notice so the insert below cannot fail on the primary key; the connector is
     // then the only thing left that can reject it.
     await pool.query('DELETE FROM run_notices WHERE run_id=$1', [runId])
     await assert.rejects(
       pool.query(
-        `INSERT INTO run_notices (run_id, connector_id, status, kind, axis)
-         VALUES ($1, 'intruder', 'pending', 'failure', 'preparation')`,
-        [runId]
+        `INSERT INTO run_notices
+           (run_id, connector_id, source_event_id, status, kind, axis)
+         VALUES ($1, 'intruder', $2, 'pending', 'failure', 'preparation')`,
+        [runId, sourceEventId]
       ),
       /violates foreign key constraint/,
       'a notice must not name a connector its run does not belong to'
@@ -140,9 +147,10 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
     await pool.query('DELETE FROM run_notices WHERE run_id=$1', [runId])
     await pool
       .query(
-        `INSERT INTO run_notices (run_id, connector_id, status, kind, axis)
-         VALUES ($1, 'intruder', 'pending', 'failure', 'preparation')`,
-        [runId]
+        `INSERT INTO run_notices
+           (run_id, connector_id, source_event_id, status, kind, axis)
+         VALUES ($1, 'intruder', $2, 'pending', 'failure', 'preparation')`,
+        [runId, sourceEventId]
       )
       .catch(() => undefined)
     const stored = await pool.query(
