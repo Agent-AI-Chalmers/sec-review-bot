@@ -1,0 +1,40 @@
+{
+  "corpus": [
+    {
+      "file": "valid-minimal.tar.zst",
+      "expected": "valid",
+      "sha256": "d092fb0884f31cc628d3de34cbbfc3cd3c063ef0a24448ac31b9877a9cee4d30",
+      "size": 248
+    },
+    {
+      "file": "valid-incremental.tar.zst",
+      "expected": "valid",
+      "sha256": "e144e0c8fa78047fc15afddf232c2e39768e293320429bf681130eb7c0e69e6b",
+      "size": 346
+    },
+    {
+      "file": "invalid-order.tar.zst",
+      "expected": "invalid",
+      "sha256": "3ceab6302db180ebb794de5fb4ba38bf157bcb79a1cd7d5f7368ba44ff79c48a",
+      "size": 204
+    },
+    {
+      "file": "invalid-missing-history.tar.zst",
+      "expected": "invalid",
+      "sha256": "babd3a49f4d4b9bdaf49a1690ae95851e7e0d77738e4887c56073e4ab4a6bdf2",
+      "size": 172
+    },
+    {
+      "file": "invalid-unexpected-path.tar.zst",
+      "expected": "invalid",
+      "sha256": "d872f6cfaf64f7f7599ef8c33443ba01be2fdc63938f41fd88a30e178d5a04b1",
+      "size": 281
+    },
+    {
+      "file": "invalid-symlink.tar.zst",
+      "expected": "invalid",
+      "sha256": "4f0cb0ca6d7efd894e09fec848b93c64a9829a58c109478b90fbd2da32ededca",
+      "size": 266
+    }
+  ]
+}

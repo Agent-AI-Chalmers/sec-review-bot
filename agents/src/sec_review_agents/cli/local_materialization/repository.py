@@ -17,7 +17,6 @@ from sec_review_agents.cli.local_materialization.common import (
 )
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.utils.files import write_json
-from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workspace.snapshots import (
     WORKSPACE_SNAPSHOT_TAR_NAME,
     create_workspace_snapshot_tar,
@@ -156,7 +155,6 @@ def _materialize_incremental_artifacts(
             "base_sha": base_ref,
             "head_sha": head_ref,
             "changed_file_count": len(changed_files),
-            "generated_at": utc_now_iso(),
         },
     )
     return changed_files, commit_shas
@@ -259,7 +257,6 @@ def build_local_repository_security_bundle(
                 "scan_mode": "full",
                 "base_sha": base_ref,
                 "head_sha": resolved_ref,
-                "generated_at": utc_now_iso(),
             },
         )
 

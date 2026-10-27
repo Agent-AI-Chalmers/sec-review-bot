@@ -54,10 +54,17 @@ export async function readDiagnosticBundle(
 ): Promise<DiagnosticBundleView> {
   if (bytes.length > MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES)
     throw new Error('diagnostic_bundle_too_large')
-  const tarBytes = decompressRestrictedPaxArchive(
-    bytes,
-    MAX_EXTRACTED_BYTES + MAX_ENTRIES * 2048
-  )
+  let tarBytes: Buffer
+  try {
+    tarBytes = decompressRestrictedPaxArchive(
+      bytes,
+      MAX_EXTRACTED_BYTES + MAX_ENTRIES * 2048
+    )
+  } catch (error) {
+    if (error instanceof Error && error.message === 'invalid_tar_zstd_envelope')
+      throw new Error('invalid_diagnostic_bundle', { cause: error })
+    throw error
+  }
   const extract = tar.extract()
   const entries = new Map<string, Buffer>()
   const seenPaths = new Set<string>()

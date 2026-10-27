@@ -7,6 +7,7 @@ from urllib.parse import unquote, urlparse
 
 import pytest
 
+from sec_review_agents.artifacts.tar_zstd import canonical_tar_info
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.entrypoints import input_preparation
 from sec_review_agents.entrypoints.input_preparation import (
@@ -34,12 +35,24 @@ def _write_bundle_manifest(
     if incremental:
         (root / "incremental-window").mkdir(exist_ok=True)
     archive_path = root.with_suffix(".tar.zst")
-    with tarfile.open(archive_path, mode="w:zst") as archive:
-        archive.add(root / "manifest.json", arcname="manifest.json")
-        archive.add(root / "workspace.snapshot.tar", arcname="workspace.snapshot.tar")
-        archive.add(root / "history", arcname="history")
+    with tarfile.open(archive_path, mode="w:zst", format=tarfile.PAX_FORMAT) as archive:
+        archive.add(
+            root / "manifest.json",
+            arcname="manifest.json",
+            filter=canonical_tar_info,
+        )
+        archive.add(root / "history", arcname="history", filter=canonical_tar_info)
         if incremental:
-            archive.add(root / "incremental-window", arcname="incremental-window")
+            archive.add(
+                root / "incremental-window",
+                arcname="incremental-window",
+                filter=canonical_tar_info,
+            )
+        archive.add(
+            root / "workspace.snapshot.tar",
+            arcname="workspace.snapshot.tar",
+            filter=canonical_tar_info,
+        )
     content = archive_path.read_bytes()
     return {
         "uri": archive_path.as_uri(),
@@ -400,7 +413,7 @@ def test_workflow_input_preparation_rejects_manifest_symlink_escape(
     (bundle_root / "workspace.snapshot.tar").symlink_to(outside_tar)
     monkeypatch.setenv(input_preparation.INPUT_BUNDLE_ROOT_ENV, str(allowed_root))
 
-    with pytest.raises(ValueError, match="contains unsafe entry"):
+    with pytest.raises(ValueError):
         prepare_workflow_input(
             _issue_input(str(bundle_root)),
             "issue-review",

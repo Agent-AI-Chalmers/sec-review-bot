@@ -269,8 +269,7 @@ export async function prepareRepositoryReviewInput({
     head_sha: resolvedHeadSha,
     ...(changedFilesForScanScope === null
       ? {}
-      : { changed_file_count: changedFilesForScanScope.length }),
-    generated_at: new Date().toISOString()
+      : { changed_file_count: changedFilesForScanScope.length })
   })
 
   // The bundle is published only after the input that references it fits, so a failure here

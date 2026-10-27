@@ -121,6 +121,8 @@ jobs:
             tools_directory: contracts/tar-zstd-artifact/envelope/tools
           - name: memory-tree-profile
             tools_directory: contracts/tar-zstd-artifact/profiles/memory-tree/tools
+          - name: input-bundle-profile
+            tools_directory: contracts/tar-zstd-artifact/profiles/input-bundle/tools
           - name: run-diagnostic-profile
             tools_directory: contracts/tar-zstd-artifact/profiles/run-diagnostic/tools
     defaults:

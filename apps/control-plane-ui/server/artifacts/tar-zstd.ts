@@ -7,8 +7,14 @@ const utf8 = new TextDecoder('utf-8', { fatal: true })
 
 export interface TarEnvelopeEntry {
   path: string
-  typeFlag: string
+  typeFlag: '0' | '5'
   size: number
+  mode: number
+  uid: number
+  gid: number
+  mtime: number
+  uname: string
+  gname: string
 }
 
 function field(block: Buffer, offset: number, length: number): Buffer {
@@ -27,6 +33,10 @@ function headerPath(block: Buffer): string {
   const name = utf8.decode(field(block, 0, 100))
   const prefix = utf8.decode(field(block, 345, 155))
   return prefix ? `${prefix}/${name}` : name
+}
+
+function textField(block: Buffer, offset: number, length: number): string {
+  return utf8.decode(field(block, offset, length))
 }
 
 function parsePaxPath(body: Buffer): string {
@@ -106,7 +116,32 @@ export function validateRestrictedPaxTar(tarBytes: Buffer): TarEnvelopeEntry[] {
       pendingPath = parsePaxPath(body)
       continue
     }
-    entries.push({ path: pendingPath ?? headerPath(header), typeFlag, size })
+    const path = pendingPath ?? headerPath(header)
+    if (typeFlag !== '0' && typeFlag !== '5')
+      throw new Error('invalid_tar_zstd_envelope')
+    const entry: TarEnvelopeEntry = {
+      path,
+      typeFlag,
+      size,
+      mode: octal(header, 100, 8),
+      uid: octal(header, 108, 8),
+      gid: octal(header, 116, 8),
+      mtime: octal(header, 136, 12),
+      uname: textField(header, 265, 32),
+      gname: textField(header, 297, 32)
+    }
+    const expectedMode = typeFlag === '5' ? 0o755 : 0o644
+    if (
+      entry.mode !== expectedMode ||
+      entry.uid !== 0 ||
+      entry.gid !== 0 ||
+      entry.mtime !== 0 ||
+      entry.uname !== '' ||
+      entry.gname !== '' ||
+      (entry.typeFlag === '5' && entry.size !== 0)
+    )
+      throw new Error('invalid_tar_zstd_envelope')
+    entries.push(entry)
     pendingPath = undefined
   }
   if (

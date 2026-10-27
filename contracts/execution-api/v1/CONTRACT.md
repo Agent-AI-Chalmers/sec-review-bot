@@ -29,7 +29,7 @@ The v1 Execution Worker supports local `file:` and durable `s3:` URIs. Storage e
 
 The caller owns the input bundle. The Execution Worker and its stages own runtime state such as `artifact_paths`, stage artifact roots, writable stage workspaces, retry state, and delivery assignments.
 
-The `tar.zst` archive must contain `manifest.json`, the workspace snapshot, history, and any declared incremental window. The manifest shape is defined by [`input-bundle-manifest.schema.json`](schemas/input-bundle-manifest.schema.json). It declares the API version and bundle-relative paths. The Execution Worker parses those paths into internal local `bundle_paths`. Callers must not provide `bundle_paths` directly.
+The `tar.zst` archive must conform to the [input-bundle artifact v1 profile](../../tar-zstd-artifact/profiles/input-bundle/v1/SPEC.md) and contain `manifest.json`, the workspace snapshot, history, and any declared incremental window. The manifest shape is defined by [`input-bundle-manifest.schema.json`](schemas/input-bundle-manifest.schema.json). It declares the API version and bundle-relative paths. The Execution Worker parses those paths into internal local `bundle_paths`. Callers must not provide `bundle_paths` directly.
 
 The `input_bundle` object shape is defined by [`common.schema.json`](schemas/common.schema.json); `uri` accepts a `file:` or `s3:` reference.
 

@@ -3,6 +3,7 @@ import json
 import tarfile
 from pathlib import Path
 
+from sec_review_agents.artifacts.tar_zstd import canonical_tar_info
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 
 
@@ -24,9 +25,11 @@ def write_test_input_bundle(
     (root / "workspace.snapshot.tar").touch()
     (root / "history").mkdir(exist_ok=True)
     archive_path = Path(f"{root}.tar.zst")
-    with tarfile.open(archive_path, mode="w:zst") as archive:
-        for entry in root.iterdir():
-            archive.add(entry, arcname=entry.name)
+    with tarfile.open(archive_path, mode="w:zst", format=tarfile.PAX_FORMAT) as archive:
+        for name in ["manifest.json", "history", "workspace.snapshot.tar"]:
+            entry = root / name
+            if entry.exists():
+                archive.add(entry, arcname=name, filter=canonical_tar_info)
     content = archive_path.read_bytes()
     return {
         "uri": archive_path.as_uri(),

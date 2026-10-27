@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from sec_review_agents.contract_versions import (
+    INPUT_BUNDLE_ARTIFACT_VERSION,
     MEMORY_TREE_ARTIFACT_VERSION,
     RUN_DIAGNOSTIC_ARTIFACT_VERSION,
     TAR_ZSTD_ENVELOPE_VERSION,
@@ -20,6 +21,10 @@ from tests.project_paths import CONTRACTS_ROOT
         (
             Path("tar-zstd-artifact/profiles/memory-tree"),
             MEMORY_TREE_ARTIFACT_VERSION,
+        ),
+        (
+            Path("tar-zstd-artifact/profiles/input-bundle"),
+            INPUT_BUNDLE_ARTIFACT_VERSION,
         ),
         (
             Path("tar-zstd-artifact/profiles/run-diagnostic"),

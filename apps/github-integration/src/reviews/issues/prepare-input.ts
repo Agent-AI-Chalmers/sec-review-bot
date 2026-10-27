@@ -81,7 +81,6 @@ async function materializeHistoryArtifacts({
     issueMetadata
   )
   await writeJsonArtifact(path.join(history_path, 'linked-context.json'), {
-    generated_at: new Date().toISOString(),
     relation_type: 'cross-referenced',
     source: 'timeline',
     sources_checked: ['timeline'],

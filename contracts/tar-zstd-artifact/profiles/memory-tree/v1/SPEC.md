@@ -46,21 +46,11 @@ followed by one LF byte. Its parsed value must validate against [manifest.schema
 
 No other path is allowed. In particular, files directly below `memory/` other than `MEMORY.md`, and non-Markdown files below `memory/topics/`, are invalid.
 
-## Entry Types And Metadata
+## Entry Representation
 
-Only regular files and directories are allowed. Symlinks, hard links, devices, FIFOs, sockets, sparse files, and every other special type are invalid. Consumers must classify the tar header type directly and must never follow links.
+Entries follow the envelope's canonical type and metadata rules. Consumers classify tar header types directly and never follow links.
 
-Every entry has canonical metadata:
-
-| Field | Regular file | Directory |
-| --- | --- | --- |
-| `mtime` | `0` | `0` |
-| `uid`, `gid` | `0`, `0` | `0`, `0` |
-| `uname`, `gname` | empty | empty |
-| mode | `0644` | `0755` |
-| size | actual byte length | `0` |
-
-The envelope's local PAX `path` header is allowed when a path does not fit the ustar `name` and `prefix` fields. No PAX key changes this profile's metadata requirements; all other PAX and GNU extensions remain invalid.
+The envelope's local PAX `path` header is allowed when a path does not fit the ustar `name` and `prefix` fields. All other PAX and GNU extensions remain invalid.
 
 ## Ordering
 

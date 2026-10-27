@@ -29,6 +29,36 @@
       "expected": "invalid",
       "sha256": "27bfa61b3b381bd56b969adf9d3602cead7013ea8983e28108b763be62cfb076",
       "size": 124
+    },
+    {
+      "file": "invalid-entry-type.tar.zst",
+      "expected": "invalid",
+      "sha256": "79ce73a7febc8305cd5d9d359283c28ddd81cfdaf0ee97fb309c43b8220472c4",
+      "size": 73
+    },
+    {
+      "file": "invalid-mode.tar.zst",
+      "expected": "invalid",
+      "sha256": "250ad080ce95dbcb676a3240395df5e23973421ec02c356298cbc52d142232db",
+      "size": 86
+    },
+    {
+      "file": "invalid-mtime.tar.zst",
+      "expected": "invalid",
+      "sha256": "5224904fcac934bde172574e48e697b00dbb6481cd51fd609b6c68d751448b8a",
+      "size": 89
+    },
+    {
+      "file": "invalid-owner.tar.zst",
+      "expected": "invalid",
+      "sha256": "dbffa57db14a700a5d433373260086c6dbe5c673797288595f0f8abae0774815",
+      "size": 96
+    },
+    {
+      "file": "invalid-directory-size.tar.zst",
+      "expected": "invalid",
+      "sha256": "9e6f2a917edff583c364a1c3aa1d83e98da01ec8ef48f558a8c1c30b049cf34e",
+      "size": 77
     }
   ]
 }
