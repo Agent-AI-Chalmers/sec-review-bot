@@ -14,6 +14,8 @@
 
 Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Review Runs 协调每个 review run；Temporal 把 review、memory extraction 和 memory maintenance 工作分发给三个独立的 worker pool。PostgreSQL 保存控制和 catalog 状态，RustFS 保存运行输入、transcript、memory revision 和 artifact。
 
+图中的 Langfuse 同时位于 Docker Compose 和宿主机 worker 边界之外，因为它是独立部署的。Worker 可以向其导出 LLM observations，Review Runs 可以读取这些 observations 并生成模型用量 snapshot；两条链路都不会阻塞 review execution 或 publication。
+
 Control Plane UI 是独立部署的控制台。它的同源服务端从 Review Runs 读取运行状态并代理 artifact 下载，因此服务凭据和存储凭据都不会进入浏览器代码。公网 endpoint 的配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
 负责某条 task queue 的 worker 不存在时，该队列中的任务会停留在 Temporal 中等待执行。
@@ -191,7 +193,7 @@ PostgreSQL 初始化脚本只会在 `.agent-postgres-state` 为空时执行。�
 
 #### Langfuse tracing
 
-[Langfuse](https://langfuse.com/docs) 是可选的外部可观测性服务，不属于本仓库的 Compose 控制平面。可以使用 [Langfuse Cloud](https://cloud.langfuse.com)，也可以单独运行[自托管 Langfuse](https://langfuse.com/self-hosting)。在 Langfuse 中创建 project 和 API keys 后，把下面三项一起写入 `ops/systemd/deployment.env`，再重新运行安装脚本：
+[Langfuse](https://langfuse.com/docs) 独立部署，强烈建议配置。核心审查执行不依赖它，但 LLM 调用追踪和 Review Runs 模型用量统计依赖它。它不属于本仓库的 Compose 控制平面。可以使用 [Langfuse Cloud](https://cloud.langfuse.com)，也可以单独运行[自托管 Langfuse](https://langfuse.com/self-hosting)。在 Langfuse 中创建 project 和 API keys 后，把下面三项一起写入 `ops/systemd/deployment.env`，再重新运行安装脚本：
 
 ```bash
 LANGFUSE_PUBLIC_KEY=your_public_key

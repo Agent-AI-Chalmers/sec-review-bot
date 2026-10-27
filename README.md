@@ -40,7 +40,7 @@ A draft PR includes modified files, case details, analyzer / verifier output, an
 
 ## Architecture
 
-This repository has eight runtime roles: GitHub Integration, Review Runs, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server. They cooperate through authenticated HTTP, Temporal, object storage, and durable PostgreSQL state.
+The repository-owned runtime roles are GitHub Integration, Review Runs, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server. They cooperate through authenticated HTTP, Temporal, object storage, and durable PostgreSQL state. Langfuse is a trusted but independently deployed observability dependency rather than a repository-owned runtime role.
 
 - [`apps/github-integration/`](apps/github-integration/README.md): TypeScript GitHub integration service for webhooks, Actions-authenticated HTTP dispatch, input bundle preparation, and GitHub publishing
 - [`review-runs/`](review-runs/README.md): independently deployed TypeScript service for review-run admission and durable coordination
@@ -60,7 +60,7 @@ Each contract family under [`contracts/`](contracts/README.md) owns the tool tha
 - **Agent runtime**: [LangChain](https://www.langchain.com/) / [LangGraph](https://langchain-ai.github.io/langgraph/) ([deepagents](https://github.com/langchain-ai/deepagents)) for chat-model adapters, structured output, and tool calls.
 - **Durable execution**: [Temporal](https://temporal.io/) owns workflow / activity scheduling, worker dispatch, retry, timeout, and failure state.
 - **State and storage**: [PostgreSQL](https://www.postgresql.org/) for coordination state; S3-compatible object storage ([RustFS](https://github.com/rustfs/rustfs) locally) for input bundles and diagnostic artifacts.
-- **Observability**: [Langfuse](https://langfuse.com/) (optional, external) for LLM-call tracing and run diagnostics.
+- **Observability**: [Langfuse](https://langfuse.com/) is independently deployed and strongly recommended. Core review execution does not require it, but LLM-call tracing and Review Runs model-usage statistics do.
 - **Execution isolation**: [Docker](https://www.docker.com/) sandbox (default) or [bubblewrap](https://github.com/containers/bubblewrap) (bwrap, optional), used by the host execution worker.
 - **Local deployment**: [Docker Compose](https://docs.docker.com/compose/) + [systemd](https://systemd.io/).
 
@@ -84,8 +84,6 @@ If you only want to inspect or run the agent side, start from:
 | Issue review        | `issues.opened`, `@<app-slug> review`         | Issue comment (and a draft PR once a confirmed finding yields a patch) |
 | Pull request review | PR webhook, `@<app-slug> review`              | PR review / suggestions                                                |
 | Repository review   | scheduled / manually dispatched GitHub Action | Repository summary and deliveries                                      |
-
-Every trigger reviews in `audit` mode; there is no `repair` option.
 
 Full trigger behavior is documented in the [GitHub integration triggers guide](apps/github-integration/README.md#triggers).
 

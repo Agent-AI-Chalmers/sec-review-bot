@@ -40,7 +40,7 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
 
 ## 架构
 
-这个仓库包含八个运行角色：GitHub Integration、Review Runs、Control Plane UI、Execution Gateway、Execution Worker、Memory Extraction Worker、Memory Maintenance Worker 和 Memory Catalog Server。它们通过受认证的 HTTP、Temporal、对象存储和持久化 PostgreSQL 状态协作。
+本仓库负责的运行角色包括 GitHub Integration、Review Runs、Control Plane UI、Execution Gateway、Execution Worker、Memory Extraction Worker、Memory Maintenance Worker 和 Memory Catalog Server。它们通过受认证的 HTTP、Temporal、对象存储和持久化 PostgreSQL 状态协作。Langfuse 是受信任但独立部署的可观测性依赖，不属于本仓库负责的运行角色。
 
 - [`apps/github-integration/`](apps/github-integration/README.zh.md)：TypeScript 编写的 GitHub integration service，负责 GitHub App webhook、由 GitHub Actions 鉴权的 HTTP dispatch、输入材料准备和 GitHub 发布
 - [`review-runs/`](review-runs/README.zh.md)：独立部署的 TypeScript 服务，负责 review run 接纳和持久化协调
@@ -58,7 +58,7 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
 - **Agent 运行时**：[LangChain](https://www.langchain.com/) / [LangGraph](https://langchain-ai.github.io/langgraph/)（[deepagents](https://github.com/langchain-ai/deepagents)），负责模型适配、结构化输出和工具调用。
 - **持久执行**：[Temporal](https://temporal.io/) 负责 workflow/activity 调度、worker 分发、重试、超时和失败状态。
 - **状态与存储**：[PostgreSQL](https://www.postgresql.org/) 存协调状态；S3 兼容对象存储（本地为 [RustFS](https://github.com/rustfs/rustfs)）存输入材料包和诊断产物。
-- **可观测性**：[Langfuse](https://langfuse.com/)（可选、外部），用于 LLM 调用追踪和 run 诊断。
+- **可观测性**：[Langfuse](https://langfuse.com/) 独立部署，强烈建议配置。核心审查执行不依赖它，但 LLM 调用追踪和 Review Runs 模型用量统计依赖它。
 - **执行隔离**：[Docker](https://www.docker.com/) sandbox（默认）或 [bubblewrap](https://github.com/containers/bubblewrap)（bwrap，可选），由宿主机执行 worker 使用。
 - **本地部署**：[Docker Compose](https://docs.docker.com/compose/) + [systemd](https://systemd.io/)。
 
@@ -82,8 +82,6 @@ Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和
 | Issue review        | `issues.opened`、`@<app-slug> review` | issue comment（确认问题并产出 patch 后再开 draft PR） |
 | Pull request review | PR webhook、`@<app-slug> review`      | PR review / suggestions                               |
 | Repository review   | 定时或手动触发的 GitHub Action        | repository summary 和 deliveries                      |
-
-所有触发一律以 `audit` 模式审查；没有 `repair` 选项。
 
 完整触发行为见 [GitHub integration 触发说明](apps/github-integration/README.zh.md#触发)。
 

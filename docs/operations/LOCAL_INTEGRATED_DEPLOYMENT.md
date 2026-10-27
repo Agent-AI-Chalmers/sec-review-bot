@@ -12,6 +12,8 @@ Use it to run the complete integrated path locally. For running agents directly 
 
 Cloudflare Tunnel sends GitHub traffic to the integration service. Review Runs coordinates each review run, while Temporal dispatches review, memory extraction, and memory maintenance work to three independent worker pools. PostgreSQL stores control and catalog state, while RustFS stores run inputs, transcripts, memory revisions, and artifacts.
 
+Langfuse is shown outside both Docker Compose and the host worker boundary because it is independently deployed. The workers can export LLM observations to it, and Review Runs can read those observations to build model-usage snapshots; neither path gates review execution or publication.
+
 Control Plane UI is a separately deployed console. Its same-origin server reads run state from Review Runs and proxies artifact downloads, so service and storage credentials remain outside browser code. See [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md) for public endpoint configuration.
 
 Without the worker responsible for a task queue, tasks on that queue remain in Temporal waiting for execution.
@@ -189,7 +191,7 @@ Add or change the following variables as needed.
 
 #### Langfuse Tracing
 
-[Langfuse](https://langfuse.com/docs) is an optional external observability service. It is not part of this repository's Compose control plane. Use [Langfuse Cloud](https://cloud.langfuse.com) or run a separate [self-hosted Langfuse deployment](https://langfuse.com/self-hosting), create a project and API keys there, then set all three variables together in `ops/systemd/deployment.env` and rerun the installer:
+[Langfuse](https://langfuse.com/docs) is independently deployed and strongly recommended. Core review execution does not require it, but LLM-call tracing and Review Runs model-usage statistics do. It is not part of this repository's Compose control plane. Use [Langfuse Cloud](https://cloud.langfuse.com) or run a separate [self-hosted Langfuse deployment](https://langfuse.com/self-hosting), create a project and API keys there, then set all three variables together in `ops/systemd/deployment.env` and rerun the installer:
 
 ```bash
 LANGFUSE_PUBLIC_KEY=your_public_key

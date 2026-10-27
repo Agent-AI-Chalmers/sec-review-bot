@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 820" role="img" aria-labelledby="title description">
   <title id="title">Local integrated deployment shape</title>
-  <desc id="description">GitHub and an operator browser connect to Docker Compose services, while three host worker pools execute reviews, memory extraction, and memory maintenance.</desc>
+  <desc id="description">GitHub, an operator browser, and independently deployed Langfuse connect to Docker Compose services and three host worker pools.</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
       <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.1" />
@@ -25,6 +25,7 @@
       .memory-node .node-accent { stroke: #2f806a; }
       .storage-node .node-accent { stroke: #9a6a22; }
       .sandbox-node .node-accent { stroke: #7c5c9e; }
+      .observability-node .node-accent { stroke: #8a5a9e; }
       .node-label { font-size: 16px; font-weight: 550; }
       .edge { fill: none; stroke: #94a3b8; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; opacity: 0.76; }
       .edge.dashed { stroke-dasharray: 6 5; }
@@ -64,6 +65,10 @@
   <path d="M 1260 569 L 1140 569 Q 1150 569 1150 579 L 1150 639 Q 1150 649 1160 649 L 1130 649" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
   <path d="M 1260 426 L 1170 426 Q 1180 426 1180 429 L 1180 417 Q 1180 420 1190 420 L 700 420 Q 710 420 710 430 L 710 359 Q 710 369 720 369 L 690 369" class="edge dashed" marker-end="url(#arrow)" marker-start="url(#arrow)" />
   <path d="M 1260 551 L 1160 551 Q 1170 551 1170 561 L 1170 430 Q 1170 440 1180 440 L 720 440 Q 730 440 730 450 L 730 359 Q 730 369 740 369 L 690 369" class="edge dashed" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 720 169 L 250 169 Q 230 169 230 189 L 230 551 Q 230 561 210 561" class="edge dashed" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1250 301 L 1215 301 L 1215 755 L 245 755 Q 230 755 230 740 L 230 579 Q 230 561 210 561" class="edge dashed" marker-end="url(#arrow)" />
+  <path d="M 1250 426 L 1215 426" class="edge dashed" />
+  <path d="M 1250 551 L 1215 551" class="edge dashed" />
   <g id="github" class="node external-node">
     <rect x="50" y="115" width="160" height="72" rx="8" class="node-surface" />
     <path d="M 58 116 H 202" class="node-accent" />
@@ -77,6 +82,14 @@
     <text x="130" y="347" class="node-label" text-anchor="middle">
       <tspan x="130" dy="0">Operator</tspan>
       <tspan x="130" dy="18">browser</tspan>
+    </text>
+  </g>
+  <g id="langfuse" class="node observability-node">
+    <rect x="50" y="515" width="160" height="92" rx="8" class="node-surface" />
+    <path d="M 58 516 H 202" class="node-accent" />
+    <text x="130" y="552" class="node-label" text-anchor="middle">
+      <tspan x="130" dy="0">Langfuse</tspan>
+      <tspan x="130" dy="18">Observability</tspan>
     </text>
   </g>
   <g id="tunnel" class="node control-node">

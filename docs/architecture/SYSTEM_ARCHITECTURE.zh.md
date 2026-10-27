@@ -4,13 +4,13 @@
 
 本文是 [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-Sec Review Bot 包含八个运行角色：GitHub Integration、Review Runs、Control Plane UI、Execution Gateway、Execution Worker、Memory Extraction Worker、Memory Maintenance Worker 和 Memory Catalog Server。
+Sec Review Bot 由本仓库负责的运行角色包括 GitHub Integration、Review Runs、Control Plane UI、Execution Gateway、Execution Worker、Memory Extraction Worker、Memory Maintenance Worker 和 Memory Catalog Server。Langfuse 是受信任、独立部署并拥有独立生命周期的可观测性依赖，不属于本仓库负责的运行角色。
 
 ## 运行拓扑
 
 ![Sec Review Bot 运行拓扑](../../assets/architecture/runtime-topology.zh.svg)
 
-Temporal Server 属于基础设施，但它会直接向 worker 进程分发工作，因此拓扑图将它与运行服务放在一起。PostgreSQL 和对象存储则单独作为持久化设施呈现。Review execution、memory extraction 与 memory maintenance 分别使用独立的 worker 进程和 task queue。
+Temporal Server 属于基础设施，但它会直接向 worker 进程分发工作，因此拓扑图将它与运行服务放在一起。PostgreSQL 和对象存储则单独作为持久化设施呈现。Langfuse 位于本仓库的部署边界之外：worker 可以向其导出 LLM observations，Review Runs 则异步读取这些 observations 并持久化模型用量 snapshot。Review execution、memory extraction 与 memory maintenance 分别使用独立的 worker 进程和 task queue。
 
 Memory 链路只有一套与部署位置无关的状态模型：Memory Catalog 负责 PostgreSQL 中的协调状态，对象存储负责不可变 memory-tree 和 transcript artifacts，Temporal 负责 workflow 执行。每次 review invocation 都会把当前 memory tree 物化到临时目录供 agent backend 使用，并在结束后删除该目录。
 
@@ -30,6 +30,27 @@ Control Plane UI 通过自身 BFF 管理 Memory Catalog，browser 不会获得 C
 | Memory Catalog Server | `memory-catalog/` | Observation catalog、不可变 memory revision history 与 active revision 协调 | [README](../../memory-catalog/README.zh.md) |
 
 这些运行角色通过 [`contracts/`](../../contracts/README.zh.md) 下由项目维护的边界通信。Package 位置并不决定进程拓扑：`agents/` 实现三个独立的 Temporal worker。`apps/` 下的两个应用则仍分别独立部署。
+
+## 可观测性与统计链路
+
+```mermaid
+sequenceDiagram
+  participant Workers as Agent Workers
+  participant Langfuse as Langfuse（独立部署）
+  participant Runs as Review Runs
+  participant Database as PostgreSQL
+  participant UI as Control Plane UI
+
+  Workers-->>Langfuse: 可选地导出 LLM traces 和 generations
+  Note over Workers,Langfuse: Review execution 不等待可观测性数据送达
+  Runs->>Langfuse: 按 run_id 读取终态 run observations
+  Langfuse-->>Runs: 返回 review roots 和 model generations
+  Runs->>Database: 保存 reconciliation 状态和聚合 snapshot
+  UI->>Runs: 读取 run 详情
+  Runs-->>UI: 返回 snapshot、等待状态或无 observation 记录
+```
+
+Langfuse 保存每次模型调用的 observation。Review Runs 读取并汇总这些数据，写入自己的数据库，供 Control Plane UI 展示。
 
 ## 主 Review 链路
 

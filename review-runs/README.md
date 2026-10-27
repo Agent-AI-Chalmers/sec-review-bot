@@ -27,7 +27,8 @@ The service runs as an independent Node.js process on port `8090` by default. Po
 - Polls Execution API provider and records execution progress, terminal workflow results, and terminal artifact references.
 - Makes successful terminal results claimable by the owning integration for GitHub publication.
 - Persists publication steps so completed remote side effects are not repeated after restart.
-- Exposes redacted run queries for the Control Plane UI.
+- Reconciles terminal-run model-call totals from external Langfuse without changing execution or publication outcomes.
+- Exposes redacted run queries, including the optional execution-statistics snapshot, for the Control Plane UI.
 
 ## Run lifecycle
 
@@ -43,15 +44,17 @@ If Execution API provider submission may have succeeded but its response was los
 
 The run trunk and the three lifecycle axes are separate tables. `review_runs` holds only the admitted identity; each axis keeps its own state and its own input:
 
-| Table               | Responsibility                                                      | Status                                                                                        |
-| ------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `review_runs`       | Admission identity shared by all axes (no update path)              | —                                                                                             |
-| `preparations`      | Claimable input preparation                                         | `pending`, `preparing`, `uncertain`, `disconnected`, `submitted`, `failed`                    |
-| `run_notices`       | Connector-owned user-visible failure and attention work             | `pending`, `delivering`, `delivered`, `failed`                                                |
-| `executions`        | Execution API provider submission, observation, and terminal result | `pending`, `queued`, `running`, `uncertain`, `disconnected`, `succeeded`, `skipped`, `failed` |
-| `publications`      | Whole-publication ownership and outcome                             | `pending`, `publishing`, `uncertain`, `disconnected`, `published`, `failed`, `skipped`        |
-| `publication_steps` | Recoverable individual connector side effects                       | `pending`, `running`, `uncertain`, `disconnected`, `succeeded`, `failed`, `terminal_failed`   |
-| `review_run_events` | Append-only audit log of transitions on every axis                  | —                                                                                             |
+| Table                         | Responsibility                                                      | Status                                                                                        |
+| ----------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `review_runs`                 | Admission identity shared by all axes (no update path)              | —                                                                                             |
+| `preparations`                | Claimable input preparation                                         | `pending`, `preparing`, `uncertain`, `disconnected`, `submitted`, `failed`                    |
+| `run_notices`                 | Connector-owned user-visible failure and attention work             | `pending`, `delivering`, `delivered`, `failed`                                                |
+| `executions`                  | Execution API provider submission, observation, and terminal result | `pending`, `queued`, `running`, `uncertain`, `disconnected`, `succeeded`, `skipped`, `failed` |
+| `publications`                | Whole-publication ownership and outcome                             | `pending`, `publishing`, `uncertain`, `disconnected`, `published`, `failed`, `skipped`        |
+| `publication_steps`           | Recoverable individual connector side effects                       | `pending`, `running`, `uncertain`, `disconnected`, `succeeded`, `failed`, `terminal_failed`   |
+| `execution_statistics`        | Statistics reconciliation state and run totals                      | `pending`, `reconciling`, `settled`, `unavailable`                                            |
+| `execution_statistics_groups` | Workflow-coordinate/agent/provider/model call and token totals      | —                                                                                             |
+| `review_run_events`           | Append-only audit log of transitions on every axis                  | —                                                                                             |
 
 ```mermaid
 flowchart LR
@@ -130,7 +133,7 @@ The write surface — admission, submission, preparation and publication claims 
 
 The contract is **enforced on requests**: routing, path/query/body validation, and authentication are all derived from it, so a request outside the document is rejected before a handler runs. Responses are _described_ by the contract but not validated against it at runtime — `fastify-openapi-glue` is request-only — so the declared response schemas are a promise the handlers keep, pinned by tests rather than by the framework. `review-runs/test/observed-run-contract.test.ts` validates the committed fixtures and the shapes `observeRun()` actually produces against the shared schemas, and `review-runs/test/server-http.test.ts` exercises the HTTP surface, which is what keeps a response from drifting outside its schema unnoticed.
 
-Read responses omit `execution_input` and `publish_context`. They retain `source_platform` for stable platform aggregation and `connector_id` for the connector type and instance that owns the run. The UI BFF holds the read token; browser code receives neither Review Runs token.
+Read responses omit `execution_input` and `publish_context`. They retain `source_platform` for stable platform aggregation and `connector_id` for the connector type and instance that owns the run. `execution_statistics` is `null` when no snapshot row exists; otherwise it projects the reconciliation state, observed totals, and grouped totals from the two relational statistics tables. A missing or incomplete snapshot is not zero usage. The UI BFF holds the read token; browser code receives neither Review Runs token nor Langfuse credentials.
 
 The service token authenticates components coordinating a run; the read token authenticates redacted reads; a third, optional admin token authenticates the operator surface under `/v1/admin`. The three are deliberately not nested: holding the service token does not reach an admin route, and the admin token cannot admit runs or move a run through its normal lifecycle. `/v1/admin` exists only when `REVIEW_RUNS_ADMIN_TOKEN` is configured — otherwise the paths answer 404 rather than 401, so an unconfigured deployment does not advertise an operator surface at all. Reading the parked-run queue needs only the read token, because knowing a run is stuck is not privileged; only the decisions that conclude one are.
 
@@ -140,24 +143,40 @@ Read responses report three independent lifecycle axes as nested objects of the 
 
 ## Configuration
 
-| Variable                                      | Required                                             | Purpose                                                                                   |
-| --------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                | Yes                                                  | PostgreSQL connection string                                                              |
-| `REVIEW_RUNS_READ_TOKEN`                      | Yes                                                  | Redacted read API; the console backend and any read-only consumer use this one            |
-| `REVIEW_RUNS_SERVICE_TOKEN`                   | Yes                                                  | Component coordination (admission, claims, terminal outcomes); cannot reach `/v1/admin`   |
-| `REVIEW_RUNS_ADMIN_TOKEN`                     | No                                                   | Operator authentication for `/v1/admin/*`; when unset the whole admin surface answers 404 |
-| `EXECUTION_API_URL`                           | Yes                                                  | Execution API provider base URL                                                           |
-| `EXECUTION_API_TOKEN`                         | For non-loopback or protected Execution API provider | Execution API provider authentication                                                     |
-| `REVIEW_RUNS_PORT`                            | No                                                   | Listen port; default `8090`                                                               |
-| `CONNECTOR_ID`                                | No                                                   | Coordination namespace; default `github-integration:default`                              |
-| `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS` | No                                                   | Coordinator interval; default `15000`                                                     |
-| `EXECUTION_API_REQUEST_TIMEOUT_MS`            | No                                                   | Execution API provider request timeout; default `30000`                                   |
-| `EXECUTION_API_REQUEST_RETRIES`               | No                                                   | Execution API provider transport retries; default `2`                                     |
-| `EXECUTION_API_RETRY_BASE_DELAY_MS`           | No                                                   | Initial retry delay; default `500`                                                        |
+| Variable                                      | Required                                             | Purpose                                                                                       |
+| --------------------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                | Yes                                                  | PostgreSQL connection string                                                                  |
+| `REVIEW_RUNS_READ_TOKEN`                      | Yes                                                  | Redacted read API; the console backend and any read-only consumer use this one                |
+| `REVIEW_RUNS_SERVICE_TOKEN`                   | Yes                                                  | Component coordination (admission, claims, terminal outcomes); cannot reach `/v1/admin`       |
+| `REVIEW_RUNS_ADMIN_TOKEN`                     | No                                                   | Operator authentication for `/v1/admin/*`; when unset the whole admin surface answers 404     |
+| `EXECUTION_API_URL`                           | Yes                                                  | Execution API provider base URL                                                               |
+| `EXECUTION_API_TOKEN`                         | For non-loopback or protected Execution API provider | Execution API provider authentication                                                         |
+| `REVIEW_RUNS_PORT`                            | No                                                   | Listen port; default `8090`                                                                   |
+| `CONNECTOR_ID`                                | No                                                   | Coordination namespace; default `github-integration:default`                                  |
+| `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS` | No                                                   | Coordinator interval; default `15000`                                                         |
+| `EXECUTION_API_REQUEST_TIMEOUT_MS`            | No                                                   | Execution API provider request timeout; default `30000`                                       |
+| `EXECUTION_API_REQUEST_RETRIES`               | No                                                   | Execution API provider transport retries; default `2`                                         |
+| `EXECUTION_API_RETRY_BASE_DELAY_MS`           | No                                                   | Initial retry delay; default `500`                                                            |
+| `LANGFUSE_BASE_URL`                           | No                                                   | External Langfuse URL; enables execution statistics when all three Langfuse variables are set |
+| `LANGFUSE_PUBLIC_KEY`                         | With `LANGFUSE_BASE_URL`                             | Langfuse project public key                                                                   |
+| `LANGFUSE_SECRET_KEY`                         | With `LANGFUSE_BASE_URL`                             | Langfuse project secret key                                                                   |
+| `LANGFUSE_REQUEST_TIMEOUT_MS`                 | No                                                   | One Langfuse request timeout; default `30000`                                                 |
+| `EXECUTION_STATISTICS_POLL_INTERVAL_MS`       | No                                                   | Statistics coordinator interval; default `15000`                                              |
+| `EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS`     | No                                                   | Maximum due runs reconciled per coordinator pass; default `20`                                |
+| `EXECUTION_STATISTICS_INITIAL_DELAY_MS`       | No                                                   | Delay after execution completion before the first Langfuse read; default `30000`              |
+| `EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS`  | No                                                   | Delay before confirming that two snapshots match; default `30000`                             |
+| `EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS`   | No                                                   | Maximum observation-settling window; default `600000`                                         |
+| `EXECUTION_STATISTICS_MAX_FAILURES`           | No                                                   | Consecutive Langfuse read failures before marking statistics unavailable; default `8`         |
+| `EXECUTION_STATISTICS_RETRY_DELAY_MS`         | No                                                   | Delay after a failed Langfuse read; default `30000`                                           |
+| `EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS`       | No                                                   | Lease timeout for a statistics reconciliation claim; default `600000`                         |
 
 ## Database schema
 
 Schema files live in `src/database/schema-versions`. Applied versions and SHA-256 checksums are recorded in `schema_versions`. Startup uses a PostgreSQL advisory lock to serialize schema work and rejects a database whose recorded checksum differs from the checked-in file. The experimental deployment policy permits destructive schema resets.
+
+Execution statistics use two relational tables: `execution_statistics` owns reconciliation state and run totals, while `execution_statistics_groups` stores totals by case, delivery, pass, draft batch, discovery chunk, agent, provider, and model. Call-level observations remain in external Langfuse. A snapshot is `settled` only after two matching reads that contain at least one review root; reaching the bounded window first produces `partial_window`, or `no_observations` when the whole window contains no review roots. Usage coverage applies only to calls returned by Langfuse and is not an upload-completeness claim.
+
+Langfuse HTTP 429 responses defer the claimed run according to `Retry-After` (falling back to `EXECUTION_STATISTICS_RETRY_DELAY_MS`) without consuming the consecutive-failure budget. If that delay reaches the settlement deadline, reconciliation concludes as `unavailable` with failure code `LANGFUSE_RATE_LIMITED` instead of remaining pending indefinitely.
 
 ## Development
 
