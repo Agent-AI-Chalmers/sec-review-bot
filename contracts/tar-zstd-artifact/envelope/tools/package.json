@@ -4,7 +4,9 @@
   "version": "0.0.1",
   "license": "Apache-2.0",
   "type": "module",
-  "engines": { "node": ">=24 <25" },
+  "engines": {
+    "node": ">=24 <25"
+  },
   "scripts": {
     "generate": "node generate.mjs",
     "check": "node generate.mjs --check",

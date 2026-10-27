@@ -28,10 +28,7 @@ test("generated artifact manifest covers the run-diagnostic corpus", () => {
   const generated = JSON.parse(
     fs.readFileSync(path.join(toolRoot, "generated-artifacts.json"), "utf8"),
   );
-  assert.equal(
-    generated.family,
-    "tar-zstd-artifact/profiles/run-diagnostic",
-  );
+  assert.equal(generated.family, "tar-zstd-artifact/profiles/run-diagnostic");
   const corpus = path.resolve(toolRoot, "..", "v1", "corpus");
   const expected = fs
     .readdirSync(corpus)

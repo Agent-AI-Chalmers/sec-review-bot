@@ -146,11 +146,7 @@ const definitions = [
     expected: "invalid",
     unitId: "unit-1",
     bytes: archive([
-      [
-        "manifest.json",
-        "0",
-        json(manifest([nonCanonicalTranscript])),
-      ],
+      ["manifest.json", "0", json(manifest([nonCanonicalTranscript]))],
       ["result.json", "0", json({})],
       ["artifact-tree/", "5"],
       [transcript, "0", Buffer.from("{}\n")],
