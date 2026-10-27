@@ -231,3 +231,25 @@ test('the unfiltered list does not lead with a row that satisfies a filter looku
     await fixture.close()
   }
 })
+
+test('run fixtures filter by source platform', async () => {
+  const fixture = await startFixtureServer()
+  try {
+    const github = await (
+      await fetch(`${fixture.base}/api/runs?source_platform=github&limit=1`)
+    ).json()
+    assert.strictEqual(github.runs[0]?.source_platform, 'github')
+
+    const gitlab = await (
+      await fetch(`${fixture.base}/api/runs?source_platform=gitlab&limit=1`)
+    ).json()
+    assert.strictEqual(gitlab.runs[0]?.source_platform, 'gitlab')
+
+    const unknown = await (
+      await fetch(`${fixture.base}/api/runs?source_platform=unknown&limit=1`)
+    ).json()
+    assert.strictEqual(unknown.runs[0]?.source_platform, 'unknown')
+  } finally {
+    await fixture.close()
+  }
+})

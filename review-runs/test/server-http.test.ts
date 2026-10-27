@@ -55,11 +55,11 @@ test('the compiled server registers the contract from any working directory', as
 
 test('readiness requires a usable PostgreSQL store without exposing its failure', async () => {
   const ready = await buildApp({
-    connectorId: 'github-app:test',
+    connectorId: 'github-integration:test',
     checkReadiness: async () => {}
   })
   const unavailable = await buildApp({
-    connectorId: 'github-app:test',
+    connectorId: 'github-integration:test',
     checkReadiness: async () => {
       throw new Error('database connection refused')
     }
@@ -726,7 +726,9 @@ test('the admin surface is absent unless an admin token is configured', async ()
   const path = `/v1/admin/runs/${runId}/abandon`
   const body = { reason: 'operator says stop' }
 
-  const unconfigured = await buildApp({ connectorId: 'github-app:test' })
+  const unconfigured = await buildApp({
+    connectorId: 'github-integration:test'
+  })
   try {
     for (const headers of [
       {},
@@ -758,6 +760,8 @@ test('the admin surface is absent unless an admin token is configured', async ()
   const adminRecord = (preparationStatus: 'failed' | 'uncertain') => ({
     run_id: runId,
     workflow: 'issue-review',
+    source_platform: 'github',
+    connector_id: 'github-integration:test',
     preparation: {
       status: preparationStatus,
       attempt_count: 1,
@@ -788,7 +792,7 @@ test('the admin surface is absent unless an admin token is configured', async ()
     notices: []
   })
   const store = {
-    connectorId: 'github-app:test',
+    connectorId: 'github-integration:test',
     abandonBlockedPreparation: async () => adminRecord('failed'),
     resumeDisconnectedRun: async () => adminRecord('uncertain')
   }
@@ -861,7 +865,7 @@ test('the resume route answers 409 for a run that is not disconnected', async ()
   // rather than an opaque fault, so the console can explain what happened.
   const app = await buildApp(
     {
-      connectorId: 'github-app:test',
+      connectorId: 'github-integration:test',
       resumeDisconnectedRun: async () => {
         throw Object.assign(
           new Error('Review run x has no disconnected axis to resume.'),
@@ -887,7 +891,7 @@ test('the blocked preparation queue is readable with the read token', async () =
   // Knowing a run is stuck is not privileged: the console must be able to surface the queue
   // without holding an operator credential. Only acting on it is admin-gated.
   const app = await buildApp({
-    connectorId: 'github-app:test',
+    connectorId: 'github-integration:test',
     listParkedRuns: async () => [
       {
         run_id: 'run-1',

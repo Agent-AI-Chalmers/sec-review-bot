@@ -132,11 +132,11 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 
 契约在**请求侧是强制执行的**：路由、path/query/body 校验与鉴权都由它派生，因此任何不符合该文档的请求都会在进入 handler 之前被拒绝。响应侧由契约**描述**，但运行时并不对其校验——`fastify-openapi-glue` 只处理请求——因此声明的响应 schema 是 handler 需要遵守的约定，由测试而非框架来固定。`review-runs/test/observed-run-contract.test.ts` 会用共享 schema 校验已提交的 fixtures 以及 `observeRun()` 实际产出的形状，`review-runs/test/server-http.test.ts` 则覆盖 HTTP 面，这正是防止响应在无人察觉的情况下偏离其 schema 的机制。
 
-查询响应不包含 `execution_input` 和 `publish_context`。UI BFF 持有 read token；浏览器代码不接收任何 Review Runs token。
+查询响应不包含 `execution_input` 和 `publish_context`。它们会保留 `source_platform`，用于稳定的平台聚合；也会保留 `connector_id`，用于标识拥有该 run 的 connector 类型与实例。UI BFF 持有 read token；浏览器代码不接收任何 Review Runs token。
 
 service token 用于协调 run 的各个组件，read token 用于脱敏读取，第三个可选的 admin token 用于 `/v1/admin` 下的运维面。三者刻意不构成包含关系：持有 service token 无法访问 admin 路由，admin token 也不能接纳 run 或让 run 走正常生命周期。只有在配置了 `REVIEW_RUNS_ADMIN_TOKEN` 时 `/v1/admin` 才存在——否则这些路径返回 404 而不是 401，因此未配置的部署不会暴露任何运维面。查看 parked 队列（三轴合一的"停止重试"列表）只需要 read token，因为"知道某个 run 卡住了"并不属于特权；只有"决定放弃它、不再等待它、或把它交回自动恢复"才需要 admin token。
 
-查询响应以形状一致的三组嵌套对象报告彼此独立的生命周期轴：`preparation`、`execution` 与 `publication`。每组各自带有 `status`、`started_at`、`finished_at` 与 `updated_at`。preparation 摘要额外给出 `attempt_count` 以及终态的 `failure_code`，但绝不包含其 opaque input、claim token 或 connector identity。`notices` 包含 run 的某个环节失败或需要关注时应由集成展示给用户的消息。消息按产生时间从早到晚排列；同一 run 发生多次独立事件时会保留多条，不会合并。
+查询响应以形状一致的三组嵌套对象报告彼此独立的生命周期轴：`preparation`、`execution` 与 `publication`。每组各自带有 `status`、`started_at`、`finished_at` 与 `updated_at`。preparation 摘要额外给出 `attempt_count` 以及终态的 `failure_code`，但绝不包含其 opaque input 或 claim token。`notices` 包含 run 的某个环节失败或需要关注时应由集成展示给用户的消息。消息按产生时间从早到晚排列；同一 run 发生多次独立事件时会保留多条，不会合并。
 
 `/healthz` 只证明 HTTP 进程仍存活。`/readyz` 会验证当前 PostgreSQL 连接池可以执行 schema ledger 查询，且 ledger 的完整版本集合与本应用完全一致；否则返回不含数据库细节的 `503 {"status":"unavailable"}`。Compose 将 `/readyz` 用作 Review Runs healthcheck。Execution API provider 与 GitHub 被有意排除：它们的瞬时不可达不会使 durable admission、读取或 PostgreSQL 支持的恢复变得不安全，其故障由各自的状态机恢复路径处理。
 
@@ -151,7 +151,7 @@ service token 用于协调 run 的各个组件，read token 用于脱敏读取�
 | `EXECUTION_API_URL`                           | 是                                                 | Execution API provider base URL                         |
 | `EXECUTION_API_TOKEN`                         | 非 loopback 或受保护的 Execution API provider 必需 | Execution API provider 认证                             |
 | `REVIEW_RUNS_PORT`                            | 否                                                 | 监听端口；默认 `8090`                                   |
-| `CONNECTOR_ID`                                | 否                                                 | 协调 namespace；默认 `github-app:default`               |
+| `CONNECTOR_ID`                                | 否                                                 | 协调 namespace；默认 `github-integration:default`       |
 | `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS` | 否                                                 | Coordinator 间隔；默认 `15000`                          |
 | `EXECUTION_API_REQUEST_TIMEOUT_MS`            | 否                                                 | Execution API provider 请求超时；默认 `30000`           |
 | `EXECUTION_API_REQUEST_RETRIES`               | 否                                                 | Execution API provider transport 重试次数；默认 `2`     |

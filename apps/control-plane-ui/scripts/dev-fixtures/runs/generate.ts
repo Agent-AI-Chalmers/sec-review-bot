@@ -42,6 +42,7 @@ type StepStatus =
   | 'succeeded'
   | 'failed'
   | 'terminal_failed'
+type FixtureSourcePlatform = 'github' | 'gitlab' | 'unknown'
 
 // The contract's own artifact union, not a look-alike: `available` is the only status that may
 // carry `artifact`, and the fixtures must satisfy the same shape the console renders.
@@ -50,6 +51,8 @@ type FixtureArtifact = NonNullable<ArtifactStorage>
 export interface FixtureRun {
   run_id: string
   workflow: Workflow
+  connector_id: string
+  source_platform: FixtureSourcePlatform
   preparation: {
     status: PreparationStatus
     attempt_count: number
@@ -88,8 +91,11 @@ export interface FixtureRun {
  * failed, but the console rendered `undefined`. This alias makes the shape a compile-time fact:
  * widening, narrowing, or renaming a field on either side stops compiling here.
  */
-type FixtureMatchesRun = FixtureRun extends Run ? true : false
-type RunMatchesFixture = Run extends FixtureRun ? true : false
+type ContractShapedFixtureRun = Omit<FixtureRun, 'source_platform'> & {
+  source_platform: Run['source_platform']
+}
+type FixtureMatchesRun = ContractShapedFixtureRun extends Run ? true : false
+type RunMatchesFixture = Run extends ContractShapedFixtureRun ? true : false
 const _fixtureMatchesRun: FixtureMatchesRun = true
 const _runMatchesFixture: RunMatchesFixture = true
 void _fixtureMatchesRun
@@ -217,6 +223,17 @@ function runId(index: number): string {
   const block = (length: number): string =>
     next().toString(16).padStart(8, '0').slice(0, length)
   return `${block(8)}-${block(4)}-4${block(3)}-${'89ab'.charAt(next() % 4)}${block(3)}-${block(8)}${block(4)}`
+}
+
+function sourceFor(index: number): {
+  platform: FixtureSourcePlatform
+  connectorId: string
+} {
+  if (index % 17 === 0)
+    return { platform: 'unknown', connectorId: 'legacy-webhook:default' }
+  if (index % 5 === 0)
+    return { platform: 'gitlab', connectorId: 'gitlab-integration:default' }
+  return { platform: 'github', connectorId: 'github-integration:default' }
 }
 
 /** Ten mixed hex characters, the shape the delivery planner derives from its cases. */
@@ -563,6 +580,7 @@ export const runs: FixtureRun[] = Array.from(
         (index + Math.floor(index / WORKFLOWS.length)) % WORKFLOWS.length
       ]!
     const run_id = runId(index)
+    const source = sourceFor(index)
     // An active run has necessarily been admitted a short time ago (it is still in flight), so
     // its timeline is anchored near now rather than at the newest historical slot. Otherwise a
     // running fixture would claim to have been executing for hours while also being polled just
@@ -632,6 +650,8 @@ export const runs: FixtureRun[] = Array.from(
     return {
       run_id,
       workflow,
+      connector_id: source.connectorId,
+      source_platform: source.platform,
       preparation,
       created_at: iso(createdAt),
       execution: {

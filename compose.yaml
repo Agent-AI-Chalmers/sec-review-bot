@@ -165,7 +165,7 @@ services:
       REVIEW_RUNS_READ_TOKEN: "${REVIEW_RUNS_READ_TOKEN:?REVIEW_RUNS_READ_TOKEN is required}"
       # Optional: an empty value disables the /v1/admin surface entirely (it answers 404).
       REVIEW_RUNS_ADMIN_TOKEN: "${REVIEW_RUNS_ADMIN_TOKEN:-}"
-      CONNECTOR_ID: "${CONNECTOR_ID:-github-app:default}"
+      CONNECTOR_ID: "${CONNECTOR_ID:-github-integration:default}"
       DATABASE_URL: "postgresql://${POSTGRES_USER:-sec_review_bot}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/sec_review_review_runs"
       EXECUTION_API_URL: "http://execution-gateway:8000"
       EXECUTION_API_TOKEN: "${EXECUTION_API_TOKEN:?EXECUTION_API_TOKEN is required}"

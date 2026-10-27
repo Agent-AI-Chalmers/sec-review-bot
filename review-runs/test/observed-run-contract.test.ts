@@ -165,6 +165,8 @@ function recordWith(
   return {
     run_id: 'run-contract',
     workflow: 'repository-review',
+    source_platform: 'github',
+    connector_id: 'github-integration:test',
     preparation: {
       status: 'submitted',
       attempt_count: 1,
@@ -213,6 +215,7 @@ test('the redacted read never carries a field the observed schema does not decla
     Object.keys(observed).sort(),
     [
       'artifact_storage',
+      'connector_id',
       'created_at',
       'execution',
       'failure_code',
@@ -220,6 +223,7 @@ test('the redacted read never carries a field the observed schema does not decla
       'preparation',
       'publication',
       'run_id',
+      'source_platform',
       'workflow'
     ],
     'the observed run must carry exactly the fields its schema declares'

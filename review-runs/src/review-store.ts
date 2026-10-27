@@ -101,6 +101,8 @@ interface ReviewRunRow {
   trunk: {
     run_id: string
     workflow: WorkflowName
+    source_platform: 'github'
+    connector_id: string
     publish_context: JsonObject
     created_at: string
     created_at_cursor: string
@@ -151,6 +153,8 @@ const RUN_SELECT = `
     json_build_object(
       'run_id', r.run_id,
       'workflow', r.workflow,
+      'source_platform', r.source_platform,
+      'connector_id', r.connector_id,
       'publish_context', p.input,
       'created_at', r.created_at,
       'created_at_cursor', to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
@@ -259,6 +263,8 @@ function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
   return {
     run_id: trunk.run_id,
     workflow: trunk.workflow,
+    source_platform: trunk.source_platform,
+    connector_id: trunk.connector_id,
     publish_context: trunk.publish_context,
     ...(execution.input === null ? {} : { execution_input: execution.input }),
     preparation: {
@@ -352,6 +358,7 @@ function projectRunRows(rows: ReviewRunRow[]): RunRowsProjection {
 export class ReviewRunStore {
   private readonly pool: Pool
   readonly connectorId: string
+  readonly sourcePlatform: ReviewRunRecord['source_platform']
   private readonly claimTimeoutMs: number
   private readonly preparations: PreparationStore
   private readonly publications: PublicationStore
@@ -361,13 +368,16 @@ export class ReviewRunStore {
 
   constructor({
     connectionString,
-    connectorId = process.env.CONNECTOR_ID?.trim() || 'github-app:default',
+    connectorId = process.env.CONNECTOR_ID?.trim() ||
+      'github-integration:default',
+    sourcePlatform = 'github',
     claimTimeoutMs = DEFAULT_CLAIM_TIMEOUT_MS,
     pool,
     onDroppedRunRow = () => {}
   }: {
     connectionString?: string
     connectorId?: string
+    sourcePlatform?: ReviewRunRecord['source_platform']
     claimTimeoutMs?: number
     pool?: Pool
     /** Reports a stored row the record contract cannot represent. Fan-out reads already return
@@ -394,6 +404,7 @@ export class ReviewRunStore {
       console.error('review_runs_pool_idle_client_error', error.message)
     })
     this.connectorId = connectorId
+    this.sourcePlatform = sourcePlatform
     this.claimTimeoutMs = Math.max(0, claimTimeoutMs)
     this.preparations = new PreparationStore(
       this.pool,
@@ -458,12 +469,13 @@ export class ReviewRunStore {
     const preparationToken = crypto.randomUUID()
     await client.query(
       `INSERT INTO review_runs
-      (run_id,connector_id,workflow,ingress_kind,ingress_key)
-      VALUES ($1,$2,$3,$4,$5)`,
+      (run_id,connector_id,workflow,source_platform,ingress_kind,ingress_key)
+      VALUES ($1,$2,$3,$4,$5,$6)`,
       [
         run.run_id,
         this.connectorId,
         run.workflow,
+        this.sourcePlatform,
         run.ingress_kind ?? null,
         run.ingress_key ?? null
       ]
@@ -816,6 +828,7 @@ export class ReviewRunStore {
       execution_status?: ExecutionStatus
       publication_status?: PublicationStatus
       preparation_status?: PreparationStatus
+      source_platform?: ReviewRunRecord['source_platform']
       workflow?: WorkflowName
       from?: string
       to?: string
@@ -831,6 +844,8 @@ export class ReviewRunStore {
     }
     if (options.workflow !== undefined)
       clauses.push(`r.workflow=${add(options.workflow)}`)
+    if (options.source_platform !== undefined)
+      clauses.push(`r.source_platform=${add(options.source_platform)}`)
     // An axis filter selects on that axis' state, but must not hide a row whose axis is missing:
     // such a row is corrupt, and the projection reports it in `dropped`. Filtering it out here
     // instead would make the filter the only reason corruption went unnoticed.
@@ -898,6 +913,7 @@ export class ReviewRunStore {
       execution_status?: ExecutionStatus
       publication_status?: PublicationStatus
       preparation_status?: PreparationStatus
+      source_platform?: ReviewRunRecord['source_platform']
       workflow?: WorkflowName
       from?: string
       to?: string

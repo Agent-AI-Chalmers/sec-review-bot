@@ -200,6 +200,9 @@ function parseListQuery(url: URL): ListQueryOptions {
   const preparationStatus = url.searchParams.get('preparation_status')
   if (preparationStatus !== null)
     options.preparation_status = preparationStatus as PreparationStatus
+  const sourcePlatform = url.searchParams.get('source_platform')
+  if (sourcePlatform !== null)
+    options.source_platform = sourcePlatform as ReviewRunStore['sourcePlatform']
   const workflow = url.searchParams.get('workflow')
   if (workflow !== null) options.workflow = workflow as ReviewRunWorkflow
   for (const name of ['from', 'to'] as const) {
@@ -805,7 +808,8 @@ export async function startReviewRunsServer(): Promise<{
   // Optional by design: a deployment that does not want an operator surface simply leaves it
   // unset, and `/v1/admin/*` then answers 404 instead of existing behind a token nobody rotates.
   const adminToken = process.env.REVIEW_RUNS_ADMIN_TOKEN?.trim() || undefined
-  const connectorId = process.env.CONNECTOR_ID?.trim() || 'github-app:default'
+  const connectorId =
+    process.env.CONNECTOR_ID?.trim() || 'github-integration:default'
   const store = new ReviewRunStore({
     connectionString: requiredEnv('DATABASE_URL'),
     connectorId,

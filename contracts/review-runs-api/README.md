@@ -24,6 +24,8 @@ Both sides of a request are typed from the contract too, not only the response: 
 Consumers can rely on:
 
 - the field names and required fields of an observed run;
+- `source_platform`, the stable source-code-hosting platform used for aggregation, and
+  `connector_id`, the connector type and instance namespace that admitted and owns the run;
 - the three lifecycle axes as nested objects: the redacted `preparation` summary, and `execution` / `publication`. Each reports its own `status`, `started_at`, `finished_at`, and `updated_at` (the axis' last write, not a phase bound); the query parameters that filter them keep the established `*_status` spelling;
 - `notices`: messages that an integration should show when part of the run fails or needs attention. They are ordered from oldest to newest, and separate events remain separate entries;
 - the `artifact_storage` variants: absent; an error variant whose status is `unavailable` or `failed`, with optional `error_code` and `message`; or `available` with a stored bundle.
@@ -31,7 +33,7 @@ Consumers can rely on:
 The following are not part of this contract:
 
 - internal store records, such as the row shape persisted in Postgres;
-- connector-owned preparation input, claim tokens, connector identities, and full reconciliation identities;
+- connector-owned preparation input, claim tokens, and full reconciliation identities;
 - anything the console derives for display, such as relative times or phase durations.
 
 ## Tooling

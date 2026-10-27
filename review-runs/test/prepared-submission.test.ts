@@ -7,6 +7,8 @@ import { ExecutionSubmissionUncertainError } from '../src/execution-client.js'
 const run: ReviewRunRecord = {
   run_id: 'run-1',
   workflow: 'issue-review',
+  source_platform: 'github',
+  connector_id: 'github-integration:test',
   publish_context: {},
   preparation: {
     status: 'submitted',

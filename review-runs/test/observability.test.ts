@@ -7,6 +7,8 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
   const observed = observeRun({
     run_id: 'run-1',
     workflow: 'issue-review',
+    source_platform: 'github',
+    connector_id: 'github-integration:test',
     preparation: {
       status: 'submitted',
       attempt_count: 1,
@@ -39,6 +41,8 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
   assert.deepStrictEqual(observed, {
     run_id: 'run-1',
     workflow: 'issue-review',
+    source_platform: 'github',
+    connector_id: 'github-integration:test',
     preparation: {
       status: 'submitted',
       attempt_count: 1,

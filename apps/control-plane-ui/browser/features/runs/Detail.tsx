@@ -43,6 +43,7 @@ import { RunFilesViewer } from './RunFilesViewer.js'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { CopyAction } from '../../shared/CopyAction.js'
 import { useRefresh } from '../../shared/refresh.js'
+import { PlatformMark } from './PlatformMark.js'
 import {
   ExecutionStatus,
   PreparationStatus,
@@ -741,45 +742,78 @@ export function Detail(): React.JSX.Element {
                 copiedName={t('runIdCopied')}
               />
             </Group>
-            <Group
-              gap="lg"
-              align="center"
-              mt="md"
-              className="run-state-summary"
-            >
-              <span className="workflow-chip">
-                {workflowLabel(run.workflow, t)}
-              </span>
-              <Group gap={6} align="center">
-                <Text c="dimmed" size="xs">
-                  {t('preparation')}
-                </Text>
-                <PreparationStatus preparation={run.preparation} />
-              </Group>
-              <Group gap={6} align="center">
-                <Text c="dimmed" size="xs">
-                  {t('execution')}
-                </Text>
-                <ExecutionStatus status={run.execution.status} />
-              </Group>
-              <Group gap={6} align="center">
-                <Text c="dimmed" size="xs">
-                  {t('publication')}
-                </Text>
-                <PublicationStatus status={run.publication.status} />
-              </Group>
-              {run.failure_code && (
-                // `baseline` rather than the default: the label and the code are different
-                // typefaces at the same size, so centring them leaves the two baselines a
-                // fraction apart and the pair reads as misaligned.
-                <Group gap={6} wrap="wrap" align="baseline">
+            <div className="run-summary-grid">
+              <div className="run-summary-item">
+                <Group gap={6} align="baseline" wrap="nowrap">
                   <Text c="dimmed" size="xs">
-                    {t('failureCode')}:
+                    {t('workflow')}
                   </Text>
-                  <ExplainedCode code={run.failure_code} size="xs" />
+                  <Text size="sm">{workflowLabel(run.workflow, t)}</Text>
                 </Group>
+              </div>
+              <div className="run-summary-item">
+                {/* Text-only pairs use baseline alignment, but PlatformMark starts with an
+                    inline SVG. Baseline-aligning that flex item uses the SVG box as the
+                    reference and visibly lifts both the icon and platform name. */}
+                <Group gap={6} align="center" wrap="nowrap">
+                  <Text c="dimmed" size="xs">
+                    {t('platform')}
+                  </Text>
+                  <PlatformMark
+                    platform={run.source_platform}
+                    githubLabel={t('platformGithub')}
+                    gitlabLabel={t('platformGitlab')}
+                    unknownLabel={t('platformUnknown')}
+                    size="sm"
+                  />
+                </Group>
+              </div>
+              <div className="run-summary-item run-summary-integration">
+                <Group gap={6} align="baseline" wrap="nowrap">
+                  <Text c="dimmed" size="xs">
+                    {t('integrationInstance')}
+                  </Text>
+                  <Text size="sm" ff="monospace" className="integration-id">
+                    {run.connector_id}
+                  </Text>
+                </Group>
+              </div>
+              <div className="run-summary-item">
+                <Group gap={6} align="baseline" wrap="nowrap">
+                  <Text c="dimmed" size="xs">
+                    {t('preparation')}
+                  </Text>
+                  <PreparationStatus preparation={run.preparation} />
+                </Group>
+              </div>
+              <div className="run-summary-item">
+                <Group gap={6} align="baseline" wrap="nowrap">
+                  <Text c="dimmed" size="xs">
+                    {t('execution')}
+                  </Text>
+                  <ExecutionStatus status={run.execution.status} />
+                </Group>
+              </div>
+              <div className="run-summary-item">
+                <Group gap={6} align="baseline" wrap="nowrap">
+                  <Text c="dimmed" size="xs">
+                    {t('publication')}
+                  </Text>
+                  <PublicationStatus status={run.publication.status} />
+                </Group>
+              </div>
+              {run.failure_code && (
+                <div className="run-summary-failure">
+                  {/* `baseline` keeps the label and monospace code visually aligned. */}
+                  <Group gap={6} wrap="wrap" align="baseline">
+                    <Text c="dimmed" size="xs">
+                      {t('failureCode')}:
+                    </Text>
+                    <ExplainedCode code={run.failure_code} size="xs" />
+                  </Group>
+                </div>
               )}
-            </Group>
+            </div>
           </div>
           <Stack gap="xl">
             {Boolean(error) && (

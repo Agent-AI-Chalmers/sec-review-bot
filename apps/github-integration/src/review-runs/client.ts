@@ -110,7 +110,7 @@ type SuccessBody<Id extends OperationId> =
 
 class HttpReviewRunsClient {
   readonly connectorId =
-    process.env.CONNECTOR_ID?.trim() || 'github-app:default'
+    process.env.CONNECTOR_ID?.trim() || 'github-integration:default'
 
   // One HTTP request with auth, timeout, and error/status handling. `nullOn404` maps a 404
   // to `null` for reads that distinguish "absent" from "error".

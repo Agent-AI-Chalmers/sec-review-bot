@@ -108,6 +108,8 @@ components:
       required:
         - run_id
         - workflow
+        - source_platform
+        - connector_id
         - publish_context
         - preparation
         - execution
@@ -127,6 +129,15 @@ components:
             - issue-review
             - pull-request-review
             - repository-review
+        source_platform:
+          type: string
+          description: The source code hosting platform used for stable cross-connector aggregation.
+          enum:
+            - github
+        connector_id:
+          type: string
+          minLength: 1
+          description: The connector namespace that admitted and owns the run.
         publish_context:
           type: object
           additionalProperties: {}
@@ -294,6 +305,8 @@ components:
       required:
         - run_id
         - workflow
+        - source_platform
+        - connector_id
         - publish_context
         - preparation
         - execution
@@ -315,6 +328,15 @@ components:
             - issue-review
             - pull-request-review
             - repository-review
+        source_platform:
+          type: string
+          description: The source code hosting platform used for stable cross-connector aggregation.
+          enum:
+            - github
+        connector_id:
+          type: string
+          minLength: 1
+          description: The connector namespace that admitted and owns the run.
         publish_context:
           type: object
           additionalProperties: {}
@@ -466,6 +488,8 @@ components:
       required:
         - run_id
         - workflow
+        - source_platform
+        - connector_id
         - preparation
         - execution
         - publication
@@ -483,6 +507,15 @@ components:
             - issue-review
             - pull-request-review
             - repository-review
+        source_platform:
+          type: string
+          description: The source code hosting platform used for stable cross-connector aggregation.
+          enum:
+            - github
+        connector_id:
+          type: string
+          minLength: 1
+          description: The connector namespace that admitted and owns the run.
         preparation:
           $ref: "#/components/schemas/PreparationSummary"
         execution:
@@ -1123,6 +1156,10 @@ paths:
                   - preparing
                   - submitted
                   - failed
+              source_platform:
+                type: string
+                enum:
+                  - github
               workflow:
                 type: string
                 enum:

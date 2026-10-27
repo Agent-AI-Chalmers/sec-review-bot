@@ -106,6 +106,8 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
   const work = {
     run_id: 'run-1',
     workflow: 'issue-review',
+    source_platform: 'github',
+    connector_id: 'github-integration:test',
     publish_context: {},
     preparation: {
       status: 'submitted',
@@ -155,7 +157,7 @@ test('publisher starts no GitHub work when its initial lease renewal fails', asy
         'A lease failure must not be converted into publication failure.'
       )
     },
-    connectorId: 'github-app:test',
+    connectorId: 'github-integration:test',
     ...unreachedPublicationSteps()
   } satisfies PublicationCoordinatorStore
   const { app, requests } = fakeApp({
@@ -189,6 +191,8 @@ test('explicit ownership checks share a failing in-flight heartbeat', async () =
   const work = {
     run_id: 'run-1',
     workflow: 'issue-review',
+    source_platform: 'github',
+    connector_id: 'github-integration:test',
     publish_context: {},
     preparation: {
       status: 'submitted',
@@ -272,6 +276,8 @@ test('a reconciliation that loses the step ends the publication instead of holdi
       ({
         run_id: RUN_ID,
         workflow: 'repository-review',
+        source_platform: 'github',
+        connector_id: 'github-integration:test',
         publish_context: REPOSITORY_CONTEXT,
         preparation: {
           status: 'submitted',

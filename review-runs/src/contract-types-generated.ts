@@ -30,6 +30,13 @@ export interface components {
       run_id: string
       /** @enum {string} */
       workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
+      /**
+       * @description The source code hosting platform used for stable cross-connector aggregation.
+       * @enum {string}
+       */
+      source_platform: 'github'
+      /** @description The connector namespace that admitted and owns the run. */
+      connector_id: string
       publish_context: {
         [key: string]: unknown
       }
@@ -97,6 +104,13 @@ export interface components {
       run_id: string
       /** @enum {string} */
       workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
+      /**
+       * @description The source code hosting platform used for stable cross-connector aggregation.
+       * @enum {string}
+       */
+      source_platform: 'github'
+      /** @description The connector namespace that admitted and owns the run. */
+      connector_id: string
       publish_context: {
         [key: string]: unknown
       }
@@ -165,6 +179,13 @@ export interface components {
       run_id: string
       /** @enum {string} */
       workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
+      /**
+       * @description The source code hosting platform used for stable cross-connector aggregation.
+       * @enum {string}
+       */
+      source_platform: 'github'
+      /** @description The connector namespace that admitted and owns the run. */
+      connector_id: string
       preparation: components['schemas']['PreparationSummary']
       execution: components['schemas']['ExecutionSummary']
       publication: components['schemas']['PublicationSummary']
@@ -468,6 +489,8 @@ export interface operations {
            * @enum {string}
            */
           preparation_status?: 'pending' | 'preparing' | 'submitted' | 'failed'
+          /** @enum {string} */
+          source_platform?: 'github'
           /** @enum {string} */
           workflow?:
             'issue-review' | 'pull-request-review' | 'repository-review'

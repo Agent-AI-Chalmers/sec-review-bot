@@ -515,6 +515,12 @@ test('run queries apply status filters before pagination limits', async () => {
         (run) => run.preparation?.status === 'preparing'
       )
     )
+    const { runs: githubRuns } = await store.listRunsPage({
+      source_platform: 'github',
+      limit: 10
+    })
+    assert.strictEqual(githubRuns.length, 3)
+    assert.ok(githubRuns.every((run) => run.source_platform === 'github'))
   } finally {
     await store.close()
   }

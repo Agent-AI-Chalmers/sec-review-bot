@@ -117,6 +117,7 @@ export function createRunsHandler(): (
       const executionStatus = url.searchParams.get('execution_status')
       const publicationStatus = url.searchParams.get('publication_status')
       const preparationStatus = url.searchParams.get('preparation_status')
+      const sourcePlatform = url.searchParams.get('source_platform')
       const workflow = url.searchParams.get('workflow')
       const filtered = runs.filter(
         (run) =>
@@ -128,6 +129,7 @@ export function createRunsHandler(): (
           // store, which never returns a run without one.
           (preparationStatus === null ||
             run.preparation?.status === preparationStatus) &&
+          (sourcePlatform === null || run.source_platform === sourcePlatform) &&
           (from === null || run.created_at >= from) &&
           (to === null || run.created_at < to) &&
           (workflow === null || run.workflow === workflow) &&
