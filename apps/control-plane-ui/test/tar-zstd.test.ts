@@ -34,3 +34,25 @@ test('restricted PAX reader matches the shared corpus', () => {
       assert.throws(read, { message: 'invalid_tar_zstd_envelope' }, item.file)
   }
 })
+
+test('restricted PAX reader returns the validated canonical header', () => {
+  const entries = validateRestrictedPaxTar(
+    zstdDecompressSync(
+      fs.readFileSync(path.join(corpus, 'valid-ustar.tar.zst'))
+    )
+  )
+
+  assert.deepEqual(entries, [
+    {
+      path: 'tree/file.txt',
+      typeFlag: '0',
+      size: 3,
+      mode: 0o644,
+      uid: 0,
+      gid: 0,
+      mtime: 0,
+      uname: '',
+      gname: ''
+    }
+  ])
+})

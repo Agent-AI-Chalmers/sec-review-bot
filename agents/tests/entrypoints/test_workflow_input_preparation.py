@@ -7,6 +7,7 @@ from urllib.parse import unquote, urlparse
 
 import pytest
 
+from sec_review_agents.artifacts.tar_zstd import canonical_tar_info
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.entrypoints import input_preparation
 from sec_review_agents.entrypoints.input_preparation import (
@@ -14,16 +15,6 @@ from sec_review_agents.entrypoints.input_preparation import (
     prepare_workflow_input,
 )
 from tests.contract_fixtures import contract_fixture
-
-
-def _canonical_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
-    info.mtime = 0
-    info.uid = 0
-    info.gid = 0
-    info.uname = ""
-    info.gname = ""
-    info.mode = 0o755 if info.isdir() else 0o644
-    return info
 
 
 def _write_bundle_manifest(
@@ -48,19 +39,19 @@ def _write_bundle_manifest(
         archive.add(
             root / "manifest.json",
             arcname="manifest.json",
-            filter=_canonical_tar_info,
+            filter=canonical_tar_info,
         )
-        archive.add(root / "history", arcname="history", filter=_canonical_tar_info)
+        archive.add(root / "history", arcname="history", filter=canonical_tar_info)
         if incremental:
             archive.add(
                 root / "incremental-window",
                 arcname="incremental-window",
-                filter=_canonical_tar_info,
+                filter=canonical_tar_info,
             )
         archive.add(
             root / "workspace.snapshot.tar",
             arcname="workspace.snapshot.tar",
-            filter=_canonical_tar_info,
+            filter=canonical_tar_info,
         )
     content = archive_path.read_bytes()
     return {

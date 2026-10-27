@@ -18,7 +18,10 @@ from sec_review_agents.artifacts.reference import (
     local_artifact_reference,
     require_artifact_media_type,
 )
-from sec_review_agents.artifacts.tar_zstd import validate_restricted_pax_archive
+from sec_review_agents.artifacts.tar_zstd import (
+    canonical_tar_info,
+    validate_restricted_pax_archive,
+)
 from sec_review_agents.contract_versions import RUN_DIAGNOSTIC_ARTIFACT_VERSION
 from sec_review_agents.runtime.transcripts import TRANSCRIPT_SUFFIX
 
@@ -158,12 +161,12 @@ def _build_diagnostic_archive(
             archive.add(
                 manifest_path,
                 arcname=DIAGNOSTIC_BUNDLE_MANIFEST,
-                filter=_normalize_tar_info,
+                filter=canonical_tar_info,
             )
             archive.add(
                 result_path,
                 arcname="result.json",
-                filter=_normalize_tar_info,
+                filter=canonical_tar_info,
             )
             _add_artifact_tree(archive, artifact_root)
     validate_restricted_pax_archive(archive_path)
@@ -241,7 +244,7 @@ def _add_artifact_tree(archive: tarfile.TarFile, artifact_root: Path) -> None:
         artifact_root,
         arcname=DIAGNOSTIC_TREE_DIR,
         recursive=False,
-        filter=_normalize_tar_info,
+        filter=canonical_tar_info,
     )
     for path in sorted(artifact_root.rglob("*")):
         relative = path.relative_to(artifact_root)
@@ -251,18 +254,8 @@ def _add_artifact_tree(archive: tarfile.TarFile, artifact_root: Path) -> None:
             path,
             arcname=f"{DIAGNOSTIC_TREE_DIR}/{relative.as_posix()}",
             recursive=False,
-            filter=_normalize_tar_info,
+            filter=canonical_tar_info,
         )
-
-
-def _normalize_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
-    """Remove host- and attempt-specific metadata from archive members."""
-    info.mtime = 0
-    info.uid = 0
-    info.gid = 0
-    info.uname = ""
-    info.gname = ""
-    return info
 
 
 def materialize_diagnostic_transcript_unit(
@@ -283,6 +276,7 @@ def materialize_diagnostic_transcript_unit(
             else None
         ),
     )
+    validate_restricted_pax_archive(archive_path)
     root = extract_archive(
         archive_path,
         destination,

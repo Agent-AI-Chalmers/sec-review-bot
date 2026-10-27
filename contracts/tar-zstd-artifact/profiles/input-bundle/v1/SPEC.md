@@ -37,26 +37,16 @@ Only regular files and directories are allowed. Paths are relative UTF-8 paths u
 
 No path outside the tree above is allowed.
 
-## Entry Metadata And Ordering
-
-Every entry has canonical metadata:
-
-| Field | Regular file | Directory |
-| --- | --- | --- |
-| `mtime` | `0` | `0` |
-| `uid`, `gid` | `0`, `0` | `0`, `0` |
-| `uname`, `gname` | empty | empty |
-| mode | `0644` | `0755` |
-| size | actual byte length | `0` |
+## Ordering
 
 `manifest.json` is first. Every remaining entry is ordered by ascending bytewise lexical order of its canonical UTF-8 path. The envelope's local PAX `path` header is used only when the effective path does not fit ordinary ustar fields.
 
 ## Production And Consumption
 
-Producers emit exactly the required metadata and ordering, then compress the tar stream as one Zstandard frame. The contract does not pin a compressor implementation or compression level: artifact identity is the digest of the actual compressed bytes. For the same entry paths and bodies, one producer configuration must reproduce the same compressed bytes across retries.
+Producers emit the envelope's canonical entry metadata and this profile's required ordering, then compress the tar stream as one Zstandard frame. The contract does not pin a compressor implementation or compression level: artifact identity is the digest of the actual compressed bytes. For the same entry paths and bodies, one producer configuration must reproduce the same compressed bytes across retries.
 
-Consumers verify reference size and digest before decompression, validate the shared envelope and this profile before extraction, and enforce entry-count and extracted-byte limits while parsing. They must not extract links, special entries, non-canonical paths, or entries whose metadata violates this profile.
+Consumers verify reference size and digest before decompression, validate the shared envelope and this profile before extraction, and enforce entry-count and extracted-byte limits while parsing. They must not extract non-canonical paths or entries outside this profile's tree.
 
 ## Shared Corpus
 
-[corpus/manifest.json](corpus/manifest.json) records real valid and invalid archives. The cases cover the minimal and incremental trees, canonical ordering and metadata, required paths, unexpected paths, and symbolic links. Every input-bundle consumer executes these bytes in addition to the envelope corpus.
+[corpus/manifest.json](corpus/manifest.json) records real valid and invalid archives. The cases cover the minimal and incremental trees, canonical ordering, required paths, unexpected paths, and symbolic links. Every input-bundle consumer executes these bytes in addition to the envelope corpus.

@@ -37,26 +37,16 @@ Workspace snapshot 有意作为未压缩 tar 嵌套在 transport archive 中。E
 
 不允许上述 tree 之外的 path。
 
-## Entry Metadata And Ordering
-
-每个 entry 使用 canonical metadata：
-
-| Field | Regular file | Directory |
-| --- | --- | --- |
-| `mtime` | `0` | `0` |
-| `uid`, `gid` | `0`, `0` | `0`, `0` |
-| `uname`, `gname` | empty | empty |
-| mode | `0644` | `0755` |
-| size | 实际 byte length | `0` |
+## Ordering
 
 `manifest.json` 位于首位。其余 entry 按 canonical UTF-8 path 的 bytewise lexical order 升序排列。只有 effective path 无法放入普通 ustar field 时，才使用 envelope 的 local PAX `path` header。
 
 ## Production And Consumption
 
-Producer 精确生成规定的 metadata 与顺序，然后将 tar stream 压缩为单个 Zstandard frame。本 contract 不固定 compressor implementation 或 compression level：artifact identity 是实际压缩 bytes 的 digest。对于相同 entry path 与 body，同一个 producer configuration 必须在重试间复现相同压缩 bytes。
+Producer 使用 envelope 的 canonical entry metadata 与本 profile 规定的顺序，然后将 tar stream 压缩为单个 Zstandard frame。本 contract 不固定 compressor implementation 或 compression level：artifact identity 是实际压缩 bytes 的 digest。对于相同 entry path 与 body，同一个 producer configuration 必须在重试间复现相同压缩 bytes。
 
-Consumer 在解压前校验 reference size 与 digest，在 extraction 前校验共享 envelope 与本 profile，并在解析时执行 entry-count 与 extracted-byte limit。不得解压 link、special entry、non-canonical path 或 metadata 不符合本 profile 的 entry。
+Consumer 在解压前校验 reference size 与 digest，在 extraction 前校验共享 envelope 与本 profile，并在解析时执行 entry-count 与 extracted-byte limit。不得解压 non-canonical path 或本 profile tree 之外的 entry。
 
 ## Shared Corpus
 
-[corpus/manifest.json](corpus/manifest.json) 记录真实的合法与非法 archive。用例覆盖 minimal 与 incremental tree、canonical ordering 和 metadata、required path、unexpected path 与 symbolic link。每个 input-bundle consumer 除 envelope corpus 外还必须执行这些 bytes。
+[corpus/manifest.json](corpus/manifest.json) 记录真实的合法与非法 archive。用例覆盖 minimal 与 incremental tree、canonical ordering、required path、unexpected path 与 symbolic link。每个 input-bundle consumer 除 envelope corpus 外还必须执行这些 bytes。

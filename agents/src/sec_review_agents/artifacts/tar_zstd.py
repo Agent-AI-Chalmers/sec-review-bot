@@ -1,5 +1,6 @@
 """Validation for the repository's restricted POSIX PAX tar+zstd envelope."""
 
+import tarfile
 from compression import zstd
 from dataclasses import dataclass
 from pathlib import Path
@@ -9,6 +10,17 @@ _BLOCK_SIZE = 512
 _PAX_TYPE = b"x"
 _REJECTED_EXTENSION_TYPES = {b"g", b"L", b"K", b"S"}
 _MAX_PAX_HEADER_BYTES = 1024 * 1024
+
+
+def canonical_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
+    """Apply canonical metadata for project-owned tar+zstd artifacts."""
+    info.mtime = 0
+    info.uid = 0
+    info.gid = 0
+    info.uname = ""
+    info.gname = ""
+    info.mode = 0o755 if info.isdir() else 0o644
+    return info
 
 
 @dataclass(frozen=True)
@@ -99,7 +111,7 @@ def _discard_exact(source: _BinaryReader, size: int) -> None:
 
 
 def validate_restricted_pax_archive(archive_path: Path) -> tuple[TarEnvelopeEntry, ...]:
-    """Validate raw headers that high-level tar readers commonly hide."""
+    """Validate the shared restricted envelope directly from raw tar headers."""
     entries: list[TarEnvelopeEntry] = []
     pending_path: str | None = None
     terminated = False
@@ -140,23 +152,37 @@ def validate_restricted_pax_archive(archive_path: Path) -> tuple[TarEnvelopeEntr
                 pending_path = _parse_pax_path(body)
                 continue
             _discard_exact(source, padded_size)
-            entries.append(
-                TarEnvelopeEntry(
-                    path=(
-                        pending_path
-                        if pending_path is not None
-                        else _header_path(header)
-                    ),
-                    type_flag=type_flag,
-                    size=size,
-                    mode=_octal(header, 100, 8),
-                    uid=_octal(header, 108, 8),
-                    gid=_octal(header, 116, 8),
-                    mtime=_octal(header, 136, 12),
-                    uname=_text_field(header, 265, 32),
-                    gname=_text_field(header, 297, 32),
-                )
+            entry = TarEnvelopeEntry(
+                path=(
+                    pending_path if pending_path is not None else _header_path(header)
+                ),
+                type_flag=type_flag,
+                size=size,
+                mode=_octal(header, 100, 8),
+                uid=_octal(header, 108, 8),
+                gid=_octal(header, 116, 8),
+                mtime=_octal(header, 136, 12),
+                uname=_text_field(header, 265, 32),
+                gname=_text_field(header, 297, 32),
             )
+            if entry.type_flag not in {b"0", b"5"}:
+                raise ValueError(
+                    f"Artifact archive contains an unsupported entry type: {entry.path}"
+                )
+            expected_mode = 0o755 if entry.type_flag == b"5" else 0o644
+            if (
+                entry.mode != expected_mode
+                or entry.uid != 0
+                or entry.gid != 0
+                or entry.mtime != 0
+                or entry.uname
+                or entry.gname
+                or (entry.type_flag == b"5" and entry.size != 0)
+            ):
+                raise ValueError(
+                    f"Artifact archive entry metadata is not canonical: {entry.path}"
+                )
+            entries.append(entry)
             pending_path = None
         if terminated:
             while chunk := source.read(1024 * 1024):
@@ -169,4 +195,8 @@ def validate_restricted_pax_archive(archive_path: Path) -> tuple[TarEnvelopeEntr
     return tuple(entries)
 
 
-__all__ = ["TarEnvelopeEntry", "validate_restricted_pax_archive"]
+__all__ = [
+    "TarEnvelopeEntry",
+    "canonical_tar_info",
+    "validate_restricted_pax_archive",
+]

@@ -19,12 +19,6 @@
       "size": 204
     },
     {
-      "file": "invalid-mtime.tar.zst",
-      "expected": "invalid",
-      "sha256": "9b40dcd77d7b5776f9dc697f4e8ebe664c2169477df33bf9ef0067d1932fbe8c",
-      "size": 248
-    },
-    {
       "file": "invalid-missing-history.tar.zst",
       "expected": "invalid",
       "sha256": "babd3a49f4d4b9bdaf49a1690ae95851e7e0d77738e4887c56073e4ab4a6bdf2",

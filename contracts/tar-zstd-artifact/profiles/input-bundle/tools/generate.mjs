@@ -109,15 +109,6 @@ const definitions = [
     ]),
   },
   {
-    file: "invalid-mtime.tar.zst",
-    expected: "invalid",
-    bytes: archive(
-      minimal().map((entry) =>
-        entry.name === "history/review.json" ? { ...entry, mtime: 1 } : entry,
-      ),
-    ),
-  },
-  {
     file: "invalid-missing-history.tar.zst",
     expected: "invalid",
     bytes: archive(

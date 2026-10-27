@@ -14,7 +14,10 @@ from sec_review_agents.artifacts.reference import (
     local_artifact_reference,
     require_artifact_media_type,
 )
-from sec_review_agents.artifacts.tar_zstd import validate_restricted_pax_archive
+from sec_review_agents.artifacts.tar_zstd import (
+    canonical_tar_info,
+    validate_restricted_pax_archive,
+)
 from sec_review_agents.contract_versions import MEMORY_TREE_ARTIFACT_VERSION
 
 MEMORY_TREE_ARTIFACT_FILENAME = f"memory-tree.{MEMORY_TREE_ARTIFACT_VERSION}.tar.zst"
@@ -104,25 +107,13 @@ def _collect_memory_content(root: Path) -> dict[str, bytes]:
 
 def _add_directory(archive: tarfile.TarFile, name: str) -> None:
     info = tarfile.TarInfo(name)
-    info.mtime = 0
-    info.uid = 0
-    info.gid = 0
-    info.uname = ""
-    info.gname = ""
     info.type = tarfile.DIRTYPE
-    info.mode = 0o755
-    archive.addfile(info)
+    archive.addfile(canonical_tar_info(info))
 
 
 def _add_file(archive: tarfile.TarFile, name: str, content: bytes) -> None:
-    info = tarfile.TarInfo(name)
-    info.mtime = 0
-    info.uid = 0
-    info.gid = 0
-    info.uname = ""
-    info.gname = ""
+    info = canonical_tar_info(tarfile.TarInfo(name))
     info.size = len(content)
-    info.mode = 0o644
     with tempfile.SpooledTemporaryFile() as source:
         source.write(content)
         source.seek(0)
@@ -176,25 +167,16 @@ def _validate_archive(archive_path: Path) -> None:
             if index > 1 and name <= previous_name:
                 raise ValueError("Memory tree entries are not in canonical order.")
             previous_name = name
-            if (
-                member.mtime != 0
-                or member.uid != 0
-                or member.gid != 0
-                or member.uname != ""
-                or member.gname != ""
-            ):
-                raise ValueError(f"Memory tree entry metadata is invalid: {name}")
             if name in {"memory/", "memory/topics/"} or (
                 name.startswith("memory/topics/") and name.endswith("/")
             ):
-                if not member.isdir() or member.mode != 0o755:
+                if not member.isdir():
                     raise ValueError(f"Memory tree directory is invalid: {name}")
                 continue
             if name == MEMORY_TREE_ARTIFACT_MANIFEST:
                 source = archive.extractfile(member)
                 if (
                     not member.isfile()
-                    or member.mode != 0o644
                     or source is None
                     or source.read() != MEMORY_TREE_ARTIFACT_MANIFEST_BYTES
                 ):
@@ -205,7 +187,7 @@ def _validate_archive(archive_path: Path) -> None:
                 raise ValueError(f"Unexpected memory tree entry: {name}")
             relative = name.removeprefix("memory/")
             _validate_content_path(relative)
-            if not member.isfile() or member.mode != 0o644:
+            if not member.isfile():
                 raise ValueError(f"Memory tree file is invalid: {name}")
             if member.size > MAX_MEMORY_TREE_FILE_BYTES:
                 raise ValueError(f"Memory tree file exceeds the size limit: {name}")

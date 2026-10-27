@@ -14,7 +14,12 @@
         "contracts/tar-zstd-artifact/envelope/v1/corpus/valid-pax-path.tar.zst",
         "contracts/tar-zstd-artifact/envelope/v1/corpus/invalid-global-pax.tar.zst",
         "contracts/tar-zstd-artifact/envelope/v1/corpus/invalid-pax-key.tar.zst",
-        "contracts/tar-zstd-artifact/envelope/v1/corpus/invalid-gnu-longname.tar.zst"
+        "contracts/tar-zstd-artifact/envelope/v1/corpus/invalid-gnu-longname.tar.zst",
+        "contracts/tar-zstd-artifact/envelope/v1/corpus/invalid-entry-type.tar.zst",
+        "contracts/tar-zstd-artifact/envelope/v1/corpus/invalid-mode.tar.zst",
+        "contracts/tar-zstd-artifact/envelope/v1/corpus/invalid-mtime.tar.zst",
+        "contracts/tar-zstd-artifact/envelope/v1/corpus/invalid-owner.tar.zst",
+        "contracts/tar-zstd-artifact/envelope/v1/corpus/invalid-directory-size.tar.zst"
       ]
     }
   ]

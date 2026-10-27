@@ -3,17 +3,8 @@ import json
 import tarfile
 from pathlib import Path
 
+from sec_review_agents.artifacts.tar_zstd import canonical_tar_info
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
-
-
-def _canonical_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
-    info.mtime = 0
-    info.uid = 0
-    info.gid = 0
-    info.uname = ""
-    info.gname = ""
-    info.mode = 0o755 if info.isdir() else 0o644
-    return info
 
 
 def write_test_input_bundle(
@@ -38,7 +29,7 @@ def write_test_input_bundle(
         for name in ["manifest.json", "history", "workspace.snapshot.tar"]:
             entry = root / name
             if entry.exists():
-                archive.add(entry, arcname=name, filter=_canonical_tar_info)
+                archive.add(entry, arcname=name, filter=canonical_tar_info)
     content = archive_path.read_bytes()
     return {
         "uri": archive_path.as_uri(),

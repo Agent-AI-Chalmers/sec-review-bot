@@ -16,7 +16,7 @@ manifest 是 UTF-8 JSON object，包含 `version: 1`、所属 `run_id`、`result
 
 ## 生产
 
-生产者规范化 `mtime`、`uid`、`gid`、`uname` 与 `gname`，从 `artifact-tree/` 排除 publication directory 和 symlink，显式选择 POSIX PAX 输出，并在发布前按共享 envelope 校验已完成 archive。
+生产者应用 envelope 的 canonical entry 规则，从 `artifact-tree/` 排除 publication directory 和 symlink，显式选择 POSIX PAX 输出，并在发布前按共享 envelope 与本 profile 校验已完成 archive。
 
 ## 共享 Corpus
 

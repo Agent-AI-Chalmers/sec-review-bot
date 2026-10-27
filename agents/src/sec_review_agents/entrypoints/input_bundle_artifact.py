@@ -35,21 +35,6 @@ def _allowed_path(entry: TarEnvelopeEntry) -> bool:
     return False
 
 
-def _validate_metadata(entry: TarEnvelopeEntry) -> None:
-    expected_mode = 0o755 if entry.type_flag == b"5" else 0o644
-    if (
-        entry.mode != expected_mode
-        or entry.uid != 0
-        or entry.gid != 0
-        or entry.mtime != 0
-        or entry.uname
-        or entry.gname
-    ):
-        raise ValueError(
-            f"Input bundle archive entry metadata is not canonical: {entry.path}"
-        )
-
-
 def _require_parent_directories(entries: tuple[TarEnvelopeEntry, ...]) -> None:
     paths = {entry.path for entry in entries}
     for entry in entries:
@@ -85,7 +70,6 @@ def validate_input_bundle_archive(
             )
         if not _allowed_path(entry):
             raise ValueError(f"Input bundle archive path is not allowed: {entry.path}")
-        _validate_metadata(entry)
         encoded = entry.path.encode("utf-8")
         if index > 1 and previous is not None and encoded <= previous:
             raise ValueError("Input bundle archive entries are not in canonical order.")

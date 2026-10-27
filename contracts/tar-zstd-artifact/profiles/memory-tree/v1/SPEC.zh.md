@@ -46,21 +46,11 @@ memory/topics/**/*.md  （可选）
 
 不允许其他路径。尤其是 `memory/` 下除 `MEMORY.md` 外的文件，以及 `memory/topics/` 下非 Markdown 文件，均无效。
 
-## Entry 类型与元数据
+## Entry 表示
 
-只允许 regular file 和 directory。symlink、hard link、device、FIFO、socket、sparse file 及其他 special type 均无效。消费者必须直接分类 tar header 类型，绝不能跟随 link。
+entry 遵循 envelope 的 canonical type 与 metadata 规则。消费者必须直接分类 tar header 类型，绝不能跟随 link。
 
-每个 entry 使用规范元数据：
-
-| 字段 | Regular file | Directory |
-| --- | --- | --- |
-| `mtime` | `0` | `0` |
-| `uid`, `gid` | `0`, `0` | `0`, `0` |
-| `uname`, `gname` | empty | empty |
-| mode | `0644` | `0755` |
-| size | 实际 byte length | `0` |
-
-路径无法放入 ustar `name` 与 `prefix` 字段时，允许使用 envelope 的局部 PAX `path` header。任何 PAX key 都不能改变本 profile 的 metadata 要求；其他 PAX 与 GNU extension 仍然无效。
+路径无法放入 ustar `name` 与 `prefix` 字段时，允许使用 envelope 的局部 PAX `path` header。其他 PAX 与 GNU extension 仍然无效。
 
 ## 顺序
 

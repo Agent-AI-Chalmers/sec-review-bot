@@ -16,7 +16,7 @@ The manifest is a UTF-8 JSON object with `version: 1`, the owning `run_id`, `res
 
 ## Production
 
-Producers normalize `mtime`, `uid`, `gid`, `uname`, and `gname`, exclude the publication directory and symbolic links from `artifact-tree/`, explicitly select POSIX PAX output, and validate the completed archive against the shared envelope before publication.
+Producers apply the envelope's canonical entry rules, exclude the publication directory and symbolic links from `artifact-tree/`, explicitly select POSIX PAX output, and validate the completed archive against the shared envelope and this profile before publication.
 
 ## Shared Corpus
 

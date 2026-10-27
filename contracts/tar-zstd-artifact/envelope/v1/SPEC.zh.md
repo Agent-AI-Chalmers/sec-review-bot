@@ -23,7 +23,21 @@ tar stream 使用 POSIX ustar header，并允许在被修改 member 前紧邻一
 - 连续或悬空的局部 extended header 无效；
 - 禁止全局 PAX header（`g`）、未知 PAX key、重复 `path` record、GNU long-name（`L`）、GNU long-link（`K`）和 GNU sparse（`S`）extension。
 
-消费者必须校验应用 `path` 后的有效路径；底层 ustar member 的占位名称不具权威。profile 可以进一步禁止 member type 与 metadata。
+消费者必须校验应用 `path` 后的有效路径；底层 ustar member 的占位名称不具权威。
+
+## Canonical Entry
+
+只允许 regular file 和 directory。每个 entry 使用 canonical metadata：
+
+| Field | Regular file | Directory |
+| --- | --- | --- |
+| `mtime` | `0` | `0` |
+| `uid`, `gid` | `0`, `0` | `0`, `0` |
+| `uname`, `gname` | empty | empty |
+| mode | `0644` | `0755` |
+| size | 实际 body length | `0` |
+
+profile 负责规定允许的 file 与 directory，但不能放宽这些共享 entry 规则。
 
 ## Tar 结构
 

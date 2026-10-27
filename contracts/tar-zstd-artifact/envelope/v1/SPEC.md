@@ -23,7 +23,21 @@ The supported PAX subset is deliberately small:
 - consecutive or orphan local extended headers are invalid;
 - global PAX headers (`g`), unknown PAX keys, duplicate `path` records, GNU long-name (`L`), GNU long-link (`K`), and GNU sparse (`S`) extensions are invalid.
 
-Consumers validate the effective path after applying `path`; placeholder names in the underlying ustar member have no authority. Profiles may reject additional member types and metadata.
+Consumers validate the effective path after applying `path`; placeholder names in the underlying ustar member have no authority.
+
+## Canonical Entries
+
+Only regular files and directories are allowed. Every entry has canonical metadata:
+
+| Field | Regular file | Directory |
+| --- | --- | --- |
+| `mtime` | `0` | `0` |
+| `uid`, `gid` | `0`, `0` | `0`, `0` |
+| `uname`, `gname` | empty | empty |
+| mode | `0644` | `0755` |
+| size | actual body length | `0` |
+
+Profiles define which files and directories are allowed, but cannot relax these shared entry rules.
 
 ## Tar Structure
 
