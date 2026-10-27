@@ -294,7 +294,8 @@ def render(filename: str, labels: dict[str, str]) -> None:
 
     tree = ET.ElementTree(root)
     ET.indent(tree, space="  ")
-    tree.write(ROOT / filename, encoding="utf-8", xml_declaration=True)
+    output = ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    (ROOT / filename).write_bytes(output + b"\n")
 
 
 render(
