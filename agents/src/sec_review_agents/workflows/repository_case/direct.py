@@ -26,30 +26,30 @@ async def run_repository_case_review_direct(
     # Local direct runs reuse activity functions for artifact parity, but they do
     # not emulate Temporal retries. Runtime failures must still propagate.
     prepared_case = prepare_repository_case_activity(request)
-    runtime_context = request["runtime_context"]
     analysis_result = await analyze_repository_case_activity(
+        request,
         prepared_case,
-        runtime_context,
     )
     cvss_result_task = asyncio.create_task(
         score_repository_case_cvss_activity(
+            request,
             prepared_case,
             analysis_result,
         )
     )
     try:
         mitigation_result = await mitigate_repository_case_activity(
+            request,
             prepared_case,
             analysis_result,
             None,
-            runtime_context,
         )
         verifier_result = await verify_repository_case_activity(
+            request,
             prepared_case,
             analysis_result,
             mitigation_result,
             None,
-            runtime_context,
         )
         retry_count = 0
         history: list[dict[str, Any]] = []
@@ -70,17 +70,17 @@ async def run_repository_case_review_direct(
                 retry_context,
             )
             mitigation_result = await mitigate_repository_case_activity(
+                request,
                 prepared_case,
                 analysis_result,
                 retry_context,
-                runtime_context,
             )
             verifier_result = await verify_repository_case_activity(
+                request,
                 prepared_case,
                 analysis_result,
                 mitigation_result,
                 retry_context,
-                runtime_context,
             )
         # Match the workflow path: observed scoring failures are persisted by the
         # stage, while CVSS remains advisory to the case result.

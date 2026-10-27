@@ -7,28 +7,12 @@ from langchain.agents.middleware import AgentMiddleware
 from langgraph.graph.state import CompiledStateGraph
 
 from sec_review_agents.observability.log_config import logger
-from sec_review_agents.observability.trace_context import (
-    bind_trace_context,
-    clear_trace_context,
-)
 from sec_review_agents.utils.serialization import json_safe
 
 
 def log_diagnostic(event: str, /, **fields: Any) -> None:
     safe_fields = {k: json_safe(v) for k, v in fields.items() if v is not None}
     logger.info(event, **safe_fields)
-
-
-def bind_workflow_context(
-    *,
-    workflow: str,
-    run_id: str | None = None,
-) -> None:
-    clear_trace_context()
-    bind_trace_context(
-        run_id=run_id,
-        workflow=workflow,
-    )
 
 
 def log_stage_started(*, stage: str, **fields: Any) -> float:

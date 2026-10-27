@@ -23,7 +23,6 @@ from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
 from sec_review_agents.scan_stages.triage.result import TriageResult
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
-    prepare_internal_workflow_activity,
 )
 from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
 from sec_review_agents.workflows.repository.case_execution_input import (
@@ -182,18 +181,28 @@ def build_repository_discovery_manifest_activity(
 
 @activity.defn
 async def scan_repository_discovery_chunk_activity(
+    request: ReviewWorkflowRequest,
     manifest: Mapping[str, Any],
     chunk: Mapping[str, Any],
 ) -> dict[str, Any]:
     from pathlib import Path
 
+    from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.scan_stages.discovery.stage import scan_discovery_chunk
+    from sec_review_agents.temporal.support import activity_trace_labels
 
-    return await scan_discovery_chunk(
-        chunk=chunk,
-        root=Path(manifest["workspace_root"]),
-        discovery_artifacts_path=Path(str(manifest["discovery_artifacts_path"])),
-    )
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name=request.workflow,
+            run_id=request.run_id,
+            chunk_id=str(chunk["chunk_id"]),
+        )
+    ):
+        return await scan_discovery_chunk(
+            chunk=chunk,
+            root=Path(manifest["workspace_root"]),
+            discovery_artifacts_path=Path(str(manifest["discovery_artifacts_path"])),
+        )
 
 
 @activity.defn
@@ -231,13 +240,23 @@ async def triage_repository_activity(
     request: ReviewWorkflowRequest,
     discovery_result: Mapping[str, Any],
 ) -> TriageResult:
+    from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.scan_stages.triage.stage import run_repository_triage_stage
+    from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import artifact_path
 
-    return await run_repository_triage_stage(
-        triage_root=artifact_path(request.prepared_input["artifact_paths"], "triage"),
-        discovery_result=discovery_result,
-    )
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name=request.workflow,
+            run_id=request.run_id,
+        )
+    ):
+        return await run_repository_triage_stage(
+            triage_root=artifact_path(
+                request.prepared_input["artifact_paths"], "triage"
+            ),
+            discovery_result=discovery_result,
+        )
 
 
 @activity.defn
@@ -362,59 +381,78 @@ def prepare_repository_case_activity(
 
 @activity.defn
 async def analyze_repository_case_activity(
+    request: RepositoryCaseReviewRequest,
     prepared_case: dict[str, Any],
-    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.observability.trace_context import bind_trace_context
+    from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import artifact_path
     from sec_review_agents.workflows.repository_case.stage import (
         analyze_repository_case_stage,
     )
 
-    bind_trace_context(workflow="repository-review")
-    return await analyze_repository_case_stage(
-        prepared_case["case_execution_input"],
-        analyzer_artifacts_path=artifact_path(
-            prepared_case["artifact_paths"],
-            "analyzer",
-        ),
-        published_transcript_path=_repository_case_transcript_path(
-            prepared_case,
-            order=1,
-            stage="analyzer",
-        ),
-        runtime_context=runtime_context,
-    )
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name="repository-review",
+            run_id=request["run_id"],
+            case_id=_repository_case_id_from_request(request),
+            pass_kind="initial",
+            pass_index="0",
+        )
+    ):
+        return await analyze_repository_case_stage(
+            prepared_case["case_execution_input"],
+            analyzer_artifacts_path=artifact_path(
+                prepared_case["artifact_paths"],
+                "analyzer",
+            ),
+            published_transcript_path=_repository_case_transcript_path(
+                prepared_case,
+                order=1,
+                stage="analyzer",
+            ),
+            runtime_context=request["runtime_context"],
+        )
 
 
 @activity.defn
 async def score_repository_case_cvss_activity(
+    request: RepositoryCaseReviewRequest,
     prepared_case: dict[str, Any],
     analysis_result: Mapping[str, Any],
 ) -> dict[str, Any]:
     from sec_review_agents.observability.trace_context import bind_trace_context
+    from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import artifact_path
     from sec_review_agents.workflows.repository_case.stage import (
         score_repository_case_cvss_stage,
     )
 
-    bind_trace_context(workflow="repository-review")
-    return await score_repository_case_cvss_stage(
-        prepared_case["case_execution_input"],
-        analysis_result,
-        cvss_artifacts_path=artifact_path(
-            prepared_case["artifact_paths"],
-            "cvss",
-        ),
-    )
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name="repository-review",
+            run_id=request["run_id"],
+            case_id=_repository_case_id_from_request(request),
+            pass_kind="initial",
+            pass_index="0",
+        )
+    ):
+        return await score_repository_case_cvss_stage(
+            prepared_case["case_execution_input"],
+            analysis_result,
+            cvss_artifacts_path=artifact_path(
+                prepared_case["artifact_paths"],
+                "cvss",
+            ),
+        )
 
 
 @activity.defn
 async def mitigate_repository_case_activity(
+    request: RepositoryCaseReviewRequest,
     prepared_case: dict[str, Any],
     analysis_result: Mapping[str, Any],
     retry_context: Mapping[str, Any] | None,
-    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
@@ -422,13 +460,13 @@ async def mitigate_repository_case_activity(
         create_skipped_mitigation_result,
         mitigation_attempt_label,
     )
+    from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import artifact_path
     from sec_review_agents.workflows.repository_case.stage import (
         MITIGATION_NO_TARGET_REASON,
         run_repository_case_mitigation_stage,
     )
 
-    bind_trace_context(workflow="repository-review")
     mitigator_artifacts_path = artifact_path(
         prepared_case["artifact_paths"],
         "mitigator",
@@ -447,30 +485,40 @@ async def mitigate_repository_case_activity(
             retry_context=retry_context,
             reason=MITIGATION_NO_TARGET_REASON,
         )
-    return await run_repository_case_mitigation_stage(
-        prepared_case["case_execution_input"],
-        analysis_result,
-        retry_context,
-        runtime_context,
-        mitigator_artifacts_path=mitigator_artifacts_path,
-        published_transcript_path=_repository_case_transcript_path(
-            prepared_case,
-            order=review_stage_attempt_order(
-                stage="mitigator", retry_context=retry_context
+    pass_index = int((retry_context or {}).get("retry_index") or 0)
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name="repository-review",
+            run_id=request["run_id"],
+            case_id=_repository_case_id_from_request(request),
+            pass_kind="feedback" if retry_context is not None else "initial",
+            pass_index=str(pass_index),
+        )
+    ):
+        return await run_repository_case_mitigation_stage(
+            prepared_case["case_execution_input"],
+            analysis_result,
+            retry_context,
+            request["runtime_context"],
+            mitigator_artifacts_path=mitigator_artifacts_path,
+            published_transcript_path=_repository_case_transcript_path(
+                prepared_case,
+                order=review_stage_attempt_order(
+                    stage="mitigator", retry_context=retry_context
+                ),
+                stage="mitigator",
+                attempt=mitigation_attempt_label(retry_context),
             ),
-            stage="mitigator",
-            attempt=mitigation_attempt_label(retry_context),
-        ),
-    )
+        )
 
 
 @activity.defn
 async def verify_repository_case_activity(
+    request: RepositoryCaseReviewRequest,
     prepared_case: dict[str, Any],
     analysis_result: Mapping[str, Any],
     mitigation_result: dict[str, Any] | None,
     retry_context: Mapping[str, Any] | None,
-    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
@@ -478,12 +526,12 @@ async def verify_repository_case_activity(
         create_skipped_verification_result,
         verification_attempt_label,
     )
+    from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import artifact_path
     from sec_review_agents.workflows.repository_case.stage import (
         run_repository_case_verification_stage,
     )
 
-    bind_trace_context(workflow="repository-review")
     verifier_artifacts_path = artifact_path(
         prepared_case["artifact_paths"],
         "verifier",
@@ -502,22 +550,32 @@ async def verify_repository_case_activity(
             retry_context=retry_context,
             reason="Verification was skipped because analysis produced no confirmed repair target.",
         )
-    return await run_repository_case_verification_stage(
-        prepared_case["case_execution_input"],
-        analysis_result,
-        mitigation_result,
-        retry_context,
-        runtime_context,
-        verifier_artifacts_path=verifier_artifacts_path,
-        published_transcript_path=_repository_case_transcript_path(
-            prepared_case,
-            order=review_stage_attempt_order(
-                stage="verifier", retry_context=retry_context
+    pass_index = int((retry_context or {}).get("retry_index") or 0)
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name="repository-review",
+            run_id=request["run_id"],
+            case_id=_repository_case_id_from_request(request),
+            pass_kind="feedback" if retry_context is not None else "initial",
+            pass_index=str(pass_index),
+        )
+    ):
+        return await run_repository_case_verification_stage(
+            prepared_case["case_execution_input"],
+            analysis_result,
+            mitigation_result,
+            retry_context,
+            request["runtime_context"],
+            verifier_artifacts_path=verifier_artifacts_path,
+            published_transcript_path=_repository_case_transcript_path(
+                prepared_case,
+                order=review_stage_attempt_order(
+                    stage="verifier", retry_context=retry_context
+                ),
+                stage="verifier",
+                attempt=verification_attempt_label(retry_context),
             ),
-            stage="verifier",
-            attempt=verification_attempt_label(retry_context),
-        ),
-    )
+        )
 
 
 @activity.defn
@@ -525,13 +583,11 @@ def archive_repository_case_feedback_attempt_activity(
     prepared_case: dict[str, Any],
     retry_context: dict[str, Any],
 ) -> None:
-    from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import (
         archive_initial_feedback_attempt,
     )
     from sec_review_agents.utils.paths import artifact_path
 
-    bind_trace_context(workflow="repository-review")
     archive_initial_feedback_attempt(
         mitigator_root=artifact_path(prepared_case["artifact_paths"], "mitigator"),
         verifier_root=artifact_path(prepared_case["artifact_paths"], "verifier"),
@@ -547,13 +603,11 @@ def build_repository_case_result_activity(
     mitigation_result: dict[str, Any] | None,
     verifier_result: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.record import build_review_record
     from sec_review_agents.workflows.repository_case.stage import (
         derive_case_disposition,
     )
 
-    bind_trace_context(workflow="repository-review")
     case_execution_input = prepared_case["case_execution_input"]
     case_id = str(case_execution_input["case_id"]).strip()
     case_disposition = derive_case_disposition(
@@ -623,6 +677,8 @@ async def plan_repository_delivery_activity(
         generate_delivery_plan,
         persist_delivery_plan,
     )
+    from sec_review_agents.observability.trace_context import bind_trace_context
+    from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import required_path
 
     prepared_input = request.prepared_input
@@ -638,10 +694,16 @@ async def plan_repository_delivery_activity(
             result=result,
         )
         return result
-    return await generate_delivery_plan(
-        run_artifacts_root=run_artifacts_root,
-        case_results=delivery_case_inputs,
-    )
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name=request.workflow,
+            run_id=request.run_id,
+        )
+    ):
+        return await generate_delivery_plan(
+            run_artifacts_root=run_artifacts_root,
+            case_results=delivery_case_inputs,
+        )
 
 
 @activity.defn
@@ -703,6 +765,7 @@ def build_skipped_repository_delivery_result_activity(
 
 @activity.defn
 async def execute_repository_single_deliveries_activity(
+    request: ReviewWorkflowRequest,
     delivery_execution: Mapping[str, Any],
 ) -> list[dict[str, Any]]:
     from pathlib import Path
@@ -710,14 +773,25 @@ async def execute_repository_single_deliveries_activity(
     from sec_review_agents.delivery_stages.execution import (
         execute_delivery_entry,
     )
+    from sec_review_agents.observability.trace_context import bind_trace_context
+    from sec_review_agents.temporal.support import activity_trace_labels
 
     outcomes = []
     for delivery_request in delivery_execution["single_delivery_execution_items"]:
-        outcome = await execute_delivery_entry(
-            run_artifacts_root=Path(delivery_execution["run_artifacts_root_path"]),
-            delivery_entry=delivery_request["delivery"],
-            case_results=delivery_request["case_items"],
-        )
+        delivery = delivery_request["delivery"]
+        delivery_id = str(delivery.get("delivery_id") or "").strip() or None
+        with bind_trace_context(
+            **activity_trace_labels(
+                workflow_name=request.workflow,
+                run_id=request.run_id,
+                delivery_id=delivery_id,
+            )
+        ):
+            outcome = await execute_delivery_entry(
+                run_artifacts_root=Path(delivery_execution["run_artifacts_root_path"]),
+                delivery_entry=delivery,
+                case_results=delivery_request["case_items"],
+            )
         if outcome is not None:
             outcomes.append(
                 {
@@ -730,6 +804,7 @@ async def execute_repository_single_deliveries_activity(
 
 @activity.defn
 async def execute_repository_combined_delivery_activity(
+    request: ReviewWorkflowRequest,
     delivery_execution: Mapping[str, Any],
     delivery_request: Mapping[str, Any],
 ) -> dict[str, Any] | None:
@@ -738,17 +813,27 @@ async def execute_repository_combined_delivery_activity(
     from sec_review_agents.delivery_stages.execution import (
         execute_delivery_entry,
     )
+    from sec_review_agents.observability.trace_context import bind_trace_context
+    from sec_review_agents.temporal.support import activity_trace_labels
 
     run_artifacts_root = Path(delivery_execution["run_artifacts_root_path"])
     delivery_entry = delivery_request["delivery"]
-    return await execute_delivery_entry(
-        run_artifacts_root=run_artifacts_root,
-        baseline_snapshot_tar_path=Path(
-            delivery_execution["workspace_snapshot_tar_path"]
-        ),
-        delivery_entry=delivery_entry,
-        case_results=delivery_request["case_items"],
-    )
+    delivery_id = str(delivery_entry.get("delivery_id") or "").strip() or None
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name=request.workflow,
+            run_id=request.run_id,
+            delivery_id=delivery_id,
+        )
+    ):
+        return await execute_delivery_entry(
+            run_artifacts_root=run_artifacts_root,
+            baseline_snapshot_tar_path=Path(
+                delivery_execution["workspace_snapshot_tar_path"]
+            ),
+            delivery_entry=delivery_entry,
+            case_results=delivery_request["case_items"],
+        )
 
 
 @activity.defn
@@ -824,7 +909,7 @@ class RepositoryDiscoveryWorkflow:
             task = asyncio.create_task(
                 workflow.execute_activity(
                     scan_repository_discovery_chunk_activity,
-                    args=[manifest, chunk],
+                    args=[request, manifest, chunk],
                     schedule_to_close_timeout=timedelta(
                         seconds=request.timeout_seconds
                     ),
@@ -918,10 +1003,9 @@ class RepositoryCaseReviewWorkflow:
             schedule_to_close_timeout=activity_timeout,
             retry_policy=retry_policy,
         )
-        runtime_context = request["runtime_context"]
         analysis_result = await workflow.execute_activity(
             analyze_repository_case_activity,
-            args=[prepared_case, runtime_context],
+            args=[request, prepared_case],
             schedule_to_close_timeout=activity_timeout,
             retry_policy=retry_policy,
         )
@@ -930,7 +1014,7 @@ class RepositoryCaseReviewWorkflow:
         cvss_task = asyncio.create_task(
             workflow.execute_activity(
                 score_repository_case_cvss_activity,
-                args=[prepared_case, analysis_result],
+                args=[request, prepared_case, analysis_result],
                 schedule_to_close_timeout=activity_timeout,
                 retry_policy=retry_policy,
             )
@@ -938,18 +1022,18 @@ class RepositoryCaseReviewWorkflow:
         try:
             mitigation_result = await workflow.execute_activity(
                 mitigate_repository_case_activity,
-                args=[prepared_case, analysis_result, None, runtime_context],
+                args=[request, prepared_case, analysis_result, None],
                 schedule_to_close_timeout=activity_timeout,
                 retry_policy=retry_policy,
             )
             verifier_result = await workflow.execute_activity(
                 verify_repository_case_activity,
                 args=[
+                    request,
                     prepared_case,
                     analysis_result,
                     mitigation_result,
                     None,
-                    runtime_context,
                 ],
                 schedule_to_close_timeout=activity_timeout,
                 retry_policy=retry_policy,
@@ -977,10 +1061,10 @@ class RepositoryCaseReviewWorkflow:
                 mitigation_result = await workflow.execute_activity(
                     mitigate_repository_case_activity,
                     args=[
+                        request,
                         prepared_case,
                         analysis_result,
                         retry_context,
-                        runtime_context,
                     ],
                     schedule_to_close_timeout=activity_timeout,
                     retry_policy=retry_policy,
@@ -988,11 +1072,11 @@ class RepositoryCaseReviewWorkflow:
                 verifier_result = await workflow.execute_activity(
                     verify_repository_case_activity,
                     args=[
+                        request,
                         prepared_case,
                         analysis_result,
                         mitigation_result,
                         retry_context,
-                        runtime_context,
                     ],
                     schedule_to_close_timeout=activity_timeout,
                     retry_policy=retry_policy,
@@ -1121,7 +1205,7 @@ class RepositoryDeliveryWorkflow:
         )
         single_outcomes = await workflow.execute_activity(
             execute_repository_single_deliveries_activity,
-            args=[delivery_execution],
+            args=[request, delivery_execution],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
@@ -1141,7 +1225,7 @@ class RepositoryDeliveryWorkflow:
             task = asyncio.create_task(
                 workflow.execute_activity(
                     execute_repository_combined_delivery_activity,
-                    args=[delivery_execution, delivery_request],
+                    args=[request, delivery_execution, delivery_request],
                     schedule_to_close_timeout=timedelta(
                         seconds=request.timeout_seconds
                     ),
@@ -1187,12 +1271,6 @@ class RepositoryDeliveryWorkflow:
 class RepositoryReviewWorkflow:
     @workflow.run
     async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
-        await workflow.execute_activity(
-            prepare_internal_workflow_activity,
-            args=[request.workflow, request.run_id],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
         scan_result = await workflow.execute_child_workflow(
             RepositoryScanWorkflow.run,
             request,

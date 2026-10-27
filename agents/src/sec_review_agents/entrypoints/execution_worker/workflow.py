@@ -35,34 +35,33 @@ def prepare_execution_run_activity(request: ExecutionWorkflowInput) -> dict[str,
     )
     from sec_review_agents.entrypoints.input_preparation import prepare_run_input
     from sec_review_agents.features import memory_processing_enabled
-    from sec_review_agents.observability.diagnostics import (
-        bind_workflow_context,
-        log_diagnostic,
-    )
-    from sec_review_agents.observability.trace_context import clear_trace_context
+    from sec_review_agents.observability.diagnostics import log_diagnostic
+    from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.runtime.runtime_config import runtime_context_from_config
 
     try:
         validate_execution_workflow_input(request)
-        bind_workflow_context(workflow=request.workflow, run_id=request.run_id)
-        log_diagnostic(
-            "execution_workflow_input",
-            input_type=type(request.input).__name__,
-            run_id=request.run_id,
-        )
-        return {
-            "ok": True,
-            "workflow": request.workflow,
-            "run_id": request.run_id,
-            "prepared_input": prepare_run_input(
-                request.input,
+        # This scope enriches preparation logs only. Downstream Temporal
+        # activities receive run_id in their request and bind it again locally.
+        with bind_trace_context(workflow=request.workflow, run_id=request.run_id):
+            log_diagnostic(
+                "execution_workflow_input",
+                input_type=type(request.input).__name__,
                 run_id=request.run_id,
-                workflow=request.workflow,
-            ),
-            "runtime_context": runtime_context_from_config(request.runtime),
-            "timeout_seconds": request.timeout_seconds,
-            "memory_processing_enabled": memory_processing_enabled(),
-        }
+            )
+            return {
+                "ok": True,
+                "workflow": request.workflow,
+                "run_id": request.run_id,
+                "prepared_input": prepare_run_input(
+                    request.input,
+                    run_id=request.run_id,
+                    workflow=request.workflow,
+                ),
+                "runtime_context": runtime_context_from_config(request.runtime),
+                "timeout_seconds": request.timeout_seconds,
+                "memory_processing_enabled": memory_processing_enabled(),
+            }
     except ValueError as error:
         return {
             "ok": False,
@@ -82,8 +81,6 @@ def prepare_execution_run_activity(request: ExecutionWorkflowInput) -> dict[str,
                 message=str(error),
             ),
         }
-    finally:
-        clear_trace_context()
 
 
 @workflow.defn(name=EXECUTION_WORKFLOW_TYPE)

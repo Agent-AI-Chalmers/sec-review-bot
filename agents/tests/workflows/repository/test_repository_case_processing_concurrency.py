@@ -125,16 +125,15 @@ async def test_direct_case_records_skipped_verification_without_confirmed_target
             return_value={"case_id": "case-1"},
         ) as build_result_mock,
     ):
-        await repository_case_direct.run_repository_case_review_direct(
-            repository_case_review_request("case-1")
-        )
+        request = repository_case_review_request("case-1")
+        await repository_case_direct.run_repository_case_review_direct(request)
 
     verify_mock.assert_awaited_once_with(
+        request,
         prepared_case,
         analysis_result,
         mitigation_result,
         None,
-        {},
     )
     assert build_result_mock.call_args.args[-1] == verifier_result
 
@@ -153,11 +152,11 @@ async def test_case_verification_activity_persists_skip_without_running_verifier
         "sec_review_agents.workflows.repository_case.stage.run_repository_case_verification_stage"
     ) as verify_mock:
         result = await verify_repository_case_activity(
+            repository_case_review_request("case-1"),
             prepared_case,
             {"verdict": "no-actionable-finding", "narratives": []},
             {"changed_files": []},
             None,
-            {},
         )
 
     verify_mock.assert_not_called()
@@ -207,7 +206,7 @@ async def test_direct_repository_discovery_refills_sliding_window() -> None:
     def fake_build_manifest(_request):
         return {"max_concurrency": 2, "chunks": chunks}
 
-    async def fake_scan_chunk(_manifest, chunk):
+    async def fake_scan_chunk(_request, _manifest, chunk):
         nonlocal active_count, max_active_count
         active_count += 1
         max_active_count = max(max_active_count, active_count)
@@ -294,7 +293,7 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
         }
 
     @activity.defn(name="analyze_repository_case_activity")
-    def fake_analyzer(prepared_case: dict, _runtime_context: dict) -> dict:
+    def fake_analyzer(_request: dict, prepared_case: dict) -> dict:
         case_id = prepared_case["case_execution_input"]["case_id"]
         if case_id == "case-2":
             # This test targets failure isolation and immediate window refill,
@@ -318,7 +317,7 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
         }
 
     @activity.defn(name="score_repository_case_cvss_activity")
-    def fake_cvss(_prepared_case: dict, _analysis_result: dict) -> dict:
+    def fake_cvss(_request: dict, _prepared_case: dict, _analysis_result: dict) -> dict:
         return {
             "outcome": "scored",
             "base_score": 7.5,
@@ -327,10 +326,10 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
 
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigator(
+        _request: dict,
         prepared_case: dict,
         _analysis_result: dict,
         _retry_context: dict | None,
-        _runtime_context: dict,
     ) -> dict:
         case_id = prepared_case["case_execution_input"]["case_id"]
         if case_id == "case-1" and not case_3_started.wait(2.0):
@@ -342,11 +341,11 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
 
     @activity.defn(name="verify_repository_case_activity")
     def fake_verifier(
+        _request: dict,
         _prepared_case: dict,
         _analysis_result: dict,
         _mitigation_result: dict | None,
         _retry_context: dict | None,
-        _runtime_context: dict,
     ) -> dict:
         return {
             "overview": "Verified.",
@@ -564,7 +563,9 @@ async def test_repository_discovery_workflow_refills_chunk_window() -> None:
         }
 
     @activity.defn(name="scan_repository_discovery_chunk_activity")
-    def fake_scan_discovery_chunk(_manifest: dict, chunk: dict) -> dict:
+    def fake_scan_discovery_chunk(
+        _request: ReviewWorkflowRequest, _manifest: dict, chunk: dict
+    ) -> dict:
         chunk_id = chunk["chunk_id"]
         if chunk_id == "discovery-chunk-0001" and not chunk_3_started.wait(2.0):
             raise RuntimeError("discovery chunk window was not refilled")
@@ -642,7 +643,7 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
         }
 
     @activity.defn(name="analyze_repository_case_activity")
-    def fake_analyzer(_prepared_case: dict, _runtime_context: dict) -> dict:
+    def fake_analyzer(_request: dict, _prepared_case: dict) -> dict:
         return {
             "verdict": "confirmed-vulnerability",
             "narratives": [
@@ -655,7 +656,7 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
         }
 
     @activity.defn(name="score_repository_case_cvss_activity")
-    def fake_cvss(_prepared_case: dict, _analysis_result: dict) -> dict:
+    def fake_cvss(_request: dict, _prepared_case: dict, _analysis_result: dict) -> dict:
         cvss_started.set()
         if not mitigator_started.wait(1.0):
             raise RuntimeError("Mitigator did not start while CVSS stage was running.")
@@ -667,10 +668,10 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
 
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigator(
+        _request: dict,
         _prepared_case: dict,
         _analysis_result: dict,
         _retry_context: dict | None,
-        _runtime_context: dict,
     ) -> dict:
         mitigator_started.set()
         if not cvss_started.wait(1.0):
@@ -681,11 +682,11 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
 
     @activity.defn(name="verify_repository_case_activity")
     def fake_verifier(
+        _request: dict,
         _prepared_case: dict,
         _analysis_result: dict,
         _mitigation_result: dict | None,
         _retry_context: dict | None,
-        _runtime_context: dict,
     ) -> dict:
         return {
             "overview": "No patch was available to verify.",
@@ -768,32 +769,32 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
         }
 
     @activity.defn(name="analyze_repository_case_activity")
-    def fake_analyzer(_prepared_case: dict, _runtime_context: dict) -> dict:
+    def fake_analyzer(_request: dict, _prepared_case: dict) -> dict:
         return {
             "verdict": "confirmed-vulnerability",
             "narratives": [{"verdict": "confirmed-vulnerability"}],
         }
 
     @activity.defn(name="score_repository_case_cvss_activity")
-    def fake_cvss(_prepared_case: dict, _analysis_result: dict) -> dict:
+    def fake_cvss(_request: dict, _prepared_case: dict, _analysis_result: dict) -> dict:
         raise RuntimeError("cvss failed after retries")
 
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigator(
+        _request: dict,
         _prepared_case: dict,
         _analysis_result: dict,
         _retry_context: dict | None,
-        _runtime_context: dict,
     ) -> dict:
         return {"changed_files": ["demo.py"]}
 
     @activity.defn(name="verify_repository_case_activity")
     def fake_verifier(
+        _request: dict,
         _prepared_case: dict,
         _analysis_result: dict,
         _mitigation_result: dict | None,
         _retry_context: dict | None,
-        _runtime_context: dict,
     ) -> dict:
         return {
             "overview": "Verified.",
@@ -875,7 +876,11 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
         },
     }
 
-    async def fake_cvss(_prepared_case: dict, _analysis_result: dict) -> dict:
+    async def fake_cvss(
+        _request: dict,
+        _prepared_case: dict,
+        _analysis_result: dict,
+    ) -> dict:
         cvss_started.set()
         if not await asyncio.to_thread(mitigator_started.wait, 1.0):
             raise RuntimeError(
@@ -888,10 +893,10 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
         }
 
     async def fake_mitigator(
+        _request: dict,
         _prepared_case: dict,
         _analysis_result: dict,
         _retry_context: dict | None,
-        _runtime_context: dict,
     ) -> dict:
         mitigator_started.set()
         if not await asyncio.to_thread(cvss_started.wait, 1.0):
@@ -903,8 +908,8 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
         }
 
     async def fake_analyzer(
+        _request: dict,
         _prepared_case: dict,
-        _runtime_context: dict,
     ) -> dict:
         return {
             "verdict": "confirmed-vulnerability",
@@ -912,11 +917,11 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
         }
 
     async def fake_verifier(
+        _request: dict,
         _prepared_case: dict,
         _analysis_result: dict,
         _mitigation_result: dict | None,
         _retry_context: dict | None,
-        _runtime_context: dict,
     ) -> dict:
         return {"patch_coverage": "no-patch"}
 
@@ -999,31 +1004,35 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
     }
 
     async def fake_analyzer(
+        _request: dict,
         _prepared_case: dict,
-        _runtime_context: dict,
     ) -> dict:
         return {
             "verdict": "confirmed-vulnerability",
             "narratives": [{"verdict": "confirmed-vulnerability"}],
         }
 
-    async def fake_cvss(_prepared_case: dict, _analysis_result: dict) -> dict:
+    async def fake_cvss(
+        _request: dict,
+        _prepared_case: dict,
+        _analysis_result: dict,
+    ) -> dict:
         raise RuntimeError("cvss model failed")
 
     async def fake_mitigator(
+        _request: dict,
         _prepared_case: dict,
         _analysis_result: dict,
         _retry_context: dict | None,
-        _runtime_context: dict,
     ) -> dict:
         return {"changed_files": ["demo.py"]}
 
     async def fake_verifier(
+        _request: dict,
         _prepared_case: dict,
         _analysis_result: dict,
         _mitigation_result: dict | None,
         _retry_context: dict | None,
-        _runtime_context: dict,
     ) -> dict:
         return {"patch_coverage": "full"}
 

@@ -15,7 +15,6 @@ from sec_review_agents.run_diagnostics.publication import (
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
-    prepare_internal_workflow_activity,
 )
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.review_intent import (
@@ -83,9 +82,11 @@ async def run_issue_single_agent(
 async def run_issue_single_agent_activity(
     request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
+    from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
     )
+    from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import required_path
 
     prepared_input = request.prepared_input
@@ -103,16 +104,26 @@ async def run_issue_single_agent_activity(
         bundle_paths["history_path"],
         label="bundle_paths.history_path",
     )
-    return await run_issue_single_agent(
-        issue=prepared_input["issue"],
-        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
-        history_path=history_path,
-        single_agent_artifacts_path=run_artifacts_root / "single-agent",
-        review_objective=review_intent.objective,
-        test_changes=review_intent.test_changes,
-        runtime_context=request.runtime_context,
-        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
-    )
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name=request.workflow,
+            run_id=request.run_id,
+            pass_kind="initial",
+            pass_index="0",
+        )
+    ):
+        return await run_issue_single_agent(
+            issue=prepared_input["issue"],
+            workspace_snapshot_tar_path=workspace_snapshot_tar_path,
+            history_path=history_path,
+            single_agent_artifacts_path=run_artifacts_root / "single-agent",
+            review_objective=review_intent.objective,
+            test_changes=review_intent.test_changes,
+            runtime_context=request.runtime_context,
+            setup_declaration_content=setup_declaration_content_for_backend(
+                prepared_input
+            ),
+        )
 
 
 @activity.defn
@@ -141,12 +152,6 @@ def build_issue_single_agent_result_activity(
 class IssueSingleAgentWorkflow:
     @workflow.run
     async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
-        await workflow.execute_activity(
-            prepare_internal_workflow_activity,
-            args=[request.workflow, request.run_id],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
         result = await workflow.execute_activity(
             run_issue_single_agent_activity,
             args=[request],
@@ -303,7 +308,6 @@ async def execute_issue_single_agent(
 async def run_issue_single_agent_direct(
     request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
-    prepare_internal_workflow_activity(request.workflow, request.run_id)
     single_agent_result = await run_issue_single_agent_activity(request)
     return build_issue_single_agent_result_activity(
         request,
