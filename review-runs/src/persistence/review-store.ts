@@ -26,11 +26,12 @@ import { Pool, type PoolClient } from 'pg'
 import type {
   ReviewRunWorkflow as WorkflowName,
   ExecutionArtifactStorage
-} from './contracts.js'
+} from '../contracts.js'
 import {
   applySchemaVersions,
   KNOWN_SCHEMA_VERSIONS
-} from './database/schema-version-runner.js'
+} from '../database/schema-version-runner.js'
+import { transaction } from '../database/transaction.js'
 import {
   normalizeArtifactStorage,
   type CreateReviewRunArgs,
@@ -42,8 +43,8 @@ import {
   type ReviewRunEvent,
   type ReviewRunRecord,
   type ExecutionStatus
-} from './shapes.js'
-import type { ExecutionStatisticsSummary } from './shapes.js'
+} from '../shapes.js'
+import type { ExecutionStatisticsSummary } from '../shapes.js'
 import {
   PreparationStore,
   type PreparationExpiryResult,
@@ -61,7 +62,6 @@ import {
 } from './run-record-projection.js'
 import { queueRunNotice } from './run-notices.js'
 import { ExecutionStore } from './execution-store.js'
-import { transaction } from './transaction.js'
 
 export type {
   CreateReviewRunArgs,
@@ -72,7 +72,7 @@ export type {
   ReviewRunAdmission,
   ReviewRunRecord,
   ExecutionStatus
-} from './shapes.js'
+} from '../shapes.js'
 
 type JsonObject = Record<string, unknown>
 export type PublishContext = JsonObject

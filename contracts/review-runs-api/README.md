@@ -17,7 +17,7 @@ Review Runs produces each observed run from `observeRun()` and each record from 
 
 The GitHub integration imports Review Runs's shapes directly, so its view of the record is the same type rather than a hand-written copy. The console consumes types generated from the same schema, and a committed fixture pins them at compile time, so the two callers keep their own compile-time ties to the one schema.
 
-Both sides of a request are typed from the contract too, not only the response: the integration's client takes the contract's own `operationId` and derives each request body and success value from it, and Review Runs' route handlers read `request.body` and `request.params` through their operation's types (`review-runs/src/route-types.ts`). Renaming a request field in [openapi.yaml](v1/openapi.yaml) therefore fails both typechecks, rather than leaving a call site that compiles while the field is quietly ignored.
+Both sides of a request are typed from the contract too, not only the response: the integration's client takes the contract's own `operationId` and derives each request body and success value from it, and Review Runs' route handlers read `request.body` and `request.params` through their operation's types (`review-runs/src/http/route-types.ts`). Renaming a request field in [openapi.yaml](v1/openapi.yaml) therefore fails both typechecks, rather than leaving a call site that compiles while the field is quietly ignored.
 
 ## Public Boundary
 

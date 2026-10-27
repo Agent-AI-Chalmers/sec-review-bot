@@ -1,4 +1,4 @@
-import type { ReviewRunStore } from './review-store.js'
+import type { ReviewRunStore } from '../persistence/review-store.js'
 import type { OperationHandlers } from './route-handlers.js'
 import type { PathParams, RequestBody } from './route-types.js'
 

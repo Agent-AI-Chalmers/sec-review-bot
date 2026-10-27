@@ -4,8 +4,8 @@ import test from 'node:test'
 
 import { Pool } from 'pg'
 
-import { ExecutionStatisticsStore } from '../../src/execution-statistics-store.js'
-import { ReviewRunStore } from '../../src/review-store.js'
+import { ReviewRunStore } from '../../src/persistence/review-store.js'
+import { ExecutionStatisticsStore } from '../../src/statistics/execution-statistics-store.js'
 
 function databaseUrl(): string {
   const value = process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL

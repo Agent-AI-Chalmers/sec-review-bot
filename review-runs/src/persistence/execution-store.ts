@@ -11,11 +11,11 @@
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
-import type { ExecutionArtifactStorage } from './contracts.js'
+import type { ExecutionArtifactStorage } from '../contracts.js'
 import { appendEvent } from './review-run-events.js'
 import { queueRunNotice } from './run-notices.js'
-import { normalizeArtifactStorage } from './shapes.js'
-import { transaction } from './transaction.js'
+import { transaction } from '../database/transaction.js'
+import { normalizeArtifactStorage } from '../shapes.js'
 
 export class ExecutionStore {
   constructor(

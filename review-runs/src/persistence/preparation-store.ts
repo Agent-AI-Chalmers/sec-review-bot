@@ -3,9 +3,10 @@
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
-import type { ReviewRunWorkflow as WorkflowName } from './contracts.js'
-import type { components } from './contract-types-generated.js'
-import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
+import type { components } from '../contract-types-generated.js'
+import type { ReviewRunWorkflow as WorkflowName } from '../contracts.js'
+import { transaction } from '../database/transaction.js'
+import { SUBMISSION_STATE_UNCERTAIN } from '../errors.js'
 import { appendEvent } from './review-run-events.js'
 import {
   abandonInFlightPublication,
@@ -13,8 +14,7 @@ import {
 } from './publication-abandon.js'
 import { skipPendingExecutions } from './execution-skip.js'
 import { queueRunNotice } from './run-notices.js'
-import type { RunNoticeWork } from './shapes.js'
-import { transaction } from './transaction.js'
+import type { RunNoticeWork } from '../shapes.js'
 
 type JsonObject = Record<string, unknown>
 

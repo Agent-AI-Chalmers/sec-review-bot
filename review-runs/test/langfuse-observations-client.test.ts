@@ -4,7 +4,7 @@ import test from 'node:test'
 import {
   LangfuseObservationsClient,
   LangfuseRateLimitError
-} from '../src/langfuse-observations-client.js'
+} from '../src/statistics/langfuse-observations-client.js'
 
 test('Langfuse observations are read by session without one request per root', async (t) => {
   const originalFetch = globalThis.fetch

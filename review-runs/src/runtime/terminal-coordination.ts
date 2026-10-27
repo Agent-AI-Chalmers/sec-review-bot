@@ -1,5 +1,8 @@
-import type { ReviewRunRecord, ReviewRunStore } from './review-store.js'
-import type { ExecutionRunStatus } from './execution-client.js'
+import type {
+  ReviewRunRecord,
+  ReviewRunStore
+} from '../persistence/review-store.js'
+import type { ExecutionRunStatus } from '../execution-client.js'
 
 type ObservationStore = Pick<
   ReviewRunStore,

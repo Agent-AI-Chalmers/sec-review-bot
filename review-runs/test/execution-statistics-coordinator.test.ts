@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { reconcileExecutionStatisticsPass } from '../src/execution-statistics-coordinator.js'
-import type { ExecutionStatisticsWork } from '../src/execution-statistics-store.js'
-import { LangfuseRateLimitError } from '../src/langfuse-observations-client.js'
+import { reconcileExecutionStatisticsPass } from '../src/statistics/execution-statistics-coordinator.js'
+import type { ExecutionStatisticsWork } from '../src/statistics/execution-statistics-store.js'
+import { LangfuseRateLimitError } from '../src/statistics/langfuse-observations-client.js'
 
 function work(index: number): ExecutionStatisticsWork {
   return {

@@ -10,7 +10,7 @@
 // `openapi.yaml`. They are type-level only: the runtime behaviour they protect is covered by
 // `server-http.test.ts`, which exercises the registered routes.
 import type { operations } from '../src/contract-types-generated.js'
-import type { PathParams, RequestBody } from '../src/route-types.js'
+import type { PathParams, RequestBody } from '../src/http/route-types.js'
 
 type Expect<T extends true> = T
 type Equals<A, B> =

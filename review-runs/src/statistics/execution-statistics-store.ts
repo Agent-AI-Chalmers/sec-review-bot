@@ -2,7 +2,7 @@ import crypto from 'node:crypto'
 import { Pool } from 'pg'
 
 import type { ExecutionStatisticsSnapshot } from './execution-statistics.js'
-import { transaction } from './transaction.js'
+import { transaction } from '../database/transaction.js'
 
 export interface ExecutionStatisticsWork {
   runId: string

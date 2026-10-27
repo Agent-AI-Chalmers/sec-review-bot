@@ -1,4 +1,7 @@
-import type { PublicationStepRecord, ReviewRunRecord } from './review-store.js'
+import type {
+  PublicationStepRecord,
+  ReviewRunRecord
+} from './persistence/review-store.js'
 import type {
   ExecutionStatisticsSummary,
   ObservedRun,

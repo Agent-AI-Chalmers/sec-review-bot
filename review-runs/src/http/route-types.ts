@@ -11,7 +11,7 @@
 // of a request is the operation's own type from
 // `contracts/review-runs-api/v1/openapi.yaml`. Renaming a field in the contract now breaks
 // the handler that reads it at compile time instead of at run time.
-import type { operations } from './contract-types-generated.js'
+import type { operations } from '../contract-types-generated.js'
 
 type OperationId = keyof operations
 type Operation<Id extends OperationId> = operations[Id]

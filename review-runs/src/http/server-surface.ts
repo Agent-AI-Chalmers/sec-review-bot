@@ -8,12 +8,12 @@ import openapiGlue from '@platformatic/fastify-openapi-glue'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 
 import { buildAdminRouteHandlers } from './admin-route-handlers.js'
-import { contractDigest } from './contract-digest.js'
+import { contractDigest } from '../contract-digest.js'
 import { buildCoordinationRouteHandlers } from './coordination-route-handlers.js'
-import { ReviewRunStore } from './review-store.js'
+import { ReviewRunStore } from '../persistence/review-store.js'
 import { buildReadRouteHandlers } from './read-route-handlers.js'
-import { DeterministicReviewRunError } from './errors.js'
-import { ERROR_RESPONSE_CODES_FROM_CONTRACT } from './error-codes-generated.js'
+import { DeterministicReviewRunError } from '../errors.js'
+import { ERROR_RESPONSE_CODES_FROM_CONTRACT } from '../error-codes-generated.js'
 import type { OperationHandlers } from './route-handlers.js'
 
 const MAX_BODY_BYTES = 1024 * 1024
@@ -158,7 +158,7 @@ interface ReviewRunsRouteDeps {
  * silently shaping the surface. Running from source (tsx) falls back to the repository's
  * contracts tree, which is the source of truth in that mode. */
 function resolveSpecPath(): string {
-  const built = new URL('./openapi.yaml', import.meta.url)
+  const built = new URL('../openapi.yaml', import.meta.url)
   if (existsSync(built)) {
     const builtPath = fileURLToPath(built)
     const digestPath = `${builtPath}.sha256`
@@ -178,7 +178,10 @@ function resolveSpecPath(): string {
     return builtPath
   }
   const fromSource = fileURLToPath(
-    new URL('../../contracts/review-runs-api/v1/openapi.yaml', import.meta.url)
+    new URL(
+      '../../../contracts/review-runs-api/v1/openapi.yaml',
+      import.meta.url
+    )
   )
   if (existsSync(fromSource)) return fromSource
   throw new Error(

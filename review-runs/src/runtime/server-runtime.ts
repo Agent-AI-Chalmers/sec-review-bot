@@ -1,12 +1,12 @@
 // Composes the Review Runs process: durable stores, background coordinators, and HTTP surface.
 import Fastify from 'fastify'
 
-import type { ReviewRunWorkflow } from './contracts.js'
+import type { ReviewRunWorkflow } from '../contracts.js'
 import {
   coordinateReviewRunsOnce,
   startReviewRunCoordinatorLoop
 } from './coordinator.js'
-import { integerEnv } from './env.js'
+import { integerEnv } from '../env.js'
 import {
   ExecutionSubmissionUncertainError,
   getExecutionRunStatus,
@@ -15,16 +15,16 @@ import {
   submitExecutionRun,
   type ExecutionRunStatus,
   type ExecutionRunStatusBatch
-} from './execution-client.js'
-import { reconcileExecutionStatisticsPass } from './execution-statistics-coordinator.js'
-import { ExecutionStatisticsStore } from './execution-statistics-store.js'
-import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
-import { LangfuseObservationsClient } from './langfuse-observations-client.js'
-import { ReviewRunStore } from './review-store.js'
+} from '../execution-client.js'
+import { ReviewRunStore } from '../persistence/review-store.js'
+import { reconcileExecutionStatisticsPass } from '../statistics/execution-statistics-coordinator.js'
+import { ExecutionStatisticsStore } from '../statistics/execution-statistics-store.js'
+import { SUBMISSION_STATE_UNCERTAIN } from '../errors.js'
+import { LangfuseObservationsClient } from '../statistics/langfuse-observations-client.js'
 import {
   REVIEW_RUNS_FASTIFY_OPTIONS,
   registerReviewRunsRoutes
-} from './server-surface.js'
+} from '../http/server-surface.js'
 import {
   concludeExhaustedSubmissionRecovery,
   recoverReviewRunSubmission

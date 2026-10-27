@@ -14,9 +14,9 @@ import { fileURLToPath } from 'node:url'
 
 const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src')
 const AXIS_STORES = [
-  'preparation-store.ts',
-  'publication-store.ts',
-  'execution-store.ts'
+  'persistence/preparation-store.ts',
+  'persistence/publication-store.ts',
+  'persistence/execution-store.ts'
 ] as const
 
 /** The modules `file` imports, normalized to the `.ts` basename used by `AXIS_STORES`.
@@ -37,9 +37,10 @@ test('single-axis stores do not depend on each other', () => {
     const dependencies = importedModules(store)
     for (const other of AXIS_STORES) {
       if (other === store) continue
+      const otherName = path.basename(other)
       assert.ok(
-        !dependencies.includes(other),
-        `${store} imports ${other}; a cross-axis write shared by two axes belongs in its own module so the stores stay independent`
+        !dependencies.includes(otherName),
+        `${store} imports ${otherName}; a cross-axis write shared by two axes belongs in its own module so the stores stay independent`
       )
     }
     // `review-store.ts` constructs the stores, so it must not be imported back.
@@ -52,8 +53,8 @@ test('single-axis stores do not depend on each other', () => {
 
 test('the process entry, HTTP surface, and runtime composition stay acyclic', () => {
   const entry = importedModules('server.ts')
-  const surface = importedModules('server-surface.ts')
-  const runtime = importedModules('server-runtime.ts')
+  const surface = importedModules('http/server-surface.ts')
+  const runtime = importedModules('runtime/server-runtime.ts')
 
   assert.ok(entry.includes('server-surface.ts'))
   assert.ok(entry.includes('server-runtime.ts'))
@@ -63,9 +64,9 @@ test('the process entry, HTTP surface, and runtime composition stay acyclic', ()
   assert.ok(!surface.includes('server-runtime.ts'))
 
   for (const handler of [
-    'read-route-handlers.ts',
-    'coordination-route-handlers.ts',
-    'admin-route-handlers.ts'
+    'http/read-route-handlers.ts',
+    'http/coordination-route-handlers.ts',
+    'http/admin-route-handlers.ts'
   ]) {
     const dependencies = importedModules(handler)
     assert.ok(!dependencies.includes('server.ts'))
@@ -75,7 +76,7 @@ test('the process entry, HTTP surface, and runtime composition stay acyclic', ()
 })
 
 test('operator decisions compose axis stores without creating a dependency cycle', () => {
-  const dependencies = importedModules('operator-decision-store.ts')
+  const dependencies = importedModules('persistence/operator-decision-store.ts')
   assert.ok(dependencies.includes('preparation-store.ts') === false)
   assert.ok(dependencies.includes('publication-store.ts'))
   assert.ok(dependencies.includes('execution-store.ts'))

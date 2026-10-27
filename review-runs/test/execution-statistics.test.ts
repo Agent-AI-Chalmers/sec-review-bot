@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { aggregateExecutionStatistics } from '../src/execution-statistics.js'
+import { aggregateExecutionStatistics } from '../src/statistics/execution-statistics.js'
 
 test('execution statistics aggregate native provider/model usage by review agent', () => {
   const snapshot = aggregateExecutionStatistics({

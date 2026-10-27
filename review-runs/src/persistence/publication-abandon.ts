@@ -8,7 +8,7 @@
 // A small module both can import keeps the dependency graph one-directional.
 import type { PoolClient } from 'pg'
 
-import type { PublicationStatus } from './shapes.js'
+import type { PublicationStatus } from '../shapes.js'
 
 /** Converge a publication that has not concluded yet to `skipped`, in the caller's transaction.
  *

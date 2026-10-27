@@ -1,7 +1,7 @@
 import type {
   ReviewRunWorkflow as WorkflowName,
   ExecutionArtifactStorage
-} from './contracts.js'
+} from '../contracts.js'
 import type { Pool, PoolClient } from 'pg'
 import {
   normalizeArtifactStorage,
@@ -9,7 +9,7 @@ import {
   type ObservedRun,
   type PublicationStatus,
   type ReviewRunRecord
-} from './shapes.js'
+} from '../shapes.js'
 
 type JsonObject = Record<string, unknown>
 

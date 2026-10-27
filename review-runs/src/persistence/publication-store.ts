@@ -12,14 +12,14 @@
 // `pending`, where the normal cross-axis selector can claim it after checking execution.
 import { Pool, type PoolClient } from 'pg'
 
+import { transaction } from '../database/transaction.js'
 import {
   DeterministicReviewRunError,
   PUBLICATION_STEP_ERROR_CODES
-} from './errors.js'
-import type { PublicationStepRecord } from './shapes.js'
+} from '../errors.js'
+import type { PublicationStepRecord } from '../shapes.js'
 import { appendEvent } from './review-run-events.js'
 import { queueRunNotice } from './run-notices.js'
-import { transaction } from './transaction.js'
 
 /**
  * Why every `publication_steps` write takes the publication row lock FIRST.

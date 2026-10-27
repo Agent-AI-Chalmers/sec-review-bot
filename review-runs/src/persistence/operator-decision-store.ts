@@ -6,8 +6,8 @@ import { abandonInFlightPublication } from './publication-abandon.js'
 import { appendEvent } from './review-run-events.js'
 import { findRunRecord } from './run-record-projection.js'
 import { queueRunNotice } from './run-notices.js'
-import type { ReviewRunRecord } from './shapes.js'
-import { transaction } from './transaction.js'
+import { transaction } from '../database/transaction.js'
+import type { ReviewRunRecord } from '../shapes.js'
 
 export class OperatorDecisionStore {
   constructor(
