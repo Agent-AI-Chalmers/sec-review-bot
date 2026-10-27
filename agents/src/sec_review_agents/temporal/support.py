@@ -4,7 +4,6 @@ from temporalio import activity
 from temporalio.common import RetryPolicy
 
 ACTIVITY_RETRY_MAXIMUM_ATTEMPTS = 3
-REVIEW_EXECUTION_STATISTICS_SCOPE = "review-execution"
 
 
 def activity_retry_policy() -> RetryPolicy:
@@ -35,7 +34,6 @@ def activity_trace_labels(
     return {
         "workflow": workflow_name,
         "run_id": run_id,
-        "statistics_scope": REVIEW_EXECUTION_STATISTICS_SCOPE,
         "temporal_activity_attempt": attempt,
         **labels,
     }
@@ -43,7 +41,6 @@ def activity_trace_labels(
 
 __all__ = [
     "ACTIVITY_RETRY_MAXIMUM_ATTEMPTS",
-    "REVIEW_EXECUTION_STATISTICS_SCOPE",
     "activity_retry_policy",
     "activity_trace_labels",
 ]

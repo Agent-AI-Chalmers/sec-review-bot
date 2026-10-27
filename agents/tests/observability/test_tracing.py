@@ -50,7 +50,6 @@ def test_tracing_metadata_uses_bound_trace_context(monkeypatch) -> None:
     assert config.metadata == {
         "sec_review_agent": "repository-analyzer",
         "sec_review_workflow": "repository-review",
-        "sec_review_run_id": "run-1",
         "langfuse_session_id": "run-1",
     }
 

@@ -50,24 +50,32 @@ def _compact_string_metadata(values: Mapping[str, object]) -> dict[str, str]:
 
 
 def _build_metadata(agent_name: str) -> dict[str, str]:
-    """Project the current activity labels into stable Langfuse metadata."""
+    """Describe which review work produced an invocation in Langfuse."""
     trace_context = current_trace_context()
     return _compact_string_metadata(
         {
+            # Langfuse maps this special key to sessionId; statistics query it by run_id.
+            "langfuse_session_id": trace_context.get("run_id"),
+            # Stable runtime name used to admit review calls and group their usage.
             "sec_review_agent": agent_name,
+            # Product workflow that scheduled the invocation; used for diagnosis only.
             "sec_review_workflow": trace_context.get("workflow"),
-            "sec_review_run_id": trace_context.get("run_id"),
-            "sec_review_statistics_scope": trace_context.get("statistics_scope"),
+            # Repository case being reviewed, when the workflow is case-oriented.
             "sec_review_case_id": trace_context.get("case_id"),
+            # Discovery input chunk that produced the invocation.
             "sec_review_chunk_id": trace_context.get("chunk_id"),
+            # Position within a batched stage invocation.
             "sec_review_batch_index": trace_context.get("batch_index"),
+            # Delivery item being planned or synthesized.
             "sec_review_delivery_id": trace_context.get("delivery_id"),
+            # Initial or feedback pass; explains repeated agent invocations.
             "sec_review_pass_kind": trace_context.get("pass_kind"),
+            # Zero-based pass number within the same stage.
             "sec_review_pass_index": trace_context.get("pass_index"),
+            # Temporal retry attempt; distinguishes infrastructure retries.
             "sec_review_temporal_activity_attempt": trace_context.get(
                 "temporal_activity_attempt"
             ),
-            "langfuse_session_id": trace_context.get("run_id"),
         }
     )
 
