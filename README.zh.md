@@ -77,11 +77,11 @@ Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和
 
 ## 支持的工作流
 
-| 路径                | 触发方式                                    | 输出                             |
-| ------------------- | ------------------------------------------- | -------------------------------- |
-| Issue review        | `issues.opened`、`@<app-slug> review`       | issue comment（确认问题并产出 patch 后再开 draft PR） |
-| Pull request review | PR webhook、`@<app-slug> review`            | PR review / suggestions          |
-| Repository review   | 定时或手动触发的 GitHub Action              | repository summary 和 deliveries |
+| 路径                | 触发方式                              | 输出                                                  |
+| ------------------- | ------------------------------------- | ----------------------------------------------------- |
+| Issue review        | `issues.opened`、`@<app-slug> review` | issue comment（确认问题并产出 patch 后再开 draft PR） |
+| Pull request review | PR webhook、`@<app-slug> review`      | PR review / suggestions                               |
+| Repository review   | 定时或手动触发的 GitHub Action        | repository summary 和 deliveries                      |
 
 所有触发一律以 `audit` 模式审查；没有 `repair` 选项。
 
@@ -117,14 +117,14 @@ sudo systemctl enable --now sec-review-bot.target
 
 各 package 的安装和开发命令放在对应 package README 里。
 
-| 目标                            | 入口                                                                     |
-| ------------------------------- | ------------------------------------------------------------------------ |
-| 理解运行实体与职责边界          | [系统架构](docs/architecture/SYSTEM_ARCHITECTURE.zh.md)                  |
-| 本地启动完整链路和执行 worker   | [本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)    |
-| 开发某个 package 或服务         | [文档地图](docs/README.zh.md)及对应 package 的 README                    |
-| 修改 contract 或生成产物        | [Contracts 说明](contracts/README.zh.md)                                 |
-| 把 GitHub 入站请求转发到本地    | [本地 GitHub 入站设置](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) |
-| 准备贡献                        | [贡献指南](CONTRIBUTING.md)                                              |
+| 目标                          | 入口                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| 理解运行实体与职责边界        | [系统架构](docs/architecture/SYSTEM_ARCHITECTURE.zh.md)                  |
+| 本地启动完整链路和执行 worker | [本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)    |
+| 开发某个 package 或服务       | [文档地图](docs/README.zh.md)及对应 package 的 README                    |
+| 修改 contract 或生成产物      | [Contracts 说明](contracts/README.zh.md)                                 |
+| 把 GitHub 入站请求转发到本地  | [本地 GitHub 入站设置](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) |
+| 准备贡献                      | [贡献指南](CONTRIBUTING.md)                                              |
 
 ## 论文
 

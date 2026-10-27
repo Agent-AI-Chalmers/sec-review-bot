@@ -261,7 +261,6 @@ CodeGraph 在 sandbox 内运行，因此需要一个能执行命令的 backend�
 | `.agent-postgres-state` | PostgreSQL | Review Runs run 状态与 Memory Catalog 协调状态 |
 | `.agent-temporal-state` | Temporal | workflow history 和待处理 task state |
 
-
 ## 运行部署
 
 ### 集成服务

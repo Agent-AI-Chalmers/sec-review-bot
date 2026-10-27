@@ -3,7 +3,6 @@
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-
 SVG = "http://www.w3.org/2000/svg"
 ET.register_namespace("", SVG)
 
@@ -48,8 +47,12 @@ def add_node(
     tone: str,
 ) -> None:
     group = element(parent, "g", id=node_id, class_=f"node {tone}")
-    element(group, "rect", x=x, y=y, width=width, height=height, rx=8, class_="node-surface")
-    element(group, "path", d=f"M {x + 8} {y + 1} H {x + width - 8}", class_="node-accent")
+    element(
+        group, "rect", x=x, y=y, width=width, height=height, rx=8, class_="node-surface"
+    )
+    element(
+        group, "path", d=f"M {x + 8} {y + 1} H {x + width - 8}", class_="node-accent"
+    )
     line_count = len(label.split("\n"))
     baseline = y + height // 2 - (line_count - 1) * 9 + 5
     add_text(group, x + width // 2, baseline, label, css_class="node-label")
@@ -67,18 +70,65 @@ def add_store(
     icon: str,
 ) -> None:
     group = element(parent, "g", id=node_id, class_=f"store {tone}")
-    element(group, "rect", x=x, y=y, width=width, height=height, rx=8, class_="node-surface")
-    element(group, "path", d=f"M {x + 8} {y + 1} H {x + width - 8}", class_="node-accent")
+    element(
+        group, "rect", x=x, y=y, width=width, height=height, rx=8, class_="node-surface"
+    )
+    element(
+        group, "path", d=f"M {x + 8} {y + 1} H {x + width - 8}", class_="node-accent"
+    )
     icon_x = x + 34
     icon_y = y + height // 2 - 16
     if icon == "database":
-        element(group, "ellipse", cx=icon_x, cy=icon_y + 6, rx=16, ry=5, class_="store-icon")
-        element(group, "path", d=f"M {icon_x - 16} {icon_y + 6} V {icon_y + 27} M {icon_x + 16} {icon_y + 6} V {icon_y + 27} M {icon_x - 16} {icon_y + 27} C {icon_x - 16} {icon_y + 34}, {icon_x + 16} {icon_y + 34}, {icon_x + 16} {icon_y + 27}", class_="store-icon no-fill")
+        element(
+            group, "ellipse", cx=icon_x, cy=icon_y + 6, rx=16, ry=5, class_="store-icon"
+        )
+        element(
+            group,
+            "path",
+            d=f"M {icon_x - 16} {icon_y + 6} V {icon_y + 27} M {icon_x + 16} {icon_y + 6} V {icon_y + 27} M {icon_x - 16} {icon_y + 27} C {icon_x - 16} {icon_y + 34}, {icon_x + 16} {icon_y + 34}, {icon_x + 16} {icon_y + 27}",
+            class_="store-icon no-fill",
+        )
     elif icon == "objects":
-        element(group, "rect", x=icon_x - 17, y=icon_y, width=14, height=14, rx=3, class_="object-icon")
-        element(group, "rect", x=icon_x + 3, y=icon_y, width=14, height=14, rx=3, class_="object-icon")
-        element(group, "rect", x=icon_x - 17, y=icon_y + 20, width=14, height=14, rx=3, class_="object-icon")
-        element(group, "rect", x=icon_x + 3, y=icon_y + 20, width=14, height=14, rx=3, class_="object-icon")
+        element(
+            group,
+            "rect",
+            x=icon_x - 17,
+            y=icon_y,
+            width=14,
+            height=14,
+            rx=3,
+            class_="object-icon",
+        )
+        element(
+            group,
+            "rect",
+            x=icon_x + 3,
+            y=icon_y,
+            width=14,
+            height=14,
+            rx=3,
+            class_="object-icon",
+        )
+        element(
+            group,
+            "rect",
+            x=icon_x - 17,
+            y=icon_y + 20,
+            width=14,
+            height=14,
+            rx=3,
+            class_="object-icon",
+        )
+        element(
+            group,
+            "rect",
+            x=icon_x + 3,
+            y=icon_y + 20,
+            width=14,
+            height=14,
+            rx=3,
+            class_="object-icon",
+        )
     else:
         raise ValueError(f"Unknown store icon: {icon}")
     add_text(group, x + 128, y + height // 2 + 6, label, css_class="node-label")
@@ -107,8 +157,14 @@ def rounded_path(points: list[tuple[int, int]], radius: int = 10) -> str:
         previous = points[index - 1]
         current = points[index]
         following = points[index + 1]
-        incoming = min(radius, abs(current[0] - previous[0]) // 2 + abs(current[1] - previous[1]) // 2)
-        outgoing = min(radius, abs(following[0] - current[0]) // 2 + abs(following[1] - current[1]) // 2)
+        incoming = min(
+            radius,
+            abs(current[0] - previous[0]) // 2 + abs(current[1] - previous[1]) // 2,
+        )
+        outgoing = min(
+            radius,
+            abs(following[0] - current[0]) // 2 + abs(following[1] - current[1]) // 2,
+        )
         before = (
             current[0] - (incoming if current[0] != previous[0] else 0),
             current[1] - (incoming if current[1] != previous[1] else 0),
@@ -117,7 +173,12 @@ def rounded_path(points: list[tuple[int, int]], radius: int = 10) -> str:
             current[0] + (outgoing if following[0] != current[0] else 0),
             current[1] + (outgoing if following[1] != current[1] else 0),
         )
-        commands.extend((f"L {before[0]} {before[1]}", f"Q {current[0]} {current[1]} {after[0]} {after[1]}"))
+        commands.extend(
+            (
+                f"L {before[0]} {before[1]}",
+                f"Q {current[0]} {current[1]} {after[0]} {after[1]}",
+            )
+        )
     commands.append(f"L {points[-1][0]} {points[-1][1]}")
     return " ".join(commands)
 
@@ -137,8 +198,18 @@ def render(filename: str, labels: dict[str, str]) -> None:
     description.text = labels["description"]
 
     defs = element(root, "defs")
-    shadow = element(defs, "filter", id="shadow", x="-20%", y="-20%", width="140%", height="150%")
-    element(shadow, "feDropShadow", dx=0, dy=3, stdDeviation=4, flood_color="#0f172a", flood_opacity=0.10)
+    shadow = element(
+        defs, "filter", id="shadow", x="-20%", y="-20%", width="140%", height="150%"
+    )
+    element(
+        shadow,
+        "feDropShadow",
+        dx=0,
+        dy=3,
+        stdDeviation=4,
+        flood_color="#0f172a",
+        flood_opacity=0.10,
+    )
     marker = element(
         defs,
         "marker",
@@ -177,11 +248,29 @@ def render(filename: str, labels: dict[str, str]) -> None:
     """
 
     external = element(root, "g")
-    element(external, "rect", x=20, y=24, width=200, height=360, rx=7, class_="group external")
+    element(
+        external,
+        "rect",
+        x=20,
+        y=24,
+        width=200,
+        height=360,
+        rx=7,
+        class_="group external",
+    )
     add_text(external, 120, 54, labels["external"], css_class="group-label")
 
     runtime = element(root, "g")
-    element(runtime, "rect", x=250, y=24, width=1120, height=360, rx=7, class_="group runtime")
+    element(
+        runtime,
+        "rect",
+        x=250,
+        y=24,
+        width=1120,
+        height=360,
+        rx=7,
+        class_="group runtime",
+    )
     add_text(runtime, 810, 54, labels["runtime"], css_class="group-label")
 
     persistence = element(root, "g")
@@ -211,25 +300,66 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_path(root, [(580, 166), (580, 515)])
     add_path(root, [(1160, 326), (1160, 485), (655, 485), (655, 515)])
     add_path(root, [(360, 326), (360, 625), (930, 625), (930, 561), (970, 561)])
-    add_path(root, [(790, 166), (790, 400), (950, 400), (950, 475), (1075, 475), (1075, 515)])
-    add_path(root, [(1240, 130), (1310, 130), (1310, 561), (1180, 561)], bidirectional=True)
+    add_path(
+        root, [(790, 166), (790, 400), (950, 400), (950, 475), (1075, 475), (1075, 515)]
+    )
+    add_path(
+        root, [(1240, 130), (1310, 130), (1310, 561), (1180, 561)], bidirectional=True
+    )
     add_path(root, [(790, 326), (790, 450), (1030, 450), (1030, 515)])
-    add_path(root, [(975, 326), (975, 475), (1090, 475), (1090, 515)], bidirectional=True)
+    add_path(
+        root, [(975, 326), (975, 475), (1090, 475), (1090, 515)], bidirectional=True
+    )
 
     add_node(root, "operator", 45, 94, 150, 72, labels["operator"], "external-node")
     add_node(root, "github", 45, 254, 150, 72, "GitHub", "external-node")
     add_node(root, "ui", 280, 94, 160, 72, "Control Plane UI", "control-node")
-    add_node(root, "integration", 280, 254, 160, 72, "GitHub\nIntegration", "control-node")
+    add_node(
+        root, "integration", 280, 254, 160, 72, "GitHub\nIntegration", "control-node"
+    )
     add_node(root, "control", 495, 94, 170, 72, "Review Control\nPlane", "control-node")
     add_node(root, "gateway", 710, 94, 160, 72, "Execution\nGateway", "execution-node")
     add_node(root, "temporal", 895, 94, 160, 72, "Temporal Server", "execution-node")
-    add_node(root, "execution-worker", 1080, 94, 160, 72, "Execution\nWorker", "execution-node")
-    add_node(root, "extraction-worker", 700, 254, 180, 72, "Memory Extraction\nWorker", "memory-node")
-    add_node(root, "maintenance-worker", 885, 254, 180, 72, "Memory Maintenance\nWorker", "memory-node")
-    add_node(root, "catalog", 1080, 254, 180, 72, "Memory Catalog\nServer", "memory-node")
+    add_node(
+        root,
+        "execution-worker",
+        1080,
+        94,
+        160,
+        72,
+        "Execution\nWorker",
+        "execution-node",
+    )
+    add_node(
+        root,
+        "extraction-worker",
+        700,
+        254,
+        180,
+        72,
+        "Memory Extraction\nWorker",
+        "memory-node",
+    )
+    add_node(
+        root,
+        "maintenance-worker",
+        885,
+        254,
+        180,
+        72,
+        "Memory Maintenance\nWorker",
+        "memory-node",
+    )
+    add_node(
+        root, "catalog", 1080, 254, 180, 72, "Memory Catalog\nServer", "memory-node"
+    )
 
-    add_store(root, "postgres", 500, 515, 210, 92, "PostgreSQL", "storage-node", "database")
-    add_store(root, "storage", 970, 515, 210, 92, labels["storage"], "storage-node", "objects")
+    add_store(
+        root, "postgres", 500, 515, 210, 92, "PostgreSQL", "storage-node", "database"
+    )
+    add_store(
+        root, "storage", 970, 515, 210, 92, labels["storage"], "storage-node", "objects"
+    )
 
     add_text(root, 810, 454, labels["persistence"], css_class="group-label")
 

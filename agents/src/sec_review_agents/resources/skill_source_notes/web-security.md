@@ -6,31 +6,31 @@ These sources support the `web-security` references.
 
 Authoritative references:
 
-- https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html
-- https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html
-- https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html
-- https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html
-- https://portswigger.net/web-security/oauth
-- https://portswigger.net/web-security/jwt
-- https://cwe.mitre.org/data/definitions/287.html
-- https://cwe.mitre.org/data/definitions/384.html
+- <https://cheatsheetseries.owasp.org/cheatsheets/Authentication_Cheat_Sheet.html>
+- <https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html>
+- <https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html>
+- <https://cheatsheetseries.owasp.org/cheatsheets/JSON_Web_Token_for_Java_Cheat_Sheet.html>
+- <https://portswigger.net/web-security/oauth>
+- <https://portswigger.net/web-security/jwt>
+- <https://cwe.mitre.org/data/definitions/287.html>
+- <https://cwe.mitre.org/data/definitions/384.html>
 
 ## csrf
 
 Authoritative references:
 
-- https://portswigger.net/web-security/csrf
-- https://portswigger.net/kb/issues/00200700_cross-site-request-forgery
-- https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html
-- https://cwe.mitre.org/data/definitions/352.html
+- <https://portswigger.net/web-security/csrf>
+- <https://portswigger.net/kb/issues/00200700_cross-site-request-forgery>
+- <https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html>
+- <https://cwe.mitre.org/data/definitions/352.html>
 
 ## file-upload
 
 Authoritative references:
 
-- https://portswigger.net/web-security/file-upload
-- https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html
-- https://cwe.mitre.org/data/definitions/434.html
+- <https://portswigger.net/web-security/file-upload>
+- <https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html>
+- <https://cwe.mitre.org/data/definitions/434.html>
 
 Claim ledger:
 
@@ -48,12 +48,12 @@ Claim ledger:
 
 Authoritative references:
 
-- https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html
-- https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html
-- https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html
-- https://owasp.org/Top10/A02_2021-Cryptographic_Failures/
-- https://cwe.mitre.org/data/definitions/798.html
-- https://cwe.mitre.org/data/definitions/209.html
+- <https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html>
+- <https://cheatsheetseries.owasp.org/cheatsheets/Error_Handling_Cheat_Sheet.html>
+- <https://cheatsheetseries.owasp.org/cheatsheets/Logging_Cheat_Sheet.html>
+- <https://owasp.org/Top10/A02_2021-Cryptographic_Failures/>
+- <https://cwe.mitre.org/data/definitions/798.html>
+- <https://cwe.mitre.org/data/definitions/209.html>
 
 Claim ledger:
 
@@ -70,31 +70,31 @@ Claim ledger:
 
 Authoritative references:
 
-- https://portswigger.net/web-security/sql-injection
-- https://portswigger.net/kb/issues/00100200_sql-injection
-- https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html
-- https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html
-- https://cwe.mitre.org/data/definitions/89.html
+- <https://portswigger.net/web-security/sql-injection>
+- <https://portswigger.net/kb/issues/00100200_sql-injection>
+- <https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html>
+- <https://cheatsheetseries.owasp.org/cheatsheets/Query_Parameterization_Cheat_Sheet.html>
+- <https://cwe.mitre.org/data/definitions/89.html>
 
 ## ssrf
 
 Authoritative references:
 
-- https://portswigger.net/web-security/ssrf
-- https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html
-- https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/
-- https://cwe.mitre.org/data/definitions/918.html
+- <https://portswigger.net/web-security/ssrf>
+- <https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html>
+- <https://owasp.org/Top10/A10_2021-Server-Side_Request_Forgery_%28SSRF%29/>
+- <https://cwe.mitre.org/data/definitions/918.html>
 
 ## xss
 
 Authoritative references:
 
-- https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html
-- https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html
-- https://portswigger.net/web-security/cross-site-scripting
-- https://portswigger.net/web-security/cross-site-scripting/dom-based
-- https://portswigger.net/web-security/cross-site-scripting/contexts
-- https://cwe.mitre.org/data/definitions/79.html
+- <https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html>
+- <https://cheatsheetseries.owasp.org/cheatsheets/DOM_based_XSS_Prevention_Cheat_Sheet.html>
+- <https://portswigger.net/web-security/cross-site-scripting>
+- <https://portswigger.net/web-security/cross-site-scripting/dom-based>
+- <https://portswigger.net/web-security/cross-site-scripting/contexts>
+- <https://cwe.mitre.org/data/definitions/79.html>
 
 Claim ledger:
 
@@ -107,6 +107,7 @@ Claim ledger:
 - Claim: URL, attribute, JavaScript, HTML, and template contexts have distinct neutralization requirements.
   Primary source: OWASP XSS Prevention Cheat Sheet; PortSwigger XSS contexts.
   Limit: Do not reduce XSS review to `innerHTML` only.
+
 ## Authentication
 
 | Rule group and affected reference | Primary support and locator | Supported inference and limits |

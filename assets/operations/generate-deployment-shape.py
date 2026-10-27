@@ -3,7 +3,6 @@
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-
 SVG = "http://www.w3.org/2000/svg"
 ET.register_namespace("", SVG)
 
@@ -48,8 +47,12 @@ def add_node(
     tone: str,
 ) -> None:
     group = element(parent, "g", id=node_id, class_=f"node {tone}")
-    element(group, "rect", x=x, y=y, width=width, height=height, rx=8, class_="node-surface")
-    element(group, "path", d=f"M {x + 8} {y + 1} H {x + width - 8}", class_="node-accent")
+    element(
+        group, "rect", x=x, y=y, width=width, height=height, rx=8, class_="node-surface"
+    )
+    element(
+        group, "path", d=f"M {x + 8} {y + 1} H {x + width - 8}", class_="node-accent"
+    )
     line_count = len(label.split("\n"))
     baseline = y + height // 2 - (line_count - 1) * 9 + 5
     add_text(group, x + width // 2, baseline, label, css_class="node-label")
@@ -80,8 +83,14 @@ def rounded_path(points: list[tuple[int, int]], radius: int = 10) -> str:
         previous = points[index - 1]
         current = points[index]
         following = points[index + 1]
-        incoming = min(radius, abs(current[0] - previous[0]) // 2 + abs(current[1] - previous[1]) // 2)
-        outgoing = min(radius, abs(following[0] - current[0]) // 2 + abs(following[1] - current[1]) // 2)
+        incoming = min(
+            radius,
+            abs(current[0] - previous[0]) // 2 + abs(current[1] - previous[1]) // 2,
+        )
+        outgoing = min(
+            radius,
+            abs(following[0] - current[0]) // 2 + abs(following[1] - current[1]) // 2,
+        )
         before = (
             current[0] - (incoming if current[0] != previous[0] else 0),
             current[1] - (incoming if current[1] != previous[1] else 0),
@@ -90,7 +99,12 @@ def rounded_path(points: list[tuple[int, int]], radius: int = 10) -> str:
             current[0] + (outgoing if following[0] != current[0] else 0),
             current[1] + (outgoing if following[1] != current[1] else 0),
         )
-        commands.extend((f"L {before[0]} {before[1]}", f"Q {current[0]} {current[1]} {after[0]} {after[1]}"))
+        commands.extend(
+            (
+                f"L {before[0]} {before[1]}",
+                f"Q {current[0]} {current[1]} {after[0]} {after[1]}",
+            )
+        )
     commands.append(f"L {points[-1][0]} {points[-1][1]}")
     return " ".join(commands)
 
@@ -110,8 +124,18 @@ def render(filename: str, labels: dict[str, str]) -> None:
     description.text = labels["description"]
 
     defs = element(root, "defs")
-    shadow = element(defs, "filter", id="shadow", x="-20%", y="-20%", width="140%", height="150%")
-    element(shadow, "feDropShadow", dx=0, dy=3, stdDeviation=4, flood_color="#0f172a", flood_opacity=0.10)
+    shadow = element(
+        defs, "filter", id="shadow", x="-20%", y="-20%", width="140%", height="150%"
+    )
+    element(
+        shadow,
+        "feDropShadow",
+        dx=0,
+        dy=3,
+        stdDeviation=4,
+        flood_color="#0f172a",
+        flood_opacity=0.10,
+    )
     marker = element(
         defs,
         "marker",
@@ -148,11 +172,31 @@ def render(filename: str, labels: dict[str, str]) -> None:
       .arrow-head { fill: #94a3b8; opacity: 0.76; }
     """
 
-    element(root, "rect", x=20, y=24, width=220, height=760, rx=7, class_="zone external-zone")
+    element(
+        root,
+        "rect",
+        x=20,
+        y=24,
+        width=220,
+        height=760,
+        rx=7,
+        class_="zone external-zone",
+    )
     add_text(root, 130, 56, labels["external"], css_class="zone-label")
-    element(root, "rect", x=270, y=24, width=930, height=760, rx=7, class_="zone compose-zone")
+    element(
+        root,
+        "rect",
+        x=270,
+        y=24,
+        width=930,
+        height=760,
+        rx=7,
+        class_="zone compose-zone",
+    )
     add_text(root, 735, 56, "Docker Compose", css_class="zone-label")
-    element(root, "rect", x=1230, y=24, width=240, height=760, rx=7, class_="zone host-zone")
+    element(
+        root, "rect", x=1230, y=24, width=240, height=760, rx=7, class_="zone host-zone"
+    )
     add_text(root, 1350, 56, labels["host"], css_class="zone-label")
 
     add_path(root, [(210, 151), (300, 151)])
@@ -160,9 +204,15 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_path(root, [(680, 151), (720, 151)], bidirectional=True)
     add_path(root, [(900, 151), (940, 151)], bidirectional=True)
     add_path(root, [(1025, 187), (1025, 315)])
-    add_path(root, [(1110, 333), (1180, 333), (1180, 301), (1260, 301)], bidirectional=True)
-    add_path(root, [(1110, 351), (1190, 351), (1190, 426), (1260, 426)], bidirectional=True)
-    add_path(root, [(1110, 369), (1200, 369), (1200, 551), (1260, 551)], bidirectional=True)
+    add_path(
+        root, [(1110, 333), (1180, 333), (1180, 301), (1260, 301)], bidirectional=True
+    )
+    add_path(
+        root, [(1110, 351), (1190, 351), (1190, 426), (1260, 426)], bidirectional=True
+    )
+    add_path(
+        root, [(1110, 369), (1200, 369), (1200, 551), (1260, 551)], bidirectional=True
+    )
     add_path(root, [(1260, 283), (1245, 283), (1245, 691), (1260, 691)])
     add_path(root, [(210, 351), (300, 351)])
     add_path(root, [(470, 351), (490, 351), (490, 205), (720, 205), (720, 169)])
@@ -171,26 +221,75 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_path(root, [(600, 387), (600, 560), (740, 560), (740, 590)])
     add_path(root, [(1110, 169), (1140, 169), (1140, 560), (1070, 560), (1070, 590)])
     add_path(root, [(1025, 387), (1025, 590)], bidirectional=True)
-    add_path(root, [(1260, 319), (1170, 319), (1170, 631), (1130, 631)], bidirectional=True)
-    add_path(root, [(1260, 444), (1160, 444), (1160, 613), (1130, 613)], bidirectional=True)
-    add_path(root, [(1260, 569), (1150, 569), (1150, 649), (1130, 649)], bidirectional=True)
-    add_path(root, [(1260, 426), (1180, 426), (1180, 420), (710, 420), (710, 369), (690, 369)], bidirectional=True, dashed=True)
-    add_path(root, [(1260, 551), (1170, 551), (1170, 440), (730, 440), (730, 369), (690, 369)], bidirectional=True, dashed=True)
+    add_path(
+        root, [(1260, 319), (1170, 319), (1170, 631), (1130, 631)], bidirectional=True
+    )
+    add_path(
+        root, [(1260, 444), (1160, 444), (1160, 613), (1130, 613)], bidirectional=True
+    )
+    add_path(
+        root, [(1260, 569), (1150, 569), (1150, 649), (1130, 649)], bidirectional=True
+    )
+    add_path(
+        root,
+        [(1260, 426), (1180, 426), (1180, 420), (710, 420), (710, 369), (690, 369)],
+        bidirectional=True,
+        dashed=True,
+    )
+    add_path(
+        root,
+        [(1260, 551), (1170, 551), (1170, 440), (730, 440), (730, 369), (690, 369)],
+        bidirectional=True,
+        dashed=True,
+    )
 
     add_node(root, "github", 50, 115, 160, 72, "GitHub", "external-node")
     add_node(root, "browser", 50, 315, 160, 72, labels["browser"], "external-node")
     add_node(root, "tunnel", 300, 115, 170, 72, "Cloudflare\nTunnel", "control-node")
-    add_node(root, "integration", 510, 115, 170, 72, "GitHub\nIntegration", "control-node")
-    add_node(root, "control", 720, 115, 180, 72, "Review Control\nPlane", "control-node")
+    add_node(
+        root, "integration", 510, 115, 170, 72, "GitHub\nIntegration", "control-node"
+    )
+    add_node(
+        root, "control", 720, 115, 180, 72, "Review Control\nPlane", "control-node"
+    )
     add_node(root, "gateway", 940, 115, 170, 72, "Execution\nGateway", "execution-node")
     add_node(root, "ui", 300, 315, 170, 72, "Control Plane UI", "control-node")
     add_node(root, "temporal", 940, 315, 170, 72, "Temporal Server", "execution-node")
-    add_node(root, "catalog", 510, 315, 180, 72, "Memory Catalog\nServer", "memory-node")
+    add_node(
+        root, "catalog", 510, 315, 180, 72, "Memory Catalog\nServer", "memory-node"
+    )
     add_node(root, "postgres", 700, 590, 190, 82, "PostgreSQL", "storage-node")
     add_node(root, "storage", 940, 590, 190, 82, labels["storage"], "storage-node")
-    add_node(root, "execution-worker", 1250, 265, 200, 72, "Execution Worker", "execution-node")
-    add_node(root, "memory-extraction-worker", 1250, 390, 200, 72, "Memory Extraction\nWorker", "memory-node")
-    add_node(root, "memory-maintenance-worker", 1250, 515, 200, 72, "Memory Maintenance\nWorker", "memory-node")
+    add_node(
+        root,
+        "execution-worker",
+        1250,
+        265,
+        200,
+        72,
+        "Execution Worker",
+        "execution-node",
+    )
+    add_node(
+        root,
+        "memory-extraction-worker",
+        1250,
+        390,
+        200,
+        72,
+        "Memory Extraction\nWorker",
+        "memory-node",
+    )
+    add_node(
+        root,
+        "memory-maintenance-worker",
+        1250,
+        515,
+        200,
+        72,
+        "Memory Maintenance\nWorker",
+        "memory-node",
+    )
     add_node(root, "sandbox", 1250, 650, 200, 82, "Docker sandbox", "sandbox-node")
 
     tree = ET.ElementTree(root)

@@ -7,6 +7,7 @@ Use it when the issue is ambiguous, the code path is non-local, or the task is l
 If used, keep the todo list minimal and phase-oriented.
 
 Suggested workflow:
+
 - Start with a short checklist covering issue grounding, targeted code inspection, decision or repair, and self-check.
 - Prefer 3-5 items rather than a detailed step inventory.
 - Update the list only at meaningful milestones:

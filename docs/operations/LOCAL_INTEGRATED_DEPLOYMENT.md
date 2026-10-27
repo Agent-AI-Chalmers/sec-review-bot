@@ -259,7 +259,6 @@ With the sample configuration, the integrated deployment stores runtime data in 
 | `.agent-postgres-state` | PostgreSQL | Review Runs run state and Memory Catalog coordination state |
 | `.agent-temporal-state` | Temporal | Workflow history and pending task state |
 
-
 ## Run The Deployment
 
 ### Integrated Service
