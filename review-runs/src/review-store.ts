@@ -1,14 +1,16 @@
-// Implements Review Runs's durable review trunk and its read projection, and orchestrates
-// the cross-axis transitions that must move more than one lifecycle axis in one transaction.
+// Implements Review Runs's durable review trunk and orchestrates cross-axis transitions that
+// must move more than one lifecycle axis in one transaction. The SQL row-to-record projection
+// lives in `run-record-projection.ts`; operator-only cross-axis decisions live in
+// `operator-decision-store.ts`.
 //
 // Axis ownership:
 // - `execution-store.ts` owns single-axis execution writes (status transitions, observation
 //   heartbeat, artifact/result, submission-recovery claims).
 // - `preparation-store.ts` / `publication-store.ts` own their own axes.
-// - This store owns the run trunk, the full-record projection (`RUN_SELECT`/`rowToRecord`),
-//   and cross-axis transitions (submit -> queued, execution failure -> publication skipped,
-//   rejected replay -> publication skipped). A cross-axis transition is owned by the axis that
-//   initiates it; preparations initiating an execution skip is therefore in that store.
+// - This store owns the run trunk, queries that select run projections, and normal cross-axis
+//   transitions (submit -> queued, execution failure -> publication skipped, rejected replay ->
+//   publication skipped). A cross-axis transition is owned by the axis that initiates it;
+//   preparations initiating an execution skip is therefore in that store.
 // - `publication-abandon.ts` holds the one transition shared by more than one axis: concluding a
 //   publication that can never publish. It is separate because both preparation and execution
 //   trigger it, and single-axis stores must not import each other (this store is what constructs
@@ -33,7 +35,6 @@ import {
   normalizeArtifactStorage,
   type CreateReviewRunArgs,
   type PublicationStatus,
-  type ObservedRun,
   type PublicationStepRecord,
   type PreparationStatus,
   type PublicationWork,
@@ -52,6 +53,12 @@ import {
 import { PublicationStore } from './publication-store.js'
 import { abandonInFlightPublication } from './publication-abandon.js'
 import { appendEvent, listEvents } from './review-run-events.js'
+import { OperatorDecisionStore } from './operator-decision-store.js'
+import {
+  RUN_SELECT,
+  rowToRecord,
+  type ReviewRunRow
+} from './run-record-projection.js'
 import { queueRunNotice } from './run-notices.js'
 import { ExecutionStore } from './execution-store.js'
 import { transaction } from './transaction.js'
@@ -70,6 +77,9 @@ export type {
 type JsonObject = Record<string, unknown>
 export type PublishContext = JsonObject
 
+const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
+const CLAIM_WAIT_INTERVAL_MS = 250
+
 export type {
   PreparationExpiryBlocked,
   PreparationExpiryResult,
@@ -77,245 +87,7 @@ export type {
   PreparationWork
 } from './preparation-store.js'
 
-/** One axis' columns as the SELECT returns them, before they are shaped for the record.
- *
- * The axes share a shape on purpose: `status`, `started_at`, `finished_at`, `updated_at`, and the
- * failure pair mean the same thing on each. Grouping them here is what lets the type say which
- * axis a timestamp belongs to, instead of a flat bag where `started_at` and
- * `execution_finished_at` sit side by side with no way to tell whether the prefix matters. */
-interface AxisRowColumns<S> {
-  status: S
-  started_at: string | null
-  finished_at: string | null
-  updated_at: string | null
-  failure_code: string | null
-  failure_message: string | null
-}
-
-/** The row `RUN_SELECT` produces: the run trunk, its three axes, and the notice outbox.
- *
- * `executions` and `preparations` are LEFT JOINed, so their axes carry a `missing` flag rather
- * than being nullable: a run with a missing axis row is corruption the projection must report,
- * and a null axis would force every caller to re-decide what a missing axis means. `publications`
- * is an inner join, so it has no such flag. */
-interface ReviewRunRow {
-  trunk: {
-    run_id: string
-    workflow: WorkflowName
-    source_platform: 'github'
-    connector_id: string
-    publish_context: JsonObject
-    created_at: string
-    created_at_cursor: string
-    ingress_kind: 'github_webhook' | 'github_actions_dispatch' | null
-    ingress_key: string | null
-  }
-  execution: AxisRowColumns<ExecutionStatus> & {
-    missing: boolean
-    input: JsonObject | null
-    observed_at: string | null
-    artifact_storage: ExecutionArtifactStorage | null
-    workflow_result: unknown | null
-  }
-  publication: AxisRowColumns<PublicationStatus>
-  preparation: AxisRowColumns<
-    'pending' | 'preparing' | 'submitted' | 'failed' | null
-  > & {
-    missing: boolean
-    attempt_count: number | null
-    disconnect_reason: string | null
-  }
-  /** Written on any axis' terminal failure; `status` is null when no notice exists.
-   *
-   * Taken from the read contract rather than restated, so a state added to the notice machine
-   * (or one renamed, as `skipped` became `failed`) cannot leave this row type behind. */
-  notices: ObservedRun['notices']
-}
-
-const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
-/** How often a waiting publication claim re-checks for work. The state is a local indexed
- * query, so this trades a cheap read against how quickly the caller starts publishing. */
-const CLAIM_WAIT_INTERVAL_MS = 250
-
-/**
- * The full cross-axis read: one run trunk row joined to its three axis rows.
- *
- * `created_at_cursor` carries the full-precision (microsecond) UTC timestamp for keyset
- * pagination. node-pg maps `created_at` to a millisecond JS Date, so a cursor built from the
- * truncated value would skip every row in the same millisecond; this string keeps the
- * microseconds for an exact `(created_at, run_id) < boundary`.
- *
- * `executions`, `preparations`, and the failure notice are LEFT JOINed so a run that somehow
- * lacks one of those rows is surfaced and reported by the projection, not silently dropped from
- * every read. `publications` is an inner join because publication is never optional.
- */
-const RUN_SELECT = `
-  SELECT
-    json_build_object(
-      'run_id', r.run_id,
-      'workflow', r.workflow,
-      'source_platform', r.source_platform,
-      'connector_id', r.connector_id,
-      'publish_context', p.input,
-      'created_at', r.created_at,
-      'created_at_cursor', to_char(r.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"'),
-      'ingress_kind', r.ingress_kind,
-      'ingress_key', r.ingress_key
-    ) AS trunk,
-    json_build_object(
-      'status', e.status,
-      'started_at', e.started_at,
-      'finished_at', e.finished_at,
-      'updated_at', e.observed_at,
-      'failure_code', e.failure_code,
-      'failure_message', e.failure_message,
-      'missing', (e.run_id IS NULL),
-      'input', e.input,
-      'observed_at', e.observed_at,
-      'artifact_storage', e.artifact_storage,
-      'workflow_result', e.workflow_result
-    ) AS execution,
-    json_build_object(
-      'status', p.status,
-      'started_at', p.started_at,
-      'finished_at', p.finished_at,
-      'updated_at', p.updated_at,
-      'failure_code', p.failure_code,
-      'failure_message', p.failure_message
-    ) AS publication,
-    json_build_object(
-      'status', pr.status,
-      'started_at', pr.started_at,
-      'finished_at', pr.finished_at,
-      'updated_at', pr.updated_at,
-      'failure_code', pr.failure_code,
-      'failure_message', pr.failure_message,
-      'missing', (pr.run_id IS NULL),
-      'attempt_count', pr.attempt_count,
-      'disconnect_reason', pr.disconnect_reason
-    ) AS preparation,
-    COALESCE((
-      SELECT jsonb_agg(jsonb_build_object(
-        'notice_id', n.notice_id,
-        'kind', n.kind,
-        'axis', n.axis,
-        'status', n.status,
-        'reason_code', n.reason_code,
-        'comment_url', n.comment_url
-      ) ORDER BY n.created_at, n.notice_id)
-      FROM run_notices n
-      WHERE n.run_id=r.run_id AND n.connector_id=r.connector_id
-    ), '[]'::jsonb) AS notices
-  FROM review_runs r
-  JOIN publications p ON p.run_id = r.run_id AND p.connector_id = r.connector_id
-  LEFT JOIN executions e ON e.run_id = r.run_id AND e.connector_id = r.connector_id
-  LEFT JOIN preparations pr
-    ON pr.run_id = r.run_id AND pr.connector_id = r.connector_id
-`
-
-/** Normalize a timestamp the SELECT produced. `json_build_object` serializes timestamptz as an
- * ISO string, so this only ever narrows the precision (microseconds to milliseconds) - it never
- * receives a `Date`. Values come from `clock_timestamp()`, so parsing is exact. */
-function iso(value: string): string {
-  return new Date(value).toISOString()
-}
-/** `iso` for an axis timestamp that is meaningful only once the phase reaches it. */
-function isoOrNull(value: string | null): string | null {
-  return value === null ? null : iso(value)
-}
-function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
-  const { trunk, execution, publication, preparation } = row
-  if (execution.missing) {
-    // A run without its execution row is corrupt, not a valid record. Throwing makes the
-    // projection report it in `dropped` instead of silently omitting or misrepresenting it.
-    throw new Error(`run ${trunk.run_id} has no executions row`)
-  }
-  if (preparation.missing) {
-    // Same rule as the execution axis: admission writes the run, its preparation, and its
-    // execution in one transaction and nothing deletes an axis alone, so a missing preparation
-    // row is corruption. Returning `preparation: null` would report it as a legitimate record,
-    // which is exactly what the contract says null does *not* mean.
-    throw new Error(`run ${trunk.run_id} has no preparations row`)
-  }
-  // The guard above proves the row exists, but the axis columns are still typed nullable because
-  // the query LEFT JOINs them. Narrowing with real checks (rather than `as`) keeps the type
-  // honest if a future column is added to the summary without a matching NOT NULL in the schema.
-  if (preparation.status === null || preparation.attempt_count === null) {
-    throw new Error(`run ${trunk.run_id} has an incomplete preparations row`)
-  }
-  if (
-    execution.observed_at === null ||
-    preparation.updated_at === null ||
-    publication.updated_at === null
-  ) {
-    // These three are NOT NULL in the schema, so a null here can only mean the LEFT JOIN was
-    // somehow satisfied by a partial row. Checking rather than asserting keeps the type honest.
-    throw new Error(`run ${trunk.run_id} has an incomplete axis row`)
-  }
-  // The run-level failure code names the axis that actually stopped the run, in the order the
-  // phases run:
-  // - a `failed` publication is the terminal failure: report its own code, even when that code
-  //   is null. Falling back to the execution/preparation code here would attribute another
-  //   axis' reason to the publication that genuinely failed.
-  // - otherwise execution is next, then preparation. A skipped execution still reports the
-  //   preparation failure that caused it, and a publication skipped because execution failed
-  //   reports that execution reason, because publication itself never failed.
-  const publicationFailure = publication.status === 'failed'
-  return {
-    run_id: trunk.run_id,
-    workflow: trunk.workflow,
-    source_platform: trunk.source_platform,
-    connector_id: trunk.connector_id,
-    publish_context: trunk.publish_context,
-    ...(execution.input === null ? {} : { execution_input: execution.input }),
-    preparation: {
-      status: preparation.status,
-      attempt_count: preparation.attempt_count,
-      started_at: isoOrNull(preparation.started_at),
-      finished_at: isoOrNull(preparation.finished_at),
-      updated_at: iso(preparation.updated_at),
-      failure_code: preparation.failure_code,
-      // Non-null means coordination stopped retrying this run: the persisted story contradicts
-      // an expiry conclusion, so it needs an operator decision. Exposed here so the condition is
-      // visible on the read surface instead of only in a log line.
-      disconnect_reason: preparation.disconnect_reason
-    },
-    // Each axis reports the same three instants under the same names: when it started, when it
-    // finished, and (for execution) when it was last observed.
-    execution: {
-      status: execution.status,
-      started_at: isoOrNull(execution.started_at),
-      finished_at: isoOrNull(execution.finished_at),
-      updated_at: iso(execution.observed_at)
-    },
-    publication: {
-      status: publication.status,
-      started_at: isoOrNull(publication.started_at),
-      finished_at: isoOrNull(publication.finished_at),
-      updated_at: iso(publication.updated_at)
-    },
-    created_at: iso(trunk.created_at),
-    failure_code: publicationFailure
-      ? publication.failure_code
-      : (execution.failure_code ?? preparation.failure_code),
-    failure_message: publicationFailure
-      ? publication.failure_message
-      : (execution.failure_message ?? preparation.failure_message),
-    artifact_storage: normalizeArtifactStorage(
-      execution.artifact_storage,
-      `run ${trunk.run_id}`
-    ),
-    notices: row.notices,
-    ...(trunk.ingress_kind ? { ingress_kind: trunk.ingress_kind } : {}),
-    ...(trunk.ingress_key ? { ingress_key: trunk.ingress_key } : {})
-  }
-}
-
-/** One run the system stopped working on by itself, and the axis it is parked on.
- *
- * Distinct from `PreparationExpiryBlocked`, which is what one expiry pass could not conclude:
- * that type describes a failure inside coordination, while this one describes a run an operator
- * can act on, which may be parked on any of the three axes. */
+/** One run the system stopped working on by itself, and the axis it is parked on. */
 export interface ParkedRun {
   run_id: string
   axis: 'preparation' | 'execution' | 'publication'
@@ -364,6 +136,7 @@ export class ReviewRunStore {
   private readonly preparations: PreparationStore
   private readonly publications: PublicationStore
   private readonly executions: ExecutionStore
+  private readonly operatorDecisions: OperatorDecisionStore
   private readonly onDroppedRunRow: (dropped: DroppedRunRow) => void
   private initialized = false
 
@@ -421,6 +194,12 @@ export class ReviewRunStore {
       this.pool,
       this.connectorId,
       this.claimTimeoutMs
+    )
+    this.operatorDecisions = new OperatorDecisionStore(
+      this.pool,
+      this.connectorId,
+      this.publications,
+      this.executions
     )
   }
 
@@ -1043,508 +822,42 @@ export class ReviewRunStore {
     return result.rows
   }
 
-  /** Abandon a blocked run at an operator's explicit request.
-   *
-   * This is not a repair and does not try to make the run publishable: it concludes the axes
-   * that are still open, so the run stops holding work no coordinator can conclude. The
-   * execution axis is deliberately left exactly as it is - a `succeeded` result and its
-   * `workflow_result` stay on the row - because abandoning says "this result will not be
-   * delivered", not "this result never happened". Nothing is deleted: the run, its events, and
-   * its ingress identity all remain, so a replay of the same webhook still resolves to this run
-   * instead of starting a new one.
-   *
-   * Only a preparation parked by a contradiction (`disconnected`) is eligible. A run parked on
-   * execution or publication is ended with `giveUpDisconnectedRun` instead. That restriction is
-   * what keeps this from becoming a general state-jumping endpoint: it can only finish a
-   * transition coordination already proved impossible.
-   *
-   * `reason` is required and recorded on every event, so an abandonment always names why. */
   async abandonBlockedPreparation(
     runId: string,
     reason: string
   ): Promise<ReviewRunRecord> {
     this.ready()
-    if (reason.trim() === '')
-      throw Object.assign(new Error('An abandonment reason is required.'), {
-        statusCode: 400
-      })
-    return await transaction(this.pool, async (client) => {
-      // Claim the decision: only one caller may abandon a given disconnected row, and its state
-      // doubles as the "still needs a decision" flag. The reason it was parked is read here so
-      // the decision is recorded under its own name: this route only exists for the
-      // contradiction `EXECUTION_ALREADY_ADVANCED`, and every reason the audit log writes must
-      // be one the contract declares for that edge.
-      const blocked = await client.query<{
-        attempt_count: number
-        disconnect_reason: string | null
-      }>(
-        `SELECT attempt_count, disconnect_reason FROM preparations
-         WHERE run_id=$1 AND connector_id=$2
-           AND status='disconnected'
-         FOR UPDATE`,
-        [runId, this.connectorId]
-      )
-      if (blocked.rowCount !== 1)
-        throw Object.assign(
-          new Error(`Review run ${runId} is not a disconnected preparation.`),
-          { statusCode: 409 }
-        )
-
-      // The stored reason is the one the contract declares for this edge, and the CHECK that
-      // pairs `disconnected` with a reason guarantees it is present for a selected row.
-      const abandonCode =
-        blocked.rows[0]?.disconnect_reason ?? 'EXECUTION_ALREADY_ADVANCED'
-      const failed = await client.query(
-        `UPDATE preparations
-         SET status='failed', claim_token=NULL, claimed_at=NULL,
-             failure_code=$4,
-             failure_message=$3,
-             last_failure_code=$4,
-             last_failure_message=$3,
-             finished_at=clock_timestamp(),
-             disconnect_reason=NULL,
-             updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
-        [runId, this.connectorId, reason, abandonCode]
-      )
-      if (failed.rowCount !== 1)
-        // The row was selected `FOR UPDATE` above, so nothing else can change it while this
-        // transaction runs: reaching here means the stored row disagrees with itself, never a
-        // lost race. That is a caller-visible fact about the run rather than a server fault, so
-        // it answers 409 like every other "this run is not in a state this operation may act on".
-        throw Object.assign(
-          new Error(
-            `Preparation ${runId} is disconnected but its state changed; nothing was written.`
-          ),
-          { statusCode: 409 }
-        )
-      const preparationEventId = await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'preparation',
-        fromStatus: 'disconnected',
-        toStatus: 'failed',
-        reasonCode: abandonCode
-      })
-      await queueRunNotice(client, {
-        runId,
-        connectorId: this.connectorId,
-        sourceEventId: preparationEventId,
-        kind: 'failure',
-        axis: 'preparation',
-        reasonCode: abandonCode
-      })
-      // The execution axis must not outlive the run's decision. A blocked run is blocked
-      // precisely because execution already advanced, so it may still be `queued` or `running`
-      // and would otherwise be driven to `succeeded` later with nowhere for that result to go -
-      // an "execution succeeded, publication skipped" pair that reads as a normal outcome while
-      // the notice says the run failed. An execution that already succeeded is left alone: that
-      // is a real result and the evidence behind the blocked decision. One that is still moving
-      // cannot deliver anything now, so it ends here; `skipped` is wrong for it because it did
-      // run.
-      const stoppedExecution = await client.query<{ from_status: string }>(
-        `WITH previous AS (
-           SELECT run_id, status FROM executions
-           WHERE run_id=$1 AND connector_id=$2
-             AND status IN ('queued','running','uncertain')
-           FOR UPDATE
-         )
-         UPDATE executions e
-         SET status='failed', claim_token=NULL, claimed_at=NULL,
-             failure_code=$4,
-             failure_message=$3,
-             finished_at=COALESCE(e.finished_at, clock_timestamp()),
-             observed_at=clock_timestamp(), updated_at=clock_timestamp()
-         FROM previous
-         WHERE e.run_id=previous.run_id
-         RETURNING previous.status AS from_status`,
-        [runId, this.connectorId, reason, abandonCode]
-      )
-      if (stoppedExecution.rows[0] !== undefined) {
-        await appendEvent(client, {
-          runId,
-          connectorId: this.connectorId,
-          axis: 'execution',
-          fromStatus: stoppedExecution.rows[0].from_status,
-          toStatus: 'failed',
-          reasonCode: abandonCode
-        })
-      }
-      // Any publication still waiting is not applicable now that the run will not deliver a
-      // result. The helper reports what it actually moved, so the event names the real origin.
-      const publicationFrom = await abandonInFlightPublication(
-        client,
-        this.connectorId,
-        runId
-      )
-      if (publicationFrom !== null) {
-        await appendEvent(client, {
-          runId,
-          connectorId: this.connectorId,
-          axis: 'publication',
-          fromStatus: publicationFrom,
-          toStatus: 'skipped',
-          reasonCode: 'PUBLICATION_ABANDONED'
-        })
-      }
-      const record = await this.getWith(client, runId)
-      if (record === null)
-        throw new Error(`Review run ${runId} disappeared during abandonment.`)
-      return record
-    })
+    return await this.operatorDecisions.abandonBlockedPreparation(runId, reason)
   }
-  /** Resume whichever axis can actually be resumed; see the per-axis methods.
-   *
-   * Not every disconnected run is resumable, and the difference is not cosmetic:
-   *
-   * - A disconnected execution replays its already-persisted input under the same run_id, so
-   *   resuming it is safe and is the only automatic way to learn the outcome.
-   * - A disconnected publication re-claims the run; its steps keep their state, so no side
-   *   effect is repeated.
-   * - A disconnected preparation is resumable only while execution is still `pending`. That is
-   *   the claim condition `claimNext` enforces: if execution moved on, a resumed row would sit in
-   *   `uncertain` forever with no preparer able to take it - worse than staying parked, because a
-   *   parked row is at least visible in the operator queue. Resuming there would also invite
-   *   rebuilding an input whose previous copy may already have been consumed by the Execution.
-   *
-   * A run with no disconnected axis, or one parked where resuming cannot help, answers 409.
-   */
+
   async resumeDisconnectedRun(runId: string): Promise<ReviewRunRecord> {
     this.ready()
-    const run = await this.getRun(runId)
-    if (run === null)
-      throw Object.assign(new Error(`Review run does not exist: ${runId}`), {
-        statusCode: 404
-      })
-    // Preparation is checked first because it can park only by contradicting execution, so a
-    // disconnected preparation tells us something about the other axes too: if execution also
-    // moved on, resuming execution would leave the preparation stalled with no preparer able to
-    // take it. Checking execution first would report such a run as resumable.
-    if (run.preparation.status === 'disconnected') {
-      if (run.execution.status === 'pending')
-        return await this.resumeDisconnectedPreparation(runId)
-      throw Object.assign(
-        new Error(
-          `Review run ${runId} cannot be resumed: its preparation is disconnected and execution already moved past pending.`
-        ),
-        { statusCode: 409 }
-      )
-    }
-    if (run.execution.status === 'disconnected')
-      return await this.resumeDisconnectedExecution(runId)
-    if (run.publication.status === 'disconnected')
-      return await this.resumeDisconnectedPublication(runId)
-    throw Object.assign(
-      new Error(`Review run ${runId} has no resumable disconnected axis.`),
-      { statusCode: 409 }
-    )
+    return await this.operatorDecisions.resumeDisconnectedRun(runId)
   }
 
-  /** Hand a parked publication back to automatic recovery.
-   *
-   * The counterpart of `resumeDisconnectedPreparation` for the other axis that can park. Like
-   * it, this returns the budgets the park consumed: the parked steps become attemptable again,
-   * so the side effects they name are issued once more rather than only looked for. Steps that
-   * already succeeded keep their status, so the run resumes where it stopped. */
   async resumeDisconnectedPublication(runId: string): Promise<ReviewRunRecord> {
     this.ready()
-    return await transaction(this.pool, async (client) => {
-      if (!(await this.publications.resumeDisconnectedOn(client, runId)))
-        throw Object.assign(
-          new Error(`Review run ${runId} is not a disconnected publication.`),
-          { statusCode: 409 }
-        )
-      const record = await this.getWith(client, runId)
-      if (record === null)
-        throw new Error(`Review run ${runId} disappeared during resumption.`)
-      return record
-    })
+    return await this.operatorDecisions.resumeDisconnectedPublication(runId)
   }
-  /** Stop waiting for a disconnected run; see the three single-axis decisions below.
-   *
-   * The distinction from `abandonBlockedPreparation` is deliberate and is the reason this exists
-   * as a separate operation: that one resolves a *contradiction* (preparation unfinished while
-   * execution finished), while this one accepts that an outcome is *unknowable* and stops
-   * waiting for it. Neither may claim the task never ran. */
+
   async giveUpDisconnectedRun(
     runId: string,
     reason: string
   ): Promise<ReviewRunRecord> {
     this.ready()
-    if (reason.trim() === '')
-      throw Object.assign(new Error('A reason is required.'), {
-        statusCode: 400
-      })
-    const run = await this.getRun(runId)
-    if (run === null)
-      throw Object.assign(new Error(`Review run does not exist: ${runId}`), {
-        statusCode: 404
-      })
-    if (run.preparation.status === 'disconnected')
-      return await this.giveUpDisconnectedPreparation(runId, reason)
-    if (run.execution.status === 'disconnected')
-      return await this.giveUpDisconnectedExecution(runId, reason)
-    if (run.publication.status === 'disconnected')
-      return await this.giveUpDisconnectedPublication(runId, reason)
-    throw Object.assign(
-      new Error(`Review run ${runId} has no disconnected axis to give up.`),
-      { statusCode: 409 }
-    )
+    return await this.operatorDecisions.giveUpDisconnectedRun(runId, reason)
   }
 
-  /** Conclude a disconnected preparation as a failure at the operator's request.
-   *
-   * The preparation ends `failed` with `PREPARATION_GIVEN_UP_BY_OPERATOR`, which says what
-   * actually happened: the operator declined to keep waiting, not that the input was bad. */
-  private async giveUpDisconnectedPreparation(
-    runId: string,
-    reason: string
-  ): Promise<ReviewRunRecord> {
-    return await transaction(this.pool, async (client) => {
-      const gaveUp = await client.query(
-        `UPDATE preparations
-         SET status='failed', claim_token=NULL, claimed_at=NULL,
-             failure_code='PREPARATION_GIVEN_UP_BY_OPERATOR',
-             failure_message=$3,
-             last_failure_code='PREPARATION_GIVEN_UP_BY_OPERATOR',
-             last_failure_message=$3,
-             finished_at=clock_timestamp(), disconnect_reason=NULL,
-             updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
-        [runId, this.connectorId, reason]
-      )
-      if (gaveUp.rowCount !== 1)
-        throw Object.assign(
-          new Error(`Review run ${runId} is not a disconnected preparation.`),
-          { statusCode: 409 }
-        )
-      const eventId = await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'preparation',
-        fromStatus: 'disconnected',
-        toStatus: 'failed',
-        reasonCode: 'PREPARATION_GIVEN_UP_BY_OPERATOR'
-      })
-      await queueRunNotice(client, {
-        runId,
-        connectorId: this.connectorId,
-        sourceEventId: eventId,
-        kind: 'failure',
-        axis: 'preparation',
-        reasonCode: 'PREPARATION_GIVEN_UP_BY_OPERATOR'
-      })
-      const publicationFrom = await abandonInFlightPublication(
-        client,
-        this.connectorId,
-        runId
-      )
-      if (publicationFrom !== null) {
-        await appendEvent(client, {
-          runId,
-          connectorId: this.connectorId,
-          axis: 'publication',
-          fromStatus: publicationFrom,
-          toStatus: 'skipped',
-          reasonCode: 'PUBLICATION_ABANDONED'
-        })
-      }
-      const record = await this.getWith(client, runId)
-      if (record === null)
-        throw new Error(`Review run ${runId} disappeared during the decision.`)
-      return record
-    })
-  }
-
-  /** Stop waiting for a disconnected execution at the operator's request.
-   *
-   * The task ends `failed` with `SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR`. That code is chosen
-   * over anything resembling "never ran" on purpose: the Execution may have accepted this task and
-   * may be running it right now. What ends is this run's willingness to find out. Publication is
-   * skipped because no result will be delivered, not because none exists. */
-  private async giveUpDisconnectedExecution(
-    runId: string,
-    reason: string
-  ): Promise<ReviewRunRecord> {
-    return await transaction(this.pool, async (client) => {
-      const gaveUp = await client.query(
-        `UPDATE executions
-         SET status='failed', claim_token=NULL, claimed_at=NULL,
-             failure_code='SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR',
-             failure_message=$3,
-             finished_at=COALESCE(finished_at, clock_timestamp()),
-             observed_at=clock_timestamp(), updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
-        [runId, this.connectorId, reason]
-      )
-      if (gaveUp.rowCount !== 1)
-        throw Object.assign(
-          new Error(`Review run ${runId} is not a disconnected execution.`),
-          { statusCode: 409 }
-        )
-      const eventId = await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'execution',
-        fromStatus: 'disconnected',
-        toStatus: 'failed',
-        reasonCode: 'SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR'
-      })
-      await queueRunNotice(client, {
-        runId,
-        connectorId: this.connectorId,
-        sourceEventId: eventId,
-        kind: 'failure',
-        axis: 'execution',
-        reasonCode: 'SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR'
-      })
-      const publicationFrom = await abandonInFlightPublication(
-        client,
-        this.connectorId,
-        runId
-      )
-      if (publicationFrom !== null) {
-        await appendEvent(client, {
-          runId,
-          connectorId: this.connectorId,
-          axis: 'publication',
-          fromStatus: publicationFrom,
-          toStatus: 'skipped',
-          reasonCode: 'PUBLICATION_ABANDONED'
-        })
-      }
-      const record = await this.getWith(client, runId)
-      if (record === null)
-        throw new Error(`Review run ${runId} disappeared during the decision.`)
-      return record
-    })
-  }
-
-  /** Stop publishing at the operator's request, after a step's outcome could not be established.
-   *
-   * The axis ends `failed`, deliberately not `skipped`: `skipped` reads as "nothing was
-   * published", and a step in this state may already have taken effect remotely. Failing says
-   * the honest thing — publishing was stopped, and what is actually on the remote system is
-   * unknown — while still releasing the run so it stops waiting. The steps keep their
-   * `disconnected` status as the record of which one could not be concluded. */
-  private async giveUpDisconnectedPublication(
-    runId: string,
-    reason: string
-  ): Promise<ReviewRunRecord> {
-    return await transaction(this.pool, async (client) => {
-      const gaveUp = await client.query(
-        `UPDATE publications
-         SET status='failed', claim_token=NULL, claimed_at=NULL,
-             failure_code='PUBLICATION_ABANDONED_BY_OPERATOR',
-             failure_message=$3,
-             finished_at=COALESCE(finished_at, clock_timestamp()),
-             updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
-        [runId, this.connectorId, reason]
-      )
-      if (gaveUp.rowCount !== 1)
-        throw Object.assign(
-          new Error(`Review run ${runId} is not a disconnected publication.`),
-          { statusCode: 409 }
-        )
-      const eventId = await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'publication',
-        fromStatus: 'disconnected',
-        toStatus: 'failed',
-        reasonCode: 'PUBLICATION_ABANDONED_BY_OPERATOR'
-      })
-      await queueRunNotice(client, {
-        runId,
-        connectorId: this.connectorId,
-        sourceEventId: eventId,
-        kind: 'failure',
-        axis: 'publication',
-        reasonCode: 'PUBLICATION_ABANDONED_BY_OPERATOR'
-      })
-      const record = await this.getWith(client, runId)
-      if (record === null)
-        throw new Error(`Review run ${runId} disappeared during the decision.`)
-      return record
-    })
-  }
-
-  /** Hand a disconnected execution back to automatic replay; see the execution store.
-   *
-   * The last axis that can park. Its only alternative is abandoning the run, so without this a
-   * run whose replays never resolved stays stuck with no owner and no writer. */
   async resumeDisconnectedExecution(runId: string): Promise<ReviewRunRecord> {
     this.ready()
-    return await transaction(this.pool, async (client) => {
-      if (
-        !(await this.executions.resumeDisconnectedSubmissionRecoveryOn(
-          client,
-          runId
-        ))
-      )
-        throw Object.assign(
-          new Error(`Review run ${runId} is not a disconnected execution.`),
-          { statusCode: 409 }
-        )
-      const record = await this.getWith(client, runId)
-      if (record === null)
-        throw new Error(`Review run ${runId} disappeared during resumption.`)
-      return record
-    })
-  }
-  /** Hand a disconnected preparation back to automatic recovery.
-   *
-   * The only legitimate way out of `disconnected` other than abandoning. It does not repair
-   * anything and does not assert an outcome: it clears the reason and puts the row back in
-   * `uncertain`, because after an operator has intervened nobody yet knows whether the prepared
-   * input reached Review Runs. Recovery then re-establishes that the same way it always does.
-   *
-   * `attempt_count` is reset to zero. Disconnection is reached when the attempt budget (`MAX_PREPARATION_ATTEMPTS`)
-   * is spent, so a row resumed with its count intact would be concluded as failed by the very
-   * next expired lease, and the operator's decision would never get an attempt to act on. The
-   * reset is what makes the resume a real hand-back: it grants a fresh budget, not a fresh fact.
-   * The grant is bounded on purpose — each resumed run gets one more budget, and the operator
-   * decision that the logs record is the only source of extra attempts.
-   *
-   * A run that is not disconnected answers 409, the same "this run is not in a state this
-   * operation may act on" rule the abandonment uses. */
-  async resumeDisconnectedPreparation(runId: string): Promise<ReviewRunRecord> {
-    this.ready()
-    return await transaction(this.pool, async (client) => {
-      const resumed = await client.query(
-        `UPDATE preparations
-         SET status='uncertain', disconnect_reason=NULL, attempt_count=0,
-             available_at=clock_timestamp(), updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
-        [runId, this.connectorId]
-      )
-      if (resumed.rowCount !== 1)
-        throw Object.assign(
-          new Error(`Review run ${runId} is not a disconnected preparation.`),
-          { statusCode: 409 }
-        )
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'preparation',
-        fromStatus: 'disconnected',
-        toStatus: 'uncertain',
-        reasonCode: 'PREPARATION_RESUMED_BY_OPERATOR'
-      })
-      const record = await this.getWith(client, runId)
-      if (record === null)
-        throw new Error(`Review run ${runId} disappeared during resumption.`)
-      return record
-    })
+    return await this.operatorDecisions.resumeDisconnectedExecution(runId)
   }
 
-  /** Recoverable runs, as a projection rather than a bare array: a row the contract cannot
-   * represent is returned in `dropped` instead of aborting the read.
-   *
-   * An uncertain submission is recoverable when it has no live claim, or when its claim has
-   * expired, so a stalled recovery becomes claimable again. The lease is `claimed_at`; the
-   * observation heartbeat writes `observed_at` only, so it can never extend this lease. */
+  async resumeDisconnectedPreparation(runId: string): Promise<ReviewRunRecord> {
+    this.ready()
+    return await this.operatorDecisions.resumeDisconnectedPreparation(runId)
+  }
+
   async listSubmissionRecoveries(): Promise<RunRowsProjection> {
     this.ready()
     const result = await this.pool.query<ReviewRunRow>(

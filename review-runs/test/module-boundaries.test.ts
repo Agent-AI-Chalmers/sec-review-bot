@@ -27,9 +27,9 @@ const AXIS_STORES = [
  */
 function importedModules(file: string): string[] {
   const source = readFileSync(path.join(SRC, file), 'utf8')
-  return [...source.matchAll(/^import[\s\S]*?from '(\.[^']+)'/gm)].map(
-    (match) => path.basename(match[1] ?? '').replace(/\.js$/, '.ts')
-  )
+  return [
+    ...source.matchAll(/^(?:import|export)[\s\S]*?from '(\.[^']+)'/gm)
+  ].map((match) => path.basename(match[1] ?? '').replace(/\.js$/, '.ts'))
 }
 
 test('single-axis stores do not depend on each other', () => {
@@ -46,6 +46,45 @@ test('single-axis stores do not depend on each other', () => {
     assert.ok(
       !dependencies.includes('review-store.ts'),
       `${store} imports review-store.ts, which constructs it`
+    )
+  }
+})
+
+test('the process entry, HTTP surface, and runtime composition stay acyclic', () => {
+  const entry = importedModules('server.ts')
+  const surface = importedModules('server-surface.ts')
+  const runtime = importedModules('server-runtime.ts')
+
+  assert.ok(entry.includes('server-surface.ts'))
+  assert.ok(entry.includes('server-runtime.ts'))
+  assert.ok(runtime.includes('server-surface.ts'))
+  assert.ok(!runtime.includes('server.ts'))
+  assert.ok(!surface.includes('server.ts'))
+  assert.ok(!surface.includes('server-runtime.ts'))
+
+  for (const handler of [
+    'read-route-handlers.ts',
+    'coordination-route-handlers.ts',
+    'admin-route-handlers.ts'
+  ]) {
+    const dependencies = importedModules(handler)
+    assert.ok(!dependencies.includes('server.ts'))
+    assert.ok(!dependencies.includes('server-surface.ts'))
+    assert.ok(!dependencies.includes('server-runtime.ts'))
+  }
+})
+
+test('operator decisions compose axis stores without creating a dependency cycle', () => {
+  const dependencies = importedModules('operator-decision-store.ts')
+  assert.ok(dependencies.includes('preparation-store.ts') === false)
+  assert.ok(dependencies.includes('publication-store.ts'))
+  assert.ok(dependencies.includes('execution-store.ts'))
+  assert.ok(!dependencies.includes('review-store.ts'))
+
+  for (const store of AXIS_STORES) {
+    assert.ok(
+      !importedModules(store).includes('operator-decision-store.ts'),
+      `${store} imports the cross-axis operator decision store`
     )
   }
 })
