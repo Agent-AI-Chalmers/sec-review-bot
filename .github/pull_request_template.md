@@ -5,13 +5,13 @@
 ## Compatibility
 
 <!--
-Choose the applicable classification and explain when needed:
-- No compatibility impact
-- Backward-compatible behavior change
-- Breaking change
-
-For a breaking change, state what breaks and how callers or operators should migrate.
+Select exactly one classification. For a breaking change, state what breaks and how callers or
+operators should migrate.
 -->
+
+- [ ] No compatibility impact
+- [ ] Backward-compatible behavior change
+- [ ] Breaking change
 
 ## Validation
 

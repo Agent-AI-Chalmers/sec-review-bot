@@ -21,77 +21,16 @@ jobs:
     name: PR Description
     runs-on: ubuntu-latest
     steps:
+      - name: Check out repository
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v7
+
       - name: Validate pull request description
         if: github.event_name == 'pull_request'
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-        run: |
-          node <<'NODE'
-          const body = process.env.PR_BODY ?? ''
-          const author = process.env.PR_AUTHOR ?? ''
-
-          // Dependabot owns its generated release notes and command block. It
-          // cannot render the repository's human-authored PR template.
-          if (author === 'dependabot[bot]') {
-            if (!body.trim()) {
-              console.error('Dependabot pull request description is empty.')
-              process.exit(1)
-            }
-            process.exit(0)
-          }
-
-          const requiredSections = ['Summary', 'Compatibility', 'Validation']
-          const sections = new Map()
-          let currentSection = null
-
-          for (const line of body.split(/\r?\n/)) {
-            const heading = line.match(/^##\s+(.+?)\s*$/)
-            if (heading) {
-              currentSection = heading[1]
-              if (requiredSections.includes(currentSection)) {
-                if (sections.has(currentSection)) {
-                  console.error(`Duplicate required section: ## ${currentSection}`)
-                  process.exit(1)
-                }
-                sections.set(currentSection, [])
-              }
-              continue
-            }
-            if (sections.has(currentSection)) {
-              sections.get(currentSection).push(line)
-            }
-          }
-
-          const visibleText = (lines) => lines.join('\n').replace(/<!--[\s\S]*?-->/g, '').trim()
-          for (const section of requiredSections) {
-            if (!sections.has(section)) {
-              console.error(`Missing required section: ## ${section}`)
-              process.exit(1)
-            }
-            if (!visibleText(sections.get(section))) {
-              console.error(`Required section is empty: ## ${section}`)
-              process.exit(1)
-            }
-          }
-
-          const compatibility = visibleText(sections.get('Compatibility'))
-          const classificationPattern = /^\s*(?:[-*]\s*)?(No compatibility impact|Backward-compatible behavior change|Breaking change)\s*\.?\s*$/gm
-          const classifications = [...compatibility.matchAll(classificationPattern)]
-          if (classifications.length !== 1) {
-            console.error('## Compatibility must contain exactly one supported classification.')
-            console.error('Choose: No compatibility impact, Backward-compatible behavior change, or Breaking change.')
-            process.exit(1)
-          }
-
-          if (classifications[0][1] === 'Breaking change') {
-            const explanation = compatibility.replace(classificationPattern, '').trim()
-            if (!explanation) {
-              console.error('A breaking change must explain what breaks and how to migrate.')
-              process.exit(1)
-            }
-          }
-          NODE
+        run: python3 .github/ci/validate-pr-description.py
 
       - name: Preserve the required check in the merge queue
         if: github.event_name == 'merge_group'
