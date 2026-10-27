@@ -4,9 +4,9 @@
 //
 // Selecting publishable work is deliberately NOT here. It requires the execution axis
 // (`executions.status='succeeded'` and a non-null workflow_result) and returns a full
-// cross-axis record, so it lives in `ReviewRunStore` as cross-axis orchestration rather than as
-// a single-axis write. Do not reintroduce a publication-only selection here: a version that
-// duplicated the SQL without a caller is what this comment replaces.
+// cross-axis record, so it lives in `PublicationClaimStore` behind the `ReviewRunStore` facade.
+// Do not reintroduce a publication-only selection here: a version that duplicated the SQL
+// without a caller is what this comment replaces.
 //
 // Resuming a disconnected publication is still a single-axis write: it returns the row to
 // `pending`, where the normal cross-axis selector can claim it after checking execution.

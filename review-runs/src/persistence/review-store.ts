@@ -32,7 +32,6 @@ import { transaction } from '../database/transaction.js'
 import {
   normalizeArtifactStorage,
   type CreateReviewRunArgs,
-  type PublicationStatus,
   type PublicationStepRecord,
   type PublicationWork,
   type ReviewRunAdmission,
@@ -47,6 +46,7 @@ import {
   type PreparationWork
 } from './preparation-store.js'
 import { PublicationStore } from './publication-store.js'
+import { PublicationClaimStore } from './publication-claim-store.js'
 import { abandonInFlightPublication } from './publication-abandon.js'
 import { appendEvent } from './review-run-events.js'
 import { OperatorDecisionStore } from './operator-decision-store.js'
@@ -81,7 +81,6 @@ type JsonObject = Record<string, unknown>
 export type PublishContext = JsonObject
 
 const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
-const CLAIM_WAIT_INTERVAL_MS = 250
 
 export type {
   PreparationExpiryBlocked,
@@ -102,6 +101,7 @@ export class ReviewRunStore {
   private readonly claimTimeoutMs: number
   private readonly preparations: PreparationStore
   private readonly publications: PublicationStore
+  private readonly publicationClaims: PublicationClaimStore
   private readonly executions: ExecutionStore
   private readonly operatorDecisions: OperatorDecisionStore
   private readonly queries: ReviewRunQueries
@@ -153,6 +153,11 @@ export class ReviewRunStore {
       this.claimTimeoutMs
     )
     this.publications = new PublicationStore(
+      this.pool,
+      this.connectorId,
+      this.claimTimeoutMs
+    )
+    this.publicationClaims = new PublicationClaimStore(
       this.pool,
       this.connectorId,
       this.claimTimeoutMs
@@ -666,216 +671,11 @@ export class ReviewRunStore {
       return true
     })
   }
-  /** Claim one known run for publication.
-   *
-   * Inlined here rather than forwarded to `PublicationStore`: the claim condition reads the
-   * execution axis (`executions.status='succeeded'` and a non-null workflow_result), so it is
-   * cross-axis orchestration, not a single-axis publication write.
-   *
-   * A claimable run must have a JSON result that is not the JSON value `null`: `IS NOT NULL`
-   * accepts a stored JSON `null`, but node-pg reads it back as JS `null`, which would poison
-   * the claim path. Excluding it keeps a null-result run from blocking publication for every
-   * other run behind it.
-   *
-   * `started_at` is set on the first claim only: a retryable failure returns the row to
-   * pending and it is claimed again, and that must not move when the publication phase began. */
   async claimPublication(runId: string): Promise<string | null> {
-    const token = crypto.randomUUID()
-    return await transaction(this.pool, async (client) => {
-      // `uncertain` is claimable on an expired lease for the same reason `publishing` is. The
-      // axis reports a step's uncertainty while a live publisher reconciles it, but if that
-      // publisher dies nothing else moves the row: claiming the axis is the only way in, and the
-      // step-level writes require the axis claim. Excluding it would park the run for automated
-      // work, reachable only through an operator resume. A live lease is never stolen either way.
-      //
-      // Capture the pre-update state so the audit event names where the claim came from: a fresh
-      // `pending` claim versus reclaiming an expired lease (`publishing`, or `uncertain` whose
-      // reconciling owner died).
-      const result = await client.query<{
-        claim_token: string
-        from_status: PublicationStatus
-      }>(
-        `
-        WITH previous AS (
-          SELECT run_id, status FROM publications
-          WHERE run_id=$1 AND connector_id=$3
-          FOR UPDATE
-        )
-        UPDATE publications p
-        SET status='publishing', claim_token=$2, claimed_at=clock_timestamp(),
-            started_at=COALESCE(p.started_at, clock_timestamp()),
-            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-        FROM previous, executions e
-        WHERE p.run_id=previous.run_id AND previous.run_id=$1 AND p.connector_id=$3
-          AND e.run_id=p.run_id AND e.connector_id=p.connector_id
-          AND e.status='succeeded' AND jsonb_typeof(e.workflow_result) <> 'null'
-          AND NOT EXISTS (SELECT 1 FROM publication_steps s
-            WHERE s.run_id=p.run_id AND s.connector_id=p.connector_id
-              AND s.status='disconnected')
-          AND (
-            previous.status='pending'
-            OR (previous.status IN ('publishing','uncertain')
-              AND p.claimed_at <= clock_timestamp()-($4*interval '1 millisecond'))
-          )
-        RETURNING p.claim_token, previous.status AS from_status
-      `,
-        [runId, token, this.connectorId, this.claimTimeoutMs]
-      )
-      const claimed = result.rows[0]
-      if (claimed === undefined) return null
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'publication',
-        fromStatus: claimed.from_status,
-        toStatus: 'publishing',
-        reasonCode:
-          claimed.from_status === 'publishing' ||
-          claimed.from_status === 'uncertain'
-            ? 'PUBLICATION_LEASE_EXPIRED'
-            : null
-      })
-      return claimed.claim_token
-    })
+    return await this.publicationClaims.claim(runId)
   }
-  /**
-   * Claim the next publishable run, optionally holding the request until one appears.
-   *
-   * Like `claimPublication`, this stays here because selecting publishable work joins the
-   * execution axis and the result is a full cross-axis record.
-   *
-   * The wait lives here because the state it looks for is in this database: a re-check
-   * costs one indexed query per tick for the single caller that waits. Waiting on a
-   * remote service is a different trade, since there each re-check is a round trip per
-   * watched item — which is why the Execution status query deliberately offers no such
-   * option.
-   */
   async claimNextPublication(waitMs = 0): Promise<PublicationWork | null> {
-    // The contract declares `wait_ms` a non-negative integer, so the handler passes a value the
-    // schema already bounded below. Clamp it here anyway: the cap keeps one request from holding
-    // a connection longer than intended, and a store method should not assume its caller
-    // validated on its behalf.
-    const boundedWaitMs =
-      Number.isFinite(waitMs) && waitMs > 0 ? Math.min(waitMs, 30_000) : 0
-    const deadline = Date.now() + boundedWaitMs
-    for (;;) {
-      const work = await this.claimNextPublicationOnce()
-      if (work !== null || Date.now() >= deadline) return work
-      await new Promise((resolve) =>
-        setTimeout(resolve, CLAIM_WAIT_INTERVAL_MS)
-      )
-    }
-  }
-
-  /** Claim the oldest publishable run for this connector.
-   *
-   * The SELECT applies the same JSON-`null` guard as `claimPublication`: a stored JSON `null`
-   * result must not be selected as claimable work, or the claim would throw and roll back on the
-   * same row on every poll. Its status predicate is the same one too: an expired lease of a
-   * `publishing` or `uncertain` row is claimable, and a live one is never taken.
-   *
-   * `started_at` is written with `COALESCE` so only the first claim marks when the publication
-   * phase began; a retryable failure returns the row to pending and is claimed again. */
-  private async claimNextPublicationOnce(): Promise<PublicationWork | null> {
-    return await transaction(this.pool, async (client) => {
-      const candidate = await client.query<{
-        run_id: string
-        status: PublicationStatus
-      }>(
-        `
-        SELECT p.run_id, p.status
-        FROM publications p
-        JOIN executions e ON e.run_id=p.run_id AND e.connector_id=p.connector_id
-        WHERE p.connector_id=$1
-          AND e.status='succeeded' AND jsonb_typeof(e.workflow_result) <> 'null'
-          AND NOT EXISTS (SELECT 1 FROM publication_steps s
-            WHERE s.run_id=p.run_id AND s.connector_id=p.connector_id
-              AND s.status='disconnected')
-          AND (p.status='pending' OR
-            (p.status IN ('publishing','uncertain')
-              AND p.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')))
-        ORDER BY p.updated_at
-        FOR UPDATE OF p SKIP LOCKED
-        LIMIT 1
-      `,
-        [this.connectorId, this.claimTimeoutMs]
-      )
-      const candidateRow = candidate.rows[0]
-      if (candidateRow === undefined) return null
-      const runId = candidateRow.run_id
-      const token = crypto.randomUUID()
-      // Restate the FULL claimable condition instead of relying on the SELECT's row lock alone.
-      // The lock makes this safe today; repeating the predicate keeps it safe if the two
-      // statements are ever split, and it guarantees the UPDATE can only succeed on a row the
-      // SELECT could legitimately have chosen. That matters for more than the status: a row
-      // selected as an expired `publishing` lease must still be expired here, or a concurrent
-      // claimant that just renewed it would have its healthy lease overwritten. `status=$4`
-      // additionally pins the row the event's `from_status` was captured from, so the audit log
-      // cannot claim an origin the row no longer had.
-      //
-      // The execution join is repeated for the same reason: it pins the exact set of columns the
-      // SELECT filtered on, so if these statements are ever split (or the SELECT's predicate
-      // drifts) the UPDATE alone still refuses a row whose execution is not successful with a
-      // stored result. It is not a substitute for the SELECT's `FOR UPDATE` lock, which is what
-      // serialises concurrent writers today.
-      const claimed = await client.query(
-        `
-        UPDATE publications p SET status='publishing', claim_token=$3,
-          claimed_at=clock_timestamp(),
-          started_at=COALESCE(p.started_at, clock_timestamp()),
-          failure_code=NULL, failure_message=NULL,
-          updated_at=clock_timestamp()
-        FROM executions e
-        WHERE p.run_id=$1 AND p.connector_id=$2 AND p.status=$4
-          AND e.run_id=p.run_id AND e.connector_id=p.connector_id
-          AND e.status='succeeded' AND jsonb_typeof(e.workflow_result) <> 'null'
-          AND NOT EXISTS (SELECT 1 FROM publication_steps s
-            WHERE s.run_id=p.run_id AND s.connector_id=p.connector_id
-              AND s.status='disconnected')
-          AND (
-            $4='pending'
-            OR ($4 IN ('publishing','uncertain')
-              AND p.claimed_at <= clock_timestamp()-($5*interval '1 millisecond'))
-          )
-      `,
-        [
-          runId,
-          this.connectorId,
-          token,
-          candidateRow.status,
-          this.claimTimeoutMs
-        ]
-      )
-      if (claimed.rowCount !== 1)
-        throw new Error(
-          `Publication work changed while being claimed: ${runId}`
-        )
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'publication',
-        fromStatus: candidateRow.status,
-        toStatus: 'publishing',
-        reasonCode:
-          candidateRow.status === 'publishing' ||
-          candidateRow.status === 'uncertain'
-            ? 'PUBLICATION_LEASE_EXPIRED'
-            : null
-      })
-      const result = await client.query<ReviewRunRow>(
-        `${RUN_SELECT}
-        WHERE r.run_id=$1 AND r.connector_id=$2`,
-        [runId, this.connectorId]
-      )
-      const row = result.rows[0]
-      if (row === undefined || row.execution.workflow_result === null)
-        throw new Error(`Claimed publication work is incomplete: ${runId}`)
-      return {
-        ...rowToRecord(row),
-        workflow_result: row.execution.workflow_result,
-        claim_token: token
-      }
-    })
+    return await this.publicationClaims.claimNext(waitMs)
   }
   publicationHeartbeatIntervalMs(): number {
     return this.publications.heartbeatIntervalMs()

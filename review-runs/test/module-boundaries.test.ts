@@ -118,3 +118,11 @@ test('submission transitions compose axes without depending on axis stores', () 
     )
   }
 })
+
+test('publication claims stay separate from single-axis publication writes', () => {
+  const dependencies = importedModules('persistence/publication-claim-store.ts')
+  assert.ok(dependencies.includes('run-record-projection.ts'))
+  assert.ok(dependencies.includes('review-run-events.ts'))
+  assert.ok(!dependencies.includes('publication-store.ts'))
+  assert.ok(!dependencies.includes('review-store.ts'))
+})
