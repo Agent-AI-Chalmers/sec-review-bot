@@ -32,6 +32,10 @@ export type {
   ReviewRunRecord
 }
 
+export type ExecutionStatisticsSummary = NonNullable<
+  ObservedRun['execution_statistics']
+>
+
 export type IngressKind = 'github_webhook' | 'github_actions_dispatch'
 export type ExecutionStatus =
   | 'pending'

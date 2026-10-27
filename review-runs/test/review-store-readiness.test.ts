@@ -19,6 +19,10 @@ test('fan-out reads refuse to run before initialize()', async () => {
   await assert.rejects(() => store.listParkedRuns(), /initialize/)
   await assert.rejects(() => store.listEvents('run-1'), /initialize/)
   await assert.rejects(() => store.runExists('run-1'), /initialize/)
+  await assert.rejects(
+    () => store.getExecutionStatistics(['run-1']),
+    /initialize/
+  )
 })
 
 test('an idle-client pool error is reported instead of crashing the process', async () => {

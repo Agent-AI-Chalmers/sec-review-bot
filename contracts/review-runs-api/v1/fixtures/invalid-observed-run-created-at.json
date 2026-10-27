@@ -45,5 +45,47 @@
       "reason_code": "PREPARATION_RETRY_EXHAUSTED",
       "comment_url": "https://github.com/example/example/issues/1#issuecomment-1"
     }
-  ]
+  ],
+  "execution_statistics": {
+    "reconciliation_status": "settled",
+    "ingestion_status": "settled",
+    "usage_coverage": "complete_for_observed_calls",
+    "root_trace_count": 2,
+    "excluded_non_review_root_count": 1,
+    "observed_call_count": 2,
+    "usage_reported_call_count": 2,
+    "token_usage": {
+      "input_tokens": 22,
+      "output_tokens": 6,
+      "total_tokens": 28,
+      "cache_read_input_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "reasoning_tokens": null
+    },
+    "groups": [
+      {
+        "agent_name": "repository-discovery",
+        "case_id": null,
+        "delivery_id": null,
+        "pass_kind": null,
+        "pass_index": null,
+        "batch_index": null,
+        "chunk_id": null,
+        "provider": "anthropic",
+        "model": "deepseek-v4-pro",
+        "model_call_count": 2,
+        "usage_reported_call_count": 2,
+        "token_usage": {
+          "input_tokens": 22,
+          "output_tokens": 6,
+          "total_tokens": 28,
+          "cache_read_input_tokens": 0,
+          "cache_creation_input_tokens": 0,
+          "reasoning_tokens": null
+        }
+      }
+    ],
+    "settled_at": "2026-10-10T05:03:46.000Z",
+    "updated_at": "2026-10-10T05:03:46.000Z"
+  }
 }

@@ -42,6 +42,7 @@ import {
   type ReviewRunRecord,
   type ExecutionStatus
 } from './shapes.js'
+import type { ExecutionStatisticsSummary } from './shapes.js'
 import {
   PreparationStore,
   type PreparationExpiryResult,
@@ -819,6 +820,76 @@ export class ReviewRunStore {
       this.onDroppedRunRow({ run_id: row.trunk.run_id, error })
       return null
     }
+  }
+
+  /** Read execution statistics for a run page without making one query per run.
+   *
+   * Statistics are connector-fenced through the run trunk. Missing rows are omitted from the
+   * map; the observed read model turns that absence into `execution_statistics: null`, which is
+   * distinct from a settled snapshot containing zero observed calls. */
+  async getExecutionStatistics(
+    runIds: readonly string[]
+  ): Promise<Map<string, ExecutionStatisticsSummary>> {
+    this.ready()
+    if (runIds.length === 0) return new Map()
+    const result = await this.pool.query<{
+      run_id: string
+      statistics: ExecutionStatisticsSummary
+    }>(
+      `SELECT s.run_id,
+        json_build_object(
+          'reconciliation_status', s.status,
+          'ingestion_status', s.ingestion_status,
+          'usage_coverage', s.usage_coverage,
+          'root_trace_count', s.root_trace_count,
+          'excluded_non_review_root_count', s.excluded_non_review_root_count,
+          'observed_call_count', s.observed_call_count,
+          'usage_reported_call_count', s.usage_reported_call_count,
+          'token_usage', json_build_object(
+            'input_tokens', s.input_tokens,
+            'output_tokens', s.output_tokens,
+            'total_tokens', s.total_tokens,
+            'cache_read_input_tokens', s.cache_read_input_tokens,
+            'cache_creation_input_tokens', s.cache_creation_input_tokens,
+            'reasoning_tokens', s.reasoning_tokens
+          ),
+          'groups', COALESCE((
+            SELECT jsonb_agg(jsonb_build_object(
+              'agent_name', g.agent_name,
+              'case_id', g.case_id,
+              'delivery_id', g.delivery_id,
+              'pass_kind', g.pass_kind,
+              'pass_index', g.pass_index,
+              'batch_index', g.batch_index,
+              'chunk_id', g.chunk_id,
+              'provider', g.provider,
+              'model', g.model,
+              'model_call_count', g.model_call_count,
+              'usage_reported_call_count', g.usage_reported_call_count,
+              'token_usage', jsonb_build_object(
+                'input_tokens', g.input_tokens,
+                'output_tokens', g.output_tokens,
+                'total_tokens', g.total_tokens,
+                'cache_read_input_tokens', g.cache_read_input_tokens,
+                'cache_creation_input_tokens', g.cache_creation_input_tokens,
+                'reasoning_tokens', g.reasoning_tokens
+              )
+            ) ORDER BY g.case_id NULLS FIRST,g.delivery_id NULLS FIRST,
+              g.pass_index NULLS FIRST,g.batch_index NULLS FIRST,g.chunk_id NULLS FIRST,
+              g.agent_name,g.provider,g.model NULLS FIRST)
+            FROM execution_statistics_groups g WHERE g.run_id=s.run_id
+          ), '[]'::jsonb),
+          'settled_at', s.settled_at,
+          'updated_at', s.updated_at
+        ) AS statistics
+       FROM execution_statistics s
+       JOIN review_runs r ON r.run_id=s.run_id
+       WHERE r.connector_id=$1 AND s.run_id=ANY($2::text[])`,
+      [this.connectorId, runIds]
+    )
+    return new Map(
+      result.rows.map(({ run_id, statistics }) => [run_id, statistics])
+    )
   }
 
   private async listRunRows(

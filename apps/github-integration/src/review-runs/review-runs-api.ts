@@ -697,6 +697,9 @@ export interface components {
       connector_id: string
       preparation: components['schemas']['PreparationSummary']
       execution: components['schemas']['ExecutionSummary']
+      /** @description Best-effort model-call statistics reconciled from external Langfuse after execution. Null means this deployment has not produced statistics for the run; it does not mean the execution used zero model calls. */
+      execution_statistics:
+        components['schemas']['ExecutionStatisticsSummary'] | null
       publication: components['schemas']['PublicationSummary']
       /** Format: date-time */
       created_at: string
@@ -704,6 +707,58 @@ export interface components {
       artifact_storage: components['schemas']['ArtifactStorage']
       /** @description User-visible notices caused by this run's coordination events, in creation order. */
       notices: components['schemas']['RunNoticeSummary'][]
+    }
+    ExecutionStatisticsSummary: {
+      /** @enum {string} */
+      reconciliation_status:
+        'pending' | 'reconciling' | 'settled' | 'unavailable'
+      /** @enum {string|null} */
+      ingestion_status:
+        'settled' | 'partial_window' | 'no_observations' | 'unavailable' | null
+      /**
+       * @description Coverage for calls returned by Langfuse. It is not proof that every real model call was uploaded.
+       * @enum {string|null}
+       */
+      usage_coverage:
+        'complete_for_observed_calls' | 'partial' | 'unavailable' | null
+      root_trace_count: number
+      excluded_non_review_root_count: number
+      observed_call_count: number
+      usage_reported_call_count: number
+      token_usage: components['schemas']['ExecutionTokenUsage']
+      groups: components['schemas']['ExecutionStatisticsGroup'][]
+      /** Format: date-time */
+      settled_at: string | null
+      /** Format: date-time */
+      updated_at: string
+    }
+    ExecutionStatisticsGroup: {
+      agent_name: string
+      /** @description Repository case identity, or null for run-level work. */
+      case_id: string | null
+      /** @description Repository delivery identity, or null outside delivery execution. */
+      delivery_id: string | null
+      /** @description Runtime pass classification such as initial or feedback when supplied by the agent. */
+      pass_kind: string | null
+      /** @description Zero-based pass number within the review or case when supplied by the agent. */
+      pass_index: number | null
+      /** @description One-based draft batch number for batched triage or delivery planning; null for non-batched work. */
+      batch_index: number | null
+      /** @description Discovery scan chunk identity, or null outside repository discovery. */
+      chunk_id: string | null
+      provider: string
+      model: string | null
+      model_call_count: number
+      usage_reported_call_count: number
+      token_usage: components['schemas']['ExecutionTokenUsage']
+    }
+    ExecutionTokenUsage: {
+      input_tokens: number | null
+      output_tokens: number | null
+      total_tokens: number | null
+      cache_read_input_tokens: number | null
+      cache_creation_input_tokens: number | null
+      reasoning_tokens: number | null
     }
     ExecutionSummary: {
       /**

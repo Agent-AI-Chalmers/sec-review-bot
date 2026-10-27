@@ -218,6 +218,7 @@ test('the redacted read never carries a field the observed schema does not decla
       'connector_id',
       'created_at',
       'execution',
+      'execution_statistics',
       'failure_code',
       'notices',
       'preparation',

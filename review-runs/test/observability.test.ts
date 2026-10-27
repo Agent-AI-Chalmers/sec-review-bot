@@ -58,6 +58,7 @@ test('observed run excludes internal inputs, publish context, and diagnostic mes
       finished_at: '2026-01-01T00:01:00.000Z',
       updated_at: '2026-01-01T00:01:00.000Z'
     },
+    execution_statistics: null,
     publication: {
       status: 'pending',
       started_at: null,

@@ -69,6 +69,7 @@ export interface FixtureRun {
     finished_at: string | null
     updated_at: string
   }
+  execution_statistics: Run['execution_statistics']
   publication: {
     status: PublicationStatus
     started_at: string | null
@@ -164,6 +165,236 @@ const WORKFLOWS: readonly Workflow[] = [
   'issue-review',
   'repository-review'
 ]
+
+type StatisticsGroup = NonNullable<
+  Run['execution_statistics']
+>['groups'][number]
+
+const STATISTICS_GROUPS: Record<Workflow, StatisticsGroup[]> = {
+  'issue-review': [
+    statisticsGroup('issue-analyzer', 1, 3_100, 550, 1_100, {
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('issue-mitigator', 1, 3_400, 650, 1_200, {
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('issue-verifier', 1, 2_500, 400, 800, {
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('issue-mitigator', 1, 3_700, 750, 1_300, {
+      passKind: 'feedback',
+      passIndex: 1
+    }),
+    statisticsGroup('issue-verifier', 1, 2_800, 500, 1_000, {
+      passKind: 'feedback',
+      passIndex: 1
+    })
+  ],
+  'pull-request-review': [
+    statisticsGroup('pull-request-analyzer', 1, 3_200, 600, 1_000, {
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('pull-request-mitigator', 1, 4_200, 800, 1_300, {
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('pull-request-verifier', 1, 2_400, 400, 800, {
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('pull-request-mitigator', 1, 2_400, 400, 800, {
+      passKind: 'feedback',
+      passIndex: 1
+    }),
+    statisticsGroup('pull-request-verifier', 1, 2_400, 450, 800, {
+      passKind: 'feedback',
+      passIndex: 1
+    })
+  ],
+  'repository-review': [
+    statisticsGroup('repository-discovery', 1, 2_800, 360, 1_100, {
+      chunkId: 'discovery-chunk-0001'
+    }),
+    statisticsGroup('repository-discovery', 1, 2_700, 354, 1_000, {
+      chunkId: 'discovery-chunk-0002'
+    }),
+    statisticsGroup('repository-discovery', 1, 2_700, 370, 1_000, {
+      chunkId: 'discovery-chunk-0003'
+    }),
+    statisticsGroup('repository-triager', 1, 2_700, 400, 900, {
+      passKind: 'draft',
+      passIndex: 0,
+      batchIndex: 1
+    }),
+    statisticsGroup('repository-triager', 1, 2_400, 400, 900, {
+      passKind: 'draft',
+      passIndex: 0,
+      batchIndex: 2
+    }),
+    statisticsGroup('repository-triager', 1, 1_800, 300, 600, {
+      passKind: 'refinement',
+      passIndex: 1
+    }),
+    statisticsGroup('repository-analyzer', 2, 5_200, 1_000, 1_600, {
+      caseId: '7d9a2f6c31b4e8',
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('repository-cvss-v4-scorer', 1, 1_200, 225, 450, {
+      caseId: '7d9a2f6c31b4e8',
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('repository-mitigator', 1, 2_600, 500, 700, {
+      caseId: '7d9a2f6c31b4e8',
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('repository-verifier', 1, 2_900, 550, 800, {
+      caseId: '7d9a2f6c31b4e8',
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('repository-mitigator', 2, 5_000, 1_000, 1_500, {
+      caseId: '7d9a2f6c31b4e8',
+      passKind: 'feedback',
+      passIndex: 1
+    }),
+    statisticsGroup('repository-verifier', 2, 5_400, 1_100, 1_700, {
+      caseId: '7d9a2f6c31b4e8',
+      passKind: 'feedback',
+      passIndex: 1
+    }),
+    statisticsGroup('repository-analyzer', 2, 5_020, 1_100, 1_580, {
+      caseId: 'c4e81a90d2f763',
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('repository-cvss-v4-scorer', 1, 1_200, 225, 450, {
+      caseId: 'c4e81a90d2f763',
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('repository-mitigator', 1, 2_500, 500, 700, {
+      caseId: 'c4e81a90d2f763',
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('repository-verifier', 1, 2_600, 500, 700, {
+      caseId: 'c4e81a90d2f763',
+      passKind: 'initial',
+      passIndex: 0
+    }),
+    statisticsGroup('repository-delivery-planner', 1, 1_600, 300, 400, {
+      passKind: 'draft',
+      passIndex: 0,
+      batchIndex: 1
+    }),
+    statisticsGroup('repository-delivery-planner', 1, 1_000, 200, 300, {
+      passKind: 'draft',
+      passIndex: 0,
+      batchIndex: 2
+    }),
+    statisticsGroup('repository-delivery-planner', 1, 900, 200, 300, {
+      passKind: 'refinement',
+      passIndex: 1
+    })
+  ]
+}
+
+function statisticsGroup(
+  agent_name: string,
+  model_call_count: number,
+  input_tokens: number,
+  output_tokens: number,
+  cache_read_input_tokens: number,
+  context: {
+    caseId?: string
+    deliveryId?: string
+    passKind?: string
+    passIndex?: number
+    batchIndex?: number
+    chunkId?: string
+  } = {}
+): StatisticsGroup {
+  return {
+    agent_name,
+    case_id: context.caseId ?? null,
+    delivery_id: context.deliveryId ?? null,
+    pass_kind: context.passKind ?? null,
+    pass_index: context.passIndex ?? null,
+    batch_index: context.batchIndex ?? null,
+    chunk_id: context.chunkId ?? null,
+    provider: 'anthropic',
+    model: 'deepseek-v4-pro',
+    model_call_count,
+    usage_reported_call_count: model_call_count,
+    token_usage: {
+      input_tokens,
+      output_tokens,
+      total_tokens: input_tokens + output_tokens,
+      cache_read_input_tokens,
+      cache_creation_input_tokens: null,
+      reasoning_tokens: null
+    }
+  }
+}
+
+function executionStatisticsFor(
+  workflow: Workflow,
+  updatedAt: number,
+  includeFeedback: boolean,
+  index: number
+): Run['execution_statistics'] {
+  const baseGroups = STATISTICS_GROUPS[workflow].filter(
+    (group) => includeFeedback || group.pass_kind !== 'feedback'
+  )
+  const groups =
+    workflow === 'repository-review'
+      ? [
+          ...baseGroups,
+          ...repositoryDeliveryIdsFor(index).map((deliveryId, position) =>
+            statisticsGroup(
+              'patch-synthesizer',
+              1,
+              2_700 + position * 400,
+              540 + position * 120,
+              700 + position * 200,
+              { deliveryId }
+            )
+          )
+        ]
+      : baseGroups
+  const sum = (read: (group: StatisticsGroup) => number | null): number =>
+    groups.reduce((total, group) => total + (read(group) ?? 0), 0)
+  return {
+    reconciliation_status: 'settled',
+    ingestion_status: 'settled',
+    usage_coverage: 'complete_for_observed_calls',
+    root_trace_count: groups.length,
+    excluded_non_review_root_count: 0,
+    observed_call_count: sum((group) => group.model_call_count),
+    usage_reported_call_count: sum((group) => group.usage_reported_call_count),
+    token_usage: {
+      input_tokens: sum((group) => group.token_usage.input_tokens),
+      output_tokens: sum((group) => group.token_usage.output_tokens),
+      total_tokens: sum((group) => group.token_usage.total_tokens),
+      cache_read_input_tokens: sum(
+        (group) => group.token_usage.cache_read_input_tokens
+      ),
+      cache_creation_input_tokens: null,
+      reasoning_tokens: null
+    },
+    groups,
+    settled_at: iso(updatedAt + 65_000),
+    updated_at: iso(updatedAt + 65_000)
+  }
+}
+
 /**
  * The steps each workflow actually initializes, in publication order:
  * pull-request reviews publish one review, issue reviews always publish a summary
@@ -177,15 +408,20 @@ function stepKeysFor(workflow: Workflow, index: number): string[] {
       ? ['issue:draft-pr', 'issue:summary-comment']
       : ['issue:summary-comment']
   }
-  const deliveries = 1 + (index % 2)
   return [
-    ...Array.from(
-      { length: deliveries },
-      (_, position) => `repository:delivery:combined-${digest(index, position)}`
+    ...repositoryDeliveryIdsFor(index).map(
+      (deliveryId) => `repository:delivery:${deliveryId}`
     ),
     'repository:summary-issue',
     'repository:summary-comment'
   ]
+}
+
+function repositoryDeliveryIdsFor(index: number): string[] {
+  return Array.from(
+    { length: 2 + (index % 2) },
+    (_, position) => `combined-${digest(index, position)}`
+  )
 }
 
 const REMOTE_ROOT = 'https://github.com/octo/example'
@@ -668,6 +904,15 @@ export const runs: FixtureRun[] = Array.from(
             : executionUpdatedAt
         )
       },
+      execution_statistics:
+        scenario.execution_status === 'succeeded'
+          ? executionStatisticsFor(
+              workflow,
+              executionUpdatedAt,
+              workflow === 'repository-review' || index % 2 === 0,
+              index
+            )
+          : null,
       publication: {
         status: scenario.publication_status,
         started_at:

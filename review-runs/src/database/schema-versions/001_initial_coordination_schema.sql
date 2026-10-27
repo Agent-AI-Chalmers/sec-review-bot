@@ -1,6 +1,6 @@
 -- The durable review trunk: one row per admitted task, carrying only its identity and the
--- fields shared across all three lifecycle axes. Execution, preparation, and publication each
--- keep their own state machine in executions, preparations, and publications.
+-- fields shared across all three lifecycle axes. Preparation, execution, and publication each
+-- keep their own state machine in preparations, executions, and publications.
 CREATE TABLE review_runs (
   run_id text PRIMARY KEY,
   connector_id text NOT NULL,
@@ -18,7 +18,7 @@ CREATE TABLE review_runs (
 );
 
 COMMENT ON TABLE review_runs IS
-  'Durable review identity: the externally admitted task and the fields that span all three lifecycle axes. Execution, preparation, and publication each keep their own state machine and their own input in executions, preparations, and publications.';
+  'Durable review identity: the externally admitted task and the fields that span all three lifecycle axes. Preparation, execution, and publication each keep their own state machine and their own input in preparations, executions, and publications.';
 COMMENT ON COLUMN review_runs.run_id IS
   'Stable review identity assigned at admission, before preparation, execution, or publication begins, and shared with the Execution.';
 COMMENT ON COLUMN review_runs.connector_id IS
@@ -36,7 +36,105 @@ COMMENT ON COLUMN review_runs.created_at IS
 COMMENT ON COLUMN review_runs.updated_at IS
   'Row mtime for the trunk row: last time identity metadata or an ingress checkpoint changed. Lifetime progress and per-axis input live on the axis tables.';
 
--- Execution is the third lifecycle axis, alongside preparation and publication. It has no
+-- Preparation is a separately claimable unit of work. Its protocol deliberately
+-- contains no provider-specific columns: connectors own the interpretation of
+-- their preparation inputs and the external side effects used to construct them.
+CREATE TABLE preparations (
+  run_id text PRIMARY KEY,
+  connector_id text NOT NULL,
+  input_version text NOT NULL,
+  input jsonb NOT NULL,
+  status text NOT NULL CHECK (status IN ('pending', 'preparing', 'uncertain', 'disconnected', 'submitted', 'failed')),
+  available_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  claim_token uuid,
+  claimed_at timestamptz,
+  attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
+  -- The failure fields describe the current attempt while it is in flight and the reason the
+  -- row cannot continue once it is terminal. A claim clears them for the new attempt, so they
+  -- cannot be the place a lease expiry looks for "what went wrong last time"; that is
+  -- last_failure_code / last_failure_message below.
+  failure_code text,
+  failure_message text,
+  last_failure_code text,
+  last_failure_message text,
+  started_at timestamptz,
+  finished_at timestamptz,
+  -- Why preparation is `disconnected`: automatic work stopped without reaching a conclusion, and
+  -- only a person can decide what happens next. It is a durable "do not retry this by itself"
+  -- record: without it, every coordination pass would select the same row, fail the same way, and
+  -- roll back, so a single stuck run would starve every other run in the pass. NULL in every
+  -- other state, which the CHECK below pins.
+  disconnect_reason text,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  CHECK (
+    (status = 'preparing' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
+    OR (status <> 'preparing' AND claim_token IS NULL AND claimed_at IS NULL)
+  ),
+  -- Only a disconnected row carries a reason, and a disconnected row always carries one.
+  CHECK ((status = 'disconnected') = (disconnect_reason IS NOT NULL)),
+  -- A preparation that has ever been claimed keeps its start even after a retry or an expired
+  -- lease returns it to `pending`, because the phase really did begin; only a never-claimed row
+  -- has no start. Every non-pending state therefore implies a start, and only the terminal ones
+  -- carry an end.
+  CHECK (
+    CASE status
+      WHEN 'pending' THEN finished_at IS NULL
+      WHEN 'preparing' THEN started_at IS NOT NULL AND finished_at IS NULL
+      WHEN 'uncertain' THEN started_at IS NOT NULL AND finished_at IS NULL
+      WHEN 'disconnected' THEN started_at IS NOT NULL AND finished_at IS NULL
+      ELSE started_at IS NOT NULL AND finished_at IS NOT NULL
+    END
+  ),
+  FOREIGN KEY (run_id, connector_id)
+    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE
+);
+
+COMMENT ON TABLE preparations IS
+  'Provider-neutral, durable preparation work for one review run. Connectors own how work is reconstructed and executed.';
+COMMENT ON COLUMN preparations.run_id IS
+  'Review run whose Execution input is being prepared.';
+COMMENT ON COLUMN preparations.connector_id IS
+  'Connector namespace allowed to claim and complete this preparation.';
+COMMENT ON COLUMN preparations.input_version IS
+  'Connector-defined version of input. Review Runs treats the input as opaque.';
+COMMENT ON COLUMN preparations.input IS
+  'Connector-owned, replayable preparation input. It contains no Review Runs-defined provider fields.';
+COMMENT ON COLUMN preparations.status IS
+  'Preparation lifecycle: pending (waiting for a preparer), preparing (a preparer currently owns the claim), uncertain (the claim lapsed and it is unknown whether the prepared input reached Review Runs), disconnected (automatic work stopped without a conclusion; a person must decide), submitted (input handed to the Execution), failed (terminal). An expired claim returns to uncertain, never to pending; expiry after the retry budget is exhausted is terminal.';
+COMMENT ON COLUMN preparations.available_at IS
+  'Earliest time a pending preparation may be claimed. Retry backoff is durable so a process restart cannot bypass it.';
+COMMENT ON COLUMN preparations.claim_token IS
+  'Fencing token held by the current preparer; stale owners cannot save input or queue the run.';
+COMMENT ON COLUMN preparations.claimed_at IS
+  'Last acquisition or renewal time for the current preparation claim.';
+COMMENT ON COLUMN preparations.attempt_count IS
+  'Number of claims taken, including the one admission makes. A claim is counted when it is taken, not when it succeeds, so a failed or expired attempt still advances this value: it is the budget MAX_PREPARATION_ATTEMPTS is compared against, and the attempt number handed to the connector for its retry policy.';
+COMMENT ON COLUMN preparations.failure_code IS
+  'Machine-readable reason for the current failure: set by a retryable failure or by a terminal one, and cleared when the work is claimed again. NULL while an attempt is in flight and has not failed.';
+COMMENT ON COLUMN preparations.failure_message IS
+  'Operator-readable detail associated with failure_code. Cleared together with it on a new claim.';
+COMMENT ON COLUMN preparations.last_failure_code IS
+  'Most recent failure recorded by any attempt, kept across re-claims because a claim clears failure_code. A lease expiry that exhausts the retry budget reports this instead of the generic exhaustion code, so the last real reason survives the gap between a failure and the row dying on its next lease.';
+COMMENT ON COLUMN preparations.last_failure_message IS
+  'Operator-readable detail associated with last_failure_code, kept across re-claims for the same reason.';
+COMMENT ON COLUMN preparations.started_at IS
+  'Immutable instant a preparer first claimed this work, i.e. the preparation phase began; NULL while it is still pending. Written once, so a retry that returns the row to pending and claims it again does not move it. Distinct from claimed_at, which is the current lease and is renewed on every heartbeat.';
+COMMENT ON COLUMN preparations.finished_at IS
+  'Immutable instant the preparation axis reached a terminal state (submitted or failed); NULL while it is pending, preparing, uncertain, or disconnected. Written once, in the same UPDATE that sets the terminal status. Distinct from updated_at, which also moves on claim heartbeats and input checkpoints and therefore cannot mark the phase end.';
+COMMENT ON COLUMN preparations.disconnect_reason IS
+  'Why preparation is `disconnected`: the automatic path stopped without a conclusion and a person must decide. Non-NULL means coordination deliberately skips this row instead of retrying a transition that must keep failing. Cleared when an operator resumes the row into `uncertain`, or concludes it.';
+
+CREATE INDEX preparations_claimable_idx
+  ON preparations (connector_id, status, available_at, updated_at);
+
+-- A disconnected row is excluded from the claimable index's predicate; this one finds the rows
+-- an operator still has to act on, without scanning every pending preparation.
+CREATE INDEX preparations_disconnected_idx
+  ON preparations (connector_id, updated_at)
+  WHERE status = 'disconnected';
+
+-- Execution is the second lifecycle axis, after preparation and before publication. It has no
 -- externally claimable owner (Review Runs observes the Execution), so its claim token only
 -- fences replay of an uncertain submission. It deliberately mirrors the axis shape:
 -- run_id + connector_id + status + failure + claim/lease + timestamps.
@@ -141,161 +239,10 @@ CREATE INDEX executions_status_idx
 CREATE INDEX executions_recovery_idx
   ON executions (connector_id, status, claimed_at);
 
--- Preparation is a separately claimable unit of work. Its protocol deliberately
--- contains no provider-specific columns: connectors own the interpretation of
--- their preparation inputs and the external side effects used to construct them.
-CREATE TABLE preparations (
-  run_id text PRIMARY KEY REFERENCES review_runs(run_id) ON DELETE CASCADE,
-  connector_id text NOT NULL,
-  input_version text NOT NULL,
-  input jsonb NOT NULL,
-  status text NOT NULL CHECK (status IN ('pending', 'preparing', 'uncertain', 'disconnected', 'submitted', 'failed')),
-  available_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  claim_token uuid,
-  claimed_at timestamptz,
-  attempt_count integer NOT NULL DEFAULT 0 CHECK (attempt_count >= 0),
-  -- The failure fields describe the current attempt while it is in flight and the reason the
-  -- row cannot continue once it is terminal. A claim clears them for the new attempt, so they
-  -- cannot be the place a lease expiry looks for "what went wrong last time"; that is
-  -- last_failure_code / last_failure_message below.
-  failure_code text,
-  failure_message text,
-  last_failure_code text,
-  last_failure_message text,
-  started_at timestamptz,
-  finished_at timestamptz,
-  -- Why preparation is `disconnected`: automatic work stopped without reaching a conclusion, and
-  -- only a person can decide what happens next. It is a durable "do not retry this by itself"
-  -- record: without it, every coordination pass would select the same row, fail the same way, and
-  -- roll back, so a single stuck run would starve every other run in the pass. NULL in every
-  -- other state, which the CHECK below pins.
-  disconnect_reason text,
-  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  CHECK (
-    (status = 'preparing' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
-    OR (status <> 'preparing' AND claim_token IS NULL AND claimed_at IS NULL)
-  ),
-  -- Only a disconnected row carries a reason, and a disconnected row always carries one.
-  CHECK ((status = 'disconnected') = (disconnect_reason IS NOT NULL)),
-  -- A preparation that has ever been claimed keeps its start even after a retry or an expired
-  -- lease returns it to `pending`, because the phase really did begin; only a never-claimed row
-  -- has no start. Every non-pending state therefore implies a start, and only the terminal ones
-  -- carry an end.
-  CHECK (
-    CASE status
-      WHEN 'pending' THEN finished_at IS NULL
-      WHEN 'preparing' THEN started_at IS NOT NULL AND finished_at IS NULL
-      WHEN 'uncertain' THEN started_at IS NOT NULL AND finished_at IS NULL
-      WHEN 'disconnected' THEN started_at IS NOT NULL AND finished_at IS NULL
-      ELSE started_at IS NOT NULL AND finished_at IS NOT NULL
-    END
-  ),
-  FOREIGN KEY (run_id, connector_id)
-    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE,
-  -- Foreign-key target for the notice outbox, which belongs to the same connector as
-  -- the preparation it reports on.
-  UNIQUE (run_id, connector_id)
-);
-
-COMMENT ON TABLE preparations IS
-  'Provider-neutral, durable preparation work for one review run. Connectors own how work is reconstructed and executed.';
-COMMENT ON COLUMN preparations.run_id IS
-  'Review run whose Execution input is being prepared.';
-COMMENT ON COLUMN preparations.connector_id IS
-  'Connector namespace allowed to claim and complete this preparation.';
-COMMENT ON COLUMN preparations.input_version IS
-  'Connector-defined version of input. Review Runs treats the input as opaque.';
-COMMENT ON COLUMN preparations.input IS
-  'Connector-owned, replayable preparation input. It contains no Review Runs-defined provider fields.';
-COMMENT ON COLUMN preparations.status IS
-  'Preparation lifecycle: pending (waiting for a preparer), preparing (a preparer currently owns the claim), uncertain (the claim lapsed and it is unknown whether the prepared input reached Review Runs), disconnected (automatic work stopped without a conclusion; a person must decide), submitted (input handed to the Execution), failed (terminal). An expired claim returns to uncertain, never to pending; expiry after the retry budget is exhausted is terminal.';
-COMMENT ON COLUMN preparations.available_at IS
-  'Earliest time a pending preparation may be claimed. Retry backoff is durable so a process restart cannot bypass it.';
-COMMENT ON COLUMN preparations.claim_token IS
-  'Fencing token held by the current preparer; stale owners cannot save input or queue the run.';
-COMMENT ON COLUMN preparations.claimed_at IS
-  'Last acquisition or renewal time for the current preparation claim.';
-COMMENT ON COLUMN preparations.attempt_count IS
-  'Number of claims taken, including the one admission makes. A claim is counted when it is taken, not when it succeeds, so a failed or expired attempt still advances this value: it is the budget MAX_PREPARATION_ATTEMPTS is compared against, and the attempt number handed to the connector for its retry policy.';
-COMMENT ON COLUMN preparations.failure_code IS
-  'Machine-readable reason for the current failure: set by a retryable failure or by a terminal one, and cleared when the work is claimed again. NULL while an attempt is in flight and has not failed.';
-COMMENT ON COLUMN preparations.failure_message IS
-  'Operator-readable detail associated with failure_code. Cleared together with it on a new claim.';
-COMMENT ON COLUMN preparations.last_failure_code IS
-  'Most recent failure recorded by any attempt, kept across re-claims because a claim clears failure_code. A lease expiry that exhausts the retry budget reports this instead of the generic exhaustion code, so the last real reason survives the gap between a failure and the row dying on its next lease.';
-COMMENT ON COLUMN preparations.last_failure_message IS
-  'Operator-readable detail associated with last_failure_code, kept across re-claims for the same reason.';
-COMMENT ON COLUMN preparations.started_at IS
-  'Immutable instant a preparer first claimed this work, i.e. the preparation phase began; NULL while it is still pending. Written once, so a retry that returns the row to pending and claims it again does not move it. Distinct from claimed_at, which is the current lease and is renewed on every heartbeat.';
-COMMENT ON COLUMN preparations.finished_at IS
-  'Immutable instant the preparation axis reached a terminal state (submitted or failed); NULL while it is pending, preparing, uncertain, or disconnected. Written once, in the same UPDATE that sets the terminal status. Distinct from updated_at, which also moves on claim heartbeats and input checkpoints and therefore cannot mark the phase end.';
-COMMENT ON COLUMN preparations.disconnect_reason IS
-  'Why preparation is `disconnected`: the automatic path stopped without a conclusion and a person must decide. Non-NULL means coordination deliberately skips this row instead of retrying a transition that must keep failing. Cleared when an operator resumes the row into `uncertain`, or concludes it.';
-
-CREATE INDEX preparations_claimable_idx
-  ON preparations (connector_id, status, available_at, updated_at);
-
--- A disconnected row is excluded from the claimable index's predicate; this one finds the rows
--- an operator still has to act on, without scanning every pending preparation.
-CREATE INDEX preparations_disconnected_idx
-  ON preparations (connector_id, updated_at)
-  WHERE status = 'disconnected';
-
--- A terminal preparation failure may need connector-facing acknowledgement after
--- the preparer has died. This outbox is deliberately provider-neutral: it stores
--- delivery ownership only, while connectors interpret the preparation input.
-CREATE TABLE run_notices (
-  -- A notice is one user-visible consequence of one coordination event. A run can therefore
-  -- have several notices over time (for example, recover then later become disconnected again).
-  notice_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  run_id text NOT NULL REFERENCES review_runs(run_id) ON DELETE CASCADE,
-  connector_id text NOT NULL,
-  kind text NOT NULL CHECK (kind IN ('failure', 'attention')),
-  -- The transition event is appended in the same transaction and is the idempotency key.
-  -- The foreign key is added after review_run_events below because this is the initial schema.
-  source_event_id bigint UNIQUE,
-  -- `failed` rather than `skipped` for a delivery that did not happen: the connector tried and
-  -- could not reach the provider, which is a failure, not a decision to skip. Sharing `skipped`
-  -- with the other axes made it indistinguishable from "this notice did not apply".
-  status text NOT NULL CHECK (status IN ('pending', 'delivering', 'delivered', 'failed')),
-  axis text NOT NULL CHECK (axis IN ('preparation', 'execution', 'publication')),
-  -- The reason is captured when the notice is created, not read back at delivery time: the axis
-  -- row is a live state machine that a later retry may rewrite, while the notice exists to report
-  -- one specific conclusion.
-  reason_code text,
-  -- Where the connector posted the acknowledgement. Recorded on delivery rather than derived:
-  -- the comment's URL is only known once GitHub answers, and a reader needs to open the exact
-  -- comment rather than the issue it sits on. Null while undelivered and when delivery failed.
-  comment_url text,
-  claim_token uuid,
-  claimed_at timestamptz,
-  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  CHECK (
-    (status = 'delivering' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
-    OR (status <> 'delivering' AND claim_token IS NULL AND claimed_at IS NULL)
-  ),
-  -- The notice is read by joining on connector_id, so a notice stored under a connector the run
-  -- does not belong to would make `notices_status` read as null instead of surfacing as a
-  -- bad write. The composite key below replaces the single-column one above for this purpose:
-  -- `run_id` alone would already be satisfied, and the pair is what the join actually means.
-  FOREIGN KEY (run_id, connector_id)
-    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE
-);
-COMMENT ON TABLE run_notices IS
-  'Provider-neutral outbox for user-visible failure and attention notices caused by coordination events.';
-COMMENT ON COLUMN run_notices.axis IS
-  'Lifecycle axis whose event caused this notice.';
-COMMENT ON COLUMN run_notices.reason_code IS
-  'Event reason captured at creation, so delivery reports the original conclusion rather than re-reading mutable snapshot state.';
-CREATE INDEX run_notices_claimable_idx
-  ON run_notices (connector_id, status, updated_at);
-
 -- Every run has one publication row. Keeping this state separate means a
 -- successful review remains successful even if delivery to the connector fails.
 CREATE TABLE publications (
-  run_id text PRIMARY KEY REFERENCES review_runs(run_id) ON DELETE CASCADE,
+  run_id text PRIMARY KEY,
   connector_id text NOT NULL,
   input jsonb NOT NULL,
   status text NOT NULL CHECK (status IN ('pending', 'publishing', 'uncertain', 'disconnected', 'published', 'failed', 'skipped')),
@@ -306,7 +253,6 @@ CREATE TABLE publications (
   started_at timestamptz,
   finished_at timestamptz,
   updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
-  UNIQUE (connector_id, run_id),
   -- `pending` has no end, but may have a start: a retryable failure returns the row to pending
   -- while the phase is still running. `uncertain` and `disconnected` are mid-phase for the same
   -- reason: they say something about one step, not that the phase ended. `skipped` has an end and
@@ -352,8 +298,9 @@ COMMENT ON COLUMN publications.finished_at IS
 COMMENT ON COLUMN publications.updated_at IS
   'Time the publication state, claim heartbeat, or failure information last changed.';
 
-CREATE INDEX publications_status_idx
-  ON publications (status, updated_at);
+-- Publication coordination is connector-scoped and selects work by lifecycle state and age.
+CREATE INDEX publications_claimable_idx
+  ON publications (connector_id, status, updated_at);
 
 -- A publication may require several externally visible actions. Persisting each
 -- action prevents a retry from repeating steps that already succeeded.
@@ -431,8 +378,8 @@ COMMENT ON COLUMN publication_steps.updated_at IS
 
 -- Append-only log of coordination-side state transitions, so an operator can see how a
 -- run reached its current state instead of reconstructing it from row mtimes or process
--- logs. The live snapshot tables above remain the source of truth for "now"; this table is
--- an audit trail. It deliberately records only Review Runs coordination axes: the Execution's
+-- logs. The live snapshot tables remain the source of truth for "now"; this table is an
+-- audit trail. It deliberately records only Review Runs coordination axes: the Execution's
 -- own execution history lives in Temporal and is not duplicated here.
 CREATE TABLE review_run_events (
   event_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -456,7 +403,7 @@ COMMENT ON COLUMN review_run_events.run_id IS
 COMMENT ON COLUMN review_run_events.connector_id IS
   'Connector namespace that owns the run, kept so reads can be fenced per connector.';
 COMMENT ON COLUMN review_run_events.axis IS
-  'Which coordination state machine the transition belongs to: execution, preparation, publication, or notice.';
+  'Which coordination state machine the transition belongs to: execution, preparation, or publication.';
 COMMENT ON COLUMN review_run_events.from_status IS
   'State before the transition; NULL for the first event on an axis (for example admission).';
 COMMENT ON COLUMN review_run_events.to_status IS
@@ -466,9 +413,142 @@ COMMENT ON COLUMN review_run_events.reason_code IS
 COMMENT ON COLUMN review_run_events.occurred_at IS
   'Time the transition was recorded, written in the same transaction as the snapshot update.';
 
-ALTER TABLE run_notices
-  ADD CONSTRAINT run_notices_source_event_id_fkey
-  FOREIGN KEY (source_event_id) REFERENCES review_run_events (event_id) ON DELETE CASCADE;
-
 CREATE INDEX review_run_events_run_idx
   ON review_run_events (run_id, occurred_at);
+
+-- A terminal coordination outcome may need connector-facing acknowledgement after the process
+-- that reached it has gone away. This outbox stores delivery ownership while the source event
+-- keeps the exact transition being reported.
+CREATE TABLE run_notices (
+  -- A notice is one user-visible consequence of one coordination event. A run can therefore
+  -- have several notices over time (for example, recover then later become disconnected again).
+  notice_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  run_id text NOT NULL,
+  connector_id text NOT NULL,
+  kind text NOT NULL CHECK (kind IN ('failure', 'attention')),
+  -- The transition event is appended in the same transaction and is the idempotency key.
+  source_event_id bigint NOT NULL UNIQUE REFERENCES review_run_events(event_id) ON DELETE CASCADE,
+  -- `failed` rather than `skipped` for a delivery that did not happen: the connector tried and
+  -- could not reach the provider, which is a failure, not a decision to skip. Sharing `skipped`
+  -- with the other axes made it indistinguishable from "this notice did not apply".
+  status text NOT NULL CHECK (status IN ('pending', 'delivering', 'delivered', 'failed')),
+  axis text NOT NULL CHECK (axis IN ('preparation', 'execution', 'publication')),
+  -- The reason is captured when the notice is created, not read back at delivery time: the axis
+  -- row is a live state machine that a later retry may rewrite, while the notice exists to report
+  -- one specific conclusion.
+  reason_code text,
+  -- Where the connector posted the acknowledgement. Recorded on delivery rather than derived:
+  -- the comment's URL is only known once GitHub answers, and a reader needs to open the exact
+  -- comment rather than the issue it sits on. Null while undelivered and when delivery failed.
+  comment_url text,
+  claim_token uuid,
+  claimed_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  CHECK (
+    (status = 'delivering' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
+    OR (status <> 'delivering' AND claim_token IS NULL AND claimed_at IS NULL)
+  ),
+  -- The notice is read by joining on connector_id, so reject a connector that does not own the
+  -- run instead of letting the notice silently disappear from those reads.
+  FOREIGN KEY (run_id, connector_id)
+    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE
+);
+COMMENT ON TABLE run_notices IS
+  'Provider-neutral outbox for user-visible failure and attention notices caused by coordination events.';
+COMMENT ON COLUMN run_notices.axis IS
+  'Lifecycle axis whose event caused this notice.';
+COMMENT ON COLUMN run_notices.reason_code IS
+  'Event reason captured at creation, so delivery reports the original conclusion rather than re-reading mutable snapshot state.';
+CREATE INDEX run_notices_claimable_idx
+  ON run_notices (connector_id, status, updated_at);
+
+-- Statistics reconciliation is deliberately separate from the execution axis. Execution reaches
+-- its terminal state without waiting for Langfuse, while this table records a later, best-effort
+-- read of the observations that arrived for that run.
+CREATE TABLE execution_statistics (
+  run_id text PRIMARY KEY REFERENCES executions(run_id) ON DELETE CASCADE,
+  status text NOT NULL CHECK (status IN ('pending', 'reconciling', 'settled', 'unavailable')),
+  ingestion_status text CHECK (ingestion_status IN ('settled', 'partial_window', 'no_observations', 'unavailable')),
+  usage_coverage text CHECK (usage_coverage IN ('complete_for_observed_calls', 'partial', 'unavailable')),
+  observation_set_hash text,
+  root_trace_count integer NOT NULL DEFAULT 0 CHECK (root_trace_count >= 0),
+  excluded_non_review_root_count integer NOT NULL DEFAULT 0 CHECK (excluded_non_review_root_count >= 0),
+  observed_call_count integer NOT NULL DEFAULT 0 CHECK (observed_call_count >= 0),
+  usage_reported_call_count integer NOT NULL DEFAULT 0 CHECK (usage_reported_call_count >= 0),
+  input_tokens bigint CHECK (input_tokens >= 0),
+  output_tokens bigint CHECK (output_tokens >= 0),
+  total_tokens bigint CHECK (total_tokens >= 0),
+  cache_read_input_tokens bigint CHECK (cache_read_input_tokens >= 0),
+  cache_creation_input_tokens bigint CHECK (cache_creation_input_tokens >= 0),
+  reasoning_tokens bigint CHECK (reasoning_tokens >= 0),
+  failure_count integer NOT NULL DEFAULT 0 CHECK (failure_count >= 0),
+  next_attempt_at timestamptz NOT NULL,
+  reconciliation_deadline_at timestamptz,
+  claim_token uuid,
+  claimed_at timestamptz,
+  failure_code text,
+  settled_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  CHECK (
+    (status = 'reconciling' AND claim_token IS NOT NULL AND claimed_at IS NOT NULL)
+    OR (status <> 'reconciling' AND claim_token IS NULL AND claimed_at IS NULL)
+  ),
+  -- The window begins on the first claim. A never-claimed pending row is the only shape that may
+  -- not have a deadline; every later state must retain the window established by that claim.
+  CHECK (status = 'pending' OR reconciliation_deadline_at IS NOT NULL),
+  CHECK (
+    (status IN ('settled', 'unavailable')) = (ingestion_status IS NOT NULL)
+  ),
+  CHECK (
+    (status IN ('settled', 'unavailable')) = (settled_at IS NOT NULL)
+  ),
+  CHECK ((status = 'unavailable') = (failure_code IS NOT NULL))
+);
+
+COMMENT ON TABLE execution_statistics IS
+  'Best-effort Langfuse reconciliation for one terminal execution. It does not gate or rewrite execution state.';
+COMMENT ON COLUMN execution_statistics.observation_set_hash IS
+  'Hash of the observation IDs and aggregate values from the latest successful read. A second identical read settles the snapshot without retaining call-level records.';
+COMMENT ON COLUMN execution_statistics.ingestion_status IS
+  'settled means two non-empty review-root reads matched; partial_window means the bounded reconciliation window ended while observations were still changing; no_observations means the whole window produced no review roots; unavailable means Langfuse could not be read within the retry budget.';
+COMMENT ON COLUMN execution_statistics.usage_coverage IS
+  'Coverage of usage for calls Langfuse returned, not proof that every model call was uploaded.';
+COMMENT ON COLUMN execution_statistics.failure_count IS
+  'Consecutive failed Langfuse reads. A successful snapshot resets it, so earlier successful reconciliation polls do not consume the transport-failure budget.';
+COMMENT ON COLUMN execution_statistics.reconciliation_deadline_at IS
+  'End of the observation-settling window, established when this run is first claimed. Backlog time before the first Langfuse read does not consume the window.';
+
+CREATE INDEX execution_statistics_claimable_idx
+  ON execution_statistics (status, next_attempt_at, claimed_at);
+
+CREATE TABLE execution_statistics_groups (
+  group_id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  run_id text NOT NULL REFERENCES execution_statistics(run_id) ON DELETE CASCADE,
+  agent_name text NOT NULL,
+  case_id text,
+  delivery_id text,
+  pass_kind text,
+  pass_index integer CHECK (pass_index >= 0),
+  batch_index integer CHECK (batch_index >= 1),
+  chunk_id text,
+  provider text NOT NULL,
+  model text,
+  model_call_count integer NOT NULL CHECK (model_call_count > 0),
+  usage_reported_call_count integer NOT NULL CHECK (usage_reported_call_count >= 0),
+  input_tokens bigint CHECK (input_tokens >= 0),
+  output_tokens bigint CHECK (output_tokens >= 0),
+  total_tokens bigint CHECK (total_tokens >= 0),
+  cache_read_input_tokens bigint CHECK (cache_read_input_tokens >= 0),
+  cache_creation_input_tokens bigint CHECK (cache_creation_input_tokens >= 0),
+  reasoning_tokens bigint CHECK (reasoning_tokens >= 0),
+  UNIQUE NULLS NOT DISTINCT (
+    run_id, agent_name, case_id, delivery_id, pass_kind, pass_index, batch_index,
+    chunk_id, provider, model
+  ),
+  CHECK (usage_reported_call_count <= model_call_count)
+);
+
+COMMENT ON TABLE execution_statistics_groups IS
+  'Run statistics grouped by workflow coordinates, review agent, and Langfuse native provider/model identity. Call-level observations remain in Langfuse.';

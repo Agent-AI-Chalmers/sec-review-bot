@@ -10,6 +10,7 @@
     "connector_id",
     "preparation",
     "execution",
+    "execution_statistics",
     "publication",
     "created_at",
     "failure_code",
@@ -124,6 +125,225 @@
           "description": "Last time the execution axis was written: a polling confirmation, a state transition, or a submission/recovery write. This is the observation freshness the console reports (\"observed Ns ago\"), not a phase bound — use `started_at` and `finished_at` for that."
         }
       }
+    },
+    "execution_statistics": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reconciliation_status",
+            "ingestion_status",
+            "usage_coverage",
+            "root_trace_count",
+            "excluded_non_review_root_count",
+            "observed_call_count",
+            "usage_reported_call_count",
+            "token_usage",
+            "groups",
+            "settled_at",
+            "updated_at"
+          ],
+          "properties": {
+            "reconciliation_status": {
+              "type": "string",
+              "enum": ["pending", "reconciling", "settled", "unavailable"]
+            },
+            "ingestion_status": {
+              "type": ["string", "null"],
+              "enum": [
+                "settled",
+                "partial_window",
+                "no_observations",
+                "unavailable",
+                null
+              ]
+            },
+            "usage_coverage": {
+              "type": ["string", "null"],
+              "enum": [
+                "complete_for_observed_calls",
+                "partial",
+                "unavailable",
+                null
+              ],
+              "description": "Coverage for calls returned by Langfuse. It is not proof that every real model call was uploaded."
+            },
+            "root_trace_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "excluded_non_review_root_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "observed_call_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "usage_reported_call_count": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "token_usage": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "input_tokens",
+                "output_tokens",
+                "total_tokens",
+                "cache_read_input_tokens",
+                "cache_creation_input_tokens",
+                "reasoning_tokens"
+              ],
+              "properties": {
+                "input_tokens": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                },
+                "output_tokens": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                },
+                "total_tokens": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                },
+                "cache_read_input_tokens": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                },
+                "cache_creation_input_tokens": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                },
+                "reasoning_tokens": {
+                  "type": ["integer", "null"],
+                  "minimum": 0
+                }
+              }
+            },
+            "groups": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "agent_name",
+                  "case_id",
+                  "delivery_id",
+                  "pass_kind",
+                  "pass_index",
+                  "batch_index",
+                  "chunk_id",
+                  "provider",
+                  "model",
+                  "model_call_count",
+                  "usage_reported_call_count",
+                  "token_usage"
+                ],
+                "properties": {
+                  "agent_name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "case_id": {
+                    "type": ["string", "null"],
+                    "description": "Repository case identity, or null for run-level work."
+                  },
+                  "delivery_id": {
+                    "type": ["string", "null"],
+                    "description": "Repository delivery identity, or null outside delivery execution."
+                  },
+                  "pass_kind": {
+                    "type": ["string", "null"],
+                    "description": "Runtime pass classification such as initial or feedback when supplied by the agent."
+                  },
+                  "pass_index": {
+                    "type": ["integer", "null"],
+                    "minimum": 0,
+                    "description": "Zero-based pass number within the review or case when supplied by the agent."
+                  },
+                  "batch_index": {
+                    "type": ["integer", "null"],
+                    "minimum": 1,
+                    "description": "One-based draft batch number for batched triage or delivery planning; null for non-batched work."
+                  },
+                  "chunk_id": {
+                    "type": ["string", "null"],
+                    "description": "Discovery scan chunk identity, or null outside repository discovery."
+                  },
+                  "provider": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "model": {
+                    "type": ["string", "null"]
+                  },
+                  "model_call_count": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "usage_reported_call_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "token_usage": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": [
+                      "input_tokens",
+                      "output_tokens",
+                      "total_tokens",
+                      "cache_read_input_tokens",
+                      "cache_creation_input_tokens",
+                      "reasoning_tokens"
+                    ],
+                    "properties": {
+                      "input_tokens": {
+                        "type": ["integer", "null"],
+                        "minimum": 0
+                      },
+                      "output_tokens": {
+                        "type": ["integer", "null"],
+                        "minimum": 0
+                      },
+                      "total_tokens": {
+                        "type": ["integer", "null"],
+                        "minimum": 0
+                      },
+                      "cache_read_input_tokens": {
+                        "type": ["integer", "null"],
+                        "minimum": 0
+                      },
+                      "cache_creation_input_tokens": {
+                        "type": ["integer", "null"],
+                        "minimum": 0
+                      },
+                      "reasoning_tokens": {
+                        "type": ["integer", "null"],
+                        "minimum": 0
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "settled_at": {
+              "type": ["string", "null"],
+              "format": "date-time"
+            },
+            "updated_at": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Best-effort model-call statistics reconciled from external Langfuse after execution. Null means this deployment has not produced statistics for the run; it does not mean the execution used zero model calls."
     },
     "publication": {
       "type": "object",
