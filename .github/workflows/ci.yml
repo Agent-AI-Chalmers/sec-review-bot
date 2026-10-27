@@ -71,7 +71,7 @@ jobs:
       # a job and its filter still agree, that every generated artifact and every tracked file is
       # covered — the coupling that, when missing, lets a change run no job at all.
       - name: Check changed-area model
-        run: node --test .github/ci/check-changed-areas.mjs
+        run: python3 .github/ci/check-changed-areas.py
 
   ops:
     name: Ops

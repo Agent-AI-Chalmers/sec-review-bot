@@ -2,7 +2,7 @@
 #
 # This file is the single source of truth for which changes run which jobs: each top-level key
 # is an area a job gates on (`needs.changes.outputs.<area>`), and the globs under it select the
-# area. It is read directly — there is no generator — and `check-changed-areas.mjs` guards it.
+# area. It is read directly — there is no generator — and `check-changed-areas.py` guards it.
 #
 # Every glob that belongs to an area that reads the shared contract, or that can affect how a
 # job runs, is listed under that area too: CI cannot see those couplings in an import graph, so

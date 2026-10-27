@@ -1,4 +1,22 @@
-# Changed-area model
+# CI Checks
+
+## Pull Request Descriptions
+
+`validate-pr-description.py` validates the required pull request sections and compatibility
+checkboxes. The template lists all supported classifications, and exactly one must be selected.
+A breaking change must also explain what breaks and how callers or operators migrate.
+
+To validate a local Markdown file with the same entry point the workflow uses:
+
+```bash
+python .github/ci/validate-pr-description.py /path/to/pr-body.md
+```
+
+Dependabot descriptions are exempt from the human-authored template but must be non-empty.
+
+The CI validators use only the Python standard library and support Python 3.10 or newer. Their workflows intentionally use the hosted runner's `python3` instead of installing the agents package's Python version; these short metadata checks do not depend on the agents runtime.
+
+## Changed-Area Model
 
 CI does not run every job on every change. The `changes` job decides which areas changed, and each area job runs only when its area did.
 
@@ -9,7 +27,7 @@ That decision lives in **`changed-areas.yml`**:
 - `ci.yml` reads the file **directly** (`filters: .github/ci/changed-areas.yml`);
 - each job gates on its area with `needs.changes.outputs.<area> == 'true'`.
 
-A static `outputs:` map on the `changes` job is a GitHub Actions requirement, so the workflow does restate the area names once. `check-changed-areas.mjs` checks that restatement against the model, along with what the model cannot state about itself.
+A static `outputs:` map on the `changes` job is a GitHub Actions requirement, so the workflow does restate the area names once. `check-changed-areas.py` checks that restatement against the model, along with what the model cannot state about itself.
 
 ## Why the couplings are written down
 
@@ -23,25 +41,26 @@ A missed path means a change runs **no job at all** — silent, green CI. That i
 
 ## What the checker does — and does not do
 
-The model is trusted as given: it states *intent*. The checker does not "verify the model"; it checks **completeness** — facts about the repository that no file can state about itself:
+The model is trusted as given: it states _intent_. The checker does not "verify the model"; it checks **completeness** — facts about the repository that no file can state about itself:
 
 - every generated artifact (from the tools' manifests) is covered by `contract-tools`;
 - every tracked file is covered by an area or acknowledged in `UNCOVERED`;
 - the client↔server seam is wired to both packages;
 - no filter is dead (an area declared with no job, or a job gating on an area not declared).
 
-The one thing it is *not* is a second opinion on the model's own contents — there is no rendered copy of the model left to compare against.
+The one thing it is _not_ is a second opinion on the model's own contents — there is no rendered copy of the model left to compare against.
 
 ## Files
 
-| File | Role |
-| --- | --- |
-| `changed-areas.yml` | **The model.** The `dorny/paths-filter` filter set `ci.yml` reads. Edit this. |
-| `check-changed-areas.mjs` | The completeness checker. |
+| File                         | Role                                                                          |
+| ---------------------------- | ----------------------------------------------------------------------------- |
+| `changed-areas.yml`          | **The model.** The `dorny/paths-filter` filter set `ci.yml` reads. Edit this. |
+| `check-changed-areas.py`     | The completeness checker.                                                     |
+| `validate-pr-description.py` | The pull request description validator and local CLI.                         |
 
 ## Editing
 
-Edit `changed-areas.yml`, then run `node --test .github/ci/check-changed-areas.mjs`.
+Edit `changed-areas.yml`, then run `python3 .github/ci/check-changed-areas.py`.
 
 The checker runs in CI's `automation-config` job (whose filter includes `.github/ci/**`) and fails when:
 
