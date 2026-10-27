@@ -28,6 +28,16 @@ def _prepared_input(artifact_root: Path) -> dict[str, Any]:
     }
 
 
+def _request(artifact_root: Path) -> ReviewWorkflowRequest:
+    return ReviewWorkflowRequest(
+        workflow="pull-request-review",
+        run_id="run-test",
+        prepared_input=_prepared_input(artifact_root),
+        timeout_seconds=30,
+        runtime_context={},
+    )
+
+
 @pytest.mark.asyncio
 async def test_mitigation_activity_skip_accepts_serialized_artifact_root(
     tmp_path: Path,
@@ -36,10 +46,9 @@ async def test_mitigation_activity_skip_accepts_serialized_artifact_root(
     artifact_root = tmp_path / "artifacts"
 
     result = await mitigate_pull_request_activity(
-        prepared_input=_prepared_input(artifact_root),
+        request=_request(artifact_root),
         analysis_result={"narratives": []},
         retry_context=None,
-        runtime_context={},
     )
 
     assert result["file_changes"] == []
@@ -64,12 +73,11 @@ async def test_mitigation_activity_run_accepts_serialized_artifact_root(
     )
 
     result = await mitigate_pull_request_activity(
-        prepared_input=_prepared_input(artifact_root),
+        request=_request(artifact_root),
         analysis_result={
             "narratives": [{"verdict": "confirmed-defect"}],
         },
         retry_context=None,
-        runtime_context={},
     )
 
     assert result == {"changed_files": []}
@@ -107,9 +115,6 @@ async def test_direct_review_records_skipped_verification_without_confirmed_targ
 
     with (
         patch(
-            "sec_review_agents.workflows.pull_request.direct.prepare_internal_workflow_activity"
-        ),
-        patch(
             "sec_review_agents.workflows.pull_request.direct.analyze_pull_request_activity",
             return_value=analysis_result,
         ),
@@ -129,11 +134,10 @@ async def test_direct_review_records_skipped_verification_without_confirmed_targ
         await run_pull_request_review_direct(request)
 
     verify_mock.assert_awaited_once_with(
-        {},
+        request,
         analysis_result,
         mitigation_result,
         None,
-        {},
     )
     build_result_mock.assert_called_once_with(
         analysis_result,
@@ -156,11 +160,16 @@ async def test_verification_activity_persists_skip_without_running_verifier(
         "sec_review_agents.workflows.pull_request.verification.verify_pull_request"
     ) as verify_mock:
         result = await verify_pull_request_activity(
-            prepared_input,
+            ReviewWorkflowRequest(
+                workflow="pull-request-review",
+                run_id="run-test",
+                prepared_input=prepared_input,
+                timeout_seconds=30,
+                runtime_context={},
+            ),
             {"verdict": "no-actionable-finding", "narratives": []},
             {"changed_files": []},
             None,
-            {},
         )
 
     verify_mock.assert_not_called()

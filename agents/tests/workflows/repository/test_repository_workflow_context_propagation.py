@@ -7,6 +7,7 @@ import sec_review_agents.workflows.repository.workflow as repository_workflow
 from sec_review_agents.workflows.repository.case_execution_input import (
     RepositoryCaseExecutionInput,
 )
+from sec_review_agents.workflows.repository.workflow import RepositoryCaseReviewRequest
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 
 
@@ -36,7 +37,16 @@ async def test_repository_case_activity_binds_trace_context() -> None:
             return_value=analyzer_result,
         ) as analyzer_stage_mock,
     ):
+        request: RepositoryCaseReviewRequest = {
+            "run_id": "run-1",
+            "case_execution_input": repository_case_execution_input("case-1"),
+            "cases_artifacts_path": "/tmp/cases",
+            "published_transcripts_path": published_transcripts_path,
+            "timeout_seconds": 30,
+            "runtime_context": {},
+        }
         result = await repository_workflow.analyze_repository_case_activity(
+            request,
             {
                 "case_execution_input": repository_case_execution_input("case-1"),
                 "artifact_paths": {
@@ -44,10 +54,12 @@ async def test_repository_case_activity_binds_trace_context() -> None:
                 },
                 "published_transcripts_path": published_transcripts_path,
             },
-            {},
         )
 
-    bind_mock.assert_called_once_with(workflow="repository-review")
+    assert bind_mock.call_args.kwargs["workflow"] == "repository-review"
+    assert bind_mock.call_args.kwargs["run_id"] == "run-1"
+    assert bind_mock.call_args.kwargs["statistics_scope"] == "review-execution"
+    assert bind_mock.call_args.kwargs["case_id"] == "case-1"
     assert analyzer_stage_mock.call_args.kwargs["published_transcript_path"] == (
         Path(published_transcripts_path) / "0001-analyzer-initial.jsonl"
     )

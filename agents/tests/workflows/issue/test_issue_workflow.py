@@ -24,11 +24,17 @@ async def test_mitigation_activity_accepts_serialized_artifact_root(
         "review_intent": {"objective": "audit"},
     }
 
-    result = await mitigate_issue_activity(
+    request = ReviewWorkflowRequest(
+        workflow="issue-review",
+        run_id="run-test",
         prepared_input=prepared_input,
+        timeout_seconds=30,
+        runtime_context={},
+    )
+    result = await mitigate_issue_activity(
+        request=request,
         analysis_result={"narratives": []},
         retry_context=None,
-        runtime_context={},
     )
 
     assert result["file_changes"] == []
@@ -60,9 +66,6 @@ async def test_direct_review_records_skipped_verification_without_confirmed_targ
 
     with (
         patch(
-            "sec_review_agents.workflows.issue.direct.prepare_internal_workflow_activity"
-        ),
-        patch(
             "sec_review_agents.workflows.issue.direct.analyze_issue_activity",
             return_value=analysis_result,
         ),
@@ -82,11 +85,10 @@ async def test_direct_review_records_skipped_verification_without_confirmed_targ
         await run_issue_review_direct(request)
 
     verify_mock.assert_awaited_once_with(
-        {},
+        request,
         analysis_result,
         mitigation_result,
         None,
-        {},
     )
     build_result_mock.assert_called_once_with(
         analysis_result,
@@ -109,11 +111,16 @@ async def test_verification_activity_persists_skip_without_running_verifier(
         "sec_review_agents.workflows.issue.verification.verify_issue"
     ) as verify_mock:
         result = await verify_issue_activity(
-            prepared_input,
+            ReviewWorkflowRequest(
+                workflow="issue-review",
+                run_id="run-test",
+                prepared_input=prepared_input,
+                timeout_seconds=30,
+                runtime_context={},
+            ),
             {"verdict": "no-actionable-finding", "narratives": []},
             {"changed_files": []},
             None,
-            {},
         )
 
     verify_mock.assert_not_called()

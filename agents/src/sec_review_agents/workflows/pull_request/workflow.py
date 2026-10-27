@@ -15,10 +15,8 @@ from sec_review_agents.run_diagnostics.publication import (
     RunDiagnosticPublicationRequest,
     publish_run_diagnostic_activity,
 )
-from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
-    prepare_internal_workflow_activity,
 )
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
@@ -31,9 +29,9 @@ from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 @activity.defn
 async def analyze_pull_request_activity(
-    prepared_input: dict[str, Any],
-    runtime_context: ExecutionRuntimeContext,
+    request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
+    from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.transcripts import (
         review_transcript_path,
         review_transcripts_root,
@@ -41,6 +39,7 @@ async def analyze_pull_request_activity(
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
     )
+    from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -49,6 +48,7 @@ async def analyze_pull_request_activity(
         analyze_pull_request,
     )
 
+    prepared_input = request.prepared_input
     review_intent = require_review_intent(prepared_input.get("review_intent"))
     if review_intent.objective != REVIEW_OBJECTIVE_AUDIT:
         raise ValueError("review_intent.objective must be 'audit'.")
@@ -61,38 +61,48 @@ async def analyze_pull_request_activity(
         bundle_paths["workspace_snapshot_tar_path"],
         label="bundle_paths.workspace_snapshot_tar_path",
     )
-    return await analyze_pull_request(
-        pr=prepared_input["pr"],
-        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
-        history_path=required_path(
-            bundle_paths["history_path"],
-            label="bundle_paths.history_path",
-        ),
-        incremental_window_path=required_path(
-            bundle_paths["incremental_window_path"],
-            label="bundle_paths.incremental_window_path",
-        ),
-        analyzer_artifacts_path=artifact_path(
-            prepared_input["artifact_paths"],
-            "analyzer",
-        ),
-        published_transcript_path=review_transcript_path(
-            review_transcripts_root(run_artifacts_root),
-            order=1,
-            stage="analyzer",
-        ),
-        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
-        runtime_context=runtime_context,
-    )
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name=request.workflow,
+            run_id=request.run_id,
+            pass_kind="initial",
+            pass_index="0",
+        )
+    ):
+        return await analyze_pull_request(
+            pr=prepared_input["pr"],
+            workspace_snapshot_tar_path=workspace_snapshot_tar_path,
+            history_path=required_path(
+                bundle_paths["history_path"],
+                label="bundle_paths.history_path",
+            ),
+            incremental_window_path=required_path(
+                bundle_paths["incremental_window_path"],
+                label="bundle_paths.incremental_window_path",
+            ),
+            analyzer_artifacts_path=artifact_path(
+                prepared_input["artifact_paths"],
+                "analyzer",
+            ),
+            published_transcript_path=review_transcript_path(
+                review_transcripts_root(run_artifacts_root),
+                order=1,
+                stage="analyzer",
+            ),
+            setup_declaration_content=setup_declaration_content_for_backend(
+                prepared_input
+            ),
+            runtime_context=request.runtime_context,
+        )
 
 
 @activity.defn
 async def mitigate_pull_request_activity(
-    prepared_input: dict[str, Any],
+    request: ReviewWorkflowRequest,
     analysis_result: dict[str, Any],
     retry_context: dict[str, Any] | None,
-    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
+    from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.mitigation.stage import (
         create_skipped_mitigation_result,
@@ -105,6 +115,7 @@ async def mitigate_pull_request_activity(
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
     )
+    from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -113,6 +124,7 @@ async def mitigate_pull_request_activity(
         mitigate_pull_request,
     )
 
+    prepared_input = request.prepared_input
     review_intent = require_review_intent(prepared_input.get("review_intent"))
     if review_intent.objective != REVIEW_OBJECTIVE_AUDIT:
         raise ValueError("review_intent.objective must be 'audit'.")
@@ -140,45 +152,56 @@ async def mitigate_pull_request_activity(
             reason="No confirmed, reparable mitigation target was available from the analyzer output.",
         )
     bundle_paths = prepared_input["bundle_paths"]
-    return await mitigate_pull_request(
-        pr=prepared_input["pr"],
-        workspace_snapshot_tar_path=required_path(
-            bundle_paths["workspace_snapshot_tar_path"],
-            label="bundle_paths.workspace_snapshot_tar_path",
-        ),
-        history_path=required_path(
-            bundle_paths["history_path"],
-            label="bundle_paths.history_path",
-        ),
-        incremental_window_path=required_path(
-            bundle_paths["incremental_window_path"],
-            label="bundle_paths.incremental_window_path",
-        ),
-        mitigator_artifacts_path=mitigator_artifacts_path,
-        published_transcript_path=review_transcript_path(
-            review_transcripts_root(run_artifacts_root),
-            order=review_stage_attempt_order(
-                stage="mitigator", retry_context=retry_context
+    pass_index = int((retry_context or {}).get("retry_index") or 0)
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name=request.workflow,
+            run_id=request.run_id,
+            pass_kind="feedback" if retry_context is not None else "initial",
+            pass_index=str(pass_index),
+        )
+    ):
+        return await mitigate_pull_request(
+            pr=prepared_input["pr"],
+            workspace_snapshot_tar_path=required_path(
+                bundle_paths["workspace_snapshot_tar_path"],
+                label="bundle_paths.workspace_snapshot_tar_path",
             ),
-            stage="mitigator",
-            attempt=mitigation_attempt_label(retry_context),
-        ),
-        analysis_result=analysis_result,
-        retry_context=retry_context,
-        test_changes=review_intent.test_changes,
-        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
-        runtime_context=runtime_context,
-    )
+            history_path=required_path(
+                bundle_paths["history_path"],
+                label="bundle_paths.history_path",
+            ),
+            incremental_window_path=required_path(
+                bundle_paths["incremental_window_path"],
+                label="bundle_paths.incremental_window_path",
+            ),
+            mitigator_artifacts_path=mitigator_artifacts_path,
+            published_transcript_path=review_transcript_path(
+                review_transcripts_root(run_artifacts_root),
+                order=review_stage_attempt_order(
+                    stage="mitigator", retry_context=retry_context
+                ),
+                stage="mitigator",
+                attempt=mitigation_attempt_label(retry_context),
+            ),
+            analysis_result=analysis_result,
+            retry_context=retry_context,
+            test_changes=review_intent.test_changes,
+            setup_declaration_content=setup_declaration_content_for_backend(
+                prepared_input
+            ),
+            runtime_context=request.runtime_context,
+        )
 
 
 @activity.defn
 async def verify_pull_request_activity(
-    prepared_input: dict[str, Any],
+    request: ReviewWorkflowRequest,
     analysis_result: dict[str, Any],
     mitigation_result: dict[str, Any] | None,
     retry_context: dict[str, Any] | None,
-    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
+    from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.transcripts import (
         review_transcript_path,
@@ -191,6 +214,7 @@ async def verify_pull_request_activity(
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
     )
+    from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import (
         artifact_path,
         required_path,
@@ -199,6 +223,7 @@ async def verify_pull_request_activity(
         verify_pull_request,
     )
 
+    prepared_input = request.prepared_input
     run_artifacts_root = required_path(
         prepared_input["artifact_root_path"],
         label="artifact_root_path",
@@ -226,32 +251,43 @@ async def verify_pull_request_activity(
         bundle_paths["workspace_snapshot_tar_path"],
         label="bundle_paths.workspace_snapshot_tar_path",
     )
-    return await verify_pull_request(
-        pr=prepared_input["pr"],
-        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
-        history_path=required_path(
-            bundle_paths["history_path"],
-            label="bundle_paths.history_path",
-        ),
-        incremental_window_path=required_path(
-            bundle_paths["incremental_window_path"],
-            label="bundle_paths.incremental_window_path",
-        ),
-        verifier_artifacts_path=verifier_artifacts_path,
-        published_transcript_path=review_transcript_path(
-            review_transcripts_root(run_artifacts_root),
-            order=review_stage_attempt_order(
-                stage="verifier", retry_context=retry_context
+    pass_index = int((retry_context or {}).get("retry_index") or 0)
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name=request.workflow,
+            run_id=request.run_id,
+            pass_kind="feedback" if retry_context is not None else "initial",
+            pass_index=str(pass_index),
+        )
+    ):
+        return await verify_pull_request(
+            pr=prepared_input["pr"],
+            workspace_snapshot_tar_path=workspace_snapshot_tar_path,
+            history_path=required_path(
+                bundle_paths["history_path"],
+                label="bundle_paths.history_path",
             ),
-            stage="verifier",
-            attempt=verification_attempt_label(retry_context),
-        ),
-        analysis_result=analysis_result,
-        mitigation_result=mitigation_result,
-        retry_context=retry_context,
-        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
-        runtime_context=runtime_context,
-    )
+            incremental_window_path=required_path(
+                bundle_paths["incremental_window_path"],
+                label="bundle_paths.incremental_window_path",
+            ),
+            verifier_artifacts_path=verifier_artifacts_path,
+            published_transcript_path=review_transcript_path(
+                review_transcripts_root(run_artifacts_root),
+                order=review_stage_attempt_order(
+                    stage="verifier", retry_context=retry_context
+                ),
+                stage="verifier",
+                attempt=verification_attempt_label(retry_context),
+            ),
+            analysis_result=analysis_result,
+            mitigation_result=mitigation_result,
+            retry_context=retry_context,
+            setup_declaration_content=setup_declaration_content_for_backend(
+                prepared_input
+            ),
+            runtime_context=request.runtime_context,
+        )
 
 
 @activity.defn
@@ -294,34 +330,25 @@ def build_pull_request_review_result_activity(
 class PullRequestReviewWorkflow:
     @workflow.run
     async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
-        await workflow.execute_activity(
-            prepare_internal_workflow_activity,
-            args=[request.workflow, request.run_id],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
-        prepared_input = request.prepared_input
-        runtime_context = request.runtime_context
         analysis_result = await workflow.execute_activity(
             analyze_pull_request_activity,
-            args=[prepared_input, runtime_context],
+            request,
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
         mitigation_result = await workflow.execute_activity(
             mitigate_pull_request_activity,
-            args=[prepared_input, analysis_result, None, runtime_context],
+            args=[request, analysis_result, None],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
         verifier_result = await workflow.execute_activity(
             verify_pull_request_activity,
             args=[
-                prepared_input,
+                request,
                 analysis_result,
                 mitigation_result,
                 None,
-                runtime_context,
             ],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
@@ -342,24 +369,23 @@ class PullRequestReviewWorkflow:
             history = retry_context["history"]
             await workflow.execute_activity(
                 archive_pull_request_feedback_attempt_activity,
-                args=[prepared_input, retry_context],
+                args=[request.prepared_input, retry_context],
                 schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
                 retry_policy=activity_retry_policy(),
             )
             mitigation_result = await workflow.execute_activity(
                 mitigate_pull_request_activity,
-                args=[prepared_input, analysis_result, retry_context, runtime_context],
+                args=[request, analysis_result, retry_context],
                 schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
                 retry_policy=activity_retry_policy(),
             )
             verifier_result = await workflow.execute_activity(
                 verify_pull_request_activity,
                 args=[
-                    prepared_input,
+                    request,
                     analysis_result,
                     mitigation_result,
                     retry_context,
-                    runtime_context,
                 ],
                 schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
                 retry_policy=activity_retry_policy(),

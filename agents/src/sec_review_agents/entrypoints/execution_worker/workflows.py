@@ -9,7 +9,6 @@ from sec_review_agents.entrypoints.execution_worker.workflow import (
 from sec_review_agents.run_diagnostics.publication import (
     publish_run_diagnostic_activity,
 )
-from sec_review_agents.temporal.support import prepare_internal_workflow_activity
 from sec_review_agents.workflows.issue.single_agent import (
     IssueSingleAgentWorkflow,
     build_issue_single_agent_result_activity,
@@ -80,7 +79,6 @@ WORKFLOWS: list[Any] = [
 ]
 ACTIVITIES: list[Any] = [
     prepare_execution_run_activity,
-    prepare_internal_workflow_activity,
     analyze_issue_activity,
     mitigate_issue_activity,
     verify_issue_activity,

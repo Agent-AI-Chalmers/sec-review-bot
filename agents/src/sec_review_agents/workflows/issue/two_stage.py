@@ -16,7 +16,6 @@ from sec_review_agents.run_diagnostics.publication import (
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
-    prepare_internal_workflow_activity,
 )
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.issue.workflow import (
@@ -33,10 +32,10 @@ from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 @activity.defn
 async def mitigate_issue_self_check_activity(
-    prepared_input: dict[str, Any],
+    request: ReviewWorkflowRequest,
     analysis_result: Mapping[str, Any],
-    runtime_context: ExecutionRuntimeContext,
 ) -> dict[str, Any]:
+    from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.mitigation.stage import (
         create_skipped_mitigation_result,
         mitigation_attempt_label,
@@ -48,11 +47,13 @@ async def mitigate_issue_self_check_activity(
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
     )
+    from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import artifact_path, required_path
     from sec_review_agents.workflows.issue.mitigation_self_check import (
         mitigate_issue_with_self_check,
     )
 
+    prepared_input = request.prepared_input
     run_artifacts_root = required_path(
         prepared_input["artifact_root_path"],
         label="artifact_root_path",
@@ -80,25 +81,35 @@ async def mitigate_issue_self_check_activity(
         bundle_paths["workspace_snapshot_tar_path"],
         label="bundle_paths.workspace_snapshot_tar_path",
     )
-    return await mitigate_issue_with_self_check(
-        issue=prepared_input["issue"],
-        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
-        history_path=required_path(
-            bundle_paths["history_path"],
-            label="bundle_paths.history_path",
-        ),
-        mitigator_artifacts_path=mitigator_artifacts_path,
-        published_transcript_path=review_transcript_path(
-            review_transcripts_root(run_artifacts_root),
-            order=2,
-            stage="mitigator",
-            attempt=mitigation_attempt_label(None),
-        ),
-        analysis_result=analysis_result,
-        test_changes=review_intent.test_changes,
-        runtime_context=runtime_context,
-        setup_declaration_content=setup_declaration_content_for_backend(prepared_input),
-    )
+    with bind_trace_context(
+        **activity_trace_labels(
+            workflow_name=request.workflow,
+            run_id=request.run_id,
+            pass_kind="initial",
+            pass_index="0",
+        )
+    ):
+        return await mitigate_issue_with_self_check(
+            issue=prepared_input["issue"],
+            workspace_snapshot_tar_path=workspace_snapshot_tar_path,
+            history_path=required_path(
+                bundle_paths["history_path"],
+                label="bundle_paths.history_path",
+            ),
+            mitigator_artifacts_path=mitigator_artifacts_path,
+            published_transcript_path=review_transcript_path(
+                review_transcripts_root(run_artifacts_root),
+                order=2,
+                stage="mitigator",
+                attempt=mitigation_attempt_label(None),
+            ),
+            analysis_result=analysis_result,
+            test_changes=review_intent.test_changes,
+            runtime_context=request.runtime_context,
+            setup_declaration_content=setup_declaration_content_for_backend(
+                prepared_input
+            ),
+        )
 
 
 @activity.defn
@@ -115,23 +126,16 @@ def build_issue_two_stage_result_activity(
 class IssueTwoStageWorkflow:
     @workflow.run
     async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
-        await workflow.execute_activity(
-            prepare_internal_workflow_activity,
-            args=[request.workflow, request.run_id],
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
-            retry_policy=activity_retry_policy(),
-        )
         prepared_input = request.prepared_input
-        runtime_context = request.runtime_context
         analysis_result = await workflow.execute_activity(
             analyze_issue_activity,
-            args=[prepared_input, runtime_context],
+            request,
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
         mitigation_result = await workflow.execute_activity(
             mitigate_issue_self_check_activity,
-            args=[prepared_input, analysis_result, runtime_context],
+            args=[request, analysis_result],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
@@ -291,14 +295,10 @@ async def execute_issue_two_stage(
 async def run_issue_two_stage_direct(
     request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
-    prepared_input = request.prepared_input
-    runtime_context = request.runtime_context
-    prepare_internal_workflow_activity(request.workflow, request.run_id)
-    analysis_result = await analyze_issue_activity(prepared_input, runtime_context)
+    analysis_result = await analyze_issue_activity(request)
     mitigation_result = await mitigate_issue_self_check_activity(
-        prepared_input,
+        request,
         analysis_result,
-        runtime_context,
     )
     return build_issue_two_stage_result_activity(
         {

@@ -50,12 +50,23 @@ def _compact_string_metadata(values: Mapping[str, object]) -> dict[str, str]:
 
 
 def _build_metadata(agent_name: str) -> dict[str, str]:
+    """Project the current activity labels into stable Langfuse metadata."""
     trace_context = current_trace_context()
     return _compact_string_metadata(
         {
             "sec_review_agent": agent_name,
             "sec_review_workflow": trace_context.get("workflow"),
             "sec_review_run_id": trace_context.get("run_id"),
+            "sec_review_statistics_scope": trace_context.get("statistics_scope"),
+            "sec_review_case_id": trace_context.get("case_id"),
+            "sec_review_chunk_id": trace_context.get("chunk_id"),
+            "sec_review_batch_index": trace_context.get("batch_index"),
+            "sec_review_delivery_id": trace_context.get("delivery_id"),
+            "sec_review_pass_kind": trace_context.get("pass_kind"),
+            "sec_review_pass_index": trace_context.get("pass_index"),
+            "sec_review_temporal_activity_attempt": trace_context.get(
+                "temporal_activity_attempt"
+            ),
             "langfuse_session_id": trace_context.get("run_id"),
         }
     )

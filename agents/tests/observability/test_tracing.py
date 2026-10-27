@@ -64,6 +64,18 @@ def test_trace_context_ignores_none_and_strips_strings() -> None:
     assert current_trace_context() == {"workflow": "repository-review"}
 
 
+def test_trace_context_token_restores_previous_context() -> None:
+    bind_trace_context(workflow="outer-workflow")
+
+    with bind_trace_context(run_id="run-1"):
+        assert current_trace_context() == {
+            "workflow": "outer-workflow",
+            "run_id": "run-1",
+        }
+
+    assert current_trace_context() == {"workflow": "outer-workflow"}
+
+
 def test_trace_context_rejects_blank_strings() -> None:
     with pytest.raises(ValueError, match="must not be blank"):
         bind_trace_context(workflow=" ")

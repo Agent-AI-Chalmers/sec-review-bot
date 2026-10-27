@@ -13,7 +13,6 @@ from sec_review_agents.delivery_stages.result import (
     persist_delivery_result,
 )
 from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
-from sec_review_agents.temporal.support import prepare_internal_workflow_activity
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.repository.workflow import (
     RepositoryCaseReviewRequest,
@@ -34,7 +33,6 @@ from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 async def run_repository_review_direct(
     request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
-    prepare_internal_workflow_activity(request.workflow, request.run_id)
     scan_result = await run_repository_scan_direct(request)
     case_results = await run_repository_case_reviews_direct(request, scan_result)
     delivery_result = await run_repository_delivery_direct(request, case_results)
@@ -74,7 +72,7 @@ async def run_repository_discovery_direct(
     ) -> tuple[int, dict[str, Any]]:
         async with semaphore:
             return index, await scan_repository_discovery_chunk_activity(
-                manifest, chunk
+                request, manifest, chunk
             )
 
     chunk_results: list[dict[str, Any] | None] = [None] * len(chunks)

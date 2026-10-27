@@ -11,6 +11,8 @@ from sec_review_agents.observability.trace_context import current_trace_context
 def _merge_trace_context(
     logger: Any, method_name: str, event_dict: dict[str, Any]
 ) -> dict[str, Any]:
+    # Activity code binds once; every log emitted below it receives the same
+    # run/case/pass labels without threading them through logging call sites.
     for key, value in current_trace_context().items():
         event_dict.setdefault(key, value)
     return event_dict

@@ -248,8 +248,8 @@ async def _run_case_workflow(state: _CaseWorkflowState) -> dict[str, Any]:
 
     @activity.defn(name="analyze_repository_case_activity")
     def fake_analyze_repository_case(
+        _request: dict[str, Any],
         _prepared_case: dict[str, Any],
-        _runtime_context: dict[str, Any],
     ) -> dict[str, Any]:
         return {
             "overview": "confirmed",
@@ -259,6 +259,7 @@ async def _run_case_workflow(state: _CaseWorkflowState) -> dict[str, Any]:
 
     @activity.defn(name="score_repository_case_cvss_activity")
     def fake_score_repository_case_cvss(
+        _request: dict[str, Any],
         _prepared_case: dict[str, Any],
         _analysis_result: dict[str, Any],
     ) -> dict[str, Any]:
@@ -266,21 +267,21 @@ async def _run_case_workflow(state: _CaseWorkflowState) -> dict[str, Any]:
 
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigate_repository_case(
+        _request: dict[str, Any],
         _prepared_case: dict[str, Any],
         _analysis_result: dict[str, Any],
         retry_context: dict[str, Any] | None,
-        _runtime_context: dict[str, Any],
     ) -> dict[str, Any]:
         state.mitigation_retry_contexts.append(retry_context)
         return state.mitigation_results.pop(0)
 
     @activity.defn(name="verify_repository_case_activity")
     def fake_verify_repository_case(
+        _request: dict[str, Any],
         _prepared_case: dict[str, Any],
         _analysis_result: dict[str, Any],
         _mitigation_result: dict[str, Any] | None,
         retry_context: dict[str, Any] | None,
-        _runtime_context: dict[str, Any],
     ) -> dict[str, Any]:
         state.verification_retry_contexts.append(retry_context)
         if retry_context is not None:

@@ -5,7 +5,6 @@ from sec_review_agents.review_stages.feedback_loop import (
     feedback_retry_context,
     should_retry_from_verifier_result,
 )
-from sec_review_agents.temporal.support import prepare_internal_workflow_activity
 from sec_review_agents.workflows.pull_request.workflow import (
     analyze_pull_request_activity,
     archive_pull_request_feedback_attempt_activity,
@@ -19,24 +18,18 @@ from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 async def run_pull_request_review_direct(
     request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
-    prepare_internal_workflow_activity(request.workflow, request.run_id)
     prepared_input = request.prepared_input
-    runtime_context = request.runtime_context
-    analysis_result = await analyze_pull_request_activity(
-        prepared_input, runtime_context
-    )
+    analysis_result = await analyze_pull_request_activity(request)
     mitigation_result = await mitigate_pull_request_activity(
-        prepared_input,
+        request,
         analysis_result,
         None,
-        runtime_context,
     )
     verifier_result = await verify_pull_request_activity(
-        prepared_input,
+        request,
         analysis_result,
         mitigation_result,
         None,
-        runtime_context,
     )
     retry_count = 0
     history: list[dict[str, Any]] = []
@@ -54,17 +47,15 @@ async def run_pull_request_review_direct(
         history = retry_context["history"]
         archive_pull_request_feedback_attempt_activity(prepared_input, retry_context)
         mitigation_result = await mitigate_pull_request_activity(
-            prepared_input,
+            request,
             analysis_result,
             retry_context,
-            runtime_context,
         )
         verifier_result = await verify_pull_request_activity(
-            prepared_input,
+            request,
             analysis_result,
             mitigation_result,
             retry_context,
-            runtime_context,
         )
     return build_pull_request_review_result_activity(
         analysis_result,
