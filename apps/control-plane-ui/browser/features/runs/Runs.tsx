@@ -7,7 +7,6 @@ import {
   Collapse,
   Container,
   Group,
-  NativeSelect,
   Pagination,
   Paper,
   Select,
@@ -69,6 +68,38 @@ const DEFAULT_PAGE_SIZE = 50
 /** sessionStorage key for the visited-page trail, so it survives navigation to a
  * run detail and back (see the cursorParents state below). */
 const CURSOR_PARENTS_KEY = 'runs:cursor-parents'
+
+interface FilterOption {
+  value: string
+  label: string
+}
+
+function FilterSelect({
+  width,
+  label,
+  value,
+  options,
+  onChange
+}: {
+  width: number
+  label: string
+  value: string
+  options: FilterOption[]
+  onChange: (value: string) => void
+}): React.JSX.Element {
+  const t = useMessages()
+  return (
+    <Select
+      w={width}
+      label={label}
+      value={value === '' ? 'all' : value}
+      onChange={(next) => onChange(next === null || next === 'all' ? '' : next)}
+      data={[{ value: 'all', label: t('all') }, ...options]}
+      allowDeselect={false}
+      comboboxProps={{ withinPortal: true }}
+    />
+  )
+}
 
 export function Runs(): React.JSX.Element {
   const { language } = useLanguage()
@@ -327,72 +358,50 @@ export function Runs(): React.JSX.Element {
         {/* Page size lives with the pager below the table, where "how many per page" is asked. */}
         <div className="operations-row">
           <Group aria-label="Run list controls" align="flex-end" gap="md">
-            <NativeSelect
-              w={120}
+            <FilterSelect
+              width={120}
               label={t('platform')}
               value={search.get('source_platform') ?? ''}
-              onChange={(event) =>
-                update('source_platform', event.target.value)
-              }
-            >
-              <option value="">{t('all')}</option>
-              <option value="github">{t('platformGithub')}</option>
-            </NativeSelect>
-            <NativeSelect
-              w={150}
+              onChange={(value) => update('source_platform', value)}
+              options={[{ value: 'github', label: t('platformGithub') }]}
+            />
+            <FilterSelect
+              width={150}
               label={t('workflow')}
               value={search.get('workflow') ?? ''}
-              onChange={(event) => update('workflow', event.target.value)}
-            >
-              <option value="">{t('all')}</option>
-              {['issue-review', 'pull-request-review', 'repository-review'].map(
-                (value) => (
-                  <option key={value} value={value}>
-                    {workflowLabel(value, t)}
-                  </option>
-                )
-              )}
-            </NativeSelect>
-            <NativeSelect
-              w={130}
+              onChange={(value) => update('workflow', value)}
+              options={[
+                'issue-review',
+                'pull-request-review',
+                'repository-review'
+              ].map((value) => ({ value, label: workflowLabel(value, t) }))}
+            />
+            <FilterSelect
+              width={130}
               label={t('preparation')}
               value={search.get('preparation_status') ?? ''}
-              onChange={(event) =>
-                update('preparation_status', event.target.value)
-              }
-            >
-              <option value="">{t('all')}</option>
-              {PREPARATION_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {preparationStateLabel(value, t)}
-                </option>
-              ))}
-            </NativeSelect>
-            <NativeSelect
-              w={120}
+              onChange={(value) => update('preparation_status', value)}
+              options={PREPARATION_STATUSES.map((value) => ({
+                value,
+                label: preparationStateLabel(value, t)
+              }))}
+            />
+            <FilterSelect
+              width={120}
               label={t('execution')}
               value={search.get('execution_status') ?? ''}
-              onChange={(event) =>
-                update('execution_status', event.target.value)
-              }
-            >
-              <option value="">{t('all')}</option>
-              {EXECUTION_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {executionStatusLabel(value, t)}
-                </option>
-              ))}
-            </NativeSelect>
-            <NativeSelect
-              w={130}
+              onChange={(value) => update('execution_status', value)}
+              options={EXECUTION_STATUSES.map((value) => ({
+                value,
+                label: executionStatusLabel(value, t)
+              }))}
+            />
+            <FilterSelect
+              width={130}
               label={t('publication')}
               value={search.get('publication_status') ?? ''}
-              onChange={(event) =>
-                update('publication_status', event.target.value)
-              }
-            >
-              <option value="">{t('all')}</option>
-              {(
+              onChange={(value) => update('publication_status', value)}
+              options={(
                 [
                   'pending',
                   'publishing',
@@ -400,12 +409,11 @@ export function Runs(): React.JSX.Element {
                   'failed',
                   'skipped'
                 ] as const
-              ).map((value) => (
-                <option key={value} value={value}>
-                  {runPublicationStatusLabel(value, t)}
-                </option>
-              ))}
-            </NativeSelect>
+              ).map((value) => ({
+                value,
+                label: runPublicationStatusLabel(value, t)
+              }))}
+            />
             <Button
               variant={search.has('range') ? 'light' : 'subtle'}
               leftSection={<IconAdjustmentsHorizontal size={ICON_SIZE.md} />}
@@ -427,17 +435,17 @@ export function Runs(): React.JSX.Element {
         </div>
         <Collapse expanded={moreFiltersOpened}>
           <Group className="operations-more" mt="md" align="flex-end">
-            <NativeSelect
-              w={140}
+            <FilterSelect
+              width={140}
               label={t('timeRange')}
               value={search.get('range') ?? ''}
-              onChange={(event) => update('range', event.target.value)}
-            >
-              <option value="">{t('all')}</option>
-              <option value="1h">{t('lastHour')}</option>
-              <option value="24h">{t('lastDay')}</option>
-              <option value="7d">{t('lastWeek')}</option>
-            </NativeSelect>
+              onChange={(value) => update('range', value)}
+              options={[
+                { value: '1h', label: t('lastHour') },
+                { value: '24h', label: t('lastDay') },
+                { value: '7d', label: t('lastWeek') }
+              ]}
+            />
           </Group>
         </Collapse>
       </Box>

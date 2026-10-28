@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict'
 
+async function chooseSelect(page, label, option) {
+  await page.getByRole('combobox', { name: label, exact: true }).click()
+  await page.getByRole('option', { name: option, exact: true }).click()
+}
+
 export async function smokeRuns({
   name,
   viewport,
@@ -146,20 +151,19 @@ export async function smokeRuns({
     // The fixture spreads its runs over more than a week, so each range preset must
     // narrow the list by a distinct amount rather than silently filtering nothing.
     await page.getByRole('button', { name: 'More filters' }).click()
-    const timeRange = page.getByLabel('Time range')
     const allRows = (await rows()).length
-    await timeRange.selectOption('1h')
+    await chooseSelect(page, 'Time range', 'Last hour')
     await waitUntil(
       async () => (await rows()).length < allRows,
       `${name} a one-hour range must narrow the list`
     )
     const hourRows = (await rows()).length
-    await timeRange.selectOption('24h')
+    await chooseSelect(page, 'Time range', 'Last 24 hours')
     await waitUntil(async () => {
       const count = (await rows()).length
       return count > hourRows && count < allRows
     }, `${name} a 24-hour range must sit between the hour and everything`)
-    await timeRange.selectOption('')
+    await chooseSelect(page, 'Time range', 'All')
     await waitUntil(
       async () => (await rows()).length === allRows,
       `${name} clearing the range must restore the list`
@@ -168,8 +172,7 @@ export async function smokeRuns({
     // Preparation is a lifecycle axis of its own, not a facet of the Execution or
     // publication state: selecting one of its states must narrow the list and every
     // surviving row must report that state in its Preparation cell.
-    const preparation = page.getByLabel('Preparation')
-    await preparation.selectOption('failed')
+    await chooseSelect(page, 'Preparation', 'Failed')
     await waitUntil(
       async () => (await rows()).length < allRows,
       `${name} a preparation state must narrow the list`
@@ -181,7 +184,7 @@ export async function smokeRuns({
       preparationCells.length > 0,
       `${name} a preparation filter must leave rows to inspect`
     )
-    await preparation.selectOption('')
+    await chooseSelect(page, 'Preparation', 'All')
     await waitUntil(
       async () => (await rows()).length === allRows,
       `${name} clearing the preparation filter must restore the list`
@@ -190,21 +193,20 @@ export async function smokeRuns({
     // The Execution filter must offer every state the contract declares, including the
     // two that are not part of the happy path. Otherwise an operator cannot isolate an
     // unconfirmed submission or a run whose execution was skipped.
-    const execution = page.getByLabel('Execution')
-    const executionStates = await execution
-      .locator('option')
-      .evaluateAll((options) => options.map((option) => option.value))
+    await page.getByRole('combobox', { name: 'Execution', exact: true }).click()
+    const executionStates = await page.getByRole('option').allTextContents()
     assert.ok(
-      executionStates.includes('uncertain') &&
-        executionStates.includes('skipped'),
+      executionStates.includes('Uncertain') &&
+        executionStates.includes('Skipped'),
       `${name} the Execution filter must include uncertain and skipped`
     )
-    await execution.selectOption('uncertain')
+    await page.keyboard.press('Escape')
+    await chooseSelect(page, 'Execution', 'Uncertain')
     await waitUntil(
       async () => (await rows()).length < allRows,
       `${name} the uncertain execution state must narrow the list`
     )
-    await execution.selectOption('')
+    await chooseSelect(page, 'Execution', 'All')
     await waitUntil(
       async () => (await rows()).length === allRows,
       `${name} clearing the execution filter must restore the list`
@@ -300,8 +302,8 @@ export async function smokeRuns({
 
     // A repository review publishes one step per delivery plus two summaries, so a
     // published one must render the multi-step delivery list.
-    await page.getByLabel('Workflow').selectOption('repository-review')
-    await page.getByLabel('Publication').selectOption('published')
+    await chooseSelect(page, 'Workflow', 'Repository review')
+    await chooseSelect(page, 'Publication', 'Published')
     // Wait until the filters have been applied to the list, so the first row we open is
     // actually a published repository review rather than a stale row.
     //
@@ -773,7 +775,7 @@ export async function smokeRuns({
   // The newest fixture run may still be preparing, whose Execution phase shows a status
   // rather than an elapsed time. Filter to a run that has actually been submitted so the
   // timing assertions below are about a phase that has begun.
-  await page.getByLabel('Execution').selectOption('running')
+  await chooseSelect(page, 'Execution', 'Running')
   // Wait for the filter to actually apply: a stale row from before the selection would
   // otherwise be clicked, and a still-preparing run has no Execution timestamp to assert.
   await waitUntil(
@@ -922,7 +924,7 @@ export async function smokeRuns({
   // A publication that was ruled out is not a moment either, so it must stay
   // silent rather than repeat the Execution failure time.
   await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
-  await page.getByLabel('Execution').selectOption('failed')
+  await chooseSelect(page, 'Execution', 'Failed')
   await waitUntil(
     async () =>
       /[A-Z_]{4,}/.test(

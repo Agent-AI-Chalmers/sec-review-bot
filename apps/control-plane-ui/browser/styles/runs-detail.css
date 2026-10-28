@@ -49,6 +49,24 @@
 
 /* ----------------------------------------------------------------- run list */
 
+/* Native selects are gone; keep every combobox popup on the same rounded surface. */
+.mantine-Combobox-dropdown,
+.mantine-Popover-dropdown {
+  border-radius: var(--mantine-radius-md);
+  overflow: hidden;
+}
+
+.mantine-Select-options,
+.mantine-Combobox-options {
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.mantine-Combobox-option,
+.mantine-Select-option {
+  border-radius: var(--mantine-radius-sm);
+}
+
 .run-id {
   overflow-wrap: anywhere;
 }

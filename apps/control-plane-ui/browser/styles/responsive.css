@@ -139,14 +139,8 @@
   }
 
   .operations-bar [aria-label='Run list controls'] > *,
-  .operations-bar
-    [aria-label='Run list controls']
-    > *
-    .mantine-NativeSelect-root,
   .operations-per-page,
-  .operations-per-page .mantine-NativeSelect-root,
-  .operations-more,
-  .operations-more .mantine-NativeSelect-root {
+  .operations-more {
     min-width: 0;
     width: 100% !important;
   }
