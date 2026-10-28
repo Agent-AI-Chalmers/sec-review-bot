@@ -1,11 +1,12 @@
 import React from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  Alert,
+  Badge,
   Box,
   Button,
   Collapse,
   Container,
+  Drawer,
   Group,
   Pagination,
   Paper,
@@ -14,7 +15,8 @@ import {
   Table,
   Text,
   Title,
-  Tooltip
+  Tooltip,
+  UnstyledButton
 } from '@mantine/core'
 import {
   IconAdjustmentsHorizontal,
@@ -142,7 +144,7 @@ export function Runs(): React.JSX.Element {
   // normal pagination, and an operator needs to see them before the list, so they load
   // separately and a failure here never hides the list itself.
   const [blocked, setBlocked] = React.useState<ParkedRun[]>([])
-  const [showParkedDetails, setShowParkedDetails] = React.useState(false)
+  const [parkedOpen, setParkedOpen] = React.useState(false)
   React.useEffect(() => {
     let cancelled = false
     parkedRuns()
@@ -289,64 +291,83 @@ export function Runs(): React.JSX.Element {
         </Group>
       </Group>
       {blocked.length > 0 && (
-        <Alert
-          color="orange"
-          variant="light"
-          mb="md"
-          title={
-            <Group gap="xs" align="center" wrap="nowrap">
-              <IconAlertTriangle size={ICON_SIZE.md} aria-hidden />
-              <span>{t('parkedRunsTitle')}</span>
-            </Group>
-          }
-          className="parked-runs-alert"
-          data-testid="parked-runs"
-          // A standing queue, not a transient fault: `role="alert"` belongs to the refresh
-          // error below, and Mantine's Alert would otherwise claim that role and be the first
-          // thing an alert-based assertion sees.
-          role="status"
-        >
-          <Text size="sm">{t('parkedRunsSummary')}</Text>
-          <div id="parked-runs-details">
-            <Collapse expanded={showParkedDetails}>
-              <Text size="sm" mt="xs" mb="xs">
-                {t('parkedRunsBody')}
-              </Text>
-              <Stack gap={4}>
-                {blocked.map((block) => (
-                  <Text
-                    key={block.run_id}
-                    size="sm"
-                    component={Link}
-                    to={`/runs/${encodeURIComponent(block.run_id)}`}
-                    c="orange.9"
-                  >
-                    {/* The axis is shown because the decision differs by axis, and the run id alone
-                        leaves the operator guessing which one stopped. */}
-                    <Text span size="xs" c="dimmed">
-                      {axisLabel(block.axis, t)}
-                      {' · '}
-                    </Text>
-                    <Text span ff="monospace" size="sm">
-                      {block.run_id}
-                    </Text>
-                  </Text>
-                ))}
-              </Stack>
-            </Collapse>
-          </div>
-          <Button
-            variant="subtle"
-            color="orange"
-            size="compact-xs"
-            mt="xs"
-            aria-expanded={showParkedDetails}
-            aria-controls="parked-runs-details"
-            onClick={() => setShowParkedDetails((value) => !value)}
+        <>
+          <Paper
+            withBorder
+            p="sm"
+            mb="md"
+            className="parked-runs-summary"
+            data-testid="parked-runs"
+            role="status"
           >
-            {showParkedDetails ? t('hideDetails') : t('showDetails')}
-          </Button>
-        </Alert>
+            <Group justify="space-between" align="center" wrap="wrap" gap="sm">
+              <Group gap="xs" align="center" wrap="nowrap">
+                <IconAlertTriangle size={ICON_SIZE.md} aria-hidden />
+                <Text size="sm" fw={600}>
+                  {t('parkedRunsTitle')}
+                </Text>
+                <Badge size="sm" color="orange" variant="light">
+                  {blocked.length}
+                </Badge>
+              </Group>
+              <Button
+                variant="light"
+                color="orange"
+                size="compact-sm"
+                onClick={() => setParkedOpen(true)}
+              >
+                {t('parkedRunsView')}
+              </Button>
+            </Group>
+          </Paper>
+          <Drawer
+            opened={parkedOpen}
+            onClose={() => setParkedOpen(false)}
+            position="right"
+            size="lg"
+            title={t('parkedRunsTitle')}
+          >
+            <Stack gap="md">
+              <Stack gap={4}>
+                <Text size="sm">{t('parkedRunsSummary')}</Text>
+                <Text size="sm" c="dimmed">
+                  {t('parkedRunsBody')}
+                </Text>
+              </Stack>
+              <Stack gap="xl">
+                {(['preparation', 'execution', 'publication'] as const).map(
+                  (axis) => {
+                    const runs = blocked.filter((block) => block.axis === axis)
+                    if (runs.length === 0) return null
+                    return (
+                      <Stack gap="sm" key={axis}>
+                        <Text size="xs" fw={600} c="dimmed" tt="uppercase">
+                          {axisLabel(axis, t)}
+                        </Text>
+                        {runs.map((block) => (
+                          <UnstyledButton
+                            key={block.run_id}
+                            component={Link}
+                            to={`/runs/${encodeURIComponent(block.run_id)}`}
+                            className="parked-run-row"
+                          >
+                            <Text
+                              size="sm"
+                              ff="monospace"
+                              className="parked-run-id"
+                            >
+                              {block.run_id}
+                            </Text>
+                          </UnstyledButton>
+                        ))}
+                      </Stack>
+                    )
+                  }
+                )}
+              </Stack>
+            </Stack>
+          </Drawer>
+        </>
       )}
       {Boolean(error) && (
         <Text role="alert" c="red" mb="md">
@@ -450,7 +471,7 @@ export function Runs(): React.JSX.Element {
         </Collapse>
       </Box>
       {data === undefined ? (
-        <LoadingState message={t('loadingRuns')} />
+        <LoadingState message={t('loadingRuns')} fill />
       ) : data.runs.length === 0 ? (
         <EmptyState
           message={t('emptyRuns')}

@@ -89,8 +89,54 @@
   font-size: var(--mantine-font-size-sm);
 }
 
-.parked-runs-alert .mantine-Alert-body {
-  padding-left: var(--space-1);
+.parked-runs-summary {
+  border-color: light-dark(
+    var(--mantine-color-orange-2),
+    var(--mantine-color-orange-9)
+  );
+  background: light-dark(
+    var(--mantine-color-orange-0),
+    var(--mantine-color-dark-6)
+  );
+}
+
+.parked-runs-summary svg {
+  color: var(--mantine-color-orange-6);
+}
+
+.parked-run-row.parked-run-row {
+  display: block;
+  width: 100%;
+  padding: var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--mantine-radius-sm);
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.parked-run-row.parked-run-row:hover,
+.parked-run-row.parked-run-row:focus-visible {
+  border-color: var(--border);
+  background: var(--mantine-color-default-hover);
+}
+
+.parked-run-row.parked-run-row:focus-visible {
+  outline: 2px solid var(--mantine-color-anchor);
+  outline-offset: -2px;
+}
+
+.parked-run-id {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 360px) {
+  .parked-run-id.parked-run-id {
+    font-size: 0.75rem;
+  }
 }
 
 /* A run coordination refused to conclude on its own. Mantine's Alert supplies the surface and

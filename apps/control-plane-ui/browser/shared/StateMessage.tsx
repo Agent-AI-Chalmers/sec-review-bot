@@ -7,12 +7,21 @@ import { Loader, Stack, Text } from '@mantine/core'
  * same everywhere instead of being bare <p> or dimmed text.
  */
 export function LoadingState({
-  message
+  message,
+  fill = false
 }: {
   message: string
+  fill?: boolean
 }): React.JSX.Element {
   return (
-    <Stack align="center" gap="sm" py="xl" role="status">
+    <Stack
+      align="center"
+      justify={fill ? 'center' : undefined}
+      gap="sm"
+      py={fill ? 0 : 'xl'}
+      className={fill ? 'loading-state-fill' : undefined}
+      role="status"
+    >
       <Loader size="sm" />
       <Text c="dimmed" size="sm">
         {message}

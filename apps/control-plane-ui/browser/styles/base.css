@@ -210,6 +210,11 @@ samp {
   font-family: var(--mantine-font-family-monospace);
 }
 
+.loading-state-fill {
+  width: 100%;
+  min-height: min(52vh, 560px);
+}
+
 .error-fallback {
   display: grid;
   min-height: calc(100dvh - 58px);

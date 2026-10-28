@@ -380,6 +380,7 @@ export const messages = {
     sessionExpired: 'Your session expired. Sign in again, then retry.',
     parkedRunsTitle: 'These runs need your review',
     parkedRunsSummary: 'Parked runs need a decision before they can continue.',
+    parkedRunsView: 'View',
     showDetails: 'Show details',
     hideDetails: 'Hide details',
     parkedRunsBody:
@@ -912,6 +913,7 @@ export const messages = {
     sessionExpired: '会话已过期。请重新登录后再试。',
     parkedRunsTitle: '这些运行需要你审计',
     parkedRunsSummary: '已暂停的运行需要先做决定才能继续。',
+    parkedRunsView: '查看',
     showDetails: '显示详情',
     hideDetails: '隐藏详情',
     parkedRunsBody:
