@@ -288,8 +288,6 @@ export const messages = {
     statisticsCombinedDelivery: 'Combined delivery',
     statisticsCombinedDeliveryCount: 'combined delivery',
     statisticsCombinedDeliveries: 'combined deliveries',
-    runHistory: 'History',
-    runHistoryEmpty: 'No recorded transitions yet',
     failureCodePreparationRetryExhausted:
       'Preparation kept failing and ran out of retries.',
     // Each sentence states what the code itself means - the fact it names and its consequence.
@@ -548,7 +546,6 @@ export const messages = {
       'an operator returned it to the normal publication queue',
     edge_publication_disconnected_failed:
       'an operator stopped publishing (some steps may already exist)',
-    stateMachinesTitle: 'State machines',
     stateMachineHint:
       'Tap a connection to read its transition. The list below is the complete reference.',
     stateMachineTransitions: 'Transitions',
@@ -853,8 +850,6 @@ export const messages = {
     statisticsCombinedDelivery: '组合交付',
     statisticsCombinedDeliveryCount: '个组合交付',
     statisticsCombinedDeliveries: '个组合交付',
-    runHistory: '历史',
-    runHistoryEmpty: '暂无记录的变更',
     failureCodePreparationRetryExhausted: '准备阶段反复失败，重试次数已用完。',
     // 每条只说这个码本身的意思：它命名的事实，以及这件事的后果。系统怎么处理、operator 能怎么选，
     // 属于状态和它周围的横幅；在这里重复会把同一件事说两遍，也会把“决定”塞进一个本该只命名事实的词表里。
@@ -1065,7 +1060,6 @@ export const messages = {
     edge_publication_publishing_publishing:
       '发布认领过期，被新的发布者接管（状态本身不变，仅记录时间线）',
     edge_publication_publishing_published: '所有发布步骤均成功',
-    stateMachinesTitle: '状态机',
     stateMachineHint: '点按连线查看转移说明；下方列表是完整参考。',
     stateMachineTransitions: '状态转移',
     stateMachineNoTransitions: '暂无状态转移。',

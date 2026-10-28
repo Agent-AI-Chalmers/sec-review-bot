@@ -704,22 +704,6 @@ a {
   background: var(--brand);
 }
 
-.state-machine-transitions {
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--border);
-}
-
-.state-machine-transition {
-  display: grid;
-  gap: 2px;
-  padding: var(--space-2) 0;
-  border-top: 1px solid var(--border);
-}
-
-.state-machine-transition:first-child {
-  border-top: 0;
-}
-
 .state-machine-edge-tip {
   position: fixed;
   transform: translate(-50%, calc(-100% - 10px));
@@ -733,88 +717,6 @@ a {
   white-space: nowrap;
   pointer-events: none;
   z-index: 400;
-}
-
-/* Run history is an operator detail, collapsed by default. It sits below the timeline as a
-   quiet disclosure rather than a full table, so the primary run view stays uncluttered. */
-.run-history {
-  margin-top: 20px;
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-4);
-}
-
-.run-history-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: fit-content;
-  cursor: pointer;
-  user-select: none;
-  font-size: var(--mantine-font-size-sm);
-  font-weight: 500;
-  color: var(--mantine-color-dimmed);
-  list-style: none;
-}
-
-.run-history-summary::-webkit-details-marker {
-  display: none;
-}
-
-.run-history-summary:hover {
-  color: var(--mantine-color-text);
-}
-
-.run-history-chevron {
-  transition: transform 120ms ease;
-}
-
-.run-history[open] .run-history-chevron {
-  transform: rotate(90deg);
-}
-
-.run-history-count {
-  min-width: 18px;
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-panel);
-  background: var(--mantine-color-default-hover);
-  font-size: 11px;
-  line-height: 18px;
-  text-align: center;
-}
-
-.run-history-list {
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.run-history-item {
-  display: grid;
-  grid-template-columns: 150px 92px minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: var(--space-3);
-  font-size: var(--mantine-font-size-xs);
-}
-
-.run-history-time {
-  color: var(--mantine-color-dimmed);
-  white-space: nowrap;
-}
-
-.run-history-axis {
-  font-weight: 500;
-}
-
-.run-history-transition,
-.run-history-reason {
-  font-family: var(--mantine-font-family-monospace);
-}
-
-.run-history-reason {
-  color: var(--mantine-color-red-6);
 }
 
 .delivery-main {
