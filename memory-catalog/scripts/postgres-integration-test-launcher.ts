@@ -11,8 +11,9 @@ import { parse } from 'yaml'
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url))
 const catalogDirectory = path.resolve(scriptDirectory, '..')
 const repositoryDirectory = path.resolve(catalogDirectory, '..')
-const suppliedDatabaseUrl =
-  process.env.TEST_DATABASE_URL ?? process.env.MEMORY_CATALOG_DATABASE_URL
+// Never inherit the service's ordinary database URL. An external test database must be selected
+// explicitly; otherwise the launcher owns an isolated PostgreSQL container and its cleanup.
+const suppliedDatabaseUrl = process.env.TEST_DATABASE_URL
 
 async function configuredPostgresImage(): Promise<string> {
   if (process.env.TEST_POSTGRES_IMAGE !== undefined)

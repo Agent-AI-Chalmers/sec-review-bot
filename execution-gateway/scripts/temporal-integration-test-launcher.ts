@@ -11,8 +11,9 @@ import { parse } from 'yaml'
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url))
 const gatewayDirectory = path.resolve(scriptDirectory, '..')
 const repositoryDirectory = path.resolve(gatewayDirectory, '..')
-const suppliedTemporalAddress =
-  process.env.TEST_TEMPORAL_ADDRESS ?? process.env.TEMPORAL_ADDRESS
+// Never inherit the service's ordinary TEMPORAL_ADDRESS: integration tests create workflows and
+// must not write into a developer or shared deployment merely because that variable is present.
+const suppliedTemporalAddress = process.env.TEST_TEMPORAL_ADDRESS
 
 async function configuredTemporalImage(): Promise<string> {
   if (process.env.TEST_TEMPORAL_IMAGE !== undefined)
