@@ -18,7 +18,7 @@ Dependabot is configured in [`.github/dependabot.yml`](../../.github/dependabot.
 
 Dependency maintenance also includes wrappers, adapters, prompts, and tool-description overrides that compensate for upstream behavior. When a direct dependency changes, compare each local override with the current upstream implementation and the behavior it originally supplied. Keep only project-specific behavior that upstream does not own; replacing an upstream contract locally can hide later fixes and create a silent fork.
 
-> **Example: Deep Agents filesystem tools.** Deep Agents 0.7.26 already provides literal `grep` guidance, regex-miss recovery, backend-aware `rg` fallback, `max_count`, offloaded-result instructions, complete `read_file` pagination and result-shape guidance, and a bounded `execute.timeout` schema. This repository therefore keeps only its project-specific command-evidence policy in the composed agent prompt instead of replacing those tool descriptions.
+> **Example: Deep Agents filesystem tools.** Deep Agents 0.7.26 already provides literal `grep` guidance, regex-miss recovery, backend-aware `rg` fallback, `max_count`, offloaded-result instructions, complete `read_file` pagination and result-shape guidance, and an `execute.timeout` schema with an explicit upper limit. This repository therefore keeps only its project-specific command-evidence policy in the composed agent prompt instead of replacing those tool descriptions.
 
 ## Node Packages (pnpm)
 

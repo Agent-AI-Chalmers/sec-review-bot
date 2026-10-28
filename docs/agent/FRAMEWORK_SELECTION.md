@@ -25,7 +25,7 @@ From that angle, `create_deep_agent` is a high-level harness with useful default
 
 The current design therefore reuses useful `deepagents` middleware and backend protocols, while building each stage agent explicitly with LangChain `create_agent`. This is not a rejection of `deepagents`; it avoids letting a general-purpose harness decide the responsibilities of the security-review workflow.
 
-In hindsight, this choice has held up. The memory mechanism is one example: it is not as simple as using the default memory middleware. It includes post-run observation extraction, offline maintenance of fragmented lessons, and a progressive-disclosure layout closer to Claude Code memory, so agents first see a bounded startup index and then read relevant topics on demand.
+In hindsight, this choice has held up. The memory mechanism is one example: it is not as simple as using the default memory middleware. It includes post-run observation extraction, offline maintenance of fragmented lessons, and a progressive-disclosure layout closer to Claude Code memory, so agents first see the startup index and then read relevant topics on demand.
 
 ## Why Not Raw LangGraph
 

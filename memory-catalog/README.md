@@ -18,7 +18,7 @@ Language: English | [中文](README.zh.md)
 | `GET`  | `/v1/maintenance-control`              | Return the durable `enabled` or `paused` automatic-maintenance state.                                     |
 | `POST` | `/v1/maintenance-control/pause`        | Idempotently pause automatic maintenance with generation compare-and-swap.                                |
 | `POST` | `/v1/maintenance-control/resume`       | Idempotently resume automatic maintenance with generation compare-and-swap.                               |
-| `GET`  | `/v1/maintenance-input?limit=...`      | Return bounded observations and the active memory state they must be maintained against.                  |
+| `GET`  | `/v1/maintenance-input?limit=...`      | Return up to `limit` observations and the active memory state they must be maintained against.            |
 | `POST` | `/v1/memory-tree/revisions`            | Create a maintenance or operator revision with idempotency and expected-active-revision compare-and-swap. |
 | `GET`  | `/v1/memory-tree`                      | Return the current memory tree and its revision.                                                          |
 | `POST` | `/v1/memory-tree/restore`              | Move the active pointer to an existing revision without creating a revision.                              |

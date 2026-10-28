@@ -117,7 +117,7 @@ The audit that motivated this document framed the choice as the contracts below.
 | | Full revision on `synchronize` | Incremental revision on `synchronize` |
 | --- | --- | --- |
 | Window | all artifacts on `base...head` | all artifacts on `previous..head` |
-| Cost | repeats full analysis on every push | bounded by push size |
+| Cost | repeats full analysis on every push | scales with push size |
 | Repeated findings | likely, across runs | unlikely |
 | Cross-file causality | preserved | **can be missed** when a push changes shared code |
 | `changed-files.json` semantics | matches the patch | matches the patch |

@@ -6,7 +6,7 @@ This directory owns the Joern and Playwright CLI tests. Every scenario is a case
 
 ### Capability
 
-Capability cases run without an LLM. They prove that the installed CLI, Docker sandbox, workspace materialization, setup declaration, and a specific tool behavior work together. The `case.json` selects a bounded probe and its expected marker; Python owns the probe implementation so fixture data cannot introduce arbitrary commands.
+Capability cases run without an LLM. They prove that the installed CLI, Docker sandbox, workspace materialization, setup declaration, and a specific tool behavior work together. The `case.json` selects a predefined probe and its expected marker; Python owns the probe implementation so fixture data cannot introduce arbitrary commands.
 
 ### Discovery
 

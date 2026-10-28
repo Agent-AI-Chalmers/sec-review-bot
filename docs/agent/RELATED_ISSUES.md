@@ -37,7 +37,7 @@ Agent design also has other mechanisms to suppress pathological context growth, 
 
 For this project specifically, experiments also showed that our agents have never reached the context limit. Based on historical runs using DeepSeek V4 Pro, the highest context input peak for a single AI call was only 210,292 tokens. DeepSeek V4 Pro's public API context length is 1M tokens. In other words, the peak in this batch was about 210K, around 21% of the context window, still far from the limit.
 
-This may be because this project is not an infinite conversation system. A single issue / PR / repository review has clear input, stage boundaries, and structured output. It is not an infinite-dialogue agent or a free-form creative agent, so even difficult tasks do not become unbounded in scale.
+This may be because this project is not an infinite conversation system. A single issue / PR / repository review has clear input, stage boundaries, and structured output. It is not an infinite-dialogue agent or a free-form creative agent, so even difficult tasks do not expand indefinitely.
 
 Even so, having a default compression mechanism is still a good fallback.
 

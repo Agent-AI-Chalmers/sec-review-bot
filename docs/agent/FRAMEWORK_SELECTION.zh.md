@@ -27,7 +27,7 @@
 
 所以当前设计复用了 `deepagents` 里有用的 middleware 和 backend protocol，同时用 LangChain `create_agent` 显式构造每个 stage agent。这个选择不是否定 `deepagents`，而是避免让一个通用 harness 替安全审查 workflow 决定阶段职责。
 
-事后来看，这个选择是对的。memory 机制就是一个例子：它不是直接用默认 memory middleware 那么简单，而是包括运行后产出经验、离线整理经验碎片，以及更接近 Claude Code memory 的渐进式披露组织方式，让 agent 先看到有界的启动索引，再按需读取相关 topic。
+事后来看，这个选择是对的。memory 机制就是一个例子：它不是直接用默认 memory middleware 那么简单，而是包括运行后产出经验、离线整理经验碎片，以及更接近 Claude Code memory 的渐进式披露组织方式，让 agent 先看到启动索引，再按需读取相关 topic。
 
 ## 为什么不直接用原始 LangGraph
 

@@ -6,7 +6,7 @@ This package owns the agent-visible filesystem and command-execution backends. I
 
 - `docker`: service-side and benchmark-oriented execution sandbox. Use this when running other people's code should not happen directly on the host, when a stage needs a pinned image, or when tooling must be reproducible across machines. This is the normal backend for execution-heavy analyzer / mitigation / verification paths.
 - `bwrap`: Linux / WSL2-only local development middle ground. Commands still run with host tooling, but bwrap narrows the visible filesystem and process environment with bind mounts and namespaces. It is not available to native macOS or Windows hosts; use the Docker backend there. Use this when local execution is useful but fully naked host execution is not acceptable. It is experimental and explicit opt-in only. Network is isolated by default, matching the Docker backend; set `AGENT_BWRAP_NETWORK_MODE=inherit` only when commands explicitly need the host network.
-- `local`: filesystem-only backend with no command execution. It relies on deepagents/backend path routing and this package's bounded file operations; it can read and write allowed material views but is not an execution sandbox. Its safety comes from having little capability, not from process isolation. Agents that need no shell select it directly; it is not reachable through `AGENT_SANDBOX_BACKEND`, so a stage that runs commands never receives it by configuration.
+- `local`: filesystem-only backend with no command execution. It relies on deepagents/backend path routing and this package's size- and count-limited file operations; it can read and write allowed material views but is not an execution sandbox. Its safety comes from having little capability, not from process isolation. Agents that need no shell select it directly; it is not reachable through `AGENT_SANDBOX_BACKEND`, so a stage that runs commands never receives it by configuration.
 
 Docker is the default when `AGENT_SANDBOX_BACKEND` is unset. There is no automatic backend discovery or shell-less fallback: use `AGENT_SANDBOX_BACKEND=bwrap` only when the host has been checked and the caller accepts the host-policy dependency.
 
@@ -26,7 +26,7 @@ This project follows that logic by implementing `SandboxBackendProtocol` backend
 
 LangChain and DeepAgents provide the backend interfaces we build on, but their default filesystem and shell implementations do not enforce all of this project's safety requirements.
 
-Across the local, Docker, and bwrap backends, the file-operation guarantees are bounded reads and search, ignored-directory pruning, deterministic truncation, explicit writable roots, symlink non-traversal, and newline-tolerant edits. Docker and bwrap regular-file transfers additionally resolve route-relative paths through directory file descriptors, `O_NOFOLLOW`, and non-blocking type checks, so symlinks, concurrent renames, and special files cannot redirect or indefinitely stall a transfer.
+Across the local, Docker, and bwrap backends, file operations enforce read-size and search-result limits, ignored-directory pruning, deterministic truncation, explicit writable roots, symlink non-traversal, and newline-tolerant edits. Docker and bwrap regular-file transfers additionally resolve route-relative paths through directory file descriptors, `O_NOFOLLOW`, and non-blocking type checks, so symlinks, concurrent renames, and special files cannot redirect or indefinitely stall a transfer.
 
 Execution-capable backends add a separate process-isolation layer:
 

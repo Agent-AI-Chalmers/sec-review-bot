@@ -20,7 +20,7 @@
 | `GET`  | `/v1/maintenance-control`              | 返回持久的自动 maintenance `enabled` 或 `paused` 状态。                                          |
 | `POST` | `/v1/maintenance-control/pause`        | 使用 operation 幂等与 generation compare-and-swap 暂停自动 maintenance。                         |
 | `POST` | `/v1/maintenance-control/resume`       | 使用 operation 幂等与 generation compare-and-swap 恢复自动 maintenance。                         |
-| `GET`  | `/v1/maintenance-input?limit=...`      | 返回有界 observations，以及 maintainer 必须基于的 active memory 状态。                           |
+| `GET`  | `/v1/maintenance-input?limit=...`      | 返回不超过 `limit` 条 observations，以及 maintainer 必须基于的 active memory 状态。              |
 | `POST` | `/v1/memory-tree/revisions`            | 通过幂等身份和 expected-active-revision compare-and-swap 创建 maintenance 或 operator revision。 |
 | `GET`  | `/v1/memory-tree`                      | 返回当前 memory tree 及其 revision。                                                             |
 | `POST` | `/v1/memory-tree/restore`              | 把 active pointer 移到已有 revision，不创建 revision。                                           |

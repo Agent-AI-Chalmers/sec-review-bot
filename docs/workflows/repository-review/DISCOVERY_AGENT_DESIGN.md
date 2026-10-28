@@ -4,11 +4,11 @@ Language: English | [中文](DISCOVERY_AGENT_DESIGN.zh.md)
 
 ## Role
 
-Discovery is the screening stage of repository review. Its purpose is to surface security clues worth deeper investigation while keeping cost bounded and scan coverage explainable.
+Discovery is the screening stage of repository review. Its purpose is to surface security clues worth deeper investigation while controlling cost and keeping scan coverage explainable.
 
 This stage produces candidates, not vulnerability conclusions. A candidate should identify a concrete repository location, suspicious behavior, and initial evidence, but it may remain uncertain. Triage later decides whether to keep, suppress, or merge it, and analyzer confirms or rejects the issue using broader context.
 
-Discovery therefore does not classify `vulnerability_type` or CWE, merge cross-file root causes, or produce final reports. Nor does it ask one agent to explore and understand the entire repository freely. It performs repeatable screening over an explicit file scope and bounded local context.
+Discovery therefore does not classify `vulnerability_type` or CWE, merge cross-file root causes, or produce final reports. Nor does it ask one agent to explore and understand the entire repository freely. It performs repeatable screening over an explicit file scope and the local context assembled for that scope.
 
 ## Scan Scope
 
@@ -53,7 +53,7 @@ The `single-file` strategy gives each discovery agent one file. Its advantage is
 
 The `batched` strategy groups several files into a chunk and gives each discovery agent one chunk. This amortizes fixed prompt cost and preserves some cross-file context. The corresponding risk is that larger chunks ask the model to attend to more material at once. Experiments also show that a long context can reduce security-clue recall even when the request remains below the maximum input limit.
 
-The current default is `single-file`, so each model call has a sharply bounded code scope and concentrated attention. `batched` remains available as a worker-side deployment setting through `AGENT_DISCOVERY_CHUNK_STRATEGY`; it is not selectable by a review request. When batching is enabled, the target for an ordinary chunk is one fifth of the selected model's measured context-window input limit, leaving explicit room between efficient batching and concentrated attention.
+The current default is `single-file`, so each model call focuses on one file. `batched` remains available as a worker-side deployment setting through `AGENT_DISCOVERY_CHUNK_STRATEGY`; it is not selectable by a review request. When batching is enabled, the target for an ordinary chunk is one fifth of the selected model's measured context-window input limit, leaving explicit room between efficient batching and concentrated attention.
 
 Discovery applies an ordinary chunk target and a single-file hard limit:
 
