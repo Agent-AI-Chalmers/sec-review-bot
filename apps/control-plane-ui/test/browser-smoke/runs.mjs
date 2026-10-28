@@ -999,15 +999,35 @@ export async function smokeRuns({
   )
 
   if (name === 'desktop' && server !== undefined) {
+    await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    await page.getByTestId('parked-runs').waitFor()
     const parkedRunId = await page.evaluate(async () => {
       const response = await fetch('/api/runs/parked')
       const body = await response.json()
       return body.blocks[0].run_id
     })
+    await page
+      .getByTestId('parked-runs')
+      .getByRole('button', { name: 'View', exact: true })
+      .click()
+    const parkedDrawer = page.getByRole('dialog')
+    await parkedDrawer.waitFor()
+    assert.match(
+      (await parkedDrawer.textContent()) ?? '',
+      /Waiting \d/,
+      `${name} the parked queue must show how long each run has waited`
+    )
+    await page.keyboard.press('Escape')
+    await parkedDrawer.waitFor({ state: 'hidden' })
     await page.goto(`${base}/runs/${encodeURIComponent(parkedRunId)}`, {
       waitUntil: 'networkidle'
     })
     await page.getByTestId('blocked-run').waitFor()
+    assert.match(
+      (await page.getByTestId('blocked-run').textContent()) ?? '',
+      /Waiting \d/,
+      `${name} the parked detail banner must show how long the run has waited`
+    )
     await page.route('**/api/admin/runs/*/resume', (route) =>
       route.fulfill({
         status: 401,
