@@ -7,9 +7,8 @@ setup:
     working-directory: agents
     timeout_seconds: 600
 
-  # TypeScript packages. The image ships node and an older pnpm; every package
-  # declares `packageManager: pnpm@12.10.1`, so activate it through corepack
-  # before installing against the committed lockfiles.
+  # TypeScript packages. The image ships node and an older pnpm, so activate the
+  # repository's pnpm line through corepack before installing committed lockfiles.
   - run: corepack enable
     timeout_seconds: 60
   - run: pnpm install --frozen-lockfile
@@ -22,8 +21,29 @@ setup:
     working-directory: review-runs
     timeout_seconds: 600
   - run: pnpm install --frozen-lockfile
+    working-directory: execution-gateway
+    timeout_seconds: 600
+  - run: pnpm install --frozen-lockfile
+    working-directory: memory-catalog
+    timeout_seconds: 600
+  - run: pnpm install --frozen-lockfile
     working-directory: contracts/review-runs-api/tools
     timeout_seconds: 600
   - run: pnpm install --frozen-lockfile
-    working-directory: contracts/integration-contract/tools
+    working-directory: contracts/execution-api/tools
+    timeout_seconds: 600
+  - run: pnpm install --frozen-lockfile
+    working-directory: contracts/memory-catalog-api/tools
+    timeout_seconds: 600
+  - run: pnpm install --frozen-lockfile
+    working-directory: contracts/tar-zstd-artifact/envelope/tools
+    timeout_seconds: 600
+  - run: pnpm install --frozen-lockfile
+    working-directory: contracts/tar-zstd-artifact/profiles/input-bundle/tools
+    timeout_seconds: 600
+  - run: pnpm install --frozen-lockfile
+    working-directory: contracts/tar-zstd-artifact/profiles/memory-tree/tools
+    timeout_seconds: 600
+  - run: pnpm install --frozen-lockfile
+    working-directory: contracts/tar-zstd-artifact/profiles/run-diagnostic/tools
     timeout_seconds: 600

@@ -36,6 +36,16 @@ python -m scripts.token_usage.summarize /path/to/local-run
 python -m scripts.replay.repository_triage --help
 ```
 
+## System Test
+
+The repository keeps one cross-service system test for the execution-submission boundary. It builds Review Runs and Execution Gateway, starts a disposable Temporal service, and verifies that the production Review Runs client can submit, replay, and read a run through the real Gateway HTTP surface:
+
+```bash
+node --test scripts/system-tests/execution-submission.test.mjs
+```
+
+Set `TEST_TEMPORAL_ADDRESS` to use an existing disposable Temporal service. Otherwise the test uses the Temporal image configured in `compose.yaml` and removes the temporary Docker container afterward. The test deliberately stops before worker execution, which requires the separately configured agents runtime, workspace, object storage, and model access.
+
 ### Langfuse Run Statistics Probe
 
 `probe_langfuse_run_statistics.py` reads one review `run_id` from the [Langfuse Observations API v2](https://langfuse.com/docs/api-and-data-platform/features/public-api#v2) and prints a read-only JSON summary. It finds roots whose `sec_review_agent` belongs to the maintained review-agent allowlist, reads `GENERATION` observations under those traces with cursor pagination, and accepts only calls emitted by the Langfuse callback scope. Provider-SDK duplicate spans are suppressed by the production exporter; encountering one here is treated as a tracing regression. Remaining calls are deduplicated by observation ID and grouped by agent and native provider/model.

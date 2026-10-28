@@ -53,4 +53,7 @@ pnpm run server
 pnpm run lint
 pnpm run typecheck
 pnpm test
+pnpm run test:integration
 ```
+
+`pnpm test` 运行隔离的单元测试和 server 测试。`pnpm run test:integration` 使用显式提供的 `TEST_DATABASE_URL` 对 PostgreSQL store 进行测试；未设置时，launcher 会使用仓库 `compose.yaml` 中配置的镜像创建并清理一个临时本地 Docker PostgreSQL 实例。Launcher 会有意忽略服务常规使用的 `MEMORY_CATALOG_DATABASE_URL`，避免测试意外修改共享数据库。

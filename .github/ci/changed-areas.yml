@@ -19,6 +19,8 @@ automation-config:
   - ".editorconfig"
   # The changed-area model and its validator.
   - ".github/ci/**"
+  # The trusted review setup is executable repository automation.
+  - ".sec-review/**"
 
 ops:
   # Deployment scripts and the Compose topology.
@@ -69,6 +71,17 @@ execution-gateway:
   - "execution-gateway/**"
   - "contracts/execution-api/**"
   - "contracts/execution-workflow/**"
+  - ".github/workflows/ci.yml"
+
+system-tests:
+  # The single cross-service path joins these production boundaries and their shared contracts.
+  - "scripts/system-tests/**"
+  - "review-runs/**"
+  - "execution-gateway/**"
+  - "contracts/execution-api/**"
+  - "contracts/execution-workflow/**"
+  - "compose.yaml"
+  - ".github/ci/**"
   - ".github/workflows/ci.yml"
 
 memory-catalog:

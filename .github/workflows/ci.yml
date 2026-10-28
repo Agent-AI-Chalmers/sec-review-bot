@@ -30,6 +30,7 @@ jobs:
       contract-tools: ${{ steps.filter.outputs.contract-tools }}
       review-runs: ${{ steps.filter.outputs.review-runs }}
       execution-gateway: ${{ steps.filter.outputs.execution-gateway }}
+      system-tests: ${{ steps.filter.outputs.system-tests }}
       memory-catalog: ${{ steps.filter.outputs.memory-catalog }}
       github-integration: ${{ steps.filter.outputs.github-integration }}
       control-plane-ui: ${{ steps.filter.outputs.control-plane-ui }}
@@ -65,6 +66,20 @@ jobs:
       # file still prevents malformed YAML from reaching the default branch.
       - name: Parse Dependabot configuration
         run: ruby -e 'require "yaml"; YAML.parse_file(".github/dependabot.yml")'
+
+      - name: Check trusted review setup package coverage
+        run: |
+          ruby -ryaml -e '
+            setup = YAML.safe_load_file(".sec-review/setup.yml").fetch("setup")
+            actual = setup.filter_map do |step|
+              step["working-directory"] if step["run"] == "pnpm install --frozen-lockfile"
+            end.sort
+            expected = IO.popen(["git", "ls-files", "*/pnpm-lock.yaml"], &:read).lines.map {
+              File.dirname(_1.strip)
+            }.sort
+            message = "setup pnpm directories differ:\nexpected=" + expected.inspect + "\nactual=" + actual.inspect
+            abort message unless actual == expected
+          '
 
       # The changed-area model (`.github/ci/changed-areas.yml`) is the single source of the
       # `changes` job's filters. This checks the couplings CI cannot see in an import graph: that
@@ -257,6 +272,47 @@ jobs:
           pnpm run typecheck
           pnpm test
 
+      - name: Integration test
+        run: pnpm run test:integration
+
+  execution-submission-system:
+    name: Execution Submission System Test
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.system-tests == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: execution-gateway/package.json
+          check-latest: true
+          cache: pnpm
+          cache-dependency-path: |
+            execution-gateway/pnpm-lock.yaml
+            review-runs/pnpm-lock.yaml
+
+      - name: Install Execution Gateway dependencies
+        working-directory: execution-gateway
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Review Runs dependencies
+        working-directory: review-runs
+        run: pnpm install --frozen-lockfile
+
+      - name: Test execution submission boundary
+        run: node --test scripts/system-tests/execution-submission.test.mjs
+
   memory-catalog:
     name: Memory Catalog
     needs: changes
@@ -264,6 +320,20 @@ jobs:
       github.event_name == 'merge_group' ||
       needs.changes.outputs.memory-catalog == 'true'
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: memory_catalog_test
+          POSTGRES_USER: memory_catalog
+          POSTGRES_PASSWORD: ci-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U memory_catalog -d memory_catalog_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
     defaults:
       run:
         working-directory: memory-catalog
@@ -294,6 +364,11 @@ jobs:
           pnpm run lint
           pnpm run typecheck
           pnpm test
+
+      - name: Integration test
+        env:
+          TEST_DATABASE_URL: postgresql://memory_catalog:ci-test-password@127.0.0.1:5432/memory_catalog_test
+        run: pnpm run test:integration
 
   github-integration:
     name: GitHub Integration

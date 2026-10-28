@@ -13,6 +13,6 @@
     "sourceMap": true,
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts"],
+  "include": ["scripts/**/*.ts", "src/**/*.ts", "test/**/*.ts"],
   "exclude": ["dist", "node_modules"]
 }
