@@ -1,5 +1,7 @@
 # Contributing
 
+Language: English | [中文](CONTRIBUTING.zh.md)
+
 Keep changes focused, preserve explicit ownership boundaries, and validate the packages and contracts that actually consume the change. This guide provides the repository-wide workflow; package and contract READMEs remain the source of truth for local details.
 
 ## Find The Owning Boundary

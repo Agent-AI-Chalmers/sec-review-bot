@@ -10,7 +10,7 @@
 
 [English](README.md) · 中文
 
-[架构](docs/architecture/SYSTEM_ARCHITECTURE.zh.md) · [文档](docs/README.zh.md) · [部署](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md) · [贡献指南](CONTRIBUTING.md)
+[架构](docs/architecture/SYSTEM_ARCHITECTURE.zh.md) · [文档](docs/README.zh.md) · [部署](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md) · [贡献指南](CONTRIBUTING.zh.md)
 
 </div>
 
@@ -122,7 +122,7 @@ sudo systemctl enable --now sec-review-bot.target
 | 开发某个 package 或服务       | [文档地图](docs/README.zh.md)及对应 package 的 README                    |
 | 修改 contract 或生成产物      | [Contracts 说明](contracts/README.zh.md)                                 |
 | 把 GitHub 入站请求转发到本地  | [本地 GitHub 入站设置](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) |
-| 准备贡献                      | [贡献指南](CONTRIBUTING.md)                                              |
+| 准备贡献                      | [贡献指南](CONTRIBUTING.zh.md)                                           |
 
 ## 论文
 
