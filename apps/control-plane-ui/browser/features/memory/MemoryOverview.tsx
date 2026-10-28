@@ -20,9 +20,25 @@ export type OverviewRange = NonNullable<
 function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
   const t = useMessages()
   const { language } = useLanguage()
-  const width = 720
+  const scrollRef = React.useRef<HTMLDivElement>(null)
+  const [width, setWidth] = React.useState(720)
   const height = 220
-  const padding = { top: 18, right: 14, bottom: 34, left: 38 }
+  React.useLayoutEffect(() => {
+    const element = scrollRef.current
+    if (!element) return
+    const measure = (): void => {
+      const next = Math.max(
+        320,
+        Math.round(element.getBoundingClientRect().width)
+      )
+      setWidth((current) => (current === next ? current : next))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return (): void => observer.disconnect()
+  }, [])
+  const padding = { top: 18, right: 38, bottom: 34, left: 38 }
   const plotWidth = width - padding.left - padding.right
   const plotHeight = height - padding.top - padding.bottom
   // A wide window can be almost entirely empty. Start at the first period with
@@ -62,7 +78,7 @@ function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
     }))
 
   return (
-    <div className="memory-overview-trend-scroll">
+    <div className="memory-overview-trend-scroll" ref={scrollRef}>
       <svg
         className="memory-overview-trend"
         viewBox={`0 0 ${width} ${height}`}

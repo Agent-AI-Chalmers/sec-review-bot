@@ -340,7 +340,6 @@
   display: block;
   width: 100%;
   height: 220px;
-  min-width: 620px;
   color: var(--mantine-color-dimmed);
 }
 

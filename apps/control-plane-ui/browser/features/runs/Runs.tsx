@@ -262,8 +262,13 @@ export function Runs(): React.JSX.Element {
           color="orange"
           variant="light"
           mb="md"
-          title={t('parkedRunsTitle')}
-          icon={<IconAlertTriangle size={ICON_SIZE.lg} />}
+          title={
+            <Group gap="xs" align="center" wrap="nowrap">
+              <IconAlertTriangle size={ICON_SIZE.md} aria-hidden />
+              <span>{t('parkedRunsTitle')}</span>
+            </Group>
+          }
+          className="parked-runs-alert"
           data-testid="parked-runs"
           // A standing queue, not a transient fault: `role="alert"` belongs to the refresh
           // error below, and Mantine's Alert would otherwise claim that role and be the first

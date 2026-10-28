@@ -71,6 +71,10 @@
   font-size: var(--mantine-font-size-sm);
 }
 
+.parked-runs-alert .mantine-Alert-body {
+  padding-left: var(--space-1);
+}
+
 /* A run coordination refused to conclude on its own. Mantine's Alert supplies the surface and
    the accent; these rules only keep the explanation readable at a wide viewport. */
 .blocked-run .blocked-run-body {
