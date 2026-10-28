@@ -14,7 +14,7 @@ Discovery 因此不承担漏洞定性、`vulnerability_type` / CWE 分类、跨�
 
 ## 扫描范围
 
-Discovery 关注可能直接承载程序行为或安全边界的文件。“能够作为 UTF-8 文本读取”并不自动意味着文件值得进入初筛。扫描范围由三层边界共同决定。
+Discovery 关注可能直接承载程序行为或安全边界的文件。“能够作为 UTF-8 文本读取”并不自动意味着文件值得进入初筛。扫描范围由以下边界共同决定。
 
 ### `paths_ignore`
 
@@ -41,13 +41,15 @@ YAML、JSON、SQL、XML 和 HTML 保持扫描。它们既可能是普通数据�
 
 ### 单文件大小保护
 
+<!-- doc-default: AGENT_DISCOVERY_MAX_FILE_BYTES; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
 Discovery 在读取文件之前使用 `AGENT_DISCOVERY_MAX_FILE_BYTES` 限制单文件字节数，默认值为 256 KiB。它是 worker 读取、解码和 prompt 构造的资源边界，不是模型上下文边界；字节数与 token 数之间没有稳定换算关系，超过该限制并不表示模型一定装不下文件。
 
+<!-- doc-default: AGENT_DISCOVERY_MAX_FILE_BYTES; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
 这个限制属于服务运行环境，而不属于单次 review 的扫描范围。它不在公开 `scan_scope` 契约中，调用方不能为某次请求放宽 worker 的安全边界。当前没有证据支持调整 256 KiB 默认值，只有发现值得扫描的源文件确实因此被排除时，才应结合具体样本和资源成本重新评估。
 
 ## Chunk 设计
 
-Discovery 的输入组织有两种直接策略。
+Discovery 输入支持以下组织策略。
 
 `single-file` 策略让每个 discovery agent 只读取一个文件。它的优点是注意力集中，每次调用的代码范围也非常明确。代价是每个文件都需要一次独立的模型调用，并重复加载 system prompt、输出 schema 和其他固定上下文。对于包含大量小文件的仓库，这部分固定开销可能显著增加成本；单文件视角也无法直接提供局部的跨文件关系。
 
@@ -55,7 +57,7 @@ Discovery 的输入组织有两种直接策略。
 
 当前默认策略是 `single-file`，让每次模型调用都有明确且集中的代码范围。`batched` 仍可通过 worker 侧部署配置 `AGENT_DISCOVERY_CHUNK_STRATEGY` 启用，但不能由 review 请求选择。启用批量模式时，普通 chunk 的目标大小设为实际选定模型上下文窗口输入上限的五分之一，在调用成本和注意力之间保留明确余量。
 
-当前采用两个不同的 token 边界：
+Discovery 使用普通 chunk target 和单文件 hard limit：
 
 | 输入形态 | 边界 | 行为 |
 | --- | --- | --- |

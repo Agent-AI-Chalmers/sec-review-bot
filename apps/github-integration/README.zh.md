@@ -18,8 +18,10 @@ pnpm --dir review-runs install
 pnpm --dir apps/github-integration install
 ```
 
+<!-- doc-default: github-integration.node-runtime; source=apps/github-integration/package.json -->
 请使用 Node 24.x。
 
+<!-- doc-time-sensitive: node-active-lts-schedule; checked=2026-10-28; source=https://github.com/nodejs/Release#release-schedule -->
 > _Node 24 是当前 package 的 LTS 基线。[Node.js release schedule](https://github.com/nodejs/Release#release-schedule) 当前把 Node 26 的 Active LTS start 列为 2026-10-28；到那之后，可以评估把默认 runtime 切到 Node 26。_
 
 ## 命令

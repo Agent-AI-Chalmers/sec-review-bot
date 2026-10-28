@@ -249,7 +249,7 @@ sec-review-execution-worker
 
 ### 手动启动 Workers
 
-分别启动 Temporal 和三个 worker。
+分别启动 Temporal 和各个 worker 进程。
 
 最小本地启动形状：
 
@@ -297,7 +297,7 @@ Agent 可以声明自己需要的 skills。worker 启动 agent 时会自动准�
 
 Memory 依赖 Temporal、使用 PostgreSQL 的 Memory Catalog，以及 S3 兼容对象存储。
 
-本地 Memory 开发由 Compose 运行基础设施，三个 worker 则作为宿主机进程运行。
+本地 Memory 开发由 Compose 运行基础设施，各个 worker 则作为宿主机进程运行。
 
 > [!WARNING]
 > 仓库提供的是只供 loopback 开发使用的固定凭据。它们不是 secret，不得用于共享机器或可被其他主机访问的部署。

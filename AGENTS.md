@@ -137,6 +137,8 @@ Run targeted `--help` or fixture-based smoke checks for scripts affected by a ch
 
 ### Documentation Checks
 
+Before editing maintained documentation, follow `docs/DOCUMENTATION_GUIDE.md`, including its rules for durable statements and mutable-fact markers.
+
 After documentation moves or local Markdown link edits, run:
 
 ```bash

@@ -29,7 +29,7 @@
 
 该服务独占自己的 PostgreSQL database 和 `schema_versions` ledger。默认集成部署将它与 Review Runs database 放在同一个 PostgreSQL 实例中，但两者是相互独立的 database。
 
-列表 cursor 是不透明且排他的。Extractions 和 observations 均按 `created_at`、`extraction_id` 降序排列，因此相同时间戳的记录也能稳定翻页。Maintenance-control 单例是持久状态，初始值为 generation `0` 的 `enabled`；Phase 1 只开放读取。
+列表 cursor 是不透明且排他的。Extractions 和 observations 均按 `created_at`、`extraction_id` 降序排列，因此相同时间戳的记录也能稳定翻页。Maintenance-control 单例是持久状态，初始值为 generation `0` 的 `enabled`；API 返回其当前状态，并通过 pause 与 resume operation 修改它。
 
 任何时刻只允许一个 maintainer 执行。Temporal 使用固定 workflow ID 和 `SKIP` schedule overlap policy 强制该约束，因此 catalog 不实现 batch lease 或并发 claim。
 

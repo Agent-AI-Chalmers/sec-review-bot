@@ -27,7 +27,7 @@ Language: English | [中文](README.zh.md)
 
 The service owns its PostgreSQL database and its `schema_versions` ledger. The default integrated deployment places that database beside, but separate from, Review Runs database in the same PostgreSQL instance.
 
-Collection cursors are opaque and exclusive. Extractions and observations are ordered by `created_at` and then `extraction_id`, both descending, so records with equal timestamps remain stable across pages. The maintenance-control row is durable and initially records `enabled` with generation `0`; Phase 1 exposes it read-only.
+Collection cursors are opaque and exclusive. Extractions and observations are ordered by `created_at` and then `extraction_id`, both descending, so records with equal timestamps remain stable across pages. The maintenance-control row is durable and initially records `enabled` with generation `0`; the API returns its current state and changes it through the pause and resume operations.
 
 Only one maintainer may execute at a time. Temporal enforces that invariant with one fixed workflow ID and a schedule overlap policy of `SKIP`; the catalog therefore does not implement batch leases or concurrent claims.
 

@@ -4,13 +4,13 @@ Language: English | [中文](REVIEW_WINDOW_CONTRACT.zh.md)
 
 ## Problem
 
-A pull request review run materializes three artifacts that all describe the same change:
+A pull request review run materializes these artifacts to describe the same change:
 
 - `changed-files.json`, the file list for the window;
 - `incremental.patch`, the diff of that window;
 - the input's `files` collection, the separate export that anchors inline suggestions and mitigation patches.
 
-If those three describe different change windows, the run is internally inconsistent.
+If these artifacts describe different change windows, the run is internally inconsistent.
 
 ### How an agent learns the window
 
@@ -24,9 +24,9 @@ Suggestion anchoring is a separate concern and uses the input's `files` collecti
 
 This document records the window semantics, the measured behavior of the GitHub APIs involved, what the review tooling ecosystem does, and the contract this project adopts.
 
-## Two Windows
+## Candidate Windows
 
-For a given run there are exactly two candidate windows:
+For a given run, the candidate windows are:
 
 | Window | Range | Meaning |
 | --- | --- | --- |
@@ -112,21 +112,21 @@ The structural lesson is the one this document argues for: PR-Agent derives the 
 
 ## Candidate Contracts
 
-The audit that motivated this document framed the choice as two contracts. They are not symmetric in this project.
+The audit that motivated this document framed the choice as the contracts below. They are not symmetric in this project.
 
 | | Full revision on `synchronize` | Incremental revision on `synchronize` |
 | --- | --- | --- |
-| Window | all three artifacts on `base...head` | all three artifacts on `previous..head` |
+| Window | all artifacts on `base...head` | all artifacts on `previous..head` |
 | Cost | repeats full analysis on every push | bounded by push size |
 | Repeated findings | likely, across runs | unlikely |
 | Cross-file causality | preserved | **can be missed** when a push changes shared code |
 | `changed-files.json` semantics | matches the patch | matches the patch |
 
-The decisive requirement is not which window is better; it is that **whatever window is chosen, all three artifacts share it**.
+The decisive requirement is not which window is better; it is that **whatever window is chosen, the artifacts share it**.
 
 ## Contract This Project Adopts
 
-`synchronize` uses the **push window** for all three artifacts. The reasons:
+`synchronize` uses the **push window** for these artifacts. The reasons:
 
 - the event already carries the window, and the audit identified it as the intended scope;
 - it matches CodeRabbit's documented behavior for new commits;

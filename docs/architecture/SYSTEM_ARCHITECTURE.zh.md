@@ -29,7 +29,7 @@ Control Plane UI 通过自身 BFF 管理 Memory Catalog，browser 不会获得 C
 | Memory Maintenance Worker | `agents/` | 消费有界 maintenance input、调用 maintainer、发布 memory tree 并提交 revision | [README](../../agents/README.zh.md) |
 | Memory Catalog Server | `memory-catalog/` | Observation catalog、不可变 memory revision history 与 active revision 协调 | [README](../../memory-catalog/README.zh.md) |
 
-这些运行角色通过 [`contracts/`](../../contracts/README.zh.md) 下由项目维护的边界通信。Package 位置并不决定进程拓扑：`agents/` 实现三个独立的 Temporal worker。`apps/` 下的两个应用则仍分别独立部署。
+这些运行角色通过 [`contracts/`](../../contracts/README.zh.md) 下由项目维护的边界通信。Package 位置并不决定进程拓扑：`agents/` 实现彼此独立部署的 Temporal worker。`apps/` 下的应用也分别独立部署。
 
 ## 可观测性与统计链路
 

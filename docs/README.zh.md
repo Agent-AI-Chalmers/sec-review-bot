@@ -10,6 +10,8 @@
 
 ## 文档地图
 
+- [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md) / [中文](DOCUMENTATION_GUIDE.zh.md)：关于耐久表述、易变事实、翻译和文档审核的仓库级规则。
+
 ### architecture/
 
 - [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：逻辑运行角色、当前部署边界、职责所有权，以及主 review 与异步 memory 链路。

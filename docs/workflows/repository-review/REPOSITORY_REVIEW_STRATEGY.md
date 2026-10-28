@@ -10,7 +10,7 @@ The workflow favors broad initial coverage, later denoising and consolidation, a
 
 ## Stage Model
 
-The workflow is organized into three segments:
+The workflow is organized into these segments:
 
 1. `scan / case formation`: `discovery -> triage`
 2. `per-case review`: run `analyzer / cvss-v4-scoring / mitigator / verifier` for each retained `case`

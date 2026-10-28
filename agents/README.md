@@ -91,7 +91,7 @@ The Python package is easiest to read by responsibility:
    - `delivery_stages/`: repository delivery planning, delivery execution, patch synthesis execution, and delivery result generation.
 
 3. Workflows: combines stages into product paths.
-   - `workflows/`: `issue/`, `pull_request/`, and `repository/` are the three public workflows; `repository_case/` is the per-case review used inside repository workflow.
+   - `workflows/`: `issue/`, `pull_request/`, and `repository/` are the public workflows; `repository_case/` is the per-case review used inside repository workflow.
 
 4. Local and operator commands.
    - `cli/`: commands for development and operations that perform one requested task and exit, plus their local-only support code.
@@ -127,7 +127,7 @@ The external TypeScript Gateway receives HTTP run requests and uses the Temporal
 
 Local runs are for development and debugging. They are not the production integration path.
 
-There are three local execution paths:
+The supported local execution paths are:
 
 - Direct local run: the default and fastest path for ordinary development.
 - Local `--temporal` run: for exercising workflow / activity orchestration.
@@ -247,7 +247,7 @@ sec-review-execution-worker
 
 ### Run the Workers Manually
 
-Start Temporal and the three workers in separate terminals.
+Start Temporal and the worker processes in separate terminals.
 
 Minimal local startup shape:
 
@@ -295,7 +295,7 @@ Agents can declare the skills they need. The worker prepares and mounts the decl
 
 Memory requires Temporal, a Memory Catalog backed by PostgreSQL, and S3-compatible object storage.
 
-For local Memory development, Compose runs the infrastructure and the three workers run as host processes.
+For local Memory development, Compose runs the infrastructure and the workers run as host processes.
 
 > [!WARNING]
 > The checked-in development credentials are fixed loopback-only values. They are not secrets and must not be used on a shared machine or any deployment reachable from another host.
