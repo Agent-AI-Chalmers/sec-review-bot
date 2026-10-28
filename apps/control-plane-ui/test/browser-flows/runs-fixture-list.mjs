@@ -110,8 +110,11 @@ export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
     (await page.locator('.run-id').first().textContent())?.trim() ?? ''
   assert.ok(knownRunId.length > 0)
   await page.getByRole('link', { name: 'Back to runs' }).click()
+  await page.waitForURL(`${base}/runs`)
+  await page.getByRole('heading', { name: 'Runs' }).waitFor()
   await page.getByRole('button', { name: 'Jump to run' }).click()
-  const jump = page.getByLabel('Go to run ID')
+  const jump = page.getByRole('dialog').getByLabel('Go to run ID')
+  await jump.waitFor()
   await jump.fill(knownRunId)
   await page.getByRole('button', { name: 'Go to run' }).click()
   await page.waitForSelector('.run-progress-timeline')

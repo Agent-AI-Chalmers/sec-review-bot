@@ -2,6 +2,20 @@ import assert from 'node:assert/strict'
 
 import { openPublishedRepositoryRun } from './runs-fixture-support.mjs'
 
+async function clickAndWaitForExpansion({
+  control,
+  expanded,
+  waitUntil,
+  message
+}) {
+  await control.click()
+  await waitUntil(
+    async () =>
+      (await control.getAttribute('aria-expanded')) === String(expanded),
+    message
+  )
+}
+
 export async function runFixtureRunStatisticsFlow({
   name,
   viewport,
@@ -38,15 +52,24 @@ export async function runFixtureRunStatisticsFlow({
     0,
     `${name} workflow stages must start collapsed`
   )
-  await workflowStages
-    .nth(0)
-    .locator('.statistics-workflow-stage-control')
-    .click()
+  await clickAndWaitForExpansion({
+    control: workflowStages
+      .nth(0)
+      .locator('.statistics-workflow-stage-control'),
+    expanded: true,
+    waitUntil,
+    message: `${name} scan stage did not expand`
+  })
   const discoveryRow = workflowStages
     .nth(0)
     .locator('.statistics-group-row')
     .filter({ hasText: 'repository-discovery' })
-  await discoveryRow.click()
+  await clickAndWaitForExpansion({
+    control: discoveryRow,
+    expanded: true,
+    waitUntil,
+    message: `${name} discovery details did not expand`
+  })
   assert.match(
     (await workflowStages.nth(0).textContent()) ?? '',
     /Call.*Input.*Output.*discovery-chunk-0001.*2,800.*Cache read.*1,100.*Cache write.*56.*360.*Reasoning.*54.*discovery-chunk-0002.*2,700.*Cache read.*1,000.*Cache write.*54.*354.*Reasoning.*53.*discovery-chunk-0003.*2,700.*Cache read.*1,000.*Cache write.*54.*370.*Reasoning.*56.*Total.*8,200.*Cache read.*3,100.*Cache write.*164.*1,084.*Reasoning.*163/s,
@@ -56,16 +79,25 @@ export async function runFixtureRunStatisticsFlow({
     .nth(0)
     .locator('.statistics-group-row')
     .filter({ hasText: 'repository-triager' })
-  await triageRow.click()
+  await clickAndWaitForExpansion({
+    control: triageRow,
+    expanded: true,
+    waitUntil,
+    message: `${name} triage details did not expand`
+  })
   assert.match(
     (await workflowStages.nth(0).textContent()) ?? '',
     /Call.*Draft batch 1.*2,700.*Cache read.*900.*Cache write.*54.*400.*Reasoning.*60.*Draft batch 2.*2,400.*Cache read.*900.*Cache write.*48.*400.*Reasoning.*60.*Refinement.*1,800.*Cache read.*600.*Cache write.*36.*300.*Reasoning.*45.*Total.*6,900.*Cache read.*2,400.*Cache write.*138.*1,100.*Reasoning.*165/s,
     `${name} triage details must explain its batches without adding hierarchy`
   )
-  await workflowStages
-    .nth(1)
-    .locator('.statistics-workflow-stage-control')
-    .click()
+  await clickAndWaitForExpansion({
+    control: workflowStages
+      .nth(1)
+      .locator('.statistics-workflow-stage-control'),
+    expanded: true,
+    waitUntil,
+    message: `${name} review stage did not expand`
+  })
   const reviewUnits = workflowStages.nth(1).locator('.statistics-unit')
   assert.strictEqual(
     await reviewUnits.count(),
@@ -77,7 +109,12 @@ export async function runFixtureRunStatisticsFlow({
     /Case 7d9a2f6c31b4e8.*9 Calls · 26,675 tokens/s,
     `${name} a collapsed case must retain its usage summary`
   )
-  await reviewUnits.nth(0).locator('.statistics-unit-control').click()
+  await clickAndWaitForExpansion({
+    control: reviewUnits.nth(0).locator('.statistics-unit-control'),
+    expanded: true,
+    waitUntil,
+    message: `${name} first review case did not expand`
+  })
   assert.match(
     (await reviewUnits.nth(0).textContent()) ?? '',
     /Initial review.*Feedback pass 1/s,
@@ -102,24 +139,50 @@ export async function runFixtureRunStatisticsFlow({
       `${name} initial and feedback tables must share fixed column tracks`
     )
   }
-  await reviewUnits.nth(1).locator('.statistics-unit-control').click()
+  await clickAndWaitForExpansion({
+    control: reviewUnits.nth(1).locator('.statistics-unit-control'),
+    expanded: true,
+    waitUntil,
+    message: `${name} second review case did not expand`
+  })
   assert.doesNotMatch(
     (await reviewUnits.nth(1).textContent()) ?? '',
     /Initial review/,
     `${name} a case without feedback must not label its only pass as initial`
   )
-  await workflowStages
-    .nth(2)
-    .locator('.statistics-workflow-stage-control')
-    .click()
+  await clickAndWaitForExpansion({
+    control: workflowStages
+      .nth(2)
+      .locator('.statistics-workflow-stage-control'),
+    expanded: true,
+    waitUntil,
+    message: `${name} delivery stage did not expand`
+  })
   const deliveryRows = workflowStages.nth(2).locator('.statistics-group-row')
   assert.strictEqual(
     await deliveryRows.count(),
     2,
     `${name} delivery usage must stay flat at the agent level`
   )
-  await deliveryRows.filter({ hasText: 'repository-delivery-planner' }).click()
-  await deliveryRows.filter({ hasText: 'patch-synthesizer' }).click()
+  const deliveryPlannerRow = deliveryRows.filter({
+    hasText: 'repository-delivery-planner'
+  })
+  const patchSynthesizerRow = deliveryRows.filter({
+    hasText: 'patch-synthesizer'
+  })
+  // Playwright completes a click before React necessarily commits the resulting detail row.
+  await clickAndWaitForExpansion({
+    control: deliveryPlannerRow,
+    expanded: true,
+    waitUntil,
+    message: `${name} delivery planner details did not expand`
+  })
+  await clickAndWaitForExpansion({
+    control: patchSynthesizerRow,
+    expanded: true,
+    waitUntil,
+    message: `${name} patch synthesizer details did not expand`
+  })
   assert.match(
     (await workflowStages.nth(2).textContent()) ?? '',
     /Call.*Draft batch 1.*Draft batch 2.*Refinement.*patch-synthesizer.*combined-[a-f0-9]+.*combined-[a-f0-9]+/s,
@@ -135,22 +198,33 @@ export async function runFixtureRunStatisticsFlow({
     /anthropic\/deepseek-v4-pro/,
     `${name} provider and model must share one compact identity line`
   )
-  const usageRows = statisticsDetails.locator(
-    '.statistics-group-row[aria-expanded="false"]'
-  )
+  const usageRows = statisticsDetails.locator('.statistics-group-row')
   const expandedBefore = await statisticsDetails
     .locator('.statistics-group-row[aria-expanded="true"]')
     .count()
-  await usageRows.filter({ hasText: 'repository-analyzer' }).first().click()
+  const analyzerRow = usageRows
+    .filter({ hasText: 'repository-analyzer' })
+    .first()
+  await clickAndWaitForExpansion({
+    control: analyzerRow,
+    expanded: true,
+    waitUntil,
+    message: `${name} analyzer details did not expand`
+  })
   assert.match(
     (await statisticsDetails.textContent()) ?? '',
     /Input\s*5,200.*Cache read\s*1,600.*Cache write\s*104.*Output\s*1,000.*Reasoning\s*150/,
     `${name} an agent without subgroups must expose its token breakdown`
   )
-  await usageRows
+  const scorerRow = usageRows
     .filter({ hasText: 'repository-cvss-v4-scorer' })
     .first()
-    .click()
+  await clickAndWaitForExpansion({
+    control: scorerRow,
+    expanded: true,
+    waitUntil,
+    message: `${name} scorer details did not expand`
+  })
   assert.strictEqual(
     await statisticsDetails
       .locator('.statistics-group-row[aria-expanded="true"]')
@@ -159,6 +233,16 @@ export async function runFixtureRunStatisticsFlow({
     `${name} expanding one usage group must not close another`
   )
   await page.getByRole('button', { name: 'Expand all' }).click()
+  await waitUntil(
+    async () =>
+      (await statisticsDetails
+        .locator('.statistics-workflow-stage-control[aria-expanded="true"]')
+        .count()) === 3 &&
+      (await statisticsDetails
+        .locator('.statistics-unit-control[aria-expanded="true"]')
+        .count()) === 2,
+    `${name} expand all did not open every statistics section`
+  )
   assert.strictEqual(
     await statisticsDetails
       .locator('.statistics-workflow-stage-control[aria-expanded="true"]')
@@ -174,6 +258,16 @@ export async function runFixtureRunStatisticsFlow({
     `${name} expand all must open every review case`
   )
   await page.getByRole('button', { name: 'Collapse all' }).click()
+  await waitUntil(
+    async () =>
+      (await statisticsDetails
+        .locator('.statistics-workflow-stage-control[aria-expanded="true"]')
+        .count()) === 0 &&
+      (await statisticsDetails
+        .locator('.statistics-group-row[aria-expanded="true"]')
+        .count()) === 0,
+    `${name} collapse all did not close every statistics section`
+  )
   assert.strictEqual(
     await statisticsDetails
       .locator('.statistics-workflow-stage-control[aria-expanded="true"]')
