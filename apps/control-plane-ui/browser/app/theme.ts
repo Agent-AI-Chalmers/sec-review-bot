@@ -72,10 +72,12 @@ export const mantineTheme = createTheme({
   headings: {
     fontFamily: FONT_STACK,
     fontWeight: '700',
+    // The console is dense, so the type scale only opens up where it carries
+    // hierarchy: page title, section title, and a slightly raised subsection.
     sizes: {
-      h1: { fontSize: '1.75rem', lineHeight: '1.2' },
-      h2: { fontSize: '1.125rem', lineHeight: '1.3' },
-      h3: { fontSize: '1rem', lineHeight: '1.3' }
+      h1: { fontSize: '2rem', lineHeight: '1.2' },
+      h2: { fontSize: '1.25rem', lineHeight: '1.3' },
+      h3: { fontSize: '1.0625rem', lineHeight: '1.35' }
     }
   },
   defaultRadius: 'md',
