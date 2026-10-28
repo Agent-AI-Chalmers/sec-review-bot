@@ -3,6 +3,8 @@
  * - base: global tokens, element defaults, and shared utilities
  * - shell: application header, navigation, and page frame
  * - runs-detail: run list, run status, and run detail views
+ * - parked-runs: parked-run summary and decision banner
+ * - transitions: state-machine diagrams and transition history
  * - memory: memory tables, revision graph, and overview
  * - workspace-editor: file workspace, previews, and code editors
  * - transcript-viewer: transcript timeline and message content
@@ -14,6 +16,8 @@
 @import './styles/base.css';
 @import './styles/shell.css';
 @import './styles/runs-detail.css';
+@import './styles/parked-runs.css';
+@import './styles/transitions.css';
 @import './styles/memory.css';
 @import './styles/workspace-editor.css';
 @import './styles/transcript-viewer.css';
