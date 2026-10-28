@@ -560,6 +560,7 @@ export function Runs(): React.JSX.Element {
                 w={72}
                 value={String(pageSize)}
                 allowDeselect={false}
+                comboboxProps={{ withinPortal: true }}
                 data={pageSizeOptions.map((size) => String(size))}
                 onChange={(value) => {
                   // Reuse the filter path: changing how much a page holds invalidates the
