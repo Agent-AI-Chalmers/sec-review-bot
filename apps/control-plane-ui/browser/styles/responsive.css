@@ -201,6 +201,14 @@
     padding-left: 18px;
   }
 
+  .transcript-layout {
+    display: block;
+  }
+
+  .transcript-minimap {
+    display: none;
+  }
+
   .transcript-message-body {
     padding: 10px;
   }

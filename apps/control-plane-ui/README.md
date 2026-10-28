@@ -15,6 +15,12 @@ pnpm run dev:fixtures
 
 Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies representative run and memory states without requiring Review Runs, Memory Catalog, PostgreSQL, or RustFS. Memory pause, resume, edit, and restore controls are stateful fixtures. Memory tree and transcript actions return small fixture attachments so their browser download behavior can be exercised without stored objects.
 
+The fixture server also exposes stable full-page error states for visual inspection:
+
+- `/memory/revisions/404/tree` shows a memory-tree preview failure while preserving the artifact download.
+- `/memory/revisions/404/transcript` shows a transcript load failure.
+- `/runs/fixture-artifact-load-error/files` shows a run-files load failure.
+
 The Viewer page is entirely local to the browser. It accepts one JSON or JSONL transcript file, or pasted transcript content, and renders the messages without uploading the input to the BFF.
 
 ## Source layout

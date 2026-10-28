@@ -156,6 +156,22 @@ body {
   padding: var(--mantine-spacing-xl);
   place-items: center;
 }
+
+.content-load-state {
+  display: grid;
+  min-height: min(52vh, 560px);
+  padding: var(--mantine-spacing-xl);
+  place-items: center;
+}
+
+.resource-load-error {
+  width: min(100%, 560px);
+  padding: var(--mantine-spacing-xl);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
+}
 /*
  * A theme switch is a colour change, not a motion effect, so the cross-fade is only
  * armed while one is actually happening: the console adds `.theme-transition` for the

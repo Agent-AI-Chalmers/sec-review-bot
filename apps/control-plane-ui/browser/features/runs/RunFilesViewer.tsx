@@ -1,7 +1,7 @@
 import React from 'react'
 import {
   ActionIcon,
-  Alert,
+  Button,
   Container,
   Group,
   Modal,
@@ -17,6 +17,7 @@ import {
   throwIfUnauthorized
 } from '../../shared/api-client.js'
 import { FileWorkspace } from '../workspace/FileWorkspace.js'
+import { ResourceLoadError } from '../../shared/ResourceLoadError.js'
 import { useMessages } from '../../shared/i18n.js'
 
 interface RunFilesResponse {
@@ -72,14 +73,29 @@ export function RunFilesContent({
 
   throwIfUnauthorized(error)
 
+  if (error !== undefined)
+    return (
+      <div className="content-load-state">
+        <ResourceLoadError
+          message={t('runFilesLoadFailed')}
+          actions={
+            <Button
+              component="a"
+              href={`/api/runs/${encodeURIComponent(runId)}/artifact`}
+              download
+              variant="default"
+              leftSection={<IconDownload size={16} />}
+            >
+              {t('downloadDiagnosticBundle')}
+            </Button>
+          }
+        />
+      </div>
+    )
+
   return (
     <>
-      {error !== undefined && (
-        <Alert color="red">{t('runFilesLoadFailed')}</Alert>
-      )}
-      {error === undefined && !selectedFile && (
-        <Text c="dimmed">{t('loading')}</Text>
-      )}
+      {!selectedFile && <Text c="dimmed">{t('loading')}</Text>}
       {selectedFile && (
         <FileWorkspace
           files={files}

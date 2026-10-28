@@ -1,3 +1,10 @@
+.transcript-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 26px;
+  gap: 8px;
+  align-items: start;
+}
+
 .transcript-timeline {
   position: relative;
   box-sizing: border-box;
@@ -5,6 +12,71 @@
   max-width: none;
   margin: 0;
   padding-left: 24px;
+}
+
+.transcript-minimap {
+  position: sticky;
+  z-index: 1;
+}
+
+.transcript-minimap-track {
+  position: relative;
+  width: 24px;
+  height: 100%;
+  margin-left: auto;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.transcript-minimap-track:focus-visible {
+  outline: 2px solid var(--mantine-color-text);
+  outline-offset: 2px;
+}
+
+/* Marks are not pointer targets; the slider track owns hover, click, and focus. */
+.transcript-minimap-marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 8%,
+    black 92%,
+    transparent
+  );
+}
+
+.transcript-minimap-segment {
+  position: absolute;
+  right: 0;
+  height: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  /* State hierarchy: a faint border line by default, the tertiary text colour
+     under the pointer, and full text colour for the current mark. */
+  background: var(--border-strong);
+  transform: translateY(-50%);
+  transition: background-color 100ms ease;
+}
+
+.transcript-minimap-segment[data-preview='true'] {
+  background: var(--muted);
+}
+
+.transcript-minimap-segment[data-current='true'] {
+  z-index: 1;
+  background: var(--mantine-color-text);
+}
+
+.transcript-minimap-preview {
+  position: absolute;
+  z-index: 3;
+  right: calc(100% + 8px);
+  width: 280px;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 .transcript-toolbar {

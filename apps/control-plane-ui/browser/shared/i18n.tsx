@@ -29,6 +29,7 @@ export const messages = {
     jsonlRecord: 'Record {record} · line {line}',
     jsonlInvalidRecord: 'Invalid JSON',
     previewUnavailable: 'Preview unavailable',
+    contentUnavailable: 'Content unavailable',
     previewUnavailableDescription:
       'This {size} file is binary or exceeds the online preview limit. Download the original bundle to inspect it.',
     runFiles: 'Run files',
@@ -50,6 +51,9 @@ export const messages = {
     maintenanceLoading: 'Loading',
     pauseMaintenance: 'Pause automatic maintenance',
     resumeMaintenance: 'Resume automatic maintenance',
+    maintenanceControlHelp:
+      'Pausing does not stop a maintenance run that is already in progress. If it reaches the save step while paused, that run fails and will not continue when maintenance resumes; the next maintenance run picks the remaining observations up again.',
+    maintenanceControlHelpLabel: 'Explain automatic maintenance control',
     editMemoryTree: 'Edit current memory',
     memoryOverview: 'Overview',
     memoryRevisions: 'Revisions',
@@ -119,6 +123,8 @@ export const messages = {
     transcriptCacheRead: 'Cache read',
     transcriptCacheCreation: 'Cache write',
     transcriptSearch: 'Search messages, tools, and arguments',
+    transcriptMinimap: 'Transcript navigation',
+    transcriptMinimapPosition: 'Transcript position',
     transcriptShowing: 'Showing {shown} of {total} messages',
     transcriptUsageProcessed: '{count} processed',
     openFullPage: 'Open in new page',
@@ -569,6 +575,7 @@ export const messages = {
     jsonlRecord: '记录 {record} · 第 {line} 行',
     jsonlInvalidRecord: 'JSON 无效',
     previewUnavailable: '无法在线预览',
+    contentUnavailable: '内容不可用',
     previewUnavailableDescription:
       '该文件大小为 {size}，属于二进制文件或超过在线预览限制。请下载原始包后查看。',
     runFiles: '运行文件',
@@ -590,6 +597,9 @@ export const messages = {
     maintenanceLoading: '加载中',
     pauseMaintenance: '暂停自动维护',
     resumeMaintenance: '恢复自动维护',
+    maintenanceControlHelp:
+      '暂停不会中止已经开始的那一轮维护。如果它在暂停期间走到保存步骤，这一轮会失败，恢复后也不会自动继续；之后的维护会重新处理这些内容。',
+    maintenanceControlHelpLabel: '说明自动维护控制行为',
     editMemoryTree: '编辑当前记忆',
     memoryOverview: '概览',
     memoryRevisions: '修订历史',
@@ -659,6 +669,8 @@ export const messages = {
     transcriptCacheRead: '缓存读取',
     transcriptCacheCreation: '缓存写入',
     transcriptSearch: '搜索消息、工具和参数',
+    transcriptMinimap: '过程记录导航',
+    transcriptMinimapPosition: '过程记录位置',
     transcriptShowing: '显示 {shown} / {total} 条消息',
     transcriptUsageProcessed: '累计处理 {count}',
     openFullPage: '在新页面打开',

@@ -199,6 +199,15 @@ try {
         waitUntil
       })
       await smokeViewer({ page })
+      await page.goto(`${base}/runs/fixture-artifact-load-error/files`, {
+        waitUntil: 'domcontentloaded'
+      })
+      await page
+        .getByText('The run files could not be opened.', { exact: true })
+        .waitFor()
+      await page
+        .getByRole('link', { name: 'Download diagnostic bundle' })
+        .waitFor()
       console.log(`browser-smoke ${name}: ok (${base})`)
     }
     await context.close()

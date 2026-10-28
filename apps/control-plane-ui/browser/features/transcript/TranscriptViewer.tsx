@@ -1,7 +1,6 @@
 import React from 'react'
 import {
   ActionIcon,
-  Alert,
   Badge,
   Button,
   Checkbox,
@@ -16,6 +15,7 @@ import {
   TextInput,
   Tooltip
 } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 import {
   IconArrowDown,
   IconArrowUp,
@@ -41,6 +41,7 @@ import {
   isAbortError,
   throwIfUnauthorized
 } from '../../shared/api-client.js'
+import { ResourceLoadError } from '../../shared/ResourceLoadError.js'
 import { useMessages } from '../../shared/i18n.js'
 import { LatestRequestGuard } from '../../shared/latest-request.js'
 import {
@@ -50,6 +51,16 @@ import {
   type TranscriptMessageView,
   type TranscriptRole
 } from './transcript-model.js'
+import {
+  MAX_MINIMAP_MARKS,
+  MINIMAP_HEIGHT,
+  minimapBuckets,
+  minimapMarkWidth,
+  minimapTicks,
+  nearestSegment,
+  sameSegments,
+  type MinimapSegment
+} from './transcript-minimap.js'
 
 export type { TranscriptEvent } from './transcript-model.js'
 
@@ -377,9 +388,7 @@ function ToolCall({
   const t = useMessages()
   const jump = (): void => {
     if (!call.resultMessageId) return
-    document
-      .getElementById(`transcript-${call.resultMessageId}`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    scrollToTranscriptElement(`transcript-${call.resultMessageId}`)
   }
   return (
     <Paper withBorder p="sm" className="transcript-tool-call">
@@ -426,13 +435,12 @@ function TranscriptMessage({
   const presentation = rolePresentation(message.role)
   const jumpToCall = (): void => {
     if (!message.toolCallId) return
-    document
-      .getElementById(`transcript-call-${message.toolCallId}`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    scrollToTranscriptElement(`transcript-call-${message.toolCallId}`)
   }
   return (
     <Paper
       id={`transcript-${message.id}`}
+      data-transcript-message-key={messageKey(message)}
       withBorder
       className={`transcript-message transcript-${message.role}`}
     >
@@ -585,20 +593,343 @@ const ROLES: TranscriptRole[] = [
   'unknown'
 ]
 
+function scrollParent(element: HTMLElement): HTMLElement | undefined {
+  let ancestor = element.parentElement
+  while (ancestor) {
+    const style = getComputedStyle(ancestor)
+    if (/(auto|scroll)/.test(style.overflowY)) return ancestor
+    ancestor = ancestor.parentElement
+  }
+  return undefined
+}
+
+function scrollToTranscriptElement(
+  id: string,
+  behavior?: ScrollBehavior
+): void {
+  document.getElementById(id)?.scrollIntoView({
+    behavior:
+      behavior ??
+      (window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth'),
+    block: 'center'
+  })
+}
+
+function messageKey(message: TranscriptMessageView): string {
+  return `${message.seq}:${message.id}:${message.role}`
+}
+
+function messagePreview(message: TranscriptMessageView): string {
+  const value =
+    message.content || message.reasoning || message.name || message.role
+  const preview = value.replaceAll(/\s+/g, ' ').trim().slice(0, 120)
+  return preview || message.role
+}
+
+const MinimapMark = React.memo(function MinimapMark({
+  top,
+  width,
+  current,
+  preview
+}: {
+  top: number
+  width: number
+  current: boolean
+  preview: boolean
+}): React.JSX.Element {
+  return (
+    <span
+      className="transcript-minimap-segment"
+      data-current={current ? 'true' : undefined}
+      data-preview={preview ? 'true' : undefined}
+      style={{ top: `${top}px`, width: `${width}px` }}
+    />
+  )
+})
+
+function TranscriptMinimap({
+  messages,
+  timelineRef,
+  timelineId
+}: {
+  messages: TranscriptMessageView[]
+  timelineRef: React.RefObject<HTMLDivElement | null>
+  timelineId: string
+}): React.JSX.Element {
+  const t = useMessages()
+  const [segments, setSegments] = React.useState<MinimapSegment[]>([])
+  const [current, setCurrent] = React.useState(0)
+  const [hovered, setHovered] = React.useState<number | null>(null)
+  const [topOffset, setTopOffset] = React.useState<number | null>(null)
+
+  // A layout effect measures the scrollport before the first paint, so the
+  // modal rail never shows its 50vh fallback for a frame.
+  React.useLayoutEffect(() => {
+    const timeline = timelineRef.current
+    if (!timeline) return
+    const scroller = scrollParent(timeline)
+    const scrollTarget = scroller ?? window
+    let layoutFrame = 0
+    let scrollFrame = 0
+    let measured: MinimapSegment[] = []
+
+    const updateCurrent = (): void => {
+      if (measured.length === 0) return
+      const timelineRect = timeline.getBoundingClientRect()
+      if (timelineRect.height <= 0) return
+      const viewportTop = scroller ? scroller.getBoundingClientRect().top : 0
+      const viewportHeight = scroller
+        ? scroller.clientHeight
+        : window.innerHeight
+      const center =
+        (viewportTop - timelineRect.top + viewportHeight / 2) /
+        timelineRect.height
+      const next = nearestSegment(measured, center)
+      setCurrent((value) => (value === next ? value : next))
+    }
+
+    const updateTop = (): void => {
+      const height = scroller ? scroller.clientHeight : window.innerHeight
+      const next = Math.max(8, (height - MINIMAP_HEIGHT) / 2)
+      setTopOffset((value) => (value === next ? value : next))
+    }
+
+    const measure = (): void => {
+      layoutFrame = 0
+      updateTop()
+      const timelineRect = timeline.getBoundingClientRect()
+      if (timelineRect.height <= 0) return
+      const byKey = new Map(
+        messages.map((message) => [messageKey(message), message])
+      )
+      const next: MinimapSegment[] = []
+      for (const node of timeline.querySelectorAll<HTMLElement>(
+        ':scope > [data-transcript-message-key]'
+      )) {
+        const message = byKey.get(node.dataset.transcriptMessageKey ?? '')
+        if (!message) continue
+        const rect = node.getBoundingClientRect()
+        next.push({
+          message,
+          top: (rect.top - timelineRect.top) / timelineRect.height,
+          height: rect.height / timelineRect.height
+        })
+      }
+      measured = next
+      setSegments((value) => (sameSegments(value, next) ? value : next))
+      updateCurrent()
+    }
+
+    const scheduleMeasure = (): void => {
+      cancelAnimationFrame(layoutFrame)
+      layoutFrame = requestAnimationFrame(measure)
+    }
+    const scheduleCurrent = (): void => {
+      cancelAnimationFrame(scrollFrame)
+      scrollFrame = requestAnimationFrame(updateCurrent)
+    }
+
+    const resizeObserver = new ResizeObserver(scheduleMeasure)
+    resizeObserver.observe(timeline)
+    scrollTarget.addEventListener('scroll', scheduleCurrent, { passive: true })
+    window.addEventListener('resize', scheduleMeasure)
+    measure()
+    return (): void => {
+      cancelAnimationFrame(layoutFrame)
+      cancelAnimationFrame(scrollFrame)
+      resizeObserver.disconnect()
+      scrollTarget.removeEventListener('scroll', scheduleCurrent)
+      window.removeEventListener('resize', scheduleMeasure)
+    }
+  }, [messages, timelineRef])
+
+  const ticks = minimapTicks(segments.length)
+  if (segments.length === 0)
+    return (
+      <nav
+        className="transcript-minimap"
+        aria-label={t('transcriptMinimap')}
+        style={{
+          height: MINIMAP_HEIGHT,
+          top: topOffset ?? `calc(50vh - ${MINIMAP_HEIGHT / 2}px)`
+        }}
+      />
+    )
+
+  const active = Math.min(current, segments.length - 1)
+  const dense = segments.length > MAX_MINIMAP_MARKS
+  const buckets = dense ? minimapBuckets(segments.length, ticks) : []
+  const currentBucket = dense
+    ? buckets.find((bucket) => bucket.start <= active && active <= bucket.end)
+    : undefined
+  const hoveredIndex =
+    hovered === null ? null : Math.min(hovered, segments.length - 1)
+  const hoveredMessage =
+    hoveredIndex === null ? undefined : segments[hoveredIndex]?.message
+  const currentMessage = segments[active]?.message
+  const currentLabel = currentMessage
+    ? `${t(rolePresentation(currentMessage.role).key)} #${currentMessage.seq}: ${messagePreview(currentMessage)}`
+    : undefined
+
+  const indexAt = (clientY: number, rect: DOMRect): number => {
+    if (ticks.gap === 0) return 0
+    return Math.max(
+      0,
+      Math.min(
+        segments.length - 1,
+        Math.round((clientY - rect.top - ticks.start) / ticks.gap)
+      )
+    )
+  }
+
+  const navigate = (index: number): void => {
+    const message = segments[index]?.message
+    if (!message) return
+    // The rail is a direct ordering control: jump instantly and let the scroll
+    // listener derive the current message. A smooth scroll would keep firing
+    // scroll events while a second key press still uses the old index.
+    scrollToTranscriptElement(`transcript-${message.id}`, 'auto')
+  }
+
+  return (
+    <nav
+      className="transcript-minimap"
+      aria-label={t('transcriptMinimap')}
+      style={{
+        height: MINIMAP_HEIGHT,
+        top: topOffset ?? `calc(50vh - ${MINIMAP_HEIGHT / 2}px)`
+      }}
+    >
+      <div
+        className="transcript-minimap-track"
+        role="slider"
+        tabIndex={0}
+        aria-label={t('transcriptMinimapPosition')}
+        aria-controls={timelineId}
+        aria-orientation="vertical"
+        aria-valuemin={1}
+        aria-valuemax={segments.length}
+        aria-valuenow={active + 1}
+        aria-valuetext={currentLabel}
+        onClick={(event) => {
+          navigate(
+            indexAt(event.clientY, event.currentTarget.getBoundingClientRect())
+          )
+        }}
+        onMouseMove={(event) => {
+          setHovered(
+            indexAt(event.clientY, event.currentTarget.getBoundingClientRect())
+          )
+        }}
+        onMouseLeave={() => setHovered(null)}
+        onFocus={() => setHovered(active)}
+        onBlur={() => setHovered(null)}
+        onKeyDown={(event) => {
+          const last = segments.length - 1
+          let next: number | undefined
+          if (event.key === 'ArrowUp' || event.key === 'ArrowLeft')
+            next = Math.max(0, active - 1)
+          else if (event.key === 'ArrowDown' || event.key === 'ArrowRight')
+            next = Math.min(last, active + 1)
+          else if (event.key === 'Home') next = 0
+          else if (event.key === 'End') next = last
+          else if (event.key === 'Enter' || event.key === ' ') next = active
+          if (next === undefined) return
+          event.preventDefault()
+          setHovered(next)
+          navigate(next)
+        }}
+      >
+        <div className="transcript-minimap-marks" aria-hidden="true">
+          {dense ? (
+            <>
+              {buckets.map((bucket) => {
+                const preview =
+                  hoveredIndex !== null &&
+                  bucket.start <= hoveredIndex &&
+                  hoveredIndex <= bucket.end
+                return (
+                  <MinimapMark
+                    key={`bucket-${bucket.start}`}
+                    top={bucket.top}
+                    width={minimapMarkWidth(false, preview)}
+                    current={false}
+                    preview={preview}
+                  />
+                )
+              })}
+              {currentMessage && (
+                <MinimapMark
+                  key="current"
+                  top={currentBucket?.top ?? ticks.start + active * ticks.gap}
+                  width={minimapMarkWidth(true, false)}
+                  current
+                  preview={false}
+                />
+              )}
+            </>
+          ) : (
+            segments.map((segment, index) => {
+              const preview = index === hoveredIndex
+              return (
+                <MinimapMark
+                  key={messageKey(segment.message)}
+                  top={ticks.start + index * ticks.gap}
+                  width={minimapMarkWidth(index === active, preview)}
+                  current={index === active}
+                  preview={preview}
+                />
+              )
+            })
+          )}
+        </div>
+      </div>
+      {hoveredMessage && hoveredIndex !== null && (
+        <Paper
+          withBorder
+          p="xs"
+          className="transcript-minimap-preview"
+          aria-hidden="true"
+          style={{ top: `${ticks.start + hoveredIndex * ticks.gap}px` }}
+        >
+          <Text size="xs" fw={700}>
+            {t(rolePresentation(hoveredMessage.role).key)} · #
+            {hoveredMessage.seq}
+          </Text>
+          <Text size="xs" lineClamp={3} c="dimmed">
+            {messagePreview(hoveredMessage)}
+          </Text>
+        </Paper>
+      )}
+    </nav>
+  )
+}
+
 export function TranscriptTimeline({
   events
 }: {
   events: TranscriptEvent[]
 }): React.JSX.Element {
   const t = useMessages()
+  const timelineId = React.useId()
+  const narrowTranscript = useMediaQuery('(max-width: 700px)', false, {
+    getInitialValueInEffect: false
+  })
   const document = React.useMemo(() => normalizeTranscript(events), [events])
   const [query, setQuery] = React.useState('')
   const [roles, setRoles] = React.useState<TranscriptRole[]>(ROLES)
   const [force, setForce] = React.useState(0)
-  const filtered = document.messages.filter(
-    (message) =>
-      roles.includes(message.role) &&
-      message.searchable.includes(query.trim().toLowerCase())
+  const timelineRef = React.useRef<HTMLDivElement>(null)
+  const filtered = React.useMemo(
+    () =>
+      document.messages.filter(
+        (message) =>
+          roles.includes(message.role) &&
+          message.searchable.includes(query.trim().toLowerCase())
+      ),
+    [document.messages, query, roles]
   )
   const toggleRole = (role: TranscriptRole): void =>
     setRoles((current) =>
@@ -682,16 +1013,30 @@ export function TranscriptTimeline({
           </Group>
         </Group>
       </Paper>
-      <Stack gap="sm" className="transcript-timeline">
-        {filtered.map((message) => (
-          <TranscriptMessage
-            key={`${message.id}:${message.seq}:${message.role}`}
-            message={message}
-            force={force}
-            query={query.trim()}
+      <div className="transcript-layout">
+        <Stack
+          id={timelineId}
+          gap="sm"
+          className="transcript-timeline"
+          ref={timelineRef}
+        >
+          {filtered.map((message) => (
+            <TranscriptMessage
+              key={messageKey(message)}
+              message={message}
+              force={force}
+              query={query.trim()}
+            />
+          ))}
+        </Stack>
+        {!narrowTranscript && (
+          <TranscriptMinimap
+            messages={filtered}
+            timelineRef={timelineRef}
+            timelineId={timelineId}
           />
-        ))}
-      </Stack>
+        )}
+      </div>
     </Stack>
   )
 }
@@ -773,7 +1118,11 @@ export function TranscriptContent({
   }, [t, target.contentHref])
   throwIfUnauthorized(error)
   if (error !== undefined)
-    return <Alert color="red">{t('transcriptLoadFailed')}</Alert>
+    return (
+      <div className="content-load-state">
+        <ResourceLoadError message={t('transcriptLoadFailed')} />
+      </div>
+    )
   if (loading) return <Text c="dimmed">{t('loading')}</Text>
   return <TranscriptTimeline events={events} />
 }

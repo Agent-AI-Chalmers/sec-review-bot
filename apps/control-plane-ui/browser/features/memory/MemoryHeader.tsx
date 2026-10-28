@@ -1,6 +1,14 @@
 import React from 'react'
-import { Alert, Button, Group, Paper, Switch } from '@mantine/core'
-import { IconEdit } from '@tabler/icons-react'
+import {
+  ActionIcon,
+  Alert,
+  Button,
+  Group,
+  Paper,
+  Switch,
+  Tooltip
+} from '@mantine/core'
+import { IconEdit, IconInfoCircle } from '@tabler/icons-react'
 
 import { useMessages } from '../../shared/i18n.js'
 import type { components } from './api-types.generated.js'
@@ -54,6 +62,25 @@ export function MemoryHeader({
             }
             onChange={onToggleMaintenance}
           />
+          <Tooltip
+            label={t('maintenanceControlHelp')}
+            multiline
+            w={360}
+            position="bottom-start"
+            events={{ hover: true, focus: true, touch: true }}
+          >
+            <ActionIcon
+              component="span"
+              role="img"
+              tabIndex={0}
+              variant="subtle"
+              color="gray"
+              size="sm"
+              aria-label={t('maintenanceControlHelpLabel')}
+            >
+              <IconInfoCircle size={16} />
+            </ActionIcon>
+          </Tooltip>
           <Button
             variant="default"
             leftSection={<IconEdit size={16} />}
