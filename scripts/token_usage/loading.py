@@ -14,6 +14,7 @@ NUMERIC_FIELDS = (
     "output_tokens",
     "total_tokens",
     "cache_read_tokens",
+    "cache_creation_tokens",
     "reasoning_tokens",
 )
 TRANSCRIPTS_DIRNAME = "transcripts"
@@ -154,7 +155,9 @@ def _usage_records_from_value(
                     return [(direct_usage, model_id)]
             response_usage = response_metadata.get("usage")
             if isinstance(response_usage, dict):
-                direct_usage = usage_from_langchain_metadata(response_usage)
+                direct_usage = usage_from_provider_metadata(
+                    response_usage
+                ) or usage_from_langchain_metadata(response_usage)
                 if direct_usage is not None:
                     return [(direct_usage, model_id)]
 
@@ -222,6 +225,7 @@ def _read_transcript_usage(path: Path, *, stage: str) -> StageUsage:
         output_tokens=totals["output_tokens"],
         total_tokens=totals["total_tokens"],
         cache_read_tokens=totals["cache_read_tokens"],
+        cache_creation_tokens=totals["cache_creation_tokens"],
         reasoning_tokens=totals["reasoning_tokens"],
         ai_message_count=len(records),
         ai_messages_with_usage_count=len(records),
@@ -312,6 +316,7 @@ def _aggregate_stage_usage(
         output_tokens=sum(item.output_tokens for item in payloads),
         total_tokens=sum(item.total_tokens for item in payloads),
         cache_read_tokens=sum(item.cache_read_tokens for item in payloads),
+        cache_creation_tokens=sum(item.cache_creation_tokens for item in payloads),
         reasoning_tokens=sum(item.reasoning_tokens for item in payloads),
         ai_message_count=sum(item.ai_message_count for item in payloads),
         ai_messages_with_usage_count=sum(

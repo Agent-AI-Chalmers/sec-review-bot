@@ -10,12 +10,12 @@ GENERATION_FIELDS = "basic,time,metadata,model,usage"
 LANGFUSE_SDK_INSTRUMENTATION_SCOPE = "langfuse-sdk"
 
 TOKEN_FIELDS = (
-    "input",
-    "output",
-    "total",
+    "input_tokens",
+    "output_tokens",
+    "total_tokens",
     "cache_read_input_tokens",
     "cache_creation_input_tokens",
-    "reasoning",
+    "reasoning_tokens",
 )
 
 
@@ -143,12 +143,44 @@ def _usage_details(observation: Mapping[str, Any]) -> Mapping[str, Any]:
 
 def _call_usage(observation: Mapping[str, Any]) -> dict[str, int] | None:
     raw = _usage_details(observation)
-    usage = {
-        field: number
-        for field in TOKEN_FIELDS
-        if (number := _int_value(raw.get(field))) is not None
-    }
-    return usage or None
+    ordinary_input = _int_value(raw.get("input"))
+    ordinary_output = _int_value(raw.get("output"))
+    total = _int_value(raw.get("total"))
+    cache_read = _int_value(raw.get("cache_read_input_tokens"))
+    cache_creation = _int_value(raw.get("cache_creation_input_tokens"))
+    reasoning = _int_value(raw.get("reasoning"))
+    if all(
+        value is None
+        for value in (
+            ordinary_input,
+            ordinary_output,
+            total,
+            cache_read,
+            cache_creation,
+            reasoning,
+        )
+    ):
+        return None
+
+    # Langfuse reports ordinary, cache, and reasoning usage as mutually exclusive
+    # billing buckets. Expose inclusive OpenTelemetry-style input/output totals while
+    # retaining the cache and reasoning buckets as subsets for callers that need them.
+    usage: dict[str, int] = {}
+    if ordinary_input is not None:
+        usage["input_tokens"] = (
+            ordinary_input + (cache_read or 0) + (cache_creation or 0)
+        )
+    if ordinary_output is not None:
+        usage["output_tokens"] = ordinary_output + (reasoning or 0)
+    if total is not None:
+        usage["total_tokens"] = total
+    if cache_read is not None:
+        usage["cache_read_input_tokens"] = cache_read
+    if cache_creation is not None:
+        usage["cache_creation_input_tokens"] = cache_creation
+    if reasoning is not None:
+        usage["reasoning_tokens"] = reasoning
+    return usage
 
 
 def _empty_totals() -> dict[str, int]:

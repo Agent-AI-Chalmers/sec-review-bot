@@ -2,6 +2,8 @@
 
 This directory contains a helper for summarizing token usage and effective patch cost from local run transcripts.
 
+Token fields follow OpenTelemetry GenAI semantics: `input_tokens` and `output_tokens` are inclusive totals. `cache_read_tokens` and `cache_creation_tokens` are subsets of `input_tokens`, while `reasoning_tokens` is a subset of `output_tokens`. The derived `uncached_input_tokens` subtracts both cache subsets from `input_tokens`.
+
 It is a repository-level reporting script. It reads stage-local transcript files directly.
 
 Install the agents package before running this repository-level script:
