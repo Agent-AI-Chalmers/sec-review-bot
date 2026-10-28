@@ -35,8 +35,8 @@
 | GitHub Integration | [`apps/github-integration/README.zh.md`](apps/github-integration/README.zh.md) | format、lint、typecheck、单元测试；数据库边界变化时运行集成测试 |
 | Review Runs | [`review-runs/README.zh.md`](review-runs/README.zh.md) | format、lint、typecheck、测试、PostgreSQL 集成测试 |
 | Control Plane UI | [`apps/control-plane-ui/README.zh.md`](apps/control-plane-ui/README.zh.md) | format、lint、typecheck、测试、build；用户可见流程运行浏览器 smoke test |
-| Execution Gateway | [`execution-gateway/README.zh.md`](execution-gateway/README.zh.md) | format、lint、typecheck、测试 |
-| Memory Catalog Server | [`memory-catalog/README.zh.md`](memory-catalog/README.zh.md) | format、lint、typecheck、测试 |
+| Execution Gateway | [`execution-gateway/README.zh.md`](execution-gateway/README.zh.md) | format、lint、typecheck、测试、Temporal integration tests |
+| Memory Catalog Server | [`memory-catalog/README.zh.md`](memory-catalog/README.zh.md) | format、lint、typecheck、测试、PostgreSQL integration tests |
 | 仓库脚本 | [`scripts/README.md`](scripts/README.md) | Ruff、Black、compile 检查和聚焦的入口探针 |
 | 文档 | [`docs/DOCUMENTATION_GUIDE.zh.md`](docs/DOCUMENTATION_GUIDE.zh.md) 和 [`docs/README.zh.md`](docs/README.zh.md) | 根据变更运行链接、wrapping 和译文标题检查 |
 
