@@ -908,7 +908,7 @@ export function Detail(): React.JSX.Element {
                     {/* The two parked states have different causes and different
                         consequences, so the explanation follows the axis that stopped rather
                         than describing the preparation contradiction in both cases. */}
-                    <Stack gap={4}>
+                    <Stack gap="xs">
                       <Text size="sm" className="blocked-run-body">
                         {t(
                           parkedAxis === 'preparation'
@@ -1008,7 +1008,7 @@ export function Detail(): React.JSX.Element {
                       make that pointer lead nowhere unless guessed at. A code the console does
                       not know still renders as the bare code. */}
                   {run.preparation.disconnect_reason !== null && (
-                    <Stack gap={2}>
+                    <Stack gap={4}>
                       <Text size="xs" ff="monospace" c="dimmed">
                         {run.preparation.disconnect_reason}
                       </Text>

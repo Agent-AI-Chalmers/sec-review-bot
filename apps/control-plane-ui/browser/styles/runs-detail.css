@@ -97,6 +97,7 @@
    the accent; these rules only keep the explanation readable at a wide viewport. */
 .blocked-run .blocked-run-body {
   max-width: 62ch;
+  line-height: 1.75;
 }
 
 /* The decision sits beside the explanation rather than after it, so it is visible without
