@@ -4,7 +4,7 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-这是用于查看 Review Runs run 和操作 memory 的内部控制台。浏览器只访问该应用的同源服务端；服务端持有上游凭据，并仅代理明确白名单内的路由。
+这是用于查看和处置 Review Runs run、检查执行诊断与 artifact、管理 agent memory，以及阅读 transcript 的内部控制台。服务端数据只通过该应用的同源 BFF 获取；BFF 持有上游凭据，并仅代理明确白名单内的路由。独立的 transcript Viewer 则完全在浏览器中处理上传或粘贴的输入。
 
 ## 本地运行
 
@@ -15,13 +15,15 @@ pnpm install
 pnpm run dev:fixtures
 ```
 
-打开 Vite 输出的地址，通常是 `http://localhost:5173`。这种模式提供有代表性的 run 和 memory 状态，不需要启动 Review Runs、Memory Catalog、PostgreSQL 或 RustFS。Memory 暂停、恢复、编辑和回滚使用有状态 fixture；artifact 下载链接背后没有真实存储对象。
+打开 Vite 输出的地址，通常是 `http://localhost:5173`。这种模式提供有代表性的 run 和 memory 状态，不需要启动 Review Runs、Memory Catalog、PostgreSQL 或 RustFS。Memory 暂停、恢复、编辑和回滚使用有状态 fixture；memory tree 与 transcript 操作会返回小型 fixture 附件，因此无需真实存储对象也能验证浏览器下载行为。
 
 fixture server 还提供稳定的全页错误状态，便于进行视觉检查：
 
 - `/memory/revisions/404/tree` 显示 memory tree 预览失败，同时保留 artifact 下载入口。
 - `/memory/revisions/404/transcript` 显示 transcript 加载失败。
 - `/runs/fixture-artifact-load-error/files` 显示 run files 加载失败。
+
+Viewer 页面完全在浏览器本地运行。它接受项目基于事件的 JSONL transcript contract 和直接导出的 LangGraph message-array JSON，可以上传文件或粘贴内容，输入不会发送到 BFF。对于缺少 tool result ID 的直接消息数组，只有在一条 assistant 消息的调用后紧跟完整且无歧义的结果序列时，Viewer 才会建立关联。
 
 ## 源码布局
 

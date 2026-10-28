@@ -361,3 +361,131 @@ test('run fixtures filter by source platform', async () => {
     await fixture.close()
   }
 })
+
+test('memory fixtures form one coherent provenance graph', async () => {
+  const fixture = await startFixtureServer()
+  try {
+    const [extractions, observations, overview, revisions] = await Promise.all([
+      fetch(`${fixture.base}/api/memory/extractions?limit=100`).then(
+        (response) => response.json()
+      ),
+      fetch(`${fixture.base}/api/memory/observations?limit=100`).then(
+        (response) => response.json()
+      ),
+      fetch(`${fixture.base}/api/memory/overview?range=30d`).then((response) =>
+        response.json()
+      ),
+      fetch(`${fixture.base}/api/memory/revisions?limit=100`).then((response) =>
+        response.json()
+      )
+    ])
+    type FixtureExtraction = {
+      extraction_id: string
+      source_run_id: string
+      source_unit_id: string
+      observation: { body_markdown: string } | null
+    }
+    const extractionById = new Map<string, FixtureExtraction>(
+      extractions.extractions.map(
+        (record: FixtureExtraction) => [record.extraction_id, record] as const
+      )
+    )
+
+    assert.strictEqual(extractions.next_cursor, null)
+    assert.strictEqual(extractions.extractions.length, 6)
+    assert.strictEqual(observations.next_cursor, null)
+    assert.strictEqual(observations.observations.length, 3)
+    assert.strictEqual(
+      overview.totals.completed_extraction_count,
+      extractions.extractions.length
+    )
+    assert.strictEqual(
+      overview.totals.observation_count,
+      observations.observations.length
+    )
+    assert.strictEqual(
+      overview.totals.pending_observation_count +
+        overview.totals.consumed_observation_count,
+      observations.observations.length
+    )
+    assert.strictEqual(
+      overview.totals.units_with_observation_count +
+        overview.totals.units_without_observation_count,
+      overview.totals.extracted_unit_count
+    )
+    assert.strictEqual(
+      overview.workflows.reduce(
+        (total: number, workflow: { extracted_unit_count: number }) =>
+          total + workflow.extracted_unit_count,
+        0
+      ),
+      overview.totals.extracted_unit_count
+    )
+
+    for (const observation of observations.observations as Array<{
+      extraction_id: string
+      source_run_id: string
+      source_unit_id: string
+      body_markdown: string
+      consumed_revision: number | null
+    }>) {
+      const extraction = extractionById.get(observation.extraction_id)
+      assert(extraction, `${observation.extraction_id} must exist`)
+      assert.strictEqual(extraction.source_run_id, observation.source_run_id)
+      assert.strictEqual(extraction.source_unit_id, observation.source_unit_id)
+      assert.strictEqual(
+        extraction.observation?.body_markdown,
+        observation.body_markdown
+      )
+
+      const runResponse = await fetch(
+        `${fixture.base}/api/runs/${encodeURIComponent(observation.source_run_id)}`
+      )
+      assert.strictEqual(runResponse.status, 200)
+      const { run } = await runResponse.json()
+      assert.strictEqual(run.source_platform, 'github')
+      assert.strictEqual(run.execution.status, 'succeeded')
+      assert.strictEqual(run.publication.status, 'published')
+      assert.strictEqual(run.artifact_storage?.status, 'available')
+
+      if (observation.consumed_revision !== null) {
+        const revision = revisions.revisions.find(
+          (candidate: { revision: number }) =>
+            candidate.revision === observation.consumed_revision
+        )
+        assert(
+          revision,
+          'a consumed observation must name an existing revision'
+        )
+        assert.strictEqual(revision.source.kind, 'maintenance')
+        assert.ok(
+          revision.source.extraction_ids.includes(observation.extraction_id)
+        )
+      }
+    }
+
+    for (const revision of revisions.revisions as Array<{
+      source:
+        | { kind: 'maintenance'; extraction_ids: string[] }
+        | { kind: 'operator'; operation_id: string; actor: unknown }
+    }>) {
+      if (revision.source.kind === 'maintenance') {
+        for (const extractionId of revision.source.extraction_ids) {
+          const observation = observations.observations.find(
+            (candidate: { extraction_id: string }) =>
+              candidate.extraction_id === extractionId
+          )
+          assert(
+            observation,
+            `${extractionId} consumed by a revision must have an observation`
+          )
+        }
+      } else {
+        assert.ok(revision.source.operation_id)
+        assert.ok(revision.source.actor)
+      }
+    }
+  } finally {
+    await fixture.close()
+  }
+})

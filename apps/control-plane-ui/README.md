@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-Internal web console for review runs and memory operations. The browser talks only to this application's same-origin server; the server holds upstream credentials and proxies explicit route allowlists.
+Internal web console for inspecting and operating review runs, execution diagnostics and artifacts, agent memory, and transcripts. Server-backed data goes only through this application's same-origin BFF, which holds upstream credentials and proxies explicit route allowlists; the standalone transcript Viewer processes uploaded or pasted input entirely in the browser.
 
 ## Local development
 
@@ -21,7 +21,7 @@ The fixture server also exposes stable full-page error states for visual inspect
 - `/memory/revisions/404/transcript` shows a transcript load failure.
 - `/runs/fixture-artifact-load-error/files` shows a run-files load failure.
 
-The Viewer page is entirely local to the browser. It accepts one JSON or JSONL transcript file, or pasted transcript content, and renders the messages without uploading the input to the BFF.
+The Viewer page is entirely local to the browser. It accepts the project's event-based JSONL transcript contract and direct LangGraph message-array JSON, from either a file or pasted content, without uploading the input to the BFF. Direct message arrays that omit tool-result IDs are linked only when one assistant message's calls are followed by an unambiguous, complete result sequence.
 
 ## Source layout
 
