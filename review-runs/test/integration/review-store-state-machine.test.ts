@@ -3296,7 +3296,16 @@ test('abandoning a disconnected run concludes its open axes and keeps the execut
     assert.strictEqual(parked[0]?.run_id, runId)
     assert.strictEqual(parked[0]?.axis, 'preparation')
     assert.strictEqual(parked[0]?.reason, 'EXECUTION_ALREADY_ADVANCED')
-    assert.ok(parked[0]?.parked_at)
+    const disconnectEvent = (await store.listEvents(runId)).find(
+      (event) =>
+        event.axis === 'preparation' && event.to_status === 'disconnected'
+    )
+    assert.ok(disconnectEvent, 'the park must leave a transition event')
+    assert.strictEqual(
+      new Date(parked[0]?.parked_at ?? 0).toISOString(),
+      new Date(disconnectEvent.occurred_at).toISOString(),
+      'parked_at must be the transition instant, not a later activity timestamp'
+    )
 
     // A blank reason is refused: an abandonment must always say why it happened.
     await assert.rejects(
