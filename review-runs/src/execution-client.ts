@@ -6,13 +6,17 @@ import type {
   ReviewRunWorkflow,
   ExecutionArtifactStorage
 } from './contracts.js'
-import type { components } from './execution-api-schema.js'
+import type {
+  ExecutionError,
+  RunResponse,
+  RunStatusToken
+} from './execution-api-schema.js'
 import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
 
 type JsonObject = Record<string, unknown>
 
 /** One run as the published contract reports it. */
-type ContractRunResponse = components['schemas']['RunResponse']
+type ContractRunResponse = RunResponse
 
 /**
  * A response as parsed, before any field has been checked.
@@ -36,9 +40,7 @@ type ValidatedRunResponse = UnvalidatedRunResponse & {
 }
 
 /** The error envelope as parsed. Every field is read defensively. */
-type UnvalidatedExecutionError = Partial<
-  components['schemas']['ExecutionError']
->
+type UnvalidatedExecutionError = Partial<ExecutionError>
 
 /**
  * The statuses the Execution API may report.
@@ -430,7 +432,7 @@ export interface ExecutionRunStatusBatch {
 }
 
 /** One run's status token, as the contract defines it. */
-export type ExecutionRunStatusToken = components['schemas']['RunStatusToken']
+export type ExecutionRunStatusToken = RunStatusToken
 
 /**
  * How many run IDs one status request carries.

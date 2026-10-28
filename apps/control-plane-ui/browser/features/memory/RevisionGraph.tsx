@@ -3,10 +3,10 @@ import { Button, Group, Paper, Text } from '@mantine/core'
 import { IconArrowsDiff, IconEye, IconHistory } from '@tabler/icons-react'
 
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
-import type { components } from './api-types.generated.js'
+import type { MemoryTreeRevision } from './api-types.generated.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
-export type RevisionGraphItem = components['schemas']['MemoryTreeRevision']
+export type RevisionGraphItem = MemoryTreeRevision
 
 interface PositionedRevision extends RevisionGraphItem {
   x: number

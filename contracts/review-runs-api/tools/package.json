@@ -19,8 +19,10 @@
     "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
+    "@kubb/core": "5.13.1",
+    "@kubb/plugin-ts": "5.1.0",
     "@stoplight/spectral-cli": "^6.17.0",
-    "openapi-typescript": "^7.13.0",
+    "kubb": "5.13.1",
     "prettier": "^3.9.10",
     "yaml": "^2.9.1"
   },
@@ -29,6 +31,7 @@
     "@types/node": "^24.19.2",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
+    "rollup": "4.52.5",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.1"

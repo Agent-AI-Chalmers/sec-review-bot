@@ -1,21 +1,13 @@
-import type { operations } from './contract-types-generated.js'
+import type { OperationOptionsById } from './contract-types-generated.js'
 
-type OperationId = keyof operations
-type Operation<Id extends OperationId> = operations[Id]
+type OperationId = keyof OperationOptionsById
+type Operation<Id extends OperationId> = OperationOptionsById[Id]
 
 export type RequestBody<Id extends OperationId> =
-  Operation<Id> extends {
-    requestBody: { content: { 'application/json': infer Body } }
-  }
-    ? Body
-    : never
+  Operation<Id> extends { body: infer Body } ? Body : never
 
 export type PathParameters<Id extends OperationId> =
-  Operation<Id> extends { parameters: { path: infer Parameters } }
-    ? Parameters
-    : never
+  Operation<Id> extends { path: infer Parameters } ? Parameters : never
 
 export type QueryParameters<Id extends OperationId> =
-  Operation<Id> extends { parameters: { query?: infer Parameters } }
-    ? Parameters
-    : never
+  Operation<Id> extends { query?: infer Parameters } ? Parameters : never

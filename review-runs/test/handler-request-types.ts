@@ -9,7 +9,10 @@
 // These assertions fail at compile time if a handler's view of its operation drifts from
 // `openapi.yaml`. They are type-level only: the runtime behaviour they protect is covered by
 // `server-http.test.ts`, which exercises the registered routes.
-import type { operations } from '../src/contract-types-generated.js'
+import type {
+  InitializePublicationStepsOptions,
+  SubmitPreparedRunOptions
+} from '../src/contract-types-generated.js'
 import type { PathParams, RequestBody } from '../src/http/route-types.js'
 
 type Expect<T extends true> = T
@@ -21,16 +24,13 @@ type Equals<A, B> =
 /** The body an operation's handler reads is exactly the body the contract declares — so a
  * renamed, added, or removed field in `openapi.yaml` breaks the handler, not the caller. */
 export type SubmissionBodyMatchesContract = Expect<
-  Equals<
-    RequestBody<'submitPreparedRun'>,
-    operations['submitPreparedRun']['requestBody']['content']['application/json']
-  >
+  Equals<RequestBody<'submitPreparedRun'>, SubmitPreparedRunOptions['body']>
 >
 
 export type PublicationStepsBodyMatchesContract = Expect<
   Equals<
     RequestBody<'initializePublicationSteps'>,
-    operations['initializePublicationSteps']['requestBody']['content']['application/json']
+    InitializePublicationStepsOptions['body']
   >
 >
 

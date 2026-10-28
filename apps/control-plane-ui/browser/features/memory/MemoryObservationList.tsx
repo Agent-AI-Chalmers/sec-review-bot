@@ -8,10 +8,10 @@ import remarkGfm from 'remark-gfm'
 import { abbreviate } from '../../shared/format.js'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { EmptyState, LoadingState } from '../../shared/StateMessage.js'
-import type { components } from './api-types.generated.js'
+import type { ObservationRecord } from './api-types.generated.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
-type Observation = components['schemas']['ObservationRecord']
+type Observation = ObservationRecord
 
 export function MemoryObservationList({
   observations,

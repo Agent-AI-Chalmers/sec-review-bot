@@ -54,7 +54,7 @@ This split is also a security boundary. GitHub identity, permissions, API calls,
 
 [v1/openapi.yaml](v1/openapi.yaml) defines the HTTP operations and envelopes. The JSON Schemas in the same version directory define the workflow-specific objects carried by those envelopes. They are maintained and released as one API version, and are not generated from service code. Execution Gateway mounts routes and validation from these files, while the contract tools generate provider and consumer types from them.
 
-The generated TypeScript projection composes the HTTP envelope with the v1 workflow input schemas. This gives the provider a compile-time `workflow`-to-`input` relationship without introducing a shared runtime package.
+The contract tools use Kubb to generate named TypeScript types from the HTTP contract, then compose the HTTP envelope with the v1 workflow input schemas. This gives the provider a compile-time `workflow`-to-`input` relationship without introducing a shared runtime package.
 
 ## Tooling
 

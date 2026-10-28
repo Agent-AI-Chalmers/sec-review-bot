@@ -8,7 +8,15 @@ import {
   throwIfUnauthorized
 } from '../../shared/api-client.js'
 import { useMessages } from '../../shared/i18n.js'
-import type { components } from './api-types.generated.js'
+import type {
+  MaintenanceControl,
+  MaintenanceControlOperation,
+  MemoryTree,
+  MemoryTreeRestoreOperation,
+  MemoryTreeRevision,
+  MemoryTreeRevisionList,
+  ObservationList
+} from './api-types.generated.js'
 import { MemoryEditorDialog, MemoryRestoreDialog } from './MemoryDialogs.js'
 import { MemoryFilesViewer } from './MemoryFilesViewer.js'
 import { MemoryHeader } from './MemoryHeader.js'
@@ -27,19 +35,12 @@ import {
   type TranscriptTarget
 } from '../transcript/TranscriptViewer.js'
 
-type Control = components['schemas']['MaintenanceControl']
-type Revision = components['schemas']['MemoryTreeRevision']
-type RevisionPage = components['schemas']['MemoryTreeRevisionList']
-type ObservationPage = components['schemas']['ObservationList']
-type MemoryTree = components['schemas']['MemoryTree']
-type MaintenanceControlRequest = Omit<
-  components['schemas']['MaintenanceControlOperation'],
-  'actor'
->
-type RestoreRequest = Omit<
-  components['schemas']['MemoryTreeRestoreOperation'],
-  'actor'
->
+type Control = MaintenanceControl
+type Revision = MemoryTreeRevision
+type RevisionPage = MemoryTreeRevisionList
+type ObservationPage = ObservationList
+type MaintenanceControlRequest = Omit<MaintenanceControlOperation, 'actor'>
+type RestoreRequest = Omit<MemoryTreeRestoreOperation, 'actor'>
 function operationId(): string {
   return crypto.randomUUID()
 }

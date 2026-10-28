@@ -4,11 +4,11 @@ import { IconArrowsDiff, IconEye, IconHistory } from '@tabler/icons-react'
 
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { EmptyState, LoadingState } from '../../shared/StateMessage.js'
-import type { components } from './api-types.generated.js'
+import type { MemoryTreeRevision } from './api-types.generated.js'
 import { RevisionGraph } from './RevisionGraph.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
-type Revision = components['schemas']['MemoryTreeRevision']
+type Revision = MemoryTreeRevision
 
 export function MemoryRevisionHistory({
   revisions,

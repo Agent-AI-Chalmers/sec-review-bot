@@ -23,12 +23,12 @@ import {
   useLanguage,
   useMessages
 } from '../../shared/i18n.js'
-import type { components } from './api-types.generated.js'
+import type { MemoryTreeRevision } from './api-types.generated.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
 type ChangeKind = 'added' | 'modified' | 'deleted'
 
-type RevisionRecord = components['schemas']['MemoryTreeRevision']
+type RevisionRecord = MemoryTreeRevision
 
 function revisionDiffTitleParts(
   revision: number,

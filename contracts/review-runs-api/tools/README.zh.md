@@ -4,7 +4,7 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-本包渲染并校验从[本族的 OpenAPI 契约](../v1/openapi.yaml)派生的全部产物：TypeScript 投影与提交的 v1 JSON Schema。它住在所读契约旁边，因此"拥有某个投影的工具"不是"该投影落在的包"。
+本包渲染并校验从[本族的 OpenAPI 契约](../v1/openapi.yaml)派生的全部产物：Kubb 生成的 TypeScript 投影、operation 路由映射与提交的 v1 JSON Schema。它住在所读契约旁边，因此"拥有某个投影的工具"不是"该投影落在的包"。
 
 ## 命令
 
@@ -31,6 +31,7 @@ tools/
     generated-artifact.ts    { output, render } 形状
     repo-root.ts             仓库根，用于构造产物绝对路径
     generate-types.ts        API 投影（类型、错误码、控制台参数）
+    render-kubb-types.ts     共享的内存 Kubb TypeScript 投影
     generate-schemas.ts      提交的 v1 JSON Schema
   spectral-functions/
     operationRequiresSecurity.js     每个操作必须声明 security 的规则（../.spectral.yaml）

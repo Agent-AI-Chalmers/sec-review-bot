@@ -5,15 +5,15 @@
 //
 // The generator and the test that fails when the committed file lags both call
 // `renderExecutionApiTypes`, so they cannot disagree about what "current" means.
-import { readFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
-import openapiTS, { astToString, type OpenAPI3 } from 'openapi-typescript'
 import prettier from 'prettier'
 import { parse } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
 import { renderWorkflowInputDeclarations } from './generate-api-types.js'
+import { renderKubbTypes } from './render-kubb-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
@@ -43,13 +43,32 @@ const HEADER = `// Generated from ${path.relative(REPO_ROOT, SPEC_PATH)} (path r
 // \`pnpm --dir contracts/execution-api/tools run generate\`.
 `
 
+function renderOperationOptionsById(spec: unknown): string {
+  const paths = (spec as { paths?: Record<string, Record<string, unknown>> })
+    .paths
+  if (paths === undefined) throw new Error('Execution API has no paths')
+  const entries: string[] = []
+  for (const pathItem of Object.values(paths)) {
+    for (const operation of Object.values(pathItem)) {
+      const operationId = (operation as { operationId?: unknown }).operationId
+      if (typeof operationId !== 'string') continue
+      const typeName =
+        operationId.charAt(0).toUpperCase() + operationId.slice(1)
+      entries.push(`  ${operationId}: ${typeName}Options`)
+    }
+  }
+  return `export interface OperationOptionsById {\n${entries.join('\n')}\n}`
+}
+
 /** The committed content of `src/execution-api-schema.ts`. */
 export async function renderExecutionApiTypes(
   outputPath: string
 ): Promise<string> {
-  const spec = parse(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
+  const spec = parse(await readFile(SPEC_PATH, 'utf8')) as unknown
   const composedTypes = `
 ${await renderWorkflowInputDeclarations()}
+
+${renderOperationOptionsById(spec)}
 
 export interface WorkflowInputByName {
   'issue-review': IssueReviewInput
@@ -60,11 +79,11 @@ export interface WorkflowInputByName {
 export type ExecutionWorkflow = keyof WorkflowInputByName
 
 export type CreateRunRequestFor<Workflow extends ExecutionWorkflow> =
-  Omit<components['schemas']['CreateRunRequest'], 'input'> & {
+  Omit<CreateRunRequest, 'input'> & {
     input: WorkflowInputByName[Workflow]
   }
 `
-  const rendered = HEADER + astToString(await openapiTS(spec)) + composedTypes
+  const rendered = HEADER + (await renderKubbTypes(SPEC_PATH)) + composedTypes
   // `format` does not read the project's Prettier config from `filepath`; it has to be
   // resolved and passed, or the output keeps the generator's own quoting and fails
   // `format:check`.

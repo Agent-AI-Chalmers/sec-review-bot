@@ -2,12 +2,13 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import memoryTranscript from '../data/memory-transcript.json' with { type: 'json' }
 import { BASE_TIME } from '../runs/generate.js'
-import type { components } from '../../../browser/features/memory/api-types.generated.js'
+import type {
+  CatalogOverviewWorkflow,
+  ExtractionRecord,
+  ObservationRecord
+} from '../../../browser/features/memory/api-types.generated.js'
 
 const LOAD_ERROR_REVISION = 404
-type ExtractionRecord = components['schemas']['ExtractionRecord']
-type ObservationRecord = components['schemas']['ObservationRecord']
-type CatalogOverviewWorkflow = components['schemas']['CatalogOverviewWorkflow']
 type SourceRunIds = Record<
   'repository-review' | 'pull-request-review' | 'issue-review',
   string

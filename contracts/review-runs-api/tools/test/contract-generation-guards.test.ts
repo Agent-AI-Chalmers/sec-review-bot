@@ -7,12 +7,11 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import type { OpenAPI3 } from 'openapi-typescript'
-
 import { inlineLocalRefsForTest } from '../src/generate-schemas.js'
 import {
   errorResponseCodes,
-  listRunQueryParameters
+  listRunQueryParameters,
+  type OpenApiDocument
 } from '../src/generate-types.js'
 
 test('a non-string ErrorResponse.code member fails rather than disappearing', () => {
@@ -25,7 +24,7 @@ test('a non-string ErrorResponse.code member fails rather than disappearing', ()
         ErrorResponse: { properties: { code: { enum: ['VALID', 42] } } }
       }
     }
-  } as unknown as OpenAPI3
+  } as unknown as OpenApiDocument
 
   assert.throws(() => errorResponseCodes(spec), /must contain only strings/)
 })
@@ -35,7 +34,7 @@ test('string ErrorResponse.code members are returned sorted', () => {
     components: {
       schemas: { ErrorResponse: { properties: { code: { enum: ['B', 'A'] } } } }
     }
-  } as unknown as OpenAPI3
+  } as unknown as OpenApiDocument
 
   assert.deepStrictEqual(errorResponseCodes(spec), ['A', 'B'])
 })
@@ -74,7 +73,7 @@ test('a bare local $ref is inlined, and a dangling one fails', () => {
 
 /** The `listRuns` query parameter the projection reads: one form-exploded object whose
  * properties are the filter names. */
-function listRunsSpec(queryObject: Record<string, unknown>): OpenAPI3 {
+function listRunsSpec(queryObject: Record<string, unknown>): OpenApiDocument {
   return {
     paths: {
       '/v1/runs': {
@@ -91,7 +90,7 @@ function listRunsSpec(queryObject: Record<string, unknown>): OpenAPI3 {
         }
       }
     }
-  } as unknown as OpenAPI3
+  } as unknown as OpenApiDocument
 }
 
 test('the declared form-exploded query object projects to its property names', () => {
@@ -130,7 +129,7 @@ test('a conventional per-parameter list fails rather than projecting nothing', (
         }
       }
     }
-  } as unknown as OpenAPI3
+  } as unknown as OpenApiDocument
 
   assert.throws(
     () => listRunQueryParameters(spec),

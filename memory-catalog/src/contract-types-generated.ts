@@ -1,971 +1,1090 @@
 // Generated from contracts/memory-catalog-api/v1/openapi.yaml. Do not edit.
-export interface paths {
-  '/healthz': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** @description Report whether the Memory Catalog process is serving requests. */
-    get: operations['health']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/extractions': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** @description List completed extractions newest first with stable cursor pagination. */
-    get: operations['listExtractions']
-    put?: never
-    /** @description Register one completed extraction and its optional observation, or replay identical content. */
-    post: operations['registerExtraction']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/extractions/{extraction_id}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** @description Return one completed extraction, its transcript reference, and its optional observation. */
-    get: operations['getExtraction']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/observation-backlog': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** @description Summarize observations that have not yet been consumed by a memory revision. */
-    get: operations['getObservationBacklog']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/observations': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** @description List observations newest first with stable cursor pagination and processing filters. */
-    get: operations['listObservations']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/overview': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** @description Summarize completed extraction coverage, observation outcomes, and a selectable trend range. All-time trends are aggregated by month; bounded trends are aggregated by day. */
-    get: operations['getCatalogOverview']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/maintenance-input': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** @description Return a bounded observation set and the active memory state it must be maintained against. */
-    get: operations['getMaintenanceInput']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/memory-tree/revisions': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** @description List immutable memory tree revisions in descending revision order. */
-    get: operations['listMemoryTreeRevisions']
-    put?: never
-    /** @description Create an immutable memory tree revision with compare-and-swap and consume its source observations. */
-    post: operations['createMemoryTreeRevision']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/memory-tree': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** @description Return the current memory tree revision and its artifact reference, if one exists. */
-    get: operations['getMemoryTree']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/memory-tree/restore': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** @description Move the active memory pointer to an existing revision without creating a revision. */
-    post: operations['restoreMemoryTree']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/maintenance-control': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** @description Return whether automatic memory maintenance is currently allowed. */
-    get: operations['getMaintenanceControl']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/maintenance-control/pause': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** @description Idempotently transition automatic maintenance from enabled to paused. */
-    post: operations['pauseMaintenance']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/maintenance-control/resume': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** @description Idempotently transition automatic maintenance from paused to enabled. */
-    post: operations['resumeMaintenance']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/v1/memory-tree/revisions/{revision}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** @description Return one immutable memory tree revision and its maintenance transcript. */
-    get: operations['getMemoryTreeRevision']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
+/**
+ * Generated by Kubb (https://kubb.dev/).
+ * Do not edit manually.
+ */
+
+export type ArtifactReference = {
+  /**
+   * @pattern ^s3://
+   * @type string
+   */
+  uri: string
+  /**
+   * @pattern ^sha256:[0-9a-f]{64}$
+   * @type string
+   */
+  digest: string
+  /**
+   * @minLength 1
+   * @type string
+   */
+  media_type: string
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  size_bytes: number
 }
-export type webhooks = Record<string, never>
-export interface components {
-  schemas: {
-    ArtifactReference: {
-      uri: string
-      digest: string
-      media_type: string
-      size_bytes: number
-    }
-    ExtractionId: string
-    MaintenanceId: string
-    OperationId: string
-    Actor: {
-      /** @enum {string} */
-      kind: 'user' | 'service'
-      id: string
-    }
-    ExtractionObservation: {
-      body_markdown: string
-    }
-    ExtractionRegistration: {
-      extraction_id: components['schemas']['ExtractionId']
-      source_workflow: string
-      source_run_id: string
-      source_unit_id: string
-      diagnostic_bundle_digest: string
-      transcript_reference: components['schemas']['ArtifactReference']
-      observation: components['schemas']['ExtractionObservation'] | null
-    }
-    ExtractionRegistrationResult: {
-      /** @constant */
-      ok: true
-      created: boolean
-    }
-    ExtractionRecord: {
-      extraction_id: components['schemas']['ExtractionId']
-      source_workflow: string
-      source_run_id: string
-      source_unit_id: string
-      diagnostic_bundle_digest: string
-      transcript_reference: components['schemas']['ArtifactReference']
-      observation: components['schemas']['ExtractionObservation'] | null
-      /** Format: date-time */
-      created_at: string
-    }
-    ExtractionList: {
-      extractions: components['schemas']['ExtractionRecord'][]
-      next_cursor: string | null
-    }
-    ObservationRecord: {
-      extraction_id: components['schemas']['ExtractionId']
-      source_run_id: string
-      source_unit_id: string
-      body_markdown: string
-      consumed_revision: number | null
-      /** Format: date-time */
-      created_at: string
-    }
-    ObservationList: {
-      observations: components['schemas']['ObservationRecord'][]
-      next_cursor: string | null
-    }
-    ObservationBacklog: {
-      pending_count: number
-      /** Format: date-time */
-      oldest_pending_created_at: string | null
-    }
-    CatalogOverviewTotals: {
-      completed_extraction_count: number
-      extracted_unit_count: number
-      units_with_observation_count: number
-      /** @description Distinct source run/unit pairs whose completed extractions have never produced an observation. */
-      units_without_observation_count: number
-      observation_count: number
-      pending_observation_count: number
-      consumed_observation_count: number
-    }
-    CatalogOverviewPoint: {
-      /**
-       * Format: date
-       * @description Inclusive UTC start date of the day or month represented by this point.
-       */
-      period_start: string
-      extracted_unit_count: number
-      units_with_observation_count: number
-    }
-    CatalogOverviewWorkflow: {
-      source_workflow: string
-      extracted_unit_count: number
-      units_with_observation_count: number
-      units_without_observation_count: number
-    }
-    CatalogOverview: {
-      totals: components['schemas']['CatalogOverviewTotals']
-      /** @enum {string} */
-      trend_granularity: 'day' | 'month'
-      trend_points: components['schemas']['CatalogOverviewPoint'][]
-      workflows: components['schemas']['CatalogOverviewWorkflow'][]
-    }
-    MaintenanceObservation: {
-      extraction_id: components['schemas']['ExtractionId']
-      body_markdown: string
-    }
-    MaintenanceInput: {
-      /** @description Active revision that must still be current when this maintenance input is committed. */
-      expected_active_revision: number
-      active_memory_tree_reference:
-        components['schemas']['ArtifactReference'] | null
-      observations: components['schemas']['MaintenanceObservation'][]
-    }
-    MaintenanceInputResult: {
-      input: components['schemas']['MaintenanceInput'] | null
-    }
-    MaintenanceRevisionSource: {
-      /** @constant */
-      kind: 'maintenance'
-      maintenance_id: components['schemas']['MaintenanceId']
-      extraction_ids: components['schemas']['ExtractionId'][]
-      transcript_reference: components['schemas']['ArtifactReference']
-    }
-    OperatorRevisionSource: {
-      /** @constant */
-      kind: 'operator'
-      operation_id: components['schemas']['OperationId']
-      actor: components['schemas']['Actor']
-    }
-    MemoryTreeRevisionSource:
-      | components['schemas']['MaintenanceRevisionSource']
-      | components['schemas']['OperatorRevisionSource']
-    MemoryTreeRevisionCreation: {
-      /** @description Active revision that must still be current for this compare-and-swap commit. */
-      expected_active_revision: number
-      memory_tree_reference: components['schemas']['ArtifactReference']
-      source: components['schemas']['MemoryTreeRevisionSource']
-    }
-    MemoryTreeRevisionCreationResult: {
-      created: boolean
-      revision: number
-      source:
-        | {
-            /** @constant */
-            kind: 'maintenance'
-            maintenance_id: components['schemas']['MaintenanceId']
-          }
-        | {
-            /** @constant */
-            kind: 'operator'
-            operation_id: components['schemas']['OperationId']
-          }
-    }
-    MemoryTree: {
-      revision: number
-      memory_tree_reference: components['schemas']['ArtifactReference'] | null
-    }
-    MemoryTreeRevision: {
-      revision: number
-      /** @description Revision that was active when this revision was created; null for the first revision. */
-      predecessor_revision: number | null
-      memory_tree_reference: components['schemas']['ArtifactReference']
-      source: components['schemas']['MemoryTreeRevisionSource']
-      /** Format: date-time */
-      created_at: string
-    }
-    MemoryTreeRestoreOperation: {
-      operation_id: components['schemas']['OperationId']
-      expected_active_revision: number
-      restored_revision: number
-      actor: components['schemas']['Actor']
-    }
-    MemoryTreeRestoreOperationResult: {
-      created: boolean
-      active_revision: number
-      operation_id: components['schemas']['OperationId']
-    }
-    MemoryTreeRevisionList: {
-      revisions: components['schemas']['MemoryTreeRevision'][]
-      next_before_revision: number | null
-    }
-    MaintenanceControl: {
-      /** @enum {string} */
-      state: 'enabled' | 'paused'
-      generation: number
-      changed_by: components['schemas']['Actor']
-      /** Format: date-time */
-      changed_at: string
-    }
-    MaintenanceControlOperation: {
-      operation_id: components['schemas']['OperationId']
-      expected_generation: number
-      actor: components['schemas']['Actor']
-    }
-    MaintenanceControlOperationResult: {
-      created: boolean
-      control: components['schemas']['MaintenanceControl']
-    }
-    Health: {
-      /** @constant */
-      status: 'ok'
-    }
-    ErrorResponse: {
-      error: string
-      /** @enum {string} */
-      code?:
-        | 'INVALID_BODY'
-        | 'UNAUTHORIZED'
-        | 'NOT_FOUND'
-        | 'CONFLICT'
-        | 'MAINTENANCE_PAUSED'
-        | 'INTERNAL_ERROR'
-    }
-  }
-  responses: {
-    /** @description The JSON body does not match the operation schema. */
-    InvalidBody: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/json': components['schemas']['ErrorResponse']
-      }
-    }
-    /** @description Missing or invalid catalog bearer token. */
-    Unauthorized: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/json': components['schemas']['ErrorResponse']
-      }
-    }
-    /** @description An immutable identity differs from existing content, a revision compare-and-swap precondition failed, or a maintenance revision was attempted while automatic maintenance is paused. */
-    Conflict: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/json': components['schemas']['ErrorResponse']
-      }
-    }
-    /** @description The requested catalog record does not exist. */
-    NotFound: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/json': components['schemas']['ErrorResponse']
-      }
-    }
-    /** @description Opaque internal server error. */
-    InternalError: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/json': components['schemas']['ErrorResponse']
-      }
-    }
-    /** @description The request body exceeds the service limit. */
-    PayloadTooLarge: {
-      headers: {
-        [name: string]: unknown
-      }
-      content: {
-        'application/json': components['schemas']['ErrorResponse']
-      }
-    }
-  }
-  parameters: never
-  requestBodies: never
-  headers: never
-  pathItems: never
+
+/**
+ * @minLength 1
+ * @pattern ^[A-Za-z0-9._:-]+$
+ * @type string
+ */
+export type ExtractionId = string
+
+/**
+ * @minLength 1
+ * @pattern ^[A-Za-z0-9._:-]+$
+ * @type string
+ */
+export type MaintenanceId = string
+
+/**
+ * @minLength 1
+ * @pattern ^[A-Za-z0-9._:-]+$
+ * @type string
+ */
+export type OperationId = string
+
+export type Actor = {
+  kind: 'user' | 'service'
+  /**
+   * @minLength 1
+   * @type string
+   */
+  id: string
 }
-export type $defs = Record<string, never>
-export interface operations {
-  health: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Service is running. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['Health']
-        }
+
+export type ExtractionObservation = {
+  /**
+   * @minLength 1
+   * @type string
+   */
+  body_markdown: string
+}
+
+export type ExtractionRegistration = {
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  extraction_id: ExtractionId
+  /**
+   * @minLength 1
+   * @type string
+   */
+  source_workflow: string
+  /**
+   * @minLength 1
+   * @type string
+   */
+  source_run_id: string
+  /**
+   * @minLength 1
+   * @type string
+   */
+  source_unit_id: string
+  /**
+   * @pattern ^sha256:[0-9a-f]{64}$
+   * @type string
+   */
+  diagnostic_bundle_digest: string
+  transcript_reference: ArtifactReference
+  observation: ExtractionObservation | null
+}
+
+export type ExtractionRegistrationResult = {
+  ok: true
+  created: boolean
+}
+
+export type ExtractionRecord = {
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  extraction_id: ExtractionId
+  /**
+   * @minLength 1
+   * @type string
+   */
+  source_workflow: string
+  /**
+   * @minLength 1
+   * @type string
+   */
+  source_run_id: string
+  /**
+   * @minLength 1
+   * @type string
+   */
+  source_unit_id: string
+  /**
+   * @pattern ^sha256:[0-9a-f]{64}$
+   * @type string
+   */
+  diagnostic_bundle_digest: string
+  transcript_reference: ArtifactReference
+  observation: ExtractionObservation | null
+  /**
+   * @description
+   * Format: `date-time`
+   * @type string
+   */
+  created_at: string
+}
+
+export type ExtractionList = {
+  extractions: ExtractionRecord[]
+  next_cursor: string | null
+}
+
+export type ObservationRecord = {
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  extraction_id: ExtractionId
+  /**
+   * @minLength 1
+   * @type string
+   */
+  source_run_id: string
+  /**
+   * @minLength 1
+   * @type string
+   */
+  source_unit_id: string
+  /**
+   * @minLength 1
+   * @type string
+   */
+  body_markdown: string
+  /**
+   * @minLength 1
+   * @type integer
+   */
+  consumed_revision: number | null
+  /**
+   * @description
+   * Format: `date-time`
+   * @type string
+   */
+  created_at: string
+}
+
+export type ObservationList = {
+  observations: ObservationRecord[]
+  next_cursor: string | null
+}
+
+export type ObservationBacklog = {
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  pending_count: number
+  /**
+   * @description
+   * Format: `date-time`
+   * @type string
+   */
+  oldest_pending_created_at: string | null
+}
+
+export type CatalogOverviewTotals = {
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  completed_extraction_count: number
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  extracted_unit_count: number
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  units_with_observation_count: number
+  /**
+   * @description Distinct source run/unit pairs whose completed extractions have never produced an observation.
+   * @minLength 0
+   * @type integer
+   */
+  units_without_observation_count: number
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  observation_count: number
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  pending_observation_count: number
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  consumed_observation_count: number
+}
+
+export type CatalogOverviewPoint = {
+  /**
+   * @description Inclusive UTC start date of the day or month represented by this point.
+   *
+   * Format: `date`
+   * @type string
+   */
+  period_start: string
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  extracted_unit_count: number
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  units_with_observation_count: number
+}
+
+export type CatalogOverviewWorkflow = {
+  /**
+   * @minLength 1
+   * @type string
+   */
+  source_workflow: string
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  extracted_unit_count: number
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  units_with_observation_count: number
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  units_without_observation_count: number
+}
+
+export type CatalogOverview = {
+  totals: CatalogOverviewTotals
+  trend_granularity: 'day' | 'month'
+  trend_points: CatalogOverviewPoint[]
+  workflows: CatalogOverviewWorkflow[]
+}
+
+export type MaintenanceObservation = {
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  extraction_id: ExtractionId
+  /**
+   * @minLength 1
+   * @type string
+   */
+  body_markdown: string
+}
+
+export type MaintenanceInput = {
+  /**
+   * @description Active revision that must still be current when this maintenance input is committed.
+   * @minLength 0
+   * @type integer
+   */
+  expected_active_revision: number
+  active_memory_tree_reference: ArtifactReference | null
+  observations: MaintenanceObservation[]
+}
+
+export type MaintenanceInputResult = {
+  input: MaintenanceInput | null
+}
+
+export type MaintenanceRevisionSource = {
+  kind: 'maintenance'
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  maintenance_id: MaintenanceId
+  extraction_ids: ExtractionId[]
+  transcript_reference: ArtifactReference
+}
+
+export type OperatorRevisionSource = {
+  kind: 'operator'
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  operation_id: OperationId
+  actor: Actor
+}
+
+export type MemoryTreeRevisionSource =
+  MaintenanceRevisionSource | OperatorRevisionSource
+
+export type MemoryTreeRevisionCreation = {
+  /**
+   * @description Active revision that must still be current for this compare-and-swap commit.
+   * @minLength 0
+   * @type integer
+   */
+  expected_active_revision: number
+  memory_tree_reference: ArtifactReference
+  source: MemoryTreeRevisionSource
+}
+
+export type MemoryTreeRevisionCreationResult = {
+  created: boolean
+  /**
+   * @minLength 1
+   * @type integer
+   */
+  revision: number
+  source:
+    | {
+        kind: 'maintenance'
+        /**
+         * @minLength 1
+         * @pattern ^[A-Za-z0-9._:-]+$
+         * @type string
+         */
+        maintenance_id: MaintenanceId
       }
-      500: components['responses']['InternalError']
-    }
-  }
-  listExtractions: {
-    parameters: {
-      query?: {
-        cursor?: string
-        limit?: string
-        source_workflow?: string
-        source_run_id?: string
-        has_observation?: 'true' | 'false'
+    | {
+        kind: 'operator'
+        /**
+         * @minLength 1
+         * @pattern ^[A-Za-z0-9._:-]+$
+         * @type string
+         */
+        operation_id: OperationId
       }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description One page of completed extractions. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ExtractionList']
-        }
-      }
-      400: components['responses']['InvalidBody']
-      401: components['responses']['Unauthorized']
-      500: components['responses']['InternalError']
-    }
-  }
-  registerExtraction: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['ExtractionRegistration']
-      }
-    }
-    responses: {
-      /** @description Extraction accepted or identically replayed. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ExtractionRegistrationResult']
-        }
-      }
-      400: components['responses']['InvalidBody']
-      401: components['responses']['Unauthorized']
-      409: components['responses']['Conflict']
-      413: components['responses']['PayloadTooLarge']
-      500: components['responses']['InternalError']
-    }
-  }
-  getExtraction: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        extraction_id: components['schemas']['ExtractionId']
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The requested extraction. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ExtractionRecord']
-        }
-      }
-      400: components['responses']['InvalidBody']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      500: components['responses']['InternalError']
-    }
-  }
-  getObservationBacklog: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Pending observation count and age. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ObservationBacklog']
-        }
-      }
-      401: components['responses']['Unauthorized']
-      500: components['responses']['InternalError']
-    }
-  }
-  listObservations: {
-    parameters: {
-      query?: {
-        cursor?: string
-        limit?: string
-        status?: 'pending' | 'consumed'
-        consumed_revision?: string
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description One page of observations and their consumption state. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['ObservationList']
-        }
-      }
-      400: components['responses']['InvalidBody']
-      401: components['responses']['Unauthorized']
-      500: components['responses']['InternalError']
-    }
-  }
-  getCatalogOverview: {
-    parameters: {
-      query?: {
-        range?: '30d' | '90d' | 'all'
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Aggregate Memory Catalog statistics. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['CatalogOverview']
-        }
-      }
-      401: components['responses']['Unauthorized']
-      500: components['responses']['InternalError']
-    }
-  }
-  getMaintenanceInput: {
-    parameters: {
-      query: {
-        limit: string
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Current memory state and bounded pending observations, or null when none are pending. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MaintenanceInputResult']
-        }
-      }
-      400: components['responses']['InvalidBody']
-      401: components['responses']['Unauthorized']
-      500: components['responses']['InternalError']
-    }
-  }
-  listMemoryTreeRevisions: {
-    parameters: {
-      query?: {
-        before_revision?: string
-        limit?: string
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description One page of immutable memory tree revision history. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MemoryTreeRevisionList']
-        }
-      }
-      400: components['responses']['InvalidBody']
-      401: components['responses']['Unauthorized']
-      500: components['responses']['InternalError']
-    }
-  }
-  createMemoryTreeRevision: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['MemoryTreeRevisionCreation']
-      }
-    }
-    responses: {
-      /** @description An identical maintenance submission had already created this revision. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MemoryTreeRevisionCreationResult']
-        }
-      }
-      /** @description The revision was created. */
-      201: {
-        headers: {
-          Location?: string
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MemoryTreeRevisionCreationResult']
-        }
-      }
-      400: components['responses']['InvalidBody']
-      401: components['responses']['Unauthorized']
-      409: components['responses']['Conflict']
-      413: components['responses']['PayloadTooLarge']
-      500: components['responses']['InternalError']
-    }
-  }
-  getMemoryTree: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Current memory tree revision and artifact reference. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MemoryTree']
-        }
-      }
-      401: components['responses']['Unauthorized']
-      500: components['responses']['InternalError']
-    }
-  }
-  restoreMemoryTree: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['MemoryTreeRestoreOperation']
-      }
-    }
-    responses: {
-      /** @description An identical restore operation was replayed. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MemoryTreeRestoreOperationResult']
-        }
-      }
-      /** @description The active memory pointer was restored. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MemoryTreeRestoreOperationResult']
-        }
-      }
-      400: components['responses']['InvalidBody']
-      401: components['responses']['Unauthorized']
-      409: components['responses']['Conflict']
-      413: components['responses']['PayloadTooLarge']
-      500: components['responses']['InternalError']
-    }
-  }
-  getMaintenanceControl: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description Current durable maintenance control state. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MaintenanceControl']
-        }
-      }
-      401: components['responses']['Unauthorized']
-      500: components['responses']['InternalError']
-    }
-  }
-  pauseMaintenance: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['MaintenanceControlOperation']
-      }
-    }
-    responses: {
-      /** @description An identical control operation was replayed. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MaintenanceControlOperationResult']
-        }
-      }
-      /** @description Automatic maintenance was paused. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MaintenanceControlOperationResult']
-        }
-      }
-      400: components['responses']['InvalidBody']
-      401: components['responses']['Unauthorized']
-      409: components['responses']['Conflict']
-      413: components['responses']['PayloadTooLarge']
-      500: components['responses']['InternalError']
-    }
-  }
-  resumeMaintenance: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['MaintenanceControlOperation']
-      }
-    }
-    responses: {
-      /** @description An identical control operation was replayed. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MaintenanceControlOperationResult']
-        }
-      }
-      /** @description Automatic maintenance was enabled. */
-      201: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MaintenanceControlOperationResult']
-        }
-      }
-      400: components['responses']['InvalidBody']
-      401: components['responses']['Unauthorized']
-      409: components['responses']['Conflict']
-      413: components['responses']['PayloadTooLarge']
-      500: components['responses']['InternalError']
-    }
-  }
-  getMemoryTreeRevision: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        revision: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The requested immutable memory tree revision. */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'application/json': components['schemas']['MemoryTreeRevision']
-        }
-      }
-      400: components['responses']['InvalidBody']
-      401: components['responses']['Unauthorized']
-      404: components['responses']['NotFound']
-      500: components['responses']['InternalError']
-    }
-  }
+}
+
+export type MemoryTree = {
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  revision: number
+  memory_tree_reference: ArtifactReference | null
+}
+
+export type MemoryTreeRevision = {
+  /**
+   * @minLength 1
+   * @type integer
+   */
+  revision: number
+  /**
+   * @description Revision that was active when this revision was created; null for the first revision.
+   * @minLength 1
+   * @type integer
+   */
+  predecessor_revision: number | null
+  memory_tree_reference: ArtifactReference
+  source: MemoryTreeRevisionSource
+  /**
+   * @description
+   * Format: `date-time`
+   * @type string
+   */
+  created_at: string
+}
+
+export type MemoryTreeRestoreOperation = {
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  operation_id: OperationId
+  /**
+   * @minLength 1
+   * @type integer
+   */
+  expected_active_revision: number
+  /**
+   * @minLength 1
+   * @type integer
+   */
+  restored_revision: number
+  actor: Actor
+}
+
+export type MemoryTreeRestoreOperationResult = {
+  created: boolean
+  /**
+   * @minLength 1
+   * @type integer
+   */
+  active_revision: number
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  operation_id: OperationId
+}
+
+export type MemoryTreeRevisionList = {
+  revisions: MemoryTreeRevision[]
+  /**
+   * @minLength 1
+   * @type integer
+   */
+  next_before_revision: number | null
+}
+
+export type MaintenanceControl = {
+  state: 'enabled' | 'paused'
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  generation: number
+  changed_by: Actor
+  /**
+   * @description
+   * Format: `date-time`
+   * @type string
+   */
+  changed_at: string
+}
+
+export type MaintenanceControlOperation = {
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  operation_id: OperationId
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  expected_generation: number
+  actor: Actor
+}
+
+export type MaintenanceControlOperationResult = {
+  created: boolean
+  control: MaintenanceControl
+}
+
+export type Health = {
+  status: 'ok'
+}
+
+export type ErrorResponse = {
+  error: string
+  code?:
+    | 'INVALID_BODY'
+    | 'UNAUTHORIZED'
+    | 'NOT_FOUND'
+    | 'CONFLICT'
+    | 'MAINTENANCE_PAUSED'
+    | 'INTERNAL_ERROR'
+}
+
+export type HealthStatus200 = Health
+
+export type HealthStatus500 = ErrorResponse
+
+export type HealthOptions = {
+  body?: never
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type HealthResponses = {
+  '200': HealthStatus200
+  '500': HealthStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type HealthResponse = HealthStatus200
+
+export type ListExtractionsQuery = {
+  /**
+   * @minLength 1
+   * @type string | undefined
+   */
+  cursor?: string
+  /**
+   * @pattern ^[1-9][0-9]*$
+   * @type string | undefined
+   */
+  limit?: string
+  /**
+   * @minLength 1
+   * @type string | undefined
+   */
+  source_workflow?: string
+  /**
+   * @minLength 1
+   * @type string | undefined
+   */
+  source_run_id?: string
+  has_observation?: 'true' | 'false'
+}
+
+export type ListExtractionsStatus200 = ExtractionList
+
+export type ListExtractionsStatus400 = ErrorResponse
+
+export type ListExtractionsStatus401 = ErrorResponse
+
+export type ListExtractionsStatus500 = ErrorResponse
+
+export type ListExtractionsOptions = {
+  body?: never
+  path?: never
+  query?: ListExtractionsQuery
+  headers?: never
+}
+
+export type ListExtractionsResponses = {
+  '200': ListExtractionsStatus200
+  '400': ListExtractionsStatus400
+  '401': ListExtractionsStatus401
+  '500': ListExtractionsStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type ListExtractionsResponse = ListExtractionsStatus200
+
+export type RegisterExtractionStatus200 = ExtractionRegistrationResult
+
+export type RegisterExtractionStatus400 = ErrorResponse
+
+export type RegisterExtractionStatus401 = ErrorResponse
+
+export type RegisterExtractionStatus409 = ErrorResponse
+
+export type RegisterExtractionStatus413 = ErrorResponse
+
+export type RegisterExtractionStatus500 = ErrorResponse
+
+export type RegisterExtractionBody = ExtractionRegistration
+
+export type RegisterExtractionOptions = {
+  body: RegisterExtractionBody
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type RegisterExtractionResponses = {
+  '200': RegisterExtractionStatus200
+  '400': RegisterExtractionStatus400
+  '401': RegisterExtractionStatus401
+  '409': RegisterExtractionStatus409
+  '413': RegisterExtractionStatus413
+  '500': RegisterExtractionStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type RegisterExtractionResponse = RegisterExtractionStatus200
+
+export type GetExtractionPath = {
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  extraction_id: ExtractionId
+}
+
+export type GetExtractionStatus200 = ExtractionRecord
+
+export type GetExtractionStatus400 = ErrorResponse
+
+export type GetExtractionStatus401 = ErrorResponse
+
+export type GetExtractionStatus404 = ErrorResponse
+
+export type GetExtractionStatus500 = ErrorResponse
+
+export type GetExtractionOptions = {
+  body?: never
+  path: GetExtractionPath
+  query?: never
+  headers?: never
+}
+
+export type GetExtractionResponses = {
+  '200': GetExtractionStatus200
+  '400': GetExtractionStatus400
+  '401': GetExtractionStatus401
+  '404': GetExtractionStatus404
+  '500': GetExtractionStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type GetExtractionResponse = GetExtractionStatus200
+
+export type GetObservationBacklogStatus200 = ObservationBacklog
+
+export type GetObservationBacklogStatus401 = ErrorResponse
+
+export type GetObservationBacklogStatus500 = ErrorResponse
+
+export type GetObservationBacklogOptions = {
+  body?: never
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type GetObservationBacklogResponses = {
+  '200': GetObservationBacklogStatus200
+  '401': GetObservationBacklogStatus401
+  '500': GetObservationBacklogStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type GetObservationBacklogResponse = GetObservationBacklogStatus200
+
+export type ListObservationsQuery = {
+  /**
+   * @minLength 1
+   * @type string | undefined
+   */
+  cursor?: string
+  /**
+   * @pattern ^[1-9][0-9]*$
+   * @type string | undefined
+   */
+  limit?: string
+  status?: 'pending' | 'consumed'
+  /**
+   * @pattern ^[1-9][0-9]*$
+   * @type string | undefined
+   */
+  consumed_revision?: string
+}
+
+export type ListObservationsStatus200 = ObservationList
+
+export type ListObservationsStatus400 = ErrorResponse
+
+export type ListObservationsStatus401 = ErrorResponse
+
+export type ListObservationsStatus500 = ErrorResponse
+
+export type ListObservationsOptions = {
+  body?: never
+  path?: never
+  query?: ListObservationsQuery
+  headers?: never
+}
+
+export type ListObservationsResponses = {
+  '200': ListObservationsStatus200
+  '400': ListObservationsStatus400
+  '401': ListObservationsStatus401
+  '500': ListObservationsStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type ListObservationsResponse = ListObservationsStatus200
+
+export type GetCatalogOverviewQuery = {
+  /**
+   * @default '30d'
+   * @type string | undefined
+   */
+  range?: '30d' | '90d' | 'all'
+}
+
+export type GetCatalogOverviewStatus200 = CatalogOverview
+
+export type GetCatalogOverviewStatus401 = ErrorResponse
+
+export type GetCatalogOverviewStatus500 = ErrorResponse
+
+export type GetCatalogOverviewOptions = {
+  body?: never
+  path?: never
+  query?: GetCatalogOverviewQuery
+  headers?: never
+}
+
+export type GetCatalogOverviewResponses = {
+  '200': GetCatalogOverviewStatus200
+  '401': GetCatalogOverviewStatus401
+  '500': GetCatalogOverviewStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type GetCatalogOverviewResponse = GetCatalogOverviewStatus200
+
+export type GetMaintenanceInputQuery = {
+  /**
+   * @pattern ^[1-9][0-9]*$
+   * @type string
+   */
+  limit: string
+}
+
+export type GetMaintenanceInputStatus200 = MaintenanceInputResult
+
+export type GetMaintenanceInputStatus400 = ErrorResponse
+
+export type GetMaintenanceInputStatus401 = ErrorResponse
+
+export type GetMaintenanceInputStatus500 = ErrorResponse
+
+export type GetMaintenanceInputOptions = {
+  body?: never
+  path?: never
+  query: GetMaintenanceInputQuery
+  headers?: never
+}
+
+export type GetMaintenanceInputResponses = {
+  '200': GetMaintenanceInputStatus200
+  '400': GetMaintenanceInputStatus400
+  '401': GetMaintenanceInputStatus401
+  '500': GetMaintenanceInputStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type GetMaintenanceInputResponse = GetMaintenanceInputStatus200
+
+export type CreateMemoryTreeRevisionStatus200 = MemoryTreeRevisionCreationResult
+
+export type CreateMemoryTreeRevisionStatus201 = MemoryTreeRevisionCreationResult
+
+export type CreateMemoryTreeRevisionStatus400 = ErrorResponse
+
+export type CreateMemoryTreeRevisionStatus401 = ErrorResponse
+
+export type CreateMemoryTreeRevisionStatus409 = ErrorResponse
+
+export type CreateMemoryTreeRevisionStatus413 = ErrorResponse
+
+export type CreateMemoryTreeRevisionStatus500 = ErrorResponse
+
+export type CreateMemoryTreeRevisionBody = MemoryTreeRevisionCreation
+
+export type CreateMemoryTreeRevisionOptions = {
+  body: CreateMemoryTreeRevisionBody
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type CreateMemoryTreeRevisionResponses = {
+  '200': CreateMemoryTreeRevisionStatus200
+  '201': CreateMemoryTreeRevisionStatus201
+  '400': CreateMemoryTreeRevisionStatus400
+  '401': CreateMemoryTreeRevisionStatus401
+  '409': CreateMemoryTreeRevisionStatus409
+  '413': CreateMemoryTreeRevisionStatus413
+  '500': CreateMemoryTreeRevisionStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type CreateMemoryTreeRevisionResponse =
+  CreateMemoryTreeRevisionStatus200 | CreateMemoryTreeRevisionStatus201
+
+export type ListMemoryTreeRevisionsQuery = {
+  /**
+   * @pattern ^[1-9][0-9]*$
+   * @type string | undefined
+   */
+  before_revision?: string
+  /**
+   * @pattern ^[1-9][0-9]*$
+   * @type string | undefined
+   */
+  limit?: string
+}
+
+export type ListMemoryTreeRevisionsStatus200 = MemoryTreeRevisionList
+
+export type ListMemoryTreeRevisionsStatus400 = ErrorResponse
+
+export type ListMemoryTreeRevisionsStatus401 = ErrorResponse
+
+export type ListMemoryTreeRevisionsStatus500 = ErrorResponse
+
+export type ListMemoryTreeRevisionsOptions = {
+  body?: never
+  path?: never
+  query?: ListMemoryTreeRevisionsQuery
+  headers?: never
+}
+
+export type ListMemoryTreeRevisionsResponses = {
+  '200': ListMemoryTreeRevisionsStatus200
+  '400': ListMemoryTreeRevisionsStatus400
+  '401': ListMemoryTreeRevisionsStatus401
+  '500': ListMemoryTreeRevisionsStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type ListMemoryTreeRevisionsResponse = ListMemoryTreeRevisionsStatus200
+
+export type GetMemoryTreeStatus200 = MemoryTree
+
+export type GetMemoryTreeStatus401 = ErrorResponse
+
+export type GetMemoryTreeStatus500 = ErrorResponse
+
+export type GetMemoryTreeOptions = {
+  body?: never
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type GetMemoryTreeResponses = {
+  '200': GetMemoryTreeStatus200
+  '401': GetMemoryTreeStatus401
+  '500': GetMemoryTreeStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type GetMemoryTreeResponse = GetMemoryTreeStatus200
+
+export type RestoreMemoryTreeStatus200 = MemoryTreeRestoreOperationResult
+
+export type RestoreMemoryTreeStatus201 = MemoryTreeRestoreOperationResult
+
+export type RestoreMemoryTreeStatus400 = ErrorResponse
+
+export type RestoreMemoryTreeStatus401 = ErrorResponse
+
+export type RestoreMemoryTreeStatus409 = ErrorResponse
+
+export type RestoreMemoryTreeStatus413 = ErrorResponse
+
+export type RestoreMemoryTreeStatus500 = ErrorResponse
+
+export type RestoreMemoryTreeBody = MemoryTreeRestoreOperation
+
+export type RestoreMemoryTreeOptions = {
+  body: RestoreMemoryTreeBody
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type RestoreMemoryTreeResponses = {
+  '200': RestoreMemoryTreeStatus200
+  '201': RestoreMemoryTreeStatus201
+  '400': RestoreMemoryTreeStatus400
+  '401': RestoreMemoryTreeStatus401
+  '409': RestoreMemoryTreeStatus409
+  '413': RestoreMemoryTreeStatus413
+  '500': RestoreMemoryTreeStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type RestoreMemoryTreeResponse =
+  RestoreMemoryTreeStatus200 | RestoreMemoryTreeStatus201
+
+export type GetMaintenanceControlStatus200 = MaintenanceControl
+
+export type GetMaintenanceControlStatus401 = ErrorResponse
+
+export type GetMaintenanceControlStatus500 = ErrorResponse
+
+export type GetMaintenanceControlOptions = {
+  body?: never
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type GetMaintenanceControlResponses = {
+  '200': GetMaintenanceControlStatus200
+  '401': GetMaintenanceControlStatus401
+  '500': GetMaintenanceControlStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type GetMaintenanceControlResponse = GetMaintenanceControlStatus200
+
+export type PauseMaintenanceStatus200 = MaintenanceControlOperationResult
+
+export type PauseMaintenanceStatus201 = MaintenanceControlOperationResult
+
+export type PauseMaintenanceStatus400 = ErrorResponse
+
+export type PauseMaintenanceStatus401 = ErrorResponse
+
+export type PauseMaintenanceStatus409 = ErrorResponse
+
+export type PauseMaintenanceStatus413 = ErrorResponse
+
+export type PauseMaintenanceStatus500 = ErrorResponse
+
+export type PauseMaintenanceBody = MaintenanceControlOperation
+
+export type PauseMaintenanceOptions = {
+  body: PauseMaintenanceBody
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type PauseMaintenanceResponses = {
+  '200': PauseMaintenanceStatus200
+  '201': PauseMaintenanceStatus201
+  '400': PauseMaintenanceStatus400
+  '401': PauseMaintenanceStatus401
+  '409': PauseMaintenanceStatus409
+  '413': PauseMaintenanceStatus413
+  '500': PauseMaintenanceStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type PauseMaintenanceResponse =
+  PauseMaintenanceStatus200 | PauseMaintenanceStatus201
+
+export type ResumeMaintenanceStatus200 = MaintenanceControlOperationResult
+
+export type ResumeMaintenanceStatus201 = MaintenanceControlOperationResult
+
+export type ResumeMaintenanceStatus400 = ErrorResponse
+
+export type ResumeMaintenanceStatus401 = ErrorResponse
+
+export type ResumeMaintenanceStatus409 = ErrorResponse
+
+export type ResumeMaintenanceStatus413 = ErrorResponse
+
+export type ResumeMaintenanceStatus500 = ErrorResponse
+
+export type ResumeMaintenanceBody = MaintenanceControlOperation
+
+export type ResumeMaintenanceOptions = {
+  body: ResumeMaintenanceBody
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type ResumeMaintenanceResponses = {
+  '200': ResumeMaintenanceStatus200
+  '201': ResumeMaintenanceStatus201
+  '400': ResumeMaintenanceStatus400
+  '401': ResumeMaintenanceStatus401
+  '409': ResumeMaintenanceStatus409
+  '413': ResumeMaintenanceStatus413
+  '500': ResumeMaintenanceStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type ResumeMaintenanceResponse =
+  ResumeMaintenanceStatus200 | ResumeMaintenanceStatus201
+
+export type GetMemoryTreeRevisionPath = {
+  /**
+   * @pattern ^[1-9][0-9]*$
+   * @type string
+   */
+  revision: string
+}
+
+export type GetMemoryTreeRevisionStatus200 = MemoryTreeRevision
+
+export type GetMemoryTreeRevisionStatus400 = ErrorResponse
+
+export type GetMemoryTreeRevisionStatus401 = ErrorResponse
+
+export type GetMemoryTreeRevisionStatus404 = ErrorResponse
+
+export type GetMemoryTreeRevisionStatus500 = ErrorResponse
+
+export type GetMemoryTreeRevisionOptions = {
+  body?: never
+  path: GetMemoryTreeRevisionPath
+  query?: never
+  headers?: never
+}
+
+export type GetMemoryTreeRevisionResponses = {
+  '200': GetMemoryTreeRevisionStatus200
+  '400': GetMemoryTreeRevisionStatus400
+  '401': GetMemoryTreeRevisionStatus401
+  '404': GetMemoryTreeRevisionStatus404
+  '500': GetMemoryTreeRevisionStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type GetMemoryTreeRevisionResponse = GetMemoryTreeRevisionStatus200
+export interface OperationOptionsById {
+  health: HealthOptions
+  listExtractions: ListExtractionsOptions
+  registerExtraction: RegisterExtractionOptions
+  getExtraction: GetExtractionOptions
+  getObservationBacklog: GetObservationBacklogOptions
+  listObservations: ListObservationsOptions
+  getCatalogOverview: GetCatalogOverviewOptions
+  getMaintenanceInput: GetMaintenanceInputOptions
+  createMemoryTreeRevision: CreateMemoryTreeRevisionOptions
+  listMemoryTreeRevisions: ListMemoryTreeRevisionsOptions
+  getMemoryTree: GetMemoryTreeOptions
+  restoreMemoryTree: RestoreMemoryTreeOptions
+  getMaintenanceControl: GetMaintenanceControlOptions
+  pauseMaintenance: PauseMaintenanceOptions
+  resumeMaintenance: ResumeMaintenanceOptions
+  getMemoryTreeRevision: GetMemoryTreeRevisionOptions
 }

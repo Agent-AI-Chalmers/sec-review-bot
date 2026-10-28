@@ -11,11 +11,11 @@ import {
 import { IconEdit, IconInfoCircle } from '@tabler/icons-react'
 
 import { useMessages } from '../../shared/i18n.js'
-import type { components } from './api-types.generated.js'
+import type { MaintenanceControl } from './api-types.generated.js'
 import { RefreshControls } from '../../shared/refresh.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
-type Control = components['schemas']['MaintenanceControl']
+type Control = MaintenanceControl
 
 export function MemoryHeader({
   control,

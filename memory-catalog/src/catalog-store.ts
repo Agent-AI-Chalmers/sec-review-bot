@@ -1,33 +1,29 @@
 import { Pool, type PoolClient } from 'pg'
 
-import type { components } from './contract-types-generated.js'
+import type {
+  Actor,
+  ArtifactReference,
+  CatalogOverview,
+  ExtractionList,
+  ExtractionRecord,
+  ExtractionRegistration,
+  MaintenanceControl,
+  MaintenanceControlOperation,
+  MaintenanceControlOperationResult,
+  MaintenanceInput,
+  MemoryTree,
+  MemoryTreeRestoreOperation,
+  MemoryTreeRestoreOperationResult,
+  MemoryTreeRevision,
+  MemoryTreeRevisionCreation,
+  MemoryTreeRevisionCreationResult,
+  MemoryTreeRevisionList,
+  ObservationBacklog,
+  ObservationList,
+} from './contract-types-generated.js'
 import { applySchemaVersions } from './database/schema-version-runner.js'
 
-type ArtifactReference = components['schemas']['ArtifactReference']
-type ExtractionRegistration = components['schemas']['ExtractionRegistration']
-type ExtractionRecord = components['schemas']['ExtractionRecord']
-type ExtractionList = components['schemas']['ExtractionList']
-type ObservationList = components['schemas']['ObservationList']
-type ObservationBacklog = components['schemas']['ObservationBacklog']
-type CatalogOverview = components['schemas']['CatalogOverview']
 type CatalogOverviewRange = '30d' | '90d' | 'all'
-type MaintenanceInput = components['schemas']['MaintenanceInput']
-type MemoryTreeRevisionCreation =
-  components['schemas']['MemoryTreeRevisionCreation']
-type MemoryTreeRevisionCreationResult =
-  components['schemas']['MemoryTreeRevisionCreationResult']
-type MemoryTree = components['schemas']['MemoryTree']
-type MemoryTreeRevision = components['schemas']['MemoryTreeRevision']
-type MemoryTreeRevisionList = components['schemas']['MemoryTreeRevisionList']
-type MemoryTreeRestoreOperation =
-  components['schemas']['MemoryTreeRestoreOperation']
-type MemoryTreeRestoreOperationResult =
-  components['schemas']['MemoryTreeRestoreOperationResult']
-type MaintenanceControl = components['schemas']['MaintenanceControl']
-type MaintenanceControlOperation =
-  components['schemas']['MaintenanceControlOperation']
-type MaintenanceControlOperationResult =
-  components['schemas']['MaintenanceControlOperationResult']
 
 export interface ExtractionListFilters {
   sourceWorkflow?: string
@@ -118,7 +114,7 @@ interface RevisionRow {
   extraction_ids: string[]
   maintenance_transcript_reference: ArtifactReference | null
   operation_id: string | null
-  actor: components['schemas']['Actor'] | null
+  actor: Actor | null
   memory_tree_reference: ArtifactReference
   created_at: Date
 }
@@ -552,7 +548,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
     const result = await this.#pool.query<{
       state: 'enabled' | 'paused'
       generation: string
-      changed_by: components['schemas']['Actor']
+      changed_by: Actor
       changed_at: Date
     }>(`select state, generation, changed_by, changed_at
         from maintenance_control where singleton=true`)
@@ -576,7 +572,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         identical: boolean
         resulting_state: 'enabled' | 'paused'
         resulting_generation: string
-        actor: components['schemas']['Actor']
+        actor: Actor
         changed_at: Date
       }>(
         `select target_state=$2 and expected_generation=$3 and
@@ -629,7 +625,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       const changed = await client.query<{
         state: 'enabled' | 'paused'
         generation: string
-        changed_by: components['schemas']['Actor']
+        changed_by: Actor
         changed_at: Date
       }>(
         `update maintenance_control
