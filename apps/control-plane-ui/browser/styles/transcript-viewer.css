@@ -349,56 +349,6 @@
   font-size: var(--mantine-font-size-sm);
 }
 
-@media (max-width: 640px) {
-  .json-row {
-    grid-template-columns: 1fr;
-    gap: 2px;
-  }
-
-  .json-key {
-    padding-top: 0;
-  }
-
-  .json-table {
-    min-width: 0;
-  }
-
-  .json-table thead {
-    display: none;
-  }
-
-  .json-table tbody,
-  .json-table tr,
-  .json-table td {
-    display: block;
-  }
-
-  .json-table tr {
-    padding: var(--space-2) 0;
-    border-bottom: 1px solid var(--border);
-  }
-
-  .json-table td {
-    display: grid;
-    grid-template-columns: 90px minmax(0, 1fr);
-    gap: var(--space-2);
-    padding: 2px 0;
-    border: 0;
-  }
-
-  .json-table td::before {
-    content: attr(data-label);
-    color: var(--mantine-color-dimmed);
-    font-family: var(--mantine-font-family-monospace);
-    font-size: var(--mantine-font-size-xs);
-  }
-
-  .json-table td:first-child {
-    min-width: 0;
-    white-space: normal;
-  }
-}
-
 .transcript-diff > div {
   min-width: 0;
   padding: var(--space-3);
