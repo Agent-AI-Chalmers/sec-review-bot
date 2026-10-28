@@ -34,7 +34,8 @@ test('transcript normalization separates content, reasoning, usage, and tool lin
           input_token_details: {
             cache_read: 7,
             cache_creation: 2
-          }
+          },
+          output_token_details: { reasoning: 1 }
         }
       }
     },
@@ -46,7 +47,8 @@ test('transcript normalization separates content, reasoning, usage, and tool lin
         id: 'tool-1',
         name: 'read_file',
         tool_call_id: 'call-1',
-        content: 'file contents'
+        content: 'file contents',
+        artifact: { source: 'workspace', truncated: false }
       }
     }
   ])
@@ -60,14 +62,17 @@ test('transcript normalization separates content, reasoning, usage, and tool lin
     document.messages[0]?.toolCalls[0]?.resultMessageId,
     'tool-1'
   )
-  assert.deepStrictEqual(document.messages[1]?.toolArgs, {
-    path: '/workspace/a'
+  assert.strictEqual(document.messages[1]?.toolCallId, 'call-1')
+  assert.deepStrictEqual(document.messages[1]?.artifact, {
+    source: 'workspace',
+    truncated: false
   })
   assert.strictEqual(document.totalUsage.total, 15)
   assert.strictEqual(document.totalUsage.input, 10)
   assert.strictEqual(document.totalUsage.output, 5)
   assert.strictEqual(document.totalUsage.cacheRead, 7)
   assert.strictEqual(document.totalUsage.cacheCreation, 2)
+  assert.strictEqual(document.totalUsage.reasoning, 1)
 })
 
 test('zero cache counters are treated as absent usage details', () => {
@@ -92,6 +97,37 @@ test('zero cache counters are treated as absent usage details', () => {
   assert.strictEqual(document.messages[0]?.usage?.cacheCreation, undefined)
   assert.strictEqual(document.totalUsage.cacheRead, undefined)
   assert.strictEqual(document.totalUsage.cacheCreation, undefined)
+})
+
+test('raw provider cache buckets become inclusive transcript input', () => {
+  const document = normalizeTranscript([
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        content: 'Provider response metadata.',
+        response_metadata: {
+          usage: {
+            input_tokens: 6,
+            cache_read_input_tokens: 3,
+            cache_creation_input_tokens: 1,
+            output_tokens: 5,
+            total_tokens: 15
+          }
+        }
+      }
+    }
+  ])
+
+  assert.deepStrictEqual(document.messages[0]?.usage, {
+    input: 10,
+    output: 5,
+    cacheRead: 3,
+    cacheCreation: 1,
+    total: 15,
+    reasoning: undefined
+  })
 })
 
 test('ordered message-array tool results link when the complete run is unambiguous', () => {
@@ -127,8 +163,8 @@ test('ordered message-array tool results link when the complete run is unambiguo
     document.messages[0]?.toolCalls[1]?.resultMessageId,
     'result-2'
   )
-  assert.deepStrictEqual(document.messages[1]?.toolArgs, { path: 'a' })
-  assert.deepStrictEqual(document.messages[2]?.toolArgs, { path: 'b' })
+  assert.strictEqual(document.messages[1]?.toolCallId, 'call-1')
+  assert.strictEqual(document.messages[2]?.toolCallId, 'call-2')
 })
 
 test('message-array tool results are not guessed when the ordered run is incomplete', () => {
@@ -155,5 +191,5 @@ test('message-array tool results are not guessed when the ordered run is incompl
     document.messages[0]?.toolCalls[0]?.resultMessageId,
     undefined
   )
-  assert.strictEqual(document.messages[1]?.toolArgs, undefined)
+  assert.strictEqual(document.messages[1]?.toolCallId, undefined)
 })

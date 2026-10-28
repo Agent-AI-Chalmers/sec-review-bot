@@ -321,6 +321,8 @@ function statisticsGroup(
     chunkId?: string
   } = {}
 ): StatisticsGroup {
+  const cache_creation_input_tokens = Math.round(input_tokens * 0.02)
+  const reasoning_tokens = Math.round(output_tokens * 0.15)
   return {
     agent_name,
     case_id: context.caseId ?? null,
@@ -338,8 +340,8 @@ function statisticsGroup(
       output_tokens,
       total_tokens: input_tokens + output_tokens,
       cache_read_input_tokens,
-      cache_creation_input_tokens: null,
-      reasoning_tokens: null
+      cache_creation_input_tokens,
+      reasoning_tokens
     }
   }
 }
@@ -386,8 +388,10 @@ function executionStatisticsFor(
       cache_read_input_tokens: sum(
         (group) => group.token_usage.cache_read_input_tokens
       ),
-      cache_creation_input_tokens: null,
-      reasoning_tokens: null
+      cache_creation_input_tokens: sum(
+        (group) => group.token_usage.cache_creation_input_tokens
+      ),
+      reasoning_tokens: sum((group) => group.token_usage.reasoning_tokens)
     },
     groups,
     settled_at: iso(updatedAt + 65_000),

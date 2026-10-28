@@ -191,7 +191,27 @@ a {
 }
 
 .statistics-usage-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
   margin-top: 5px;
+}
+
+.statistics-usage-metric {
+  min-width: 0;
+  text-align: right;
+}
+
+.statistics-usage-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.statistics-usage-subsets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 2px var(--space-3);
+  margin-top: 2px;
 }
 
 .statistics-groups {
@@ -298,6 +318,16 @@ a {
   padding-left: 0;
 }
 
+.statistics-agent-breakdown th:not(:first-child),
+.statistics-agent-breakdown td:not(:first-child) {
+  width: 31%;
+}
+
+.statistics-usage-cell-subset {
+  margin-top: 1px;
+  white-space: nowrap;
+}
+
 .statistics-agent-breakdown-total td {
   border-top: 1px solid var(--border);
   color: var(--mantine-color-text);
@@ -312,6 +342,9 @@ a {
 .statistics-table {
   table-layout: fixed;
 }
+
+/* Identity and prose columns start from the left; comparable quantities share a
+   right edge. Keep each numeric header aligned with the cells beneath it. */
 
 .statistics-table th:nth-child(1) {
   width: 38%;

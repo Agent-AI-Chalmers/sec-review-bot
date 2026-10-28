@@ -50,19 +50,57 @@ function statusPresentation(statistics: Statistics): {
 function UsageDetails({ usage }: { usage: Usage }): React.JSX.Element {
   const { language } = useLanguage()
   const t = useMessages()
-  const details = [
-    [t('statisticsInputTokens'), usage.input_tokens],
-    [t('statisticsOutputTokens'), usage.output_tokens],
-    [t('statisticsCacheReadTokens'), usage.cache_read_input_tokens]
-  ] as const
   return (
-    <Group gap="xs" wrap="wrap" className="statistics-usage-details">
-      {details.map(([label, value]) => (
-        <Text key={label} size="xs" c="dimmed">
-          {label} {formatCount(value, language)}
-        </Text>
-      ))}
-    </Group>
+    <div className="statistics-usage-details">
+      <UsageMetric
+        label={t('statisticsInputTokens')}
+        value={usage.input_tokens}
+        subsets={[
+          [t('statisticsCacheReadTokens'), usage.cache_read_input_tokens],
+          [
+            t('statisticsCacheCreationTokens'),
+            usage.cache_creation_input_tokens
+          ]
+        ]}
+        language={language}
+      />
+      <UsageMetric
+        label={t('statisticsOutputTokens')}
+        value={usage.output_tokens}
+        subsets={[[t('statisticsReasoningTokens'), usage.reasoning_tokens]]}
+        language={language}
+      />
+    </div>
+  )
+}
+
+function UsageMetric({
+  label,
+  value,
+  subsets,
+  language
+}: {
+  label: string
+  value: number | null
+  subsets: ReadonlyArray<readonly [string, number | null]>
+  language: 'en' | 'zh'
+}): React.JSX.Element {
+  return (
+    <div className="statistics-usage-metric">
+      <Text size="xs" c="dimmed">
+        {label}
+      </Text>
+      <Text size="sm" fw={600} className="statistics-usage-value">
+        {formatCount(value, language)}
+      </Text>
+      <div className="statistics-usage-subsets">
+        {subsets.map(([subsetLabel, subsetValue]) => (
+          <Text key={subsetLabel} size="xs" c="dimmed">
+            {subsetLabel} {formatCount(subsetValue, language)}
+          </Text>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -229,25 +267,36 @@ function AgentBreakdown({
   const { language } = useLanguage()
   const t = useMessages()
   const totalUsage = summedUsage(sections.flatMap((section) => section.groups))
-  const usageCells = (usage: Usage): React.JSX.Element[] =>
-    [
-      usage.input_tokens,
-      usage.output_tokens,
-      usage.cache_read_input_tokens
-    ].map((value, index) => (
-      <Table.Td key={index} ta="right">
-        {formatCount(value, language)}
-      </Table.Td>
-    ))
+  const usageCells = (usage: Usage): React.JSX.Element[] => [
+    <Table.Td key="input" ta="right">
+      <Text size="xs" fw={600} inherit>
+        {formatCount(usage.input_tokens, language)}
+      </Text>
+      <Text size="xs" c="dimmed" className="statistics-usage-cell-subset">
+        {t('statisticsCacheReadTokens')}{' '}
+        {formatCount(usage.cache_read_input_tokens, language)} ·{' '}
+        {t('statisticsCacheCreationTokens')}{' '}
+        {formatCount(usage.cache_creation_input_tokens, language)}
+      </Text>
+    </Table.Td>,
+    <Table.Td key="output" ta="right">
+      <Text size="xs" fw={600} inherit>
+        {formatCount(usage.output_tokens, language)}
+      </Text>
+      <Text size="xs" c="dimmed" className="statistics-usage-cell-subset">
+        {t('statisticsReasoningTokens')}{' '}
+        {formatCount(usage.reasoning_tokens, language)}
+      </Text>
+    </Table.Td>
+  ]
   return (
-    <Table.ScrollContainer minWidth={420}>
+    <Table.ScrollContainer minWidth={300}>
       <Table className="statistics-agent-breakdown">
         <Table.Thead>
           <Table.Tr>
             <Table.Th>{t('statisticsCallBreakdown')}</Table.Th>
             <Table.Th ta="right">{t('statisticsInputTokens')}</Table.Th>
             <Table.Th ta="right">{t('statisticsOutputTokens')}</Table.Th>
-            <Table.Th ta="right">{t('statisticsCacheReadTokens')}</Table.Th>
           </Table.Tr>
         </Table.Thead>
         <Table.Tbody>
@@ -301,7 +350,7 @@ function StatisticsTable({
               <Table.Th className="statistics-model-column">
                 {t('statisticsModel')}
               </Table.Th>
-              <Table.Th className="statistics-numeric-column" ta="center">
+              <Table.Th className="statistics-numeric-column" ta="right">
                 {t('statisticsCalls')}
               </Table.Th>
               <Table.Th className="statistics-numeric-column" ta="right">
@@ -367,7 +416,7 @@ function StatisticsTable({
                         </Text>
                       </Text>
                     </Table.Td>
-                    <Table.Td className="statistics-numeric-column" ta="center">
+                    <Table.Td className="statistics-numeric-column" ta="right">
                       {formatCount(group.model_call_count, language)}
                     </Table.Td>
                     <Table.Td className="statistics-numeric-column" ta="right">
@@ -755,7 +804,17 @@ export function ExecutionStatistics({
           onClose={() => setDetailsOpened(false)}
           position="right"
           size="xl"
-          title={t('statisticsDetailsTitle')}
+          title={
+            <div>
+              <Text size="md" fw={500}>
+                {t('statisticsDetailsTitle')}
+              </Text>
+              <Text size="xs" c="dimmed">
+                {t('statisticsUpdated')}{' '}
+                {formatDate(statistics.updated_at, language)}
+              </Text>
+            </div>
+          }
         >
           <div
             className="execution-statistics-details"
@@ -773,10 +832,6 @@ export function ExecutionStatistics({
             {hasObservedUsage && (
               <UsageDetails usage={statistics.token_usage} />
             )}
-            <Text size="xs" c="dimmed" mt="sm">
-              {t('statisticsUpdated')}{' '}
-              {formatDate(statistics.updated_at, language)}
-            </Text>
             <div className="statistics-groups">
               {workflow === 'repository-review' ? (
                 <RepositoryBreakdown

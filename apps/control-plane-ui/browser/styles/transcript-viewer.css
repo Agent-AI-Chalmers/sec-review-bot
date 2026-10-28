@@ -118,14 +118,14 @@
 
 .transcript-section-header {
   min-height: 38px;
-  padding-right: var(--space-2);
+  padding: var(--space-3) 0 0;
   background: transparent;
 }
 
-.transcript-section-header > button:first-child {
+.transcript-section-toggle {
   min-width: 0;
-  flex: 1;
   justify-content: flex-start;
+  padding-inline: 0;
 }
 
 .transcript-section-content {
@@ -134,8 +134,7 @@
 }
 
 .transcript-tool-calls,
-.transcript-tool-call,
-.transcript-linked-call {
+.transcript-tool-call {
   min-width: 0;
 }
 
@@ -174,10 +173,6 @@
 
 .transcript-tool-call-body {
   padding-top: var(--space-3);
-}
-
-.transcript-linked-call {
-  padding: 0;
 }
 
 .transcript-args {
@@ -333,7 +328,8 @@
   white-space: nowrap;
 }
 
-.json-table-number {
+.json-table .json-table-number {
+  text-align: right;
   white-space: nowrap;
 }
 
@@ -378,6 +374,34 @@
 
 .transcript-token-metrics {
   margin-left: auto;
+}
+
+.transcript-usage-details {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.transcript-usage-total,
+.transcript-usage-metric,
+.transcript-usage-subset {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.transcript-usage-total {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.transcript-usage-group {
+  display: grid;
+  gap: 3px;
+}
+
+.transcript-usage-subset {
+  padding-left: var(--space-3);
 }
 
 .transcript-message mark {

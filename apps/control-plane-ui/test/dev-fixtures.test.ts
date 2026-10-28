@@ -131,6 +131,51 @@ test('dev fixtures distinguish a statistics snapshot from no snapshot', async ()
     .map((step) => step.step_key.match(/^repository:delivery:(.+)$/)?.[1])
     .filter((deliveryId): deliveryId is string => deliveryId !== undefined)
   assert.deepStrictEqual(patchDeliveryIds, publicationDeliveryIds)
+  for (const run of completed) {
+    const statistics = run.execution_statistics
+    assert(statistics !== null)
+    const usages = [
+      statistics.token_usage,
+      ...statistics.groups.map((group) => group.token_usage)
+    ]
+    for (const usage of usages) {
+      if (
+        usage.input_tokens !== null &&
+        usage.output_tokens !== null &&
+        usage.total_tokens !== null
+      ) {
+        assert.strictEqual(
+          usage.total_tokens,
+          usage.input_tokens + usage.output_tokens,
+          'fixture total_tokens must equal inclusive input_tokens + output_tokens'
+        )
+      }
+      if (
+        usage.input_tokens !== null &&
+        usage.cache_read_input_tokens !== null
+      ) {
+        assert(
+          usage.cache_read_input_tokens <= usage.input_tokens,
+          'fixture cache_read_input_tokens must be a subset of input_tokens'
+        )
+      }
+      if (
+        usage.input_tokens !== null &&
+        usage.cache_creation_input_tokens !== null
+      ) {
+        assert(
+          usage.cache_creation_input_tokens <= usage.input_tokens,
+          'fixture cache_creation_input_tokens must be a subset of input_tokens'
+        )
+      }
+      if (usage.output_tokens !== null && usage.reasoning_tokens !== null) {
+        assert(
+          usage.reasoning_tokens <= usage.output_tokens,
+          'fixture reasoning_tokens must be a subset of output_tokens'
+        )
+      }
+    }
+  }
   for (const workflow of ['issue-review', 'pull-request-review'] as const) {
     const workflowRuns = completed.filter((run) => run.workflow === workflow)
     assert(
