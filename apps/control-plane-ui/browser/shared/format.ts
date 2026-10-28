@@ -27,7 +27,10 @@ export function failureReason(
   if (!(error instanceof ApiError)) return undefined
   if (error.code === 'review_runs_timeout') return t('errorTimeout')
   if (error.code === 'review_runs_unavailable') return t('errorUnreachable')
+  if (error.code === 'memory_catalog_timeout') return t('errorMemoryTimeout')
+  if (error.code === 'memory_catalog_unavailable')
+    return t('errorMemoryUnreachable')
   return error.status >= 500
-    ? `${t('errorUpstream')} (${error.status})`
+    ? t('errorStatus').replace('{status}', String(error.status))
     : undefined
 }

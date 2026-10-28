@@ -145,6 +145,23 @@ function ErrorFallback({ error }: { error: unknown }): React.JSX.Element {
   )
 }
 
+function NotFound(): React.JSX.Element {
+  const t = useMessages()
+  return (
+    <div className="error-fallback">
+      <Stack align="center" gap="sm">
+        <Title order={1}>404</Title>
+        <Text ta="center" c="dimmed">
+          {t('pageNotFound')}
+        </Text>
+        <Button component={Link} to="/runs" mt="xs">
+          {t('backToRuns')}
+        </Button>
+      </Stack>
+    </div>
+  )
+}
+
 export function App(): React.JSX.Element {
   const t = useMessages()
   const location = useLocation()
@@ -233,7 +250,7 @@ export function App(): React.JSX.Element {
                   element={<ExtractionTranscriptPage />}
                 />
                 <Route path="/viewer" element={<Viewer />} />
-                <Route path="*" element={<Runs />} />
+                <Route path="*" element={<NotFound />} />
               </Routes>
             </React.Suspense>
           </ErrorBoundary>
