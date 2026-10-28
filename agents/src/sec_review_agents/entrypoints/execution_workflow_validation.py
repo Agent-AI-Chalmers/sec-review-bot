@@ -9,11 +9,13 @@ from pathlib import Path
 from typing import Any
 
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
+from pydantic import JsonValue
 
 from sec_review_agents.contract_versions import EXECUTION_WORKFLOW_VERSION
 from sec_review_agents.entrypoints.execution_workflow import (
     EXECUTION_WORKFLOW_TYPE,
     RUN_ID_PATTERN_TEXT,
+    ExecutionRuntimeConfig,
     ExecutionWorkflowInput,
 )
 
@@ -69,10 +71,10 @@ def _load_source_checkout_schema() -> dict[str, Any]:
     raise RuntimeError(f"Could not locate {_CONTRACT_LABEL} contract schema.")
 
 
-def validate_execution_workflow_input(request: ExecutionWorkflowInput) -> None:
-    """Reject an input that violates the Execution Workflow contract."""
+def parse_execution_workflow_input(value: JsonValue) -> ExecutionWorkflowInput:
+    """Validate a raw Temporal payload before projecting it into runtime data."""
     errors = sorted(
-        Draft202012Validator(_schema()).iter_errors(asdict(request)),
+        Draft202012Validator(_schema()).iter_errors(value),
         key=lambda error: list(error.path),
     )
     if errors:
@@ -83,5 +85,50 @@ def validate_execution_workflow_input(request: ExecutionWorkflowInput) -> None:
             f"at {location}: {error.message}"
         )
 
+    if not isinstance(value, dict):
+        raise AssertionError("schema-valid Execution Workflow input must be an object")
+    workflow_name = value["workflow"]
+    run_id = value["run_id"]
+    caller_input = value["input"]
+    timeout_seconds = value["timeout_seconds"]
+    runtime_value = value.get("runtime")
+    if not isinstance(workflow_name, str):
+        raise AssertionError("schema-valid workflow must be a string")
+    if not isinstance(run_id, str):
+        raise AssertionError("schema-valid run_id must be a string")
+    if not isinstance(caller_input, dict):
+        raise AssertionError("schema-valid input must be an object")
+    if not isinstance(timeout_seconds, int) or isinstance(timeout_seconds, bool):
+        raise AssertionError("schema-valid timeout_seconds must be an integer")
 
-__all__ = ["validate_execution_workflow_input"]
+    runtime: ExecutionRuntimeConfig | None = None
+    if runtime_value is not None:
+        if not isinstance(runtime_value, dict):
+            raise AssertionError("schema-valid runtime must be an object or null")
+        runtime = {}
+        workspace_image = runtime_value.get("workspace_image")
+        if workspace_image is not None:
+            if not isinstance(workspace_image, str):
+                raise AssertionError(
+                    "schema-valid runtime.workspace_image must be a string"
+                )
+            runtime["workspace_image"] = workspace_image
+
+    return ExecutionWorkflowInput(
+        workflow=workflow_name,
+        run_id=run_id,
+        input=caller_input,
+        timeout_seconds=timeout_seconds,
+        runtime=runtime,
+    )
+
+
+def validate_execution_workflow_input(request: ExecutionWorkflowInput) -> None:
+    """Reject a typed input whose values violate the Execution Workflow contract."""
+    parse_execution_workflow_input(asdict(request))
+
+
+__all__ = [
+    "parse_execution_workflow_input",
+    "validate_execution_workflow_input",
+]

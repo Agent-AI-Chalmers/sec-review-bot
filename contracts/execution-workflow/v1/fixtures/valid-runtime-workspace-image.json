@@ -1,0 +1,9 @@
+{
+  "workflow": "repository-review",
+  "run_id": "run-runtime-image",
+  "input": {},
+  "timeout_seconds": 3600,
+  "runtime": {
+    "workspace_image": "registry.example/review:latest"
+  }
+}

@@ -18,7 +18,7 @@ def assert_review_record_shape(review_record: Mapping[str, Any]) -> None:
         assert key in review_record
 
 
-def test_shared_v6_issue_and_pull_request_result_fixtures_are_public_shape() -> None:
+def test_shared_issue_and_pull_request_result_fixtures_are_public_shape() -> None:
     issue_result = contract_fixture("issue-review-result.json")
     pull_request_result = contract_fixture("pull-request-review-result.json")
 
@@ -28,7 +28,7 @@ def test_shared_v6_issue_and_pull_request_result_fixtures_are_public_shape() -> 
     assert_review_record_shape(pull_request_result["review_record"])
 
 
-def test_shared_v6_repository_result_fixture_is_public_shape() -> None:
+def test_shared_repository_result_fixture_is_public_shape() -> None:
     result = contract_fixture("repository-review-result.json")
 
     assert_public_workflow_result(result)
@@ -37,7 +37,7 @@ def test_shared_v6_repository_result_fixture_is_public_shape() -> None:
     assert_review_record_shape(result["case_results"][0]["review_record"])
 
 
-def test_shared_v6_repository_blocked_result_fixture_is_public_shape() -> None:
+def test_shared_repository_blocked_result_fixture_is_public_shape() -> None:
     result = contract_fixture("repository-review-result-blocked.json")
 
     assert_public_workflow_result(result)

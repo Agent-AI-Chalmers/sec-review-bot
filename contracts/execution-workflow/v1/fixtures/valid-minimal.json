@@ -1,0 +1,6 @@
+{
+  "workflow": "issue-review",
+  "run_id": "run-contract",
+  "input": {},
+  "timeout_seconds": 60
+}

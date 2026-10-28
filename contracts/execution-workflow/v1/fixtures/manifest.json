@@ -1,0 +1,16 @@
+{
+  "$comment": "Execution Workflow inputs shared by Execution Gateway and Execution Worker. Each valid case must pass both runtime validators; each invalid case must be rejected.",
+  "valid": [
+    "valid-minimal.json",
+    "valid-runtime-null.json",
+    "valid-runtime-workspace-image.json"
+  ],
+  "invalid": [
+    "invalid-extra-top-level-field.json",
+    "invalid-missing-timeout.json",
+    "invalid-run-id.json",
+    "invalid-runtime-field.json",
+    "invalid-timeout.json",
+    "invalid-workflow.json"
+  ]
+}

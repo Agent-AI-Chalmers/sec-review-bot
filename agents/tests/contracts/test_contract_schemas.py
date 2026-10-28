@@ -92,7 +92,7 @@ def test_execution_worker_rejects_extra_input_bundle_manifest_property() -> None
         ("repository-review", "repository-review-result.json"),
     ],
 )
-def test_execution_result_accepts_shared_v6_workflow_result_fixtures(
+def test_execution_result_accepts_shared_workflow_result_fixtures(
     workflow: str, fixture_name: str
 ) -> None:
     validate_execution_api_result(contract_fixture(fixture_name), workflow)

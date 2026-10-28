@@ -302,7 +302,7 @@ def test_issue_workflow_input_preparation_derives_stage_artifacts() -> None:
     )
 
 
-def test_shared_v6_issue_input_fixture_prepares() -> None:
+def test_shared_issue_input_fixture_prepares() -> None:
     payload = contract_fixture("issue-review-input.json")
     payload["input_bundle"] = _write_bundle_manifest(
         "/tmp/sec-review-fixtures/issue-review"
@@ -318,7 +318,7 @@ def test_shared_v6_issue_input_fixture_prepares() -> None:
     assert prepared["review_intent"]["objective"] == "audit"
 
 
-def test_shared_v6_pull_request_input_fixture_prepares() -> None:
+def test_shared_pull_request_input_fixture_prepares() -> None:
     payload = contract_fixture("pull-request-review-input.json")
     payload["input_bundle"] = _write_bundle_manifest(
         "/tmp/sec-review-fixtures/pull-request-review", incremental=True
@@ -334,7 +334,7 @@ def test_shared_v6_pull_request_input_fixture_prepares() -> None:
     assert prepared["pr"]["number"] == 42
 
 
-def test_shared_v6_repository_input_fixtures_prepare() -> None:
+def test_shared_repository_input_fixtures_prepare() -> None:
     full_payload = contract_fixture("repository-review-input-full.json")
     full_payload["input_bundle"] = _write_bundle_manifest(
         "/tmp/sec-review-fixtures/repository-review-full"

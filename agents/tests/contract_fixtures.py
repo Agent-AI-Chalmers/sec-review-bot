@@ -6,7 +6,10 @@ from typing import Any
 from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
 from referencing import Registry, Resource
 
-from sec_review_agents.contract_versions import EXECUTION_API_VERSION
+from sec_review_agents.contract_versions import (
+    EXECUTION_API_VERSION,
+    EXECUTION_WORKFLOW_VERSION,
+)
 from tests.project_paths import CONTRACTS_ROOT
 
 # --- execution-api family ------------------------------------------
@@ -63,6 +66,27 @@ def contract_schema_registry() -> Registry:
         resources.append((schema["$id"], resource))
         resources.append((schema_file.name, resource))
     return Registry().with_resources(resources)
+
+
+# --- execution-workflow family ------------------------------------
+
+_EXECUTION_WORKFLOW_FIXTURES_ROOT = (
+    CONTRACTS_ROOT / "execution-workflow" / EXECUTION_WORKFLOW_VERSION / "fixtures"
+)
+
+
+def execution_workflow_fixture(name: str) -> dict[str, Any]:
+    return json.loads(
+        (_EXECUTION_WORKFLOW_FIXTURES_ROOT / name).read_text(encoding="utf-8")
+    )
+
+
+def execution_workflow_fixture_manifest() -> dict[str, Any]:
+    return execution_workflow_fixture("manifest.json")
+
+
+def execution_workflow_fixture_files() -> list[Path]:
+    return sorted(_EXECUTION_WORKFLOW_FIXTURES_ROOT.glob("*.json"))
 
 
 def contract_validator(schema_name: str) -> Draft202012Validator:

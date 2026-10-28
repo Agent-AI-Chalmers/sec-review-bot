@@ -33,7 +33,7 @@ def git_repo(tmp_path: Path) -> Path:
     return repo
 
 
-def test_local_issue_bundle_passes_the_v6_input_schema(
+def test_local_issue_bundle_passes_the_contract_input_schema(
     git_repo: Path, tmp_path: Path
 ) -> None:
     """A local issue run starts the same workflow the GitHub path starts.
