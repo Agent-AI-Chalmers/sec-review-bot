@@ -118,8 +118,24 @@ export async function runFixtureRunStatisticsFlow({
     2,
     `${name} delivery usage must stay flat at the agent level`
   )
-  await deliveryRows.filter({ hasText: 'repository-delivery-planner' }).click()
-  await deliveryRows.filter({ hasText: 'patch-synthesizer' }).click()
+  const deliveryPlannerRow = deliveryRows.filter({
+    hasText: 'repository-delivery-planner'
+  })
+  const patchSynthesizerRow = deliveryRows.filter({
+    hasText: 'patch-synthesizer'
+  })
+  await deliveryPlannerRow.click()
+  await waitUntil(
+    async () =>
+      (await deliveryPlannerRow.getAttribute('aria-expanded')) === 'true',
+    `${name} delivery planner details did not expand`
+  )
+  await patchSynthesizerRow.click()
+  await waitUntil(
+    async () =>
+      (await patchSynthesizerRow.getAttribute('aria-expanded')) === 'true',
+    `${name} patch synthesizer details did not expand`
+  )
   assert.match(
     (await workflowStages.nth(2).textContent()) ?? '',
     /Call.*Draft batch 1.*Draft batch 2.*Refinement.*patch-synthesizer.*combined-[a-f0-9]+.*combined-[a-f0-9]+/s,
