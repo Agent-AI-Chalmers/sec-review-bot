@@ -1,6 +1,6 @@
 # Review Runs
 
-[中文版](README.zh.md)
+Language: English | [中文](README.zh.md)
 
 Review Runs is the review-run coordination service. It accepts review requests and durably coordinates their complete lifecycle across input preparation, execution, and result publication.
 

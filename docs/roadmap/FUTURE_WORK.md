@@ -1,5 +1,7 @@
 # Future Work
 
+Language: English | [中文](FUTURE_WORK.zh.md)
+
 This page records directions that are worth exploring later.
 
 ## Platform Adapters

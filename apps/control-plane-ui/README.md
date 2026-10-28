@@ -1,5 +1,7 @@
 # Control Plane UI
 
+Language: English | [中文](README.zh.md)
+
 Internal web console for review runs and memory operations. The browser talks only to this application's same-origin server; the server holds upstream credentials and proxies explicit route allowlists.
 
 ## Local development

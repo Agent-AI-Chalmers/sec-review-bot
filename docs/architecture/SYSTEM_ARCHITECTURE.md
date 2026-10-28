@@ -1,5 +1,7 @@
 # System Architecture
 
+Language: English | [中文](SYSTEM_ARCHITECTURE.zh.md)
+
 Sec Review Bot's repository-owned runtime roles are GitHub Integration, Review Runs, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server. Langfuse is a trusted observability dependency with an independent deployment and lifecycle, not a repository-owned runtime role.
 
 ## Runtime topology

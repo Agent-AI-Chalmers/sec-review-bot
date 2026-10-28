@@ -2,6 +2,8 @@
 
 语言：[English](SPEC.md) | 中文
 
+本文是 [SPEC.md](SPEC.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 ## Envelope
 
 artifact 使用受限 POSIX PAX [envelope v1](../../../envelope/v1/SPEC.zh.md)，media type 为 `application/tar+zstd`，文件名为 `diagnostic-tree.v1.tar.zst`。

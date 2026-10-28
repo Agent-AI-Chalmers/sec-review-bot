@@ -2,6 +2,8 @@
 
 语言：[English](README.md) | 中文
 
+本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 本 family 定义项目自有、media type 为 `application/tar+zstd` 的 artifact 所共享的 archive envelope，以及规定每种 artifact 内部组织的 profiles。
 
 - [envelope/v1/SPEC.zh.md](envelope/v1/SPEC.zh.md) 定义受限 POSIX PAX 方言。

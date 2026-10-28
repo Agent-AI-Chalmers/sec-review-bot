@@ -2,6 +2,8 @@
 
 语言：[English](SPEC.md) | 中文
 
+本文是 [SPEC.md](SPEC.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 ## 封装
 
 v1 memory tree artifact 使用受限 POSIX PAX [envelope v1](../../../envelope/v1/SPEC.zh.md)。
