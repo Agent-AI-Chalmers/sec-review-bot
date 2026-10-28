@@ -122,10 +122,10 @@ export async function runRunsErrorFlow({ name, page, base, waitUntil }) {
   await page.getByRole('button', { name: 'Refresh', exact: true }).click()
   await waitUntil(
     async () =>
-      /unreachable/.test(
+      /Review Runs is unavailable\./.test(
         (await page.locator('[role="alert"]').first().textContent()) ?? ''
       ),
-    `${name} an unreachable Review Runs must say so`
+    `${name} an unavailable Review Runs must say so`
   )
   await page.unroute('**/api/runs*')
 }
