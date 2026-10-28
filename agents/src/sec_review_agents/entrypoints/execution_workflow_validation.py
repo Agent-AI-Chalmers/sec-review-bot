@@ -8,7 +8,7 @@ from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator  # type: ignore[import-untyped]
+from jsonschema import Draft202012Validator
 from pydantic import JsonValue
 
 from sec_review_agents.contract_versions import EXECUTION_WORKFLOW_VERSION
