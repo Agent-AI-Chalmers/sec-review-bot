@@ -1,26 +1,21 @@
 import React from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  Badge,
   Box,
   Button,
   Collapse,
   Container,
-  Drawer,
   Group,
   Pagination,
   Paper,
   Select,
-  Stack,
   Table,
   Text,
   Title,
-  Tooltip,
-  UnstyledButton
+  Tooltip
 } from '@mantine/core'
 import {
   IconAdjustmentsHorizontal,
-  IconAlertTriangle,
   IconChevronDown,
   IconInbox
 } from '@tabler/icons-react'
@@ -41,7 +36,6 @@ import {
   PREPARATION_STATUSES,
   PreparationStatus,
   PublicationStatus,
-  axisLabel,
   executionStatusLabel,
   preparationStateLabel,
   runPublicationStatusLabel
@@ -56,7 +50,7 @@ import {
 import { LIST_RUN_QUERY_PARAMS } from '../../../shared/list-run-query-params.js'
 import { PlatformMark } from './PlatformMark.js'
 import { ICON_SIZE } from '../../shared/design.js'
-import { useNow } from '../../shared/useNow.js'
+import { ParkedRuns } from './ParkedRuns.js'
 import { RunJump } from './RunJump.js'
 
 const RANGE_MINUTES: Record<string, number> = {
@@ -145,8 +139,6 @@ export function Runs(): React.JSX.Element {
   // normal pagination, and an operator needs to see them before the list, so they load
   // separately and a failure here never hides the list itself.
   const [blocked, setBlocked] = React.useState<ParkedRun[]>([])
-  const [parkedOpen, setParkedOpen] = React.useState(false)
-  const now = useNow()
   React.useEffect(() => {
     let cancelled = false
     parkedRuns()
@@ -274,12 +266,6 @@ export function Runs(): React.JSX.Element {
     return number
   }, [cursorParents, cursor])
   const totalPages = data?.next_cursor != null ? page + 1 : page
-  const oldestWait = blocked.reduce<number | null>((oldest, block) => {
-    const parkedAt = Date.parse(block.parked_at)
-    if (!Number.isFinite(parkedAt)) return oldest
-    const wait = Math.max(0, now - parkedAt)
-    return oldest === null || wait > oldest ? wait : oldest
-  }, null)
   return (
     <Container size="lg" py="xl">
       <Group
@@ -298,104 +284,7 @@ export function Runs(): React.JSX.Element {
           />
         </Group>
       </Group>
-      {blocked.length > 0 && (
-        <>
-          <Paper
-            withBorder
-            p="sm"
-            mb="md"
-            className="parked-runs-summary"
-            data-testid="parked-runs"
-            role="status"
-          >
-            <Group justify="space-between" align="center" wrap="wrap" gap="sm">
-              <Group gap="xs" align="center" wrap="nowrap">
-                <IconAlertTriangle size={ICON_SIZE.md} aria-hidden />
-                <Text size="sm" fw={600}>
-                  {t('parkedRunsTitle')}
-                </Text>
-                <Badge size="sm" color="orange" variant="light">
-                  {blocked.length}
-                </Badge>
-                {oldestWait !== null && (
-                  <Text size="xs" c="dimmed">
-                    {t('parkedOldest').replace(
-                      '{duration}',
-                      formatDuration(oldestWait, t)
-                    )}
-                  </Text>
-                )}
-              </Group>
-              <Button
-                variant="light"
-                color="orange"
-                size="compact-sm"
-                onClick={() => setParkedOpen(true)}
-              >
-                {t('parkedRunsView')}
-              </Button>
-            </Group>
-          </Paper>
-          <Drawer
-            opened={parkedOpen}
-            onClose={() => setParkedOpen(false)}
-            position="right"
-            size="lg"
-            title={t('parkedRunsTitle')}
-          >
-            <Stack gap="md">
-              <Stack gap={4}>
-                <Text size="sm">{t('parkedRunsSummary')}</Text>
-                <Text size="sm" c="dimmed">
-                  {t('parkedRunsBody')}
-                </Text>
-              </Stack>
-              <Stack gap="xl">
-                {(['preparation', 'execution', 'publication'] as const).map(
-                  (axis) => {
-                    const runs = blocked.filter((block) => block.axis === axis)
-                    if (runs.length === 0) return null
-                    return (
-                      <Stack gap="sm" key={axis}>
-                        <Text size="xs" fw={600} c="dimmed" tt="uppercase">
-                          {axisLabel(axis, t)}
-                        </Text>
-                        {runs.map((block) => {
-                          const wait = now - Date.parse(block.parked_at)
-                          return (
-                            <UnstyledButton
-                              key={block.run_id}
-                              component={Link}
-                              to={`/runs/${encodeURIComponent(block.run_id)}`}
-                              className="parked-run-row"
-                            >
-                              <Text
-                                size="sm"
-                                ff="monospace"
-                                className="parked-run-id"
-                              >
-                                {block.run_id}
-                              </Text>
-                              {Number.isFinite(wait) && (
-                                <Text size="xs" c="dimmed">
-                                  {t('parkedAge').replace(
-                                    '{duration}',
-                                    formatDuration(Math.max(0, wait), t)
-                                  )}
-                                </Text>
-                              )}
-                            </UnstyledButton>
-                          )
-                        })}
-                      </Stack>
-                    )
-                  }
-                )}
-              </Stack>
-            </Stack>
-          </Drawer>
-        </>
-      )}
+      <ParkedRuns blocked={blocked} />
       {Boolean(error) && (
         <Text role="alert" c="red" mb="md">
           {t('refreshFailed')}
