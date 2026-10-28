@@ -77,7 +77,8 @@ jobs:
             expected = `git ls-files "*/pnpm-lock.yaml"`.lines.map {
               File.dirname(_1.strip)
             }.sort
-            abort "setup pnpm directories differ:\nexpected=#{expected}\nactual=#{actual}" unless actual == expected
+            message = "setup pnpm directories differ:\nexpected=" + expected.inspect + "\nactual=" + actual.inspect
+            abort message unless actual == expected
           '
 
       # The changed-area model (`.github/ci/changed-areas.yml`) is the single source of the
