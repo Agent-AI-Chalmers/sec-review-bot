@@ -1,5 +1,13 @@
 import React from 'react'
-import { Badge, Button, Drawer, Group, Table, Text } from '@mantine/core'
+import {
+  Accordion,
+  Badge,
+  Button,
+  Drawer,
+  Group,
+  Table,
+  Text
+} from '@mantine/core'
 
 import type { Run } from './api.js'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
@@ -391,11 +399,19 @@ function StatisticsTable({
 function RepositoryBreakdown({
   groups,
   expandedGroups,
-  toggleGroup
+  toggleGroup,
+  openStages,
+  onStagesChange,
+  openCases,
+  onCasesChange
 }: {
   groups: StatisticsGroup[]
   expandedGroups: Set<string>
   toggleGroup: (key: string) => void
+  openStages: string[]
+  onStagesChange: (value: string[]) => void
+  openCases: string[]
+  onCasesChange: (value: string[]) => void
 }): React.JSX.Element {
   const t = useMessages()
   const scanGroups = groups.filter(
@@ -434,103 +450,144 @@ function RepositoryBreakdown({
   })
 
   return (
-    <div className="statistics-workflow-stages">
-      <details className="statistics-workflow-stage">
-        <summary>
-          <span>{t('statisticsScanStage')}</span>
-          <SummaryMetrics groups={scanGroups} />
-        </summary>
-        <div className="statistics-stage-body">
-          <StatisticsTable
-            section={{ key: 'scan', label: '', groups: scanSummary.groups }}
-            breakdowns={scanSummary.breakdowns}
-            expandedGroups={expandedGroups}
-            toggleGroup={toggleGroup}
-          />
-        </div>
-      </details>
+    <Accordion
+      multiple
+      value={openStages}
+      onChange={onStagesChange}
+      keepMounted
+      variant="unstyled"
+      chevronPosition="left"
+      className="statistics-workflow-stages"
+    >
+      <Accordion.Item value="scan" className="statistics-workflow-stage">
+        <Accordion.Control className="statistics-workflow-stage-control">
+          <Group justify="space-between" wrap="nowrap" gap="md">
+            <span>{t('statisticsScanStage')}</span>
+            <SummaryMetrics groups={scanGroups} />
+          </Group>
+        </Accordion.Control>
+        <Accordion.Panel className="statistics-stage-panel">
+          <div className="statistics-stage-body">
+            <StatisticsTable
+              section={{ key: 'scan', label: '', groups: scanSummary.groups }}
+              breakdowns={scanSummary.breakdowns}
+              expandedGroups={expandedGroups}
+              toggleGroup={toggleGroup}
+            />
+          </div>
+        </Accordion.Panel>
+      </Accordion.Item>
 
-      <details className="statistics-workflow-stage">
-        <summary>
-          <span>{t('statisticsReviewStage')}</span>
-          <SummaryMetrics
-            groups={[...caseGroups.values()].flat()}
-            prefix={`${caseGroups.size} ${t('statisticsCases')}`}
-          />
-        </summary>
-        <div className="statistics-stage-body statistics-units">
-          {[...caseGroups].map(([caseId, caseUsageGroups]) => {
-            const sections = passSections(caseUsageGroups, t)
-            const onlyInitialPass = isOnlyInitialPass(sections)
-            return (
-              <details key={caseId} className="statistics-unit">
-                <summary>
-                  <span>
-                    {t('statisticsCase')} {caseId}
-                  </span>
-                  <SummaryMetrics groups={caseUsageGroups} />
-                </summary>
-                <div className="statistics-unit-body">
-                  {onlyInitialPass ? (
-                    <StatisticsTable
-                      section={{
-                        ...sections[0],
-                        key: `case:${caseId}:initial:0`,
-                        label: ''
-                      }}
-                      expandedGroups={expandedGroups}
-                      toggleGroup={toggleGroup}
-                    />
-                  ) : (
-                    sections.map((section) => (
-                      <StatisticsTable
-                        key={`${caseId}:${section.key}`}
-                        section={{
-                          ...section,
-                          key: `case:${caseId}:${section.key}`
-                        }}
-                        expandedGroups={expandedGroups}
-                        toggleGroup={toggleGroup}
-                      />
-                    ))
-                  )}
-                </div>
-              </details>
-            )
-          })}
-        </div>
-      </details>
+      <Accordion.Item value="review" className="statistics-workflow-stage">
+        <Accordion.Control className="statistics-workflow-stage-control">
+          <Group justify="space-between" wrap="nowrap" gap="md">
+            <span>{t('statisticsReviewStage')}</span>
+            <SummaryMetrics
+              groups={[...caseGroups.values()].flat()}
+              prefix={`${caseGroups.size} ${t('statisticsCases')}`}
+            />
+          </Group>
+        </Accordion.Control>
+        <Accordion.Panel className="statistics-stage-panel">
+          <div className="statistics-stage-body statistics-units">
+            <Accordion
+              multiple
+              value={openCases}
+              onChange={onCasesChange}
+              keepMounted
+              variant="unstyled"
+              chevronPosition="left"
+            >
+              {[...caseGroups].map(([caseId, caseUsageGroups]) => {
+                const sections = passSections(caseUsageGroups, t)
+                const onlyInitialPass = isOnlyInitialPass(sections)
+                return (
+                  <Accordion.Item
+                    key={caseId}
+                    value={caseId}
+                    className="statistics-unit"
+                  >
+                    <Accordion.Control className="statistics-unit-control">
+                      <Group justify="space-between" wrap="nowrap" gap="md">
+                        <span>
+                          {t('statisticsCase')} {caseId}
+                        </span>
+                        <SummaryMetrics groups={caseUsageGroups} />
+                      </Group>
+                    </Accordion.Control>
+                    <Accordion.Panel className="statistics-unit-panel">
+                      <div className="statistics-unit-body">
+                        {onlyInitialPass ? (
+                          <StatisticsTable
+                            section={{
+                              ...sections[0],
+                              key: `case:${caseId}:initial:0`,
+                              label: ''
+                            }}
+                            expandedGroups={expandedGroups}
+                            toggleGroup={toggleGroup}
+                          />
+                        ) : (
+                          sections.map((section) => (
+                            <StatisticsTable
+                              key={`${caseId}:${section.key}`}
+                              section={{
+                                ...section,
+                                key: `case:${caseId}:${section.key}`
+                              }}
+                              expandedGroups={expandedGroups}
+                              toggleGroup={toggleGroup}
+                            />
+                          ))
+                        )}
+                      </div>
+                    </Accordion.Panel>
+                  </Accordion.Item>
+                )
+              })}
+            </Accordion>
+          </div>
+        </Accordion.Panel>
+      </Accordion.Item>
 
-      <details className="statistics-workflow-stage">
-        <summary>
-          <span>{t('statisticsDeliveryStage')}</span>
-          <SummaryMetrics groups={deliveryStageGroups} />
-        </summary>
-        <div className="statistics-stage-body">
-          <StatisticsTable
-            section={{
-              key: 'delivery',
-              label: '',
-              groups: deliverySummary.groups
-            }}
-            breakdowns={deliverySummary.breakdowns}
-            expandedGroups={expandedGroups}
-            toggleGroup={toggleGroup}
-          />
-        </div>
-      </details>
-    </div>
+      <Accordion.Item value="delivery" className="statistics-workflow-stage">
+        <Accordion.Control className="statistics-workflow-stage-control">
+          <Group justify="space-between" wrap="nowrap" gap="md">
+            <span>{t('statisticsDeliveryStage')}</span>
+            <SummaryMetrics groups={deliveryStageGroups} />
+          </Group>
+        </Accordion.Control>
+        <Accordion.Panel className="statistics-stage-panel">
+          <div className="statistics-stage-body">
+            <StatisticsTable
+              section={{
+                key: 'delivery',
+                label: '',
+                groups: deliverySummary.groups
+              }}
+              breakdowns={deliverySummary.breakdowns}
+              expandedGroups={expandedGroups}
+              toggleGroup={toggleGroup}
+            />
+          </div>
+        </Accordion.Panel>
+      </Accordion.Item>
+    </Accordion>
   )
 }
 
 function PassBreakdown({
   sections,
   expandedGroups,
-  toggleGroup
+  toggleGroup,
+  openStages,
+  onStagesChange
 }: {
   sections: UsageSection[]
   expandedGroups: Set<string>
   toggleGroup: (key: string) => void
+  openStages: string[]
+  onStagesChange: (value: string[]) => void
 }): React.JSX.Element {
   if (isOnlyInitialPass(sections)) {
     const section = sections[0]
@@ -543,23 +600,39 @@ function PassBreakdown({
     )
   }
   return (
-    <div className="statistics-workflow-stages">
+    <Accordion
+      multiple
+      value={openStages}
+      onChange={onStagesChange}
+      keepMounted
+      variant="unstyled"
+      chevronPosition="left"
+      className="statistics-workflow-stages"
+    >
       {sections.map((section) => (
-        <details key={section.key} className="statistics-workflow-stage">
-          <summary>
-            <span>{section.label}</span>
-            <SummaryMetrics groups={section.groups} />
-          </summary>
-          <div className="statistics-stage-body">
-            <StatisticsTable
-              section={{ ...section, label: '' }}
-              expandedGroups={expandedGroups}
-              toggleGroup={toggleGroup}
-            />
-          </div>
-        </details>
+        <Accordion.Item
+          key={section.key}
+          value={section.key}
+          className="statistics-workflow-stage"
+        >
+          <Accordion.Control className="statistics-workflow-stage-control">
+            <Group justify="space-between" wrap="nowrap" gap="md">
+              <span>{section.label}</span>
+              <SummaryMetrics groups={section.groups} />
+            </Group>
+          </Accordion.Control>
+          <Accordion.Panel className="statistics-stage-panel">
+            <div className="statistics-stage-body">
+              <StatisticsTable
+                section={{ ...section, label: '' }}
+                expandedGroups={expandedGroups}
+                toggleGroup={toggleGroup}
+              />
+            </div>
+          </Accordion.Panel>
+        </Accordion.Item>
       ))}
-    </div>
+    </Accordion>
   )
 }
 
@@ -576,6 +649,8 @@ export function ExecutionStatistics({
     () => new Set()
   )
   const [detailsOpened, setDetailsOpened] = React.useState(false)
+  const [openStages, setOpenStages] = React.useState<string[]>([])
+  const [openCases, setOpenCases] = React.useState<string[]>([])
   const detailsRef = React.useRef<HTMLDivElement>(null)
   if (statistics === null) return null
   const status = statusPresentation(statistics)
@@ -592,6 +667,17 @@ export function ExecutionStatistics({
     statistics.token_usage.total_tokens !== null
   const hasDetails = hasObservedUsage || statistics.groups.length > 0
   const sections = passSections(statistics.groups, t)
+  const stageIds =
+    workflow === 'repository-review'
+      ? ['scan', 'review', 'delivery']
+      : sections.map((section) => section.key)
+  const caseIds = [
+    ...new Set(
+      statistics.groups
+        .map((group) => group.case_id)
+        .filter((caseId): caseId is string => caseId !== null)
+    )
+  ]
   const toggleGroup = (key: string): void => {
     setExpandedGroups((current) => {
       const next = new Set(current)
@@ -601,11 +687,10 @@ export function ExecutionStatistics({
     })
   }
   const expandAll = (): void => {
+    setOpenStages(stageIds)
+    setOpenCases(caseIds)
     const root = detailsRef.current
     if (root === null) return
-    root.querySelectorAll('details').forEach((detail) => {
-      detail.open = true
-    })
     const keys = [
       ...root.querySelectorAll<HTMLElement>('.statistics-group-row')
     ]
@@ -614,11 +699,8 @@ export function ExecutionStatistics({
     setExpandedGroups(new Set(keys))
   }
   const collapseAll = (): void => {
-    const root = detailsRef.current
-    if (root === null) return
-    root.querySelectorAll('details').forEach((detail) => {
-      detail.open = false
-    })
+    setOpenStages([])
+    setOpenCases([])
     setExpandedGroups(new Set())
   }
 
@@ -701,12 +783,18 @@ export function ExecutionStatistics({
                   groups={statistics.groups}
                   expandedGroups={expandedGroups}
                   toggleGroup={toggleGroup}
+                  openStages={openStages}
+                  onStagesChange={setOpenStages}
+                  openCases={openCases}
+                  onCasesChange={setOpenCases}
                 />
               ) : (
                 <PassBreakdown
                   sections={sections}
                   expandedGroups={expandedGroups}
                   toggleGroup={toggleGroup}
+                  openStages={openStages}
+                  onStagesChange={setOpenStages}
                 />
               )}
             </div>

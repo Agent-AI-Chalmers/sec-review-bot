@@ -364,12 +364,15 @@ export async function smokeRuns({
     )
     assert.strictEqual(
       await statisticsDetails
-        .locator('.statistics-workflow-stage[open]')
+        .locator('.statistics-workflow-stage-control[aria-expanded="true"]')
         .count(),
       0,
       `${name} workflow stages must start collapsed`
     )
-    await workflowStages.nth(0).locator('summary').first().click()
+    await workflowStages
+      .nth(0)
+      .locator('.statistics-workflow-stage-control')
+      .click()
     const discoveryRow = workflowStages
       .nth(0)
       .locator('.statistics-group-row')
@@ -377,7 +380,7 @@ export async function smokeRuns({
     await discoveryRow.click()
     assert.match(
       (await workflowStages.nth(0).textContent()) ?? '',
-      /Call breakdown.*Input.*Output.*Cache read.*discovery-chunk-0001.*2,800.*360.*1,100.*discovery-chunk-0002.*2,700.*354.*1,000.*discovery-chunk-0003.*2,700.*370.*1,000.*Total.*8,200.*1,084.*3,100/s,
+      /Call.*Input.*Output.*Cache read.*discovery-chunk-0001.*2,800.*360.*1,100.*discovery-chunk-0002.*2,700.*354.*1,000.*discovery-chunk-0003.*2,700.*370.*1,000.*Total.*8,200.*1,084.*3,100/s,
       `${name} discovery details must expose per-chunk calls and token dimensions`
     )
     const triageRow = workflowStages
@@ -387,10 +390,13 @@ export async function smokeRuns({
     await triageRow.click()
     assert.match(
       (await workflowStages.nth(0).textContent()) ?? '',
-      /Call breakdown.*Draft batch 1.*2,700.*400.*900.*Draft batch 2.*2,400.*400.*900.*Refinement.*1,800.*300.*600.*Total.*6,900.*1,100.*2,400/s,
+      /Call.*Draft batch 1.*2,700.*400.*900.*Draft batch 2.*2,400.*400.*900.*Refinement.*1,800.*300.*600.*Total.*6,900.*1,100.*2,400/s,
       `${name} triage details must explain its batches without adding hierarchy`
     )
-    await workflowStages.nth(1).locator('summary').first().click()
+    await workflowStages
+      .nth(1)
+      .locator('.statistics-workflow-stage-control')
+      .click()
     const reviewUnits = workflowStages.nth(1).locator('.statistics-unit')
     assert.strictEqual(
       await reviewUnits.count(),
@@ -402,7 +408,7 @@ export async function smokeRuns({
       /Case 7d9a2f6c31b4e8.*9 Calls · 26,675 tokens/s,
       `${name} a collapsed case must retain its usage summary`
     )
-    await reviewUnits.nth(0).locator('summary').click()
+    await reviewUnits.nth(0).locator('.statistics-unit-control').click()
     assert.match(
       (await reviewUnits.nth(0).textContent()) ?? '',
       /Initial review.*Feedback pass 1/s,
@@ -427,13 +433,16 @@ export async function smokeRuns({
         `${name} initial and feedback tables must share fixed column tracks`
       )
     }
-    await reviewUnits.nth(1).locator('summary').click()
+    await reviewUnits.nth(1).locator('.statistics-unit-control').click()
     assert.doesNotMatch(
       (await reviewUnits.nth(1).textContent()) ?? '',
       /Initial review/,
       `${name} a case without feedback must not label its only pass as initial`
     )
-    await workflowStages.nth(2).locator('summary').first().click()
+    await workflowStages
+      .nth(2)
+      .locator('.statistics-workflow-stage-control')
+      .click()
     const deliveryRows = workflowStages.nth(2).locator('.statistics-group-row')
     assert.strictEqual(
       await deliveryRows.count(),
@@ -446,7 +455,7 @@ export async function smokeRuns({
     await deliveryRows.filter({ hasText: 'patch-synthesizer' }).click()
     assert.match(
       (await workflowStages.nth(2).textContent()) ?? '',
-      /Call breakdown.*Draft batch 1.*Draft batch 2.*Refinement.*patch-synthesizer.*combined-[a-f0-9]+.*combined-[a-f0-9]+/s,
+      /Call.*Draft batch 1.*Draft batch 2.*Refinement.*patch-synthesizer.*combined-[a-f0-9]+.*combined-[a-f0-9]+/s,
       `${name} delivery details must explain planning and patch synthesis inline`
     )
     assert.match(
@@ -485,20 +494,22 @@ export async function smokeRuns({
     await page.getByRole('button', { name: 'Expand all' }).click()
     assert.strictEqual(
       await statisticsDetails
-        .locator('.statistics-workflow-stage[open]')
+        .locator('.statistics-workflow-stage-control[aria-expanded="true"]')
         .count(),
       3,
       `${name} expand all must open every workflow stage`
     )
     assert.strictEqual(
-      await statisticsDetails.locator('.statistics-unit[open]').count(),
+      await statisticsDetails
+        .locator('.statistics-unit-control[aria-expanded="true"]')
+        .count(),
       2,
       `${name} expand all must open every review case`
     )
     await page.getByRole('button', { name: 'Collapse all' }).click()
     assert.strictEqual(
       await statisticsDetails
-        .locator('.statistics-workflow-stage[open]')
+        .locator('.statistics-workflow-stage-control[aria-expanded="true"]')
         .count(),
       0,
       `${name} collapse all must close every workflow stage`

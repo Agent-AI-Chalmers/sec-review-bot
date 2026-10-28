@@ -228,32 +228,22 @@ a {
   border-bottom: 1px solid var(--border-strong);
 }
 
-.statistics-workflow-stage > summary {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-3);
+.statistics-workflow-stage-control {
   padding: var(--space-4) 0;
   font-size: var(--mantine-font-size-sm);
   font-weight: 700;
-  cursor: pointer;
-  list-style: none;
 }
 
-.statistics-workflow-stage > summary::-webkit-details-marker {
-  display: none;
+.statistics-workflow-stage-control:hover {
+  background: transparent;
 }
 
-.statistics-workflow-stage > summary::before {
-  content: '›';
+.statistics-workflow-stage-control .mantine-Accordion-chevron {
   color: var(--mantine-color-anchor);
-  font-size: 1rem;
-  line-height: 1;
-  transition: transform 120ms ease;
 }
 
-.statistics-workflow-stage[open] > summary::before {
-  transform: rotate(90deg);
+.statistics-stage-panel {
+  padding: 0;
 }
 
 .statistics-stage-body {
@@ -272,36 +262,22 @@ a {
   background: var(--mantine-color-body);
 }
 
-.statistics-unit > summary {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--space-4);
+.statistics-unit-control {
   padding: var(--space-3) var(--space-4);
   font-size: var(--mantine-font-size-sm);
   font-weight: 600;
-  cursor: pointer;
-  list-style: none;
 }
 
-.statistics-unit > summary::-webkit-details-marker {
-  display: none;
+.statistics-unit-control:hover {
+  background: transparent;
 }
 
-.statistics-unit > summary::before {
-  content: '›';
-  color: var(--mantine-color-anchor);
-  font-size: 1rem;
-  line-height: 1;
-  transition: transform 120ms ease;
-}
-
-.statistics-unit[open] > summary::before {
-  transform: rotate(90deg);
-}
-
-.statistics-unit[open] > summary {
+.statistics-unit-control[aria-expanded='true'] {
   border-bottom: 1px solid var(--border);
+}
+
+.statistics-unit-panel {
+  padding: 0;
 }
 
 .statistics-unit-body {
@@ -318,12 +294,19 @@ a {
 }
 
 .statistics-agent-breakdown {
-  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-dimmed);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.statistics-agent-breakdown th {
+  color: var(--mantine-color-dimmed);
+  font-weight: 500;
 }
 
 .statistics-agent-breakdown th,
 .statistics-agent-breakdown td {
-  padding: var(--space-2) var(--space-3);
+  padding: 4px 8px;
 }
 
 .statistics-agent-breakdown th:first-child,
@@ -332,7 +315,8 @@ a {
 }
 
 .statistics-agent-breakdown-total td {
-  border-top: 1px solid var(--border-strong);
+  border-top: 1px solid var(--border);
+  color: var(--mantine-color-text);
   font-weight: 600;
 }
 
