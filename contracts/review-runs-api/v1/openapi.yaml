@@ -672,21 +672,32 @@ components:
         input_tokens:
           type: [integer, "null"]
           minimum: 0
+          description: >-
+            Total input tokens using OpenTelemetry GenAI semantics. Includes tokens read
+            from cache and tokens written to cache; the cache fields below are subsets,
+            not additional tokens.
         output_tokens:
           type: [integer, "null"]
           minimum: 0
+          description: >-
+            Total output tokens using OpenTelemetry GenAI semantics. Includes reasoning
+            tokens when the provider reports them; reasoning_tokens is a subset.
         total_tokens:
           type: [integer, "null"]
           minimum: 0
+          description: Total input and output tokens reported for the model calls.
         cache_read_input_tokens:
           type: [integer, "null"]
           minimum: 0
+          description: Input-token subset served from a prompt cache.
         cache_creation_input_tokens:
           type: [integer, "null"]
           minimum: 0
+          description: Input-token subset written to a prompt cache.
         reasoning_tokens:
           type: [integer, "null"]
           minimum: 0
+          description: Output-token subset used for model reasoning.
     ExecutionSummary:
       type: object
       additionalProperties: false

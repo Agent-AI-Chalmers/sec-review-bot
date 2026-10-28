@@ -245,11 +245,17 @@ export interface components {
       token_usage: components['schemas']['ExecutionTokenUsage']
     }
     ExecutionTokenUsage: {
+      /** @description Total input tokens using OpenTelemetry GenAI semantics. Includes tokens read from cache and tokens written to cache; the cache fields below are subsets, not additional tokens. */
       input_tokens: number | null
+      /** @description Total output tokens using OpenTelemetry GenAI semantics. Includes reasoning tokens when the provider reports them; reasoning_tokens is a subset. */
       output_tokens: number | null
+      /** @description Total input and output tokens reported for the model calls. */
       total_tokens: number | null
+      /** @description Input-token subset served from a prompt cache. */
       cache_read_input_tokens: number | null
+      /** @description Input-token subset written to a prompt cache. */
       cache_creation_input_tokens: number | null
+      /** @description Output-token subset used for model reasoning. */
       reasoning_tokens: number | null
     }
     ExecutionSummary: {

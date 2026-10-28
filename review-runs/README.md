@@ -213,6 +213,8 @@ Schema files live in `src/database/schema-versions`. Applied versions and SHA-25
 
 Execution statistics are stored in `execution_statistics`, which owns reconciliation state and run totals, and `execution_statistics_groups`, which stores totals by case, delivery, pass, draft batch, discovery chunk, agent, provider, and model. Call-level observations remain in external Langfuse. A snapshot is `settled` only after two matching reads that contain at least one review root; reaching the reconciliation deadline first produces `partial_window`, or `no_observations` when no review root arrived before that deadline. Usage coverage applies only to calls returned by Langfuse and is not an upload-completeness claim.
 
+The statistics boundary normalizes Langfuse's mutually exclusive billing buckets to OpenTelemetry GenAI token semantics. `input_tokens` includes cache-read and cache-creation input, and `output_tokens` includes reasoning output; the cache and reasoning fields remain available as subsets rather than additional totals.
+
 Langfuse HTTP 429 responses defer the claimed run according to `Retry-After` (falling back to `EXECUTION_STATISTICS_RETRY_DELAY_MS`) without consuming the consecutive-failure budget. If that delay reaches the settlement deadline, reconciliation concludes as `unavailable` with failure code `LANGFUSE_RATE_LIMITED` instead of remaining pending indefinitely.
 
 ## Development

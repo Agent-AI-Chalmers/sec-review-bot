@@ -31,12 +31,12 @@ function tokenValues(
   snapshot: ExecutionStatisticsSnapshot
 ): Array<number | null> {
   return [
-    snapshot.tokenUsage.input,
-    snapshot.tokenUsage.output,
-    snapshot.tokenUsage.total,
+    snapshot.tokenUsage.input_tokens,
+    snapshot.tokenUsage.output_tokens,
+    snapshot.tokenUsage.total_tokens,
     snapshot.tokenUsage.cache_read_input_tokens,
     snapshot.tokenUsage.cache_creation_input_tokens,
-    snapshot.tokenUsage.reasoning
+    snapshot.tokenUsage.reasoning_tokens
   ]
 }
 
@@ -239,12 +239,12 @@ export class ExecutionStatisticsStore {
             group.model,
             group.modelCallCount,
             group.usageReportedCallCount,
-            group.tokenUsage.input,
-            group.tokenUsage.output,
-            group.tokenUsage.total,
+            group.tokenUsage.input_tokens,
+            group.tokenUsage.output_tokens,
+            group.tokenUsage.total_tokens,
             group.tokenUsage.cache_read_input_tokens,
             group.tokenUsage.cache_creation_input_tokens,
-            group.tokenUsage.reasoning
+            group.tokenUsage.reasoning_tokens
           ]
         )
       }
