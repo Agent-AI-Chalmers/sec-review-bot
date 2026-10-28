@@ -204,7 +204,7 @@ Additional notes:
 
 ## GitHub REST API Version
 
-- By default, `X-GitHub-Api-Version` is pinned to `2026-03-10` to avoid falling back to soon-to-be-removed compatibility paths.
+- By default, `X-GitHub-Api-Version` is pinned to `2026-03-10`.
 - Override it with `GITHUB_API_VERSION` when debugging or rolling out an API version change.
 - Version docs: <https://docs.github.com/en/rest/about-the-rest-api/api-versions?apiVersion=2026-03-10>
 

@@ -4,22 +4,26 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-Review Runs 接纳 review 请求，并持久协调输入准备、执行和结果发布的完整生命周期。
+Review Runs 是 review run 协调服务。它接纳 review 请求，并持久协调输入准备、执行和结果发布的完整生命周期。
 
 ## 在系统中的位置
 
 ```mermaid
 flowchart LR
-  integration[GitHub integration] -->|接纳并提交已准备的 input| control[Review Runs]
+  integration[GitHub integration] <-->|review 接纳、input 交接与 publication 协调| control[Review Run 协调服务]
   control -->|提交并轮询| execution[Execution API]
   control <-->|run 和 publication 状态| postgres[(PostgreSQL)]
-  integration <-->|领取并记录 publication| control
+  workers[Agent Workers] -.->|导出 LLM observations| langfuse[Langfuse]
+  control -->|读取 observations 并生成统计| langfuse
   ui[Control Plane UI] -->|查询| control
 ```
 
-GitHub integration 负责解析 GitHub 请求、准备 input 和执行 GitHub 副作用。Execution API provider、Temporal 和 worker 负责 workflow 执行。Review Runs 协调这些边界，但不解析原始 GitHub payload、不解释 workflow 专用 result，也不执行 agent。Provider 身份不是 Review Runs 的依赖。完整数据流见[系统架构](../docs/architecture/SYSTEM_ARCHITECTURE.zh.md)。
+- **GitHub integration** 负责解析 GitHub 请求、准备 input 和执行 GitHub 副作用。
+- **Review Run 协调服务** 负责接纳、持久生命周期状态、恢复、execution 观察和 publication 协调。
+- **Execution API provider、Temporal 和 workers** 负责 workflow 执行。
+- **Langfuse** 独立保存可选的 LLM observations；Review Runs 异步读取这些数据来生成统计。
 
-服务作为独立 Node.js 进程运行，默认监听 `8090`。PostgreSQL 凭据只提供给 Review Runs。
+完整数据流见[系统架构](../docs/architecture/SYSTEM_ARCHITECTURE.zh.md)。
 
 ## 功能
 
@@ -29,7 +33,8 @@ GitHub integration 负责解析 GitHub 请求、准备 input 和执行 GitHub �
 - 轮询 Execution API provider，并记录执行进度、终态 workflow result 和终态 artifact 引用。
 - 让所属 integration 可以领取成功终态并执行 GitHub 发布。
 - 持久化 publication step，避免进程重启后重复已完成的远程副作用。
-- 为 Control Plane UI 提供脱敏的 run 查询。
+- 从外部 Langfuse 协调终态 run 的模型调用总量，但不改变 execution 或 publication 结果。
+- 为 Control Plane UI 提供脱敏的 run 查询，包括可选的 execution-statistics snapshot。
 
 ## Run 生命周期
 
@@ -55,46 +60,53 @@ run 主干和三条生命周期轴分别存放在不同的表中。`review_runs`
 | `publication_steps` | 可恢复的单个 connector 副作用               | `pending`、`running`、`uncertain`、`disconnected`、`succeeded`、`failed`、`terminal_failed`   |
 | `review_run_events` | 每条轴状态转换的只追加审计日志              | —                                                                                             |
 
+`preparations.status`：
+
 ```mermaid
 flowchart LR
-  subgraph preparation[preparations.status]
-    prepending[pending] -->|领取| preparing
-    preparing -->|input 被接受| submitted
-    preparing -->|重试| prepending
-    preparing -->|失败| prepfailed[failed]
-  end
-
-  subgraph runner[executions.status / execution.status]
-    pending -->|提交 input| queued
-    pending -->|准备失败| skipped
-    pending -->|提交结果未确认| uncertain
-    queued --> running --> succeeded
-    queued --> succeeded
-    queued --> failed
-    running --> failed
-    uncertain -->|重放被接受| queued
-    uncertain -->|重放被拒绝| failed
-  end
-
-  subgraph publication[publications.status]
-    pubpending[pending] --> publishing --> published
-    publishing -->|可重试失败| pubpending
-    publishing -->|终态失败| pubfailed[failed]
-    pubpending -->|执行结果不可发布| skipped
-    publishing -->|执行失败| skipped
-  end
-
-  subgraph steps[publication_steps.status]
-    steppending[pending] --> runningstep[running] --> stepsucceeded[succeeded]
-    runningstep --> stepfailed[failed]
-    stepfailed --> runningstep
-    stepfailed -->|达到上限且确认远端不存在| terminalfailed[terminal_failed]
-  end
-
-  preparedsubmitted[submitted] -.->|提交 input| pending
-  succeeded -.->|result 变为可领取| pubpending
-  publishing -.->|初始化副作用| steppending
+  prepending[pending] -->|领取| preparing
+  preparing -->|input 被接受| submitted
+  preparing -->|重试| prepending
+  preparing -->|失败| prepfailed[failed]
 ```
+
+`executions.status` / `execution.status`：
+
+```mermaid
+flowchart LR
+  pending -->|提交 input| queued
+  pending -->|准备失败| skipped
+  pending -->|提交结果未确认| uncertain
+  queued --> running --> succeeded
+  queued --> succeeded
+  queued --> failed
+  running --> failed
+  uncertain -->|重放被接受| queued
+  uncertain -->|重放被拒绝| failed
+```
+
+`publications.status`：
+
+```mermaid
+flowchart LR
+  pubpending[pending] --> publishing --> published
+  publishing -->|可重试失败| pubpending
+  publishing -->|终态失败| pubfailed[failed]
+  pubpending -->|执行结果不可发布| skipped
+  publishing -->|执行失败| skipped
+```
+
+`publication_steps.status`：
+
+```mermaid
+flowchart LR
+  steppending[pending] --> runningstep[running] --> stepsucceeded[succeeded]
+  runningstep --> stepfailed[failed]
+  stepfailed --> runningstep
+  stepfailed -->|达到上限且确认远端不存在| terminalfailed[terminal_failed]
+```
+
+四条轴仍由三个跨轴触发关系连接：preparation 进入 `submitted` 后提交 Execution input，execution 进入 `succeeded` 后 publication 变为可领取，publication 被领取后初始化 connector 副作用。这些是 orchestration trigger，不是同一张表内的状态迁移。
 
 `publication_steps.attempt_count` 就是该步骤的重试预算，而预算唯一计量的单位是「尝试」：一次尝试在被启动时就已消耗，因此中途死亡的 publisher 与一次失败的尝试消耗同样的额度。判断「还能不能再试一次」只以这个计数为准——不是失败次数，不是崩溃次数，也不是时间。系统不单独保存失败次数：步骤上的 `failed` 迁移本身，已经由 `failure_code`、`failure_message` 以及 run 的事件日志记录下来。`recovery_attempt_count` 则记录确认远端结果的失败次数：查询远端状态不会重复写入副作用，因此普通的远端结果确认不会推进 `attempt_count`。
 
@@ -102,13 +114,35 @@ flowchart LR
 
 ## Claim 和恢复
 
-Preparation、submission recovery、publication、publication step 提交和 run notice 都使用 claim token 隔离过期 owner。Input preparation 活跃期间，GitHub integration 会续租 preparation claim。过期的 preparation 会回到 `uncertain` 而不是 `pending`，因为租约过期并不能证明什么都没发生：下一次认领会先查明上一位持有者留下了什么，再决定是否重建。在有限重试预算耗尽后，过期失败会使 run 失败、跳过 publication，并创建持久化的 connector notice work。提交恢复预算耗尽则把 execution 从 `uncertain` 转为 `disconnected`，并创建 attention notice：结果仍未知，因此不能报告为失败。
+### Claim 租约
 
-过期处理按 run 隔离。如果某个 run 的持久化状态与过期结论自相矛盾——`preparing` 租约已过期，但 execution 早已离开 `pending`——那么结论一旦写入就会覆盖 Execution API provider 的真实结果。这类行会被回滚、标为 `disconnected` 并带上 `disconnect_reason`（当前为 `EXECUTION_ALREADY_ADVANCED`）、排一条 attention 通知，同时记录 `review_runs_preparation_expiry_blocked` 事件；后续每一轮协调都会跳过它，而不是反复重试一个必然失败的转换。其余 run 的协调不受影响。operator 有三种明确决策：`POST /v1/admin/runs/{run_id}/abandon` 给它收尾——准备阶段记为 `failed`（原因沿用它被停下的那个，即 `EXECUTION_ALREADY_ADVANCED`），仍在执行的 execution 一并置为 failed，publication 置为 skipped 并排队通知；`POST /v1/admin/runs/{run_id}/give-up` 则用于 disconnected 的 execution 或 publication：它表示不再等待结果，但绝不声称什么都没发生；而 `POST /v1/admin/runs/{run_id}/resume` 会把该行交回自动恢复并给予新的尝试预算。对 disconnected publication，resume 会把 publication 和停下的步骤放回 `pending`，清空旧 claim，并重置步骤的发布尝试预算与远端结果确认预算。正常 publisher 随后从队列领取该 run，并重新执行这些步骤；已经成功的步骤保持不变。每次 resume 都会记录 `PUBLICATION_RESUMED_BY_OPERATOR` 事件。三个端点对没有 `disconnected` 轴的 run 都返回 409，且都不幂等：第二次调用已找不到可处理的行，会以同样方式被拒绝。
+Preparation、submission recovery、publication、publication step 提交和 run notice 都使用 claim token 拒绝过期 owner 的写入。GitHub integration 会续租活跃的 preparation 和 publication claim。租约过期只会使工作进入可恢复状态，不能单独证明上一位 owner 是否完成了远端操作。
 
-`abandon` 记录的是该行被停下时的原因（目前恒为 `EXECUTION_ALREADY_ADVANCED`），而不是单独的放弃码。这是相对旧版 `PREPARATION_ABANDONED` 的**有意不兼容**变更：按该旧码检索的脚本或告警将不再命中，应改为按事件类型或 `publication`/`execution` 的收尾结果判断。原因是审计日志写出的每一个 reason 都必须是契约为该条边声明过的值，为同一条边再造第二个码，正是两者漂移的开始。
+### 自动恢复
 
-若要自动恢复 preparation，connector 会在 admission 时提交版本化、opaque 的 preparation input。Review Runs 只持久化并返还该 input 给拥有工作的一方，绝不解释其中任何 provider 专属字段。没有提供可重放 input 的 connector 仍可同步 prepare，但其过期工作不能由恢复 worker 领取。
+| 轴                   | 恢复行为                                                                                                    | 自动恢复停止条件                                                               |
+| -------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Preparation          | 过期的 `preparing` 行进入 `uncertain`。下一次 claim 会先确认上一位 owner 留下的状态，再决定是否重建 input。 | 重试预算耗尽，或 execution 已离开 `pending`。                                  |
+| Execution submission | 未确认的 submission 进入 `uncertain`，并在同一个 `run_id` 下重放。                                          | 重放预算耗尽，进入 `disconnected`。                                            |
+| Publication          | 远端结果未知的 step 由 connector 查询并完成 reconciliation。                                                | Reconciliation 在预算内无法得出结论，step 和 publication 进入 `disconnected`。 |
+
+Preparation 重试耗尽会使 run 失败、跳过 publication，并创建 connector notice。若 preparation 过期时 execution 已经推进，该 preparation 会以 `disconnect_reason=EXECUTION_ALREADY_ADVANCED` 进入 `disconnected`；后续过期处理会保留这条 parked row，并继续处理其他 run。Execution 和 publication 进入 disconnected 时会创建 attention work，因为它们的远端结果仍然未知。
+
+### Operator 决策
+
+| 决策                                   | 适用对象                                           | 结果                                                                                                                                                                                              |
+| -------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /v1/admin/runs/{run_id}/resume`  | 可以恢复的 disconnected 轴                         | Preparation 和 execution 回到 `uncertain` 并获得新的恢复预算。Publication 回到 `pending`；disconnected steps 回到 `pending`，并重置 attempt 和 reconciliation budget。已经成功的 steps 保持不变。 |
+| `POST /v1/admin/runs/{run_id}/give-up` | 任意 disconnected 轴                               | 停止等待，将 disconnected 轴收敛为 failed，并创建相应 notice。该决定不表示远端操作从未发生。                                                                                                      |
+| `POST /v1/admin/runs/{run_id}/abandon` | 因 `EXECUTION_ALREADY_ADVANCED` 停下的 preparation | 使用 `EXECUTION_ALREADY_ADVANCED` 使 preparation 失败，结束仍开放的下游轴，跳过 publication，并保留已经记录的终态 execution result。                                                              |
+
+Run 不满足适用条件时，这些操作返回 409。它们不幂等：第一次决策移动该轴后，同一请求将找不到可处理的 disconnected row。Resume publication 可能再次执行尚未完成的远端副作用；每次决策都会写入 event log。
+
+### 可重放 Preparation
+
+若要自动恢复 preparation，connector 会在 admission 时提交版本化、opaque 的 preparation input。Review Runs 持久化该值，并只把它返回给拥有这项工作的 connector。没有提供可重放 input 的 connector 仍可同步 prepare，但其过期工作不能由 recovery worker 领取。
+
+### 恢复身份与状态
 
 `run_id` 在 PostgreSQL 中全局唯一。`ingress_kind` 和 `ingress_key` 提供 connector 范围的入口幂等。`connector_id` 隔离读取、claim、publication 和 publication step。持久化操作日志同时包含 `connector_id` 和 `run_id`。
 
@@ -178,6 +212,8 @@ Execution statistics 使用两张关系表：`execution_statistics` 保存 recon
 Langfuse 返回 HTTP 429 时，已领取的 run 按 `Retry-After` 延期；缺少该响应头时使用 `EXECUTION_STATISTICS_RETRY_DELAY_MS`，且不会增加连续失败次数。如果这次延期已经到达 settlement deadline，reconciliation 会收敛为 `unavailable` 并记录 `LANGFUSE_RATE_LIMITED`，不会无限停留在 `pending`。
 
 ## 开发
+
+服务作为独立 Node.js 进程运行，默认监听 `8090`。PostgreSQL 凭据只提供给 Review Runs。
 
 使用 Node.js 24 和 pnpm 12。在本目录安装依赖并启动服务：
 

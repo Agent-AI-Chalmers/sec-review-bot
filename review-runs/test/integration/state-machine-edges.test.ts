@@ -659,9 +659,8 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     )
 
     // publication: disconnected -> pending when an operator returns parked work to the queue.
-    // The steps return to `uncertain` with a fresh reconciliation budget, so the axis follows
-    // them; the attempt budget stays spent, which is what keeps the side effect from running
-    // again.
+    // Disconnected steps return to `pending` with fresh attempt and reconciliation budgets;
+    // succeeded steps remain complete.
     const resumedPublication = await newPreparingRun()
     await pool.query(
       `UPDATE preparations SET status='submitted', claim_token=NULL, claimed_at=NULL,

@@ -67,8 +67,8 @@
   <path d="M 1240 130 L 1300 130 Q 1310 130 1310 140 L 1310 551 Q 1310 561 1320 561 L 1180 561" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
   <path d="M 790 326 L 790 440 Q 790 450 800 450 L 1020 450 Q 1030 450 1030 460 L 1030 515" class="edge" marker-end="url(#arrow)" />
   <path d="M 975 326 L 975 465 Q 975 475 985 475 L 1080 475 Q 1090 475 1090 485 L 1090 515" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 495 148 L 235 148 Q 220 148 220 163 L 220 545 Q 220 561 195 561" class="edge dashed" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 1160 166 L 1160 390 L 245 390 Q 230 390 230 405 L 230 543 Q 230 561 195 561" class="edge dashed" marker-end="url(#arrow)" />
+  <path d="M 495 148 L 210 148 Q 220 148 220 158 L 220 551 Q 220 561 230 561 L 195 561" class="edge dashed" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1160 166 L 1160 380 Q 1160 390 1170 390 L 220 390 Q 230 390 230 400 L 230 551 Q 230 561 240 561 L 195 561" class="edge dashed" marker-end="url(#arrow)" />
   <path d="M 790 326 L 790 390" class="edge dashed" />
   <path d="M 975 326 L 975 390" class="edge dashed" />
   <g id="operator" class="node external-node">
@@ -89,7 +89,7 @@
   <g id="langfuse" class="node observability-node">
     <rect x="45" y="515" width="150" height="92" rx="8" class="node-surface" />
     <path d="M 53 516 H 187" class="node-accent" />
-    <text x="120" y="552" class="node-label" text-anchor="middle">
+    <text x="120" y="557" class="node-label" text-anchor="middle">
       <tspan x="120" dy="0">Langfuse</tspan>
       <tspan x="120" dy="18">Observability</tspan>
     </text>
@@ -109,12 +109,12 @@
       <tspan x="360" dy="18">Integration</tspan>
     </text>
   </g>
-  <g id="control" class="node control-node">
+  <g id="review-runs" class="node control-node">
     <rect x="495" y="94" width="170" height="72" rx="8" class="node-surface" />
     <path d="M 503 95 H 657" class="node-accent" />
     <text x="580" y="126" class="node-label" text-anchor="middle">
-      <tspan x="580" dy="0">Review Control</tspan>
-      <tspan x="580" dy="18">Plane</tspan>
+      <tspan x="580" dy="0">Review Run</tspan>
+      <tspan x="580" dy="18">Coordination Service</tspan>
     </text>
   </g>
   <g id="gateway" class="node execution-node">

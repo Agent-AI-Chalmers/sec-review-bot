@@ -2,22 +2,26 @@
 
 [中文版](README.zh.md)
 
-Review Runs accepts review requests and durably coordinates their complete lifecycle across input preparation, execution, and result publication.
+Review Runs is the review-run coordination service. It accepts review requests and durably coordinates their complete lifecycle across input preparation, execution, and result publication.
 
 ## Where it fits
 
 ```mermaid
 flowchart LR
-  integration[GitHub integration] -->|admit and submit prepared input| control[Review Runs]
+  integration[GitHub integration] <-->|review admission, input handoff, and publication coordination| control[Review Run Coordination Service]
   control -->|submit and poll| execution[Execution API]
   control <-->|run and publication state| postgres[(PostgreSQL)]
-  integration <-->|claim and record publication| control
+  workers[Agent Workers] -.->|export LLM observations| langfuse[Langfuse]
+  control -->|read observations for statistics| langfuse
   ui[Control Plane UI] -->|queries| control
 ```
 
-GitHub integration owns GitHub request parsing, input preparation, and GitHub side effects. The Execution API provider, Temporal, and the worker own workflow execution. Review Runs coordinates those boundaries without parsing raw GitHub payloads, interpreting workflow-specific results, or executing agents. Provider identity is not part of Review Runs's dependency. See the [system architecture](../docs/architecture/SYSTEM_ARCHITECTURE.md) for the complete data flow.
+- **GitHub integration** owns GitHub request parsing, input preparation, and GitHub side effects.
+- **Review Run Coordination Service** owns admission, durable lifecycle state, recovery, execution observation, and publication coordination.
+- **Execution API provider, Temporal, and workers** own workflow execution.
+- **Langfuse** independently stores optional LLM observations; Review Runs reads them asynchronously to build statistics.
 
-The service runs as an independent Node.js process on port `8090` by default. PostgreSQL credentials are provided only to Review Runs.
+See the [system architecture](../docs/architecture/SYSTEM_ARCHITECTURE.md) for the complete data flow.
 
 ## What it does
 
@@ -56,46 +60,53 @@ The run trunk and the three lifecycle axes are separate tables. `review_runs` ho
 | `execution_statistics_groups` | Workflow-coordinate/agent/provider/model call and token totals      | —                                                                                             |
 | `review_run_events`           | Append-only audit log of transitions on every axis                  | —                                                                                             |
 
+`preparations.status`:
+
 ```mermaid
 flowchart LR
-  subgraph preparation[preparations.status]
-    prepending[pending] -->|claimed| preparing
-    preparing -->|input accepted| submitted
-    preparing -->|retry| prepending
-    preparing -->|failed| prepfailed[failed]
-  end
-
-  subgraph runner[executions.status / execution.status]
-    pending -->|input submitted| queued
-    pending -->|preparation failed| skipped
-    pending -->|submission unconfirmed| uncertain
-    queued --> running --> succeeded
-    queued --> succeeded
-    queued --> failed
-    running --> failed
-    uncertain -->|replay accepted| queued
-    uncertain -->|replay rejected| failed
-  end
-
-  subgraph publication[publications.status]
-    pubpending[pending] --> publishing --> published
-    publishing -->|retryable failure| pubpending
-    publishing -->|terminal failure| pubfailed[failed]
-    pubpending -->|execution not publishable| skipped
-    publishing -->|execution failed| skipped
-  end
-
-  subgraph steps[publication_steps.status]
-    steppending[pending] --> runningstep[running] --> stepsucceeded[succeeded]
-    runningstep --> stepfailed[failed]
-    stepfailed --> runningstep
-    stepfailed -->|limit reached, reconciled absent| terminalfailed[terminal_failed]
-  end
-
-  preparedsubmitted[submitted] -.->|submits input| pending
-  succeeded -.->|result becomes claimable| pubpending
-  publishing -.->|initializes side effects| steppending
+  prepending[pending] -->|claimed| preparing
+  preparing -->|input accepted| submitted
+  preparing -->|retry| prepending
+  preparing -->|failed| prepfailed[failed]
 ```
+
+`executions.status` / `execution.status`:
+
+```mermaid
+flowchart LR
+  pending -->|input submitted| queued
+  pending -->|preparation failed| skipped
+  pending -->|submission unconfirmed| uncertain
+  queued --> running --> succeeded
+  queued --> succeeded
+  queued --> failed
+  running --> failed
+  uncertain -->|replay accepted| queued
+  uncertain -->|replay rejected| failed
+```
+
+`publications.status`:
+
+```mermaid
+flowchart LR
+  pubpending[pending] --> publishing --> published
+  publishing -->|retryable failure| pubpending
+  publishing -->|terminal failure| pubfailed[failed]
+  pubpending -->|execution not publishable| skipped
+  publishing -->|execution failed| skipped
+```
+
+`publication_steps.status`:
+
+```mermaid
+flowchart LR
+  steppending[pending] --> runningstep[running] --> stepsucceeded[succeeded]
+  runningstep --> stepfailed[failed]
+  stepfailed --> runningstep
+  stepfailed -->|limit reached, reconciled absent| terminalfailed[terminal_failed]
+```
+
+The axes remain connected by three cross-axis triggers: a submitted preparation causes Execution input submission, a succeeded execution makes publication claimable, and claiming publication initializes its connector side effects. These are orchestration triggers, not status transitions within one table.
 
 `publication_steps.attempt_count` is the step's retry budget, and attempts are the only unit that budget counts: an attempt is spent when it starts, so a publisher that dies mid-effect consumes one exactly like a failed attempt does. That count — not failures, not crashes, not elapsed time — is the single source of truth for whether another attempt is allowed. Nothing stores a separate failure total; the `failed` transitions on the step are what `failure_code`, `failure_message`, and the run's event log already record. `recovery_attempt_count` is deliberately a different budget: a reconciliation reads the remote system, which does not spend permission to repeat the write, so it never advances `attempt_count`.
 
@@ -103,13 +114,35 @@ Reaching the attempt limit does not fail a step. Any attempt that started may ha
 
 ## Claims and recovery
 
-Preparation, submission recovery, publication, publication-step commits, and run notices use claim tokens to fence stale owners. While input preparation is active, GitHub integration renews its preparation claim. An expired preparation returns to `uncertain` rather than `pending`, because a lapsed lease is not evidence that nothing happened: the next claim establishes what the previous owner left behind before rebuilding anything. After the finite retry budget is exhausted, expiry fails the run, skips publication, and creates durable connector notice work. A submission recovery that exhausts its budget instead moves execution from `uncertain` to `disconnected` and queues an attention notice: the outcome is still unknown, so it is not reported as a failure.
+### Claim leases
 
-Expiry is isolated per run. A run whose persisted story contradicts an expiry conclusion — an expired `preparing` lease while its execution has already left `pending` — cannot be concluded without overwriting a real Execution result. Such a row becomes `disconnected` with a `disconnect_reason` (currently `EXECUTION_ALREADY_ADVANCED`), queues an attention notice, and is reported as `review_runs_preparation_expiry_blocked`; every later pass skips it instead of retrying a transition that must keep failing. Coordination keeps running for all other runs. An operator has two ways out, and both are explicit: `POST /v1/admin/runs/{run_id}/abandon` concludes the run rather than repairing it (preparation becomes `failed` with the reason it was parked under, `EXECUTION_ALREADY_ADVANCED`, an execution still in flight is failed, publication is skipped, and a notice is queued), `POST /v1/admin/runs/{run_id}/give-up` stops waiting for a disconnected execution or publication without asserting that nothing happened, while `POST /v1/admin/runs/{run_id}/resume` hands the row back as `uncertain` with a fresh attempt budget so recovery can re-establish what the previous owner left behind. Resuming serves both parked axes, and grants a fresh _reconciliation_ budget rather than a fresh side effect: a `disconnected` publication returns to `uncertain` with its parked steps back in `uncertain` and their reconciliation budget reset, so the connector looks at the remote system once more instead of re-running a write whose outcome nobody established. The attempt budget stays spent, so a resumed run never re-runs a step: the step is offered for reconciliation (`PUBLICATION_STEP_RETRY_EXHAUSTED`), and only the connector's answer — the effect exists, or it looked and it does not — ends it. All three endpoints answer 409 for a run with no disconnected axis, and none is idempotent: a second call finds no such row and is refused the same way.
+Preparation, submission recovery, publication, publication-step commits, and run notices use claim tokens to reject writes from stale owners. GitHub integration renews active preparation and publication claims. A lease expiry makes the work recoverable; it does not by itself establish whether the previous owner completed a remote operation.
 
-`abandon` records the reason the row was parked under — today always `EXECUTION_ALREADY_ADVANCED` — rather than a separate abandonment code. That is a deliberate, incompatible change from the earlier `PREPARATION_ABANDONED`: an operator script or alert keyed on that code will no longer match, and should key on the event or on `publication`/`execution` convergence instead. The reason is that every reason the audit log writes must be one the contract declares for the edge that wrote it, and inventing a second code for the same edge is how the two drifted apart.
+### Automatic recovery
 
-For automatic preparation recovery, a connector includes its versioned, opaque preparation input at admission. Review Runs persists and returns that input to the connector which owns the work, but never interprets provider-specific fields. A connector that does not provide replayable input can still prepare synchronously, but its expired work cannot be claimed by the recovery worker.
+| Axis                 | Recovery behavior                                                                                                                   | Stops automatically when                                                                              |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| Preparation          | An expired `preparing` row moves to `uncertain`. The next claim checks what the previous owner left behind before rebuilding input. | The retry budget is exhausted, or execution has already advanced beyond `pending`.                    |
+| Execution submission | An unconfirmed submission moves to `uncertain` and is replayed under the same `run_id`.                                             | The replay budget is exhausted, producing `disconnected`.                                             |
+| Publication          | A step whose remote outcome is unknown is reconciled against the connector.                                                         | Reconciliation cannot conclude within its budget, parking the step and publication as `disconnected`. |
+
+Preparation retry exhaustion fails the run, skips publication, and queues a connector notice. A preparation whose execution already advanced becomes `disconnected` with `disconnect_reason=EXECUTION_ALREADY_ADVANCED`; later expiry passes leave it parked while continuing to process other runs. Execution and publication disconnections queue attention work because their remote outcomes remain unknown.
+
+### Operator decisions
+
+| Decision                               | Eligible run                                       | Result                                                                                                                                                                                                                                 |
+| -------------------------------------- | -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /v1/admin/runs/{run_id}/resume`  | A resumable disconnected axis                      | Preparation and execution return to `uncertain` with fresh recovery budgets. Publication returns to `pending`; disconnected steps return to `pending` with fresh attempt and reconciliation budgets. Succeeded steps remain unchanged. |
+| `POST /v1/admin/runs/{run_id}/give-up` | Any disconnected axis                              | Stops waiting, concludes the disconnected axis as failed, and queues the applicable notice. It does not assert that the remote operation never happened.                                                                               |
+| `POST /v1/admin/runs/{run_id}/abandon` | Preparation parked by `EXECUTION_ALREADY_ADVANCED` | Fails preparation with `EXECUTION_ALREADY_ADVANCED`, concludes any open downstream axes, skips publication, and preserves an already-recorded terminal execution result.                                                               |
+
+These operations return 409 when the run is not eligible. They are not idempotent: after the first decision moves the axis, the same request no longer has a disconnected row to act on. Publication resume may issue an unfinished side effect again; every such decision is recorded in the event log.
+
+### Replayable preparation
+
+For automatic preparation recovery, a connector includes its versioned, opaque preparation input at admission. Review Runs persists that value and returns it only to the connector that owns the work. A connector without replayable input can prepare synchronously, but its expired work cannot be claimed by the recovery worker.
+
+### Recovery identity and state
 
 `run_id` is globally unique in PostgreSQL. `ingress_kind` and `ingress_key` provide connector-scoped ingress idempotency. `connector_id` fences reads, claims, publications, and publication steps. Durable-operation logs include both `connector_id` and `run_id`.
 
@@ -179,6 +212,8 @@ Execution statistics use two relational tables: `execution_statistics` owns reco
 Langfuse HTTP 429 responses defer the claimed run according to `Retry-After` (falling back to `EXECUTION_STATISTICS_RETRY_DELAY_MS`) without consuming the consecutive-failure budget. If that delay reaches the settlement deadline, reconciliation concludes as `unavailable` with failure code `LANGFUSE_RATE_LIMITED` instead of remaining pending indefinitely.
 
 ## Development
+
+The service runs as an independent Node.js process on port `8090` by default. PostgreSQL credentials are provided only to Review Runs.
 
 Use Node.js 24 and pnpm 12. Install dependencies and start the service from this directory:
 
