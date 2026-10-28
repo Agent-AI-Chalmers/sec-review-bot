@@ -12,8 +12,10 @@
     "build": "vite build && tsc -p tsconfig.server.build.json",
     "server": "node dist-server/server/index.js",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json",
-    "test": "node --import tsx --test test/*.test.ts",
-    "test:smoke": "node test/browser-smoke.mjs",
+    "test": "pnpm run test:node && pnpm run test:component",
+    "test:node": "node --import tsx --test test/*.test.ts",
+    "test:component": "vitest run --config vitest.config.ts",
+    "test:e2e": "playwright test",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
@@ -41,15 +43,20 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "1.64.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.8",
     "@types/node": "^24.19.2",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@types/tar-stream": "^3.1.5",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",
-    "playwright-core": "^1.64.1",
+    "jsdom": "^30.1.3",
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
-    "typescript-eslint": "^8.72.1"
+    "typescript-eslint": "^8.72.1",
+    "vitest": "^5.0.5"
   }
 }

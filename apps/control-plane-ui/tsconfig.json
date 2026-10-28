@@ -10,5 +10,14 @@
     "skipLibCheck": true,
     "exactOptionalPropertyTypes": true
   },
-  "include": ["browser", "shared", "scripts", "vite.config.ts"]
+  "include": [
+    "browser",
+    "shared",
+    "scripts",
+    "test/components",
+    "test/e2e",
+    "playwright.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ]
 }

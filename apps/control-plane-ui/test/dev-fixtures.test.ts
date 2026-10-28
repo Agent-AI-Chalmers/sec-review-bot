@@ -357,14 +357,14 @@ test('dev fixtures page the run list in the order their cursor describes', async
 })
 
 test('the unfiltered list does not lead with a row that satisfies a filter lookup', async () => {
-  // The browser smoke test opens "the first row" after selecting a filter, and waits for that
+  // The browser flow opens "the first row" after selecting a filter, and waits for that
   // row to look filtered. When the newest run already looks like the filter's result before
   // the filtered response arrives, the wait passes against the stale list and the test opens
   // a run the filter excluded - which is how a run with no publication start reached an
   // assertion about a published phase.
   //
-  // The smoke test now checks two columns instead of one, but the fixtures must not depend on
-  // that: the newest run stays outside the (workflow, publication) combination the smoke test
+  // The browser flow now checks two columns instead of one, but the fixtures must not depend on
+  // that: the newest run stays outside the (workflow, publication) combination the flow
   // filters for, so a one-column wait cannot pass early again.
   const fixture = await startFixtureServer()
   try {
