@@ -51,4 +51,7 @@ pnpm run server
 pnpm run lint
 pnpm run typecheck
 pnpm test
+pnpm run test:integration
 ```
+
+`pnpm test` runs the isolated unit and server tests. `pnpm run test:integration` exercises the PostgreSQL store against `TEST_DATABASE_URL` or `MEMORY_CATALOG_DATABASE_URL`; when neither is set, the launcher creates and removes a temporary local Docker PostgreSQL instance using the image configured in the repository `compose.yaml`.

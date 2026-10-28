@@ -264,6 +264,20 @@ jobs:
       github.event_name == 'merge_group' ||
       needs.changes.outputs.memory-catalog == 'true'
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: memory_catalog_test
+          POSTGRES_USER: memory_catalog
+          POSTGRES_PASSWORD: ci-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U memory_catalog -d memory_catalog_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
     defaults:
       run:
         working-directory: memory-catalog
@@ -294,6 +308,11 @@ jobs:
           pnpm run lint
           pnpm run typecheck
           pnpm test
+
+      - name: Integration test
+        env:
+          TEST_DATABASE_URL: postgresql://memory_catalog:ci-test-password@127.0.0.1:5432/memory_catalog_test
+        run: pnpm run test:integration
 
   github-integration:
     name: GitHub Integration
