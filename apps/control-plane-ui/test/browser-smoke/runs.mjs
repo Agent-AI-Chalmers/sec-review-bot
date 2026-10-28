@@ -259,6 +259,7 @@ export async function smokeRuns({
     await page.getByRole('link', { name: 'Back to runs' }).click()
     await page.getByRole('heading', { name: 'Runs' }).waitFor()
 
+    await page.getByRole('button', { name: 'Jump to run' }).click()
     const jump = page.getByLabel('Go to run ID')
     await jump.fill(knownRunId)
     await page.getByRole('button', { name: 'Go to run' }).click()
@@ -272,6 +273,7 @@ export async function smokeRuns({
     // Jumping to an unknown id from a detail page must not keep rendering the previous
     // run. React Router keeps this component mounted when only the id changes, so that
     // state has to be keyed by id or the 404 reads as a failed refresh of the old run.
+    await page.getByRole('button', { name: 'Jump to run' }).click()
     await jump.fill('00000000-0000-0000-0000-000000000000')
     await page.getByRole('button', { name: 'Go to run' }).click()
     await page.getByRole('heading', { name: 'Run not found' }).waitFor({

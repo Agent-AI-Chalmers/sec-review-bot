@@ -1,16 +1,25 @@
 import { existsSync } from 'node:fs'
+import { createServer as createNetServer } from 'node:net'
 import { setTimeout as delay } from 'node:timers/promises'
 import { chromium } from 'playwright-core'
 
 // Two modes:
-//   - Self-managed (default): starts the Vite dev server with `CONTROL_PLANE_UI_DEV_FIXTURES=1`
-//     and asserts the run-console invariants against the deterministic fixtures. No
-//     database, BFF, or access token required, so CI can run it unattended.
-//   - Attached: set CONTROL_PLANE_UI_BASE_URL (and CONTROL_PLANE_UI_ACCESS_TOKEN for an
-//     authenticated BFF) to smoke an already-running deployment instead.
-const FIXTURE_PORT = 5188
+//   - Self-managed (default): each job starts its own Vite dev server with
+//     `CONTROL_PLANE_UI_DEV_FIXTURES=1`, so browser state and fixture mutations
+//     cannot leak between jobs.
+//   - Attached: set CONTROL_PLANE_UI_BASE_URL (and CONTROL_PLANE_UI_ACCESS_TOKEN
+//     for an authenticated BFF) to smoke an already-running deployment. Attached
+//     jobs run one at a time because the deployment's state is shared.
+//
+// Jobs are split by viewport and feature. By default all six jobs run through a
+// small concurrency pool; `SMOKE_SHARD` selects one or more for a CI matrix:
+//   SMOKE_SHARD=desktop-memory
+//   SMOKE_SHARD=desktop
+//   SMOKE_SHARD=memory
+// `SMOKE_CONCURRENCY` overrides the pool size (default 3).
 const EXTERNAL_BASE = process.env.CONTROL_PLANE_UI_BASE_URL
 const TOKEN = process.env.CONTROL_PLANE_UI_ACCESS_TOKEN
+const SHARD = process.env.SMOKE_SHARD ?? 'all'
 
 // GitHub's ubuntu runner images preinstall Chrome; the apt package installs
 // `google-chrome-stable` with a `google-chrome` symlink.
@@ -77,27 +86,10 @@ const EXPECTED_HEADERS = [
   'Failure code'
 ]
 
-// Bind loopback explicitly. Vite's default host is `localhost`, which Node may
-// resolve to ::1 first, leaving 127.0.0.1 refused.
-let server
-let base = EXTERNAL_BASE
-if (base === undefined) {
-  process.env.CONTROL_PLANE_UI_DEV_FIXTURES = '1'
-  const { createServer } = await import('vite')
-  server = await createServer({
-    server: {
-      host: '127.0.0.1',
-      port: FIXTURE_PORT,
-      strictPort: true,
-      // The smoke suite deliberately injects a 401 to verify the sign-in fallback.
-      // Forwarding browser console errors makes that expected React boundary noisy.
-      forwardConsole: false
-    }
-  })
-  await server.listen()
-  base = `http://127.0.0.1:${FIXTURE_PORT}`
-  await waitForServer(`${base}/`)
-}
+const { smokeMemoryPreflight, smokeMemory } =
+  await import('./browser-smoke/memory.mjs')
+const { smokeRuns } = await import('./browser-smoke/runs.mjs')
+const { smokeViewer } = await import('./browser-smoke/viewer.mjs')
 
 async function waitForServer(url) {
   const deadline = Date.now() + 30_000
@@ -113,9 +105,6 @@ async function waitForServer(url) {
   }
 }
 
-// Poll a predicate until it is true, instead of sleeping a fixed amount and
-// hoping the UI has settled. The predicate runs immediately and then every
-// interval, so a condition that is already true costs nothing.
 async function waitUntil(
   predicate,
   message,
@@ -129,8 +118,6 @@ async function waitUntil(
   }
 }
 
-// Like waitUntil, but for a producer whose current value is wanted back: poll
-// until the predicate accepts the value, then return it.
 async function waitUntilValue(
   produce,
   predicate,
@@ -146,20 +133,58 @@ async function waitUntilValue(
   }
 }
 
-const { smokeMemoryPreflight, smokeMemory } =
-  await import('./browser-smoke/memory.mjs')
-const { smokeRuns } = await import('./browser-smoke/runs.mjs')
-const { smokeViewer } = await import('./browser-smoke/viewer.mjs')
+function freePort() {
+  return new Promise((resolve, reject) => {
+    const socket = createNetServer()
+    socket.once('error', reject)
+    socket.listen(0, '127.0.0.1', () => {
+      const address = socket.address()
+      const port =
+        typeof address === 'object' && address !== null ? address.port : 0
+      socket.close(() => resolve(port))
+    })
+  })
+}
 
-const browser = await chromium.launch({
-  executablePath: CHROME_PATH,
-  headless: true
-})
-try {
-  for (const [name, viewport] of [
-    ['desktop', { width: 1440, height: 900 }],
-    ['mobile', { width: 390, height: 844 }]
-  ]) {
+async function startFixtureServer() {
+  if (EXTERNAL_BASE !== undefined)
+    return { base: EXTERNAL_BASE, server: undefined }
+  process.env.CONTROL_PLANE_UI_DEV_FIXTURES = '1'
+  const { createServer } = await import('vite')
+  const port = await freePort()
+  const server = await createServer({
+    server: {
+      host: '127.0.0.1',
+      port,
+      strictPort: true,
+      // The smoke suite deliberately injects a 401 to verify the sign-in fallback.
+      // Forwarding browser console errors makes that expected React boundary noisy.
+      forwardConsole: false
+    }
+  })
+  await server.listen()
+  const base = `http://127.0.0.1:${port}`
+  await waitForServer(`${base}/`)
+  return { base, server }
+}
+
+async function runFilesError(page, base) {
+  await page.goto(`${base}/runs/fixture-artifact-load-error/files`, {
+    waitUntil: 'domcontentloaded'
+  })
+  await page
+    .getByText('The run files could not be opened.', { exact: true })
+    .waitFor()
+  await page.getByRole('link', { name: 'Download diagnostic bundle' }).waitFor()
+}
+
+async function runJob({ name, viewport, module }) {
+  const { base, server } = await startFixtureServer()
+  const browser = await chromium.launch({
+    executablePath: CHROME_PATH,
+    headless: true
+  })
+  try {
     const context = await browser.newContext({
       viewport,
       locale: 'en-US',
@@ -174,20 +199,8 @@ try {
     }
     await page.getByRole('heading', { name: 'Runs' }).waitFor()
 
-    await smokeMemoryPreflight({ name, context, base, server })
-    const hasRuns = await smokeRuns({
-      name,
-      viewport,
-      page,
-      browser,
-      base,
-      server,
-      waitUntil,
-      waitUntilValue,
-      contrastScript: CONTRAST,
-      expectedHeaders: EXPECTED_HEADERS
-    })
-    if (hasRuns) {
+    if (module === 'memory') {
+      await smokeMemoryPreflight({ name, context, base, server })
       await smokeMemory({
         name,
         viewport,
@@ -198,21 +211,72 @@ try {
         server,
         waitUntil
       })
-      await smokeViewer({ page })
-      await page.goto(`${base}/runs/fixture-artifact-load-error/files`, {
-        waitUntil: 'domcontentloaded'
+    } else if (module === 'runs') {
+      const hasRuns = await smokeRuns({
+        name,
+        viewport,
+        page,
+        browser,
+        base,
+        server,
+        waitUntil,
+        waitUntilValue,
+        contrastScript: CONTRAST,
+        expectedHeaders: EXPECTED_HEADERS
       })
-      await page
-        .getByText('The run files could not be opened.', { exact: true })
-        .waitFor()
-      await page
-        .getByRole('link', { name: 'Download diagnostic bundle' })
-        .waitFor()
-      console.log(`browser-smoke ${name}: ok (${base})`)
+      if (hasRuns) await runFilesError(page, base)
+    } else {
+      await smokeViewer({ page })
     }
-    await context.close()
+    console.log(`browser-smoke ${name}-${module}: ok (${base})`)
+  } finally {
+    await browser.close()
+    if (server !== undefined) await server.close()
   }
-} finally {
-  await browser.close()
-  if (server !== undefined) await server.close()
+}
+
+const VIEWPORTS = [
+  ['desktop', { width: 1440, height: 900 }],
+  ['mobile', { width: 390, height: 844 }]
+]
+const MODULES = ['memory', 'runs', 'viewer']
+
+function selectJobs() {
+  const jobs = []
+  for (const [name, viewport] of VIEWPORTS)
+    for (const module of MODULES) jobs.push({ name, viewport, module })
+  if (SHARD === 'all') return jobs
+  const [viewportPart, modulePart] = SHARD.split('-')
+  return jobs.filter((job) => {
+    if (modulePart === undefined)
+      return job.name === viewportPart || job.module === viewportPart
+    return job.name === viewportPart && job.module === modulePart
+  })
+}
+
+const jobs = selectJobs()
+if (jobs.length === 0) throw new Error(`Unknown SMOKE_SHARD: ${SHARD}`)
+const concurrency = Math.max(
+  1,
+  Number(process.env.SMOKE_CONCURRENCY ?? (EXTERNAL_BASE === undefined ? 3 : 1))
+)
+const failures = []
+let cursor = 0
+await Promise.all(
+  Array.from({ length: Math.min(concurrency, jobs.length) }, async () => {
+    for (;;) {
+      const job = jobs[cursor]
+      cursor += 1
+      if (job === undefined) return
+      try {
+        await runJob(job)
+      } catch (error) {
+        failures.push(error)
+      }
+    }
+  })
+)
+if (failures.length > 0) {
+  if (failures.length === 1) throw failures[0]
+  throw new AggregateError(failures, `${failures.length} smoke jobs failed`)
 }

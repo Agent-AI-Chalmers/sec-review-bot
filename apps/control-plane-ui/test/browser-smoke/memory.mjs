@@ -310,13 +310,13 @@ export async function smokeMemory({
     await zhPage.getByText('概览', { exact: true }).waitFor()
     await zhPage
       .getByRole('region', { name: '概览' })
-      .getByText('未产出观察记录', { exact: true })
+      .getByText('未产出观察项', { exact: true })
       .waitFor()
     await zhPage.getByText('修订历史', { exact: true }).click()
     await zhPage.getByText('列表', { exact: true }).click()
     await zhPage.locator('tr[aria-current="true"]').waitFor()
     await zhPage.getByText('修订历史', { exact: true }).waitFor()
-    await zhPage.getByText('观察记录', { exact: true }).click()
+    await zhPage.getByText('观察项', { exact: true }).click()
     const zhIncorporationLayout = await zhPage.evaluate(() => {
       const container = document.querySelector('.memory-incorporation')
       const label = container?.querySelector('span')
