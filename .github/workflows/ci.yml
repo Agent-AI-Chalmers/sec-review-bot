@@ -430,6 +430,54 @@ jobs:
           SMOKE_SHARD: ${{ matrix.shard }}
         run: pnpm run test:smoke
 
+  control-plane-ui-font-audit:
+    name: Control Plane UI font audit (${{ matrix.os }})
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.control-plane-ui == 'true'
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: apps/control-plane-ui
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - macos-latest
+          - windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: apps/control-plane-ui/package.json
+          check-latest: true
+          cache: pnpm
+          cache-dependency-path: apps/control-plane-ui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Render font screenshots
+        env:
+          FONT_AUDIT_OUT: ${{ runner.temp }}/font-audit
+        run: node test/font-audit.mjs
+
+      - name: Upload font screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: font-audit-${{ matrix.os }}
+          path: ${{ runner.temp }}/font-audit
+
   agents:
     name: Agents
     needs: changes
