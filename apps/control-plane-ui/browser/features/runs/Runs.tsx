@@ -56,6 +56,7 @@ import {
 import { LIST_RUN_QUERY_PARAMS } from '../../../shared/list-run-query-params.js'
 import { PlatformMark } from './PlatformMark.js'
 import { ICON_SIZE } from '../../shared/design.js'
+import { useNow } from '../../shared/useNow.js'
 import { RunJump } from './RunJump.js'
 
 const RANGE_MINUTES: Record<string, number> = {
@@ -145,6 +146,7 @@ export function Runs(): React.JSX.Element {
   // separately and a failure here never hides the list itself.
   const [blocked, setBlocked] = React.useState<ParkedRun[]>([])
   const [parkedOpen, setParkedOpen] = React.useState(false)
+  const now = useNow()
   React.useEffect(() => {
     let cancelled = false
     parkedRuns()
@@ -272,6 +274,12 @@ export function Runs(): React.JSX.Element {
     return number
   }, [cursorParents, cursor])
   const totalPages = data?.next_cursor != null ? page + 1 : page
+  const oldestWait = blocked.reduce<number | null>((oldest, block) => {
+    const parkedAt = Date.parse(block.parked_at)
+    if (!Number.isFinite(parkedAt)) return oldest
+    const wait = Math.max(0, now - parkedAt)
+    return oldest === null || wait > oldest ? wait : oldest
+  }, null)
   return (
     <Container size="lg" py="xl">
       <Group
@@ -309,6 +317,14 @@ export function Runs(): React.JSX.Element {
                 <Badge size="sm" color="orange" variant="light">
                   {blocked.length}
                 </Badge>
+                {oldestWait !== null && (
+                  <Text size="xs" c="dimmed">
+                    {t('parkedOldest').replace(
+                      '{duration}',
+                      formatDuration(oldestWait, t)
+                    )}
+                  </Text>
+                )}
               </Group>
               <Button
                 variant="light"
@@ -345,7 +361,7 @@ export function Runs(): React.JSX.Element {
                           {axisLabel(axis, t)}
                         </Text>
                         {runs.map((block) => {
-                          const wait = Date.now() - Date.parse(block.parked_at)
+                          const wait = now - Date.parse(block.parked_at)
                           return (
                             <UnstyledButton
                               key={block.run_id}

@@ -380,6 +380,7 @@ export const messages = {
     parkedRunsSummary: 'Parked runs need a decision before they can continue.',
     parkedRunsView: 'View',
     parkedAge: 'Waiting {duration}',
+    parkedOldest: 'Oldest wait {duration}',
     showDetails: 'Show details',
     hideDetails: 'Hide details',
     parkedRunsBody:
@@ -555,6 +556,7 @@ export const messages = {
     stateMachineLegendCurrent: 'Current',
     stateMachineFit: 'Fit',
     stateMachineActual: '100%',
+    stateMachineScrollHint: 'Scroll sideways to see the whole diagram.',
     stateDuration: 'In this state for {duration}',
     stateFinal: 'Final state',
     failureNoticeDelivered: 'The requester was told this run failed',
@@ -922,6 +924,7 @@ export const messages = {
     parkedRunsSummary: '已暂停的运行需要先做决定才能继续。',
     parkedRunsView: '查看',
     parkedAge: '已等待 {duration}',
+    parkedOldest: '最久已等待 {duration}',
     showDetails: '显示详情',
     hideDetails: '隐藏详情',
     parkedRunsBody:
@@ -1068,6 +1071,7 @@ export const messages = {
     stateMachineLegendCurrent: '当前',
     stateMachineFit: '适应宽度',
     stateMachineActual: '100%',
+    stateMachineScrollHint: '可横向滚动查看完整图。',
     stateDuration: '此状态停留 {duration}',
     stateFinal: '终态',
     failureNoticeDelivered: '已通知发起人这次运行失败',

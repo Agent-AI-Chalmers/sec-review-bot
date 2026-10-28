@@ -20,6 +20,7 @@ import {
   type Message
 } from '../../shared/i18n.js'
 import { axisLabel } from './status.js'
+import { useNow } from '../../shared/useNow.js'
 import {
   STATE_MACHINES,
   type StateAxis,
@@ -541,6 +542,28 @@ export function StateMachineDiagram({
 }
 
 const TRANSITIONS_PAGE_SIZE = 12
+const FIT_PREFERENCE_KEY = 'state-machine-fit'
+
+function initialFit(): boolean {
+  try {
+    return localStorage.getItem(FIT_PREFERENCE_KEY) !== 'actual'
+  } catch {
+    return true
+  }
+}
+
+function latestTransitionAxis(events: RunEvent[]): StateAxis {
+  let latest: RunEvent | undefined
+  for (const event of events) {
+    if (event.from_status === null) continue
+    if (
+      latest === undefined ||
+      Date.parse(event.occurred_at) > Date.parse(latest.occurred_at)
+    )
+      latest = event
+  }
+  return latest?.axis ?? 'execution'
+}
 
 function TransitionReason({ code }: { code: string }): React.JSX.Element {
   const t = useMessages()
@@ -579,9 +602,12 @@ export function RunTransitions({
   const t = useMessages()
   const { language } = useLanguage()
   const [opened, setOpened] = React.useState(false)
-  const [axis, setAxis] = React.useState<StateAxis>('execution')
+  const [axis, setAxis] = React.useState<StateAxis>(() =>
+    latestTransitionAxis(events)
+  )
   const [page, setPage] = React.useState(1)
-  const [fit, setFit] = React.useState(true)
+  const [fit, setFit] = React.useState(initialFit)
+  const now = useNow()
   const machines = STATE_MACHINES.filter((machine) =>
     (DIAGRAMMED_AXES as readonly string[]).includes(machine.axis)
   )
@@ -664,7 +690,7 @@ export function RunTransitions({
       return { kind: 'final' }
     return {
       kind: 'duration',
-      ms: Math.max(0, Date.now() - Date.parse(event.occurred_at))
+      ms: Math.max(0, now - Date.parse(event.occurred_at))
     }
   }
   return (
@@ -704,6 +730,11 @@ export function RunTransitions({
           <Text size="xs" c="dimmed">
             {t('stateMachineHint')}
           </Text>
+          {!fit && (
+            <Text size="xs" c="dimmed">
+              {t('stateMachineScrollHint')}
+            </Text>
+          )}
           <StateMachineDiagram
             machine={machine}
             run={run}
@@ -734,7 +765,18 @@ export function RunTransitions({
             <SegmentedControl
               size="xs"
               value={fit ? 'fit' : 'actual'}
-              onChange={(value) => setFit(value === 'fit')}
+              onChange={(value) => {
+                const next = value === 'fit'
+                setFit(next)
+                try {
+                  localStorage.setItem(
+                    FIT_PREFERENCE_KEY,
+                    next ? 'fit' : 'actual'
+                  )
+                } catch {
+                  // Storage can be unavailable in privacy-restricted contexts.
+                }
+              }}
               data={[
                 { value: 'fit', label: t('stateMachineFit') },
                 { value: 'actual', label: t('stateMachineActual') }

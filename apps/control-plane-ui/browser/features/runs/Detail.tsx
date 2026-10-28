@@ -46,6 +46,7 @@ import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { CopyAction } from '../../shared/CopyAction.js'
 import { LoadingState } from '../../shared/StateMessage.js'
 import { useRefresh } from '../../shared/refresh.js'
+import { useNow } from '../../shared/useNow.js'
 import { PlatformMark } from './PlatformMark.js'
 import {
   ExecutionStatus,
@@ -577,6 +578,7 @@ function ExplainedCode({
 export function Detail(): React.JSX.Element {
   const { language } = useLanguage()
   const t = useMessages()
+  const now = useNow()
   const { runId = '' } = useParams()
   const location = useLocation()
   // Restore the list's filters and cursor when the reader came from it. A reload or
@@ -922,7 +924,7 @@ export function Detail(): React.JSX.Element {
                         {t('parkedAge').replace(
                           '{duration}',
                           formatDuration(
-                            Math.max(0, Date.now() - Date.parse(parkedAt)),
+                            Math.max(0, now - Date.parse(parkedAt)),
                             t
                           )
                         )}
