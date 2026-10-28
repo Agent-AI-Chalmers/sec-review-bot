@@ -1036,11 +1036,10 @@ x-state-machines:
       # `disconnected` stops automation on a run whose own records contradict each other. What an
       # operator may do about it is the state's outgoing edges below, not part of its meaning.
       - { from: preparing, to: disconnected, reason: EXECUTION_ALREADY_ADVANCED, label: cannot be concluded automatically }
-      # The operator decisions off a disconnected preparation: hand it back, give up on the
-      # outcome, or abandon the run through the older blocked-run route. That route writes
-      # EXECUTION_ALREADY_ADVANCED, because the run it concludes is the contradicted one;
-      # PREPARATION_ABANDONED is kept declared because this state is reached from a stored row,
-      # and a reason a consumer sees must be one the contract names. Both end it as `failed`.
+      # Operator decisions can resume the preparation, give up on its outcome, or abandon the
+      # contradicted run. Abandon writes EXECUTION_ALREADY_ADVANCED. PREPARATION_ABANDONED remains
+      # declared because stored records may expose it, and every exposed reason must be named by
+      # the contract. Both failure edges end the preparation as `failed`.
       - { from: disconnected, to: uncertain, reason: PREPARATION_RESUMED_BY_OPERATOR, label: resumed by an operator }
       - { from: disconnected, to: failed, reason: PREPARATION_GIVEN_UP_BY_OPERATOR, label: given up by an operator }
       - { from: disconnected, to: failed, reason: EXECUTION_ALREADY_ADVANCED, label: abandoned by an operator }

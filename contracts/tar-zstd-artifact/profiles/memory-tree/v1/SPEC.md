@@ -16,7 +16,7 @@ A v1 memory tree artifact uses the restricted POSIX PAX [envelope v1](../../../e
 | Maximum total regular-file size | 256 MiB (`268,435,456` bytes) |
 | Maximum single regular-file size | 16 MiB (`16,777,216` bytes) |
 
-The single-file limit is deliberately below both aggregate limits. A memory tree is a collection of bounded Markdown resources; one file must not consume the compressed archive budget or dominate extraction memory.
+The single-file limit is deliberately below both aggregate limits. A memory tree is a collection of Markdown files subject to the limits above; one file must not consume the compressed archive budget or dominate extraction memory.
 
 Consumers must verify the compressed-byte size and digest before decompression, then enforce entry count and uncompressed limits while parsing. They must not extract an entry before validating its path, type, declared size, and metadata.
 

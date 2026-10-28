@@ -14,9 +14,7 @@ python3 .github/ci/validate-pr-title.py 'fix(scope): describe the change'
 
 ### Descriptions
 
-`validate-pr-description.py` validates the required pull request sections and compatibility
-checkboxes. The template lists all supported classifications, and exactly one must be selected.
-A breaking change must also explain what breaks and how callers or operators migrate.
+`validate-pr-description.py` validates the required pull request sections and compatibility checkboxes. The template lists all supported classifications, and exactly one must be selected. A breaking change must also explain what breaks and how callers or operators migrate.
 
 To validate a local Markdown file with the same entry point the workflow uses:
 

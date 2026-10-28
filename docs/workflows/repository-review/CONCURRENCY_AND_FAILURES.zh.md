@@ -52,6 +52,7 @@ App 提交的 runs、workflow fanout 和 worker activity 容量之间的系统�
 
 Discovery 会把仓库文件打成 chunks。Temporal 路径和 direct 路径都会按滑动窗口执行 discovery chunks。
 
+<!-- doc-default: AGENT_DISCOVERY_MAX_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
 并发上限来自 `AGENT_DISCOVERY_MAX_CONCURRENCY`，默认是 `1`。实际有效并发不会超过 chunk 数。
 
 在 Temporal 路径里，每个 discovery chunk 是一个 activity，会走 Temporal activity retry。retry 之后仍失败时，整个 discovery 失败。Discovery 不合成 partial completed result，因为缺一个 chunk 就意味着扫描覆盖不完整。
@@ -60,12 +61,14 @@ Discovery 会把仓库文件打成 chunks。Temporal 路径和 direct 路径都�
 
 Triage 在一个 activity 内部运行。batched triage 会按滑动窗口执行 batch drafts，然后进入全局 refinement / workbench state。
 
+<!-- doc-default: TRIAGE_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/triage/agent_passes.py -->
 当前 batch draft 并发上限是代码常量 `TRIAGE_MAX_BATCH_CONCURRENCY = 3`。这不是常规部署环境变量。Triage 的输出是全局 case set；某个 batch 失败时，整个 triage 失败。
 
 ### Case Processing
 
 Triage 后的每个 case 是独立审查单元。Repository review 会按滑动窗口执行 case workflows。
 
+<!-- doc-default: AGENT_CASE_PROCESSING_MAX_CONCURRENCY; source=agents/src/sec_review_agents/workflows/repository/workflow.py -->
 并发上限来自 `AGENT_CASE_PROCESSING_MAX_CONCURRENCY`，默认是 `1`。实际有效并发不会超过 case 数。
 
 单个 case workflow 内部也有并行。Temporal 时间线里，CVSS scoring 可以和 mitigation / verification 路径重叠执行：
@@ -78,6 +81,7 @@ Triage 后的每个 case 是独立审查单元。Repository review 会按滑动�
 
 Delivery planning 可以按滑动窗口执行 batch drafts，然后进入全局 refinement / workbench state。
 
+<!-- doc-default: DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/planning/agent_passes.py -->
 当前 batch draft 并发上限是代码常量 `DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY = 3`。这不是常规部署环境变量。Delivery planning 产出的是全局 delivery plan；某个 batch 失败时，整个 delivery planning 失败。
 
 ### Delivery Execution
@@ -88,6 +92,7 @@ Delivery execution 只消费 `disposition == "keep"` 的 case。
 
 `combined` delivery 会调用 patch-synthesis agent。多个 combined deliveries 会按滑动窗口执行。
 
+<!-- doc-default: REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/execution/input.py -->
 并发上限来自 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`，默认是 `4`。
 
 Temporal 路径里，combined delivery patch synthesis 是独立 activity；`single` delivery 仍然是轻量投影，不占 patch synthesis 并发窗口。Direct 路径仍然在本地进程内用滑动窗口执行。

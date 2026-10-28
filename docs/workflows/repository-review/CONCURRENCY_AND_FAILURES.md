@@ -2,7 +2,7 @@
 
 Language: English | [中文](CONCURRENCY_AND_FAILURES.zh.md)
 
-This document explains how `repository-review` uses in-stage concurrency, which knobs affect wall time, and how failures are bounded.
+This document explains how `repository-review` uses in-stage concurrency, which knobs affect wall time, and where failures stop or propagate.
 
 For system-wide concurrency between app-submitted runs, workflow fanout, and worker activity capacity, see [../CONCURRENCY_MODEL.md](../CONCURRENCY_MODEL.md). This document focuses on the repository review workflow after one repository run has been admitted.
 
@@ -50,6 +50,7 @@ With sliding windows, completed slots are filled immediately instead of waiting 
 
 Discovery splits repository files into chunks. Temporal and direct paths both execute discovery chunks with a sliding window.
 
+<!-- doc-default: AGENT_DISCOVERY_MAX_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
 The concurrency limit comes from `AGENT_DISCOVERY_MAX_CONCURRENCY`. The default is `1`. Effective concurrency never exceeds the number of chunks.
 
 In the Temporal path, each discovery chunk is an activity and uses Temporal activity retry. If a chunk still fails after retry, the whole discovery fails. Discovery does not produce a partial completed result because missing a chunk means scan coverage is incomplete.
@@ -58,12 +59,14 @@ In the Temporal path, each discovery chunk is an activity and uses Temporal acti
 
 Triage runs inside one activity. Batched triage executes batch drafts with a sliding window, then enters global refinement / workbench state.
 
+<!-- doc-default: TRIAGE_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/triage/agent_passes.py -->
 The current batch draft concurrency limit is the code constant `TRIAGE_MAX_BATCH_CONCURRENCY = 3`. This is not a normal deployment environment variable. Triage produces a global case set, so a failed batch fails the whole triage stage.
 
 ### Case Processing
 
 After triage, each case is an independent review unit. Repository review executes case workflows with a sliding window.
 
+<!-- doc-default: AGENT_CASE_PROCESSING_MAX_CONCURRENCY; source=agents/src/sec_review_agents/workflows/repository/workflow.py -->
 The concurrency limit comes from `AGENT_CASE_PROCESSING_MAX_CONCURRENCY`. The default is `1`. Effective concurrency never exceeds the number of cases.
 
 One case also has internal parallelism. In Temporal, CVSS scoring can run while the mitigation / verification path continues:
@@ -76,6 +79,7 @@ If a case still fails after activity retry, repository review records a blocked 
 
 Delivery planning can execute batch drafts with a sliding window, then enters global refinement / workbench state.
 
+<!-- doc-default: DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/planning/agent_passes.py -->
 The current batch draft concurrency limit is the code constant `DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY = 3`. This is not a normal deployment environment variable. Delivery planning produces a global delivery plan, so a failed batch fails the whole delivery planning stage.
 
 ### Delivery Execution
@@ -86,6 +90,7 @@ Delivery execution only consumes cases with `disposition == "keep"`.
 
 `combined` delivery calls the patch-synthesis agent. Multiple combined deliveries execute with a sliding window.
 
+<!-- doc-default: REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/execution/input.py -->
 The concurrency limit comes from `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`. The default is `4`.
 
 In the Temporal path, combined delivery patch synthesis is an independent activity. `single` delivery remains a lightweight projection and does not occupy the patch synthesis window. The direct path still executes locally with a sliding window.

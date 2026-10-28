@@ -2,6 +2,8 @@
 
 语言：[English](SPEC.md) | 中文
 
+本文是 [SPEC.md](SPEC.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 ## 封装
 
 v1 memory tree artifact 使用受限 POSIX PAX [envelope v1](../../../envelope/v1/SPEC.zh.md)。
@@ -16,7 +18,7 @@ v1 memory tree artifact 使用受限 POSIX PAX [envelope v1](../../../envelope/v
 | 最大 regular-file 总大小 | 256 MiB（`268,435,456` bytes） |
 | 最大单个 regular-file 大小 | 16 MiB（`16,777,216` bytes） |
 
-单文件限制有意低于两个总量限制。memory tree 是一组有界 Markdown 资源；单个文件不得耗尽压缩归档预算或主导解压内存。
+单文件限制有意低于两个总量限制。memory tree 中的 Markdown 文件受上述大小限制约束；单个文件不得耗尽压缩归档预算或主导解压内存。
 
 消费者必须在解压前校验压缩字节大小和摘要，并在解析时执行 entry 数量与解压大小限制。在验证路径、类型、声明大小和元数据之前，不得提取 entry。
 

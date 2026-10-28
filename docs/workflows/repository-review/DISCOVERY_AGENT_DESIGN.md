@@ -4,15 +4,15 @@ Language: English | [中文](DISCOVERY_AGENT_DESIGN.zh.md)
 
 ## Role
 
-Discovery is the screening stage of repository review. Its purpose is to surface security clues worth deeper investigation while keeping cost bounded and scan coverage explainable.
+Discovery is the screening stage of repository review. Its purpose is to surface security clues worth deeper investigation while controlling cost and keeping scan coverage explainable.
 
 This stage produces candidates, not vulnerability conclusions. A candidate should identify a concrete repository location, suspicious behavior, and initial evidence, but it may remain uncertain. Triage later decides whether to keep, suppress, or merge it, and analyzer confirms or rejects the issue using broader context.
 
-Discovery therefore does not classify `vulnerability_type` or CWE, merge cross-file root causes, or produce final reports. Nor does it ask one agent to explore and understand the entire repository freely. It performs repeatable screening over an explicit file scope and bounded local context.
+Discovery therefore does not classify `vulnerability_type` or CWE, merge cross-file root causes, or produce final reports. Nor does it ask one agent to explore and understand the entire repository freely. It performs repeatable screening over an explicit file scope and the local context assembled for that scope.
 
 ## Scan Scope
 
-Discovery focuses on files that may directly encode program behavior or a security boundary. Being readable as UTF-8 does not by itself make a file useful for initial screening. Scan scope has three distinct boundaries.
+Discovery focuses on files that may directly encode program behavior or a security boundary. Being readable as UTF-8 does not by itself make a file useful for initial screening. Scan scope has the following boundaries.
 
 ### `paths_ignore`
 
@@ -39,21 +39,23 @@ Scan results should let readers distinguish an intentional repository exclusion,
 
 ### Per-File Size Protection
 
+<!-- doc-default: AGENT_DISCOVERY_MAX_FILE_BYTES; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
 Before reading a file, discovery applies `AGENT_DISCOVERY_MAX_FILE_BYTES`, with a default of 256 KiB. This is a worker resource boundary for reading, decoding, and prompt construction, not a model context boundary; byte size has no stable conversion to tokens, so exceeding it does not mean the model necessarily could not accept the file.
 
+<!-- doc-default: AGENT_DISCOVERY_MAX_FILE_BYTES; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
 This limit belongs to the service environment rather than an individual review's scan scope. It is absent from the public `scan_scope` contract, so a caller cannot relax the worker safety boundary for one request. There is currently no evidence for changing the 256 KiB default; reconsider it only when a source file worth scanning is demonstrably excluded, using that concrete sample and its resource cost.
 
 ## Chunk Design
 
-There are two direct ways to organize discovery input.
+Discovery input supports these organization strategies.
 
 The `single-file` strategy gives each discovery agent one file. Its advantage is concentrated attention and a sharply defined code scope for every call. The tradeoff is that every file requires a separate model call and reloads the system prompt, output schema, and other fixed context. In a repository with many small files, that repeated overhead can materially increase cost. A single-file view also provides no local cross-file context by itself.
 
 The `batched` strategy groups several files into a chunk and gives each discovery agent one chunk. This amortizes fixed prompt cost and preserves some cross-file context. The corresponding risk is that larger chunks ask the model to attend to more material at once. Experiments also show that a long context can reduce security-clue recall even when the request remains below the maximum input limit.
 
-The current default is `single-file`, so each model call has a sharply bounded code scope and concentrated attention. `batched` remains available as a worker-side deployment setting through `AGENT_DISCOVERY_CHUNK_STRATEGY`; it is not selectable by a review request. When batching is enabled, the target for an ordinary chunk is one fifth of the selected model's measured context-window input limit, leaving explicit room between efficient batching and concentrated attention.
+The current default is `single-file`, so each model call focuses on one file. `batched` remains available as a worker-side deployment setting through `AGENT_DISCOVERY_CHUNK_STRATEGY`; it is not selectable by a review request. When batching is enabled, the target for an ordinary chunk is one fifth of the selected model's measured context-window input limit, leaving explicit room between efficient batching and concentrated attention.
 
-The design uses two token boundaries:
+Discovery applies an ordinary chunk target and a single-file hard limit:
 
 | Input shape | Boundary | Behavior |
 | --- | --- | --- |

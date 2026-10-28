@@ -2,6 +2,8 @@
 
 语言：[English](SPEC.md) | 中文
 
+本文是 [SPEC.md](SPEC.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 ## 范围
 
 本 contract 只定义项目自有 `application/tar+zstd` artifact 共享的表示。各 profile 自行定义允许的目录树、语义 metadata、规范顺序、资源限制和生产规则。

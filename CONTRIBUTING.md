@@ -1,5 +1,7 @@
 # Contributing
 
+Language: English | [中文](CONTRIBUTING.zh.md)
+
 Keep changes focused, preserve explicit ownership boundaries, and validate the packages and contracts that actually consume the change. This guide provides the repository-wide workflow; package and contract READMEs remain the source of truth for local details.
 
 ## Find The Owning Boundary
@@ -18,7 +20,7 @@ Do not infer ownership from directory size or document length. Runtime roles hav
 - Search for current callers, tests, generated consumers, repository scripts, and comments before treating a path as obsolete.
 - Keep the patch close to the owning boundary. Remove misleading compatibility and false indirection instead of wrapping them again.
 - Decide compatibility explicitly. A breaking change must identify affected callers, artifacts, persisted data, configuration, or operational behavior and provide a migration path.
-- Update documentation when responsibilities, setup, configuration, public behavior, or operational procedures change.
+- Update documentation when responsibilities, setup, configuration, public behavior, or operational procedures change. Follow the [documentation guide](docs/DOCUMENTATION_GUIDE.md) for durable wording and mutable-fact markers.
 - Do not hand-edit generated artifacts without changing their source and running the owning generator.
 
 ## Validate The Affected Areas
@@ -34,7 +36,7 @@ Run checks from every affected package, not only from the package where the firs
 | Execution Gateway | [`execution-gateway/README.md`](execution-gateway/README.md) | format, lint, typecheck, tests |
 | Memory Catalog Server | [`memory-catalog/README.md`](memory-catalog/README.md) | format, lint, typecheck, tests |
 | Repository scripts | [`scripts/README.md`](scripts/README.md) | Ruff, Black, compile checks, and focused entrypoint probes |
-| Documentation | [`docs/README.md`](docs/README.md) | link, wrapping, and translated-heading checks as applicable |
+| Documentation | [`docs/DOCUMENTATION_GUIDE.md`](docs/DOCUMENTATION_GUIDE.md) and [`docs/README.md`](docs/README.md) | link, wrapping, and translated-heading checks as applicable |
 
 For a contract change, run the affected family tool from `contracts/<family>/tools/`: regenerate projections, check that committed artifacts are fresh, and run formatting, lint, contract lint when present, typechecking, and tests. Then run the consuming package checks. See the [contracts change checklist](contracts/README.md#change-checklist).
 

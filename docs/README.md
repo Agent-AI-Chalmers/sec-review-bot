@@ -8,6 +8,8 @@ For a project overview, start with the repository [README](../README.md).
 
 ## Documentation Map
 
+- [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md): Repository-wide rules for durable wording, mutable facts, translations, and documentation review.
+
 ### architecture/
 
 - [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md): Logical runtime roles, current deployment boundaries, ownership, and the main review and asynchronous memory paths.

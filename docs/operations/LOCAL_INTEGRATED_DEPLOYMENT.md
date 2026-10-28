@@ -462,7 +462,7 @@ When running GitHub integration without Compose, use an address reachable by the
 GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 ```
 
-Each git and snapshot command is bounded by `GITHUB_INTEGRATION_GIT_TIMEOUT_MS` (default `600000`, i.e. 10 minutes) so a hung remote cannot stall input preparation indefinitely. Raise it for repositories whose cold clone legitimately takes longer.
+Each git and snapshot command has a `GITHUB_INTEGRATION_GIT_TIMEOUT_MS` timeout (default `600000`, i.e. 10 minutes) so a hung remote cannot stall input preparation indefinitely. Raise it for repositories whose cold clone legitimately takes longer.
 
 ## Why The Deployment Looks Like This
 

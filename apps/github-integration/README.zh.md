@@ -18,7 +18,11 @@ pnpm --dir review-runs install
 pnpm --dir apps/github-integration install
 ```
 
+<!-- doc-default: github-integration.node-runtime; source=apps/github-integration/package.json -->
+
 请使用 Node 24.x。
+
+<!-- doc-time-sensitive: node-active-lts-schedule; checked=2026-10-28; source=https://github.com/nodejs/Release#release-schedule -->
 
 > _Node 24 是当前 package 的 LTS 基线。[Node.js release schedule](https://github.com/nodejs/Release#release-schedule) 当前把 Node 26 的 Active LTS start 列为 2026-10-28；到那之后，可以评估把默认 runtime 切到 Node 26。_
 
@@ -205,7 +209,7 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 
 ## GitHub REST API 版本
 
-- 默认通过 `X-GitHub-Api-Version` 固定到 `2026-03-10`，避免落到即将移除的旧兼容路径。
+- 默认通过 `X-GitHub-Api-Version` 固定到 `2026-03-10`。
 - 可通过环境变量 `GITHUB_API_VERSION` 覆盖（例如在排查或灰度升级时）。
 - 版本说明文档：<https://docs.github.com/en/rest/about-the-rest-api/api-versions?apiVersion=2026-03-10>
 

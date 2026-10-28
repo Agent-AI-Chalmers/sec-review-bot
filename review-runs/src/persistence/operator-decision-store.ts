@@ -172,8 +172,8 @@ export class OperatorDecisionStore {
    *
    * - A disconnected execution replays its already-persisted input under the same run_id, so
    *   resuming it is safe and is the only automatic way to learn the outcome.
-   * - A disconnected publication re-claims the run; its steps keep their state, so no side
-   *   effect is repeated.
+   * - A disconnected publication returns to the normal claim queue. Its disconnected steps
+   *   receive fresh attempt and reconciliation budgets; succeeded steps remain complete.
    * - A disconnected preparation is resumable only while execution is still `pending`. That is
    *   the claim condition `claimNext` enforces: if execution moved on, a resumed row would sit in
    *   `uncertain` forever with no preparer able to take it - worse than staying parked, because a
@@ -233,10 +233,9 @@ export class OperatorDecisionStore {
   }
   /** Stop waiting for a disconnected run; see the three single-axis decisions below.
    *
-   * The distinction from `abandonBlockedPreparation` is deliberate and is the reason this exists
-   * as a separate operation: that one resolves a *contradiction* (preparation unfinished while
-   * execution finished), while this one accepts that an outcome is *unknowable* and stops
-   * waiting for it. Neither may claim the task never ran. */
+   * `abandonBlockedPreparation` concludes a preparation contradicted by execution state. This
+   * operation concludes an axis whose remote outcome remains unknown. Neither decision records
+   * that the task never ran. */
   async giveUpDisconnectedRun(
     runId: string,
     reason: string

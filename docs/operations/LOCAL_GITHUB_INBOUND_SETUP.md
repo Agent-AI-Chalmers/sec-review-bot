@@ -49,7 +49,7 @@ Common choices:
 
 ## Local Service Addresses
 
-The GitHub integration service provides two inbound endpoints by default:
+The GitHub integration service provides these inbound endpoints by default:
 
 ```text
 http://localhost:30000/api/webhook
@@ -105,16 +105,16 @@ If you already have a domain but no public inbound service, or if you do not wan
 2. Route a domain or subdomain to the local GitHub integration service.
 3. The GitHub App and GitHub Actions use that stable HTTPS address for their respective endpoints.
 
-Add two Published application routes to the Cloudflare Tunnel. Both routes use the same Hostname and Service but have different Paths:
+Add a Published application route for each endpoint. The routes use the same Hostname and Service but have different Paths:
 
 ```text
 Hostname: your-subdomain.example.com
 Service: http://localhost:30000
-Path 1: /api/webhook
-Path 2: /api/repository-review/dispatch
+Webhook Path: /api/webhook
+Repository Review Path: /api/repository-review/dispatch
 ```
 
-Do not append an endpoint path to Service. After configuration, the two public URLs are:
+Do not append an endpoint path to Service. After configuration, the public URLs are:
 
 ```text
 https://your-subdomain.example.com/api/webhook
@@ -133,7 +133,7 @@ Add one route, then repeat the process for the other route:
 
 ![Cloudflare add GitHub inbound route](../../assets/screenshots/cloudflare-add-github-inbound-route.png)
 
-When finished, the same tunnel should have two routes:
+When finished, the same tunnel should contain the configured routes:
 
 ![Cloudflare GitHub inbound routes](../../assets/screenshots/cloudflare-github-inbound-routes.png)
 

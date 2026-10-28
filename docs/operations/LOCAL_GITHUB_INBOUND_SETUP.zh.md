@@ -49,7 +49,7 @@ GitHub -> 公网 HTTPS URL -> 本地 http://localhost:30000/api/webhook
 
 ## 本地服务地址
 
-GitHub integration 默认提供两个入站 endpoint：
+GitHub integration 默认提供以下入站 endpoint：
 
 ```text
 http://localhost:30000/api/webhook
@@ -105,16 +105,16 @@ npx smee -u https://smee.io/xxxxxxxxxxxx -t http://localhost:30000/api/webhook
 2. 把某个域名或子域名路由到本地 GitHub integration 服务
 3. GitHub App 和 GitHub Actions 通过这个稳定的 HTTPS 地址访问各自的 endpoint
 
-在 Cloudflare Tunnel 中添加两条 Published application route。两条 route 使用相同的 Hostname 和 Service，只填写不同的 Path：
+在 Cloudflare Tunnel 中为每个 endpoint 添加一条 Published application route。这些 route 使用相同的 Hostname 和 Service，只填写不同的 Path：
 
 ```text
 Hostname: your-subdomain.example.com
 Service: http://localhost:30000
-Path 1: /api/webhook
-Path 2: /api/repository-review/dispatch
+Webhook Path: /api/webhook
+Repository Review Path: /api/repository-review/dispatch
 ```
 
-Service 中不要附加 endpoint 路径。配置完成后，两个公网地址分别是：
+Service 中不要附加 endpoint 路径。配置完成后的公网地址是：
 
 ```text
 https://your-subdomain.example.com/api/webhook
@@ -133,7 +133,7 @@ https://your-subdomain.example.com/api/repository-review/dispatch
 
 ![Cloudflare 添加 GitHub 入站 route](../../assets/screenshots/cloudflare-add-github-inbound-route.png)
 
-完成后，同一个 tunnel 下应当有两条 route：
+完成后，同一个 tunnel 下应当包含已配置的 route：
 
 ![Cloudflare GitHub 入站 routes](../../assets/screenshots/cloudflare-github-inbound-routes.png)
 

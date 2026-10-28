@@ -63,7 +63,7 @@ The online baseline is set by the **deployer** (`AGENT_DOCKER_NETWORK_MODE`, def
 
 These decisions matter, but they are **not** trust judgments. They are about how the environment is obtained and how the declaration is defined, not about how far each source is trusted. They are kept here so they are not confused with the trust model above.
 
-**Do not bake dependencies into the image.** The workspace image stays an "isolation host + generic engine"; it does not pre-install the reviewed repository's dependencies. The toolchain combinations (language × framework × repository) are unbounded, so prediction is guaranteed to fail — "install uv today, and what tomorrow?".
+**Do not bake dependencies into the image.** The workspace image stays an "isolation host + generic engine"; it does not pre-install the reviewed repository's dependencies. The toolchain combinations (language × framework × repository) cannot be enumerated in advance, so prediction is guaranteed to fail — "install uv today, and what tomorrow?".
 
 **Do not run the agent in CI.** A long-running agent runs in its own container, not in GitHub Actions. CI minutes are finite, and a single review with a cold install does not fit. (The *trust* model of hosted CI is reused — see "isolated" above; its *execution* model is not.)
 

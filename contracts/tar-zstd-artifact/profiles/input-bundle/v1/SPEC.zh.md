@@ -1,6 +1,8 @@
 # Input Bundle Artifact - v1
 
-[English](SPEC.md) | 中文
+语言：[English](SPEC.md) | 中文
+
+本文是 [SPEC.md](SPEC.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
 ## Envelope
 

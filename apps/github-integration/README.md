@@ -16,7 +16,11 @@ pnpm --dir review-runs install
 pnpm --dir apps/github-integration install
 ```
 
+<!-- doc-default: github-integration.node-runtime; source=apps/github-integration/package.json -->
+
 Use Node 24.x.
+
+<!-- doc-time-sensitive: node-active-lts-schedule; checked=2026-10-28; source=https://github.com/nodejs/Release#release-schedule -->
 
 > _Node 24 is the current LTS baseline for this package. The [Node.js release schedule](https://github.com/nodejs/Release#release-schedule) currently lists Node 26's Active LTS start as 2026-10-28; after that, this package can evaluate moving the default runtime to Node 26._
 
@@ -31,8 +35,7 @@ pnpm run build
 pnpm test
 ```
 
-`pnpm test` runs tests that do not require external services. The integration
-suite uses Review Runs test database for publisher boundary tests:
+`pnpm test` runs tests that do not require external services. The integration suite uses Review Runs test database for publisher boundary tests:
 
 ```bash
 TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
@@ -204,7 +207,7 @@ Additional notes:
 
 ## GitHub REST API Version
 
-- By default, `X-GitHub-Api-Version` is pinned to `2026-03-10` to avoid falling back to soon-to-be-removed compatibility paths.
+- By default, `X-GitHub-Api-Version` is pinned to `2026-03-10`.
 - Override it with `GITHUB_API_VERSION` when debugging or rolling out an API version change.
 - Version docs: <https://docs.github.com/en/rest/about-the-rest-api/api-versions?apiVersion=2026-03-10>
 

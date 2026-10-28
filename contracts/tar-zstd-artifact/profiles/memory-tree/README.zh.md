@@ -2,6 +2,8 @@
 
 语言：[English](README.md) | 中文
 
+本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+
 本 family 定义用于存储一棵已渲染 memory tree 的可移植、内容寻址归档。发布 tree 的生产者以及所有验证或解压该归档的服务共享此契约。
 
 其压缩与 tar 表示遵循共享的 [envelope v1](../../envelope/v1/SPEC.zh.md)；本目录定义该 envelope 内部的 memory-tree profile。

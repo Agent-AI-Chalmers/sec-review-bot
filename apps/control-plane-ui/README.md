@@ -1,5 +1,7 @@
 # Control Plane UI
 
+Language: English | [中文](README.zh.md)
+
 Internal web console for review runs and memory operations. The browser talks only to this application's same-origin server; the server holds upstream credentials and proxies explicit route allowlists.
 
 ## Local development
@@ -72,7 +74,7 @@ pnpm run build
 
 The production server requires `REVIEW_RUNS_READ_TOKEN` and `CONTROL_PLANE_UI_ACCESS_TOKEN`, and they answer different questions. The access token decides who may open the console: the browser exchanges it for an HTTP-only session cookie, and the token itself never reaches browser code or Vite variables. The read token is what the backend then uses to call Review Runs query routes on the signed-in user's behalf; it never leaves the server either. Keeping them separate means a console account and a read key can be issued, rotated, and revoked independently — a read-only consumer such as a dashboard holds only the read token and has no console access.
 
-The BFF also proxies terminal artifact downloads from private RustFS storage. It receives a dedicated `s3:GetObject` credential restricted to `sec-review/runs/*/artifacts/*`; the browser supplies only a run ID and never receives storage credentials or an object URI. Before responding to the browser, the BFF writes the object to a temporary file and verifies its size and SHA-256 digest against Review Runs metadata. Downloads are attachment-only, bounded by a storage idle timeout, and protected by the same HTTP-only session.
+The BFF also proxies terminal artifact downloads from private RustFS storage. It receives a dedicated `s3:GetObject` credential restricted to `sec-review/runs/*/artifacts/*`; the browser supplies only a run ID and never receives storage credentials or an object URI. Before responding to the browser, the BFF writes the object to a temporary file and verifies its size and SHA-256 digest against Review Runs metadata. Downloads are attachment-only, subject to a storage idle timeout, and protected by the same HTTP-only session.
 
 The server-side memory tree reader and builder implement the versioned [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.md). They remain outside the browser bundle; the BFF is responsible for validation, digest calculation, and canonical object keys.
 

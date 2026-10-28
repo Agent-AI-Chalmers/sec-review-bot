@@ -1,6 +1,6 @@
 # Review Runs API contract tools
 
-Language: English
+Language: English | [中文](README.zh.md)
 
 This package renders and checks every artifact derived from [this family's OpenAPI contract](../v1/openapi.yaml): the TypeScript projections and committed v1 JSON Schemas. It lives beside the contract it reads, so the tool that owns a projection is not the package the projection lands in.
 

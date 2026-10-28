@@ -20,7 +20,7 @@
 | `GET`  | `/v1/maintenance-control`              | 返回持久的自动 maintenance `enabled` 或 `paused` 状态。                                          |
 | `POST` | `/v1/maintenance-control/pause`        | 使用 operation 幂等与 generation compare-and-swap 暂停自动 maintenance。                         |
 | `POST` | `/v1/maintenance-control/resume`       | 使用 operation 幂等与 generation compare-and-swap 恢复自动 maintenance。                         |
-| `GET`  | `/v1/maintenance-input?limit=...`      | 返回有界 observations，以及 maintainer 必须基于的 active memory 状态。                           |
+| `GET`  | `/v1/maintenance-input?limit=...`      | 返回不超过 `limit` 条 observations，以及 maintainer 必须基于的 active memory 状态。              |
 | `POST` | `/v1/memory-tree/revisions`            | 通过幂等身份和 expected-active-revision compare-and-swap 创建 maintenance 或 operator revision。 |
 | `GET`  | `/v1/memory-tree`                      | 返回当前 memory tree 及其 revision。                                                             |
 | `POST` | `/v1/memory-tree/restore`              | 把 active pointer 移到已有 revision，不创建 revision。                                           |
@@ -29,7 +29,7 @@
 
 该服务独占自己的 PostgreSQL database 和 `schema_versions` ledger。默认集成部署将它与 Review Runs database 放在同一个 PostgreSQL 实例中，但两者是相互独立的 database。
 
-列表 cursor 是不透明且排他的。Extractions 和 observations 均按 `created_at`、`extraction_id` 降序排列，因此相同时间戳的记录也能稳定翻页。Maintenance-control 单例是持久状态，初始值为 generation `0` 的 `enabled`；Phase 1 只开放读取。
+列表 cursor 是不透明且排他的。Extractions 和 observations 均按 `created_at`、`extraction_id` 降序排列，因此相同时间戳的记录也能稳定翻页。Maintenance-control 单例是持久状态，初始值为 generation `0` 的 `enabled`；API 返回其当前状态，并通过 pause 与 resume operation 修改它。
 
 任何时刻只允许一个 maintainer 执行。Temporal 使用固定 workflow ID 和 `SKIP` schedule overlap policy 强制该约束，因此 catalog 不实现 batch lease 或并发 claim。
 

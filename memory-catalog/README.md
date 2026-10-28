@@ -18,7 +18,7 @@ Language: English | [中文](README.zh.md)
 | `GET`  | `/v1/maintenance-control`              | Return the durable `enabled` or `paused` automatic-maintenance state.                                     |
 | `POST` | `/v1/maintenance-control/pause`        | Idempotently pause automatic maintenance with generation compare-and-swap.                                |
 | `POST` | `/v1/maintenance-control/resume`       | Idempotently resume automatic maintenance with generation compare-and-swap.                               |
-| `GET`  | `/v1/maintenance-input?limit=...`      | Return bounded observations and the active memory state they must be maintained against.                  |
+| `GET`  | `/v1/maintenance-input?limit=...`      | Return up to `limit` observations and the active memory state they must be maintained against.            |
 | `POST` | `/v1/memory-tree/revisions`            | Create a maintenance or operator revision with idempotency and expected-active-revision compare-and-swap. |
 | `GET`  | `/v1/memory-tree`                      | Return the current memory tree and its revision.                                                          |
 | `POST` | `/v1/memory-tree/restore`              | Move the active pointer to an existing revision without creating a revision.                              |
@@ -27,7 +27,7 @@ Language: English | [中文](README.zh.md)
 
 The service owns its PostgreSQL database and its `schema_versions` ledger. The default integrated deployment places that database beside, but separate from, Review Runs database in the same PostgreSQL instance.
 
-Collection cursors are opaque and exclusive. Extractions and observations are ordered by `created_at` and then `extraction_id`, both descending, so records with equal timestamps remain stable across pages. The maintenance-control row is durable and initially records `enabled` with generation `0`; Phase 1 exposes it read-only.
+Collection cursors are opaque and exclusive. Extractions and observations are ordered by `created_at` and then `extraction_id`, both descending, so records with equal timestamps remain stable across pages. The maintenance-control row is durable and initially records `enabled` with generation `0`; the API returns its current state and changes it through the pause and resume operations.
 
 Only one maintainer may execute at a time. Temporal enforces that invariant with one fixed workflow ID and a schedule overlap policy of `SKIP`; the catalog therefore does not implement batch leases or concurrent claims.
 

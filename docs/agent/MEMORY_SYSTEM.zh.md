@@ -68,7 +68,7 @@ maintenance 会读取 extraction 产生的 observations，并把有用经验并�
 
 ## 生命周期
 
-主 agent 只读取维护后的 memory 视图，不直接写 memory。prompt 里只注入使用规则和有界的 `MEMORY.md` 启动索引；相关 topic 文件可以再按需通过普通 filesystem tools 读取。
+主 agent 只读取维护后的 memory 视图，不直接写 memory。prompt 里只注入使用规则和 `MEMORY.md` 启动索引；相关 topic 文件可以再按需通过普通 filesystem tools 读取。
 
 经验产出走异步链路，无论如何都不影响正常流程（指 review）。
 

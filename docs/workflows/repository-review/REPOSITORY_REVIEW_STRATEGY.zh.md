@@ -12,7 +12,7 @@
 
 ## Stage Model
 
-工作流按三段组织：
+工作流包含以下阶段：
 
 1. `scan / case formation`：`discovery -> triage`
 2. `per-case review`：对每个 retained `case` 执行 `analyzer / cvss-v4-scoring / mitigator / verifier`

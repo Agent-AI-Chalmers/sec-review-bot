@@ -10,7 +10,7 @@ Concurrency is controlled at three different layers:
 
 - App-submitted runs: each submitted run starts an independent Temporal workflow execution. Different runs can make progress at the same time.
 - Workflow fanout: a workflow may intentionally keep several child workflows or activities in flight, usually with a sliding window.
-- Worker activity capacity: a worker process can execute only a bounded number of activities at once.
+- Worker activity capacity: each worker process has a configured activity concurrency limit.
 
 These layers are related, but they are not the same knob.
 

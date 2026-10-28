@@ -139,13 +139,16 @@ def add_path(
     points: list[tuple[int, int]],
     *,
     bidirectional: bool = False,
+    dashed: bool = False,
+    arrow: bool = True,
 ) -> None:
     commands = rounded_path(points)
     attributes: dict[str, object] = {
         "d": commands,
-        "class_": "edge",
-        "marker_end": "url(#arrow)",
+        "class_": "edge dashed" if dashed else "edge",
     }
+    if arrow:
+        attributes["marker_end"] = "url(#arrow)"
     if bidirectional:
         attributes["marker_start"] = "url(#arrow)"
     element(parent, "path", **attributes)
@@ -239,11 +242,13 @@ def render(filename: str, labels: dict[str, str]) -> None:
       .execution-node .node-accent { stroke: #b85c38; }
       .memory-node .node-accent { stroke: #2f806a; }
       .storage-node .node-accent { stroke: #9a6a22; }
+      .observability-node .node-accent { stroke: #8a5a9e; }
       .store-icon { fill: #f5f1e9; stroke: #8b6b3f; stroke-width: 1.4; }
       .store-icon.no-fill { fill: none; }
       .object-icon { fill: #f5f1e9; stroke: #8b6b3f; stroke-width: 1.4; }
       .node-label { font-size: 16px; font-weight: 550; }
       .edge { fill: none; stroke: #94a3b8; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; opacity: 0.78; }
+      .edge.dashed { stroke-dasharray: 6 5; }
       .arrow-head { fill: #94a3b8; opacity: 0.78; }
     """
 
@@ -254,7 +259,7 @@ def render(filename: str, labels: dict[str, str]) -> None:
         x=20,
         y=24,
         width=200,
-        height=360,
+        height=626,
         rx=7,
         class_="group external",
     )
@@ -310,14 +315,46 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_path(
         root, [(975, 326), (975, 475), (1090, 475), (1090, 515)], bidirectional=True
     )
+    add_path(
+        root,
+        [(495, 148), (220, 148), (220, 561), (195, 561)],
+        bidirectional=True,
+        dashed=True,
+    )
+    add_path(
+        root,
+        [(1160, 166), (1160, 390), (230, 390), (230, 561), (195, 561)],
+        dashed=True,
+    )
+    add_path(root, [(790, 326), (790, 390)], dashed=True, arrow=False)
+    add_path(root, [(975, 326), (975, 390)], dashed=True, arrow=False)
 
     add_node(root, "operator", 45, 94, 150, 72, labels["operator"], "external-node")
     add_node(root, "github", 45, 254, 150, 72, "GitHub", "external-node")
+    add_node(
+        root,
+        "langfuse",
+        45,
+        515,
+        150,
+        92,
+        labels["langfuse"],
+        "observability-node",
+    )
     add_node(root, "ui", 280, 94, 160, 72, "Control Plane UI", "control-node")
     add_node(
         root, "integration", 280, 254, 160, 72, "GitHub\nIntegration", "control-node"
     )
-    add_node(root, "control", 495, 94, 170, 72, "Review Control\nPlane", "control-node")
+    add_node(
+        root,
+        "review-runs",
+        495,
+        94,
+        170,
+        72,
+        labels["review_runs"],
+        "control-node",
+    )
     add_node(root, "gateway", 710, 94, 160, 72, "Execution\nGateway", "execution-node")
     add_node(root, "temporal", 895, 94, 160, 72, "Temporal Server", "execution-node")
     add_node(
@@ -373,11 +410,13 @@ render(
     "runtime-topology.svg",
     {
         "title": "Sec Review Bot runtime topology",
-        "description": "External systems connect to runtime services, with persistence infrastructure beneath the services.",
+        "description": "External systems connect to repository-owned runtime services, with persistence infrastructure below and independently deployed Langfuse observability alongside them.",
         "external": "External",
         "runtime": "Runtime services",
         "persistence": "Persistence infrastructure",
         "operator": "Operator\nbrowser",
+        "langfuse": "Langfuse\nObservability",
+        "review_runs": "Review Run\nCoordination Service",
         "storage": "Object Storage",
     },
 )
@@ -386,11 +425,13 @@ render(
     "runtime-topology.zh.svg",
     {
         "title": "Sec Review Bot 运行拓扑",
-        "description": "外部系统连接运行服务，持久化设施位于运行服务下方。",
+        "description": "外部系统连接本仓库负责的运行服务，持久化设施位于下方，独立部署的 Langfuse 可观测性服务位于部署边界之外。",
         "external": "外部",
         "runtime": "运行服务",
         "persistence": "持久化设施",
         "operator": "运维人员\n浏览器",
+        "langfuse": "Langfuse\n可观测性",
+        "review_runs": "Review Run\n协调服务",
         "storage": "对象存储",
     },
 )

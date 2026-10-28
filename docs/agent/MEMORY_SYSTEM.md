@@ -66,7 +66,7 @@ Maintenance reads observations produced by extraction and folds useful experienc
 
 ## Lifecycle
 
-Main agents only read the maintained memory view and do not write memory directly. The prompt includes only the usage rule and a bounded `MEMORY.md` startup index; relevant topic files can then be read on demand through normal filesystem tools.
+Main agents only read the maintained memory view and do not write memory directly. The prompt includes only the usage rule and the `MEMORY.md` startup index; relevant topic files can then be read on demand through normal filesystem tools.
 
 Experience production runs through an asynchronous path and does not affect the normal flow, meaning the review itself.
 
