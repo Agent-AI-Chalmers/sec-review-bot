@@ -15,6 +15,7 @@ import {
 import { logout } from './session-api.js'
 import { useLanguage, useMessages } from '../shared/i18n.js'
 import { mantineTheme } from './theme.js'
+import { ICON_SIZE } from '../shared/design.js'
 
 export type Theme = 'light' | 'dark'
 export type RefreshInterval = 5000 | 15000 | 30000 | 60000
@@ -163,7 +164,7 @@ export function PreferenceControls({
               color="gray"
               aria-label={t('language')}
             >
-              <IconLanguage size={19} stroke={1.8} />
+              <IconLanguage size={ICON_SIZE.lg} stroke={1.8} />
             </ActionIcon>
           </Tooltip>
         </Menu.Target>
@@ -191,9 +192,9 @@ export function PreferenceControls({
           onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
         >
           {theme === 'light' ? (
-            <IconMoon size={19} stroke={1.8} />
+            <IconMoon size={ICON_SIZE.lg} stroke={1.8} />
           ) : (
-            <IconSun size={19} stroke={1.8} />
+            <IconSun size={ICON_SIZE.lg} stroke={1.8} />
           )}
         </ActionIcon>
       </Tooltip>
@@ -206,7 +207,7 @@ export function PreferenceControls({
             loading={signingOut}
             onClick={signOut}
           >
-            <IconLogout size={19} stroke={1.8} />
+            <IconLogout size={ICON_SIZE.lg} stroke={1.8} />
           </ActionIcon>
         </Tooltip>
       )}

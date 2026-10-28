@@ -10,6 +10,7 @@ import {
 import { FileWorkspace } from '../workspace/FileWorkspace.js'
 import { ResourceLoadError } from '../../shared/ResourceLoadError.js'
 import { useMessages } from '../../shared/i18n.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 export function MemoryFilesContent({
   revision,
@@ -62,7 +63,7 @@ export function MemoryFilesContent({
             size="lg"
             aria-label={t('openFullPage')}
           >
-            <IconExternalLink size={18} />
+            <IconExternalLink size={ICON_SIZE.lg} />
           </ActionIcon>
         </Tooltip>
       )}
@@ -75,7 +76,7 @@ export function MemoryFilesContent({
           size="lg"
           aria-label={t('downloadMemoryTree')}
         >
-          <IconDownload size={18} />
+          <IconDownload size={ICON_SIZE.lg} />
         </ActionIcon>
       </Tooltip>
     </Group>
@@ -92,7 +93,7 @@ export function MemoryFilesContent({
               href={`/api/memory/revisions/${revision}/artifact`}
               download
               variant="default"
-              leftSection={<IconDownload size={16} />}
+              leftSection={<IconDownload size={ICON_SIZE.md} />}
             >
               {t('downloadMemoryTree')}
             </Button>

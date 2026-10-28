@@ -26,6 +26,7 @@ import { login } from './session-api.js'
 import { useMessages } from '../shared/i18n.js'
 import { PreferenceControls } from './preferences.js'
 import { failureReason } from '../shared/format.js'
+import { ICON_SIZE } from '../shared/design.js'
 
 const Runs = React.lazy(async () => ({
   default: (await import('../features/runs/Runs.js')).Runs
@@ -175,7 +176,7 @@ export function App(): React.JSX.Element {
                   size="compact-sm"
                   className="primary-nav-link"
                   aria-label={t('runs')}
-                  leftSection={<IconListDetails size={16} />}
+                  leftSection={<IconListDetails size={ICON_SIZE.md} />}
                 >
                   <span className="primary-nav-label">{t('runs')}</span>
                 </Button>
@@ -186,7 +187,7 @@ export function App(): React.JSX.Element {
                   size="compact-sm"
                   className="primary-nav-link"
                   aria-label={t('memory')}
-                  leftSection={<IconBrain size={16} />}
+                  leftSection={<IconBrain size={ICON_SIZE.md} />}
                 >
                   <span className="primary-nav-label">{t('memory')}</span>
                 </Button>
@@ -197,7 +198,7 @@ export function App(): React.JSX.Element {
                   size="compact-sm"
                   className="primary-nav-link"
                   aria-label={t('viewerNav')}
-                  leftSection={<IconFileText size={16} />}
+                  leftSection={<IconFileText size={ICON_SIZE.md} />}
                 >
                   <span className="primary-nav-label">{t('viewerNav')}</span>
                 </Button>
@@ -231,7 +232,7 @@ export function App(): React.JSX.Element {
                       variant="filled"
                       size={36}
                     >
-                      <IconArrowRight size={16} />
+                      <IconArrowRight size={ICON_SIZE.md} />
                     </ActionIcon>
                   </Group>
                 </form>

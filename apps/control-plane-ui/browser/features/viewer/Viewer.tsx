@@ -18,6 +18,7 @@ import {
   TranscriptTimeline,
   type TranscriptEvent
 } from '../transcript/TranscriptViewer.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 function messageRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
@@ -113,7 +114,7 @@ export function Viewer(): React.JSX.Element {
                 <Button
                   {...props}
                   variant="default"
-                  leftSection={<IconUpload size={16} />}
+                  leftSection={<IconUpload size={ICON_SIZE.md} />}
                 >
                   {t('uploadFile')}
                 </Button>
@@ -126,7 +127,7 @@ export function Viewer(): React.JSX.Element {
             )}
           </Group>
           <Button
-            leftSection={<IconPlayerPlay size={16} />}
+            leftSection={<IconPlayerPlay size={ICON_SIZE.md} />}
             disabled={!input.trim()}
             onClick={() => render()}
           >

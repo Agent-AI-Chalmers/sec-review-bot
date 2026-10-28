@@ -27,7 +27,7 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--space-3);
   color: inherit;
   font-size: 15px;
   font-weight: 700;
@@ -40,7 +40,7 @@
   content: '';
   width: 22px;
   height: 22px;
-  border-radius: 7px;
+  border-radius: var(--radius-panel);
   background: linear-gradient(
     135deg,
     var(--brand),

@@ -82,6 +82,21 @@
   inherits: true;
   initial-value: #dc2626;
 }
+@property --status-complete-soft {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #ebfbee;
+}
+@property --status-failed-soft {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #fff5f5;
+}
+@property --surface-overlay {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgb(255 255 255 / 96%);
+}
 
 :root {
   /* Mantine derives this from `mantineTheme` (see theme.ts), which is the single
@@ -126,6 +141,21 @@
   --status-active: #2563eb;
   --status-complete: #15803d;
   --status-failed: #dc2626;
+  --status-complete-soft: #ebfbee;
+  --status-failed-soft: #fff5f5;
+  --surface-overlay: rgb(255 255 255 / 96%);
+  /* Small shared geometry. Feature styles compose these instead of repeating
+     the same pixel values; the spacing scale is deliberately 2px at the low end
+     so dense control rows stay tight. */
+  --radius-panel: 6px;
+  --radius-pill: 999px;
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-7: 32px;
 }
 
 [data-theme='dark'] {
@@ -143,6 +173,9 @@
   --status-active: #60a5fa;
   --status-complete: #4ade80;
   --status-failed: #f87171;
+  --status-complete-soft: rgb(34 55 43 / 48%);
+  --status-failed-soft: rgb(70 35 35 / 30%);
+  --surface-overlay: rgb(38 34 32 / 96%);
 }
 
 body {
@@ -168,7 +201,7 @@ body {
   width: min(100%, 560px);
   padding: var(--mantine-spacing-xl);
   border: 1px solid var(--mantine-color-default-border);
-  border-radius: 6px;
+  border-radius: var(--radius-panel);
   background: var(--surface-raised);
   box-shadow: var(--shadow-sm);
 }
@@ -198,7 +231,10 @@ body {
     --shadow-color var(--theme-transition) var(--theme-ease),
     --status-active var(--theme-transition) var(--theme-ease),
     --status-complete var(--theme-transition) var(--theme-ease),
-    --status-failed var(--theme-transition) var(--theme-ease);
+    --status-failed var(--theme-transition) var(--theme-ease),
+    --status-complete-soft var(--theme-transition) var(--theme-ease),
+    --status-failed-soft var(--theme-transition) var(--theme-ease),
+    --surface-overlay var(--theme-transition) var(--theme-ease);
 }
 
 .visually-hidden {
@@ -215,5 +251,5 @@ body {
 
 .mantine-Paper-root form {
   display: grid;
-  gap: 16px;
+  gap: var(--space-5);
 }

@@ -1,3 +1,7 @@
+/* Breakpoint scale: 600 compact, 700 rail/workspace, 760 tablet.
+   New queries should stay on this scale; the rail's JS query reads
+   BREAKPOINTS.rail from shared/design.ts. */
+
 /* Reduced motion */
 
 @media (prefers-reduced-motion: reduce) {
@@ -52,7 +56,7 @@
 
   .statistics-section .mantine-Table-td,
   .statistics-section .mantine-Table-th {
-    padding-inline: 8px;
+    padding-inline: var(--space-3);
   }
 
   .statistics-unit > summary {
@@ -69,7 +73,7 @@
   }
 
   .statistics-stage-body {
-    padding-left: 12px;
+    padding-left: var(--space-4);
   }
 
   .brand {
@@ -122,7 +126,7 @@
   .delivery-main {
     align-items: flex-start;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-2);
   }
 }
 
@@ -198,7 +202,7 @@
   }
 
   .transcript-timeline {
-    padding-left: 18px;
+    padding-left: var(--space-5);
   }
 
   .transcript-layout {
@@ -210,7 +214,7 @@
   }
 
   .transcript-message-body {
-    padding: 10px;
+    padding: var(--space-3);
   }
 
   .transcript-toolbar {

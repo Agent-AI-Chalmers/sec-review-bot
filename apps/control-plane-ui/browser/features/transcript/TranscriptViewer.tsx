@@ -44,6 +44,8 @@ import {
 import { ResourceLoadError } from '../../shared/ResourceLoadError.js'
 import { useMessages } from '../../shared/i18n.js'
 import { LatestRequestGuard } from '../../shared/latest-request.js'
+import { BREAKPOINTS, ICON_SIZE } from '../../shared/design.js'
+import { LoadingState } from '../../shared/StateMessage.js'
 import {
   normalizeTranscript,
   type ToolCallView,
@@ -159,7 +161,11 @@ function CopyButton({ value }: { value: string }): React.JSX.Element {
   return (
     <Tooltip label={copied ? t('copied') : t('copy')}>
       <ActionIcon variant="subtle" color="gray" onClick={() => void copy()}>
-        {copied ? <IconCheck size={15} /> : <IconCopy size={15} />}
+        {copied ? (
+          <IconCheck size={ICON_SIZE.sm} />
+        ) : (
+          <IconCopy size={ICON_SIZE.sm} />
+        )}
       </ActionIcon>
     </Tooltip>
   )
@@ -178,30 +184,30 @@ function rolePresentation(role: TranscriptRole): {
   if (role === 'system')
     return {
       color: 'gray',
-      icon: <IconSettings size={17} />,
+      icon: <IconSettings size={ICON_SIZE.md} />,
       key: 'transcriptSystem'
     }
   if (role === 'human')
     return {
       color: 'orange',
-      icon: <IconUser size={17} />,
+      icon: <IconUser size={ICON_SIZE.md} />,
       key: 'transcriptHuman'
     }
   if (role === 'assistant')
     return {
       color: 'blue',
-      icon: <IconRobot size={17} />,
+      icon: <IconRobot size={ICON_SIZE.md} />,
       key: 'transcriptAssistant'
     }
   if (role === 'tool')
     return {
       color: 'green',
-      icon: <IconTool size={17} />,
+      icon: <IconTool size={ICON_SIZE.md} />,
       key: 'transcriptTool'
     }
   return {
     color: 'gray',
-    icon: <IconSettings size={17} />,
+    icon: <IconSettings size={ICON_SIZE.md} />,
     key: 'transcriptUnknown'
   }
 }
@@ -240,9 +246,9 @@ function Section({
           color="gray"
           leftSection={
             opened ? (
-              <IconChevronDown size={15} />
+              <IconChevronDown size={ICON_SIZE.sm} />
             ) : (
-              <IconChevronRight size={15} />
+              <IconChevronRight size={ICON_SIZE.sm} />
             )
           }
           onClick={() => setOpened((current) => !current)}
@@ -394,7 +400,7 @@ function ToolCall({
     <Paper withBorder p="sm" className="transcript-tool-call">
       <Group justify="space-between" mb="xs">
         <Group gap="xs">
-          <IconTool size={16} />
+          <IconTool size={ICON_SIZE.md} />
           <Text fw={600} size="sm">
             <HighlightText value={call.name} query={query} />
           </Text>
@@ -403,7 +409,7 @@ function ToolCall({
           <Button
             variant="subtle"
             size="compact-xs"
-            leftSection={<IconArrowDown size={14} />}
+            leftSection={<IconArrowDown size={ICON_SIZE.sm} />}
             onClick={jump}
           >
             {t('transcriptJumpResult')}
@@ -472,7 +478,10 @@ function TranscriptMessage({
           <Group gap={6} className="transcript-token-metrics">
             {message.usage.total !== undefined && (
               <Tooltip label={message.usage.total.toLocaleString()}>
-                <Badge variant="outline" leftSection={<IconCpu size={12} />}>
+                <Badge
+                  variant="outline"
+                  leftSection={<IconCpu size={ICON_SIZE.xs} />}
+                >
                   {formatTokens(message.usage.total)}
                 </Badge>
               </Tooltip>
@@ -495,7 +504,10 @@ function TranscriptMessage({
               </Badge>
             )}
             {message.usage.reasoning !== undefined && (
-              <Badge variant="outline" leftSection={<IconBrain size={12} />}>
+              <Badge
+                variant="outline"
+                leftSection={<IconBrain size={ICON_SIZE.xs} />}
+              >
                 {message.usage.reasoning}
               </Badge>
             )}
@@ -512,7 +524,7 @@ function TranscriptMessage({
               <Button
                 variant="subtle"
                 size="compact-xs"
-                leftSection={<IconArrowUp size={14} />}
+                leftSection={<IconArrowUp size={ICON_SIZE.sm} />}
                 onClick={jumpToCall}
               >
                 {t('transcriptJumpCall')}
@@ -526,7 +538,7 @@ function TranscriptMessage({
             title={t('transcriptReasoning')}
             value={message.reasoning}
             force={force}
-            icon={<IconBrain size={15} />}
+            icon={<IconBrain size={ICON_SIZE.sm} />}
           >
             <div className="memory-markdown memory-markdown-full">
               <HighlightedMarkdown query={query}>
@@ -914,9 +926,13 @@ export function TranscriptTimeline({
 }): React.JSX.Element {
   const t = useMessages()
   const timelineId = React.useId()
-  const narrowTranscript = useMediaQuery('(max-width: 700px)', false, {
-    getInitialValueInEffect: false
-  })
+  const narrowTranscript = useMediaQuery(
+    `(max-width: ${BREAKPOINTS.rail}px)`,
+    false,
+    {
+      getInitialValueInEffect: false
+    }
+  )
   const document = React.useMemo(() => normalizeTranscript(events), [events])
   const [query, setQuery] = React.useState('')
   const [roles, setRoles] = React.useState<TranscriptRole[]>(ROLES)
@@ -991,7 +1007,7 @@ export function TranscriptTimeline({
           </Stack>
           <Group gap="xs" wrap="wrap">
             <TextInput
-              leftSection={<IconSearch size={15} />}
+              leftSection={<IconSearch size={ICON_SIZE.sm} />}
               placeholder={t('transcriptSearch')}
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
@@ -1066,7 +1082,7 @@ export function TranscriptViewer({
               target="_blank"
               rel="noreferrer"
               variant="default"
-              leftSection={<IconExternalLink size={16} />}
+              leftSection={<IconExternalLink size={ICON_SIZE.md} />}
             >
               {t('openFullPage')}
             </Button>
@@ -1075,7 +1091,7 @@ export function TranscriptViewer({
               href={target.downloadHref}
               download
               variant="default"
-              leftSection={<IconDownload size={16} />}
+              leftSection={<IconDownload size={ICON_SIZE.md} />}
             >
               {t('downloadOriginal')}
             </Button>
@@ -1123,6 +1139,6 @@ export function TranscriptContent({
         <ResourceLoadError message={t('transcriptLoadFailed')} />
       </div>
     )
-  if (loading) return <Text c="dimmed">{t('loading')}</Text>
+  if (loading) return <LoadingState message={t('loading')} />
   return <TranscriptTimeline events={events} />
 }

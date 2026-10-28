@@ -27,6 +27,7 @@ import {
 
 import { formatBytes } from '../../shared/format.js'
 import { useMessages } from '../../shared/i18n.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 const CodeEditor = React.lazy(async () => ({
   default: (await import('./CodeEditor.js')).CodeEditor
@@ -130,11 +131,11 @@ function FileTreeItem({
           onClick={() => setOpened((current) => !current)}
         >
           {opened ? (
-            <IconChevronDown size={14} />
+            <IconChevronDown size={ICON_SIZE.sm} />
           ) : (
-            <IconChevronRight size={14} />
+            <IconChevronRight size={ICON_SIZE.sm} />
           )}
-          <IconFolder size={16} />
+          <IconFolder size={ICON_SIZE.md} />
           <span>{node.name}</span>
         </UnstyledButton>
         <Collapse expanded={opened}>
@@ -162,9 +163,9 @@ function FileTreeItem({
       onClick={() => onSelect(node.path!)}
     >
       {node.name.endsWith('.md') ? (
-        <IconFileText size={16} />
+        <IconFileText size={ICON_SIZE.md} />
       ) : (
-        <IconFile size={16} />
+        <IconFile size={ICON_SIZE.md} />
       )}
       <span>{node.name}</span>
       {fileMarkers[node.path] && (
@@ -335,7 +336,7 @@ export function FileWorkspace({
                     aria-label={t('newFile')}
                     onClick={() => openOperation('new')}
                   >
-                    <IconPlus size={16} />
+                    <IconPlus size={ICON_SIZE.md} />
                   </ActionIcon>
                 </Tooltip>
                 <Tooltip label={t('renameFile')}>
@@ -345,7 +346,7 @@ export function FileWorkspace({
                     disabled={!selectedFile}
                     onClick={() => openOperation('rename')}
                   >
-                    <IconPencil size={16} />
+                    <IconPencil size={ICON_SIZE.md} />
                   </ActionIcon>
                 </Tooltip>
                 <Tooltip label={t('deleteFile')}>
@@ -356,7 +357,7 @@ export function FileWorkspace({
                     disabled={Object.keys(files).length <= 1}
                     onClick={() => setDeleteOpen(true)}
                   >
-                    <IconTrash size={16} />
+                    <IconTrash size={ICON_SIZE.md} />
                   </ActionIcon>
                 </Tooltip>
               </Group>

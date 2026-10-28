@@ -4,6 +4,7 @@ import { IconArrowsDiff, IconEye, IconHistory } from '@tabler/icons-react'
 
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import type { components } from './api-types.generated.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 export type RevisionGraphItem = components['schemas']['MemoryTreeRevision']
 
@@ -330,7 +331,7 @@ export function RevisionGraph({
               <Button
                 size="xs"
                 variant="subtle"
-                leftSection={<IconEye size={14} />}
+                leftSection={<IconEye size={ICON_SIZE.sm} />}
                 onClick={() => onViewFiles(selected.revision)}
               >
                 {t('tree')}
@@ -338,7 +339,7 @@ export function RevisionGraph({
               <Button
                 size="xs"
                 variant="subtle"
-                leftSection={<IconArrowsDiff size={14} />}
+                leftSection={<IconArrowsDiff size={ICON_SIZE.sm} />}
                 onClick={() => onCompare(selected)}
               >
                 {t('compareWithPredecessor')}
@@ -347,7 +348,7 @@ export function RevisionGraph({
                 <Button
                   size="xs"
                   variant="subtle"
-                  leftSection={<IconEye size={14} />}
+                  leftSection={<IconEye size={ICON_SIZE.sm} />}
                   onClick={() => onViewProcess(selected.revision)}
                 >
                   {t('process')}
@@ -356,14 +357,14 @@ export function RevisionGraph({
               {activeRevision !== undefined &&
               selected.revision === activeRevision ? (
                 <div className="memory-current-action memory-current-indicator">
-                  <IconHistory size={14} />
+                  <IconHistory size={ICON_SIZE.sm} />
                   {t('alreadyCurrent')}
                 </div>
               ) : allowSetCurrent ? (
                 <Button
                   size="xs"
                   variant="subtle"
-                  leftSection={<IconHistory size={14} />}
+                  leftSection={<IconHistory size={ICON_SIZE.sm} />}
                   className="memory-current-action"
                   onClick={() => onSetCurrent(selected.revision)}
                 >

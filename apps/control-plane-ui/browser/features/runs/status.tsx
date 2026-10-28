@@ -8,6 +8,7 @@ import {
 } from '@tabler/icons-react'
 import { type ArtifactStorage, type Run } from './api.js'
 import { useMessages } from '../../shared/i18n.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 export type PublicationStepStatus =
   | 'pending'
@@ -121,11 +122,11 @@ export function PublicationStatus({
 }
 
 export function statusBullet(tone: StatusTone): React.ReactNode {
-  if (tone === 'active') return <IconPlayerPlay size={14} />
-  if (tone === 'complete') return <IconCheck size={14} />
-  if (tone === 'failed') return <IconAlertTriangle size={14} />
-  if (tone === 'neutral') return <IconMinus size={14} />
-  return <IconClock size={14} />
+  if (tone === 'active') return <IconPlayerPlay size={ICON_SIZE.sm} />
+  if (tone === 'complete') return <IconCheck size={ICON_SIZE.sm} />
+  if (tone === 'failed') return <IconAlertTriangle size={ICON_SIZE.sm} />
+  if (tone === 'neutral') return <IconMinus size={ICON_SIZE.sm} />
+  return <IconClock size={ICON_SIZE.sm} />
 }
 
 export function publicationStatusLabel(

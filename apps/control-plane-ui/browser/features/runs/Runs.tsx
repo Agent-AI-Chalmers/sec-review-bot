@@ -33,6 +33,7 @@ import {
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { CopyAction } from '../../shared/CopyAction.js'
 import { RefreshControls, useRefresh } from '../../shared/refresh.js'
+import { EmptyState, LoadingState } from '../../shared/StateMessage.js'
 import {
   EXECUTION_STATUSES,
   ExecutionStatus,
@@ -53,6 +54,7 @@ import {
 } from './format.js'
 import { LIST_RUN_QUERY_PARAMS } from '../../../shared/list-run-query-params.js'
 import { PlatformMark } from './PlatformMark.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 const RANGE_MINUTES: Record<string, number> = {
   '1h': 60,
@@ -256,7 +258,7 @@ export function Runs(): React.JSX.Element {
           variant="light"
           mb="md"
           title={t('parkedRunsTitle')}
-          icon={<IconAlertTriangle size={18} />}
+          icon={<IconAlertTriangle size={ICON_SIZE.lg} />}
           data-testid="parked-runs"
           // A standing queue, not a transient fault: `role="alert"` belongs to the refresh
           // error below, and Mantine's Alert would otherwise claim that role and be the first
@@ -380,7 +382,7 @@ export function Runs(): React.JSX.Element {
             </NativeSelect>
             <Button
               variant={search.has('range') ? 'light' : 'subtle'}
-              leftSection={<IconAdjustmentsHorizontal size={16} />}
+              leftSection={<IconAdjustmentsHorizontal size={ICON_SIZE.md} />}
               rightSection={
                 <IconChevronDown
                   size={14}
@@ -414,16 +416,18 @@ export function Runs(): React.JSX.Element {
         </Collapse>
       </Box>
       {data === undefined ? (
-        <p>{t('loadingRuns')}</p>
+        <LoadingState message={t('loadingRuns')} />
       ) : data.runs.length === 0 ? (
-        <Stack align="center" gap="xs" py="xl">
-          <IconInbox
-            size={40}
-            stroke={1.2}
-            style={{ color: 'var(--mantine-color-dimmed)' }}
-          />
-          <Text c="dimmed">{t('emptyRuns')}</Text>
-        </Stack>
+        <EmptyState
+          message={t('emptyRuns')}
+          icon={
+            <IconInbox
+              size={40}
+              stroke={1.2}
+              style={{ color: 'var(--mantine-color-dimmed)' }}
+            />
+          }
+        />
       ) : (
         <>
           <Paper withBorder radius="sm" className="table-wrap">

@@ -43,6 +43,7 @@ import { RunFilesViewer } from './RunFilesViewer.js'
 import { ExecutionStatistics } from './ExecutionStatistics.js'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { CopyAction } from '../../shared/CopyAction.js'
+import { LoadingState } from '../../shared/StateMessage.js'
 import { useRefresh } from '../../shared/refresh.js'
 import { PlatformMark } from './PlatformMark.js'
 import {
@@ -79,6 +80,7 @@ import {
   workflowLabel,
   abandonFailureMessageKey
 } from './format.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 interface Step {
   step_key: string
@@ -149,9 +151,9 @@ function Artifact({
               >
                 <code>{expanded ? hex : abbreviateDigest(hex)}</code>
                 {expanded ? (
-                  <IconChevronUp size={14} />
+                  <IconChevronUp size={ICON_SIZE.sm} />
                 ) : (
-                  <IconChevronDown size={14} />
+                  <IconChevronDown size={ICON_SIZE.sm} />
                 )}
               </button>
               <CopyAction
@@ -166,7 +168,7 @@ function Artifact({
               className="artifact-actions"
               variant="default"
               size="xs"
-              leftSection={<IconFiles size={14} />}
+              leftSection={<IconFiles size={ICON_SIZE.sm} />}
               onClick={() => setFilesOpen(true)}
             >
               {t('viewRunFiles')}
@@ -688,7 +690,7 @@ export function Detail(): React.JSX.Element {
             to={backTo}
             variant="subtle"
             px={0}
-            leftSection={<IconArrowLeft size={16} />}
+            leftSection={<IconArrowLeft size={ICON_SIZE.md} />}
           >
             {t('back')}
           </Button>
@@ -723,13 +725,13 @@ export function Detail(): React.JSX.Element {
         to={backTo}
         variant="subtle"
         px={0}
-        leftSection={<IconArrowLeft size={16} />}
+        leftSection={<IconArrowLeft size={ICON_SIZE.md} />}
         mb="lg"
       >
         {t('back')}
       </Button>
       {run === undefined ? (
-        <p>{t('loadingRun')}</p>
+        <LoadingState message={t('loadingRun')} />
       ) : (
         <>
           <div className="run-heading">
@@ -866,7 +868,7 @@ export function Detail(): React.JSX.Element {
                 variant="light"
                 radius="sm"
                 p="lg"
-                icon={<IconAlertTriangle size={22} />}
+                icon={<IconAlertTriangle size={ICON_SIZE.xl} />}
                 title={t(
                   parkedAxis === 'preparation'
                     ? 'blockedRunTitle'
@@ -961,7 +963,7 @@ export function Detail(): React.JSX.Element {
                           unknowable outcome is given up on. */}
                       {run.preparation.status === 'disconnected' ? (
                         <Button
-                          color="orange"
+                          color="red"
                           variant="filled"
                           size="xs"
                           onClick={() => setAbandoning(true)}
@@ -972,7 +974,7 @@ export function Detail(): React.JSX.Element {
                         </Button>
                       ) : (
                         <Button
-                          color="orange"
+                          color="red"
                           variant="filled"
                           size="xs"
                           onClick={() => setGivingUp(true)}
@@ -1015,7 +1017,7 @@ export function Detail(): React.JSX.Element {
                 className="run-progress-timeline"
               >
                 <Timeline.Item
-                  bullet={<IconClock size={14} />}
+                  bullet={<IconClock size={ICON_SIZE.sm} />}
                   title={t('created')}
                 >
                   <Text c="dimmed" size="sm">

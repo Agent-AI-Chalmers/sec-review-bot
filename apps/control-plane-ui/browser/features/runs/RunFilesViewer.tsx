@@ -18,7 +18,9 @@ import {
 } from '../../shared/api-client.js'
 import { FileWorkspace } from '../workspace/FileWorkspace.js'
 import { ResourceLoadError } from '../../shared/ResourceLoadError.js'
+import { LoadingState } from '../../shared/StateMessage.js'
 import { useMessages } from '../../shared/i18n.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 interface RunFilesResponse {
   files: Record<string, string>
@@ -84,7 +86,7 @@ export function RunFilesContent({
               href={`/api/runs/${encodeURIComponent(runId)}/artifact`}
               download
               variant="default"
-              leftSection={<IconDownload size={16} />}
+              leftSection={<IconDownload size={ICON_SIZE.md} />}
             >
               {t('downloadDiagnosticBundle')}
             </Button>
@@ -95,7 +97,7 @@ export function RunFilesContent({
 
   return (
     <>
-      {!selectedFile && <Text c="dimmed">{t('loading')}</Text>}
+      {!selectedFile && <LoadingState message={t('loading')} />}
       {selectedFile && (
         <FileWorkspace
           files={files}
@@ -114,7 +116,7 @@ export function RunFilesContent({
                     variant="default"
                     size="lg"
                   >
-                    <IconExternalLink size={18} />
+                    <IconExternalLink size={ICON_SIZE.lg} />
                   </ActionIcon>
                 </Tooltip>
               )}
@@ -126,7 +128,7 @@ export function RunFilesContent({
                   variant="default"
                   size="lg"
                 >
-                  <IconDownload size={18} />
+                  <IconDownload size={ICON_SIZE.lg} />
                 </ActionIcon>
               </Tooltip>
             </Group>

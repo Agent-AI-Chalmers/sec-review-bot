@@ -5,6 +5,7 @@ import { IconCheck, IconChevronDown, IconRefresh } from '@tabler/icons-react'
 import { formatDate, useLanguage, useMessages } from './i18n.js'
 import { usePreferences } from '../app/preferences.js'
 import { RefreshQueue } from './refresh-queue.js'
+import { ICON_SIZE } from './design.js'
 
 export interface RefreshState {
   refresh: () => Promise<void>
@@ -83,7 +84,7 @@ export function RefreshControls({
         <Button.Group>
           <Button
             variant="default"
-            leftSection={<IconRefresh size={16} />}
+            leftSection={<IconRefresh size={ICON_SIZE.md} />}
             loading={refreshing}
             onClick={() => void refresh()}
           >
@@ -100,7 +101,7 @@ export function RefreshControls({
                   <Text size="xs" c="dimmed">
                     {intervalLabel(refreshInterval)}
                   </Text>
-                  <IconChevronDown size={14} />
+                  <IconChevronDown size={ICON_SIZE.sm} />
                 </Group>
               </Button>
             </Menu.Target>
@@ -113,7 +114,9 @@ export function RefreshControls({
                 <Menu.Item
                   key={ms}
                   rightSection={
-                    refreshInterval === ms ? <IconCheck size={14} /> : null
+                    refreshInterval === ms ? (
+                      <IconCheck size={ICON_SIZE.sm} />
+                    ) : null
                   }
                   onClick={() => setRefreshInterval(ms)}
                 >

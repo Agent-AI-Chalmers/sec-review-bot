@@ -21,6 +21,7 @@ import {
 import { MemoryRevisionDiffViewer } from './MemoryRevisionDiff.js'
 import { MemoryRevisionHistory } from './MemoryRevisionHistory.js'
 import { useRefresh } from '../../shared/refresh.js'
+import { LoadingState } from '../../shared/StateMessage.js'
 import {
   TranscriptViewer,
   type TranscriptTarget
@@ -340,7 +341,9 @@ export function Memory(): React.JSX.Element {
               {overviewError}
             </Alert>
           )}
-          {overviewLoading && !overview && <p>{t('loading')}</p>}
+          {overviewLoading && !overview && (
+            <LoadingState message={t('loading')} />
+          )}
           {overview && (
             <MemoryOverview
               overview={overview}

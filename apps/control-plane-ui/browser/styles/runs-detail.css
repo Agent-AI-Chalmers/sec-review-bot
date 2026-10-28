@@ -3,7 +3,7 @@
 .status-text {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: var(--space-3);
   white-space: nowrap;
 }
 
@@ -56,7 +56,7 @@
 .platform-mark {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   line-height: 1.25;
   vertical-align: middle;
   white-space: nowrap;
@@ -85,7 +85,7 @@
 
 .run-heading {
   margin-bottom: 32px;
-  padding: 22px 24px;
+  padding: var(--space-6) var(--space-6);
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: var(--mantine-radius-lg);
@@ -95,7 +95,7 @@
 .run-summary-grid {
   display: grid;
   grid-template-columns: max-content max-content minmax(0, 1fr);
-  gap: 14px 24px;
+  gap: var(--space-5) var(--space-6);
   align-items: center;
   margin-top: 16px;
   min-width: 0;
@@ -118,7 +118,7 @@
 }
 
 .operations-bar {
-  padding: 16px 18px;
+  padding: var(--space-5) var(--space-5);
   background: var(--surface-raised);
   border: 1px solid var(--border);
   border-radius: var(--mantine-radius-lg);
@@ -167,7 +167,7 @@ a {
 
 .execution-statistics {
   margin-top: 14px;
-  padding: 12px 14px;
+  padding: var(--space-4) var(--space-5);
   background: var(--mantine-color-default-hover);
   border: 1px solid var(--border);
   border-radius: var(--mantine-radius-sm);
@@ -183,7 +183,7 @@ a {
 
 .statistics-section + .statistics-section {
   margin-top: 18px;
-  padding-top: 14px;
+  padding-top: var(--space-5);
   border-top: 1px solid var(--border);
 }
 
@@ -199,8 +199,8 @@ a {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 10px;
-  padding: 12px 0;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
   font-size: var(--mantine-font-size-sm);
   font-weight: 700;
   cursor: pointer;
@@ -224,12 +224,12 @@ a {
 }
 
 .statistics-stage-body {
-  padding: 4px 0 16px 20px;
+  padding: var(--space-1) 0 var(--space-5) var(--mantine-spacing-lg);
 }
 
 .statistics-units {
   display: grid;
-  gap: 8px;
+  gap: var(--space-3);
   margin-top: 10px;
 }
 
@@ -243,8 +243,8 @@ a {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   font-size: var(--mantine-font-size-sm);
   font-weight: 600;
   cursor: pointer;
@@ -272,7 +272,7 @@ a {
 }
 
 .statistics-unit-body {
-  padding: 12px;
+  padding: var(--space-4);
 }
 
 .statistics-unit-metrics {
@@ -290,7 +290,7 @@ a {
 
 .statistics-agent-breakdown th,
 .statistics-agent-breakdown td {
-  padding: 5px 8px;
+  padding: var(--space-2) var(--space-3);
 }
 
 .statistics-agent-breakdown th:first-child,
@@ -305,7 +305,7 @@ a {
 
 .statistics-section .mantine-Table-td,
 .statistics-section .mantine-Table-th {
-  padding-block: 8px;
+  padding-block: var(--space-3);
 }
 
 .statistics-table {
@@ -373,10 +373,10 @@ a {
 
 .artifact-section {
   display: grid;
-  gap: 6px;
+  gap: var(--space-2);
   /* The execution timestamp and the artifact row were touching; space them like the
      publication summary and its rows. */
-  padding-top: 10px;
+  padding-top: var(--space-3);
 }
 
 .artifact-panel {
@@ -384,7 +384,7 @@ a {
 }
 
 .artifact-state {
-  padding: 8px 0;
+  padding: var(--space-3) 0;
 }
 
 /* The artifact reads as one row: its facts together, the download trailing. */
@@ -392,21 +392,21 @@ a {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 4px 16px;
+  gap: var(--space-1) var(--space-5);
 }
 
 .artifact-facts {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 6px 12px;
+  gap: var(--space-2) var(--space-4);
   min-width: 0;
 }
 
 .artifact-digest-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-3);
   min-width: 0;
 }
 
@@ -425,7 +425,7 @@ a {
 .artifact-digest-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   min-width: 0;
   padding: 0;
   border: 0;
@@ -447,33 +447,33 @@ a {
 
 .publication-summary {
   display: grid;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .delivery-item {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px 16px;
-  padding: 4px 0 10px;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-1) 0 var(--space-3);
 }
 
 .delivery-item + .delivery-item {
   border-top: 1px solid var(--border);
-  padding-top: 10px;
+  padding-top: var(--space-3);
 }
 
 /* State machines are reference material, collapsed by default like History. */
 .state-machines {
   margin-top: 20px;
   border-top: 1px solid var(--border);
-  padding-top: 12px;
+  padding-top: var(--space-4);
 }
 
 .state-machine-summary {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   width: fit-content;
   cursor: pointer;
   user-select: none;
@@ -503,7 +503,7 @@ a {
   margin-top: 14px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-5);
 }
 
 .state-machine-title {
@@ -552,7 +552,7 @@ a {
 }
 
 .state-machine-node.is-current text {
-  fill: #fff;
+  fill: var(--mantine-color-white);
   font-weight: 600;
 }
 
@@ -608,8 +608,8 @@ a {
 .state-machine-edge-tip {
   position: fixed;
   transform: translate(-50%, calc(-100% - 10px));
-  padding: 2px 7px;
-  border-radius: 6px;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-panel);
   background: var(--surface-raised);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-sm);
@@ -625,13 +625,13 @@ a {
 .run-history {
   margin-top: 20px;
   border-top: 1px solid var(--border);
-  padding-top: 12px;
+  padding-top: var(--space-4);
 }
 
 .run-history-summary {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   width: fit-content;
   cursor: pointer;
   user-select: none;
@@ -659,8 +659,8 @@ a {
 
 .run-history-count {
   min-width: 18px;
-  padding: 0 6px;
-  border-radius: 9px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-panel);
   background: var(--mantine-color-default-hover);
   font-size: 11px;
   line-height: 18px;
@@ -673,14 +673,14 @@ a {
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .run-history-item {
   display: grid;
   grid-template-columns: 150px 92px minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: 10px;
+  gap: var(--space-3);
   font-size: var(--mantine-font-size-xs);
 }
 
@@ -705,14 +705,14 @@ a {
 .delivery-main {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   min-width: 0;
 }
 
 .delivery-link {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
   justify-self: end;
 }
 

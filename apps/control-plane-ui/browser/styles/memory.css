@@ -16,7 +16,7 @@
   max-height: min(68vh, 720px);
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-panel);
   background: light-dark(
     var(--mantine-color-gray-0),
     var(--mantine-color-dark-8)
@@ -60,9 +60,9 @@
   position: absolute;
   z-index: 1;
   display: flex;
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-panel);
   flex-direction: column;
   justify-content: center;
   color: var(--mantine-color-text);
@@ -87,7 +87,7 @@
     var(--mantine-color-green-7),
     var(--mantine-color-green-5)
   );
-  background: light-dark(var(--mantine-color-green-0), rgb(34 55 43 / 48%));
+  background: var(--status-complete-soft);
 }
 
 .revision-graph-node strong {
@@ -187,7 +187,7 @@
   display: flex;
   align-items: center;
   gap: var(--mantine-spacing-xs);
-  padding-inline: 10px;
+  padding-inline: var(--mantine-spacing-xs);
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
   font-weight: 600;
@@ -238,9 +238,9 @@
 
 .memory-markdown pre {
   overflow-x: auto;
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-panel);
   background: var(--surface-raised);
 }
 
@@ -249,7 +249,7 @@
 }
 .memory-overview {
   display: grid;
-  gap: 24px;
+  gap: var(--space-6);
 }
 
 .memory-overview-metrics {
@@ -262,7 +262,7 @@
   display: grid;
   align-content: center;
   min-height: 126px;
-  padding: 18px 22px;
+  padding: var(--space-5) var(--space-6);
   border-inline-start: 1px solid var(--mantine-color-default-border);
 }
 
@@ -286,7 +286,7 @@
 .memory-overview-legend span {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .memory-overview-section {
@@ -302,7 +302,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-5);
 }
 
 .memory-overview-legend {
@@ -315,7 +315,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 18px;
+  gap: var(--space-5);
   flex-wrap: wrap;
 }
 
@@ -372,15 +372,15 @@
 .memory-overview-lower {
   display: grid;
   grid-template-columns: minmax(220px, 0.7fr) minmax(0, 2fr);
-  gap: 36px;
+  gap: var(--space-7);
   align-items: start;
 }
 
 .memory-overview-outcome {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  padding: 12px 0;
+  gap: var(--space-5);
+  padding: var(--space-4) 0;
   border-block-end: 1px solid var(--mantine-color-default-border);
 }
 

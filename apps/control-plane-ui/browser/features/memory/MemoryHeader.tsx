@@ -13,6 +13,7 @@ import { IconEdit, IconInfoCircle } from '@tabler/icons-react'
 import { useMessages } from '../../shared/i18n.js'
 import type { components } from './api-types.generated.js'
 import { RefreshControls } from '../../shared/refresh.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 type Control = components['schemas']['MaintenanceControl']
 
@@ -78,12 +79,12 @@ export function MemoryHeader({
               size="sm"
               aria-label={t('maintenanceControlHelpLabel')}
             >
-              <IconInfoCircle size={16} />
+              <IconInfoCircle size={ICON_SIZE.md} />
             </ActionIcon>
           </Tooltip>
           <Button
             variant="default"
-            leftSection={<IconEdit size={16} />}
+            leftSection={<IconEdit size={ICON_SIZE.md} />}
             disabled={activeRevision === undefined || treeLoading}
             onClick={onEdit}
           >
