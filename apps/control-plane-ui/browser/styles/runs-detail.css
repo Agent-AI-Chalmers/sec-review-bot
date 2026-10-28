@@ -527,69 +527,60 @@ a {
   padding-top: var(--space-3);
 }
 
-/* State machines are reference material, collapsed by default like History. */
-.state-machines {
+.transitions-entry {
   margin-top: 20px;
-  border-top: 1px solid var(--border);
-  padding-top: var(--space-4);
 }
 
-.state-machine-summary {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: fit-content;
-  cursor: pointer;
-  user-select: none;
-  font-size: var(--mantine-font-size-sm);
-  font-weight: 500;
+.transitions-count {
+  margin-left: var(--space-2);
   color: var(--mantine-color-dimmed);
+  font-variant-numeric: tabular-nums;
+}
+
+.transitions-body {
+  margin-top: var(--space-4);
+}
+
+.transitions-list {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.run-transition-list {
+  margin: var(--space-3) 0;
+  padding: 0;
   list-style: none;
 }
 
-.state-machine-summary::-webkit-details-marker {
-  display: none;
+.run-transition {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
 }
 
-.state-machine-summary:hover {
-  color: var(--mantine-color-text);
+.run-transition:first-child {
+  border-top: 0;
 }
 
-.state-machine-chevron {
-  transition: transform 120ms ease;
-}
-
-.state-machines[open] .state-machine-chevron {
-  transform: rotate(90deg);
-}
-
-.state-machines-body {
-  margin-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-5);
-}
-
-.state-machine-title {
-  display: block;
-  margin-bottom: 2px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-.state-machine-svg {
-  /* Rendered at a fixed pixel size so node widths, labels, and strokes are identical across
-     every axis. A wider axis (execution has more states) stays wider rather than being shrunk
-     to fit, which would otherwise make its text smaller than the other diagrams'. The
-     container scrolls horizontally if an axis does not fit. */
-  display: block;
-  flex: none;
-  color: var(--mantine-color-dimmed);
-  overflow: visible;
+.transitions-list .mantine-Pagination-root {
+  justify-content: center;
+  margin-top: var(--space-3);
 }
 
 .state-machine {
-  overflow-x: auto;
+  display: flex;
+  justify-content: center;
+  overflow: visible;
+}
+
+.state-machine-svg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  color: var(--mantine-color-dimmed);
+  overflow: visible;
 }
 
 /* Nodes: quiet by default, brand-tinted when current, with a readable label in both themes. */
@@ -611,12 +602,13 @@ a {
 }
 
 .state-machine-node.is-current rect {
-  fill: var(--brand);
+  fill: var(--brand-soft);
   stroke: var(--brand);
+  stroke-width: 2;
 }
 
 .state-machine-node.is-current text {
-  fill: var(--mantine-color-white);
+  fill: var(--mantine-color-text);
   font-weight: 600;
 }
 
@@ -632,8 +624,8 @@ a {
 .state-machine-edge-path {
   fill: none;
   stroke: currentColor;
-  stroke-width: 1.3;
-  opacity: 0.55;
+  stroke-width: 1.1;
+  opacity: 0.35;
 }
 
 .state-machine-edge.is-traversed .state-machine-edge-path {
@@ -669,6 +661,55 @@ a {
 }
 
 /* The floating transition label shown on edge hover/focus, positioned at the pointer. */
+.state-machine-legend {
+  justify-content: flex-end;
+  gap: var(--space-4);
+}
+
+.state-machine-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+}
+
+.state-machine-legend-line {
+  display: inline-block;
+  width: 20px;
+  height: 2px;
+  background: var(--muted);
+}
+
+.state-machine-legend-line.is-revert {
+  height: 0;
+  border-top: 1px dashed var(--muted);
+  background: transparent;
+}
+
+.state-machine-legend-line.is-current {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+
+.state-machine-transitions {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.state-machine-transition {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border);
+}
+
+.state-machine-transition:first-child {
+  border-top: 0;
+}
+
 .state-machine-edge-tip {
   position: fixed;
   transform: translate(-50%, calc(-100% - 10px));

@@ -1,10 +1,25 @@
 import React from 'react'
 
-import { Text, Tooltip } from '@mantine/core'
-import { IconChevronRight } from '@tabler/icons-react'
+import {
+  Button,
+  Collapse,
+  Group,
+  Pagination,
+  SegmentedControl,
+  Stack,
+  Text,
+  Tooltip
+} from '@mantine/core'
+import { IconChevronDown, IconSitemap } from '@tabler/icons-react'
 
 import type { Run, RunEvent } from './api.js'
-import { useMessages, type Message } from '../../shared/i18n.js'
+import {
+  formatDate,
+  useLanguage,
+  useMessages,
+  type Message
+} from '../../shared/i18n.js'
+import { axisLabel } from './status.js'
 import {
   STATE_MACHINES,
   type StateAxis,
@@ -16,6 +31,7 @@ import {
   revertSide,
   selfLoopSide
 } from './state-machine-layout.js'
+import { failureCodeLabel } from './format.js'
 
 /** The current state of one axis, read from the run. */
 function currentState(run: Run, axis: StateAxis): string | null {
@@ -353,9 +369,6 @@ export function StateMachineDiagram({
   )
   return (
     <div className="state-machine">
-      <Text className="state-machine-title" size="xs" c="dimmed">
-        {machineTitle(machine, t)}
-      </Text>
       <svg
         className="state-machine-svg"
         width={width}
@@ -363,6 +376,7 @@ export function StateMachineDiagram({
         viewBox={`0 0 ${width} ${viewHeight}`}
         role="group"
         aria-label={machineTitle(machine, t)}
+        onPointerDown={() => setHovered(null)}
       >
         <defs>
           <marker
@@ -438,6 +452,14 @@ export function StateMachineDiagram({
                   tabIndex={0}
                   role="img"
                   aria-label={label}
+                  onPointerDown={(event) => {
+                    event.stopPropagation()
+                    setHovered({
+                      label,
+                      x: event.clientX,
+                      y: event.clientY
+                    })
+                  }}
                   onMouseEnter={(event) =>
                     setHovered({ label, x: event.clientX, y: event.clientY })
                   }
@@ -516,43 +538,191 @@ export function StateMachineDiagram({
   )
 }
 
+const TRANSITIONS_PAGE_SIZE = 12
+
+function TransitionReason({ code }: { code: string }): React.JSX.Element {
+  const t = useMessages()
+  const { explanation } = failureCodeLabel(code, t)
+  const label = (
+    <Text component="span" size="xs" ff="monospace" c="dimmed">
+      {code}
+    </Text>
+  )
+  if (explanation === null) return label
+  return (
+    <Tooltip
+      label={explanation}
+      multiline
+      w={360}
+      withArrow
+      position="bottom-start"
+      openDelay={150}
+    >
+      {label}
+    </Tooltip>
+  )
+}
+
 /**
- * The coordination state machines for one run, in lifecycle order (preparation, execution,
- * publication). The failure notice is not a run lifecycle axis, so it is shown as a small line
- * here only when the preparation actually failed.
+ * The coordination state machines and the transitions this run actually made. The diagrams stay
+ * above as a small reference; the paginated list below is the authoritative history.
  */
-export function RunStateMachines({
+export function RunTransitions({
   run,
   events
 }: {
   run: Run
   events: RunEvent[]
-}): React.JSX.Element {
+}): React.JSX.Element | null {
   const t = useMessages()
+  const { language } = useLanguage()
+  const [opened, setOpened] = React.useState(false)
+  const [axis, setAxis] = React.useState<StateAxis>('execution')
+  const [page, setPage] = React.useState(1)
+  const machines = STATE_MACHINES.filter((machine) =>
+    (DIAGRAMMED_AXES as readonly string[]).includes(machine.axis)
+  )
+  const machine =
+    machines.find((candidate) => candidate.axis === axis) ?? machines[0]
+  if (machine === undefined) return null
+  const transitionEvents = events.filter((event) => event.from_status !== null)
+  const totalPages = Math.max(
+    1,
+    Math.ceil(transitionEvents.length / TRANSITIONS_PAGE_SIZE)
+  )
+  const currentPage = Math.min(page, totalPages)
+  const visibleEvents = transitionEvents.slice(
+    (currentPage - 1) * TRANSITIONS_PAGE_SIZE,
+    currentPage * TRANSITIONS_PAGE_SIZE
+  )
+  const labelFor = (event: RunEvent, state: string | null): string => {
+    if (state === null) return '—'
+    const eventMachine = machines.find(
+      (candidate) => candidate.axis === event.axis
+    )
+    return eventMachine === undefined
+      ? state
+      : stateLabel(eventMachine, state, t)
+  }
+  const explanationFor = (event: RunEvent): string | null => {
+    const eventMachine = machines.find(
+      (candidate) => candidate.axis === event.axis
+    )
+    if (eventMachine === undefined) return null
+    const edge =
+      eventMachine.transitions.find(
+        (candidate) =>
+          candidate.from === event.from_status &&
+          candidate.to === event.to_status &&
+          (event.reason_code === null || candidate.reason === event.reason_code)
+      ) ??
+      eventMachine.transitions.find(
+        (candidate) =>
+          candidate.from === event.from_status &&
+          candidate.to === event.to_status
+      )
+    if (edge !== undefined) return edgeLabel(eventMachine, edge, t)
+    const description = stateDescription(eventMachine, event.to_status, t)
+    return description === '' ? null : description
+  }
   return (
-    // Collapsed by default, like History: the diagrams are reference material rather than the
-    // run's own status, so they stay out of the way until the reader asks for them.
-    <details className="state-machines">
-      <summary className="state-machine-summary">
-        <IconChevronRight
-          size={14}
-          className="state-machine-chevron"
-          aria-hidden="true"
-        />
-        {t('stateMachinesTitle')}
-      </summary>
-      <div className="state-machines-body">
-        {STATE_MACHINES.filter((machine) =>
-          (DIAGRAMMED_AXES as readonly string[]).includes(machine.axis)
-        ).map((machine) => (
-          <StateMachineDiagram
-            key={machine.axis}
-            machine={machine}
-            run={run}
-            events={events}
+    <div className="run-transitions">
+      <Button
+        variant="subtle"
+        size="compact-sm"
+        leftSection={<IconSitemap size={16} aria-hidden />}
+        rightSection={
+          <IconChevronDown
+            size={14}
+            aria-hidden
+            style={{
+              transform: opened ? 'rotate(180deg)' : undefined,
+              transition: 'transform 120ms ease'
+            }}
           />
-        ))}
-      </div>
-    </details>
+        }
+        aria-expanded={opened}
+        className="transitions-entry"
+        onClick={() => setOpened((value) => !value)}
+      >
+        {t('stateMachineTransitions')}
+        <span className="transitions-count">{transitionEvents.length}</span>
+      </Button>
+      <Collapse expanded={opened}>
+        <Stack gap="md" className="transitions-body">
+          <SegmentedControl
+            fullWidth
+            value={axis}
+            onChange={(value) => setAxis(value as StateAxis)}
+            data={machines.map((candidate) => ({
+              value: candidate.axis,
+              label: machineTitle(candidate, t)
+            }))}
+          />
+          <Text size="xs" c="dimmed">
+            {t('stateMachineHint')}
+          </Text>
+          <StateMachineDiagram machine={machine} run={run} events={events} />
+          <Group gap="md" className="state-machine-legend">
+            <span className="state-machine-legend-item">
+              <span className="state-machine-legend-line is-forward" />
+              {t('stateMachineLegendForward')}
+            </span>
+            <span className="state-machine-legend-item">
+              <span className="state-machine-legend-line is-revert" />
+              {t('stateMachineLegendRevert')}
+            </span>
+            <span className="state-machine-legend-item">
+              <span className="state-machine-legend-line is-current" />
+              {t('stateMachineLegendCurrent')}
+            </span>
+          </Group>
+          <div className="transitions-list">
+            <Text size="xs" fw={600} c="dimmed">
+              {t('stateMachineTransitions')} · {transitionEvents.length}
+            </Text>
+            {transitionEvents.length === 0 ? (
+              <Text size="sm" c="dimmed">
+                {t('stateMachineNoTransitions')}
+              </Text>
+            ) : (
+              <ul className="run-transition-list">
+                {visibleEvents.map((event) => {
+                  const explanation = explanationFor(event)
+                  return (
+                    <li className="run-transition" key={event.event_id}>
+                      <Text size="xs" c="dimmed">
+                        {formatDate(event.occurred_at, language)} ·{' '}
+                        {axisLabel(event.axis, t)}
+                      </Text>
+                      <Text size="sm">
+                        {labelFor(event, event.from_status)} →{' '}
+                        {labelFor(event, event.to_status)}
+                      </Text>
+                      {explanation !== null && (
+                        <Text size="xs" c="dimmed">
+                          {explanation}
+                        </Text>
+                      )}
+                      {event.reason_code !== null && (
+                        <TransitionReason code={event.reason_code} />
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+            {totalPages > 1 && (
+              <Pagination
+                total={totalPages}
+                value={currentPage}
+                onChange={setPage}
+                size="sm"
+              />
+            )}
+          </div>
+        </Stack>
+      </Collapse>
+    </div>
   )
 }

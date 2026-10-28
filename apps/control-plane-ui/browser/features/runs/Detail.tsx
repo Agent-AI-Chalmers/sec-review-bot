@@ -23,7 +23,6 @@ import {
   IconArrowLeft,
   IconArrowUpRight,
   IconChevronDown,
-  IconChevronRight,
   IconChevronUp,
   IconClock,
   IconFiles
@@ -39,7 +38,7 @@ import {
   throwIfUnauthorized,
   type RunEvent
 } from './api.js'
-import { RunStateMachines } from './StateMachine.js'
+import { RunTransitions } from './StateMachine.js'
 import { RunFilesViewer } from './RunFilesViewer.js'
 import { RunJump } from './RunJump.js'
 import { ExecutionStatistics } from './ExecutionStatistics.js'
@@ -55,7 +54,6 @@ import {
   type PublicationStepStatus,
   artifactStatusColor,
   artifactStatusLabel,
-  axisLabel,
   executionStatusLabel,
   executionTone,
   preparationStateLabel,
@@ -1243,47 +1241,7 @@ export function Detail(): React.JSX.Element {
                     ))}
                 </Timeline.Item>
               </Timeline>
-              <RunStateMachines run={run} events={events} />
-              {events.length > 0 && (
-                // A native disclosure keeps this operator detail out of the way until asked
-                // for, collapses without page state, and stays keyboard/screen-reader
-                // accessible. It is a compact list rather than a table: one transition per
-                // line reads better than four columns at this density.
-                <details className="run-history">
-                  <summary className="run-history-summary">
-                    <IconChevronRight
-                      size={14}
-                      className="run-history-chevron"
-                      aria-hidden="true"
-                    />
-                    {t('runHistory')}
-                    <span className="run-history-count">{events.length}</span>
-                  </summary>
-                  <ul className="run-history-list">
-                    {events.map((event) => (
-                      <li key={event.event_id} className="run-history-item">
-                        <span className="run-history-time">
-                          {formatDate(event.occurred_at, language)}
-                        </span>
-                        <span className="run-history-axis">
-                          {axisLabel(event.axis, t)}
-                        </span>
-                        <span className="run-history-transition">
-                          {event.from_status === null ? '—' : event.from_status}
-                          {' → '}
-                          {event.to_status}
-                        </span>
-                        {event.reason_code !== null && (
-                          <ExplainedCode
-                            code={event.reason_code}
-                            className="run-history-reason"
-                          />
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
+              <RunTransitions run={run} events={events} />
             </Paper>
           </Stack>
         </>
