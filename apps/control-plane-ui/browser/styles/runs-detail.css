@@ -180,6 +180,14 @@ a {
   border-radius: var(--mantine-radius-sm);
 }
 
+.statistics-details-button {
+  margin-left: auto;
+}
+
+.execution-statistics-details .statistics-groups {
+  margin-top: var(--space-4);
+}
+
 .statistics-usage-details {
   margin-top: 5px;
 }

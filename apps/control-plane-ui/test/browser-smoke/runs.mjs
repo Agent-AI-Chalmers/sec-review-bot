@@ -339,24 +339,31 @@ export async function smokeRuns({
       /Settled/,
       `${name} a healthy statistics snapshot must not compete with execution status`
     )
+    await statistics.getByRole('button', { name: /View details/ }).click()
+    const statisticsDetails = page.getByTestId('execution-statistics-details')
+    await statisticsDetails.waitFor()
     assert.match(
-      (await statistics.textContent()) ?? '',
+      (await statisticsDetails.textContent()) ?? '',
       /Input 58,020.*Output 10,784.*Cache read 18,280/,
-      `${name} the useful token breakdown must be visible without expanding details`
+      `${name} the useful token breakdown must be available in the details drawer`
     )
     assert.match(
-      (await statistics.textContent()) ?? '',
+      (await statisticsDetails.textContent()) ?? '',
       /Scan stage.*6 Calls · 17,284 tokens.*Review stage.*2 cases · 14 Calls · 40,320 tokens.*Delivery stage.*5 Calls · 11,200 tokens/s,
       `${name} collapsed repository stages must retain their usage summaries`
     )
-    const workflowStages = statistics.locator('.statistics-workflow-stage')
+    const workflowStages = statisticsDetails.locator(
+      '.statistics-workflow-stage'
+    )
     assert.strictEqual(
       await workflowStages.count(),
       3,
       `${name} repository usage must have scan, review, and delivery stages`
     )
     assert.strictEqual(
-      await statistics.locator('.statistics-workflow-stage[open]').count(),
+      await statisticsDetails
+        .locator('.statistics-workflow-stage[open]')
+        .count(),
       0,
       `${name} workflow stages must start collapsed`
     )
@@ -441,24 +448,24 @@ export async function smokeRuns({
       `${name} delivery details must explain planning and patch synthesis inline`
     )
     assert.match(
-      (await statistics.textContent()) ?? '',
+      (await statisticsDetails.textContent()) ?? '',
       /repository-discovery/,
       `${name} a completed run must show its agent usage groups`
     )
     assert.match(
-      (await statistics.textContent()) ?? '',
+      (await statisticsDetails.textContent()) ?? '',
       /anthropic\/deepseek-v4-pro/,
       `${name} provider and model must share one compact identity line`
     )
-    const usageRows = statistics.locator(
+    const usageRows = statisticsDetails.locator(
       '.statistics-group-row[aria-expanded="false"]'
     )
-    const expandedBefore = await statistics
+    const expandedBefore = await statisticsDetails
       .locator('.statistics-group-row[aria-expanded="true"]')
       .count()
     await usageRows.filter({ hasText: 'repository-analyzer' }).first().click()
     assert.match(
-      (await statistics.textContent()) ?? '',
+      (await statisticsDetails.textContent()) ?? '',
       /Input 5,200.*Output 1,000.*Cache read 1,600/,
       `${name} an agent without subgroups must expose its token breakdown`
     )
@@ -467,12 +474,42 @@ export async function smokeRuns({
       .first()
       .click()
     assert.strictEqual(
-      await statistics
+      await statisticsDetails
         .locator('.statistics-group-row[aria-expanded="true"]')
         .count(),
       expandedBefore + 2,
       `${name} expanding one usage group must not close another`
     )
+    await page.getByRole('button', { name: 'Expand all' }).click()
+    assert.strictEqual(
+      await statisticsDetails
+        .locator('.statistics-workflow-stage[open]')
+        .count(),
+      3,
+      `${name} expand all must open every workflow stage`
+    )
+    assert.strictEqual(
+      await statisticsDetails.locator('.statistics-unit[open]').count(),
+      2,
+      `${name} expand all must open every review case`
+    )
+    await page.getByRole('button', { name: 'Collapse all' }).click()
+    assert.strictEqual(
+      await statisticsDetails
+        .locator('.statistics-workflow-stage[open]')
+        .count(),
+      0,
+      `${name} collapse all must close every workflow stage`
+    )
+    assert.strictEqual(
+      await statisticsDetails
+        .locator('.statistics-group-row[aria-expanded="true"]')
+        .count(),
+      0,
+      `${name} collapse all must close every usage group`
+    )
+    await page.keyboard.press('Escape')
+    await statisticsDetails.waitFor({ state: 'hidden' })
     const publicationBody =
       (await page
         .locator('.run-progress-timeline .mantine-Timeline-itemBody')

@@ -1,5 +1,5 @@
 import React from 'react'
-import { Badge, Group, Table, Text } from '@mantine/core'
+import { Badge, Button, Drawer, Group, Table, Text } from '@mantine/core'
 
 import type { Run } from './api.js'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
@@ -317,6 +317,7 @@ function StatisticsTable({
                 <React.Fragment key={key}>
                   <Table.Tr
                     className="statistics-group-row"
+                    data-group-key={key}
                     tabIndex={0}
                     aria-expanded={expanded}
                     onClick={() => toggleGroup(key)}
@@ -574,6 +575,8 @@ export function ExecutionStatistics({
   const [expandedGroups, setExpandedGroups] = React.useState<Set<string>>(
     () => new Set()
   )
+  const [detailsOpened, setDetailsOpened] = React.useState(false)
+  const detailsRef = React.useRef<HTMLDivElement>(null)
   if (statistics === null) return null
   const status = statusPresentation(statistics)
   const noObservations = statistics.ingestion_status === 'no_observations'
@@ -587,6 +590,7 @@ export function ExecutionStatistics({
     statistics.usage_coverage === 'partial' ||
     statistics.observed_call_count > 0 ||
     statistics.token_usage.total_tokens !== null
+  const hasDetails = hasObservedUsage || statistics.groups.length > 0
   const sections = passSections(statistics.groups, t)
   const toggleGroup = (key: string): void => {
     setExpandedGroups((current) => {
@@ -595,6 +599,27 @@ export function ExecutionStatistics({
       else next.add(key)
       return next
     })
+  }
+  const expandAll = (): void => {
+    const root = detailsRef.current
+    if (root === null) return
+    root.querySelectorAll('details').forEach((detail) => {
+      detail.open = true
+    })
+    const keys = [
+      ...root.querySelectorAll<HTMLElement>('.statistics-group-row')
+    ]
+      .map((row) => row.dataset.groupKey)
+      .filter((key): key is string => key !== undefined)
+    setExpandedGroups(new Set(keys))
+  }
+  const collapseAll = (): void => {
+    const root = detailsRef.current
+    if (root === null) return
+    root.querySelectorAll('details').forEach((detail) => {
+      detail.open = false
+    })
+    setExpandedGroups(new Set())
   }
 
   return (
@@ -616,6 +641,16 @@ export function ExecutionStatistics({
             {t('statisticsTokenUnit')}
           </Text>
         )}
+        {hasDetails && (
+          <Button
+            variant="subtle"
+            size="compact-xs"
+            className="statistics-details-button"
+            onClick={() => setDetailsOpened(true)}
+          >
+            {t('statisticsViewDetails')}
+          </Button>
+        )}
       </Group>
       {partial && (
         <Text size="xs" c="yellow" mt={4} data-testid="statistics-warning">
@@ -632,29 +667,51 @@ export function ExecutionStatistics({
           {t('statisticsNoObservations')}
         </Text>
       )}
-      {hasObservedUsage && <UsageDetails usage={statistics.token_usage} />}
-      {hasObservedUsage && (
-        <>
-          <Text size="xs" c="dimmed" mt="sm">
-            {t('statisticsUpdated')}{' '}
-            {formatDate(statistics.updated_at, language)}
-          </Text>
-          <div className="statistics-groups">
-            {workflow === 'repository-review' ? (
-              <RepositoryBreakdown
-                groups={statistics.groups}
-                expandedGroups={expandedGroups}
-                toggleGroup={toggleGroup}
-              />
-            ) : (
-              <PassBreakdown
-                sections={sections}
-                expandedGroups={expandedGroups}
-                toggleGroup={toggleGroup}
-              />
+      {hasDetails && (
+        <Drawer
+          opened={detailsOpened}
+          onClose={() => setDetailsOpened(false)}
+          position="right"
+          size="xl"
+          title={t('statisticsDetailsTitle')}
+        >
+          <div
+            className="execution-statistics-details"
+            data-testid="execution-statistics-details"
+            ref={detailsRef}
+          >
+            <Group justify="flex-end" gap="xs" mb="xs">
+              <Button variant="subtle" size="compact-xs" onClick={expandAll}>
+                {t('statisticsExpandAll')}
+              </Button>
+              <Button variant="subtle" size="compact-xs" onClick={collapseAll}>
+                {t('statisticsCollapseAll')}
+              </Button>
+            </Group>
+            {hasObservedUsage && (
+              <UsageDetails usage={statistics.token_usage} />
             )}
+            <Text size="xs" c="dimmed" mt="sm">
+              {t('statisticsUpdated')}{' '}
+              {formatDate(statistics.updated_at, language)}
+            </Text>
+            <div className="statistics-groups">
+              {workflow === 'repository-review' ? (
+                <RepositoryBreakdown
+                  groups={statistics.groups}
+                  expandedGroups={expandedGroups}
+                  toggleGroup={toggleGroup}
+                />
+              ) : (
+                <PassBreakdown
+                  sections={sections}
+                  expandedGroups={expandedGroups}
+                  toggleGroup={toggleGroup}
+                />
+              )}
+            </div>
           </div>
-        </>
+        </Drawer>
       )}
     </div>
   )
