@@ -6,12 +6,10 @@ This family defines the complete public Execution API: HTTP operations, executio
 
 Use these documents:
 
-- [v1/openapi.yaml](v1/openapi.yaml): how callers create and poll workflow runs — paths, status
-  codes, request and response shapes, and the security scheme.
+- [v1/openapi.yaml](v1/openapi.yaml): how callers create and poll workflow runs — paths, status codes, request and response shapes, and the security scheme.
 - [v1/CONTRACT.md](v1/CONTRACT.md): workflow input and result shapes.
 - [v1/schemas](v1/schemas): JSON Schemas for machine validation.
-- [v1/fixtures](v1/fixtures): executable JSON examples shared by Python and TypeScript
-  tests.
+- [v1/fixtures](v1/fixtures): executable JSON examples shared by Python and TypeScript tests.
 
 Together these files define Execution API v1.
 
@@ -45,8 +43,7 @@ Callers are responsible for:
 Agents are responsible for:
 
 - executing structured orchestration for issue, pull request, and repository workflows;
-- producing structured workflow results centered on `review_record` and repository
-  `deliveries[]`;
+- producing structured workflow results centered on `review_record` and repository `deliveries[]`;
 - saving stage artifacts.
 
 The GitHub integration is one implementation of the caller side: it turns GitHub events and publishing rules into execution inputs and result publication.
@@ -94,8 +91,7 @@ The following changes are breaking changes:
 - required error body field changes
 - workflow name or input required field changes
 
-Adding an endpoint, an endpoint option, or an optional request/response field is a
-non-breaking extension.
+Adding an endpoint, an endpoint option, or an optional request/response field is a non-breaking extension.
 
 ## Enforcement
 

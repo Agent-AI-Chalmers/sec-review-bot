@@ -32,8 +32,7 @@ Each step:
 
 ## Validity Rules
 
-Parsing is strict. Anything outside the format above is rejected, never silently
-ignored:
+Parsing is strict. Anything outside the format above is rejected, never silently ignored:
 
 - the top level must be a mapping with only the `setup` key;
 - `setup` must be a list of mappings (each a step);

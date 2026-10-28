@@ -33,8 +33,7 @@ pnpm run build
 pnpm test
 ```
 
-`pnpm test` runs tests that do not require external services. The integration
-suite uses Review Runs test database for publisher boundary tests:
+`pnpm test` runs tests that do not require external services. The integration suite uses Review Runs test database for publisher boundary tests:
 
 ```bash
 TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \

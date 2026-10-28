@@ -25,8 +25,7 @@ Do not enter this workflow when:
 
 ## Workflow
 
-1. Restate the finding in plain language. Capture the dangerous behavior, affected
-   boundary, and why it matters.
+1. Restate the finding in plain language. Capture the dangerous behavior, affected boundary, and why it matters.
 
 2. Decide whether the problem is primarily about:
    - authentication

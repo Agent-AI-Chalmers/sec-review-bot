@@ -24,9 +24,7 @@ contracts/
     profiles/<name>/<version>/{SPEC.md,corpus/}
 ```
 
-并非每个族都使用每一种资产。若契约的规则是决策逻辑而非结构形状，它会携带 `corpus/`
-而不是 `schemas/` 与 `fixtures/`，并在代码中强制该格式。参见
-[setup-declaration](setup-declaration/README.zh.md)。
+并非每个族都使用每一种资产。若契约的规则是决策逻辑而非结构形状，它会携带 `corpus/` 而不是 `schemas/` 与 `fixtures/`，并在代码中强制该格式。参见 [setup-declaration](setup-declaration/README.zh.md)。
 
 一个族也可以存放适用于所有版本的文档，例如传输层参考。
 
