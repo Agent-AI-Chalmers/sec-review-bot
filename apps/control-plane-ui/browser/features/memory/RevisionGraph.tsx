@@ -148,12 +148,31 @@ export function RevisionGraph({
   React.useLayoutEffect(() => {
     const viewport = scrollRef.current
     if (!viewport) return
+    // On a narrow canvas the graph is wider than its viewport. Centering the
+    // whole canvas can leave the current revision half outside the initial
+    // frame, so center the current node instead and fall back to the canvas
+    // center only when no revision is current.
+    const current =
+      activeRevision === undefined
+        ? undefined
+        : layout.nodes.find((item) => item.revision === activeRevision)
+    if (!current) {
+      viewport.scrollLeft = Math.max(
+        0,
+        (viewport.scrollWidth - viewport.clientWidth) / 2
+      )
+      viewport.scrollTop = 0
+      return
+    }
     viewport.scrollLeft = Math.max(
       0,
-      (viewport.scrollWidth - viewport.clientWidth) / 2
+      Math.min(
+        viewport.scrollWidth - viewport.clientWidth,
+        current.x + NODE_WIDTH / 2 - viewport.clientWidth / 2
+      )
     )
     viewport.scrollTop = 0
-  }, [layout.height, layout.width])
+  }, [layout.height, layout.width, layout.nodes, activeRevision])
 
   React.useEffect(() => {
     if (highlightedRevision === undefined) return

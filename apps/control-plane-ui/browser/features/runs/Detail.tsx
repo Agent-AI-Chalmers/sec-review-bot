@@ -776,7 +776,12 @@ export function Detail(): React.JSX.Element {
                   <Text c="dimmed" size="xs">
                     {t('integrationInstance')}
                   </Text>
-                  <Text size="sm" ff="monospace" className="integration-id">
+                  <Text
+                    size="sm"
+                    ff="monospace"
+                    className="integration-id"
+                    title={run.connector_id}
+                  >
                     {run.connector_id}
                   </Text>
                 </Group>
@@ -866,7 +871,7 @@ export function Detail(): React.JSX.Element {
                 // call to act, and it must not look like another content card on the page.
                 color="orange"
                 variant="light"
-                radius="sm"
+                radius="md"
                 p="lg"
                 icon={<IconAlertTriangle size={ICON_SIZE.xl} />}
                 title={t(
@@ -888,6 +893,7 @@ export function Detail(): React.JSX.Element {
                     align="center"
                     gap="lg"
                     wrap="nowrap"
+                    className="blocked-run-content"
                   >
                     {/* The two parked states have different causes and different
                         consequences, so the explanation follows the axis that stopped rather

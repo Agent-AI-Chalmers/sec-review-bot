@@ -1,5 +1,12 @@
 import React from 'react'
-import { Alert, Button, Container, Group, Title } from '@mantine/core'
+import {
+  ActionIcon,
+  Alert,
+  Container,
+  Group,
+  Title,
+  Tooltip
+} from '@mantine/core'
 import { IconDownload } from '@tabler/icons-react'
 import { useParams } from 'react-router-dom'
 
@@ -129,15 +136,18 @@ function TranscriptPage({
     <Container fluid py="xl" px={{ base: 'md', md: 'xl' }}>
       <Group justify="space-between" mb="lg">
         <Title order={1}>{target.title}</Title>
-        <Button
-          component="a"
-          href={target.downloadHref}
-          download
-          variant="default"
-          leftSection={<IconDownload size={ICON_SIZE.md} />}
-        >
-          {t('downloadOriginal')}
-        </Button>
+        <Tooltip label={t('downloadOriginal')}>
+          <ActionIcon
+            component="a"
+            href={target.downloadHref}
+            download
+            variant="default"
+            size="lg"
+            aria-label={t('downloadOriginal')}
+          >
+            <IconDownload size={ICON_SIZE.md} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
       <TranscriptContent target={target} />
     </Container>

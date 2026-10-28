@@ -1073,28 +1073,34 @@ export function TranscriptViewer({
       size="calc(100vw - 64px)"
       classNames={{ body: 'memory-viewer-modal' }}
     >
-      <Group justify="end" mb="md">
+      <Group justify="end" mb="md" gap="xs">
         {target && (
           <>
-            <Button
-              component="a"
-              href={target.pageHref}
-              target="_blank"
-              rel="noreferrer"
-              variant="default"
-              leftSection={<IconExternalLink size={ICON_SIZE.md} />}
-            >
-              {t('openFullPage')}
-            </Button>
-            <Button
-              component="a"
-              href={target.downloadHref}
-              download
-              variant="default"
-              leftSection={<IconDownload size={ICON_SIZE.md} />}
-            >
-              {t('downloadOriginal')}
-            </Button>
+            <Tooltip label={t('openFullPage')}>
+              <ActionIcon
+                component="a"
+                href={target.pageHref}
+                target="_blank"
+                rel="noreferrer"
+                variant="default"
+                size="lg"
+                aria-label={t('openFullPage')}
+              >
+                <IconExternalLink size={ICON_SIZE.md} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label={t('downloadOriginal')}>
+              <ActionIcon
+                component="a"
+                href={target.downloadHref}
+                download
+                variant="default"
+                size="lg"
+                aria-label={t('downloadOriginal')}
+              >
+                <IconDownload size={ICON_SIZE.md} />
+              </ActionIcon>
+            </Tooltip>
           </>
         )}
       </Group>

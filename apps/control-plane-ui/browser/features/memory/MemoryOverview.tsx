@@ -227,48 +227,68 @@ export function MemoryOverview({
         <Trend overview={overview} />
       </section>
 
-      <div className="memory-overview-lower">
-        <section className="memory-overview-section">
-          <h2>{t('observationLifecycle')}</h2>
-          <div className="memory-overview-outcome">
-            <span>{t('pendingObservations')}</span>
-            <strong>{totals.pending_observation_count.toLocaleString()}</strong>
-          </div>
-          <div className="memory-overview-outcome">
-            <span>{t('consumedObservations')}</span>
-            <strong>
-              {totals.consumed_observation_count.toLocaleString()}
-            </strong>
-          </div>
-        </section>
-        <section className="memory-overview-section memory-overview-workflows">
+      <section className="memory-overview-section memory-overview-workflows">
+        <div className="memory-overview-workflows-head">
           <h2>{t('workflowBreakdown')}</h2>
-          <Table>
-            <Table.Thead>
-              <Table.Tr>
-                <Table.Th>{t('workflow')}</Table.Th>
-                <Table.Th ta="right">{t('extractedUnits')}</Table.Th>
-                <Table.Th ta="right">{t('unitsWithObservation')}</Table.Th>
-                <Table.Th ta="right">{t('unitsWithoutObservation')}</Table.Th>
+          <div className="memory-overview-lifecycle-inline">
+            <span className="memory-overview-lifecycle-inline-label">
+              {t('observationLifecycle')}
+            </span>
+            <span>
+              <i className="memory-overview-lifecycle-swatch pending" />
+              {t('pendingObservations')}
+              <strong>
+                {totals.pending_observation_count.toLocaleString()}
+              </strong>
+            </span>
+            <span>
+              <i className="memory-overview-lifecycle-swatch consumed" />
+              {t('consumedObservations')}
+              <strong>
+                {totals.consumed_observation_count.toLocaleString()}
+              </strong>
+            </span>
+          </div>
+        </div>
+        <Table>
+          <Table.Thead>
+            <Table.Tr>
+              <Table.Th>{t('workflow')}</Table.Th>
+              <Table.Th ta="right">{t('extractedUnits')}</Table.Th>
+              <Table.Th ta="right">{t('unitsWithObservation')}</Table.Th>
+              <Table.Th ta="right">{t('unitsWithoutObservation')}</Table.Th>
+            </Table.Tr>
+          </Table.Thead>
+          <Table.Tbody>
+            {overview.workflows.map((item) => (
+              <Table.Tr key={item.source_workflow}>
+                <Table.Td>{workflowLabel(item.source_workflow, t)}</Table.Td>
+                <Table.Td ta="right">{item.extracted_unit_count}</Table.Td>
+                <Table.Td ta="right">
+                  {item.units_with_observation_count}
+                </Table.Td>
+                <Table.Td ta="right">
+                  {item.units_without_observation_count}
+                </Table.Td>
               </Table.Tr>
-            </Table.Thead>
-            <Table.Tbody>
-              {overview.workflows.map((item) => (
-                <Table.Tr key={item.source_workflow}>
-                  <Table.Td>{workflowLabel(item.source_workflow, t)}</Table.Td>
-                  <Table.Td ta="right">{item.extracted_unit_count}</Table.Td>
-                  <Table.Td ta="right">
-                    {item.units_with_observation_count}
-                  </Table.Td>
-                  <Table.Td ta="right">
-                    {item.units_without_observation_count}
-                  </Table.Td>
-                </Table.Tr>
-              ))}
-            </Table.Tbody>
-          </Table>
-        </section>
-      </div>
+            ))}
+          </Table.Tbody>
+          <Table.Tfoot>
+            <Table.Tr>
+              <Table.Th>{t('lifecycleTotal')}</Table.Th>
+              <Table.Th ta="right">
+                {totals.extracted_unit_count.toLocaleString()}
+              </Table.Th>
+              <Table.Th ta="right">
+                {totals.units_with_observation_count.toLocaleString()}
+              </Table.Th>
+              <Table.Th ta="right">
+                {totals.units_without_observation_count.toLocaleString()}
+              </Table.Th>
+            </Table.Tr>
+          </Table.Tfoot>
+        </Table>
+      </section>
     </div>
   )
 }

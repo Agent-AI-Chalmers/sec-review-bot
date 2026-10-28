@@ -82,10 +82,10 @@ export const mantineTheme = createTheme({
   cursorType: 'pointer',
   components: {
     Paper: Paper.extend({
-      defaultProps: { radius: 'lg', shadow: 'sm' }
+      defaultProps: { radius: 'md', shadow: 'sm' }
     }),
     Card: Card.extend({
-      defaultProps: { radius: 'lg', shadow: 'sm', withBorder: true }
+      defaultProps: { radius: 'md', shadow: 'sm', withBorder: true }
     }),
     Badge: Badge.extend({
       defaultProps: { radius: 'xl', variant: 'light' }

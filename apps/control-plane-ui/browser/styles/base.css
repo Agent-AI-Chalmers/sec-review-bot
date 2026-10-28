@@ -147,7 +147,7 @@
   /* Small shared geometry. Feature styles compose these instead of repeating
      the same pixel values; the spacing scale is deliberately 2px at the low end
      so dense control rows stay tight. */
-  --radius-panel: 6px;
+  --radius-panel: 8px;
   --radius-pill: 999px;
   --space-1: 4px;
   --space-2: 6px;

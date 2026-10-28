@@ -110,6 +110,7 @@ export function Runs(): React.JSX.Element {
   // normal pagination, and an operator needs to see them before the list, so they load
   // separately and a failure here never hides the list itself.
   const [blocked, setBlocked] = React.useState<ParkedRun[]>([])
+  const [showParkedDetails, setShowParkedDetails] = React.useState(false)
   React.useEffect(() => {
     let cancelled = false
     parkedRuns()
@@ -265,30 +266,46 @@ export function Runs(): React.JSX.Element {
           // thing an alert-based assertion sees.
           role="status"
         >
-          <Text size="sm" mb="xs">
-            {t('parkedRunsBody')}
-          </Text>
-          <Stack gap={4}>
-            {blocked.map((block) => (
-              <Text
-                key={block.run_id}
-                size="sm"
-                component={Link}
-                to={`/runs/${encodeURIComponent(block.run_id)}`}
-                c="orange.9"
-              >
-                {/* The axis is shown because the decision differs by axis, and the run id alone
-                    leaves the operator guessing which one stopped. */}
-                <Text span size="xs" c="dimmed">
-                  {axisLabel(block.axis, t)}
-                  {' · '}
-                </Text>
-                <Text span ff="monospace" size="sm">
-                  {block.run_id}
-                </Text>
+          <Text size="sm">{t('parkedRunsSummary')}</Text>
+          <div id="parked-runs-details">
+            <Collapse expanded={showParkedDetails}>
+              <Text size="sm" mt="xs" mb="xs">
+                {t('parkedRunsBody')}
               </Text>
-            ))}
-          </Stack>
+              <Stack gap={4}>
+                {blocked.map((block) => (
+                  <Text
+                    key={block.run_id}
+                    size="sm"
+                    component={Link}
+                    to={`/runs/${encodeURIComponent(block.run_id)}`}
+                    c="orange.9"
+                  >
+                    {/* The axis is shown because the decision differs by axis, and the run id alone
+                        leaves the operator guessing which one stopped. */}
+                    <Text span size="xs" c="dimmed">
+                      {axisLabel(block.axis, t)}
+                      {' · '}
+                    </Text>
+                    <Text span ff="monospace" size="sm">
+                      {block.run_id}
+                    </Text>
+                  </Text>
+                ))}
+              </Stack>
+            </Collapse>
+          </div>
+          <Button
+            variant="subtle"
+            color="orange"
+            size="compact-xs"
+            mt="xs"
+            aria-expanded={showParkedDetails}
+            aria-controls="parked-runs-details"
+            onClick={() => setShowParkedDetails((value) => !value)}
+          >
+            {showParkedDetails ? t('hideDetails') : t('showDetails')}
+          </Button>
         </Alert>
       )}
       {Boolean(error) && (
@@ -430,7 +447,7 @@ export function Runs(): React.JSX.Element {
         />
       ) : (
         <>
-          <Paper withBorder radius="sm" className="table-wrap">
+          <Paper withBorder radius="md" className="table-wrap">
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>

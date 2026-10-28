@@ -102,6 +102,7 @@
 .transcript-message {
   position: relative;
   overflow: visible;
+  box-shadow: none;
 }
 
 .transcript-message::before {
@@ -138,9 +139,13 @@
 
 .transcript-section {
   min-width: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
+  border: 0;
+  border-radius: 0;
   overflow: hidden;
+}
+
+.transcript-section + .transcript-section {
+  border-top: 1px solid var(--border);
 }
 
 .transcript-section-header {

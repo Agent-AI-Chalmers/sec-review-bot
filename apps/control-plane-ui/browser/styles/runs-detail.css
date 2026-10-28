@@ -84,11 +84,11 @@
 }
 
 .run-heading {
-  margin-bottom: 32px;
-  padding: var(--space-6) var(--space-6);
+  margin-bottom: var(--space-6);
+  padding: var(--space-6);
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: var(--mantine-radius-lg);
+  border-radius: var(--radius-panel);
   box-shadow: var(--shadow-sm);
 }
 
@@ -106,7 +106,10 @@
 }
 
 .integration-id {
-  overflow-wrap: anywhere;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .run-summary-grid .status-text {
@@ -118,10 +121,10 @@
 }
 
 .operations-bar {
-  padding: var(--space-5) var(--space-5);
+  padding: var(--space-5);
   background: var(--surface-raised);
   border: 1px solid var(--border);
-  border-radius: var(--mantine-radius-lg);
+  border-radius: var(--radius-panel);
   box-shadow: var(--shadow-sm);
 }
 
