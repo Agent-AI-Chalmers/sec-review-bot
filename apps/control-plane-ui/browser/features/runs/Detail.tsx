@@ -1284,7 +1284,7 @@ export function Detail(): React.JSX.Element {
                     ))}
                 </Timeline.Item>
               </Timeline>
-              <RunTransitions run={run} events={events} />
+              <RunTransitions key={run.run_id} run={run} events={events} />
             </Paper>
           </Stack>
         </>

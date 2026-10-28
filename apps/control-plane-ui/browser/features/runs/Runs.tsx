@@ -140,20 +140,6 @@ export function Runs(): React.JSX.Element {
   // separately and a failure here never hides the list itself.
   const [blocked, setBlocked] = React.useState<ParkedRun[]>([])
   React.useEffect(() => {
-    let cancelled = false
-    parkedRuns()
-      .then((blocks) => {
-        if (!cancelled) setBlocked(blocks)
-      })
-      .catch((value: unknown) => {
-        if (!cancelled) setAuxiliaryError(value)
-        // The queue is an operator aid, not a precondition for reading runs; leave it empty.
-      })
-    return (): void => {
-      cancelled = true
-    }
-  }, [])
-  React.useEffect(() => {
     window.sessionStorage.setItem(
       CURSOR_PARENTS_KEY,
       JSON.stringify(cursorParents)
@@ -199,6 +185,19 @@ export function Runs(): React.JSX.Element {
     : [...PAGE_SIZES, pageSize].sort((left, right) => left - right)
   const load = React.useCallback(async (): Promise<void> => {
     const requestedQuery = query
+    // The parked queue is a separate read, but it belongs to the same refresh cycle: keeping it
+    // out here made refresh look successful while a newly parked run stayed invisible.
+    const parkedRequest = parkedRuns()
+      .then((blocks) => {
+        if (latestQuery.current === requestedQuery) {
+          setBlocked(blocks)
+          setAuxiliaryError(undefined)
+        }
+      })
+      .catch((value: unknown) => {
+        if (latestQuery.current === requestedQuery) setAuxiliaryError(value)
+        // The queue is an operator aid, not a precondition for reading runs.
+      })
     try {
       const nextData = await api<{ runs: Run[]; next_cursor: string | null }>(
         `/runs?${requestedQuery}`
@@ -210,6 +209,7 @@ export function Runs(): React.JSX.Element {
     } catch (value) {
       if (latestQuery.current === requestedQuery) setError(value)
     }
+    await parkedRequest
   }, [query])
   const { refresh, refreshing, lastChecked } = useRefresh(load)
   // An expired session must reach the sign-in form even when the console still has data
@@ -289,6 +289,13 @@ export function Runs(): React.JSX.Element {
         <Text role="alert" c="red" mb="md">
           {t('refreshFailed')}
           {failureReason(error, t) && ` ${failureReason(error, t)}`}
+        </Text>
+      )}
+      {auxiliaryError !== undefined && (
+        <Text role="alert" c="red" mb="md">
+          {t('parkedRunsError')}
+          {failureReason(auxiliaryError, t) &&
+            ` ${failureReason(auxiliaryError, t)}`}
         </Text>
       )}
       <Box className="operations-bar" mb="lg">
