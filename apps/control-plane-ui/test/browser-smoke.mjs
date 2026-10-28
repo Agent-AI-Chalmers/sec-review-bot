@@ -11,11 +11,12 @@ import { chromium } from 'playwright-core'
 //     for an authenticated BFF) to smoke an already-running deployment. Attached
 //     jobs run one at a time because the deployment's state is shared.
 //
-// Jobs are split by viewport and feature. By default all six jobs run through a
+// Jobs are split by viewport and feature. By default all eight jobs run through a
 // small concurrency pool; `SMOKE_SHARD` selects one or more for a CI matrix:
+//   SMOKE_SHARD=desktop-memory-preflight
 //   SMOKE_SHARD=desktop-memory
 //   SMOKE_SHARD=desktop
-//   SMOKE_SHARD=memory
+//   SMOKE_SHARD=memory-preflight
 // `SMOKE_CONCURRENCY` overrides the pool size (default 3).
 const EXTERNAL_BASE = process.env.CONTROL_PLANE_UI_BASE_URL
 const TOKEN = process.env.CONTROL_PLANE_UI_ACCESS_TOKEN
@@ -199,8 +200,9 @@ async function runJob({ name, viewport, module }) {
     }
     await page.getByRole('heading', { name: 'Runs' }).waitFor()
 
-    if (module === 'memory') {
+    if (module === 'memory-preflight') {
       await smokeMemoryPreflight({ name, context, base, server })
+    } else if (module === 'memory') {
       await smokeMemory({
         name,
         viewport,
@@ -239,19 +241,21 @@ const VIEWPORTS = [
   ['desktop', { width: 1440, height: 900 }],
   ['mobile', { width: 390, height: 844 }]
 ]
-const MODULES = ['memory', 'runs', 'viewer']
+const MODULES = ['memory-preflight', 'memory', 'runs', 'viewer']
 
 function selectJobs() {
   const jobs = []
   for (const [name, viewport] of VIEWPORTS)
     for (const module of MODULES) jobs.push({ name, viewport, module })
   if (SHARD === 'all') return jobs
-  const [viewportPart, modulePart] = SHARD.split('-')
-  return jobs.filter((job) => {
-    if (modulePart === undefined)
-      return job.name === viewportPart || job.module === viewportPart
-    return job.name === viewportPart && job.module === modulePart
-  })
+  const [first, ...rest] = SHARD.split('-')
+  if (first === 'desktop' || first === 'mobile') {
+    const module = rest.join('-')
+    return jobs.filter(
+      (job) => job.name === first && (module === '' || job.module === module)
+    )
+  }
+  return jobs.filter((job) => job.module === SHARD)
 }
 
 const jobs = selectJobs()
