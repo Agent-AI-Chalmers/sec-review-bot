@@ -267,22 +267,284 @@ function Section({
   )
 }
 
-function ValueView({
+const JSON_MAX_DEPTH = 3
+
+function isPrimitive(
+  value: unknown
+): value is string | number | boolean | null {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  )
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function looksLikeMarkdown(value: string): boolean {
+  return (
+    value.includes('\n') ||
+    /(^|\n)\s{0,3}(#{1,6}\s|[-*+]\s|\d+\.\s|>\s)/.test(value) ||
+    /\*\*[^*]+\*\*/.test(value) ||
+    /\[[^\]]+\]\([^)]+\)/.test(value) ||
+    (value.length > 80 && value.includes(' '))
+  )
+}
+
+function recordPreview(value: unknown): string {
+  if (!isRecord(value)) return ''
+  for (const key of ['title', 'name', 'label', 'summary']) {
+    const candidate = value[key]
+    if (typeof candidate === 'string' && candidate.trim() !== '')
+      return candidate.slice(0, 110)
+  }
+  const first = Object.values(value).find(
+    (candidate) => typeof candidate === 'string' && candidate.trim() !== ''
+  )
+  return typeof first === 'string' ? first.slice(0, 110) : ''
+}
+
+function JsonRaw({
   value,
   query
 }: {
   value: unknown
   query: string
 }): React.JSX.Element {
-  return typeof value === 'string' ? (
-    <Text size="sm">
-      <HighlightText value={value} query={query} />
-    </Text>
-  ) : (
-    <Code block>
-      <HighlightText value={JSON.stringify(value, null, 2)} query={query} />
-    </Code>
+  return (
+    <details className="json-raw">
+      <summary>Raw JSON</summary>
+      <Code block>
+        <HighlightText value={JSON.stringify(value, null, 2)} query={query} />
+      </Code>
+    </details>
   )
+}
+
+function JsonPrimitive({
+  value,
+  query
+}: {
+  value: unknown
+  query: string
+}): React.JSX.Element {
+  if (value === null || value === undefined)
+    return <span className="json-null">null</span>
+  if (typeof value === 'string') {
+    if (looksLikeMarkdown(value))
+      return (
+        <div className="memory-markdown json-markdown">
+          <HighlightedMarkdown query={query}>{value}</HighlightedMarkdown>
+        </div>
+      )
+    return (
+      <code className="json-code">
+        <HighlightText value={value} query={query} />
+      </code>
+    )
+  }
+  return <code className="json-code">{String(value)}</code>
+}
+
+function JsonTableValue({
+  value,
+  query
+}: {
+  value: unknown
+  query: string
+}): React.JSX.Element {
+  if (value === null || value === undefined)
+    return <span className="json-null">null</span>
+  if (typeof value === 'string')
+    return (
+      <span className="json-table-text">
+        <HighlightText value={value} query={query} />
+      </span>
+    )
+  return <code className="json-code">{String(value)}</code>
+}
+
+function JsonObjectView({
+  value,
+  query,
+  depth
+}: {
+  value: Record<string, unknown>
+  query: string
+  depth: number
+}): React.JSX.Element {
+  const entries = Object.entries(value)
+  if (entries.length === 0) return <span className="json-empty">{'{}'}</span>
+  return (
+    <div className="json-object">
+      {entries.map(([key, child]) => {
+        const complex = Array.isArray(child) || isRecord(child)
+        if (complex)
+          return (
+            <div className="json-field" key={key}>
+              <div className="json-field-key">
+                <HighlightText value={key} query={query} />
+              </div>
+              <div className="json-field-body">
+                <JsonValueView value={child} query={query} depth={depth + 1} />
+              </div>
+            </div>
+          )
+        return (
+          <div className="json-row" key={key}>
+            <div className="json-key">
+              <HighlightText value={key} query={query} />
+            </div>
+            <div className="json-value">
+              <JsonValueView value={child} query={query} depth={depth + 1} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function JsonTable({
+  rows,
+  keys,
+  query
+}: {
+  rows: Record<string, unknown>[]
+  keys: string[]
+  query: string
+}): React.JSX.Element {
+  return (
+    <div className="json-table-wrap">
+      <table className="json-table">
+        <thead>
+          <tr>
+            {keys.map((key) => (
+              <th key={key}>
+                <HighlightText value={key} query={query} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={index}>
+              {keys.map((key) => (
+                <td
+                  className={
+                    typeof row[key] === 'number'
+                      ? 'json-table-number'
+                      : undefined
+                  }
+                  data-label={key}
+                  key={key}
+                >
+                  <JsonTableValue value={row[key]} query={query} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function JsonArrayView({
+  value,
+  query,
+  depth
+}: {
+  value: unknown[]
+  query: string
+  depth: number
+}): React.JSX.Element {
+  if (value.length === 0) return <span className="json-empty">[]</span>
+
+  const allPrimitive = value.every(isPrimitive)
+  const allShortPrimitive =
+    allPrimitive &&
+    value.every(
+      (item) =>
+        typeof item !== 'string' ||
+        (item.length <= 120 && !item.includes('\n') && !looksLikeMarkdown(item))
+    )
+  if (allShortPrimitive)
+    return (
+      <div className="json-chips">
+        {value.map((item, index) => (
+          <code className="json-code" key={index}>
+            {item === null ? 'null' : String(item)}
+          </code>
+        ))}
+      </div>
+    )
+
+  const allFlatObjects =
+    value.length > 0 &&
+    value.every(
+      (item) => isRecord(item) && Object.values(item).every(isPrimitive)
+    )
+  const keys = allFlatObjects
+    ? [
+        ...new Set(
+          value.flatMap((item) => (isRecord(item) ? Object.keys(item) : []))
+        )
+      ]
+    : []
+  if (allFlatObjects && keys.length > 0 && keys.length <= 6)
+    return <JsonTable rows={value.filter(isRecord)} keys={keys} query={query} />
+
+  if (value.every(isRecord))
+    return (
+      <div className="json-array">
+        {value.map((item, index) => (
+          <details className="json-record" key={index} open={index === 0}>
+            <summary>
+              <span className="json-index">#{index + 1}</span>
+              <span className="json-record-preview">
+                {recordPreview(item) || `Item ${index + 1}`}
+              </span>
+            </summary>
+            <div className="json-record-body">
+              <JsonValueView value={item} query={query} depth={depth + 1} />
+            </div>
+          </details>
+        ))}
+      </div>
+    )
+
+  return (
+    <div className="json-array">
+      {value.map((item, index) => (
+        <div className="json-array-item" key={index}>
+          <span className="json-index">#{index + 1}</span>
+          <JsonValueView value={item} query={query} depth={depth + 1} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function JsonValueView({
+  value,
+  query,
+  depth = 0
+}: {
+  value: unknown
+  query: string
+  depth?: number
+}): React.JSX.Element {
+  if ((Array.isArray(value) || isRecord(value)) && depth > JSON_MAX_DEPTH)
+    return <JsonRaw value={value} query={query} />
+  if (Array.isArray(value))
+    return <JsonArrayView value={value} query={query} depth={depth} />
+  if (isRecord(value))
+    return <JsonObjectView value={value} query={query} depth={depth} />
+  return <JsonPrimitive value={value} query={query} />
 }
 
 function ToolArguments({
@@ -343,14 +605,14 @@ function ToolArguments({
         </Stack>
       )}
       {ordinary.length > 0 && (
-        <div className="transcript-args-table">
+        <div className="transcript-args">
           {ordinary.map(([key, value]) => (
-            <React.Fragment key={key}>
-              <Text size="xs" fw={700} c="dimmed">
+            <div className="transcript-arg" key={key}>
+              <Text size="xs" fw={600} className="transcript-arg-key">
                 <HighlightText value={key} query={query} />
               </Text>
-              <ValueView value={value} query={query} />
-            </React.Fragment>
+              <JsonValueView value={value} query={query} />
+            </div>
           ))}
         </div>
       )}
@@ -384,11 +646,9 @@ function ToolArguments({
 
 function ToolCall({
   call,
-  force,
   query
 }: {
   call: ToolCallView
-  force: number
   query: string
 }): React.JSX.Element {
   const t = useMessages()
@@ -397,11 +657,15 @@ function ToolCall({
     scrollToTranscriptElement(`transcript-${call.resultMessageId}`)
   }
   return (
-    <Paper withBorder p="sm" className="transcript-tool-call">
-      <Group justify="space-between" mb="xs">
-        <Group gap="xs">
-          <IconTool size={ICON_SIZE.md} />
-          <Text fw={600} size="sm">
+    <div className="transcript-tool-call">
+      <Group
+        justify="space-between"
+        wrap="nowrap"
+        className="transcript-tool-call-header"
+      >
+        <Group gap="xs" wrap="nowrap">
+          <IconTool size={ICON_SIZE.md} color="var(--mantine-color-green-6)" />
+          <Text fw={600} size="sm" c="green.7" truncate>
             <HighlightText value={call.name} query={query} />
           </Text>
         </Group>
@@ -416,15 +680,64 @@ function ToolCall({
           </Button>
         )}
       </Group>
-      <Section
-        title={t('transcriptArguments')}
-        value={JSON.stringify(call.args, null, 2)}
-        openedInitially
-        force={force}
-      >
+      <div className="transcript-tool-call-body">
         <ToolArguments args={call.args} query={query} />
-      </Section>
-    </Paper>
+      </div>
+    </div>
+  )
+}
+
+function ToolCalls({
+  calls,
+  force,
+  query
+}: {
+  calls: ToolCallView[]
+  force: number
+  query: string
+}): React.JSX.Element {
+  const t = useMessages()
+  const [opened, setOpened] = React.useState(true)
+  const previousForce = React.useRef(force)
+  React.useEffect(() => {
+    if (force === previousForce.current) return
+    previousForce.current = force
+    setOpened(force > 0)
+  }, [force])
+  return (
+    <div className="transcript-tool-calls">
+      <Button
+        variant="subtle"
+        color="green"
+        size="compact-sm"
+        className="transcript-tool-calls-toggle"
+        aria-expanded={opened}
+        leftSection={
+          opened ? (
+            <IconChevronDown size={ICON_SIZE.sm} />
+          ) : (
+            <IconChevronRight size={ICON_SIZE.sm} />
+          )
+        }
+        onClick={() => setOpened((current) => !current)}
+      >
+        <Group gap={6} wrap="nowrap">
+          <IconTool size={ICON_SIZE.sm} />
+          <Text fw={600} size="sm">
+            {t('transcriptToolCalls')} · {calls.length}
+          </Text>
+        </Group>
+      </Button>
+      <Collapse expanded={opened}>
+        <div className="transcript-tool-calls-body">
+          {calls.map((call) => (
+            <div id={`transcript-call-${call.id}`} key={call.id}>
+              <ToolCall call={call} query={query} />
+            </div>
+          ))}
+        </div>
+      </Collapse>
+    </div>
   )
 }
 
@@ -573,11 +886,9 @@ function TranscriptMessage({
             )}
           </Section>
         )}
-        {message.toolCalls.map((call) => (
-          <div id={`transcript-call-${call.id}`} key={call.id}>
-            <ToolCall call={call} force={force} query={query} />
-          </div>
-        ))}
+        {message.toolCalls.length > 0 && (
+          <ToolCalls calls={message.toolCalls} force={force} query={query} />
+        )}
         {message.artifact !== undefined && message.artifact !== null && (
           <Section
             title={t('transcriptArtifact')}

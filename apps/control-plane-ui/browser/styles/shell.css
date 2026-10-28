@@ -1,5 +1,9 @@
 /* ---------------------------------------------------------------- app shell */
 
+:root {
+  --app-header-height: 58px;
+}
+
 .mantine-AppShell-header {
   background: var(--surface-raised);
   border-bottom: 1px solid var(--border);
