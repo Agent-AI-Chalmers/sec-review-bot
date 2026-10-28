@@ -1,7 +1,6 @@
 import React from 'react'
-import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Route, Routes } from 'react-router-dom'
 import {
-  ActionIcon,
   AppShell,
   Button,
   Center,
@@ -12,15 +11,9 @@ import {
   PasswordInput,
   Stack,
   Text,
-  TextInput,
   Title
 } from '@mantine/core'
-import {
-  IconArrowRight,
-  IconFileText,
-  IconListDetails,
-  IconBrain
-} from '@tabler/icons-react'
+import { IconFileText, IconListDetails, IconBrain } from '@tabler/icons-react'
 import { ApiError } from '../shared/api-client.js'
 import { login } from './session-api.js'
 import { useMessages } from '../shared/i18n.js'
@@ -154,11 +147,7 @@ function ErrorFallback({ error }: { error: unknown }): React.JSX.Element {
 
 export function App(): React.JSX.Element {
   const t = useMessages()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [runIdInput, setRunIdInput] = React.useState('')
   const [unauthorized, setUnauthorized] = React.useState(false)
-  const showRunJump = location.pathname.startsWith('/runs')
   return (
     <>
       <AppShell header={{ height: 58 }}>
@@ -203,40 +192,6 @@ export function App(): React.JSX.Element {
                   <span className="primary-nav-label">{t('viewerNav')}</span>
                 </Button>
               </Group>
-              {/* Without a session every request 401s, so a run-id jump would only
-                  bounce the reader back to the sign-in form. */}
-              {!unauthorized && showRunJump && (
-                <form
-                  className="open-run"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    const requestedRunId = runIdInput.trim()
-                    if (requestedRunId)
-                      navigate(`/runs/${encodeURIComponent(requestedRunId)}`)
-                  }}
-                >
-                  <Group gap={6} align="center" wrap="nowrap">
-                    <TextInput
-                      aria-label={t('goToRunId')}
-                      placeholder={t('runIdPlaceholder')}
-                      value={runIdInput}
-                      size="sm"
-                      ff="monospace"
-                      onChange={(event) =>
-                        setRunIdInput(event.currentTarget.value)
-                      }
-                    />
-                    <ActionIcon
-                      type="submit"
-                      aria-label={t('goToRun')}
-                      variant="filled"
-                      size={36}
-                    >
-                      <IconArrowRight size={ICON_SIZE.md} />
-                    </ActionIcon>
-                  </Group>
-                </form>
-              )}
               <PreferenceControls signedIn={!unauthorized} />
             </Group>
           </Container>

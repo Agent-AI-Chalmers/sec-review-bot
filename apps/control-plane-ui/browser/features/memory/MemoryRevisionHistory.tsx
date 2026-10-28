@@ -3,7 +3,7 @@ import { Alert, Button, Group, SegmentedControl, Table } from '@mantine/core'
 import { IconArrowsDiff, IconEye, IconHistory } from '@tabler/icons-react'
 
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
-import { LoadingState } from '../../shared/StateMessage.js'
+import { EmptyState, LoadingState } from '../../shared/StateMessage.js'
 import type { components } from './api-types.generated.js'
 import { RevisionGraph } from './RevisionGraph.js'
 import { ICON_SIZE } from '../../shared/design.js'
@@ -39,6 +39,9 @@ export function MemoryRevisionHistory({
 }): React.JSX.Element {
   const t = useMessages()
   const { language } = useLanguage()
+
+  if (!loading && revisions.length === 0 && !error)
+    return <EmptyState message={t('noRevisions')} />
 
   return (
     <>

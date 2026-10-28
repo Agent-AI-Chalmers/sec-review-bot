@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm'
 
 import { abbreviate } from '../../shared/format.js'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
-import { LoadingState } from '../../shared/StateMessage.js'
+import { EmptyState, LoadingState } from '../../shared/StateMessage.js'
 import type { components } from './api-types.generated.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
@@ -30,6 +30,9 @@ export function MemoryObservationList({
   const { language } = useLanguage()
   const [selectedObservation, setSelectedObservation] =
     React.useState<Observation>()
+
+  if (!loading && observations.length === 0 && !error)
+    return <EmptyState message={t('noObservations')} />
 
   return (
     <>

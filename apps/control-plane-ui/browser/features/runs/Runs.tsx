@@ -55,6 +55,7 @@ import {
 import { LIST_RUN_QUERY_PARAMS } from '../../../shared/list-run-query-params.js'
 import { PlatformMark } from './PlatformMark.js'
 import { ICON_SIZE } from '../../shared/design.js'
+import { RunJump } from './RunJump.js'
 
 const RANGE_MINUTES: Record<string, number> = {
   '1h': 60,
@@ -247,11 +248,14 @@ export function Runs(): React.JSX.Element {
         mb="lg"
       >
         <Title order={1}>{t('runs')}</Title>
-        <RefreshControls
-          refresh={refresh}
-          refreshing={refreshing}
-          lastChecked={lastChecked}
-        />
+        <Group gap="sm" align="center" wrap="wrap" justify="flex-end">
+          <RunJump />
+          <RefreshControls
+            refresh={refresh}
+            refreshing={refreshing}
+            lastChecked={lastChecked}
+          />
+        </Group>
       </Group>
       {blocked.length > 0 && (
         <Alert
@@ -471,7 +475,9 @@ export function Runs(): React.JSX.Element {
                             // A hex id reads far better in a monospaced face: proportional
                             // digits make `0`/`O` and `1`/`l` ambiguous at 12px.
                             style={{
-                              fontFamily: 'var(--mantine-font-family-monospace)'
+                              fontFamily:
+                                'var(--mantine-font-family-monospace)',
+                              whiteSpace: 'nowrap'
                             }}
                             to={`/runs/${encodeURIComponent(run.run_id)}`}
                             state={{ listSearch: search.toString() }}

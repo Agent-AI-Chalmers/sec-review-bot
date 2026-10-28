@@ -4,6 +4,7 @@ import { IconInfoCircle } from '@tabler/icons-react'
 
 import { workflowLabel } from '../../shared/format.js'
 import { useLanguage, useMessages } from '../../shared/i18n.js'
+import { EmptyState } from '../../shared/StateMessage.js'
 import type { components, operations } from './api-types.generated.js'
 
 export type CatalogOverview = components['schemas']['CatalogOverview']
@@ -24,30 +25,40 @@ function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
   const padding = { top: 18, right: 14, bottom: 34, left: 38 }
   const plotWidth = width - padding.left - padding.right
   const plotHeight = height - padding.top - padding.bottom
+  // A wide window can be almost entirely empty. Start at the first period with
+  // activity (keeping one baseline point) so the default view is not a flat line.
+  const firstActive = overview.trend_points.findIndex(
+    (point) =>
+      point.extracted_unit_count > 0 || point.units_with_observation_count > 0
+  )
+  const trendPoints =
+    firstActive > 0
+      ? overview.trend_points.slice(Math.max(0, firstActive - 1))
+      : overview.trend_points
   const maximum = Math.max(
     1,
-    ...overview.trend_points.map((point) => point.extracted_unit_count)
+    ...trendPoints.map((point) => point.extracted_unit_count)
   )
   const point = (value: number, index: number): string => {
     const x =
       padding.left +
-      (overview.trend_points.length <= 1
+      (trendPoints.length <= 1
         ? plotWidth / 2
-        : (index / (overview.trend_points.length - 1)) * plotWidth)
+        : (index / (trendPoints.length - 1)) * plotWidth)
     const y = padding.top + plotHeight - (value / maximum) * plotHeight
     return `${x},${y}`
   }
   const labels = [
     0,
-    Math.floor((overview.trend_points.length - 1) / 2),
-    overview.trend_points.length - 1
+    Math.floor((trendPoints.length - 1) / 2),
+    trendPoints.length - 1
   ]
     .filter(
       (value, index, values) => value >= 0 && values.indexOf(value) === index
     )
     .map((index) => ({
       index,
-      periodStart: overview.trend_points[index]?.period_start
+      periodStart: trendPoints[index]?.period_start
     }))
 
   return (
@@ -72,7 +83,7 @@ function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
           )
         })}
         <polyline
-          points={overview.trend_points
+          points={trendPoints
             .map((trendPoint, index) =>
               point(trendPoint.extracted_unit_count, index)
             )
@@ -80,7 +91,7 @@ function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
           className="memory-overview-line memory-overview-line-extracted"
         />
         <polyline
-          points={overview.trend_points
+          points={trendPoints
             .map((trendPoint, index) =>
               point(trendPoint.units_with_observation_count, index)
             )
@@ -100,9 +111,9 @@ function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
         {labels.map(({ index, periodStart }) => {
           const x =
             padding.left +
-            (overview.trend_points.length <= 1
+            (trendPoints.length <= 1
               ? plotWidth / 2
-              : (index / (overview.trend_points.length - 1)) * plotWidth)
+              : (index / (trendPoints.length - 1)) * plotWidth)
           return (
             <text
               key={index}
@@ -111,7 +122,7 @@ function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
               textAnchor={
                 index === 0
                   ? 'start'
-                  : index === overview.trend_points.length - 1
+                  : index === trendPoints.length - 1
                     ? 'end'
                     : 'middle'
               }
@@ -250,44 +261,48 @@ export function MemoryOverview({
             </span>
           </div>
         </div>
-        <Table>
-          <Table.Thead>
-            <Table.Tr>
-              <Table.Th>{t('workflow')}</Table.Th>
-              <Table.Th ta="right">{t('extractedUnits')}</Table.Th>
-              <Table.Th ta="right">{t('unitsWithObservation')}</Table.Th>
-              <Table.Th ta="right">{t('unitsWithoutObservation')}</Table.Th>
-            </Table.Tr>
-          </Table.Thead>
-          <Table.Tbody>
-            {overview.workflows.map((item) => (
-              <Table.Tr key={item.source_workflow}>
-                <Table.Td>{workflowLabel(item.source_workflow, t)}</Table.Td>
-                <Table.Td ta="right">{item.extracted_unit_count}</Table.Td>
-                <Table.Td ta="right">
-                  {item.units_with_observation_count}
-                </Table.Td>
-                <Table.Td ta="right">
-                  {item.units_without_observation_count}
-                </Table.Td>
+        {overview.workflows.length === 0 ? (
+          <EmptyState message={t('noWorkflowData')} />
+        ) : (
+          <Table>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>{t('workflow')}</Table.Th>
+                <Table.Th ta="right">{t('extractedUnits')}</Table.Th>
+                <Table.Th ta="right">{t('unitsWithObservation')}</Table.Th>
+                <Table.Th ta="right">{t('unitsWithoutObservation')}</Table.Th>
               </Table.Tr>
-            ))}
-          </Table.Tbody>
-          <Table.Tfoot>
-            <Table.Tr>
-              <Table.Th>{t('lifecycleTotal')}</Table.Th>
-              <Table.Th ta="right">
-                {totals.extracted_unit_count.toLocaleString()}
-              </Table.Th>
-              <Table.Th ta="right">
-                {totals.units_with_observation_count.toLocaleString()}
-              </Table.Th>
-              <Table.Th ta="right">
-                {totals.units_without_observation_count.toLocaleString()}
-              </Table.Th>
-            </Table.Tr>
-          </Table.Tfoot>
-        </Table>
+            </Table.Thead>
+            <Table.Tbody>
+              {overview.workflows.map((item) => (
+                <Table.Tr key={item.source_workflow}>
+                  <Table.Td>{workflowLabel(item.source_workflow, t)}</Table.Td>
+                  <Table.Td ta="right">{item.extracted_unit_count}</Table.Td>
+                  <Table.Td ta="right">
+                    {item.units_with_observation_count}
+                  </Table.Td>
+                  <Table.Td ta="right">
+                    {item.units_without_observation_count}
+                  </Table.Td>
+                </Table.Tr>
+              ))}
+            </Table.Tbody>
+            <Table.Tfoot>
+              <Table.Tr>
+                <Table.Th>{t('lifecycleTotal')}</Table.Th>
+                <Table.Th ta="right">
+                  {totals.extracted_unit_count.toLocaleString()}
+                </Table.Th>
+                <Table.Th ta="right">
+                  {totals.units_with_observation_count.toLocaleString()}
+                </Table.Th>
+                <Table.Th ta="right">
+                  {totals.units_without_observation_count.toLocaleString()}
+                </Table.Th>
+              </Table.Tr>
+            </Table.Tfoot>
+          </Table>
+        )}
       </section>
     </div>
   )

@@ -40,6 +40,7 @@ import {
 } from './api.js'
 import { RunStateMachines } from './StateMachine.js'
 import { RunFilesViewer } from './RunFilesViewer.js'
+import { RunJump } from './RunJump.js'
 import { ExecutionStatistics } from './ExecutionStatistics.js'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { CopyAction } from '../../shared/CopyAction.js'
@@ -720,16 +721,18 @@ export function Detail(): React.JSX.Element {
   const publishedStart = run?.publication.started_at ?? null
   return (
     <Container size="lg" py="xl">
-      <Button
-        component={Link}
-        to={backTo}
-        variant="subtle"
-        px={0}
-        leftSection={<IconArrowLeft size={ICON_SIZE.md} />}
-        mb="lg"
-      >
-        {t('back')}
-      </Button>
+      <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+        <Button
+          component={Link}
+          to={backTo}
+          variant="subtle"
+          px={0}
+          leftSection={<IconArrowLeft size={ICON_SIZE.md} />}
+        >
+          {t('back')}
+        </Button>
+        <RunJump />
+      </Group>
       {run === undefined ? (
         <LoadingState message={t('loadingRun')} />
       ) : (

@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Inter Variable';
+  src: url('../assets/fonts/InterVariable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /*
  * Every colour the console owns is a named, *typed* custom property. `@property`
  * gives each one a syntax, which is what makes them interpolable: a plain custom
@@ -104,6 +112,7 @@
      fallback, kept in sync by the `--mantine-font-family` fallback itself. */
   font-family: var(
     --mantine-font-family,
+    'Inter Variable',
     Inter,
     'Inter var',
     ui-sans-serif,
@@ -113,11 +122,17 @@
     Roboto,
     'PingFang SC',
     'Hiragino Sans GB',
+    'Noto Sans SC',
     'Noto Sans CJK SC',
+    'Source Han Sans SC',
     'Microsoft YaHei',
     sans-serif
   );
   color-scheme: light;
+  font-optical-sizing: auto;
+  /* Inter ships real 100–900 weights; do not let the browser fake bold on
+     Chinese fallback faces that only carry 400/700. */
+  font-synthesis-weight: none;
   /* The console's own colour tokens cross-fade at Mantine's pace, not its own: the
      components it composes swap their theme colours over ~100-150ms with `ease`, and
      the console must not run at a different tempo or the two visibly disagree. Owning
@@ -180,6 +195,9 @@
 
 body {
   margin: 0;
+  /* The console is mostly tables and counters; tabular figures keep columns and
+     metric changes from shifting. Inter draws the digits, not the CJK fallback. */
+  font-variant-numeric: tabular-nums lining-nums;
   -webkit-font-smoothing: antialiased;
 }
 

@@ -53,7 +53,6 @@ export function MemoryHeader({
           <Switch
             checked={control?.state === 'enabled'}
             disabled={!control || busy}
-            color="green"
             label={
               control?.state === 'enabled'
                 ? t('maintenanceEnabled')
