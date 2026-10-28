@@ -15,7 +15,8 @@ import {
   TextInput,
   Timeline,
   Title,
-  Tooltip
+  Tooltip,
+  UnstyledButton
 } from '@mantine/core'
 import { IconAlertTriangle } from '@tabler/icons-react'
 import {
@@ -143,7 +144,7 @@ function Artifact({
               <Text c="dimmed" size="xs">
                 {t('sha256')}
               </Text>
-              <button
+              <UnstyledButton
                 type="button"
                 className="artifact-digest-toggle"
                 aria-expanded={expanded}
@@ -156,7 +157,7 @@ function Artifact({
                 ) : (
                   <IconChevronDown size={ICON_SIZE.sm} />
                 )}
-              </button>
+              </UnstyledButton>
               <CopyAction
                 value={artifact.digest}
                 name={t('copyDigest')}
@@ -876,14 +877,20 @@ export function Detail(): React.JSX.Element {
                 variant="light"
                 radius="md"
                 p="lg"
-                icon={<IconAlertTriangle size={ICON_SIZE.xl} />}
-                title={t(
-                  parkedAxis === 'preparation'
-                    ? 'blockedRunTitle'
-                    : parkedAxis === 'execution'
-                      ? 'disconnectedExecutionTitle'
-                      : 'disconnectedPublicationTitle'
-                )}
+                title={
+                  <Group gap="xs" align="center" wrap="nowrap">
+                    <IconAlertTriangle size={ICON_SIZE.md} aria-hidden />
+                    <span>
+                      {t(
+                        parkedAxis === 'preparation'
+                          ? 'blockedRunTitle'
+                          : parkedAxis === 'execution'
+                            ? 'disconnectedExecutionTitle'
+                            : 'disconnectedPublicationTitle'
+                      )}
+                    </span>
+                  </Group>
+                }
                 className="blocked-run"
                 data-testid="blocked-run"
               >

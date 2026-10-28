@@ -201,6 +201,15 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Native code elements otherwise fall back to the platform's generic monospace,
+   which resolves to a CJK mono face in a Chinese document. Use the same explicit
+   Latin-first stack as Mantine's monospace components. */
+code,
+kbd,
+samp {
+  font-family: var(--mantine-font-family-monospace);
+}
+
 .error-fallback {
   display: grid;
   min-height: calc(100dvh - 58px);
