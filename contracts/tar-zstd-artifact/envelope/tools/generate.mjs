@@ -2,10 +2,9 @@ import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { zstdCompressSync } from 'node:zlib'
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const root = path.resolve(import.meta.dirname, '..')
 const corpus = path.join(root, 'v1', 'corpus')
 
 function octal(header, offset, length, value) {

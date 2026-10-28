@@ -2,10 +2,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
-const toolRoot = path.dirname(fileURLToPath(import.meta.url));
-const corpusRoot = path.resolve(toolRoot, "..", "v1", "corpus");
+const toolRoot = import.meta.dirname;
+const corpusRoot = path.resolve(toolRoot, "../v1/corpus");
 
 test("input-bundle corpus manifest covers every archive", () => {
   const manifest = JSON.parse(

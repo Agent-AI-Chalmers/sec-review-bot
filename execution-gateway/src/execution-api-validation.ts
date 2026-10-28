@@ -1,6 +1,5 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import Ajv2020Module, {
   type AnySchemaObject,
@@ -17,12 +16,7 @@ import { EXECUTION_API_VERSION } from './execution-api-version.js'
 function contractsRoot(): string {
   const configured = process.env.SEC_REVIEW_CONTRACTS_ROOT?.trim()
   if (configured) return path.resolve(configured)
-  return path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    '..',
-    '..',
-    'contracts',
-  )
+  return path.resolve(import.meta.dirname, '../../contracts')
 }
 
 const schemaByWorkflow: Record<ExecutionWorkflow, string> = {

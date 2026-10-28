@@ -2,7 +2,6 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import { test } from 'node:test'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { zstdCompressSync } from 'node:zlib'
 
 import tar from 'tar-stream'
@@ -13,12 +12,7 @@ import {
   readMemoryTreeArtifact
 } from '../server/memory/memory-tree-artifact.js'
 
-const repositoryRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  '..'
-)
+const repositoryRoot = path.resolve(import.meta.dirname, '../../..')
 
 async function memoryTreeArchive(
   entries: Array<{

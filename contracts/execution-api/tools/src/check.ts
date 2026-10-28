@@ -1,7 +1,6 @@
 // Prove this family's committed artifacts match a fresh render of its contract.
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { generatedArtifacts as payloadTypes } from './generate-api-types.js'
 import { generatedArtifacts as apiTypes } from './generate-types.js'
@@ -28,7 +27,10 @@ export async function staleGeneratedArtifacts(): Promise<StaleArtifact[]> {
   return stale
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] !== undefined &&
+  import.meta.filename === path.resolve(process.argv[1])
+) {
   const stale = await staleGeneratedArtifacts()
   if (stale.length > 0) {
     for (const { output, command } of stale) {

@@ -4,10 +4,9 @@ import crypto from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
 import { spawn } from 'node:child_process'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 
-const scriptDirectory = path.dirname(fileURLToPath(import.meta.url))
+const scriptDirectory = import.meta.dirname
 const reviewRunsDirectory = path.resolve(scriptDirectory, '..')
 const repositoryDirectory = path.resolve(reviewRunsDirectory, '..')
 const suppliedDatabaseUrl =

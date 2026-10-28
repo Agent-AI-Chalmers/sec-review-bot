@@ -2,15 +2,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { fileURLToPath } from "node:url";
 
 test("run-diagnostic corpus manifest covers every archive", () => {
-  const corpus = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    "..",
-    "v1",
-    "corpus",
-  );
+  const corpus = path.resolve(import.meta.dirname, "../v1/corpus");
   const manifest = JSON.parse(
     fs.readFileSync(path.join(corpus, "manifest.json"), "utf8"),
   );
@@ -24,12 +18,12 @@ test("run-diagnostic corpus manifest covers every archive", () => {
 });
 
 test("generated artifact manifest covers the run-diagnostic corpus", () => {
-  const toolRoot = path.dirname(fileURLToPath(import.meta.url));
+  const toolRoot = import.meta.dirname;
   const generated = JSON.parse(
     fs.readFileSync(path.join(toolRoot, "generated-artifacts.json"), "utf8"),
   );
   assert.equal(generated.family, "tar-zstd-artifact/profiles/run-diagnostic");
-  const corpus = path.resolve(toolRoot, "..", "v1", "corpus");
+  const corpus = path.resolve(toolRoot, "../v1/corpus");
   const expected = fs
     .readdirSync(corpus)
     .map(

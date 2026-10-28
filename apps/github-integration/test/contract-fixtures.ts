@@ -1,6 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { EXECUTION_API_VERSION } from '../src/execution/execution-api-version.js'
 
@@ -11,7 +10,7 @@ import { EXECUTION_API_VERSION } from '../src/execution/execution-api-version.js
  * merely-named `contracts/` directory (such as this package's own `test/contracts/`) does not
  * match. */
 export function workspaceRoot(): string {
-  let current = path.dirname(fileURLToPath(import.meta.url))
+  let current = import.meta.dirname
   while (true) {
     if (existsSync(path.join(current, 'contracts', 'README.md'))) {
       return current

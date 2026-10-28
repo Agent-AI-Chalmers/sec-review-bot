@@ -1,18 +1,14 @@
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import prettier from 'prettier'
 import { parse } from 'yaml'
 
 import { renderKubbTypes } from './render-kubb-types.js'
 
-const toolsRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..'
-)
-const contractPath = path.resolve(toolsRoot, '..', 'v1', 'openapi.yaml')
-const repositoryRoot = path.resolve(toolsRoot, '..', '..', '..')
+const toolsRoot = path.resolve(import.meta.dirname, '..')
+const contractPath = path.resolve(toolsRoot, '../v1/openapi.yaml')
+const repositoryRoot = path.resolve(toolsRoot, '../../..')
 const outputPaths = [
   path.resolve(
     repositoryRoot,
@@ -60,7 +56,10 @@ export async function renderGeneratedTypes(
 
 export { outputPaths }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] !== undefined &&
+  import.meta.filename === path.resolve(process.argv[1])
+) {
   await Promise.all(
     outputPaths.map(async (outputPath) =>
       writeFile(outputPath, await renderGeneratedTypes(outputPath))

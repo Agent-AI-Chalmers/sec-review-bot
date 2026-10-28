@@ -8,13 +8,8 @@ import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { createRequire } from 'node:module'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
 
-const repositoryDirectory = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-)
+const repositoryDirectory = path.resolve(import.meta.dirname, '../..')
 const gatewayDirectory = path.join(repositoryDirectory, 'execution-gateway')
 const reviewRunsDirectory = path.join(repositoryDirectory, 'review-runs')
 const requireFromGateway = createRequire(
