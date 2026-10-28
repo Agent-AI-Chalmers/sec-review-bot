@@ -1,5 +1,9 @@
 /* ---------------------------------------------------------------- app shell */
 
+:root {
+  --app-header-height: 58px;
+}
+
 .mantine-AppShell-header {
   background: var(--surface-raised);
   border-bottom: 1px solid var(--border);
@@ -27,7 +31,7 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: var(--space-3);
   color: inherit;
   font-size: 15px;
   font-weight: 700;
@@ -40,7 +44,7 @@
   content: '';
   width: 22px;
   height: 22px;
-  border-radius: 7px;
+  border-radius: var(--radius-panel);
   background: linear-gradient(
     135deg,
     var(--brand),
@@ -63,13 +67,4 @@
       transparent 60%
     );
   min-height: calc(100vh - 58px);
-}
-.open-run {
-  flex: 0 1 320px;
-  min-width: 0;
-}
-
-.open-run .mantine-TextInput-root {
-  flex: 1;
-  min-width: 0;
 }

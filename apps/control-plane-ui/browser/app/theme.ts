@@ -22,9 +22,9 @@ import {
 // CJK SC` the Linux one, and `Microsoft YaHei` the Windows one; each is optional, so the stack
 // degrades to `system-ui` on a machine that has none of them.
 export const FONT_STACK =
-  'Inter, "Inter var", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, ' +
-  '"PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", ' +
-  'sans-serif'
+  '"Inter Variable", Inter, "Inter var", ui-sans-serif, system-ui, -apple-system, ' +
+  '"Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Noto Sans SC", ' +
+  '"Noto Sans CJK SC", "Source Han Sans SC", "Microsoft YaHei", sans-serif'
 
 // Named Latin monospace faces come before any CJK one. `ui-monospace` alone resolves to whatever
 // the platform considers monospaced, and on a machine without a Latin monospace installed that is
@@ -72,20 +72,22 @@ export const mantineTheme = createTheme({
   headings: {
     fontFamily: FONT_STACK,
     fontWeight: '700',
+    // The console is dense, so the type scale only opens up where it carries
+    // hierarchy: page title, section title, and a slightly raised subsection.
     sizes: {
-      h1: { fontSize: '1.75rem', lineHeight: '1.2' },
-      h2: { fontSize: '1.125rem', lineHeight: '1.3' },
-      h3: { fontSize: '1rem', lineHeight: '1.3' }
+      h1: { fontSize: '2rem', lineHeight: '1.2' },
+      h2: { fontSize: '1.25rem', lineHeight: '1.3' },
+      h3: { fontSize: '1.0625rem', lineHeight: '1.35' }
     }
   },
   defaultRadius: 'md',
   cursorType: 'pointer',
   components: {
     Paper: Paper.extend({
-      defaultProps: { radius: 'lg', shadow: 'sm' }
+      defaultProps: { radius: 'md', shadow: 'sm' }
     }),
     Card: Card.extend({
-      defaultProps: { radius: 'lg', shadow: 'sm', withBorder: true }
+      defaultProps: { radius: 'md', shadow: 'sm', withBorder: true }
     }),
     Badge: Badge.extend({
       defaultProps: { radius: 'xl', variant: 'light' }

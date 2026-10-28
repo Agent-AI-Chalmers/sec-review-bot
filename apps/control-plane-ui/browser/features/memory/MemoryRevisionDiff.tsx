@@ -24,6 +24,7 @@ import {
   useMessages
 } from '../../shared/i18n.js'
 import type { components } from './api-types.generated.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 type ChangeKind = 'added' | 'modified' | 'deleted'
 
@@ -247,7 +248,7 @@ export function MemoryRevisionDiffContent({
                 size="lg"
                 aria-label={t('openFullPage')}
               >
-                <IconExternalLink size={18} />
+                <IconExternalLink size={ICON_SIZE.lg} />
               </ActionIcon>
             </Tooltip>
           )}

@@ -229,6 +229,44 @@ test('dev fixtures serve memory actions as downloads', async () => {
   }
 })
 
+test('dev fixtures expose stable full-page load-error scenarios', async () => {
+  const fixture = await startFixtureServer()
+  try {
+    for (const [path, status, error] of [
+      [
+        '/api/memory/revisions/404/content',
+        422,
+        'invalid_memory_tree_artifact'
+      ],
+      [
+        '/api/memory/revisions/404/transcript/content',
+        503,
+        'memory_catalog_unavailable'
+      ],
+      [
+        '/api/runs/fixture-artifact-load-error/artifact/content',
+        503,
+        'review_runs_unavailable'
+      ]
+    ] as const) {
+      const response = await fetch(`${fixture.base}${path}`)
+      assert.strictEqual(response.status, status)
+      assert.deepStrictEqual(await response.json(), { error })
+    }
+
+    const download = await fetch(
+      `${fixture.base}/api/memory/revisions/404/artifact`
+    )
+    assert.strictEqual(download.status, 200)
+    assert.strictEqual(
+      download.headers.get('content-disposition'),
+      'attachment; filename="memory-tree.v1.tar.zst"'
+    )
+  } finally {
+    await fixture.close()
+  }
+})
+
 test('dev fixtures page the run list in the order their cursor describes', async () => {
   // The run list is built in scenario order, and an active run's timestamp is anchored near
   // now rather than at its newest historical slot, so array order is not creation order. The

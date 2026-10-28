@@ -894,6 +894,29 @@ async def test_catalog_revision_conflict_is_not_retried(monkeypatch) -> None:
     assert captured.value.non_retryable is True
 
 
+@pytest.mark.asyncio
+async def test_catalog_maintenance_pause_is_not_retried(monkeypatch) -> None:
+    from temporalio.exceptions import ApplicationError
+
+    from sec_review_agents.memory.catalog_client import (
+        MemoryMaintenancePausedError,
+    )
+
+    def paused(**_kwargs):
+        raise MemoryMaintenancePausedError("Automatic memory maintenance is paused.")
+
+    monkeypatch.setattr(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        Mock(return_value=SimpleNamespace(create_memory_tree_revision=paused)),
+    )
+
+    with pytest.raises(ApplicationError) as captured:
+        maintenance_workflow.commit_memory_tree_revision_activity(_revision_creation())
+
+    assert captured.value.type == "MEMORY_MAINTENANCE_PAUSED"
+    assert captured.value.non_retryable is True
+
+
 def test_commit_memory_tree_revision_uses_prepared_payload_after_processing_is_disabled(
     monkeypatch,
 ) -> None:

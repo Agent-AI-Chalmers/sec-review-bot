@@ -16,7 +16,7 @@
   max-height: min(68vh, 720px);
   overflow: auto;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-panel);
   background: light-dark(
     var(--mantine-color-gray-0),
     var(--mantine-color-dark-8)
@@ -60,9 +60,9 @@
   position: absolute;
   z-index: 1;
   display: flex;
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-panel);
   flex-direction: column;
   justify-content: center;
   color: var(--mantine-color-text);
@@ -87,7 +87,7 @@
     var(--mantine-color-green-7),
     var(--mantine-color-green-5)
   );
-  background: light-dark(var(--mantine-color-green-0), rgb(34 55 43 / 48%));
+  background: var(--status-complete-soft);
 }
 
 .revision-graph-node strong {
@@ -187,7 +187,7 @@
   display: flex;
   align-items: center;
   gap: var(--mantine-spacing-xs);
-  padding-inline: 10px;
+  padding-inline: var(--mantine-spacing-xs);
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-xs);
   font-weight: 600;
@@ -214,6 +214,9 @@
 .memory-markdown {
   min-width: 280px;
   overflow-wrap: anywhere;
+  color: var(--mantine-color-text);
+  font-size: 0.9375rem;
+  line-height: 1.75;
 }
 
 .memory-table .memory-observation-index {
@@ -236,20 +239,118 @@
   margin-bottom: 0;
 }
 
+.memory-markdown p {
+  margin: 0 0 0.85em;
+}
+
+.memory-markdown p:last-child {
+  margin-bottom: 0;
+}
+
+.memory-markdown ul,
+.memory-markdown ol {
+  margin: 0 0 0.9em;
+  padding-left: 1.4em;
+}
+
+.memory-markdown li {
+  margin: 0.3em 0;
+}
+
+.memory-markdown li > p {
+  margin: 0;
+}
+
+.memory-markdown h1,
+.memory-markdown h2,
+.memory-markdown h3,
+.memory-markdown h4,
+.memory-markdown h5,
+.memory-markdown h6 {
+  margin: 1.2em 0 0.5em;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.memory-markdown h1 {
+  font-size: 1.35em;
+}
+
+.memory-markdown h2 {
+  font-size: 1.2em;
+}
+
+.memory-markdown h3 {
+  font-size: 1.1em;
+}
+
+.memory-markdown h4,
+.memory-markdown h5,
+.memory-markdown h6 {
+  font-size: 1em;
+}
+
+.memory-markdown strong {
+  font-weight: 650;
+}
+
+.memory-markdown a {
+  color: var(--mantine-color-brand-6);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.memory-markdown :not(pre) > code {
+  padding: 0.12em 0.36em;
+  border-radius: 4px;
+  background: light-dark(
+    var(--mantine-color-gray-1),
+    var(--mantine-color-dark-6)
+  );
+  color: var(--mantine-color-text);
+  font-size: 0.9em;
+}
+
 .memory-markdown pre {
   overflow-x: auto;
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-panel);
   background: var(--surface-raised);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.memory-markdown pre code {
+  padding: 0;
+  background: transparent;
+  font-size: inherit;
 }
 
 .memory-markdown code {
   font-family: var(--mantine-font-family-monospace);
 }
+
+.memory-markdown blockquote {
+  margin: 0 0 0.9em;
+  padding-left: var(--space-4);
+  border-left: 3px solid var(--border-strong);
+  color: var(--mantine-color-dimmed);
+}
+
+.memory-markdown hr {
+  margin: 1.2em 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.memory-markdown img {
+  max-width: 100%;
+  height: auto;
+}
 .memory-overview {
   display: grid;
-  gap: 24px;
+  gap: var(--space-6);
 }
 
 .memory-overview-metrics {
@@ -262,7 +363,7 @@
   display: grid;
   align-content: center;
   min-height: 126px;
-  padding: 18px 22px;
+  padding: var(--space-5) var(--space-6);
   border-inline-start: 1px solid var(--mantine-color-default-border);
 }
 
@@ -286,7 +387,7 @@
 .memory-overview-legend span {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .memory-overview-section {
@@ -302,7 +403,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: var(--space-5);
 }
 
 .memory-overview-legend {
@@ -315,7 +416,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 18px;
+  gap: var(--space-5);
   flex-wrap: wrap;
 }
 
@@ -340,7 +441,6 @@
   display: block;
   width: 100%;
   height: 220px;
-  min-width: 620px;
   color: var(--mantine-color-dimmed);
 }
 
@@ -369,22 +469,59 @@
   stroke: var(--mantine-color-green-6);
 }
 
-.memory-overview-lower {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.7fr) minmax(0, 2fr);
-  gap: 36px;
-  align-items: start;
-}
-
-.memory-overview-outcome {
+.memory-overview-workflows-head {
   display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 16px;
-  padding: 12px 0;
-  border-block-end: 1px solid var(--mantine-color-default-border);
+  gap: var(--space-2) var(--space-4);
 }
 
-.memory-overview-outcome strong,
-.memory-overview-workflows td:not(:first-child) {
+.memory-overview-lifecycle-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  color: var(--muted);
+  font-size: var(--mantine-font-size-xs);
+}
+
+.memory-overview-lifecycle-inline > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.memory-overview-lifecycle-inline strong {
+  color: var(--mantine-color-text);
   font-variant-numeric: tabular-nums;
+}
+
+.memory-overview-lifecycle-inline-label {
+  color: var(--muted);
+}
+
+.memory-overview-lifecycle-swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+.memory-overview-lifecycle-swatch.pending {
+  background: var(--muted);
+}
+
+.memory-overview-lifecycle-swatch.consumed {
+  background: var(--status-complete);
+}
+
+.memory-overview-workflows td:not(:first-child),
+.memory-overview-workflows tfoot th:not(:first-child) {
+  font-variant-numeric: tabular-nums;
+}
+
+.memory-overview-workflows tfoot th {
+  border-top: 1px solid var(--border);
+  color: var(--mantine-color-text);
 }

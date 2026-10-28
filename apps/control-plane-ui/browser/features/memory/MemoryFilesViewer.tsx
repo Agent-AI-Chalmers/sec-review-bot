@@ -1,5 +1,5 @@
 import React from 'react'
-import { ActionIcon, Alert, Group, Modal, Tooltip } from '@mantine/core'
+import { ActionIcon, Button, Group, Modal, Tooltip } from '@mantine/core'
 import { IconDownload, IconExternalLink } from '@tabler/icons-react'
 
 import {
@@ -8,7 +8,9 @@ import {
   throwIfUnauthorized
 } from '../../shared/api-client.js'
 import { FileWorkspace } from '../workspace/FileWorkspace.js'
+import { ResourceLoadError } from '../../shared/ResourceLoadError.js'
 import { useMessages } from '../../shared/i18n.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 export function MemoryFilesContent({
   revision,
@@ -48,44 +50,65 @@ export function MemoryFilesContent({
 
   throwIfUnauthorized(error)
 
+  const toolbar = (
+    <Group gap="sm" wrap="nowrap">
+      {!fullPage && (
+        <Tooltip label={t('openFullPage')}>
+          <ActionIcon
+            component="a"
+            href={`/memory/revisions/${revision}/tree`}
+            target="_blank"
+            rel="noreferrer"
+            variant="default"
+            size="lg"
+            aria-label={t('openFullPage')}
+          >
+            <IconExternalLink size={ICON_SIZE.lg} />
+          </ActionIcon>
+        </Tooltip>
+      )}
+      <Tooltip label={t('downloadMemoryTree')}>
+        <ActionIcon
+          component="a"
+          href={`/api/memory/revisions/${revision}/artifact`}
+          download
+          variant="default"
+          size="lg"
+          aria-label={t('downloadMemoryTree')}
+        >
+          <IconDownload size={ICON_SIZE.lg} />
+        </ActionIcon>
+      </Tooltip>
+    </Group>
+  )
+
+  if (error !== undefined)
+    return (
+      <div className="content-load-state">
+        <ResourceLoadError
+          message={t('memoryFilesLoadFailed')}
+          actions={
+            <Button
+              component="a"
+              href={`/api/memory/revisions/${revision}/artifact`}
+              download
+              variant="default"
+              leftSection={<IconDownload size={ICON_SIZE.md} />}
+            >
+              {t('downloadMemoryTree')}
+            </Button>
+          }
+        />
+      </div>
+    )
+
   return (
     <>
-      {error !== undefined && (
-        <Alert color="red">{t('memoryFilesLoadFailed')}</Alert>
-      )}
       <FileWorkspace
         files={files}
         selectedFile={selectedFile}
         onSelectFile={setSelectedFile}
-        toolbar={
-          <Group gap="sm" wrap="nowrap">
-            {!fullPage && (
-              <Tooltip label={t('openFullPage')}>
-                <ActionIcon
-                  component="a"
-                  href={`/memory/revisions/${revision}/tree`}
-                  target="_blank"
-                  rel="noreferrer"
-                  variant="default"
-                  size="lg"
-                >
-                  <IconExternalLink size={18} />
-                </ActionIcon>
-              </Tooltip>
-            )}
-            <Tooltip label={t('downloadMemoryTree')}>
-              <ActionIcon
-                component="a"
-                href={`/api/memory/revisions/${revision}/artifact`}
-                download
-                variant="default"
-                size="lg"
-              >
-                <IconDownload size={18} />
-              </ActionIcon>
-            </Tooltip>
-          </Group>
-        }
+        toolbar={toolbar}
       />
     </>
   )

@@ -1,0 +1,58 @@
+/* Parked-run summary, queue rows, and the parked-run decision banner. */
+
+.parked-runs-summary {
+  border-color: light-dark(
+    var(--mantine-color-orange-2),
+    var(--mantine-color-orange-9)
+  );
+  background: light-dark(
+    var(--mantine-color-orange-0),
+    var(--mantine-color-dark-6)
+  );
+}
+
+.parked-runs-summary svg {
+  color: var(--mantine-color-orange-6);
+}
+
+.parked-run-row.parked-run-row {
+  display: block;
+  width: 100%;
+  padding: var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--mantine-radius-sm);
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
+}
+
+.parked-run-row.parked-run-row:hover,
+.parked-run-row.parked-run-row:focus-visible {
+  border-color: var(--border);
+  background: var(--mantine-color-default-hover);
+}
+
+.parked-run-row.parked-run-row:focus-visible {
+  outline: 2px solid var(--mantine-color-anchor);
+  outline-offset: -2px;
+}
+
+.parked-run-id {
+  overflow-wrap: anywhere;
+}
+
+/* A run coordination refused to conclude on its own. Mantine's Alert supplies the surface and
+   the accent; these rules only keep the explanation readable at a wide viewport. */
+.blocked-run .blocked-run-body {
+  max-width: 62ch;
+  line-height: 1.75;
+}
+
+/* The decision sits beside the explanation rather than after it, so it is visible without
+   reading to the end, and it does not wrap onto its own line at a narrow width. */
+.blocked-run .blocked-run-action {
+  flex-shrink: 0;
+}

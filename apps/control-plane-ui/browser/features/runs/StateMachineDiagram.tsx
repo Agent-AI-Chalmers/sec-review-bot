@@ -1,90 +1,30 @@
 import React from 'react'
 
-import { Text, Tooltip } from '@mantine/core'
-import { IconChevronRight } from '@tabler/icons-react'
+import { Tooltip } from '@mantine/core'
 
 import type { Run, RunEvent } from './api.js'
-import { useMessages, type Message } from '../../shared/i18n.js'
-import {
-  STATE_MACHINES,
-  type StateAxis,
-  type StateMachine as StateMachineDefinition
+import { useMessages } from '../../shared/i18n.js'
+import type {
+  StateAxis,
+  StateMachine as StateMachineDefinition
 } from './state-machines.generated.js'
 import {
-  DIAGRAMMED_AXES,
   STATE_LAYOUT,
   revertSide,
   selfLoopSide
 } from './state-machine-layout.js'
+import {
+  edgeLabel,
+  machineTitle,
+  stateDescription,
+  stateLabel
+} from './transitions.js'
 
 /** The current state of one axis, read from the run. */
 function currentState(run: Run, axis: StateAxis): string | null {
   if (axis === 'execution') return run.execution.status
   if (axis === 'publication') return run.publication.status
   return run.preparation.status
-}
-
-/** i18n key for a state's label or hover description. The contract carries the English text
- * (its own documented label) and the console localizes it by this key, so a translation lives
- * with the rest of the UI copy rather than inside the API document. */
-function stateKey(
-  axis: StateAxis,
-  state: string,
-  field: 'label' | 'desc'
-): Message | null {
-  const key = `state_${axis}_${state}_${field}`
-  return key as Message
-}
-
-function stateLabel(
-  machine: StateMachineDefinition,
-  state: string,
-  t: (key: Message) => string
-): string {
-  const key = stateKey(machine.axis, state, 'label')
-  const translated = key === null ? undefined : t(key)
-  // Fall back to the contract's English label if a translation key is missing.
-  return translated && translated !== key
-    ? translated
-    : (machine.details[state]?.label ?? state)
-}
-
-function stateDescription(
-  machine: StateMachineDefinition,
-  state: string,
-  t: (key: Message) => string
-): string {
-  const key = stateKey(machine.axis, state, 'desc')
-  const translated = key === null ? undefined : t(key)
-  return translated && translated !== key
-    ? translated
-    : (machine.details[state]?.description ?? '')
-}
-
-/** Localized label for a transition edge, or '' when the contract gives it no label. The
- * contract carries an English label; the console overrides it with a translation key when one
- * exists. */
-function edgeLabel(
-  machine: StateMachineDefinition,
-  edge: StateMachineDefinition['transitions'][number],
-  t: (key: Message) => string
-): string {
-  const key = `edge_${machine.axis}_${edge.from}_${edge.to}` as Message
-  const translated = t(key)
-  if (translated && translated !== key) return translated
-  if (edge.label !== undefined) return edge.label
-  // Every edge gets a tooltip even if the contract gives it no label, so hovering never lands
-  // on an edge with no explanation.
-  return `${stateLabel(machine, edge.from, t)} → ${stateLabel(machine, edge.to, t)}`
-}
-
-function machineTitle(
-  machine: StateMachineDefinition,
-  t: (key: Message) => string
-): string {
-  const key = `machine_${machine.axis}_title` as Message
-  const translated = t(key)
-  return translated && translated !== key ? translated : machine.title
 }
 
 /** Column each state sits in: the longest simple path from the initial state, ignoring edges
@@ -272,11 +212,13 @@ const PAD = 12
 export function StateMachineDiagram({
   machine,
   run,
-  events
+  events,
+  fit = true
 }: {
   machine: StateMachineDefinition
   run: Run
   events: RunEvent[]
+  fit?: boolean
 }): React.JSX.Element | null {
   const t = useMessages()
   const current = currentState(run, machine.axis)
@@ -352,10 +294,7 @@ export function StateMachineDiagram({
       .map((event) => `${event.from_status ?? ''}->${event.to_status}`)
   )
   return (
-    <div className="state-machine">
-      <Text className="state-machine-title" size="xs" c="dimmed">
-        {machineTitle(machine, t)}
-      </Text>
+    <div className={fit ? 'state-machine is-fit' : 'state-machine is-actual'}>
       <svg
         className="state-machine-svg"
         width={width}
@@ -363,6 +302,7 @@ export function StateMachineDiagram({
         viewBox={`0 0 ${width} ${viewHeight}`}
         role="group"
         aria-label={machineTitle(machine, t)}
+        onPointerDown={() => setHovered(null)}
       >
         <defs>
           <marker
@@ -438,6 +378,14 @@ export function StateMachineDiagram({
                   tabIndex={0}
                   role="img"
                   aria-label={label}
+                  onPointerDown={(event) => {
+                    event.stopPropagation()
+                    setHovered({
+                      label,
+                      x: event.clientX,
+                      y: event.clientY
+                    })
+                  }}
                   onMouseEnter={(event) =>
                     setHovered({ label, x: event.clientX, y: event.clientY })
                   }
@@ -513,46 +461,5 @@ export function StateMachineDiagram({
         </span>
       )}
     </div>
-  )
-}
-
-/**
- * The coordination state machines for one run, in lifecycle order (preparation, execution,
- * publication). The failure notice is not a run lifecycle axis, so it is shown as a small line
- * here only when the preparation actually failed.
- */
-export function RunStateMachines({
-  run,
-  events
-}: {
-  run: Run
-  events: RunEvent[]
-}): React.JSX.Element {
-  const t = useMessages()
-  return (
-    // Collapsed by default, like History: the diagrams are reference material rather than the
-    // run's own status, so they stay out of the way until the reader asks for them.
-    <details className="state-machines">
-      <summary className="state-machine-summary">
-        <IconChevronRight
-          size={14}
-          className="state-machine-chevron"
-          aria-hidden="true"
-        />
-        {t('stateMachinesTitle')}
-      </summary>
-      <div className="state-machines-body">
-        {STATE_MACHINES.filter((machine) =>
-          (DIAGRAMMED_AXES as readonly string[]).includes(machine.axis)
-        ).map((machine) => (
-          <StateMachineDiagram
-            key={machine.axis}
-            machine={machine}
-            run={run}
-            events={events}
-          />
-        ))}
-      </div>
-    </details>
   )
 }

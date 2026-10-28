@@ -3,6 +3,7 @@ import { ActionIcon, Tooltip } from '@mantine/core'
 import { IconCheck, IconCopy } from '@tabler/icons-react'
 
 import { useMessages } from './i18n.js'
+import { ICON_SIZE } from './design.js'
 
 /** Copies a value and confirms it briefly; used for run ids and artifact digests. */
 export function CopyAction({
@@ -32,7 +33,11 @@ export function CopyAction({
           aria-label={text}
           onClick={() => void copy()}
         >
-          {copied ? <IconCheck size={15} /> : <IconCopy size={15} />}
+          {copied ? (
+            <IconCheck size={ICON_SIZE.sm} />
+          ) : (
+            <IconCopy size={ICON_SIZE.sm} />
+          )}
         </ActionIcon>
       </Tooltip>
       <span className="visually-hidden" aria-live="polite">

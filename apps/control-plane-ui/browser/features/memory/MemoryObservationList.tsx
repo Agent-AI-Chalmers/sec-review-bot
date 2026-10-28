@@ -7,7 +7,9 @@ import remarkGfm from 'remark-gfm'
 
 import { abbreviate } from '../../shared/format.js'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
+import { EmptyState, LoadingState } from '../../shared/StateMessage.js'
 import type { components } from './api-types.generated.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 type Observation = components['schemas']['ObservationRecord']
 
@@ -29,6 +31,9 @@ export function MemoryObservationList({
   const [selectedObservation, setSelectedObservation] =
     React.useState<Observation>()
 
+  if (!loading && observations.length === 0 && !error)
+    return <EmptyState message={t('noObservations')} />
+
   return (
     <>
       {error && (
@@ -36,7 +41,9 @@ export function MemoryObservationList({
           {error}
         </Alert>
       )}
-      {loading && observations.length === 0 && <p>{t('loading')}</p>}
+      {loading && observations.length === 0 && (
+        <LoadingState message={t('loading')} />
+      )}
       <div className="memory-table">
         <Table striped>
           <Table.Thead>
@@ -95,7 +102,7 @@ export function MemoryObservationList({
                     <Button
                       size="xs"
                       variant="subtle"
-                      leftSection={<IconEye size={14} />}
+                      leftSection={<IconEye size={ICON_SIZE.sm} />}
                       onClick={() => setSelectedObservation(item)}
                     >
                       {t('content')}
@@ -103,7 +110,7 @@ export function MemoryObservationList({
                     <Button
                       size="xs"
                       variant="subtle"
-                      leftSection={<IconEye size={14} />}
+                      leftSection={<IconEye size={ICON_SIZE.sm} />}
                       onClick={() => onViewProcess(item)}
                     >
                       {t('process')}

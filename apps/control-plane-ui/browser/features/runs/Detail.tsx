@@ -15,14 +15,14 @@ import {
   TextInput,
   Timeline,
   Title,
-  Tooltip
+  Tooltip,
+  UnstyledButton
 } from '@mantine/core'
 import { IconAlertTriangle } from '@tabler/icons-react'
 import {
   IconArrowLeft,
   IconArrowUpRight,
   IconChevronDown,
-  IconChevronRight,
   IconChevronUp,
   IconClock,
   IconFiles
@@ -38,12 +38,15 @@ import {
   throwIfUnauthorized,
   type RunEvent
 } from './api.js'
-import { RunStateMachines } from './StateMachine.js'
+import { RunTransitions } from './RunTransitions.js'
 import { RunFilesViewer } from './RunFilesViewer.js'
+import { RunJump } from './RunJump.js'
 import { ExecutionStatistics } from './ExecutionStatistics.js'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { CopyAction } from '../../shared/CopyAction.js'
+import { LoadingState } from '../../shared/StateMessage.js'
 import { useRefresh } from '../../shared/refresh.js'
+import { useNow } from '../../shared/useNow.js'
 import { PlatformMark } from './PlatformMark.js'
 import {
   ExecutionStatus,
@@ -52,7 +55,6 @@ import {
   type PublicationStepStatus,
   artifactStatusColor,
   artifactStatusLabel,
-  axisLabel,
   executionStatusLabel,
   executionTone,
   preparationStateLabel,
@@ -79,6 +81,7 @@ import {
   workflowLabel,
   abandonFailureMessageKey
 } from './format.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 interface Step {
   step_key: string
@@ -140,7 +143,7 @@ function Artifact({
               <Text c="dimmed" size="xs">
                 {t('sha256')}
               </Text>
-              <button
+              <UnstyledButton
                 type="button"
                 className="artifact-digest-toggle"
                 aria-expanded={expanded}
@@ -149,11 +152,11 @@ function Artifact({
               >
                 <code>{expanded ? hex : abbreviateDigest(hex)}</code>
                 {expanded ? (
-                  <IconChevronUp size={14} />
+                  <IconChevronUp size={ICON_SIZE.sm} />
                 ) : (
-                  <IconChevronDown size={14} />
+                  <IconChevronDown size={ICON_SIZE.sm} />
                 )}
-              </button>
+              </UnstyledButton>
               <CopyAction
                 value={artifact.digest}
                 name={t('copyDigest')}
@@ -166,7 +169,7 @@ function Artifact({
               className="artifact-actions"
               variant="default"
               size="xs"
-              leftSection={<IconFiles size={14} />}
+              leftSection={<IconFiles size={ICON_SIZE.sm} />}
               onClick={() => setFilesOpen(true)}
             >
               {t('viewRunFiles')}
@@ -575,6 +578,7 @@ function ExplainedCode({
 export function Detail(): React.JSX.Element {
   const { language } = useLanguage()
   const t = useMessages()
+  const now = useNow()
   const { runId = '' } = useParams()
   const location = useLocation()
   // Restore the list's filters and cursor when the reader came from it. A reload or
@@ -626,6 +630,29 @@ export function Detail(): React.JSX.Element {
           : run.publication.status === 'disconnected'
             ? 'publication'
             : null
+  const parkedAt: string | null =
+    parkedAxis === null || run === undefined
+      ? null
+      : ((): string | null => {
+          let latest: string | null = null
+          for (const event of events) {
+            if (event.axis !== parkedAxis || event.to_status !== 'disconnected')
+              continue
+            if (
+              latest === null ||
+              Date.parse(event.occurred_at) > Date.parse(latest)
+            )
+              latest = event.occurred_at
+          }
+          return (
+            latest ??
+            (parkedAxis === 'preparation'
+              ? run.preparation.updated_at
+              : parkedAxis === 'execution'
+                ? run.execution.updated_at
+                : run.publication.updated_at)
+          )
+        })()
   const load = React.useCallback(async (): Promise<void> => {
     try {
       const [runValue, stepValue, eventValue] = await Promise.all([
@@ -688,7 +715,7 @@ export function Detail(): React.JSX.Element {
             to={backTo}
             variant="subtle"
             px={0}
-            leftSection={<IconArrowLeft size={16} />}
+            leftSection={<IconArrowLeft size={ICON_SIZE.md} />}
           >
             {t('back')}
           </Button>
@@ -718,18 +745,20 @@ export function Detail(): React.JSX.Element {
   const publishedStart = run?.publication.started_at ?? null
   return (
     <Container size="lg" py="xl">
-      <Button
-        component={Link}
-        to={backTo}
-        variant="subtle"
-        px={0}
-        leftSection={<IconArrowLeft size={16} />}
-        mb="lg"
-      >
-        {t('back')}
-      </Button>
+      <Group justify="space-between" align="center" mb="lg" wrap="wrap">
+        <Button
+          component={Link}
+          to={backTo}
+          variant="subtle"
+          px={0}
+          leftSection={<IconArrowLeft size={ICON_SIZE.md} />}
+        >
+          {t('back')}
+        </Button>
+        <RunJump />
+      </Group>
       {run === undefined ? (
-        <p>{t('loadingRun')}</p>
+        <LoadingState message={t('loadingRun')} />
       ) : (
         <>
           <div className="run-heading">
@@ -774,7 +803,12 @@ export function Detail(): React.JSX.Element {
                   <Text c="dimmed" size="xs">
                     {t('integrationInstance')}
                   </Text>
-                  <Text size="sm" ff="monospace" className="integration-id">
+                  <Text
+                    size="sm"
+                    ff="monospace"
+                    className="integration-id"
+                    title={run.connector_id}
+                  >
                     {run.connector_id}
                   </Text>
                 </Group>
@@ -864,16 +898,40 @@ export function Detail(): React.JSX.Element {
                 // call to act, and it must not look like another content card on the page.
                 color="orange"
                 variant="light"
-                radius="sm"
+                radius="md"
                 p="lg"
-                icon={<IconAlertTriangle size={22} />}
-                title={t(
-                  parkedAxis === 'preparation'
-                    ? 'blockedRunTitle'
-                    : parkedAxis === 'execution'
-                      ? 'disconnectedExecutionTitle'
-                      : 'disconnectedPublicationTitle'
-                )}
+                title={
+                  <Group
+                    justify="space-between"
+                    align="center"
+                    wrap="wrap"
+                    gap="xs"
+                  >
+                    <Group gap="xs" align="center" wrap="nowrap">
+                      <IconAlertTriangle size={ICON_SIZE.md} aria-hidden />
+                      <span>
+                        {t(
+                          parkedAxis === 'preparation'
+                            ? 'blockedRunTitle'
+                            : parkedAxis === 'execution'
+                              ? 'disconnectedExecutionTitle'
+                              : 'disconnectedPublicationTitle'
+                        )}
+                      </span>
+                    </Group>
+                    {parkedAt !== null && (
+                      <Text size="xs" c="dimmed">
+                        {t('parkedAge').replace(
+                          '{duration}',
+                          formatDuration(
+                            Math.max(0, now - Date.parse(parkedAt)),
+                            t
+                          )
+                        )}
+                      </Text>
+                    )}
+                  </Group>
+                }
                 className="blocked-run"
                 data-testid="blocked-run"
               >
@@ -886,11 +944,12 @@ export function Detail(): React.JSX.Element {
                     align="center"
                     gap="lg"
                     wrap="nowrap"
+                    className="blocked-run-content"
                   >
                     {/* The two parked states have different causes and different
                         consequences, so the explanation follows the axis that stopped rather
                         than describing the preparation contradiction in both cases. */}
-                    <Stack gap={4}>
+                    <Stack gap="xs">
                       <Text size="sm" className="blocked-run-body">
                         {t(
                           parkedAxis === 'preparation'
@@ -961,7 +1020,7 @@ export function Detail(): React.JSX.Element {
                           unknowable outcome is given up on. */}
                       {run.preparation.status === 'disconnected' ? (
                         <Button
-                          color="orange"
+                          color="red"
                           variant="filled"
                           size="xs"
                           onClick={() => setAbandoning(true)}
@@ -972,7 +1031,7 @@ export function Detail(): React.JSX.Element {
                         </Button>
                       ) : (
                         <Button
-                          color="orange"
+                          color="red"
                           variant="filled"
                           size="xs"
                           onClick={() => setGivingUp(true)}
@@ -990,7 +1049,7 @@ export function Detail(): React.JSX.Element {
                       make that pointer lead nowhere unless guessed at. A code the console does
                       not know still renders as the bare code. */}
                   {run.preparation.disconnect_reason !== null && (
-                    <Stack gap={2}>
+                    <Stack gap={4}>
                       <Text size="xs" ff="monospace" c="dimmed">
                         {run.preparation.disconnect_reason}
                       </Text>
@@ -1015,7 +1074,7 @@ export function Detail(): React.JSX.Element {
                 className="run-progress-timeline"
               >
                 <Timeline.Item
-                  bullet={<IconClock size={14} />}
+                  bullet={<IconClock size={ICON_SIZE.sm} />}
                   title={t('created')}
                 >
                   <Text c="dimmed" size="sm">
@@ -1225,47 +1284,7 @@ export function Detail(): React.JSX.Element {
                     ))}
                 </Timeline.Item>
               </Timeline>
-              <RunStateMachines run={run} events={events} />
-              {events.length > 0 && (
-                // A native disclosure keeps this operator detail out of the way until asked
-                // for, collapses without page state, and stays keyboard/screen-reader
-                // accessible. It is a compact list rather than a table: one transition per
-                // line reads better than four columns at this density.
-                <details className="run-history">
-                  <summary className="run-history-summary">
-                    <IconChevronRight
-                      size={14}
-                      className="run-history-chevron"
-                      aria-hidden="true"
-                    />
-                    {t('runHistory')}
-                    <span className="run-history-count">{events.length}</span>
-                  </summary>
-                  <ul className="run-history-list">
-                    {events.map((event) => (
-                      <li key={event.event_id} className="run-history-item">
-                        <span className="run-history-time">
-                          {formatDate(event.occurred_at, language)}
-                        </span>
-                        <span className="run-history-axis">
-                          {axisLabel(event.axis, t)}
-                        </span>
-                        <span className="run-history-transition">
-                          {event.from_status === null ? '—' : event.from_status}
-                          {' → '}
-                          {event.to_status}
-                        </span>
-                        {event.reason_code !== null && (
-                          <ExplainedCode
-                            code={event.reason_code}
-                            className="run-history-reason"
-                          />
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </details>
-              )}
+              <RunTransitions key={run.run_id} run={run} events={events} />
             </Paper>
           </Stack>
         </>

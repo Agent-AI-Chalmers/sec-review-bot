@@ -17,6 +17,12 @@ pnpm run dev:fixtures
 
 打开 Vite 输出的地址，通常是 `http://localhost:5173`。这种模式提供有代表性的 run 和 memory 状态，不需要启动 Review Runs、Memory Catalog、PostgreSQL 或 RustFS。Memory 暂停、恢复、编辑和回滚使用有状态 fixture；artifact 下载链接背后没有真实存储对象。
 
+fixture server 还提供稳定的全页错误状态，便于进行视觉检查：
+
+- `/memory/revisions/404/tree` 显示 memory tree 预览失败，同时保留 artifact 下载入口。
+- `/memory/revisions/404/transcript` 显示 transcript 加载失败。
+- `/runs/fixture-artifact-load-error/files` 显示 run files 加载失败。
+
 ## 源码布局
 
 该 package 先按运行时划分，再按 browser 功能所有权组织：

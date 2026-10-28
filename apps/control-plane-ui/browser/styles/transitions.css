@@ -1,0 +1,193 @@
+/* Run transitions: state-machine diagrams, controls, and the transition list. */
+
+.transitions-entry {
+  margin-top: 20px;
+}
+
+.transitions-count {
+  margin-left: var(--space-2);
+  color: var(--mantine-color-dimmed);
+  font-variant-numeric: tabular-nums;
+}
+
+.transitions-body {
+  margin-top: var(--space-4);
+}
+
+.transitions-list {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.run-transition-list {
+  margin: var(--space-3) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-transition {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
+}
+
+.run-transition:first-child {
+  border-top: 0;
+}
+
+.transitions-list .mantine-Pagination-root {
+  justify-content: center;
+  margin-top: var(--space-3);
+}
+
+.state-machine {
+  display: flex;
+  justify-content: center;
+  overflow: visible;
+}
+
+.state-machine.is-actual {
+  justify-content: flex-start;
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+.state-machine.is-actual .state-machine-svg {
+  max-width: none;
+}
+
+.state-machine-svg {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  color: var(--mantine-color-dimmed);
+  overflow: visible;
+}
+
+/* Nodes: quiet by default, brand-tinted when current, with a readable label in both themes. */
+.state-machine-node rect {
+  fill: var(--surface-raised);
+  stroke: var(--border);
+  stroke-width: 1;
+  transition: stroke 120ms ease;
+}
+
+.state-machine-node text {
+  fill: var(--mantine-color-text);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.state-machine-node:hover rect {
+  stroke: var(--brand);
+}
+
+.state-machine-node.is-current rect {
+  fill: var(--brand-soft);
+  stroke: var(--brand);
+  stroke-width: 2;
+}
+
+.state-machine-node.is-current text {
+  fill: var(--mantine-color-text);
+  font-weight: 600;
+}
+
+.state-machine-node:focus-visible {
+  outline: none;
+}
+
+.state-machine-node:focus-visible rect {
+  stroke: var(--brand);
+  stroke-width: 2;
+}
+
+.state-machine-edge-path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.1;
+  opacity: 0.35;
+}
+
+.state-machine-edge.is-traversed .state-machine-edge-path {
+  stroke: var(--brand);
+  opacity: 1;
+  stroke-width: 1.6;
+}
+
+.state-machine-edge.is-revert .state-machine-edge-path {
+  stroke-dasharray: 4 3;
+}
+
+/* A self-loop repeats a state rather than moving to another one. It keeps the dashed
+   back-edge treatment so it reads as "this can happen again", not as forward progress. */
+.state-machine-edge.is-self-loop .state-machine-edge-path {
+  stroke-dasharray: 4 3;
+}
+
+/* The invisible hover/focus target over an edge: a wide transparent stroke that makes the thin
+   line easy to point at, and a faint ring when focused from the keyboard. */
+.state-machine-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: help;
+  outline: none;
+}
+
+.state-machine-edge-hit:focus-visible {
+  stroke: var(--brand);
+  stroke-opacity: 0.25;
+}
+
+/* The floating transition label shown on edge hover/focus, positioned at the pointer. */
+.state-machine-legend {
+  justify-content: flex-end;
+  gap: var(--space-4);
+}
+
+.state-machine-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+}
+
+.state-machine-legend-line {
+  display: inline-block;
+  width: 20px;
+  height: 2px;
+  background: var(--muted);
+}
+
+.state-machine-legend-line.is-revert {
+  height: 0;
+  border-top: 1px dashed var(--muted);
+  background: transparent;
+}
+
+.state-machine-legend-line.is-current {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+
+.state-machine-edge-tip {
+  position: fixed;
+  transform: translate(-50%, calc(-100% - 10px));
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  color: var(--mantine-color-text);
+  font-size: var(--mantine-font-size-xs);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 400;
+}

@@ -12,6 +12,8 @@ import {
   type FixtureRun
 } from './generate.js'
 
+const ARTIFACT_LOAD_ERROR_RUN_ID = 'fixture-artifact-load-error'
+
 export function createRunsHandler(): (
   request: IncomingMessage,
   response: ServerResponse
@@ -46,6 +48,7 @@ export function createRunsHandler(): (
       | 'EXECUTION_ALREADY_ADVANCED'
       | 'SUBMISSION_RECOVERY_EXHAUSTED'
       | 'PUBLICATION_RECONCILIATION_EXHAUSTED'
+    parked_at: string
   }> =>
     runs.flatMap((run, index) => {
       // Only the runs this fixture deliberately parked are queued. A run whose state
@@ -65,7 +68,8 @@ export function createRunsHandler(): (
               ? ('EXECUTION_ALREADY_ADVANCED' as const)
               : axis === 'execution'
                 ? ('SUBMISSION_RECOVERY_EXHAUSTED' as const)
-                : ('PUBLICATION_RECONCILIATION_EXHAUSTED' as const)
+                : ('PUBLICATION_RECONCILIATION_EXHAUSTED' as const),
+          parked_at: run.created_at
         }
       ]
     })
@@ -165,6 +169,11 @@ export function createRunsHandler(): (
       /^\/api\/runs\/([^/?]+)\/artifact\/content$/.exec(requestUrl)
     if (request.method === 'GET' && runArtifactContentMatch !== null) {
       const runId = decodeURIComponent(runArtifactContentMatch[1] ?? '')
+      if (runId === ARTIFACT_LOAD_ERROR_RUN_ID) {
+        response.statusCode = 503
+        response.end(JSON.stringify({ error: 'review_runs_unavailable' }))
+        return
+      }
       const run = runs.find((item) => item.run_id === runId)
       if (run?.artifact_storage?.status !== 'available') {
         response.statusCode = 409

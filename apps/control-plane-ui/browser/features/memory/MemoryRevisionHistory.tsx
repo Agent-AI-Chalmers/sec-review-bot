@@ -3,8 +3,10 @@ import { Alert, Button, Group, SegmentedControl, Table } from '@mantine/core'
 import { IconArrowsDiff, IconEye, IconHistory } from '@tabler/icons-react'
 
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
+import { EmptyState, LoadingState } from '../../shared/StateMessage.js'
 import type { components } from './api-types.generated.js'
 import { RevisionGraph } from './RevisionGraph.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 type Revision = components['schemas']['MemoryTreeRevision']
 
@@ -38,6 +40,9 @@ export function MemoryRevisionHistory({
   const t = useMessages()
   const { language } = useLanguage()
 
+  if (!loading && revisions.length === 0 && !error)
+    return <EmptyState message={t('noRevisions')} />
+
   return (
     <>
       {error && (
@@ -45,7 +50,9 @@ export function MemoryRevisionHistory({
           {error}
         </Alert>
       )}
-      {loading && revisions.length === 0 && <p>{t('loading')}</p>}
+      {loading && revisions.length === 0 && (
+        <LoadingState message={t('loading')} />
+      )}
       <Group justify="end" mb="md">
         <SegmentedControl
           value={view}
@@ -120,7 +127,7 @@ export function MemoryRevisionHistory({
                       <Button
                         size="xs"
                         variant="subtle"
-                        leftSection={<IconEye size={14} />}
+                        leftSection={<IconEye size={ICON_SIZE.sm} />}
                         onClick={() => onViewFiles(item.revision)}
                       >
                         {t('tree')}
@@ -128,7 +135,7 @@ export function MemoryRevisionHistory({
                       <Button
                         size="xs"
                         variant="subtle"
-                        leftSection={<IconArrowsDiff size={14} />}
+                        leftSection={<IconArrowsDiff size={ICON_SIZE.sm} />}
                         onClick={() => onCompare(item)}
                       >
                         {t('compareWithPredecessor')}
@@ -137,7 +144,7 @@ export function MemoryRevisionHistory({
                         <Button
                           size="xs"
                           variant="subtle"
-                          leftSection={<IconEye size={14} />}
+                          leftSection={<IconEye size={ICON_SIZE.sm} />}
                           onClick={() => onViewProcess(item.revision)}
                         >
                           {t('process')}
@@ -148,14 +155,14 @@ export function MemoryRevisionHistory({
                       {activeRevision !== undefined &&
                       item.revision === activeRevision ? (
                         <div className="memory-current-action memory-current-indicator">
-                          <IconHistory size={14} />
+                          <IconHistory size={ICON_SIZE.sm} />
                           {t('alreadyCurrent')}
                         </div>
                       ) : activeRevision !== undefined ? (
                         <Button
                           size="xs"
                           variant="subtle"
-                          leftSection={<IconHistory size={14} />}
+                          leftSection={<IconHistory size={ICON_SIZE.sm} />}
                           className="memory-current-action"
                           onClick={() => onSetCurrent(item.revision)}
                         >

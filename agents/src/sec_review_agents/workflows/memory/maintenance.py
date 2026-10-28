@@ -112,6 +112,7 @@ def commit_memory_tree_revision_activity(
 
     from sec_review_agents.memory.catalog_client import (
         MemoryCatalogConflictError,
+        MemoryMaintenancePausedError,
         configured_memory_catalog_client,
     )
     from sec_review_agents.utils.env import bootstrap_agents_env
@@ -130,6 +131,12 @@ def commit_memory_tree_revision_activity(
             memory_tree_reference=creation.memory_tree_reference,
             maintenance_transcript_reference=creation.maintenance_transcript_reference,
         )
+    except MemoryMaintenancePausedError as error:
+        raise ApplicationError(
+            str(error),
+            type="MEMORY_MAINTENANCE_PAUSED",
+            non_retryable=True,
+        ) from error
     except MemoryCatalogConflictError as error:
         raise ApplicationError(
             str(error),

@@ -7,7 +7,7 @@ import { PostgresMemoryCatalogStore } from '../src/catalog-store.js'
 import {
   ExtractionConflictError,
   InvalidCatalogCursorError,
-  MaintenanceControlConflictError,
+  MaintenancePausedError,
   MemoryTreeRevisionConflictError,
 } from '../src/catalog-store.js'
 
@@ -229,7 +229,7 @@ await test('paused control rejects a new maintenance commit before active CAS', 
         transcript_reference: maintenanceTranscript,
       },
     }),
-    MaintenanceControlConflictError,
+    MaintenancePausedError,
   )
   assert.equal(
     statements.some((sql) => sql.includes('select active_revision')),

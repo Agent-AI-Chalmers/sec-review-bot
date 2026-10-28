@@ -1,3 +1,7 @@
+/* Breakpoint scale: 600 compact, 700 rail/workspace, 760 tablet.
+   New queries should stay on this scale; the rail's JS query reads
+   BREAKPOINTS.rail from shared/design.ts. */
+
 /* Reduced motion */
 
 @media (prefers-reduced-motion: reduce) {
@@ -23,7 +27,47 @@
   }
 
   .run-summary-grid {
-    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--space-3);
+  }
+
+  .run-summary-integration > .mantine-Group-root {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-1);
+  }
+
+  .run-summary-integration .integration-id {
+    width: 100%;
+  }
+
+  .run-heading {
+    margin-bottom: var(--space-5);
+    padding: var(--space-4);
+  }
+
+  .run-id {
+    font-size: 1.5rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .blocked-run .blocked-run-content {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: var(--space-3);
+  }
+
+  .blocked-run .blocked-run-content > .mantine-Stack-root {
+    width: 100%;
+  }
+
+  .blocked-run .blocked-run-body {
+    max-width: none;
+  }
+
+  .blocked-run .blocked-run-action {
+    justify-content: flex-start;
   }
 
   .run-summary-integration {
@@ -52,7 +96,7 @@
 
   .statistics-section .mantine-Table-td,
   .statistics-section .mantine-Table-th {
-    padding-inline: 8px;
+    padding-inline: var(--space-3);
   }
 
   .statistics-unit > summary {
@@ -69,7 +113,7 @@
   }
 
   .statistics-stage-body {
-    padding-left: 12px;
+    padding-left: var(--space-4);
   }
 
   .brand {
@@ -95,14 +139,8 @@
   }
 
   .operations-bar [aria-label='Run list controls'] > *,
-  .operations-bar
-    [aria-label='Run list controls']
-    > *
-    .mantine-NativeSelect-root,
   .operations-per-page,
-  .operations-per-page .mantine-NativeSelect-root,
-  .operations-more,
-  .operations-more .mantine-NativeSelect-root {
+  .operations-more {
     min-width: 0;
     width: 100% !important;
   }
@@ -122,7 +160,13 @@
   .delivery-main {
     align-items: flex-start;
     flex-direction: column;
-    gap: 6px;
+    gap: var(--space-2);
+  }
+}
+
+@media (max-width: 360px) {
+  .parked-run-id.parked-run-id {
+    font-size: 0.75rem;
   }
 }
 
@@ -158,8 +202,9 @@
   }
 
   .memory-overview-trend-controls {
-    align-items: flex-start;
-    justify-content: flex-start;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
   }
 }
 
@@ -198,23 +243,77 @@
   }
 
   .transcript-timeline {
-    padding-left: 18px;
+    padding-left: var(--space-5);
+  }
+
+  .transcript-layout {
+    display: block;
+  }
+
+  .transcript-minimap {
+    display: none;
   }
 
   .transcript-message-body {
-    padding: 10px;
+    padding: var(--space-3);
   }
 
   .transcript-toolbar {
     position: static;
   }
 
-  .transcript-args-table {
-    grid-template-columns: 1fr;
-  }
-
   .transcript-token-metrics {
     width: 100%;
     margin-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .json-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .json-key {
+    padding-top: 0;
+  }
+
+  .json-table {
+    min-width: 0;
+  }
+
+  .json-table thead {
+    display: none;
+  }
+
+  .json-table tbody,
+  .json-table tr,
+  .json-table td {
+    display: block;
+  }
+
+  .json-table tr {
+    padding: var(--space-2) 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .json-table td {
+    display: grid;
+    grid-template-columns: 90px minmax(0, 1fr);
+    gap: var(--space-2);
+    padding: 2px 0;
+    border: 0;
+  }
+
+  .json-table td::before {
+    content: attr(data-label);
+    color: var(--mantine-color-dimmed);
+    font-family: var(--mantine-font-family-monospace);
+    font-size: var(--mantine-font-size-xs);
+  }
+
+  .json-table td:first-child {
+    min-width: 0;
+    white-space: normal;
   }
 }

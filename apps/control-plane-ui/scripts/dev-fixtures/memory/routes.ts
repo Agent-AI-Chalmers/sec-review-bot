@@ -3,6 +3,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import memoryTranscript from '../data/memory-transcript.json' with { type: 'json' }
 import { BASE_TIME } from '../runs/generate.js'
 
+const LOAD_ERROR_REVISION = 404
+
 export function createMemoryHandler(
   sourceRunIds: readonly string[]
 ): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
@@ -254,6 +256,14 @@ export function createMemoryHandler(
         requestUrl
       )
     if (request.method === 'GET' && memoryTranscriptContentMatch !== null) {
+      if (
+        memoryTranscriptContentMatch[1] === 'revisions' &&
+        Number(memoryTranscriptContentMatch[2]) === LOAD_ERROR_REVISION
+      ) {
+        response.statusCode = 503
+        response.end(JSON.stringify({ error: 'memory_catalog_unavailable' }))
+        return
+      }
       response.end(JSON.stringify(memoryTranscript))
       return
     }
@@ -268,7 +278,8 @@ export function createMemoryHandler(
       const revision = Number(identity)
       const available =
         collection === 'revisions'
-          ? memoryFilesByRevision.has(revision)
+          ? memoryFilesByRevision.has(revision) ||
+            revision === LOAD_ERROR_REVISION
           : /^fixture-extraction-[23]$/.test(identity)
       if (
         !available ||
@@ -295,7 +306,13 @@ export function createMemoryHandler(
     const memoryContentMatch =
       /^\/api\/memory\/revisions\/([1-9][0-9]*)\/content$/.exec(requestUrl)
     if (request.method === 'GET' && memoryContentMatch !== null) {
-      const files = memoryFilesByRevision.get(Number(memoryContentMatch[1]))
+      const revision = Number(memoryContentMatch[1])
+      if (revision === LOAD_ERROR_REVISION) {
+        response.statusCode = 422
+        response.end(JSON.stringify({ error: 'invalid_memory_tree_artifact' }))
+        return
+      }
+      const files = memoryFilesByRevision.get(revision)
       if (files === undefined) response.statusCode = 404
       response.end(
         JSON.stringify(files === undefined ? { error: 'not_found' } : { files })

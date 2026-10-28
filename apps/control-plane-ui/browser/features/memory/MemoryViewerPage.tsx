@@ -1,10 +1,18 @@
 import React from 'react'
-import { Alert, Button, Container, Group, Text, Title } from '@mantine/core'
+import {
+  ActionIcon,
+  Alert,
+  Container,
+  Group,
+  Title,
+  Tooltip
+} from '@mantine/core'
 import { IconDownload } from '@tabler/icons-react'
 import { useParams } from 'react-router-dom'
 
 import { useMessages } from '../../shared/i18n.js'
 import { isAbortError, throwIfUnauthorized } from '../../shared/api-client.js'
+import { LoadingState } from '../../shared/StateMessage.js'
 import type { components } from './api-types.generated.js'
 import { MemoryFilesContent } from './MemoryFilesViewer.js'
 import {
@@ -16,6 +24,7 @@ import {
   TranscriptContent,
   type TranscriptTarget
 } from '../transcript/TranscriptViewer.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 function numericRevision(value: string | undefined): number | undefined {
   if (!value || !/^\d+$/.test(value)) return undefined
@@ -83,7 +92,7 @@ export function MemoryRevisionDiffPage(): React.JSX.Element {
   if (!record)
     return (
       <div className="error-fallback">
-        <Text>{t('loading')}</Text>
+        <LoadingState message={t('loading')} />
       </div>
     )
   return (
@@ -127,15 +136,18 @@ function TranscriptPage({
     <Container fluid py="xl" px={{ base: 'md', md: 'xl' }}>
       <Group justify="space-between" mb="lg">
         <Title order={1}>{target.title}</Title>
-        <Button
-          component="a"
-          href={target.downloadHref}
-          download
-          variant="default"
-          leftSection={<IconDownload size={16} />}
-        >
-          {t('downloadOriginal')}
-        </Button>
+        <Tooltip label={t('downloadOriginal')}>
+          <ActionIcon
+            component="a"
+            href={target.downloadHref}
+            download
+            variant="default"
+            size="lg"
+            aria-label={t('downloadOriginal')}
+          >
+            <IconDownload size={ICON_SIZE.md} />
+          </ActionIcon>
+        </Tooltip>
       </Group>
       <TranscriptContent target={target} />
     </Container>

@@ -1,3 +1,11 @@
+@font-face {
+  font-family: 'Inter Variable';
+  src: url('../assets/fonts/InterVariable.woff2') format('woff2-variations');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /*
  * Every colour the console owns is a named, *typed* custom property. `@property`
  * gives each one a syntax, which is what makes them interpolable: a plain custom
@@ -82,6 +90,21 @@
   inherits: true;
   initial-value: #dc2626;
 }
+@property --status-complete-soft {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #ebfbee;
+}
+@property --status-failed-soft {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #fff5f5;
+}
+@property --surface-overlay {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: rgb(255 255 255 / 96%);
+}
 
 :root {
   /* Mantine derives this from `mantineTheme` (see theme.ts), which is the single
@@ -89,6 +112,7 @@
      fallback, kept in sync by the `--mantine-font-family` fallback itself. */
   font-family: var(
     --mantine-font-family,
+    'Inter Variable',
     Inter,
     'Inter var',
     ui-sans-serif,
@@ -98,11 +122,17 @@
     Roboto,
     'PingFang SC',
     'Hiragino Sans GB',
+    'Noto Sans SC',
     'Noto Sans CJK SC',
+    'Source Han Sans SC',
     'Microsoft YaHei',
     sans-serif
   );
   color-scheme: light;
+  font-optical-sizing: auto;
+  /* Inter ships real 100–900 weights; do not let the browser fake bold on
+     Chinese fallback faces that only carry 400/700. */
+  font-synthesis-weight: none;
   /* The console's own colour tokens cross-fade at Mantine's pace, not its own: the
      components it composes swap their theme colours over ~100-150ms with `ease`, and
      the console must not run at a different tempo or the two visibly disagree. Owning
@@ -126,6 +156,21 @@
   --status-active: #2563eb;
   --status-complete: #15803d;
   --status-failed: #dc2626;
+  --status-complete-soft: #ebfbee;
+  --status-failed-soft: #fff5f5;
+  --surface-overlay: rgb(255 255 255 / 96%);
+  /* Small shared geometry. Feature styles compose these instead of repeating
+     the same pixel values; the spacing scale is deliberately 2px at the low end
+     so dense control rows stay tight. */
+  --radius-panel: 8px;
+  --radius-pill: 999px;
+  --space-1: 4px;
+  --space-2: 6px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-7: 32px;
 }
 
 [data-theme='dark'] {
@@ -143,11 +188,31 @@
   --status-active: #60a5fa;
   --status-complete: #4ade80;
   --status-failed: #f87171;
+  --status-complete-soft: rgb(34 55 43 / 48%);
+  --status-failed-soft: rgb(70 35 35 / 30%);
+  --surface-overlay: rgb(38 34 32 / 96%);
 }
 
 body {
   margin: 0;
+  /* The console is mostly tables and counters; tabular figures keep columns and
+     metric changes from shifting. Inter draws the digits, not the CJK fallback. */
+  font-variant-numeric: tabular-nums lining-nums;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Native code elements otherwise fall back to the platform's generic monospace,
+   which resolves to a CJK mono face in a Chinese document. Use the same explicit
+   Latin-first stack as Mantine's monospace components. */
+code,
+kbd,
+samp {
+  font-family: var(--mantine-font-family-monospace);
+}
+
+.loading-state-fill {
+  width: 100%;
+  min-height: min(52vh, 560px);
 }
 
 .error-fallback {
@@ -155,6 +220,22 @@ body {
   min-height: calc(100dvh - 58px);
   padding: var(--mantine-spacing-xl);
   place-items: center;
+}
+
+.content-load-state {
+  display: grid;
+  min-height: min(52vh, 560px);
+  padding: var(--mantine-spacing-xl);
+  place-items: center;
+}
+
+.resource-load-error {
+  width: min(100%, 560px);
+  padding: var(--mantine-spacing-xl);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--radius-panel);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-sm);
 }
 /*
  * A theme switch is a colour change, not a motion effect, so the cross-fade is only
@@ -182,7 +263,10 @@ body {
     --shadow-color var(--theme-transition) var(--theme-ease),
     --status-active var(--theme-transition) var(--theme-ease),
     --status-complete var(--theme-transition) var(--theme-ease),
-    --status-failed var(--theme-transition) var(--theme-ease);
+    --status-failed var(--theme-transition) var(--theme-ease),
+    --status-complete-soft var(--theme-transition) var(--theme-ease),
+    --status-failed-soft var(--theme-transition) var(--theme-ease),
+    --surface-overlay var(--theme-transition) var(--theme-ease);
 }
 
 .visually-hidden {
@@ -199,5 +283,5 @@ body {
 
 .mantine-Paper-root form {
   display: grid;
-  gap: 16px;
+  gap: var(--space-5);
 }

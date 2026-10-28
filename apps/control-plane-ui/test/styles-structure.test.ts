@@ -10,6 +10,8 @@ const expectedLoadOrder = [
   'base.css',
   'shell.css',
   'runs-detail.css',
+  'parked-runs.css',
+  'transitions.css',
   'memory.css',
   'workspace-editor.css',
   'transcript-viewer.css',

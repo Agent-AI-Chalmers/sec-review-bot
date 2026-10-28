@@ -1,10 +1,19 @@
 import React from 'react'
-import { Alert, Button, Group, Paper, Switch } from '@mantine/core'
-import { IconEdit } from '@tabler/icons-react'
+import {
+  ActionIcon,
+  Alert,
+  Button,
+  Group,
+  Paper,
+  Switch,
+  Tooltip
+} from '@mantine/core'
+import { IconEdit, IconInfoCircle } from '@tabler/icons-react'
 
 import { useMessages } from '../../shared/i18n.js'
 import type { components } from './api-types.generated.js'
 import { RefreshControls } from '../../shared/refresh.js'
+import { ICON_SIZE } from '../../shared/design.js'
 
 type Control = components['schemas']['MaintenanceControl']
 
@@ -44,7 +53,6 @@ export function MemoryHeader({
           <Switch
             checked={control?.state === 'enabled'}
             disabled={!control || busy}
-            color="green"
             label={
               control?.state === 'enabled'
                 ? t('maintenanceEnabled')
@@ -54,9 +62,28 @@ export function MemoryHeader({
             }
             onChange={onToggleMaintenance}
           />
+          <Tooltip
+            label={t('maintenanceControlHelp')}
+            multiline
+            w={360}
+            position="bottom-start"
+            events={{ hover: true, focus: true, touch: true }}
+          >
+            <ActionIcon
+              component="span"
+              role="img"
+              tabIndex={0}
+              variant="subtle"
+              color="gray"
+              size="sm"
+              aria-label={t('maintenanceControlHelpLabel')}
+            >
+              <IconInfoCircle size={ICON_SIZE.md} />
+            </ActionIcon>
+          </Tooltip>
           <Button
             variant="default"
-            leftSection={<IconEdit size={16} />}
+            leftSection={<IconEdit size={ICON_SIZE.md} />}
             disabled={activeRevision === undefined || treeLoading}
             onClick={onEdit}
           >

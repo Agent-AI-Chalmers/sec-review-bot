@@ -37,7 +37,7 @@ Temporal 会先记录已发布的 artifact references，再调度 revision 提�
 
 Revision provenance 使用带标签的 maintenance/operator source。每个 revision 通过 `predecessor_revision` 记录创建时的 active revision；即使 active pointer 回退，revision 编号仍保持全局递增。Operator `operation_id` 全局唯一：相同内容重放返回原 revision，不同内容则冲突。Operator edit 不消费 observations。Restore 使用独立的幂等 ledger，只移动 active pointer；下一次自动或人工 revision 会把恢复后的 revision 记录为前驱。
 
-Pause 与 resume 使用独立的幂等 ledger。相同重放会在检查当前 generation 前返回该 operation 保存的结果；新 operation 锁定 control 单例，检查 `expected_generation` 与合法转换后增加 generation。新的 maintenance revision 在提交事务中锁定同一行，并在 paused 时被拒绝；operator revision 不受影响。Worker 的开始前读取只用于避免无效工作，不能替代该事务边界。
+Pause 与 resume 使用独立的幂等 ledger。相同重放会在检查当前 generation 前返回该 operation 保存的结果；新 operation 锁定 control 单例，检查 `expected_generation` 与合法转换后增加 generation。新的 maintenance revision 在提交事务中锁定同一行，并在 paused 时以 `MAINTENANCE_PAUSED` 冲突码被拒绝，与 revision compare-and-swap 冲突区分；operator revision 不受影响。Worker 的开始前读取只用于避免无效工作，不能替代该事务边界。
 
 ## 本地运行
 

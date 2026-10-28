@@ -1,7 +1,6 @@
 import React from 'react'
-import { Link, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Route, Routes } from 'react-router-dom'
 import {
-  ActionIcon,
   AppShell,
   Button,
   Center,
@@ -12,20 +11,15 @@ import {
   PasswordInput,
   Stack,
   Text,
-  TextInput,
   Title
 } from '@mantine/core'
-import {
-  IconArrowRight,
-  IconFileText,
-  IconListDetails,
-  IconBrain
-} from '@tabler/icons-react'
+import { IconFileText, IconListDetails, IconBrain } from '@tabler/icons-react'
 import { ApiError } from '../shared/api-client.js'
 import { login } from './session-api.js'
 import { useMessages } from '../shared/i18n.js'
 import { PreferenceControls } from './preferences.js'
 import { failureReason } from '../shared/format.js'
+import { ICON_SIZE } from '../shared/design.js'
 
 const Runs = React.lazy(async () => ({
   default: (await import('../features/runs/Runs.js')).Runs
@@ -153,11 +147,7 @@ function ErrorFallback({ error }: { error: unknown }): React.JSX.Element {
 
 export function App(): React.JSX.Element {
   const t = useMessages()
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [runIdInput, setRunIdInput] = React.useState('')
   const [unauthorized, setUnauthorized] = React.useState(false)
-  const showRunJump = location.pathname.startsWith('/runs')
   return (
     <>
       <AppShell header={{ height: 58 }}>
@@ -175,7 +165,7 @@ export function App(): React.JSX.Element {
                   size="compact-sm"
                   className="primary-nav-link"
                   aria-label={t('runs')}
-                  leftSection={<IconListDetails size={16} />}
+                  leftSection={<IconListDetails size={ICON_SIZE.md} />}
                 >
                   <span className="primary-nav-label">{t('runs')}</span>
                 </Button>
@@ -186,7 +176,7 @@ export function App(): React.JSX.Element {
                   size="compact-sm"
                   className="primary-nav-link"
                   aria-label={t('memory')}
-                  leftSection={<IconBrain size={16} />}
+                  leftSection={<IconBrain size={ICON_SIZE.md} />}
                 >
                   <span className="primary-nav-label">{t('memory')}</span>
                 </Button>
@@ -197,45 +187,11 @@ export function App(): React.JSX.Element {
                   size="compact-sm"
                   className="primary-nav-link"
                   aria-label={t('viewerNav')}
-                  leftSection={<IconFileText size={16} />}
+                  leftSection={<IconFileText size={ICON_SIZE.md} />}
                 >
                   <span className="primary-nav-label">{t('viewerNav')}</span>
                 </Button>
               </Group>
-              {/* Without a session every request 401s, so a run-id jump would only
-                  bounce the reader back to the sign-in form. */}
-              {!unauthorized && showRunJump && (
-                <form
-                  className="open-run"
-                  onSubmit={(event) => {
-                    event.preventDefault()
-                    const requestedRunId = runIdInput.trim()
-                    if (requestedRunId)
-                      navigate(`/runs/${encodeURIComponent(requestedRunId)}`)
-                  }}
-                >
-                  <Group gap={6} align="center" wrap="nowrap">
-                    <TextInput
-                      aria-label={t('goToRunId')}
-                      placeholder={t('runIdPlaceholder')}
-                      value={runIdInput}
-                      size="sm"
-                      ff="monospace"
-                      onChange={(event) =>
-                        setRunIdInput(event.currentTarget.value)
-                      }
-                    />
-                    <ActionIcon
-                      type="submit"
-                      aria-label={t('goToRun')}
-                      variant="filled"
-                      size={36}
-                    >
-                      <IconArrowRight size={16} />
-                    </ActionIcon>
-                  </Group>
-                </form>
-              )}
               <PreferenceControls signedIn={!unauthorized} />
             </Group>
           </Container>

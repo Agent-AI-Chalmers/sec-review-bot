@@ -100,6 +100,7 @@ export interface MemoryCatalogStore {
 export class ExtractionConflictError extends Error {}
 export class MemoryTreeRevisionConflictError extends Error {}
 export class MaintenanceControlConflictError extends Error {}
+export class MaintenancePausedError extends Error {}
 export class InvalidCatalogCursorError extends Error {
   readonly statusCode = 400
 }
@@ -763,7 +764,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
            where singleton=true for update`,
         )
         if (control.rows[0]?.state !== 'enabled')
-          throw new MaintenanceControlConflictError(
+          throw new MaintenancePausedError(
             'Automatic memory maintenance is paused.',
           )
       }

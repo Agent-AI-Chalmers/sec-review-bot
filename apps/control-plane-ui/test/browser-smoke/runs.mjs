@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict'
 
+async function chooseSelect(page, label, option) {
+  await page.getByRole('combobox', { name: label, exact: true }).click()
+  await page.getByRole('option', { name: option, exact: true }).click()
+}
+
 export async function smokeRuns({
   name,
   viewport,
@@ -146,20 +151,19 @@ export async function smokeRuns({
     // The fixture spreads its runs over more than a week, so each range preset must
     // narrow the list by a distinct amount rather than silently filtering nothing.
     await page.getByRole('button', { name: 'More filters' }).click()
-    const timeRange = page.getByLabel('Time range')
     const allRows = (await rows()).length
-    await timeRange.selectOption('1h')
+    await chooseSelect(page, 'Time range', 'Last hour')
     await waitUntil(
       async () => (await rows()).length < allRows,
       `${name} a one-hour range must narrow the list`
     )
     const hourRows = (await rows()).length
-    await timeRange.selectOption('24h')
+    await chooseSelect(page, 'Time range', 'Last 24 hours')
     await waitUntil(async () => {
       const count = (await rows()).length
       return count > hourRows && count < allRows
     }, `${name} a 24-hour range must sit between the hour and everything`)
-    await timeRange.selectOption('')
+    await chooseSelect(page, 'Time range', 'All')
     await waitUntil(
       async () => (await rows()).length === allRows,
       `${name} clearing the range must restore the list`
@@ -168,8 +172,7 @@ export async function smokeRuns({
     // Preparation is a lifecycle axis of its own, not a facet of the Execution or
     // publication state: selecting one of its states must narrow the list and every
     // surviving row must report that state in its Preparation cell.
-    const preparation = page.getByLabel('Preparation')
-    await preparation.selectOption('failed')
+    await chooseSelect(page, 'Preparation', 'Failed')
     await waitUntil(
       async () => (await rows()).length < allRows,
       `${name} a preparation state must narrow the list`
@@ -181,7 +184,7 @@ export async function smokeRuns({
       preparationCells.length > 0,
       `${name} a preparation filter must leave rows to inspect`
     )
-    await preparation.selectOption('')
+    await chooseSelect(page, 'Preparation', 'All')
     await waitUntil(
       async () => (await rows()).length === allRows,
       `${name} clearing the preparation filter must restore the list`
@@ -190,21 +193,20 @@ export async function smokeRuns({
     // The Execution filter must offer every state the contract declares, including the
     // two that are not part of the happy path. Otherwise an operator cannot isolate an
     // unconfirmed submission or a run whose execution was skipped.
-    const execution = page.getByLabel('Execution')
-    const executionStates = await execution
-      .locator('option')
-      .evaluateAll((options) => options.map((option) => option.value))
+    await page.getByRole('combobox', { name: 'Execution', exact: true }).click()
+    const executionStates = await page.getByRole('option').allTextContents()
     assert.ok(
-      executionStates.includes('uncertain') &&
-        executionStates.includes('skipped'),
+      executionStates.includes('Uncertain') &&
+        executionStates.includes('Skipped'),
       `${name} the Execution filter must include uncertain and skipped`
     )
-    await execution.selectOption('uncertain')
+    await page.keyboard.press('Escape')
+    await chooseSelect(page, 'Execution', 'Uncertain')
     await waitUntil(
       async () => (await rows()).length < allRows,
       `${name} the uncertain execution state must narrow the list`
     )
-    await execution.selectOption('')
+    await chooseSelect(page, 'Execution', 'All')
     await waitUntil(
       async () => (await rows()).length === allRows,
       `${name} clearing the execution filter must restore the list`
@@ -259,6 +261,7 @@ export async function smokeRuns({
     await page.getByRole('link', { name: 'Back to runs' }).click()
     await page.getByRole('heading', { name: 'Runs' }).waitFor()
 
+    await page.getByRole('button', { name: 'Jump to run' }).click()
     const jump = page.getByLabel('Go to run ID')
     await jump.fill(knownRunId)
     await page.getByRole('button', { name: 'Go to run' }).click()
@@ -272,6 +275,7 @@ export async function smokeRuns({
     // Jumping to an unknown id from a detail page must not keep rendering the previous
     // run. React Router keeps this component mounted when only the id changes, so that
     // state has to be keyed by id or the 404 reads as a failed refresh of the old run.
+    await page.getByRole('button', { name: 'Jump to run' }).click()
     await jump.fill('00000000-0000-0000-0000-000000000000')
     await page.getByRole('button', { name: 'Go to run' }).click()
     await page.getByRole('heading', { name: 'Run not found' }).waitFor({
@@ -298,8 +302,8 @@ export async function smokeRuns({
 
     // A repository review publishes one step per delivery plus two summaries, so a
     // published one must render the multi-step delivery list.
-    await page.getByLabel('Workflow').selectOption('repository-review')
-    await page.getByLabel('Publication').selectOption('published')
+    await chooseSelect(page, 'Workflow', 'Repository review')
+    await chooseSelect(page, 'Publication', 'Published')
     // Wait until the filters have been applied to the list, so the first row we open is
     // actually a published repository review rather than a stale row.
     //
@@ -337,28 +341,38 @@ export async function smokeRuns({
       /Settled/,
       `${name} a healthy statistics snapshot must not compete with execution status`
     )
+    await statistics.getByRole('button', { name: /View details/ }).click()
+    const statisticsDetails = page.getByTestId('execution-statistics-details')
+    await statisticsDetails.waitFor()
     assert.match(
-      (await statistics.textContent()) ?? '',
+      (await statisticsDetails.textContent()) ?? '',
       /Input 58,020.*Output 10,784.*Cache read 18,280/,
-      `${name} the useful token breakdown must be visible without expanding details`
+      `${name} the useful token breakdown must be available in the details drawer`
     )
     assert.match(
-      (await statistics.textContent()) ?? '',
+      (await statisticsDetails.textContent()) ?? '',
       /Scan stage.*6 Calls · 17,284 tokens.*Review stage.*2 cases · 14 Calls · 40,320 tokens.*Delivery stage.*5 Calls · 11,200 tokens/s,
       `${name} collapsed repository stages must retain their usage summaries`
     )
-    const workflowStages = statistics.locator('.statistics-workflow-stage')
+    const workflowStages = statisticsDetails.locator(
+      '.statistics-workflow-stage'
+    )
     assert.strictEqual(
       await workflowStages.count(),
       3,
       `${name} repository usage must have scan, review, and delivery stages`
     )
     assert.strictEqual(
-      await statistics.locator('.statistics-workflow-stage[open]').count(),
+      await statisticsDetails
+        .locator('.statistics-workflow-stage-control[aria-expanded="true"]')
+        .count(),
       0,
       `${name} workflow stages must start collapsed`
     )
-    await workflowStages.nth(0).locator('summary').first().click()
+    await workflowStages
+      .nth(0)
+      .locator('.statistics-workflow-stage-control')
+      .click()
     const discoveryRow = workflowStages
       .nth(0)
       .locator('.statistics-group-row')
@@ -366,7 +380,7 @@ export async function smokeRuns({
     await discoveryRow.click()
     assert.match(
       (await workflowStages.nth(0).textContent()) ?? '',
-      /Call breakdown.*Input.*Output.*Cache read.*discovery-chunk-0001.*2,800.*360.*1,100.*discovery-chunk-0002.*2,700.*354.*1,000.*discovery-chunk-0003.*2,700.*370.*1,000.*Total.*8,200.*1,084.*3,100/s,
+      /Call.*Input.*Output.*Cache read.*discovery-chunk-0001.*2,800.*360.*1,100.*discovery-chunk-0002.*2,700.*354.*1,000.*discovery-chunk-0003.*2,700.*370.*1,000.*Total.*8,200.*1,084.*3,100/s,
       `${name} discovery details must expose per-chunk calls and token dimensions`
     )
     const triageRow = workflowStages
@@ -376,10 +390,13 @@ export async function smokeRuns({
     await triageRow.click()
     assert.match(
       (await workflowStages.nth(0).textContent()) ?? '',
-      /Call breakdown.*Draft batch 1.*2,700.*400.*900.*Draft batch 2.*2,400.*400.*900.*Refinement.*1,800.*300.*600.*Total.*6,900.*1,100.*2,400/s,
+      /Call.*Draft batch 1.*2,700.*400.*900.*Draft batch 2.*2,400.*400.*900.*Refinement.*1,800.*300.*600.*Total.*6,900.*1,100.*2,400/s,
       `${name} triage details must explain its batches without adding hierarchy`
     )
-    await workflowStages.nth(1).locator('summary').first().click()
+    await workflowStages
+      .nth(1)
+      .locator('.statistics-workflow-stage-control')
+      .click()
     const reviewUnits = workflowStages.nth(1).locator('.statistics-unit')
     assert.strictEqual(
       await reviewUnits.count(),
@@ -391,7 +408,7 @@ export async function smokeRuns({
       /Case 7d9a2f6c31b4e8.*9 Calls · 26,675 tokens/s,
       `${name} a collapsed case must retain its usage summary`
     )
-    await reviewUnits.nth(0).locator('summary').click()
+    await reviewUnits.nth(0).locator('.statistics-unit-control').click()
     assert.match(
       (await reviewUnits.nth(0).textContent()) ?? '',
       /Initial review.*Feedback pass 1/s,
@@ -416,13 +433,16 @@ export async function smokeRuns({
         `${name} initial and feedback tables must share fixed column tracks`
       )
     }
-    await reviewUnits.nth(1).locator('summary').click()
+    await reviewUnits.nth(1).locator('.statistics-unit-control').click()
     assert.doesNotMatch(
       (await reviewUnits.nth(1).textContent()) ?? '',
       /Initial review/,
       `${name} a case without feedback must not label its only pass as initial`
     )
-    await workflowStages.nth(2).locator('summary').first().click()
+    await workflowStages
+      .nth(2)
+      .locator('.statistics-workflow-stage-control')
+      .click()
     const deliveryRows = workflowStages.nth(2).locator('.statistics-group-row')
     assert.strictEqual(
       await deliveryRows.count(),
@@ -435,28 +455,28 @@ export async function smokeRuns({
     await deliveryRows.filter({ hasText: 'patch-synthesizer' }).click()
     assert.match(
       (await workflowStages.nth(2).textContent()) ?? '',
-      /Call breakdown.*Draft batch 1.*Draft batch 2.*Refinement.*patch-synthesizer.*combined-[a-f0-9]+.*combined-[a-f0-9]+/s,
+      /Call.*Draft batch 1.*Draft batch 2.*Refinement.*patch-synthesizer.*combined-[a-f0-9]+.*combined-[a-f0-9]+/s,
       `${name} delivery details must explain planning and patch synthesis inline`
     )
     assert.match(
-      (await statistics.textContent()) ?? '',
+      (await statisticsDetails.textContent()) ?? '',
       /repository-discovery/,
       `${name} a completed run must show its agent usage groups`
     )
     assert.match(
-      (await statistics.textContent()) ?? '',
+      (await statisticsDetails.textContent()) ?? '',
       /anthropic\/deepseek-v4-pro/,
       `${name} provider and model must share one compact identity line`
     )
-    const usageRows = statistics.locator(
+    const usageRows = statisticsDetails.locator(
       '.statistics-group-row[aria-expanded="false"]'
     )
-    const expandedBefore = await statistics
+    const expandedBefore = await statisticsDetails
       .locator('.statistics-group-row[aria-expanded="true"]')
       .count()
     await usageRows.filter({ hasText: 'repository-analyzer' }).first().click()
     assert.match(
-      (await statistics.textContent()) ?? '',
+      (await statisticsDetails.textContent()) ?? '',
       /Input 5,200.*Output 1,000.*Cache read 1,600/,
       `${name} an agent without subgroups must expose its token breakdown`
     )
@@ -465,12 +485,81 @@ export async function smokeRuns({
       .first()
       .click()
     assert.strictEqual(
-      await statistics
+      await statisticsDetails
         .locator('.statistics-group-row[aria-expanded="true"]')
         .count(),
       expandedBefore + 2,
       `${name} expanding one usage group must not close another`
     )
+    await page.getByRole('button', { name: 'Expand all' }).click()
+    assert.strictEqual(
+      await statisticsDetails
+        .locator('.statistics-workflow-stage-control[aria-expanded="true"]')
+        .count(),
+      3,
+      `${name} expand all must open every workflow stage`
+    )
+    assert.strictEqual(
+      await statisticsDetails
+        .locator('.statistics-unit-control[aria-expanded="true"]')
+        .count(),
+      2,
+      `${name} expand all must open every review case`
+    )
+    await page.getByRole('button', { name: 'Collapse all' }).click()
+    assert.strictEqual(
+      await statisticsDetails
+        .locator('.statistics-workflow-stage-control[aria-expanded="true"]')
+        .count(),
+      0,
+      `${name} collapse all must close every workflow stage`
+    )
+    assert.strictEqual(
+      await statisticsDetails
+        .locator('.statistics-group-row[aria-expanded="true"]')
+        .count(),
+      0,
+      `${name} collapse all must close every usage group`
+    )
+    await page.keyboard.press('Escape')
+    await statisticsDetails.waitFor({ state: 'hidden' })
+
+    // Transitions are the run's actual state changes, not the synthetic initialization events
+    // (which have no from_status). The section starts collapsed, explains each edge, and hides
+    // pagination until there is more than one page.
+    const transitions = page.locator('.run-transitions')
+    await transitions.locator('.transitions-entry').click()
+    await transitions.locator('.transitions-body').waitFor()
+    assert.strictEqual(
+      await transitions.locator('.state-machine-svg').count(),
+      1,
+      `${name} transitions must show one selected state machine at a time`
+    )
+    const transitionRows = transitions.locator('.run-transition')
+    assert.ok(
+      (await transitionRows.count()) > 0,
+      `${name} the run must list its actual transitions`
+    )
+    assert.doesNotMatch(
+      (await transitionRows.first().textContent()) ?? '',
+      /—\s*→/,
+      `${name} initialization events must not appear as transitions`
+    )
+    assert.match(
+      (await transitionRows.first().textContent()) ?? '',
+      /In this state for|Final state/,
+      `${name} a transition must explain how long the resulting state lasted`
+    )
+    assert.strictEqual(
+      await transitions.locator('.mantine-Pagination-root').count(),
+      0,
+      `${name} a single page of transitions must not render pagination`
+    )
+    await transitions.getByText('100%', { exact: true }).click()
+    await transitions.locator('.state-machine.is-actual').waitFor()
+    await transitions.getByText('Fit', { exact: true }).click()
+    await transitions.locator('.state-machine.is-fit').waitFor()
+
     const publicationBody =
       (await page
         .locator('.run-progress-timeline .mantine-Timeline-itemBody')
@@ -734,7 +823,7 @@ export async function smokeRuns({
   // The newest fixture run may still be preparing, whose Execution phase shows a status
   // rather than an elapsed time. Filter to a run that has actually been submitted so the
   // timing assertions below are about a phase that has begun.
-  await page.getByLabel('Execution').selectOption('running')
+  await chooseSelect(page, 'Execution', 'Running')
   // Wait for the filter to actually apply: a stale row from before the selection would
   // otherwise be clicked, and a still-preparing run has no Execution timestamp to assert.
   await waitUntil(
@@ -883,7 +972,7 @@ export async function smokeRuns({
   // A publication that was ruled out is not a moment either, so it must stay
   // silent rather than repeat the Execution failure time.
   await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
-  await page.getByLabel('Execution').selectOption('failed')
+  await chooseSelect(page, 'Execution', 'Failed')
   await waitUntil(
     async () =>
       /[A-Z_]{4,}/.test(
@@ -910,15 +999,35 @@ export async function smokeRuns({
   )
 
   if (name === 'desktop' && server !== undefined) {
+    await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    await page.getByTestId('parked-runs').waitFor()
     const parkedRunId = await page.evaluate(async () => {
       const response = await fetch('/api/runs/parked')
       const body = await response.json()
       return body.blocks[0].run_id
     })
+    await page
+      .getByTestId('parked-runs')
+      .getByRole('button', { name: 'View', exact: true })
+      .click()
+    const parkedDrawer = page.getByRole('dialog')
+    await parkedDrawer.waitFor()
+    assert.match(
+      (await parkedDrawer.textContent()) ?? '',
+      /Waiting \d/,
+      `${name} the parked queue must show how long each run has waited`
+    )
+    await page.keyboard.press('Escape')
+    await parkedDrawer.waitFor({ state: 'hidden' })
     await page.goto(`${base}/runs/${encodeURIComponent(parkedRunId)}`, {
       waitUntil: 'networkidle'
     })
     await page.getByTestId('blocked-run').waitFor()
+    assert.match(
+      (await page.getByTestId('blocked-run').textContent()) ?? '',
+      /Waiting \d/,
+      `${name} the parked detail banner must show how long the run has waited`
+    )
     await page.route('**/api/admin/runs/*/resume', (route) =>
       route.fulfill({
         status: 401,
@@ -943,6 +1052,58 @@ export async function smokeRuns({
       'an admin-token 401 must stay in the maintenance dialog'
     )
     await page.unroute('**/api/admin/runs/*/resume')
+
+    // More than one page of transitions: page 1 must hold exactly the page size, and the
+    // pagination must be centered. The fixture is too short to exercise this, so synthesize
+    // additional events through the same API contract the page already consumes.
+    await page.route('**/api/runs/*/events', async (route) => {
+      const response = await route.fetch()
+      const body = await response.json()
+      const sample = body.events.find((event) => event.from_status !== null)
+      assert.ok(sample, `${name} fixtures need a transition to synthesize`)
+      const extra = Array.from({ length: 13 }, (_, index) => ({
+        ...sample,
+        event_id: `synthetic-transition-${index}`,
+        occurred_at: new Date(
+          Date.parse(sample.occurred_at) + (index + 1) * 1000
+        ).toISOString()
+      }))
+      await route.fulfill({
+        response,
+        json: { events: [...body.events, ...extra] }
+      })
+    })
+    await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    await page.locator('tbody tr td a').first().click()
+    await page.waitForSelector('.run-progress-timeline')
+    const pagedTransitions = page.locator('.run-transitions')
+    await pagedTransitions.locator('.transitions-entry').click()
+    await pagedTransitions.locator('.transitions-body').waitFor()
+    assert.strictEqual(
+      await pagedTransitions.locator('.run-transition').count(),
+      12,
+      `${name} transitions must cap a page at 12 rows`
+    )
+    const pager = pagedTransitions.locator('.mantine-Pagination-root')
+    assert.strictEqual(
+      await pager.count(),
+      1,
+      `${name} multiple transition pages must render pagination`
+    )
+    assert.strictEqual(
+      await pager.evaluate(
+        (element) => getComputedStyle(element).justifyContent
+      ),
+      'center',
+      `${name} transition pagination must be centered`
+    )
+    await pager.getByRole('button', { name: '2', exact: true }).click()
+    await waitUntil(
+      async () =>
+        (await pagedTransitions.locator('.run-transition').count()) < 12,
+      `${name} the second transition page must load fewer than a full page`
+    )
+    await page.unroute('**/api/runs/*/events')
   }
 
   // An expired session is not a refresh blip: it must reach the sign-in form even when

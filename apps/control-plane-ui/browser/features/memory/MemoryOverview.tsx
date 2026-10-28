@@ -4,6 +4,7 @@ import { IconInfoCircle } from '@tabler/icons-react'
 
 import { workflowLabel } from '../../shared/format.js'
 import { useLanguage, useMessages } from '../../shared/i18n.js'
+import { EmptyState } from '../../shared/StateMessage.js'
 import type { components, operations } from './api-types.generated.js'
 
 export type CatalogOverview = components['schemas']['CatalogOverview']
@@ -19,39 +20,65 @@ export type OverviewRange = NonNullable<
 function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
   const t = useMessages()
   const { language } = useLanguage()
-  const width = 720
+  const scrollRef = React.useRef<HTMLDivElement>(null)
+  const [width, setWidth] = React.useState(720)
   const height = 220
-  const padding = { top: 18, right: 14, bottom: 34, left: 38 }
+  React.useLayoutEffect(() => {
+    const element = scrollRef.current
+    if (!element) return
+    const measure = (): void => {
+      const next = Math.max(
+        320,
+        Math.round(element.getBoundingClientRect().width)
+      )
+      setWidth((current) => (current === next ? current : next))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(element)
+    return (): void => observer.disconnect()
+  }, [])
+  const padding = { top: 18, right: 38, bottom: 34, left: 38 }
   const plotWidth = width - padding.left - padding.right
   const plotHeight = height - padding.top - padding.bottom
+  // A wide window can be almost entirely empty. Start at the first period with
+  // activity (keeping one baseline point) so the default view is not a flat line.
+  const firstActive = overview.trend_points.findIndex(
+    (point) =>
+      point.extracted_unit_count > 0 || point.units_with_observation_count > 0
+  )
+  const trendPoints =
+    firstActive > 0
+      ? overview.trend_points.slice(Math.max(0, firstActive - 1))
+      : overview.trend_points
   const maximum = Math.max(
     1,
-    ...overview.trend_points.map((point) => point.extracted_unit_count)
+    ...trendPoints.map((point) => point.extracted_unit_count)
   )
   const point = (value: number, index: number): string => {
     const x =
       padding.left +
-      (overview.trend_points.length <= 1
+      (trendPoints.length <= 1
         ? plotWidth / 2
-        : (index / (overview.trend_points.length - 1)) * plotWidth)
+        : (index / (trendPoints.length - 1)) * plotWidth)
     const y = padding.top + plotHeight - (value / maximum) * plotHeight
     return `${x},${y}`
   }
   const labels = [
     0,
-    Math.floor((overview.trend_points.length - 1) / 2),
-    overview.trend_points.length - 1
+    Math.floor((trendPoints.length - 1) / 2),
+    trendPoints.length - 1
   ]
     .filter(
       (value, index, values) => value >= 0 && values.indexOf(value) === index
     )
     .map((index) => ({
       index,
-      periodStart: overview.trend_points[index]?.period_start
+      periodStart: trendPoints[index]?.period_start
     }))
 
   return (
-    <div className="memory-overview-trend-scroll">
+    <div className="memory-overview-trend-scroll" ref={scrollRef}>
       <svg
         className="memory-overview-trend"
         viewBox={`0 0 ${width} ${height}`}
@@ -72,7 +99,7 @@ function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
           )
         })}
         <polyline
-          points={overview.trend_points
+          points={trendPoints
             .map((trendPoint, index) =>
               point(trendPoint.extracted_unit_count, index)
             )
@@ -80,7 +107,7 @@ function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
           className="memory-overview-line memory-overview-line-extracted"
         />
         <polyline
-          points={overview.trend_points
+          points={trendPoints
             .map((trendPoint, index) =>
               point(trendPoint.units_with_observation_count, index)
             )
@@ -100,9 +127,9 @@ function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
         {labels.map(({ index, periodStart }) => {
           const x =
             padding.left +
-            (overview.trend_points.length <= 1
+            (trendPoints.length <= 1
               ? plotWidth / 2
-              : (index / (overview.trend_points.length - 1)) * plotWidth)
+              : (index / (trendPoints.length - 1)) * plotWidth)
           return (
             <text
               key={index}
@@ -111,7 +138,7 @@ function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
               textAnchor={
                 index === 0
                   ? 'start'
-                  : index === overview.trend_points.length - 1
+                  : index === trendPoints.length - 1
                     ? 'end'
                     : 'middle'
               }
@@ -227,22 +254,32 @@ export function MemoryOverview({
         <Trend overview={overview} />
       </section>
 
-      <div className="memory-overview-lower">
-        <section className="memory-overview-section">
-          <h2>{t('observationLifecycle')}</h2>
-          <div className="memory-overview-outcome">
-            <span>{t('pendingObservations')}</span>
-            <strong>{totals.pending_observation_count.toLocaleString()}</strong>
-          </div>
-          <div className="memory-overview-outcome">
-            <span>{t('consumedObservations')}</span>
-            <strong>
-              {totals.consumed_observation_count.toLocaleString()}
-            </strong>
-          </div>
-        </section>
-        <section className="memory-overview-section memory-overview-workflows">
+      <section className="memory-overview-section memory-overview-workflows">
+        <div className="memory-overview-workflows-head">
           <h2>{t('workflowBreakdown')}</h2>
+          <div className="memory-overview-lifecycle-inline">
+            <span className="memory-overview-lifecycle-inline-label">
+              {t('observationLifecycle')}
+            </span>
+            <span>
+              <i className="memory-overview-lifecycle-swatch pending" />
+              {t('pendingObservations')}
+              <strong>
+                {totals.pending_observation_count.toLocaleString()}
+              </strong>
+            </span>
+            <span>
+              <i className="memory-overview-lifecycle-swatch consumed" />
+              {t('consumedObservations')}
+              <strong>
+                {totals.consumed_observation_count.toLocaleString()}
+              </strong>
+            </span>
+          </div>
+        </div>
+        {overview.workflows.length === 0 ? (
+          <EmptyState message={t('noWorkflowData')} />
+        ) : (
           <Table>
             <Table.Thead>
               <Table.Tr>
@@ -266,9 +303,23 @@ export function MemoryOverview({
                 </Table.Tr>
               ))}
             </Table.Tbody>
+            <Table.Tfoot>
+              <Table.Tr>
+                <Table.Th>{t('lifecycleTotal')}</Table.Th>
+                <Table.Th ta="right">
+                  {totals.extracted_unit_count.toLocaleString()}
+                </Table.Th>
+                <Table.Th ta="right">
+                  {totals.units_with_observation_count.toLocaleString()}
+                </Table.Th>
+                <Table.Th ta="right">
+                  {totals.units_without_observation_count.toLocaleString()}
+                </Table.Th>
+              </Table.Tr>
+            </Table.Tfoot>
           </Table>
-        </section>
-      </div>
+        )}
+      </section>
     </div>
   )
 }

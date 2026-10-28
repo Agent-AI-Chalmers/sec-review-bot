@@ -101,6 +101,75 @@ export async function smokeMemoryPreflight({ name, context, base, server }) {
     )
     await racePage.close()
 
+    const transcriptFailurePage = await context.newPage()
+    await transcriptFailurePage.route(
+      '**/api/memory/revisions/1/transcript/content',
+      (route) =>
+        route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: '{"error":"memory_catalog_unavailable"}'
+        })
+    )
+    await transcriptFailurePage.goto(`${base}/memory/revisions/1/transcript`, {
+      waitUntil: 'domcontentloaded'
+    })
+    await transcriptFailurePage
+      .getByText('The process transcript could not be opened.', { exact: true })
+      .waitFor()
+    const centeredTranscriptError = await transcriptFailurePage.evaluate(() => {
+      const state = document.querySelector('.content-load-state')
+      const alert = state?.querySelector('[role="alert"]')
+      if (!state || !alert) return false
+      const stateRect = state.getBoundingClientRect()
+      const alertRect = alert.getBoundingClientRect()
+      return (
+        Math.abs(
+          alertRect.left +
+            alertRect.width / 2 -
+            (stateRect.left + stateRect.width / 2)
+        ) < 1 &&
+        Math.abs(
+          alertRect.top +
+            alertRect.height / 2 -
+            (stateRect.top + stateRect.height / 2)
+        ) < 1
+      )
+    })
+    assert.strictEqual(
+      centeredTranscriptError,
+      true,
+      'a full-page transcript load error must be centered in its content region'
+    )
+    await transcriptFailurePage.close()
+
+    const memoryFilesFailurePage = await context.newPage()
+    await memoryFilesFailurePage.route(
+      '**/api/memory/revisions/1/content',
+      (route) =>
+        route.fulfill({
+          status: 422,
+          contentType: 'application/json',
+          body: '{"error":"invalid_memory_tree_artifact"}'
+        })
+    )
+    await memoryFilesFailurePage.goto(`${base}/memory/revisions/1/tree`, {
+      waitUntil: 'domcontentloaded'
+    })
+    await memoryFilesFailurePage
+      .getByText('The memory files could not be opened.', { exact: true })
+      .waitFor()
+    const memoryTreeDownload = memoryFilesFailurePage.getByRole('link', {
+      name: 'Download memory tree'
+    })
+    await memoryTreeDownload.waitFor()
+    assert.strictEqual(
+      await memoryTreeDownload.getAttribute('href'),
+      '/api/memory/revisions/1/artifact',
+      'a memory preview failure must preserve the original artifact download'
+    )
+    await memoryFilesFailurePage.close()
+
     if (server !== undefined) {
       const partialFailurePage = await context.newPage()
       await partialFailurePage.route('**/api/memory/overview*', (route) =>
@@ -227,17 +296,27 @@ export async function smokeMemory({
     await zhPage.addInitScript(() => localStorage.setItem('ui-language', 'zh'))
     await zhPage.goto(`${base}/memory`, { waitUntil: 'domcontentloaded' })
     await zhPage.getByRole('heading', { name: '记忆' }).waitFor()
-    await zhPage.getByRole('switch', { name: '自动维护' }).waitFor()
+    const maintenanceSwitch = zhPage.getByRole('switch', {
+      name: '自动维护'
+    })
+    await maintenanceSwitch.waitFor()
+    await zhPage.getByRole('img', { name: '说明自动维护控制行为' }).hover()
+    const maintenanceHelp = zhPage.getByRole('tooltip')
+    await maintenanceHelp.waitFor()
+    assert.ok(
+      (await maintenanceHelp.textContent())?.trim(),
+      `${name} maintenance help tooltip must render its explanation`
+    )
     await zhPage.getByText('概览', { exact: true }).waitFor()
     await zhPage
       .getByRole('region', { name: '概览' })
-      .getByText('未产出观察记录', { exact: true })
+      .getByText('未产出观察项', { exact: true })
       .waitFor()
     await zhPage.getByText('修订历史', { exact: true }).click()
     await zhPage.getByText('列表', { exact: true }).click()
     await zhPage.locator('tr[aria-current="true"]').waitFor()
     await zhPage.getByText('修订历史', { exact: true }).waitFor()
-    await zhPage.getByText('观察记录', { exact: true }).click()
+    await zhPage.getByText('观察项', { exact: true }).click()
     const zhIncorporationLayout = await zhPage.evaluate(() => {
       const container = document.querySelector('.memory-incorporation')
       const label = container?.querySelector('span')
@@ -591,18 +670,60 @@ export async function smokeMemory({
       .getByText('Assistant', { exact: true })
       .waitFor()
     const transcriptLayout = await maintenanceDialog.evaluate((dialog) => {
+      const layout = dialog.querySelector('.transcript-layout')
       const timeline = dialog.querySelector('.transcript-timeline')
+      const minimap = dialog.querySelector('.transcript-minimap')
       const body = dialog.querySelector('.mantine-Modal-body')
-      if (timeline === null || body === null) return null
+      if (layout === null || timeline === null || body === null) return null
       return {
+        layoutWidth: layout.getBoundingClientRect().width,
         timelineWidth: timeline.getBoundingClientRect().width,
+        minimapWidth: minimap?.getBoundingClientRect().width ?? 0,
+        minimapPresent: minimap !== null,
+        gap: Number.parseFloat(getComputedStyle(layout).columnGap) || 0,
         bodyWidth: body.getBoundingClientRect().width
       }
     })
     assert.ok(
       transcriptLayout !== null &&
-        transcriptLayout.timelineWidth >= transcriptLayout.bodyWidth - 48,
-      `${name} transcript timeline must fill the modal content width`
+        transcriptLayout.layoutWidth >= transcriptLayout.bodyWidth - 48,
+      `${name} transcript layout must fill the modal content width`
+    )
+    assert.ok(
+      transcriptLayout !== null &&
+        transcriptLayout.timelineWidth >=
+          transcriptLayout.layoutWidth -
+            transcriptLayout.minimapWidth -
+            transcriptLayout.gap -
+            1,
+      `${name} transcript timeline must fill the column next to the minimap`
+    )
+    assert.strictEqual(
+      transcriptLayout?.minimapPresent,
+      viewport.width > 700,
+      `${name} transcript minimap must be mounted only when its rail has room`
+    )
+    await waitUntil(
+      () =>
+        maintenanceDialog.evaluate((dialog) => {
+          const minimap = dialog.querySelector('.transcript-minimap')
+          if (minimap === null) return true
+          let scroller = minimap.parentElement
+          while (
+            scroller !== null &&
+            !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)
+          )
+            scroller = scroller.parentElement
+          if (scroller === null) return false
+          const rail = minimap.getBoundingClientRect()
+          const port = scroller.getBoundingClientRect()
+          return (
+            Math.abs(
+              rail.top + rail.height / 2 - (port.top + port.height / 2)
+            ) < 8
+          )
+        }),
+      `${name} transcript rail must center in the modal scrollport`
     )
     await maintenanceDialog
       .getByPlaceholder('Search messages, tools, and arguments')

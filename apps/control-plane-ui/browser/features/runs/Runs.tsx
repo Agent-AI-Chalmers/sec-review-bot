@@ -1,17 +1,14 @@
 import React from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  Alert,
   Box,
   Button,
   Collapse,
   Container,
   Group,
-  NativeSelect,
   Pagination,
   Paper,
   Select,
-  Stack,
   Table,
   Text,
   Title,
@@ -19,7 +16,6 @@ import {
 } from '@mantine/core'
 import {
   IconAdjustmentsHorizontal,
-  IconAlertTriangle,
   IconChevronDown,
   IconInbox
 } from '@tabler/icons-react'
@@ -33,13 +29,13 @@ import {
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { CopyAction } from '../../shared/CopyAction.js'
 import { RefreshControls, useRefresh } from '../../shared/refresh.js'
+import { EmptyState, LoadingState } from '../../shared/StateMessage.js'
 import {
   EXECUTION_STATUSES,
   ExecutionStatus,
   PREPARATION_STATUSES,
   PreparationStatus,
   PublicationStatus,
-  axisLabel,
   executionStatusLabel,
   preparationStateLabel,
   runPublicationStatusLabel
@@ -53,6 +49,9 @@ import {
 } from './format.js'
 import { LIST_RUN_QUERY_PARAMS } from '../../../shared/list-run-query-params.js'
 import { PlatformMark } from './PlatformMark.js'
+import { ICON_SIZE } from '../../shared/design.js'
+import { ParkedRuns } from './ParkedRuns.js'
+import { RunJump } from './RunJump.js'
 
 const RANGE_MINUTES: Record<string, number> = {
   '1h': 60,
@@ -66,6 +65,38 @@ const DEFAULT_PAGE_SIZE = 50
 /** sessionStorage key for the visited-page trail, so it survives navigation to a
  * run detail and back (see the cursorParents state below). */
 const CURSOR_PARENTS_KEY = 'runs:cursor-parents'
+
+interface FilterOption {
+  value: string
+  label: string
+}
+
+function FilterSelect({
+  width,
+  label,
+  value,
+  options,
+  onChange
+}: {
+  width: number
+  label: string
+  value: string
+  options: FilterOption[]
+  onChange: (value: string) => void
+}): React.JSX.Element {
+  const t = useMessages()
+  return (
+    <Select
+      w={width}
+      label={label}
+      value={value === '' ? 'all' : value}
+      onChange={(next) => onChange(next === null || next === 'all' ? '' : next)}
+      data={[{ value: 'all', label: t('all') }, ...options]}
+      allowDeselect={false}
+      comboboxProps={{ withinPortal: true }}
+    />
+  )
+}
 
 export function Runs(): React.JSX.Element {
   const { language } = useLanguage()
@@ -108,20 +139,6 @@ export function Runs(): React.JSX.Element {
   // normal pagination, and an operator needs to see them before the list, so they load
   // separately and a failure here never hides the list itself.
   const [blocked, setBlocked] = React.useState<ParkedRun[]>([])
-  React.useEffect(() => {
-    let cancelled = false
-    parkedRuns()
-      .then((blocks) => {
-        if (!cancelled) setBlocked(blocks)
-      })
-      .catch((value: unknown) => {
-        if (!cancelled) setAuxiliaryError(value)
-        // The queue is an operator aid, not a precondition for reading runs; leave it empty.
-      })
-    return (): void => {
-      cancelled = true
-    }
-  }, [])
   React.useEffect(() => {
     window.sessionStorage.setItem(
       CURSOR_PARENTS_KEY,
@@ -168,6 +185,19 @@ export function Runs(): React.JSX.Element {
     : [...PAGE_SIZES, pageSize].sort((left, right) => left - right)
   const load = React.useCallback(async (): Promise<void> => {
     const requestedQuery = query
+    // The parked queue is a separate read, but it belongs to the same refresh cycle: keeping it
+    // out here made refresh look successful while a newly parked run stayed invisible.
+    const parkedRequest = parkedRuns()
+      .then((blocks) => {
+        if (latestQuery.current === requestedQuery) {
+          setBlocked(blocks)
+          setAuxiliaryError(undefined)
+        }
+      })
+      .catch((value: unknown) => {
+        if (latestQuery.current === requestedQuery) setAuxiliaryError(value)
+        // The queue is an operator aid, not a precondition for reading runs.
+      })
     try {
       const nextData = await api<{ runs: Run[]; next_cursor: string | null }>(
         `/runs?${requestedQuery}`
@@ -179,6 +209,7 @@ export function Runs(): React.JSX.Element {
     } catch (value) {
       if (latestQuery.current === requestedQuery) setError(value)
     }
+    await parkedRequest
   }, [query])
   const { refresh, refreshing, lastChecked } = useRefresh(load)
   // An expired session must reach the sign-in form even when the console still has data
@@ -244,127 +275,77 @@ export function Runs(): React.JSX.Element {
         mb="lg"
       >
         <Title order={1}>{t('runs')}</Title>
-        <RefreshControls
-          refresh={refresh}
-          refreshing={refreshing}
-          lastChecked={lastChecked}
-        />
+        <Group gap="sm" align="center" wrap="wrap" justify="flex-end">
+          <RunJump />
+          <RefreshControls
+            refresh={refresh}
+            refreshing={refreshing}
+            lastChecked={lastChecked}
+          />
+        </Group>
       </Group>
-      {blocked.length > 0 && (
-        <Alert
-          color="orange"
-          variant="light"
-          mb="md"
-          title={t('parkedRunsTitle')}
-          icon={<IconAlertTriangle size={18} />}
-          data-testid="parked-runs"
-          // A standing queue, not a transient fault: `role="alert"` belongs to the refresh
-          // error below, and Mantine's Alert would otherwise claim that role and be the first
-          // thing an alert-based assertion sees.
-          role="status"
-        >
-          <Text size="sm" mb="xs">
-            {t('parkedRunsBody')}
-          </Text>
-          <Stack gap={4}>
-            {blocked.map((block) => (
-              <Text
-                key={block.run_id}
-                size="sm"
-                component={Link}
-                to={`/runs/${encodeURIComponent(block.run_id)}`}
-                c="orange.9"
-              >
-                {/* The axis is shown because the decision differs by axis, and the run id alone
-                    leaves the operator guessing which one stopped. */}
-                <Text span size="xs" c="dimmed">
-                  {axisLabel(block.axis, t)}
-                  {' · '}
-                </Text>
-                <Text span ff="monospace" size="sm">
-                  {block.run_id}
-                </Text>
-              </Text>
-            ))}
-          </Stack>
-        </Alert>
-      )}
+      <ParkedRuns blocked={blocked} />
       {Boolean(error) && (
         <Text role="alert" c="red" mb="md">
           {t('refreshFailed')}
           {failureReason(error, t) && ` ${failureReason(error, t)}`}
         </Text>
       )}
+      {auxiliaryError !== undefined && (
+        <Text role="alert" c="red" mb="md">
+          {t('parkedRunsError')}
+          {failureReason(auxiliaryError, t) &&
+            ` ${failureReason(auxiliaryError, t)}`}
+        </Text>
+      )}
       <Box className="operations-bar" mb="lg">
         {/* Page size lives with the pager below the table, where "how many per page" is asked. */}
         <div className="operations-row">
           <Group aria-label="Run list controls" align="flex-end" gap="md">
-            <NativeSelect
-              w={120}
+            <FilterSelect
+              width={120}
               label={t('platform')}
               value={search.get('source_platform') ?? ''}
-              onChange={(event) =>
-                update('source_platform', event.target.value)
-              }
-            >
-              <option value="">{t('all')}</option>
-              <option value="github">{t('platformGithub')}</option>
-            </NativeSelect>
-            <NativeSelect
-              w={150}
+              onChange={(value) => update('source_platform', value)}
+              options={[{ value: 'github', label: t('platformGithub') }]}
+            />
+            <FilterSelect
+              width={150}
               label={t('workflow')}
               value={search.get('workflow') ?? ''}
-              onChange={(event) => update('workflow', event.target.value)}
-            >
-              <option value="">{t('all')}</option>
-              {['issue-review', 'pull-request-review', 'repository-review'].map(
-                (value) => (
-                  <option key={value} value={value}>
-                    {workflowLabel(value, t)}
-                  </option>
-                )
-              )}
-            </NativeSelect>
-            <NativeSelect
-              w={130}
+              onChange={(value) => update('workflow', value)}
+              options={[
+                'issue-review',
+                'pull-request-review',
+                'repository-review'
+              ].map((value) => ({ value, label: workflowLabel(value, t) }))}
+            />
+            <FilterSelect
+              width={130}
               label={t('preparation')}
               value={search.get('preparation_status') ?? ''}
-              onChange={(event) =>
-                update('preparation_status', event.target.value)
-              }
-            >
-              <option value="">{t('all')}</option>
-              {PREPARATION_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {preparationStateLabel(value, t)}
-                </option>
-              ))}
-            </NativeSelect>
-            <NativeSelect
-              w={120}
+              onChange={(value) => update('preparation_status', value)}
+              options={PREPARATION_STATUSES.map((value) => ({
+                value,
+                label: preparationStateLabel(value, t)
+              }))}
+            />
+            <FilterSelect
+              width={120}
               label={t('execution')}
               value={search.get('execution_status') ?? ''}
-              onChange={(event) =>
-                update('execution_status', event.target.value)
-              }
-            >
-              <option value="">{t('all')}</option>
-              {EXECUTION_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {executionStatusLabel(value, t)}
-                </option>
-              ))}
-            </NativeSelect>
-            <NativeSelect
-              w={130}
+              onChange={(value) => update('execution_status', value)}
+              options={EXECUTION_STATUSES.map((value) => ({
+                value,
+                label: executionStatusLabel(value, t)
+              }))}
+            />
+            <FilterSelect
+              width={130}
               label={t('publication')}
               value={search.get('publication_status') ?? ''}
-              onChange={(event) =>
-                update('publication_status', event.target.value)
-              }
-            >
-              <option value="">{t('all')}</option>
-              {(
+              onChange={(value) => update('publication_status', value)}
+              options={(
                 [
                   'pending',
                   'publishing',
@@ -372,15 +353,14 @@ export function Runs(): React.JSX.Element {
                   'failed',
                   'skipped'
                 ] as const
-              ).map((value) => (
-                <option key={value} value={value}>
-                  {runPublicationStatusLabel(value, t)}
-                </option>
-              ))}
-            </NativeSelect>
+              ).map((value) => ({
+                value,
+                label: runPublicationStatusLabel(value, t)
+              }))}
+            />
             <Button
               variant={search.has('range') ? 'light' : 'subtle'}
-              leftSection={<IconAdjustmentsHorizontal size={16} />}
+              leftSection={<IconAdjustmentsHorizontal size={ICON_SIZE.md} />}
               rightSection={
                 <IconChevronDown
                   size={14}
@@ -399,34 +379,36 @@ export function Runs(): React.JSX.Element {
         </div>
         <Collapse expanded={moreFiltersOpened}>
           <Group className="operations-more" mt="md" align="flex-end">
-            <NativeSelect
-              w={140}
+            <FilterSelect
+              width={140}
               label={t('timeRange')}
               value={search.get('range') ?? ''}
-              onChange={(event) => update('range', event.target.value)}
-            >
-              <option value="">{t('all')}</option>
-              <option value="1h">{t('lastHour')}</option>
-              <option value="24h">{t('lastDay')}</option>
-              <option value="7d">{t('lastWeek')}</option>
-            </NativeSelect>
+              onChange={(value) => update('range', value)}
+              options={[
+                { value: '1h', label: t('lastHour') },
+                { value: '24h', label: t('lastDay') },
+                { value: '7d', label: t('lastWeek') }
+              ]}
+            />
           </Group>
         </Collapse>
       </Box>
       {data === undefined ? (
-        <p>{t('loadingRuns')}</p>
+        <LoadingState message={t('loadingRuns')} fill />
       ) : data.runs.length === 0 ? (
-        <Stack align="center" gap="xs" py="xl">
-          <IconInbox
-            size={40}
-            stroke={1.2}
-            style={{ color: 'var(--mantine-color-dimmed)' }}
-          />
-          <Text c="dimmed">{t('emptyRuns')}</Text>
-        </Stack>
+        <EmptyState
+          message={t('emptyRuns')}
+          icon={
+            <IconInbox
+              size={40}
+              stroke={1.2}
+              style={{ color: 'var(--mantine-color-dimmed)' }}
+            />
+          }
+        />
       ) : (
         <>
-          <Paper withBorder radius="sm" className="table-wrap">
+          <Paper withBorder radius="md" className="table-wrap">
             <Table striped highlightOnHover>
               <Table.Thead>
                 <Table.Tr>
@@ -450,7 +432,9 @@ export function Runs(): React.JSX.Element {
                             // A hex id reads far better in a monospaced face: proportional
                             // digits make `0`/`O` and `1`/`l` ambiguous at 12px.
                             style={{
-                              fontFamily: 'var(--mantine-font-family-monospace)'
+                              fontFamily:
+                                'var(--mantine-font-family-monospace)',
+                              whiteSpace: 'nowrap'
                             }}
                             to={`/runs/${encodeURIComponent(run.run_id)}`}
                             state={{ listSearch: search.toString() }}
@@ -533,6 +517,7 @@ export function Runs(): React.JSX.Element {
                 w={72}
                 value={String(pageSize)}
                 allowDeselect={false}
+                comboboxProps={{ withinPortal: true }}
                 data={pageSizeOptions.map((size) => String(size))}
                 onChange={(value) => {
                   // Reuse the filter path: changing how much a page holds invalidates the

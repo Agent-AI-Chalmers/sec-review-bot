@@ -15,6 +15,7 @@ from sec_review_agents.contract_versions import MEMORY_CATALOG_API_VERSION
 from sec_review_agents.memory.catalog_client import (
     MemoryCatalogClient,
     MemoryCatalogConflictError,
+    MemoryMaintenancePausedError,
 )
 from tests.project_paths import CONTRACTS_ROOT
 
@@ -295,6 +296,44 @@ def test_extraction_conflict_preserves_non_retryable_catalog_semantics() -> None
                 media_type="application/zstd",
             ),
             observation_markdown="Different content.",
+        )
+
+
+def test_maintenance_pause_preserves_its_own_conflict_semantics() -> None:
+    _validator("ErrorResponse").validate(
+        {
+            "error": "Automatic memory maintenance is paused.",
+            "code": "MAINTENANCE_PAUSED",
+        }
+    )
+    client = MemoryCatalogClient(base_url="http://catalog", token="secret")
+    paused = HTTPError(
+        f"http://catalog{API_ROOT}/memory-tree/revisions",
+        409,
+        "Conflict",
+        Message(),
+        BytesIO(
+            b'{"error":"Automatic memory maintenance is paused.",'
+            b'"code":"MAINTENANCE_PAUSED"}'
+        ),
+    )
+
+    with (
+        patch(
+            "sec_review_agents.memory.catalog_client.urlopen",
+            side_effect=paused,
+        ),
+        pytest.raises(MemoryMaintenancePausedError, match="HTTP 409"),
+    ):
+        client.create_memory_tree_revision(
+            maintenance_id="maintenance-1",
+            expected_active_revision=1,
+            extraction_ids=["extraction-1"],
+            memory_tree_reference=_artifact("memory"),
+            maintenance_transcript_reference=_artifact(
+                "maintenance-transcript.jsonl.zst",
+                media_type="application/zstd",
+            ),
         )
 
 

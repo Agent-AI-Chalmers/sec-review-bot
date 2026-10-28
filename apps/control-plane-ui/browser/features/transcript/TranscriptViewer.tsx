@@ -1,7 +1,6 @@
 import React from 'react'
 import {
   ActionIcon,
-  Alert,
   Badge,
   Button,
   Checkbox,
@@ -16,6 +15,7 @@ import {
   TextInput,
   Tooltip
 } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 import {
   IconArrowDown,
   IconArrowUp,
@@ -41,8 +41,11 @@ import {
   isAbortError,
   throwIfUnauthorized
 } from '../../shared/api-client.js'
+import { ResourceLoadError } from '../../shared/ResourceLoadError.js'
 import { useMessages } from '../../shared/i18n.js'
 import { LatestRequestGuard } from '../../shared/latest-request.js'
+import { BREAKPOINTS, ICON_SIZE } from '../../shared/design.js'
+import { LoadingState } from '../../shared/StateMessage.js'
 import {
   normalizeTranscript,
   type ToolCallView,
@@ -50,6 +53,16 @@ import {
   type TranscriptMessageView,
   type TranscriptRole
 } from './transcript-model.js'
+import {
+  MAX_MINIMAP_MARKS,
+  MINIMAP_HEIGHT,
+  minimapBuckets,
+  minimapMarkWidth,
+  minimapTicks,
+  nearestSegment,
+  sameSegments,
+  type MinimapSegment
+} from './transcript-minimap.js'
 
 export type { TranscriptEvent } from './transcript-model.js'
 
@@ -148,7 +161,11 @@ function CopyButton({ value }: { value: string }): React.JSX.Element {
   return (
     <Tooltip label={copied ? t('copied') : t('copy')}>
       <ActionIcon variant="subtle" color="gray" onClick={() => void copy()}>
-        {copied ? <IconCheck size={15} /> : <IconCopy size={15} />}
+        {copied ? (
+          <IconCheck size={ICON_SIZE.sm} />
+        ) : (
+          <IconCopy size={ICON_SIZE.sm} />
+        )}
       </ActionIcon>
     </Tooltip>
   )
@@ -167,30 +184,30 @@ function rolePresentation(role: TranscriptRole): {
   if (role === 'system')
     return {
       color: 'gray',
-      icon: <IconSettings size={17} />,
+      icon: <IconSettings size={ICON_SIZE.md} />,
       key: 'transcriptSystem'
     }
   if (role === 'human')
     return {
       color: 'orange',
-      icon: <IconUser size={17} />,
+      icon: <IconUser size={ICON_SIZE.md} />,
       key: 'transcriptHuman'
     }
   if (role === 'assistant')
     return {
       color: 'blue',
-      icon: <IconRobot size={17} />,
+      icon: <IconRobot size={ICON_SIZE.md} />,
       key: 'transcriptAssistant'
     }
   if (role === 'tool')
     return {
       color: 'green',
-      icon: <IconTool size={17} />,
+      icon: <IconTool size={ICON_SIZE.md} />,
       key: 'transcriptTool'
     }
   return {
     color: 'gray',
-    icon: <IconSettings size={17} />,
+    icon: <IconSettings size={ICON_SIZE.md} />,
     key: 'transcriptUnknown'
   }
 }
@@ -229,9 +246,9 @@ function Section({
           color="gray"
           leftSection={
             opened ? (
-              <IconChevronDown size={15} />
+              <IconChevronDown size={ICON_SIZE.sm} />
             ) : (
-              <IconChevronRight size={15} />
+              <IconChevronRight size={ICON_SIZE.sm} />
             )
           }
           onClick={() => setOpened((current) => !current)}
@@ -250,22 +267,284 @@ function Section({
   )
 }
 
-function ValueView({
+const JSON_MAX_DEPTH = 3
+
+function isPrimitive(
+  value: unknown
+): value is string | number | boolean | null {
+  return (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'number' ||
+    typeof value === 'boolean'
+  )
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function looksLikeMarkdown(value: string): boolean {
+  return (
+    value.includes('\n') ||
+    /(^|\n)\s{0,3}(#{1,6}\s|[-*+]\s|\d+\.\s|>\s)/.test(value) ||
+    /\*\*[^*]+\*\*/.test(value) ||
+    /\[[^\]]+\]\([^)]+\)/.test(value) ||
+    (value.length > 80 && value.includes(' '))
+  )
+}
+
+function recordPreview(value: unknown): string {
+  if (!isRecord(value)) return ''
+  for (const key of ['title', 'name', 'label', 'summary']) {
+    const candidate = value[key]
+    if (typeof candidate === 'string' && candidate.trim() !== '')
+      return candidate.slice(0, 110)
+  }
+  const first = Object.values(value).find(
+    (candidate) => typeof candidate === 'string' && candidate.trim() !== ''
+  )
+  return typeof first === 'string' ? first.slice(0, 110) : ''
+}
+
+function JsonRaw({
   value,
   query
 }: {
   value: unknown
   query: string
 }): React.JSX.Element {
-  return typeof value === 'string' ? (
-    <Text size="sm">
-      <HighlightText value={value} query={query} />
-    </Text>
-  ) : (
-    <Code block>
-      <HighlightText value={JSON.stringify(value, null, 2)} query={query} />
-    </Code>
+  return (
+    <details className="json-raw">
+      <summary>Raw JSON</summary>
+      <Code block>
+        <HighlightText value={JSON.stringify(value, null, 2)} query={query} />
+      </Code>
+    </details>
   )
+}
+
+function JsonPrimitive({
+  value,
+  query
+}: {
+  value: unknown
+  query: string
+}): React.JSX.Element {
+  if (value === null || value === undefined)
+    return <span className="json-null">null</span>
+  if (typeof value === 'string') {
+    if (looksLikeMarkdown(value))
+      return (
+        <div className="memory-markdown json-markdown">
+          <HighlightedMarkdown query={query}>{value}</HighlightedMarkdown>
+        </div>
+      )
+    return (
+      <code className="json-code">
+        <HighlightText value={value} query={query} />
+      </code>
+    )
+  }
+  return <code className="json-code">{String(value)}</code>
+}
+
+function JsonTableValue({
+  value,
+  query
+}: {
+  value: unknown
+  query: string
+}): React.JSX.Element {
+  if (value === null || value === undefined)
+    return <span className="json-null">null</span>
+  if (typeof value === 'string')
+    return (
+      <span className="json-table-text">
+        <HighlightText value={value} query={query} />
+      </span>
+    )
+  return <code className="json-code">{String(value)}</code>
+}
+
+function JsonObjectView({
+  value,
+  query,
+  depth
+}: {
+  value: Record<string, unknown>
+  query: string
+  depth: number
+}): React.JSX.Element {
+  const entries = Object.entries(value)
+  if (entries.length === 0) return <span className="json-empty">{'{}'}</span>
+  return (
+    <div className="json-object">
+      {entries.map(([key, child]) => {
+        const complex = Array.isArray(child) || isRecord(child)
+        if (complex)
+          return (
+            <div className="json-field" key={key}>
+              <div className="json-field-key">
+                <HighlightText value={key} query={query} />
+              </div>
+              <div className="json-field-body">
+                <JsonValueView value={child} query={query} depth={depth + 1} />
+              </div>
+            </div>
+          )
+        return (
+          <div className="json-row" key={key}>
+            <div className="json-key">
+              <HighlightText value={key} query={query} />
+            </div>
+            <div className="json-value">
+              <JsonValueView value={child} query={query} depth={depth + 1} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function JsonTable({
+  rows,
+  keys,
+  query
+}: {
+  rows: Record<string, unknown>[]
+  keys: string[]
+  query: string
+}): React.JSX.Element {
+  return (
+    <div className="json-table-wrap">
+      <table className="json-table">
+        <thead>
+          <tr>
+            {keys.map((key) => (
+              <th key={key}>
+                <HighlightText value={key} query={query} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={index}>
+              {keys.map((key) => (
+                <td
+                  className={
+                    typeof row[key] === 'number'
+                      ? 'json-table-number'
+                      : undefined
+                  }
+                  data-label={key}
+                  key={key}
+                >
+                  <JsonTableValue value={row[key]} query={query} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function JsonArrayView({
+  value,
+  query,
+  depth
+}: {
+  value: unknown[]
+  query: string
+  depth: number
+}): React.JSX.Element {
+  if (value.length === 0) return <span className="json-empty">[]</span>
+
+  const allPrimitive = value.every(isPrimitive)
+  const allShortPrimitive =
+    allPrimitive &&
+    value.every(
+      (item) =>
+        typeof item !== 'string' ||
+        (item.length <= 120 && !item.includes('\n') && !looksLikeMarkdown(item))
+    )
+  if (allShortPrimitive)
+    return (
+      <div className="json-chips">
+        {value.map((item, index) => (
+          <code className="json-code" key={index}>
+            {item === null ? 'null' : String(item)}
+          </code>
+        ))}
+      </div>
+    )
+
+  const allFlatObjects =
+    value.length > 0 &&
+    value.every(
+      (item) => isRecord(item) && Object.values(item).every(isPrimitive)
+    )
+  const keys = allFlatObjects
+    ? [
+        ...new Set(
+          value.flatMap((item) => (isRecord(item) ? Object.keys(item) : []))
+        )
+      ]
+    : []
+  if (allFlatObjects && keys.length > 0 && keys.length <= 6)
+    return <JsonTable rows={value.filter(isRecord)} keys={keys} query={query} />
+
+  if (value.every(isRecord))
+    return (
+      <div className="json-array">
+        {value.map((item, index) => (
+          <details className="json-record" key={index} open={index === 0}>
+            <summary>
+              <span className="json-index">#{index + 1}</span>
+              <span className="json-record-preview">
+                {recordPreview(item) || `Item ${index + 1}`}
+              </span>
+            </summary>
+            <div className="json-record-body">
+              <JsonValueView value={item} query={query} depth={depth + 1} />
+            </div>
+          </details>
+        ))}
+      </div>
+    )
+
+  return (
+    <div className="json-array">
+      {value.map((item, index) => (
+        <div className="json-array-item" key={index}>
+          <span className="json-index">#{index + 1}</span>
+          <JsonValueView value={item} query={query} depth={depth + 1} />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function JsonValueView({
+  value,
+  query,
+  depth = 0
+}: {
+  value: unknown
+  query: string
+  depth?: number
+}): React.JSX.Element {
+  if ((Array.isArray(value) || isRecord(value)) && depth > JSON_MAX_DEPTH)
+    return <JsonRaw value={value} query={query} />
+  if (Array.isArray(value))
+    return <JsonArrayView value={value} query={query} depth={depth} />
+  if (isRecord(value))
+    return <JsonObjectView value={value} query={query} depth={depth} />
+  return <JsonPrimitive value={value} query={query} />
 }
 
 function ToolArguments({
@@ -326,14 +605,14 @@ function ToolArguments({
         </Stack>
       )}
       {ordinary.length > 0 && (
-        <div className="transcript-args-table">
+        <div className="transcript-args">
           {ordinary.map(([key, value]) => (
-            <React.Fragment key={key}>
-              <Text size="xs" fw={700} c="dimmed">
+            <div className="transcript-arg" key={key}>
+              <Text size="xs" fw={600} className="transcript-arg-key">
                 <HighlightText value={key} query={query} />
               </Text>
-              <ValueView value={value} query={query} />
-            </React.Fragment>
+              <JsonValueView value={value} query={query} />
+            </div>
           ))}
         </div>
       )}
@@ -367,26 +646,26 @@ function ToolArguments({
 
 function ToolCall({
   call,
-  force,
   query
 }: {
   call: ToolCallView
-  force: number
   query: string
 }): React.JSX.Element {
   const t = useMessages()
   const jump = (): void => {
     if (!call.resultMessageId) return
-    document
-      .getElementById(`transcript-${call.resultMessageId}`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    scrollToTranscriptElement(`transcript-${call.resultMessageId}`)
   }
   return (
-    <Paper withBorder p="sm" className="transcript-tool-call">
-      <Group justify="space-between" mb="xs">
-        <Group gap="xs">
-          <IconTool size={16} />
-          <Text fw={600} size="sm">
+    <div className="transcript-tool-call">
+      <Group
+        justify="space-between"
+        wrap="nowrap"
+        className="transcript-tool-call-header"
+      >
+        <Group gap="xs" wrap="nowrap">
+          <IconTool size={ICON_SIZE.md} color="var(--mantine-color-green-6)" />
+          <Text fw={600} size="sm" c="green.7" truncate>
             <HighlightText value={call.name} query={query} />
           </Text>
         </Group>
@@ -394,22 +673,71 @@ function ToolCall({
           <Button
             variant="subtle"
             size="compact-xs"
-            leftSection={<IconArrowDown size={14} />}
+            leftSection={<IconArrowDown size={ICON_SIZE.sm} />}
             onClick={jump}
           >
             {t('transcriptJumpResult')}
           </Button>
         )}
       </Group>
-      <Section
-        title={t('transcriptArguments')}
-        value={JSON.stringify(call.args, null, 2)}
-        openedInitially
-        force={force}
-      >
+      <div className="transcript-tool-call-body">
         <ToolArguments args={call.args} query={query} />
-      </Section>
-    </Paper>
+      </div>
+    </div>
+  )
+}
+
+function ToolCalls({
+  calls,
+  force,
+  query
+}: {
+  calls: ToolCallView[]
+  force: number
+  query: string
+}): React.JSX.Element {
+  const t = useMessages()
+  const [opened, setOpened] = React.useState(true)
+  const previousForce = React.useRef(force)
+  React.useEffect(() => {
+    if (force === previousForce.current) return
+    previousForce.current = force
+    setOpened(force > 0)
+  }, [force])
+  return (
+    <div className="transcript-tool-calls">
+      <Button
+        variant="subtle"
+        color="green"
+        size="compact-sm"
+        className="transcript-tool-calls-toggle"
+        aria-expanded={opened}
+        leftSection={
+          opened ? (
+            <IconChevronDown size={ICON_SIZE.sm} />
+          ) : (
+            <IconChevronRight size={ICON_SIZE.sm} />
+          )
+        }
+        onClick={() => setOpened((current) => !current)}
+      >
+        <Group gap={6} wrap="nowrap">
+          <IconTool size={ICON_SIZE.sm} />
+          <Text fw={600} size="sm">
+            {t('transcriptToolCalls')} · {calls.length}
+          </Text>
+        </Group>
+      </Button>
+      <Collapse expanded={opened}>
+        <div className="transcript-tool-calls-body">
+          {calls.map((call) => (
+            <div id={`transcript-call-${call.id}`} key={call.id}>
+              <ToolCall call={call} query={query} />
+            </div>
+          ))}
+        </div>
+      </Collapse>
+    </div>
   )
 }
 
@@ -426,13 +754,12 @@ function TranscriptMessage({
   const presentation = rolePresentation(message.role)
   const jumpToCall = (): void => {
     if (!message.toolCallId) return
-    document
-      .getElementById(`transcript-call-${message.toolCallId}`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    scrollToTranscriptElement(`transcript-call-${message.toolCallId}`)
   }
   return (
     <Paper
       id={`transcript-${message.id}`}
+      data-transcript-message-key={messageKey(message)}
       withBorder
       className={`transcript-message transcript-${message.role}`}
     >
@@ -464,7 +791,10 @@ function TranscriptMessage({
           <Group gap={6} className="transcript-token-metrics">
             {message.usage.total !== undefined && (
               <Tooltip label={message.usage.total.toLocaleString()}>
-                <Badge variant="outline" leftSection={<IconCpu size={12} />}>
+                <Badge
+                  variant="outline"
+                  leftSection={<IconCpu size={ICON_SIZE.xs} />}
+                >
                   {formatTokens(message.usage.total)}
                 </Badge>
               </Tooltip>
@@ -487,7 +817,10 @@ function TranscriptMessage({
               </Badge>
             )}
             {message.usage.reasoning !== undefined && (
-              <Badge variant="outline" leftSection={<IconBrain size={12} />}>
+              <Badge
+                variant="outline"
+                leftSection={<IconBrain size={ICON_SIZE.xs} />}
+              >
                 {message.usage.reasoning}
               </Badge>
             )}
@@ -504,7 +837,7 @@ function TranscriptMessage({
               <Button
                 variant="subtle"
                 size="compact-xs"
-                leftSection={<IconArrowUp size={14} />}
+                leftSection={<IconArrowUp size={ICON_SIZE.sm} />}
                 onClick={jumpToCall}
               >
                 {t('transcriptJumpCall')}
@@ -518,7 +851,7 @@ function TranscriptMessage({
             title={t('transcriptReasoning')}
             value={message.reasoning}
             force={force}
-            icon={<IconBrain size={15} />}
+            icon={<IconBrain size={ICON_SIZE.sm} />}
           >
             <div className="memory-markdown memory-markdown-full">
               <HighlightedMarkdown query={query}>
@@ -553,11 +886,9 @@ function TranscriptMessage({
             )}
           </Section>
         )}
-        {message.toolCalls.map((call) => (
-          <div id={`transcript-call-${call.id}`} key={call.id}>
-            <ToolCall call={call} force={force} query={query} />
-          </div>
-        ))}
+        {message.toolCalls.length > 0 && (
+          <ToolCalls calls={message.toolCalls} force={force} query={query} />
+        )}
         {message.artifact !== undefined && message.artifact !== null && (
           <Section
             title={t('transcriptArtifact')}
@@ -585,20 +916,347 @@ const ROLES: TranscriptRole[] = [
   'unknown'
 ]
 
+function scrollParent(element: HTMLElement): HTMLElement | undefined {
+  let ancestor = element.parentElement
+  while (ancestor) {
+    const style = getComputedStyle(ancestor)
+    if (/(auto|scroll)/.test(style.overflowY)) return ancestor
+    ancestor = ancestor.parentElement
+  }
+  return undefined
+}
+
+function scrollToTranscriptElement(
+  id: string,
+  behavior?: ScrollBehavior
+): void {
+  document.getElementById(id)?.scrollIntoView({
+    behavior:
+      behavior ??
+      (window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth'),
+    block: 'center'
+  })
+}
+
+function messageKey(message: TranscriptMessageView): string {
+  return `${message.seq}:${message.id}:${message.role}`
+}
+
+function messagePreview(message: TranscriptMessageView): string {
+  const value =
+    message.content || message.reasoning || message.name || message.role
+  const preview = value.replaceAll(/\s+/g, ' ').trim().slice(0, 120)
+  return preview || message.role
+}
+
+const MinimapMark = React.memo(function MinimapMark({
+  top,
+  width,
+  current,
+  preview
+}: {
+  top: number
+  width: number
+  current: boolean
+  preview: boolean
+}): React.JSX.Element {
+  return (
+    <span
+      className="transcript-minimap-segment"
+      data-current={current ? 'true' : undefined}
+      data-preview={preview ? 'true' : undefined}
+      style={{ top: `${top}px`, width: `${width}px` }}
+    />
+  )
+})
+
+function TranscriptMinimap({
+  messages,
+  timelineRef,
+  timelineId
+}: {
+  messages: TranscriptMessageView[]
+  timelineRef: React.RefObject<HTMLDivElement | null>
+  timelineId: string
+}): React.JSX.Element {
+  const t = useMessages()
+  const [segments, setSegments] = React.useState<MinimapSegment[]>([])
+  const [current, setCurrent] = React.useState(0)
+  const [hovered, setHovered] = React.useState<number | null>(null)
+  const [topOffset, setTopOffset] = React.useState<number | null>(null)
+
+  // A layout effect measures the scrollport before the first paint, so the
+  // modal rail never shows its 50vh fallback for a frame.
+  React.useLayoutEffect(() => {
+    const timeline = timelineRef.current
+    if (!timeline) return
+    const scroller = scrollParent(timeline)
+    const scrollTarget = scroller ?? window
+    let layoutFrame = 0
+    let scrollFrame = 0
+    let measured: MinimapSegment[] = []
+
+    const updateCurrent = (): void => {
+      if (measured.length === 0) return
+      const timelineRect = timeline.getBoundingClientRect()
+      if (timelineRect.height <= 0) return
+      const viewportTop = scroller ? scroller.getBoundingClientRect().top : 0
+      const viewportHeight = scroller
+        ? scroller.clientHeight
+        : window.innerHeight
+      const center =
+        (viewportTop - timelineRect.top + viewportHeight / 2) /
+        timelineRect.height
+      const next = nearestSegment(measured, center)
+      setCurrent((value) => (value === next ? value : next))
+    }
+
+    const updateTop = (): void => {
+      const height = scroller ? scroller.clientHeight : window.innerHeight
+      const next = Math.max(8, (height - MINIMAP_HEIGHT) / 2)
+      setTopOffset((value) => (value === next ? value : next))
+    }
+
+    const measure = (): void => {
+      layoutFrame = 0
+      updateTop()
+      const timelineRect = timeline.getBoundingClientRect()
+      if (timelineRect.height <= 0) return
+      const byKey = new Map(
+        messages.map((message) => [messageKey(message), message])
+      )
+      const next: MinimapSegment[] = []
+      for (const node of timeline.querySelectorAll<HTMLElement>(
+        ':scope > [data-transcript-message-key]'
+      )) {
+        const message = byKey.get(node.dataset.transcriptMessageKey ?? '')
+        if (!message) continue
+        const rect = node.getBoundingClientRect()
+        next.push({
+          message,
+          top: (rect.top - timelineRect.top) / timelineRect.height,
+          height: rect.height / timelineRect.height
+        })
+      }
+      measured = next
+      setSegments((value) => (sameSegments(value, next) ? value : next))
+      updateCurrent()
+    }
+
+    const scheduleMeasure = (): void => {
+      cancelAnimationFrame(layoutFrame)
+      layoutFrame = requestAnimationFrame(measure)
+    }
+    const scheduleCurrent = (): void => {
+      cancelAnimationFrame(scrollFrame)
+      scrollFrame = requestAnimationFrame(updateCurrent)
+    }
+
+    const resizeObserver = new ResizeObserver(scheduleMeasure)
+    resizeObserver.observe(timeline)
+    scrollTarget.addEventListener('scroll', scheduleCurrent, { passive: true })
+    window.addEventListener('resize', scheduleMeasure)
+    measure()
+    return (): void => {
+      cancelAnimationFrame(layoutFrame)
+      cancelAnimationFrame(scrollFrame)
+      resizeObserver.disconnect()
+      scrollTarget.removeEventListener('scroll', scheduleCurrent)
+      window.removeEventListener('resize', scheduleMeasure)
+    }
+  }, [messages, timelineRef])
+
+  const ticks = minimapTicks(segments.length)
+  if (segments.length === 0)
+    return (
+      <nav
+        className="transcript-minimap"
+        aria-label={t('transcriptMinimap')}
+        style={{
+          height: MINIMAP_HEIGHT,
+          top: topOffset ?? `calc(50vh - ${MINIMAP_HEIGHT / 2}px)`
+        }}
+      />
+    )
+
+  const active = Math.min(current, segments.length - 1)
+  const dense = segments.length > MAX_MINIMAP_MARKS
+  const buckets = dense ? minimapBuckets(segments.length, ticks) : []
+  const currentBucket = dense
+    ? buckets.find((bucket) => bucket.start <= active && active <= bucket.end)
+    : undefined
+  const hoveredIndex =
+    hovered === null ? null : Math.min(hovered, segments.length - 1)
+  const hoveredMessage =
+    hoveredIndex === null ? undefined : segments[hoveredIndex]?.message
+  const currentMessage = segments[active]?.message
+  const currentLabel = currentMessage
+    ? `${t(rolePresentation(currentMessage.role).key)} #${currentMessage.seq}: ${messagePreview(currentMessage)}`
+    : undefined
+
+  const indexAt = (clientY: number, rect: DOMRect): number => {
+    if (ticks.gap === 0) return 0
+    return Math.max(
+      0,
+      Math.min(
+        segments.length - 1,
+        Math.round((clientY - rect.top - ticks.start) / ticks.gap)
+      )
+    )
+  }
+
+  const navigate = (index: number): void => {
+    const message = segments[index]?.message
+    if (!message) return
+    // The rail is a direct ordering control: jump instantly and let the scroll
+    // listener derive the current message. A smooth scroll would keep firing
+    // scroll events while a second key press still uses the old index.
+    scrollToTranscriptElement(`transcript-${message.id}`, 'auto')
+  }
+
+  return (
+    <nav
+      className="transcript-minimap"
+      aria-label={t('transcriptMinimap')}
+      style={{
+        height: MINIMAP_HEIGHT,
+        top: topOffset ?? `calc(50vh - ${MINIMAP_HEIGHT / 2}px)`
+      }}
+    >
+      <div
+        className="transcript-minimap-track"
+        role="slider"
+        tabIndex={0}
+        aria-label={t('transcriptMinimapPosition')}
+        aria-controls={timelineId}
+        aria-orientation="vertical"
+        aria-valuemin={1}
+        aria-valuemax={segments.length}
+        aria-valuenow={active + 1}
+        aria-valuetext={currentLabel}
+        onClick={(event) => {
+          navigate(
+            indexAt(event.clientY, event.currentTarget.getBoundingClientRect())
+          )
+        }}
+        onMouseMove={(event) => {
+          setHovered(
+            indexAt(event.clientY, event.currentTarget.getBoundingClientRect())
+          )
+        }}
+        onMouseLeave={() => setHovered(null)}
+        onFocus={() => setHovered(active)}
+        onBlur={() => setHovered(null)}
+        onKeyDown={(event) => {
+          const last = segments.length - 1
+          let next: number | undefined
+          if (event.key === 'ArrowUp' || event.key === 'ArrowLeft')
+            next = Math.max(0, active - 1)
+          else if (event.key === 'ArrowDown' || event.key === 'ArrowRight')
+            next = Math.min(last, active + 1)
+          else if (event.key === 'Home') next = 0
+          else if (event.key === 'End') next = last
+          else if (event.key === 'Enter' || event.key === ' ') next = active
+          if (next === undefined) return
+          event.preventDefault()
+          setHovered(next)
+          navigate(next)
+        }}
+      >
+        <div className="transcript-minimap-marks" aria-hidden="true">
+          {dense ? (
+            <>
+              {buckets.map((bucket) => {
+                const preview =
+                  hoveredIndex !== null &&
+                  bucket.start <= hoveredIndex &&
+                  hoveredIndex <= bucket.end
+                return (
+                  <MinimapMark
+                    key={`bucket-${bucket.start}`}
+                    top={bucket.top}
+                    width={minimapMarkWidth(false, preview)}
+                    current={false}
+                    preview={preview}
+                  />
+                )
+              })}
+              {currentMessage && (
+                <MinimapMark
+                  key="current"
+                  top={currentBucket?.top ?? ticks.start + active * ticks.gap}
+                  width={minimapMarkWidth(true, false)}
+                  current
+                  preview={false}
+                />
+              )}
+            </>
+          ) : (
+            segments.map((segment, index) => {
+              const preview = index === hoveredIndex
+              return (
+                <MinimapMark
+                  key={messageKey(segment.message)}
+                  top={ticks.start + index * ticks.gap}
+                  width={minimapMarkWidth(index === active, preview)}
+                  current={index === active}
+                  preview={preview}
+                />
+              )
+            })
+          )}
+        </div>
+      </div>
+      {hoveredMessage && hoveredIndex !== null && (
+        <Paper
+          withBorder
+          p="xs"
+          className="transcript-minimap-preview"
+          aria-hidden="true"
+          style={{ top: `${ticks.start + hoveredIndex * ticks.gap}px` }}
+        >
+          <Text size="xs" fw={700}>
+            {t(rolePresentation(hoveredMessage.role).key)} · #
+            {hoveredMessage.seq}
+          </Text>
+          <Text size="xs" lineClamp={3} c="dimmed">
+            {messagePreview(hoveredMessage)}
+          </Text>
+        </Paper>
+      )}
+    </nav>
+  )
+}
+
 export function TranscriptTimeline({
   events
 }: {
   events: TranscriptEvent[]
 }): React.JSX.Element {
   const t = useMessages()
+  const timelineId = React.useId()
+  const narrowTranscript = useMediaQuery(
+    `(max-width: ${BREAKPOINTS.rail}px)`,
+    false,
+    {
+      getInitialValueInEffect: false
+    }
+  )
   const document = React.useMemo(() => normalizeTranscript(events), [events])
   const [query, setQuery] = React.useState('')
   const [roles, setRoles] = React.useState<TranscriptRole[]>(ROLES)
   const [force, setForce] = React.useState(0)
-  const filtered = document.messages.filter(
-    (message) =>
-      roles.includes(message.role) &&
-      message.searchable.includes(query.trim().toLowerCase())
+  const timelineRef = React.useRef<HTMLDivElement>(null)
+  const filtered = React.useMemo(
+    () =>
+      document.messages.filter(
+        (message) =>
+          roles.includes(message.role) &&
+          message.searchable.includes(query.trim().toLowerCase())
+      ),
+    [document.messages, query, roles]
   )
   const toggleRole = (role: TranscriptRole): void =>
     setRoles((current) =>
@@ -660,7 +1318,7 @@ export function TranscriptTimeline({
           </Stack>
           <Group gap="xs" wrap="wrap">
             <TextInput
-              leftSection={<IconSearch size={15} />}
+              leftSection={<IconSearch size={ICON_SIZE.sm} />}
               placeholder={t('transcriptSearch')}
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
@@ -682,16 +1340,30 @@ export function TranscriptTimeline({
           </Group>
         </Group>
       </Paper>
-      <Stack gap="sm" className="transcript-timeline">
-        {filtered.map((message) => (
-          <TranscriptMessage
-            key={`${message.id}:${message.seq}:${message.role}`}
-            message={message}
-            force={force}
-            query={query.trim()}
+      <div className="transcript-layout">
+        <Stack
+          id={timelineId}
+          gap="sm"
+          className="transcript-timeline"
+          ref={timelineRef}
+        >
+          {filtered.map((message) => (
+            <TranscriptMessage
+              key={messageKey(message)}
+              message={message}
+              force={force}
+              query={query.trim()}
+            />
+          ))}
+        </Stack>
+        {!narrowTranscript && (
+          <TranscriptMinimap
+            messages={filtered}
+            timelineRef={timelineRef}
+            timelineId={timelineId}
           />
-        ))}
-      </Stack>
+        )}
+      </div>
     </Stack>
   )
 }
@@ -712,28 +1384,34 @@ export function TranscriptViewer({
       size="calc(100vw - 64px)"
       classNames={{ body: 'memory-viewer-modal' }}
     >
-      <Group justify="end" mb="md">
+      <Group justify="end" mb="md" gap="xs">
         {target && (
           <>
-            <Button
-              component="a"
-              href={target.pageHref}
-              target="_blank"
-              rel="noreferrer"
-              variant="default"
-              leftSection={<IconExternalLink size={16} />}
-            >
-              {t('openFullPage')}
-            </Button>
-            <Button
-              component="a"
-              href={target.downloadHref}
-              download
-              variant="default"
-              leftSection={<IconDownload size={16} />}
-            >
-              {t('downloadOriginal')}
-            </Button>
+            <Tooltip label={t('openFullPage')}>
+              <ActionIcon
+                component="a"
+                href={target.pageHref}
+                target="_blank"
+                rel="noreferrer"
+                variant="default"
+                size="lg"
+                aria-label={t('openFullPage')}
+              >
+                <IconExternalLink size={ICON_SIZE.md} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label={t('downloadOriginal')}>
+              <ActionIcon
+                component="a"
+                href={target.downloadHref}
+                download
+                variant="default"
+                size="lg"
+                aria-label={t('downloadOriginal')}
+              >
+                <IconDownload size={ICON_SIZE.md} />
+              </ActionIcon>
+            </Tooltip>
           </>
         )}
       </Group>
@@ -773,7 +1451,11 @@ export function TranscriptContent({
   }, [t, target.contentHref])
   throwIfUnauthorized(error)
   if (error !== undefined)
-    return <Alert color="red">{t('transcriptLoadFailed')}</Alert>
-  if (loading) return <Text c="dimmed">{t('loading')}</Text>
+    return (
+      <div className="content-load-state">
+        <ResourceLoadError message={t('transcriptLoadFailed')} />
+      </div>
+    )
+  if (loading) return <LoadingState message={t('loading')} />
   return <TranscriptTimeline events={events} />
 }

@@ -4,6 +4,7 @@ import { test } from 'node:test'
 import type { MemoryCatalogStore } from '../src/catalog-store.js'
 import {
   ExtractionConflictError,
+  MaintenancePausedError,
   MemoryTreeRevisionConflictError,
 } from '../src/catalog-store.js'
 import { createApp } from '../src/server.js'
@@ -495,8 +496,8 @@ await test('maintenance input is read and a revision is created with resource se
   await app.close()
 })
 
-await test('revision conflicts are declared as 409', async () => {
-  const store: MemoryCatalogStore = {
+function storeWithRevisionFailure(error: Error): MemoryCatalogStore {
+  return {
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
@@ -517,10 +518,7 @@ await test('revision conflicts are declared as 409', async () => {
       }),
     changeMaintenanceControl: () => Promise.reject(new Error('not used')),
     getMaintenanceInput: () => Promise.resolve(null),
-    createMemoryTreeRevision: () =>
-      Promise.reject(
-        new MemoryTreeRevisionConflictError('stale expected active revision'),
-      ),
+    createMemoryTreeRevision: () => Promise.reject(error),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     getMemoryTree: () =>
       Promise.resolve({ revision: 0, memory_tree_reference: null }),
@@ -528,27 +526,53 @@ await test('revision conflicts are declared as 409', async () => {
     listMemoryTreeRevisions: () =>
       Promise.resolve({ revisions: [], next_before_revision: null }),
   }
+}
+
+async function postRevision(store: MemoryCatalogStore) {
   const app = await createApp({ store, token: 'secret' })
-  const response = await app.inject({
-    method: 'POST',
-    url: '/v1/memory-tree/revisions',
-    headers: { authorization: 'Bearer secret' },
-    payload: {
-      expected_active_revision: 0,
-      memory_tree_reference: revision.memory_tree_reference,
-      source: revision.source,
-    },
-  })
+  try {
+    return await app.inject({
+      method: 'POST',
+      url: '/v1/memory-tree/revisions',
+      headers: { authorization: 'Bearer secret' },
+      payload: {
+        expected_active_revision: 0,
+        memory_tree_reference: revision.memory_tree_reference,
+        source: revision.source,
+      },
+    })
+  } finally {
+    await app.close()
+  }
+}
+
+function responseCode(response: { json: () => unknown }): unknown {
+  const payload = response.json()
+  return typeof payload === 'object' && payload !== null && 'code' in payload
+    ? payload.code
+    : null
+}
+
+await test('revision conflicts are declared as 409', async () => {
+  const response = await postRevision(
+    storeWithRevisionFailure(
+      new MemoryTreeRevisionConflictError('stale expected active revision'),
+    ),
+  )
 
   assert.equal(response.statusCode, 409)
-  const payload: unknown = response.json()
-  assert.equal(
-    typeof payload === 'object' && payload !== null && 'code' in payload
-      ? payload.code
-      : null,
-    'CONFLICT',
+  assert.equal(responseCode(response), 'CONFLICT')
+})
+
+await test('a paused maintenance commit has its own 409 code', async () => {
+  const response = await postRevision(
+    storeWithRevisionFailure(
+      new MaintenancePausedError('Automatic memory maintenance is paused.'),
+    ),
   )
-  await app.close()
+
+  assert.equal(response.statusCode, 409)
+  assert.equal(responseCode(response), 'MAINTENANCE_PAUSED')
 })
 
 await test('restore moves the active pointer through its own operation', async () => {

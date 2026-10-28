@@ -842,6 +842,11 @@ export interface components {
         | 'EXECUTION_ALREADY_ADVANCED'
         | 'SUBMISSION_RECOVERY_EXHAUSTED'
         | 'PUBLICATION_RECONCILIATION_EXHAUSTED'
+      /**
+       * Format: date-time
+       * @description When the axis entered the parked state, taken from its disconnected transition event. The row's updated_at is only a fallback for data written before transition events existed.
+       */
+      parked_at: string
     }
     /** @description Durable preparation state for the run's preparation axis. This is an operational summary only; it never exposes connector-owned preparation input. It is not nullable: admission creates a run, its preparation, and its execution in one transaction and nothing deletes an axis on its own, so every readable run carries a summary. A row whose preparation is missing is corrupt — Review Runs drops it from list reads and answers 404 for a single-run read, logging the fault — rather than reported with a null summary. */
     PreparationSummary: {

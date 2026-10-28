@@ -382,7 +382,52 @@ jobs:
           pnpm test
           pnpm run build
 
-      - name: Smoke test
+  control-plane-ui-smoke:
+    name: Control Plane UI smoke (${{ matrix.shard }})
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.control-plane-ui == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/control-plane-ui
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - desktop-memory-preflight
+          - desktop-memory
+          - desktop-runs
+          - desktop-viewer
+          - mobile-memory-preflight
+          - mobile-memory
+          - mobile-runs
+          - mobile-viewer
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 12
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: apps/control-plane-ui/package.json
+          check-latest: true
+          cache: pnpm
+          cache-dependency-path: apps/control-plane-ui/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Smoke shard
+        env:
+          SMOKE_SHARD: ${{ matrix.shard }}
         run: pnpm run test:smoke
 
   agents:
