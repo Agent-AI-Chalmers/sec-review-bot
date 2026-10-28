@@ -46,6 +46,10 @@ export async function smokeViewer({ page }) {
     .getByLabel('Paste transcript JSONL or JSON messages')
     .fill(pastedTranscript)
   await page.getByRole('button', { name: 'Render' }).click()
+  await page.getByRole('button', { name: 'Edit input' }).waitFor()
+  await page
+    .getByLabel('Paste transcript JSONL or JSON messages')
+    .waitFor({ state: 'hidden' })
   await page
     .locator('.transcript-timeline')
     .getByText('Pasted assistant response', { exact: true })
@@ -252,6 +256,7 @@ export async function smokeViewer({ page }) {
         message: { type: 'human', content: `Dense message ${index + 1}` }
       })
     ).join('\n')
+    await page.getByRole('button', { name: 'Edit input' }).click()
     await page
       .getByLabel('Paste transcript JSONL or JSON messages')
       .fill(denseTranscript)

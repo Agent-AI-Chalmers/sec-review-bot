@@ -1063,7 +1063,13 @@ export function Detail(): React.JSX.Element {
                 </Stack>
               </Alert>
             )}
-            <Paper component="section" withBorder radius="sm" p="md">
+            <Paper
+              component="section"
+              withBorder
+              radius="sm"
+              p="md"
+              className="run-progress-panel"
+            >
               <Title order={2} mb="lg">
                 {t('runProgress')}
               </Title>

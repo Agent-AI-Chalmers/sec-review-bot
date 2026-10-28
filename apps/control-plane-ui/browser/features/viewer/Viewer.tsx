@@ -2,6 +2,7 @@ import React from 'react'
 import {
   Alert,
   Button,
+  Collapse,
   Container,
   FileButton,
   Group,
@@ -11,7 +12,12 @@ import {
   Textarea,
   Title
 } from '@mantine/core'
-import { IconPlayerPlay, IconUpload } from '@tabler/icons-react'
+import {
+  IconChevronDown,
+  IconEdit,
+  IconPlayerPlay,
+  IconUpload
+} from '@tabler/icons-react'
 
 import { useMessages } from '../../shared/i18n.js'
 import {
@@ -73,13 +79,16 @@ export function Viewer(): React.JSX.Element {
   const [filename, setFilename] = React.useState('')
   const [events, setEvents] = React.useState<TranscriptEvent[]>([])
   const [error, setError] = React.useState('')
+  const [inputOpened, setInputOpened] = React.useState(true)
   const render = (content = input): void => {
     try {
       setEvents(parseViewerInput(content))
       setError('')
+      setInputOpened(false)
     } catch {
       setEvents([])
       setError(t('viewerParseFailed'))
+      setInputOpened(true)
     }
   }
   const upload = async (file: File | null): Promise<void> => {
@@ -95,59 +104,96 @@ export function Viewer(): React.JSX.Element {
         {t('viewer')}
       </Title>
       <Paper withBorder p="md" mb="xl" className="viewer-input">
-        <Textarea
-          placeholder={t('viewerPlaceholder')}
-          aria-label={t('viewerPlaceholder')}
-          autosize
-          minRows={8}
-          maxRows={18}
-          value={input}
-          onChange={(event) => setInput(event.currentTarget.value)}
-        />
-        <Group justify="space-between" mt="md">
-          <Group gap="sm">
-            <FileButton
-              onChange={(file) => void upload(file)}
-              accept=".json,.jsonl,application/json,text/plain"
-            >
-              {(props) => (
-                <Button
-                  {...props}
-                  variant="default"
-                  leftSection={<IconUpload size={ICON_SIZE.md} />}
-                >
-                  {t('uploadFile')}
-                </Button>
-              )}
-            </FileButton>
-            {filename && (
-              <Text size="sm" c="dimmed">
-                {filename}
-              </Text>
-            )}
-          </Group>
-          <Button
-            leftSection={<IconPlayerPlay size={ICON_SIZE.md} />}
-            disabled={!input.trim()}
-            onClick={() => render()}
+        {events.length > 0 && (
+          <Group
+            justify="space-between"
+            gap="sm"
+            className="viewer-input-summary"
           >
-            {t('render')}
-          </Button>
-        </Group>
-        {error && (
-          <Alert color="red" mt="md">
-            {error}
-          </Alert>
+            <div>
+              <Text size="sm" fw={600}>
+                {t('transcriptMessageCount').replace(
+                  '{count}',
+                  String(events.length)
+                )}
+              </Text>
+              {filename && (
+                <Text size="xs" c="dimmed">
+                  {filename}
+                </Text>
+              )}
+            </div>
+            <Button
+              variant="subtle"
+              size="compact-sm"
+              leftSection={<IconEdit size={ICON_SIZE.sm} />}
+              rightSection={
+                <IconChevronDown
+                  size={ICON_SIZE.sm}
+                  style={{
+                    transform: inputOpened ? 'rotate(180deg)' : undefined,
+                    transition: 'transform 120ms ease'
+                  }}
+                />
+              }
+              aria-expanded={inputOpened}
+              onClick={() => setInputOpened((opened) => !opened)}
+            >
+              {t('viewerEditInput')}
+            </Button>
+          </Group>
         )}
+        <Collapse expanded={inputOpened}>
+          <div className="viewer-input-editor">
+            <Textarea
+              placeholder={t('viewerPlaceholder')}
+              aria-label={t('viewerPlaceholder')}
+              autosize
+              minRows={8}
+              maxRows={18}
+              value={input}
+              onChange={(event) => setInput(event.currentTarget.value)}
+            />
+            <Group justify="space-between" mt="md">
+              <Group gap="sm">
+                <FileButton
+                  onChange={(file) => void upload(file)}
+                  accept=".json,.jsonl,application/json,text/plain"
+                >
+                  {(props) => (
+                    <Button
+                      {...props}
+                      variant="default"
+                      leftSection={<IconUpload size={ICON_SIZE.md} />}
+                    >
+                      {t('uploadFile')}
+                    </Button>
+                  )}
+                </FileButton>
+                {filename && (
+                  <Text size="sm" c="dimmed">
+                    {filename}
+                  </Text>
+                )}
+              </Group>
+              <Button
+                leftSection={<IconPlayerPlay size={ICON_SIZE.md} />}
+                disabled={!input.trim()}
+                onClick={() => render()}
+              >
+                {t('render')}
+              </Button>
+            </Group>
+            {error && (
+              <Alert color="red" mt="md">
+                {error}
+              </Alert>
+            )}
+          </div>
+        </Collapse>
       </Paper>
       {events.length > 0 && (
         <Stack gap="md">
-          <Text size="sm" c="dimmed">
-            {t('transcriptMessageCount').replace(
-              '{count}',
-              String(events.length)
-            )}
-          </Text>
           <TranscriptTimeline events={events} />
         </Stack>
       )}

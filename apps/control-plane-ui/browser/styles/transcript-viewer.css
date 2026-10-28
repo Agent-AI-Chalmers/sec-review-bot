@@ -100,8 +100,8 @@
 
 .transcript-message-body {
   display: grid;
-  gap: var(--space-4);
-  padding: var(--space-4) var(--space-5) var(--space-5);
+  gap: 0;
+  padding: 0 var(--space-5) var(--space-5);
   border-top: 1px solid var(--border);
 }
 
@@ -119,10 +119,7 @@
 .transcript-section-header {
   min-height: 38px;
   padding-right: var(--space-2);
-  background: light-dark(
-    var(--mantine-color-gray-0),
-    var(--mantine-color-dark-7)
-  );
+  background: transparent;
 }
 
 .transcript-section-header > button:first-child {
@@ -132,14 +129,19 @@
 }
 
 .transcript-section-content {
-  padding: var(--space-4);
-  border-top: 1px solid var(--border);
+  padding: 0 var(--space-3) var(--space-4);
+  border-top: 0;
 }
 
 .transcript-tool-calls,
 .transcript-tool-call,
 .transcript-linked-call {
   min-width: 0;
+}
+
+.transcript-tool-calls {
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
 }
 
 .transcript-tool-calls-toggle {
@@ -390,4 +392,12 @@
 
 .viewer-input textarea {
   font-family: var(--mantine-font-family-monospace);
+}
+
+.viewer-input-summary + .mantine-Collapse-root[data-expanded='true'] {
+  margin-top: var(--space-4);
+}
+
+.viewer-input-editor {
+  padding-top: 1px;
 }
