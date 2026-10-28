@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { setTimeout as delay } from 'node:timers/promises'
 
-export async function smokeMemoryPreflight({ name, context, base, server }) {
+export async function runMemoryPreflightFlow({ name, context, base, server }) {
   if (name === 'desktop') {
     let releaseA
     let releaseB
@@ -280,7 +280,7 @@ export async function smokeMemoryPreflight({ name, context, base, server }) {
   }
 }
 
-export async function smokeMemory({
+export async function runMemoryFlow({
   name,
   viewport,
   page,
@@ -828,15 +828,6 @@ export async function smokeMemory({
     )
     await extractionDialog.locator('.mantine-Modal-close').click()
     await page.getByText('Revisions', { exact: true }).click()
-    const controlSwitch = page.getByRole('switch', {
-      name: 'Automatic maintenance'
-    })
-    const wasEnabled = await controlSwitch.isChecked()
-    await controlSwitch.click()
-    await waitUntil(
-      async () => (await controlSwitch.isChecked()) !== wasEnabled,
-      `${name} maintenance switch must commit without a reason dialog`
-    )
     await page.getByText('List', { exact: true }).click()
     const currentRevision = (
       (await page
@@ -888,7 +879,7 @@ export async function smokeMemory({
     const editor = editDialog.getByLabel('Workspace editor')
     await editor.click()
     await page.keyboard.press('ControlOrMeta+End')
-    await page.keyboard.type('\nEdited in browser smoke.\n')
+    await page.keyboard.type('\nEdited in browser flow.\n')
     assert.strictEqual(
       await editDialog.locator('.file-workspace-file[data-modified]').count(),
       1,

@@ -4,7 +4,15 @@ import tseslint from 'typescript-eslint'
 import eslintConfigPrettier from 'eslint-config-prettier/flat'
 
 export default defineConfig(
-  { ignores: ['dist/**', 'dist-server/**', 'node_modules/**'] },
+  {
+    ignores: [
+      'dist/**',
+      'dist-server/**',
+      'node_modules/**',
+      'playwright-report/**',
+      'test-results/**'
+    ]
+  },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
@@ -38,7 +46,7 @@ export default defineConfig(
         getComputedStyle: 'readonly',
         localStorage: 'readonly',
         navigator: 'readonly',
-        // The smoke script parses the page URL to name the run it opened.
+        // Browser flows parse page URLs to identify the run they opened.
         URL: 'readonly'
       }
     }

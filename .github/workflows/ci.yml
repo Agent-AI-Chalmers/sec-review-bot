@@ -382,8 +382,8 @@ jobs:
           pnpm test
           pnpm run build
 
-  control-plane-ui-smoke:
-    name: Control Plane UI smoke (${{ matrix.shard }})
+  control-plane-ui-browser:
+    name: Control Plane UI browser (${{ matrix.project }})
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
@@ -395,15 +395,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard:
-          - desktop-memory-preflight
-          - desktop-memory
-          - desktop-runs
-          - desktop-viewer
-          - mobile-memory-preflight
-          - mobile-memory
-          - mobile-runs
-          - mobile-viewer
+        project:
+          - desktop
+          - mobile
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -425,10 +419,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Smoke shard
-        env:
-          SMOKE_SHARD: ${{ matrix.shard }}
-        run: pnpm run test:smoke
+      - name: Browser project
+        run: pnpm exec playwright test --project=${{ matrix.project }}
 
   agents:
     name: Agents
