@@ -1,11 +1,4 @@
 // The repository root, reached from `<repo>/contracts/execution-api/tools/src`.
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
-export const REPO_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  '..',
-  '..'
-)
+export const REPO_ROOT = path.resolve(import.meta.dirname, '../../../..')

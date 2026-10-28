@@ -2,7 +2,7 @@
 // and connects transport operations to the durable coordination store.
 import { timingSafeEqual } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import path from 'node:path'
 
 import openapiGlue from '@platformatic/fastify-openapi-glue'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
@@ -158,34 +158,31 @@ interface ReviewRunsRouteDeps {
  * silently shaping the surface. Running from source (tsx) falls back to the repository's
  * contracts tree, which is the source of truth in that mode. */
 function resolveSpecPath(): string {
-  const built = new URL('../openapi.yaml', import.meta.url)
+  const built = path.resolve(import.meta.dirname, '../openapi.yaml')
   if (existsSync(built)) {
-    const builtPath = fileURLToPath(built)
-    const digestPath = `${builtPath}.sha256`
+    const digestPath = `${built}.sha256`
     if (!existsSync(digestPath)) {
       throw new Error(
-        `${builtPath} has no ${digestPath}; the build must produce both.`
+        `${built} has no ${digestPath}; the build must produce both.`
       )
     }
     const expected = readFileSync(digestPath, 'utf8').trim()
-    const actual = contractDigest(readFileSync(builtPath))
+    const actual = contractDigest(readFileSync(built))
     if (actual !== expected) {
       throw new Error(
-        `${builtPath} does not match its recorded digest; rebuild so the contract and ` +
+        `${built} does not match its recorded digest; rebuild so the contract and ` +
           'server.js come from the same build.'
       )
     }
-    return builtPath
+    return built
   }
-  const fromSource = fileURLToPath(
-    new URL(
-      '../../../contracts/review-runs-api/v1/openapi.yaml',
-      import.meta.url
-    )
+  const fromSource = path.resolve(
+    import.meta.dirname,
+    '../../../contracts/review-runs-api/v1/openapi.yaml'
   )
   if (existsSync(fromSource)) return fromSource
   throw new Error(
-    `OpenAPI contract not found next to the module (${fileURLToPath(built)}) or in the ` +
+    `OpenAPI contract not found next to the module (${built}) or in the ` +
       `repository tree (${fromSource}).`
   )
 }

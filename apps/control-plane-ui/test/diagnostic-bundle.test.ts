@@ -2,19 +2,13 @@ import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { test } from 'node:test'
-import { fileURLToPath } from 'node:url'
 import { zstdCompressSync } from 'node:zlib'
 
 import tar from 'tar-stream'
 
 import { readDiagnosticBundle } from '../server/run/diagnostic-bundle.js'
 
-const repositoryRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  '..'
-)
+const repositoryRoot = path.resolve(import.meta.dirname, '../../..')
 
 async function bundle(
   entries: Array<{

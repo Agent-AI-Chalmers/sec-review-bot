@@ -5,13 +5,8 @@
 // `rootDir` does not compile. They only need file paths, which follow from the repository
 // layout, so the paths are derived here from this file's own location.
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
-export const REPO_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..'
-)
+export const REPO_ROOT = path.resolve(import.meta.dirname, '../..')
 
 export const REVIEW_RUNS_API_SPEC_PATH = path.join(
   REPO_ROOT,

@@ -11,7 +11,6 @@ import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
-import { pathToFileURL } from 'node:url'
 import { zstdDecompressSync } from 'node:zlib'
 import {
   GetObjectCommand,
@@ -1220,7 +1219,7 @@ export function createControlPlaneUiServer({
 
 if (
   process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
+  import.meta.filename === path.resolve(process.argv[1])
 ) {
   const reviewRunsToken = process.env.REVIEW_RUNS_READ_TOKEN
   const accessToken = process.env.CONTROL_PLANE_UI_ACCESS_TOKEN

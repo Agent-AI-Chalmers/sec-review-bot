@@ -1,14 +1,11 @@
 import dotenv from 'dotenv'
 import fs from 'fs'
 import nodePath from 'path'
-import { fileURLToPath } from 'url'
 
 import { integerEnv } from './utils/env.js'
 
-const CURRENT_FILE_PATH = fileURLToPath(import.meta.url)
-const CURRENT_DIR_PATH = nodePath.dirname(CURRENT_FILE_PATH)
-const PACKAGE_ENV_PATH = nodePath.resolve(CURRENT_DIR_PATH, '.env')
-const DIST_ENV_PATH = nodePath.resolve(CURRENT_DIR_PATH, '..', '.env')
+const PACKAGE_ENV_PATH = nodePath.resolve(import.meta.dirname, '.env')
+const DIST_ENV_PATH = nodePath.resolve(import.meta.dirname, '../.env')
 
 const ENV_FILE_PATH = [PACKAGE_ENV_PATH, DIST_ENV_PATH].find((candidatePath) =>
   fs.existsSync(candidatePath)

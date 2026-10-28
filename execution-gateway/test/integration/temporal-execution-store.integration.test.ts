@@ -3,7 +3,6 @@ import crypto from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
 
 import {
   ExecutionRunConflictError,
@@ -16,12 +15,7 @@ const temporalAddress = process.env.TEST_TEMPORAL_ADDRESS
 if (temporalAddress === undefined)
   throw new Error('TEST_TEMPORAL_ADDRESS is required for integration tests.')
 
-const repositoryDirectory = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  '..',
-)
+const repositoryDirectory = path.resolve(import.meta.dirname, '../../..')
 
 async function issueReviewInput(): Promise<IssueReviewInput> {
   return JSON.parse(

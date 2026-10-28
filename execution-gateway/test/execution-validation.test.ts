@@ -4,7 +4,6 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
 
 import {
   isExecutionError,
@@ -17,11 +16,7 @@ import {
   validateExecutionWorkflowInput,
 } from '../src/execution-workflow-validation.js'
 
-const REPO_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-)
+const REPO_ROOT = path.resolve(import.meta.dirname, '../..')
 
 function contractFixture(name: string): unknown {
   return JSON.parse(

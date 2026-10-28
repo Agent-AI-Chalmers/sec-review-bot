@@ -2,21 +2,13 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { test } from 'node:test'
-import { fileURLToPath } from 'node:url'
 import { zstdDecompressSync } from 'node:zlib'
 
 import { validateRestrictedPaxTar } from '../server/artifacts/tar-zstd.js'
 
 const corpus = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..',
-  '..',
-  '..',
-  'contracts',
-  'tar-zstd-artifact',
-  'envelope',
-  'v1',
-  'corpus'
+  import.meta.dirname,
+  '../../../contracts/tar-zstd-artifact/envelope/v1/corpus'
 )
 
 test('restricted PAX reader matches the shared corpus', () => {

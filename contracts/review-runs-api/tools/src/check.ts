@@ -6,7 +6,6 @@
 // that regenerates it; `staleGeneratedArtifacts()` returns them so a test can assert the same.
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { generatedArtifacts as schemas } from './generate-schemas.js'
 import { generatedArtifacts as stateMachines } from './generate-state-machines.js'
@@ -36,7 +35,10 @@ export async function staleGeneratedArtifacts(): Promise<StaleArtifact[]> {
   return stale
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (
+  process.argv[1] !== undefined &&
+  import.meta.filename === path.resolve(process.argv[1])
+) {
   const stale = await staleGeneratedArtifacts()
   if (stale.length > 0) {
     for (const { output, command } of stale) {

@@ -1,7 +1,6 @@
 import { timingSafeEqual } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import openapiGlue from '@platformatic/fastify-openapi-glue'
 import Fastify, {
@@ -23,17 +22,12 @@ import {
 } from './temporal-execution-store.js'
 
 function specPath(): string {
-  const moduleDirectory = path.dirname(fileURLToPath(import.meta.url))
+  const moduleDirectory = import.meta.dirname
   const built = path.join(moduleDirectory, 'openapi.yaml')
   if (existsSync(built)) return built
   return path.resolve(
     moduleDirectory,
-    '..',
-    '..',
-    'contracts',
-    'execution-api',
-    'v1',
-    'openapi.yaml',
+    '../../contracts/execution-api/v1/openapi.yaml',
   )
 }
 

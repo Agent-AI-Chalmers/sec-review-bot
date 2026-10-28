@@ -5,7 +5,7 @@ import test from 'node:test'
 
 import { parse } from 'yaml'
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..', '..', '..')
+const REPO_ROOT = path.resolve(import.meta.dirname, '../../../..')
 const CONTRACT_ROOT = path.join(REPO_ROOT, 'contracts', 'memory-catalog-api')
 
 test('the HTTP contract is a hand-maintained YAML source, not a service projection', () => {

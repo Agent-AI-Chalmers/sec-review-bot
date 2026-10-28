@@ -4,11 +4,10 @@ import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { parse } from 'yaml'
 
-const scriptDirectory = path.dirname(fileURLToPath(import.meta.url))
+const scriptDirectory = import.meta.dirname
 const gatewayDirectory = path.resolve(scriptDirectory, '..')
 const repositoryDirectory = path.resolve(gatewayDirectory, '..')
 // Never inherit the service's ordinary TEMPORAL_ADDRESS: integration tests create workflows and

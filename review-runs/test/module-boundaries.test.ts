@@ -10,9 +10,8 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
-import { fileURLToPath } from 'node:url'
 
-const SRC = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src')
+const SRC = path.resolve(import.meta.dirname, '../src')
 const AXIS_STORES = [
   'persistence/preparation-store.ts',
   'persistence/publication-store.ts',

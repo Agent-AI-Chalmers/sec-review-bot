@@ -4,11 +4,10 @@ import crypto from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import { parse } from 'yaml'
 
-const scriptDirectory = path.dirname(fileURLToPath(import.meta.url))
+const scriptDirectory = import.meta.dirname
 const catalogDirectory = path.resolve(scriptDirectory, '..')
 const repositoryDirectory = path.resolve(catalogDirectory, '..')
 // Never inherit the service's ordinary database URL. An external test database must be selected
