@@ -9,10 +9,7 @@ from sec_review_agents.entrypoints.execution_protocol import (
     EXECUTION_REQUEST_INVALID,
     EXECUTION_WORKFLOW_UNSUPPORTED,
 )
-from sec_review_agents.entrypoints.execution_workflow import (
-    EXECUTION_WORKFLOW_TYPE,
-    ExecutionWorkflowInput,
-)
+from sec_review_agents.entrypoints.execution_workflow import EXECUTION_WORKFLOW_TYPE
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
@@ -26,12 +23,27 @@ from sec_review_agents.workflows.review_request import (
     ReviewWorkflowRequest,
 )
 
+EXECUTION_INPUT_PREPARATION_TIMEOUT = timedelta(minutes=5)
+
+
+def _invalid_execution_request(error: ValueError) -> dict[str, Any]:
+    from sec_review_agents.entrypoints.execution_protocol import build_execution_error
+
+    return {
+        "ok": False,
+        "error": build_execution_error(
+            code=EXECUTION_REQUEST_INVALID,
+            category="input",
+            message=str(error),
+            details={"name": error.__class__.__name__},
+        ),
+    }
+
 
 @activity.defn
-def prepare_execution_run_activity(request: ExecutionWorkflowInput) -> dict[str, Any]:
-    from sec_review_agents.entrypoints.execution_protocol import build_execution_error
+def prepare_execution_run_activity(request: dict[str, Any]) -> dict[str, Any]:
     from sec_review_agents.entrypoints.execution_workflow_validation import (
-        validate_execution_workflow_input,
+        parse_execution_workflow_input,
     )
     from sec_review_agents.entrypoints.input_preparation import prepare_run_input
     from sec_review_agents.features import memory_processing_enabled
@@ -40,39 +52,38 @@ def prepare_execution_run_activity(request: ExecutionWorkflowInput) -> dict[str,
     from sec_review_agents.runtime.runtime_config import runtime_context_from_config
 
     try:
-        validate_execution_workflow_input(request)
+        parsed_request = parse_execution_workflow_input(request)
         # This scope enriches preparation logs only. Downstream Temporal
         # activities receive run_id in their request and bind it again locally.
-        with bind_trace_context(workflow=request.workflow, run_id=request.run_id):
+        with bind_trace_context(
+            workflow=parsed_request.workflow,
+            run_id=parsed_request.run_id,
+        ):
             log_diagnostic(
                 "execution_workflow_input",
-                input_type=type(request.input).__name__,
-                run_id=request.run_id,
+                input_type=type(parsed_request.input).__name__,
+                run_id=parsed_request.run_id,
             )
             return {
                 "ok": True,
-                "workflow": request.workflow,
-                "run_id": request.run_id,
+                "workflow": parsed_request.workflow,
+                "run_id": parsed_request.run_id,
                 "prepared_input": prepare_run_input(
-                    request.input,
-                    run_id=request.run_id,
-                    workflow=request.workflow,
+                    parsed_request.input,
+                    run_id=parsed_request.run_id,
+                    workflow=parsed_request.workflow,
                 ),
-                "runtime_context": runtime_context_from_config(request.runtime),
-                "timeout_seconds": request.timeout_seconds,
+                "runtime_context": runtime_context_from_config(parsed_request.runtime),
+                "timeout_seconds": parsed_request.timeout_seconds,
                 "memory_processing_enabled": memory_processing_enabled(),
             }
     except ValueError as error:
-        return {
-            "ok": False,
-            "error": build_execution_error(
-                code=EXECUTION_REQUEST_INVALID,
-                category="input",
-                message=str(error),
-                details={"name": error.__class__.__name__},
-            ),
-        }
+        return _invalid_execution_request(error)
     except NotImplementedError as error:
+        from sec_review_agents.entrypoints.execution_protocol import (
+            build_execution_error,
+        )
+
         return {
             "ok": False,
             "error": build_execution_error(
@@ -86,11 +97,11 @@ def prepare_execution_run_activity(request: ExecutionWorkflowInput) -> dict[str,
 @workflow.defn(name=EXECUTION_WORKFLOW_TYPE)
 class ExecutionWorkflow:
     @workflow.run
-    async def run(self, request: ExecutionWorkflowInput) -> dict[str, Any]:
+    async def run(self, request: dict[str, Any]) -> dict[str, Any]:
         prepared = await workflow.execute_activity(
             prepare_execution_run_activity,
             request,
-            schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+            schedule_to_close_timeout=EXECUTION_INPUT_PREPARATION_TIMEOUT,
             retry_policy=activity_retry_policy(),
         )
         if prepared.get("ok") is False:
@@ -106,23 +117,23 @@ class ExecutionWorkflow:
                 diagnostic_scheme="s3",
             ),
         )
-        if request.workflow == "issue-review":
+        if prepared["workflow"] == "issue-review":
             result = await workflow.execute_child_workflow(
                 IssueReviewWorkflow.run,
                 internal_request,
-                id=_child_workflow_id(request),
+                id=_child_workflow_id(prepared["run_id"], prepared["workflow"]),
             )
-        elif request.workflow == "pull-request-review":
+        elif prepared["workflow"] == "pull-request-review":
             result = await workflow.execute_child_workflow(
                 PullRequestReviewWorkflow.run,
                 internal_request,
-                id=_child_workflow_id(request),
+                id=_child_workflow_id(prepared["run_id"], prepared["workflow"]),
             )
-        elif request.workflow == "repository-review":
+        elif prepared["workflow"] == "repository-review":
             result = await workflow.execute_child_workflow(
                 RepositoryReviewWorkflow.run,
                 internal_request,
-                id=_child_workflow_id(request),
+                id=_child_workflow_id(prepared["run_id"], prepared["workflow"]),
             )
         else:
             return {
@@ -130,7 +141,7 @@ class ExecutionWorkflow:
                 "error": {
                     "category": "workflow",
                     "code": EXECUTION_WORKFLOW_UNSUPPORTED,
-                    "message": f"Unsupported workflow: {request.workflow}",
+                    "message": f"Unsupported workflow: {prepared['workflow']}",
                     "retryable": False,
                     "details": {},
                 },
@@ -140,11 +151,12 @@ class ExecutionWorkflow:
         }
 
 
-def _child_workflow_id(request: ExecutionWorkflowInput) -> str:
-    return f"{request.run_id}:{request.workflow}"
+def _child_workflow_id(run_id: str, workflow_name: str) -> str:
+    return f"{run_id}:{workflow_name}"
 
 
 __all__ = [
+    "EXECUTION_INPUT_PREPARATION_TIMEOUT",
     "ExecutionWorkflow",
     "prepare_execution_run_activity",
 ]

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -38,6 +38,58 @@ function contractFixture(name: string): unknown {
     ),
   )
 }
+
+const EXECUTION_WORKFLOW_FIXTURES_ROOT = path.join(
+  REPO_ROOT,
+  'contracts',
+  'execution-workflow',
+  'v1',
+  'fixtures',
+)
+
+function executionWorkflowFixture(name: string): unknown {
+  return JSON.parse(
+    readFileSync(path.join(EXECUTION_WORKFLOW_FIXTURES_ROOT, name), 'utf8'),
+  )
+}
+
+interface ExecutionWorkflowFixtureManifest {
+  valid: string[]
+  invalid: string[]
+}
+
+function executionWorkflowFixtureManifest(): ExecutionWorkflowFixtureManifest {
+  return executionWorkflowFixture(
+    'manifest.json',
+  ) as ExecutionWorkflowFixtureManifest
+}
+
+await test('execution workflow shared fixtures match Gateway validation', () => {
+  const manifest = executionWorkflowFixtureManifest()
+  const declared = new Set([...manifest.valid, ...manifest.invalid])
+  const actual = new Set(
+    readdirSync(EXECUTION_WORKFLOW_FIXTURES_ROOT).filter(
+      (name) => name.endsWith('.json') && name !== 'manifest.json',
+    ),
+  )
+
+  assert.deepEqual(declared, actual)
+  assert.equal(
+    manifest.valid.some((name) => manifest.invalid.includes(name)),
+    false,
+  )
+  for (const name of manifest.valid) {
+    assert.doesNotThrow(() =>
+      validateExecutionWorkflowInput(executionWorkflowFixture(name)),
+    )
+  }
+  for (const name of manifest.invalid) {
+    assert.throws(
+      () => validateExecutionWorkflowInput(executionWorkflowFixture(name)),
+      /execution-workflow\/v1/,
+    )
+  }
+})
 
 await test('execution workflow input owns the Temporal workflow type', () => {
   assert.equal(executionWorkflowType(), 'execution-workflow')
