@@ -22,9 +22,9 @@ RUN pnpm deploy --filter . --prod /prod
 
 FROM node:24-alpine
 
-# The GitHub integration service needs git and system CA certificates to materialize review
-# refs over HTTPS. Alpine's BusyBox already provides the tar used for workspace snapshots.
-RUN apk add --no-cache ca-certificates git
+# The GitHub integration service materializes review refs over HTTPS and creates
+# deterministic input bundles with GNU tar options unsupported by BusyBox tar.
+RUN apk add --no-cache ca-certificates git tar
 
 WORKDIR /app
 
