@@ -257,6 +257,9 @@ jobs:
           pnpm run typecheck
           pnpm test
 
+      - name: Integration test
+        run: pnpm run test:integration
+
   memory-catalog:
     name: Memory Catalog
     needs: changes

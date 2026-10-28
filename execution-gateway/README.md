@@ -22,4 +22,7 @@ pnpm run server
 pnpm run lint
 pnpm run typecheck
 pnpm test
+pnpm run test:integration
 ```
+
+`pnpm test` runs the isolated validation and HTTP tests. `pnpm run test:integration` exercises workflow submission and request identity against `TEST_TEMPORAL_ADDRESS` or `TEMPORAL_ADDRESS`; when neither is set, the launcher creates and removes a temporary local Docker Temporal service using the image configured in the repository `compose.yaml`.
