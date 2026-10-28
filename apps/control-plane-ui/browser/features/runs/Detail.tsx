@@ -38,7 +38,7 @@ import {
   throwIfUnauthorized,
   type RunEvent
 } from './api.js'
-import { RunTransitions } from './StateMachine.js'
+import { RunTransitions } from './RunTransitions.js'
 import { RunFilesViewer } from './RunFilesViewer.js'
 import { RunJump } from './RunJump.js'
 import { ExecutionStatistics } from './ExecutionStatistics.js'
