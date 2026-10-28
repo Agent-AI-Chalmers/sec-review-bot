@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict'
 import { setTimeout as delay } from 'node:timers/promises'
 
+async function waitForCondition(predicate, message) {
+  const deadline = Date.now() + 5_000
+  for (;;) {
+    if (await predicate()) return
+    if (Date.now() > deadline) throw new Error(message)
+    await delay(50)
+  }
+}
+
 export async function runMemoryPreflightFlow({ name, context, base, server }) {
   if (name === 'desktop') {
     let releaseA
@@ -255,7 +264,15 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
         0,
         'unknown current revision must not expose set-current in the graph'
       )
+      const listView = unknownCurrentPage.getByRole('radio', {
+        name: 'List',
+        exact: true
+      })
       await unknownCurrentPage.getByText('List', { exact: true }).click()
+      await waitForCondition(
+        () => listView.isChecked(),
+        'unknown current revision list view did not become active'
+      )
       assert.strictEqual(
         await unknownCurrentPage.locator('tr[aria-current="true"]').count(),
         0,
@@ -754,6 +771,7 @@ export async function runMemoryFlow({
       .getByRole('button', { name: 'Collapse all' })
       .click()
     await maintenanceDialog.locator('.mantine-Modal-close').click()
+    await maintenanceDialog.waitFor({ state: 'hidden' })
 
     assert.strictEqual(
       await page
@@ -763,7 +781,16 @@ export async function runMemoryFlow({
       0,
       `${name} revision rows must keep downloads inside their viewers`
     )
-    await page.getByText('Observations', { exact: true }).click()
+    const observationsTab = page.getByRole('tab', {
+      name: 'Observations',
+      exact: true
+    })
+    await observationsTab.click()
+    await waitUntil(
+      async () =>
+        (await observationsTab.getAttribute('aria-selected')) === 'true',
+      `${name} observations tab did not become active`
+    )
     const observationIndex = page
       .locator('tbody .memory-observation-index')
       .first()
@@ -803,7 +830,12 @@ export async function runMemoryFlow({
         )),
       `${name} incorporated revision link must reveal and highlight its graph node`
     )
-    await page.getByText('Observations', { exact: true }).click()
+    await observationsTab.click()
+    await waitUntil(
+      async () =>
+        (await observationsTab.getAttribute('aria-selected')) === 'true',
+      `${name} observations tab did not become active again`
+    )
     assert.strictEqual(
       await page
         .locator('.mantine-Tabs-panel:visible')
@@ -898,6 +930,9 @@ export async function runMemoryFlow({
       .getByRole('dialog', { name: 'Delete file' })
       .getByRole('button', { name: 'Delete' })
       .click()
+    await editDialog
+      .getByRole('button', { name: 'renamed.md' })
+      .waitFor({ state: 'hidden' })
     assert.strictEqual(
       await editDialog.getByRole('button', { name: 'renamed.md' }).count(),
       0,

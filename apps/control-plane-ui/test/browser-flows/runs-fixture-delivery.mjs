@@ -118,6 +118,10 @@ export async function runFixtureRunDeliveryFlow({
   )
   const collapsed = (await digest.textContent()) ?? ''
   await digest.click()
+  await waitUntil(
+    async () => (await digest.getAttribute('aria-expanded')) === 'true',
+    `${name} digest did not expand`
+  )
   assert.strictEqual(
     await digest.getAttribute('aria-expanded'),
     'true',
@@ -133,6 +137,10 @@ export async function runFixtureRunDeliveryFlow({
   await runFilesDialog.waitFor()
   await runFilesDialog.locator('.file-workspace-preview > ul').waitFor()
   await runFilesDialog.getByText('review.jsonl', { exact: true }).click()
+  await waitUntil(
+    async () => (await runFilesDialog.locator('.jsonl-record').count()) === 2,
+    `${name} JSONL preview did not render both records`
+  )
   assert.strictEqual(
     await runFilesDialog.locator('.jsonl-record').count(),
     2,
@@ -217,8 +225,6 @@ export async function runFixtureRunDeliveryFlow({
   await page.locator('tbody tr:first-child td a').first().waitFor()
   await page.locator('tbody tr:first-child td a').first().click()
   await page.waitForSelector('.delivery-item')
-  // There is no event for an element remaining absent, so allow the UI to settle first.
-  await page.waitForTimeout(300)
   assert.strictEqual(
     await page.locator('.publication-summary .delivery-link').count(),
     0,
