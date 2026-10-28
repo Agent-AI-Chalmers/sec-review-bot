@@ -3291,13 +3291,12 @@ test('abandoning a disconnected run concludes its open axes and keeps the execut
     assert.deepStrictEqual(expiry.blocked, [
       { run_id: runId, reason: 'EXECUTION_ALREADY_ADVANCED' }
     ])
-    assert.deepStrictEqual(await store.listParkedRuns(), [
-      {
-        run_id: runId,
-        axis: 'preparation',
-        reason: 'EXECUTION_ALREADY_ADVANCED'
-      }
-    ])
+    const parked = await store.listParkedRuns()
+    assert.strictEqual(parked.length, 1)
+    assert.strictEqual(parked[0]?.run_id, runId)
+    assert.strictEqual(parked[0]?.axis, 'preparation')
+    assert.strictEqual(parked[0]?.reason, 'EXECUTION_ALREADY_ADVANCED')
+    assert.ok(parked[0]?.parked_at)
 
     // A blank reason is refused: an abandonment must always say why it happened.
     await assert.rejects(

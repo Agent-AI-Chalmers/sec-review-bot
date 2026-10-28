@@ -628,6 +628,29 @@ export function Detail(): React.JSX.Element {
           : run.publication.status === 'disconnected'
             ? 'publication'
             : null
+  const parkedAt: string | null =
+    parkedAxis === null || run === undefined
+      ? null
+      : ((): string | null => {
+          let latest: string | null = null
+          for (const event of events) {
+            if (event.axis !== parkedAxis || event.to_status !== 'disconnected')
+              continue
+            if (
+              latest === null ||
+              Date.parse(event.occurred_at) > Date.parse(latest)
+            )
+              latest = event.occurred_at
+          }
+          return (
+            latest ??
+            (parkedAxis === 'preparation'
+              ? run.preparation.updated_at
+              : parkedAxis === 'execution'
+                ? run.execution.updated_at
+                : run.publication.updated_at)
+          )
+        })()
   const load = React.useCallback(async (): Promise<void> => {
     try {
       const [runValue, stepValue, eventValue] = await Promise.all([
@@ -876,17 +899,35 @@ export function Detail(): React.JSX.Element {
                 radius="md"
                 p="lg"
                 title={
-                  <Group gap="xs" align="center" wrap="nowrap">
-                    <IconAlertTriangle size={ICON_SIZE.md} aria-hidden />
-                    <span>
-                      {t(
-                        parkedAxis === 'preparation'
-                          ? 'blockedRunTitle'
-                          : parkedAxis === 'execution'
-                            ? 'disconnectedExecutionTitle'
-                            : 'disconnectedPublicationTitle'
-                      )}
-                    </span>
+                  <Group
+                    justify="space-between"
+                    align="center"
+                    wrap="wrap"
+                    gap="xs"
+                  >
+                    <Group gap="xs" align="center" wrap="nowrap">
+                      <IconAlertTriangle size={ICON_SIZE.md} aria-hidden />
+                      <span>
+                        {t(
+                          parkedAxis === 'preparation'
+                            ? 'blockedRunTitle'
+                            : parkedAxis === 'execution'
+                              ? 'disconnectedExecutionTitle'
+                              : 'disconnectedPublicationTitle'
+                        )}
+                      </span>
+                    </Group>
+                    {parkedAt !== null && (
+                      <Text size="xs" c="dimmed">
+                        {t('parkedAge').replace(
+                          '{duration}',
+                          formatDuration(
+                            Math.max(0, Date.now() - Date.parse(parkedAt)),
+                            t
+                          )
+                        )}
+                      </Text>
+                    )}
                   </Group>
                 }
                 className="blocked-run"

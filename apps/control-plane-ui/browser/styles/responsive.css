@@ -196,8 +196,9 @@
   }
 
   .memory-overview-trend-controls {
-    align-items: flex-start;
-    justify-content: flex-start;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
   }
 }
 

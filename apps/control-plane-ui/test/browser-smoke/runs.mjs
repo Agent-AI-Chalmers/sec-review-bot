@@ -523,6 +523,43 @@ export async function smokeRuns({
     )
     await page.keyboard.press('Escape')
     await statisticsDetails.waitFor({ state: 'hidden' })
+
+    // Transitions are the run's actual state changes, not the synthetic initialization events
+    // (which have no from_status). The section starts collapsed, explains each edge, and hides
+    // pagination until there is more than one page.
+    const transitions = page.locator('.run-transitions')
+    await transitions.locator('.transitions-entry').click()
+    await transitions.locator('.transitions-body').waitFor()
+    assert.strictEqual(
+      await transitions.locator('.state-machine-svg').count(),
+      1,
+      `${name} transitions must show one selected state machine at a time`
+    )
+    const transitionRows = transitions.locator('.run-transition')
+    assert.ok(
+      (await transitionRows.count()) > 0,
+      `${name} the run must list its actual transitions`
+    )
+    assert.doesNotMatch(
+      (await transitionRows.first().textContent()) ?? '',
+      /—\s*→/,
+      `${name} initialization events must not appear as transitions`
+    )
+    assert.match(
+      (await transitionRows.first().textContent()) ?? '',
+      /In this state for|Final state/,
+      `${name} a transition must explain how long the resulting state lasted`
+    )
+    assert.strictEqual(
+      await transitions.locator('.mantine-Pagination-root').count(),
+      0,
+      `${name} a single page of transitions must not render pagination`
+    )
+    await transitions.getByText('100%', { exact: true }).click()
+    await transitions.locator('.state-machine.is-actual').waitFor()
+    await transitions.getByText('Fit', { exact: true }).click()
+    await transitions.locator('.state-machine.is-fit').waitFor()
+
     const publicationBody =
       (await page
         .locator('.run-progress-timeline .mantine-Timeline-itemBody')

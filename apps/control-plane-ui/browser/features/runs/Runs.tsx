@@ -344,22 +344,33 @@ export function Runs(): React.JSX.Element {
                         <Text size="xs" fw={600} c="dimmed" tt="uppercase">
                           {axisLabel(axis, t)}
                         </Text>
-                        {runs.map((block) => (
-                          <UnstyledButton
-                            key={block.run_id}
-                            component={Link}
-                            to={`/runs/${encodeURIComponent(block.run_id)}`}
-                            className="parked-run-row"
-                          >
-                            <Text
-                              size="sm"
-                              ff="monospace"
-                              className="parked-run-id"
+                        {runs.map((block) => {
+                          const wait = Date.now() - Date.parse(block.parked_at)
+                          return (
+                            <UnstyledButton
+                              key={block.run_id}
+                              component={Link}
+                              to={`/runs/${encodeURIComponent(block.run_id)}`}
+                              className="parked-run-row"
                             >
-                              {block.run_id}
-                            </Text>
-                          </UnstyledButton>
-                        ))}
+                              <Text
+                                size="sm"
+                                ff="monospace"
+                                className="parked-run-id"
+                              >
+                                {block.run_id}
+                              </Text>
+                              {Number.isFinite(wait) && (
+                                <Text size="xs" c="dimmed">
+                                  {t('parkedAge').replace(
+                                    '{duration}',
+                                    formatDuration(Math.max(0, wait), t)
+                                  )}
+                                </Text>
+                              )}
+                            </UnstyledButton>
+                          )
+                        })}
                       </Stack>
                     )
                   }

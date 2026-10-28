@@ -48,6 +48,7 @@ export function createRunsHandler(): (
       | 'EXECUTION_ALREADY_ADVANCED'
       | 'SUBMISSION_RECOVERY_EXHAUSTED'
       | 'PUBLICATION_RECONCILIATION_EXHAUSTED'
+    parked_at: string
   }> =>
     runs.flatMap((run, index) => {
       // Only the runs this fixture deliberately parked are queued. A run whose state
@@ -67,7 +68,8 @@ export function createRunsHandler(): (
               ? ('EXECUTION_ALREADY_ADVANCED' as const)
               : axis === 'execution'
                 ? ('SUBMISSION_RECOVERY_EXHAUSTED' as const)
-                : ('PUBLICATION_RECONCILIATION_EXHAUSTED' as const)
+                : ('PUBLICATION_RECONCILIATION_EXHAUSTED' as const),
+          parked_at: run.created_at
         }
       ]
     })

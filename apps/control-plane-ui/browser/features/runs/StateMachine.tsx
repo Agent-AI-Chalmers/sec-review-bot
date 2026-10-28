@@ -31,7 +31,7 @@ import {
   revertSide,
   selfLoopSide
 } from './state-machine-layout.js'
-import { failureCodeLabel } from './format.js'
+import { failureCodeLabel, formatDuration } from './format.js'
 
 /** The current state of one axis, read from the run. */
 function currentState(run: Run, axis: StateAxis): string | null {
@@ -288,11 +288,13 @@ const PAD = 12
 export function StateMachineDiagram({
   machine,
   run,
-  events
+  events,
+  fit = true
 }: {
   machine: StateMachineDefinition
   run: Run
   events: RunEvent[]
+  fit?: boolean
 }): React.JSX.Element | null {
   const t = useMessages()
   const current = currentState(run, machine.axis)
@@ -368,7 +370,7 @@ export function StateMachineDiagram({
       .map((event) => `${event.from_status ?? ''}->${event.to_status}`)
   )
   return (
-    <div className="state-machine">
+    <div className={fit ? 'state-machine is-fit' : 'state-machine is-actual'}>
       <svg
         className="state-machine-svg"
         width={width}
@@ -579,6 +581,7 @@ export function RunTransitions({
   const [opened, setOpened] = React.useState(false)
   const [axis, setAxis] = React.useState<StateAxis>('execution')
   const [page, setPage] = React.useState(1)
+  const [fit, setFit] = React.useState(true)
   const machines = STATE_MACHINES.filter((machine) =>
     (DIAGRAMMED_AXES as readonly string[]).includes(machine.axis)
   )
@@ -625,6 +628,45 @@ export function RunTransitions({
     const description = stateDescription(eventMachine, event.to_status, t)
     return description === '' ? null : description
   }
+  const durationFor = (
+    event: RunEvent
+  ): { kind: 'duration'; ms: number } | { kind: 'final' } => {
+    const axisEvents = transitionEvents.filter(
+      (candidate) => candidate.axis === event.axis
+    )
+    const index = axisEvents.findIndex(
+      (candidate) => candidate.event_id === event.event_id
+    )
+    const next = index >= 0 ? axisEvents[index + 1] : undefined
+    if (next !== undefined) {
+      return {
+        kind: 'duration',
+        ms: Math.max(
+          0,
+          Date.parse(next.occurred_at) - Date.parse(event.occurred_at)
+        )
+      }
+    }
+    const eventMachine = machines.find(
+      (candidate) => candidate.axis === event.axis
+    )
+    const summary =
+      event.axis === 'preparation'
+        ? run.preparation
+        : event.axis === 'execution'
+          ? run.execution
+          : run.publication
+    if (
+      summary.finished_at !== null ||
+      (eventMachine !== undefined &&
+        eventMachine.terminal.includes(event.to_status))
+    )
+      return { kind: 'final' }
+    return {
+      kind: 'duration',
+      ms: Math.max(0, Date.now() - Date.parse(event.occurred_at))
+    }
+  }
   return (
     <div className="run-transitions">
       <Button
@@ -662,20 +704,42 @@ export function RunTransitions({
           <Text size="xs" c="dimmed">
             {t('stateMachineHint')}
           </Text>
-          <StateMachineDiagram machine={machine} run={run} events={events} />
-          <Group gap="md" className="state-machine-legend">
-            <span className="state-machine-legend-item">
-              <span className="state-machine-legend-line is-forward" />
-              {t('stateMachineLegendForward')}
-            </span>
-            <span className="state-machine-legend-item">
-              <span className="state-machine-legend-line is-revert" />
-              {t('stateMachineLegendRevert')}
-            </span>
-            <span className="state-machine-legend-item">
-              <span className="state-machine-legend-line is-current" />
-              {t('stateMachineLegendCurrent')}
-            </span>
+          <StateMachineDiagram
+            machine={machine}
+            run={run}
+            events={events}
+            fit={fit}
+          />
+          <Group
+            justify="space-between"
+            align="center"
+            wrap="wrap"
+            gap="sm"
+            className="state-machine-toolbar"
+          >
+            <Group gap="md" className="state-machine-legend">
+              <span className="state-machine-legend-item">
+                <span className="state-machine-legend-line is-forward" />
+                {t('stateMachineLegendForward')}
+              </span>
+              <span className="state-machine-legend-item">
+                <span className="state-machine-legend-line is-revert" />
+                {t('stateMachineLegendRevert')}
+              </span>
+              <span className="state-machine-legend-item">
+                <span className="state-machine-legend-line is-current" />
+                {t('stateMachineLegendCurrent')}
+              </span>
+            </Group>
+            <SegmentedControl
+              size="xs"
+              value={fit ? 'fit' : 'actual'}
+              onChange={(value) => setFit(value === 'fit')}
+              data={[
+                { value: 'fit', label: t('stateMachineFit') },
+                { value: 'actual', label: t('stateMachineActual') }
+              ]}
+            />
           </Group>
           <div className="transitions-list">
             <Text size="xs" fw={600} c="dimmed">
@@ -689,6 +753,7 @@ export function RunTransitions({
               <ul className="run-transition-list">
                 {visibleEvents.map((event) => {
                   const explanation = explanationFor(event)
+                  const duration = durationFor(event)
                   return (
                     <li className="run-transition" key={event.event_id}>
                       <Text size="xs" c="dimmed">
@@ -704,6 +769,14 @@ export function RunTransitions({
                           {explanation}
                         </Text>
                       )}
+                      <Text size="xs" c="dimmed">
+                        {duration.kind === 'final'
+                          ? t('stateFinal')
+                          : t('stateDuration').replace(
+                              '{duration}',
+                              formatDuration(duration.ms, t)
+                            )}
+                      </Text>
                       {event.reason_code !== null && (
                         <TransitionReason code={event.reason_code} />
                       )}

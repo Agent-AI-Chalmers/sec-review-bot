@@ -574,6 +574,16 @@ a {
   overflow: visible;
 }
 
+.state-machine.is-actual {
+  justify-content: flex-start;
+  overflow-x: auto;
+  padding-bottom: var(--space-2);
+}
+
+.state-machine.is-actual .state-machine-svg {
+  max-width: none;
+}
+
 .state-machine-svg {
   display: block;
   width: auto;

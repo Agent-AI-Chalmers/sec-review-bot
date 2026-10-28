@@ -22,6 +22,7 @@ import {
 export interface ParkedRun {
   run_id: string
   axis: 'preparation' | 'execution' | 'publication'
+  parked_at: string
   reason:
     | 'EXECUTION_ALREADY_ADVANCED'
     | 'SUBMISSION_RECOVERY_EXHAUSTED'
@@ -242,20 +243,44 @@ export class ReviewRunQueries {
 
   async listParkedRuns(): Promise<ParkedRun[]> {
     const result = await this.pool.query<ParkedRun>(
-      `SELECT run_id, axis, reason FROM (
-         SELECT run_id, 'preparation' AS axis, disconnect_reason AS reason, updated_at
+      `SELECT run_id, axis, reason, parked_at FROM (
+         SELECT run_id, 'preparation' AS axis, disconnect_reason AS reason,
+           COALESCE((
+             SELECT e.occurred_at FROM review_run_events e
+             WHERE e.run_id = preparations.run_id
+               AND e.connector_id = preparations.connector_id
+               AND e.axis = 'preparation'
+               AND e.to_status = 'disconnected'
+             ORDER BY e.occurred_at DESC LIMIT 1
+           ), updated_at) AS parked_at
          FROM preparations
          WHERE connector_id=$1 AND status='disconnected'
          UNION ALL
-         SELECT run_id, 'execution' AS axis, 'SUBMISSION_RECOVERY_EXHAUSTED' AS reason, updated_at
+         SELECT run_id, 'execution' AS axis, 'SUBMISSION_RECOVERY_EXHAUSTED' AS reason,
+           COALESCE((
+             SELECT e.occurred_at FROM review_run_events e
+             WHERE e.run_id = executions.run_id
+               AND e.connector_id = executions.connector_id
+               AND e.axis = 'execution'
+               AND e.to_status = 'disconnected'
+             ORDER BY e.occurred_at DESC LIMIT 1
+           ), updated_at) AS parked_at
          FROM executions
          WHERE connector_id=$1 AND status='disconnected'
          UNION ALL
-         SELECT run_id, 'publication' AS axis, 'PUBLICATION_RECONCILIATION_EXHAUSTED' AS reason, updated_at
+         SELECT run_id, 'publication' AS axis, 'PUBLICATION_RECONCILIATION_EXHAUSTED' AS reason,
+           COALESCE((
+             SELECT e.occurred_at FROM review_run_events e
+             WHERE e.run_id = publications.run_id
+               AND e.connector_id = publications.connector_id
+               AND e.axis = 'publication'
+               AND e.to_status = 'disconnected'
+             ORDER BY e.occurred_at DESC LIMIT 1
+           ), updated_at) AS parked_at
          FROM publications
          WHERE connector_id=$1 AND status='disconnected'
        ) parked
-       ORDER BY updated_at, run_id`,
+       ORDER BY parked_at, run_id`,
       [this.connectorId]
     )
     return result.rows

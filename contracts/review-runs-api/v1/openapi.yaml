@@ -835,6 +835,7 @@ components:
         - run_id
         - axis
         - reason
+        - parked_at
       properties:
         run_id:
           type: string
@@ -854,6 +855,13 @@ components:
             - EXECUTION_ALREADY_ADVANCED
             - SUBMISSION_RECOVERY_EXHAUSTED
             - PUBLICATION_RECONCILIATION_EXHAUSTED
+        parked_at:
+          type: string
+          format: date-time
+          description: >-
+            When the axis entered the parked state, taken from its disconnected transition
+            event. The row's updated_at is only a fallback for data written before transition
+            events existed.
     PreparationSummary:
       type: object
       description: >-

@@ -899,7 +899,8 @@ test('the blocked preparation queue is readable with the read token', async () =
       {
         run_id: 'run-1',
         axis: 'preparation',
-        reason: 'EXECUTION_ALREADY_ADVANCED'
+        reason: 'EXECUTION_ALREADY_ADVANCED',
+        parked_at: '2026-10-28T10:00:00.000Z'
       }
     ]
   })
@@ -915,7 +916,8 @@ test('the blocked preparation queue is readable with the read token', async () =
         {
           run_id: 'run-1',
           axis: 'preparation',
-          reason: 'EXECUTION_ALREADY_ADVANCED'
+          reason: 'EXECUTION_ALREADY_ADVANCED',
+          parked_at: '2026-10-28T10:00:00.000Z'
         }
       ]
     })
