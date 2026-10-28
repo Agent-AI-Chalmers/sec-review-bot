@@ -448,6 +448,7 @@ export interface components {
         | 'UNAUTHORIZED'
         | 'NOT_FOUND'
         | 'CONFLICT'
+        | 'MAINTENANCE_PAUSED'
         | 'INTERNAL_ERROR'
     }
   }
@@ -470,7 +471,7 @@ export interface components {
         'application/json': components['schemas']['ErrorResponse']
       }
     }
-    /** @description An immutable identity differs from existing content, or a revision compare-and-swap precondition failed. */
+    /** @description An immutable identity differs from existing content, a revision compare-and-swap precondition failed, or a maintenance revision was attempted while automatic maintenance is paused. */
     Conflict: {
       headers: {
         [name: string]: unknown

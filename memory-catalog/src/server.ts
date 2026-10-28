@@ -13,6 +13,7 @@ import Fastify, {
 import {
   ExtractionConflictError,
   MaintenanceControlConflictError,
+  MaintenancePausedError,
   PostgresMemoryCatalogStore,
   MemoryTreeRevisionConflictError,
   type MemoryCatalogStore,
@@ -60,6 +61,7 @@ function errorStatusCode(error: unknown): number {
   if (
     error instanceof ExtractionConflictError ||
     error instanceof MaintenanceControlConflictError ||
+    error instanceof MaintenancePausedError ||
     error instanceof MemoryTreeRevisionConflictError
   )
     return 409
@@ -268,7 +270,9 @@ export async function createApp(options: {
         : statusCode === 401
           ? 'UNAUTHORIZED'
           : statusCode === 409
-            ? 'CONFLICT'
+            ? error instanceof MaintenancePausedError
+              ? 'MAINTENANCE_PAUSED'
+              : 'CONFLICT'
             : 'INTERNAL_ERROR'
     const message = error instanceof Error ? error.message : String(error)
     void reply.status(statusCode).send({

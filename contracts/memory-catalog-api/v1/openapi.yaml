@@ -471,7 +471,7 @@ components:
         code:
           type: string
           enum:
-            [INVALID_BODY, UNAUTHORIZED, NOT_FOUND, CONFLICT, INTERNAL_ERROR]
+            [INVALID_BODY, UNAUTHORIZED, NOT_FOUND, CONFLICT, MAINTENANCE_PAUSED, INTERNAL_ERROR]
   responses:
     InvalidBody:
       description: The JSON body does not match the operation schema.
@@ -484,7 +484,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
     Conflict:
-      description: An immutable identity differs from existing content, or a revision compare-and-swap precondition failed.
+      description: An immutable identity differs from existing content, a revision compare-and-swap precondition failed, or a maintenance revision was attempted while automatic maintenance is paused.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }

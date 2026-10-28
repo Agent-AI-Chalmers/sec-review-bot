@@ -20,6 +20,21 @@ class MemoryCatalogConflictError(RuntimeError):
     """A catalog identity or revision precondition conflicts with stored state."""
 
 
+class MemoryMaintenancePausedError(MemoryCatalogConflictError):
+    """The catalog refused a maintenance commit because automation is paused."""
+
+
+def _error_code(detail: str) -> str | None:
+    try:
+        value = json.loads(detail)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(value, dict):
+        return None
+    code = value.get("code")
+    return code if isinstance(code, str) else None
+
+
 @dataclass(frozen=True)
 class MemoryCatalogClient:
     base_url: str
@@ -50,6 +65,8 @@ class MemoryCatalogClient:
             detail = error.read().decode("utf-8", errors="replace")
             message = f"Memory catalog returned HTTP {error.code}: {detail}"
             if error.code == 409:
+                if _error_code(detail) == "MAINTENANCE_PAUSED":
+                    raise MemoryMaintenancePausedError(message) from error
                 raise MemoryCatalogConflictError(message) from error
             raise RuntimeError(message) from error
         except URLError as error:
@@ -235,5 +252,6 @@ __all__ = [
     "AGENT_MEMORY_CATALOG_URL_ENV",
     "MemoryCatalogClient",
     "MemoryCatalogConflictError",
+    "MemoryMaintenancePausedError",
     "configured_memory_catalog_client",
 ]
