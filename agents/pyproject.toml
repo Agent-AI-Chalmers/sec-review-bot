@@ -6,41 +6,41 @@ readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.14"
 dependencies = [
-  "deepagents>=0.7.9",
-  "langfuse>=4.14.0",
-  "langchain>=1.3.13",
-  "langchain-core>=1.2.28",
-  "langgraph>=1.2.9",
-  "langchain-anthropic>=1.0.0",
-  "langchain-google-genai>=4.2.7",
-  "langchain-mcp-adapters>=0.3.0",
-  "langchain-openai>=1.3.5",
-  "jsonschema>=4.20.0",
-  "pyyaml>=6.0.0",
-  "pydantic>=2.12.5",
-  "cvss>=3.4",
+  "deepagents>=0.7.32",
+  "langfuse>=5.0.4",
+  "langchain>=1.4.7",
+  "langchain-core>=1.7.1",
+  "langgraph>=1.2.18",
+  "langchain-anthropic>=1.7.7",
+  "langchain-google-genai>=4.4.2",
+  "langchain-mcp-adapters>=0.3.2",
+  "langchain-openai>=1.7.3",
+  "jsonschema>=4.26.0",
+  "pyyaml>=6.0.3",
+  "pydantic>=2.14.1",
+  "cvss>=3.6",
   "structlog>=26.1.0",
-  "temporalio>=1.30.0",
-  "boto3>=1.40.0",
+  "temporalio>=1.34.0",
+  "boto3>=1.43.120",
   "yamlcore>=0.0.4",
 ]
 
 [dependency-groups]
 test = [
-  "pytest>=9.0.0",
-  "pytest-asyncio>=1.3.0",
+  "pytest>=9.2.0",
+  "pytest-asyncio>=1.4.1",
   "pytest-timeout>=2.4.0",
 ]
 lint = [
-  "black>=26.0.0",
-  "ruff>=0.15.21",
+  "black>=26.10.1",
+  "ruff>=0.17.3",
 ]
 typecheck = [
-  "hatchling>=1.29.0",
-  "mypy>=2.2.0",
-  "pyright>=1.1.411",
-  "types-PyYAML>=6.0.0",
-  "types-jsonschema>=4.26.0.20250516",
+  "hatchling>=1.33.0",
+  "mypy>=2.4.0",
+  "pyright>=1.1.414",
+  "types-PyYAML>=6.0.12.20260906",
+  "types-jsonschema>=4.26.0.20261006",
 ]
 dev = [
   { include-group = "test" },
@@ -60,6 +60,7 @@ sec-review-agents-memory = "sec_review_agents.cli.memory:main"
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
+asyncio_default_fixture_loop_scope = "function"
 # A hung test is indistinguishable from a slow one until it finishes. Without a bound, an
 # environment that lacks Docker or network sits in a container command for the backend's
 # 10-minute default instead of reporting the tests that need it. This is a backstop: tests that
