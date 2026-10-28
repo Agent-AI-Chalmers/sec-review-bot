@@ -453,7 +453,7 @@ jobs:
       - name: Set up uv
         # setup-uv intentionally uses immutable releases and does not publish
         # floating major/minor tags; pin the action while the uv CLI tracks latest.
-        uses: astral-sh/setup-uv@v10.3.2
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
           cache-dependency-glob: agents/uv.lock
@@ -508,7 +508,7 @@ jobs:
           python-version-file: agents/.python-version
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.2
+        uses: astral-sh/setup-uv@v10.3.3
         with:
           enable-cache: true
           cache-dependency-glob: agents/uv.lock
