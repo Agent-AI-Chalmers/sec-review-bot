@@ -69,6 +69,8 @@ def serialize_agent_message(message: Any, *, message_id: str) -> dict:
         }
         # Tool linkage belongs only on tool results; null fields on every other
         # message would make the append-only artifact noisier without adding data.
+        # LangChain's artifact is application-attached data, not a downloadable
+        # review artifact, so preserve only its JSON-safe value for inspection.
         if serialized["type"] == "tool":
             serialized.update(
                 {
@@ -92,6 +94,8 @@ def serialize_agent_message(message: Any, *, message_id: str) -> dict:
         "usage_metadata": json_safe(getattr(message, "usage_metadata", None)),
     }
     # Keep tool-call correlation and result metadata next to the tool message.
+    # LangChain's artifact is application-attached data, not a downloadable
+    # review artifact, so preserve only its JSON-safe value for inspection.
     if serialized["type"] == "tool":
         serialized.update(
             {

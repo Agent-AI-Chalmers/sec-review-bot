@@ -22,12 +22,12 @@ export const REVIEW_AGENT_NAMES = new Set([
 ])
 
 const TOKEN_FIELDS = [
-  'input',
-  'output',
-  'total',
+  'input_tokens',
+  'output_tokens',
+  'total_tokens',
   'cache_read_input_tokens',
   'cache_creation_input_tokens',
-  'reasoning'
+  'reasoning_tokens'
 ] as const
 
 type TokenField = (typeof TOKEN_FIELDS)[number]
@@ -91,12 +91,12 @@ interface GroupAccumulator {
 
 function emptyTokenSums(): Record<TokenField, number> {
   return {
-    input: 0,
-    output: 0,
-    total: 0,
+    input_tokens: 0,
+    output_tokens: 0,
+    total_tokens: 0,
     cache_read_input_tokens: 0,
     cache_creation_input_tokens: 0,
-    reasoning: 0
+    reasoning_tokens: 0
   }
 }
 
@@ -113,27 +113,43 @@ function nonNegativeInteger(value: unknown): number | null {
 function tokenUsage(observation: LangfuseObservation): TokenUsage | null {
   const details = observation.usageDetails
   if (details === undefined) return null
+  const ordinaryInput = tokenValue(details.input)
+  const ordinaryOutput = tokenValue(details.output)
+  const total = tokenValue(details.total)
+  const cacheRead = tokenValue(details.cache_read_input_tokens)
+  const cacheCreation = tokenValue(details.cache_creation_input_tokens)
+  const reasoning = tokenValue(details.reasoning)
+  if (
+    ordinaryInput === null &&
+    ordinaryOutput === null &&
+    total === null &&
+    cacheRead === null &&
+    cacheCreation === null &&
+    reasoning === null
+  )
+    return null
+
+  // Langfuse usage details are mutually exclusive billing buckets. The Review Runs
+  // boundary exposes OpenTelemetry-style inclusive input/output totals instead.
   const result: TokenUsage = {
-    input: null,
-    output: null,
-    total: null,
-    cache_read_input_tokens: null,
-    cache_creation_input_tokens: null,
-    reasoning: null
+    input_tokens:
+      ordinaryInput === null
+        ? null
+        : ordinaryInput + (cacheRead ?? 0) + (cacheCreation ?? 0),
+    output_tokens:
+      ordinaryOutput === null ? null : ordinaryOutput + (reasoning ?? 0),
+    total_tokens: total,
+    cache_read_input_tokens: cacheRead,
+    cache_creation_input_tokens: cacheCreation,
+    reasoning_tokens: reasoning
   }
-  let reported = false
-  for (const field of TOKEN_FIELDS) {
-    const value = details[field]
-    if (
-      typeof value === 'number' &&
-      Number.isSafeInteger(value) &&
-      value >= 0
-    ) {
-      result[field] = value
-      reported = true
-    }
-  }
-  return reported ? result : null
+  return result
+}
+
+function tokenValue(value: unknown): number | null {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : null
 }
 
 function completeTotals(

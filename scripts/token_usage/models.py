@@ -14,13 +14,17 @@ class StageUsage:
     output_tokens: int
     total_tokens: int
     cache_read_tokens: int
+    cache_creation_tokens: int
     reasoning_tokens: int
     ai_message_count: int
     ai_messages_with_usage_count: int
 
     @property
     def uncached_input_tokens(self) -> int:
-        return max(self.input_tokens - self.cache_read_tokens, 0)
+        return max(
+            self.input_tokens - self.cache_read_tokens - self.cache_creation_tokens,
+            0,
+        )
 
     @property
     def cache_ratio(self) -> float:
@@ -42,13 +46,17 @@ class UsageTotals:
     output_tokens: int
     total_tokens: int
     cache_read_tokens: int
+    cache_creation_tokens: int
     reasoning_tokens: int
     ai_message_count: int
     ai_messages_with_usage_count: int
 
     @property
     def uncached_input_tokens(self) -> int:
-        return max(self.input_tokens - self.cache_read_tokens, 0)
+        return max(
+            self.input_tokens - self.cache_read_tokens - self.cache_creation_tokens,
+            0,
+        )
 
     @property
     def cache_ratio(self) -> float:
@@ -64,6 +72,7 @@ def aggregate_stage_usages(stages: Iterable[StageUsage]) -> UsageTotals:
         output_tokens=sum(item.output_tokens for item in items),
         total_tokens=sum(item.total_tokens for item in items),
         cache_read_tokens=sum(item.cache_read_tokens for item in items),
+        cache_creation_tokens=sum(item.cache_creation_tokens for item in items),
         reasoning_tokens=sum(item.reasoning_tokens for item in items),
         ai_message_count=sum(item.ai_message_count for item in items),
         ai_messages_with_usage_count=sum(

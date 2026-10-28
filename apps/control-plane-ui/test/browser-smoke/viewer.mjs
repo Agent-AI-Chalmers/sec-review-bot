@@ -25,7 +25,14 @@ export async function smokeViewer({ page }) {
             name: 'replace_text',
             args: { old_string: 'unsafe', new_string: 'validated' }
           }
-        ]
+        ],
+        usage_metadata: {
+          input_tokens: 1200,
+          output_tokens: 225,
+          total_tokens: 1425,
+          input_token_details: { cache_read: 450, cache_creation: 24 },
+          output_token_details: { reasoning: 34 }
+        }
       }
     }),
     JSON.stringify({
@@ -38,7 +45,8 @@ export async function smokeViewer({ page }) {
         content: Array.from(
           { length: 80 },
           (_, index) => `replacement complete ${index + 1}`
-        ).join('\n')
+        ).join('\n'),
+        artifact: { source: 'workspace', changed_files: 1 }
       }
     })
   ].join('\n')
@@ -54,12 +62,44 @@ export async function smokeViewer({ page }) {
     .locator('.transcript-timeline')
     .getByText('Pasted assistant response', { exact: true })
     .waitFor()
+  const usageDetails = page.getByRole('button', { name: 'Usage details' })
+  assert.strictEqual(
+    await usageDetails.count(),
+    2,
+    'the transcript summary and message must each expose token details'
+  )
+  await usageDetails.first().click()
+  const usagePopover = page.locator('.transcript-usage-details').last()
+  await usagePopover.waitFor()
+  assert.match(
+    (await usagePopover.textContent()) ?? '',
+    /Input1,200.*Cache read450.*Cache write24.*Output225.*Reasoning34.*Total1,425/,
+    'token details must preserve the inclusive totals and their subsets'
+  )
+  await page.keyboard.press('Escape')
   await page.getByRole('button', { name: 'Expand all' }).click()
+  const toolResult = page.locator(
+    '.transcript-timeline .transcript-message[data-transcript-role="tool"]'
+  )
+  await toolResult.locator('[data-transcript-action="back-to-call"]').waitFor()
+  assert.strictEqual(
+    await toolResult.locator('.transcript-args').count(),
+    0,
+    'tool results must not repeat the originating call arguments'
+  )
   await page.getByText('Pasted reasoning detail', { exact: true }).waitFor()
+  const attachedData = toolResult.locator(
+    '[data-transcript-section="artifact"]'
+  )
+  await attachedData.waitFor()
+  assert.match(
+    (await attachedData.textContent()) ?? '',
+    /"source": "workspace".*"changed_files": 1/s,
+    'tool attached data must remain inspectable as structured JSON'
+  )
   await page.getByText('Before', { exact: true }).first().waitFor()
   await page.getByText('After', { exact: true }).first().waitFor()
   await page.getByRole('button', { name: 'Jump to result' }).waitFor()
-  await page.getByRole('button', { name: 'Back to call' }).waitFor()
   // "Expand all" animates every section, and scrollIntoView picks its target from
   // the current layout. Navigating while a section is still growing lands on a
   // stale offset, so wait for the transcript height to settle first.

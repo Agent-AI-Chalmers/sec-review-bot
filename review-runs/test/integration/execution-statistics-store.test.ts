@@ -51,12 +51,12 @@ test('statistics settle only after two identical reads and persist relational gr
       usageReportedCallCount: 1,
       usageCoverage: 'complete_for_observed_calls' as const,
       tokenUsage: {
-        input: 10,
-        output: 2,
-        total: 12,
+        input_tokens: 10,
+        output_tokens: 2,
+        total_tokens: 12,
         cache_read_input_tokens: 4,
         cache_creation_input_tokens: 0,
-        reasoning: 0
+        reasoning_tokens: 0
       },
       groups: [
         {
@@ -72,12 +72,12 @@ test('statistics settle only after two identical reads and persist relational gr
           modelCallCount: 1,
           usageReportedCallCount: 1,
           tokenUsage: {
-            input: 10,
-            output: 2,
-            total: 12,
+            input_tokens: 10,
+            output_tokens: 2,
+            total_tokens: 12,
             cache_read_input_tokens: 4,
             cache_creation_input_tokens: 0,
-            reasoning: 0
+            reasoning_tokens: 0
           }
         }
       ]
@@ -226,12 +226,12 @@ test('an empty observation set waits for the full window instead of settling as 
     usageReportedCallCount: 0,
     usageCoverage: 'complete_for_observed_calls' as const,
     tokenUsage: {
-      input: null,
-      output: null,
-      total: null,
+      input_tokens: null,
+      output_tokens: null,
+      total_tokens: null,
       cache_read_input_tokens: null,
       cache_creation_input_tokens: null,
-      reasoning: null
+      reasoning_tokens: null
     },
     groups: []
   }

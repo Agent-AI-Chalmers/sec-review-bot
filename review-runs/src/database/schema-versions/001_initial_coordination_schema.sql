@@ -515,6 +515,10 @@ COMMENT ON COLUMN execution_statistics.ingestion_status IS
   'settled means two non-empty review-root reads matched; partial_window means the bounded reconciliation window ended while observations were still changing; no_observations means the whole window produced no review roots; unavailable means Langfuse could not be read within the retry budget.';
 COMMENT ON COLUMN execution_statistics.usage_coverage IS
   'Coverage of usage for calls Langfuse returned, not proof that every model call was uploaded.';
+COMMENT ON COLUMN execution_statistics.input_tokens IS
+  'Inclusive OpenTelemetry GenAI input total. Cache-read and cache-creation columns are subsets.';
+COMMENT ON COLUMN execution_statistics.output_tokens IS
+  'Inclusive OpenTelemetry GenAI output total. Reasoning tokens are a subset.';
 COMMENT ON COLUMN execution_statistics.failure_count IS
   'Consecutive failed Langfuse reads. A successful snapshot resets it, so earlier successful reconciliation polls do not consume the transport-failure budget.';
 COMMENT ON COLUMN execution_statistics.reconciliation_deadline_at IS
@@ -552,3 +556,7 @@ CREATE TABLE execution_statistics_groups (
 
 COMMENT ON TABLE execution_statistics_groups IS
   'Run statistics grouped by workflow coordinates, review agent, and Langfuse native provider/model identity. Call-level observations remain in Langfuse.';
+COMMENT ON COLUMN execution_statistics_groups.input_tokens IS
+  'Inclusive OpenTelemetry GenAI input total. Cache-read and cache-creation columns are subsets.';
+COMMENT ON COLUMN execution_statistics_groups.output_tokens IS
+  'Inclusive OpenTelemetry GenAI output total. Reasoning tokens are a subset.';

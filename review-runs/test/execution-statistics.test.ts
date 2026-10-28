@@ -25,7 +25,14 @@ test('execution statistics aggregate native provider/model usage by review agent
           sec_review_chunk_id: 'discovery-chunk-0002',
           ls_provider: 'anthropic'
         },
-        usageDetails: { input: 10, output: 3, total: 13 }
+        usageDetails: {
+          input: 6,
+          cache_read_input_tokens: 3,
+          cache_creation_input_tokens: 1,
+          output: 2,
+          reasoning: 1,
+          total: 13
+        }
       },
       {
         id: 'generation-2',
@@ -37,7 +44,14 @@ test('execution statistics aggregate native provider/model usage by review agent
           sec_review_pass_index: '1',
           ls_provider: 'anthropic'
         },
-        usageDetails: { input: 5, output: 1, total: 6 }
+        usageDetails: {
+          input: 5,
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          output: 1,
+          reasoning: 0,
+          total: 6
+        }
       }
     ],
     excludedNonReviewRootCount: 1
@@ -47,12 +61,12 @@ test('execution statistics aggregate native provider/model usage by review agent
   assert.strictEqual(snapshot.usageReportedCallCount, 2)
   assert.strictEqual(snapshot.usageCoverage, 'complete_for_observed_calls')
   assert.deepStrictEqual(snapshot.tokenUsage, {
-    input: 15,
-    output: 4,
-    total: 19,
-    cache_read_input_tokens: null,
-    cache_creation_input_tokens: null,
-    reasoning: null
+    input_tokens: 15,
+    output_tokens: 4,
+    total_tokens: 19,
+    cache_read_input_tokens: 3,
+    cache_creation_input_tokens: 1,
+    reasoning_tokens: 1
   })
   assert.deepStrictEqual(snapshot.groups, [
     {
@@ -68,12 +82,12 @@ test('execution statistics aggregate native provider/model usage by review agent
       modelCallCount: 1,
       usageReportedCallCount: 1,
       tokenUsage: {
-        input: 10,
-        output: 3,
-        total: 13,
-        cache_read_input_tokens: null,
-        cache_creation_input_tokens: null,
-        reasoning: null
+        input_tokens: 10,
+        output_tokens: 3,
+        total_tokens: 13,
+        cache_read_input_tokens: 3,
+        cache_creation_input_tokens: 1,
+        reasoning_tokens: 1
       }
     },
     {
@@ -89,12 +103,12 @@ test('execution statistics aggregate native provider/model usage by review agent
       modelCallCount: 1,
       usageReportedCallCount: 1,
       tokenUsage: {
-        input: 5,
-        output: 1,
-        total: 6,
-        cache_read_input_tokens: null,
-        cache_creation_input_tokens: null,
-        reasoning: null
+        input_tokens: 5,
+        output_tokens: 1,
+        total_tokens: 6,
+        cache_read_input_tokens: 0,
+        cache_creation_input_tokens: 0,
+        reasoning_tokens: 0
       }
     }
   ])

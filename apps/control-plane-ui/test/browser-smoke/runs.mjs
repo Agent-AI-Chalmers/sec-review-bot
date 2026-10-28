@@ -346,7 +346,7 @@ export async function smokeRuns({
     await statisticsDetails.waitFor()
     assert.match(
       (await statisticsDetails.textContent()) ?? '',
-      /Input 58,020.*Output 10,784.*Cache read 18,280/,
+      /Input\s*58,020.*Cache read\s*18,280.*Cache write\s*1,160.*Output\s*10,784.*Reasoning\s*1,619/,
       `${name} the useful token breakdown must be available in the details drawer`
     )
     assert.match(
@@ -380,7 +380,7 @@ export async function smokeRuns({
     await discoveryRow.click()
     assert.match(
       (await workflowStages.nth(0).textContent()) ?? '',
-      /Call.*Input.*Output.*Cache read.*discovery-chunk-0001.*2,800.*360.*1,100.*discovery-chunk-0002.*2,700.*354.*1,000.*discovery-chunk-0003.*2,700.*370.*1,000.*Total.*8,200.*1,084.*3,100/s,
+      /Call.*Input.*Output.*discovery-chunk-0001.*2,800.*Cache read.*1,100.*Cache write.*56.*360.*Reasoning.*54.*discovery-chunk-0002.*2,700.*Cache read.*1,000.*Cache write.*54.*354.*Reasoning.*53.*discovery-chunk-0003.*2,700.*Cache read.*1,000.*Cache write.*54.*370.*Reasoning.*56.*Total.*8,200.*Cache read.*3,100.*Cache write.*164.*1,084.*Reasoning.*163/s,
       `${name} discovery details must expose per-chunk calls and token dimensions`
     )
     const triageRow = workflowStages
@@ -390,7 +390,7 @@ export async function smokeRuns({
     await triageRow.click()
     assert.match(
       (await workflowStages.nth(0).textContent()) ?? '',
-      /Call.*Draft batch 1.*2,700.*400.*900.*Draft batch 2.*2,400.*400.*900.*Refinement.*1,800.*300.*600.*Total.*6,900.*1,100.*2,400/s,
+      /Call.*Draft batch 1.*2,700.*Cache read.*900.*Cache write.*54.*400.*Reasoning.*60.*Draft batch 2.*2,400.*Cache read.*900.*Cache write.*48.*400.*Reasoning.*60.*Refinement.*1,800.*Cache read.*600.*Cache write.*36.*300.*Reasoning.*45.*Total.*6,900.*Cache read.*2,400.*Cache write.*138.*1,100.*Reasoning.*165/s,
       `${name} triage details must explain its batches without adding hierarchy`
     )
     await workflowStages
@@ -477,7 +477,7 @@ export async function smokeRuns({
     await usageRows.filter({ hasText: 'repository-analyzer' }).first().click()
     assert.match(
       (await statisticsDetails.textContent()) ?? '',
-      /Input 5,200.*Output 1,000.*Cache read 1,600/,
+      /Input\s*5,200.*Cache read\s*1,600.*Cache write\s*104.*Output\s*1,000.*Reasoning\s*150/,
       `${name} an agent without subgroups must expose its token breakdown`
     )
     await usageRows

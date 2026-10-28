@@ -667,7 +667,7 @@ export async function smokeMemory({
       .waitFor()
     await maintenanceDialog
       .locator('.transcript-message')
-      .getByText('Assistant', { exact: true })
+      .getByText('AI response', { exact: true })
       .waitFor()
     const transcriptLayout = await maintenanceDialog.evaluate((dialog) => {
       const layout = dialog.querySelector('.transcript-layout')

@@ -32,7 +32,6 @@ export interface TranscriptMessageView {
   reasoning: string
   toolCalls: ToolCallView[]
   toolCallId: string | undefined
-  toolArgs: Record<string, unknown> | undefined
   status: string | undefined
   artifact: unknown
   usage: UsageView | undefined
@@ -113,17 +112,29 @@ function usage(message: Record<string, unknown>): UsageView | undefined {
   const outputDetails =
     record(source.output_token_details) ??
     record(source.completion_tokens_details)
+  const cacheRead =
+    positiveNumber(inputDetails?.cache_read) ??
+    positiveNumber(inputDetails?.cached_tokens) ??
+    positiveNumber(source.cache_read_input_tokens)
+  const cacheCreation =
+    positiveNumber(inputDetails?.cache_creation) ??
+    positiveNumber(source.cache_creation_input_tokens)
+  const promptTokens = number(source.prompt_tokens)
+  const ordinaryInput = number(source.input_tokens)
+  // LangChain usage metadata and OpenAI prompt totals are already inclusive.
+  // Raw Anthropic response metadata reports ordinary and cache input separately.
+  const input =
+    promptTokens ??
+    (direct === undefined && inputDetails === undefined
+      ? ordinaryInput === undefined
+        ? undefined
+        : ordinaryInput + (cacheRead ?? 0) + (cacheCreation ?? 0)
+      : ordinaryInput)
   const result: UsageView = {
-    input: number(source.input_tokens) ?? number(source.prompt_tokens),
+    input,
     output: number(source.output_tokens) ?? number(source.completion_tokens),
-    // Cache counters are input subdivisions, not extra tokens to add to total usage.
-    cacheRead:
-      positiveNumber(inputDetails?.cache_read) ??
-      positiveNumber(inputDetails?.cached_tokens) ??
-      positiveNumber(source.cache_read_input_tokens),
-    cacheCreation:
-      positiveNumber(inputDetails?.cache_creation) ??
-      positiveNumber(source.cache_creation_input_tokens),
+    cacheRead,
+    cacheCreation,
     total: number(source.total_tokens),
     reasoning:
       number(outputDetails?.reasoning) ??
@@ -192,7 +203,6 @@ export function normalizeTranscript(
       toolCallId:
         typeof raw.tool_call_id === 'string' ? raw.tool_call_id : undefined,
       status: typeof raw.status === 'string' ? raw.status : undefined,
-      toolArgs: undefined,
       artifact: raw.artifact,
       usage: usage(raw),
       searchable: ''
@@ -242,16 +252,10 @@ export function normalizeTranscript(
       message.toolCallId ? [[message.toolCallId, message] as const] : []
     )
   )
-  const calls = new Map<string, ToolCallView>()
   for (const message of messages) {
     for (const call of message.toolCalls) {
       call.resultMessageId = results.get(call.id)?.id
-      calls.set(call.id, call)
     }
-  }
-  for (const message of messages) {
-    if (message.toolCallId)
-      message.toolArgs = calls.get(message.toolCallId)?.args
   }
   const totalUsage: UsageView = {
     input: undefined,

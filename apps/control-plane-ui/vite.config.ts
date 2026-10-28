@@ -19,6 +19,12 @@ export default defineConfig({
               test: /node_modules[\\/](?:@codemirror|codemirror|@lezer|style-mod|w3c-keyname|crelt)[\\/]/,
               maxSize: 250_000,
               priority: 20
+            },
+            {
+              name: 'ui',
+              test: /node_modules[\\/](?:@mantine|@floating-ui)[\\/]/,
+              maxSize: 400_000,
+              priority: 10
             }
           ]
         }

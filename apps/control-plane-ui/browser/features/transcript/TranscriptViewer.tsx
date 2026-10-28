@@ -9,6 +9,7 @@ import {
   Group,
   Modal,
   Paper,
+  Popover,
   SimpleGrid,
   Stack,
   Text,
@@ -19,6 +20,7 @@ import { useMediaQuery } from '@mantine/hooks'
 import {
   IconArrowDown,
   IconArrowUp,
+  IconBraces,
   IconBrain,
   IconCheck,
   IconChevronDown,
@@ -27,6 +29,7 @@ import {
   IconCpu,
   IconDownload,
   IconExternalLink,
+  IconMessage,
   IconRobot,
   IconSearch,
   IconSettings,
@@ -51,7 +54,8 @@ import {
   type ToolCallView,
   type TranscriptEvent,
   type TranscriptMessageView,
-  type TranscriptRole
+  type TranscriptRole,
+  type UsageView
 } from './transcript-model.js'
 import {
   MAX_MINIMAP_MARKS,
@@ -78,6 +82,100 @@ function formatTokens(value: number): string {
     notation: value >= 10_000 ? 'compact' : 'standard',
     maximumFractionDigits: 2
   }).format(value)
+}
+
+function TokenUsageDetails({ usage }: { usage: UsageView }): React.JSX.Element {
+  const t = useMessages()
+  const metric = (
+    label: string,
+    value: number | undefined,
+    subsets: ReadonlyArray<readonly [string, number | undefined]> = []
+  ): React.JSX.Element | null => {
+    if (value === undefined && subsets.every(([, item]) => item === undefined))
+      return null
+    return (
+      <div className="transcript-usage-group">
+        <div className="transcript-usage-metric">
+          <Text size="xs">{label}</Text>
+          <Text size="sm" fw={600}>
+            {value === undefined ? '—' : value.toLocaleString()}
+          </Text>
+        </div>
+        {subsets.map(
+          ([subsetLabel, subsetValue]) =>
+            subsetValue !== undefined && (
+              <div className="transcript-usage-subset" key={subsetLabel}>
+                <Text size="xs" c="dimmed">
+                  {subsetLabel}
+                </Text>
+                <Text size="xs" c="dimmed">
+                  {subsetValue.toLocaleString()}
+                </Text>
+              </div>
+            )
+        )}
+      </div>
+    )
+  }
+  return (
+    <div className="transcript-usage-details">
+      {metric(t('transcriptTokensIn'), usage.input, [
+        [t('transcriptCacheRead'), usage.cacheRead],
+        [t('transcriptCacheCreation'), usage.cacheCreation]
+      ])}
+      {metric(t('transcriptTokensOut'), usage.output, [
+        [t('transcriptReasoningTokens'), usage.reasoning]
+      ])}
+      {usage.total !== undefined && (
+        <div className="transcript-usage-total">
+          <Text size="xs">{t('transcriptTokensTotal')}</Text>
+          <Text size="sm" fw={600}>
+            {usage.total.toLocaleString()}
+          </Text>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function TokenUsagePopover({
+  usage,
+  compact = false
+}: {
+  usage: UsageView
+  compact?: boolean
+}): React.JSX.Element {
+  const t = useMessages()
+  return (
+    <Popover
+      width={248}
+      position="bottom-end"
+      shadow="xs"
+      withArrow
+      arrowSize={8}
+    >
+      <Popover.Target>
+        <Button
+          variant="subtle"
+          color="gray"
+          size="compact-xs"
+          leftSection={<IconCpu size={ICON_SIZE.xs} />}
+          aria-label={t('transcriptUsageDetails')}
+        >
+          {compact
+            ? usage.total === undefined
+              ? t('transcriptUsageDetails')
+              : formatTokens(usage.total)
+            : usage.total === undefined
+              ? t('transcriptUsageDetails')
+              : `${formatTokens(usage.total)} ${t('transcriptTokenUnit')}`}
+        </Button>
+      </Popover.Target>
+      <Popover.Dropdown>
+        <TokenUsageDetails usage={usage} />
+      </Popover.Dropdown>
+    </Popover>
+  )
 }
 
 function HighlightText({
@@ -213,19 +311,23 @@ function rolePresentation(role: TranscriptRole): {
 }
 
 function Section({
+  kind,
   title,
   value,
   openedInitially = false,
   force,
   children,
-  icon
+  icon,
+  color = 'blue'
 }: {
+  kind: 'message' | 'reasoning' | 'result' | 'artifact'
   title: string
   value: string
   openedInitially?: boolean
   force: number
   children: React.ReactNode
   icon?: React.ReactNode
+  color?: string
 }): React.JSX.Element {
   const [opened, setOpened] = React.useState(openedInitially)
   const previousForce = React.useRef(force)
@@ -235,7 +337,7 @@ function Section({
     setOpened(force > 0)
   }, [force])
   return (
-    <div className="transcript-section">
+    <div className="transcript-section" data-transcript-section={kind}>
       <Group
         justify="space-between"
         wrap="nowrap"
@@ -243,7 +345,10 @@ function Section({
       >
         <Button
           variant="subtle"
-          color="gray"
+          color={color}
+          size="compact-sm"
+          className="transcript-section-toggle"
+          aria-expanded={opened}
           leftSection={
             opened ? (
               <IconChevronDown size={ICON_SIZE.sm} />
@@ -417,13 +522,28 @@ function JsonTable({
   keys: string[]
   query: string
 }): React.JSX.Element {
+  const numericKeys = new Set(
+    keys.filter((key) => {
+      const values = rows
+        .map((row) => row[key])
+        .filter((value) => value !== null && value !== undefined)
+      return (
+        values.length > 0 && values.every((value) => typeof value === 'number')
+      )
+    })
+  )
   return (
     <div className="json-table-wrap">
       <table className="json-table">
         <thead>
           <tr>
             {keys.map((key) => (
-              <th key={key}>
+              <th
+                className={
+                  numericKeys.has(key) ? 'json-table-number' : undefined
+                }
+                key={key}
+              >
                 <HighlightText value={key} query={query} />
               </th>
             ))}
@@ -435,9 +555,7 @@ function JsonTable({
               {keys.map((key) => (
                 <td
                   className={
-                    typeof row[key] === 'number'
-                      ? 'json-table-number'
-                      : undefined
+                    numericKeys.has(key) ? 'json-table-number' : undefined
                   }
                   data-label={key}
                   key={key}
@@ -760,6 +878,7 @@ function TranscriptMessage({
     <Paper
       id={`transcript-${message.id}`}
       data-transcript-message-key={messageKey(message)}
+      data-transcript-role={message.role}
       withBorder
       className={`transcript-message transcript-${message.role}`}
     >
@@ -787,71 +906,36 @@ function TranscriptMessage({
             </Badge>
           )}
         </Group>
-        {message.usage && (
-          <Group gap={6} className="transcript-token-metrics">
-            {message.usage.total !== undefined && (
-              <Tooltip label={message.usage.total.toLocaleString()}>
-                <Badge
-                  variant="outline"
-                  leftSection={<IconCpu size={ICON_SIZE.xs} />}
-                >
-                  {formatTokens(message.usage.total)}
-                </Badge>
-              </Tooltip>
-            )}
-            {(message.usage.input !== undefined ||
-              message.usage.output !== undefined) && (
-              <Badge variant="outline">
-                {t('transcriptTokensIn')} {message.usage.input ?? '—'} ·{' '}
-                {t('transcriptTokensOut')} {message.usage.output ?? '—'}
-              </Badge>
-            )}
-            {message.usage.cacheRead !== undefined && (
-              <Badge variant="outline">
-                {t('transcriptCacheRead')} {message.usage.cacheRead}
-              </Badge>
-            )}
-            {message.usage.cacheCreation !== undefined && (
-              <Badge variant="outline">
-                {t('transcriptCacheCreation')} {message.usage.cacheCreation}
-              </Badge>
-            )}
-            {message.usage.reasoning !== undefined && (
-              <Badge
-                variant="outline"
-                leftSection={<IconBrain size={ICON_SIZE.xs} />}
-              >
-                {message.usage.reasoning}
-              </Badge>
-            )}
-          </Group>
-        )}
-      </Group>
-      <div className="transcript-message-body">
-        {message.toolArgs && (
-          <div className="transcript-linked-call">
-            <Group justify="space-between" mb="xs">
-              <Text size="xs" fw={700} c="dimmed">
-                {t('transcriptCallArguments')}
-              </Text>
+        {(message.toolCallId || message.usage) && (
+          <Group gap="xs" wrap="wrap">
+            {message.toolCallId && (
               <Button
                 variant="subtle"
                 size="compact-xs"
+                data-transcript-action="back-to-call"
                 leftSection={<IconArrowUp size={ICON_SIZE.sm} />}
                 onClick={jumpToCall}
               >
                 {t('transcriptJumpCall')}
               </Button>
-            </Group>
-            <ToolArguments args={message.toolArgs} query={query} />
-          </div>
+            )}
+            {message.usage && (
+              <div className="transcript-token-metrics">
+                <TokenUsagePopover usage={message.usage} compact />
+              </div>
+            )}
+          </Group>
         )}
+      </Group>
+      <div className="transcript-message-body">
         {message.reasoning && (
           <Section
+            kind="reasoning"
             title={t('transcriptReasoning')}
             value={message.reasoning}
             force={force}
             icon={<IconBrain size={ICON_SIZE.sm} />}
+            color="violet"
           >
             <div className="memory-markdown memory-markdown-full">
               <HighlightedMarkdown query={query}>
@@ -862,6 +946,7 @@ function TranscriptMessage({
         )}
         {message.content && (
           <Section
+            kind={message.role === 'tool' ? 'result' : 'message'}
             title={
               message.role === 'tool'
                 ? t('transcriptResult')
@@ -872,6 +957,8 @@ function TranscriptMessage({
               message.content.length <= 600 && message.role !== 'system'
             }
             force={force}
+            icon={<IconMessage size={ICON_SIZE.sm} />}
+            color={message.role === 'tool' ? 'green' : 'blue'}
           >
             {message.role === 'tool' ? (
               <Code block className="transcript-tool-output">
@@ -891,9 +978,12 @@ function TranscriptMessage({
         )}
         {message.artifact !== undefined && message.artifact !== null && (
           <Section
+            kind="artifact"
             title={t('transcriptArtifact')}
             value={JSON.stringify(message.artifact, null, 2)}
             force={force}
+            icon={<IconBraces size={ICON_SIZE.sm} />}
+            color="gray"
           >
             <Code block>
               <HighlightText
@@ -1264,20 +1354,6 @@ export function TranscriptTimeline({
         ? current.filter((item) => item !== role)
         : [...current, role]
     )
-  const usageParts = [
-    document.totalUsage.input === undefined
-      ? undefined
-      : `${t('transcriptTokensIn')} ${formatTokens(document.totalUsage.input)}`,
-    document.totalUsage.output === undefined
-      ? undefined
-      : `${t('transcriptTokensOut')} ${formatTokens(document.totalUsage.output)}`,
-    document.totalUsage.cacheRead === undefined
-      ? undefined
-      : `${t('transcriptCacheRead')} ${formatTokens(document.totalUsage.cacheRead)}`,
-    document.totalUsage.cacheCreation === undefined
-      ? undefined
-      : `${t('transcriptCacheCreation')} ${formatTokens(document.totalUsage.cacheCreation)}`
-  ].filter(Boolean)
   return (
     <Stack gap="md">
       <Paper withBorder p="sm" className="transcript-toolbar">
@@ -1296,25 +1372,16 @@ export function TranscriptTimeline({
                 )
               })}
             </Group>
-            <Text size="xs" c="dimmed">
-              {t('transcriptShowing')
-                .replace('{shown}', String(filtered.length))
-                .replace('{total}', String(document.messages.length))}
-              {document.totalUsage.total !== undefined && (
-                <>
-                  {' · '}
-                  <Tooltip label={document.totalUsage.total.toLocaleString()}>
-                    <span>
-                      {t('transcriptUsageProcessed').replace(
-                        '{count}',
-                        formatTokens(document.totalUsage.total)
-                      )}
-                    </span>
-                  </Tooltip>
-                </>
-              )}
-              {usageParts.length > 0 && ` · ${usageParts.join(' · ')}`}
-            </Text>
+            <Group gap={4} wrap="wrap">
+              <Text size="xs" c="dimmed">
+                {t('transcriptShowing')
+                  .replace('{shown}', String(filtered.length))
+                  .replace('{total}', String(document.messages.length))}
+              </Text>
+              {Object.values(document.totalUsage).some(
+                (value) => value !== undefined
+              ) && <TokenUsagePopover usage={document.totalUsage} />}
+            </Group>
           </Stack>
           <Group gap="xs" wrap="wrap">
             <TextInput

@@ -113,6 +113,7 @@ def render_raw_text(runs: list[RunUsage], config: RenderConfig | None = None) ->
             f"output={run.output_tokens:,} "
             f"total={run.total_tokens:,} "
             f"cache_read={run.cache_read_tokens:,} "
+            f"cache_creation={run.totals.cache_creation_tokens:,} "
             f"uncached_input={run.uncached_input_tokens:,} "
             f"cache_ratio={run.cache_ratio * 100:.2f}% "
             f"ai_msgs={run.ai_message_count}"
@@ -126,6 +127,7 @@ def render_raw_text(runs: list[RunUsage], config: RenderConfig | None = None) ->
             f"output={totals.output_tokens:,} "
             f"total={totals.total_tokens:,} "
             f"cache_read={totals.cache_read_tokens:,} "
+            f"cache_creation={totals.cache_creation_tokens:,} "
             f"uncached_input={totals.uncached_input_tokens:,} "
             f"cache_ratio={totals.cache_ratio * 100:.2f}% "
             f"ai_msgs={totals.ai_message_count}"
@@ -151,6 +153,7 @@ def render_raw_text(runs: list[RunUsage], config: RenderConfig | None = None) ->
                 f"output={stage.output_tokens:,} "
                 f"total={stage.total_tokens:,} "
                 f"cache_read={stage.cache_read_tokens:,} "
+                f"cache_creation={stage.cache_creation_tokens:,} "
                 f"uncached_input={stage.uncached_input_tokens:,} "
                 f"cache_ratio={stage.cache_ratio * 100:.2f}% "
                 f"ai_msgs={stage.ai_message_count}"
@@ -177,6 +180,7 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
         "input",
         "output",
         "cache_read",
+        "cache_creation",
         "uncached",
         "cache_ratio",
         "efficiency",
@@ -202,6 +206,7 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                 f"{run.input_tokens:,}",
                 f"{run.output_tokens:,}",
                 f"{run.cache_read_tokens:,}",
+                f"{run.totals.cache_creation_tokens:,}",
                 f"{run.uncached_input_tokens:,}",
                 f"{run.cache_ratio * 100:.2f}%",
                 f"{efficiency * 100:.2f}%",
@@ -219,6 +224,7 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                 f"{effective_totals.input_tokens:,}",
                 f"{effective_totals.output_tokens:,}",
                 f"{effective_totals.cache_read_tokens:,}",
+                f"{effective_totals.cache_creation_tokens:,}",
                 f"{effective_totals.uncached_input_tokens:,}",
                 f"{effective_totals.cache_ratio * 100:.2f}%",
                 f"{efficiency * 100:.2f}%",
@@ -239,6 +245,7 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                     f"{stage.input_tokens:,}",
                     f"{stage.output_tokens:,}",
                     f"{stage.cache_read_tokens:,}",
+                    f"{stage.cache_creation_tokens:,}",
                     f"{stage.uncached_input_tokens:,}",
                     f"{stage.cache_ratio * 100:.2f}%",
                     "",
@@ -264,6 +271,7 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                         f"{attempt.usage.input_tokens:,}",
                         f"{attempt.usage.output_tokens:,}",
                         f"{attempt.usage.cache_read_tokens:,}",
+                        f"{attempt.usage.cache_creation_tokens:,}",
                         f"{attempt.usage.uncached_input_tokens:,}",
                         f"{attempt.usage.cache_ratio * 100:.2f}%",
                         "effective" if attempt in visible_attempts else "",
@@ -294,6 +302,7 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
             "output_tokens",
             "total_tokens",
             "cache_read_tokens",
+            "cache_creation_tokens",
             "uncached_input_tokens",
             "cache_ratio",
             "ai_message_count",
@@ -330,6 +339,7 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
                 totals.output_tokens,
                 totals.total_tokens,
                 totals.cache_read_tokens,
+                totals.cache_creation_tokens,
                 totals.uncached_input_tokens,
                 f"{totals.cache_ratio:.6f}",
                 totals.ai_message_count,
@@ -429,6 +439,7 @@ def render_json(runs: list[RunUsage], config: RenderConfig | None = None) -> str
             "output_tokens": totals.output_tokens,
             "total_tokens": totals.total_tokens,
             "cache_read_tokens": totals.cache_read_tokens,
+            "cache_creation_tokens": totals.cache_creation_tokens,
             "uncached_input_tokens": totals.uncached_input_tokens,
             "cache_ratio": totals.cache_ratio,
             "ai_message_count": totals.ai_message_count,
@@ -448,6 +459,7 @@ def render_json(runs: list[RunUsage], config: RenderConfig | None = None) -> str
                 "output_tokens": effective_totals.output_tokens,
                 "total_tokens": effective_totals.total_tokens,
                 "cache_read_tokens": effective_totals.cache_read_tokens,
+                "cache_creation_tokens": effective_totals.cache_creation_tokens,
                 "uncached_input_tokens": effective_totals.uncached_input_tokens,
                 "cache_ratio": effective_totals.cache_ratio,
                 "ai_message_count": effective_totals.ai_message_count,

@@ -30,6 +30,7 @@ GitHub 集成直接 import Review Runs 的形状，因此它对记录的视图�
 - 以嵌套对象报告的三条生命周期轴：脱敏的 `preparation` 摘要，以及 `execution` / `publication`。每组各自报告 `status`、`started_at`、`finished_at` 与该轴的 `updated_at`（最后一次写入时间，不是阶段边界）；用于筛选它们的查询参数沿用既有的 `*_status` 拼写；
 - `notices`：当 run 的某个环节失败或需要关注时，应由集成展示给用户的消息。消息按产生时间从早到晚排列；同一 run 发生多次独立事件时会保留多条，不会合并；
 - `execution_statistics`：Review Runs 生成的可空统计快照，包含 reconciliation 状态、已观察到的模型调用与 token 汇总，以及流程坐标/agent/provider/model 分组。case、delivery、pass、draft batch 和 discovery chunk 坐标可空，因为多数阶段没有这些坐标。`null` 表示尚无快照记录，不表示零消耗；
+- execution statistics 的 token 总量采用 OpenTelemetry GenAI 语义：`input_tokens` 和 `output_tokens` 包含各自已报告的缓存与 reasoning 子集。Langfuse 的互斥计费 bucket 会在进入本 contract 前完成标准化；
 - `artifact_storage` 的变体：不存在；状态为 `unavailable` 或 `failed` 的错误变体，可带 `error_code` 与 `message`；或 `available` 且带有已存储的 bundle。
 
 以下不属于本契约：

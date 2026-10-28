@@ -112,6 +112,44 @@
     white-space: normal;
   }
 
+  .statistics-usage-details {
+    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  .statistics-usage-metric {
+    text-align: left;
+  }
+
+  .statistics-usage-subsets {
+    justify-content: flex-start;
+  }
+
+  .statistics-agent-breakdown tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .statistics-agent-breakdown th:first-child,
+  .statistics-agent-breakdown td:first-child {
+    grid-column: 1 / -1;
+    width: auto;
+    padding-right: 0;
+  }
+
+  .statistics-agent-breakdown th:not(:first-child),
+  .statistics-agent-breakdown td:not(:first-child) {
+    width: auto;
+  }
+
+  .statistics-agent-breakdown thead th:first-child {
+    padding-bottom: 0;
+  }
+
+  .statistics-usage-cell-subset {
+    white-space: normal;
+  }
+
   .statistics-stage-body {
     padding-left: var(--space-4);
   }
@@ -487,6 +525,7 @@
     color: var(--mantine-color-dimmed);
     font-family: var(--mantine-font-family-monospace);
     font-size: var(--mantine-font-size-xs);
+    text-align: left;
   }
 
   .json-table td:first-child {
