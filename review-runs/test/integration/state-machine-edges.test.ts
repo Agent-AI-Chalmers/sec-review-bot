@@ -738,8 +738,18 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
   }
 }
 
+// Recording every path drives timing-sensitive PostgreSQL queues. Share one fixture run across
+// the contract assertions so they inspect the same transitions without driving those mutable
+// queues three times.
+let recordedPaths: Promise<RecordedEdge[]> | undefined
+
+function recordEveryPathOnce(): Promise<RecordedEdge[]> {
+  recordedPaths ??= recordEveryPath()
+  return recordedPaths
+}
+
 test('every transition a run records is declared in the contract', async () => {
-  const recorded = await recordEveryPath()
+  const recorded = await recordEveryPathOnce()
   const declared = new Map(
     STATE_MACHINES.map((machine) => [machine.axis, declaredEdges(machine.axis)])
   )
@@ -756,7 +766,7 @@ test('every declared edge is reachable by a write path', async () => {
   // is a diagram claim nothing backs, and the driver above is the evidence that each one is
   // real. When a transition is renamed in the contract, this fails until a path produces the
   // new name, instead of silently agreeing with a stale list.
-  const recorded = await recordEveryPath()
+  const recorded = await recordEveryPathOnce()
   const observed = new Map<string, Set<string>>()
   for (const { axis, edge } of recorded) {
     const edges = observed.get(axis) ?? new Set<string>()
@@ -798,7 +808,7 @@ test('a reason the audit log writes is the reason the contract declares', async 
   // comparison above looks only at `from->to`, so a write path could attach a different code
   // and nothing would notice. Edges the contract leaves without a reason are exempt: their
   // code is an open set owned by the connector, not a contract value.
-  const recorded = await recordEveryPath()
+  const recorded = await recordEveryPathOnce()
   const declared = declaredReasons()
   for (const { axis, edge, reason } of recorded) {
     const key = `${axis} ${edge}`
