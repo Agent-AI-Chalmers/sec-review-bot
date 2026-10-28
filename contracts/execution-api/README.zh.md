@@ -56,7 +56,7 @@ GitHub integration 是调用方一侧的一种实现：它把 GitHub 事件与�
 
 [v1/openapi.yaml](v1/openapi.yaml) 定义 HTTP 操作与 envelope，同一版本目录中的 JSON Schema 定义 envelope 携带的 workflow 对象。它们作为一个 API 版本共同维护和发布，不由服务代码生成。Execution Gateway 从这些文件挂载路由和校验，contract tools 也从中生成 provider 与 consumer 类型。
 
-生成的 TypeScript 投影会把 HTTP envelope 与 v1 workflow input schema 组合起来，使 provider 在编译期拥有 `workflow` 到 `input` 的对应关系，同时不引入共享运行时 package。
+契约工具使用 Kubb 从 HTTP 契约生成具名 TypeScript 类型，再把 HTTP envelope 与 v1 workflow input schema 组合起来，使 provider 在编译期拥有 `workflow` 到 `input` 的对应关系，同时不引入共享运行时 package。
 
 ## 工具
 

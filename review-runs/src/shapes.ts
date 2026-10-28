@@ -7,21 +7,22 @@
 // not part of that contract: the small vocabulary unions, the store's create args, and the
 // Execution artifact narrowing helper.
 import type { ExecutionArtifactStorage } from './contracts.js'
-import type { components } from './contract-types-generated.js'
 import type {
   ObservedRun,
   ObservedStep,
   PublicationStepRecord,
   PublicationWork,
   ReviewRunAdmission,
+  ReviewRunEvent as ContractReviewRunEvent,
+  RunNoticeWork as ContractRunNoticeWork,
   ReviewRunRecord
 } from './contract-types-generated.js'
 
 /** One coordination state transition, as the read endpoint reports it. */
-export type ReviewRunEvent = components['schemas']['ReviewRunEvent']
+export type ReviewRunEvent = ContractReviewRunEvent
 
 /** A queued failure acknowledgement, as the connector receives it. */
-export type RunNoticeWork = components['schemas']['RunNoticeWork']
+export type RunNoticeWork = ContractRunNoticeWork
 
 export type {
   ObservedRun,

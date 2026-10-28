@@ -8,7 +8,7 @@ import Ajv2020Module, {
 } from 'ajv/dist/2020.js'
 
 import type {
-  components,
+  ExecutionError,
   ExecutionWorkflow,
   WorkflowInputByName,
 } from './execution-api-types-generated.js'
@@ -72,9 +72,7 @@ export function supportedWorkflows(): ExecutionWorkflow[] {
   return Object.keys(schemaByWorkflow) as ExecutionWorkflow[]
 }
 
-export function isExecutionError(
-  value: unknown,
-): value is components['schemas']['ExecutionError'] {
+export function isExecutionError(value: unknown): value is ExecutionError {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
     return false
   const error = value as Record<string, unknown>

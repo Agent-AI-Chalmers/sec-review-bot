@@ -5,17 +5,18 @@ import { IconInfoCircle } from '@tabler/icons-react'
 import { workflowLabel } from '../../shared/format.js'
 import { useLanguage, useMessages } from '../../shared/i18n.js'
 import { EmptyState } from '../../shared/StateMessage.js'
-import type { components, operations } from './api-types.generated.js'
+import type {
+  CatalogOverview as CatalogOverviewContract,
+  GetCatalogOverviewQuery
+} from './api-types.generated.js'
 
-export type CatalogOverview = components['schemas']['CatalogOverview']
+export type CatalogOverview = CatalogOverviewContract
 
 function percent(part: number, total: number): string {
   return total === 0 ? '0%' : `${Math.round((part / total) * 100)}%`
 }
 
-export type OverviewRange = NonNullable<
-  NonNullable<operations['getCatalogOverview']['parameters']['query']>['range']
->
+export type OverviewRange = NonNullable<GetCatalogOverviewQuery['range']>
 
 function Trend({ overview }: { overview: CatalogOverview }): React.JSX.Element {
   const t = useMessages()

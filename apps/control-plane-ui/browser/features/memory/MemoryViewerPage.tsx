@@ -13,7 +13,7 @@ import { useParams } from 'react-router-dom'
 import { useMessages } from '../../shared/i18n.js'
 import { isAbortError, throwIfUnauthorized } from '../../shared/api-client.js'
 import { LoadingState } from '../../shared/StateMessage.js'
-import type { components } from './api-types.generated.js'
+import type { MemoryTreeRevision } from './api-types.generated.js'
 import { MemoryFilesContent } from './MemoryFilesViewer.js'
 import {
   loadRevisionRecord,
@@ -62,8 +62,7 @@ export function RevisionTranscriptPage(): React.JSX.Element {
 export function MemoryRevisionDiffPage(): React.JSX.Element {
   const t = useMessages()
   const revision = numericRevision(useParams().revision)
-  const [record, setRecord] =
-    React.useState<components['schemas']['MemoryTreeRevision']>()
+  const [record, setRecord] = React.useState<MemoryTreeRevision>()
   const [failure, setFailure] = React.useState<unknown>()
   React.useEffect(() => {
     if (revision === undefined) return

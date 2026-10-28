@@ -9,7 +9,11 @@
 //
 // These assertions are type-level only; `client.test.ts` covers the transport behaviour.
 import { operationRoutes } from '../../src/review-runs/review-runs-api.js'
-import type { operations } from '../../src/review-runs/review-runs-api.js'
+import type {
+  GetInternalRunResponse,
+  OperationOptionsById,
+  SubmitPreparedRunOptions
+} from '../../src/review-runs/review-runs-api.js'
 import type { ReviewRunsClient } from '../../src/review-runs/client.js'
 
 type Expect<T extends true> = T
@@ -23,7 +27,7 @@ type Equals<A, B> =
  * object literal in `submitPreparedRun` at compile time. */
 export type SubmissionBodyFieldsMatchContract = Expect<
   Equals<
-    keyof operations['submitPreparedRun']['requestBody']['content']['application/json'],
+    keyof SubmitPreparedRunOptions['body'],
     'preparation_token' | 'publish_context' | 'input'
   >
 >
@@ -41,8 +45,7 @@ export type PublicationStepsAcceptsStepKeys = Expect<
 export type GetRunMayReportAbsence = Expect<
   Equals<
     Awaited<ReturnType<ReviewRunsClient['getRun']>>,
-    | operations['getInternalRun']['responses'][200]['content']['application/json']
-    | null
+    GetInternalRunResponse | null
   >
 >
 
@@ -50,7 +53,7 @@ export type GetRunMayReportAbsence = Expect<
  * `operationId` — the map and `operations` stay in step (both are projections of the same
  * document). A new operation without a route fails here. */
 export type EveryOperationHasARoute = Expect<
-  Equals<keyof typeof operationRoutes, keyof operations>
+  Equals<keyof typeof operationRoutes, keyof OperationOptionsById>
 >
 
 /** The route map carries the path and method as literal strings from the document, which is

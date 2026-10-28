@@ -1,8 +1,6 @@
 // Defines the integration-side admission boundary: every accepted connector
 // request receives a Review Runs run identity and replayable preparation input.
-import type { components } from './review-runs-api.js'
-
-type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
+import type { ReviewRunAdmission } from './review-runs-api.js'
 
 interface ReviewRunAdmissionRequest {
   workflow: ReviewRunAdmission['record']['workflow']

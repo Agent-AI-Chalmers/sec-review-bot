@@ -11,11 +11,11 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import openapiTS, { astToString, type OpenAPI3 } from 'openapi-typescript'
 import prettier from 'prettier'
 import { parse as parseYaml } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
+import { renderKubbTypes } from './render-kubb-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
@@ -52,13 +52,18 @@ const HEADER = headerComment()
 
 type OpenApiPathItem = Record<string, unknown>
 
+export interface OpenApiDocument {
+  paths?: Record<string, OpenApiPathItem>
+  components?: { schemas?: Record<string, unknown> }
+}
+
 /** Every `(operationId, path, method)` the contract declares, in document order. The
  * operationId is what the client is keyed by, and the path/method are the URL it must be
  * called at — the pairing the generated types alone cannot express, because two operations
  * with identical shapes (both taking `{ token }` and returning a boolean, say) are
  * indistinguishable structurally. */
 export function operationRoutes(
-  spec: OpenAPI3
+  spec: OpenApiDocument
 ): Array<{ operationId: string; path: string; method: string }> {
   const methods = [
     'get',
@@ -87,7 +92,7 @@ export function operationRoutes(
 /** The runtime `operationRoutes` map projected into the generated file. It is data, not a
  * type, because the client needs the actual strings at request time; deriving them from the
  * `paths` type is impossible when operations are structurally identical. */
-function renderOperationRoutes(spec: OpenAPI3): string {
+function renderOperationRoutes(spec: OpenApiDocument): string {
   const entries = operationRoutes(spec)
     .map(
       ({ operationId, path, method }) =>
@@ -104,14 +109,44 @@ ${entries}
 `
 }
 
+function operationTypeName(operationId: string): string {
+  return operationId.charAt(0).toUpperCase() + operationId.slice(1)
+}
+
+function renderOperationTypeMaps(spec: OpenApiDocument): string {
+  const routes = operationRoutes(spec)
+  const options = routes
+    .map(({ operationId }) => {
+      const name = operationTypeName(operationId)
+      return `  ${operationId}: ${name}Options`
+    })
+    .join('\n')
+  const responses = routes
+    .map(({ operationId }) => {
+      const name = operationTypeName(operationId)
+      return `  ${operationId}: ${name}Response`
+    })
+    .join('\n')
+  return `export interface OperationOptionsById {
+${options}
+}
+
+export interface OperationResponseById {
+${responses}
+}
+`
+}
+
 /** The committed content of the github-integration review-runs API types. */
 export async function renderReviewRunsApiTypes(): Promise<string> {
-  const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
+  const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenApiDocument
   const rendered =
     HEADER +
-    astToString(await openapiTS(spec)) +
+    (await renderKubbTypes(SPEC_PATH)) +
     '\n' +
-    renderOperationRoutes(spec)
+    renderOperationRoutes(spec) +
+    '\n' +
+    renderOperationTypeMaps(spec)
   const options = await prettier.resolveConfig(OUTPUT_PATH)
   return await prettier.format(rendered, { ...options, filepath: OUTPUT_PATH })
 }
@@ -132,7 +167,7 @@ export const ERROR_CODES_PATH = path.resolve(
  * advertises itself as "Every code the contract's ErrorResponse.code enum allows", and that
  * array is a security control — `server.ts` refuses to emit any code outside it, so a member
  * silently dropped here would be stripped from a response as if it were an internal code. */
-export function errorResponseCodes(spec: OpenAPI3): string[] {
+export function errorResponseCodes(spec: OpenApiDocument): string[] {
   const codeSchema = spec.components?.schemas?.ErrorResponse as
     { properties?: { code?: { enum?: (string | number)[] } } } | undefined
   const values = codeSchema?.properties?.code?.enum ?? []
@@ -146,7 +181,7 @@ export function errorResponseCodes(spec: OpenAPI3): string[] {
 }
 
 /** Pull the `PUBLICATION_STEP_*` members out of the contract's ErrorResponse.code enum. */
-export function publicationStepCodes(spec: OpenAPI3): string[] {
+export function publicationStepCodes(spec: OpenApiDocument): string[] {
   return errorResponseCodes(spec).filter((value) =>
     value.startsWith('PUBLICATION_STEP_')
   )
@@ -154,7 +189,7 @@ export function publicationStepCodes(spec: OpenAPI3): string[] {
 
 /** The committed content of `review-runs/src/error-codes-generated.ts`. */
 export async function renderErrorCodeTypes(): Promise<string> {
-  const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
+  const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenApiDocument
   const codes = publicationStepCodes(spec)
   const union = codes.map((code) => `  | '${code}'`).join('\n')
   const array = codes.map((code) => `  '${code}',`).join('\n')
@@ -187,56 +222,21 @@ export const CONTRACT_TYPES_PATH = path.resolve(
   'contract-types-generated.ts'
 )
 
-const SHAPE_ALIASES: ReadonlyArray<readonly [string, string]> = [
-  ['ReviewRunRecord', 'ReviewRunRecord'],
-  ['ReviewRunAdmission', 'ReviewRunAdmission'],
-  ['PublicationWork', 'PublicationWork'],
-  ['PublicationStepRecord', 'PublicationStepRecord'],
-  ['ObservedStep', 'ObservedPublicationStep'],
-  ['ObservedRun', 'ObservedRun']
-]
-
-type ContractAst = Awaited<ReturnType<typeof openapiTS>>
-
-/** Select a top-level interface node from the AST by name, rather than matching rendered
- * text: a change in how openapi-typescript prints its output must not silently break this
- * projection. */
-function interfaceNode(ast: ContractAst, name: string): ContractAst[number] {
-  const node = ast.find(
-    (candidate) =>
-      (candidate as { name?: { text?: string } }).name?.text === name
-  )
-  if (node === undefined) {
-    throw new Error(`openapi-typescript produced no ${name} interface`)
-  }
-  return node
-}
-
 /** The committed content of `review-runs/src/contract-types-generated.ts`. */
 export async function renderContractTypes(): Promise<string> {
-  const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
-  const ast = await openapiTS(spec)
-  const components = astToString(interfaceNode(ast, 'components'))
-  // The operations interface carries each operation's request body and path parameters, so
-  // the server's route handlers can read a request through its own operation's types
-  // (`route-types.ts`) instead of a hand-written cast that no schema checks.
-  const operations = astToString(interfaceNode(ast, 'operations'))
-  const lines = SHAPE_ALIASES.map(
-    ([alias, schema]) =>
-      `export type ${alias} = components['schemas']['${schema}']`
-  )
+  const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenApiDocument
   const body =
     headerComment() +
     `//
 // The hand-written openapi.yaml owns the domain shapes and the request shapes; these
-// interfaces are its server-side projection, so the server's types follow the contract
+// types are its server-side projection, so the server's types follow the contract
 // instead of a parallel schema.
 
-${components}
+${await renderKubbTypes(SPEC_PATH)}
 
-${operations}
+${renderOperationTypeMaps(spec)}
 
-${lines.join('\n')}
+export type ObservedStep = ObservedPublicationStep
 `
   const options = await prettier.resolveConfig(CONTRACT_TYPES_PATH)
   return await prettier.format(body, {
@@ -264,7 +264,7 @@ export const LIST_RUN_QUERY_PARAMS_PATH = path.resolve(
  * reads that object's property names. An operation with no such object is an error rather
  * than an empty list: an empty allow-list would make the console send no filters at all,
  * which is a silent loss of function, not a change to an empty set. */
-export function listRunQueryParameters(spec: OpenAPI3): string[] {
+export function listRunQueryParameters(spec: OpenApiDocument): string[] {
   const list = (
     spec.paths?.['/v1/runs'] as { get?: { parameters?: unknown[] } } | undefined
   )?.get
@@ -315,7 +315,7 @@ export function listRunQueryParameters(spec: OpenAPI3): string[] {
 
 /** The committed content of `apps/control-plane-ui/shared/list-run-query-params.ts`. */
 export async function renderListRunQueryParams(): Promise<string> {
-  const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
+  const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenApiDocument
   const names = listRunQueryParameters(spec)
   const entries = names.map((name) => `  '${name}',`).join('\n')
   const body =
@@ -352,23 +352,8 @@ export const UI_TYPES_PATH = path.resolve(
   'api-types.generated.ts'
 )
 
-const UI_SHAPE_ALIASES: ReadonlyArray<readonly [string, string]> = [
-  ['ArtifactStorage', 'ArtifactStorage'],
-  ['Run', 'ObservedRun'],
-  ['RunEvent', 'ReviewRunEvent'],
-  ['PublicationStep', 'ObservedPublicationStep'],
-  ['ParkedRun', 'ParkedRun']
-]
-
 /** The committed content of `apps/control-plane-ui/browser/features/runs/api-types.generated.ts`. */
 export async function renderUiContractTypes(): Promise<string> {
-  const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenAPI3
-  const ast = await openapiTS(spec)
-  const components = astToString(interfaceNode(ast, 'components'))
-  const lines = UI_SHAPE_ALIASES.map(
-    ([alias, schema]) =>
-      `export type ${alias} = components['schemas']['${schema}']`
-  )
   const body =
     headerComment() +
     `//
@@ -377,9 +362,11 @@ export async function renderUiContractTypes(): Promise<string> {
 // and a flattened copy of a discriminated union (ArtifactStorage) cannot express which fields a
 // given status requires.
 
-${components}
+${await renderKubbTypes(SPEC_PATH)}
 
-${lines.join('\n')}
+export type Run = ObservedRun
+export type RunEvent = ReviewRunEvent
+export type PublicationStep = ObservedPublicationStep
 `
   const options = await prettier.resolveConfig(UI_TYPES_PATH)
   return await prettier.format(body, { ...options, filepath: UI_TYPES_PATH })

@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-This package renders and checks every artifact derived from [this family's OpenAPI contract](../v1/openapi.yaml): the TypeScript projections and committed v1 JSON Schemas. It lives beside the contract it reads, so the tool that owns a projection is not the package the projection lands in.
+This package renders and checks every artifact derived from [this family's OpenAPI contract](../v1/openapi.yaml): Kubb-generated TypeScript projections, operation route maps, and committed v1 JSON Schemas. It lives beside the contract it reads, so the tool that owns a projection is not the package the projection lands in.
 
 ## Commands
 
@@ -29,6 +29,7 @@ tools/
     generated-artifact.ts    the { output, render } shape
     repo-root.ts             the repository root, for absolute output paths
     generate-types.ts        the API projections (types, error codes, console params)
+    render-kubb-types.ts     the shared in-memory Kubb TypeScript projection
     generate-schemas.ts      the committed v1 JSON Schemas
   spectral-functions/
     operationRequiresSecurity.js     the every-operation-declares-security rule (../.spectral.yaml)

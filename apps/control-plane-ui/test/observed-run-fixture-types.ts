@@ -58,3 +58,8 @@ export type ArtifactKeysMatchTheContract = Expect<
     AvailableArtifactStorage['artifact']
   >
 >
+
+/** Kubb must preserve the union: an available artifact cannot omit its reference. */
+export type AvailableStorageRequiresArtifact = Expect<
+  { status: 'available' } extends NonNullable<ArtifactStorage> ? false : true
+>

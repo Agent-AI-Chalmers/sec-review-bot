@@ -3,7 +3,7 @@
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 
-import type { components } from '../contract-types-generated.js'
+import type { PreparationWork as ContractPreparationWork } from '../contract-types-generated.js'
 import type { ReviewRunWorkflow as WorkflowName } from '../contracts.js'
 import { transaction } from '../database/transaction.js'
 import { SUBMISSION_STATE_UNCERTAIN } from '../errors.js'
@@ -23,7 +23,7 @@ type JsonObject = Record<string, unknown>
 // the connector, and a published field the connector never reads is a contract obligation nobody
 // honours. The claim's origin state is exactly that - it is read below to name the audit event and
 // must stay out of the returned message.
-export type PreparationWork = components['schemas']['PreparationWork']
+export type PreparationWork = ContractPreparationWork
 
 // The notice is a cross-service message, so its field set belongs to the contract and is
 // re-exported rather than restated; a local copy would drift from the schema the connector reads.

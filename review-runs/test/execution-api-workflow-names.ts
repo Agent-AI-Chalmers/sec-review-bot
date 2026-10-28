@@ -4,9 +4,9 @@
 // the names. What it guards is the other direction: the route must keep publishing an enum.
 // If it stopped, the alias would widen to `string` and nothing else would fail — the service
 // would accept any workflow name at compile time while the Execution API still rejected the rest.
-import type { operations } from '../src/execution-api-schema.js'
+import type { CreateRunOptions } from '../src/execution-api-schema.js'
 
-type SpecWorkflow = operations['createRun']['parameters']['path']['workflow']
+type SpecWorkflow = CreateRunOptions['path']['workflow']
 
 /** True only while the contract names the workflows instead of accepting any string. */
 type NarrowerThanString<T> = [string] extends [T] ? false : true

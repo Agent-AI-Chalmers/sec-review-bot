@@ -1,23 +1,33 @@
 // Provides the typed HTTP boundary to Review Runs and keeps wire-level
 // contract details out of GitHub workflows and coordinators.
 import { operationRoutes } from './review-runs-api.js'
-import type { components, operations } from './review-runs-api.js'
+import type {
+  OperationOptionsById,
+  OperationResponseById,
+  PreparationWork,
+  PublicationStepRecord,
+  PublicationWork,
+  ReviewRunAdmission,
+  ReviewRunRecord,
+  RunNoticeWork
+} from './review-runs-api.js'
 import {
   parsePublishContextForWorkflow,
   type PublishContext
 } from './publish-context.js'
 import { integerEnv } from '../utils/env.js'
 
-export type ReviewRunRecord = components['schemas']['ReviewRunRecord']
-export type ReviewRunAdmission = components['schemas']['ReviewRunAdmission']
-export type PublicationWork = components['schemas']['PublicationWork']
-export type RunNoticeWork = components['schemas']['RunNoticeWork']
-export type PublicationStepRecord =
-  components['schemas']['PublicationStepRecord']
+export type {
+  PublicationStepRecord,
+  PublicationWork,
+  ReviewRunAdmission,
+  ReviewRunRecord,
+  RunNoticeWork
+}
 
 type JsonObject = Record<string, unknown>
 
-type OperationId = keyof operations
+type OperationId = keyof OperationOptionsById & keyof typeof operationRoutes
 
 /** The path template the contract serves an operation at, e.g. `/v1/runs/{runId}/submission`.
  * Taken from the generated `operationRoutes` map (a projection of `openapi.yaml`), not from
@@ -88,25 +98,17 @@ interface HttpErrorBody {
   code?: string
 }
 
-type Operation<Id extends OperationId> = operations[Id]
+type Operation<Id extends OperationId> = OperationOptionsById[Id]
 
 /** The JSON request body the contract declares for an operation. A `POST` must pass exactly
  * this, so a field renamed in `openapi.yaml` fails the client's typecheck instead of being
  * accepted here and silently stripped or ignored by the service. */
 type RequestBody<Id extends OperationId> =
-  Operation<Id> extends {
-    requestBody: { content: { 'application/json': infer Body } }
-  }
-    ? Body
-    : never
+  Operation<Id> extends { body: infer Body } ? Body : never
 
 /** The success body the contract declares for an operation, keyed by status code. */
 type SuccessBody<Id extends OperationId> =
-  Operation<Id> extends {
-    responses: { 200: { content: { 'application/json': infer Body } } }
-  }
-    ? Body
-    : void
+  unknown extends OperationResponseById[Id] ? void : OperationResponseById[Id]
 
 class HttpReviewRunsClient {
   readonly connectorId =
@@ -249,9 +251,7 @@ class HttpReviewRunsClient {
     return await this.request('renewPreparationClaim', { runId }, { token })
   }
 
-  async claimNextPreparation(): Promise<
-    components['schemas']['PreparationWork'] | null
-  > {
+  async claimNextPreparation(): Promise<PreparationWork | null> {
     return await this.request('claimNextPreparation', {}, undefined)
   }
 
