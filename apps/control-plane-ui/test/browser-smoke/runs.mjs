@@ -1052,6 +1052,58 @@ export async function smokeRuns({
       'an admin-token 401 must stay in the maintenance dialog'
     )
     await page.unroute('**/api/admin/runs/*/resume')
+
+    // More than one page of transitions: page 1 must hold exactly the page size, and the
+    // pagination must be centered. The fixture is too short to exercise this, so synthesize
+    // additional events through the same API contract the page already consumes.
+    await page.route('**/api/runs/*/events', async (route) => {
+      const response = await route.fetch()
+      const body = await response.json()
+      const sample = body.events.find((event) => event.from_status !== null)
+      assert.ok(sample, `${name} fixtures need a transition to synthesize`)
+      const extra = Array.from({ length: 13 }, (_, index) => ({
+        ...sample,
+        event_id: `synthetic-transition-${index}`,
+        occurred_at: new Date(
+          Date.parse(sample.occurred_at) + (index + 1) * 1000
+        ).toISOString()
+      }))
+      await route.fulfill({
+        response,
+        json: { events: [...body.events, ...extra] }
+      })
+    })
+    await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
+    await page.locator('tbody tr td a').first().click()
+    await page.waitForSelector('.run-progress-timeline')
+    const pagedTransitions = page.locator('.run-transitions')
+    await pagedTransitions.locator('.transitions-entry').click()
+    await pagedTransitions.locator('.transitions-body').waitFor()
+    assert.strictEqual(
+      await pagedTransitions.locator('.run-transition').count(),
+      12,
+      `${name} transitions must cap a page at 12 rows`
+    )
+    const pager = pagedTransitions.locator('.mantine-Pagination-root')
+    assert.strictEqual(
+      await pager.count(),
+      1,
+      `${name} multiple transition pages must render pagination`
+    )
+    assert.strictEqual(
+      await pager.evaluate(
+        (element) => getComputedStyle(element).justifyContent
+      ),
+      'center',
+      `${name} transition pagination must be centered`
+    )
+    await pager.getByRole('button', { name: '2', exact: true }).click()
+    await waitUntil(
+      async () =>
+        (await pagedTransitions.locator('.run-transition').count()) < 12,
+      `${name} the second transition page must load fewer than a full page`
+    )
+    await page.unroute('**/api/runs/*/events')
   }
 
   // An expired session is not a refresh blip: it must reach the sign-in form even when
