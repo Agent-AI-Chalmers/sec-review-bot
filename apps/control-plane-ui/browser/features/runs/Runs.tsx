@@ -59,9 +59,9 @@ const RANGE_MINUTES: Record<string, number> = {
   '7d': 10_080
 }
 const PAGE_SIZES: readonly number[] = [10, 20, 50, 100]
-/** Mirrors Review Runs' own default, so an unadorned `/runs` asks for what
- * the server would have returned anyway. */
-const DEFAULT_PAGE_SIZE = 50
+/** The console defaults to a scan-friendly page instead of Review Runs' larger API default.
+ * Operators can still select 50 or 100 when bulk comparison matters more than page length. */
+const DEFAULT_PAGE_SIZE = 20
 /** sessionStorage key for the visited-page trail, so it survives navigation to a
  * run detail and back (see the cursorParents state below). */
 const CURSOR_PARENTS_KEY = 'runs:cursor-parents'
@@ -425,7 +425,7 @@ export function Runs(): React.JSX.Element {
               <Table.Tbody>
                 {data.runs.map((run) => (
                   <Table.Tr key={run.run_id}>
-                    <Table.Td>
+                    <Table.Td data-label={t('run')}>
                       <Group gap={4} align="center" wrap="nowrap">
                         <Tooltip label={run.run_id}>
                           <Link
@@ -451,8 +451,10 @@ export function Runs(): React.JSX.Element {
                         </span>
                       </Group>
                     </Table.Td>
-                    <Table.Td>{workflowLabel(run.workflow, t)}</Table.Td>
-                    <Table.Td>
+                    <Table.Td data-label={t('workflow')}>
+                      {workflowLabel(run.workflow, t)}
+                    </Table.Td>
+                    <Table.Td data-label={t('platform')}>
                       <PlatformMark
                         platform={run.source_platform}
                         githubLabel={t('platformGithub')}
@@ -461,16 +463,16 @@ export function Runs(): React.JSX.Element {
                         compactOnNarrow
                       />
                     </Table.Td>
-                    <Table.Td>
+                    <Table.Td data-label={t('preparation')}>
                       <PreparationStatus preparation={run.preparation} />
                     </Table.Td>
-                    <Table.Td>
+                    <Table.Td data-label={t('execution')}>
                       <ExecutionStatus status={run.execution.status} />
                     </Table.Td>
-                    <Table.Td>
+                    <Table.Td data-label={t('publication')}>
                       <PublicationStatus status={run.publication.status} />
                     </Table.Td>
-                    <Table.Td>
+                    <Table.Td data-label={t('lastActivity')}>
                       <Tooltip label={formatDate(lastActivity(run), language)}>
                         <span>
                           {formatDuration(
@@ -481,7 +483,7 @@ export function Runs(): React.JSX.Element {
                         </span>
                       </Tooltip>
                     </Table.Td>
-                    <Table.Td>
+                    <Table.Td data-label={t('failureCode')}>
                       {run.failure_code && (
                         <Text c="red" size="xs" ff="monospace">
                           {run.failure_code}

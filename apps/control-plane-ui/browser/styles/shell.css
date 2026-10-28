@@ -11,21 +11,14 @@
   backdrop-filter: saturate(180%) blur(8px);
 }
 
-/* A thin brand-coloured rule under the header: the only decorative chrome, and it
-   gives the otherwise grey console a single deliberate accent. */
+/* One restrained brand rule is enough to identify the shell. */
 .mantine-AppShell-header::after {
   content: '';
   position: absolute;
   inset: auto 0 -1px 0;
   height: 2px;
-  background: linear-gradient(
-    90deg,
-    var(--brand) 0%,
-    var(--brand-2) 45%,
-    var(--brand-3) 70%,
-    transparent 100%
-  );
-  opacity: 0.85;
+  background: var(--brand);
+  opacity: 0.75;
 }
 
 .brand {
@@ -45,26 +38,18 @@
   width: 22px;
   height: 22px;
   border-radius: var(--radius-panel);
-  background: linear-gradient(
-    135deg,
-    var(--brand),
-    var(--brand-2) 55%,
-    var(--brand-3)
-  );
-  box-shadow: 0 2px 6px color-mix(in srgb, var(--brand) 35%, transparent);
+  background: var(--brand);
 }
 
 .mantine-AppShell-main {
-  background:
-    radial-gradient(
-      1100px 380px at 12% -8%,
-      var(--brand-soft),
-      transparent 62%
-    ),
-    radial-gradient(
-      900px 320px at 88% -12%,
-      color-mix(in srgb, var(--brand-3) 7%, transparent),
-      transparent 60%
-    );
   min-height: calc(100vh - 58px);
+}
+
+.primary-nav-link[data-active='true'] {
+  color: var(--mantine-color-text);
+  background: var(--brand-soft);
+}
+
+.primary-nav-link[data-active='true'] .mantine-Button-section {
+  color: var(--brand);
 }

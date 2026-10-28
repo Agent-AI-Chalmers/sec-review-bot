@@ -280,7 +280,7 @@ export function MemoryOverview({
         {overview.workflows.length === 0 ? (
           <EmptyState message={t('noWorkflowData')} />
         ) : (
-          <Table>
+          <Table className="memory-overview-workflows-table">
             <Table.Thead>
               <Table.Tr>
                 <Table.Th>{t('workflow')}</Table.Th>
@@ -292,12 +292,19 @@ export function MemoryOverview({
             <Table.Tbody>
               {overview.workflows.map((item) => (
                 <Table.Tr key={item.source_workflow}>
-                  <Table.Td>{workflowLabel(item.source_workflow, t)}</Table.Td>
-                  <Table.Td ta="right">{item.extracted_unit_count}</Table.Td>
-                  <Table.Td ta="right">
+                  <Table.Td data-label={t('workflow')}>
+                    {workflowLabel(item.source_workflow, t)}
+                  </Table.Td>
+                  <Table.Td data-label={t('extractedUnits')} ta="right">
+                    {item.extracted_unit_count}
+                  </Table.Td>
+                  <Table.Td data-label={t('unitsWithObservation')} ta="right">
                     {item.units_with_observation_count}
                   </Table.Td>
-                  <Table.Td ta="right">
+                  <Table.Td
+                    data-label={t('unitsWithoutObservation')}
+                    ta="right"
+                  >
                     {item.units_without_observation_count}
                   </Table.Td>
                 </Table.Tr>
@@ -306,13 +313,13 @@ export function MemoryOverview({
             <Table.Tfoot>
               <Table.Tr>
                 <Table.Th>{t('lifecycleTotal')}</Table.Th>
-                <Table.Th ta="right">
+                <Table.Th data-label={t('extractedUnits')} ta="right">
                   {totals.extracted_unit_count.toLocaleString()}
                 </Table.Th>
-                <Table.Th ta="right">
+                <Table.Th data-label={t('unitsWithObservation')} ta="right">
                   {totals.units_with_observation_count.toLocaleString()}
                 </Table.Th>
-                <Table.Th ta="right">
+                <Table.Th data-label={t('unitsWithoutObservation')} ta="right">
                   {totals.units_without_observation_count.toLocaleString()}
                 </Table.Th>
               </Table.Tr>

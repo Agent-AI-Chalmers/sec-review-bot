@@ -1,11 +1,5 @@
 import React from 'react'
-import {
-  ActionIcon,
-  Group,
-  MantineProvider,
-  Menu,
-  Tooltip
-} from '@mantine/core'
+import { ActionIcon, Group, MantineProvider, Tooltip } from '@mantine/core'
 import {
   IconLanguage,
   IconLogout,
@@ -156,34 +150,16 @@ export function PreferenceControls({
   }
   return (
     <Group gap={4} wrap="nowrap" aria-label="Preferences">
-      <Menu position="bottom-end" withinPortal>
-        <Menu.Target>
-          <Tooltip label={t('language')}>
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              aria-label={t('language')}
-            >
-              <IconLanguage size={ICON_SIZE.lg} stroke={1.8} />
-            </ActionIcon>
-          </Tooltip>
-        </Menu.Target>
-        <Menu.Dropdown>
-          <Menu.Label>{t('language')}</Menu.Label>
-          <Menu.Item
-            onClick={() => setLanguage('en')}
-            fw={language === 'en' ? 600 : undefined}
-          >
-            English
-          </Menu.Item>
-          <Menu.Item
-            onClick={() => setLanguage('zh')}
-            fw={language === 'zh' ? 600 : undefined}
-          >
-            中文
-          </Menu.Item>
-        </Menu.Dropdown>
-      </Menu>
+      <Tooltip label={language === 'en' ? '切换到中文' : 'Switch to English'}>
+        <ActionIcon
+          variant="subtle"
+          color="gray"
+          aria-label={t('language')}
+          onClick={() => setLanguage(language === 'en' ? 'zh' : 'en')}
+        >
+          <IconLanguage size={ICON_SIZE.lg} stroke={1.8} />
+        </ActionIcon>
+      </Tooltip>
       <Tooltip label={theme === 'light' ? t('dark') : t('light')}>
         <ActionIcon
           variant="subtle"

@@ -10,9 +10,29 @@ export function createFixtureRouter(): (
   next: () => void
 ) => Promise<void> {
   let signedIn = true
-  const handleMemory = createMemoryHandler(
-    runs.slice(0, 3).map((run) => run.run_id)
-  )
+  const sourceRunIds = Object.fromEntries(
+    ['repository-review', 'pull-request-review', 'issue-review'].map(
+      (workflow) => {
+        const run = runs.find(
+          (candidate) =>
+            candidate.workflow === workflow &&
+            candidate.source_platform === 'github' &&
+            candidate.execution.status === 'succeeded' &&
+            candidate.publication.status === 'published' &&
+            candidate.artifact_storage?.status === 'available'
+        )
+        if (run === undefined)
+          throw new Error(
+            `dev fixtures need one completed GitHub ${workflow} run for memory provenance`
+          )
+        return [workflow, run.run_id]
+      }
+    )
+  ) as Record<
+    'repository-review' | 'pull-request-review' | 'issue-review',
+    string
+  >
+  const handleMemory = createMemoryHandler(sourceRunIds)
   const handleRuns = createRunsHandler()
 
   return async (request, response, next): Promise<void> => {

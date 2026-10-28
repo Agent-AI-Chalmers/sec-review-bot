@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, Route, Routes } from 'react-router-dom'
+import { Link, Route, Routes, useLocation } from 'react-router-dom'
 import {
   AppShell,
   Button,
@@ -147,7 +147,13 @@ function ErrorFallback({ error }: { error: unknown }): React.JSX.Element {
 
 export function App(): React.JSX.Element {
   const t = useMessages()
+  const location = useLocation()
   const [unauthorized, setUnauthorized] = React.useState(false)
+  const activeSection = location.pathname.startsWith('/memory')
+    ? 'memory'
+    : location.pathname.startsWith('/viewer')
+      ? 'viewer'
+      : 'runs'
   return (
     <>
       <AppShell header={{ height: 58 }}>
@@ -164,6 +170,8 @@ export function App(): React.JSX.Element {
                   variant="subtle"
                   size="compact-sm"
                   className="primary-nav-link"
+                  data-active={activeSection === 'runs' ? 'true' : undefined}
+                  aria-current={activeSection === 'runs' ? 'page' : undefined}
                   aria-label={t('runs')}
                   leftSection={<IconListDetails size={ICON_SIZE.md} />}
                 >
@@ -175,6 +183,8 @@ export function App(): React.JSX.Element {
                   variant="subtle"
                   size="compact-sm"
                   className="primary-nav-link"
+                  data-active={activeSection === 'memory' ? 'true' : undefined}
+                  aria-current={activeSection === 'memory' ? 'page' : undefined}
                   aria-label={t('memory')}
                   leftSection={<IconBrain size={ICON_SIZE.md} />}
                 >
@@ -186,6 +196,8 @@ export function App(): React.JSX.Element {
                   variant="subtle"
                   size="compact-sm"
                   className="primary-nav-link"
+                  data-active={activeSection === 'viewer' ? 'true' : undefined}
+                  aria-current={activeSection === 'viewer' ? 'page' : undefined}
                   aria-label={t('viewerNav')}
                   leftSection={<IconFileText size={ICON_SIZE.md} />}
                 >

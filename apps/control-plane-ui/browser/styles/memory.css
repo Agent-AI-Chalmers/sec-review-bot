@@ -521,6 +521,10 @@
   font-variant-numeric: tabular-nums;
 }
 
+.memory-overview-workflows-table {
+  width: 100%;
+}
+
 .memory-overview-workflows tfoot th {
   border-top: 1px solid var(--border);
   color: var(--mantine-color-text);

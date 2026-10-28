@@ -213,6 +213,30 @@ export function normalizeTranscript(
       .toLowerCase()
     return view
   })
+
+  // A direct LangGraph message-array export may omit `tool_call_id` from tool results
+  // while retaining the canonical ordering: one assistant message with N calls followed
+  // immediately by N results. Recover only that exact, unambiguous shape; partial or
+  // interleaved result runs remain deliberately unlinked.
+  for (let index = 0; index < messages.length; index += 1) {
+    const calls = messages[index]?.toolCalls ?? []
+    if (calls.length === 0) continue
+    const results = messages.slice(index + 1, index + 1 + calls.length)
+    if (
+      results.length !== calls.length ||
+      results.some(
+        (message) => message.role !== 'tool' || message.toolCallId !== undefined
+      )
+    )
+      continue
+    const following = messages[index + 1 + calls.length]
+    if (following?.role === 'tool' && following.toolCallId === undefined)
+      continue
+    results.forEach((message, resultIndex) => {
+      message.toolCallId = calls[resultIndex]?.id
+    })
+  }
+
   const results = new Map(
     messages.flatMap((message) =>
       message.toolCallId ? [[message.toolCallId, message] as const] : []

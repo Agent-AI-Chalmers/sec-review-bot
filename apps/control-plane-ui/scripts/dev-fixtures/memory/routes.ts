@@ -2,11 +2,26 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 
 import memoryTranscript from '../data/memory-transcript.json' with { type: 'json' }
 import { BASE_TIME } from '../runs/generate.js'
+import type { components } from '../../../browser/features/memory/api-types.generated.js'
 
 const LOAD_ERROR_REVISION = 404
+type ExtractionRecord = components['schemas']['ExtractionRecord']
+type ObservationRecord = components['schemas']['ObservationRecord']
+type CatalogOverviewWorkflow = components['schemas']['CatalogOverviewWorkflow']
+type SourceRunIds = Record<
+  'repository-review' | 'pull-request-review' | 'issue-review',
+  string
+>
+
+const transcriptReference = {
+  uri: 's3://sec-review/memory/transcripts/fixture/transcript.v1.jsonl.zst',
+  digest: `sha256:${'1'.repeat(64)}`,
+  media_type: 'application/x-ndjson+zstd',
+  size_bytes: 4096
+}
 
 export function createMemoryHandler(
-  sourceRunIds: readonly string[]
+  sourceRunIds: SourceRunIds
 ): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
   let memoryControl = {
     state: 'enabled' as 'enabled' | 'paused',
@@ -57,7 +72,11 @@ export function createMemoryHandler(
       revision: 3,
       predecessor_revision: 1,
       created_at: new Date(BASE_TIME + 120_000).toISOString(),
-      source: { kind: 'operator' }
+      source: {
+        kind: 'operator',
+        operation_id: 'fixture-operator-branch',
+        actor: { kind: 'user', id: 'fixture-operator' }
+      }
     },
     {
       revision: 2,
@@ -67,7 +86,7 @@ export function createMemoryHandler(
         kind: 'maintenance',
         maintenance_id: 'fixture-maintenance-2',
         extraction_ids: ['fixture-extraction-2'],
-        transcript_reference: {}
+        transcript_reference: transcriptReference
       }
     },
     {
@@ -75,13 +94,126 @@ export function createMemoryHandler(
       predecessor_revision: null,
       created_at: new Date(BASE_TIME).toISOString(),
       source: {
-        kind: 'maintenance',
-        maintenance_id: 'fixture-maintenance-1',
-        extraction_ids: ['fixture-extraction-1'],
-        transcript_reference: {}
+        kind: 'operator',
+        operation_id: 'fixture-bootstrap-memory',
+        actor: { kind: 'service', id: 'fixture-bootstrap' }
       }
     }
   ]
+  const extractionRecords: ExtractionRecord[] = [
+    {
+      extraction_id: 'fixture-extraction-1',
+      source_workflow: 'repository-review',
+      source_run_id: sourceRunIds['repository-review'],
+      source_unit_id: 'case-reachability',
+      diagnostic_bundle_digest: `sha256:${'2'.repeat(64)}`,
+      transcript_reference: transcriptReference,
+      observation: null,
+      created_at: new Date(BASE_TIME - 300_000).toISOString()
+    },
+    {
+      extraction_id: 'fixture-extraction-2',
+      source_workflow: 'repository-review',
+      source_run_id: sourceRunIds['repository-review'],
+      source_unit_id: 'case-authentication',
+      diagnostic_bundle_digest: `sha256:${'3'.repeat(64)}`,
+      transcript_reference: transcriptReference,
+      observation: {
+        body_markdown:
+          '**Reject unequal input lengths before calling `timingSafeEqual`.** Comparing buffers of different lengths throws instead of returning false, so validate the length first and fail authentication without exposing a distinct error path.'
+      },
+      created_at: new Date(BASE_TIME).toISOString()
+    },
+    {
+      extraction_id: 'fixture-extraction-3',
+      source_workflow: 'repository-review',
+      source_run_id: sourceRunIds['repository-review'],
+      source_unit_id: 'case-proxy-boundary',
+      diagnostic_bundle_digest: `sha256:${'4'.repeat(64)}`,
+      transcript_reference: transcriptReference,
+      observation: {
+        body_markdown:
+          '**Strip internal debugging headers when proxying upstream responses.** Forward only an explicit response-header allowlist so private identifiers and credentials cannot cross the service boundary.'
+      },
+      created_at: new Date(BASE_TIME + 120_000).toISOString()
+    },
+    {
+      extraction_id: 'fixture-extraction-4',
+      source_workflow: 'pull-request-review',
+      source_run_id: sourceRunIds['pull-request-review'],
+      source_unit_id: 'pull-request',
+      diagnostic_bundle_digest: `sha256:${'5'.repeat(64)}`,
+      transcript_reference: transcriptReference,
+      observation: {
+        body_markdown:
+          '**Perform tenant authorization before any lookup whose result reveals resource existence.** A post-lookup guard still permits status, timing, or error differences to disclose whether another tenant owns the requested object.'
+      },
+      created_at: new Date(BASE_TIME + 180_000).toISOString()
+    },
+    {
+      extraction_id: 'fixture-extraction-5',
+      source_workflow: 'issue-review',
+      source_run_id: sourceRunIds['issue-review'],
+      source_unit_id: 'issue',
+      diagnostic_bundle_digest: `sha256:${'6'.repeat(64)}`,
+      transcript_reference: transcriptReference,
+      observation: null,
+      created_at: new Date(BASE_TIME + 240_000).toISOString()
+    },
+    {
+      extraction_id: 'fixture-extraction-6',
+      source_workflow: 'repository-review',
+      source_run_id: sourceRunIds['repository-review'],
+      source_unit_id: 'case-reachability',
+      diagnostic_bundle_digest: `sha256:${'7'.repeat(64)}`,
+      transcript_reference: transcriptReference,
+      observation: null,
+      created_at: new Date(BASE_TIME + 300_000).toISOString()
+    }
+  ]
+  const consumedRevisionByExtraction = new Map([['fixture-extraction-2', 2]])
+  const observations: ObservationRecord[] = extractionRecords.flatMap(
+    (record) =>
+      record.observation === null
+        ? []
+        : [
+            {
+              extraction_id: record.extraction_id,
+              source_run_id: record.source_run_id,
+              source_unit_id: record.source_unit_id,
+              body_markdown: record.observation.body_markdown,
+              consumed_revision:
+                consumedRevisionByExtraction.get(record.extraction_id) ?? null,
+              created_at: record.created_at
+            }
+          ]
+  )
+  const unitOutcomes = new Map<
+    string,
+    { source_workflow: string; hasObservation: boolean }
+  >()
+  for (const record of extractionRecords) {
+    const key = `${record.source_run_id}\u0000${record.source_unit_id}`
+    const current = unitOutcomes.get(key)
+    unitOutcomes.set(key, {
+      source_workflow: record.source_workflow,
+      hasObservation:
+        (current?.hasObservation ?? false) || record.observation !== null
+    })
+  }
+  const workflowOutcomes = new Map<string, CatalogOverviewWorkflow>()
+  for (const outcome of unitOutcomes.values()) {
+    const current = workflowOutcomes.get(outcome.source_workflow) ?? {
+      source_workflow: outcome.source_workflow,
+      extracted_unit_count: 0,
+      units_with_observation_count: 0,
+      units_without_observation_count: 0
+    }
+    current.extracted_unit_count += 1
+    if (outcome.hasObservation) current.units_with_observation_count += 1
+    else current.units_without_observation_count += 1
+    workflowOutcomes.set(outcome.source_workflow, current)
+  }
   return async (request, response): Promise<void> => {
     const requestUrl = request.url
     if (requestUrl === undefined) return
@@ -113,13 +245,21 @@ export function createMemoryHandler(
       response.end(
         JSON.stringify({
           totals: {
-            completed_extraction_count: 6,
-            extracted_unit_count: 5,
-            units_with_observation_count: 3,
-            units_without_observation_count: 2,
-            observation_count: 3,
-            pending_observation_count: 2,
-            consumed_observation_count: 1
+            completed_extraction_count: extractionRecords.length,
+            extracted_unit_count: unitOutcomes.size,
+            units_with_observation_count: [...unitOutcomes.values()].filter(
+              (outcome) => outcome.hasObservation
+            ).length,
+            units_without_observation_count: [...unitOutcomes.values()].filter(
+              (outcome) => !outcome.hasObservation
+            ).length,
+            observation_count: observations.length,
+            pending_observation_count: observations.filter(
+              (observation) => observation.consumed_revision === null
+            ).length,
+            consumed_observation_count: observations.filter(
+              (observation) => observation.consumed_revision !== null
+            ).length
           },
           trend_granularity: range === 'all' ? 'month' : 'day',
           trend_points: Array.from({ length: pointCount }, (_, index) => {
@@ -137,26 +277,7 @@ export function createMemoryHandler(
               units_with_observation_count: outcome[1]
             }
           }),
-          workflows: [
-            {
-              source_workflow: 'repository-review',
-              extracted_unit_count: 2,
-              units_with_observation_count: 1,
-              units_without_observation_count: 1
-            },
-            {
-              source_workflow: 'pull-request-review',
-              extracted_unit_count: 2,
-              units_with_observation_count: 1,
-              units_without_observation_count: 1
-            },
-            {
-              source_workflow: 'issue-review',
-              extracted_unit_count: 1,
-              units_with_observation_count: 1,
-              units_without_observation_count: 0
-            }
-          ]
+          workflows: [...workflowOutcomes.values()]
         })
       )
       return
@@ -179,35 +300,7 @@ export function createMemoryHandler(
     ) {
       response.end(
         JSON.stringify({
-          observations: [
-            {
-              extraction_id: 'fixture-extraction-2',
-              source_run_id: sourceRunIds[0]!,
-              source_unit_id: 'repository',
-              body_markdown:
-                '**Reject unequal input lengths before calling `timingSafeEqual`.** Comparing buffers of different lengths throws instead of returning false, so validate the length first and fail authentication without exposing a distinct error path.',
-              consumed_revision: 2,
-              created_at: new Date(BASE_TIME).toISOString()
-            },
-            {
-              extraction_id: 'fixture-extraction-3',
-              source_run_id: sourceRunIds[1]!,
-              source_unit_id: 'pull-request',
-              body_markdown:
-                '**Perform tenant authorization before any lookup whose result reveals resource existence.** A post-lookup guard still permits status, timing, or error differences to disclose whether another tenant owns the requested object.',
-              consumed_revision: null,
-              created_at: new Date(BASE_TIME + 120_000).toISOString()
-            },
-            {
-              extraction_id: 'fixture-extraction-4',
-              source_run_id: sourceRunIds[2]!,
-              source_unit_id: 'issue',
-              body_markdown:
-                '**Strip internal debugging headers when proxying upstream responses.** Forward only an explicit response-header allowlist so private identifiers and credentials cannot cross the service boundary.',
-              consumed_revision: null,
-              created_at: new Date(BASE_TIME + 180_000).toISOString()
-            }
-          ],
+          observations: [...observations].reverse(),
           next_cursor: null
         })
       )
@@ -219,22 +312,7 @@ export function createMemoryHandler(
     ) {
       response.end(
         JSON.stringify({
-          extractions: [
-            {
-              extraction_id: 'fixture-extraction-2',
-              source_workflow: 'repository-review',
-              source_run_id: sourceRunIds[0]!,
-              created_at: new Date(BASE_TIME).toISOString(),
-              observation: {}
-            },
-            {
-              extraction_id: 'fixture-extraction-3',
-              source_workflow: 'pull-request-review',
-              source_run_id: sourceRunIds[1]!,
-              created_at: new Date(BASE_TIME + 120_000).toISOString(),
-              observation: {}
-            }
-          ],
+          extractions: [...extractionRecords].reverse(),
           next_cursor: null
         })
       )
@@ -280,7 +358,9 @@ export function createMemoryHandler(
         collection === 'revisions'
           ? memoryFilesByRevision.has(revision) ||
             revision === LOAD_ERROR_REVISION
-          : /^fixture-extraction-[23]$/.test(identity)
+          : extractionRecords.some(
+              (record) => record.extraction_id === identity
+            )
       if (
         !available ||
         (collection === 'extractions' && kind !== 'transcript')
