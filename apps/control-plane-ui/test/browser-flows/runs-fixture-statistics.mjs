@@ -124,6 +124,7 @@ export async function runFixtureRunStatisticsFlow({
   const patchSynthesizerRow = deliveryRows.filter({
     hasText: 'patch-synthesizer'
   })
+  // Playwright completes the click before React necessarily commits the expanded detail row.
   await deliveryPlannerRow.click()
   await waitUntil(
     async () =>
