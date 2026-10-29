@@ -232,6 +232,16 @@
     padding: var(--space-4);
   }
 
+  /* Desktop tables color each cell on hover. Mobile rows have gaps between
+     their grid cells, so color the whole row instead of showing separate blocks. */
+  .table-wrap .mantine-Table-tr:hover {
+    background: var(--brand-soft);
+  }
+
+  .table-wrap .mantine-Table-tr:hover td {
+    background: transparent;
+  }
+
   .table-wrap tbody tr + tr {
     border-top: 1px solid var(--border);
   }
