@@ -1,5 +1,5 @@
 import React from 'react'
-import { Link, Route, Routes, useLocation } from 'react-router-dom'
+import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import {
   AppShell,
   Button,
@@ -229,6 +229,7 @@ export function App(): React.JSX.Element {
           <ErrorBoundary onUnauthorized={setUnauthorized}>
             <React.Suspense fallback={<RouteFallback />}>
               <Routes>
+                <Route path="/" element={<Navigate to="/runs" replace />} />
                 <Route path="/runs" element={<Runs />} />
                 <Route path="/runs/:runId" element={<Detail />} />
                 <Route path="/runs/:runId/files" element={<RunFilesPage />} />

@@ -16,6 +16,23 @@ vi.mock('../../browser/features/runs/Runs.js', () => ({
   Runs: (): React.JSX.Element => <div>Runs route</div>
 }))
 
+test('the application root opens the run list', async () => {
+  window.history.replaceState(null, '', '/')
+
+  render(
+    <LanguageProvider>
+      <MantineProvider theme={mantineTheme}>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </MantineProvider>
+    </LanguageProvider>
+  )
+
+  expect(await screen.findByText('Runs route')).toBeVisible()
+  expect(window.location.pathname).toBe('/runs')
+})
+
 test('unknown routes preserve the URL and render a not-found page', async () => {
   window.history.replaceState(null, '', '/unknown')
 

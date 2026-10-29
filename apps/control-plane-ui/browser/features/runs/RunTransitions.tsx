@@ -12,6 +12,7 @@ import {
 } from '@mantine/core'
 import { IconChevronDown, IconSitemap } from '@tabler/icons-react'
 
+import { ICON_SIZE } from '../../shared/design.js'
 import type { Run, RunEvent } from './api.js'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { axisLabel } from './status.js'
@@ -102,10 +103,10 @@ export function RunTransitions({
       <Button
         variant="subtle"
         size="compact-sm"
-        leftSection={<IconSitemap size={16} aria-hidden />}
+        leftSection={<IconSitemap size={ICON_SIZE.md} aria-hidden />}
         rightSection={
           <IconChevronDown
-            size={14}
+            size={ICON_SIZE.sm}
             aria-hidden
             style={{
               transform: opened ? 'rotate(180deg)' : undefined,

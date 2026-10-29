@@ -6,6 +6,22 @@
 
 这是用于查看和处置 Review Runs run、检查执行诊断与 artifact、管理 agent memory，以及阅读执行轨迹的内部控制台。服务端数据只通过该应用的同源 BFF 获取；BFF 持有上游凭据，并仅代理明确白名单内的路由。独立的执行轨迹查看器完全在浏览器中处理上传或粘贴的输入。
 
+## 界面预览
+
+> 以下 fixture 截图同时也是提交到仓库的 Playwright 视觉基线。
+
+### Runs
+
+<img src="test/e2e/visual.spec.ts-snapshots/runs-list-light-desktop-linux.png" alt="浅色主题下桌面视口的 run 列表" width="900">
+
+### Memory
+
+<img src="test/e2e/visual.spec.ts-snapshots/memory-light-desktop-linux.png" alt="浅色主题下的 memory 概览" width="900">
+
+### Viewer
+
+<img src="test/e2e/visual.spec.ts-snapshots/viewer-light-desktop-linux.png" alt="浅色主题下的执行轨迹查看器" width="900">
+
 ## 本地运行
 
 在 `apps/control-plane-ui` 中安装依赖，并启动使用 fixture 的预览：
@@ -77,14 +93,22 @@ pnpm run lint
 pnpm run format:check
 pnpm run typecheck
 pnpm run colors:check
+pnpm run icons:check
+pnpm run styles:report
 pnpm test
 pnpm run test:e2e
 pnpm run build
 ```
 
-`pnpm run colors:check` 检查控制台自定义的颜色是否在浅色和深色主题中完整且有效。当前景色与背景色的对比度不足，或品牌色没有按从浅到深排列时，检查会失败；相邻品牌色可能过于接近时只报告提示，不会让命令失败。
+额外的 UI 一致性检查包括：
+
+- `pnpm run colors:check`：检查自定义颜色是否同时存在于浅色和深色主题中，指定的文字与背景组合是否仍然清晰，以及品牌色是否保持从浅到深排列。相邻颜色过于接近时只报告提示，不会导致 CI 失败。
+- `pnpm run icons:check`：要求浏览器图标来自 Tabler，并使用共享的 `ICON_SIZE` 尺寸等级。
+- `pnpm run styles:report`：列出维护中的 CSS 里直接写入的间距、圆角和字号值。该报告仅供检查，不会导致 CI 失败。
 
 `pnpm test` 会运行 Node 测试和 Vitest React 组件测试。组件测试通过 React Testing Library 与 jsdom 验证局部渲染和交互行为。`pnpm run test:e2e` 通过 Playwright Test 运行桌面与移动 Chrome project。本地每个 worker 都会在随机端口启动独立的 fixture server，避免有状态流程在 worker 之间泄漏；调试时可通过 `CONTROL_PLANE_UI_E2E_PORT` 指定固定本地端口。设置 `CONTROL_PLANE_UI_BASE_URL` 后可以测试已经运行的外部部署；该部署需要登录时还需设置 `CONTROL_PLANE_UI_ACCESS_TOKEN`。外部部署测试只读，并使用单 worker，避免针对共享数据成倍增加负载和观测干扰；单 worker 是稳定性策略，不是防止写入的安全边界。浏览器特有的布局、滚动、minimap、下载与请求竞态行为保留在由 Playwright 测试调用的可复用 browser flow 中；组件行为则由 Vitest 覆盖，不在 E2E 中重复断言。
+
+本地 fixture 浏览器套件还会通过 axe 检查 WCAG A/AA 问题，包括实际渲染文字的对比度，并验证键盘焦点以及控件的 disabled/loading 状态。视觉测试覆盖桌面和移动端、浅色和深色主题，以及稳定的错误状态；测试会将当前截图与仓库中已提交的基准图片比较，允许最多 0.1% 的像素存在差异。0.1% 是本项目选择的容差，不是 Playwright 的标准值。界面有意变化时，开发者必须先人工检查新图片，确认变化符合预期，再运行 `pnpm run test:e2e:update-visuals` 更新基准并将其提交。
 
 生产服务需要 `REVIEW_RUNS_READ_TOKEN` 和 `CONTROL_PLANE_UI_ACCESS_TOKEN`，它们回答的是两个不同的问题。访问 token 决定"谁能打开控制台"：浏览器用它换取 HTTP-only 会话 cookie，token 本身不会进入浏览器代码或 Vite 变量。read token 则是后端在用户登录后调用 Review Runs 查询路由时使用的凭证，同样只存在于服务端。两者分开，意味着控制台账号与读密钥可以独立签发、轮换和吊销——例如只读的监控面板只持有 read token，不具备任何控制台访问能力。
 

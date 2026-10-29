@@ -94,11 +94,11 @@ export function RefreshControls({
             <Menu.Target>
               <Button
                 variant="default"
-                aria-label={t('refreshInterval')}
+                aria-label={`${t('refreshInterval')}: ${intervalLabel(refreshInterval)}`}
                 px={6}
               >
                 <Group gap={2} wrap="nowrap">
-                  <Text size="xs" c="dimmed">
+                  <Text size="xs" c="var(--muted)">
                     {intervalLabel(refreshInterval)}
                   </Text>
                   <IconChevronDown size={ICON_SIZE.sm} />

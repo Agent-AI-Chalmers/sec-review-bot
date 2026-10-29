@@ -5,6 +5,9 @@ import {
   IconBrandGitlab,
   IconSourceCode
 } from '@tabler/icons-react'
+
+import { ICON_SIZE } from '../../shared/design.js'
+
 type PlatformMarkProps = {
   platform: string
   githubLabel: string
@@ -41,9 +44,10 @@ export function PlatformMark({
     <Tooltip label={label} disabled={!compactOnNarrow}>
       <span
         className={`platform-mark${compactOnNarrow ? ' platform-mark-compact' : ''}${size === 'sm' ? ' platform-mark-sm' : ''}`}
+        role="img"
         aria-label={label}
       >
-        <Icon size={17} stroke={1.8} aria-hidden="true" />
+        <Icon size={ICON_SIZE.lg} stroke={1.8} aria-hidden="true" />
         <span className="platform-mark-label" aria-hidden="true">
           {label}
         </span>

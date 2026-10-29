@@ -373,7 +373,7 @@
 
 .memory-overview-metric > span,
 .memory-overview-metric small {
-  color: var(--mantine-color-dimmed);
+  color: var(--muted);
 }
 
 .memory-overview-metric strong {
@@ -408,7 +408,7 @@
 
 .memory-overview-legend {
   flex-wrap: wrap;
-  color: var(--mantine-color-dimmed);
+  color: var(--muted);
   font-size: var(--mantine-font-size-sm);
 }
 

@@ -3,6 +3,7 @@ import { SegmentedControl, Table, Tooltip } from '@mantine/core'
 import { IconInfoCircle } from '@tabler/icons-react'
 
 import { workflowLabel } from '../../shared/format.js'
+import { ICON_SIZE } from '../../shared/design.js'
 import { useLanguage, useMessages } from '../../shared/i18n.js'
 import { EmptyState } from '../../shared/StateMessage.js'
 import type {
@@ -202,7 +203,7 @@ export function MemoryOverview({
             {t('unitsWithoutObservation')}
             <Tooltip label={t('unitsWithoutObservationHelp')}>
               <IconInfoCircle
-                size={15}
+                size={ICON_SIZE.md}
                 aria-label={t('unitsWithoutObservationHelp')}
               />
             </Tooltip>

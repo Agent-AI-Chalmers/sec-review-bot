@@ -232,6 +232,16 @@
     padding: var(--space-4);
   }
 
+  /* Desktop tables color each cell on hover. Mobile rows have gaps between
+     their grid cells, so color the whole row instead of showing separate blocks. */
+  .table-wrap .mantine-Table-tr:hover {
+    background: var(--brand-soft);
+  }
+
+  .table-wrap .mantine-Table-tr:hover td {
+    background: transparent;
+  }
+
   .table-wrap tbody tr + tr {
     border-top: 1px solid var(--border);
   }
@@ -322,6 +332,18 @@
 @media (max-width: 760px) {
   .memory-overview-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* A phone can wrap both the label and the note. Keep the label, value, and
+     note in fixed rows so extra text cannot move a large value up or down. */
+  .memory-overview-metric {
+    grid-template-rows: 3.5em auto 1fr;
+    align-content: start;
+  }
+
+  .memory-overview-metric > span {
+    display: flex;
+    align-items: flex-start;
   }
 
   .memory-overview-metric:nth-child(3) {

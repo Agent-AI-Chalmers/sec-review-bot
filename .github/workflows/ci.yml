@@ -455,6 +455,8 @@ jobs:
           pnpm run lint
           pnpm run typecheck
           pnpm run colors:check
+          pnpm run icons:check
+          pnpm run styles:report
           pnpm test
           pnpm run build
 

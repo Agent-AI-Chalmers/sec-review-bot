@@ -552,7 +552,7 @@ function ExplainedCode({
     <Text
       component="span"
       className={className}
-      c={tone === 'error' ? 'red' : 'dimmed'}
+      c={tone === 'error' ? 'var(--failure-text)' : 'var(--muted)'}
       size={size}
       ff="monospace"
     >
@@ -775,7 +775,7 @@ export function Detail(): React.JSX.Element {
             <div className="run-summary-grid">
               <div className="run-summary-item">
                 <Group gap={6} align="baseline" wrap="nowrap">
-                  <Text c="dimmed" size="xs">
+                  <Text c="var(--muted)" size="xs">
                     {t('workflow')}
                   </Text>
                   <Text size="sm">{workflowLabel(run.workflow, t)}</Text>
@@ -786,7 +786,7 @@ export function Detail(): React.JSX.Element {
                     inline SVG. Baseline-aligning that flex item uses the SVG box as the
                     reference and visibly lifts both the icon and platform name. */}
                 <Group gap={6} align="center" wrap="nowrap">
-                  <Text c="dimmed" size="xs">
+                  <Text c="var(--muted)" size="xs">
                     {t('platform')}
                   </Text>
                   <PlatformMark
@@ -800,7 +800,7 @@ export function Detail(): React.JSX.Element {
               </div>
               <div className="run-summary-item run-summary-integration">
                 <Group gap={6} align="baseline" wrap="nowrap">
-                  <Text c="dimmed" size="xs">
+                  <Text c="var(--muted)" size="xs">
                     {t('integrationInstance')}
                   </Text>
                   <Text
@@ -815,7 +815,7 @@ export function Detail(): React.JSX.Element {
               </div>
               <div className="run-summary-item">
                 <Group gap={6} align="baseline" wrap="nowrap">
-                  <Text c="dimmed" size="xs">
+                  <Text c="var(--muted)" size="xs">
                     {t('preparation')}
                   </Text>
                   <PreparationStatus preparation={run.preparation} />
@@ -823,7 +823,7 @@ export function Detail(): React.JSX.Element {
               </div>
               <div className="run-summary-item">
                 <Group gap={6} align="baseline" wrap="nowrap">
-                  <Text c="dimmed" size="xs">
+                  <Text c="var(--muted)" size="xs">
                     {t('execution')}
                   </Text>
                   <ExecutionStatus status={run.execution.status} />
@@ -831,7 +831,7 @@ export function Detail(): React.JSX.Element {
               </div>
               <div className="run-summary-item">
                 <Group gap={6} align="baseline" wrap="nowrap">
-                  <Text c="dimmed" size="xs">
+                  <Text c="var(--muted)" size="xs">
                     {t('publication')}
                   </Text>
                   <PublicationStatus status={run.publication.status} />
@@ -841,7 +841,7 @@ export function Detail(): React.JSX.Element {
                 <div className="run-summary-failure">
                   {/* `baseline` keeps the label and monospace code visually aligned. */}
                   <Group gap={6} wrap="wrap" align="baseline">
-                    <Text c="dimmed" size="xs">
+                    <Text c="var(--muted)" size="xs">
                       {t('failureCode')}:
                     </Text>
                     <ExplainedCode code={run.failure_code} size="xs" />
@@ -1083,7 +1083,7 @@ export function Detail(): React.JSX.Element {
                   bullet={<IconClock size={ICON_SIZE.sm} />}
                   title={t('created')}
                 >
-                  <Text c="dimmed" size="sm">
+                  <Text c="var(--muted)" size="sm">
                     {formatDate(run.created_at, language)}
                   </Text>
                 </Timeline.Item>
@@ -1096,7 +1096,7 @@ export function Detail(): React.JSX.Element {
                       nothing to time. `started_at` is the phase start and `finished_at` its end;
                       `updated_at` also moves on claim heartbeats and input checkpoints and so
                       cannot time the phase. */}
-                  <Text c="dimmed" size="sm">
+                  <Text c="var(--muted)" size="sm">
                     {run.preparation.started_at === null
                       ? preparationStateLabel(run.preparation.status, t)
                       : formatDate(run.preparation.started_at, language)}
@@ -1129,13 +1129,13 @@ export function Detail(): React.JSX.Element {
                     // Execution API yet (nothing to time), or it never will because preparation failed
                     // and the axis was concluded as `skipped`. The latter has an end without a
                     // start, so report when it was concluded rather than a duration it never had.
-                    <Text c="dimmed" size="sm">
+                    <Text c="var(--muted)" size="sm">
                       {executionStatusLabel(run.execution.status, t)}
                       {run.execution.finished_at !== null &&
                         ` · ${formatDate(run.execution.finished_at, language)}`}
                     </Text>
                   ) : (
-                    <Text c="dimmed" size="sm">
+                    <Text c="var(--muted)" size="sm">
                       {formatDate(run.execution.started_at, language)} ·{' '}
                       {phaseElapsed(
                         run.execution.started_at,
@@ -1150,7 +1150,7 @@ export function Detail(): React.JSX.Element {
                   )}
                   {observationAgeMs(run) !== null && (
                     <Text
-                      c={isObservationStale(run) ? 'yellow' : 'dimmed'}
+                      c={isObservationStale(run) ? 'yellow' : 'var(--muted)'}
                       size="xs"
                       mt={2}
                     >
@@ -1189,7 +1189,7 @@ export function Detail(): React.JSX.Element {
                 >
                   <div className="publication-summary">
                     {publishedStart !== null && (
-                      <Text c="dimmed" size="sm">
+                      <Text c="var(--muted)" size="sm">
                         {/* The publication phase starts when the work is first claimed, not
                             when execution ended: the gap between the two is the coordinator's
                             polling wait and is not publishing time. The guard above proves the
@@ -1249,7 +1249,7 @@ export function Detail(): React.JSX.Element {
                               >
                                 {t('openExternalLink')}
                                 <IconArrowUpRight
-                                  size={14}
+                                  size={ICON_SIZE.sm}
                                   aria-hidden="true"
                                 />
                               </Anchor>
