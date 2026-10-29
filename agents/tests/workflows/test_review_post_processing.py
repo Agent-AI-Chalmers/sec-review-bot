@@ -91,7 +91,7 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
             review_units=[
                 {
                     "unit_id": "review",
-                    "transcript_root": "/tmp/run-1/artifacts/transcripts",
+                    "trajectory_root": "/tmp/run-1/artifacts/trajectories",
                 }
             ],
             result=public_result,
@@ -153,7 +153,7 @@ async def test_single_review_publishes_before_scheduling_memory(
     assert publications[0].review_units == [
         {
             "unit_id": "review",
-            "transcript_root": "/tmp/run-1/artifacts/transcripts",
+            "trajectory_root": "/tmp/run-1/artifacts/trajectories",
         }
     ]
 
@@ -216,11 +216,11 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
     assert publications[0].review_units == [
         {
             "unit_id": "case-a",
-            "transcript_root": "/tmp/run-1/artifacts/cases/case-a/transcripts",
+            "trajectory_root": "/tmp/run-1/artifacts/cases/case-a/trajectories",
         },
         {
             "unit_id": "case-b",
-            "transcript_root": "/tmp/run-1/artifacts/cases/case-b/transcripts",
+            "trajectory_root": "/tmp/run-1/artifacts/cases/case-b/trajectories",
         },
     ]
 

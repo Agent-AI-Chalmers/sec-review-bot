@@ -22,10 +22,10 @@ from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 @dataclass(frozen=True)
 class MemoryMaintenanceResult:
-    """Candidate memory tree and invocation transcript produced by the agent."""
+    """Candidate memory tree and invocation trajectory produced by the agent."""
 
     memory_tree_path: Path
-    maintainer_transcript_path: Path
+    maintainer_trajectory_path: Path
 
 
 def _prepare_worktree(
@@ -70,7 +70,7 @@ async def maintain_memory_tree(
     base_memory_tree: Path | None,
     observations: list[tuple[str, Path]],
     worktree_root: Path,
-    maintainer_transcript_path: Path,
+    maintainer_trajectory_path: Path,
     deployment: str | None = None,
 ) -> MemoryMaintenanceResult:
     """Generate a candidate memory tree from explicit immutable inputs."""
@@ -99,11 +99,11 @@ async def maintain_memory_tree(
             agent_name=MEMORY_MAINTAINER_AGENT_NAME,
             system_prompt=MEMORY_MAINTAINER_SYSTEM_PROMPT,
             user_prompt=build_maintenance_prompt(prompt_observations),
-            transcript_paths=(maintainer_transcript_path,),
+            trajectory_paths=(maintainer_trajectory_path,),
         )
     return MemoryMaintenanceResult(
         memory_tree_path=worktree_root,
-        maintainer_transcript_path=maintainer_transcript_path,
+        maintainer_trajectory_path=maintainer_trajectory_path,
     )
 
 

@@ -58,7 +58,7 @@ function manifest(runId = 'run-1'): string {
     review_units: [
       {
         id: 'unit-1',
-        transcripts: ['artifact-tree/unit-1/review.jsonl']
+        trajectories: ['artifact-tree/unit-1/review.jsonl']
       }
     ]
   })

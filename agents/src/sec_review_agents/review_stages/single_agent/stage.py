@@ -22,7 +22,7 @@ from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
     record_bootstrap_result,
 )
-from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
+from sec_review_agents.runtime.trajectories import remove_trajectories, trajectory_path
 from sec_review_agents.utils.files import (
     persist_text_artifact,
     reset_stage_attempt_artifacts,
@@ -59,13 +59,13 @@ async def run_single_agent_stage(
             single_agent_artifacts_path,
             filenames=("workspace.patch",),
         )
-        remove_transcripts((transcript_path(single_agent_artifacts_path),))
+        remove_trajectories((trajectory_path(single_agent_artifacts_path),))
         workspace_path = Path(tempdir)
         restore_workspace_from_snapshot_tar(
             tar_path=baseline_snapshot_tar_path,
             destination_path=workspace_path,
         )
-        transcript = transcript_path(single_agent_artifacts_path)
+        trajectory = trajectory_path(single_agent_artifacts_path)
         backend = build_backend(workspace_path, memory_path_view)
         # Keep backend lifetime around both agent construction and invocation; some
         # middleware resolves tools against backend resources during graph creation.
@@ -101,7 +101,7 @@ async def run_single_agent_stage(
                     agent_name=agent_name,
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
-                    transcript_paths=(transcript,),
+                    trajectory_paths=(trajectory,),
                 )
         raw_declared_paths = agent_output.get("declared_changed_files")
         if raw_declared_paths is None:

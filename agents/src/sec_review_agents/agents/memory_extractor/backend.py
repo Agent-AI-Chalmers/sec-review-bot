@@ -10,17 +10,17 @@ from sec_review_agents.filesystem.path_views import read_only_path_view, skill_v
 from sec_review_agents.runtime.skills import materialize_all_agent_skills_view
 
 
-def create_memory_extractor_backend(*, transcript_root: Path) -> BackendProtocol:
-    """Mount staged transcripts and all bundled skills for the extractor.
+def create_memory_extractor_backend(*, trajectory_root: Path) -> BackendProtocol:
+    """Mount staged trajectories and all bundled skills for the extractor.
 
     Skills are existing agent knowledge for the extraction decision, not source
-    evidence. Mounting every packaged skill lets the extractor reject transcript
+    evidence. Mounting every packaged skill lets the extractor reject trajectory
     lessons that merely restate guidance already available to review agents.
     """
     path_views = [
         read_only_path_view(
-            agent_path="/transcripts",
-            host_path=transcript_root,
+            agent_path="/trajectories",
+            host_path=trajectory_root,
         )
     ]
     if agent_skills_enabled():

@@ -52,12 +52,12 @@ def archive_initial_feedback_attempt(
 def review_stage_attempt_order(
     *, stage: str, retry_context: Mapping[str, Any] | None
 ) -> int:
-    """Return the ordered transcript position for a review stage attempt."""
+    """Return the ordered trajectory position for a review stage attempt."""
     if stage == "analyzer":
         return 1
     base = 2 if stage == "mitigator" else 3 if stage == "verifier" else None
     if base is None:
-        raise ValueError(f"Unsupported review transcript stage: {stage}")
+        raise ValueError(f"Unsupported review trajectory stage: {stage}")
     if not isinstance(retry_context, Mapping):
         return base
     retry_index = retry_context.get("retry_index")
@@ -85,7 +85,7 @@ def feedback_retry_context(
 ) -> dict[str, Any]:
     summary = verifier_result_summary(verifier_result)
     # Preserve compact verifier feedback across retry rounds without carrying
-    # full transcripts, diffs, or tool output back into prompts and artifacts.
+    # full trajectories, diffs, or tool output back into prompts and artifacts.
     projected_history = [
         dict(item) for item in history or [] if isinstance(item, Mapping)
     ]

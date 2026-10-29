@@ -5,64 +5,64 @@
       "expected": "valid",
       "runId": "run-1",
       "unitId": "unit-1",
-      "sha256": "d5b50bed5ae259c37c1ba5da5862e858e8e8d79dc10e6fc71abeaf45d9497116",
-      "size": 284
+      "sha256": "ee648087c42d4e77dc89b41d2fc8174871ea645460f0dce27a81d1b96a4d4f5d",
+      "size": 286
     },
     {
       "file": "valid-pax-path.tar.zst",
       "expected": "valid",
       "runId": "run-1",
       "unitId": "unit-1",
-      "sha256": "9a44fca4d2cf3bcd1c30d9617762d208bb7ca135999c119e2b3272e0c256a72b",
-      "size": 354
+      "sha256": "134de6245170614072adee02304726483ecc2b0ccd5dcb27c93e590241711e85",
+      "size": 355
     },
     {
       "file": "invalid-result-reference.tar.zst",
       "expected": "invalid",
       "runId": "run-1",
       "unitId": "unit-1",
-      "sha256": "ac24e79b0ad25dc3a1344d444cde67b156f9867f7d2439782838e3ac4b9c46a5",
-      "size": 245
+      "sha256": "a1ae364262389a1ed806a79a74821d7a41df1ae0b116a43576a9f85cb45cd958",
+      "size": 244
     },
     {
-      "file": "invalid-missing-transcript.tar.zst",
+      "file": "invalid-missing-trajectory.tar.zst",
       "expected": "invalid",
       "runId": "run-1",
       "unitId": "unit-1",
-      "sha256": "f5a42aa2a9bf9fe4af2ea4af74f62ee0a600e5946319f6506abb7a1324a40b0d",
+      "sha256": "6fdbdfa415a0897b7420e6e30119bc7fb2e0c24162a270fa71db824bcd872714",
       "size": 223
     },
     {
-      "file": "invalid-noncanonical-transcript-path.tar.zst",
+      "file": "invalid-noncanonical-trajectory-path.tar.zst",
       "expected": "invalid",
       "runId": "run-1",
       "unitId": "unit-1",
-      "sha256": "cc0369f03c08ea1865b9cec94c56e270d8c67153d190486c9b60a600c7e9ae51",
-      "size": 242
+      "sha256": "82bba4be17b78024eb068a9d0e5f2891b82c7cd19d7e9c6d9efc1250820b20f9",
+      "size": 244
     },
     {
-      "file": "invalid-transcript-extension.tar.zst",
+      "file": "invalid-trajectory-extension.tar.zst",
       "expected": "invalid",
       "runId": "run-1",
       "unitId": "unit-1",
-      "sha256": "71eb051633057f0ee335dc8d19a85bb785260889811fed8a3112a74e18462ac5",
-      "size": 240
+      "sha256": "55ba3844b545bfdb6d8e71ecd9bff65da465b248e6da6633c1b9aace95822f02",
+      "size": 242
     },
     {
       "file": "invalid-duplicate-unit.tar.zst",
       "expected": "invalid",
       "runId": "run-1",
       "unitId": "unit-1",
-      "sha256": "cc7deec45909b722c1c3005ad68ae28ceb831e5972404a58b3115c380d369551",
-      "size": 245
+      "sha256": "b6b96c1631f8abf2b655a95384e5353051de69cfdd316baf34984b065975ec35",
+      "size": 248
     },
     {
       "file": "invalid-symlink.tar.zst",
       "expected": "invalid",
       "runId": "run-1",
       "unitId": "unit-1",
-      "sha256": "02990eecc2f56ab9e59955199ef3a476031243bd248f0c0f28cb67d80ef07c91",
-      "size": 243
+      "sha256": "e8699f966e350e9d5713c770c5bd9b14a57c9f81e1ac7f7cc1f0ad6f6e4760e4",
+      "size": 245
     }
   ]
 }

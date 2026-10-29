@@ -64,12 +64,12 @@ function json(value) {
   return Buffer.from(`${JSON.stringify(value)}\n`);
 }
 
-function manifest(transcripts, overrides = {}) {
+function manifest(trajectories, overrides = {}) {
   return {
     version: 1,
     run_id: "run-1",
     result: "result.json",
-    review_units: [{ id: "unit-1", transcripts }],
+    review_units: [{ id: "unit-1", trajectories }],
     ...overrides,
   };
 }
@@ -83,21 +83,21 @@ function archive(entries) {
   );
 }
 
-const transcript = "artifact-tree/unit-1/review.jsonl";
-const longTranscript = `artifact-tree/unit-1/${"a".repeat(110)}.jsonl`;
-const nonCanonicalTranscript = "artifact-tree/unit-1/./review.jsonl";
-const wrongExtensionTranscript = "artifact-tree/unit-1/review.txt";
+const trajectory = "artifact-tree/unit-1/review.jsonl";
+const longTrajectory = `artifact-tree/unit-1/${"a".repeat(110)}.jsonl`;
+const nonCanonicalTrajectory = "artifact-tree/unit-1/./review.jsonl";
+const wrongExtensionTrajectory = "artifact-tree/unit-1/review.txt";
 const definitions = [
   {
     file: "valid-minimal.tar.zst",
     expected: "valid",
     unitId: "unit-1",
     bytes: archive([
-      ["manifest.json", "0", json(manifest([transcript]))],
+      ["manifest.json", "0", json(manifest([trajectory]))],
       ["result.json", "0", json({ status: "completed" })],
       ["artifact-tree/", "5"],
       ["artifact-tree/unit-1/", "5"],
-      [transcript, "0", Buffer.from('{"event":"message"}\n')],
+      [trajectory, "0", Buffer.from('{"event":"message"}\n')],
     ]),
   },
   {
@@ -105,11 +105,11 @@ const definitions = [
     expected: "valid",
     unitId: "unit-1",
     bytes: archive([
-      ["manifest.json", "0", json(manifest([longTranscript]))],
+      ["manifest.json", "0", json(manifest([longTrajectory]))],
       ["result.json", "0", json({ status: "completed" })],
       ["artifact-tree/", "5"],
       ["artifact-tree/unit-1/", "5"],
-      [longTranscript, "0", Buffer.from('{"event":"message"}\n')],
+      [longTrajectory, "0", Buffer.from('{"event":"message"}\n')],
     ]),
   },
   {
@@ -120,43 +120,43 @@ const definitions = [
       [
         "manifest.json",
         "0",
-        json(manifest([transcript], { result: "other.json" })),
+        json(manifest([trajectory], { result: "other.json" })),
       ],
       ["result.json", "0", json({})],
       ["artifact-tree/", "5"],
-      [transcript, "0", Buffer.from("{}\n")],
+      [trajectory, "0", Buffer.from("{}\n")],
     ]),
   },
   {
-    file: "invalid-missing-transcript.tar.zst",
+    file: "invalid-missing-trajectory.tar.zst",
     expected: "invalid",
     unitId: "unit-1",
     bytes: archive([
-      ["manifest.json", "0", json(manifest([transcript]))],
+      ["manifest.json", "0", json(manifest([trajectory]))],
       ["result.json", "0", json({})],
       ["artifact-tree/", "5"],
     ]),
   },
   {
-    file: "invalid-noncanonical-transcript-path.tar.zst",
+    file: "invalid-noncanonical-trajectory-path.tar.zst",
     expected: "invalid",
     unitId: "unit-1",
     bytes: archive([
-      ["manifest.json", "0", json(manifest([nonCanonicalTranscript]))],
+      ["manifest.json", "0", json(manifest([nonCanonicalTrajectory]))],
       ["result.json", "0", json({})],
       ["artifact-tree/", "5"],
-      [transcript, "0", Buffer.from("{}\n")],
+      [trajectory, "0", Buffer.from("{}\n")],
     ]),
   },
   {
-    file: "invalid-transcript-extension.tar.zst",
+    file: "invalid-trajectory-extension.tar.zst",
     expected: "invalid",
     unitId: "unit-1",
     bytes: archive([
-      ["manifest.json", "0", json(manifest([wrongExtensionTranscript]))],
+      ["manifest.json", "0", json(manifest([wrongExtensionTrajectory]))],
       ["result.json", "0", json({})],
       ["artifact-tree/", "5"],
-      [wrongExtensionTranscript, "0", Buffer.from("{}\n")],
+      [wrongExtensionTrajectory, "0", Buffer.from("{}\n")],
     ]),
   },
   {
@@ -168,17 +168,17 @@ const definitions = [
         "manifest.json",
         "0",
         json(
-          manifest([transcript], {
+          manifest([trajectory], {
             review_units: [
-              { id: "unit-1", transcripts: [transcript] },
-              { id: "unit-1", transcripts: [transcript] },
+              { id: "unit-1", trajectories: [trajectory] },
+              { id: "unit-1", trajectories: [trajectory] },
             ],
           }),
         ),
       ],
       ["result.json", "0", json({})],
       ["artifact-tree/", "5"],
-      [transcript, "0", Buffer.from("{}\n")],
+      [trajectory, "0", Buffer.from("{}\n")],
     ]),
   },
   {
@@ -186,10 +186,10 @@ const definitions = [
     expected: "invalid",
     unitId: "unit-1",
     bytes: archive([
-      ["manifest.json", "0", json(manifest([transcript]))],
+      ["manifest.json", "0", json(manifest([trajectory]))],
       ["result.json", "0", json({})],
       ["artifact-tree/", "5"],
-      [transcript, "2"],
+      [trajectory, "2"],
     ]),
   },
 ];

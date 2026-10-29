@@ -22,8 +22,8 @@ const revision = {
     kind: 'maintenance' as const,
     maintenance_id: 'maintenance-1',
     extraction_ids: ['extraction-1'],
-    transcript_reference: {
-      uri: 's3://sec-review/memory/transcripts/memory-maintainer/transcript.v1.jsonl.zst',
+    trajectory_reference: {
+      uri: 's3://sec-review/memory/trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
       digest: `sha256:${'b'.repeat(64)}`,
       media_type: 'application/zstd',
       size_bytes: 21,
@@ -44,8 +44,8 @@ const extraction = {
   source_run_id: 'run-1',
   source_unit_id: 'review',
   diagnostic_bundle_digest: `sha256:${'b'.repeat(64)}`,
-  transcript_reference: {
-    uri: 's3://sec-review/memory/transcripts/memory-extractor/transcript.v1.jsonl.zst',
+  trajectory_reference: {
+    uri: 's3://sec-review/memory/trajectories/memory-extractor/trajectory.v1.jsonl.zst',
     digest: `sha256:${'a'.repeat(64)}`,
     media_type: 'application/zstd',
     size_bytes: 42,

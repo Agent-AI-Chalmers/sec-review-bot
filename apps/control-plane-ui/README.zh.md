@@ -4,7 +4,7 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-这是用于查看和处置 Review Runs run、检查执行诊断与 artifact、管理 agent memory，以及阅读 transcript 的内部控制台。服务端数据只通过该应用的同源 BFF 获取；BFF 持有上游凭据，并仅代理明确白名单内的路由。独立的 transcript Viewer 则完全在浏览器中处理上传或粘贴的输入。
+这是用于查看和处置 Review Runs run、检查执行诊断与 artifact、管理 agent memory，以及阅读执行轨迹的内部控制台。服务端数据只通过该应用的同源 BFF 获取；BFF 持有上游凭据，并仅代理明确白名单内的路由。独立的执行轨迹查看器完全在浏览器中处理上传或粘贴的输入。
 
 ## 本地运行
 
@@ -15,15 +15,15 @@ pnpm install
 pnpm run dev:fixtures
 ```
 
-打开 Vite 输出的地址，通常是 `http://localhost:5173`。这种模式提供有代表性的 run 和 memory 状态，不需要启动 Review Runs、Memory Catalog、PostgreSQL 或 RustFS。Memory 暂停、恢复、编辑和回滚使用有状态 fixture；memory tree 与 transcript 操作会返回小型 fixture 附件，因此无需真实存储对象也能验证浏览器下载行为。
+打开 Vite 输出的地址，通常是 `http://localhost:5173`。这种模式提供有代表性的 run 和 memory 状态，不需要启动 Review Runs、Memory Catalog、PostgreSQL 或 RustFS。Memory 暂停、恢复、编辑和回滚使用有状态 fixture；memory tree 与执行轨迹操作会返回小型 fixture 附件，因此无需真实存储对象也能验证浏览器下载行为。
 
 fixture server 还提供稳定的全页错误状态，便于进行视觉检查：
 
 - `/memory/revisions/404/tree` 显示 memory tree 预览失败，同时保留 artifact 下载入口。
-- `/memory/revisions/404/transcript` 显示 transcript 加载失败。
+- `/memory/revisions/404/trajectory` 显示执行轨迹加载失败。
 - `/runs/fixture-artifact-load-error/files` 显示 run files 加载失败。
 
-Viewer 页面完全在浏览器本地运行。它接受项目基于事件的 JSONL transcript contract 和直接导出的 LangGraph message-array JSON，可以上传文件或粘贴内容，输入不会发送到 BFF。对于缺少 tool result ID 的直接消息数组，只有在一条 assistant 消息的调用后紧跟完整且无歧义的结果序列时，Viewer 才会建立关联。
+查看器页面完全在浏览器本地运行。它接受项目基于事件的 JSONL 执行轨迹格式和直接导出的 LangGraph message-array JSON，可以上传文件或粘贴内容，输入不会发送到 BFF。对于缺少 tool result ID 的直接消息数组，只有在一条 assistant 消息的调用后紧跟完整且无歧义的结果序列时，查看器才会建立关联。
 
 ## 源码布局
 
@@ -36,8 +36,8 @@ browser/
     runs/             run 列表、详情、状态和 Review Runs projections
     memory/           memory 查看和 Memory Catalog projections
     workspace/        runs 与 memory 共用的文件浏览和编辑能力
-    transcript/       transcript model 和 renderer
-    viewer/           本地 transcript viewer 页面
+    trajectory/       执行轨迹的解析与展示
+    viewer/           本地执行轨迹查看器页面
   shared/             仅供 browser 使用的基础设施和小型工具
   styles/             按顺序加载的样式分区
   main.tsx            browser 入口
@@ -91,4 +91,4 @@ BFF 还负责代理下载私有 RustFS 中的终态 artifact。它使用单独�
 
 设置 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_TOKEN` 后启用 memory 管理。BFF 会从 Catalog JSON 中移除存储 URI，自行读取 artifact，并在返回内容或下载前校验 size 和 SHA-256 digest。
 
-经过认证的 control plane 可以暂停或恢复 maintenance、编辑 active memory tree，以及恢复已有 revision。BFF 在服务端确定 actor identity，并使用 expected active revision 和 control generation 的 compare-and-swap。其 S3 identity 只能在 `memory/trees/*` 下创建不可变对象；run artifact 和 memory transcript 仍然只读。编辑或恢复失败后不会自动恢复 maintenance。
+经过认证的 control plane 可以暂停或恢复 maintenance、编辑 active memory tree，以及恢复已有 revision。BFF 在服务端确定 actor identity，并使用 expected active revision 和 control generation 的 compare-and-swap。其 S3 identity 只能在 `memory/trees/*` 下创建不可变对象；run artifact 和 memory 相关执行轨迹仍然只读。编辑或恢复失败后不会自动恢复 maintenance。

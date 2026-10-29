@@ -161,10 +161,10 @@ def test_prompt_profile_preserves_inline_code_in_review_target_claim() -> None:
     ) == [f"- Review target claim: {long_claim}"]
 
 
-def test_render_structured_markdown_profiles_keep_prompt_transcripts_visible() -> None:
+def test_render_structured_markdown_profiles_keep_prompt_trajectories_visible() -> None:
     payload = {
         "overview": "Context for retry.",
-        "transcripts": ["model requested file context"],
+        "trajectories": ["model requested file context"],
         "diagnostics": ["hidden"],
     }
 
@@ -174,7 +174,7 @@ def test_render_structured_markdown_profiles_keep_prompt_transcripts_visible() -
     assert render_structured_markdown(payload, profile="prompt") == [
         "Context for retry.",
         "",
-        "Transcripts:",
+        "Trajectories:",
         "",
         "- model requested file context",
     ]

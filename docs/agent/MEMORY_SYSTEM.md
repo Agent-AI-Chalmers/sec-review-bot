@@ -35,19 +35,19 @@ This project implements a subset of Claude Code Memory:
 
 ## Core Artifacts
 
-- `transcripts`: process records left by main agents after completing a review.
-- `observations`: reusable experience extracted from transcripts.
+- `trajectories`: process records left by main agents after completing a review.
+- `observations`: reusable experience extracted from trajectories.
 - `memory`: maintained experience material.
 
-> Here, `transcripts` means the archival process record left by an agent while doing one task. Other systems or contexts often call similar artifacts `trace`, `trajectory` (SWE-agent), or `rollout` (Codex).
+> Here, a `trajectory` is the ordered record of messages and tool interactions from one agent task. It is kept for later inspection and experience extraction. Other systems may call a similar artifact a `trace` or `rollout`.
 
 ```text
 main agent
-  ├─ write transcripts
+  ├─ write trajectories
   └─ read memory
 
 extraction
-  ├─ read transcripts
+  ├─ read trajectories
   ├─ consult existing system-prompt and skill guidance
   └─ write observations
 
@@ -56,7 +56,7 @@ maintenance
   └─ update memory
 ```
 
-Extraction reads the stage transcripts from one review, such as analyzer, mitigation, and verification process records, and extracts reusable experience into observations. System prompts and all bundled skills under `/skills` count as guidance the agents already have. An observation should add supported, durable experience beyond that guidance; otherwise, extraction produces no observation.
+Extraction reads the stage trajectories from one review, such as analyzer, mitigation, and verification process records, and extracts reusable experience into observations. System prompts and all bundled skills under `/skills` count as guidance the agents already have. An observation should add supported, durable experience beyond that guidance; otherwise, extraction produces no observation.
 
 Maintenance reads observations produced by extraction and folds useful experience into memory.
 
@@ -72,7 +72,7 @@ Experience production runs through an asynchronous path and does not affect the 
 
 Roughly, the flow is a set of asynchronous checks:
 
-- Source: after an issue or pull-request review publishes transcripts, the review enters asynchronous memory processing. Repository review contributes one extraction unit per case whose transcripts exist.
+- Source: after an issue or pull-request review publishes trajectories, the review enters asynchronous memory processing. Repository review contributes one extraction unit per case whose trajectories exist.
 - Extraction processes each review independently and produces pending observations.
   - Multiple extractions can run concurrently.
 - Maintenance checks periodically and runs when the threshold or age condition is met: the maintenance trigger schedule runs every hour by default. It starts maintenance only when at least 10 observations are pending, or when the oldest pending observation has waited at least one day.
@@ -110,7 +110,7 @@ This project does not put memory writes on the main agents' critical path. There
 1. Multi-agent concurrency. When multiple reviews, stage agents, or repository cases run at the same time, direct writes to long-term memory would create immediate write-conflict problems. File-based memory is especially exposed to this. Even if file locks serialize writes, lock waiting and write latency would be brought back into the main flow.
 2. There is no supervisor here, and a single agent does not have a global view. By itself, it is usually hard for one agent to stably produce long-term experience of sufficient quality.
 
-Therefore, the current implementation only lets main agents leave transcripts, while experience writing, filtering, and merging live in asynchronous extraction / maintenance workflows. This sacrifices some immediate memory experience, but gives clearer sources, a more stable main flow, and memory updates that are easier to audit and roll back.
+Therefore, the current implementation only lets main agents leave trajectories, while experience writing, filtering, and merging live in asynchronous extraction / maintenance workflows. This sacrifices some immediate memory experience, but gives clearer sources, a more stable main flow, and memory updates that are easier to audit and roll back.
 
 ---
 

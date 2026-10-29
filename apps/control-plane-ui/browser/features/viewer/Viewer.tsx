@@ -21,9 +21,9 @@ import {
 
 import { useMessages } from '../../shared/i18n.js'
 import {
-  TranscriptTimeline,
-  type TranscriptEvent
-} from '../transcript/TranscriptViewer.js'
+  TrajectoryTimeline,
+  type TrajectoryEvent
+} from '../trajectory/TrajectoryViewer.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
 function messageRecord(value: unknown): Record<string, unknown> | null {
@@ -32,10 +32,10 @@ function messageRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>
 }
 
-/** Accept the concrete shapes people actually paste from this repository: transcript JSONL,
+/** Accept the concrete shapes people actually paste from this repository: trajectory JSONL,
  * an event array, `{ events }`, `{ messages }`, or a raw message array. Unlike agent-visual's
  * compatibility parser, this does not evaluate or guess Python repr syntax. */
-export function parseViewerInput(input: string): TranscriptEvent[] {
+export function parseViewerInput(input: string): TrajectoryEvent[] {
   const trimmed = input.trim()
   if (!trimmed) throw new Error('empty_input')
   let value: unknown
@@ -77,7 +77,7 @@ export function Viewer(): React.JSX.Element {
   const t = useMessages()
   const [input, setInput] = React.useState('')
   const [filename, setFilename] = React.useState('')
-  const [events, setEvents] = React.useState<TranscriptEvent[]>([])
+  const [events, setEvents] = React.useState<TrajectoryEvent[]>([])
   const [error, setError] = React.useState('')
   const [inputOpened, setInputOpened] = React.useState(true)
   const render = (content = input): void => {
@@ -112,7 +112,7 @@ export function Viewer(): React.JSX.Element {
           >
             <div>
               <Text size="sm" fw={600}>
-                {t('transcriptMessageCount').replace(
+                {t('trajectoryMessageCount').replace(
                   '{count}',
                   String(events.length)
                 )}
@@ -194,7 +194,7 @@ export function Viewer(): React.JSX.Element {
       </Paper>
       {events.length > 0 && (
         <Stack gap="md">
-          <TranscriptTimeline events={events} />
+          <TrajectoryTimeline events={events} />
         </Stack>
       )}
     </Container>

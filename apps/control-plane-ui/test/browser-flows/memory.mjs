@@ -28,7 +28,7 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
     const aSettled = new Promise((resolve) => {
       markASettled = resolve
     })
-    const transcriptResponse = (content) => ({
+    const trajectoryResponse = (content) => ({
       events: [
         {
           seq: 1,
@@ -44,12 +44,12 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
     })
     const racePage = await context.newPage()
     await racePage.route(
-      '**/api/memory/revisions/1/transcript/content',
+      '**/api/memory/revisions/1/trajectory/content',
       async (route) => {
         try {
           await aGate
           await route
-            .fulfill({ json: transcriptResponse('Transcript target A') })
+            .fulfill({ json: trajectoryResponse('Trajectory target A') })
             .catch(() => undefined)
         } finally {
           markASettled()
@@ -57,21 +57,21 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
       }
     )
     await racePage.route(
-      '**/api/memory/revisions/2/transcript/content',
+      '**/api/memory/revisions/2/trajectory/content',
       async (route) => {
         markBRequested()
         await bGate
         await route.fulfill({
-          json: transcriptResponse('Transcript target B')
+          json: trajectoryResponse('Trajectory target B')
         })
       }
     )
-    await racePage.goto(`${base}/memory/revisions/1/transcript`, {
+    await racePage.goto(`${base}/memory/revisions/1/trajectory`, {
       waitUntil: 'domcontentloaded'
     })
     await racePage.getByText('Loading…', { exact: true }).waitFor()
     await racePage.evaluate(() => {
-      globalThis.history.pushState({}, '', '/memory/revisions/2/transcript')
+      globalThis.history.pushState({}, '', '/memory/revisions/2/trajectory')
       globalThis.dispatchEvent(new globalThis.PopStateEvent('popstate'))
     })
     await bRequested
@@ -80,28 +80,28 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
     assert.strictEqual(
       await racePage.getByText('Loading…', { exact: true }).isVisible(),
       true,
-      'an aborted transcript request must not clear the next target loading state'
+      'an aborted trajectory request must not clear the next target loading state'
     )
     releaseB()
-    await racePage.getByText('Transcript target B', { exact: true }).waitFor()
+    await racePage.getByText('Trajectory target B', { exact: true }).waitFor()
     assert.strictEqual(
-      await racePage.getByText('Transcript target A', { exact: true }).count(),
+      await racePage.getByText('Trajectory target A', { exact: true }).count(),
       0,
-      'a delayed transcript response must not overwrite the current target'
+      'a delayed trajectory response must not overwrite the current target'
     )
     releaseA()
     await aSettled
     assert.strictEqual(
       await racePage
-        .getByText('Transcript target B', { exact: true })
+        .getByText('Trajectory target B', { exact: true })
         .isVisible(),
       true,
-      'the current transcript must remain visible after the stale handler settles'
+      'the current trajectory must remain visible after the stale handler settles'
     )
     assert.strictEqual(
-      await racePage.getByText('Transcript target A', { exact: true }).count(),
+      await racePage.getByText('Trajectory target A', { exact: true }).count(),
       0,
-      'the settled stale handler must not replace the current transcript'
+      'the settled stale handler must not replace the current trajectory'
     )
     assert.strictEqual(
       await racePage.getByRole('alert').count(),
@@ -110,9 +110,9 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
     )
     await racePage.close()
 
-    const transcriptFailurePage = await context.newPage()
-    await transcriptFailurePage.route(
-      '**/api/memory/revisions/1/transcript/content',
+    const trajectoryFailurePage = await context.newPage()
+    await trajectoryFailurePage.route(
+      '**/api/memory/revisions/1/trajectory/content',
       (route) =>
         route.fulfill({
           status: 503,
@@ -120,13 +120,13 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
           body: '{"error":"memory_catalog_unavailable"}'
         })
     )
-    await transcriptFailurePage.goto(`${base}/memory/revisions/1/transcript`, {
+    await trajectoryFailurePage.goto(`${base}/memory/revisions/1/trajectory`, {
       waitUntil: 'domcontentloaded'
     })
-    await transcriptFailurePage
-      .getByText('The process transcript could not be opened.', { exact: true })
+    await trajectoryFailurePage
+      .getByText('The trajectory could not be opened.', { exact: true })
       .waitFor()
-    const centeredTranscriptError = await transcriptFailurePage.evaluate(() => {
+    const centeredTrajectoryError = await trajectoryFailurePage.evaluate(() => {
       const state = document.querySelector('.content-load-state')
       const alert = state?.querySelector('[role="alert"]')
       if (!state || !alert) return false
@@ -146,11 +146,11 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
       )
     })
     assert.strictEqual(
-      centeredTranscriptError,
+      centeredTrajectoryError,
       true,
-      'a full-page transcript load error must be centered in its content region'
+      'a full-page trajectory load error must be centered in its content region'
     )
-    await transcriptFailurePage.close()
+    await trajectoryFailurePage.close()
 
     const memoryFilesFailurePage = await context.newPage()
     await memoryFilesFailurePage.route(
@@ -679,17 +679,17 @@ export async function runMemoryFlow({
       name: 'Maintenance process'
     })
     await maintenanceDialog
-      .locator('.transcript-message')
+      .locator('.trajectory-message')
       .getByText('System', { exact: true })
       .waitFor()
     await maintenanceDialog
-      .locator('.transcript-message')
+      .locator('.trajectory-message')
       .getByText('AI response', { exact: true })
       .waitFor()
-    const transcriptLayout = await maintenanceDialog.evaluate((dialog) => {
-      const layout = dialog.querySelector('.transcript-layout')
-      const timeline = dialog.querySelector('.transcript-timeline')
-      const minimap = dialog.querySelector('.transcript-minimap')
+    const trajectoryLayout = await maintenanceDialog.evaluate((dialog) => {
+      const layout = dialog.querySelector('.trajectory-layout')
+      const timeline = dialog.querySelector('.trajectory-timeline')
+      const minimap = dialog.querySelector('.trajectory-minimap')
       const body = dialog.querySelector('.mantine-Modal-body')
       if (layout === null || timeline === null || body === null) return null
       return {
@@ -702,28 +702,28 @@ export async function runMemoryFlow({
       }
     })
     assert.ok(
-      transcriptLayout !== null &&
-        transcriptLayout.layoutWidth >= transcriptLayout.bodyWidth - 48,
-      `${name} transcript layout must fill the modal content width`
+      trajectoryLayout !== null &&
+        trajectoryLayout.layoutWidth >= trajectoryLayout.bodyWidth - 48,
+      `${name} trajectory layout must fill the modal content width`
     )
     assert.ok(
-      transcriptLayout !== null &&
-        transcriptLayout.timelineWidth >=
-          transcriptLayout.layoutWidth -
-            transcriptLayout.minimapWidth -
-            transcriptLayout.gap -
+      trajectoryLayout !== null &&
+        trajectoryLayout.timelineWidth >=
+          trajectoryLayout.layoutWidth -
+            trajectoryLayout.minimapWidth -
+            trajectoryLayout.gap -
             1,
-      `${name} transcript timeline must fill the column next to the minimap`
+      `${name} trajectory timeline must fill the column next to the minimap`
     )
     assert.strictEqual(
-      transcriptLayout?.minimapPresent,
+      trajectoryLayout?.minimapPresent,
       viewport.width > 700,
-      `${name} transcript minimap must be mounted only when its rail has room`
+      `${name} trajectory minimap must be mounted only when its rail has room`
     )
     await waitUntil(
       () =>
         maintenanceDialog.evaluate((dialog) => {
-          const minimap = dialog.querySelector('.transcript-minimap')
+          const minimap = dialog.querySelector('.trajectory-minimap')
           if (minimap === null) return true
           let scroller = minimap.parentElement
           while (
@@ -740,28 +740,28 @@ export async function runMemoryFlow({
             ) < 8
           )
         }),
-      `${name} transcript rail must center in the modal scrollport`
+      `${name} trajectory rail must center in the modal scrollport`
     )
     await maintenanceDialog
       .getByPlaceholder('Search messages, tools, and arguments')
       .fill('current memory')
     await waitUntil(
       async () =>
-        (await maintenanceDialog.locator('.transcript-message').count()) === 1,
-      `${name} transcript search must filter messages`
+        (await maintenanceDialog.locator('.trajectory-message').count()) === 1,
+      `${name} trajectory search must filter messages`
     )
     assert.strictEqual(
       await maintenanceDialog.locator('mark').textContent(),
       'current memory',
-      `${name} transcript search must highlight the matching text`
+      `${name} trajectory search must highlight the matching text`
     )
-    const fullTranscriptHref = await maintenanceDialog
+    const fullTrajectoryHref = await maintenanceDialog
       .getByRole('link', { name: 'Open in new page' })
       .getAttribute('href')
     assert.match(
-      fullTranscriptHref ?? '',
-      /^\/memory\/revisions\/\d+\/transcript$/,
-      `${name} transcript modal must expose a dedicated page`
+      fullTrajectoryHref ?? '',
+      /^\/memory\/revisions\/\d+\/trajectory$/,
+      `${name} trajectory modal must expose a dedicated page`
     )
     await maintenanceDialog
       .getByPlaceholder('Search messages, tools, and arguments')
@@ -776,7 +776,7 @@ export async function runMemoryFlow({
     assert.strictEqual(
       await page
         .locator('.mantine-Tabs-panel:visible')
-        .getByRole('link', { name: /Download (memory tree|transcript)/ })
+        .getByRole('link', { name: /Download (memory tree|trajectory)/ })
         .count(),
       0,
       `${name} revision rows must keep downloads inside their viewers`
@@ -839,10 +839,10 @@ export async function runMemoryFlow({
     assert.strictEqual(
       await page
         .locator('.mantine-Tabs-panel:visible')
-        .getByRole('link', { name: 'Download transcript' })
+        .getByRole('link', { name: 'Download trajectory' })
         .count(),
       0,
-      `${name} observation rows must not duplicate transcript downloads`
+      `${name} observation rows must not duplicate trajectory downloads`
     )
     await page
       .locator('.mantine-Tabs-panel:visible')
@@ -854,9 +854,9 @@ export async function runMemoryFlow({
     })
     await waitUntil(
       async () =>
-        (await extractionDialog.locator('.transcript-message').count()) === 4 &&
-        (await extractionDialog.locator('.transcript-tool').count()) === 1,
-      `${name} extraction transcript must render all messages and its tool result`
+        (await extractionDialog.locator('.trajectory-message').count()) === 4 &&
+        (await extractionDialog.locator('.trajectory-tool').count()) === 1,
+      `${name} extraction trajectory must render all messages and its tool result`
     )
     await extractionDialog.locator('.mantine-Modal-close').click()
     await page.getByText('Revisions', { exact: true }).click()

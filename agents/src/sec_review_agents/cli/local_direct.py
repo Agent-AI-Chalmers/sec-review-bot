@@ -43,16 +43,16 @@ def _publish_local_diagnostic(
         units = [
             DiagnosticReviewUnit(
                 unit_id=case_root.name,
-                transcript_root=case_root / "transcripts",
+                trajectory_root=case_root / "trajectories",
             )
             for case_root in sorted((artifact_root / "cases").glob("*"))
-            if case_root.is_dir() and list((case_root / "transcripts").glob("*.jsonl"))
+            if case_root.is_dir() and list((case_root / "trajectories").glob("*.jsonl"))
         ]
     else:
-        transcript_root = artifact_root / "transcripts"
+        trajectory_root = artifact_root / "trajectories"
         units = (
-            [DiagnosticReviewUnit("review", transcript_root)]
-            if list(transcript_root.glob("*.jsonl"))
+            [DiagnosticReviewUnit("review", trajectory_root)]
+            if list(trajectory_root.glob("*.jsonl"))
             else []
         )
     # Direct mode is an offline producer even when the shell also carries

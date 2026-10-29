@@ -16,7 +16,7 @@ class StructuredRenderSchema:
     """Lightweight display hints, not a contract JSON Schema mirror."""
 
     hidden_keys: frozenset[str] = frozenset(
-        {"raw", "debug", "diagnostics", "transcript", "transcripts"}
+        {"raw", "debug", "diagnostics", "trajectory", "trajectories"}
     )
     summary_keys: tuple[str, ...] = (
         "overview",
@@ -43,7 +43,7 @@ StructuredRenderProfile = Literal["prompt", "preview", "public_report"]
 
 
 DEFAULT_STRUCTURED_RENDER_SCHEMA = StructuredRenderSchema()
-# Prompt rendering may preserve transcript-shaped context that previews/reports hide.
+# Prompt rendering may preserve trajectory-shaped context that previews/reports hide.
 PROMPT_STRUCTURED_RENDER_SCHEMA = StructuredRenderSchema(
     hidden_keys=frozenset({"raw", "debug", "diagnostics"}),
     prose_keys=frozenset(

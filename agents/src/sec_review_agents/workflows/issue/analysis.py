@@ -19,14 +19,14 @@ async def analyze_issue(
     workspace_snapshot_tar_path: Path,
     history_path: Path,
     analyzer_artifacts_path: Path,
-    published_transcript_path: Path | None = None,
+    published_trajectory_path: Path | None = None,
     review_objective: ReviewObjective,
     runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     return await run_analysis_stage(
         analyzer_artifacts_path=analyzer_artifacts_path,
-        published_transcript_path=published_transcript_path,
+        published_trajectory_path=published_trajectory_path,
         agent_name="issue-analyzer",
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         setup_declaration_content=setup_declaration_content,

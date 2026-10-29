@@ -14,7 +14,7 @@ from sec_review_agents.agents.memory_extractor.backend import (
 )
 from sec_review_agents.agents.memory_extractor.prompts import build_extractor_prompt
 from sec_review_agents.agents.memory_extractor.tools import (
-    build_transcript_tools,
+    build_trajectory_tools,
 )
 from sec_review_agents.agents.memory_maintainer.prompts import build_maintenance_prompt
 from sec_review_agents.agents.memory_maintainer.tools import (
@@ -63,7 +63,7 @@ def _create_memory_tree(root: Path) -> Path:
     return root
 
 
-def _transcript_jsonl(*contents: str) -> str:
+def _trajectory_jsonl(*contents: str) -> str:
     return "".join(
         json.dumps(
             {
@@ -89,48 +89,48 @@ def _transcript_jsonl(*contents: str) -> str:
     )
 
 
-def test_stage_transcripts_copies_ordered_jsonl_files(tmp_path: Path) -> None:
-    source = tmp_path / "run" / "transcript.jsonl"
+def test_stage_trajectories_copies_ordered_jsonl_files(tmp_path: Path) -> None:
+    source = tmp_path / "run" / "trajectory.jsonl"
     source.parent.mkdir()
-    transcript_content = _transcript_jsonl("message")
-    source.write_text(transcript_content, encoding="utf-8")
+    trajectory_content = _trajectory_jsonl("message")
+    source.write_text(trajectory_content, encoding="utf-8")
     destination = tmp_path / "staged"
 
-    staged = memory_extraction.stage_transcripts(
+    staged = memory_extraction.stage_trajectories(
         [
-            ("transcript", "transcript", source),
+            ("trajectory", "trajectory", source),
         ],
         destination,
     )
 
     assert staged == [
         (
-            "transcript",
-            Path("/transcripts/0001-transcript.jsonl"),
+            "trajectory",
+            Path("/trajectories/0001-trajectory.jsonl"),
         )
     ]
-    assert (destination / "0001-transcript.jsonl").read_text(
+    assert (destination / "0001-trajectory.jsonl").read_text(
         encoding="utf-8"
-    ) == transcript_content
+    ) == trajectory_content
     assert not (destination / "MANIFEST.md").exists()
 
 
 @pytest.mark.parametrize(
     "content",
     [
-        _transcript_jsonl("readable") + '{"seq":2,"event":"message","message":',
+        _trajectory_jsonl("readable") + '{"seq":2,"event":"message","message":',
         '{"seq":2,"event":"message","message":{}}\n',
         "\n",
     ],
 )
-def test_stage_transcripts_preserves_incomplete_input(
+def test_stage_trajectories_preserves_incomplete_input(
     tmp_path: Path, content: str
 ) -> None:
-    source = tmp_path / "transcript.jsonl"
+    source = tmp_path / "trajectory.jsonl"
     source.write_text(content, encoding="utf-8")
 
     destination = tmp_path / "staged"
-    memory_extraction.stage_transcripts(
+    memory_extraction.stage_trajectories(
         [("analyzer", "initial", source)],
         destination,
     )
@@ -140,21 +140,21 @@ def test_stage_transcripts_preserves_incomplete_input(
     ) == content
 
 
-def test_transcript_tools_list_and_read_messages(tmp_path: Path) -> None:
-    transcript = tmp_path / "0001-analyzer-initial.jsonl"
-    transcript.write_text(
-        _transcript_jsonl("initial claim", "verified conclusion"),
+def test_trajectory_tools_list_and_read_messages(tmp_path: Path) -> None:
+    trajectory = tmp_path / "0001-analyzer-initial.jsonl"
+    trajectory.write_text(
+        _trajectory_jsonl("initial claim", "verified conclusion"),
         encoding="utf-8",
     )
-    backend = create_memory_extractor_backend(transcript_root=tmp_path)
-    list_messages, read_message = build_transcript_tools(backend)
+    backend = create_memory_extractor_backend(trajectory_root=tmp_path)
+    list_messages, read_message = build_trajectory_tools(backend)
 
     listed = list_messages.invoke(
-        {"file_path": "/transcripts/0001-analyzer-initial.jsonl"}
+        {"file_path": "/trajectories/0001-analyzer-initial.jsonl"}
     )
     message = read_message.invoke(
         {
-            "file_path": "/transcripts/0001-analyzer-initial.jsonl",
+            "file_path": "/trajectories/0001-analyzer-initial.jsonl",
             "seq": 2,
         }
     )
@@ -165,39 +165,39 @@ def test_transcript_tools_list_and_read_messages(tmp_path: Path) -> None:
     assert message["message"]["content"] == "verified conclusion"
 
 
-def test_list_transcript_messages_reports_partial_lines_without_losing_messages(
+def test_list_trajectory_messages_reports_partial_lines_without_losing_messages(
     tmp_path: Path,
 ) -> None:
-    transcript = tmp_path / "0001-analyzer-initial.jsonl"
-    transcript.write_text(
-        _transcript_jsonl("readable") + '{"seq":2,"event":"message"',
+    trajectory = tmp_path / "0001-analyzer-initial.jsonl"
+    trajectory.write_text(
+        _trajectory_jsonl("readable") + '{"seq":2,"event":"message"',
         encoding="utf-8",
     )
-    backend = create_memory_extractor_backend(transcript_root=tmp_path)
-    list_messages, _ = build_transcript_tools(backend)
+    backend = create_memory_extractor_backend(trajectory_root=tmp_path)
+    list_messages, _ = build_trajectory_tools(backend)
 
     result = list_messages.invoke(
-        {"file_path": "/transcripts/0001-analyzer-initial.jsonl"}
+        {"file_path": "/trajectories/0001-analyzer-initial.jsonl"}
     )
 
     assert [message["seq"] for message in result["messages"]] == [1]
     assert result["parse_errors"][0]["line"] == 2
 
 
-def test_collect_review_memory_transcripts_uses_flat_published_files(
+def test_collect_review_memory_trajectories_uses_flat_published_files(
     tmp_path: Path,
 ) -> None:
     review_root = tmp_path / "review"
-    published = review_root / "transcripts" / "0001-analyzer-initial.jsonl"
+    published = review_root / "trajectories" / "0001-analyzer-initial.jsonl"
     unrelated = review_root / "notes" / "scratch.json"
     published.parent.mkdir(parents=True)
     unrelated.parent.mkdir(parents=True)
-    published.write_text(_transcript_jsonl("message"), encoding="utf-8")
+    published.write_text(_trajectory_jsonl("message"), encoding="utf-8")
     unrelated.write_text(
         '[{"index":0,"type":"note","content":"scratch"}]\n', encoding="utf-8"
     )
 
-    refs = memory_extraction.collect_review_memory_transcripts(review_root)
+    refs = memory_extraction.collect_review_memory_trajectories(review_root)
 
     assert refs == [
         (
@@ -208,44 +208,44 @@ def test_collect_review_memory_transcripts_uses_flat_published_files(
     ]
 
 
-def test_collect_review_memory_transcripts_rejects_invalid_published_name(
+def test_collect_review_memory_trajectories_rejects_invalid_published_name(
     tmp_path: Path,
 ) -> None:
     review_root = tmp_path / "review"
-    transcript = review_root / "transcripts" / "analyzer.jsonl"
-    transcript.parent.mkdir(parents=True)
-    transcript.write_text(_transcript_jsonl("message"), encoding="utf-8")
+    trajectory = review_root / "trajectories" / "analyzer.jsonl"
+    trajectory.parent.mkdir(parents=True)
+    trajectory.write_text(_trajectory_jsonl("message"), encoding="utf-8")
 
     with pytest.raises(ValueError, match="<order>-<stage>-<attempt>"):
-        memory_extraction.collect_review_memory_transcripts(review_root)
+        memory_extraction.collect_review_memory_trajectories(review_root)
 
 
-def test_collect_review_memory_transcripts_skips_non_memory_stage(
+def test_collect_review_memory_trajectories_skips_non_memory_stage(
     tmp_path: Path,
 ) -> None:
     review_root = tmp_path / "review"
-    transcripts = review_root / "transcripts"
-    transcripts.mkdir(parents=True)
-    analyzer = transcripts / "0001-analyzer-initial.jsonl"
-    cvss = transcripts / "0002-cvss-initial.jsonl"
-    analyzer.write_text(_transcript_jsonl("analysis"), encoding="utf-8")
-    cvss.write_text(_transcript_jsonl("score"), encoding="utf-8")
+    trajectories = review_root / "trajectories"
+    trajectories.mkdir(parents=True)
+    analyzer = trajectories / "0001-analyzer-initial.jsonl"
+    cvss = trajectories / "0002-cvss-initial.jsonl"
+    analyzer.write_text(_trajectory_jsonl("analysis"), encoding="utf-8")
+    cvss.write_text(_trajectory_jsonl("score"), encoding="utf-8")
 
-    refs = memory_extraction.collect_review_memory_transcripts(review_root)
+    refs = memory_extraction.collect_review_memory_trajectories(review_root)
 
     assert [(stage, path) for stage, _attempt, path in refs] == [
         ("analyzer", analyzer.resolve())
     ]
 
 
-def test_stage_review_transcripts_writes_ordered_prompt(tmp_path: Path) -> None:
+def test_stage_review_trajectories_writes_ordered_prompt(tmp_path: Path) -> None:
     sources = []
     for label in ("analyzer", "mitigator", "verifier"):
         path = tmp_path / f"{label}.jsonl"
-        path.write_text(_transcript_jsonl("message"), encoding="utf-8")
+        path.write_text(_trajectory_jsonl("message"), encoding="utf-8")
         sources.append(path)
 
-    staged = memory_extraction.stage_transcripts(
+    staged = memory_extraction.stage_trajectories(
         [
             ("analyzer", "initial", sources[0]),
             ("mitigator", "initial", sources[1]),
@@ -257,27 +257,27 @@ def test_stage_review_transcripts_writes_ordered_prompt(tmp_path: Path) -> None:
     assert staged == [
         (
             "analyzer initial",
-            Path("/transcripts/0001-analyzer-initial.jsonl"),
+            Path("/trajectories/0001-analyzer-initial.jsonl"),
         ),
         (
             "mitigator initial",
-            Path("/transcripts/0002-mitigator-initial.jsonl"),
+            Path("/trajectories/0002-mitigator-initial.jsonl"),
         ),
         (
             "verifier initial",
-            Path("/transcripts/0003-verifier-initial.jsonl"),
+            Path("/trajectories/0003-verifier-initial.jsonl"),
         ),
     ]
     prompt = build_extractor_prompt(staged)
-    assert "analyzer initial: `/transcripts/0001-analyzer-initial.jsonl`" in prompt
-    assert "mitigator initial: `/transcripts/0002-mitigator-initial.jsonl`" in prompt
-    assert "verifier initial: `/transcripts/0003-verifier-initial.jsonl`" in prompt
+    assert "analyzer initial: `/trajectories/0001-analyzer-initial.jsonl`" in prompt
+    assert "mitigator initial: `/trajectories/0002-mitigator-initial.jsonl`" in prompt
+    assert "verifier initial: `/trajectories/0003-verifier-initial.jsonl`" in prompt
     assert str(tmp_path) not in prompt
     assert "source:" not in prompt
-    assert "/transcripts/MANIFEST.md" not in prompt
+    assert "/trajectories/MANIFEST.md" not in prompt
 
 
-def test_transcript_extraction_prompt_extracts_observation_only() -> None:
+def test_trajectory_extraction_prompt_extracts_observation_only() -> None:
     """Keep output-schema internals out of the extractor's task message."""
     user_prompt = build_extractor_prompt([])
 
@@ -610,11 +610,11 @@ def test_extraction_id_slugs_job_id() -> None:
     )
 
 
-def test_extraction_id_falls_back_to_transcript_hash() -> None:
+def test_extraction_id_falls_back_to_trajectory_hash() -> None:
     obs_id = memory_extraction.extraction_id([Path("/tmp/a.json"), Path("/tmp/b.json")])
 
-    assert obs_id.startswith("transcripts-")
-    assert len(obs_id) == len("transcripts-") + 16
+    assert obs_id.startswith("trajectories-")
+    assert len(obs_id) == len("trajectories-") + 16
 
 
 def test_extraction_id_distinguishes_extraction_jobs() -> None:

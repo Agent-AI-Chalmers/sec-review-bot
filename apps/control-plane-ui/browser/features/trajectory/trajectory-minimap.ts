@@ -1,7 +1,7 @@
-import type { TranscriptMessageView } from './transcript-model.js'
+import type { TrajectoryMessageView } from './trajectory-model.js'
 
 export interface MinimapSegment {
-  message: TranscriptMessageView
+  message: TrajectoryMessageView
   top: number
   height: number
 }
@@ -29,7 +29,7 @@ export function minimapMarkWidth(current: boolean, preview: boolean): number {
   return preview ? MINIMAP_PREVIEW_WIDTH : MINIMAP_MARK_WIDTH
 }
 
-// One 10px slot per mark. Dense transcripts show groups in those slots
+// One 10px slot per mark. Dense trajectories show groups in those slots
 // instead of compressing every message into 240px.
 export const MAX_MINIMAP_MARKS = 25
 
@@ -40,7 +40,7 @@ export interface MinimapBucket {
 }
 
 /**
- * Dense transcripts compress several messages into one muted background mark.
+ * Dense trajectories compress several messages into one muted background mark.
  * The current message is not part of these buckets: the viewer draws it
  * separately at its exact position so only that mark is highlighted.
  */

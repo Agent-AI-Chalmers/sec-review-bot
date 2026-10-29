@@ -3,7 +3,7 @@
 # APIs, and may not fit current run artifacts. Review and adapt this script for
 # your own inputs and risk tolerance before use.
 
-"""Preview memory observation extraction from explicit transcript inputs."""
+"""Preview memory observation extraction from explicit trajectory inputs."""
 
 import argparse
 import asyncio
@@ -13,7 +13,7 @@ from uuid import uuid4
 from sec_review_agents.memory.extractor import (
     preview_memory_observation_from_paths,
 )
-from sec_review_agents.runtime.transcripts import transcript_path
+from sec_review_agents.runtime.trajectories import trajectory_path
 from sec_review_agents.utils.env import bootstrap_agents_env
 from sec_review_agents.utils.files import slug_filename_component
 
@@ -29,7 +29,7 @@ WARNING = (
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Experimentally read review transcripts and write observation Markdown "
+            "Experimentally read review trajectories and write observation Markdown "
             "files to an output directory. " + WARNING
         )
     )
@@ -38,8 +38,8 @@ def _parse_args() -> argparse.Namespace:
         nargs="+",
         type=Path,
         help=(
-            "Review artifact directories containing transcripts/, or transcript "
-            "JSONL transcript files."
+            "Review artifact directories containing trajectories/, or trajectory "
+            "JSONL trajectory files."
         ),
     )
     parser.add_argument(
@@ -57,7 +57,7 @@ def _parse_args() -> argparse.Namespace:
     id_group.add_argument(
         "--extraction-id",
         default=None,
-        help="Stable extraction id for the collected transcript sequence.",
+        help="Stable extraction id for the collected trajectory sequence.",
     )
     parser.add_argument(
         "--source-workflow",
@@ -84,7 +84,7 @@ def _write_observation(path: Path, content: str) -> None:
 
 
 async def main() -> int:
-    """Run one preview extraction attempt over the supplied transcript sequence."""
+    """Run one preview extraction attempt over the supplied trajectory sequence."""
     bootstrap_agents_env()
     args = _parse_args()
     output_dir = args.output_dir.expanduser().resolve()
@@ -93,7 +93,7 @@ async def main() -> int:
         args.extraction_id or args.job_id or args.source_workflow,
         fallback="preview",
     )
-    transcript_output = transcript_path(
+    trajectory_output = trajectory_path(
         output_dir,
         name=f"memory-extractor-{run_label}-{uuid4().hex}",
     )
@@ -105,17 +105,17 @@ async def main() -> int:
         job_id=args.job_id,
         source_workflow=args.source_workflow,
         run_id=args.run_id,
-        extractor_transcript_path=transcript_output,
+        extractor_trajectory_path=trajectory_output,
     )
     if result.skipped or result.observation_markdown is None:
         print(f"No observation written: {result.summary}")
-        print(f"Extractor transcript: {transcript_output}")
+        print(f"Extractor trajectory: {trajectory_output}")
         return 1
 
     target = output_dir / f"{result.extraction_id}.md"
     _write_observation(target, result.observation_markdown)
     print(f"Observation: {target}")
-    print(f"Extractor transcript: {transcript_output}")
+    print(f"Extractor trajectory: {trajectory_output}")
     print(WARNING)
     return 0
 

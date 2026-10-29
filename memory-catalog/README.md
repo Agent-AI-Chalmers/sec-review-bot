@@ -2,16 +2,16 @@
 
 Language: English | [中文](README.zh.md)
 
-`memory-catalog/` exposes the HTTP API that records completed memory extractions, coordinates observation processing, and commits memory tree revisions. Coordination state is stored in PostgreSQL. Workers publish immutable memory trees and compressed memory-agent transcripts to object storage, and the catalog stores their artifact references.
+`memory-catalog/` exposes the HTTP API that records completed memory extractions, coordinates observation processing, and commits memory tree revisions. Coordination state is stored in PostgreSQL. Workers publish immutable memory trees and compressed memory-agent trajectories to object storage, and the catalog stores their artifact references.
 
 ## API
 
 | Method | Path                                   | Purpose                                                                                                   |
 | ------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `GET`  | `/healthz`                             | Report service health.                                                                                    |
-| `POST` | `/v1/extractions`                      | Atomically register a completed extraction, its transcript reference, and its optional observation.       |
+| `POST` | `/v1/extractions`                      | Atomically register a completed extraction, its trajectory reference, and its optional observation.       |
 | `GET`  | `/v1/extractions`                      | List completed extractions with stable cursor pagination and provenance filters.                          |
-| `GET`  | `/v1/extractions/{extraction_id}`      | Return one extraction, its transcript reference, and its optional observation.                            |
+| `GET`  | `/v1/extractions/{extraction_id}`      | Return one extraction, its trajectory reference, and its optional observation.                            |
 | `GET`  | `/v1/observations`                     | List observations with stable cursor pagination and consumption filters.                                  |
 | `GET`  | `/v1/overview`                         | Summarize completed extraction coverage, observation outcomes, and a 30-day, 90-day, or all-time trend.   |
 | `GET`  | `/v1/observation-backlog`              | Return the count and oldest age of pending observations.                                                  |

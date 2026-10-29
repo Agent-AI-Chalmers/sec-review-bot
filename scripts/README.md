@@ -63,6 +63,6 @@ The output describes calls observed by Langfuse. `complete_for_observed_calls` m
 
 ## Experimental Memory Probe
 
-`experimental_memory_extract_observations.py` runs the memory extractor against explicit transcript files or review artifact directories and writes the observation preview and a uniquely named extractor transcript to a requested directory. It is a model-development probe, not an operational ingestion path: it does not use Temporal, register state with the Memory Catalog, or publish artifacts.
+`experimental_memory_extract_observations.py` runs the memory extractor against explicit trajectory files or review artifact directories and writes the observation preview and a uniquely named extractor trajectory to a requested directory. It is a model-development probe, not an operational ingestion path: it does not use Temporal, register state with the Memory Catalog, or publish artifacts.
 
 There is no repository script for directly maintaining persistent memory from observation files. Operational maintenance is started and scheduled through the agents Temporal CLI; persistent state remains owned by the Memory Catalog.

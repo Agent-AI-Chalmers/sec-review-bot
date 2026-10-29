@@ -843,9 +843,9 @@ class TestRepositoryDeliveryExecution:
 
         def _invoke_side_effect(*args, **kwargs):
             invoke_calls["count"] += 1
-            for transcript_path in kwargs["transcript_paths"]:
-                transcript_path.parent.mkdir(parents=True, exist_ok=True)
-                transcript_path.write_text("{}\n", encoding="utf-8")
+            for trajectory_path in kwargs["trajectory_paths"]:
+                trajectory_path.parent.mkdir(parents=True, exist_ok=True)
+                trajectory_path.write_text("{}\n", encoding="utf-8")
             if invoke_calls["count"] == 1:
                 merge_workspace = self._latest_patch_synthesis_workspace(
                     create_agent_calls
@@ -896,7 +896,7 @@ class TestRepositoryDeliveryExecution:
         patch_synthesis_artifacts = (
             self.run_artifacts / "patch-synthesis" / "combined-edb095e4e7"
         )
-        assert (patch_synthesis_artifacts / "transcript.jsonl").exists()
+        assert (patch_synthesis_artifacts / "trajectory.jsonl").exists()
         assert (patch_synthesis_artifacts / "workspace.patch").exists()
 
     @pytest.mark.asyncio

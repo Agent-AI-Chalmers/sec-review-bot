@@ -1,6 +1,6 @@
-"""Domain-independent JSONL transcript writing and reading.
+"""Domain-independent JSONL trajectory writing and reading.
 
-Removal updates are intentionally omitted: transcripts preserve messages once
+Removal updates are intentionally omitted: trajectories preserve messages once
 observed and are not replayable snapshots of the current LangGraph state.
 """
 
@@ -15,18 +15,18 @@ from langchain_core.messages import RemoveMessage
 
 from sec_review_agents.utils.serialization import json_safe
 
-TRANSCRIPT_BASENAME = "transcript"
-TRANSCRIPT_SUFFIX = ".jsonl"
+TRAJECTORY_BASENAME = "trajectory"
+TRAJECTORY_SUFFIX = ".jsonl"
 
 
-def transcript_path(directory: Path, *, name: str = TRANSCRIPT_BASENAME) -> Path:
+def trajectory_path(directory: Path, *, name: str = TRAJECTORY_BASENAME) -> Path:
     normalized = str(name).strip()
     if not normalized or Path(normalized).name != normalized or Path(normalized).suffix:
-        raise ValueError(f"Transcript name must be a plain file stem: {name!r}")
-    return directory / f"{normalized}{TRANSCRIPT_SUFFIX}"
+        raise ValueError(f"Trajectory name must be a plain file stem: {name!r}")
+    return directory / f"{normalized}{TRAJECTORY_SUFFIX}"
 
 
-def remove_transcripts(paths: Iterable[Path]) -> None:
+def remove_trajectories(paths: Iterable[Path]) -> None:
     for path in paths:
         path.unlink(missing_ok=True)
 
@@ -107,7 +107,7 @@ def serialize_agent_message(message: Any, *, message_id: str) -> dict:
     return serialized
 
 
-def read_transcript_events(path: Path) -> list[dict[str, Any]]:
+def read_trajectory_events(path: Path) -> list[dict[str, Any]]:
     events: list[dict[str, Any]] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
@@ -118,9 +118,9 @@ def read_transcript_events(path: Path) -> list[dict[str, Any]]:
     return events
 
 
-def read_transcript_messages(path: Path) -> list[dict[str, Any]]:
+def read_trajectory_messages(path: Path) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
-    for event in read_transcript_events(path):
+    for event in read_trajectory_events(path):
         if event.get("event") != "message":
             continue
         message = event.get("message")
@@ -129,10 +129,10 @@ def read_transcript_messages(path: Path) -> list[dict[str, Any]]:
     return messages
 
 
-class TranscriptWriter:
+class TrajectoryWriter:
     def __init__(self, paths: tuple[Path, ...]) -> None:
         if not paths:
-            raise ValueError("TranscriptWriter requires at least one path.")
+            raise ValueError("TrajectoryWriter requires at least one path.")
         self.paths = paths
         self.path = self.paths[0]
         self._seq = 0
@@ -146,9 +146,9 @@ class TranscriptWriter:
     def _append(self, record: dict[str, Any]) -> None:
         encoded = json.dumps(record, ensure_ascii=False, separators=(",", ":"))
         for path in self.paths:
-            with path.open("a", encoding="utf-8") as transcript_file:
-                transcript_file.write(encoded)
-                transcript_file.write("\n")
+            with path.open("a", encoding="utf-8") as trajectory_file:
+                trajectory_file.write(encoded)
+                trajectory_file.write("\n")
 
     def _ensure_message_id(self, message: Any) -> str:
         if isinstance(message, dict):
@@ -200,11 +200,11 @@ class TranscriptWriter:
 
 
 __all__ = [
-    "TRANSCRIPT_BASENAME",
-    "TRANSCRIPT_SUFFIX",
-    "TranscriptWriter",
-    "read_transcript_events",
-    "read_transcript_messages",
-    "remove_transcripts",
-    "transcript_path",
+    "TRAJECTORY_BASENAME",
+    "TRAJECTORY_SUFFIX",
+    "TrajectoryWriter",
+    "read_trajectory_events",
+    "read_trajectory_messages",
+    "remove_trajectories",
+    "trajectory_path",
 ]

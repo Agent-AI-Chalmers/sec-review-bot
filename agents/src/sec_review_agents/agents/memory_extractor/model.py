@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 class MemoryObservationOutput(BaseModel):
     has_observation: bool = Field(
-        description="True when the transcripts contain durable reusable review experience.",
+        description="True when the trajectories contain durable reusable review experience.",
     )
     observation_markdown: str = Field(
         default="",

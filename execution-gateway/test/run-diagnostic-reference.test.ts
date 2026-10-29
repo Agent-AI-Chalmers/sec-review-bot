@@ -18,7 +18,7 @@ await test('accepts the workflow-owned run diagnostic reference', () => {
   assert.deepEqual(parseRunDiagnosticArtifact(artifact, 'run-1'), artifact)
 })
 
-await test('rejects the deleted standalone transcript object', () => {
+await test('rejects the deleted standalone trajectory object', () => {
   assert.throws(
     () =>
       parseRunDiagnosticArtifact(
@@ -26,7 +26,7 @@ await test('rejects the deleted standalone transcript object', () => {
           ...artifact,
           artifact: {
             ...artifact.artifact,
-            uri: 's3://sec-review/runs/run-1/transcripts/review-transcripts.v1.tar.zst',
+            uri: 's3://sec-review/runs/run-1/trajectories/review-trajectories.v1.tar.zst',
           },
         },
         'run-1',

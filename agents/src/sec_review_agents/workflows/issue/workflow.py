@@ -31,9 +31,9 @@ async def analyze_issue_activity(
     request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
     from sec_review_agents.observability.trace_context import bind_trace_context
-    from sec_review_agents.review_stages.transcripts import (
-        review_transcript_path,
-        review_transcripts_root,
+    from sec_review_agents.review_stages.trajectories import (
+        review_trajectories_root,
+        review_trajectory_path,
     )
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
@@ -75,8 +75,8 @@ async def analyze_issue_activity(
                 prepared_input["artifact_paths"],
                 "analyzer",
             ),
-            published_transcript_path=review_transcript_path(
-                review_transcripts_root(run_artifacts_root),
+            published_trajectory_path=review_trajectory_path(
+                review_trajectories_root(run_artifacts_root),
                 order=1,
                 stage="analyzer",
             ),
@@ -100,9 +100,9 @@ async def mitigate_issue_activity(
         create_skipped_mitigation_result,
         mitigation_attempt_label,
     )
-    from sec_review_agents.review_stages.transcripts import (
-        review_transcript_path,
-        review_transcripts_root,
+    from sec_review_agents.review_stages.trajectories import (
+        review_trajectories_root,
+        review_trajectory_path,
     )
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
@@ -125,8 +125,8 @@ async def mitigate_issue_activity(
     )
     review_intent = require_review_intent(prepared_input.get("review_intent"))
     if not has_confirmed_repair_target(analysis_result):
-        review_transcript_path(
-            review_transcripts_root(run_artifacts_root),
+        review_trajectory_path(
+            review_trajectories_root(run_artifacts_root),
             order=review_stage_attempt_order(
                 stage="mitigator", retry_context=retry_context
             ),
@@ -159,8 +159,8 @@ async def mitigate_issue_activity(
                 label="bundle_paths.history_path",
             ),
             mitigator_artifacts_path=mitigator_artifacts_path,
-            published_transcript_path=review_transcript_path(
-                review_transcripts_root(run_artifacts_root),
+            published_trajectory_path=review_trajectory_path(
+                review_trajectories_root(run_artifacts_root),
                 order=review_stage_attempt_order(
                     stage="mitigator", retry_context=retry_context
                 ),
@@ -186,9 +186,9 @@ async def verify_issue_activity(
 ) -> dict[str, Any]:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
-    from sec_review_agents.review_stages.transcripts import (
-        review_transcript_path,
-        review_transcripts_root,
+    from sec_review_agents.review_stages.trajectories import (
+        review_trajectories_root,
+        review_trajectory_path,
     )
     from sec_review_agents.review_stages.verification.stage import (
         create_skipped_verification_result,
@@ -214,8 +214,8 @@ async def verify_issue_activity(
         "verifier",
     )
     if not has_confirmed_repair_target(analysis_result):
-        review_transcript_path(
-            review_transcripts_root(run_artifacts_root),
+        review_trajectory_path(
+            review_trajectories_root(run_artifacts_root),
             order=review_stage_attempt_order(
                 stage="verifier", retry_context=retry_context
             ),
@@ -249,8 +249,8 @@ async def verify_issue_activity(
                 label="bundle_paths.history_path",
             ),
             verifier_artifacts_path=verifier_artifacts_path,
-            published_transcript_path=review_transcript_path(
-                review_transcripts_root(run_artifacts_root),
+            published_trajectory_path=review_trajectory_path(
+                review_trajectories_root(run_artifacts_root),
                 order=review_stage_attempt_order(
                     stage="verifier", retry_context=retry_context
                 ),
@@ -386,7 +386,7 @@ class IssueReviewWorkflow:
                     review_units=[
                         {
                             "unit_id": "review",
-                            "transcript_root": str(artifact_root / "transcripts"),
+                            "trajectory_root": str(artifact_root / "trajectories"),
                         }
                     ],
                     result=result,

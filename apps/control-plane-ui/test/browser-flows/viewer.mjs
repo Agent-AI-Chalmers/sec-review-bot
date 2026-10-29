@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 
 export async function runViewerFlow({ page }) {
   await page.getByRole('link', { name: 'Viewer', exact: true }).click()
-  await page.getByRole('heading', { name: 'Transcript Viewer' }).waitFor()
-  const pastedTranscript = [
+  await page.getByRole('heading', { name: 'Trajectory Viewer' }).waitFor()
+  const pastedTrajectory = [
     JSON.stringify({
       seq: 1,
       event: 'message',
@@ -51,15 +51,15 @@ export async function runViewerFlow({ page }) {
     })
   ].join('\n')
   await page
-    .getByLabel('Paste transcript JSONL or JSON messages')
-    .fill(pastedTranscript)
+    .getByLabel('Paste trajectory JSONL or JSON messages')
+    .fill(pastedTrajectory)
   await page.getByRole('button', { name: 'Render' }).click()
   await page.getByRole('button', { name: 'Edit input' }).waitFor()
   await page
-    .getByLabel('Paste transcript JSONL or JSON messages')
+    .getByLabel('Paste trajectory JSONL or JSON messages')
     .waitFor({ state: 'hidden' })
   await page
-    .locator('.transcript-timeline')
+    .locator('.trajectory-timeline')
     .getByText('Pasted assistant response', { exact: true })
     .waitFor()
   await page.getByRole('button', { name: 'Expand all' }).click()
@@ -69,14 +69,14 @@ export async function runViewerFlow({ page }) {
   await page.getByRole('button', { name: 'Jump to result' }).waitFor()
   // "Expand all" animates every section, and scrollIntoView picks its target from
   // the current layout. Navigating while a section is still growing lands on a
-  // stale offset, so wait for the transcript height to settle first.
+  // stale offset, so wait for the trajectory height to settle first.
   let previousHeight = -1
   let stableSamples = 0
   let settled = false
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const height = await page.evaluate(() =>
       Math.round(
-        document.querySelector('.transcript-timeline')?.getBoundingClientRect()
+        document.querySelector('.trajectory-timeline')?.getBoundingClientRect()
           .height ?? 0
       )
     )
@@ -93,21 +93,21 @@ export async function runViewerFlow({ page }) {
     await page.waitForTimeout(100)
   }
   if (!settled)
-    throw new Error('transcript layout did not settle before minimap checks')
+    throw new Error('trajectory layout did not settle before minimap checks')
 
   if ((page.viewportSize()?.width ?? 0) > 700) {
     const minimap = page.getByRole('navigation', {
-      name: 'Transcript navigation'
+      name: 'Trajectory navigation'
     })
     await minimap.waitFor()
-    const segments = minimap.locator('.transcript-minimap-segment')
+    const segments = minimap.locator('.trajectory-minimap-segment')
     assert.strictEqual(
       await segments.count(),
       3,
       'the minimap must create one primary segment per visible top-level message'
     )
     const current = minimap.locator(
-      '.transcript-minimap-segment[data-current="true"]'
+      '.trajectory-minimap-segment[data-current="true"]'
     )
     assert.strictEqual(
       await current.count(),
@@ -115,24 +115,24 @@ export async function runViewerFlow({ page }) {
       'the minimap must identify exactly one message nearest the viewport center'
     )
     const slider = minimap.getByRole('slider', {
-      name: 'Transcript position'
+      name: 'Trajectory position'
     })
     await slider.waitFor()
     const controls = await slider.getAttribute('aria-controls')
     assert.ok(
       controls,
-      'the minimap slider must control the transcript timeline'
+      'the minimap slider must control the trajectory timeline'
     )
     assert.strictEqual(
       await page.evaluate(
         (id) =>
           document
             .getElementById(id)
-            ?.classList.contains('transcript-timeline') === true,
+            ?.classList.contains('trajectory-timeline') === true,
         controls
       ),
       true,
-      'the minimap slider must point at the transcript timeline'
+      'the minimap slider must point at the trajectory timeline'
     )
     assert.strictEqual(
       await slider.getAttribute('aria-valuemax'),
@@ -148,7 +148,7 @@ export async function runViewerFlow({ page }) {
     const middleY = middleBox.y - sliderBox.y + middleBox.height / 2
 
     await slider.hover({ position: { x: sliderBox.width / 2, y: middleY } })
-    const preview = minimap.locator('.transcript-minimap-preview')
+    const preview = minimap.locator('.trajectory-minimap-preview')
     await preview.waitFor()
     assert.match(
       (await preview.textContent()) ?? '',
@@ -201,7 +201,7 @@ export async function runViewerFlow({ page }) {
     await page.waitForFunction(
       () =>
         document
-          .querySelectorAll('.transcript-minimap-segment')[1]
+          .querySelectorAll('.trajectory-minimap-segment')[1]
           ?.getAttribute('data-current') === 'true',
       null,
       { timeout: 5_000 }
@@ -209,7 +209,7 @@ export async function runViewerFlow({ page }) {
     await page.waitForFunction(
       () => {
         const messages = document.querySelectorAll(
-          '.transcript-timeline .transcript-message'
+          '.trajectory-timeline .trajectory-message'
         )
         const element = messages[1]
         if (element === undefined) return false
@@ -220,7 +220,7 @@ export async function runViewerFlow({ page }) {
       { timeout: 5_000 }
     )
 
-    const denseTranscript = Array.from({ length: 130 }, (_, index) =>
+    const denseTrajectory = Array.from({ length: 130 }, (_, index) =>
       JSON.stringify({
         seq: index + 1,
         event: 'message',
@@ -229,17 +229,17 @@ export async function runViewerFlow({ page }) {
     ).join('\n')
     await page.getByRole('button', { name: 'Edit input' }).click()
     await page
-      .getByLabel('Paste transcript JSONL or JSON messages')
-      .fill(denseTranscript)
+      .getByLabel('Paste trajectory JSONL or JSON messages')
+      .fill(denseTrajectory)
     await page.getByRole('button', { name: 'Render' }).click()
     await page.getByText('Dense message 130', { exact: true }).waitFor()
     await page.waitForFunction(
-      () => document.querySelectorAll('.transcript-minimap-segment').length > 1,
+      () => document.querySelectorAll('.trajectory-minimap-segment').length > 1,
       null,
       { timeout: 5_000 }
     )
     const denseMarkCount = await page
-      .locator('.transcript-minimap-segment')
+      .locator('.trajectory-minimap-segment')
       .count()
     assert.ok(
       denseMarkCount <= 26,
@@ -247,30 +247,30 @@ export async function runViewerFlow({ page }) {
     )
     assert.strictEqual(
       await page
-        .locator('.transcript-minimap-segment[data-current="true"]')
+        .locator('.trajectory-minimap-segment[data-current="true"]')
         .count(),
       1,
       'exactly one current mark must be drawn after bucketing'
     )
     assert.strictEqual(
       await page
-        .getByRole('slider', { name: 'Transcript position' })
+        .getByRole('slider', { name: 'Trajectory position' })
         .getAttribute('aria-valuemax'),
       '130',
       'the slider must keep addressing every dense message'
     )
   }
 
-  const uploadedTranscript = JSON.stringify({
-    messages: [{ type: 'human', content: 'Uploaded transcript message' }]
+  const uploadedTrajectory = JSON.stringify({
+    messages: [{ type: 'human', content: 'Uploaded trajectory message' }]
   })
   await page.locator('input[type="file"]').setInputFiles({
-    name: 'sample-transcript.json',
+    name: 'sample-trajectory.json',
     mimeType: 'application/json',
-    buffer: Buffer.from(uploadedTranscript)
+    buffer: Buffer.from(uploadedTrajectory)
   })
   await page
-    .locator('.transcript-timeline')
-    .getByText('Uploaded transcript message', { exact: true })
+    .locator('.trajectory-timeline')
+    .getByText('Uploaded trajectory message', { exact: true })
     .waitFor()
 }

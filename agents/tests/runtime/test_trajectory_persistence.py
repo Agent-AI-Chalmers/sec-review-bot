@@ -6,10 +6,10 @@ import pytest
 from langchain_core.messages import ToolMessage
 
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.transcripts import (
-    TranscriptWriter,
-    read_transcript_events,
-    read_transcript_messages,
+from sec_review_agents.runtime.trajectories import (
+    TrajectoryWriter,
+    read_trajectory_events,
+    read_trajectory_messages,
 )
 
 
@@ -35,45 +35,45 @@ class _ImmutableMessage:
         self.content = content
 
 
-def test_transcript_appends_jsonl_message_events(tmp_path: Path) -> None:
-    transcript_path = tmp_path / "transcript.jsonl"
-    writer = TranscriptWriter((transcript_path,))
+def test_trajectory_appends_jsonl_message_events(tmp_path: Path) -> None:
+    trajectory_path = tmp_path / "trajectory.jsonl"
+    writer = TrajectoryWriter((trajectory_path,))
 
     writer.write_messages([_FakeMessage("first")])
     writer.write_messages([_FakeMessage("second", message_id="msg-2")])
 
-    events = read_transcript_events(transcript_path)
-    messages = read_transcript_messages(transcript_path)
+    events = read_trajectory_events(trajectory_path)
+    messages = read_trajectory_messages(trajectory_path)
     assert [item["seq"] for item in events] == [1, 2]
     assert [item["event"] for item in events] == ["message", "message"]
     assert [item["content"] for item in messages] == ["first", "second"]
 
 
-def test_transcript_writer_fans_out_to_multiple_paths(tmp_path: Path) -> None:
-    primary = tmp_path / "stage" / "transcript.jsonl"
-    consumer = tmp_path / "transcripts" / "0001-analyzer-initial.jsonl"
-    writer = TranscriptWriter((primary, consumer))
+def test_trajectory_writer_fans_out_to_multiple_paths(tmp_path: Path) -> None:
+    primary = tmp_path / "stage" / "trajectory.jsonl"
+    consumer = tmp_path / "trajectories" / "0001-analyzer-initial.jsonl"
+    writer = TrajectoryWriter((primary, consumer))
 
     writer.write_messages([_FakeMessage("shared")])
 
     assert primary.read_text(encoding="utf-8") == consumer.read_text(encoding="utf-8")
-    messages = read_transcript_messages(consumer)
+    messages = read_trajectory_messages(consumer)
     assert messages[0]["content"] == "shared"
 
 
-def test_transcript_writes_system_message(tmp_path: Path) -> None:
-    transcript_path = tmp_path / "transcript.jsonl"
-    writer = TranscriptWriter((transcript_path,))
+def test_trajectory_writes_system_message(tmp_path: Path) -> None:
+    trajectory_path = tmp_path / "trajectory.jsonl"
+    writer = TrajectoryWriter((trajectory_path,))
     writer.write_messages([{"type": "system", "content": "Base system prompt."}])
 
-    message = read_transcript_messages(transcript_path)[0]
+    message = read_trajectory_messages(trajectory_path)[0]
     assert message["type"] == "system"
     assert message["content"] == "Base system prompt."
 
 
-def test_transcript_preserves_tool_result_linkage_and_metadata(tmp_path: Path) -> None:
-    transcript_path = tmp_path / "transcript.jsonl"
-    writer = TranscriptWriter((transcript_path,))
+def test_trajectory_preserves_tool_result_linkage_and_metadata(tmp_path: Path) -> None:
+    trajectory_path = tmp_path / "trajectory.jsonl"
+    writer = TrajectoryWriter((trajectory_path,))
 
     writer.write_messages(
         [
@@ -87,58 +87,58 @@ def test_transcript_preserves_tool_result_linkage_and_metadata(tmp_path: Path) -
         ]
     )
 
-    message = read_transcript_messages(transcript_path)[0]
+    message = read_trajectory_messages(trajectory_path)[0]
     assert message["tool_call_id"] == "call-1"
     assert message["status"] == "error"
     assert message["artifact"] == {"stderr": "failure detail"}
 
 
-def test_transcript_assigns_id_before_deduplicating_message(tmp_path: Path) -> None:
-    transcript_path = tmp_path / "transcript.jsonl"
-    writer = TranscriptWriter((transcript_path,))
+def test_trajectory_assigns_id_before_deduplicating_message(tmp_path: Path) -> None:
+    trajectory_path = tmp_path / "trajectory.jsonl"
+    writer = TrajectoryWriter((trajectory_path,))
     message = _FakeMessage("repeated", message_id="")
 
     writer.write_messages([message])
     writer.write_messages([message])
 
-    messages = read_transcript_messages(transcript_path)
+    messages = read_trajectory_messages(trajectory_path)
     assert isinstance(message.id, str) and message.id
     assert [item["id"] for item in messages] == [message.id]
 
 
-def test_transcript_uses_object_identity_when_generated_id_cannot_be_persisted(
+def test_trajectory_uses_object_identity_when_generated_id_cannot_be_persisted(
     tmp_path: Path,
 ) -> None:
-    transcript_path = tmp_path / "transcript.jsonl"
-    writer = TranscriptWriter((transcript_path,))
+    trajectory_path = tmp_path / "trajectory.jsonl"
+    writer = TrajectoryWriter((trajectory_path,))
     message = _ImmutableMessage("immutable")
 
     writer.write_messages([message])
     writer.write_messages([message])
 
-    messages = read_transcript_messages(transcript_path)
+    messages = read_trajectory_messages(trajectory_path)
     assert len(messages) == 1
     assert isinstance(messages[0]["id"], str) and messages[0]["id"]
 
 
-def test_transcript_does_not_merge_distinct_idless_immutable_messages(
+def test_trajectory_does_not_merge_distinct_idless_immutable_messages(
     tmp_path: Path,
 ) -> None:
-    transcript_path = tmp_path / "transcript.jsonl"
-    writer = TranscriptWriter((transcript_path,))
+    trajectory_path = tmp_path / "trajectory.jsonl"
+    writer = TrajectoryWriter((trajectory_path,))
 
     writer.write_messages(
         [_ImmutableMessage("same content"), _ImmutableMessage("same content")]
     )
 
-    messages = read_transcript_messages(transcript_path)
+    messages = read_trajectory_messages(trajectory_path)
     assert len(messages) == 2
     assert messages[0]["id"] != messages[1]["id"]
 
 
 @pytest.mark.asyncio
 async def test_agent_runtime_graph_prepends_system_message(tmp_path: Path) -> None:
-    transcript_path = tmp_path / "transcript.jsonl"
+    trajectory_path = tmp_path / "trajectory.jsonl"
     agent = Mock()
 
     async def astream(*args: Any, **kwargs: Any):
@@ -151,9 +151,9 @@ async def test_agent_runtime_graph_prepends_system_message(tmp_path: Path) -> No
         agent_name="test-agent",
         system_prompt="Base system prompt.",
         user_prompt="User prompt.",
-        transcript_paths=(transcript_path,),
+        trajectory_paths=(trajectory_path,),
     )
 
-    messages = read_transcript_messages(transcript_path)
+    messages = read_trajectory_messages(trajectory_path)
     assert [item["type"] for item in messages] == ["system", "human"]
     assert messages[0]["content"] == "Base system prompt."

@@ -129,7 +129,7 @@ def commit_memory_tree_revision_activity(
             expected_active_revision=creation.expected_active_revision,
             extraction_ids=list(creation.extraction_ids),
             memory_tree_reference=creation.memory_tree_reference,
-            maintenance_transcript_reference=creation.maintenance_transcript_reference,
+            maintenance_trajectory_reference=creation.maintenance_trajectory_reference,
         )
     except MemoryMaintenancePausedError as error:
         raise ApplicationError(

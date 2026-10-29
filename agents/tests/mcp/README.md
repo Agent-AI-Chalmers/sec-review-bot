@@ -18,7 +18,7 @@ Keep oracles behavioral: decisive tool interactions, forbidden errors for the ca
 
 Use `discovery` when the prompt does not name the MCP tool and the case checks whether the product agent selects it. Use `compare` only when paired MCP OFF/ON results answer a useful question; the runner records both results and does not require the OFF run to fail.
 
-Runs retain workspaces, transcripts, and verifier artifacts under `.agent-artifacts/mcp-cases/`, relative to the test process working directory. Set `MCP_CASE_OUTPUT_DIR` to use another location. Each case invocation gets a unique directory; comparison cases keep `without-mcp/` and `with-mcp/` beneath the same run directory for inspection.
+Runs retain workspaces, trajectories, and verifier artifacts under `.agent-artifacts/mcp-cases/`, relative to the test process working directory. Set `MCP_CASE_OUTPUT_DIR` to use another location. Each case invocation gets a unique directory; comparison cases keep `without-mcp/` and `with-mcp/` beneath the same run directory for inspection.
 
 MCP contract tests mock connection construction. `test_capability.py` covers Playwright browser startup and browser-observed effects plus CodeGraph index preparation and cross-file exploration. Keep infrastructure assertions there rather than making an LLM case diagnose MCP runtime failures.
 

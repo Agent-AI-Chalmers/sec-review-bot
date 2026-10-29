@@ -30,7 +30,7 @@ speculation or generic advice.
 In this project, the first user message is usually the authoritative stage input
 for the run. It may contain the review scope, case identity, original claim,
 analysis or mitigation context, retry context, repository constraints, and output
-contract. Preserve its material facts even if it appears early in the transcript.
+contract. Preserve its material facts even if it appears early in the trajectory.
 
 Later user-role messages are usually middleware retry or correction prompts.
 Preserve them separately from the initial stage input and from tool/file/log

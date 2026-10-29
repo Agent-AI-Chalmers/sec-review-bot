@@ -14,7 +14,7 @@ const expectedLoadOrder = [
   'transitions.css',
   'memory.css',
   'workspace-editor.css',
-  'transcript-viewer.css',
+  'trajectory-viewer.css',
   'responsive.css'
 ]
 const responsiveFile = 'responsive.css'

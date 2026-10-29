@@ -33,7 +33,7 @@ MAX_EXTRACTED_MEMORY_BYTES = 256 * 1024 * 1024
 
 DEFAULT_MEMORY_INDEX = """# Security Review Experience Memory
 
-Reviewed security-review experience extracted from past transcripts.
+Reviewed security-review experience extracted from past trajectories.
 
 Use the top of this file as the runtime index. Keep it short: describe available
 experience topics and route future agents to topic files in `topics/`.

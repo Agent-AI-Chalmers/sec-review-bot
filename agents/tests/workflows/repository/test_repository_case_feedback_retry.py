@@ -341,7 +341,7 @@ async def _run_case_workflow(state: _CaseWorkflowState) -> dict[str, Any]:
                     "run_id": "run-repo-case",
                     "case_execution_input": repository_case_execution_input("case-1"),
                     "cases_artifacts_path": "/tmp/cases",
-                    "published_transcripts_path": "/tmp/cases/case-1/transcripts",
+                    "published_trajectories_path": "/tmp/cases/case-1/trajectories",
                     "timeout_seconds": 30,
                     "runtime_context": {},
                 }

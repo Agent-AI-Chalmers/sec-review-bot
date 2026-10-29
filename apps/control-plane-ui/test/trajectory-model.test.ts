@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { normalizeTranscript } from '../browser/features/transcript/transcript-model.js'
+import { normalizeTrajectory } from '../browser/features/trajectory/trajectory-model.js'
 
-test('transcript normalization separates content, reasoning, usage, and tool linkage', () => {
-  const document = normalizeTranscript([
+test('trajectory normalization separates content, reasoning, usage, and tool linkage', () => {
+  const document = normalizeTrajectory([
     {
       seq: 1,
       event: 'message',
@@ -76,7 +76,7 @@ test('transcript normalization separates content, reasoning, usage, and tool lin
 })
 
 test('zero cache counters are treated as absent usage details', () => {
-  const document = normalizeTranscript([
+  const document = normalizeTrajectory([
     {
       seq: 1,
       event: 'message',
@@ -99,8 +99,8 @@ test('zero cache counters are treated as absent usage details', () => {
   assert.strictEqual(document.totalUsage.cacheCreation, undefined)
 })
 
-test('raw provider cache buckets become inclusive transcript input', () => {
-  const document = normalizeTranscript([
+test('raw provider cache buckets become inclusive trajectory input', () => {
+  const document = normalizeTrajectory([
     {
       seq: 1,
       event: 'message',
@@ -131,7 +131,7 @@ test('raw provider cache buckets become inclusive transcript input', () => {
 })
 
 test('ordered message-array tool results link when the complete run is unambiguous', () => {
-  const document = normalizeTranscript([
+  const document = normalizeTrajectory([
     {
       seq: 1,
       event: 'message',
@@ -168,7 +168,7 @@ test('ordered message-array tool results link when the complete run is unambiguo
 })
 
 test('message-array tool results are not guessed when the ordered run is incomplete', () => {
-  const document = normalizeTranscript([
+  const document = normalizeTrajectory([
     {
       seq: 1,
       event: 'message',

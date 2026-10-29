@@ -35,10 +35,10 @@ const MAX_SESSION_BODY_BYTES = 1024 * 1024
 const REVIEW_RUNS_REQUEST_TIMEOUT_MS = 10_000
 const ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS = 30_000
 const ARTIFACT_BUCKET = 'sec-review'
-const MAX_TRANSCRIPT_ARTIFACT_BYTES = 16 * 1024 * 1024
-const MAX_TRANSCRIPT_CONTENT_BYTES = 8 * 1024 * 1024
-const MAX_TRANSCRIPT_LINE_BYTES = 512 * 1024
-const MAX_TRANSCRIPT_MESSAGES = 2000
+const MAX_TRAJECTORY_ARTIFACT_BYTES = 16 * 1024 * 1024
+const MAX_TRAJECTORY_CONTENT_BYTES = 8 * 1024 * 1024
+const MAX_TRAJECTORY_LINE_BYTES = 512 * 1024
+const MAX_TRAJECTORY_MESSAGES = 2000
 
 interface ArtifactObject {
   body: Readable
@@ -63,31 +63,31 @@ interface AvailableArtifact {
   sizeBytes: number
 }
 
-interface TranscriptEvent {
+interface TrajectoryEvent {
   seq: number
   event: 'message'
   message: Record<string, unknown>
 }
 
-/** Parse only the append-only transcript shape produced by TranscriptWriter.
+/** Parse only the append-only trajectory shape produced by TrajectoryWriter.
  *
  * This deliberately does not accept arbitrary JSON arrays or Python reprs. The viewer is an
  * operational reader for one owned artifact format, so format drift must fail visibly instead
  * of being guessed into a plausible but inaccurate conversation.
  */
-function readTranscriptArtifact(bytes: Buffer): TranscriptEvent[] {
+function readTrajectoryArtifact(bytes: Buffer): TrajectoryEvent[] {
   const content = zstdDecompressSync(bytes, {
-    maxOutputLength: MAX_TRANSCRIPT_CONTENT_BYTES
+    maxOutputLength: MAX_TRAJECTORY_CONTENT_BYTES
   })
-  const events: TranscriptEvent[] = []
+  const events: TrajectoryEvent[] = []
   let previousSeq = 0
   for (const rawLine of content.toString('utf8').split('\n')) {
     if (!rawLine.trim()) continue
-    if (Buffer.byteLength(rawLine, 'utf8') > MAX_TRANSCRIPT_LINE_BYTES)
-      throw new Error('invalid_transcript_artifact')
+    if (Buffer.byteLength(rawLine, 'utf8') > MAX_TRAJECTORY_LINE_BYTES)
+      throw new Error('invalid_trajectory_artifact')
     const parsed: unknown = JSON.parse(rawLine)
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
-      throw new Error('invalid_transcript_artifact')
+      throw new Error('invalid_trajectory_artifact')
     const event = parsed as Record<string, unknown>
     if (
       !Number.isSafeInteger(event.seq) ||
@@ -97,15 +97,15 @@ function readTranscriptArtifact(bytes: Buffer): TranscriptEvent[] {
       event.message === null ||
       Array.isArray(event.message)
     )
-      throw new Error('invalid_transcript_artifact')
+      throw new Error('invalid_trajectory_artifact')
     previousSeq = event.seq as number
     events.push({
       seq: previousSeq,
       event: 'message',
       message: event.message as Record<string, unknown>
     })
-    if (events.length > MAX_TRANSCRIPT_MESSAGES)
-      throw new Error('invalid_transcript_artifact')
+    if (events.length > MAX_TRAJECTORY_MESSAGES)
+      throw new Error('invalid_trajectory_artifact')
   }
   return events
 }
@@ -240,7 +240,7 @@ function redactArtifactUris(value: unknown): unknown {
 
 function catalogArtifactReference(
   value: unknown,
-  kind: 'tree' | 'transcript'
+  kind: 'tree' | 'trajectory'
 ): AvailableArtifact | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value))
     return null
@@ -259,9 +259,9 @@ function catalogArtifactReference(
   const maximumSize =
     kind === 'tree'
       ? MAX_MEMORY_TREE_ARTIFACT_BYTES
-      : MAX_TRANSCRIPT_ARTIFACT_BYTES
+      : MAX_TRAJECTORY_ARTIFACT_BYTES
   if ((artifact.size_bytes as number) > maximumSize) return null
-  const prefix = `s3://${ARTIFACT_BUCKET}/memory/${kind === 'tree' ? 'trees/' : 'transcripts/'}`
+  const prefix = `s3://${ARTIFACT_BUCKET}/memory/${kind === 'tree' ? 'trees/' : 'trajectories/'}`
   if (!artifact.uri.startsWith(prefix)) return null
   if (
     kind === 'tree' &&
@@ -636,7 +636,7 @@ export function createControlPlaneUiServer({
         return
       }
       const memoryArtifactMatch =
-        /^\/api\/memory\/(revisions|extractions)\/([^/?]+)\/(artifact|transcript|content|transcript\/content)$/.exec(
+        /^\/api\/memory\/(revisions|extractions)\/([^/?]+)\/(artifact|trajectory|content|trajectory\/content)$/.exec(
           request.url ?? ''
         )
       if (request.method === 'GET' && memoryArtifactMatch !== null) {
@@ -647,14 +647,14 @@ export function createControlPlaneUiServer({
         const collection = memoryArtifactMatch[1]
         const identity = memoryArtifactMatch[2] ?? ''
         const requestedKind = memoryArtifactMatch[3]
-        const transcriptContent = requestedKind === 'transcript/content'
+        const trajectoryContent = requestedKind === 'trajectory/content'
         if (
           (collection === 'revisions' && !/^[1-9][0-9]*$/.test(identity)) ||
           (collection === 'extractions' &&
             !/^[A-Za-z0-9._:-]+$/.test(identity)) ||
           (collection === 'extractions' &&
-            requestedKind !== 'transcript' &&
-            !transcriptContent)
+            requestedKind !== 'trajectory' &&
+            !trajectoryContent)
         ) {
           sendJson(response, 404, { error: 'memory_artifact_not_found' })
           return
@@ -680,17 +680,17 @@ export function createControlPlaneUiServer({
           const source = record.source as Record<string, unknown> | undefined
           const rawReference =
             collection === 'extractions'
-              ? record.transcript_reference
+              ? record.trajectory_reference
               : requestedKind === 'artifact' || requestedKind === 'content'
                 ? record.memory_tree_reference
                 : source?.kind === 'maintenance'
-                  ? source.transcript_reference
+                  ? source.trajectory_reference
                   : undefined
           const artifact = catalogArtifactReference(
             rawReference,
             requestedKind === 'artifact' || requestedKind === 'content'
               ? 'tree'
-              : 'transcript'
+              : 'trajectory'
           )
           if (artifact === null) {
             sendJson(response, 409, { error: 'memory_artifact_unavailable' })
@@ -743,19 +743,19 @@ export function createControlPlaneUiServer({
             )
             return
           }
-          if (transcriptContent) {
+          if (trajectoryContent) {
             response.writeHead(200, {
               'content-type': PROXIED_CONTENT_TYPE,
               'cache-control': 'no-store'
             })
             response.end(
-              JSON.stringify({ events: readTranscriptArtifact(complete) })
+              JSON.stringify({ events: readTrajectoryArtifact(complete) })
             )
             return
           }
           response.writeHead(200, {
             'content-type': 'application/octet-stream',
-            'content-disposition': `attachment; filename="${requestedKind === 'artifact' ? 'memory-tree.v1.tar.zst' : 'memory-transcript.v1.jsonl.zst'}"`,
+            'content-disposition': `attachment; filename="${requestedKind === 'artifact' ? 'memory-tree.v1.tar.zst' : 'memory-trajectory.v1.jsonl.zst'}"`,
             'cache-control': 'no-store',
             'content-length': String(size)
           })

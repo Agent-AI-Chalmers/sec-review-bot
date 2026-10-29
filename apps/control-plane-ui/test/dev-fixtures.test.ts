@@ -252,12 +252,12 @@ test('dev fixtures serve memory actions as downloads', async () => {
         'attachment; filename="memory-tree.v1.tar.zst"'
       ],
       [
-        '/api/memory/revisions/2/transcript',
-        'attachment; filename="memory-transcript.v1.jsonl.zst"'
+        '/api/memory/revisions/2/trajectory',
+        'attachment; filename="memory-trajectory.v1.jsonl.zst"'
       ],
       [
-        '/api/memory/extractions/fixture-extraction-2/transcript',
-        'attachment; filename="memory-transcript.v1.jsonl.zst"'
+        '/api/memory/extractions/fixture-extraction-2/trajectory',
+        'attachment; filename="memory-trajectory.v1.jsonl.zst"'
       ]
     ] as const) {
       const response = await fetch(`${fixture.base}${path}`)
@@ -284,7 +284,7 @@ test('dev fixtures expose stable full-page load-error scenarios', async () => {
         'invalid_memory_tree_artifact'
       ],
       [
-        '/api/memory/revisions/404/transcript/content',
+        '/api/memory/revisions/404/trajectory/content',
         503,
         'memory_catalog_unavailable'
       ],

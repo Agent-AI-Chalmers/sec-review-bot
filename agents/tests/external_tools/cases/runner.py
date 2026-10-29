@@ -18,9 +18,9 @@ from tests.external_tools.cases.models import (
     ExternalToolCaseMode,
     ExternalToolInteractionOracle,
 )
-from tests.runtime.transcript_artifact_helpers import (
-    tool_interactions_from_transcript,
-    tool_usage_from_transcript,
+from tests.runtime.trajectory_artifact_helpers import (
+    tool_interactions_from_trajectory,
+    tool_usage_from_trajectory,
 )
 
 
@@ -78,7 +78,7 @@ async def run_external_tool_case(
                 scan_mode="full",
                 review_input=agent_case.review_input,
             )
-            transcript = artifacts / "transcript.jsonl"
+            trajectory = artifacts / "trajectory.jsonl"
         else:
             result = await verify_repository_case(
                 workspace_snapshot_tar_path=snapshot,
@@ -98,10 +98,10 @@ async def run_external_tool_case(
                 },
                 setup_declaration_content=setup_content,
             )
-            transcript = artifacts / "transcripts" / "initial.jsonl"
+            trajectory = artifacts / "trajectories" / "initial.jsonl"
     duration_seconds = monotonic() - started_at
 
-    usage = tool_usage_from_transcript(transcript)
+    usage = tool_usage_from_trajectory(trajectory)
     return {
         "case": case.id,
         "mode": mode,
@@ -112,7 +112,7 @@ async def run_external_tool_case(
         "artifactRoot": str(run_root),
         "toolNames": usage["toolNames"],
         "toolErrors": usage["toolErrors"],
-        "toolInteractions": tool_interactions_from_transcript(transcript),
+        "toolInteractions": tool_interactions_from_trajectory(trajectory),
         "result": result,
     }
 

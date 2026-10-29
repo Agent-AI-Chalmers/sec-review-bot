@@ -4,12 +4,12 @@ import userEvent from '@testing-library/user-event'
 import { expect, test } from 'vitest'
 
 import {
-  TranscriptTimeline,
-  type TranscriptEvent
-} from '../../browser/features/transcript/TranscriptViewer.js'
+  TrajectoryTimeline,
+  type TrajectoryEvent
+} from '../../browser/features/trajectory/TrajectoryViewer.js'
 import { renderComponent } from './render.js'
 
-const events: TranscriptEvent[] = [
+const events: TrajectoryEvent[] = [
   {
     seq: 1,
     event: 'message',
@@ -42,12 +42,12 @@ const events: TranscriptEvent[] = [
 
 test('tool results show result data without repeating call arguments', async () => {
   const user = userEvent.setup()
-  renderComponent(<TranscriptTimeline events={events} />)
+  renderComponent(<TrajectoryTimeline events={events} />)
 
   await user.click(screen.getByRole('button', { name: 'Expand all' }))
 
   const toolResult = document.querySelector<HTMLElement>(
-    '[data-transcript-role="tool"]'
+    '[data-trajectory-role="tool"]'
   )
   expect(toolResult).not.toBeNull()
   const result = within(toolResult!)
@@ -55,7 +55,7 @@ test('tool results show result data without repeating call arguments', async () 
   expect(result.getByRole('button', { name: 'Back to call' })).toBeVisible()
   expect(result.getByText('replacement complete')).toBeVisible()
   const artifact = toolResult!.querySelector(
-    '[data-transcript-section="artifact"]'
+    '[data-trajectory-section="artifact"]'
   )
   expect(artifact).toHaveTextContent(/changed_files.*1/)
   expect(result.queryByText('old_string')).not.toBeInTheDocument()
@@ -64,7 +64,7 @@ test('tool results show result data without repeating call arguments', async () 
 
 test('usage details expose totals and token subsets', async () => {
   const user = userEvent.setup()
-  const usageEvents: TranscriptEvent[] = [
+  const usageEvents: TrajectoryEvent[] = [
     {
       seq: 1,
       event: 'message',
@@ -81,13 +81,13 @@ test('usage details expose totals and token subsets', async () => {
       }
     }
   ]
-  renderComponent(<TranscriptTimeline events={usageEvents} />)
+  renderComponent(<TrajectoryTimeline events={usageEvents} />)
 
   await user.click(screen.getAllByRole('button', { name: 'Usage details' })[0]!)
 
   const details = await waitFor(() => {
     const element = document.querySelector<HTMLElement>(
-      '.transcript-usage-details'
+      '.trajectory-usage-details'
     )
     expect(element).not.toBeNull()
     return element!
@@ -100,25 +100,25 @@ test('usage details expose totals and token subsets', async () => {
   expect(details).toHaveTextContent(/Total\s*1,425/)
 })
 
-test('optional transcript controls are absent without their source data', () => {
-  const sparseEvents: TranscriptEvent[] = [
+test('optional trajectory controls are absent without their source data', () => {
+  const sparseEvents: TrajectoryEvent[] = [
     {
       seq: 1,
       event: 'message',
       message: { type: 'tool', content: 'Unlinked result' }
     }
   ]
-  renderComponent(<TranscriptTimeline events={sparseEvents} />)
+  renderComponent(<TrajectoryTimeline events={sparseEvents} />)
 
   const result = document.querySelector<HTMLElement>(
-    '[data-transcript-role="tool"]'
+    '[data-trajectory-role="tool"]'
   )
   expect(result).not.toBeNull()
   expect(
-    result!.querySelector('[data-transcript-action="back-to-call"]')
+    result!.querySelector('[data-trajectory-action="back-to-call"]')
   ).not.toBeInTheDocument()
   expect(
-    result!.querySelector('[data-transcript-section="artifact"]')
+    result!.querySelector('[data-trajectory-section="artifact"]')
   ).not.toBeInTheDocument()
   expect(
     screen.queryByRole('button', { name: 'Usage details' })

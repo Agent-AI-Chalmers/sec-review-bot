@@ -17,15 +17,15 @@ NUMERIC_FIELDS = (
     "cache_creation_tokens",
     "reasoning_tokens",
 )
-TRANSCRIPTS_DIRNAME = "transcripts"
-# The artifact directory each stage writes its transcripts under, keyed by the directory
+TRAJECTORIES_DIRNAME = "trajectories"
+# The artifact directory each stage writes its trajectories under, keyed by the directory
 # name the stage modules actually use and valued by pipeline order for report sorting.
 # These are directory names, not the Python modules that implement the stages: the
 # analyzer writes `analyzer/`, the mitigator writes `mitigator/`, and the CVSS stage
 # writes `cvss/`.
 #
 # This mapping is the only source for which directories are stages and how they sort, so
-# the two cannot drift: `_classify_transcript` resolves a transcript to a stage only when
+# the two cannot drift: `_classify_trajectory` resolves a trajectory to a stage only when
 # the directory is a key here, and `_stage_sort_key` then reads that stage's rank. A
 # stage directory this map does not name is not reported at all rather than sorted last.
 STAGE_ORDER = {
@@ -176,7 +176,7 @@ def _usage_records_from_value(
 
 
 def _fallback_model_id(messages: list[dict[str, Any]]) -> str | None:
-    """Recover a model id from transcript metadata when usage lacks one."""
+    """Recover a model id from trajectory metadata when usage lacks one."""
     for message in messages:
         model_id = _model_id_from_value(message)
         if model_id is not None:
@@ -184,7 +184,7 @@ def _fallback_model_id(messages: list[dict[str, Any]]) -> str | None:
     return None
 
 
-def _read_transcript_usage(path: Path, *, stage: str) -> StageUsage:
+def _read_trajectory_usage(path: Path, *, stage: str) -> StageUsage:
     messages: list[dict[str, Any]] = []
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
@@ -243,13 +243,13 @@ def _attempt_sort_key(label: str) -> tuple[int, int]:
     return (2, 999999)
 
 
-def _classify_transcript(artifact_root: Path, path: Path) -> tuple[str, str] | None:
-    """Return the stage and attempt a stage-local transcript belongs to.
+def _classify_trajectory(artifact_root: Path, path: Path) -> tuple[str, str] | None:
+    """Return the stage and attempt a stage-local trajectory belongs to.
 
-    A transcript belongs to the nearest ancestor directory that is a known stage
+    A trajectory belongs to the nearest ancestor directory that is a known stage
     directory, so container directories such as `cases/`, `batches/`, or a delivery id
     never become a stage. The attempt comes from how the stage nests the file: a bare
-    `transcript.jsonl` is the initial attempt, a file under `transcripts/` is named by that
+    `trajectory.jsonl` is the initial attempt, a file under `trajectories/` is named by that
     file, and any other subdirectory names the attempt. Published copies at the artifact
     root are not under a stage directory and return ``None``.
     """
@@ -263,46 +263,46 @@ def _classify_transcript(artifact_root: Path, path: Path) -> tuple[str, str] | N
         if len(remainder) == 1:
             return stage, "initial"
         parent = remainder[-2]
-        if parent == TRANSCRIPTS_DIRNAME:
+        if parent == TRAJECTORIES_DIRNAME:
             return stage, Path(remainder[-1]).stem
         return stage, parent
     return None
 
 
-def _discover_transcripts(artifact_root: Path) -> list[tuple[Path, str, str]]:
-    """Return every stage-local transcript with the stage and attempt it belongs to.
+def _discover_trajectories(artifact_root: Path) -> list[tuple[Path, str, str]]:
+    """Return every stage-local trajectory with the stage and attempt it belongs to.
 
-    A transcript under no known stage directory is not counted; if any such transcript is
+    A trajectory under no known stage directory is not counted; if any such trajectory is
     stage-local rather than a published copy, its tokens would otherwise disappear
     silently, so report the count once.
     """
-    published_root = artifact_root / TRANSCRIPTS_DIRNAME
-    transcripts: set[tuple[Path, str, str]] = set()
+    published_root = artifact_root / TRAJECTORIES_DIRNAME
+    trajectories: set[tuple[Path, str, str]] = set()
     unclassified: list[Path] = []
     for candidate in artifact_root.rglob("*.jsonl"):
         if (
-            candidate.name != "transcript.jsonl"
-            and candidate.parent.name != TRANSCRIPTS_DIRNAME
+            candidate.name != "trajectory.jsonl"
+            and candidate.parent.name != TRAJECTORIES_DIRNAME
         ):
             continue
         if published_root in candidate.parents:
             # The published copies at the artifact root are not stage-local.
             continue
-        classified = _classify_transcript(artifact_root, candidate)
+        classified = _classify_trajectory(artifact_root, candidate)
         if classified is None:
             unclassified.append(candidate)
             continue
         stage, attempt = classified
-        transcripts.add((candidate, stage, attempt))
+        trajectories.add((candidate, stage, attempt))
     if unclassified:
         first = min(unclassified)
         print(
-            f"warning: {len(unclassified)} transcript(s) are not under a known stage "
+            f"warning: {len(unclassified)} trajectory(s) are not under a known stage "
             f"directory, so they were not counted (first: {first}). Add the stage "
             f"directory to STAGE_ORDER if it is a stage this report should attribute.",
             file=sys.stderr,
         )
-    return sorted(transcripts)
+    return sorted(trajectories)
 
 
 def _aggregate_stage_usage(
@@ -326,17 +326,17 @@ def _aggregate_stage_usage(
 
 
 def _stage_sort_key(stage: StageUsage) -> tuple[int, str, str]:
-    # Only `_classify_transcript` builds `StageUsage.stage`, and it returns a stage only
+    # Only `_classify_trajectory` builds `StageUsage.stage`, and it returns a stage only
     # when that directory is a key in STAGE_ORDER, so the lookup cannot miss here.
     return (STAGE_ORDER[stage.stage], stage.stage, stage.model_id)
 
 
 def _load_attempt_usages(artifact_root: Path) -> list[AttemptUsage]:
     attempts: list[AttemptUsage] = []
-    for transcript_path, stage_name, attempt_label in _discover_transcripts(
+    for trajectory_path, stage_name, attempt_label in _discover_trajectories(
         artifact_root
     ):
-        usage = _read_transcript_usage(transcript_path, stage=stage_name)
+        usage = _read_trajectory_usage(trajectory_path, stage=stage_name)
         attempts.append(
             AttemptUsage(
                 stage=stage_name,

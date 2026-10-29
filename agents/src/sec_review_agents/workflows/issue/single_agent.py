@@ -177,7 +177,7 @@ class IssueSingleAgentWorkflow:
                     review_units=[
                         {
                             "unit_id": "review",
-                            "transcript_root": str(artifact_root / "transcripts"),
+                            "trajectory_root": str(artifact_root / "trajectories"),
                         }
                     ],
                     result=public_result,

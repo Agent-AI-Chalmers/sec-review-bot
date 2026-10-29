@@ -85,7 +85,7 @@ class MemoryCatalogClient:
         source_run_id: str,
         source_unit_id: str,
         diagnostic_bundle_digest: str,
-        transcript_reference: ArtifactReference,
+        trajectory_reference: ArtifactReference,
         observation_markdown: str | None,
     ) -> bool:
         value = self._request(
@@ -97,7 +97,7 @@ class MemoryCatalogClient:
                 "source_run_id": source_run_id,
                 "source_unit_id": source_unit_id,
                 "diagnostic_bundle_digest": diagnostic_bundle_digest,
-                "transcript_reference": transcript_reference.as_dict(),
+                "trajectory_reference": trajectory_reference.as_dict(),
                 "observation": (
                     {"body_markdown": observation_markdown}
                     if observation_markdown is not None
@@ -197,7 +197,7 @@ class MemoryCatalogClient:
         expected_active_revision: int,
         extraction_ids: list[str],
         memory_tree_reference: ArtifactReference,
-        maintenance_transcript_reference: ArtifactReference,
+        maintenance_trajectory_reference: ArtifactReference,
     ) -> dict[str, Any]:
         return self._request(
             "POST",
@@ -209,7 +209,7 @@ class MemoryCatalogClient:
                     "kind": "maintenance",
                     "maintenance_id": maintenance_id,
                     "extraction_ids": extraction_ids,
-                    "transcript_reference": maintenance_transcript_reference.as_dict(),
+                    "trajectory_reference": maintenance_trajectory_reference.as_dict(),
                 },
             },
         )

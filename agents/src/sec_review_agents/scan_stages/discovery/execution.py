@@ -15,7 +15,7 @@ from sec_review_agents.agents.discovery.prompts import (
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
-from sec_review_agents.runtime.transcripts import transcript_path
+from sec_review_agents.runtime.trajectories import trajectory_path
 
 
 async def run_repository_discovery_agent(
@@ -25,10 +25,10 @@ async def run_repository_discovery_agent(
     discovery_artifacts_path: Path | None = None,
 ) -> dict:
     chunk_id = str((chunk or {}).get("chunk_id") or "").strip()
-    transcript_paths = (
+    trajectory_paths = (
         (
-            transcript_path(
-                discovery_artifacts_path / "transcripts",
+            trajectory_path(
+                discovery_artifacts_path / "trajectories",
                 name=chunk_id,
             ),
         )
@@ -50,7 +50,7 @@ async def run_repository_discovery_agent(
                 chunk=chunk,
                 sources=sources,
             ),
-            transcript_paths=transcript_paths,
+            trajectory_paths=trajectory_paths,
         )
 
     candidates = structured_payload.get("candidates")

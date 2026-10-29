@@ -21,7 +21,7 @@ async def mitigate_issue(
     workspace_snapshot_tar_path: Path,
     history_path: Path,
     mitigator_artifacts_path: Path,
-    published_transcript_path: Path | None = None,
+    published_trajectory_path: Path | None = None,
     test_changes: TestChangesPolicy,
     analysis_result: Mapping[str, Any],
     retry_context: Mapping[str, Any] | None = None,
@@ -31,7 +31,7 @@ async def mitigate_issue(
     return await run_mitigation_stage(
         agent_name="issue-mitigator",
         mitigator_artifacts_path=mitigator_artifacts_path,
-        published_transcript_path=published_transcript_path,
+        published_trajectory_path=published_trajectory_path,
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=retry_context,
         setup_declaration_content=setup_declaration_content,

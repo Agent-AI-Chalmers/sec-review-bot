@@ -68,7 +68,7 @@ components:
         - source_run_id
         - source_unit_id
         - diagnostic_bundle_digest
-        - transcript_reference
+        - trajectory_reference
         - observation
       properties:
         extraction_id:
@@ -79,7 +79,7 @@ components:
         diagnostic_bundle_digest:
           type: string
           pattern: ^sha256:[0-9a-f]{64}$
-        transcript_reference:
+        trajectory_reference:
           $ref: "#/components/schemas/ArtifactReference"
         observation:
           oneOf:
@@ -101,7 +101,7 @@ components:
         - source_run_id
         - source_unit_id
         - diagnostic_bundle_digest
-        - transcript_reference
+        - trajectory_reference
         - observation
         - created_at
       properties:
@@ -113,7 +113,7 @@ components:
         diagnostic_bundle_digest:
           type: string
           pattern: ^sha256:[0-9a-f]{64}$
-        transcript_reference:
+        trajectory_reference:
           $ref: "#/components/schemas/ArtifactReference"
         observation:
           oneOf:
@@ -285,7 +285,7 @@ components:
         - kind
         - maintenance_id
         - extraction_ids
-        - transcript_reference
+        - trajectory_reference
       properties:
         kind: { type: string, const: maintenance }
         maintenance_id:
@@ -296,7 +296,7 @@ components:
           uniqueItems: true
           items:
             $ref: "#/components/schemas/ExtractionId"
-        transcript_reference:
+        trajectory_reference:
           $ref: "#/components/schemas/ArtifactReference"
     OperatorRevisionSource:
       type: object
@@ -574,7 +574,7 @@ paths:
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/extractions/{extraction_id}:
     get:
-      description: Return one completed extraction, its transcript reference, and its optional observation.
+      description: Return one completed extraction, its trajectory reference, and its optional observation.
       operationId: getExtraction
       security: [{ catalogToken: [] }]
       parameters:
@@ -857,7 +857,7 @@ paths:
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/memory-tree/revisions/{revision}:
     get:
-      description: Return one immutable memory tree revision and its maintenance transcript.
+      description: Return one immutable memory tree revision and its maintenance trajectory.
       operationId: getMemoryTreeRevision
       security: [{ catalogToken: [] }]
       parameters:

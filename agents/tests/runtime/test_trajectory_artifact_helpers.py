@@ -1,12 +1,12 @@
 import json
 
-from tests.runtime.transcript_artifact_helpers import (
-    tool_interactions_from_transcript,
+from tests.runtime.trajectory_artifact_helpers import (
+    tool_interactions_from_trajectory,
 )
 
 
-def _write_messages(transcript, messages: list[dict]) -> None:
-    transcript.write_text(
+def _write_messages(trajectory, messages: list[dict]) -> None:
+    trajectory.write_text(
         "\n".join(
             json.dumps({"seq": index, "event": "message", "message": message})
             for index, message in enumerate(messages, start=1)
@@ -17,9 +17,9 @@ def _write_messages(transcript, messages: list[dict]) -> None:
 
 
 def test_tool_interactions_pair_same_named_calls_with_their_results(tmp_path) -> None:
-    transcript = tmp_path / "transcript.jsonl"
+    trajectory = tmp_path / "trajectory.jsonl"
     _write_messages(
-        transcript,
+        trajectory,
         [
             {
                 "type": "ai",
@@ -51,7 +51,7 @@ def test_tool_interactions_pair_same_named_calls_with_their_results(tmp_path) ->
         ],
     )
 
-    assert tool_interactions_from_transcript(transcript) == [
+    assert tool_interactions_from_trajectory(trajectory) == [
         {
             "tool": "playwright_browser_navigate",
             "arguments": {"url": "https://example.test/second"},
@@ -66,9 +66,9 @@ def test_tool_interactions_pair_same_named_calls_with_their_results(tmp_path) ->
 
 
 def test_tool_interactions_ignore_calls_without_stable_ids(tmp_path) -> None:
-    transcript = tmp_path / "transcript.jsonl"
+    trajectory = tmp_path / "trajectory.jsonl"
     _write_messages(
-        transcript,
+        trajectory,
         [
             {
                 "type": "ai",
@@ -87,4 +87,4 @@ def test_tool_interactions_ignore_calls_without_stable_ids(tmp_path) -> None:
         ],
     )
 
-    assert tool_interactions_from_transcript(transcript) == []
+    assert tool_interactions_from_trajectory(trajectory) == []

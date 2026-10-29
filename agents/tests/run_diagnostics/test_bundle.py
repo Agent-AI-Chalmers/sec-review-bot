@@ -9,7 +9,7 @@ from sec_review_agents.contract_versions import RUN_DIAGNOSTIC_ARTIFACT_VERSION
 from sec_review_agents.run_diagnostics.bundle import (
     DIAGNOSTIC_BUNDLE_FILENAME,
     DiagnosticReviewUnit,
-    materialize_diagnostic_transcript_unit,
+    materialize_diagnostic_trajectory_unit,
     publish_run_diagnostic_bundle,
 )
 from tests.project_paths import CONTRACTS_ROOT
@@ -28,8 +28,8 @@ def test_diagnostic_bundle_contains_artifacts_and_selects_one_review_unit(
     tmp_path: Path,
 ) -> None:
     artifact_root = tmp_path / "artifacts"
-    first = artifact_root / "cases" / "case-a" / "transcripts"
-    second = artifact_root / "cases" / "case-b" / "transcripts"
+    first = artifact_root / "cases" / "case-a" / "trajectories"
+    second = artifact_root / "cases" / "case-b" / "trajectories"
     first.mkdir(parents=True)
     second.mkdir(parents=True)
     (first / "0001-analyzer-initial.jsonl").write_text(
@@ -52,7 +52,7 @@ def test_diagnostic_bundle_contains_artifacts_and_selects_one_review_unit(
             result={"review_record": {"overview": "done"}},
             destination_scheme="file",
         )
-    materialized = materialize_diagnostic_transcript_unit(
+    materialized = materialize_diagnostic_trajectory_unit(
         publication.reference,
         run_id="run-1",
         unit_id="case-b",
@@ -60,7 +60,7 @@ def test_diagnostic_bundle_contains_artifacts_and_selects_one_review_unit(
     )
 
     assert [
-        path.read_text(encoding="utf-8") for path in materialized.transcript_paths
+        path.read_text(encoding="utf-8") for path in materialized.trajectory_paths
     ] == ['{"event":"other"}\n']
     assert (tmp_path / "materialized" / "artifact-tree/triage/result.json").is_file()
     assert (tmp_path / "materialized" / "result.json").read_text(
@@ -71,16 +71,16 @@ def test_diagnostic_bundle_contains_artifacts_and_selects_one_review_unit(
 def test_diagnostic_bundle_is_byte_stable_across_retries(tmp_path: Path) -> None:
     """A retry must reuse the published archive rather than replace it."""
     artifact_root = tmp_path / "artifacts"
-    transcripts = artifact_root / "transcripts"
-    transcripts.mkdir(parents=True)
-    (transcripts / "0001-analyzer-initial.jsonl").write_text(
+    trajectories = artifact_root / "trajectories"
+    trajectories.mkdir(parents=True)
+    (trajectories / "0001-analyzer-initial.jsonl").write_text(
         '{"event":"message"}\n', encoding="utf-8"
     )
 
     first = publish_run_diagnostic_bundle(
         run_id="run-1",
         artifact_root=artifact_root,
-        review_units=[DiagnosticReviewUnit("review", transcripts)],
+        review_units=[DiagnosticReviewUnit("review", trajectories)],
         result={"z": 1, "a": 2},
         destination_scheme="file",
     ).reference
@@ -90,7 +90,7 @@ def test_diagnostic_bundle_is_byte_stable_across_retries(tmp_path: Path) -> None
     second = publish_run_diagnostic_bundle(
         run_id="run-1",
         artifact_root=artifact_root,
-        review_units=[DiagnosticReviewUnit("review", transcripts)],
+        review_units=[DiagnosticReviewUnit("review", trajectories)],
         result={"a": 2, "z": 1},
         destination_scheme="file",
     ).reference
@@ -101,7 +101,7 @@ def test_diagnostic_bundle_is_byte_stable_across_retries(tmp_path: Path) -> None
 
 
 def test_diagnostic_bundle_publishes_owner_only_archive(tmp_path: Path) -> None:
-    """Diagnostics contain transcripts, so the published archive stays private."""
+    """Diagnostics contain trajectories, so the published archive stays private."""
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir()
     (artifact_root / "result.json").write_text("{}\n", encoding="utf-8")
@@ -170,15 +170,15 @@ def test_diagnostic_bundle_build_failure_preserves_existing_file(
 
 def test_diagnostic_bundle_rejects_review_unit_path_traversal(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
-    transcripts = artifact_root / "transcripts"
-    transcripts.mkdir(parents=True)
-    (transcripts / "0001-analyzer-initial.jsonl").write_text("{}\n", encoding="utf-8")
+    trajectories = artifact_root / "trajectories"
+    trajectories.mkdir(parents=True)
+    (trajectories / "0001-analyzer-initial.jsonl").write_text("{}\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="one path component"):
         publish_run_diagnostic_bundle(
             run_id="run-1",
             artifact_root=artifact_root,
-            review_units=[DiagnosticReviewUnit("../outside", transcripts)],
+            review_units=[DiagnosticReviewUnit("../outside", trajectories)],
             result={},
         )
 
@@ -187,9 +187,9 @@ def test_s3_diagnostic_bundle_requires_object_storage_configuration(
     tmp_path: Path,
 ) -> None:
     artifact_root = tmp_path / "artifacts"
-    transcripts = artifact_root / "transcripts"
-    transcripts.mkdir(parents=True)
-    (transcripts / "0001.jsonl").write_text("{}\n", encoding="utf-8")
+    trajectories = artifact_root / "trajectories"
+    trajectories.mkdir(parents=True)
+    (trajectories / "0001.jsonl").write_text("{}\n", encoding="utf-8")
 
     with (
         patch.dict("os.environ", {}, clear=True),
@@ -198,7 +198,7 @@ def test_s3_diagnostic_bundle_requires_object_storage_configuration(
         publish_run_diagnostic_bundle(
             run_id="run-1",
             artifact_root=artifact_root,
-            review_units=[DiagnosticReviewUnit("review", transcripts)],
+            review_units=[DiagnosticReviewUnit("review", trajectories)],
             result={},
         )
 
@@ -222,9 +222,9 @@ def test_diagnostic_bundle_rejects_unknown_destination_scheme(tmp_path: Path) ->
 def test_publication_reports_only_units_included_in_manifest(tmp_path: Path) -> None:
     """Callers must not infer included units from a second filesystem scan."""
     artifact_root = tmp_path / "artifacts"
-    transcripts = artifact_root / "transcripts"
-    transcripts.mkdir(parents=True)
-    (transcripts / "0001-real.jsonl").write_text("{}\n", encoding="utf-8")
+    trajectories = artifact_root / "trajectories"
+    trajectories.mkdir(parents=True)
+    (trajectories / "0001-real.jsonl").write_text("{}\n", encoding="utf-8")
     empty = artifact_root / "empty"
     empty.mkdir()
     (empty / "0001-fake.jsonl").mkdir()
@@ -233,7 +233,7 @@ def test_publication_reports_only_units_included_in_manifest(tmp_path: Path) -> 
         run_id="run-1",
         artifact_root=artifact_root,
         review_units=[
-            DiagnosticReviewUnit("included", transcripts),
+            DiagnosticReviewUnit("included", trajectories),
             DiagnosticReviewUnit("empty", empty),
         ],
         result={},
@@ -272,16 +272,16 @@ def test_python_reader_matches_shared_run_diagnostic_corpus(tmp_path: Path) -> N
         destination = tmp_path / case["file"]
 
         if case["expected"] == "valid":
-            result = materialize_diagnostic_transcript_unit(
+            result = materialize_diagnostic_trajectory_unit(
                 local_artifact_reference(archive),
                 run_id=run_id,
                 unit_id=unit_id,
                 destination=destination,
             )
-            assert result.transcript_paths
+            assert result.trajectory_paths
         else:
             with pytest.raises(ValueError):
-                materialize_diagnostic_transcript_unit(
+                materialize_diagnostic_trajectory_unit(
                     local_artifact_reference(archive),
                     run_id=run_id,
                     unit_id=unit_id,

@@ -67,7 +67,7 @@ def repository_case_review_request(case_id: str) -> RepositoryCaseReviewRequest:
         "run_id": "run-test",
         "case_execution_input": repository_case_execution_input(case_id),
         "cases_artifacts_path": "/tmp/cases",
-        "published_transcripts_path": f"/tmp/cases/{case_id}/transcripts",
+        "published_trajectories_path": f"/tmp/cases/{case_id}/trajectories",
         "timeout_seconds": 30,
         "runtime_context": {},
     }
@@ -145,7 +145,7 @@ async def test_case_verification_activity_persists_skip_without_running_verifier
     prepared_case = {
         "case_execution_input": repository_case_execution_input("case-1"),
         "artifact_paths": {"verifier": str(tmp_path / "verifier")},
-        "published_transcripts_path": str(tmp_path / "transcripts"),
+        "published_trajectories_path": str(tmp_path / "trajectories"),
     }
 
     with patch(
@@ -981,7 +981,7 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
                 "run_id": "run-test",
                 "case_execution_input": prepared_case["case_execution_input"],
                 "cases_artifacts_path": "/tmp/local/artifacts/run-test/cases",
-                "published_transcripts_path": "/tmp/local/artifacts/run-test/cases/case-1/transcripts",
+                "published_trajectories_path": "/tmp/local/artifacts/run-test/cases/case-1/trajectories",
                 "timeout_seconds": 30,
                 "runtime_context": {},
             }
@@ -1092,7 +1092,7 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
                 "run_id": "run-test",
                 "case_execution_input": prepared_case["case_execution_input"],
                 "cases_artifacts_path": "/tmp/local/artifacts/run-test/cases",
-                "published_transcripts_path": "/tmp/local/artifacts/run-test/cases/case-1/transcripts",
+                "published_trajectories_path": "/tmp/local/artifacts/run-test/cases/case-1/trajectories",
                 "timeout_seconds": 30,
                 "runtime_context": {},
             }

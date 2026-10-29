@@ -50,13 +50,13 @@ import { LatestRequestGuard } from '../../shared/latest-request.js'
 import { BREAKPOINTS, ICON_SIZE } from '../../shared/design.js'
 import { LoadingState } from '../../shared/StateMessage.js'
 import {
-  normalizeTranscript,
+  normalizeTrajectory,
   type ToolCallView,
-  type TranscriptEvent,
-  type TranscriptMessageView,
-  type TranscriptRole,
+  type TrajectoryEvent,
+  type TrajectoryMessageView,
+  type TrajectoryRole,
   type UsageView
-} from './transcript-model.js'
+} from './trajectory-model.js'
 import {
   MAX_MINIMAP_MARKS,
   MINIMAP_HEIGHT,
@@ -66,11 +66,11 @@ import {
   nearestSegment,
   sameSegments,
   type MinimapSegment
-} from './transcript-minimap.js'
+} from './trajectory-minimap.js'
 
-export type { TranscriptEvent } from './transcript-model.js'
+export type { TrajectoryEvent } from './trajectory-model.js'
 
-export interface TranscriptTarget {
+export interface TrajectoryTarget {
   title: string
   contentHref: string
   downloadHref: string
@@ -94,8 +94,8 @@ function TokenUsageDetails({ usage }: { usage: UsageView }): React.JSX.Element {
     if (value === undefined && subsets.every(([, item]) => item === undefined))
       return null
     return (
-      <div className="transcript-usage-group">
-        <div className="transcript-usage-metric">
+      <div className="trajectory-usage-group">
+        <div className="trajectory-usage-metric">
           <Text size="xs">{label}</Text>
           <Text size="sm" fw={600}>
             {value === undefined ? '—' : value.toLocaleString()}
@@ -104,7 +104,7 @@ function TokenUsageDetails({ usage }: { usage: UsageView }): React.JSX.Element {
         {subsets.map(
           ([subsetLabel, subsetValue]) =>
             subsetValue !== undefined && (
-              <div className="transcript-usage-subset" key={subsetLabel}>
+              <div className="trajectory-usage-subset" key={subsetLabel}>
                 <Text size="xs" c="dimmed">
                   {subsetLabel}
                 </Text>
@@ -118,17 +118,17 @@ function TokenUsageDetails({ usage }: { usage: UsageView }): React.JSX.Element {
     )
   }
   return (
-    <div className="transcript-usage-details">
-      {metric(t('transcriptTokensIn'), usage.input, [
-        [t('transcriptCacheRead'), usage.cacheRead],
-        [t('transcriptCacheCreation'), usage.cacheCreation]
+    <div className="trajectory-usage-details">
+      {metric(t('trajectoryTokensIn'), usage.input, [
+        [t('trajectoryCacheRead'), usage.cacheRead],
+        [t('trajectoryCacheCreation'), usage.cacheCreation]
       ])}
-      {metric(t('transcriptTokensOut'), usage.output, [
-        [t('transcriptReasoningTokens'), usage.reasoning]
+      {metric(t('trajectoryTokensOut'), usage.output, [
+        [t('trajectoryReasoningTokens'), usage.reasoning]
       ])}
       {usage.total !== undefined && (
-        <div className="transcript-usage-total">
-          <Text size="xs">{t('transcriptTokensTotal')}</Text>
+        <div className="trajectory-usage-total">
+          <Text size="xs">{t('trajectoryTokensTotal')}</Text>
           <Text size="sm" fw={600}>
             {usage.total.toLocaleString()}
           </Text>
@@ -160,15 +160,15 @@ function TokenUsagePopover({
           color="gray"
           size="compact-xs"
           leftSection={<IconCpu size={ICON_SIZE.xs} />}
-          aria-label={t('transcriptUsageDetails')}
+          aria-label={t('trajectoryUsageDetails')}
         >
           {compact
             ? usage.total === undefined
-              ? t('transcriptUsageDetails')
+              ? t('trajectoryUsageDetails')
               : formatTokens(usage.total)
             : usage.total === undefined
-              ? t('transcriptUsageDetails')
-              : `${formatTokens(usage.total)} ${t('transcriptTokenUnit')}`}
+              ? t('trajectoryUsageDetails')
+              : `${formatTokens(usage.total)} ${t('trajectoryTokenUnit')}`}
         </Button>
       </Popover.Target>
       <Popover.Dropdown>
@@ -269,44 +269,44 @@ function CopyButton({ value }: { value: string }): React.JSX.Element {
   )
 }
 
-function rolePresentation(role: TranscriptRole): {
+function rolePresentation(role: TrajectoryRole): {
   color: string
   icon: React.JSX.Element
   key:
-    | 'transcriptSystem'
-    | 'transcriptHuman'
-    | 'transcriptAssistant'
-    | 'transcriptTool'
-    | 'transcriptUnknown'
+    | 'trajectorySystem'
+    | 'trajectoryHuman'
+    | 'trajectoryAssistant'
+    | 'trajectoryTool'
+    | 'trajectoryUnknown'
 } {
   if (role === 'system')
     return {
       color: 'gray',
       icon: <IconSettings size={ICON_SIZE.md} />,
-      key: 'transcriptSystem'
+      key: 'trajectorySystem'
     }
   if (role === 'human')
     return {
       color: 'orange',
       icon: <IconUser size={ICON_SIZE.md} />,
-      key: 'transcriptHuman'
+      key: 'trajectoryHuman'
     }
   if (role === 'assistant')
     return {
       color: 'blue',
       icon: <IconRobot size={ICON_SIZE.md} />,
-      key: 'transcriptAssistant'
+      key: 'trajectoryAssistant'
     }
   if (role === 'tool')
     return {
       color: 'green',
       icon: <IconTool size={ICON_SIZE.md} />,
-      key: 'transcriptTool'
+      key: 'trajectoryTool'
     }
   return {
     color: 'gray',
     icon: <IconSettings size={ICON_SIZE.md} />,
-    key: 'transcriptUnknown'
+    key: 'trajectoryUnknown'
   }
 }
 
@@ -337,17 +337,17 @@ function Section({
     setOpened(force > 0)
   }, [force])
   return (
-    <div className="transcript-section" data-transcript-section={kind}>
+    <div className="trajectory-section" data-trajectory-section={kind}>
       <Group
         justify="space-between"
         wrap="nowrap"
-        className="transcript-section-header"
+        className="trajectory-section-header"
       >
         <Button
           variant="subtle"
           color={color}
           size="compact-sm"
-          className="transcript-section-toggle"
+          className="trajectory-section-toggle"
           aria-expanded={opened}
           leftSection={
             opened ? (
@@ -366,7 +366,7 @@ function Section({
         <CopyButton value={value} />
       </Group>
       <Collapse expanded={opened}>
-        <div className="transcript-section-content">{children}</div>
+        <div className="trajectory-section-content">{children}</div>
       </Collapse>
     </div>
   )
@@ -691,7 +691,7 @@ function ToolArguments({
   return (
     <Stack gap="sm">
       {Array.isArray(args.todos) && (
-        <Stack gap={4} className="transcript-todos">
+        <Stack gap={4} className="trajectory-todos">
           {args.todos.map((item, index) => {
             const todo =
               typeof item === 'object' && item !== null
@@ -723,10 +723,10 @@ function ToolArguments({
         </Stack>
       )}
       {ordinary.length > 0 && (
-        <div className="transcript-args">
+        <div className="trajectory-args">
           {ordinary.map(([key, value]) => (
-            <div className="transcript-arg" key={key}>
-              <Text size="xs" fw={600} className="transcript-arg-key">
+            <div className="trajectory-arg" key={key}>
+              <Text size="xs" fw={600} className="trajectory-arg-key">
                 <HighlightText value={key} query={query} />
               </Text>
               <JsonValueView value={value} query={query} />
@@ -738,19 +738,19 @@ function ToolArguments({
         <SimpleGrid
           cols={{ base: 1, md: 2 }}
           spacing="sm"
-          className="transcript-diff"
+          className="trajectory-diff"
         >
-          <div className="transcript-diff-old">
+          <div className="trajectory-diff-old">
             <Text size="xs" fw={700} mb={6}>
-              {t('transcriptBefore')}
+              {t('trajectoryBefore')}
             </Text>
             <Code block>
               <HighlightText value={String(args[oldKey] ?? '')} query={query} />
             </Code>
           </div>
-          <div className="transcript-diff-new">
+          <div className="trajectory-diff-new">
             <Text size="xs" fw={700} mb={6}>
-              {t('transcriptAfter')}
+              {t('trajectoryAfter')}
             </Text>
             <Code block>
               <HighlightText value={String(args[newKey] ?? '')} query={query} />
@@ -772,14 +772,14 @@ function ToolCall({
   const t = useMessages()
   const jump = (): void => {
     if (!call.resultMessageId) return
-    scrollToTranscriptElement(`transcript-${call.resultMessageId}`)
+    scrollToTrajectoryElement(`trajectory-${call.resultMessageId}`)
   }
   return (
-    <div className="transcript-tool-call">
+    <div className="trajectory-tool-call">
       <Group
         justify="space-between"
         wrap="nowrap"
-        className="transcript-tool-call-header"
+        className="trajectory-tool-call-header"
       >
         <Group gap="xs" wrap="nowrap">
           <IconTool size={ICON_SIZE.md} color="var(--mantine-color-green-6)" />
@@ -794,11 +794,11 @@ function ToolCall({
             leftSection={<IconArrowDown size={ICON_SIZE.sm} />}
             onClick={jump}
           >
-            {t('transcriptJumpResult')}
+            {t('trajectoryJumpResult')}
           </Button>
         )}
       </Group>
-      <div className="transcript-tool-call-body">
+      <div className="trajectory-tool-call-body">
         <ToolArguments args={call.args} query={query} />
       </div>
     </div>
@@ -823,12 +823,12 @@ function ToolCalls({
     setOpened(force > 0)
   }, [force])
   return (
-    <div className="transcript-tool-calls">
+    <div className="trajectory-tool-calls">
       <Button
         variant="subtle"
         color="green"
         size="compact-sm"
-        className="transcript-tool-calls-toggle"
+        className="trajectory-tool-calls-toggle"
         aria-expanded={opened}
         leftSection={
           opened ? (
@@ -842,14 +842,14 @@ function ToolCalls({
         <Group gap={6} wrap="nowrap">
           <IconTool size={ICON_SIZE.sm} />
           <Text fw={600} size="sm">
-            {t('transcriptToolCalls')} · {calls.length}
+            {t('trajectoryToolCalls')} · {calls.length}
           </Text>
         </Group>
       </Button>
       <Collapse expanded={opened}>
-        <div className="transcript-tool-calls-body">
+        <div className="trajectory-tool-calls-body">
           {calls.map((call) => (
-            <div id={`transcript-call-${call.id}`} key={call.id}>
+            <div id={`trajectory-call-${call.id}`} key={call.id}>
               <ToolCall call={call} query={query} />
             </div>
           ))}
@@ -859,12 +859,12 @@ function ToolCalls({
   )
 }
 
-function TranscriptMessage({
+function TrajectoryMessage({
   message,
   force,
   query
 }: {
-  message: TranscriptMessageView
+  message: TrajectoryMessageView
   force: number
   query: string
 }): React.JSX.Element {
@@ -872,15 +872,15 @@ function TranscriptMessage({
   const presentation = rolePresentation(message.role)
   const jumpToCall = (): void => {
     if (!message.toolCallId) return
-    scrollToTranscriptElement(`transcript-call-${message.toolCallId}`)
+    scrollToTrajectoryElement(`trajectory-call-${message.toolCallId}`)
   }
   return (
     <Paper
-      id={`transcript-${message.id}`}
-      data-transcript-message-key={messageKey(message)}
-      data-transcript-role={message.role}
+      id={`trajectory-${message.id}`}
+      data-trajectory-message-key={messageKey(message)}
+      data-trajectory-role={message.role}
       withBorder
-      className={`transcript-message transcript-${message.role}`}
+      className={`trajectory-message trajectory-${message.role}`}
     >
       <Group justify="space-between" wrap="wrap" p="sm" gap="xs">
         <Group gap="xs" wrap="wrap">
@@ -912,26 +912,26 @@ function TranscriptMessage({
               <Button
                 variant="subtle"
                 size="compact-xs"
-                data-transcript-action="back-to-call"
+                data-trajectory-action="back-to-call"
                 leftSection={<IconArrowUp size={ICON_SIZE.sm} />}
                 onClick={jumpToCall}
               >
-                {t('transcriptJumpCall')}
+                {t('trajectoryJumpCall')}
               </Button>
             )}
             {message.usage && (
-              <div className="transcript-token-metrics">
+              <div className="trajectory-token-metrics">
                 <TokenUsagePopover usage={message.usage} compact />
               </div>
             )}
           </Group>
         )}
       </Group>
-      <div className="transcript-message-body">
+      <div className="trajectory-message-body">
         {message.reasoning && (
           <Section
             kind="reasoning"
-            title={t('transcriptReasoning')}
+            title={t('trajectoryReasoning')}
             value={message.reasoning}
             force={force}
             icon={<IconBrain size={ICON_SIZE.sm} />}
@@ -949,8 +949,8 @@ function TranscriptMessage({
             kind={message.role === 'tool' ? 'result' : 'message'}
             title={
               message.role === 'tool'
-                ? t('transcriptResult')
-                : t('transcriptContent')
+                ? t('trajectoryResult')
+                : t('trajectoryContent')
             }
             value={message.content}
             openedInitially={
@@ -961,7 +961,7 @@ function TranscriptMessage({
             color={message.role === 'tool' ? 'green' : 'blue'}
           >
             {message.role === 'tool' ? (
-              <Code block className="transcript-tool-output">
+              <Code block className="trajectory-tool-output">
                 <HighlightText value={message.content} query={query} />
               </Code>
             ) : (
@@ -979,7 +979,7 @@ function TranscriptMessage({
         {message.artifact !== undefined && message.artifact !== null && (
           <Section
             kind="artifact"
-            title={t('transcriptArtifact')}
+            title={t('trajectoryArtifact')}
             value={JSON.stringify(message.artifact, null, 2)}
             force={force}
             icon={<IconBraces size={ICON_SIZE.sm} />}
@@ -998,7 +998,7 @@ function TranscriptMessage({
   )
 }
 
-const ROLES: TranscriptRole[] = [
+const ROLES: TrajectoryRole[] = [
   'system',
   'human',
   'assistant',
@@ -1016,7 +1016,7 @@ function scrollParent(element: HTMLElement): HTMLElement | undefined {
   return undefined
 }
 
-function scrollToTranscriptElement(
+function scrollToTrajectoryElement(
   id: string,
   behavior?: ScrollBehavior
 ): void {
@@ -1030,11 +1030,11 @@ function scrollToTranscriptElement(
   })
 }
 
-function messageKey(message: TranscriptMessageView): string {
+function messageKey(message: TrajectoryMessageView): string {
   return `${message.seq}:${message.id}:${message.role}`
 }
 
-function messagePreview(message: TranscriptMessageView): string {
+function messagePreview(message: TrajectoryMessageView): string {
   const value =
     message.content || message.reasoning || message.name || message.role
   const preview = value.replaceAll(/\s+/g, ' ').trim().slice(0, 120)
@@ -1054,7 +1054,7 @@ const MinimapMark = React.memo(function MinimapMark({
 }): React.JSX.Element {
   return (
     <span
-      className="transcript-minimap-segment"
+      className="trajectory-minimap-segment"
       data-current={current ? 'true' : undefined}
       data-preview={preview ? 'true' : undefined}
       style={{ top: `${top}px`, width: `${width}px` }}
@@ -1062,12 +1062,12 @@ const MinimapMark = React.memo(function MinimapMark({
   )
 })
 
-function TranscriptMinimap({
+function TrajectoryMinimap({
   messages,
   timelineRef,
   timelineId
 }: {
-  messages: TranscriptMessageView[]
+  messages: TrajectoryMessageView[]
   timelineRef: React.RefObject<HTMLDivElement | null>
   timelineId: string
 }): React.JSX.Element {
@@ -1119,9 +1119,9 @@ function TranscriptMinimap({
       )
       const next: MinimapSegment[] = []
       for (const node of timeline.querySelectorAll<HTMLElement>(
-        ':scope > [data-transcript-message-key]'
+        ':scope > [data-trajectory-message-key]'
       )) {
-        const message = byKey.get(node.dataset.transcriptMessageKey ?? '')
+        const message = byKey.get(node.dataset.trajectoryMessageKey ?? '')
         if (!message) continue
         const rect = node.getBoundingClientRect()
         next.push({
@@ -1162,8 +1162,8 @@ function TranscriptMinimap({
   if (segments.length === 0)
     return (
       <nav
-        className="transcript-minimap"
-        aria-label={t('transcriptMinimap')}
+        className="trajectory-minimap"
+        aria-label={t('trajectoryMinimap')}
         style={{
           height: MINIMAP_HEIGHT,
           top: topOffset ?? `calc(50vh - ${MINIMAP_HEIGHT / 2}px)`
@@ -1203,23 +1203,23 @@ function TranscriptMinimap({
     // The rail is a direct ordering control: jump instantly and let the scroll
     // listener derive the current message. A smooth scroll would keep firing
     // scroll events while a second key press still uses the old index.
-    scrollToTranscriptElement(`transcript-${message.id}`, 'auto')
+    scrollToTrajectoryElement(`trajectory-${message.id}`, 'auto')
   }
 
   return (
     <nav
-      className="transcript-minimap"
-      aria-label={t('transcriptMinimap')}
+      className="trajectory-minimap"
+      aria-label={t('trajectoryMinimap')}
       style={{
         height: MINIMAP_HEIGHT,
         top: topOffset ?? `calc(50vh - ${MINIMAP_HEIGHT / 2}px)`
       }}
     >
       <div
-        className="transcript-minimap-track"
+        className="trajectory-minimap-track"
         role="slider"
         tabIndex={0}
-        aria-label={t('transcriptMinimapPosition')}
+        aria-label={t('trajectoryMinimapPosition')}
         aria-controls={timelineId}
         aria-orientation="vertical"
         aria-valuemin={1}
@@ -1255,7 +1255,7 @@ function TranscriptMinimap({
           navigate(next)
         }}
       >
-        <div className="transcript-minimap-marks" aria-hidden="true">
+        <div className="trajectory-minimap-marks" aria-hidden="true">
           {dense ? (
             <>
               {buckets.map((bucket) => {
@@ -1303,7 +1303,7 @@ function TranscriptMinimap({
         <Paper
           withBorder
           p="xs"
-          className="transcript-minimap-preview"
+          className="trajectory-minimap-preview"
           aria-hidden="true"
           style={{ top: `${ticks.start + hoveredIndex * ticks.gap}px` }}
         >
@@ -1320,23 +1320,23 @@ function TranscriptMinimap({
   )
 }
 
-export function TranscriptTimeline({
+export function TrajectoryTimeline({
   events
 }: {
-  events: TranscriptEvent[]
+  events: TrajectoryEvent[]
 }): React.JSX.Element {
   const t = useMessages()
   const timelineId = React.useId()
-  const narrowTranscript = useMediaQuery(
+  const narrowTrajectory = useMediaQuery(
     `(max-width: ${BREAKPOINTS.rail}px)`,
     false,
     {
       getInitialValueInEffect: false
     }
   )
-  const document = React.useMemo(() => normalizeTranscript(events), [events])
+  const document = React.useMemo(() => normalizeTrajectory(events), [events])
   const [query, setQuery] = React.useState('')
-  const [roles, setRoles] = React.useState<TranscriptRole[]>(ROLES)
+  const [roles, setRoles] = React.useState<TrajectoryRole[]>(ROLES)
   const [force, setForce] = React.useState(0)
   const timelineRef = React.useRef<HTMLDivElement>(null)
   const filtered = React.useMemo(
@@ -1348,7 +1348,7 @@ export function TranscriptTimeline({
       ),
     [document.messages, query, roles]
   )
-  const toggleRole = (role: TranscriptRole): void =>
+  const toggleRole = (role: TrajectoryRole): void =>
     setRoles((current) =>
       current.includes(role)
         ? current.filter((item) => item !== role)
@@ -1356,7 +1356,7 @@ export function TranscriptTimeline({
     )
   return (
     <Stack gap="md">
-      <Paper withBorder p="sm" className="transcript-toolbar">
+      <Paper withBorder p="sm" className="trajectory-toolbar">
         <Group justify="space-between" align="start" wrap="wrap">
           <Stack gap="xs">
             <Group gap="xs" wrap="wrap">
@@ -1374,7 +1374,7 @@ export function TranscriptTimeline({
             </Group>
             <Group gap={4} wrap="wrap">
               <Text size="xs" c="dimmed">
-                {t('transcriptShowing')
+                {t('trajectoryShowing')
                   .replace('{shown}', String(filtered.length))
                   .replace('{total}', String(document.messages.length))}
               </Text>
@@ -1386,7 +1386,7 @@ export function TranscriptTimeline({
           <Group gap="xs" wrap="wrap">
             <TextInput
               leftSection={<IconSearch size={ICON_SIZE.sm} />}
-              placeholder={t('transcriptSearch')}
+              placeholder={t('trajectorySearch')}
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
             />
@@ -1407,15 +1407,15 @@ export function TranscriptTimeline({
           </Group>
         </Group>
       </Paper>
-      <div className="transcript-layout">
+      <div className="trajectory-layout">
         <Stack
           id={timelineId}
           gap="sm"
-          className="transcript-timeline"
+          className="trajectory-timeline"
           ref={timelineRef}
         >
           {filtered.map((message) => (
-            <TranscriptMessage
+            <TrajectoryMessage
               key={messageKey(message)}
               message={message}
               force={force}
@@ -1423,8 +1423,8 @@ export function TranscriptTimeline({
             />
           ))}
         </Stack>
-        {!narrowTranscript && (
-          <TranscriptMinimap
+        {!narrowTrajectory && (
+          <TrajectoryMinimap
             messages={filtered}
             timelineRef={timelineRef}
             timelineId={timelineId}
@@ -1435,11 +1435,11 @@ export function TranscriptTimeline({
   )
 }
 
-export function TranscriptViewer({
+export function TrajectoryViewer({
   target,
   onClose
 }: {
-  target: TranscriptTarget | undefined
+  target: TrajectoryTarget | undefined
   onClose: () => void
 }): React.JSX.Element {
   const t = useMessages()
@@ -1482,18 +1482,18 @@ export function TranscriptViewer({
           </>
         )}
       </Group>
-      {target && <TranscriptContent target={target} />}
+      {target && <TrajectoryContent target={target} />}
     </Modal>
   )
 }
 
-export function TranscriptContent({
+export function TrajectoryContent({
   target
 }: {
-  target: TranscriptTarget
+  target: TrajectoryTarget
 }): React.JSX.Element {
   const t = useMessages()
-  const [events, setEvents] = React.useState<TranscriptEvent[]>([])
+  const [events, setEvents] = React.useState<TrajectoryEvent[]>([])
   const [error, setError] = React.useState<unknown>()
   const [loading, setLoading] = React.useState(false)
   const requests = React.useRef(new LatestRequestGuard())
@@ -1502,7 +1502,7 @@ export function TranscriptContent({
     setEvents([])
     setLoading(true)
     setError(undefined)
-    void api<{ events: TranscriptEvent[] }>(target.contentHref, {
+    void api<{ events: TrajectoryEvent[] }>(target.contentHref, {
       signal: request.signal
     })
       .then((body) => {
@@ -1520,9 +1520,9 @@ export function TranscriptContent({
   if (error !== undefined)
     return (
       <div className="content-load-state">
-        <ResourceLoadError message={t('transcriptLoadFailed')} />
+        <ResourceLoadError message={t('trajectoryLoadFailed')} />
       </div>
     )
   if (loading) return <LoadingState message={t('loading')} />
-  return <TranscriptTimeline events={events} />
+  return <TrajectoryTimeline events={events} />
 }

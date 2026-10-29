@@ -7,15 +7,15 @@ from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
 
 
-class ListTranscriptMessagesArgs(BaseModel):
+class ListTrajectoryMessagesArgs(BaseModel):
     file_path: str = Field(
-        description="Transcript path under /transcripts, such as /transcripts/0001-analyzer-initial.jsonl."
+        description="Trajectory path under /trajectories, such as /trajectories/0001-analyzer-initial.jsonl."
     )
 
 
-class ReadTranscriptMessageArgs(BaseModel):
+class ReadTrajectoryMessageArgs(BaseModel):
     file_path: str = Field(
-        description="Transcript path under /transcripts, such as /transcripts/0001-analyzer-initial.jsonl."
+        description="Trajectory path under /trajectories, such as /trajectories/0001-analyzer-initial.jsonl."
     )
     seq: int = Field(
         ge=1,
@@ -23,11 +23,11 @@ class ReadTranscriptMessageArgs(BaseModel):
     )
 
 
-def _normalize_transcript_path(file_path: str) -> str | None:
+def _normalize_trajectory_path(file_path: str) -> str | None:
     normalized = posixpath.normpath(
         file_path if file_path.startswith("/") else f"/{file_path}"
     )
-    prefix = "/transcripts/"
+    prefix = "/trajectories/"
     if not normalized.startswith(prefix):
         return None
     relative = normalized.removeprefix(prefix)
@@ -56,7 +56,7 @@ def _read_events(
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None]:
     downloaded = backend.download_files([file_path])[0]
     if downloaded.error is not None or downloaded.content is None:
-        return [], [], downloaded.error or "Transcript has no readable content."
+        return [], [], downloaded.error or "Trajectory has no readable content."
 
     events: list[dict[str, Any]] = []
     parse_errors: list[dict[str, Any]] = []
@@ -79,18 +79,18 @@ def _read_events(
     return events, parse_errors, None
 
 
-def build_transcript_tools(backend: BackendProtocol) -> list[StructuredTool]:
+def build_trajectory_tools(backend: BackendProtocol) -> list[StructuredTool]:
     def resolve(file_path: str) -> tuple[str | None, dict[str, Any] | None]:
-        normalized = _normalize_transcript_path(file_path)
+        normalized = _normalize_trajectory_path(file_path)
         if normalized is None:
             return None, {
                 "ok": False,
-                "error": "Path must name one /transcripts/*.jsonl file.",
+                "error": "Path must name one /trajectories/*.jsonl file.",
             }
         return normalized, None
 
-    def list_transcript_messages(file_path: str) -> dict[str, Any]:
-        """List message numbers and short previews from one JSONL transcript."""
+    def list_trajectory_messages(file_path: str) -> dict[str, Any]:
+        """List message numbers and short previews from one JSONL trajectory."""
 
         normalized, error = resolve(file_path)
         if error is not None:
@@ -124,8 +124,8 @@ def build_transcript_tools(backend: BackendProtocol) -> list[StructuredTool]:
             )
         return {"ok": True, "messages": messages, "parse_errors": parse_errors}
 
-    def read_transcript_message(file_path: str, seq: int) -> dict[str, Any]:
-        """Read one complete message from a JSONL transcript by sequence number."""
+    def read_trajectory_message(file_path: str, seq: int) -> dict[str, Any]:
+        """Read one complete message from a JSONL trajectory by sequence number."""
 
         normalized, error = resolve(file_path)
         if error is not None:
@@ -150,13 +150,13 @@ def build_transcript_tools(backend: BackendProtocol) -> list[StructuredTool]:
 
     return [
         StructuredTool.from_function(
-            list_transcript_messages,
-            name="list_transcript_messages",
-            args_schema=ListTranscriptMessagesArgs,
+            list_trajectory_messages,
+            name="list_trajectory_messages",
+            args_schema=ListTrajectoryMessagesArgs,
         ),
         StructuredTool.from_function(
-            read_transcript_message,
-            name="read_transcript_message",
-            args_schema=ReadTranscriptMessageArgs,
+            read_trajectory_message,
+            name="read_trajectory_message",
+            args_schema=ReadTrajectoryMessageArgs,
         ),
     ]

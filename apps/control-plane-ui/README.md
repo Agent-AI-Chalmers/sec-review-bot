@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-Internal web console for inspecting and operating review runs, execution diagnostics and artifacts, agent memory, and transcripts. Server-backed data goes only through this application's same-origin BFF, which holds upstream credentials and proxies explicit route allowlists; the standalone transcript Viewer processes uploaded or pasted input entirely in the browser.
+Internal web console for inspecting and operating review runs, execution diagnostics and artifacts, agent memory, and trajectories. Server-backed data goes only through this application's same-origin BFF, which holds upstream credentials and proxies explicit route allowlists; the standalone trajectory Viewer processes uploaded or pasted input entirely in the browser.
 
 ## Local development
 
@@ -13,15 +13,15 @@ pnpm install
 pnpm run dev:fixtures
 ```
 
-Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies representative run and memory states without requiring Review Runs, Memory Catalog, PostgreSQL, or RustFS. Memory pause, resume, edit, and restore controls are stateful fixtures. Memory tree and transcript actions return small fixture attachments so their browser download behavior can be exercised without stored objects.
+Open the URL printed by Vite, normally `http://localhost:5173`. This mode supplies representative run and memory states without requiring Review Runs, Memory Catalog, PostgreSQL, or RustFS. Memory pause, resume, edit, and restore controls are stateful fixtures. Memory tree and trajectory actions return small fixture attachments so their browser download behavior can be exercised without stored objects.
 
 The fixture server also exposes stable full-page error states for visual inspection:
 
 - `/memory/revisions/404/tree` shows a memory-tree preview failure while preserving the artifact download.
-- `/memory/revisions/404/transcript` shows a transcript load failure.
+- `/memory/revisions/404/trajectory` shows a trajectory load failure.
 - `/runs/fixture-artifact-load-error/files` shows a run-files load failure.
 
-The Viewer page is entirely local to the browser. It accepts the project's event-based JSONL transcript contract and direct LangGraph message-array JSON, from either a file or pasted content, without uploading the input to the BFF. Direct message arrays that omit tool-result IDs are linked only when one assistant message's calls are followed by an unambiguous, complete result sequence.
+The Viewer page is entirely local to the browser. It accepts the project's event-based JSONL trajectory contract and direct LangGraph message-array JSON, from either a file or pasted content, without uploading the input to the BFF. Direct message arrays that omit tool-result IDs are linked only when one assistant message's calls are followed by an unambiguous, complete result sequence.
 
 ## Source layout
 
@@ -34,8 +34,8 @@ browser/
     runs/             run list, detail, status, and Review Runs projections
     memory/           memory inspection and Memory Catalog projections
     workspace/        file browsing and editing used by runs and memory
-    transcript/       transcript model and renderer
-    viewer/           local transcript viewer page
+    trajectory/       trajectory model and renderer
+    viewer/           local trajectory viewer page
   shared/             browser-only infrastructure and small utilities
   styles/             ordered stylesheet sections
   main.tsx            browser entry point
@@ -89,4 +89,4 @@ The server-side memory tree reader and builder implement the versioned [memory-t
 
 Set `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_TOKEN` to enable memory management. The BFF strips storage URIs from Catalog JSON, fetches artifacts itself, and verifies their size and SHA-256 digest before returning content or downloads.
 
-The authenticated control plane can pause or resume maintenance, edit the active memory tree, and restore an existing revision. The BFF derives actor identity server-side and uses expected-active-revision and control-generation compare-and-swap. Its S3 identity can create immutable objects only under `memory/trees/*`; run artifacts and memory transcripts remain read-only. A failed edit or restore does not resume maintenance automatically.
+The authenticated control plane can pause or resume maintenance, edit the active memory tree, and restore an existing revision. The BFF derives actor identity server-side and uses expected-active-revision and control-generation compare-and-swap. Its S3 identity can create immutable objects only under `memory/trees/*`; run artifacts and memory trajectories remain read-only. A failed edit or restore does not resume maintenance automatically.

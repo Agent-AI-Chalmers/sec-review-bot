@@ -19,7 +19,7 @@ MAINTENANCE_PROBE = llm_probe(
     reason=MAINTENANCE_PROBE.skip_reason(),
 )
 @pytest.mark.asyncio
-async def test_llm_maintenance_reorganizes_messy_memory_without_transcripts() -> None:
+async def test_llm_maintenance_reorganizes_messy_memory_without_trajectories() -> None:
     root = Path(".agent-artifacts") / "memory-probes" / f"maintenance-{uuid4().hex[:8]}"
     runtime_memory_root = root / "base-memory"
     topics_root = runtime_memory_root / "topics"
@@ -84,7 +84,7 @@ async def test_llm_maintenance_reorganizes_messy_memory_without_transcripts() ->
         base_memory_tree=runtime_memory_root,
         observations=[("maintenance-probe", observation)],
         worktree_root=root / "candidate-memory",
-        maintainer_transcript_path=root / "memory-maintainer.jsonl",
+        maintainer_trajectory_path=root / "memory-maintainer.jsonl",
         deployment=llm_test_deployment(),
     )
 

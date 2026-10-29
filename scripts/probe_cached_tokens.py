@@ -102,12 +102,12 @@ def _round_prompt(round_index: int) -> str:
 def _build_messages(
     *,
     stable_prefix: str,
-    transcript: list[BaseMessage],
+    trajectory: list[BaseMessage],
     round_index: int,
 ) -> list[BaseMessage]:
     return [
         SystemMessage(content=stable_prefix),
-        *transcript,
+        *trajectory,
         HumanMessage(content=_round_prompt(round_index)),
     ]
 
@@ -276,13 +276,13 @@ def main() -> None:
     print(f"  stable_prefix_chars: {len(stable_prefix)}")
     print()
 
-    transcript: list[BaseMessage] = []
+    trajectory: list[BaseMessage] = []
     results: list[RoundStats] = []
 
     for round_index in range(1, args.rounds + 1):
         messages = _build_messages(
             stable_prefix=stable_prefix,
-            transcript=transcript,
+            trajectory=trajectory,
             round_index=round_index,
         )
         started = time.perf_counter()
@@ -300,7 +300,7 @@ def main() -> None:
         results.append(stats)
         _print_round_stats(stats, show_raw=args.show_raw)
 
-        transcript.extend(
+        trajectory.extend(
             [
                 HumanMessage(content=_round_prompt(round_index)),
                 _visible_text_only_message(response),

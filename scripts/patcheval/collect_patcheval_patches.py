@@ -41,23 +41,23 @@ class PatchRecord:
 
 def _retry_count(run_dir: Path) -> int | None:
     # Retry inference is only a PatchEval issue-CVE reporting hint. Read both
-    # the canonical stage transcripts and the current flat published view.
+    # the canonical stage trajectories and the current flat published view.
     artifacts = run_dir / "artifacts" / run_dir.name
     retry_indexes: list[int] = []
-    for transcript_path in artifacts.glob("**/transcripts/retry-*.jsonl"):
-        label = transcript_path.stem
+    for trajectory_path in artifacts.glob("**/trajectories/retry-*.jsonl"):
+        label = trajectory_path.stem
         try:
             retry_indexes.append(int(label.split("-", 1)[1]))
         except (IndexError, ValueError):
             continue
-    for transcript_path in artifacts.glob("transcripts/*-retry-*.jsonl"):
-        match = re.search(r"-retry-(\d+)$", transcript_path.stem)
+    for trajectory_path in artifacts.glob("trajectories/*-retry-*.jsonl"):
+        match = re.search(r"-retry-(\d+)$", trajectory_path.stem)
         if match:
             retry_indexes.append(int(match.group(1)))
     if retry_indexes:
         return max(retry_indexes)
-    if any(artifacts.glob("**/transcripts/initial.jsonl")) or any(
-        artifacts.glob("transcripts/*-initial.jsonl")
+    if any(artifacts.glob("**/trajectories/initial.jsonl")) or any(
+        artifacts.glob("trajectories/*-initial.jsonl")
     ):
         return 0
     return None

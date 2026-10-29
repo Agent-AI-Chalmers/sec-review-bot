@@ -112,7 +112,7 @@ def test_repository_case_execution_rejects_invalid_case_identity(
                 "run_id": "run-repo-case",
                 "case_execution_input": case_execution_input,  # type: ignore[typeddict-item]  # intentionally invalid case payload
                 "cases_artifacts_path": str(tmp_path / "cases"),
-                "published_transcripts_path": str(tmp_path / "transcripts"),
+                "published_trajectories_path": str(tmp_path / "trajectories"),
                 "timeout_seconds": 30,
                 "runtime_context": {},
             }
@@ -142,10 +142,10 @@ def test_repository_case_execution_input_does_not_carry_stage_artifact_paths(
     assert "artifact_paths" not in case_execution_input
 
 
-def test_repository_case_activity_preserves_published_transcripts_path(
+def test_repository_case_activity_preserves_published_trajectories_path(
     tmp_path,
 ) -> None:
-    published_transcripts_path = str(tmp_path / "cases" / "case-1" / "transcripts")
+    published_trajectories_path = str(tmp_path / "cases" / "case-1" / "trajectories")
 
     prepared_case = prepare_repository_case_activity(
         {
@@ -160,19 +160,19 @@ def test_repository_case_activity_preserves_published_transcripts_path(
             },
             "cases_artifacts_path": str(tmp_path / "cases"),
             "run_id": "run-repo-case",
-            "published_transcripts_path": published_transcripts_path,
+            "published_trajectories_path": published_trajectories_path,
             "timeout_seconds": 30,
             "runtime_context": {},
         }
     )
 
-    assert prepared_case["published_transcripts_path"] == published_transcripts_path
+    assert prepared_case["published_trajectories_path"] == published_trajectories_path
 
 
-def test_repository_case_transcripts_are_published_under_the_case_root(
+def test_repository_case_trajectories_are_published_under_the_case_root(
     tmp_path,
 ) -> None:
-    """Case-owned transcripts let only a completed case register its own extraction."""
+    """Case-owned trajectories let only a completed case register its own extraction."""
     cases_root = tmp_path / "artifacts" / "run-1" / "cases"
     request = ReviewWorkflowRequest(
         workflow="repository-review",
@@ -203,8 +203,8 @@ def test_repository_case_transcripts_are_published_under_the_case_root(
 
     batch = prepare_repository_case_review_inputs_activity(request, [case])
 
-    assert batch["case_requests"][0]["published_transcripts_path"] == str(
-        cases_root / "case-1" / "transcripts"
+    assert batch["case_requests"][0]["published_trajectories_path"] == str(
+        cases_root / "case-1" / "trajectories"
     )
 
 
