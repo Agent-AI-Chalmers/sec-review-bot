@@ -28,6 +28,11 @@ const THEME_SELECTORS: Readonly<Record<ThemeName, string>> = {
 // so their contract is the 3:1 non-text/UI-component threshold.
 const CONTRAST_REQUIREMENTS: readonly ContrastRequirement[] = [
   { foreground: '--muted', background: '--surface-raised', minimum: 4.5 },
+  {
+    foreground: '--failure-text',
+    background: '--surface-raised',
+    minimum: 4.5
+  },
   { foreground: '--link', background: '--surface-raised', minimum: 4.5 },
   { foreground: '--brand', background: '--surface-raised', minimum: 3 },
   { foreground: '--status-active', background: '--surface-raised', minimum: 3 },

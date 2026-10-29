@@ -21,7 +21,7 @@ export function ResourceLoadError({
       <Title order={2} size="h3" ta="center">
         {t('contentUnavailable')}
       </Title>
-      <Text c="dimmed" ta="center">
+      <Text c="var(--muted)" ta="center">
         {message}
       </Text>
       {actions}

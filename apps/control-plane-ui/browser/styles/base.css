@@ -41,6 +41,11 @@
   inherits: true;
   initial-value: #78716c;
 }
+@property --failure-text {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #b42318;
+}
 @property --link {
   syntax: '<color>';
   inherits: true;
@@ -149,6 +154,7 @@
   --border: #e7e5e4;
   --border-strong: #d6d3d1;
   --muted: #78716c;
+  --failure-text: #b42318;
   --link: #a3620b;
   /* Amber accent, reserved for interactive elements only. Status colours below are
      deliberately independent: a running run must stay the same colour whatever the
@@ -185,6 +191,7 @@
   --border: #3a3532;
   --border-strong: #4a4441;
   --muted: #a8a29e;
+  --failure-text: #fca5a5;
   --link: #f0b429;
   --brand: #f0b429;
   --brand-soft: #2e2519;
@@ -262,6 +269,7 @@ samp {
     --border var(--theme-transition) var(--theme-ease),
     --border-strong var(--theme-transition) var(--theme-ease),
     --muted var(--theme-transition) var(--theme-ease),
+    --failure-text var(--theme-transition) var(--theme-ease),
     --link var(--theme-transition) var(--theme-ease),
     --brand var(--theme-transition) var(--theme-ease),
     --brand-soft var(--theme-transition) var(--theme-ease),

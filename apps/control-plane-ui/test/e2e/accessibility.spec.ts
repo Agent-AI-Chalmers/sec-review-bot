@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright'
-import type { Page, TestInfo } from '@playwright/test'
+import type { Page } from '@playwright/test'
 
 import { expect, openAuthenticatedRuns, test } from './fixtures.js'
 
@@ -10,10 +10,7 @@ type AxeViolation = Readonly<{
   targets: unknown[]
 }>
 
-async function expectNoAccessibilityViolations(
-  page: Page,
-  testInfo: TestInfo
-): Promise<void> {
+async function expectNoAccessibilityViolations(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
     .analyze()
@@ -24,21 +21,7 @@ async function expectNoAccessibilityViolations(
     targets: violation.nodes.map((node) => node.target)
   }))
 
-  const contrast = violations.filter(
-    (violation) => violation.id === 'color-contrast'
-  )
-  // The first axe rollout blocks broken structure and ARIA. Existing contrast
-  // problems stay visible in the report without turning this initial baseline red.
-  if (contrast.length > 0) {
-    await testInfo.attach('axe-color-contrast-report', {
-      body: JSON.stringify(contrast, null, 2),
-      contentType: 'application/json'
-    })
-  }
-
-  expect(
-    violations.filter((violation) => violation.id !== 'color-contrast')
-  ).toEqual([])
+  expect(violations).toEqual([])
 }
 
 test.beforeEach(async ({ fixtureRuntime }) => {
@@ -48,43 +31,39 @@ test.beforeEach(async ({ fixtureRuntime }) => {
   )
 })
 
-test('runs list has no detectable structural WCAG A/AA violations', async ({
-  page
-}, testInfo) => {
+test('runs list has no detectable WCAG A/AA violations', async ({ page }) => {
   await openAuthenticatedRuns(page)
-  await expectNoAccessibilityViolations(page, testInfo)
+  await expectNoAccessibilityViolations(page)
 })
 
-test('run detail has no detectable structural WCAG A/AA violations', async ({
-  page
-}, testInfo) => {
+test('run detail has no detectable WCAG A/AA violations', async ({ page }) => {
   await openAuthenticatedRuns(page)
   await page.locator('tbody tr:first-child td a').first().click()
   await page.locator('.run-progress-timeline').waitFor()
-  await expectNoAccessibilityViolations(page, testInfo)
+  await expectNoAccessibilityViolations(page)
 })
 
-test('memory workspace has no detectable structural WCAG A/AA violations', async ({
+test('memory workspace has no detectable WCAG A/AA violations', async ({
   page
-}, testInfo) => {
+}) => {
   await openAuthenticatedRuns(page)
   await page.goto('/memory', { waitUntil: 'networkidle' })
   await page.locator('main').waitFor()
-  await expectNoAccessibilityViolations(page, testInfo)
+  await expectNoAccessibilityViolations(page)
 })
 
-test('trajectory viewer has no detectable structural WCAG A/AA violations', async ({
+test('trajectory viewer has no detectable WCAG A/AA violations', async ({
   page
-}, testInfo) => {
+}) => {
   await openAuthenticatedRuns(page)
   await page.goto('/viewer', { waitUntil: 'networkidle' })
   await page.locator('main').waitFor()
-  await expectNoAccessibilityViolations(page, testInfo)
+  await expectNoAccessibilityViolations(page)
 })
 
-test('stable error state has no detectable structural WCAG A/AA violations', async ({
+test('stable error state has no detectable WCAG A/AA violations', async ({
   page
-}, testInfo) => {
+}) => {
   await openAuthenticatedRuns(page)
   await page.goto('/runs/fixture-artifact-load-error/files', {
     waitUntil: 'networkidle'
@@ -92,5 +71,5 @@ test('stable error state has no detectable structural WCAG A/AA violations', asy
   await page
     .getByText('The run files could not be opened.', { exact: true })
     .waitFor()
-  await expectNoAccessibilityViolations(page, testInfo)
+  await expectNoAccessibilityViolations(page)
 })

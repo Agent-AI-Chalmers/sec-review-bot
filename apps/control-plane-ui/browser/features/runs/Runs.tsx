@@ -485,7 +485,7 @@ export function Runs(): React.JSX.Element {
                     </Table.Td>
                     <Table.Td data-label={t('failureCode')}>
                       {run.failure_code && (
-                        <Text c="red" size="xs" ff="monospace">
+                        <Text c="var(--failure-text)" size="xs" ff="monospace">
                           {run.failure_code}
                         </Text>
                       )}
@@ -510,7 +510,7 @@ export function Runs(): React.JSX.Element {
             gap="md"
           >
             <Group gap={6} align="center" wrap="nowrap">
-              <Text size="sm" c="dimmed">
+              <Text size="sm" c="var(--muted)">
                 {t('perPage')}
               </Text>
               <Select

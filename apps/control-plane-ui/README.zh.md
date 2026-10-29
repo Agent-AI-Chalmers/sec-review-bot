@@ -92,7 +92,7 @@ pnpm run build
 
 `pnpm test` 会运行 Node 测试和 Vitest React 组件测试。组件测试通过 React Testing Library 与 jsdom 验证局部渲染和交互行为。`pnpm run test:e2e` 通过 Playwright Test 运行桌面与移动 Chrome project。本地每个 worker 都会在随机端口启动独立的 fixture server，避免有状态流程在 worker 之间泄漏；调试时可通过 `CONTROL_PLANE_UI_E2E_PORT` 指定固定本地端口。设置 `CONTROL_PLANE_UI_BASE_URL` 后可以测试已经运行的外部部署；该部署需要登录时还需设置 `CONTROL_PLANE_UI_ACCESS_TOKEN`。外部部署测试只读，并使用单 worker，避免针对共享数据成倍增加负载和观测干扰；单 worker 是稳定性策略，不是防止写入的安全边界。浏览器特有的布局、滚动、minimap、下载与请求竞态行为保留在由 Playwright 测试调用的可复用 browser flow 中；组件行为则由 Vitest 覆盖，不在 E2E 中重复断言。
 
-本地 fixture 浏览器套件还会通过 axe 检查结构性 WCAG A/AA 问题，验证键盘焦点以及控件的 disabled/loading 状态，并提交覆盖桌面/移动、浅色/深色主题和稳定错误状态的视觉基线。当前已有的颜色对比度问题会附加到 Playwright 报告中，但暂不导致测试失败。只有在确认 UI 变更符合预期时，才运行 `pnpm run test:e2e:update-visuals` 更新基线。
+本地 fixture 浏览器套件还会通过 axe 检查 WCAG A/AA 问题，包括实际渲染文字的对比度，同时验证键盘焦点以及控件的 disabled/loading 状态，并提交覆盖桌面/移动、浅色/深色主题和稳定错误状态的视觉基线。视觉比较采用项目自行选择的 0.1% 差异像素小容差；这不是 Playwright 的标准值，有意更新基线时仍需人工检查图片。只有在确认 UI 变更符合预期时，才运行 `pnpm run test:e2e:update-visuals` 更新基线。
 
 生产服务需要 `REVIEW_RUNS_READ_TOKEN` 和 `CONTROL_PLANE_UI_ACCESS_TOKEN`，它们回答的是两个不同的问题。访问 token 决定"谁能打开控制台"：浏览器用它换取 HTTP-only 会话 cookie，token 本身不会进入浏览器代码或 Vite 变量。read token 则是后端在用户登录后调用 Review Runs 查询路由时使用的凭证，同样只存在于服务端。两者分开，意味着控制台账号与读密钥可以独立签发、轮换和吊销——例如只读的监控面板只持有 read token，不具备任何控制台访问能力。
 

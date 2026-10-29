@@ -68,7 +68,7 @@ export function ParkedRuns({
                   </Badge>
                 </Group>
                 {oldestWait !== null && (
-                  <Text size="xs" c="dimmed">
+                  <Text size="xs" c="var(--muted)">
                     {t('parkedOldest').replace(
                       '{duration}',
                       formatDuration(oldestWait, t)
