@@ -674,7 +674,7 @@ export async function runMemoryFlow({
     await diffPage.locator('.memory-diff-editor .cm-editor').first().waitFor()
     await diffPage.close()
 
-    await page.getByRole('button', { name: 'Process' }).first().click()
+    await page.getByRole('button', { name: 'Trajectory' }).first().click()
     const maintenanceDialog = page.getByRole('dialog', {
       name: 'Memory maintainer trajectory'
     })
@@ -846,7 +846,7 @@ export async function runMemoryFlow({
     )
     await page
       .locator('.mantine-Tabs-panel:visible')
-      .getByRole('button', { name: 'Process' })
+      .getByRole('button', { name: 'Trajectory' })
       .first()
       .click()
     const extractionDialog = page.getByRole('dialog', {

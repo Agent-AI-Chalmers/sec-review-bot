@@ -36,10 +36,8 @@
 }
 
 .trajectory-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 26px;
-  gap: var(--space-3);
-  align-items: start;
+  position: relative;
+  display: block;
 }
 
 .trajectory-timeline {
@@ -51,9 +49,27 @@
 }
 
 .trajectory-minimap {
+  pointer-events: auto;
+}
+
+.trajectory-minimap-viewport {
+  position: fixed;
+  right: 0;
+  z-index: 4;
+}
+
+.trajectory-minimap-layer {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  pointer-events: none;
+}
+
+.trajectory-minimap-container {
   position: sticky;
-  top: calc(var(--app-header-height) + var(--space-2));
-  z-index: 1;
+  width: 24px;
+  margin-left: auto;
+  transform: translateX(var(--space-5));
 }
 
 .trajectory-minimap-track {

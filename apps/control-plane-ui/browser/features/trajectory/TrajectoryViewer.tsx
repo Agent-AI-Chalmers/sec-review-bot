@@ -78,6 +78,8 @@ export interface TrajectoryTarget {
   pageHref: string
 }
 
+type MinimapPlacement = 'viewport' | 'container'
+
 function formatTokens(value: number): string {
   return new Intl.NumberFormat(undefined, {
     notation: value >= 10_000 ? 'compact' : 'standard',
@@ -1066,11 +1068,13 @@ const MinimapMark = React.memo(function MinimapMark({
 function TrajectoryMinimap({
   messages,
   timelineRef,
-  timelineId
+  timelineId,
+  placement
 }: {
   messages: TrajectoryMessageView[]
   timelineRef: React.RefObject<HTMLDivElement | null>
   timelineId: string
+  placement: MinimapPlacement
 }): React.JSX.Element {
   const t = useMessages()
   const [segments, setSegments] = React.useState<MinimapSegment[]>([])
@@ -1163,7 +1167,7 @@ function TrajectoryMinimap({
   if (segments.length === 0)
     return (
       <nav
-        className="trajectory-minimap"
+        className={`trajectory-minimap trajectory-minimap-${placement}`}
         aria-label={t('trajectoryMinimap')}
         style={{
           height: MINIMAP_HEIGHT,
@@ -1209,7 +1213,7 @@ function TrajectoryMinimap({
 
   return (
     <nav
-      className="trajectory-minimap"
+      className={`trajectory-minimap trajectory-minimap-${placement}`}
       aria-label={t('trajectoryMinimap')}
       style={{
         height: MINIMAP_HEIGHT,
@@ -1322,9 +1326,11 @@ function TrajectoryMinimap({
 }
 
 export function TrajectoryTimeline({
-  events
+  events,
+  minimapPlacement = 'viewport'
 }: {
   events: TrajectoryEvent[]
+  minimapPlacement?: MinimapPlacement
 }): React.JSX.Element {
   const t = useMessages()
   const timelineId = React.useId()
@@ -1424,14 +1430,25 @@ export function TrajectoryTimeline({
             />
           ))}
         </Stack>
-        {!narrowTrajectory && (
-          <TrajectoryMinimap
-            messages={filtered}
-            timelineRef={timelineRef}
-            timelineId={timelineId}
-          />
+        {!narrowTrajectory && minimapPlacement === 'container' && (
+          <div className="trajectory-minimap-layer">
+            <TrajectoryMinimap
+              messages={filtered}
+              timelineRef={timelineRef}
+              timelineId={timelineId}
+              placement="container"
+            />
+          </div>
         )}
       </div>
+      {!narrowTrajectory && minimapPlacement === 'viewport' && (
+        <TrajectoryMinimap
+          messages={filtered}
+          timelineRef={timelineRef}
+          timelineId={timelineId}
+          placement="viewport"
+        />
+      )}
     </Stack>
   )
 }
@@ -1494,15 +1511,19 @@ export function TrajectoryViewer({
         body: 'memory-viewer-modal'
       }}
     >
-      {target && <TrajectoryContent target={target} />}
+      {target && (
+        <TrajectoryContent target={target} minimapPlacement="container" />
+      )}
     </Modal>
   )
 }
 
 export function TrajectoryContent({
-  target
+  target,
+  minimapPlacement = 'viewport'
 }: {
   target: TrajectoryTarget
+  minimapPlacement?: MinimapPlacement
 }): React.JSX.Element {
   const t = useMessages()
   const [events, setEvents] = React.useState<TrajectoryEvent[]>([])
@@ -1536,5 +1557,7 @@ export function TrajectoryContent({
       </div>
     )
   if (loading) return <LoadingState message={t('loading')} />
-  return <TrajectoryTimeline events={events} />
+  return (
+    <TrajectoryTimeline events={events} minimapPlacement={minimapPlacement} />
+  )
 }
