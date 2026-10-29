@@ -51,7 +51,7 @@ export function RevisionTrajectoryPage(): React.JSX.Element {
   const revision = numericRevision(useParams().revision)
   if (revision === undefined) return <></>
   const target: TrajectoryTarget = {
-    title: t('maintenanceProcess'),
+    title: t('memoryMaintainerTrajectory'),
     contentHref: `/memory/revisions/${revision}/trajectory/content`,
     downloadHref: `/api/memory/revisions/${revision}/trajectory`,
     pageHref: `/memory/revisions/${revision}/trajectory`
@@ -117,7 +117,7 @@ export function ExtractionTrajectoryPage(): React.JSX.Element {
   if (!extractionId) return <></>
   const encoded = encodeURIComponent(extractionId)
   const target: TrajectoryTarget = {
-    title: t('extractionProcess'),
+    title: t('memoryExtractorTrajectory'),
     contentHref: `/memory/extractions/${encoded}/trajectory/content`,
     downloadHref: `/api/memory/extractions/${encoded}/trajectory`,
     pageHref: `/memory/extractions/${encoded}/trajectory`

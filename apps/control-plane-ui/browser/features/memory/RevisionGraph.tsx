@@ -98,7 +98,7 @@ export function RevisionGraph({
   revisions,
   activeRevision,
   onViewFiles,
-  onViewProcess,
+  onViewTrajectory,
   onCompare,
   onSetCurrent,
   allowSetCurrent,
@@ -108,7 +108,7 @@ export function RevisionGraph({
   revisions: RevisionGraphItem[]
   activeRevision: number | undefined
   onViewFiles: (revision: number) => void
-  onViewProcess: (revision: number) => void
+  onViewTrajectory: (revision: number) => void
   onCompare: (revision: RevisionGraphItem) => void
   onSetCurrent: (revision: number) => void
   allowSetCurrent: boolean
@@ -368,9 +368,9 @@ export function RevisionGraph({
                   size="xs"
                   variant="subtle"
                   leftSection={<IconEye size={ICON_SIZE.sm} />}
-                  onClick={() => onViewProcess(selected.revision)}
+                  onClick={() => onViewTrajectory(selected.revision)}
                 >
-                  {t('process')}
+                  {t('trajectory')}
                 </Button>
               )}
               {activeRevision !== undefined &&

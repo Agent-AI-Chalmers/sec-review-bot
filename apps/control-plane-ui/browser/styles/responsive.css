@@ -477,6 +477,23 @@
     position: static;
   }
 
+  .trajectory-viewer-header {
+    min-height: 56px;
+    padding: var(--space-2) var(--space-3);
+  }
+
+  .trajectory-viewer-title {
+    margin-right: 0;
+  }
+
+  .trajectory-viewer-header .mantine-Modal-close {
+    margin-left: var(--space-4);
+  }
+
+  .trajectory-viewer-heading {
+    gap: var(--space-2);
+  }
+
   .trajectory-token-metrics {
     width: 100%;
     margin-left: 0;

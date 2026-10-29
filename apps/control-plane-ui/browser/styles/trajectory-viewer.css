@@ -1,8 +1,43 @@
+.trajectory-viewer-header {
+  min-height: 64px;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.trajectory-viewer-title {
+  min-width: 0;
+  flex: 1;
+}
+
+.trajectory-viewer-header .mantine-Modal-close {
+  margin-left: var(--space-5);
+}
+
+.trajectory-viewer-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+}
+
+.trajectory-viewer-name {
+  min-width: 0;
+  color: var(--mantine-color-text);
+}
+
+.trajectory-viewer-name > svg {
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.memory-viewer-modal {
+  padding-top: var(--space-4);
+}
+
 .trajectory-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 26px;
-  gap: var(--space-3);
-  align-items: start;
+  position: relative;
+  display: block;
 }
 
 .trajectory-timeline {
@@ -14,9 +49,27 @@
 }
 
 .trajectory-minimap {
+  pointer-events: auto;
+}
+
+.trajectory-minimap-viewport {
+  position: fixed;
+  right: 0;
+  z-index: 4;
+}
+
+.trajectory-minimap-layer {
+  position: absolute;
+  z-index: 4;
+  inset: 0;
+  pointer-events: none;
+}
+
+.trajectory-minimap-container {
   position: sticky;
-  top: calc(var(--app-header-height) + var(--space-2));
-  z-index: 1;
+  width: 24px;
+  margin-left: auto;
+  transform: translateX(var(--space-5));
 }
 
 .trajectory-minimap-track {

@@ -31,6 +31,7 @@ import {
   IconExternalLink,
   IconMessage,
   IconRobot,
+  IconRoute,
   IconSearch,
   IconSettings,
   IconTool,
@@ -76,6 +77,8 @@ export interface TrajectoryTarget {
   downloadHref: string
   pageHref: string
 }
+
+type MinimapPlacement = 'viewport' | 'container'
 
 function formatTokens(value: number): string {
   return new Intl.NumberFormat(undefined, {
@@ -1065,11 +1068,13 @@ const MinimapMark = React.memo(function MinimapMark({
 function TrajectoryMinimap({
   messages,
   timelineRef,
-  timelineId
+  timelineId,
+  placement
 }: {
   messages: TrajectoryMessageView[]
   timelineRef: React.RefObject<HTMLDivElement | null>
   timelineId: string
+  placement: MinimapPlacement
 }): React.JSX.Element {
   const t = useMessages()
   const [segments, setSegments] = React.useState<MinimapSegment[]>([])
@@ -1162,7 +1167,7 @@ function TrajectoryMinimap({
   if (segments.length === 0)
     return (
       <nav
-        className="trajectory-minimap"
+        className={`trajectory-minimap trajectory-minimap-${placement}`}
         aria-label={t('trajectoryMinimap')}
         style={{
           height: MINIMAP_HEIGHT,
@@ -1208,7 +1213,7 @@ function TrajectoryMinimap({
 
   return (
     <nav
-      className="trajectory-minimap"
+      className={`trajectory-minimap trajectory-minimap-${placement}`}
       aria-label={t('trajectoryMinimap')}
       style={{
         height: MINIMAP_HEIGHT,
@@ -1321,9 +1326,11 @@ function TrajectoryMinimap({
 }
 
 export function TrajectoryTimeline({
-  events
+  events,
+  minimapPlacement = 'viewport'
 }: {
   events: TrajectoryEvent[]
+  minimapPlacement?: MinimapPlacement
 }): React.JSX.Element {
   const t = useMessages()
   const timelineId = React.useId()
@@ -1423,14 +1430,25 @@ export function TrajectoryTimeline({
             />
           ))}
         </Stack>
-        {!narrowTrajectory && (
-          <TrajectoryMinimap
-            messages={filtered}
-            timelineRef={timelineRef}
-            timelineId={timelineId}
-          />
+        {!narrowTrajectory && minimapPlacement === 'container' && (
+          <div className="trajectory-minimap-layer">
+            <TrajectoryMinimap
+              messages={filtered}
+              timelineRef={timelineRef}
+              timelineId={timelineId}
+              placement="container"
+            />
+          </div>
         )}
       </div>
+      {!narrowTrajectory && minimapPlacement === 'viewport' && (
+        <TrajectoryMinimap
+          messages={filtered}
+          timelineRef={timelineRef}
+          timelineId={timelineId}
+          placement="viewport"
+        />
+      )}
     </Stack>
   )
 }
@@ -1447,50 +1465,65 @@ export function TrajectoryViewer({
     <Modal
       opened={target !== undefined}
       onClose={onClose}
-      title={target?.title}
+      title={
+        target ? (
+          <div className="trajectory-viewer-heading">
+            <Group gap="sm" wrap="nowrap" className="trajectory-viewer-name">
+              <IconRoute size={ICON_SIZE.lg} aria-hidden="true" />
+              <Text fw={600} truncate>
+                {target.title}
+              </Text>
+            </Group>
+            <Group gap="xs" wrap="nowrap">
+              <Tooltip label={t('openFullPage')}>
+                <ActionIcon
+                  component="a"
+                  href={target.pageHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  variant="default"
+                  size="lg"
+                  aria-label={t('openFullPage')}
+                >
+                  <IconExternalLink size={ICON_SIZE.md} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label={t('downloadOriginal')}>
+                <ActionIcon
+                  component="a"
+                  href={target.downloadHref}
+                  download
+                  variant="default"
+                  size="lg"
+                  aria-label={t('downloadOriginal')}
+                >
+                  <IconDownload size={ICON_SIZE.md} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          </div>
+        ) : undefined
+      }
       size="calc(100vw - 64px)"
-      classNames={{ body: 'memory-viewer-modal' }}
+      classNames={{
+        header: 'trajectory-viewer-header',
+        title: 'trajectory-viewer-title',
+        body: 'memory-viewer-modal'
+      }}
     >
-      <Group justify="end" mb="md" gap="xs">
-        {target && (
-          <>
-            <Tooltip label={t('openFullPage')}>
-              <ActionIcon
-                component="a"
-                href={target.pageHref}
-                target="_blank"
-                rel="noreferrer"
-                variant="default"
-                size="lg"
-                aria-label={t('openFullPage')}
-              >
-                <IconExternalLink size={ICON_SIZE.md} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label={t('downloadOriginal')}>
-              <ActionIcon
-                component="a"
-                href={target.downloadHref}
-                download
-                variant="default"
-                size="lg"
-                aria-label={t('downloadOriginal')}
-              >
-                <IconDownload size={ICON_SIZE.md} />
-              </ActionIcon>
-            </Tooltip>
-          </>
-        )}
-      </Group>
-      {target && <TrajectoryContent target={target} />}
+      {target && (
+        <TrajectoryContent target={target} minimapPlacement="container" />
+      )}
     </Modal>
   )
 }
 
 export function TrajectoryContent({
-  target
+  target,
+  minimapPlacement = 'viewport'
 }: {
   target: TrajectoryTarget
+  minimapPlacement?: MinimapPlacement
 }): React.JSX.Element {
   const t = useMessages()
   const [events, setEvents] = React.useState<TrajectoryEvent[]>([])
@@ -1524,5 +1557,7 @@ export function TrajectoryContent({
       </div>
     )
   if (loading) return <LoadingState message={t('loading')} />
-  return <TrajectoryTimeline events={events} />
+  return (
+    <TrajectoryTimeline events={events} minimapPlacement={minimapPlacement} />
+  )
 }

@@ -18,13 +18,13 @@ export function MemoryObservationList({
   loading,
   error,
   onRevealRevision,
-  onViewProcess
+  onViewTrajectory
 }: {
   observations: Observation[]
   loading: boolean
   error: string
   onRevealRevision: (revision: number) => void
-  onViewProcess: (observation: Observation) => void
+  onViewTrajectory: (observation: Observation) => void
 }): React.JSX.Element {
   const t = useMessages()
   const { language } = useLanguage()
@@ -111,9 +111,9 @@ export function MemoryObservationList({
                       size="xs"
                       variant="subtle"
                       leftSection={<IconEye size={ICON_SIZE.sm} />}
-                      onClick={() => onViewProcess(item)}
+                      onClick={() => onViewTrajectory(item)}
                     >
-                      {t('process')}
+                      {t('trajectory')}
                     </Button>
                   </Group>
                 </Table.Td>
