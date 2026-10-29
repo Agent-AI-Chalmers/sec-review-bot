@@ -30,11 +30,18 @@ export default defineConfig({
   // External deployments share data and capacity. A fixed local port also cannot
   // host more than one fixture server, so both modes run predictably in one worker.
   workers: isolatedLocalWorkers ? 3 : 1,
-  reporter: 'line',
+  reporter: [
+    ['line'],
+    ['html', { open: 'never', outputFolder: 'playwright-report' }]
+  ],
   use: {
     locale: 'en-US',
     permissions: ['clipboard-read', 'clipboard-write'],
-    launchOptions: { executablePath }
+    launchOptions: { executablePath },
+    // CI uploads these only when the browser job fails. Traces retain DOM and
+    // network timing for races; screenshots preserve the final rendered state.
+    trace: 'retain-on-failure',
+    screenshot: 'only-on-failure'
   },
   projects: [
     {

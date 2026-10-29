@@ -497,6 +497,19 @@ jobs:
       - name: Browser project
         run: pnpm exec playwright test --project=${{ matrix.project }}
 
+      # The runner workspace disappears after the job. Preserve Playwright's
+      # report, error context, traces, and screenshots only when diagnosis is needed.
+      - name: Upload browser diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: control-plane-ui-${{ matrix.project }}-playwright
+          path: |
+            apps/control-plane-ui/playwright-report/
+            apps/control-plane-ui/test-results/
+          retention-days: 14
+          if-no-files-found: warn
+
   agents:
     name: Agents
     needs: changes
