@@ -31,6 +31,7 @@ import {
   IconExternalLink,
   IconMessage,
   IconRobot,
+  IconRoute,
   IconSearch,
   IconSettings,
   IconTool,
@@ -1447,41 +1448,52 @@ export function TrajectoryViewer({
     <Modal
       opened={target !== undefined}
       onClose={onClose}
-      title={target?.title}
+      title={
+        target ? (
+          <div className="trajectory-viewer-heading">
+            <Group gap="sm" wrap="nowrap" className="trajectory-viewer-name">
+              <IconRoute size={ICON_SIZE.lg} aria-hidden="true" />
+              <Text fw={600} truncate>
+                {target.title}
+              </Text>
+            </Group>
+            <Group gap="xs" wrap="nowrap">
+              <Tooltip label={t('openFullPage')}>
+                <ActionIcon
+                  component="a"
+                  href={target.pageHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  variant="default"
+                  size="lg"
+                  aria-label={t('openFullPage')}
+                >
+                  <IconExternalLink size={ICON_SIZE.md} />
+                </ActionIcon>
+              </Tooltip>
+              <Tooltip label={t('downloadOriginal')}>
+                <ActionIcon
+                  component="a"
+                  href={target.downloadHref}
+                  download
+                  variant="default"
+                  size="lg"
+                  aria-label={t('downloadOriginal')}
+                >
+                  <IconDownload size={ICON_SIZE.md} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          </div>
+        ) : undefined
+      }
       size="calc(100vw - 64px)"
-      classNames={{ body: 'memory-viewer-modal' }}
+      classNames={{
+        header: 'trajectory-viewer-header',
+        title: 'trajectory-viewer-title',
+        body: 'memory-viewer-modal'
+      }}
     >
-      <Group justify="end" mb="md" gap="xs">
-        {target && (
-          <>
-            <Tooltip label={t('openFullPage')}>
-              <ActionIcon
-                component="a"
-                href={target.pageHref}
-                target="_blank"
-                rel="noreferrer"
-                variant="default"
-                size="lg"
-                aria-label={t('openFullPage')}
-              >
-                <IconExternalLink size={ICON_SIZE.md} />
-              </ActionIcon>
-            </Tooltip>
-            <Tooltip label={t('downloadOriginal')}>
-              <ActionIcon
-                component="a"
-                href={target.downloadHref}
-                download
-                variant="default"
-                size="lg"
-                aria-label={t('downloadOriginal')}
-              >
-                <IconDownload size={ICON_SIZE.md} />
-              </ActionIcon>
-            </Tooltip>
-          </>
-        )}
-      </Group>
       {target && <TrajectoryContent target={target} />}
     </Modal>
   )
