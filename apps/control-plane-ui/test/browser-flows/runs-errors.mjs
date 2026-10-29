@@ -10,7 +10,7 @@ export async function runFixtureAdminFlow({ name, page, base, waitUntil }) {
   })
   await page
     .getByTestId('parked-runs')
-    .getByRole('button', { name: 'View', exact: true })
+    .getByRole('button', { name: /These runs need your review/ })
     .click()
   const parkedDrawer = page.getByRole('dialog')
   await parkedDrawer.waitFor()

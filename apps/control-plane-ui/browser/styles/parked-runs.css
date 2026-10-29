@@ -15,6 +15,37 @@
   color: var(--mantine-color-orange-6);
 }
 
+/* Mantine's unstyled button sets padding to zero with a class selector. Repeat
+   our class so this full-row button keeps real space around its contents. */
+.parked-runs-summary-trigger.parked-runs-summary-trigger {
+  width: 100%;
+  min-height: 72px;
+  padding: var(--space-4) var(--space-5);
+  border-radius: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.parked-runs-summary-trigger:hover {
+  background: light-dark(
+    var(--mantine-color-orange-1),
+    var(--mantine-color-dark-5)
+  );
+}
+
+.parked-runs-summary-trigger:focus-visible {
+  outline: 2px solid var(--mantine-color-orange-6);
+  outline-offset: -2px;
+}
+
+.parked-runs-summary-copy {
+  min-width: 0;
+}
+
+.parked-runs-summary-text {
+  min-width: 0;
+}
+
 .parked-run-row.parked-run-row {
   display: block;
   width: 100%;

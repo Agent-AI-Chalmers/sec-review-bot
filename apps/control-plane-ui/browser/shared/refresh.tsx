@@ -94,7 +94,7 @@ export function RefreshControls({
             <Menu.Target>
               <Button
                 variant="default"
-                aria-label={t('refreshInterval')}
+                aria-label={`${t('refreshInterval')}: ${intervalLabel(refreshInterval)}`}
                 px={6}
               >
                 <Group gap={2} wrap="nowrap">

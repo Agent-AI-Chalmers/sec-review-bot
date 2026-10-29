@@ -324,6 +324,18 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  /* A phone can wrap both the label and the note. Keep the label, value, and
+     note in fixed rows so extra text cannot move a large value up or down. */
+  .memory-overview-metric {
+    grid-template-rows: 3.5em auto 1fr;
+    align-content: start;
+  }
+
+  .memory-overview-metric > span {
+    display: flex;
+    align-items: flex-start;
+  }
+
   .memory-overview-metric:nth-child(3) {
     border-inline-start: 0;
     border-block-start: 1px solid var(--mantine-color-default-border);

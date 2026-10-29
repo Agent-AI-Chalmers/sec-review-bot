@@ -2,7 +2,6 @@ import React from 'react'
 import { Link } from 'react-router-dom'
 import {
   Badge,
-  Button,
   Drawer,
   Group,
   Paper,
@@ -10,7 +9,7 @@ import {
   Text,
   UnstyledButton
 } from '@mantine/core'
-import { IconAlertTriangle } from '@tabler/icons-react'
+import { IconAlertTriangle, IconChevronRight } from '@tabler/icons-react'
 
 import type { ParkedRun } from './api.js'
 import { useMessages } from '../../shared/i18n.js'
@@ -39,39 +38,48 @@ export function ParkedRuns({
     <>
       <Paper
         withBorder
-        p="sm"
+        p={0}
         mb="md"
         className="parked-runs-summary"
         data-testid="parked-runs"
         role="status"
       >
-        <Group justify="space-between" align="center" wrap="wrap" gap="sm">
-          <Group gap="xs" align="center" wrap="nowrap">
-            <IconAlertTriangle size={ICON_SIZE.md} aria-hidden />
-            <Text size="sm" fw={600}>
-              {t('parkedRunsTitle')}
-            </Text>
-            <Badge size="sm" color="orange" variant="light">
-              {blocked.length}
-            </Badge>
-            {oldestWait !== null && (
-              <Text size="xs" c="dimmed">
-                {t('parkedOldest').replace(
-                  '{duration}',
-                  formatDuration(oldestWait, t)
+        <UnstyledButton
+          className="parked-runs-summary-trigger"
+          onClick={() => setOpened(true)}
+          aria-haspopup="dialog"
+          aria-expanded={opened}
+        >
+          <Group justify="space-between" align="center" wrap="nowrap" gap="sm">
+            <Group
+              className="parked-runs-summary-copy"
+              gap="sm"
+              align="center"
+              wrap="nowrap"
+            >
+              <IconAlertTriangle size={ICON_SIZE.md} aria-hidden />
+              <Stack gap={2} className="parked-runs-summary-text">
+                <Group gap="xs" wrap="nowrap">
+                  <Text size="sm" fw={600}>
+                    {t('parkedRunsTitle')}
+                  </Text>
+                  <Badge size="sm" color="orange" variant="light">
+                    {blocked.length}
+                  </Badge>
+                </Group>
+                {oldestWait !== null && (
+                  <Text size="xs" c="dimmed">
+                    {t('parkedOldest').replace(
+                      '{duration}',
+                      formatDuration(oldestWait, t)
+                    )}
+                  </Text>
                 )}
-              </Text>
-            )}
+              </Stack>
+            </Group>
+            <IconChevronRight size={ICON_SIZE.md} aria-hidden />
           </Group>
-          <Button
-            variant="light"
-            color="orange"
-            size="compact-sm"
-            onClick={() => setOpened(true)}
-          >
-            {t('parkedRunsView')}
-          </Button>
-        </Group>
+        </UnstyledButton>
       </Paper>
       <Drawer
         opened={opened}

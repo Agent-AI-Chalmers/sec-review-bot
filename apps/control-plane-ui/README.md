@@ -75,14 +75,22 @@ pnpm run lint
 pnpm run format:check
 pnpm run typecheck
 pnpm run colors:check
+pnpm run icons:check
+pnpm run styles:report
 pnpm test
 pnpm run test:e2e
 pnpm run build
 ```
 
-`pnpm run colors:check` checks that the console's custom colors are present and valid in both light and dark themes. It fails when required foreground/background pairs lack sufficient contrast or the brand palette is not ordered from light to dark. Adjacent brand shades that may be too similar are reported for review without failing the command.
+Additional UI consistency checks:
+
+- `pnpm run colors:check`: checks that custom colors exist in both themes, required text/background pairs remain readable, and the brand palette stays ordered from light to dark. Very similar neighboring shades are reported but do not fail CI.
+- `pnpm run icons:check`: requires browser icons to come from Tabler and use the shared `ICON_SIZE` scale.
+- `pnpm run styles:report`: lists spacing, border-radius, and font-size values written directly in maintained CSS. This is an informational report and does not fail CI.
 
 `pnpm test` runs the Node tests and Vitest React component tests. Component tests use React Testing Library with jsdom for local rendering and interaction behavior. `pnpm run test:e2e` runs desktop and mobile Chrome projects through Playwright Test. Each local worker starts an isolated fixture server on a random port, so stateful flows cannot leak between workers; set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed local port when debugging. Set `CONTROL_PLANE_UI_BASE_URL` to test an already-running external deployment and `CONTROL_PLANE_UI_ACCESS_TOKEN` when that deployment requires sign-in. External-deployment tests are read-only and use one worker to avoid multiplying load and observations against shared data; the single-worker setting is a stability policy, not the write-safety boundary. Browser-only layout, scrolling, minimap, download, and request-race behavior remains in reusable browser flows invoked by Playwright tests, while component behavior is covered by Vitest rather than duplicated in E2E.
+
+The local-fixture browser suite also checks structural WCAG A/AA violations with axe, keyboard focus plus disabled/loading control states, and committed visual baselines across desktop/mobile, light/dark themes, and a stable error state. Existing color-contrast findings are attached to the Playwright report without failing the suite. Run `pnpm run test:e2e:update-visuals` only when an intentional UI change requires new baselines.
 
 The production server requires `REVIEW_RUNS_READ_TOKEN` and `CONTROL_PLANE_UI_ACCESS_TOKEN`, and they answer different questions. The access token decides who may open the console: the browser exchanges it for an HTTP-only session cookie, and the token itself never reaches browser code or Vite variables. The read token is what the backend then uses to call Review Runs query routes on the signed-in user's behalf; it never leaves the server either. Keeping them separate means a console account and a read key can be issued, rotated, and revoked independently — a read-only consumer such as a dashboard holds only the read token and has no console access.
 

@@ -363,7 +363,7 @@ export function Runs(): React.JSX.Element {
               leftSection={<IconAdjustmentsHorizontal size={ICON_SIZE.md} />}
               rightSection={
                 <IconChevronDown
-                  size={14}
+                  size={ICON_SIZE.sm}
                   style={{
                     transform: moreFiltersOpened ? 'rotate(180deg)' : undefined,
                     transition: 'transform 150ms ease'
@@ -400,7 +400,7 @@ export function Runs(): React.JSX.Element {
           message={t('emptyRuns')}
           icon={
             <IconInbox
-              size={40}
+              size={ICON_SIZE.xxl}
               stroke={1.2}
               style={{ color: 'var(--mantine-color-dimmed)' }}
             />

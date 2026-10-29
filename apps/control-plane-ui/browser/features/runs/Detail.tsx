@@ -1249,7 +1249,7 @@ export function Detail(): React.JSX.Element {
                               >
                                 {t('openExternalLink')}
                                 <IconArrowUpRight
-                                  size={14}
+                                  size={ICON_SIZE.sm}
                                   aria-hidden="true"
                                 />
                               </Anchor>
