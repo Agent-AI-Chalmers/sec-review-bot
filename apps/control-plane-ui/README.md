@@ -4,6 +4,22 @@ Language: English | [中文](README.zh.md)
 
 Internal web console for inspecting and operating review runs, execution diagnostics and artifacts, agent memory, and trajectories. Server-backed data goes only through this application's same-origin BFF, which holds upstream credentials and proxies explicit route allowlists; the standalone trajectory Viewer processes uploaded or pasted input entirely in the browser.
 
+## Interface preview
+
+> The following fixture screenshots are also committed Playwright visual baselines.
+
+### Runs
+
+<img src="test/e2e/visual.spec.ts-snapshots/runs-list-light-desktop-linux.png" alt="Runs list on a desktop viewport in the light theme" width="900">
+
+### Memory
+
+<img src="test/e2e/visual.spec.ts-snapshots/memory-light-desktop-linux.png" alt="Memory overview in the light theme" width="900">
+
+### Viewer
+
+<img src="test/e2e/visual.spec.ts-snapshots/viewer-light-desktop-linux.png" alt="Trajectory viewer in the light theme" width="900">
+
 ## Local development
 
 From `apps/control-plane-ui`, install dependencies and start the fixture-backed preview:
@@ -90,7 +106,7 @@ Additional UI consistency checks:
 
 `pnpm test` runs the Node tests and Vitest React component tests. Component tests use React Testing Library with jsdom for local rendering and interaction behavior. `pnpm run test:e2e` runs desktop and mobile Chrome projects through Playwright Test. Each local worker starts an isolated fixture server on a random port, so stateful flows cannot leak between workers; set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed local port when debugging. Set `CONTROL_PLANE_UI_BASE_URL` to test an already-running external deployment and `CONTROL_PLANE_UI_ACCESS_TOKEN` when that deployment requires sign-in. External-deployment tests are read-only and use one worker to avoid multiplying load and observations against shared data; the single-worker setting is a stability policy, not the write-safety boundary. Browser-only layout, scrolling, minimap, download, and request-race behavior remains in reusable browser flows invoked by Playwright tests, while component behavior is covered by Vitest rather than duplicated in E2E.
 
-The local-fixture browser suite also checks WCAG A/AA violations with axe, including rendered text contrast, keyboard focus plus disabled/loading control states, and committed visual baselines across desktop/mobile, light/dark themes, and a stable error state. Visual comparisons use a deliberately small project tolerance of 0.1% differing pixels; this is not a Playwright standard, and reviewers must still inspect intentional baseline updates. Run `pnpm run test:e2e:update-visuals` only when an intentional UI change requires new baselines.
+The local-fixture browser suite also checks WCAG A/AA violations with axe, including rendered text contrast, and verifies keyboard focus plus disabled/loading control states. Visual tests cover desktop and mobile viewports, light and dark themes, and a stable error state. They compare current screenshots with the baseline images committed to the repository and allow at most 0.1% of pixels to differ. The 0.1% tolerance is a project choice, not a Playwright standard. For an intentional UI change, inspect the new images first; only after confirming the change should you run `pnpm run test:e2e:update-visuals` and commit the updated baselines.
 
 The production server requires `REVIEW_RUNS_READ_TOKEN` and `CONTROL_PLANE_UI_ACCESS_TOKEN`, and they answer different questions. The access token decides who may open the console: the browser exchanges it for an HTTP-only session cookie, and the token itself never reaches browser code or Vite variables. The read token is what the backend then uses to call Review Runs query routes on the signed-in user's behalf; it never leaves the server either. Keeping them separate means a console account and a read key can be issued, rotated, and revoked independently — a read-only consumer such as a dashboard holds only the read token and has no console access.
 

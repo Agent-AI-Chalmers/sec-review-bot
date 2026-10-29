@@ -64,8 +64,8 @@ test('memory workspace', async ({ page }) => {
 })
 
 test('trajectory viewer', async ({ page }) => {
-  await openFixturePage(page, '/viewer', 'dark')
-  await expectPageSnapshot(page, 'viewer-dark.png')
+  await openFixturePage(page, '/viewer', 'light')
+  await expectPageSnapshot(page, 'viewer-light.png')
 })
 
 test('run files error state', async ({ page }) => {
