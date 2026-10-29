@@ -58,7 +58,10 @@ export async function runFixtureAdminFlow({ name, page, base, waitUntil }) {
     const body = await response.json()
     const sample = body.events.find((event) => event.from_status !== null)
     assert.ok(sample, `${name} fixtures need a transition to synthesize`)
-    const extra = Array.from({ length: 13 }, (_, index) => ({
+    // Keep the paginated shape independent of whichever fixture run is first.
+    // Appending to its real transitions can produce 24+ rows, making page two
+    // legitimately full and indistinguishable from a page-change race.
+    const transitions = Array.from({ length: 13 }, (_, index) => ({
       ...sample,
       event_id: `synthetic-transition-${index}`,
       occurred_at: new Date(
@@ -67,7 +70,12 @@ export async function runFixtureAdminFlow({ name, page, base, waitUntil }) {
     }))
     await route.fulfill({
       response,
-      json: { events: [...body.events, ...extra] }
+      json: {
+        events: [
+          ...body.events.filter((event) => event.from_status === null),
+          ...transitions
+        ]
+      }
     })
   })
   await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
@@ -88,10 +96,15 @@ export async function runFixtureAdminFlow({ name, page, base, waitUntil }) {
     'center',
     `${name} transition pagination must be centered`
   )
-  await pager.getByRole('button', { name: '2', exact: true }).click()
+  const secondPage = pager.getByRole('button', { name: '2', exact: true })
+  // Active run details poll in the background. A refresh can replace Mantine's
+  // page button between Playwright's pointer-down and pointer-up, leaving focus
+  // on page two without dispatching its click. This flow tests pagination state,
+  // so dispatch the DOM click atomically in the page instead of racing the poll.
+  await secondPage.evaluate((element) => element.click())
   await waitUntil(
-    async () => (await transitions.locator('.run-transition').count()) < 12,
-    `${name} the second transition page must load fewer than a full page`
+    async () => (await transitions.locator('.run-transition').count()) === 1,
+    `${name} the second transition page must show the remaining row`
   )
   await page.unroute('**/api/runs/*/events')
 }
