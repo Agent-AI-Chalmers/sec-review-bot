@@ -76,10 +76,13 @@ Vite 会将 `/api` 请求代理到 `http://127.0.0.1:8091` 上的 BFF。BFF 默�
 pnpm run lint
 pnpm run format:check
 pnpm run typecheck
+pnpm run colors:check
 pnpm test
 pnpm run test:e2e
 pnpm run build
 ```
+
+`pnpm run colors:check` 检查控制台自定义的颜色是否在浅色和深色主题中完整且有效。当前景色与背景色的对比度不足，或品牌色没有按从浅到深排列时，检查会失败；相邻品牌色可能过于接近时只报告提示，不会让命令失败。
 
 `pnpm test` 会运行 Node 测试和 Vitest React 组件测试。组件测试通过 React Testing Library 与 jsdom 验证局部渲染和交互行为。`pnpm run test:e2e` 通过 Playwright Test 运行桌面与移动 Chrome project。本地每个 worker 都会在随机端口启动独立的 fixture server，避免有状态流程在 worker 之间泄漏；调试时可通过 `CONTROL_PLANE_UI_E2E_PORT` 指定固定本地端口。设置 `CONTROL_PLANE_UI_BASE_URL` 后可以测试已经运行的外部部署；该部署需要登录时还需设置 `CONTROL_PLANE_UI_ACCESS_TOKEN`。外部部署测试只读，并使用单 worker，避免针对共享数据成倍增加负载和观测干扰；单 worker 是稳定性策略，不是防止写入的安全边界。浏览器特有的布局、滚动、minimap、下载与请求竞态行为保留在由 Playwright 测试调用的可复用 browser flow 中；组件行为则由 Vitest 覆盖，不在 E2E 中重复断言。
 

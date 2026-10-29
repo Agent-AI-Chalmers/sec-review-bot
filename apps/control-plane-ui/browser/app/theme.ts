@@ -8,6 +8,8 @@ import {
   Timeline
 } from '@mantine/core'
 
+import { BRAND_COLORS } from './colors.js'
+
 /**
  * Console-wide design tokens.
  *
@@ -40,33 +42,9 @@ export const MONO_STACK =
 /** Amber accent, deliberately outside the blue-violet range that AI-generated UIs
  * default to, and far enough in hue from the green/red status colours that the two
  * never read as related. Mantine requires a fixed ten-shade tuple, darkest last. */
-const brand: [
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string,
-  string
-] = [
-  '#fff8ed',
-  '#ffefd4',
-  '#ffe0a8',
-  '#fdca6b',
-  '#f9b23c',
-  '#e89b1c',
-  '#c97f0d',
-  '#a3620b',
-  '#7f4a0c',
-  '#5c360b'
-]
-
 export const mantineTheme = createTheme({
   primaryColor: 'brand',
-  colors: { brand },
+  colors: { brand: [...BRAND_COLORS] },
   fontFamily: FONT_STACK,
   fontFamilyMonospace: MONO_STACK,
   headings: {

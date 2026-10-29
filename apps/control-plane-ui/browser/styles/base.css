@@ -41,6 +41,11 @@
   inherits: true;
   initial-value: #78716c;
 }
+@property --link {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #a3620b;
+}
 /* Amber accent, reserved for interactive elements only. Status colours below are
    deliberately independent: a running run must stay the same colour whatever the
    accent is, or the accent starts carrying semantics it does not own. */
@@ -144,6 +149,7 @@
   --border: #e7e5e4;
   --border-strong: #d6d3d1;
   --muted: #78716c;
+  --link: #a3620b;
   /* Amber accent, reserved for interactive elements only. Status colours below are
      deliberately independent: a running run must stay the same colour whatever the
      accent is, or the accent starts carrying semantics it does not own. */
@@ -179,6 +185,7 @@
   --border: #3a3532;
   --border-strong: #4a4441;
   --muted: #a8a29e;
+  --link: #f0b429;
   --brand: #f0b429;
   --brand-soft: #2e2519;
   --brand-2: #f6c453;
@@ -244,11 +251,10 @@ samp {
  * would also fire on first paint, when the stored theme is applied, and the console
  * would visibly fade up from the default theme.
  *
- * The transition names the *tokens*, not the elements that read them. Because each one
- * is registered with `@property`, its value is interpolable, and a descendant inherits
- * the animated value — so every surface, border and glyph cross-fades with no rule per
- * element. Transitioning `*` instead would clobber the one transition the console
- * already owns (the row-action fade), which this approach leaves untouched.
+ * The transition applies to the registered color properties themselves. Descendants
+ * then inherit their interpolated values, so individual elements do not need transition
+ * rules. Transitioning `*` instead would clobber the one transition the console already
+ * owns (the row-action fade), which this approach leaves untouched.
  */
 .theme-transition {
   transition:
@@ -256,6 +262,7 @@ samp {
     --border var(--theme-transition) var(--theme-ease),
     --border-strong var(--theme-transition) var(--theme-ease),
     --muted var(--theme-transition) var(--theme-ease),
+    --link var(--theme-transition) var(--theme-ease),
     --brand var(--theme-transition) var(--theme-ease),
     --brand-soft var(--theme-transition) var(--theme-ease),
     --brand-2 var(--theme-transition) var(--theme-ease),
