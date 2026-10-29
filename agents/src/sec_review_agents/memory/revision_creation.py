@@ -1,7 +1,7 @@
 """Carry immutable inputs from memory maintenance to the Catalog commit.
 
 Maintenance has already produced and published the candidate memory tree and
-its transcript when this value is created. The Catalog has not yet assigned a
+its trajectory when this value is created. The Catalog has not yet assigned a
 revision number or advanced the active revision. Temporal persists this value
 between the preparation and commit activities so commit retries reuse the same
 artifacts, extraction IDs, and expected active revision.
@@ -20,7 +20,7 @@ class MemoryTreeRevisionCreation:
     expected_active_revision: int
     extraction_ids: tuple[str, ...]
     memory_tree_reference: ArtifactReference
-    maintenance_transcript_reference: ArtifactReference
+    maintenance_trajectory_reference: ArtifactReference
 
     def __post_init__(self) -> None:
         if not isinstance(self.maintenance_id, str) or not self.maintenance_id.strip():
@@ -52,9 +52,9 @@ class MemoryTreeRevisionCreation:
             )
         if not isinstance(self.memory_tree_reference, ArtifactReference):
             raise TypeError("Memory tree revision creation tree reference is invalid.")
-        if not isinstance(self.maintenance_transcript_reference, ArtifactReference):
+        if not isinstance(self.maintenance_trajectory_reference, ArtifactReference):
             raise TypeError(
-                "Memory tree revision creation maintenance transcript reference is invalid."
+                "Memory tree revision creation maintenance trajectory reference is invalid."
             )
 
 

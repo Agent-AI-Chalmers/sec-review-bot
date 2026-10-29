@@ -14,44 +14,44 @@ from sec_review_agents.review_stages.verification.stage import (
     reset_verification_attempt_artifacts,
     verification_attempt_label,
 )
-from sec_review_agents.runtime.transcripts import TranscriptWriter
+from sec_review_agents.runtime.trajectories import TrajectoryWriter
 from sec_review_agents.workspace.snapshots import (
     WORKSPACE_SNAPSHOT_TAR_NAME,
     create_workspace_snapshot_tar,
 )
 
 
-def test_mitigation_transcripts_are_scoped_by_business_attempt(
+def test_mitigation_trajectories_are_scoped_by_business_attempt(
     tmp_path: Path,
 ) -> None:
     root = tmp_path
 
-    TranscriptWriter((root / "transcripts" / "initial.jsonl",)).write_messages([])
-    TranscriptWriter((root / "transcripts" / "retry-1.jsonl",)).write_messages([])
+    TrajectoryWriter((root / "trajectories" / "initial.jsonl",)).write_messages([])
+    TrajectoryWriter((root / "trajectories" / "retry-1.jsonl",)).write_messages([])
 
-    assert (root / "transcripts" / "initial.jsonl").exists()
-    assert (root / "transcripts" / "retry-1.jsonl").exists()
+    assert (root / "trajectories" / "initial.jsonl").exists()
+    assert (root / "trajectories" / "retry-1.jsonl").exists()
 
 
-def test_verification_transcripts_are_scoped_by_business_attempt(
+def test_verification_trajectories_are_scoped_by_business_attempt(
     tmp_path: Path,
 ) -> None:
     root = tmp_path
 
-    TranscriptWriter((root / "transcripts" / "initial.jsonl",)).write_messages([])
-    TranscriptWriter((root / "transcripts" / "retry-1.jsonl",)).write_messages([])
+    TrajectoryWriter((root / "trajectories" / "initial.jsonl",)).write_messages([])
+    TrajectoryWriter((root / "trajectories" / "retry-1.jsonl",)).write_messages([])
 
-    assert (root / "transcripts" / "initial.jsonl").exists()
-    assert (root / "transcripts" / "retry-1.jsonl").exists()
+    assert (root / "trajectories" / "initial.jsonl").exists()
+    assert (root / "trajectories" / "retry-1.jsonl").exists()
 
 
 def test_initial_mitigation_attempt_clears_stale_attempt_archives(
     tmp_path: Path,
 ) -> None:
     root = tmp_path
-    (root / "transcripts").mkdir(parents=True)
-    (root / "transcripts" / "initial.jsonl").write_text("stale", encoding="utf-8")
-    (root / "transcripts" / "retry-1.jsonl").write_text("stale", encoding="utf-8")
+    (root / "trajectories").mkdir(parents=True)
+    (root / "trajectories" / "initial.jsonl").write_text("stale", encoding="utf-8")
+    (root / "trajectories" / "retry-1.jsonl").write_text("stale", encoding="utf-8")
     for filename in (
         "mitigation-result.initial.json",
         "workspace.initial.patch",
@@ -72,15 +72,15 @@ def test_initial_mitigation_attempt_clears_stale_attempt_archives(
     assert not (root / "workspace.initial.patch").exists()
     assert not (root / "mitigation-result.retry-1.json").exists()
     assert not (root / "workspace.retry-1.patch").exists()
-    assert not (root / "transcripts" / "initial.jsonl").exists()
-    assert not (root / "transcripts" / "retry-1.jsonl").exists()
+    assert not (root / "trajectories" / "initial.jsonl").exists()
+    assert not (root / "trajectories" / "retry-1.jsonl").exists()
 
 
 def test_retry_mitigation_attempt_preserves_initial_archive(tmp_path: Path) -> None:
     root = tmp_path
-    (root / "transcripts").mkdir(parents=True)
-    (root / "transcripts" / "initial.jsonl").write_text("initial", encoding="utf-8")
-    (root / "transcripts" / "retry-1.jsonl").write_text("retry", encoding="utf-8")
+    (root / "trajectories").mkdir(parents=True)
+    (root / "trajectories" / "initial.jsonl").write_text("initial", encoding="utf-8")
+    (root / "trajectories" / "retry-1.jsonl").write_text("retry", encoding="utf-8")
     initial_files = (
         "mitigation-result.initial.json",
         "workspace.initial.patch",
@@ -98,10 +98,10 @@ def test_retry_mitigation_attempt_preserves_initial_archive(tmp_path: Path) -> N
         assert (root / filename).read_text(encoding="utf-8") == "initial"
     assert (root / "mitigation-result.retry-1.json").exists()
     assert (root / "workspace.retry-1.patch").exists()
-    assert (root / "transcripts" / "initial.jsonl").read_text(
+    assert (root / "trajectories" / "initial.jsonl").read_text(
         encoding="utf-8"
     ) == "initial"
-    assert not (root / "transcripts" / "retry-1.jsonl").exists()
+    assert not (root / "trajectories" / "retry-1.jsonl").exists()
 
 
 def test_mitigation_persists_latest_and_attempt_specific_files(
@@ -206,8 +206,8 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
         return object()
 
     async def fake_invoke_agent_runtime_graph(**kwargs):
-        assert kwargs["transcript_paths"] == (
-            mitigator_root / "transcripts" / "retry-1.jsonl",
+        assert kwargs["trajectory_paths"] == (
+            mitigator_root / "trajectories" / "retry-1.jsonl",
         )
         return structured_payload
 

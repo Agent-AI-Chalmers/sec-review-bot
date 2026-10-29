@@ -30,7 +30,7 @@ def publish_run_diagnostic_activity(
     units = [
         DiagnosticReviewUnit(
             unit_id=str(unit["unit_id"]),
-            transcript_root=Path(unit["transcript_root"]),
+            trajectory_root=Path(unit["trajectory_root"]),
         )
         for unit in request.review_units
     ]

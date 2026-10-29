@@ -9,9 +9,9 @@ from sec_review_agents.workflows.repository_case.verification import (
 )
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 from tests.mcp.cases.models import McpCase, McpCaseMode
-from tests.runtime.transcript_artifact_helpers import (
-    tool_interactions_from_transcript,
-    tool_usage_from_transcript,
+from tests.runtime.trajectory_artifact_helpers import (
+    tool_interactions_from_trajectory,
+    tool_usage_from_trajectory,
 )
 
 
@@ -68,8 +68,8 @@ async def run_mcp_case(
             ),
         )
 
-    transcript = artifacts / "transcripts" / "initial.jsonl"
-    usage = tool_usage_from_transcript(transcript)
+    trajectory = artifacts / "trajectories" / "initial.jsonl"
+    usage = tool_usage_from_trajectory(trajectory)
     return {
         "case": case.id,
         "mode": mode,
@@ -77,7 +77,7 @@ async def run_mcp_case(
         "artifactRoot": str(run_root),
         "toolNames": usage["toolNames"],
         "toolErrors": usage["toolErrors"],
-        "toolInteractions": tool_interactions_from_transcript(transcript),
+        "toolInteractions": tool_interactions_from_trajectory(trajectory),
         "result": result,
     }
 

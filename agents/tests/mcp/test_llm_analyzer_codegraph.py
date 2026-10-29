@@ -19,7 +19,7 @@ from sec_review_agents.filesystem.docker_runtime import (
 from sec_review_agents.workflows.repository_case.analysis import analyze_repository_case
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 from tests.llm_probe import ProbeRequirement, llm_probe
-from tests.runtime.transcript_artifact_helpers import tool_usage_from_transcript
+from tests.runtime.trajectory_artifact_helpers import tool_usage_from_trajectory
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
 
@@ -142,8 +142,8 @@ async def _run_probe(
         "verdict": result.get("verdict"),
         "mentionsJinja": "jinja" in result_text,
         "mentionsRenderUserTemplate": "render_user_template" in result_text,
-        "toolUsage": tool_usage_from_transcript(
-            analyzer_artifacts / "transcript.jsonl",
+        "toolUsage": tool_usage_from_trajectory(
+            analyzer_artifacts / "trajectory.jsonl",
             observations=(_codegraph_tool_observation,),
         ),
         "result": result,

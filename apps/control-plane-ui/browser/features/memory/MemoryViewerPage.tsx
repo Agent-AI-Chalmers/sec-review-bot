@@ -21,9 +21,9 @@ import {
   MemoryRevisionDiffTitle
 } from './MemoryRevisionDiff.js'
 import {
-  TranscriptContent,
-  type TranscriptTarget
-} from '../transcript/TranscriptViewer.js'
+  TrajectoryContent,
+  type TrajectoryTarget
+} from '../trajectory/TrajectoryViewer.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
 function numericRevision(value: string | undefined): number | undefined {
@@ -46,17 +46,17 @@ export function MemoryFilesPage(): React.JSX.Element {
   )
 }
 
-export function RevisionTranscriptPage(): React.JSX.Element {
+export function RevisionTrajectoryPage(): React.JSX.Element {
   const t = useMessages()
   const revision = numericRevision(useParams().revision)
   if (revision === undefined) return <></>
-  const target: TranscriptTarget = {
+  const target: TrajectoryTarget = {
     title: t('maintenanceProcess'),
-    contentHref: `/memory/revisions/${revision}/transcript/content`,
-    downloadHref: `/api/memory/revisions/${revision}/transcript`,
-    pageHref: `/memory/revisions/${revision}/transcript`
+    contentHref: `/memory/revisions/${revision}/trajectory/content`,
+    downloadHref: `/api/memory/revisions/${revision}/trajectory`,
+    pageHref: `/memory/revisions/${revision}/trajectory`
   }
-  return <TranscriptPage target={target} />
+  return <TrajectoryPage target={target} />
 }
 
 export function MemoryRevisionDiffPage(): React.JSX.Element {
@@ -111,24 +111,24 @@ export function MemoryRevisionDiffPage(): React.JSX.Element {
   )
 }
 
-export function ExtractionTranscriptPage(): React.JSX.Element {
+export function ExtractionTrajectoryPage(): React.JSX.Element {
   const t = useMessages()
   const extractionId = useParams().extractionId
   if (!extractionId) return <></>
   const encoded = encodeURIComponent(extractionId)
-  const target: TranscriptTarget = {
+  const target: TrajectoryTarget = {
     title: t('extractionProcess'),
-    contentHref: `/memory/extractions/${encoded}/transcript/content`,
-    downloadHref: `/api/memory/extractions/${encoded}/transcript`,
-    pageHref: `/memory/extractions/${encoded}/transcript`
+    contentHref: `/memory/extractions/${encoded}/trajectory/content`,
+    downloadHref: `/api/memory/extractions/${encoded}/trajectory`,
+    pageHref: `/memory/extractions/${encoded}/trajectory`
   }
-  return <TranscriptPage target={target} />
+  return <TrajectoryPage target={target} />
 }
 
-function TranscriptPage({
+function TrajectoryPage({
   target
 }: {
-  target: TranscriptTarget
+  target: TrajectoryTarget
 }): React.JSX.Element {
   const t = useMessages()
   return (
@@ -148,7 +148,7 @@ function TranscriptPage({
           </ActionIcon>
         </Tooltip>
       </Group>
-      <TranscriptContent target={target} />
+      <TrajectoryContent target={target} />
     </Container>
   )
 }

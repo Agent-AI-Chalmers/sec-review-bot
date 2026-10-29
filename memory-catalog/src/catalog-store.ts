@@ -112,7 +112,7 @@ interface RevisionRow {
   source_kind: 'maintenance' | 'operator'
   maintenance_id: string | null
   extraction_ids: string[]
-  maintenance_transcript_reference: ArtifactReference | null
+  maintenance_trajectory_reference: ArtifactReference | null
   operation_id: string | null
   actor: Actor | null
   memory_tree_reference: ArtifactReference
@@ -171,7 +171,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       const inserted = await client.query(
         `insert into extractions (
            extraction_id, source_workflow, source_run_id, source_unit_id,
-           diagnostic_bundle_digest, transcript_reference
+           diagnostic_bundle_digest, trajectory_reference
          ) values ($1,$2,$3,$4,$5,$6)
          on conflict (extraction_id) do nothing`,
         [
@@ -180,7 +180,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           input.source_run_id,
           input.source_unit_id,
           input.diagnostic_bundle_digest,
-          input.transcript_reference,
+          input.trajectory_reference,
         ],
       )
       if (inserted.rowCount === 1) {
@@ -196,7 +196,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       const existing = await client.query<{ identical: boolean }>(
         `select source_workflow=$2 and source_run_id=$3 and
                 source_unit_id=$4 and diagnostic_bundle_digest=$5 and
-                transcript_reference=$6::jsonb and
+                trajectory_reference=$6::jsonb and
                 (($7::text is null and observation.body_markdown is null) or
                  observation.body_markdown=$7) as identical
          from extractions extraction
@@ -208,7 +208,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           input.source_run_id,
           input.source_unit_id,
           input.diagnostic_bundle_digest,
-          JSON.stringify(input.transcript_reference),
+          JSON.stringify(input.trajectory_reference),
           input.observation?.body_markdown ?? null,
         ],
       )
@@ -230,13 +230,13 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       source_run_id: string
       source_unit_id: string
       diagnostic_bundle_digest: string
-      transcript_reference: ArtifactReference
+      trajectory_reference: ArtifactReference
       body_markdown: string | null
       created_at: Date
     }>(
       `select extraction.extraction_id, extraction.source_workflow,
               extraction.source_run_id, extraction.source_unit_id,
-              extraction.diagnostic_bundle_digest, extraction.transcript_reference,
+              extraction.diagnostic_bundle_digest, extraction.trajectory_reference,
               observation.body_markdown, extraction.created_at
        from extractions extraction
        left join observations observation using (extraction_id)
@@ -251,7 +251,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           source_run_id: row.source_run_id,
           source_unit_id: row.source_unit_id,
           diagnostic_bundle_digest: row.diagnostic_bundle_digest,
-          transcript_reference: row.transcript_reference,
+          trajectory_reference: row.trajectory_reference,
           observation:
             row.body_markdown === null
               ? null
@@ -273,13 +273,13 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       source_run_id: string
       source_unit_id: string
       diagnostic_bundle_digest: string
-      transcript_reference: ArtifactReference
+      trajectory_reference: ArtifactReference
       body_markdown: string | null
       created_at: Date
     }>(
       `select extraction.extraction_id, extraction.source_workflow,
               extraction.source_run_id, extraction.source_unit_id,
-              extraction.diagnostic_bundle_digest, extraction.transcript_reference,
+              extraction.diagnostic_bundle_digest, extraction.trajectory_reference,
               observation.body_markdown, extraction.created_at
        from extractions extraction
        left join observations observation using (extraction_id)
@@ -710,7 +710,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
                 revision.predecessor_revision is not distinct from nullif($2, 0) and
                 revision.memory_tree_reference=$3::jsonb and
                 ($4::text='maintenance' and
-                  revision.maintenance_transcript_reference=$5::jsonb and
+                  revision.maintenance_trajectory_reference=$5::jsonb and
                   coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
                     filter (where observation.extraction_id is not null), '{}')=$6::text[] or
                  $4::text='operator' and revision.actor=$7::jsonb)
@@ -729,7 +729,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           JSON.stringify(input.memory_tree_reference),
           source.kind,
           source.kind === 'maintenance'
-            ? JSON.stringify(source.transcript_reference)
+            ? JSON.stringify(source.trajectory_reference)
             : null,
           source.kind === 'maintenance'
             ? [...source.extraction_ids].sort()
@@ -799,7 +799,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       await client.query(
         `insert into memory_tree_revisions (
            revision, predecessor_revision, memory_tree_reference, source_kind,
-           maintenance_id, maintenance_transcript_reference,
+           maintenance_id, maintenance_trajectory_reference,
            operation_id, actor
          ) values ($1,nullif($2, 0),$3,$4,$5,$6,$7,$8)`,
         [
@@ -808,7 +808,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           input.memory_tree_reference,
           source.kind,
           source.kind === 'maintenance' ? source.maintenance_id : null,
-          source.kind === 'maintenance' ? source.transcript_reference : null,
+          source.kind === 'maintenance' ? source.trajectory_reference : null,
           source.kind === 'operator' ? source.operation_id : null,
           source.kind === 'operator' ? source.actor : null,
         ],
@@ -933,7 +933,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
   ): Promise<MemoryTreeRevision | undefined> {
     const result = await this.#pool.query<RevisionRow>(
       `select revision.revision, revision.predecessor_revision, revision.source_kind,
-              revision.maintenance_id, revision.maintenance_transcript_reference,
+              revision.maintenance_id, revision.maintenance_trajectory_reference,
               revision.operation_id, revision.actor,
               coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
                 filter (where observation.extraction_id is not null), '{}') as extraction_ids,
@@ -955,7 +955,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
   ): Promise<MemoryTreeRevisionList> {
     const result = await this.#pool.query<RevisionRow>(
       `select revision.revision, revision.predecessor_revision, revision.source_kind,
-              revision.maintenance_id, revision.maintenance_transcript_reference,
+              revision.maintenance_id, revision.maintenance_trajectory_reference,
               revision.operation_id, revision.actor,
               coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
                 filter (where observation.extraction_id is not null), '{}') as extraction_ids,
@@ -985,7 +985,7 @@ function projectExtraction(row: {
   source_run_id: string
   source_unit_id: string
   diagnostic_bundle_digest: string
-  transcript_reference: ArtifactReference
+  trajectory_reference: ArtifactReference
   body_markdown: string | null
   created_at: Date
 }): ExtractionRecord {
@@ -995,7 +995,7 @@ function projectExtraction(row: {
     source_run_id: row.source_run_id,
     source_unit_id: row.source_unit_id,
     diagnostic_bundle_digest: row.diagnostic_bundle_digest,
-    transcript_reference: row.transcript_reference,
+    trajectory_reference: row.trajectory_reference,
     observation:
       row.body_markdown === null ? null : { body_markdown: row.body_markdown },
     created_at: row.created_at.toISOString(),
@@ -1009,9 +1009,9 @@ function projectRevision(row: RevisionRow): MemoryTreeRevision {
           kind: 'maintenance' as const,
           maintenance_id: requireValue(row.maintenance_id, 'maintenance_id'),
           extraction_ids: row.extraction_ids,
-          transcript_reference: requireValue(
-            row.maintenance_transcript_reference,
-            'maintenance_transcript_reference',
+          trajectory_reference: requireValue(
+            row.maintenance_trajectory_reference,
+            'maintenance_trajectory_reference',
           ),
         }
       : {

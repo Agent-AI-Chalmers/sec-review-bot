@@ -7,7 +7,7 @@ import {
   minimapMarkWidth,
   minimapTicks,
   nearestSegment
-} from '../browser/features/transcript/transcript-minimap.js'
+} from '../browser/features/trajectory/trajectory-minimap.js'
 
 test('a long message stays current while it covers the viewport center', () => {
   const segments = [
@@ -29,7 +29,7 @@ test('a viewport center between messages falls back to the nearest center', () =
   assert.equal(nearestSegment(segments, 0.42), 1)
 })
 
-test('an empty transcript has no current segment to pick', () => {
+test('an empty trajectory has no current segment to pick', () => {
   assert.equal(nearestSegment([], 0.5), 0)
 })
 
@@ -40,7 +40,7 @@ test('mark width encodes state, not message size', () => {
   assert.equal(minimapMarkWidth(true, true), 20)
 })
 
-test('dense transcripts bucket marks without overlapping', () => {
+test('dense trajectories bucket marks without overlapping', () => {
   const count = 300
   const ticks = minimapTicks(count)
   const buckets = minimapBuckets(count, ticks)
@@ -59,7 +59,7 @@ test('dense transcripts bucket marks without overlapping', () => {
   )
 })
 
-test('a sparse transcript keeps one bucket per message', () => {
+test('a sparse trajectory keeps one bucket per message', () => {
   const ticks = minimapTicks(3)
   const buckets = minimapBuckets(3, ticks)
 

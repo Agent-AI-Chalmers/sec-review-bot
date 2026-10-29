@@ -11,7 +11,7 @@ from sec_review_agents.run_diagnostics.publication import (
 def test_publication_activity_uses_publisher_unit_ids(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """The activity must not re-glob transcripts and drift from the manifest."""
+    """The activity must not re-glob trajectories and drift from the manifest."""
     empty = tmp_path / "empty"
     (empty / "0001-fake.jsonl").mkdir(parents=True)
     reference = ArtifactReference(
@@ -34,7 +34,7 @@ def test_publication_activity_uses_publisher_unit_ids(
             run_id="run-1",
             artifact_root_path=str(tmp_path / "artifacts"),
             review_units=[
-                {"unit_id": "empty", "transcript_root": str(empty)},
+                {"unit_id": "empty", "trajectory_root": str(empty)},
             ],
             result={},
             destination_scheme="file",

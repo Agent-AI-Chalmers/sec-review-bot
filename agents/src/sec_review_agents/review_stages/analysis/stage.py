@@ -20,7 +20,7 @@ from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
     record_bootstrap_result,
 )
-from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
+from sec_review_agents.runtime.trajectories import remove_trajectories, trajectory_path
 from sec_review_agents.utils.files import (
     persist_json_artifact,
     remove_json_artifacts,
@@ -34,7 +34,7 @@ from sec_review_agents.workspace.snapshots import restore_workspace_from_snapsho
 async def run_analysis_stage(
     *,
     analyzer_artifacts_path: Path,
-    published_transcript_path: Path | None = None,
+    published_trajectory_path: Path | None = None,
     agent_name: str,
     baseline_snapshot_tar_path: Path,
     build_backend: Callable[[Path, PathView | None], Any],
@@ -57,9 +57,9 @@ async def run_analysis_stage(
             tar_path=baseline_snapshot_tar_path,
             destination_path=workspace_path,
         )
-        transcript_paths = prepare_analysis_transcript(
+        trajectory_paths = prepare_analysis_trajectory(
             analyzer_artifacts_path=analyzer_artifacts_path,
-            published_transcript_path=published_transcript_path,
+            published_trajectory_path=published_trajectory_path,
         )
         backend = build_backend(workspace_path, memory_path_view)
         async with amanaged_backend(backend):
@@ -90,7 +90,7 @@ async def run_analysis_stage(
                     agent_name=agent_name,
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
-                    transcript_paths=transcript_paths,
+                    trajectory_paths=trajectory_paths,
                 )
         result = build_analysis_stage_result(
             overview=agent_output["overview"],
@@ -106,20 +106,20 @@ async def run_analysis_stage(
 
 def reset_analysis_artifacts(*, analyzer_artifacts_path: Path) -> None:
     remove_json_artifacts(analyzer_artifacts_path, ("analysis-result",))
-    remove_transcripts((transcript_path(analyzer_artifacts_path),))
+    remove_trajectories((trajectory_path(analyzer_artifacts_path),))
 
 
-def prepare_analysis_transcript(
+def prepare_analysis_trajectory(
     *,
     analyzer_artifacts_path: Path,
-    published_transcript_path: Path | None,
+    published_trajectory_path: Path | None,
 ) -> tuple[Path, ...]:
-    local_transcript_path = transcript_path(analyzer_artifacts_path)
-    if published_transcript_path is None:
-        return (local_transcript_path,)
+    local_trajectory_path = trajectory_path(analyzer_artifacts_path)
+    if published_trajectory_path is None:
+        return (local_trajectory_path,)
 
-    published_transcript_path.unlink(missing_ok=True)
-    return (local_transcript_path, published_transcript_path)
+    published_trajectory_path.unlink(missing_ok=True)
+    return (local_trajectory_path, published_trajectory_path)
 
 
 def persist_analysis_stage_result(

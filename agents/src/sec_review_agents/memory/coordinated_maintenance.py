@@ -15,10 +15,10 @@ from sec_review_agents.memory.memory_tree_artifact import (
     publish_memory_tree_artifact,
 )
 from sec_review_agents.memory.revision_creation import MemoryTreeRevisionCreation
-from sec_review_agents.memory.transcript_artifact import (
-    publish_memory_agent_transcript,
+from sec_review_agents.memory.trajectory_artifact import (
+    publish_memory_agent_trajectory,
 )
-from sec_review_agents.runtime.transcripts import transcript_path
+from sec_review_agents.runtime.trajectories import trajectory_path
 
 
 async def prepare_coordinated_memory_revision(
@@ -100,26 +100,26 @@ async def prepare_coordinated_memory_revision(
                 (extraction_id, observations_root / filename)
             )
 
-        maintainer_transcript_path = transcript_path(
-            temp_root / "memory-agent-transcripts",
+        maintainer_trajectory_path = trajectory_path(
+            temp_root / "memory-agent-trajectories",
             name="maintainer",
         )
         result = await maintain_memory_tree(
             base_memory_tree=base_memory_tree,
             observations=maintenance_observations,
             worktree_root=temp_root / "candidate-memory-tree",
-            maintainer_transcript_path=maintainer_transcript_path,
+            maintainer_trajectory_path=maintainer_trajectory_path,
             deployment=deployment,
         )
 
-        maintenance_transcript_reference = publish_memory_agent_transcript(
+        maintenance_trajectory_reference = publish_memory_agent_trajectory(
             agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-            transcript_path=result.maintainer_transcript_path,
-            output_dir=temp_root / "published-transcripts",
+            trajectory_path=result.maintainer_trajectory_path,
+            output_dir=temp_root / "published-trajectories",
         )
-        if urlparse(maintenance_transcript_reference.uri).scheme != "s3":
+        if urlparse(maintenance_trajectory_reference.uri).scheme != "s3":
             raise RuntimeError(
-                "Maintenance transcript publication requires configured S3 storage."
+                "Maintenance trajectory publication requires configured S3 storage."
             )
         memory_tree_reference = publish_memory_tree_artifact(
             memory_content_root=result.memory_tree_path,
@@ -134,7 +134,7 @@ async def prepare_coordinated_memory_revision(
         expected_active_revision=expected_active_revision,
         extraction_ids=tuple(extraction_ids),
         memory_tree_reference=memory_tree_reference,
-        maintenance_transcript_reference=maintenance_transcript_reference,
+        maintenance_trajectory_reference=maintenance_trajectory_reference,
     )
 
 

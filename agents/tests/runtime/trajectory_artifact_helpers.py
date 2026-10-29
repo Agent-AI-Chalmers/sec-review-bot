@@ -16,15 +16,15 @@ FILESYSTEM_TOOL_NAMES = {
 ToolUsageObservation = Callable[[dict[str, Any]], dict[str, Any]]
 
 
-def transcript_messages(transcript_path: Path) -> list[dict[str, Any]]:
+def trajectory_messages(trajectory_path: Path) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
-    transcript_files = (
-        [transcript_path]
-        if transcript_path.is_file()
-        else sorted(transcript_path.glob("*.jsonl"))
+    trajectory_files = (
+        [trajectory_path]
+        if trajectory_path.is_file()
+        else sorted(trajectory_path.glob("*.jsonl"))
     )
-    for transcript_file in transcript_files:
-        for line in transcript_file.read_text(encoding="utf-8").splitlines():
+    for trajectory_file in trajectory_files:
+        for line in trajectory_file.read_text(encoding="utf-8").splitlines():
             if not line.strip():
                 continue
             event = json.loads(line)
@@ -69,9 +69,9 @@ def message_read_file_paths(message: dict[str, Any]) -> list[str]:
     return paths
 
 
-def read_file_paths_from_transcript(transcript_path: Path) -> list[str]:
+def read_file_paths_from_trajectory(trajectory_path: Path) -> list[str]:
     paths: list[str] = []
-    for message in transcript_messages(transcript_path):
+    for message in trajectory_messages(trajectory_path):
         paths.extend(message_read_file_paths(message))
     return paths
 
@@ -105,12 +105,12 @@ def message_tool_errors(message: dict[str, Any]) -> list[dict[str, str]]:
     ]
 
 
-def tool_interactions_from_transcript(
-    transcript_path: Path,
+def tool_interactions_from_trajectory(
+    trajectory_path: Path,
 ) -> list[dict[str, Any]]:
     pending: dict[str, tuple[str, dict[str, Any]]] = {}
     interactions: list[dict[str, Any]] = []
-    for message in transcript_messages(transcript_path):
+    for message in trajectory_messages(trajectory_path):
         for tool_call in message.get("tool_calls") or []:
             if not isinstance(tool_call, dict):
                 continue
@@ -170,8 +170,8 @@ def empty_tool_usage(
     return _apply_observations(usage, observations)
 
 
-def tool_usage_from_transcript(
-    transcript_path: Path,
+def tool_usage_from_trajectory(
+    trajectory_path: Path,
     observations: tuple[ToolUsageObservation, ...] = (),
 ) -> dict[str, Any]:
     names: list[str] = []
@@ -179,7 +179,7 @@ def tool_usage_from_transcript(
     execute_commands: list[str] = []
     tool_errors: list[dict[str, str]] = []
 
-    for message in transcript_messages(transcript_path):
+    for message in trajectory_messages(trajectory_path):
         names.extend(message_tool_call_names(message))
         read_paths.extend(message_read_file_paths(message))
         execute_commands.extend(message_execute_commands(message))

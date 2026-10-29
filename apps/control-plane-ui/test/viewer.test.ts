@@ -3,7 +3,7 @@ import test from 'node:test'
 
 import { parseViewerInput } from '../browser/features/viewer/Viewer.js'
 
-test('viewer parses repository transcript JSONL', () => {
+test('viewer parses repository trajectory JSONL', () => {
   const events = parseViewerInput(
     [
       JSON.stringify({
@@ -27,7 +27,7 @@ test('viewer parses repository transcript JSONL', () => {
   )
 })
 
-test('viewer wraps raw message arrays as transcript events', () => {
+test('viewer wraps raw message arrays as trajectory events', () => {
   const events = parseViewerInput(
     JSON.stringify({ messages: [{ type: 'human', content: 'Inspect this' }] })
   )

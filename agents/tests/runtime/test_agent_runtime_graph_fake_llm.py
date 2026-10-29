@@ -16,7 +16,7 @@ from sec_review_agents.runtime.changed_files_acceptance_middleware import (
 from sec_review_agents.runtime.structured_response_middleware import (
     MissingStructuredResponseMiddleware,
 )
-from sec_review_agents.runtime.transcripts import read_transcript_messages
+from sec_review_agents.runtime.trajectories import read_trajectory_messages
 from tests.review_stages.stages.test_mitigation_changed_files_acceptance import (
     _baseline_snapshot,
     _copy_repo,
@@ -83,22 +83,22 @@ async def test_structured_output_agent_continues_after_prose_only_model_turn() -
         system_prompt="Return the configured structured response.",
     )
     with tempfile.TemporaryDirectory() as tempdir:
-        transcript_path = Path(tempdir) / "transcript.jsonl"
+        trajectory_path = Path(tempdir) / "trajectory.jsonl"
         result = await invoke_agent_runtime_graph(
             agent=agent,
             agent_name="fake-missing-structured-response",
             system_prompt="Return the configured structured response.",
             user_prompt="Return a patch claim.",
-            transcript_paths=(transcript_path,),
+            trajectory_paths=(trajectory_path,),
         )
-        transcript_messages = read_transcript_messages(transcript_path)
+        trajectory_messages = read_trajectory_messages(trajectory_path)
 
     assert result["changed_files"] == ["a.txt"]
-    assert transcript_messages[0]["type"] == "system"
+    assert trajectory_messages[0]["type"] == "system"
     assert (
-        transcript_messages[2]["content"] == "I found the answer but forgot the schema."
+        trajectory_messages[2]["content"] == "I found the answer but forgot the schema."
     )
-    assert transcript_messages[-2]["tool_calls"] == [
+    assert trajectory_messages[-2]["tool_calls"] == [
         {
             "name": "PatchClaimProbeOutput",
             "args": {
@@ -110,12 +110,12 @@ async def test_structured_output_agent_continues_after_prose_only_model_turn() -
             "type": "tool_call",
         }
     ]
-    assert transcript_messages[-1]["type"] == "tool"
-    assert transcript_messages[-1]["name"] == "PatchClaimProbeOutput"
+    assert trajectory_messages[-1]["type"] == "tool"
+    assert trajectory_messages[-1]["name"] == "PatchClaimProbeOutput"
 
 
 @pytest.mark.asyncio
-async def test_transcript_preserves_messages_replaced_by_summarization(
+async def test_trajectory_preserves_messages_replaced_by_summarization(
     tmp_path: Path,
 ) -> None:
     model = ToolCallingFakeMessagesListChatModel(
@@ -154,17 +154,17 @@ async def test_transcript_preserves_messages_replaced_by_summarization(
             )
         ],
     )
-    transcript_path = tmp_path / "transcript.jsonl"
+    trajectory_path = tmp_path / "trajectory.jsonl"
 
     await invoke_agent_runtime_graph(
         agent=agent,
-        agent_name="summarized-transcript-probe",
+        agent_name="summarized-trajectory-probe",
         system_prompt="Review redirect behavior.",
         user_prompt="Inspect the redirect target.",
-        transcript_paths=(transcript_path,),
+        trajectory_paths=(trajectory_path,),
     )
 
-    messages = read_transcript_messages(transcript_path)
+    messages = read_trajectory_messages(trajectory_path)
     message_ids = [message["id"] for message in messages]
     assert len(message_ids) == len(set(message_ids))
     assert [message["type"] for message in messages] == [

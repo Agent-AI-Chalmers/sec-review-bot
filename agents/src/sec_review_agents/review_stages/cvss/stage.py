@@ -18,7 +18,7 @@ from sec_review_agents.review_stages.cvss.result import (
 )
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
-from sec_review_agents.runtime.transcripts import remove_transcripts, transcript_path
+from sec_review_agents.runtime.trajectories import remove_trajectories, trajectory_path
 from sec_review_agents.utils.files import persist_json_artifact, remove_json_artifacts
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -128,7 +128,7 @@ async def run_cvss_v4_scoring_stage(
             tar_path=baseline_snapshot_tar_path,
             destination_path=workspace_path,
         )
-        transcript = transcript_path(cvss_artifacts_path)
+        trajectory = trajectory_path(cvss_artifacts_path)
         backend = build_backend(workspace_path)
         async with amanaged_backend(backend):
             agent = await create_cvss_agent_graph(
@@ -142,7 +142,7 @@ async def run_cvss_v4_scoring_stage(
                 agent_name=agent_name,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
-                transcript_paths=(transcript,),
+                trajectory_paths=(trajectory,),
             )
         result = build_cvss_stage_result_from_agent_output(agent_output)
         persist_cvss_stage_result(
@@ -156,7 +156,7 @@ def reset_cvss_artifacts(*, cvss_artifacts_path: Path) -> None:
         cvss_artifacts_path,
         ("cvss-v4-result", "cvss-v4-failure"),
     )
-    remove_transcripts((transcript_path(cvss_artifacts_path),))
+    remove_trajectories((trajectory_path(cvss_artifacts_path),))
 
 
 def build_cvss_stage_result_from_agent_output(

@@ -50,7 +50,7 @@ def _revision_creation(
         expected_active_revision=3,
         extraction_ids=extraction_ids,
         memory_tree_reference=_reference(),
-        maintenance_transcript_reference=_reference(),
+        maintenance_trajectory_reference=_reference(),
     )
 
 
@@ -73,7 +73,7 @@ def test_memory_tree_revision_creation_rejects_invalid_invariants(
         "expected_active_revision": 3,
         "extraction_ids": ("extraction-1",),
         "memory_tree_reference": _reference(),
-        "maintenance_transcript_reference": _reference(),
+        "maintenance_trajectory_reference": _reference(),
     }
     values.update(overrides)
 
@@ -140,7 +140,7 @@ def test_maintenance_preparation_result_rejects_mixed_variants() -> None:
         )
 
 
-def test_extraction_workflow_id_is_stable_per_transcript_unit() -> None:
+def test_extraction_workflow_id_is_stable_per_trajectory_unit() -> None:
     first = memory_extraction_workflow_id(
         diagnostic_bundle_digest=_reference().digest,
         unit_id="case-a",
@@ -172,7 +172,7 @@ async def test_extraction_workflow_prepares_then_registers_fixed_payload(
         source_run_id="run-1",
         source_unit_id="review",
         diagnostic_bundle_digest=_reference().digest,
-        transcript_reference=_reference(),
+        trajectory_reference=_reference(),
         observation_markdown="Remember this.",
         skipped=False,
         summary="Produced observation.",
@@ -201,33 +201,33 @@ async def test_prepare_extraction_returns_complete_serializable_payload(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
-    transcript = tmp_path / "transcript.jsonl"
-    transcript.write_text("{}\n", encoding="utf-8")
+    trajectory = tmp_path / "trajectory.jsonl"
+    trajectory.write_text("{}\n", encoding="utf-8")
     preview = SimpleNamespace(
         extraction_id="observation-1",
         observation_markdown="Remember this.",
         skipped=False,
         summary="Produced observation.",
-        extractor_transcript_path=tmp_path / "memory-extractor.jsonl",
+        extractor_trajectory_path=tmp_path / "memory-extractor.jsonl",
     )
-    extraction_transcript = ArtifactReference(
-        uri="s3://sec-review/memory/transcripts/memory-extractor/transcript.v1.jsonl.zst",
+    extraction_trajectory = ArtifactReference(
+        uri="s3://sec-review/memory/trajectories/memory-extractor/trajectory.v1.jsonl.zst",
         digest=f"sha256:{'b' * 64}",
         media_type="application/zstd",
         size_bytes=10,
     )
 
     monkeypatch.setattr(
-        "sec_review_agents.run_diagnostics.bundle.materialize_diagnostic_transcript_unit",
-        lambda *_args, **_kwargs: SimpleNamespace(transcript_paths=(transcript,)),
+        "sec_review_agents.run_diagnostics.bundle.materialize_diagnostic_trajectory_unit",
+        lambda *_args, **_kwargs: SimpleNamespace(trajectory_paths=(trajectory,)),
     )
     monkeypatch.setattr(
         "sec_review_agents.memory.extractor.preview_memory_observation_from_paths",
         AsyncMock(return_value=preview),
     )
     monkeypatch.setattr(
-        "sec_review_agents.memory.transcript_artifact.publish_memory_agent_transcript",
-        lambda **_kwargs: extraction_transcript,
+        "sec_review_agents.memory.trajectory_artifact.publish_memory_agent_trajectory",
+        lambda **_kwargs: extraction_trajectory,
     )
     request = MemoryExtractionRequest(
         source_workflow="issue-review",
@@ -248,7 +248,7 @@ async def test_prepare_extraction_returns_complete_serializable_payload(
         source_run_id="run-1",
         source_unit_id="review",
         diagnostic_bundle_digest=_reference().digest,
-        transcript_reference=extraction_transcript,
+        trajectory_reference=extraction_trajectory,
         observation_markdown="Remember this.",
         skipped=False,
         summary="Produced observation.",
@@ -264,7 +264,7 @@ async def test_extraction_payload_round_trips_through_temporal_converter() -> No
         source_run_id="run-1",
         source_unit_id="review",
         diagnostic_bundle_digest=_reference().digest,
-        transcript_reference=_reference(),
+        trajectory_reference=_reference(),
         observation_markdown=None,
         skipped=True,
         summary="No durable memory observation produced.",
@@ -289,7 +289,7 @@ async def test_extraction_payload_rejects_wrong_field_type_during_conversion() -
                 "source_run_id": "run-1",
                 "source_unit_id": "review",
                 "diagnostic_bundle_digest": _reference().digest,
-                "transcript_reference": _reference().as_dict(),
+                "trajectory_reference": _reference().as_dict(),
                 "observation_markdown": None,
                 "skipped": "yes",
                 "summary": "No durable memory observation produced.",
@@ -314,7 +314,7 @@ async def test_extraction_payload_rejects_inconsistent_observation_flags() -> No
                 "source_run_id": "run-1",
                 "source_unit_id": "review",
                 "diagnostic_bundle_digest": _reference().digest,
-                "transcript_reference": _reference().as_dict(),
+                "trajectory_reference": _reference().as_dict(),
                 "observation_markdown": "Remember this.",
                 "skipped": True,
                 "summary": "Produced observation.",
@@ -338,8 +338,8 @@ def test_register_extraction_retries_with_identical_payload_and_no_observation(
     monkeypatch,
 ) -> None:
     client = Mock()
-    transcript_reference = ArtifactReference(
-        uri="s3://sec-review/memory/transcripts/memory-extractor/transcript.v1.jsonl.zst",
+    trajectory_reference = ArtifactReference(
+        uri="s3://sec-review/memory/trajectories/memory-extractor/trajectory.v1.jsonl.zst",
         digest=f"sha256:{'b' * 64}",
         media_type="application/zstd",
         size_bytes=10,
@@ -354,7 +354,7 @@ def test_register_extraction_retries_with_identical_payload_and_no_observation(
         source_run_id="run-1",
         source_unit_id="review",
         diagnostic_bundle_digest=_reference().digest,
-        transcript_reference=transcript_reference,
+        trajectory_reference=trajectory_reference,
         observation_markdown=None,
         skipped=True,
         summary="No durable memory observation produced.",
@@ -374,7 +374,7 @@ def test_register_extraction_retries_with_identical_payload_and_no_observation(
             "summary": "No durable memory observation produced.",
             "extraction_id": "extraction-1",
             "observation_produced": False,
-            "transcript_reference": transcript_reference.as_dict(),
+            "trajectory_reference": trajectory_reference.as_dict(),
         }
     )
     expected = {
@@ -383,7 +383,7 @@ def test_register_extraction_retries_with_identical_payload_and_no_observation(
         "source_run_id": "run-1",
         "source_unit_id": "review",
         "diagnostic_bundle_digest": _reference().digest,
-        "transcript_reference": transcript_reference,
+        "trajectory_reference": trajectory_reference,
         "observation_markdown": None,
     }
     assert client.register_extraction.call_count == 2
@@ -399,7 +399,7 @@ async def test_extraction_workflow_retries_registration_with_history_payload() -
         source_run_id="run-1",
         source_unit_id="review",
         diagnostic_bundle_digest=_reference().digest,
-        transcript_reference=_reference(),
+        trajectory_reference=_reference(),
         observation_markdown=None,
         skipped=True,
         summary="No durable memory observation produced.",
@@ -431,7 +431,7 @@ async def test_extraction_workflow_retries_registration_with_history_payload() -
             "summary": "No durable memory observation produced.",
             "extraction_id": "extraction-1",
             "observation_produced": False,
-            "transcript_reference": payload.transcript_reference.as_dict(),
+            "trajectory_reference": payload.trajectory_reference.as_dict(),
         }
 
     request = MemoryExtractionRequest(
@@ -481,7 +481,7 @@ def test_catalog_extraction_conflict_is_not_retried(monkeypatch) -> None:
         source_run_id="run-1",
         source_unit_id="review",
         diagnostic_bundle_digest=_reference().digest,
-        transcript_reference=_reference(),
+        trajectory_reference=_reference(),
         observation_markdown=None,
         skipped=True,
         summary="No observation.",
@@ -801,10 +801,10 @@ async def test_maintenance_workflow_retries_commit_with_history_revision() -> No
         expected_active_revision=3,
         extraction_ids=("extraction-1", "extraction-2"),
         memory_tree_reference=_reference(),
-        maintenance_transcript_reference=ArtifactReference(
+        maintenance_trajectory_reference=ArtifactReference(
             uri=(
-                "s3://sec-review/memory/transcripts/memory-maintainer/"
-                "transcript.v1.jsonl.zst"
+                "s3://sec-review/memory/trajectories/memory-maintainer/"
+                "trajectory.v1.jsonl.zst"
             ),
             digest=f"sha256:{'b' * 64}",
             media_type="application/zstd",
@@ -947,7 +947,7 @@ def test_commit_memory_tree_revision_uses_prepared_payload_after_processing_is_d
         expected_active_revision=3,
         extraction_ids=["extraction-1", "extraction-2"],
         memory_tree_reference=_reference(),
-        maintenance_transcript_reference=_reference(),
+        maintenance_trajectory_reference=_reference(),
     )
 
 
@@ -1000,7 +1000,7 @@ def test_commit_memory_tree_revision_retry_reuses_prepared_references(
         "expected_active_revision": 3,
         "extraction_ids": ["extraction-1", "extraction-2"],
         "memory_tree_reference": _reference(),
-        "maintenance_transcript_reference": _reference(),
+        "maintenance_trajectory_reference": _reference(),
     }
     assert client.create_memory_tree_revision.call_count == 2
     assert client.create_memory_tree_revision.call_args_list[0].kwargs == expected

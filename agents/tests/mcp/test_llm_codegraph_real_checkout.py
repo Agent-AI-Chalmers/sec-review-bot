@@ -22,7 +22,7 @@ from sec_review_agents.utils.time import utc_now_iso
 from sec_review_agents.workflows.issue.analysis import analyze_issue
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 from tests.llm_probe import ProbeRequirement, llm_probe
-from tests.runtime.transcript_artifact_helpers import tool_usage_from_transcript
+from tests.runtime.trajectory_artifact_helpers import tool_usage_from_trajectory
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
 
@@ -249,8 +249,8 @@ async def _run_analyzer_probe(
             case,
             result_text,
         ),
-        "toolUsage": tool_usage_from_transcript(
-            artifacts / "analyzer" / "transcript.jsonl",
+        "toolUsage": tool_usage_from_trajectory(
+            artifacts / "analyzer" / "trajectory.jsonl",
             observations=(_codegraph_tool_observation,),
         ),
         "result": result,

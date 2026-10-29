@@ -26,12 +26,12 @@ def _s3_reference(name: str) -> ArtifactReference:
 
 
 @pytest.mark.asyncio
-async def test_extractor_returns_preview_and_records_to_explicit_transcript(
+async def test_extractor_returns_preview_and_records_to_explicit_trajectory(
     tmp_path: Path,
 ) -> None:
-    transcript = tmp_path / "review.jsonl"
-    transcript.write_text("{}\n", encoding="utf-8")
-    agent_transcript = tmp_path / "extractor.jsonl"
+    trajectory = tmp_path / "review.jsonl"
+    trajectory.write_text("{}\n", encoding="utf-8")
+    agent_trajectory = tmp_path / "extractor.jsonl"
 
     with (
         patch(
@@ -53,14 +53,14 @@ async def test_extractor_returns_preview_and_records_to_explicit_transcript(
         ) as invoke,
     ):
         result = await preview_memory_observation_from_paths(
-            [transcript],
+            [trajectory],
             extraction_id_value="extraction-1",
             source_workflow="issue-review",
             run_id="run-1",
-            extractor_transcript_path=agent_transcript,
+            extractor_trajectory_path=agent_trajectory,
         )
 
-    assert result.extractor_transcript_path == agent_transcript
+    assert result.extractor_trajectory_path == agent_trajectory
     assert result.observation_markdown is not None
     assert "Reuse the verified boundary." in result.observation_markdown
     create_model.assert_called_once_with(
@@ -68,11 +68,11 @@ async def test_extractor_returns_preview_and_records_to_explicit_transcript(
         deployment_override=None,
     )
     assert invoke.await_args is not None
-    assert invoke.await_args.kwargs["transcript_paths"] == (agent_transcript,)
+    assert invoke.await_args.kwargs["trajectory_paths"] == (agent_trajectory,)
 
 
 @pytest.mark.asyncio
-async def test_extractor_skips_without_transcripts_or_agent_execution(
+async def test_extractor_skips_without_trajectories_or_agent_execution(
     tmp_path: Path,
 ) -> None:
     empty_review = tmp_path / "empty-review"
@@ -93,13 +93,13 @@ async def test_extractor_skips_without_transcripts_or_agent_execution(
         result = await preview_memory_observation_from_paths(
             [empty_review],
             extraction_id_value="Explicit Extraction/1",
-            extractor_transcript_path=tmp_path / "extractor.jsonl",
+            extractor_trajectory_path=tmp_path / "extractor.jsonl",
         )
 
     assert result.extraction_id == "explicit-extraction-1"
     assert result.skipped is True
     assert result.observation_markdown is None
-    assert result.extractor_transcript_path is None
+    assert result.extractor_trajectory_path is None
     create_agent.assert_not_awaited()
     invoke.assert_not_awaited()
 
@@ -108,9 +108,9 @@ async def test_extractor_skips_without_transcripts_or_agent_execution(
 async def test_extractor_skips_when_agent_produces_no_observation(
     tmp_path: Path,
 ) -> None:
-    transcript = tmp_path / "review.jsonl"
-    transcript.write_text("{}\n", encoding="utf-8")
-    agent_transcript = tmp_path / "extractor.jsonl"
+    trajectory = tmp_path / "review.jsonl"
+    trajectory.write_text("{}\n", encoding="utf-8")
+    agent_trajectory = tmp_path / "extractor.jsonl"
 
     with (
         patch(
@@ -132,14 +132,14 @@ async def test_extractor_skips_when_agent_produces_no_observation(
         ),
     ):
         result = await preview_memory_observation_from_paths(
-            [transcript],
+            [trajectory],
             extraction_id_value="extraction-1",
-            extractor_transcript_path=agent_transcript,
+            extractor_trajectory_path=agent_trajectory,
         )
 
     assert result.skipped is True
     assert result.observation_markdown is None
-    assert result.extractor_transcript_path == agent_transcript
+    assert result.extractor_trajectory_path == agent_trajectory
     create_model.assert_called_once_with(
         agent_name="memory-extractor",
         deployment_override=None,
@@ -159,7 +159,7 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
     observation = tmp_path / "observation.md"
     observation.write_text("New lesson.\n", encoding="utf-8")
     candidate = tmp_path / "candidate"
-    agent_transcript = tmp_path / "maintainer.jsonl"
+    agent_trajectory = tmp_path / "maintainer.jsonl"
 
     async def invoke_agent(**kwargs) -> dict[str, object]:
         worktree = candidate
@@ -187,11 +187,11 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
             base_memory_tree=base_tree,
             observations=[("extraction-1", observation)],
             worktree_root=candidate,
-            maintainer_transcript_path=agent_transcript,
+            maintainer_trajectory_path=agent_trajectory,
         )
 
     assert result.memory_tree_path == candidate
-    assert result.maintainer_transcript_path == agent_transcript
+    assert result.maintainer_trajectory_path == agent_trajectory
     assert (candidate / "MEMORY.md").read_text(encoding="utf-8") == "# Updated\n"
     assert (candidate / "topics" / "existing.md").is_file()
     create_model.assert_called_once_with(
@@ -199,7 +199,7 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
         deployment_override=None,
     )
     assert invoke.await_args is not None
-    assert invoke.await_args.kwargs["transcript_paths"] == (agent_transcript,)
+    assert invoke.await_args.kwargs["trajectory_paths"] == (agent_trajectory,)
     assert (
         "/memory/observations/observation-0001.md"
         in invoke.await_args.kwargs["user_prompt"]
@@ -266,7 +266,7 @@ async def test_maintainer_rejects_invalid_explicit_inputs_before_agent_execution
             base_memory_tree=base_tree,
             observations=inputs,
             worktree_root=tmp_path / "candidate",
-            maintainer_transcript_path=tmp_path / "maintainer.jsonl",
+            maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
         )
 
     create_agent.assert_not_awaited()
@@ -295,10 +295,10 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
     base_tree.mkdir()
     result = SimpleNamespace(
         memory_tree_path=tmp_path / "candidate",
-        maintainer_transcript_path=tmp_path / "maintainer.jsonl",
+        maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
     )
     memory_reference = _s3_reference("published-memory-tree")
-    transcript_reference = _s3_reference("maintainer-transcript")
+    trajectory_reference = _s3_reference("maintainer-trajectory")
 
     with (
         patch(
@@ -310,8 +310,8 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
             AsyncMock(return_value=result),
         ) as maintain,
         patch(
-            "sec_review_agents.memory.coordinated_maintenance.publish_memory_agent_transcript",
-            return_value=transcript_reference,
+            "sec_review_agents.memory.coordinated_maintenance.publish_memory_agent_trajectory",
+            return_value=trajectory_reference,
         ),
         patch(
             "sec_review_agents.memory.coordinated_maintenance.publish_memory_tree_artifact",

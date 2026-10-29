@@ -92,7 +92,7 @@ export type ExtractionRegistration = {
    * @type string
    */
   diagnostic_bundle_digest: string
-  transcript_reference: ArtifactReference
+  trajectory_reference: ArtifactReference
   observation: ExtractionObservation | null
 }
 
@@ -128,7 +128,7 @@ export type ExtractionRecord = {
    * @type string
    */
   diagnostic_bundle_digest: string
-  transcript_reference: ArtifactReference
+  trajectory_reference: ArtifactReference
   observation: ExtractionObservation | null
   /**
    * @description
@@ -324,7 +324,7 @@ export type MaintenanceRevisionSource = {
    */
   maintenance_id: MaintenanceId
   extraction_ids: ExtractionId[]
-  transcript_reference: ArtifactReference
+  trajectory_reference: ArtifactReference
 }
 
 export type OperatorRevisionSource = {

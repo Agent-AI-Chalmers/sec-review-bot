@@ -22,7 +22,7 @@ async def mitigate_repository_case(
     history_path: Path | None,
     incremental_window_path: Path | None,
     mitigator_artifacts_path: Path,
-    published_transcript_path: Path | None = None,
+    published_trajectory_path: Path | None = None,
     scan_mode: str,
     review_input: str,
     analysis_result: Mapping[str, Any],
@@ -34,7 +34,7 @@ async def mitigate_repository_case(
     return await run_mitigation_stage(
         agent_name="repository-mitigator",
         mitigator_artifacts_path=mitigator_artifacts_path,
-        published_transcript_path=published_transcript_path,
+        published_trajectory_path=published_trajectory_path,
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=retry_context,
         setup_declaration_content=setup_declaration_content,

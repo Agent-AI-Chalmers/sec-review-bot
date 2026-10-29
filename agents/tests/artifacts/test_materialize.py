@@ -13,8 +13,8 @@ from sec_review_agents.artifacts.reference import (
 
 
 def test_artifact_reference_accepts_non_archive_media_type(tmp_path: Path) -> None:
-    artifact = tmp_path / "transcript.jsonl.zst"
-    artifact.write_bytes(b"compressed transcript")
+    artifact = tmp_path / "trajectory.jsonl.zst"
+    artifact.write_bytes(b"compressed trajectory")
 
     reference = local_artifact_reference(artifact, media_type=ZSTD_MEDIA_TYPE)
 
@@ -23,8 +23,8 @@ def test_artifact_reference_accepts_non_archive_media_type(tmp_path: Path) -> No
 
 
 def test_concrete_consumer_rejects_unsupported_media_type(tmp_path: Path) -> None:
-    artifact = tmp_path / "transcript.jsonl.zst"
-    artifact.write_bytes(b"compressed transcript")
+    artifact = tmp_path / "trajectory.jsonl.zst"
+    artifact.write_bytes(b"compressed trajectory")
     reference = local_artifact_reference(artifact, media_type=ZSTD_MEDIA_TYPE)
 
     with pytest.raises(ValueError, match="expected 'application/tar\\+zstd'"):

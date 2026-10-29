@@ -123,7 +123,7 @@ Commit regenerated projections with their source contract changes, and run the c
 
 ### Repository Scripts
 
-Treat `scripts/` as maintained repository consumers even though they are not part of the installed agents package or a stable public interface. When changing agents APIs, workflow contracts, artifact paths or formats, CLI arguments, transcript persistence, or runtime lifecycle helpers, search `scripts/` for affected imports, paths, filenames, and calling conventions and update them when needed. Do not assume that an experimental or repository-level script may retain an obsolete internal API.
+Treat `scripts/` as maintained repository consumers even though they are not part of the installed agents package or a stable public interface. When changing agents APIs, workflow contracts, artifact paths or formats, CLI arguments, trajectory persistence, or runtime lifecycle helpers, search `scripts/` for affected imports, paths, filenames, and calling conventions and update them when needed. Do not assume that an experimental or repository-level script may retain an obsolete internal API.
 
 Run the repository script checks from `scripts/`, using the agents project explicitly for Python dependencies:
 

@@ -10,9 +10,9 @@ Sec Review Bot's repository-owned runtime roles are GitHub Integration, Review R
 
 Temporal Server is infrastructure, but it directly dispatches work to the worker processes, so the topology presents it with the runtime services. PostgreSQL and Object Storage remain separate persistence facilities. Langfuse appears outside the repository deployment boundary: workers optionally export LLM observations to it, and Review Runs reads those observations asynchronously to persist model-usage snapshots. Review execution, memory extraction, and memory maintenance use independent worker processes and task queues.
 
-The memory path has one deployment-independent state model. Memory Catalog owns coordination state in PostgreSQL, Object Storage owns immutable memory-tree and transcript artifacts, and Temporal owns workflow execution. Each review invocation materializes the current memory tree into a temporary directory for its agent backend and removes that directory afterward.
+The memory path has one deployment-independent state model. Memory Catalog owns coordination state in PostgreSQL, Object Storage owns immutable memory-tree and trajectory artifacts, and Temporal owns workflow execution. Each review invocation materializes the current memory tree into a temporary directory for its agent backend and removes that directory afterward.
 
-Control Plane UI manages Memory Catalog through its BFF and never exposes Catalog tokens, storage credentials, or `s3://` references to the browser. The BFF fetches and identity-checks artifact downloads. Authenticated operators can pause or resume automatic maintenance, create operator edit revisions, and restore the active pointer to an existing revision. New revisions retain that active revision as their predecessor while revision identities remain globally increasing. The BFF can create immutable memory-tree objects, while run artifacts and memory transcripts remain read-only.
+Control Plane UI manages Memory Catalog through its BFF and never exposes Catalog tokens, storage credentials, or `s3://` references to the browser. The BFF fetches and identity-checks artifact downloads. Authenticated operators can pause or resume automatic maintenance, create operator edit revisions, and restore the active pointer to an existing revision. New revisions retain that active revision as their predecessor while revision identities remain globally increasing. The BFF can create immutable memory-tree objects, while run artifacts and memory trajectories remain read-only.
 
 ## Runtime ownership map
 
@@ -23,7 +23,7 @@ Control Plane UI manages Memory Catalog through its BFF and never exposes Catalo
 | Control Plane UI | `apps/control-plane-ui/` | Authenticated operator console for Review Runs inspection and memory management | [README](../../apps/control-plane-ui/README.md) |
 | Execution Gateway | `execution-gateway/` | Authenticated Execution API and HTTP-to-Temporal translation | [README](../../execution-gateway/README.md) |
 | Execution Worker | `agents/` | Review workflows, activities, agent runtime, stage artifacts, and run diagnostic publication | [README](../../agents/README.md) |
-| Memory Extraction Worker | `agents/` | Per-run diagnostic consumption, extractor invocation, transcript publication, and extraction registration | [README](../../agents/README.md) |
+| Memory Extraction Worker | `agents/` | Per-run diagnostic consumption, extractor invocation, trajectory publication, and extraction registration | [README](../../agents/README.md) |
 | Memory Maintenance Worker | `agents/` | Batched maintenance input consumption, maintainer invocation, memory tree publication, and revision commit | [README](../../agents/README.md) |
 | Memory Catalog Server | `memory-catalog/` | Observation catalog, immutable memory revision history, and active revision coordination | [README](../../memory-catalog/README.md) |
 
@@ -99,9 +99,9 @@ sequenceDiagram
   Temporal->>ExtractionWorker: Dispatch memory extraction work
   ExtractionWorker->>Storage: Download run diagnostic bundle
   Storage-->>ExtractionWorker: Run diagnostic bundle
-  Note over ExtractionWorker: Read review transcripts and run extractor
-  ExtractionWorker->>Storage: Store extractor transcript
-  ExtractionWorker->>Catalog: Save extraction result, transcript reference, and observation (if any) in one transaction
+  Note over ExtractionWorker: Read review trajectories and run extractor
+  ExtractionWorker->>Storage: Store extractor trajectory
+  ExtractionWorker->>Catalog: Save extraction result, trajectory reference, and observation (if any) in one transaction
   loop Scheduled memory maintenance
     Temporal->>MaintenanceWorker: Dispatch maintenance work
     Note over Temporal,MaintenanceWorker: One fixed workflow ID permits only one maintainer
@@ -113,7 +113,7 @@ sequenceDiagram
       Note over MaintenanceWorker: Materialize current memory tree as this activity's temporary maintenance input/worktree
     end
     Note over MaintenanceWorker: Run maintainer
-    MaintenanceWorker->>Storage: Store maintainer transcript
+    MaintenanceWorker->>Storage: Store maintainer trajectory
     MaintenanceWorker->>Storage: Store new memory tree artifact
     MaintenanceWorker-->>Temporal: Artifact references, extraction IDs, and expected active revision
     Note over Temporal: Later commit retries reuse this activity result

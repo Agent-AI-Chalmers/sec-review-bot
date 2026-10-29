@@ -23,7 +23,7 @@ from sec_review_agents.artifacts.tar_zstd import (
     validate_restricted_pax_archive,
 )
 from sec_review_agents.contract_versions import RUN_DIAGNOSTIC_ARTIFACT_VERSION
-from sec_review_agents.runtime.transcripts import TRANSCRIPT_SUFFIX
+from sec_review_agents.runtime.trajectories import TRAJECTORY_SUFFIX
 
 DIAGNOSTIC_BUNDLE_FILENAME = (
     f"diagnostic-tree.{RUN_DIAGNOSTIC_ARTIFACT_VERSION}.tar.zst"
@@ -39,13 +39,13 @@ MAX_EXTRACTED_DIAGNOSTIC_BYTES = 8 * 1024 * 1024 * 1024
 @dataclass(frozen=True)
 class DiagnosticReviewUnit:
     unit_id: str
-    transcript_root: Path
+    trajectory_root: Path
 
 
 @dataclass(frozen=True)
-class MaterializedTranscriptUnit:
+class MaterializedTrajectoryUnit:
     unit_id: str
-    transcript_paths: tuple[Path, ...]
+    trajectory_paths: tuple[Path, ...]
 
 
 @dataclass(frozen=True)
@@ -118,7 +118,7 @@ def publish_run_diagnostic_bundle(
 
 def _temporary_archive_path(output_dir: Path) -> Path:
     # mkstemp creates the archive 0600; hard-linking preserves that owner-only
-    # mode at the published path because diagnostics contain transcripts.
+    # mode at the published path because diagnostics contain trajectories.
     descriptor, value = tempfile.mkstemp(
         prefix=f".{DIAGNOSTIC_BUNDLE_FILENAME}.", suffix=".tmp", dir=output_dir
     )
@@ -222,20 +222,22 @@ def _manifest_units(
                 f"Diagnostic bundle review unit is duplicated: {unit.unit_id}"
             )
         seen_unit_ids.add(unit.unit_id)
-        transcript_root = unit.transcript_root.resolve()
+        trajectory_root = unit.trajectory_root.resolve()
         try:
-            transcript_root.relative_to(artifact_root)
+            trajectory_root.relative_to(artifact_root)
         except ValueError as error:
             raise ValueError(
-                "Diagnostic bundle transcript root must be inside artifact root."
+                "Diagnostic bundle trajectory root must be inside artifact root."
             ) from error
-        transcript_paths = [
+        trajectory_paths = [
             f"{DIAGNOSTIC_TREE_DIR}/{path.relative_to(artifact_root).as_posix()}"
-            for path in sorted(transcript_root.glob(f"*{TRANSCRIPT_SUFFIX}"))
+            for path in sorted(trajectory_root.glob(f"*{TRAJECTORY_SUFFIX}"))
             if path.is_file()
         ]
-        if transcript_paths:
-            manifest_units.append({"id": unit.unit_id, "transcripts": transcript_paths})
+        if trajectory_paths:
+            manifest_units.append(
+                {"id": unit.unit_id, "trajectories": trajectory_paths}
+            )
     return manifest_units
 
 
@@ -258,13 +260,13 @@ def _add_artifact_tree(archive: tarfile.TarFile, artifact_root: Path) -> None:
         )
 
 
-def materialize_diagnostic_transcript_unit(
+def materialize_diagnostic_trajectory_unit(
     reference: ArtifactReference,
     *,
     run_id: str,
     unit_id: str,
     destination: Path,
-) -> MaterializedTranscriptUnit:
+) -> MaterializedTrajectoryUnit:
     require_artifact_media_type(reference, ARCHIVE_MEDIA_TYPE)
     archive_path = materialize_artifact(
         reference,
@@ -284,11 +286,11 @@ def materialize_diagnostic_transcript_unit(
         maximum_extracted_bytes=MAX_EXTRACTED_DIAGNOSTIC_BYTES,
     )
     units = _validate_materialized_bundle(root, run_id=run_id)
-    for current_unit_id, transcript_paths in units.items():
+    for current_unit_id, trajectory_paths in units.items():
         if current_unit_id == unit_id:
-            return MaterializedTranscriptUnit(
+            return MaterializedTrajectoryUnit(
                 unit_id=unit_id,
-                transcript_paths=transcript_paths,
+                trajectory_paths=trajectory_paths,
             )
     raise ValueError(f"Diagnostic review unit not found: {unit_id}")
 
@@ -321,7 +323,7 @@ def _validate_materialized_bundle(
         if not isinstance(unit, dict):
             raise ValueError("Diagnostic review unit is invalid.")
         current_unit_id = unit.get("id")
-        paths = unit.get("transcripts")
+        paths = unit.get("trajectories")
         if (
             not isinstance(current_unit_id, str)
             or not current_unit_id
@@ -332,36 +334,36 @@ def _validate_materialized_bundle(
             raise ValueError("Diagnostic review unit is invalid.")
         resolved_paths: list[Path] = []
         for value in paths:
-            if not isinstance(value, str) or not _is_transcript_manifest_path(value):
+            if not isinstance(value, str) or not _is_trajectory_manifest_path(value):
                 raise ValueError("Diagnostic manifest path is invalid.")
             path = (root / value).resolve()
             try:
                 path.relative_to(resolved_root)
             except ValueError as error:
                 raise ValueError("Diagnostic manifest path escapes bundle.") from error
-            if not path.is_file() or path.suffix != TRANSCRIPT_SUFFIX:
+            if not path.is_file() or path.suffix != TRAJECTORY_SUFFIX:
                 raise ValueError(f"Diagnostic bundle file is missing: {value}")
             resolved_paths.append(path)
         validated[current_unit_id] = tuple(resolved_paths)
     return validated
 
 
-def _is_transcript_manifest_path(value: str) -> bool:
+def _is_trajectory_manifest_path(value: str) -> bool:
     parts = value.split("/")
     return (
         "\\" not in value
         and len(parts) > 1
         and parts[0] == DIAGNOSTIC_TREE_DIR
         and all(part not in {"", ".", ".."} for part in parts)
-        and value.endswith(TRANSCRIPT_SUFFIX)
+        and value.endswith(TRAJECTORY_SUFFIX)
     )
 
 
 __all__ = [
     "DiagnosticReviewUnit",
-    "MaterializedTranscriptUnit",
+    "MaterializedTrajectoryUnit",
     "PublishedDiagnosticBundle",
     "diagnostic_bundle_s3_key",
-    "materialize_diagnostic_transcript_unit",
+    "materialize_diagnostic_trajectory_unit",
     "publish_run_diagnostic_bundle",
 ]

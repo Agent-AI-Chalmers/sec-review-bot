@@ -7,7 +7,7 @@
       "Resource": [
         "arn:aws:s3:::sec-review/runs/*/artifacts/*",
         "arn:aws:s3:::sec-review/memory/trees/*",
-        "arn:aws:s3:::sec-review/memory/transcripts/*"
+        "arn:aws:s3:::sec-review/memory/trajectories/*"
       ]
     },
     {

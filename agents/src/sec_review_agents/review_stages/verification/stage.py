@@ -25,9 +25,9 @@ from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
     record_bootstrap_result,
 )
-from sec_review_agents.runtime.transcripts import (
-    remove_transcripts,
-    transcript_path,
+from sec_review_agents.runtime.trajectories import (
+    remove_trajectories,
+    trajectory_path,
 )
 from sec_review_agents.utils.files import (
     persist_json_artifact,
@@ -76,7 +76,7 @@ def reset_verification_attempt_artifacts(
             retry_label = f"retry-{retry_index}"
             json_stems.append(f"verification-result.{retry_label}")
     remove_json_artifacts(verifier_artifacts_path, json_stems)
-    transcript_attempts = (
+    trajectory_attempts = (
         ["initial"]
         + [
             f"retry-{retry_index}"
@@ -85,12 +85,12 @@ def reset_verification_attempt_artifacts(
         if attempt_label == "initial"
         else [attempt_label]
     )
-    remove_transcripts(
-        transcript_path(
-            verifier_artifacts_path / "transcripts",
-            name=transcript_attempt,
+    remove_trajectories(
+        trajectory_path(
+            verifier_artifacts_path / "trajectories",
+            name=trajectory_attempt,
         )
-        for transcript_attempt in transcript_attempts
+        for trajectory_attempt in trajectory_attempts
     )
 
 
@@ -202,7 +202,7 @@ async def run_verification_stage(
     agent_name: str,
     verifier_artifacts_path: Path,
     attempt_label: str,
-    published_transcript_path: Path | None = None,
+    published_trajectory_path: Path | None = None,
     baseline_snapshot_tar_path: Path,
     workspace_patch: str | None,
     mitigation_result: Mapping[str, Any] | None,
@@ -218,14 +218,14 @@ async def run_verification_stage(
         tempfile.TemporaryDirectory(prefix="sec-review-verifier-") as tempdir,
         materialized_memory_view() as memory_path_view,
     ):
-        local_transcript_path = transcript_path(
-            verifier_artifacts_path / "transcripts",
+        local_trajectory_path = trajectory_path(
+            verifier_artifacts_path / "trajectories",
             name=attempt_label,
         )
-        transcript_paths: tuple[Path, ...] = (local_transcript_path,)
-        if published_transcript_path is not None:
-            published_transcript_path.unlink(missing_ok=True)
-            transcript_paths = (local_transcript_path, published_transcript_path)
+        trajectory_paths: tuple[Path, ...] = (local_trajectory_path,)
+        if published_trajectory_path is not None:
+            published_trajectory_path.unlink(missing_ok=True)
+            trajectory_paths = (local_trajectory_path, published_trajectory_path)
 
         workspace_path = Path(tempdir)
         restore_workspace_from_snapshot_tar(
@@ -267,7 +267,7 @@ async def run_verification_stage(
                     agent_name=agent_name,
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
-                    transcript_paths=transcript_paths,
+                    trajectory_paths=trajectory_paths,
                 )
 
         validate_verification_coverages(agent_output, mitigation_result)

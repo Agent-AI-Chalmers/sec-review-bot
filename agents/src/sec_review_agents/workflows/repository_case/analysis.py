@@ -17,7 +17,7 @@ async def analyze_repository_case(
     history_path: Path | None,
     incremental_window_path: Path | None,
     analyzer_artifacts_path: Path,
-    published_transcript_path: Path | None = None,
+    published_trajectory_path: Path | None = None,
     scan_mode: str,
     review_input: str,
     runtime_context: ExecutionRuntimeContext | None = None,
@@ -25,7 +25,7 @@ async def analyze_repository_case(
 ) -> dict[str, Any]:
     return await run_analysis_stage(
         analyzer_artifacts_path=analyzer_artifacts_path,
-        published_transcript_path=published_transcript_path,
+        published_trajectory_path=published_trajectory_path,
         agent_name="repository-analyzer",
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         setup_declaration_content=setup_declaration_content,

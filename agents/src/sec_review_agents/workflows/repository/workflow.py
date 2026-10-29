@@ -41,7 +41,7 @@ class RepositoryCaseReviewRequest(TypedDict):
     run_id: str
     case_execution_input: RepositoryCaseExecutionInput
     cases_artifacts_path: str
-    published_transcripts_path: str
+    published_trajectories_path: str
     timeout_seconds: int
     runtime_context: ExecutionRuntimeContext
 
@@ -100,23 +100,23 @@ def _repository_case_review_timeout_seconds(
     return timeout_seconds
 
 
-def _repository_case_transcript_path(
+def _repository_case_trajectory_path(
     prepared_case: dict[str, Any],
     *,
     order: int,
     stage: str,
     attempt: str = "initial",
 ) -> Path:
-    from sec_review_agents.review_stages.transcripts import (
-        review_transcript_path,
+    from sec_review_agents.review_stages.trajectories import (
+        review_trajectory_path,
     )
     from sec_review_agents.utils.paths import required_path
 
     published_root = required_path(
-        prepared_case.get("published_transcripts_path"),
-        label="published_transcripts_path",
+        prepared_case.get("published_trajectories_path"),
+        label="published_trajectories_path",
     )
-    return review_transcript_path(
+    return review_trajectory_path(
         published_root,
         order=order,
         stage=stage,
@@ -264,8 +264,8 @@ def prepare_repository_case_review_inputs_activity(
     request: ReviewWorkflowRequest,
     cases: Sequence[Mapping[str, Any]],
 ) -> RepositoryCaseRequestBatch:
-    from sec_review_agents.review_stages.transcripts import (
-        review_transcripts_root,
+    from sec_review_agents.review_stages.trajectories import (
+        review_trajectories_root,
     )
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
@@ -339,8 +339,8 @@ def prepare_repository_case_review_inputs_activity(
                     ),
                 ),
                 "cases_artifacts_path": str(cases_artifacts_path),
-                "published_transcripts_path": str(
-                    review_transcripts_root(
+                "published_trajectories_path": str(
+                    review_trajectories_root(
                         cases_artifacts_path / str(case.get("case_id") or index),
                     )
                 ),
@@ -375,7 +375,7 @@ def prepare_repository_case_activity(
             cases_artifacts_path=Path(request["cases_artifacts_path"]),
             case_id=case_id.strip(),
         ),
-        "published_transcripts_path": request["published_transcripts_path"],
+        "published_trajectories_path": request["published_trajectories_path"],
     }
 
 
@@ -406,7 +406,7 @@ async def analyze_repository_case_activity(
                 prepared_case["artifact_paths"],
                 "analyzer",
             ),
-            published_transcript_path=_repository_case_transcript_path(
+            published_trajectory_path=_repository_case_trajectory_path(
                 prepared_case,
                 order=1,
                 stage="analyzer",
@@ -472,7 +472,7 @@ async def mitigate_repository_case_activity(
         "mitigator",
     )
     if not has_confirmed_repair_target(analysis_result):
-        _repository_case_transcript_path(
+        _repository_case_trajectory_path(
             prepared_case,
             order=review_stage_attempt_order(
                 stage="mitigator", retry_context=retry_context
@@ -501,7 +501,7 @@ async def mitigate_repository_case_activity(
             retry_context,
             request["runtime_context"],
             mitigator_artifacts_path=mitigator_artifacts_path,
-            published_transcript_path=_repository_case_transcript_path(
+            published_trajectory_path=_repository_case_trajectory_path(
                 prepared_case,
                 order=review_stage_attempt_order(
                     stage="mitigator", retry_context=retry_context
@@ -537,7 +537,7 @@ async def verify_repository_case_activity(
         "verifier",
     )
     if not has_confirmed_repair_target(analysis_result):
-        _repository_case_transcript_path(
+        _repository_case_trajectory_path(
             prepared_case,
             order=review_stage_attempt_order(
                 stage="verifier", retry_context=retry_context
@@ -567,7 +567,7 @@ async def verify_repository_case_activity(
             retry_context,
             request["runtime_context"],
             verifier_artifacts_path=verifier_artifacts_path,
-            published_transcript_path=_repository_case_transcript_path(
+            published_trajectory_path=_repository_case_trajectory_path(
                 prepared_case,
                 order=review_stage_attempt_order(
                     stage="verifier", retry_context=retry_context
@@ -1296,11 +1296,11 @@ class RepositoryReviewWorkflow:
         review_units = [
             {
                 "unit_id": str(case_result["case_id"]),
-                "transcript_root": str(
+                "trajectory_root": str(
                     artifact_root
                     / "cases"
                     / str(case_result["case_id"])
-                    / "transcripts"
+                    / "trajectories"
                 ),
             }
             for case_result in case_results

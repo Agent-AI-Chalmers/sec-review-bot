@@ -7,7 +7,7 @@
  * - transitions: state-machine diagrams and transition history
  * - memory: memory tables, revision graph, and overview
  * - workspace-editor: file workspace, previews, and code editors
- * - transcript-viewer: transcript timeline and message content
+ * - trajectory-viewer: trajectory timeline and message content
  * - responsive: reduced-motion, touch, and narrow-screen overrides
  *
  * Keep feature ownership in one domain file. Responsive overrides load last so
@@ -20,5 +20,5 @@
 @import './styles/transitions.css';
 @import './styles/memory.css';
 @import './styles/workspace-editor.css';
-@import './styles/transcript-viewer.css';
+@import './styles/trajectory-viewer.css';
 @import './styles/responsive.css';

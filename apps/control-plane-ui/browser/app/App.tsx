@@ -41,13 +41,13 @@ const MemoryRevisionDiffPage = React.lazy(async () => ({
   default: (await import('../features/memory/MemoryViewerPage.js'))
     .MemoryRevisionDiffPage
 }))
-const RevisionTranscriptPage = React.lazy(async () => ({
+const RevisionTrajectoryPage = React.lazy(async () => ({
   default: (await import('../features/memory/MemoryViewerPage.js'))
-    .RevisionTranscriptPage
+    .RevisionTrajectoryPage
 }))
-const ExtractionTranscriptPage = React.lazy(async () => ({
+const ExtractionTrajectoryPage = React.lazy(async () => ({
   default: (await import('../features/memory/MemoryViewerPage.js'))
-    .ExtractionTranscriptPage
+    .ExtractionTrajectoryPage
 }))
 const Viewer = React.lazy(async () => ({
   default: (await import('../features/viewer/Viewer.js')).Viewer
@@ -242,12 +242,12 @@ export function App(): React.JSX.Element {
                   element={<MemoryRevisionDiffPage />}
                 />
                 <Route
-                  path="/memory/revisions/:revision/transcript"
-                  element={<RevisionTranscriptPage />}
+                  path="/memory/revisions/:revision/trajectory"
+                  element={<RevisionTrajectoryPage />}
                 />
                 <Route
-                  path="/memory/extractions/:extractionId/transcript"
-                  element={<ExtractionTranscriptPage />}
+                  path="/memory/extractions/:extractionId/trajectory"
+                  element={<ExtractionTrajectoryPage />}
                 />
                 <Route path="/viewer" element={<Viewer />} />
                 <Route path="*" element={<NotFound />} />

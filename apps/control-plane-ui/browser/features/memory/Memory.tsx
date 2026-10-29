@@ -31,9 +31,9 @@ import { MemoryRevisionHistory } from './MemoryRevisionHistory.js'
 import { useRefresh } from '../../shared/refresh.js'
 import { LoadingState } from '../../shared/StateMessage.js'
 import {
-  TranscriptViewer,
-  type TranscriptTarget
-} from '../transcript/TranscriptViewer.js'
+  TrajectoryViewer,
+  type TrajectoryTarget
+} from '../trajectory/TrajectoryViewer.js'
 
 type Control = MaintenanceControl
 type Revision = MemoryTreeRevision
@@ -64,8 +64,8 @@ export function Memory(): React.JSX.Element {
   const [restoreRevision, setRestoreRevision] = React.useState<number>()
   const [viewRevision, setViewRevision] = React.useState<number>()
   const [diffRevision, setDiffRevision] = React.useState<Revision>()
-  const [transcriptTarget, setTranscriptTarget] =
-    React.useState<TranscriptTarget>()
+  const [trajectoryTarget, setTrajectoryTarget] =
+    React.useState<TrajectoryTarget>()
   const [activeTab, setActiveTab] = React.useState<string | null>('overview')
   const [revisionView, setRevisionView] = React.useState('graph')
   const [highlightedRevision, setHighlightedRevision] = React.useState<number>()
@@ -202,11 +202,11 @@ export function Memory(): React.JSX.Element {
   }
 
   const viewMaintenanceProcess = (revision: number): void => {
-    setTranscriptTarget({
+    setTrajectoryTarget({
       title: t('maintenanceProcess'),
-      contentHref: `/memory/revisions/${revision}/transcript/content`,
-      downloadHref: `/api/memory/revisions/${revision}/transcript`,
-      pageHref: `/memory/revisions/${revision}/transcript`
+      contentHref: `/memory/revisions/${revision}/trajectory/content`,
+      downloadHref: `/api/memory/revisions/${revision}/trajectory`,
+      pageHref: `/memory/revisions/${revision}/trajectory`
     })
   }
 
@@ -376,11 +376,11 @@ export function Memory(): React.JSX.Element {
             error={observationsError}
             onRevealRevision={revealRevision}
             onViewProcess={(item) =>
-              setTranscriptTarget({
+              setTrajectoryTarget({
                 title: t('extractionProcess'),
-                contentHref: `/memory/extractions/${encodeURIComponent(item.extraction_id)}/transcript/content`,
-                downloadHref: `/api/memory/extractions/${encodeURIComponent(item.extraction_id)}/transcript`,
-                pageHref: `/memory/extractions/${encodeURIComponent(item.extraction_id)}/transcript`
+                contentHref: `/memory/extractions/${encodeURIComponent(item.extraction_id)}/trajectory/content`,
+                downloadHref: `/api/memory/extractions/${encodeURIComponent(item.extraction_id)}/trajectory`,
+                pageHref: `/memory/extractions/${encodeURIComponent(item.extraction_id)}/trajectory`
               })
             }
           />
@@ -394,9 +394,9 @@ export function Memory(): React.JSX.Element {
         target={diffRevision}
         onClose={() => setDiffRevision(undefined)}
       />
-      <TranscriptViewer
-        target={transcriptTarget}
-        onClose={() => setTranscriptTarget(undefined)}
+      <TrajectoryViewer
+        target={trajectoryTarget}
+        onClose={() => setTrajectoryTarget(undefined)}
       />
       <MemoryRestoreDialog
         revision={restoreRevision}

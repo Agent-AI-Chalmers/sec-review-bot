@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import memoryTranscript from '../data/memory-transcript.json' with { type: 'json' }
+import memoryTrajectory from '../data/memory-trajectory.json' with { type: 'json' }
 import { BASE_TIME } from '../runs/generate.js'
 import type {
   CatalogOverviewWorkflow,
@@ -14,8 +14,8 @@ type SourceRunIds = Record<
   string
 >
 
-const transcriptReference = {
-  uri: 's3://sec-review/memory/transcripts/fixture/transcript.v1.jsonl.zst',
+const trajectoryReference = {
+  uri: 's3://sec-review/memory/trajectories/fixture/trajectory.v1.jsonl.zst',
   digest: `sha256:${'1'.repeat(64)}`,
   media_type: 'application/x-ndjson+zstd',
   size_bytes: 4096
@@ -87,7 +87,7 @@ export function createMemoryHandler(
         kind: 'maintenance',
         maintenance_id: 'fixture-maintenance-2',
         extraction_ids: ['fixture-extraction-2'],
-        transcript_reference: transcriptReference
+        trajectory_reference: trajectoryReference
       }
     },
     {
@@ -108,7 +108,7 @@ export function createMemoryHandler(
       source_run_id: sourceRunIds['repository-review'],
       source_unit_id: 'case-reachability',
       diagnostic_bundle_digest: `sha256:${'2'.repeat(64)}`,
-      transcript_reference: transcriptReference,
+      trajectory_reference: trajectoryReference,
       observation: null,
       created_at: new Date(BASE_TIME - 300_000).toISOString()
     },
@@ -118,7 +118,7 @@ export function createMemoryHandler(
       source_run_id: sourceRunIds['repository-review'],
       source_unit_id: 'case-authentication',
       diagnostic_bundle_digest: `sha256:${'3'.repeat(64)}`,
-      transcript_reference: transcriptReference,
+      trajectory_reference: trajectoryReference,
       observation: {
         body_markdown:
           '**Reject unequal input lengths before calling `timingSafeEqual`.** Comparing buffers of different lengths throws instead of returning false, so validate the length first and fail authentication without exposing a distinct error path.'
@@ -131,7 +131,7 @@ export function createMemoryHandler(
       source_run_id: sourceRunIds['repository-review'],
       source_unit_id: 'case-proxy-boundary',
       diagnostic_bundle_digest: `sha256:${'4'.repeat(64)}`,
-      transcript_reference: transcriptReference,
+      trajectory_reference: trajectoryReference,
       observation: {
         body_markdown:
           '**Strip internal debugging headers when proxying upstream responses.** Forward only an explicit response-header allowlist so private identifiers and credentials cannot cross the service boundary.'
@@ -144,7 +144,7 @@ export function createMemoryHandler(
       source_run_id: sourceRunIds['pull-request-review'],
       source_unit_id: 'pull-request',
       diagnostic_bundle_digest: `sha256:${'5'.repeat(64)}`,
-      transcript_reference: transcriptReference,
+      trajectory_reference: trajectoryReference,
       observation: {
         body_markdown:
           '**Perform tenant authorization before any lookup whose result reveals resource existence.** A post-lookup guard still permits status, timing, or error differences to disclose whether another tenant owns the requested object.'
@@ -157,7 +157,7 @@ export function createMemoryHandler(
       source_run_id: sourceRunIds['issue-review'],
       source_unit_id: 'issue',
       diagnostic_bundle_digest: `sha256:${'6'.repeat(64)}`,
-      transcript_reference: transcriptReference,
+      trajectory_reference: trajectoryReference,
       observation: null,
       created_at: new Date(BASE_TIME + 240_000).toISOString()
     },
@@ -167,7 +167,7 @@ export function createMemoryHandler(
       source_run_id: sourceRunIds['repository-review'],
       source_unit_id: 'case-reachability',
       diagnostic_bundle_digest: `sha256:${'7'.repeat(64)}`,
-      transcript_reference: transcriptReference,
+      trajectory_reference: trajectoryReference,
       observation: null,
       created_at: new Date(BASE_TIME + 300_000).toISOString()
     }
@@ -330,24 +330,24 @@ export function createMemoryHandler(
       response.end(JSON.stringify(record ?? { error: 'revision_not_found' }))
       return
     }
-    const memoryTranscriptContentMatch =
-      /^\/api\/memory\/(revisions|extractions)\/([^/?]+)\/transcript\/content$/.exec(
+    const memoryTrajectoryContentMatch =
+      /^\/api\/memory\/(revisions|extractions)\/([^/?]+)\/trajectory\/content$/.exec(
         requestUrl
       )
-    if (request.method === 'GET' && memoryTranscriptContentMatch !== null) {
+    if (request.method === 'GET' && memoryTrajectoryContentMatch !== null) {
       if (
-        memoryTranscriptContentMatch[1] === 'revisions' &&
-        Number(memoryTranscriptContentMatch[2]) === LOAD_ERROR_REVISION
+        memoryTrajectoryContentMatch[1] === 'revisions' &&
+        Number(memoryTrajectoryContentMatch[2]) === LOAD_ERROR_REVISION
       ) {
         response.statusCode = 503
         response.end(JSON.stringify({ error: 'memory_catalog_unavailable' }))
         return
       }
-      response.end(JSON.stringify(memoryTranscript))
+      response.end(JSON.stringify(memoryTrajectory))
       return
     }
     const memoryDownloadMatch =
-      /^\/api\/memory\/(revisions|extractions)\/([^/?]+)\/(artifact|transcript)$/.exec(
+      /^\/api\/memory\/(revisions|extractions)\/([^/?]+)\/(artifact|trajectory)$/.exec(
         requestUrl
       )
     if (request.method === 'GET' && memoryDownloadMatch !== null) {
@@ -364,7 +364,7 @@ export function createMemoryHandler(
             )
       if (
         !available ||
-        (collection === 'extractions' && kind !== 'transcript')
+        (collection === 'extractions' && kind !== 'trajectory')
       ) {
         response.statusCode = 404
         response.end(JSON.stringify({ error: 'memory_artifact_not_found' }))
@@ -373,7 +373,7 @@ export function createMemoryHandler(
       const filename =
         kind === 'artifact'
           ? 'memory-tree.v1.tar.zst'
-          : 'memory-transcript.v1.jsonl.zst'
+          : 'memory-trajectory.v1.jsonl.zst'
       const content = Buffer.from(`fixture ${collection} ${identity} ${kind}\n`)
       response.setHeader('content-type', 'application/octet-stream')
       response.setHeader(

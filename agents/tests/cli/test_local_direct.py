@@ -134,9 +134,9 @@ def test_local_direct_runs_review_only(
     monkeypatch,
 ) -> None:
     bundle = _prepared_issue_bundle(tmp_path)
-    transcripts = bundle.artifact_root_path / "transcripts"
-    transcripts.mkdir(parents=True)
-    (transcripts / "0001-analyzer-initial.jsonl").write_text("{}\n", encoding="utf-8")
+    trajectories = bundle.artifact_root_path / "trajectories"
+    trajectories.mkdir(parents=True)
+    (trajectories / "0001-analyzer-initial.jsonl").write_text("{}\n", encoding="utf-8")
     calls: list[str] = []
 
     async def fake_direct(request):

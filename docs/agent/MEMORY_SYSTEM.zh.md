@@ -37,19 +37,19 @@ memory/
 
 ## 核心产物
 
-- `transcripts`：主 agent 完成审查后留下的过程记录。
-- `observations`：从 transcripts 中提取出的可复用经验。
+- `trajectories`：主 agent 完成审查后留下的执行轨迹。
+- `observations`：从 trajectories 中提取出的可复用经验。
 - `memory`：维护后的经验材料。
 
-> 这里的 `transcripts` 指一次 agent 执行任务时留下的、可归档的过程记录；其他系统或语境里也常把类似产物称为 `trace`、`trajectory`（SWE-agent）或 `rollout`（Codex）。
+> 这里的 `trajectory` 按时间记录一次 agent 任务中的消息和工具交互，供后续检查和经验提取。其他系统也可能把类似产物称为 `trace` 或 `rollout`。
 
 ```text
 主 agent
-  ├─ 写入 transcripts
+  ├─ 写入 trajectories
   └─ 读取 memory
 
 extraction
-  ├─ 读取 transcripts
+  ├─ 读取 trajectories
   ├─ 对照已有 system prompt 与 skills 指导
   └─ 写入 observations
 
@@ -58,7 +58,7 @@ maintenance
   └─ 更新 memory
 ```
 
-extraction 从一次 review 的阶段 transcripts 中提取可复用经验，例如 analyzer、mitigation、verification 的过程记录，并写成 observation。system prompts 和 `/skills` 下的全部 bundled skills 都算是 agent 已经有的指导；observation 应该在此基础上增加有证据支持、可长期复用的经验，否则就不产生 observation。
+extraction 从一次 review 的阶段 trajectories 中提取可复用经验，例如 analyzer、mitigation、verification 的执行轨迹，并写成 observation。system prompts 和 `/skills` 下的全部 bundled skills 都算是 agent 已经有的指导；observation 应该在此基础上增加有证据支持、可长期复用的经验，否则就不产生 observation。
 
 maintenance 会读取 extraction 产生的 observations，并把有用经验并入 memory。
 
@@ -74,7 +74,7 @@ maintenance 会读取 extraction 产生的 observations，并把有用经验并�
 
 大致流程就是异步检查：
 
-- 来源：issue 或 pull-request review 发布 transcripts 后，会进入异步 memory 处理。repository review 则会按每个实际存在 transcripts 的 case 形成一个 extraction unit。
+- 来源：issue 或 pull-request review 发布 trajectories 后，会进入异步 memory 处理。repository review 则会按每个实际存在 trajectories 的 case 形成一个 extraction unit。
 - extraction 会分别处理各个 review，并产出 pending observations。
   - 可以并发执行多个 extraction。
 - maintenance 定时检查，达到阈值或者时间过长就处理：maintenance trigger schedule 默认每小时运行一次。只有 pending observations 至少有 10 条，或者最老的 pending observation 已经等待至少 1 天时，才启动 maintenance。
@@ -112,7 +112,7 @@ memory 应该保持小而可审计。它一旦长成笔记堆，就应该通过�
 1. 是多 agent 并发。多个 review、多个阶段 agent 或多个 repository case 同时运行时，如果它们都直接改长期 memory，会遇到直接的写冲突问题。文件化 memory 尤其如此。即使用文件锁串行化写入，也会把锁等待和写入延迟带回主流程。
 2. 我们这里并没有所谓的 supervisor，且单个 agent 并不具有全局的视野，仅靠它自己，通常很难稳定地产生足够好的长期经验。
 
-因此，当前实现只让主 agent 留下 transcripts，把经验写入、筛选和归并放到异步 extraction / maintenance 流程里。这样会牺牲一部分即时记忆体验，但换来更清楚的来源、更稳定的主流程，以及更容易审计和回滚的 memory 更新。
+因此，当前实现只让主 agent 留下 trajectories，把经验写入、筛选和归并放到异步 extraction / maintenance 流程里。这样会牺牲一部分即时记忆体验，但换来更清楚的来源、更稳定的主流程，以及更容易审计和回滚的 memory 更新。
 
 ---
 

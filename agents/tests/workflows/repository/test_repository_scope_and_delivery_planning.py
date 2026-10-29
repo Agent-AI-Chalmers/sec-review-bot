@@ -532,7 +532,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
             )
 
     @pytest.mark.asyncio
-    async def test_delivery_planning_transcript_uses_batch_subdirectories(self) -> None:
+    async def test_delivery_planning_trajectory_uses_batch_subdirectories(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             input_data = self._input_data(Path(tempdir))
             delivery_planning_root = (
@@ -542,11 +542,11 @@ class TestRepositoryScopeAndDeliveryPlanning:
             )
 
             async def fake_invoke_agent_runtime_graph(**kwargs):
-                assert kwargs["transcript_paths"] == (
+                assert kwargs["trajectory_paths"] == (
                     delivery_planning_root
                     / "batches"
                     / "batch-0001"
-                    / "transcript.jsonl",
+                    / "trajectory.jsonl",
                 )
                 return {}
 

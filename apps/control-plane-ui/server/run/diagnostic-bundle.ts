@@ -46,7 +46,7 @@ async function collectEntry(
 /**
  * Read the diagnostic bundle contract for the run-files UI. This is intentionally independent
  * from the memory archive reader: the two archives have different roots, manifests and limits.
- * Transcript JSONL remains ordinary source text here; transcript semantics belong to its viewer.
+ * Trajectory JSONL remains ordinary source text here; trajectory semantics belong to its viewer.
  */
 export async function readDiagnosticBundle(
   bytes: Buffer,
@@ -155,18 +155,18 @@ export async function readDiagnosticBundle(
       typeof reviewUnit.id !== 'string' ||
       reviewUnit.id === '' ||
       unitIds.has(reviewUnit.id) ||
-      !Array.isArray(reviewUnit.transcripts) ||
-      reviewUnit.transcripts.length === 0
+      !Array.isArray(reviewUnit.trajectories) ||
+      reviewUnit.trajectories.length === 0
     )
       throw new Error('invalid_diagnostic_bundle')
     unitIds.add(reviewUnit.id)
-    for (const transcript of reviewUnit.transcripts) {
+    for (const trajectory of reviewUnit.trajectories) {
       if (
-        typeof transcript !== 'string' ||
-        !safePath(transcript) ||
-        !transcript.startsWith('artifact-tree/') ||
-        !transcript.endsWith('.jsonl') ||
-        !entries.has(transcript)
+        typeof trajectory !== 'string' ||
+        !safePath(trajectory) ||
+        !trajectory.startsWith('artifact-tree/') ||
+        !trajectory.endsWith('.jsonl') ||
+        !entries.has(trajectory)
       )
         throw new Error('invalid_diagnostic_bundle')
     }

@@ -6,16 +6,16 @@ create table extractions (
   source_run_id text not null,
   source_unit_id text not null,
   diagnostic_bundle_digest text not null,
-  transcript_reference jsonb not null,
+  trajectory_reference jsonb not null,
   created_at timestamptz not null default clock_timestamp()
 );
 
 comment on table extractions is
-  'Completed memory extractor invocations and their content-addressed transcripts.';
+  'Completed memory extractor invocations and their content-addressed trajectories.';
 comment on column extractions.diagnostic_bundle_digest is
   'Digest of the immutable run diagnostic bundle supplied to the extraction workflow.';
-comment on column extractions.transcript_reference is
-  'Content-addressed compressed transcript for this extractor invocation.';
+comment on column extractions.trajectory_reference is
+  'Content-addressed compressed trajectory for this extractor invocation.';
 
 -- An extraction produces zero or one observation. Reusing extraction_id as the primary key keeps
 -- the one-to-zero-or-one relationship structural instead of maintaining a second identity.
@@ -39,7 +39,7 @@ create table memory_tree_revisions (
   memory_tree_reference jsonb not null,
   source_kind text not null check (source_kind in ('maintenance', 'operator')),
   maintenance_id text unique,
-  maintenance_transcript_reference jsonb,
+  maintenance_trajectory_reference jsonb,
   operation_id text,
   actor jsonb,
   created_at timestamptz not null default clock_timestamp(),
@@ -47,11 +47,11 @@ create table memory_tree_revisions (
     (
       source_kind = 'maintenance' and
       maintenance_id is not null and
-      maintenance_transcript_reference is not null and
+      maintenance_trajectory_reference is not null and
       operation_id is null and actor is null
     ) or (
       source_kind = 'operator' and
-      maintenance_id is null and maintenance_transcript_reference is null and
+      maintenance_id is null and maintenance_trajectory_reference is null and
       operation_id is not null and actor is not null
     )
   )
@@ -65,8 +65,8 @@ comment on column memory_tree_revisions.predecessor_revision is
   'Revision that was active when this revision was created; NULL for the first revision.';
 comment on column memory_tree_revisions.memory_tree_reference is
   'Content-addressed memory tree artifact published before this revision committed.';
-comment on column memory_tree_revisions.maintenance_transcript_reference is
-  'Content-addressed compressed transcript for the maintainer invocation that produced this revision.';
+comment on column memory_tree_revisions.maintenance_trajectory_reference is
+  'Content-addressed compressed trajectory for the maintainer invocation that produced this revision.';
 comment on column memory_tree_revisions.source_kind is
   'Tagged provenance kind: automatic maintenance or an authenticated operator action.';
 comment on column memory_tree_revisions.operation_id is

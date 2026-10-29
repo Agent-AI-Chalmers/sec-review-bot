@@ -10,7 +10,7 @@ import pytest
 from pydantic import BaseModel, ConfigDict
 
 from sec_review_agents.memory.extractor import preview_memory_observation_from_paths
-from sec_review_agents.runtime.transcripts import serialize_agent_message
+from sec_review_agents.runtime.trajectories import serialize_agent_message
 from tests.llm_probe import llm_probe, llm_test_deployment
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
@@ -38,7 +38,7 @@ class ExtractorSafetyCase(BaseModel):
     expect_memory_unchanged: bool
 
 
-class TranscriptMessage(BaseModel):
+class TrajectoryMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["system", "human", "ai", "tool"]
@@ -56,12 +56,12 @@ class TranscriptMessage(BaseModel):
     artifact: Any | None = None
 
 
-class TranscriptEvent(BaseModel):
+class TrajectoryEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     seq: int
     event: Literal["message"]
-    message: TranscriptMessage
+    message: TrajectoryMessage
 
 
 def _load_cases() -> tuple[tuple[ExtractorSafetyCase, Path], ...]:
@@ -74,10 +74,10 @@ def _load_cases() -> tuple[tuple[ExtractorSafetyCase, Path], ...]:
             raise AssertionError(
                 f"case id {case.id!r} must match directory {case_path.parent.name!r}"
             )
-        transcript_dir = case_path.parent / "transcripts"
-        if not list(transcript_dir.glob("*.jsonl")):
-            raise AssertionError(f"no transcripts found for extractor case {case.id}")
-        cases.append((case, transcript_dir))
+        trajectory_dir = case_path.parent / "trajectories"
+        if not list(trajectory_dir.glob("*.jsonl")):
+            raise AssertionError(f"no trajectories found for extractor case {case.id}")
+        cases.append((case, trajectory_dir))
     if not cases:
         raise AssertionError(f"no extractor safety cases found under {FIXTURES_ROOT}")
     return tuple(cases)
@@ -109,17 +109,17 @@ def test_extractor_safety_fixtures_are_valid() -> None:
         "prompt-injection",
         "tool-output-injection",
     }
-    for case, transcript_dir in cases:
-        for transcript in transcript_dir.glob("*.jsonl"):
+    for case, trajectory_dir in cases:
+        for trajectory in trajectory_dir.glob("*.jsonl"):
             raw_events = [
                 json.loads(line)
-                for line in transcript.read_text(encoding="utf-8").splitlines()
+                for line in trajectory.read_text(encoding="utf-8").splitlines()
                 if line.strip()
             ]
-            events = [TranscriptEvent.model_validate(event) for event in raw_events]
+            events = [TrajectoryEvent.model_validate(event) for event in raw_events]
             assert [event.seq for event in events] == list(range(1, len(events) + 1))
             messages = [event.message for event in events]
-            assert messages, f"empty transcript fixture: {transcript}"
+            assert messages, f"empty trajectory fixture: {trajectory}"
             assert messages[0].type == "system"
             if case.id in CURRENT_WRITER_FIXTURE_CASES:
                 tool_call_ids = {
@@ -147,14 +147,14 @@ def test_extractor_safety_fixtures_are_valid() -> None:
     reason=EXTRACTION_PROBE.skip_reason(),
 )
 @pytest.mark.parametrize(
-    ("case", "transcript_dir"),
+    ("case", "trajectory_dir"),
     _load_cases(),
     ids=[case.id for case, _ in _load_cases()],
 )
 @pytest.mark.asyncio
 async def test_llm_extractor_safety_case(
     case: ExtractorSafetyCase,
-    transcript_dir: Path,
+    trajectory_dir: Path,
 ) -> None:
     variant = os.getenv("MEMORY_EXTRACTOR_PROMPT_VARIANT", "current")
     root = (
@@ -163,7 +163,7 @@ async def test_llm_extractor_safety_case(
         / f"{variant}-{case.id}-{uuid4().hex[:8]}"
     )
     artifacts = root / "artifacts"
-    shutil.copytree(transcript_dir, artifacts / "transcripts")
+    shutil.copytree(trajectory_dir, artifacts / "trajectories")
     system_prompt = _selected_system_prompt()
 
     with (
@@ -183,7 +183,7 @@ async def test_llm_extractor_safety_case(
             job_id=f"llm-memory-{variant}-{case.id}",
             source_workflow="llm-memory-extractor-safety-probe",
             run_id=f"{variant}-{case.id}",
-            extractor_transcript_path=root / "memory-extractor.jsonl",
+            extractor_trajectory_path=root / "memory-extractor.jsonl",
         )
 
     output = result.summary

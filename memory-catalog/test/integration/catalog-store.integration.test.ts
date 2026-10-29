@@ -44,8 +44,8 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
     source_run_id: 'run-1',
     source_unit_id: 'review',
     diagnostic_bundle_digest: `sha256:${'d'.repeat(64)}`,
-    transcript_reference: artifact(
-      'transcripts/memory-extractor/transcript.v1.jsonl.zst',
+    trajectory_reference: artifact(
+      'trajectories/memory-extractor/trajectory.v1.jsonl.zst',
       'c',
     ),
     observation: { body_markdown: observationBody },
@@ -70,8 +70,8 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
       extraction.observation?.body_markdown,
     )
     assert.deepEqual(
-      stored?.transcript_reference,
-      extraction.transcript_reference,
+      stored?.trajectory_reference,
+      extraction.trajectory_reference,
     )
 
     const maintenanceInput = await store.getMaintenanceInput(10)
@@ -90,8 +90,8 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
         kind: 'maintenance' as const,
         maintenance_id: 'maintenance-1',
         extraction_ids: [extraction.extraction_id],
-        transcript_reference: artifact(
-          'transcripts/memory-maintainer/transcript.v1.jsonl.zst',
+        trajectory_reference: artifact(
+          'trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
           'b',
         ),
       },

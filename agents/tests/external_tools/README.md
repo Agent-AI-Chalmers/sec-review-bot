@@ -36,7 +36,7 @@ Shared workspace and setup fields remain at the case level, so one fixture can s
 
 Each enabled LLM arm injects exactly one external-tool prompt. All LLM arms disable skills and MCP.
 
-Workspaces, transcripts, workflow artifacts, and comparison summaries are retained under `.agent-artifacts/external-tool-cases/`. Set `EXTERNAL_TOOL_CASE_OUTPUT_DIR` to use another artifact root. Capability cases use pytest temporary directories because their deterministic assertions do not require post-run transcript analysis.
+Workspaces, trajectories, workflow artifacts, and comparison summaries are retained under `.agent-artifacts/external-tool-cases/`. Set `EXTERNAL_TOOL_CASE_OUTPUT_DIR` to use another artifact root. Capability cases use pytest temporary directories because their deterministic assertions do not require post-run trajectory analysis.
 
 ## Tool Notes
 

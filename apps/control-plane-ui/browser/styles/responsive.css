@@ -423,7 +423,7 @@
   }
 }
 
-/* Workspace and transcript */
+/* Workspace and trajectory */
 
 @media (max-width: 700px) {
   .file-workspace {
@@ -457,27 +457,27 @@
     min-height: 440px;
   }
 
-  .transcript-timeline {
+  .trajectory-timeline {
     padding-left: 0;
   }
 
-  .transcript-layout {
+  .trajectory-layout {
     display: block;
   }
 
-  .transcript-minimap {
+  .trajectory-minimap {
     display: none;
   }
 
-  .transcript-message-body {
+  .trajectory-message-body {
     padding: var(--space-3);
   }
 
-  .transcript-toolbar {
+  .trajectory-toolbar {
     position: static;
   }
 
-  .transcript-token-metrics {
+  .trajectory-token-metrics {
     width: 100%;
     margin-left: 0;
   }

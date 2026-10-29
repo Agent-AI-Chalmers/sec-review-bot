@@ -78,8 +78,8 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
             "kind": "maintenance",
             "maintenance_id": "maintenance-1",
             "extraction_ids": ["extraction-1"],
-            "transcript_reference": _artifact(
-                "maintenance-transcript.jsonl.zst",
+            "trajectory_reference": _artifact(
+                "maintenance-trajectory.jsonl.zst",
                 media_type="application/zstd",
             ).as_dict(),
         },
@@ -98,8 +98,8 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         "source_run_id": "run-1",
         "source_unit_id": "review",
         "diagnostic_bundle_digest": f"sha256:{'b' * 64}",
-        "transcript_reference": _artifact(
-            "extraction-transcript.jsonl.zst",
+        "trajectory_reference": _artifact(
+            "extraction-trajectory.jsonl.zst",
             media_type="application/zstd",
         ).as_dict(),
         "observation": {"body_markdown": "Remember this."},
@@ -151,8 +151,8 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         source_run_id="run-1",
         source_unit_id="review",
         diagnostic_bundle_digest=f"sha256:{'b' * 64}",
-        transcript_reference=_artifact(
-            "extraction-transcript.jsonl.zst",
+        trajectory_reference=_artifact(
+            "extraction-trajectory.jsonl.zst",
             media_type="application/zstd",
         ),
         observation_markdown="Remember this.",
@@ -185,8 +185,8 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         expected_active_revision=1,
         extraction_ids=["extraction-1"],
         memory_tree_reference=_artifact("memory-2"),
-        maintenance_transcript_reference=_artifact(
-            "maintenance-transcript.jsonl.zst",
+        maintenance_trajectory_reference=_artifact(
+            "maintenance-trajectory.jsonl.zst",
             media_type="application/zstd",
         ),
     ) == {
@@ -291,8 +291,8 @@ def test_extraction_conflict_preserves_non_retryable_catalog_semantics() -> None
             source_run_id="run-1",
             source_unit_id="review",
             diagnostic_bundle_digest=f"sha256:{'b' * 64}",
-            transcript_reference=_artifact(
-                "extraction-transcript.jsonl.zst",
+            trajectory_reference=_artifact(
+                "extraction-trajectory.jsonl.zst",
                 media_type="application/zstd",
             ),
             observation_markdown="Different content.",
@@ -330,8 +330,8 @@ def test_maintenance_pause_preserves_its_own_conflict_semantics() -> None:
             expected_active_revision=1,
             extraction_ids=["extraction-1"],
             memory_tree_reference=_artifact("memory"),
-            maintenance_transcript_reference=_artifact(
-                "maintenance-transcript.jsonl.zst",
+            maintenance_trajectory_reference=_artifact(
+                "maintenance-trajectory.jsonl.zst",
                 media_type="application/zstd",
             ),
         )

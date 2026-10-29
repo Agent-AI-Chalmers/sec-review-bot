@@ -8,7 +8,7 @@ from langchain_core.callbacks.manager import CallbackManager
 
 from sec_review_agents.observability.tracing import TracingConfig
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-from sec_review_agents.runtime.transcripts import read_transcript_messages
+from sec_review_agents.runtime.trajectories import read_trajectory_messages
 
 
 def _stream(*updates: dict[str, Any], error: Exception | None = None):
@@ -58,16 +58,16 @@ async def test_invoke_returns_structured_response_after_success(
             "sec_review_agents.runtime.agent_runtime_graph.log_agent_invocation_failed"
         ),
     ):
-        transcript_path = tmp_path / "transcript.jsonl"
+        trajectory_path = tmp_path / "trajectory.jsonl"
         result = await invoke_agent_runtime_graph(
             agent=agent,
             agent_name="test-agent",
             system_prompt="",
             user_prompt="prompt",
             config={"metadata": {"scope": "unit"}},
-            transcript_paths=(transcript_path,),
+            trajectory_paths=(trajectory_path,),
         )
-        transcript_messages = read_transcript_messages(transcript_path)
+        trajectory_messages = read_trajectory_messages(trajectory_path)
 
     assert result == {"status": "ok"}
     invoke_config = agent.astream.call_args.kwargs["config"]
@@ -76,12 +76,12 @@ async def test_invoke_returns_structured_response_after_success(
         "sec_review_agent": "test-agent",
     }
     assert invoke_config["recursion_limit"] == 3
-    assert [item["type"] for item in transcript_messages] == ["system", "human"]
-    assert transcript_messages[0]["type"] == "system"
+    assert [item["type"] for item in trajectory_messages] == ["system", "human"]
+    assert trajectory_messages[0]["type"] == "system"
 
 
 @pytest.mark.asyncio
-async def test_transcript_callback_does_not_mark_langfuse_tracing_enabled(
+async def test_trajectory_callback_does_not_mark_langfuse_tracing_enabled(
     tmp_path: Path,
 ) -> None:
     agent = _successful_agent()
@@ -94,7 +94,7 @@ async def test_transcript_callback_does_not_mark_langfuse_tracing_enabled(
         flush=flush,
     )
 
-    transcript_path = tmp_path / "transcript.jsonl"
+    trajectory_path = tmp_path / "trajectory.jsonl"
     with (
         patch(
             "sec_review_agents.runtime.agent_runtime_graph.build_tracing_config",
@@ -120,19 +120,19 @@ async def test_transcript_callback_does_not_mark_langfuse_tracing_enabled(
             agent_name="test-agent",
             system_prompt="",
             user_prompt="prompt",
-            transcript_paths=(transcript_path,),
+            trajectory_paths=(trajectory_path,),
         )
-        transcript_messages = read_transcript_messages(transcript_path)
+        trajectory_messages = read_trajectory_messages(trajectory_path)
 
     started_mock.assert_called_once()
     assert not started_mock.call_args.kwargs["tracing_enabled"]
     assert "callbacks" not in agent.astream.call_args.kwargs["config"]
-    assert transcript_messages[0]["type"] == "system"
+    assert trajectory_messages[0]["type"] == "system"
     flush.assert_called_once_with()
 
 
 @pytest.mark.asyncio
-async def test_transcript_export_preserves_callback_manager(
+async def test_trajectory_export_preserves_callback_manager(
     tmp_path: Path,
 ) -> None:
     """Preserve caller callbacks independently of ambient tracing configuration."""
@@ -173,7 +173,7 @@ async def test_transcript_export_preserves_callback_manager(
             system_prompt="",
             user_prompt="prompt",
             config={"callbacks": callback_manager},
-            transcript_paths=(tmp_path / "transcript.jsonl",),
+            trajectory_paths=(tmp_path / "trajectory.jsonl",),
         )
 
     invoke_callbacks = agent.astream.call_args.kwargs["config"]["callbacks"]
@@ -312,7 +312,7 @@ async def test_stream_failure_preserves_completed_message_updates(
             error=RuntimeError("boom"),
         )
     )
-    transcript_path = tmp_path / "transcript.jsonl"
+    trajectory_path = tmp_path / "trajectory.jsonl"
 
     with pytest.raises(RuntimeError, match="boom"):
         await invoke_agent_runtime_graph(
@@ -320,10 +320,10 @@ async def test_stream_failure_preserves_completed_message_updates(
             agent_name="test-agent",
             system_prompt="system",
             user_prompt="prompt",
-            transcript_paths=(transcript_path,),
+            trajectory_paths=(trajectory_path,),
         )
 
-    messages = read_transcript_messages(transcript_path)
+    messages = read_trajectory_messages(trajectory_path)
     assert [message["content"] for message in messages] == [
         "system",
         "prompt",
@@ -369,7 +369,7 @@ async def test_missing_structured_response_raises() -> None:
 
 
 @pytest.mark.asyncio
-async def test_transcript_messages_cover_message_dump_fields(
+async def test_trajectory_messages_cover_message_dump_fields(
     tmp_path: Path,
 ) -> None:
     class FakeMessage:
@@ -388,7 +388,7 @@ async def test_transcript_messages_cover_message_dump_fields(
 
     agent = _successful_agent(messages=[FakeMessage()])
 
-    transcript_path = tmp_path / "transcript.jsonl"
+    trajectory_path = tmp_path / "trajectory.jsonl"
     with (
         patch(
             "sec_review_agents.runtime.agent_runtime_graph.compute_graph_recursion_limit",
@@ -410,9 +410,9 @@ async def test_transcript_messages_cover_message_dump_fields(
             agent_name="test-agent",
             system_prompt="",
             user_prompt="prompt",
-            transcript_paths=(transcript_path,),
+            trajectory_paths=(trajectory_path,),
         )
-        messages = read_transcript_messages(transcript_path)
+        messages = read_trajectory_messages(trajectory_path)
 
     ai_messages = [item for item in messages if item["type"] == "ai"]
     assert len(ai_messages) == 1

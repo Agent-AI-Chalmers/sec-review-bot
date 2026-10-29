@@ -24,7 +24,7 @@ async def mitigate_issue_with_self_check(
     workspace_snapshot_tar_path: Path,
     history_path: Path,
     mitigator_artifacts_path: Path,
-    published_transcript_path: Path | None = None,
+    published_trajectory_path: Path | None = None,
     analysis_result: Mapping[str, Any],
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: ExecutionRuntimeContext | None = None,
@@ -34,7 +34,7 @@ async def mitigate_issue_with_self_check(
         agent_name="issue-mitigator-self-check",
         mitigator_artifacts_path=mitigator_artifacts_path,
         setup_declaration_content=setup_declaration_content,
-        published_transcript_path=published_transcript_path,
+        published_trajectory_path=published_trajectory_path,
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=None,
         build_backend=lambda workspace_root, memory_path_view: create_issue_mitigation_backend(

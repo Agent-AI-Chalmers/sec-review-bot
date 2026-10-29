@@ -20,8 +20,8 @@ from sec_review_agents.scan_stages.triage.agent_passes import (
     run_repository_triage_agent,
 )
 from tests.llm_probe import llm_probe
-from tests.runtime.transcript_artifact_helpers import (
-    read_file_paths_from_transcript,
+from tests.runtime.trajectory_artifact_helpers import (
+    read_file_paths_from_trajectory,
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
@@ -49,7 +49,7 @@ async def test_triage_workflow_handles_scanner_noise_and_uses_guidance() -> None
             triage_mode="single",
         )
 
-    read_paths = read_file_paths_from_transcript(triage_root / "transcript.jsonl")
+    read_paths = read_file_paths_from_trajectory(triage_root / "trajectory.jsonl")
 
     print(
         json.dumps(

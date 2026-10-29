@@ -13,9 +13,9 @@
         "contracts/tar-zstd-artifact/profiles/run-diagnostic/v1/corpus/valid-minimal.tar.zst",
         "contracts/tar-zstd-artifact/profiles/run-diagnostic/v1/corpus/valid-pax-path.tar.zst",
         "contracts/tar-zstd-artifact/profiles/run-diagnostic/v1/corpus/invalid-result-reference.tar.zst",
-        "contracts/tar-zstd-artifact/profiles/run-diagnostic/v1/corpus/invalid-missing-transcript.tar.zst",
-        "contracts/tar-zstd-artifact/profiles/run-diagnostic/v1/corpus/invalid-noncanonical-transcript-path.tar.zst",
-        "contracts/tar-zstd-artifact/profiles/run-diagnostic/v1/corpus/invalid-transcript-extension.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/run-diagnostic/v1/corpus/invalid-missing-trajectory.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/run-diagnostic/v1/corpus/invalid-noncanonical-trajectory-path.tar.zst",
+        "contracts/tar-zstd-artifact/profiles/run-diagnostic/v1/corpus/invalid-trajectory-extension.tar.zst",
         "contracts/tar-zstd-artifact/profiles/run-diagnostic/v1/corpus/invalid-duplicate-unit.tar.zst",
         "contracts/tar-zstd-artifact/profiles/run-diagnostic/v1/corpus/invalid-symlink.tar.zst"
       ]

@@ -24,9 +24,9 @@ from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
     record_bootstrap_result,
 )
-from sec_review_agents.runtime.transcripts import (
-    remove_transcripts,
-    transcript_path,
+from sec_review_agents.runtime.trajectories import (
+    remove_trajectories,
+    trajectory_path,
 )
 from sec_review_agents.utils.files import (
     persist_json_artifact,
@@ -113,7 +113,7 @@ def reset_mitigation_attempt_artifacts(
         mitigator_artifacts_path,
         filenames=filenames,
     )
-    transcript_attempts = (
+    trajectory_attempts = (
         ["initial"]
         + [
             f"retry-{retry_index}"
@@ -122,12 +122,12 @@ def reset_mitigation_attempt_artifacts(
         if attempt_label == "initial"
         else [attempt_label]
     )
-    remove_transcripts(
-        transcript_path(
-            mitigator_artifacts_path / "transcripts",
-            name=transcript_attempt,
+    remove_trajectories(
+        trajectory_path(
+            mitigator_artifacts_path / "trajectories",
+            name=trajectory_attempt,
         )
-        for transcript_attempt in transcript_attempts
+        for trajectory_attempt in trajectory_attempts
     )
 
 
@@ -166,7 +166,7 @@ async def run_mitigation_stage(
     *,
     agent_name: str,
     mitigator_artifacts_path: Path,
-    published_transcript_path: Path | None = None,
+    published_trajectory_path: Path | None = None,
     baseline_snapshot_tar_path: Path,
     retry_context: Mapping[str, Any] | None,
     build_backend: Callable[[Path, PathView | None], Any],
@@ -191,9 +191,9 @@ async def run_mitigation_stage(
             tar_path=baseline_snapshot_tar_path,
             destination_path=workspace_path,
         )
-        transcript_paths = prepare_mitigation_transcript(
+        trajectory_paths = prepare_mitigation_trajectory(
             mitigator_artifacts_path=mitigator_artifacts_path,
-            published_transcript_path=published_transcript_path,
+            published_trajectory_path=published_trajectory_path,
             attempt_label=attempt_label,
         )
         backend = build_backend(workspace_path, memory_path_view)
@@ -229,7 +229,7 @@ async def run_mitigation_stage(
                     agent_name=agent_name,
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
-                    transcript_paths=transcript_paths,
+                    trajectory_paths=trajectory_paths,
                 )
         raw_declared_paths = agent_output.get("declared_changed_files")
         if raw_declared_paths is None:
@@ -260,21 +260,21 @@ async def run_mitigation_stage(
         return result
 
 
-def prepare_mitigation_transcript(
+def prepare_mitigation_trajectory(
     *,
     mitigator_artifacts_path: Path,
-    published_transcript_path: Path | None,
+    published_trajectory_path: Path | None,
     attempt_label: str,
 ) -> tuple[Path, ...]:
-    local_transcript_path = transcript_path(
-        mitigator_artifacts_path / "transcripts",
+    local_trajectory_path = trajectory_path(
+        mitigator_artifacts_path / "trajectories",
         name=attempt_label,
     )
-    if published_transcript_path is None:
-        return (local_transcript_path,)
+    if published_trajectory_path is None:
+        return (local_trajectory_path,)
 
-    published_transcript_path.unlink(missing_ok=True)
-    return (local_transcript_path, published_transcript_path)
+    published_trajectory_path.unlink(missing_ok=True)
+    return (local_trajectory_path, published_trajectory_path)
 
 
 __all__ = [

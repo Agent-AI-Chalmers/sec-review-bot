@@ -3,20 +3,20 @@ from pathlib import Path
 import pytest
 
 from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
-from sec_review_agents.runtime.transcripts import transcript_path
+from sec_review_agents.runtime.trajectories import trajectory_path
 
 
-def test_transcript_path_uses_default_filename(tmp_path: Path) -> None:
-    assert transcript_path(tmp_path) == tmp_path / "transcript.jsonl"
+def test_trajectory_path_uses_default_filename(tmp_path: Path) -> None:
+    assert trajectory_path(tmp_path) == tmp_path / "trajectory.jsonl"
 
 
-@pytest.mark.parametrize("name", ["nested/transcript", "transcript.jsonl"])
-def test_transcript_path_rejects_physical_filename_details(
+@pytest.mark.parametrize("name", ["nested/trajectory", "trajectory.jsonl"])
+def test_trajectory_path_rejects_physical_filename_details(
     tmp_path: Path,
     name: str,
 ) -> None:
     with pytest.raises(ValueError, match="plain file stem"):
-        transcript_path(tmp_path, name=name)
+        trajectory_path(tmp_path, name=name)
 
 
 def test_review_stage_attempt_order_preserves_review_stage_order() -> None:

@@ -4,16 +4,16 @@
 
 本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-`memory-catalog/` 提供登记已完成 extraction、协调 observation 处理与提交 memory tree revision 的 HTTP API。协调状态保存在 PostgreSQL 中；worker 把不可变的 memory tree 和压缩后的 memory-agent transcript 发布到对象存储，catalog 保存对应的 artifact reference。
+`memory-catalog/` 提供登记已完成 extraction、协调 observation 处理与提交 memory tree revision 的 HTTP API。协调状态保存在 PostgreSQL 中；worker 把不可变的 memory tree 和压缩后的 memory-agent trajectory 发布到对象存储，catalog 保存对应的 artifact reference。
 
 ## API
 
 | 方法   | 路径                                   | 用途                                                                                             |
 | ------ | -------------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `GET`  | `/healthz`                             | 返回服务健康状态。                                                                               |
-| `POST` | `/v1/extractions`                      | 原子登记已完成 extraction、transcript reference 和可选 observation。                             |
+| `POST` | `/v1/extractions`                      | 原子登记已完成 extraction、trajectory reference 和可选 observation。                             |
 | `GET`  | `/v1/extractions`                      | 使用稳定 cursor 分页和 provenance 过滤列出已完成 extractions。                                   |
-| `GET`  | `/v1/extractions/{extraction_id}`      | 返回指定 extraction、transcript reference 和可选 observation。                                   |
+| `GET`  | `/v1/extractions/{extraction_id}`      | 返回指定 extraction、trajectory reference 和可选 observation。                                   |
 | `GET`  | `/v1/overview`                         | 返回已完成 extraction 的单元覆盖、observation 产出、可选范围趋势和工作流汇总。                   |
 | `GET`  | `/v1/observations`                     | 使用稳定 cursor 分页和消费状态过滤列出 observations。                                            |
 | `GET`  | `/v1/observation-backlog`              | 返回 pending observations 的数量和最早等待时间。                                                 |

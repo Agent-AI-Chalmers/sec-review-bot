@@ -12,9 +12,9 @@ Sec Review Bot 由本仓库负责的运行角色包括 GitHub Integration、Revi
 
 Temporal Server 属于基础设施，但它会直接向 worker 进程分发工作，因此拓扑图将它与运行服务放在一起。PostgreSQL 和对象存储则单独作为持久化设施呈现。Langfuse 位于本仓库的部署边界之外：worker 可以向其导出 LLM observations，Review Runs 则异步读取这些 observations 并持久化模型用量 snapshot。Review execution、memory extraction 与 memory maintenance 分别使用独立的 worker 进程和 task queue。
 
-Memory 链路只有一套与部署位置无关的状态模型：Memory Catalog 负责 PostgreSQL 中的协调状态，对象存储负责不可变 memory-tree 和 transcript artifacts，Temporal 负责 workflow 执行。每次 review invocation 都会把当前 memory tree 物化到临时目录供 agent backend 使用，并在结束后删除该目录。
+Memory 链路只有一套与部署位置无关的状态模型：Memory Catalog 负责 PostgreSQL 中的协调状态，对象存储负责不可变 memory-tree 和 trajectory artifacts，Temporal 负责 workflow 执行。每次 review invocation 都会把当前 memory tree 物化到临时目录供 agent backend 使用，并在结束后删除该目录。
 
-Control Plane UI 通过自身 BFF 管理 Memory Catalog，browser 不会获得 Catalog token、对象存储凭据或 `s3://` reference。Artifact download 由 BFF 读取并校验 identity。经过认证的 operator 可以暂停或恢复自动 maintenance、创建 operator edit revision，以及把 active pointer 恢复到已有 revision。后续新 revision 会把该 active revision 记录为前驱，同时 revision identity 保持全局递增。BFF 可以创建不可变 memory-tree object，但 run artifact 和 memory transcript 仍然只读。
+Control Plane UI 通过自身 BFF 管理 Memory Catalog，browser 不会获得 Catalog token、对象存储凭据或 `s3://` reference。Artifact download 由 BFF 读取并校验 identity。经过认证的 operator 可以暂停或恢复自动 maintenance、创建 operator edit revision，以及把 active pointer 恢复到已有 revision。后续新 revision 会把该 active revision 记录为前驱，同时 revision identity 保持全局递增。BFF 可以创建不可变 memory-tree object，但 run artifact 和 memory trajectory 仍然只读。
 
 ## 运行角色职责地图
 
@@ -25,7 +25,7 @@ Control Plane UI 通过自身 BFF 管理 Memory Catalog，browser 不会获得 C
 | Control Plane UI | `apps/control-plane-ui/` | 用于 Review Runs 查看和 memory 管理的鉴权运维控制台 | [README](../../apps/control-plane-ui/README.md) |
 | Execution Gateway | `execution-gateway/` | 经过鉴权的 Execution API 与 HTTP-to-Temporal 转换 | [README](../../execution-gateway/README.zh.md) |
 | Execution Worker | `agents/` | Review workflow、activity、agent runtime、stage artifact 与 run diagnostic publication | [README](../../agents/README.zh.md) |
-| Memory Extraction Worker | `agents/` | 按 run 消费 diagnostic、调用 extractor、发布 transcript 并登记 extraction | [README](../../agents/README.zh.md) |
+| Memory Extraction Worker | `agents/` | 按 run 消费 diagnostic、调用 extractor、发布 trajectory 并登记 extraction | [README](../../agents/README.zh.md) |
 | Memory Maintenance Worker | `agents/` | 按批消费 maintenance input、调用 maintainer、发布 memory tree 并提交 revision | [README](../../agents/README.zh.md) |
 | Memory Catalog Server | `memory-catalog/` | Observation catalog、不可变 memory revision history 与 active revision 协调 | [README](../../memory-catalog/README.zh.md) |
 
@@ -101,9 +101,9 @@ sequenceDiagram
   Temporal->>ExtractionWorker: 分发 memory extraction 工作
   ExtractionWorker->>Storage: 下载 run diagnostic bundle
   Storage-->>ExtractionWorker: run diagnostic bundle
-  Note over ExtractionWorker: 读取 review transcripts 并运行 extractor
-  ExtractionWorker->>Storage: 保存 extractor transcript
-  ExtractionWorker->>Catalog: 在同一事务中保存 extraction 结果、transcript reference 和 observation（如果有）
+  Note over ExtractionWorker: 读取 review trajectories 并运行 extractor
+  ExtractionWorker->>Storage: 保存 extractor trajectory
+  ExtractionWorker->>Catalog: 在同一事务中保存 extraction 结果、trajectory reference 和 observation（如果有）
   loop 定期 memory maintenance
     Temporal->>MaintenanceWorker: 分发 maintenance 工作
     Note over Temporal,MaintenanceWorker: 固定 workflow ID 确保同一时间只有一个 maintainer
@@ -115,7 +115,7 @@ sequenceDiagram
       Note over MaintenanceWorker: 将当前 memory tree 物化为本次 activity 的临时 maintenance input/worktree
     end
     Note over MaintenanceWorker: 运行 maintainer
-    MaintenanceWorker->>Storage: 保存 maintainer transcript
+    MaintenanceWorker->>Storage: 保存 maintainer trajectory
     MaintenanceWorker->>Storage: 保存新的 memory tree artifact
     MaintenanceWorker-->>Temporal: 返回 artifact references、extraction IDs 和 expected active revision
     Note over Temporal: 后续 commit 重试复用该 activity 结果

@@ -132,7 +132,7 @@ async def analyze_repository_case_stage(
     case_execution_input: Mapping[str, Any],
     *,
     analyzer_artifacts_path: Path,
-    published_transcript_path: Path | None = None,
+    published_trajectory_path: Path | None = None,
     runtime_context: ExecutionRuntimeContext | None,
 ) -> dict[str, Any]:
     case_id = str(case_execution_input["case_id"])
@@ -156,7 +156,7 @@ async def analyze_repository_case_stage(
             history_path=history_path,
             incremental_window_path=incremental_window_path,
             analyzer_artifacts_path=analyzer_artifacts_path,
-            published_transcript_path=published_transcript_path,
+            published_trajectory_path=published_trajectory_path,
             scan_mode=scan_mode,
             review_input=review_input,
             setup_declaration_content=_optional_case_content(
@@ -237,7 +237,7 @@ async def run_repository_case_mitigation_stage(
     runtime_context: ExecutionRuntimeContext | None,
     *,
     mitigator_artifacts_path: Path,
-    published_transcript_path: Path | None = None,
+    published_trajectory_path: Path | None = None,
 ) -> dict[str, Any]:
     case_id = str(case_execution_input["case_id"])
     started_at = log_stage_started(
@@ -256,7 +256,7 @@ async def run_repository_case_mitigation_stage(
                 "incremental_window_path",
             ),
             mitigator_artifacts_path=mitigator_artifacts_path,
-            published_transcript_path=published_transcript_path,
+            published_trajectory_path=published_trajectory_path,
             scan_mode=case_execution_input["scan_mode"],
             review_input=case_execution_input["review_input"],
             analysis_result=analyzer_result,
@@ -293,7 +293,7 @@ async def run_repository_case_verification_stage(
     runtime_context: ExecutionRuntimeContext | None,
     *,
     verifier_artifacts_path: Path,
-    published_transcript_path: Path | None = None,
+    published_trajectory_path: Path | None = None,
 ) -> dict[str, Any]:
     case_id = str(case_execution_input["case_id"])
     started_at = log_stage_started(
@@ -303,7 +303,7 @@ async def run_repository_case_verification_stage(
     try:
         result = await verify_repository_case(
             verifier_artifacts_path=verifier_artifacts_path,
-            published_transcript_path=published_transcript_path,
+            published_trajectory_path=published_trajectory_path,
             workspace_snapshot_tar_path=_case_path(
                 case_execution_input,
                 "workspace_snapshot_tar_path",

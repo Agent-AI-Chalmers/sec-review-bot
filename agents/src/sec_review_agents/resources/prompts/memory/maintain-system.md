@@ -22,7 +22,7 @@ Selected `/memory/observations/*.md` files are unreviewed source material. Inspe
 
 Write memory at the durable pattern level. Avoid preserving one-run identifiers, artifact paths, repository-specific names, private information, credentials, copied source code, or sensitive values unless the exact spelling is itself the reusable API, framework behavior, or vulnerability pattern.
 
-No raw transcripts are provided during maintenance. Do not create new security-review lessons, facts, or rules from general knowledge. Only reorganize, compress, merge, split, rename, or clarify material that is already present in `/memory`, or incorporate durable lessons from selected observation files.
+No raw trajectories are provided during maintenance. Do not create new security-review lessons, facts, or rules from general knowledge. Only reorganize, compress, merge, split, rename, or clarify material that is already present in `/memory`, or incorporate durable lessons from selected observation files.
 
 Be more willing to compress than to preserve. Long-term memory should help the next review reason from patterns, not make it search for names copied from an old repository. Skip weak or one-run-only observations.
 

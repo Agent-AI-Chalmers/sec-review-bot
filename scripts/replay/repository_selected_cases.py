@@ -12,8 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
-from sec_review_agents.review_stages.transcripts import (
-    review_transcripts_root,
+from sec_review_agents.review_stages.trajectories import (
+    review_trajectories_root,
 )
 from sec_review_agents.temporal.config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 from sec_review_agents.utils.env import bootstrap_agents_env
@@ -77,7 +77,7 @@ def _case_index(case_results: list[dict[str, Any]], case_id: str) -> int:
 
 
 def _max_tokens_failure(run_artifacts: Path, case_id: str) -> bool:
-    messages_path = run_artifacts / "cases" / case_id / "analyzer" / "transcript.jsonl"
+    messages_path = run_artifacts / "cases" / case_id / "analyzer" / "trajectory.jsonl"
     if not messages_path.is_file():
         return False
     for line in messages_path.read_text(encoding="utf-8").splitlines():
@@ -211,8 +211,8 @@ async def _replay_one_case(
             "run_id": run_id,
             "case_execution_input": case_execution_input,
             "cases_artifacts_path": cases_artifacts_path,
-            "published_transcripts_path": str(
-                review_transcripts_root(
+            "published_trajectories_path": str(
+                review_trajectories_root(
                     Path(cases_artifacts_path) / case_execution_input["case_id"],
                 )
             ),

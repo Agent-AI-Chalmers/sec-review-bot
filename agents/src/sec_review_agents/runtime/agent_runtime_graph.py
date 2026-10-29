@@ -22,7 +22,7 @@ from sec_review_agents.observability.tracing import (
     build_tracing_config,
     tracing_configured,
 )
-from sec_review_agents.runtime.transcripts import TranscriptWriter
+from sec_review_agents.runtime.trajectories import TrajectoryWriter
 from sec_review_agents.utils.limit import compute_graph_recursion_limit
 
 
@@ -71,7 +71,7 @@ async def invoke_agent_runtime_graph(
     agent_name: str,
     system_prompt: str,
     user_prompt: str,
-    transcript_paths: tuple[Path, ...] = (),
+    trajectory_paths: tuple[Path, ...] = (),
     config: RunnableConfig | None = None,
 ) -> dict:
     """Return only the agent's structured payload, not its messages or graph state."""
@@ -80,7 +80,7 @@ async def invoke_agent_runtime_graph(
     tracing_config = build_tracing_config(
         agent_name=agent_name,
     )
-    transcript_writer = TranscriptWriter(transcript_paths) if transcript_paths else None
+    trajectory_writer = TrajectoryWriter(trajectory_paths) if trajectory_paths else None
 
     invoke_config = merge_configs(
         config,
@@ -95,8 +95,8 @@ async def invoke_agent_runtime_graph(
         tracing_enabled=tracing_config.enabled,
     )
     user_message = HumanMessage(content=user_prompt)
-    if transcript_writer is not None:
-        transcript_writer.write_messages(
+    if trajectory_writer is not None:
+        trajectory_writer.write_messages(
             [SystemMessage(content=system_prompt), user_message]
         )
 
@@ -112,10 +112,10 @@ async def invoke_agent_runtime_graph(
             for node_update in update.values():
                 if not isinstance(node_update, Mapping):
                     continue
-                if transcript_writer is not None:
+                if trajectory_writer is not None:
                     update_messages = node_update.get("messages")
                     if isinstance(update_messages, list):
-                        transcript_writer.write_messages(update_messages)
+                        trajectory_writer.write_messages(update_messages)
                 candidate = node_update.get("structured_response")
                 if candidate is not None:
                     structured_result = candidate

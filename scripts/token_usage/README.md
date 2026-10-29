@@ -1,10 +1,10 @@
 # Token Usage Summary
 
-This directory contains a helper for summarizing token usage and effective patch cost from local run transcripts.
+This directory contains a helper for summarizing token usage and effective patch cost from local run trajectories.
 
 Token fields follow OpenTelemetry GenAI semantics: `input_tokens` and `output_tokens` are inclusive totals. `cache_read_tokens` and `cache_creation_tokens` are subsets of `input_tokens`, while `reasoning_tokens` is a subset of `output_tokens`. The derived `uncached_input_tokens` subtracts both cache subsets from `input_tokens`.
 
-It is a repository-level reporting script. It reads stage-local transcript files directly.
+It is a repository-level reporting script. It reads stage-local trajectory files directly.
 
 Install the agents package before running this repository-level script:
 
@@ -47,7 +47,7 @@ Prices come from OpenRouter's public model list. Each stage's `model_id` is look
 - The report header shows `fetched_at`, the UTC instant of the live snapshot. That is the only timestamp; there is no per-run generation date, so the report contents depend only on the inputs and the fetched prices.
 - The JSON output records `pricing.used_prices`: the prices actually used for the handful of models in the report (`null` for a model the source did not know). This keeps the cost figures explainable from the report alone, without persisting the whole price table.
 
-Model-name mapping is the caller's responsibility, not this script's: the `model_id` recorded in a transcript must name a model the price source knows. An unmapped model is reported as unknown rather than silently mispriced.
+Model-name mapping is the caller's responsibility, not this script's: the `model_id` recorded in a trajectory must name a model the price source knows. An unmapped model is reported as unknown rather than silently mispriced.
 
 The source is a single live endpoint with no history, so a past price cannot be requested later; a report can only be priced at fetch time or left unknown.
 

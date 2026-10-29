@@ -29,7 +29,7 @@ class MemoryExtractionRegistrationPayload:
     source_run_id: str
     source_unit_id: str
     diagnostic_bundle_digest: str
-    transcript_reference: ArtifactReference
+    trajectory_reference: ArtifactReference
     observation_markdown: str | None
     skipped: bool
     summary: str
@@ -46,8 +46,8 @@ class MemoryExtractionRegistrationPayload:
         )
         if any(not isinstance(value, str) for value in string_fields):
             raise TypeError("Memory extraction provenance and summary must be strings.")
-        if not isinstance(self.transcript_reference, ArtifactReference):
-            raise TypeError("Memory extraction transcript_reference is invalid.")
+        if not isinstance(self.trajectory_reference, ArtifactReference):
+            raise TypeError("Memory extraction trajectory_reference is invalid.")
         if self.observation_markdown is not None and not isinstance(
             self.observation_markdown, str
         ):
@@ -105,7 +105,7 @@ def memory_extraction_workflow_id(
     diagnostic_bundle_digest: str,
     unit_id: str,
 ) -> str:
-    """Return the stable Temporal identity for one transcript unit."""
+    """Return the stable Temporal identity for one trajectory unit."""
     identity = f"{diagnostic_bundle_digest}\0{unit_id}".encode()
     return f"memory-extraction:{hashlib.sha256(identity).hexdigest()}"
 
@@ -121,13 +121,13 @@ async def prepare_memory_extraction(
     from sec_review_agents.memory.extractor import (
         preview_memory_observation_from_paths,
     )
-    from sec_review_agents.memory.transcript_artifact import (
-        publish_memory_agent_transcript,
+    from sec_review_agents.memory.trajectory_artifact import (
+        publish_memory_agent_trajectory,
     )
     from sec_review_agents.run_diagnostics.bundle import (
-        materialize_diagnostic_transcript_unit,
+        materialize_diagnostic_trajectory_unit,
     )
-    from sec_review_agents.runtime.transcripts import transcript_path
+    from sec_review_agents.runtime.trajectories import trajectory_path
 
     reference = ArtifactReference.from_mapping(request.diagnostic_bundle)
     extraction_id = memory_extraction_workflow_id(
@@ -136,31 +136,31 @@ async def prepare_memory_extraction(
     )
     with tempfile.TemporaryDirectory(prefix="sec-review-extraction-input-") as tempdir:
         temp_root = Path(tempdir)
-        materialized = materialize_diagnostic_transcript_unit(
+        materialized = materialize_diagnostic_trajectory_unit(
             reference,
             run_id=request.run_id,
             unit_id=request.unit_id,
             destination=temp_root / "diagnostic-bundle",
         )
-        extractor_transcript_path = transcript_path(
-            temp_root / "memory-agent-transcripts",
+        extractor_trajectory_path = trajectory_path(
+            temp_root / "memory-agent-trajectories",
             name="extractor",
         )
         preview = await preview_memory_observation_from_paths(
-            list(materialized.transcript_paths),
+            list(materialized.trajectory_paths),
             deployment=deployment,
             extraction_id_value=extraction_id,
             job_id=extraction_id,
             source_workflow=request.source_workflow,
             run_id=request.run_id,
-            extractor_transcript_path=extractor_transcript_path,
+            extractor_trajectory_path=extractor_trajectory_path,
         )
-        if preview.extractor_transcript_path is None:
-            raise RuntimeError("Memory extraction did not record its transcript.")
-        extraction_transcript_reference = publish_memory_agent_transcript(
+        if preview.extractor_trajectory_path is None:
+            raise RuntimeError("Memory extraction did not record its trajectory.")
+        extraction_trajectory_reference = publish_memory_agent_trajectory(
             agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
-            transcript_path=preview.extractor_transcript_path,
-            output_dir=temp_root / "published-transcripts",
+            trajectory_path=preview.extractor_trajectory_path,
+            output_dir=temp_root / "published-trajectories",
         )
         return MemoryExtractionRegistrationPayload(
             extraction_id=extraction_id,
@@ -168,7 +168,7 @@ async def prepare_memory_extraction(
             source_run_id=request.run_id,
             source_unit_id=request.unit_id,
             diagnostic_bundle_digest=reference.digest,
-            transcript_reference=extraction_transcript_reference,
+            trajectory_reference=extraction_trajectory_reference,
             observation_markdown=preview.observation_markdown,
             skipped=preview.skipped,
             summary=preview.summary,
@@ -225,7 +225,7 @@ def register_memory_extraction_activity(
             source_run_id=payload.source_run_id,
             source_unit_id=payload.source_unit_id,
             diagnostic_bundle_digest=payload.diagnostic_bundle_digest,
-            transcript_reference=payload.transcript_reference,
+            trajectory_reference=payload.trajectory_reference,
             observation_markdown=payload.observation_markdown,
         )
     except MemoryCatalogConflictError as error:
@@ -240,7 +240,7 @@ def register_memory_extraction_activity(
         "summary": payload.summary,
         "extraction_id": payload.extraction_id,
         "observation_produced": payload.observation_produced,
-        "transcript_reference": payload.transcript_reference.as_dict(),
+        "trajectory_reference": payload.trajectory_reference.as_dict(),
     }
 
 

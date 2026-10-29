@@ -1,7 +1,7 @@
-export type TranscriptRole =
+export type TrajectoryRole =
   'system' | 'human' | 'assistant' | 'tool' | 'unknown'
 
-export interface TranscriptEvent {
+export interface TrajectoryEvent {
   seq: number
   event: 'message'
   message: Record<string, unknown>
@@ -23,10 +23,10 @@ export interface UsageView {
   total: number | undefined
 }
 
-export interface TranscriptMessageView {
+export interface TrajectoryMessageView {
   id: string
   seq: number
-  role: TranscriptRole
+  role: TrajectoryRole
   name: string | undefined
   content: string
   reasoning: string
@@ -38,8 +38,8 @@ export interface TranscriptMessageView {
   searchable: string
 }
 
-export interface TranscriptDocument {
-  messages: TranscriptMessageView[]
+export interface TrajectoryDocument {
+  messages: TrajectoryMessageView[]
   totalUsage: UsageView
 }
 
@@ -58,7 +58,7 @@ function positiveNumber(value: unknown): number | undefined {
   return parsed !== undefined && parsed > 0 ? parsed : undefined
 }
 
-function role(value: unknown): TranscriptRole {
+function role(value: unknown): TrajectoryRole {
   const kind = typeof value === 'string' ? value.toLowerCase() : ''
   if (kind === 'system') return 'system'
   if (kind === 'human' || kind === 'user') return 'human'
@@ -176,9 +176,9 @@ function toolCalls(message: Record<string, unknown>): ToolCallView[] {
   })
 }
 
-export function normalizeTranscript(
-  events: TranscriptEvent[]
-): TranscriptDocument {
+export function normalizeTrajectory(
+  events: TrajectoryEvent[]
+): TrajectoryDocument {
   const messages = events.map((event) => {
     const raw = event.message
     const blocks = contentParts(raw.content)
@@ -190,7 +190,7 @@ export function normalizeTranscript(
     const messageRole = role(raw.type)
     const id =
       typeof raw.id === 'string' && raw.id ? raw.id : `message-${event.seq}`
-    const view: TranscriptMessageView = {
+    const view: TrajectoryMessageView = {
       id,
       seq: event.seq,
       role: messageRole,

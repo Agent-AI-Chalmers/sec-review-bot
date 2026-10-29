@@ -26,7 +26,7 @@ async function diagnosticBundle(runId: string): Promise<Buffer> {
         review_units: [
           {
             id: 'unit-1',
-            transcripts: ['artifact-tree/unit-1/review.jsonl']
+            trajectories: ['artifact-tree/unit-1/review.jsonl']
           }
         ]
       })
@@ -405,8 +405,8 @@ test('memory edit creates a revision while restore only moves the pointer', asyn
   }
 })
 
-test('BFF verifies and strictly parses memory transcripts for the viewer', async () => {
-  const transcript = zstdCompressSync(
+test('BFF verifies and strictly parses memory trajectories for the viewer', async () => {
+  const trajectory = zstdCompressSync(
     Buffer.from(
       [
         JSON.stringify({
@@ -422,7 +422,7 @@ test('BFF verifies and strictly parses memory transcripts for the viewer', async
       ].join('\n') + '\n'
     )
   )
-  const digest = `sha256:${crypto.createHash('sha256').update(transcript).digest('hex')}`
+  const digest = `sha256:${crypto.createHash('sha256').update(trajectory).digest('hex')}`
   const catalog = createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' })
     response.end(
@@ -430,11 +430,11 @@ test('BFF verifies and strictly parses memory transcripts for the viewer', async
         revision: 2,
         source: {
           kind: 'maintenance',
-          transcript_reference: {
-            uri: 's3://sec-review/memory/transcripts/memory-maintainer/example/transcript.v1.jsonl.zst',
+          trajectory_reference: {
+            uri: 's3://sec-review/memory/trajectories/memory-maintainer/example/trajectory.v1.jsonl.zst',
             digest,
             media_type: 'application/zstd',
-            size_bytes: transcript.length
+            size_bytes: trajectory.length
           }
         }
       })
@@ -450,7 +450,7 @@ test('BFF verifies and strictly parses memory transcripts for the viewer', async
     memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
     memoryCatalogToken: 'catalog-secret',
     artifactStore: {
-      getObject: async () => ({ body: Readable.from([transcript]) })
+      getObject: async () => ({ body: Readable.from([trajectory]) })
     }
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
@@ -460,7 +460,7 @@ test('BFF verifies and strictly parses memory transcripts for the viewer', async
   try {
     const cookie = await loginCookie(base)
     const response = await fetch(
-      `${base}/api/memory/revisions/2/transcript/content`,
+      `${base}/api/memory/revisions/2/trajectory/content`,
       { headers: { cookie } }
     )
     assert.strictEqual(response.status, 200)
@@ -951,7 +951,7 @@ test('BFF verifies and reads a diagnostic bundle for the run files viewer', asyn
           review_units: [
             {
               id: 'unit-1',
-              transcripts: ['artifact-tree/unit-1/review.jsonl']
+              trajectories: ['artifact-tree/unit-1/review.jsonl']
             }
           ]
         }),
