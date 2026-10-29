@@ -139,7 +139,7 @@
 }
 
 a {
-  color: var(--brand);
+  color: var(--link);
 }
 
 /* Run ids are the list's primary identity; make them read as data, not prose. */
