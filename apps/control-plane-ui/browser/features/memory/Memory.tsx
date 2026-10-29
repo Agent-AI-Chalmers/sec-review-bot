@@ -201,9 +201,9 @@ export function Memory(): React.JSX.Element {
     requestAnimationFrame(() => setHighlightedRevision(revision))
   }
 
-  const viewMaintenanceProcess = (revision: number): void => {
+  const viewMemoryMaintainerTrajectory = (revision: number): void => {
     setTrajectoryTarget({
-      title: t('maintenanceProcess'),
+      title: t('memoryMaintainerTrajectory'),
       contentHref: `/memory/revisions/${revision}/trajectory/content`,
       downloadHref: `/api/memory/revisions/${revision}/trajectory`,
       pageHref: `/memory/revisions/${revision}/trajectory`
@@ -363,7 +363,7 @@ export function Memory(): React.JSX.Element {
             highlightedRevision={highlightedRevision}
             onViewChange={setRevisionView}
             onViewFiles={setViewRevision}
-            onViewProcess={viewMaintenanceProcess}
+            onViewTrajectory={viewMemoryMaintainerTrajectory}
             onCompare={setDiffRevision}
             onSetCurrent={setRestoreRevision}
             onHighlightEnd={() => setHighlightedRevision(undefined)}
@@ -375,9 +375,9 @@ export function Memory(): React.JSX.Element {
             loading={observationsLoading}
             error={observationsError}
             onRevealRevision={revealRevision}
-            onViewProcess={(item) =>
+            onViewTrajectory={(item) =>
               setTrajectoryTarget({
-                title: t('extractionProcess'),
+                title: t('memoryExtractorTrajectory'),
                 contentHref: `/memory/extractions/${encodeURIComponent(item.extraction_id)}/trajectory/content`,
                 downloadHref: `/api/memory/extractions/${encodeURIComponent(item.extraction_id)}/trajectory`,
                 pageHref: `/memory/extractions/${encodeURIComponent(item.extraction_id)}/trajectory`

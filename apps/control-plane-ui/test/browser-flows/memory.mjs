@@ -353,11 +353,11 @@ export async function runMemoryFlow({
     )
     await zhPage
       .locator('.mantine-Tabs-panel:visible')
-      .getByRole('button', { name: '过程' })
+      .getByRole('button', { name: '轨迹' })
       .first()
       .click()
     const zhExtractionDialog = zhPage.getByRole('dialog', {
-      name: '提取过程'
+      name: '记忆提取 Agent 轨迹'
     })
     await zhExtractionDialog.waitFor()
     await zhExtractionDialog.locator('.mantine-Modal-close').click()
@@ -676,7 +676,7 @@ export async function runMemoryFlow({
 
     await page.getByRole('button', { name: 'Process' }).first().click()
     const maintenanceDialog = page.getByRole('dialog', {
-      name: 'Maintenance process'
+      name: 'Memory maintainer trajectory'
     })
     await maintenanceDialog
       .locator('.trajectory-message')
@@ -850,7 +850,7 @@ export async function runMemoryFlow({
       .first()
       .click()
     const extractionDialog = page.getByRole('dialog', {
-      name: 'Extraction process'
+      name: 'Memory extractor trajectory'
     })
     await waitUntil(
       async () =>

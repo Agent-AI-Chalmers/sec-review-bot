@@ -19,7 +19,7 @@ export function MemoryRevisionHistory({
   highlightedRevision,
   onViewChange,
   onViewFiles,
-  onViewProcess,
+  onViewTrajectory,
   onCompare,
   onSetCurrent,
   onHighlightEnd
@@ -32,7 +32,7 @@ export function MemoryRevisionHistory({
   highlightedRevision: number | undefined
   onViewChange: (view: string) => void
   onViewFiles: (revision: number) => void
-  onViewProcess: (revision: number) => void
+  onViewTrajectory: (revision: number) => void
   onCompare: (revision: Revision) => void
   onSetCurrent: (revision: number) => void
   onHighlightEnd: () => void
@@ -69,7 +69,7 @@ export function MemoryRevisionHistory({
           activeRevision={activeRevision}
           allowSetCurrent={activeRevision !== undefined}
           onViewFiles={onViewFiles}
-          onViewProcess={onViewProcess}
+          onViewTrajectory={onViewTrajectory}
           onCompare={onCompare}
           onSetCurrent={onSetCurrent}
           highlightedRevision={highlightedRevision}
@@ -145,9 +145,9 @@ export function MemoryRevisionHistory({
                           size="xs"
                           variant="subtle"
                           leftSection={<IconEye size={ICON_SIZE.sm} />}
-                          onClick={() => onViewProcess(item.revision)}
+                          onClick={() => onViewTrajectory(item.revision)}
                         >
-                          {t('process')}
+                          {t('trajectory')}
                         </Button>
                       ) : (
                         <span aria-hidden="true" />
