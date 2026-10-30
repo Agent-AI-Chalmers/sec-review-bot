@@ -134,27 +134,42 @@ def _build_diagnostic_archive(
     result: dict[str, Any],
     run_id: str,
 ) -> None:
+    manifest_bytes = (
+        json.dumps(
+            {
+                "version": DIAGNOSTIC_BUNDLE_MANIFEST_VERSION,
+                "run_id": run_id,
+                "result": "result.json",
+                "review_units": manifest_units,
+            },
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        + "\n"
+    ).encode()
+    result_bytes = (
+        json.dumps(result, separators=(",", ":"), sort_keys=True) + "\n"
+    ).encode()
+    # A diagnostic bundle is authoritative, so exceeding its contract is an error rather than a
+    # reason to silently omit files. Reuse this scan for archive construction so the budget and
+    # the emitted entry set cannot drift within one publication attempt.
+    artifact_paths = _artifact_tree_paths(artifact_root)
+    entry_count = 3 + len(artifact_paths)
+    if entry_count > MAX_DIAGNOSTIC_BUNDLE_ENTRIES:
+        raise ValueError("Diagnostic bundle exceeds the entry count limit.")
+    extracted_bytes = (
+        len(manifest_bytes)
+        + len(result_bytes)
+        + sum(path.stat().st_size for path in artifact_paths if path.is_file())
+    )
+    if extracted_bytes > MAX_EXTRACTED_DIAGNOSTIC_BYTES:
+        raise ValueError("Diagnostic bundle exceeds the extracted size limit.")
+
     with tempfile.TemporaryDirectory(prefix="sec-review-diagnostic-bundle-") as tempdir:
         manifest_path = Path(tempdir) / DIAGNOSTIC_BUNDLE_MANIFEST
-        manifest_path.write_text(
-            json.dumps(
-                {
-                    "version": DIAGNOSTIC_BUNDLE_MANIFEST_VERSION,
-                    "run_id": run_id,
-                    "result": "result.json",
-                    "review_units": manifest_units,
-                },
-                separators=(",", ":"),
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
-        )
+        manifest_path.write_bytes(manifest_bytes)
         result_path = Path(tempdir) / "result.json"
-        result_path.write_text(
-            json.dumps(result, separators=(",", ":"), sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+        result_path.write_bytes(result_bytes)
         with tarfile.open(
             archive_path, mode="w:zst", format=tarfile.PAX_FORMAT
         ) as archive:
@@ -168,7 +183,9 @@ def _build_diagnostic_archive(
                 arcname="result.json",
                 filter=canonical_tar_info,
             )
-            _add_artifact_tree(archive, artifact_root)
+            _add_artifact_tree(archive, artifact_root, artifact_paths)
+    if archive_path.stat().st_size > MAX_DIAGNOSTIC_BUNDLE_BYTES:
+        raise ValueError("Diagnostic bundle exceeds the compressed size limit.")
     validate_restricted_pax_archive(archive_path)
     with archive_path.open("rb") as archive_file:
         os.fsync(archive_file.fileno())
@@ -241,17 +258,26 @@ def _manifest_units(
     return manifest_units
 
 
-def _add_artifact_tree(archive: tarfile.TarFile, artifact_root: Path) -> None:
+def _artifact_tree_paths(artifact_root: Path) -> list[Path]:
+    return [
+        path
+        for path in sorted(artifact_root.rglob("*"))
+        if path.relative_to(artifact_root).parts[0] != "published"
+        and not path.is_symlink()
+    ]
+
+
+def _add_artifact_tree(
+    archive: tarfile.TarFile, artifact_root: Path, artifact_paths: list[Path]
+) -> None:
     archive.add(
         artifact_root,
         arcname=DIAGNOSTIC_TREE_DIR,
         recursive=False,
         filter=canonical_tar_info,
     )
-    for path in sorted(artifact_root.rglob("*")):
+    for path in artifact_paths:
         relative = path.relative_to(artifact_root)
-        if relative.parts[0] == "published" or path.is_symlink():
-            continue
         archive.add(
             path,
             arcname=f"{DIAGNOSTIC_TREE_DIR}/{relative.as_posix()}",
@@ -278,7 +304,6 @@ def materialize_diagnostic_trajectory_unit(
             else None
         ),
     )
-    validate_restricted_pax_archive(archive_path)
     root = extract_archive(
         archive_path,
         destination,

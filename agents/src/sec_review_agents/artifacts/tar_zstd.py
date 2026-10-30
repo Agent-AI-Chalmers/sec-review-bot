@@ -4,12 +4,16 @@ import tarfile
 from compression import zstd
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import BinaryIO, Protocol
 
 _BLOCK_SIZE = 512
 _PAX_TYPE = b"x"
 _REJECTED_EXTENSION_TYPES = {b"g", b"L", b"K", b"S"}
 _MAX_PAX_HEADER_BYTES = 1024 * 1024
+
+
+class _BinaryReader(Protocol):
+    def read(self, size: int = -1) -> bytes: ...
 
 
 def canonical_tar_info(info: tarfile.TarInfo) -> tarfile.TarInfo:
@@ -34,10 +38,6 @@ class TarEnvelopeEntry:
     mtime: int
     uname: str
     gname: str
-
-
-class _BinaryReader(Protocol):
-    def read(self, size: int = -1) -> bytes: ...
 
 
 def _field(block: bytes, offset: int, length: int) -> bytes:
@@ -110,12 +110,33 @@ def _discard_exact(source: _BinaryReader, size: int) -> None:
         remaining -= len(chunk)
 
 
-def validate_restricted_pax_archive(archive_path: Path) -> tuple[TarEnvelopeEntry, ...]:
-    """Validate the shared restricted envelope directly from raw tar headers."""
+def validate_restricted_pax_archive(
+    archive_path: Path,
+    *,
+    maximum_entries: int | None = None,
+    maximum_extracted_bytes: int | None = None,
+) -> tuple[TarEnvelopeEntry, ...]:
+    """Validate a restricted archive from its filesystem path."""
+    with archive_path.open("rb") as source:
+        return read_restricted_pax_envelope(
+            source,
+            maximum_entries=maximum_entries,
+            maximum_extracted_bytes=maximum_extracted_bytes,
+        )
+
+
+def read_restricted_pax_envelope(
+    archive_source: BinaryIO,
+    *,
+    maximum_entries: int | None = None,
+    maximum_extracted_bytes: int | None = None,
+) -> tuple[TarEnvelopeEntry, ...]:
+    """Validate and read the restricted envelope from an open archive stream."""
     entries: list[TarEnvelopeEntry] = []
+    extracted_size = 0
     pending_path: str | None = None
     terminated = False
-    with zstd.open(archive_path, "rb") as source:
+    with zstd.open(archive_source, "rb") as source:
         while header := source.read(_BLOCK_SIZE):
             if len(header) != _BLOCK_SIZE:
                 raise ValueError("Artifact archive contains a partial tar header.")
@@ -151,6 +172,19 @@ def validate_restricted_pax_archive(archive_path: Path) -> tuple[TarEnvelopeEntr
                 _discard_exact(source, padded_size - size)
                 pending_path = _parse_pax_path(body)
                 continue
+            if type_flag not in {b"0", b"5"}:
+                raise ValueError("Artifact archive contains an unsupported entry type.")
+            if maximum_entries is not None and len(entries) >= maximum_entries:
+                raise ValueError("Artifact archive exceeds the entry count limit.")
+            if type_flag == b"0":
+                extracted_size += size
+                if (
+                    maximum_extracted_bytes is not None
+                    and extracted_size > maximum_extracted_bytes
+                ):
+                    raise ValueError(
+                        "Artifact archive exceeds the extracted size limit."
+                    )
             _discard_exact(source, padded_size)
             entry = TarEnvelopeEntry(
                 path=(
@@ -165,10 +199,6 @@ def validate_restricted_pax_archive(archive_path: Path) -> tuple[TarEnvelopeEntr
                 uname=_text_field(header, 265, 32),
                 gname=_text_field(header, 297, 32),
             )
-            if entry.type_flag not in {b"0", b"5"}:
-                raise ValueError(
-                    f"Artifact archive contains an unsupported entry type: {entry.path}"
-                )
             expected_mode = 0o755 if entry.type_flag == b"5" else 0o644
             if (
                 entry.mode != expected_mode
@@ -198,5 +228,6 @@ def validate_restricted_pax_archive(archive_path: Path) -> tuple[TarEnvelopeEntr
 __all__ = [
     "TarEnvelopeEntry",
     "canonical_tar_info",
+    "read_restricted_pax_envelope",
     "validate_restricted_pax_archive",
 ]

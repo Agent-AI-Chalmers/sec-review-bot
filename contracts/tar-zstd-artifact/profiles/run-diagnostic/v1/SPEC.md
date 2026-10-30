@@ -6,6 +6,12 @@ Language: English | [中文](SPEC.zh.md)
 
 The artifact uses the restricted POSIX PAX [envelope v1](../../../envelope/v1/SPEC.md) and media type `application/tar+zstd`. Its filename is `diagnostic-tree.v1.tar.zst`.
 
+| Property | Limit |
+| --- | --- |
+| Compressed archive size | 1 GiB (`1,073,741,824` bytes) |
+| Entry count | 100,000, including files and directories |
+| Total regular-file size | 8 GiB (`8,589,934,592` bytes) |
+
 ## Tree
 
 The archive contains `manifest.json`, `result.json`, and an `artifact-tree/` directory holding the run's persisted diagnostic files. Only regular files and directories are allowed. Paths are relative, use `/`, contain no empty, `.` or `..` segments, and do not use backslashes. Duplicate effective paths are invalid.
@@ -16,7 +22,7 @@ The manifest is a UTF-8 JSON object with `version: 1`, the owning `run_id`, `res
 
 ## Production
 
-Producers apply the envelope's canonical entry rules, exclude the publication directory and symbolic links from `artifact-tree/`, explicitly select POSIX PAX output, and validate the completed archive against the shared envelope and this profile before publication.
+Producers apply the envelope's canonical entry rules, exclude the publication directory and symbolic links from `artifact-tree/`, enforce the profile limits before publication, explicitly select POSIX PAX output, and validate the completed archive against the shared envelope and this profile before publication. Consumers enforce the same limits while reading and extracting.
 
 ## Shared Corpus
 
