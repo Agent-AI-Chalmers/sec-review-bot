@@ -264,7 +264,7 @@ export async function publishDeliveryDraftPrs({
         event_type,
         repo: repo.repo_full_name
       })
-      if (failure.retry) {
+      if (failure.scope === 'publication') {
         throw new Error(
           `Failed to publish repository delivery ${String(delivery?.delivery_id ?? '(unknown)')}: ${errorMessage}`,
           { cause: error }

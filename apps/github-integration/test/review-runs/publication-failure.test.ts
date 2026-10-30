@@ -17,6 +17,7 @@ test('a publication step that exhausted its retry budget fails rather than retri
   )
   assert.deepStrictEqual(classifyPublicationFailure(error), {
     retry: false,
+    scope: 'step',
     code: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
     reason: 'publication-step-retry-exhausted'
   })
@@ -34,9 +35,29 @@ test('the same exhaustion code carried by a proxy answer stays retryable', () =>
   })
   assert.deepStrictEqual(classifyPublicationFailure(relayed), {
     retry: true,
+    scope: 'publication',
     code: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
     reason: 'publication-step-retry-exhausted'
   })
+})
+
+test('a refused credential ends the publication instead of the next delivery', () => {
+  // The batch records each delivery's failure and carries on. That is right for a 404 or a 422,
+  // which belong to one delivery, but wrong for a rejected credential: every remaining delivery
+  // would fail the same way. Scope is what lets the batch tell the two apart.
+  const refused = Object.assign(new Error('Bad credentials'), { status: 401 })
+  assert.deepStrictEqual(classifyPublicationFailure(refused), {
+    retry: false,
+    scope: 'publication',
+    code: 'GITHUB_AUTH_REJECTED',
+    reason: 'github-auth-rejected'
+  })
+})
+
+test('a delivery-scoped refusal keeps the rest of the publication running', () => {
+  const missing = Object.assign(new Error('Not Found'), { status: 404 })
+  assert.strictEqual(classifyPublicationFailure(missing).scope, 'step')
+  assert.strictEqual(classifyPublicationFailure(missing).retry, false)
 })
 
 test('Review Runs publication faults that cannot be repaired fail rather than retry', () => {
@@ -60,6 +81,7 @@ test('Review Runs publication faults that cannot be repaired fail rather than re
     )
     assert.deepStrictEqual(classifyPublicationFailure(error), {
       retry: false,
+      scope: 'step',
       code,
       reason
     })
@@ -69,6 +91,7 @@ test('Review Runs publication faults that cannot be repaired fail rather than re
     classifyPublicationFailure(new Error('Publication step set changed.')),
     {
       retry: true,
+      scope: 'publication',
       code: null,
       reason: 'unknown-publish-error'
     }
