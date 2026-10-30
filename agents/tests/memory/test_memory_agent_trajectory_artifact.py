@@ -7,6 +7,7 @@ import pytest
 
 from sec_review_agents.artifacts.reference import ZSTD_MEDIA_TYPE
 from sec_review_agents.memory.trajectory_artifact import (
+    build_memory_agent_trajectory,
     memory_agent_trajectory_s3_key,
     publish_memory_agent_trajectory,
 )
@@ -21,17 +22,13 @@ def test_memory_agent_trajectory_is_content_deterministic(tmp_path: Path) -> Non
     os.utime(first, (1, 1))
     os.utime(second, (2, 2))
 
-    first_reference = publish_memory_agent_trajectory(
-        agent_name="memory-extractor",
+    first_reference = build_memory_agent_trajectory(
         trajectory_path=first,
         output_dir=tmp_path / "first-output",
-        remote=False,
     )
-    second_reference = publish_memory_agent_trajectory(
-        agent_name="memory-extractor",
+    second_reference = build_memory_agent_trajectory(
         trajectory_path=second,
         output_dir=tmp_path / "second-output",
-        remote=False,
     )
 
     assert first_reference.digest == second_reference.digest
@@ -47,11 +44,9 @@ def test_memory_agent_trajectory_requires_one_jsonl_file(tmp_path: Path) -> None
     trajectory.write_text("{}\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="must be a JSONL file"):
-        publish_memory_agent_trajectory(
-            agent_name="memory-maintainer",
+        build_memory_agent_trajectory(
             trajectory_path=trajectory,
             output_dir=tmp_path / "output",
-            remote=False,
         )
 
 
