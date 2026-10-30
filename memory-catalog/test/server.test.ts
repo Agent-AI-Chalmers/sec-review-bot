@@ -721,11 +721,10 @@ await test('memory tree revision history is queryable through the public contrac
     revisions: [revision],
     next_before_revision: null,
   })
+  // The bound lives in the contract, so the page is refused by the same query
+  // validation that guards every other declared parameter, before the store is read.
   assert.equal(excessivePage.statusCode, 400)
-  assert.deepEqual(excessivePage.json(), {
-    error: 'Memory tree revision history limit must not exceed 100.',
-    code: 'INVALID_BODY',
-  })
+  assert.equal(excessivePage.json<{ code?: string }>().code, 'INVALID_BODY')
   assert.deepEqual(calls, [{ beforeRevision: 3, limit: 10 }])
   await app.close()
 })

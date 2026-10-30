@@ -95,15 +95,9 @@ export async function registerMemoryCatalogRoutes(
           code: 'NOT_FOUND',
         })
       },
-      listExtractions: async (request: FastifyRequest, reply: FastifyReply) => {
+      listExtractions: async (request: FastifyRequest) => {
         const query = request.query as QueryParameters<'listExtractions'>
         const limit = query.limit ? Number(query.limit) : 50
-        if (limit > 100) {
-          return await reply.status(400).send({
-            error: 'Extraction list limit must not exceed 100.',
-            code: 'INVALID_BODY',
-          })
-        }
         return await store.listExtractions(query.cursor, limit, {
           ...(query.source_workflow
             ? { sourceWorkflow: query.source_workflow }
@@ -114,18 +108,9 @@ export async function registerMemoryCatalogRoutes(
             : {}),
         })
       },
-      listObservations: async (
-        request: FastifyRequest,
-        reply: FastifyReply,
-      ) => {
+      listObservations: async (request: FastifyRequest) => {
         const query = request.query as QueryParameters<'listObservations'>
         const limit = query.limit ? Number(query.limit) : 50
-        if (limit > 100) {
-          return await reply.status(400).send({
-            error: 'Observation list limit must not exceed 100.',
-            code: 'INVALID_BODY',
-          })
-        }
         return await store.listObservations(query.cursor, limit, {
           ...(query.status ? { status: query.status } : {}),
           ...(query.consumed_revision
@@ -161,19 +146,10 @@ export async function registerMemoryCatalogRoutes(
         if (result.created) void reply.status(201)
         return result
       },
-      getMaintenanceInput: async (
-        request: FastifyRequest,
-        reply: FastifyReply,
-      ) => {
+      getMaintenanceInput: async (request: FastifyRequest) => {
         const limit = Number(
           (request.query as QueryParameters<'getMaintenanceInput'>).limit,
         )
-        if (limit > 100) {
-          return await reply.status(400).send({
-            error: 'Maintenance input limit must not exceed 100.',
-            code: 'INVALID_BODY',
-          })
-        }
         return { input: await store.getMaintenanceInput(limit) }
       },
       createMemoryTreeRevision: async (
@@ -217,22 +193,13 @@ export async function registerMemoryCatalogRoutes(
           code: 'NOT_FOUND',
         })
       },
-      listMemoryTreeRevisions: async (
-        request: FastifyRequest,
-        reply: FastifyReply,
-      ) => {
+      listMemoryTreeRevisions: async (request: FastifyRequest) => {
         const query =
           request.query as QueryParameters<'listMemoryTreeRevisions'>
         const beforeRevision = query.before_revision
           ? Number(query.before_revision)
           : undefined
         const limit = query.limit ? Number(query.limit) : 50
-        if (limit > 100) {
-          return await reply.status(400).send({
-            error: 'Memory tree revision history limit must not exceed 100.',
-            code: 'INVALID_BODY',
-          })
-        }
         return await store.listMemoryTreeRevisions(beforeRevision, limit)
       },
     },
