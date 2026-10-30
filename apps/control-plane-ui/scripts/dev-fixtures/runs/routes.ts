@@ -27,6 +27,10 @@ export function createRunsHandler(): (
   // endpoint moves the row to `uncertain` with a fresh budget, so the detail page must stop
   // reporting `disconnected` and the run must leave the operator queue.
   const resumed = new Set<string>()
+  // Runs the operator stopped waiting for. Giving up is the third decision the queue offers, so
+  // it has to work locally too; the run leaves the queue and its disconnected axis ends as the
+  // failure Review Runs records, rather than the button failing with a 404.
+  const gaveUp = new Set<string>()
   // The runs the mutation above parked, read from their own axes rather than from the index
   // set that produced them. Deriving from state is what lets all three axes appear in the
   // queue: a run parked on execution or publication is as invisible to an operator as one
@@ -58,7 +62,12 @@ export function createRunsHandler(): (
       if (!parkedIndexes.has(index)) return []
       const axis = parkedAxis(run)
       if (axis === null) return []
-      if (abandoned.has(run.run_id) || resumed.has(run.run_id)) return []
+      if (
+        abandoned.has(run.run_id) ||
+        resumed.has(run.run_id) ||
+        gaveUp.has(run.run_id)
+      )
+        return []
       return [
         {
           run_id: run.run_id,
@@ -204,6 +213,93 @@ export function createRunsHandler(): (
     const resumeMatch = /^\/api\/admin\/runs\/([^/?]+)\/resume$/.exec(
       requestUrl
     )
+    // Mirrors `POST /v1/admin/runs/{runId}/give-up`: a required reason, the same credential,
+    // and the disconnected axis concluded as the failure that names the operator.
+    const giveUpMatch = /^\/api\/admin\/runs\/([^/?]+)\/give-up$/.exec(
+      requestUrl
+    )
+    if (request.method === 'POST' && giveUpMatch !== null) {
+      if (request.headers['x-review-runs-admin-token'] === undefined) {
+        response.statusCode = 401
+        response.end(JSON.stringify({ error: 'admin_token_required' }))
+        return
+      }
+      const runId = decodeURIComponent(giveUpMatch[1] ?? '')
+      const chunks: Buffer[] = []
+      for await (const chunk of request) chunks.push(Buffer.from(chunk))
+      const body = ((): Record<string, unknown> => {
+        try {
+          return JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<
+            string,
+            unknown
+          >
+        } catch {
+          return {}
+        }
+      })()
+      // The decision is never anonymous: a reason is recorded on every event it writes.
+      if (typeof body.reason !== 'string' || body.reason.trim() === '') {
+        response.statusCode = 400
+        response.end(JSON.stringify({ error: 'reason_required' }))
+        return
+      }
+      if (!blockedRunIds().includes(runId)) {
+        response.statusCode = 409
+        response.end(JSON.stringify({ error: 'not_disconnected' }))
+        return
+      }
+      const run = runs.find((item) => item.run_id === runId)
+      const axis = run === undefined ? null : parkedAxis(run)
+      if (run === undefined || axis === null) {
+        response.statusCode = 404
+        response.end(JSON.stringify({ error: 'not_found' }))
+        return
+      }
+      // The same conclusion Review Runs performs: the disconnected axis ends as a failure whose
+      // code names the decision, whatever the run would still have produced is not published,
+      // and the notice says the outcome was given up on rather than that nothing happened.
+      const now = new Date().toISOString()
+      const reasonCode =
+        axis === 'preparation'
+          ? 'PREPARATION_GIVEN_UP_BY_OPERATOR'
+          : axis === 'execution'
+            ? 'SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR'
+            : 'PUBLICATION_ABANDONED_BY_OPERATOR'
+      if (axis === 'preparation') {
+        run.preparation.status = 'failed'
+        run.preparation.failure_code = reasonCode
+        run.preparation.finished_at = now
+        run.preparation.disconnect_reason = null
+      } else if (axis === 'execution') {
+        run.execution.status = 'failed'
+        run.execution.finished_at = now
+        run.failure_code = reasonCode
+      } else {
+        run.publication.status = 'failed'
+        run.publication.finished_at = now
+        run.failure_code = reasonCode
+      }
+      if (
+        run.publication.status === 'pending' ||
+        run.publication.status === 'publishing'
+      ) {
+        run.publication.status = 'skipped'
+        run.publication.finished_at = now
+      }
+      run.notices = [
+        {
+          notice_id: `fixture-${run.run_id}-given-up`,
+          kind: 'failure',
+          status: 'pending',
+          axis,
+          reason_code: reasonCode,
+          comment_url: null
+        }
+      ]
+      gaveUp.add(runId)
+      response.end(JSON.stringify({ run }))
+      return
+    }
     if (request.method === 'POST' && resumeMatch !== null) {
       if (request.headers['x-review-runs-admin-token'] === undefined) {
         response.statusCode = 401
