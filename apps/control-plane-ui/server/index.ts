@@ -50,6 +50,13 @@ class UpstreamResponseTooLargeError extends Error {
   }
 }
 
+class ArtifactDownloadTimeoutError extends Error {
+  constructor() {
+    super('Artifact download made no progress before the idle timeout.')
+    this.name = 'ArtifactDownloadTimeoutError'
+  }
+}
+
 async function readBoundedUpstreamBody(
   response: Response,
   maximumBytes: number
@@ -115,6 +122,69 @@ interface AvailableArtifact {
   key: string
   maximumSize: number
   sizeBytes: number
+}
+
+async function readVerifiedArtifactObject(
+  artifactStore: ArtifactStore,
+  artifact: AvailableArtifact,
+  idleTimeoutMs: number
+): Promise<Buffer> {
+  const controller = new AbortController()
+  let body: Readable | undefined
+  let idleTimeout: NodeJS.Timeout | undefined
+  let timedOut = false
+  const resetIdleTimeout = (): void => {
+    clearTimeout(idleTimeout)
+    idleTimeout = setTimeout(() => {
+      timedOut = true
+      controller.abort()
+      // Once getObject has returned, aborting its signal may not affect the body stream.
+      body?.destroy(new ArtifactDownloadTimeoutError())
+    }, idleTimeoutMs)
+    idleTimeout.unref()
+  }
+
+  try {
+    resetIdleTimeout()
+    const object = await artifactStore.getObject(
+      artifact.key,
+      controller.signal
+    )
+    body = object.body
+    resetIdleTimeout()
+    if (
+      object.contentLength !== undefined &&
+      (object.contentLength !== artifact.sizeBytes ||
+        object.contentLength > artifact.maximumSize)
+    )
+      throw new Error('artifact_identity_mismatch')
+
+    const chunks: Buffer[] = []
+    let size = 0
+    const digest = crypto.createHash('sha256')
+    for await (const chunk of body) {
+      resetIdleTimeout()
+      const bytes = Buffer.from(chunk)
+      size += bytes.length
+      if (size > artifact.sizeBytes || size > artifact.maximumSize)
+        throw new Error('artifact_identity_mismatch')
+      digest.update(bytes)
+      chunks.push(bytes)
+    }
+    clearTimeout(idleTimeout)
+    if (
+      size !== artifact.sizeBytes ||
+      `sha256:${digest.digest('hex')}` !== artifact.digest
+    )
+      throw new Error('artifact_identity_mismatch')
+    return Buffer.concat(chunks, size)
+  } catch (error) {
+    if (timedOut) throw new ArtifactDownloadTimeoutError()
+    throw error
+  } finally {
+    clearTimeout(idleTimeout)
+    if (body !== undefined && !body.destroyed) body.destroy()
+  }
 }
 
 interface TrajectoryEvent {
@@ -805,7 +875,7 @@ export function createControlPlaneUiServer({
               headers: {
                 authorization: `Bearer ${memoryCatalogOperatorToken}`
               },
-              signal: AbortSignal.timeout(REVIEW_RUNS_REQUEST_TIMEOUT_MS)
+              signal: AbortSignal.timeout(reviewRunsRequestTimeoutMs)
             }
           )
           if (!upstream.ok) {
@@ -840,35 +910,11 @@ export function createControlPlaneUiServer({
             sendJson(response, 409, { error: 'memory_artifact_unavailable' })
             return
           }
-          const object = await artifactStore.getObject(
-            artifact.key,
-            AbortSignal.timeout(ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS)
+          const complete = await readVerifiedArtifactObject(
+            artifactStore,
+            artifact,
+            artifactDownloadIdleTimeoutMs
           )
-          if (
-            object.contentLength !== undefined &&
-            (object.contentLength !== artifact.sizeBytes ||
-              object.contentLength > artifact.maximumSize)
-          ) {
-            object.body.destroy()
-            throw new Error('artifact_identity_mismatch')
-          }
-          const chunks: Buffer[] = []
-          let size = 0
-          const digest = crypto.createHash('sha256')
-          for await (const chunk of object.body) {
-            const bytes = Buffer.from(chunk)
-            size += bytes.length
-            if (size > artifact.sizeBytes || size > artifact.maximumSize)
-              throw new Error('artifact_identity_mismatch')
-            digest.update(bytes)
-            chunks.push(bytes)
-          }
-          if (
-            size !== artifact.sizeBytes ||
-            `sha256:${digest.digest('hex')}` !== artifact.digest
-          )
-            throw new Error('artifact_identity_mismatch')
-          const complete = Buffer.concat(chunks)
           if (requestedKind === 'content') {
             const files = await readMemoryTreeArtifact(complete)
             response.writeHead(200, {
@@ -901,13 +947,15 @@ export function createControlPlaneUiServer({
             'content-type': 'application/octet-stream',
             'content-disposition': `attachment; filename="${requestedKind === 'artifact' ? 'memory-tree.v1.tar.zst' : 'memory-trajectory.v1.jsonl.zst'}"`,
             'cache-control': 'no-store',
-            'content-length': String(size)
+            'content-length': String(complete.length)
           })
           response.end(complete)
         } catch (error) {
-          sendJson(response, 502, {
-            error:
-              error instanceof UpstreamResponseTooLargeError
+          const timedOut = error instanceof ArtifactDownloadTimeoutError
+          sendJson(response, timedOut ? 504 : 502, {
+            error: timedOut
+              ? 'memory_artifact_download_timeout'
+              : error instanceof UpstreamResponseTooLargeError
                 ? 'upstream_response_too_large'
                 : error instanceof Error &&
                     error.message === 'artifact_identity_mismatch'

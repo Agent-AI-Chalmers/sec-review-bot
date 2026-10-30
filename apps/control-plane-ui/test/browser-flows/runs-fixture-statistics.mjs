@@ -8,6 +8,22 @@ async function clickAndWaitForExpansion({
   waitUntil,
   message
 }) {
+  let previousBox = null
+  let stableSamples = 0
+  await control.scrollIntoViewIfNeeded()
+  await waitUntil(async () => {
+    const box = await control.boundingBox()
+    if (box === null) return false
+    const stable =
+      previousBox !== null &&
+      Math.abs(box.x - previousBox.x) < 0.5 &&
+      Math.abs(box.y - previousBox.y) < 0.5 &&
+      Math.abs(box.width - previousBox.width) < 0.5 &&
+      Math.abs(box.height - previousBox.height) < 0.5
+    previousBox = box
+    stableSamples = stable ? stableSamples + 1 : 0
+    return stableSamples >= 2
+  }, `${message}: control did not settle before click`)
   await control.click()
   await waitUntil(
     async () =>
