@@ -7,7 +7,8 @@ import {
   isUnauthorizedApiError,
   throwIfUnauthorized
 } from '../../shared/api-client.js'
-import { useMessages } from '../../shared/i18n.js'
+import { useMessages, type Message } from '../../shared/i18n.js'
+import { useResource } from '../../shared/resource.js'
 import type {
   MaintenanceControl,
   MaintenanceControlOperation,
@@ -47,14 +48,27 @@ function operationId(): string {
 
 export function Memory(): React.JSX.Element {
   const t = useMessages()
-  const [control, setControl] = React.useState<Control>()
-  const [revisions, setRevisions] = React.useState<Revision[]>([])
-  const [observations, setObservations] = React.useState<
-    ObservationPage['observations']
-  >([])
-  const [overview, setOverview] = React.useState<CatalogOverview>()
-  const [overviewRange, setOverviewRange] = React.useState<OverviewRange>('30d')
+  // The selected range lives in a ref as well as in state: a reload has to read the range
+  // the reader picked, not the one this render closed over.
   const overviewRangeRef = React.useRef<OverviewRange>('30d')
+  const [overviewRange, setOverviewRange] = React.useState<OverviewRange>('30d')
+  const control = useResource((signal) =>
+    api<Control>('/memory/maintenance-control', { signal })
+  )
+  const tree = useResource((signal) =>
+    api<MemoryTree>('/memory/tree', { signal })
+  )
+  const revisions = useResource((signal) =>
+    api<RevisionPage>('/memory/revisions?limit=50', { signal })
+  )
+  const observations = useResource((signal) =>
+    api<ObservationPage>('/memory/observations?limit=50', { signal })
+  )
+  const overview = useResource((signal) =>
+    api<CatalogOverview>(`/memory/overview?range=${overviewRangeRef.current}`, {
+      signal
+    })
+  )
   const [activeRevision, setActiveRevision] = React.useState<number>()
   const [files, setFiles] = React.useState<Record<string, string>>({})
   const [initialFiles, setInitialFiles] = React.useState<
@@ -70,127 +84,36 @@ export function Memory(): React.JSX.Element {
   const [revisionView, setRevisionView] = React.useState('graph')
   const [highlightedRevision, setHighlightedRevision] = React.useState<number>()
   const [error, setError] = React.useState('')
-  const [queryError, setQueryError] = React.useState<unknown>()
-  const [controlError, setControlError] = React.useState('')
-  const [treeError, setTreeError] = React.useState('')
-  const [revisionsError, setRevisionsError] = React.useState('')
-  const [observationsError, setObservationsError] = React.useState('')
-  const [overviewError, setOverviewError] = React.useState('')
-  const [controlLoading, setControlLoading] = React.useState(true)
-  const [treeLoading, setTreeLoading] = React.useState(true)
-  const [revisionsLoading, setRevisionsLoading] = React.useState(true)
-  const [observationsLoading, setObservationsLoading] = React.useState(true)
-  const [overviewLoading, setOverviewLoading] = React.useState(true)
-  const overviewRequest = React.useRef(0)
+  const [queryFailure, setQueryFailure] = React.useState<unknown>()
   const [busy, setBusy] = React.useState(false)
-  const loadControl = React.useCallback(async (): Promise<void> => {
-    setControlLoading(true)
-    try {
-      const nextControl = await api<Control>('/memory/maintenance-control')
-      setControl(nextControl)
-      setControlError('')
-    } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryError(failure)
-      else setControlError(t('memoryControlLoadFailed'))
-    } finally {
-      setControlLoading(false)
-    }
-  }, [t])
 
-  const loadTree = React.useCallback(async (): Promise<void> => {
-    setTreeLoading(true)
-    try {
-      const tree = await api<MemoryTree>('/memory/tree')
-      setActiveRevision(tree.revision)
-      setTreeError('')
-    } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryError(failure)
-      else setTreeError(t('memoryTreeLoadFailed'))
-    } finally {
-      setTreeLoading(false)
-    }
-  }, [t])
-
-  const loadRevisions = React.useCallback(async (): Promise<void> => {
-    setRevisionsLoading(true)
-    try {
-      const revisionPage = await api<RevisionPage>('/memory/revisions?limit=50')
-      setRevisions(revisionPage.revisions)
-      setRevisionsError('')
-    } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryError(failure)
-      else setRevisionsError(t('memoryRevisionsLoadFailed'))
-    } finally {
-      setRevisionsLoading(false)
-    }
-  }, [t])
-
-  const loadObservations = React.useCallback(async (): Promise<void> => {
-    setObservationsLoading(true)
-    try {
-      const observationPage = await api<ObservationPage>(
-        '/memory/observations?limit=50'
-      )
-      setObservations(observationPage.observations)
-      setObservationsError('')
-    } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryError(failure)
-      else setObservationsError(t('memoryObservationsLoadFailed'))
-    } finally {
-      setObservationsLoading(false)
-    }
-  }, [t])
-
-  const loadOverview = React.useCallback(
-    async (range: OverviewRange): Promise<void> => {
-      const request = ++overviewRequest.current
-      setOverviewLoading(true)
-      try {
-        const nextOverview = await api<CatalogOverview>(
-          `/memory/overview?range=${range}`
-        )
-        if (
-          overviewRequest.current === request &&
-          overviewRangeRef.current === range
-        ) {
-          setOverview(nextOverview)
-          setOverviewError('')
-        }
-      } catch (failure) {
-        if (
-          overviewRequest.current === request &&
-          overviewRangeRef.current === range
-        ) {
-          if (isUnauthorizedApiError(failure)) setQueryError(failure)
-          else setOverviewError(t('memoryOverviewLoadFailed'))
-        }
-      } finally {
-        if (
-          overviewRequest.current === request &&
-          overviewRangeRef.current === range
-        )
-          setOverviewLoading(false)
-      }
-    },
-    [t]
-  )
+  // The catalog decides which revision is active; the header and the editor read it from
+  // here, so a successful edit or restore moves the whole page with the reload.
+  React.useEffect(() => {
+    if (tree.data !== undefined) setActiveRevision(tree.data.revision)
+  }, [tree.data])
 
   const load = React.useCallback(async (): Promise<void> => {
-    const requestedOverviewRange = overviewRangeRef.current
     await Promise.all([
-      loadControl(),
-      loadTree(),
-      loadRevisions(),
-      loadObservations(),
-      loadOverview(requestedOverviewRange)
+      control.reload(),
+      tree.reload(),
+      revisions.reload(),
+      observations.reload(),
+      overview.reload()
     ])
-  }, [loadControl, loadObservations, loadOverview, loadRevisions, loadTree])
+  }, [
+    control.reload,
+    observations.reload,
+    overview.reload,
+    revisions.reload,
+    tree.reload
+  ])
   const { refresh, refreshing, lastChecked } = useRefresh(load)
 
   const changeOverviewRange = async (range: OverviewRange): Promise<void> => {
     setOverviewRange(range)
     overviewRangeRef.current = range
-    await loadOverview(range)
+    await overview.reload()
   }
 
   const revealRevision = (revision: number): void => {
@@ -211,18 +134,18 @@ export function Memory(): React.JSX.Element {
   }
 
   const controlAction = async (action: 'pause' | 'resume'): Promise<void> => {
-    if (!control) return
+    if (control.data === undefined) return
     setBusy(true)
     setError('')
     try {
       const request = {
         operation_id: operationId(),
-        expected_generation: control.generation
+        expected_generation: control.data.generation
       } satisfies MaintenanceControlRequest
       await apiPost(`/memory/${action}`, request)
       await refresh()
     } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryError(failure)
+      if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
       setError(
         failure instanceof ApiError && failure.status === 409
           ? t('memoryControlConflict')
@@ -249,7 +172,7 @@ export function Memory(): React.JSX.Element {
       setInitialFiles(content.files)
       setEditOpen(true)
     } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryError(failure)
+      if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
       else setError(t('memoryLoadFailed'))
     }
   }
@@ -267,7 +190,7 @@ export function Memory(): React.JSX.Element {
       setInitialFiles(files)
       await refresh()
     } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryError(failure)
+      if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
       setError(
         failure instanceof ApiError && failure.status === 409
           ? t('memoryRevisionConflict')
@@ -291,7 +214,7 @@ export function Memory(): React.JSX.Element {
       setRestoreRevision(undefined)
       await refresh()
     } catch (failure) {
-      if (isUnauthorizedApiError(failure)) setQueryError(failure)
+      if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
       setError(
         failure instanceof ApiError && failure.status === 409
           ? t('memoryRestoreConflict')
@@ -302,7 +225,34 @@ export function Memory(): React.JSX.Element {
     }
   }
 
+  // A session that expired is the app's problem, not this tab's: render throws it to the
+  // error boundary so every surface agrees on what an expired console session looks like.
+  const queryError =
+    queryFailure ??
+    [
+      control.error,
+      tree.error,
+      revisions.error,
+      observations.error,
+      overview.error
+    ].find(isUnauthorizedApiError)
   throwIfUnauthorized(queryError)
+
+  // A failure the boundary should handle is not also rendered as a per-panel message.
+  const failureText = (failure: unknown, message: Message): string =>
+    failure === undefined || isUnauthorizedApiError(failure) ? '' : t(message)
+  const controlError = failureText(control.error, 'memoryControlLoadFailed')
+  const treeError = failureText(tree.error, 'memoryTreeLoadFailed')
+  const revisionsError = failureText(
+    revisions.error,
+    'memoryRevisionsLoadFailed'
+  )
+  const observationsError = failureText(
+    observations.error,
+    'memoryObservationsLoadFailed'
+  )
+  const overviewError = failureText(overview.error, 'memoryOverviewLoadFailed')
+
   return (
     <Container size="lg" py="xl">
       <Title order={1} mb="lg">
@@ -314,19 +264,21 @@ export function Memory(): React.JSX.Element {
         </Alert>
       )}
       <MemoryHeader
-        control={control}
+        control={control.data}
         activeRevision={activeRevision}
         busy={busy}
-        controlLoading={controlLoading}
-        treeLoading={treeLoading}
+        controlLoading={control.loading}
+        treeLoading={tree.loading}
         controlError={controlError}
         treeError={treeError}
         refresh={refresh}
         refreshing={refreshing}
         lastChecked={lastChecked}
         onToggleMaintenance={() => {
-          if (control)
-            void controlAction(control.state === 'enabled' ? 'pause' : 'resume')
+          if (control.data)
+            void controlAction(
+              control.data.state === 'enabled' ? 'pause' : 'resume'
+            )
         }}
         onEdit={() => void beginEdit()}
       />
@@ -342,12 +294,12 @@ export function Memory(): React.JSX.Element {
               {overviewError}
             </Alert>
           )}
-          {overviewLoading && !overview && (
+          {overview.loading && overview.data === undefined && (
             <LoadingState message={t('loading')} />
           )}
-          {overview && (
+          {overview.data && (
             <MemoryOverview
-              overview={overview}
+              overview={overview.data}
               range={overviewRange}
               onRangeChange={(range) => void changeOverviewRange(range)}
             />
@@ -355,9 +307,9 @@ export function Memory(): React.JSX.Element {
         </Tabs.Panel>
         <Tabs.Panel value="revisions" pt="md">
           <MemoryRevisionHistory
-            revisions={revisions}
+            revisions={revisions.data?.revisions ?? []}
             activeRevision={activeRevision}
-            loading={revisionsLoading}
+            loading={revisions.loading}
             error={revisionsError}
             view={revisionView}
             highlightedRevision={highlightedRevision}
@@ -371,8 +323,8 @@ export function Memory(): React.JSX.Element {
         </Tabs.Panel>
         <Tabs.Panel value="observations" pt="md">
           <MemoryObservationList
-            observations={observations}
-            loading={observationsLoading}
+            observations={observations.data?.observations ?? []}
+            loading={observations.loading}
             error={observationsError}
             onRevealRevision={revealRevision}
             onViewTrajectory={(item) =>
