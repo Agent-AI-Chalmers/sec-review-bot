@@ -1,3 +1,5 @@
+import { TextDecoder } from 'node:util'
+
 import {
   REVIEW_AGENT_NAMES,
   type ExecutionStatisticsRead,
@@ -6,11 +8,52 @@ import {
 
 const OBSERVATIONS_V2_PATH = '/api/public/v2/observations'
 const LANGFUSE_SDK_INSTRUMENTATION_SCOPE = 'langfuse-sdk'
+const MAX_LANGFUSE_PAGE_BYTES = 16 * 1024 * 1024
 
 export class LangfuseRateLimitError extends Error {
   constructor(readonly retryAfterMs: number | null) {
     super('Langfuse observations request was rate limited.')
   }
+}
+
+async function readBoundedPageJson(response: Response): Promise<unknown> {
+  const contentLength = response.headers.get('content-length')
+  if (
+    contentLength !== null &&
+    /^\d+$/.test(contentLength) &&
+    Number(contentLength) > MAX_LANGFUSE_PAGE_BYTES
+  ) {
+    await response.body?.cancel()
+    throw new Error('Langfuse response is larger than the page budget.')
+  }
+  if (response.body === null)
+    throw new Error('Langfuse observations response has no body.')
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > MAX_LANGFUSE_PAGE_BYTES) {
+        await reader.cancel()
+        throw new Error('Langfuse response is larger than the page budget.')
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  const body = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return JSON.parse(new TextDecoder().decode(body)) as unknown
 }
 
 function retryAfterMs(response: Response): number | null {
@@ -89,14 +132,17 @@ export class LangfuseObservationsClient {
         headers: { authorization: this.authorization },
         signal: AbortSignal.timeout(this.timeoutMs)
       })
-      if (response.status === 429)
+      if (response.status === 429) {
+        await response.body?.cancel()
         throw new LangfuseRateLimitError(retryAfterMs(response))
+      }
       if (!response.ok) {
+        await response.body?.cancel()
         throw new Error(
           `Langfuse observations request failed with HTTP ${response.status}.`
         )
       }
-      const body = objectValue(await response.json())
+      const body = objectValue(await readBoundedPageJson(response))
       const data = body?.data
       const meta = objectValue(body?.meta)
       if (!Array.isArray(data) || meta === null)
