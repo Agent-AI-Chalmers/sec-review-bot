@@ -21,6 +21,17 @@ def test_artifact_reference_accepts_non_archive_media_type(tmp_path: Path) -> No
     assert ArtifactReference.from_mapping(reference.as_dict()) == reference
 
 
+def test_artifact_reference_accepts_https_locator() -> None:
+    reference = ArtifactReference(
+        uri="https://artifacts.example/runs/run-1/input-bundle.tar.zst",
+        digest=f"sha256:{'a' * 64}",
+        media_type="application/tar+zstd",
+        size_bytes=7,
+    )
+
+    assert reference.uri.startswith("https://artifacts.example/")
+
+
 def test_concrete_consumer_rejects_unsupported_media_type(tmp_path: Path) -> None:
     artifact = tmp_path / "trajectory.jsonl.zst"
     artifact.write_bytes(b"compressed trajectory")
@@ -71,17 +82,13 @@ def test_materialize_artifact_decodes_non_ascii_file_uri_path(tmp_path: Path) ->
 @pytest.mark.parametrize(
     ("uri", "message"),
     [
-        ("file:relative/artifact.tar.zst", "absolute local file URI"),
-        ("file://remote-host/tmp/artifact.tar.zst", "absolute local file URI"),
+        ("relative/artifact.tar.zst", "must be absolute"),
         ("file:///tmp/artifact.tar.zst?download=1", "query or fragment"),
-        ("s3:", "bucket and object key"),
-        ("s3://bucket", "bucket and object key"),
         ("s3://bucket/key#fragment", "query or fragment"),
-        ("s3://user@bucket/key", "bucket and object key"),
-        ("https://artifacts.example/artifact", "scheme must be file or s3"),
+        (" https://artifacts.example/artifact", "canonical and non-empty"),
     ],
 )
-def test_artifact_reference_rejects_noncanonical_uri(
+def test_artifact_reference_rejects_unstable_or_relative_uri(
     uri: str,
     message: str,
 ) -> None:
@@ -92,6 +99,18 @@ def test_artifact_reference_rejects_noncanonical_uri(
             media_type="application/tar+zstd",
             size_bytes=7,
         )
+
+
+def test_materialize_artifact_rejects_unsupported_https_locator(tmp_path: Path) -> None:
+    reference = ArtifactReference(
+        uri="https://artifacts.example/runs/run-1/input-bundle.tar.zst",
+        digest=f"sha256:{'a' * 64}",
+        media_type="application/tar+zstd",
+        size_bytes=7,
+    )
+
+    with pytest.raises(ValueError, match="Unsupported artifact URI scheme: https"):
+        materialize_artifact(reference, tmp_path / "unused", maximum_size=100)
 
 
 def test_materialize_artifact_rejects_modified_shared_file(tmp_path: Path) -> None:

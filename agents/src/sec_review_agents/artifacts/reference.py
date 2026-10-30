@@ -5,46 +5,12 @@ import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
+
+from sec_review_agents.artifacts.uri import parse_artifact_uri
 
 ARCHIVE_MEDIA_TYPE = "application/tar+zstd"
 ZSTD_MEDIA_TYPE = "application/zstd"
 _SHA256_DIGEST = re.compile(r"sha256:[0-9a-f]{64}")
-
-
-def _validate_artifact_uri(value: object) -> str:
-    """Return a supported artifact URI after validating its canonical shape.
-
-    References are absolute local-file URIs or S3 bucket/object URIs. Query and
-    fragment components are excluded to keep stored references stable and unambiguous.
-    """
-    if not isinstance(value, str) or not value or value != value.strip():
-        raise ValueError("Artifact reference uri must be canonical and non-empty.")
-    if any(character.isspace() for character in value):
-        raise ValueError("Artifact reference uri must not contain whitespace.")
-    try:
-        parsed = urlsplit(value)
-    except ValueError as error:
-        raise ValueError("Artifact reference uri is invalid.") from error
-    if parsed.query or parsed.fragment:
-        raise ValueError("Artifact reference uri must not contain query or fragment.")
-    if parsed.scheme == "file":
-        if parsed.netloc not in {"", "localhost"} or not parsed.path.startswith("/"):
-            raise ValueError("Artifact file uri must be an absolute local file URI.")
-        if parsed.path == "/":
-            raise ValueError("Artifact file uri must identify a file path.")
-    elif parsed.scheme == "s3":
-        if (
-            not parsed.netloc
-            or "@" in parsed.netloc
-            or ":" in parsed.netloc
-            or not parsed.path.startswith("/")
-            or parsed.path == "/"
-        ):
-            raise ValueError("Artifact S3 uri must identify a bucket and object key.")
-    else:
-        raise ValueError("Artifact reference uri scheme must be file or s3.")
-    return value
 
 
 @dataclass(frozen=True)
@@ -55,7 +21,7 @@ class ArtifactReference:
     size_bytes: int
 
     def __post_init__(self) -> None:
-        uri = _validate_artifact_uri(self.uri)
+        parse_artifact_uri(self.uri)
         if (
             not isinstance(self.digest, str)
             or _SHA256_DIGEST.fullmatch(self.digest) is None
@@ -69,7 +35,6 @@ class ArtifactReference:
             or self.size_bytes < 0
         ):
             raise ValueError("Artifact reference size_bytes must be non-negative.")
-        object.__setattr__(self, "uri", uri)
         object.__setattr__(self, "media_type", self.media_type.strip())
 
     @classmethod
