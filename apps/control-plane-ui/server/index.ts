@@ -647,88 +647,127 @@ export function createControlPlaneUiServer({
           }
           chunks.push(bytes)
         }
+        let body: Record<string, unknown>
         try {
-          const body = JSON.parse(
-            Buffer.concat(chunks).toString('utf8')
-          ) as Record<string, unknown>
-          const action = memoryWriteMatch[1]
-          let catalogPath: string
-          let catalogBody: Record<string, unknown>
-          if (action === 'pause' || action === 'resume') {
-            catalogPath = `/v1/maintenance-control/${action}`
-            catalogBody = {
-              operation_id: body.operation_id,
-              expected_generation: body.expected_generation
+          body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as Record<
+            string,
+            unknown
+          >
+        } catch {
+          sendJson(response, 400, { error: 'invalid_request' })
+          return
+        }
+        const action = memoryWriteMatch[1]
+        let catalogPath: string
+        let catalogBody: Record<string, unknown>
+        if (action === 'pause' || action === 'resume') {
+          catalogPath = `/v1/maintenance-control/${action}`
+          catalogBody = {
+            operation_id: body.operation_id,
+            expected_generation: body.expected_generation
+          }
+        } else if (action === 'restore') {
+          catalogPath = '/v1/memory-tree/restore'
+          catalogBody = {
+            operation_id: body.operation_id,
+            expected_active_revision: body.expected_active_revision,
+            restored_revision: body.restored_revision
+          }
+        } else {
+          if (!artifactStore?.putMemoryArtifact) {
+            sendJson(response, 503, {
+              error: 'memory_artifact_upload_unavailable'
+            })
+            return
+          }
+          if (
+            typeof body.files !== 'object' ||
+            body.files === null ||
+            Array.isArray(body.files)
+          ) {
+            sendJson(response, 400, { error: 'invalid_memory_files' })
+            return
+          }
+          const files = new Map<string, string>()
+          for (const [name, value] of Object.entries(body.files)) {
+            if (typeof value !== 'string') {
+              sendJson(response, 400, { error: 'invalid_memory_files' })
+              return
             }
-          } else {
-            if (action === 'edit') {
-              if (!artifactStore?.putMemoryArtifact)
-                throw new Error('memory_artifact_upload_unavailable')
-              if (
-                typeof body.files !== 'object' ||
-                body.files === null ||
-                Array.isArray(body.files)
-              )
-                throw new Error('invalid_memory_files')
-              const files = new Map<string, string>()
-              for (const [name, value] of Object.entries(body.files)) {
-                if (typeof value !== 'string')
-                  throw new Error('invalid_memory_files')
-                files.set(name, value)
-              }
-              const artifact = await buildMemoryTreeArtifact(files)
-              await artifactStore.putMemoryArtifact(artifact)
-              const reference = {
-                uri: `s3://${ARTIFACT_BUCKET}/${artifact.objectKey}`,
-                digest: artifact.digest,
-                media_type: artifact.mediaType,
-                size_bytes: artifact.sizeBytes
-              }
-              catalogPath = '/v1/memory-tree/revisions'
-              catalogBody = {
-                expected_active_revision: body.expected_active_revision,
-                memory_tree_reference: reference,
-                source: {
-                  kind: 'operator',
-                  operation_id: body.operation_id
-                }
-              }
-            } else {
-              catalogPath = '/v1/memory-tree/restore'
-              catalogBody = {
-                operation_id: body.operation_id,
-                expected_active_revision: body.expected_active_revision,
-                restored_revision: body.restored_revision
-              }
+            files.set(name, value)
+          }
+          let artifact: Awaited<ReturnType<typeof buildMemoryTreeArtifact>>
+          try {
+            artifact = await buildMemoryTreeArtifact(files)
+          } catch (error) {
+            sendJson(response, 400, {
+              error: error instanceof Error ? error.message : 'invalid_request'
+            })
+            return
+          }
+          try {
+            await artifactStore.putMemoryArtifact(artifact)
+          } catch {
+            sendJson(response, 502, { error: 'memory_artifact_upload_failed' })
+            return
+          }
+          catalogPath = '/v1/memory-tree/revisions'
+          catalogBody = {
+            expected_active_revision: body.expected_active_revision,
+            memory_tree_reference: {
+              uri: `s3://${ARTIFACT_BUCKET}/${artifact.objectKey}`,
+              digest: artifact.digest,
+              media_type: artifact.mediaType,
+              size_bytes: artifact.sizeBytes
+            },
+            source: {
+              kind: 'operator',
+              operation_id: body.operation_id
             }
           }
-          const upstream = await fetch(`${memoryCatalogUrl}${catalogPath}`, {
+        }
+        let upstream: Response
+        try {
+          upstream = await fetch(`${memoryCatalogUrl}${catalogPath}`, {
             method: 'POST',
             headers: {
               authorization: `Bearer ${memoryCatalogOperatorToken}`,
               'content-type': 'application/json'
             },
             body: JSON.stringify(catalogBody),
-            signal: AbortSignal.timeout(REVIEW_RUNS_REQUEST_TIMEOUT_MS)
+            signal: AbortSignal.timeout(reviewRunsRequestTimeoutMs)
           })
-          const responseBody = await readBoundedUpstreamBody(
+        } catch (error) {
+          const timedOut =
+            error instanceof Error &&
+            (error.name === 'AbortError' || error.name === 'TimeoutError')
+          sendJson(response, timedOut ? 504 : 502, {
+            error: timedOut
+              ? 'memory_catalog_timeout'
+              : 'memory_catalog_unavailable'
+          })
+          return
+        }
+        let responseBody: Buffer
+        try {
+          responseBody = await readBoundedUpstreamBody(
             upstream,
             upstreamJsonMaxBytes
           )
-          response.writeHead(upstream.status, {
-            'content-type': PROXIED_CONTENT_TYPE,
-            'cache-control': 'no-store'
-          })
-          response.end(responseBody)
         } catch (error) {
-          if (error instanceof UpstreamResponseTooLargeError) {
-            sendJson(response, 502, { error: 'upstream_response_too_large' })
-            return
-          }
-          sendJson(response, 400, {
-            error: error instanceof Error ? error.message : 'invalid_request'
+          sendJson(response, 502, {
+            error:
+              error instanceof UpstreamResponseTooLargeError
+                ? 'upstream_response_too_large'
+                : 'memory_catalog_unavailable'
           })
+          return
         }
+        response.writeHead(upstream.status, {
+          'content-type': PROXIED_CONTENT_TYPE,
+          'cache-control': 'no-store'
+        })
+        response.end(responseBody)
         return
       }
       const memoryArtifactMatch =
