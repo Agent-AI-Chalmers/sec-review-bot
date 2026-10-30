@@ -10,7 +10,9 @@ from temporalio.converter import DataConverter
 from temporalio.worker import Worker
 
 from sec_review_agents.artifacts.reference import ArtifactReference
-from sec_review_agents.memory.revision_creation import MemoryTreeRevisionCreation
+from sec_review_agents.memory.revision_commit_input import (
+    MemoryTreeRevisionCommitInput,
+)
 from sec_review_agents.workflows.memory import (
     extraction as extraction_workflow,
 )
@@ -42,10 +44,10 @@ def _reference() -> ArtifactReference:
     )
 
 
-def _revision_creation(
+def _commit_input(
     *, extraction_ids: tuple[str, ...] = ("extraction-1",)
-) -> MemoryTreeRevisionCreation:
-    return MemoryTreeRevisionCreation(
+) -> MemoryTreeRevisionCommitInput:
+    return MemoryTreeRevisionCommitInput(
         maintenance_id="maintenance-run-1",
         expected_active_revision=3,
         extraction_ids=extraction_ids,
@@ -64,7 +66,7 @@ def _revision_creation(
         ({"extraction_ids": ("extraction-1", "extraction-1")}, "unique"),
     ],
 )
-def test_memory_tree_revision_creation_rejects_invalid_invariants(
+def test_memory_tree_commit_input_rejects_invalid_invariants(
     overrides: dict[str, object],
     message: str,
 ) -> None:
@@ -78,7 +80,7 @@ def test_memory_tree_revision_creation_rejects_invalid_invariants(
     values.update(overrides)
 
     with pytest.raises((TypeError, ValueError), match=message):
-        MemoryTreeRevisionCreation(**values)  # type: ignore[arg-type]
+        MemoryTreeRevisionCommitInput(**values)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize(
@@ -128,14 +130,14 @@ def test_maintenance_preparation_result_rejects_mixed_variants() -> None:
     with pytest.raises(ValueError, match="exactly one non-empty"):
         MemoryMaintenancePreparationResult(
             kind="complete",
-            revision_creation=_revision_creation(),
+            commit_input=_commit_input(),
             summary="Already complete.",
         )
 
-    with pytest.raises(ValueError, match="only a revision creation"):
+    with pytest.raises(ValueError, match="only a revision commit input"):
         MemoryMaintenancePreparationResult(
             kind="prepared",
-            revision_creation=_revision_creation(),
+            commit_input=_commit_input(),
             reason="Unexpected reason.",
         )
 
@@ -583,8 +585,8 @@ async def test_maintenance_prepare_skips_without_accessing_catalog_when_disabled
 @pytest.mark.asyncio
 async def test_maintenance_prepare_uses_catalog_input(monkeypatch) -> None:
     client = Mock()
-    revision = _revision_creation()
-    prepare = AsyncMock(return_value=revision)
+    commit_input = _commit_input()
+    prepare = AsyncMock(return_value=commit_input)
     monkeypatch.setattr(
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
         Mock(return_value=client),
@@ -605,7 +607,7 @@ async def test_maintenance_prepare_uses_catalog_input(monkeypatch) -> None:
 
     assert result == MemoryMaintenancePreparationResult(
         kind="prepared",
-        revision_creation=revision,
+        commit_input=commit_input,
     )
     prepare.assert_awaited_once_with(
         catalog_client=client,
@@ -759,13 +761,13 @@ async def test_manual_maintenance_runs_without_threshold(monkeypatch) -> None:
 async def test_coordinated_maintenance_commits_recorded_preparation(
     monkeypatch,
 ) -> None:
-    revision_creation = _revision_creation()
+    commit_input = _commit_input()
     results = iter(
         [
             {"ok": True, "pending_count": 1, "oldest_pending_created_at": None},
             MemoryMaintenancePreparationResult(
                 kind="prepared",
-                revision_creation=revision_creation,
+                commit_input=commit_input,
             ),
             {"ok": True, "processed_count": 1},
             {"ok": True, "pending_count": 0, "oldest_pending_created_at": None},
@@ -790,13 +792,13 @@ async def test_coordinated_maintenance_commits_recorded_preparation(
     )
     assert calls[2] == (
         maintenance_workflow.commit_memory_tree_revision_activity,
-        revision_creation,
+        commit_input,
     )
 
 
 @pytest.mark.asyncio
 async def test_maintenance_workflow_retries_commit_with_history_revision() -> None:
-    revision_creation = MemoryTreeRevisionCreation(
+    commit_input = MemoryTreeRevisionCommitInput(
         maintenance_id="maintenance-run-1",
         expected_active_revision=3,
         extraction_ids=("extraction-1", "extraction-2"),
@@ -812,7 +814,7 @@ async def test_maintenance_workflow_retries_commit_with_history_revision() -> No
         ),
     )
     prepare_calls = 0
-    commit_revisions: list[MemoryTreeRevisionCreation] = []
+    commit_revisions: list[MemoryTreeRevisionCommitInput] = []
 
     @activity.defn(name="count_pending_memory_observations_activity")
     def fake_pending_summary() -> dict[str, Any]:
@@ -831,11 +833,11 @@ async def test_maintenance_workflow_retries_commit_with_history_revision() -> No
         prepare_calls += 1
         return MemoryMaintenancePreparationResult(
             kind="prepared",
-            revision_creation=revision_creation,
+            commit_input=commit_input,
         )
 
     @activity.defn(name="commit_memory_tree_revision_activity")
-    def fake_commit(revision: MemoryTreeRevisionCreation) -> dict[str, Any]:
+    def fake_commit(revision: MemoryTreeRevisionCommitInput) -> dict[str, Any]:
         commit_revisions.append(revision)
         if len(commit_revisions) == 1:
             raise RuntimeError("response lost after catalog persistence")
@@ -870,7 +872,7 @@ async def test_maintenance_workflow_retries_commit_with_history_revision() -> No
         "processed_count": 2,
     }
     assert prepare_calls == 1
-    assert commit_revisions == [revision_creation, revision_creation]
+    assert commit_revisions == [commit_input, commit_input]
 
 
 @pytest.mark.asyncio
@@ -888,7 +890,7 @@ async def test_catalog_revision_conflict_is_not_retried(monkeypatch) -> None:
     )
 
     with pytest.raises(ApplicationError) as captured:
-        maintenance_workflow.commit_memory_tree_revision_activity(_revision_creation())
+        maintenance_workflow.commit_memory_tree_revision_activity(_commit_input())
 
     assert captured.value.type == "MEMORY_CATALOG_REVISION_CONFLICT"
     assert captured.value.non_retryable is True
@@ -911,7 +913,7 @@ async def test_catalog_maintenance_pause_is_not_retried(monkeypatch) -> None:
     )
 
     with pytest.raises(ApplicationError) as captured:
-        maintenance_workflow.commit_memory_tree_revision_activity(_revision_creation())
+        maintenance_workflow.commit_memory_tree_revision_activity(_commit_input())
 
     assert captured.value.type == "MEMORY_MAINTENANCE_PAUSED"
     assert captured.value.non_retryable is True
@@ -934,7 +936,7 @@ def test_commit_memory_tree_revision_uses_prepared_payload_after_processing_is_d
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
         Mock(return_value=client),
     )
-    prepared = _revision_creation(extraction_ids=("extraction-1", "extraction-2"))
+    prepared = _commit_input(extraction_ids=("extraction-1", "extraction-2"))
 
     assert maintenance_workflow.commit_memory_tree_revision_activity(prepared) == {
         "ok": True,
@@ -989,7 +991,7 @@ def test_commit_memory_tree_revision_retry_reuses_prepared_references(
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
         Mock(return_value=client),
     )
-    prepared = _revision_creation(extraction_ids=("extraction-1", "extraction-2"))
+    prepared = _commit_input(extraction_ids=("extraction-1", "extraction-2"))
 
     first = maintenance_workflow.commit_memory_tree_revision_activity(prepared)
     second = maintenance_workflow.commit_memory_tree_revision_activity(prepared)

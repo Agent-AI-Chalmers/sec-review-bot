@@ -4,7 +4,9 @@ from typing import Any, Literal
 
 from temporalio import activity, workflow
 
-from sec_review_agents.memory.revision_creation import MemoryTreeRevisionCreation
+from sec_review_agents.memory.revision_commit_input import (
+    MemoryTreeRevisionCommitInput,
+)
 from sec_review_agents.temporal.support import activity_retry_policy
 
 MEMORY_MAINTENANCE_PENDING_THRESHOLD = 10
@@ -25,7 +27,7 @@ class MemoryMaintenanceRequest:
 @dataclass(frozen=True)
 class MemoryMaintenancePreparationResult:
     kind: Literal["complete", "prepared"]
-    revision_creation: MemoryTreeRevisionCreation | None = None
+    commit_input: MemoryTreeRevisionCommitInput | None = None
     reason: str | None = None
     summary: str | None = None
 
@@ -41,7 +43,7 @@ class MemoryMaintenancePreparationResult:
                 and isinstance(self.summary, str)
                 and bool(self.summary.strip())
             )
-            if self.revision_creation is not None or not (has_reason or has_summary):
+            if self.commit_input is not None or not (has_reason or has_summary):
                 raise ValueError(
                     "Completed maintenance preparation requires exactly one non-empty "
                     "reason or summary, with the other field unset."
@@ -49,12 +51,12 @@ class MemoryMaintenancePreparationResult:
             return
         if self.kind == "prepared":
             if (
-                not isinstance(self.revision_creation, MemoryTreeRevisionCreation)
+                not isinstance(self.commit_input, MemoryTreeRevisionCommitInput)
                 or self.reason is not None
                 or self.summary is not None
             ):
                 raise ValueError(
-                    "Prepared maintenance requires only a revision creation."
+                    "Prepared maintenance requires only a revision commit input."
                 )
             return
         raise ValueError(f"Unsupported maintenance preparation kind: {self.kind!r}")
@@ -87,26 +89,26 @@ async def prepare_memory_maintenance_activity(
             kind="complete",
             summary="Automatic memory maintenance is paused.",
         )
-    revision_creation = await prepare_coordinated_memory_revision(
+    commit_input = await prepare_coordinated_memory_revision(
         catalog_client=catalog_client,
         maintenance_id=f"maintenance-{activity.info().workflow_run_id}",
         deployment=None,
         batch_size=request.batch_size,
     )
-    if revision_creation is None:
+    if commit_input is None:
         return MemoryMaintenancePreparationResult(
             kind="complete",
             summary="No pending memory observations selected.",
         )
     return MemoryMaintenancePreparationResult(
         kind="prepared",
-        revision_creation=revision_creation,
+        commit_input=commit_input,
     )
 
 
 @activity.defn
 def commit_memory_tree_revision_activity(
-    creation: MemoryTreeRevisionCreation,
+    commit_input: MemoryTreeRevisionCommitInput,
 ) -> dict[str, Any]:
     from temporalio.exceptions import ApplicationError
 
@@ -125,11 +127,13 @@ def commit_memory_tree_revision_activity(
         )
     try:
         committed = catalog_client.create_memory_tree_revision(
-            maintenance_id=creation.maintenance_id,
-            expected_active_revision=creation.expected_active_revision,
-            extraction_ids=list(creation.extraction_ids),
-            memory_tree_reference=creation.memory_tree_reference,
-            maintenance_trajectory_reference=creation.maintenance_trajectory_reference,
+            maintenance_id=commit_input.maintenance_id,
+            expected_active_revision=commit_input.expected_active_revision,
+            extraction_ids=list(commit_input.extraction_ids),
+            memory_tree_reference=commit_input.memory_tree_reference,
+            maintenance_trajectory_reference=(
+                commit_input.maintenance_trajectory_reference
+            ),
         )
     except MemoryMaintenancePausedError as error:
         raise ApplicationError(
@@ -147,14 +151,14 @@ def commit_memory_tree_revision_activity(
     if (
         not isinstance(source, dict)
         or source.get("kind") != "maintenance"
-        or source.get("maintenance_id") != creation.maintenance_id
+        or source.get("maintenance_id") != commit_input.maintenance_id
     ):
         raise RuntimeError("Catalog returned a different maintenance identity.")
     return {
         "ok": True,
         "skipped": False,
-        "summary": f"Processed {len(creation.extraction_ids)} memory observations.",
-        "processed_count": len(creation.extraction_ids),
+        "summary": f"Processed {len(commit_input.extraction_ids)} memory observations.",
+        "processed_count": len(commit_input.extraction_ids),
     }
 
 
@@ -252,10 +256,10 @@ class MemoryMaintenanceWorkflow:
                 assert prepared.summary is not None
                 result["summary"] = prepared.summary
         elif prepared.kind == "prepared":
-            assert prepared.revision_creation is not None
+            assert prepared.commit_input is not None
             result = await workflow.execute_activity(
                 commit_memory_tree_revision_activity,
-                prepared.revision_creation,
+                prepared.commit_input,
                 schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
                 retry_policy=activity_retry_policy(),
             )
