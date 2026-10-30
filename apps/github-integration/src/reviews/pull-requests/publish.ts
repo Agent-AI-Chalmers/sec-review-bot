@@ -22,19 +22,11 @@ import {
 } from './suggestion-service.js'
 import { logError, logInfo } from '../../utils/logger.js'
 import { asErrorWithResponse, asErrorMessage } from '../../utils/error-utils.js'
-import {
-  isPublicationStepExhausted,
-  settleExhaustedStep
-} from '../shared/settle-exhausted-step.js'
+import { runPublicationStep } from '../shared/publication-step.js'
 import { parseReviewRecord, type ReviewRecord } from '../review-record.js'
 import { isCurrentAppBotLogin } from '../../github/github-app-metadata-service.js'
 import { assertWorkflowResult } from '../../execution/execution-api-schema.js'
 import type { PublicationStepStore } from '../../review-runs/client.js'
-import { classifyPublicationFailure } from '../../review-runs/publication-failure.js'
-import {
-  isPublicationClaimLostError,
-  PublicationClaimLostError
-} from '../../review-runs/publication-claim.js'
 
 interface SuggestionReviewResult {
   review_id: number
@@ -253,73 +245,38 @@ async function publishPullRequestReviewResult({
 }): Promise<void> {
   const stepKey = 'pull-request:review'
   await store.initializePublicationSteps(run_id, claim_token, [stepKey])
-  const persisted = (await store.listPublicationSteps(run_id))[0]
-  if (persisted?.status === 'succeeded') return
-  try {
-    await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
-  } catch (error) {
-    // No attempts left is not a verdict: the review may already be on the pull request. The
-    // attempt that posted it can lose its response, and the publisher that started it may have
-    // died before recording it. Look for this run's marker before the step becomes a failure.
-    if (!isPublicationStepExhausted(error)) throw error
-    const marker = pullRequestReviewRunMarker(run_id)
-    const settled = await settleExhaustedStep({
-      store,
-      runId: run_id,
-      token: claim_token,
-      stepKey,
-      find: async () => {
-        const existing = await findPullRequestReviewByMarker(octokit, {
-          owner_login: pr.owner_login,
-          repo_name: pr.repo_name,
-          pr_number: pr.pr_number,
-          marker
-        })
-        return existing === null
-          ? null
-          : { id: existing.id, url: existing.html_url }
-      }
-    })
-    // The review was already submitted: nothing left to publish for this step.
-    if (settled.outcome === 'recorded' && settled.step === 'succeeded') return
-    throw error
-  }
-  try {
-    // Never begin a GitHub mutation on the strength of an expired heartbeat.
-    await assert_publication_claim()
-    const remote = await publishPullRequestReviewSideEffect({
-      octokit,
-      pr,
-      files: reviewFiles,
-      event_type,
-      workflow_result,
-      run_id,
-      assert_publication_claim
-    })
-    if (
-      !(await store.completePublicationStep(
+  const marker = pullRequestReviewRunMarker(run_id)
+  // No attempts left is not a verdict: the review may already be on the pull request. The
+  // attempt that posted it can lose its response, and the publisher that started it may have
+  // died before recording it, so the marker is looked for before the step becomes a failure.
+  await runPublicationStep({
+    store,
+    runId: run_id,
+    token: claim_token,
+    stepKey,
+    assertClaim: assert_publication_claim,
+    find: async () => {
+      const existing = await findPullRequestReviewByMarker(octokit, {
+        owner_login: pr.owner_login,
+        repo_name: pr.repo_name,
+        pr_number: pr.pr_number,
+        marker
+      })
+      return existing === null
+        ? null
+        : { id: existing.id, url: existing.html_url }
+    },
+    effect: async () =>
+      await publishPullRequestReviewSideEffect({
+        octokit,
+        pr,
+        files: reviewFiles,
+        event_type,
+        workflow_result,
         run_id,
-        claim_token,
-        stepKey,
-        remote
-      ))
-    )
-      throw new PublicationClaimLostError(run_id)
-  } catch (error) {
-    if (isPublicationClaimLostError(error)) throw error
-    const failure = classifyPublicationFailure(error)
-    await store.failPublicationStep(
-      run_id,
-      claim_token,
-      stepKey,
-      {
-        code: failure.code,
-        message: asErrorMessage(error)
-      },
-      { retry: failure.retry }
-    )
-    throw error
-  }
+        assert_publication_claim
+      })
+  })
 }
 
 async function publishPullRequestReviewSideEffect({

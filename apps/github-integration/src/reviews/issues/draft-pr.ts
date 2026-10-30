@@ -9,8 +9,7 @@ import type { ReviewRecord } from '../review-record.js'
 import type { FileChange, FileMode } from '../file-change.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
 import { resolveTrustedDefaultBranch } from '../../github/default-branch-service.js'
-import { isBranchAlreadyExists } from '../shared/branch-already-exists.js'
-import { DeterministicExecutionPublishError } from '../../execution/publish-error.js'
+import { publishDraftPullRequest } from '../shared/draft-pull-request.js'
 
 interface IssueContext {
   issue_number: number
@@ -200,112 +199,35 @@ export async function createDraftPullRequestFromIssueReviewRecord({
     review_record
   })
 
-  // The run-specific branch is the publish idempotency key. Reuse its open PR
-  // before creating git objects so a retried publish cannot create another PR.
-  const existingPullRequests = await octokit.rest.pulls.list({
-    owner,
-    repo,
-    state: 'open',
-    head: `${owner}:${branch_name}`
-  })
-  const existingPullRequest = existingPullRequests.data[0]
-  if (existingPullRequest) {
-    return {
-      branch_name,
-      title: existingPullRequest.title,
-      body: existingPullRequest.body ?? body,
-      html_url: existingPullRequest.html_url,
-      number: existingPullRequest.number
-    }
-  }
-
-  const commitResponse = await octokit.rest.git.getCommit({
-    owner,
-    repo,
-    commit_sha: head_sha
-  })
-  const baseTreeSha = commitResponse.data.tree.sha
-  const tree = await buildTreeElementsFromFileChanges(
+  const published = await publishDraftPullRequest({
     octokit,
-    file_changes,
-    issue,
-    assert_publication_claim
-  )
-
-  if (tree.length === 0) {
-    throw new Error('Draft PR creation requires at least one changed file.')
-  }
-
-  await assert_publication_claim()
-  const treeResponse = await octokit.rest.git.createTree({
     owner,
     repo,
-    base_tree: baseTreeSha,
-    tree
+    plan: {
+      branch_name,
+      head_sha,
+      base_branch: base,
+      title,
+      body,
+      commit_message: `Mitigate issue #${issue.issue_number}`,
+      build_tree: async () =>
+        await buildTreeElementsFromFileChanges(
+          octokit,
+          file_changes,
+          issue,
+          assert_publication_claim
+        ),
+      empty_tree_message:
+        'Draft PR creation requires at least one changed file.',
+      mismatch_message: `Existing draft PR branch does not match the validated result for run ${run_id}.`
+    },
+    assert_claim: assert_publication_claim
   })
-
-  const commitMessage = `Mitigate issue #${issue.issue_number}`
-  await assert_publication_claim()
-  const newCommitResponse = await octokit.rest.git.createCommit({
-    owner,
-    repo,
-    message: commitMessage,
-    tree: treeResponse.data.sha,
-    parents: [head_sha]
-  })
-
-  try {
-    await assert_publication_claim()
-    await octokit.rest.git.createRef({
-      owner,
-      repo,
-      ref: `refs/heads/${branch_name}`,
-      sha: newCommitResponse.data.sha
-    })
-  } catch (error) {
-    // The existing run-specific branch is a recovery checkpoint only when it
-    // still represents this run's validated result. Do not overwrite it.
-    if (!isBranchAlreadyExists(error)) {
-      throw error
-    }
-    await assert_publication_claim()
-    const existingRef = await octokit.rest.git.getRef({
-      owner,
-      repo,
-      ref: `heads/${branch_name}`
-    })
-    const existingCommit = await octokit.rest.git.getCommit({
-      owner,
-      repo,
-      commit_sha: existingRef.data.object.sha
-    })
-    if (
-      existingCommit.data.tree.sha !== treeResponse.data.sha ||
-      existingCommit.data.parents?.length !== 1 ||
-      existingCommit.data.parents[0]?.sha !== head_sha
-    ) {
-      throw new DeterministicExecutionPublishError(
-        `Existing draft PR branch does not match the validated result for run ${run_id}.`
-      )
-    }
-  }
-
-  await assert_publication_claim()
-  const pullRequestResponse = await octokit.rest.pulls.create({
-    owner,
-    repo,
-    title,
-    head: branch_name,
-    base,
-    body,
-    draft: true
-  })
-
   return {
-    branch_name,
-    title,
-    body,
-    html_url: pullRequestResponse.data.html_url,
-    number: pullRequestResponse.data.number
+    branch_name: published.branch_name,
+    title: published.title,
+    body: published.body,
+    html_url: published.html_url,
+    number: published.number
   }
 }

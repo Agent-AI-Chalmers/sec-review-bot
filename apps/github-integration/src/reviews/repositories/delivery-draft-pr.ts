@@ -5,8 +5,7 @@ import type { FileChange, FileMode, TextEncoding } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
 import type { RepositoryCaseResult, RepositoryDelivery } from './result.js'
-import { isBranchAlreadyExists } from '../shared/branch-already-exists.js'
-import { DeterministicExecutionPublishError } from '../../execution/publish-error.js'
+import { publishDraftPullRequest } from '../shared/draft-pull-request.js'
 
 interface RepositoryContext {
   owner_login: string
@@ -185,123 +184,39 @@ export async function createRepositoryDeliveryDraftPr({
     case_results
   })
 
-  // Branch name is the delivery publish idempotency key to avoid duplicate PRs on retry.
-  const existingPullRequests = await octokit.rest.pulls.list({
-    owner: repo.owner_login,
-    repo: repo.repo_name,
-    state: 'open',
-    head: `${repo.owner_login}:${branch_name}`
-  })
-
-  if (existingPullRequests.data.length > 0) {
-    const existing = existingPullRequests.data[0]
-    if (!existing) {
-      throw new Error('Failed to resolve existing delivery draft PR.')
-    }
-    return {
-      branch_name,
-      title: existing.title,
-      body: existing.body,
-      html_url: existing.html_url,
-      number: existing.number,
-      reused: true
-    }
-  }
-
-  const head_sha = input.workspace_ref
-  const commitResponse = await octokit.rest.git.getCommit({
-    owner: repo.owner_login,
-    repo: repo.repo_name,
-    commit_sha: head_sha
-  })
-  const baseTreeSha = commitResponse.data.tree.sha
-  const tree = await buildTreeElements(
+  const published = await publishDraftPullRequest({
     octokit,
-    delivery,
-    repo,
-    assert_publication_claim
-  )
-
-  if (tree.length === 0) {
-    throw new Error(
-      'Repository security delivery requires at least one changed file.'
-    )
-  }
-
-  await assert_publication_claim()
-  const treeResponse = await octokit.rest.git.createTree({
     owner: repo.owner_login,
     repo: repo.repo_name,
-    base_tree: baseTreeSha,
-    tree
+    plan: {
+      branch_name,
+      head_sha: input.workspace_ref,
+      base_branch:
+        normalizeTargetBranch(input.scan_target?.target_branch) ||
+        repo.default_branch,
+      title,
+      body,
+      commit_message: buildRepositorySecurityDeliveryCommitMessage(delivery),
+      build_tree: async () =>
+        await buildTreeElements(
+          octokit,
+          delivery,
+          repo,
+          assert_publication_claim
+        ),
+      empty_tree_message:
+        'Repository security delivery requires at least one changed file.',
+      mismatch_message: `Existing delivery draft PR branch does not match the validated result for ${String(delivery.delivery_id)}.`
+    },
+    assert_claim: assert_publication_claim
   })
-
-  await assert_publication_claim()
-  const newCommitResponse = await octokit.rest.git.createCommit({
-    owner: repo.owner_login,
-    repo: repo.repo_name,
-    message: buildRepositorySecurityDeliveryCommitMessage(delivery),
-    tree: treeResponse.data.sha,
-    parents: [head_sha]
-  })
-
-  try {
-    await assert_publication_claim()
-    await octokit.rest.git.createRef({
-      owner: repo.owner_login,
-      repo: repo.repo_name,
-      ref: `refs/heads/${branch_name}`,
-      sha: newCommitResponse.data.sha
-    })
-  } catch (error) {
-    // An existing run-specific branch is a recovery checkpoint only when it
-    // still has this run's validated contents.
-    if (!isBranchAlreadyExists(error)) {
-      throw error
-    }
-
-    await assert_publication_claim()
-    const existingRef = await octokit.rest.git.getRef({
-      owner: repo.owner_login,
-      repo: repo.repo_name,
-      ref: `heads/${branch_name}`
-    })
-    const existingCommit = await octokit.rest.git.getCommit({
-      owner: repo.owner_login,
-      repo: repo.repo_name,
-      commit_sha: existingRef.data.object.sha
-    })
-    if (
-      existingCommit.data.tree.sha !== treeResponse.data.sha ||
-      existingCommit.data.parents?.length !== 1 ||
-      existingCommit.data.parents[0]?.sha !== head_sha
-    ) {
-      throw new DeterministicExecutionPublishError(
-        `Existing delivery draft PR branch does not match the validated result for ${String(delivery.delivery_id)}.`
-      )
-    }
-  }
-
-  await assert_publication_claim()
-  const pullRequestResponse = await octokit.rest.pulls.create({
-    owner: repo.owner_login,
-    repo: repo.repo_name,
-    title,
-    head: branch_name,
-    base:
-      normalizeTargetBranch(input.scan_target?.target_branch) ||
-      repo.default_branch,
-    body,
-    draft: true
-  })
-
   return {
-    branch_name,
-    title,
-    body,
-    html_url: pullRequestResponse.data.html_url,
-    number: pullRequestResponse.data.number,
-    reused: false
+    branch_name: published.branch_name,
+    title: published.title,
+    body: published.body,
+    html_url: published.html_url,
+    number: published.number,
+    reused: published.reused
   }
 }
 import crypto from 'node:crypto'

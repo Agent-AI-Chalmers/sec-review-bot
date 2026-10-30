@@ -31,6 +31,7 @@ import {
   isPublicationStepExhausted,
   settleExhaustedStep
 } from '../shared/settle-exhausted-step.js'
+import { runPublicationStep } from '../shared/publication-step.js'
 import {
   parseRepositoryWorkflowResult,
   type RepositoryCaseResult,
@@ -325,64 +326,40 @@ async function claimOrReconcileSummaryIssue({
   assert_publication_claim: () => Promise<void>
 }): Promise<number> {
   const stepKey = 'repository:summary-issue'
-  try {
-    await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
-  } catch (error) {
-    if (!isPublicationStepExhausted(error)) throw error
-    const settled = await settleExhaustedStep({
-      store,
-      runId: run_id,
-      token: claim_token,
-      stepKey,
-      find: async () => {
-        const existing = await findRepositorySecuritySummaryIssue(octokit, {
-          owner_login: repo.owner_login,
-          repo_name: repo.repo_name,
-          title: REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE
-        })
-        return existing === null ? null : { id: existing.number }
-      }
+  const step = await runPublicationStep({
+    store,
+    runId: run_id,
+    token: claim_token,
+    stepKey,
+    assertClaim: assert_publication_claim,
+    find: async () => {
+      const existing = await findRepositorySecuritySummaryIssue(octokit, {
+        owner_login: repo.owner_login,
+        repo_name: repo.repo_name,
+        title: REPOSITORY_SECURITY_SUMMARY_ISSUE_TITLE
+      })
+      return existing === null ? null : { id: existing.number }
+    },
+    effect: async () => ({
+      id: await ensureSummaryIssueNumber(
+        octokit,
+        repo,
+        assert_publication_claim
+      )
     })
-    if (settled.outcome !== 'recorded' || settled.step !== 'succeeded')
-      throw error
-    const issueNumber = Number(settled.remote.id)
+  })
+  const issueNumber = Number(step.remote.id)
+  if (!Number.isSafeInteger(issueNumber) || issueNumber < 1)
+    throw new Error(
+      'Repository summary issue step is succeeded without a recorded issue number.'
+    )
+  if (step.reconciled)
     logInfo('repository_summary_issue_reconciled', {
       event_type,
       repo: repo.repo_full_name,
       issue_number: issueNumber
     })
-    return issueNumber
-  }
-
-  try {
-    await assert_publication_claim()
-    const summaryIssueNumber = await ensureSummaryIssueNumber(
-      octokit,
-      repo,
-      assert_publication_claim
-    )
-    if (
-      !(await store.completePublicationStep(run_id, claim_token, stepKey, {
-        id: summaryIssueNumber
-      }))
-    )
-      throw new PublicationClaimLostError(run_id)
-    return summaryIssueNumber
-  } catch (error) {
-    if (isPublicationClaimLostError(error)) throw error
-    const failure = classifyPublicationFailure(error)
-    await store.failPublicationStep(
-      run_id,
-      claim_token,
-      stepKey,
-      {
-        code: failure.code,
-        message: asErrorMessage(error)
-      },
-      { retry: failure.retry }
-    )
-    throw error
-  }
+  return issueNumber
 }
 
 /** Create a delivery's draft PR, or conclude the step from one a previous owner already opened.
@@ -391,7 +368,12 @@ async function claimOrReconcileSummaryIssue({
  * that opened it can die before recording it. The head branch embeds the run and delivery ids, so
  * an open PR from it is unambiguously this step's side effect. Reconciliation only reports what
  * it found; the step is concluded through `settleExhaustedPublicationStep`, which is also what
- * makes a confirmed absence a terminal failure. */
+ * makes a confirmed absence a terminal failure.
+ *
+ * This step deliberately does not use `runPublicationStep`: a delivery's failure is recorded by
+ * the batch that owns all deliveries, which decides whether the publication aborts or continues
+ * with the remaining ones. Recording it here as well would write the same failure twice and take
+ * the continue-or-abort decision away from the only caller that can make it. */
 async function publishOrReconcileDeliveryDraftPr({
   octokit,
   store,
@@ -559,85 +541,48 @@ async function publishRepositoryReviewResult({
       ...(scan_target ? { scan_target } : {})
     })
   ].join('\n\n')
-  const summaryCommentStep = (await store.listPublicationSteps(run_id)).find(
-    (step) => step.step_key === 'repository:summary-comment'
-  )
-  if (summaryCommentStep?.status === 'succeeded') return
-  try {
-    await store.requirePublicationStepClaim(
-      run_id,
-      claim_token,
-      'repository:summary-comment'
-    )
-  } catch (error) {
-    // No attempts left. The summary comment may already be posted under this run's marker, in
-    // which case the step is done and reporting a failure would contradict what is on GitHub.
-    if (!isPublicationStepExhausted(error)) throw error
-    const settled = await settleExhaustedStep({
-      store,
-      runId: run_id,
-      token: claim_token,
-      stepKey: 'repository:summary-comment',
-      find: async () => {
-        const existing = await findIssueCommentByMarker(github, {
-          owner_login: repo.owner_login,
-          repo_name: repo.repo_name,
-          issue_number: summaryIssueNumber,
-          marker
-        })
-        return existing === null
-          ? null
-          : { id: existing.id, url: existing.html_url }
-      }
-    })
-    if (settled.outcome === 'recorded' && settled.step === 'succeeded') return
-    throw error
-  }
-  let comment
-  try {
-    await assert_publication_claim()
-    comment = await createIssueCommentUnlessMarkerExists(github, {
-      owner_login: repo.owner_login,
-      repo_name: repo.repo_name,
-      issue_number: summaryIssueNumber,
-      body: commentBody,
-      marker,
-      assert_publication_claim
-    })
-    if (
-      !(await store.completePublicationStep(
-        run_id,
-        claim_token,
-        'repository:summary-comment',
-        {
-          id: comment.id,
-          url: comment.html_url
-        }
-      ))
-    )
-      throw new PublicationClaimLostError(run_id)
-  } catch (error) {
-    if (isPublicationClaimLostError(error)) throw error
-    const failure = classifyPublicationFailure(error)
-    await store.failPublicationStep(
-      run_id,
-      claim_token,
-      'repository:summary-comment',
-      {
-        code: failure.code,
-        message: asErrorMessage(error)
-      },
-      { retry: failure.retry }
-    )
-    throw error
-  }
+  // No attempts left is not a verdict: the summary comment may already be posted under this
+  // run's marker, in which case the step is done and reporting a failure would contradict what
+  // is on GitHub.
+  let reused = false
+  const commentStep = await runPublicationStep({
+    store,
+    runId: run_id,
+    token: claim_token,
+    stepKey: 'repository:summary-comment',
+    assertClaim: assert_publication_claim,
+    find: async () => {
+      const existing = await findIssueCommentByMarker(github, {
+        owner_login: repo.owner_login,
+        repo_name: repo.repo_name,
+        issue_number: summaryIssueNumber,
+        marker
+      })
+      return existing === null
+        ? null
+        : { id: existing.id, url: existing.html_url }
+    },
+    effect: async () => {
+      const comment = await createIssueCommentUnlessMarkerExists(github, {
+        owner_login: repo.owner_login,
+        repo_name: repo.repo_name,
+        issue_number: summaryIssueNumber,
+        body: commentBody,
+        marker,
+        assert_publication_claim
+      })
+      reused = comment.reused
+      return { id: comment.id, url: comment.html_url }
+    }
+  })
+  if (commentStep.alreadySucceeded) return
   logInfo('repository_summary_comment_publish_completed', {
-    comment_id: comment.id,
-    comment_url: comment.html_url,
+    comment_id: commentStep.remote.id,
+    comment_url: commentStep.remote.url,
     event_type,
     issue: summaryIssueNumber,
     repo: repo.repo_full_name,
-    reused: comment.reused
+    reused
   })
 }
 
