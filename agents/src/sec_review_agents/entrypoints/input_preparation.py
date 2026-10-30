@@ -150,9 +150,7 @@ def _materialize_input_bundle(
             expected_run_id is not None
             and env_value(ARTIFACT_S3_BUCKET_ENV) is not None
         ):
-            raise ValueError(
-                "Execution input input_bundle.uri must use s3 in object-storage mode."
-            )
+            raise ValueError("Execution input input_bundle.uri must use s3 in S3 mode.")
         if parsed.netloc not in {"", "localhost"}:
             raise ValueError("Execution input input_bundle file URI must be local.")
         archive_path = Path(unquote(parsed.path))

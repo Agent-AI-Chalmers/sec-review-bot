@@ -1,4 +1,4 @@
-"""Immutable artifact references shared by local and object-storage flows."""
+"""Immutable artifact references shared by local and S3 flows."""
 
 import hashlib
 import re
