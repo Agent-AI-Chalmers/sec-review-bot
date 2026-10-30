@@ -861,6 +861,83 @@ test('BFF rejects oversized memory objects before buffering their body', async (
   }
 })
 
+test('BFF times out and closes a stalled memory artifact body', async () => {
+  const digest = `sha256:${'a'.repeat(64)}`
+  const catalog = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.end(
+      JSON.stringify({
+        revision: 2,
+        memory_tree_reference: {
+          uri: `s3://sec-review/memory/trees/${'a'.repeat(64)}/memory-tree.v1.tar.zst`,
+          digest,
+          media_type: 'application/tar+zstd',
+          size_bytes: 2
+        },
+        source: {
+          kind: 'operator',
+          operation_id: 'edit-1'
+        }
+      })
+    )
+  })
+  await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
+  const catalogAddress = catalog.address()
+  assert(catalogAddress && typeof catalogAddress === 'object')
+  let sentChunk = false
+  let bodyClosed = false
+  const body = new Readable({
+    read(): void {
+      if (sentChunk) return
+      sentChunk = true
+      this.push('x')
+    }
+  })
+  body.once('close', () => {
+    bodyClosed = true
+  })
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
+    memoryCatalogOperatorToken: 'catalog-secret',
+    artifactDownloadIdleTimeoutMs: 20,
+    artifactStore: {
+      getObject: async () => ({ body })
+    }
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  try {
+    const cookie = await loginCookie(base)
+    const response = await Promise.race([
+      fetch(`${base}/api/memory/revisions/2/artifact`, {
+        headers: { cookie }
+      }),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error('memory artifact did not time out')),
+          500
+        )
+      )
+    ])
+    assert.strictEqual(response.status, 504)
+    assert.deepStrictEqual(await response.json(), {
+      error: 'memory_artifact_download_timeout'
+    })
+    assert.strictEqual(bodyClosed, true)
+  } finally {
+    body.destroy()
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => catalog.close(() => resolve()))
+    ])
+  }
+})
+
 /**
  * Sign-out has to expire the session cookie server-side: it is HttpOnly, so the console
  * cannot clear it from script. The regression this prevents is a console that appears to
