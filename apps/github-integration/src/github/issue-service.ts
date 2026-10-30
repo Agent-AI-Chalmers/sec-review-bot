@@ -45,11 +45,6 @@ export class IssueContextExtractionError extends Error {
   }
 }
 
-interface LinkedPullRequestRef {
-  event: 'cross-referenced'
-  pull_request_number: number
-}
-
 interface LinkedPullRequest {
   number: number
   title: string
@@ -141,84 +136,13 @@ function isSameRepositoryPullRequestSource(
   )
 }
 
-async function listTimelineCrossReferencedPullRequestRefs(
-  octokit: Octokit,
-  issue: IssueContext
-): Promise<LinkedPullRequestRef[]> {
-  const refs: LinkedPullRequestRef[] = []
-  const seen = new Set<number>()
-  let page = 1
-
-  while (true) {
-    const response = await octokit.rest.issues.listEventsForTimeline({
-      owner: issue.owner_login,
-      repo: issue.repo_name,
-      issue_number: issue.issue_number,
-      per_page: 100,
-      page
-    })
-
-    for (const rawEvent of response.data) {
-      const timelineEvent = asRecord(rawEvent)
-      if (asString(timelineEvent.event) !== 'cross-referenced') {
-        continue
-      }
-
-      const source = asRecord(timelineEvent.source)
-      const source_issue = asRecord(source.issue)
-      if (!source_issue || Object.keys(source_issue).length === 0) {
-        continue
-      }
-
-      const pullRequest = asRecord(source_issue.pull_request)
-      if (!pullRequest || Object.keys(pullRequest).length === 0) {
-        continue
-      }
-
-      if (
-        !isSameRepositoryPullRequestSource(source_issue, {
-          owner_login: issue.owner_login,
-          repo_name: issue.repo_name
-        })
-      ) {
-        continue
-      }
-
-      const pr_number = asNumber(source_issue.number)
-      if (
-        !Number.isInteger(pr_number) ||
-        pr_number <= 0 ||
-        seen.has(pr_number)
-      ) {
-        continue
-      }
-
-      seen.add(pr_number)
-      refs.push({
-        event: 'cross-referenced',
-        pull_request_number: pr_number
-      })
-    }
-
-    if (response.data.length < 100) {
-      break
-    }
-
-    page += 1
-  }
-
-  return refs
-}
-
 export async function fetchTimelineLinkedPullRequests(
   octokit: Octokit,
   issue: IssueContext
 ): Promise<{
   source: 'issue-timeline-cross-references'
-  refs: LinkedPullRequestRef[]
   pull_requests: LinkedPullRequest[]
 }> {
-  const refs = await listTimelineCrossReferencedPullRequestRefs(octokit, issue)
   const pull_requests: LinkedPullRequest[] = []
   const seen = new Set<number>()
 
@@ -282,7 +206,6 @@ export async function fetchTimelineLinkedPullRequests(
 
   return {
     source: 'issue-timeline-cross-references',
-    refs,
     pull_requests
   }
 }

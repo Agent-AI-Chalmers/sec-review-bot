@@ -56,9 +56,6 @@ async function materializeHistoryArtifacts({
   history_path: string
 }): Promise<{
   issueMetadata: IssueReviewInput['issue']
-  linkedPullRequests: Awaited<
-    ReturnType<typeof fetchTimelineLinkedPullRequests>
-  >
 }> {
   // The Execution Worker validates this against the v1 issue schema, which forbids additional
   // properties. Identity fields plus what the prompts render; `default_branch` and
@@ -92,10 +89,7 @@ async function materializeHistoryArtifacts({
     }))
   })
 
-  return {
-    issueMetadata,
-    linkedPullRequests
-  }
+  return { issueMetadata }
 }
 
 export async function prepareIssueReviewInput({
