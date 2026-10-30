@@ -1,6 +1,7 @@
 // Verifies the integration's typed Review Runs client at its HTTP and
 // contract boundary, without involving connector workflow behavior.
 import assert from 'node:assert/strict'
+import { ReadableStream } from 'node:stream/web'
 import test from 'node:test'
 
 import {
@@ -184,6 +185,46 @@ test('Review Runs calls have a bounded request timeout', async (t) => {
       'code' in error &&
       error.code === 'REVIEW_RUNS_REQUEST_TIMEOUT'
   )
+})
+
+test('Review Runs success responses have a bounded body', async (t) => {
+  const previousUrl = process.env.REVIEW_RUNS_SERVICE_URL
+  const previousToken = process.env.REVIEW_RUNS_SERVICE_TOKEN
+  process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
+  process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
+  t.after(() => {
+    if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
+    else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
+    if (previousToken === undefined)
+      delete process.env.REVIEW_RUNS_SERVICE_TOKEN
+    else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+  })
+  let bodyCancelled = false
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async () =>
+      new Response(
+        new ReadableStream({
+          cancel(): void {
+            bodyCancelled = true
+          }
+        }),
+        {
+          status: 200,
+          headers: { 'content-length': String(4 * 1024 * 1024 + 1) }
+        }
+      )
+  )
+
+  await assert.rejects(
+    reviewRunsClient.renewPublicationClaim('run-1', 'claim-1'),
+    (error: unknown) =>
+      error instanceof Error &&
+      'code' in error &&
+      error.code === 'REVIEW_RUNS_RESPONSE_TOO_LARGE'
+  )
+  assert.strictEqual(bodyCancelled, true)
 })
 
 test('an invalid claimed publish context is persisted as terminal failure', async (t) => {

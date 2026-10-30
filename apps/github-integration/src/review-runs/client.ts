@@ -1,5 +1,7 @@
 // Provides the typed HTTP boundary to Review Runs and keeps wire-level
 // contract details out of GitHub workflows and coordinators.
+import { TextDecoder } from 'node:util'
+
 import { operationRoutes } from './review-runs-api.js'
 import type {
   OperationOptionsById,
@@ -26,6 +28,8 @@ export type {
 }
 
 type JsonObject = Record<string, unknown>
+
+const MAX_REVIEW_RUNS_RESPONSE_BYTES = 4 * 1024 * 1024
 
 type OperationId = keyof OperationOptionsById & keyof typeof operationRoutes
 
@@ -98,6 +102,72 @@ interface HttpErrorBody {
   code?: string
 }
 
+class ReviewRunsResponseTooLargeError extends Error {
+  readonly code = 'REVIEW_RUNS_RESPONSE_TOO_LARGE'
+
+  constructor() {
+    super('Review Runs returned a response larger than the protocol budget.')
+    this.name = 'ReviewRunsResponseTooLargeError'
+  }
+}
+
+async function readBoundedResponseText(response: Response): Promise<string> {
+  const contentLength = response.headers.get('content-length')
+  if (
+    contentLength !== null &&
+    /^\d+$/.test(contentLength) &&
+    Number(contentLength) > MAX_REVIEW_RUNS_RESPONSE_BYTES
+  ) {
+    await response.body?.cancel()
+    throw new ReviewRunsResponseTooLargeError()
+  }
+  if (response.body === null) return ''
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > MAX_REVIEW_RUNS_RESPONSE_BYTES) {
+        await reader.cancel()
+        throw new ReviewRunsResponseTooLargeError()
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  const body = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return new TextDecoder().decode(body)
+}
+
+function parseHttpErrorBody(text: string): HttpErrorBody {
+  try {
+    const parsed: unknown = JSON.parse(text)
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed))
+      return {}
+    return {
+      ...('error' in parsed && typeof parsed.error === 'string'
+        ? { error: parsed.error }
+        : {}),
+      ...('code' in parsed && typeof parsed.code === 'string'
+        ? { code: parsed.code }
+        : {})
+    }
+  } catch {
+    return {}
+  }
+}
+
 type Operation<Id extends OperationId> = OperationOptionsById[Id]
 
 /** The JSON request body the contract declares for an operation. A `POST` must pass exactly
@@ -145,10 +215,24 @@ class HttpReviewRunsClient {
         signal: controller.signal
       })
       if (!response.ok) {
-        if (nullOn404 && response.status === 404) return null as SuccessBody<Id>
-        const parsed = (await response
-          .json()
-          .catch(() => ({}))) as HttpErrorBody
+        if (nullOn404 && response.status === 404) {
+          await response.body?.cancel()
+          return null as SuccessBody<Id>
+        }
+      }
+      let text: string
+      try {
+        text = await readBoundedResponseText(response)
+      } catch (error) {
+        if (!(error instanceof ReviewRunsResponseTooLargeError) || response.ok)
+          throw error
+        throw Object.assign(
+          new Error(`Review Runs returned HTTP ${response.status}.`),
+          { code: null, status: response.status }
+        )
+      }
+      if (!response.ok) {
+        const parsed = parseHttpErrorBody(text)
         // The status is part of the answer, not decoration: a refusal (4xx) is a verdict that
         // classification must tell apart from the same `code` carried by a request that never
         // got an answer. Dropping it here made every refusal look like a transport fault.
@@ -167,7 +251,6 @@ class HttpReviewRunsClient {
       // on every such call, which carried no `code` or HTTP status and was therefore
       // misclassified as a retryable publication fault — the exact "loops forever" failure the
       // terminal-code alignment exists to prevent. Parse only when there is a body.
-      const text = await response.text()
       return (text === '' ? undefined : JSON.parse(text)) as SuccessBody<Id>
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
