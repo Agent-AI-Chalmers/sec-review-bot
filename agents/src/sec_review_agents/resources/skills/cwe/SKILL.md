@@ -5,10 +5,6 @@ description: "Assign a concrete, evidence-supported CWE only after a repository-
 
 # CWE Classification Skill
 
-Use CWE as a naming and reasoning aid after a security finding is already supported by repository evidence.
-
-Do not use CWE lookup as a substitute for finding generation.
-
 ## Trigger Conditions
 
 Enter this workflow only when all of the following are true:
@@ -56,6 +52,4 @@ Do not enter this workflow when:
 ## Guardrails
 
 - Never map a finding directly to a CWE Category.
-- Do not use CWE to upgrade a weak finding into a stronger one.
-- Do not force a precise CWE when the repository evidence is still ambiguous.
 - For business-logic and chain-like issues, the prose explanation may be more precise than the CWE label.

@@ -11,7 +11,7 @@ Do not use this skill as a general web security checklist or as proof that a vul
 
 ## Route
 
-Read only the reference that matches the current reviewed lead:
+Start with the narrowest reference matching the current reviewed lead. Read another reference when checked repository evidence shows that its mechanism could change the current security judgment:
 
 - Login, session, JWT, OAuth/OIDC, password reset, cookie/session-token handling: read `/skills/web-security/references/auth-session.md`.
 - Server-side URL fetches, webhooks, image/proxy fetchers, metadata/internal network access: read `/skills/web-security/references/ssrf.md`.
