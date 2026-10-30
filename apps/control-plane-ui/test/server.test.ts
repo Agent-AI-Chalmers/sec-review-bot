@@ -60,6 +60,31 @@ async function loginCookie(base: string): Promise<string> {
   return cookie
 }
 
+test('BFF marks session cookies secure for HTTPS proxy deployments', async () => {
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    secureCookies: true
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  try {
+    const login = await fetch(`http://127.0.0.1:${address.port}/api/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: '{"token":"login-secret"}'
+    })
+
+    assert.match(login.headers.get('set-cookie') ?? '', /; Secure(?:;|$)/)
+  } finally {
+    await new Promise<void>((resolve, reject) =>
+      ui.close((error) => (error ? reject(error) : resolve()))
+    )
+  }
+})
+
 test('BFF authenticates sessions and proxies only read queries', async () => {
   let authorization = ''
   let upstreamPath = ''

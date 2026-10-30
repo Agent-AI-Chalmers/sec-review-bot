@@ -39,6 +39,7 @@ const MAX_TRAJECTORY_ARTIFACT_BYTES = 16 * 1024 * 1024
 const MAX_TRAJECTORY_CONTENT_BYTES = 8 * 1024 * 1024
 const MAX_TRAJECTORY_LINE_BYTES = 512 * 1024
 const MAX_TRAJECTORY_MESSAGES = 2000
+const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60
 
 interface ArtifactObject {
   body: Readable
@@ -433,6 +434,8 @@ export function createControlPlaneUiServer({
   artifactStore,
   artifactDownloadIdleTimeoutMs = ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS,
   reviewRunsRequestTimeoutMs = REVIEW_RUNS_REQUEST_TIMEOUT_MS,
+  secureCookies = false,
+  sessionTtlSeconds = DEFAULT_SESSION_TTL_SECONDS,
   assets = path.resolve('dist')
 }: {
   reviewRunsUrl: string
@@ -443,17 +446,29 @@ export function createControlPlaneUiServer({
   artifactStore?: ArtifactStore
   artifactDownloadIdleTimeoutMs?: number
   reviewRunsRequestTimeoutMs?: number
+  secureCookies?: boolean
+  sessionTtlSeconds?: number
   assets?: string
 }): Server {
-  const sessionValue = crypto
-    .createHash('sha256')
-    .update(accessToken)
-    .digest('base64url')
-  const authenticated = (cookie: string | undefined): boolean =>
-    cookie
+  const sessions = new Map<string, number>()
+  const sessionCookie = (request: IncomingMessage): string | undefined =>
+    request.headers.cookie
       ?.split(';')
       .map((value) => value.trim())
-      .includes(`control_plane_ui_session=${sessionValue}`) ?? false
+      .find((value) => value.startsWith('control_plane_ui_session='))
+      ?.slice('control_plane_ui_session='.length)
+  const authenticated = (request: IncomingMessage): boolean => {
+    const session = sessionCookie(request)
+    if (session === undefined) return false
+    const expiresAt = sessions.get(session)
+    if (expiresAt === undefined) return false
+    if (expiresAt <= Date.now()) {
+      sessions.delete(session)
+      return false
+    }
+    return true
+  }
+  const cookieSecurity = secureCookies ? '; Secure' : ''
   return createServer(async (request, response) => {
     securityHeaders(response)
     if (request.url === '/healthz') {
@@ -497,8 +512,11 @@ export function createControlPlaneUiServer({
         response.end('{"error":"unauthorized"}')
         return
       }
+      const sessionValue = crypto.randomBytes(32).toString('base64url')
+      sessions.set(sessionValue, Date.now() + sessionTtlSeconds * 1000)
       response.writeHead(204, {
-        'set-cookie': `control_plane_ui_session=${sessionValue}; HttpOnly; SameSite=Strict; Path=/`
+        'set-cookie': `control_plane_ui_session=${sessionValue}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionTtlSeconds}${cookieSecurity}`,
+        'cache-control': 'no-store'
       })
       response.end()
       return
@@ -519,15 +537,16 @@ export function createControlPlaneUiServer({
         response.end('{"error":"cross_origin"}')
         return
       }
+      const session = sessionCookie(request)
+      if (session !== undefined) sessions.delete(session)
       response.writeHead(204, {
-        'set-cookie':
-          'control_plane_ui_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'
+        'set-cookie': `control_plane_ui_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${cookieSecurity}`
       })
       response.end()
       return
     }
     if (request.url?.startsWith('/api/')) {
-      if (!authenticated(request.headers.cookie)) {
+      if (!authenticated(request)) {
         response.writeHead(401, { 'content-type': 'application/json' })
         response.end('{"error":"unauthorized"}')
         return
@@ -1223,6 +1242,10 @@ if (
 ) {
   const reviewRunsToken = process.env.REVIEW_RUNS_READ_TOKEN
   const accessToken = process.env.CONTROL_PLANE_UI_ACCESS_TOKEN
+  const secureCookiesValue =
+    process.env.CONTROL_PLANE_UI_SECURE_COOKIES?.trim() || 'false'
+  if (!['true', 'false'].includes(secureCookiesValue))
+    throw new Error('CONTROL_PLANE_UI_SECURE_COOKIES must be true or false.')
   if (!reviewRunsToken) throw new Error('REVIEW_RUNS_READ_TOKEN is required.')
   if (!accessToken)
     throw new Error('CONTROL_PLANE_UI_ACCESS_TOKEN is required.')
@@ -1230,11 +1253,12 @@ if (
     reviewRunsUrl: process.env.REVIEW_RUNS_URL ?? 'http://127.0.0.1:8090',
     reviewRunsToken,
     accessToken,
+    secureCookies: secureCookiesValue === 'true',
     memoryCatalogUrl: process.env.MEMORY_CATALOG_URL,
     memoryCatalogToken: process.env.MEMORY_CATALOG_TOKEN,
     artifactStore: artifactStoreFromEnvironment()
   }).listen(
     Number.parseInt(process.env.CONTROL_PLANE_UI_PORT ?? '8091', 10),
-    '0.0.0.0'
+    process.env.CONTROL_PLANE_UI_HOST?.trim() || '127.0.0.1'
   )
 }
