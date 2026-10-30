@@ -26,9 +26,9 @@ export interface PublicationStepRun {
   /** The remote object this step published, when it published one. */
   remote: ReconciledRemote
   /**
-   * True when the step was already `succeeded` before this call — because this caller had
-   * completed it earlier, or because reconciliation found the effect on the remote system.
-   * Nothing was performed and nothing was recorded by this call.
+   * True when no new side effect was needed: the step was already `succeeded`, or
+   * reconciliation found its remote effect. Reconciliation records that effect; the
+   * already-succeeded shortcut does not write.
    */
   alreadySucceeded: boolean
   /** True when the success came from reconciling an exhausted claim against the remote system. */
@@ -51,9 +51,9 @@ function recordedRemote(step: {
  * Run one publication step: short-circuit, claim, effect, complete, or record the failure.
  *
  * `find` answers exactly one question — does this step's side effect already exist? It is only
- * called after an exhausted claim, because that is the only moment when "the previous owner may
- * have succeeded and died" is a real possibility. An error from `find` propagates: a reconciliation
- * that could not be performed is not evidence of absence.
+ * called after an exhausted claim, when no attempt remains to run the workflow's idempotent
+ * effect path. Earlier retries can also recover an existing effect through that path. An error
+ * from `find` propagates: a reconciliation that could not be performed is not evidence of absence.
  *
  * `effect` performs the side effect and returns what the remote system now holds. `assertClaim` is
  * asked again immediately before it: a lease is permission to start a side effect, not merely
