@@ -148,6 +148,11 @@ test('BFF rejects a memory tree reference whose object key is not derived from i
   }
 })
 
+/**
+ * The published size budget is a refusal about the object, not about the catalog: reporting
+ * it as "unavailable" told the reader the wrong thing about a record that was perfectly
+ * well formed, and hid which limit was crossed.
+ */
 test('BFF rejects oversized memory artifacts before reading object storage', async () => {
   const digest = `sha256:${'a'.repeat(64)}`
   const catalog = createServer((_request, response) => {
@@ -194,7 +199,10 @@ test('BFF rejects oversized memory artifacts before reading object storage', asy
     const response = await fetch(`${base}/api/memory/revisions/2/artifact`, {
       headers: { cookie }
     })
-    assert.strictEqual(response.status, 409)
+    assert.strictEqual(response.status, 413)
+    assert.deepStrictEqual(await response.json(), {
+      error: 'artifact_too_large'
+    })
     assert.strictEqual(objectReads, 0)
   } finally {
     await Promise.all([

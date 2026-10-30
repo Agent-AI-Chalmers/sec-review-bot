@@ -1,46 +1,38 @@
+import type { PublishedArtifact } from '../artifacts/published-artifact.js'
+import { publishedArtifact } from '../artifacts/published-artifact.js'
 import { ARTIFACT_BUCKET } from '../artifacts/store.js'
-import type { AvailableArtifact } from '../artifacts/verified-artifact.js'
 import {
   MAX_MEMORY_TREE_ARTIFACT_BYTES,
+  MEMORY_TREE_MEDIA_TYPE,
   memoryTreeObjectKey
 } from './memory-tree-artifact.js'
 import { MAX_TRAJECTORY_ARTIFACT_BYTES } from './trajectory-artifact.js'
 
+const TRAJECTORY_MEDIA_TYPE = 'application/zstd'
+const TRAJECTORY_KEY_PREFIX = 'memory/trajectories/'
+
+/**
+ * One artifact reference a Memory Catalog record published.
+ *
+ * A memory tree names the object it published exactly — its key is derived from the digest
+ * — so the record cannot point at a second tree with the same digest. A trajectory is
+ * published per writer run, so only its prefix is fixed here.
+ */
 export function catalogArtifactReference(
   value: unknown,
   kind: 'tree' | 'trajectory'
-): AvailableArtifact | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    return null
-  const artifact = value as Record<string, unknown>
-  if (
-    typeof artifact.uri !== 'string' ||
-    typeof artifact.digest !== 'string' ||
-    !/^sha256:[0-9a-f]{64}$/.test(artifact.digest) ||
-    !Number.isSafeInteger(artifact.size_bytes) ||
-    (artifact.size_bytes as number) < 0 ||
-    (kind === 'tree'
-      ? artifact.media_type !== 'application/tar+zstd'
-      : artifact.media_type !== 'application/zstd')
-  )
-    return null
-  const maximumSize =
-    kind === 'tree'
-      ? MAX_MEMORY_TREE_ARTIFACT_BYTES
-      : MAX_TRAJECTORY_ARTIFACT_BYTES
-  if ((artifact.size_bytes as number) > maximumSize) return null
-  const prefix = `s3://${ARTIFACT_BUCKET}/memory/${kind === 'tree' ? 'trees/' : 'trajectories/'}`
-  if (!artifact.uri.startsWith(prefix)) return null
-  if (
-    kind === 'tree' &&
-    artifact.uri !==
-      `s3://${ARTIFACT_BUCKET}/${memoryTreeObjectKey(artifact.digest)}`
-  )
-    return null
-  return {
-    digest: artifact.digest,
-    key: artifact.uri.slice(`s3://${ARTIFACT_BUCKET}/`.length),
-    maximumSize,
-    sizeBytes: artifact.size_bytes as number
-  }
+): PublishedArtifact {
+  if (kind === 'tree')
+    return publishedArtifact(value, {
+      bucket: ARTIFACT_BUCKET,
+      mediaType: MEMORY_TREE_MEDIA_TYPE,
+      maximumSize: MAX_MEMORY_TREE_ARTIFACT_BYTES,
+      acceptsKey: (key, digest) => key === memoryTreeObjectKey(digest)
+    })
+  return publishedArtifact(value, {
+    bucket: ARTIFACT_BUCKET,
+    mediaType: TRAJECTORY_MEDIA_TYPE,
+    maximumSize: MAX_TRAJECTORY_ARTIFACT_BYTES,
+    acceptsKey: (key) => key.startsWith(TRAJECTORY_KEY_PREFIX)
+  })
 }
