@@ -95,6 +95,8 @@ export async function registerMemoryCatalogRoutes(
   },
 ): Promise<void> {
   const { store, workerToken, operatorToken } = options
+  // OpenAPI Glue runs security handlers before service handlers. Keep the authenticated role
+  // out of request bodies and attach it to the request object without mutating Fastify types.
   const authenticatedRoles = new WeakMap<FastifyRequest, CatalogRole>()
   const authenticate = (
     request: FastifyRequest,

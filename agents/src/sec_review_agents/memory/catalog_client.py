@@ -17,6 +17,8 @@ _API_ROOT = f"/{MEMORY_CATALOG_API_VERSION}"
 
 
 class _RejectRedirects(HTTPRedirectHandler):
+    """Keep the catalog bearer token on the configured origin only."""
+
     def redirect_request(
         self,
         req: Request,

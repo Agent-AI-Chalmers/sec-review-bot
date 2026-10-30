@@ -206,6 +206,8 @@ export function startPublicationCoordinator({
   store = reviewRunsClient,
   intervalMs = pollIntervalMs()
 }: Options): PublicationCoordinator {
+  // A connector may hold only one publication pass at a time. Shutdown prevents new ticks
+  // and waits for the active pass before returning.
   let stopped = false
   let active: Promise<void> | null = null
   const run = (): void => {

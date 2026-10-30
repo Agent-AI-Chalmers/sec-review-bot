@@ -13,6 +13,8 @@ _MAX_PAX_HEADER_BYTES = 1024 * 1024
 
 
 class _BinaryReader(Protocol):
+    """The read-only surface shared by buffered files and ``ZstdFile``."""
+
     def read(self, size: int = -1) -> bytes: ...
 
 
@@ -131,7 +133,7 @@ def read_restricted_pax_envelope(
     maximum_entries: int | None = None,
     maximum_extracted_bytes: int | None = None,
 ) -> tuple[TarEnvelopeEntry, ...]:
-    """Validate and read the restricted envelope from an open archive stream."""
+    """Validate raw headers and budgets without reopening the archive stream."""
     entries: list[TarEnvelopeEntry] = []
     extracted_size = 0
     pending_path: str | None = None
