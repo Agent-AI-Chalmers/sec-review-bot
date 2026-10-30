@@ -3410,6 +3410,11 @@ test('resuming a disconnected run grants a fresh attempt budget, not just a fres
       (await store.expireStalePreparations()).blocked.length,
       1
     )
+    const attention = await store.claimNextRunNotice()
+    assert.ok(attention)
+    assert.strictEqual(attention.run_id, runId)
+    assert.strictEqual(attention.axis, 'preparation')
+    assert.strictEqual(attention.kind, 'attention')
 
     // A run that never disconnected is refused the same way abandonment refuses one.
     await assert.rejects(
@@ -3427,6 +3432,37 @@ test('resuming a disconnected run grants a fresh attempt budget, not just a fres
       resumed.preparation.attempt_count,
       0,
       'a resumed row must get a budget it can actually act on'
+    )
+    const superseded = await pool.query<{
+      status: string
+      claim_token: string | null
+      claimed_at: string | null
+    }>(
+      `SELECT status,claim_token,claimed_at FROM run_notices
+       WHERE notice_id=$1 AND run_id=$2`,
+      [attention.notice_id, runId]
+    )
+    assert.deepStrictEqual(superseded.rows[0], {
+      status: 'superseded',
+      claim_token: null,
+      claimed_at: null
+    })
+    assert.strictEqual(
+      await store.renewRunNoticeClaim(
+        attention.notice_id,
+        attention.claim_token
+      ),
+      false,
+      'resuming fences the connector that claimed the old attention notice'
+    )
+    assert.strictEqual(
+      await store.completeRunNotice(
+        attention.notice_id,
+        attention.claim_token,
+        true,
+        'https://github.com/example/example/issues/1#issuecomment-1'
+      ),
+      false
     )
     // The run left the operator queue, and the decision is on the record.
     assert.deepStrictEqual(await store.listParkedRuns(), [])
@@ -3453,6 +3489,7 @@ test('a disconnected execution has no automatic way out, so an operator resumes 
   // resume must also reset the replay budget, or the next coordination pass would disconnect it
   // again before a single replay happened.
   const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     const runId = `run-${randomUUID()}`
     const admission = await store.createPreparingReviewRun({
@@ -3481,6 +3518,11 @@ test('a disconnected execution has no automatic way out, so an operator resumes 
       true,
       'a spent budget disconnects the run'
     )
+    const attention = await store.claimNextRunNotice()
+    assert.ok(attention)
+    assert.strictEqual(attention.run_id, runId)
+    assert.strictEqual(attention.axis, 'execution')
+    assert.strictEqual(attention.kind, 'attention')
     assert.strictEqual(
       (await store.getRun(runId))?.execution.status,
       'disconnected'
@@ -3493,6 +3535,27 @@ test('a disconnected execution has no automatic way out, so an operator resumes 
 
     const resumed = await store.resumeDisconnectedRun(runId)
     assert.strictEqual(resumed.execution.status, 'uncertain')
+    const superseded = await pool.query<{
+      status: string
+      claim_token: string | null
+      claimed_at: string | null
+    }>(
+      `SELECT status,claim_token,claimed_at FROM run_notices
+       WHERE notice_id=$1 AND run_id=$2`,
+      [attention.notice_id, runId]
+    )
+    assert.deepStrictEqual(superseded.rows[0], {
+      status: 'superseded',
+      claim_token: null,
+      claimed_at: null
+    })
+    assert.strictEqual(
+      await store.renewRunNoticeClaim(
+        attention.notice_id,
+        attention.claim_token
+      ),
+      false
+    )
     assert.strictEqual(
       await store.submissionRecoveryAttemptCount(runId),
       0,
@@ -3514,6 +3577,7 @@ test('a disconnected execution has no automatic way out, so an operator resumes 
       )
     )
   } finally {
+    await pool.end()
     await store.close()
   }
 })
@@ -3955,6 +4019,11 @@ test('a disconnected publication is parked until an operator resumes it', async 
       'disconnected',
       'the axis reports the step uncertainty so the run surfaces for an operator'
     )
+    const attention = await store.claimNextRunNotice()
+    assert.ok(attention)
+    assert.strictEqual(attention.run_id, runId)
+    assert.strictEqual(attention.axis, 'publication')
+    assert.strictEqual(attention.kind, 'attention')
     // Automation must not pick it up: no selector claims a run whose step is parked, and the
     // internal single-run claim refuses it too. Without a way out, the run would be stuck with
     // no owner and no writer - which is exactly why the operator resume exists.
@@ -3991,6 +4060,27 @@ test('a disconnected publication is parked until an operator resumes it', async 
       resumed.publication.status,
       'pending',
       'the axis is immediately claimable by the normal publisher'
+    )
+    const superseded = await pool.query<{
+      status: string
+      claim_token: string | null
+      claimed_at: string | null
+    }>(
+      `SELECT status,claim_token,claimed_at FROM run_notices
+       WHERE notice_id=$1 AND run_id=$2`,
+      [attention.notice_id, runId]
+    )
+    assert.deepStrictEqual(superseded.rows[0], {
+      status: 'superseded',
+      claim_token: null,
+      claimed_at: null
+    })
+    assert.strictEqual(
+      await store.renewRunNoticeClaim(
+        attention.notice_id,
+        attention.claim_token
+      ),
+      false
     )
     const revived = await readStep()
     assert.strictEqual(

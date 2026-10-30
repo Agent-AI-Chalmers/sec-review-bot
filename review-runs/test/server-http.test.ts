@@ -425,6 +425,41 @@ test('a failure notice completion forwards an intentional skip through the HTTP 
   }
 })
 
+test('run notice claim renewal and heartbeat configuration are exposed on the service surface', async () => {
+  const renewals: unknown[][] = []
+  const app = await buildApp({
+    renewRunNoticeClaim: async (...args: unknown[]) => {
+      renewals.push(args)
+      return true
+    },
+    runNoticeHeartbeatIntervalMs: () => 12_345
+  })
+  try {
+    const renewed = await app.inject({
+      method: 'POST',
+      url: '/v1/run-notices/notice-http-3/claim',
+      headers: {
+        authorization: `Bearer ${SERVICE_TOKEN}`,
+        'content-type': 'application/json'
+      },
+      payload: { token: 'notice-claim' }
+    })
+    assert.strictEqual(renewed.statusCode, 200, renewed.body)
+    assert.strictEqual(renewed.json(), true)
+    assert.deepStrictEqual(renewals, [['notice-http-3', 'notice-claim']])
+
+    const interval = await app.inject({
+      method: 'GET',
+      url: '/v1/config/run-notice-heartbeat-interval',
+      headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
+    })
+    assert.strictEqual(interval.statusCode, 200, interval.body)
+    assert.strictEqual(interval.json(), 12_345)
+  } finally {
+    await app.close()
+  }
+})
+
 test('a preparation input checkpoint is fenced by the HTTP route claim token', async () => {
   const checkpoints: unknown[][] = []
   const app = await buildApp({

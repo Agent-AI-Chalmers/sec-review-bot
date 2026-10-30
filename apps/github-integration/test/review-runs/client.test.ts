@@ -227,6 +227,59 @@ test('Review Runs success responses have a bounded body', async (t) => {
   assert.strictEqual(bodyCancelled, true)
 })
 
+test('run notice lease operations use the notice claim routes', async (t) => {
+  const previousUrl = process.env.REVIEW_RUNS_SERVICE_URL
+  const previousToken = process.env.REVIEW_RUNS_SERVICE_TOKEN
+  process.env.REVIEW_RUNS_SERVICE_URL = 'http://review-runs.test'
+  process.env.REVIEW_RUNS_SERVICE_TOKEN = 'test-token'
+  t.after(() => {
+    if (previousUrl === undefined) delete process.env.REVIEW_RUNS_SERVICE_URL
+    else process.env.REVIEW_RUNS_SERVICE_URL = previousUrl
+    if (previousToken === undefined)
+      delete process.env.REVIEW_RUNS_SERVICE_TOKEN
+    else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
+  })
+
+  const requests: Array<{ url: string; method: string; body?: unknown }> = []
+  t.mock.method(
+    globalThis,
+    'fetch',
+    async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      requests.push({
+        url,
+        method: init?.method ?? 'GET',
+        ...(init?.body === undefined ? {} : { body: sentBody(init) })
+      })
+      if (url.endsWith('/v1/run-notices/notice-1/claim'))
+        return Response.json(true)
+      if (url.endsWith('/v1/config/run-notice-heartbeat-interval'))
+        return Response.json(20_000)
+      return Response.json({ error: 'not_found' }, { status: 404 })
+    }
+  )
+
+  assert.strictEqual(
+    await reviewRunsClient.renewRunNoticeClaim('notice-1', 'claim-1'),
+    true
+  )
+  assert.strictEqual(
+    await reviewRunsClient.runNoticeHeartbeatIntervalMs(),
+    20_000
+  )
+  assert.deepStrictEqual(requests, [
+    {
+      url: 'http://review-runs.test/v1/run-notices/notice-1/claim',
+      method: 'POST',
+      body: { token: 'claim-1' }
+    },
+    {
+      url: 'http://review-runs.test/v1/config/run-notice-heartbeat-interval',
+      method: 'GET'
+    }
+  ])
+})
+
 test('an invalid claimed publish context is persisted as terminal failure', async (t) => {
   const previousUrl = process.env.REVIEW_RUNS_SERVICE_URL
   const previousToken = process.env.REVIEW_RUNS_SERVICE_TOKEN

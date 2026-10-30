@@ -431,7 +431,10 @@ CREATE TABLE run_notices (
   -- `failed` rather than `skipped` for a delivery that did not happen: the connector tried and
   -- could not reach the provider, which is a failure, not a decision to skip. Sharing `skipped`
   -- with the other axes made it indistinguishable from "this notice did not apply".
-  status text NOT NULL CHECK (status IN ('pending', 'delivering', 'delivered', 'failed')),
+  -- `superseded` keeps the audit record when an operator resumes the disconnected axis before
+  -- its attention notice is delivered. Deleting the row would hide that automation stopped;
+  -- leaving it claimable would later report an intervention that is no longer required.
+  status text NOT NULL CHECK (status IN ('pending', 'delivering', 'delivered', 'failed', 'superseded')),
   axis text NOT NULL CHECK (axis IN ('preparation', 'execution', 'publication')),
   -- The reason is captured when the notice is created, not read back at delivery time: the axis
   -- row is a live state machine that a later retry may rewrite, while the notice exists to report

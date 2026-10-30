@@ -232,6 +232,12 @@ export class ReviewRunStore {
       commentUrl
     )
   }
+  async renewRunNoticeClaim(noticeId: string, token: string): Promise<boolean> {
+    return await this.preparations.renewRunNoticeClaim(noticeId, token)
+  }
+  runNoticeHeartbeatIntervalMs(): number {
+    return this.preparations.heartbeatIntervalMs()
+  }
   preparationHeartbeatIntervalMs(): number {
     return this.preparations.heartbeatIntervalMs()
   }

@@ -59,6 +59,12 @@ export function buildCoordinationRouteHandlers(
 
     claimNextRunNotice: async () => await store.claimNextRunNotice(),
 
+    renewRunNoticeClaim: async (request) => {
+      const { noticeId } = request.params as PathParams<'renewRunNoticeClaim'>
+      const { token } = request.body as RequestBody<'renewRunNoticeClaim'>
+      return await store.renewRunNoticeClaim(noticeId, token)
+    },
+
     failPreparation: async (request) => {
       const { runId } = request.params as PathParams<'failPreparation'>
       const { token, failure, retry, retry_after_ms } =
@@ -185,6 +191,9 @@ export function buildCoordinationRouteHandlers(
       store.preparationHeartbeatIntervalMs(),
 
     getPublicationHeartbeatInterval: async () =>
-      store.publicationHeartbeatIntervalMs()
+      store.publicationHeartbeatIntervalMs(),
+
+    getRunNoticeHeartbeatInterval: async () =>
+      store.runNoticeHeartbeatIntervalMs()
   }
 }

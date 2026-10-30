@@ -287,6 +287,7 @@ components:
             - delivering
             - delivered
             - failed
+            - superseded
         reason_code:
           type:
             - string
@@ -1819,6 +1820,49 @@ paths:
           $ref: "#/components/responses/Unauthorized"
         "500":
           $ref: "#/components/responses/InternalError"
+  /v1/run-notices/{noticeId}/claim:
+    post:
+      operationId: renewRunNoticeClaim
+      description: >-
+        Renew the caller's notice-delivery claim while connector work is still active. Returns
+        whether the claim was renewed.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: noticeId
+          required: true
+          description: The claimed notice identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required:
+                - token
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Whether the claim was renewed.
+          content:
+            application/json:
+              schema:
+                type: boolean
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
   /v1/run-notices/{noticeId}/complete:
     post:
       operationId: completeRunNotice
@@ -2658,6 +2702,24 @@ paths:
       responses:
         "200":
           description: Publication heartbeat interval in milliseconds.
+          content:
+            application/json:
+              schema:
+                type: integer
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/config/run-notice-heartbeat-interval:
+    get:
+      operationId: getRunNoticeHeartbeatInterval
+      description: >-
+        Report how often a run-notice owner must renew its claim.
+      security:
+        - serviceToken: []
+      responses:
+        "200":
+          description: Run-notice heartbeat interval in milliseconds.
           content:
             application/json:
               schema:

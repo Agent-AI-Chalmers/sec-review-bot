@@ -9,6 +9,11 @@ import { logError, logInfo } from '../utils/logger.js'
 import { reviewRunsClient, type RunNoticeCoordinatorStore } from './client.js'
 import { classifyPreparationFailure } from './preparation-failure.js'
 import { sendRunNoticeReply } from './run-notice-reply.js'
+import {
+  RunNoticeClaimLostError,
+  startRunNoticeClaimHeartbeat,
+  type RunNoticeClaimHeartbeat
+} from './run-notice-claim.js'
 
 export interface RunNoticeCoordinator {
   stop: () => Promise<void>
@@ -67,7 +72,13 @@ export async function deliverRunNoticeOnce({
 }): Promise<boolean> {
   const notice = await store.claimNextRunNotice()
   if (notice === null) return false
+  let heartbeat: RunNoticeClaimHeartbeat | undefined
   try {
+    heartbeat = await startRunNoticeClaimHeartbeat(
+      store,
+      notice.notice_id,
+      notice.claim_token
+    )
     const input = requireRecord(notice.input, 'object')
     const repo = noticeRepository(input)
     const delivered =
@@ -81,9 +92,11 @@ export async function deliverRunNoticeOnce({
               input,
               axis: notice.axis,
               kind: notice.kind,
-              reason_code: notice.reason_code
+              reason_code: notice.reason_code,
+              assert_notice_claim: heartbeat.assertOwned
             }
           )
+    if (!(await heartbeat.stop())) return true
     if (delivered === null) {
       await store.completeRunNotice(notice.notice_id, notice.claim_token, false)
     } else {
@@ -95,6 +108,14 @@ export async function deliverRunNoticeOnce({
       )
     }
   } catch (error) {
+    if (heartbeat !== undefined) await heartbeat.stop()
+    if (error instanceof RunNoticeClaimLostError) {
+      logError('review_run_notice_claim_lost', {
+        error,
+        run_id: notice.run_id
+      })
+      return true
+    }
     // Retry transient GitHub faults after the claim lease expires. Deterministic input or
     // installation failures are concluded so one undeliverable notice cannot loop forever.
     if (
