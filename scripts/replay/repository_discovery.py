@@ -36,6 +36,14 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _run_id_from_replay_input(replay_input: dict[str, object]) -> str:
+    return (
+        Path(artifact_path(replay_input["artifact_paths"], "discovery"))
+        .resolve()
+        .parent.name
+    )
+
+
 async def main() -> None:
     bootstrap_agents_env()
     args = _parse_args()
@@ -49,11 +57,7 @@ async def main() -> None:
     replay_input = materialize_replay_input(
         public_input, workflow="repository-review", artifact_root=run_artifacts
     )
-    run_id = (
-        Path(artifact_path(replay_input["artifact_paths"], "discovery"))
-        .resolve()
-        .parent.name
-    )
+    run_id = _run_id_from_replay_input(replay_input)
 
     scan_target = replay_input["scan_target"]
     local_root = Path(replay_input["input_bundle_root_path"])
@@ -61,7 +65,7 @@ async def main() -> None:
         input_bundle_root=local_root,
         artifact_root=default_replay_artifact_root(
             input_bundle_root=local_root,
-            run_id=str(replay_input.get("run_id") or ""),
+            run_id=run_id,
         ),
     )
     manifest = prepare_discovery_chunks(
