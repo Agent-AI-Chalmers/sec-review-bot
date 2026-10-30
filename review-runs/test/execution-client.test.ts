@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
+import { ReadableStream } from 'node:stream/web'
 import test from 'node:test'
 import { parse } from 'yaml'
 
@@ -138,6 +139,33 @@ test('malformed successful status response is a terminal protocol failure', asyn
     assert.strictEqual(isTerminalExecutionPollingError(error), true)
     return true
   })
+})
+
+test('oversized successful status response is a terminal protocol failure', async () => {
+  configureExecution()
+  let bodyCancelled = false
+  globalThis.fetch = async () =>
+    new Response(
+      new ReadableStream({
+        cancel(): void {
+          bodyCancelled = true
+        }
+      }),
+      {
+        status: 200,
+        headers: { 'content-length': String(4 * 1024 * 1024 + 1) }
+      }
+    )
+
+  await assert.rejects(getExecutionRunStatus('run-1'), (error: unknown) => {
+    assert.strictEqual(
+      (error as { code?: string }).code,
+      'EXECUTION_RESPONSE_TOO_LARGE'
+    )
+    assert.strictEqual(isTerminalExecutionPollingError(error), true)
+    return true
+  })
+  assert.strictEqual(bodyCancelled, true)
 })
 
 test('malformed transient error response remains retryable', async () => {

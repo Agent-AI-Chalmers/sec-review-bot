@@ -1,4 +1,5 @@
 import { isIP } from 'node:net'
+import { TextDecoder } from 'node:util'
 
 import { integerEnv } from './env.js'
 
@@ -14,6 +15,8 @@ import type {
 import { SUBMISSION_STATE_UNCERTAIN } from './errors.js'
 
 type JsonObject = Record<string, unknown>
+
+const MAX_EXECUTION_RESPONSE_BYTES = 4 * 1024 * 1024
 
 /** One run as the published contract reports it. */
 type ContractRunResponse = RunResponse
@@ -98,6 +101,51 @@ export class ExecutionProtocolError extends Error {
     this.name = 'ExecutionProtocolError'
     this.code = code
   }
+}
+
+async function readBoundedResponseText(response: Response): Promise<string> {
+  const contentLength = response.headers.get('content-length')
+  if (
+    contentLength !== null &&
+    /^\d+$/.test(contentLength) &&
+    Number(contentLength) > MAX_EXECUTION_RESPONSE_BYTES
+  ) {
+    await response.body?.cancel()
+    throw new ExecutionProtocolError(
+      'EXECUTION_RESPONSE_TOO_LARGE',
+      'Execution returned a response larger than the protocol budget.'
+    )
+  }
+  if (response.body === null) return ''
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let size = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > MAX_EXECUTION_RESPONSE_BYTES) {
+        await reader.cancel()
+        throw new ExecutionProtocolError(
+          'EXECUTION_RESPONSE_TOO_LARGE',
+          'Execution returned a response larger than the protocol budget.'
+        )
+      }
+      chunks.push(value)
+    }
+  } finally {
+    reader.releaseLock()
+  }
+
+  const body = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) {
+    body.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return new TextDecoder().decode(body)
 }
 
 export function isTerminalExecutionPollingError(error: unknown): boolean {
@@ -300,7 +348,7 @@ async function request(
 ): Promise<{
   response: Response
   body: unknown
-  bodyParseError?: SyntaxError
+  bodyParseError?: SyntaxError | ExecutionProtocolError
 }> {
   const base = serviceUrl()
   const retries = integerEnv('EXECUTION_API_REQUEST_RETRIES', 2, 0)
@@ -318,10 +366,16 @@ async function request(
         headers: { ...serviceHeaders(base), ...init.headers },
         signal: controller.signal
       })
-      const text = await response.text()
+      let text = ''
       let body: unknown = null
-      let bodyParseError: SyntaxError | undefined
-      if (text.trim()) {
+      let bodyParseError: SyntaxError | ExecutionProtocolError | undefined
+      try {
+        text = await readBoundedResponseText(response)
+      } catch (error) {
+        if (!(error instanceof ExecutionProtocolError)) throw error
+        bodyParseError = error
+      }
+      if (bodyParseError === undefined && text.trim()) {
         try {
           body = JSON.parse(text)
         } catch (error) {
@@ -387,7 +441,7 @@ export async function submitExecutionRun({
   let result: {
     response: Response
     body: unknown
-    bodyParseError?: SyntaxError
+    bodyParseError?: SyntaxError | ExecutionProtocolError
   }
   try {
     result = await request(
@@ -490,6 +544,7 @@ async function readExecutionRunStatuses(
   })
   if (!response.ok) throw executionError(body, response.status)
   if (bodyParseError) {
+    if (bodyParseError instanceof ExecutionProtocolError) throw bodyParseError
     throw new ExecutionProtocolError(
       'EXECUTION_INVALID_JSON',
       'Execution returned invalid JSON for a status query.',
@@ -544,6 +599,7 @@ export async function getExecutionRunStatus(
   )
   if (!response.ok) throw executionError(body, response.status)
   if (bodyParseError) {
+    if (bodyParseError instanceof ExecutionProtocolError) throw bodyParseError
     throw new ExecutionProtocolError(
       'EXECUTION_INVALID_JSON',
       `Execution returned invalid JSON for ${runId}.`,
