@@ -1,7 +1,6 @@
-import { clearInterval } from 'node:timers'
+import { clearImmediate, clearInterval } from 'node:timers'
 import type { App } from 'octokit'
 
-import { startReviewRunCoordinatorLoop } from '../review-runs/coordinator.js'
 import { handleIssueReviewRun } from '../reviews/issues/publish.js'
 import { handlePullRequestReviewRun } from '../reviews/pull-requests/publish.js'
 import { handleRepositoryReviewRun } from '../reviews/repositories/publish.js'
@@ -207,20 +206,36 @@ export function startPublicationCoordinator({
   store = reviewRunsClient,
   intervalMs = pollIntervalMs()
 }: Options): PublicationCoordinator {
-  const loop = startReviewRunCoordinatorLoop({
-    intervalMs,
-    runOnce: async () => await publishReviewRunsOnce({ app, store }),
-    onError: (error) => {
-      logError('review_publication_loop_failed', {
-        error,
-        error_message: asErrorMessage(error),
-        connector_id: store.connectorId
+  let stopped = false
+  let active: Promise<void> | null = null
+  const run = (): void => {
+    if (stopped || active !== null) return
+    active = publishReviewRunsOnce({ app, store })
+      .catch((error) => {
+        logError('review_publication_loop_failed', {
+          error,
+          error_message: asErrorMessage(error),
+          connector_id: store.connectorId
+        })
       })
-    }
-  })
+      .finally(() => {
+        active = null
+      })
+  }
+
+  const timer = setInterval(run, intervalMs)
+  timer.unref?.()
+  const initialRun = setImmediate(run)
   logInfo('review_publication_loop_started', {
     connector_id: store.connectorId,
     interval_ms: intervalMs
   })
-  return loop
+  return {
+    stop: async () => {
+      stopped = true
+      clearImmediate(initialRun)
+      clearInterval(timer)
+      await active
+    }
+  }
 }
