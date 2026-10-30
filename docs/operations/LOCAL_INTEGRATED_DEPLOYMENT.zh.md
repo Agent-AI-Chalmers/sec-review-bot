@@ -35,6 +35,8 @@ Control Plane UI 是独立部署的控制台。它的同源服务端从 Review R
 | RustFS API | `http://127.0.0.1:9100` |
 | RustFS Console | `http://127.0.0.1:9101` |
 
+Temporal 接入只与 Execution Gateway 共享的专用 Compose internal network。gRPC 与 Web UI 端口发布在宿主 loopback，供宿主 worker 和本地 operator 使用。
+
 ## 前提
 
 ### GitHub App 权限设置

@@ -79,6 +79,8 @@ services:
     ports:
       - "127.0.0.1:${TEMPORAL_PORT:-7233}:7233"
       - "127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8233"
+    networks:
+      - temporal-internal
 
   execution-gateway:
     restart: "on-failure:5"
@@ -114,6 +116,9 @@ services:
     depends_on:
       temporal:
         condition: service_started
+    networks:
+      - default
+      - temporal-internal
 
   memory-catalog-server:
     restart: "on-failure:5"
@@ -290,3 +295,7 @@ services:
 secrets:
   github-app-private-key:
     file: ${GITHUB_APP_PRIVATE_KEY_FILE:-./apps/github-integration/private-key.pem}
+
+networks:
+  temporal-internal:
+    internal: true

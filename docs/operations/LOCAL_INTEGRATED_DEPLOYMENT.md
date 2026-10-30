@@ -33,6 +33,8 @@ Default local endpoints:
 | RustFS API | `http://127.0.0.1:9100` |
 | RustFS Console | `http://127.0.0.1:9101` |
 
+Temporal is attached to a dedicated internal Compose network shared only with Execution Gateway. Its gRPC and Web UI ports are published on host loopback for the host workers and local operators.
+
 ## Prerequisites
 
 ### GitHub App Permission Settings
