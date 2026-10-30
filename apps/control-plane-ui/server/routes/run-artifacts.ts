@@ -12,7 +12,7 @@ import {
   readVerifiedArtifactBuffer,
   withVerifiedArtifactFile
 } from '../artifacts/verified-artifact.js'
-import { PROXIED_CONTENT_TYPE, sendJson } from '../http-response.js'
+import { PROXIED_CONTENT_TYPE, sendJson } from '../http.js'
 import type { ReviewRunsClient } from '../upstream/review-runs-client.js'
 import { UpstreamRequestError } from '../upstream/request.js'
 import {

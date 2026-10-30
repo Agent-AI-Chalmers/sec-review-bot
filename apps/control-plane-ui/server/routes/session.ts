@@ -1,11 +1,11 @@
 import crypto from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import { sendJson } from '../http-response.js'
 import {
   RequestBodyTooLargeError,
-  readBoundedRequestBody
-} from '../http-request.js'
+  readBoundedRequestBody,
+  sendJson
+} from '../http.js'
 import { requireSameOrigin } from '../request-security.js'
 
 export interface SessionRoutes {
