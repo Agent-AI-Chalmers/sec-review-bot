@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from sec_review_agents.artifacts.uri import (
+    ARTIFACT_URI_SCHEMES,
     parse_artifact_uri,
     parse_local_artifact_uri,
     parse_s3_artifact_uri,
@@ -17,6 +18,13 @@ def test_parse_artifact_uri_returns_standard_components() -> None:
     assert parsed.scheme == "https"
     assert parsed.netloc == "artifacts.example"
     assert parsed.path == "/runs/run-1/input-bundle.tar.zst"
+    assert ARTIFACT_URI_SCHEMES == frozenset({"file", "s3", "https"})
+
+
+@pytest.mark.parametrize("scheme", ["ftp", "gs", "oci", "ipfs"])
+def test_parse_artifact_uri_rejects_unadopted_scheme(scheme: str) -> None:
+    with pytest.raises(ValueError, match="scheme must be one of: file, https, s3"):
+        parse_artifact_uri(f"{scheme}://artifacts.example/object")
 
 
 def test_parse_local_artifact_uri_accepts_absolute_local_path() -> None:

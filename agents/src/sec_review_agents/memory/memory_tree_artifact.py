@@ -6,7 +6,9 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from sec_review_agents.artifacts.archive import extract_archive, validate_archive
-from sec_review_agents.artifacts.materialize import materialize_artifact
+from sec_review_agents.artifacts.materialize import (
+    materialize_verified_artifact_file,
+)
 from sec_review_agents.artifacts.reference import (
     ARCHIVE_MEDIA_TYPE,
     ArtifactReference,
@@ -270,10 +272,10 @@ def materialize_memory_tree(
     destination: Path,
 ) -> Path:
     require_artifact_media_type(reference, ARCHIVE_MEDIA_TYPE)
-    archive_path = materialize_artifact(
+    archive_path = materialize_verified_artifact_file(
         reference,
-        destination.with_suffix(".tar.zst"),
-        maximum_size=MAX_MEMORY_TREE_ARTIFACT_BYTES,
+        local_destination=destination.with_suffix(".tar.zst"),
+        maximum_bytes=MAX_MEMORY_TREE_ARTIFACT_BYTES,
         expected_s3_key=(
             memory_tree_artifact_s3_key(reference.digest)
             if urlparse(reference.uri).scheme == "s3"
