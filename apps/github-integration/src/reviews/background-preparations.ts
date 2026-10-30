@@ -9,19 +9,19 @@ export class BackgroundPreparations {
   constructor(private readonly log_failure: FailureLogger = logError) {}
 
   start(
-    execution: Promise<unknown>,
+    preparation: Promise<unknown>,
     context: Record<string, unknown> = {}
   ): void {
-    this.active.add(execution)
-    void execution
+    this.active.add(preparation)
+    void preparation
       .catch((error: unknown) => {
-        this.log_failure('review_background_execution_failed', {
+        this.log_failure('review_background_preparation_failed', {
           ...context,
           error,
           error_message: error instanceof Error ? error.message : String(error)
         })
       })
-      .finally(() => this.active.delete(execution))
+      .finally(() => this.active.delete(preparation))
   }
 
   async stop(): Promise<void> {

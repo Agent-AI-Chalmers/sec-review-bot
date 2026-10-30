@@ -107,7 +107,7 @@ test('repository dispatch returns preparing as soon as durable admission complet
   const { handleRepositoryReviewDispatch } =
     await import('../../../../src/ingress/github/actions/repository-review-http-handler.js')
   const response = captureResponse()
-  let finishExecution: (() => void) | undefined
+  let finishPreparation: (() => void) | undefined
 
   await handleRepositoryReviewDispatch({
     app: fakeApp(),
@@ -125,9 +125,9 @@ test('repository dispatch returns preparing as soon as durable admission complet
         replayed: false
       })
       await new Promise<void>((resolve) => {
-        finishExecution = resolve
+        finishPreparation = resolve
       })
-      throw new Error('execution failed after admission')
+      throw new Error('preparation failed after admission')
     }
   })
 
@@ -141,7 +141,7 @@ test('repository dispatch returns preparing as soon as durable admission complet
     repo_full_name: 'octo/example',
     summary_issue_url: null
   })
-  finishExecution?.()
+  finishPreparation?.()
 })
 
 test('repository dispatch requires a correlation id before starting a review', async () => {

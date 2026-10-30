@@ -142,7 +142,7 @@ export async function handlePullRequestSynchronizeWithDeps(
     const admitted = new Promise<void>((resolve) => {
       resolveAdmission = resolve
     })
-    const execution = startPullRequestReviewCommandFn({
+    const preparation = startPullRequestReviewCommandFn({
       octokit,
       trusted_default_branch,
       pr,
@@ -152,12 +152,12 @@ export async function handlePullRequestSynchronizeWithDeps(
         resolveAdmission?.()
       }
     })
-    backgroundPreparations.start(execution, {
+    backgroundPreparations.start(preparation, {
       ingress: 'pull_request.synchronize',
       pr: pr.pr_number,
       repo: pr.repo_full_name
     })
-    await Promise.race([admitted, execution])
+    await Promise.race([admitted, preparation])
   } catch (error: unknown) {
     const errorInfo = asErrorWithResponse(error)
 

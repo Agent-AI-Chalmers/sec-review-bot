@@ -232,13 +232,13 @@ export async function handleRepositoryReviewDispatch({
   const admissionPromise = new Promise<DispatchAdmission>((resolve) => {
     resolveAdmission = resolve
   })
-  const execution = dispatchReview({
+  const preparation = dispatchReview({
     app,
     payload,
     verified_repository: oidcClaims.repository,
     on_admitted: resolveAdmission!
   })
-  backgroundPreparations.start(execution, {
+  backgroundPreparations.start(preparation, {
     ingress: 'repository-review-dispatch',
     repo: repo_full_name
   })
@@ -246,7 +246,7 @@ export async function handleRepositoryReviewDispatch({
   try {
     const admission = await Promise.race([
       admissionPromise,
-      execution.then((submitted) => ({
+      preparation.then((submitted) => ({
         run_id: submitted.run_id,
         status: 'queued',
         replayed: false

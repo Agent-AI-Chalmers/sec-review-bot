@@ -126,7 +126,7 @@ export async function handleIssueOpenedWithDeps(
     const admitted = new Promise<void>((resolve) => {
       resolveAdmission = resolve
     })
-    const execution = startIssueReviewCommandFn({
+    const preparation = startIssueReviewCommandFn({
       octokit,
       issue,
       trusted_default_branch,
@@ -136,12 +136,12 @@ export async function handleIssueOpenedWithDeps(
         resolveAdmission?.()
       }
     })
-    backgroundPreparations.start(execution, {
+    backgroundPreparations.start(preparation, {
       ingress: 'issues.opened',
       issue: issue.issue_number,
       repo: issue.repo_full_name
     })
-    await Promise.race([admitted, execution])
+    await Promise.race([admitted, preparation])
   } catch (error: unknown) {
     const errorInfo = asErrorWithResponse(error)
 
