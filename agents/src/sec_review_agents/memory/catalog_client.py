@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.contract_versions import MEMORY_CATALOG_API_VERSION
@@ -14,6 +14,26 @@ from sec_review_agents.utils.env import env_value
 AGENT_MEMORY_CATALOG_URL_ENV = "AGENT_MEMORY_CATALOG_URL"
 AGENT_MEMORY_CATALOG_TOKEN_ENV = "AGENT_MEMORY_CATALOG_TOKEN"
 _API_ROOT = f"/{MEMORY_CATALOG_API_VERSION}"
+
+
+class _RejectRedirects(HTTPRedirectHandler):
+    def redirect_request(
+        self,
+        req: Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> None:
+        return None
+
+
+_CATALOG_OPENER = build_opener(_RejectRedirects())
+
+
+def _open_catalog_request(request: Request, *, timeout: int) -> Any:
+    return _CATALOG_OPENER.open(request, timeout=timeout)
 
 
 class MemoryCatalogConflictError(RuntimeError):
@@ -59,7 +79,9 @@ class MemoryCatalogClient:
             },
         )
         try:
-            with urlopen(request, timeout=self.timeout_seconds) as response:
+            with _open_catalog_request(
+                request, timeout=self.timeout_seconds
+            ) as response:
                 value = json.loads(response.read().decode("utf-8"))
         except HTTPError as error:
             detail = error.read().decode("utf-8", errors="replace")
