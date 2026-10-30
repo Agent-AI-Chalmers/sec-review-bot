@@ -1,25 +1,27 @@
 import { createReadStream, createWriteStream } from 'node:fs'
 import { mkdtemp, rm, stat } from 'node:fs/promises'
-import {
-  createServer,
-  type IncomingMessage,
-  type Server,
-  type ServerResponse
-} from 'node:http'
+import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import path from 'node:path'
 import crypto from 'node:crypto'
 import { zstdDecompressSync } from 'node:zlib'
-import {
-  GetObjectCommand,
-  HeadObjectCommand,
-  PutObjectCommand,
-  S3Client
-} from '@aws-sdk/client-s3'
 
 import { LIST_RUN_QUERY_PARAMS } from '../shared/list-run-query-params.js'
+import {
+  ARTIFACT_BUCKET,
+  type ArtifactStore,
+  artifactStorageStatus,
+  artifactStoreFromEnvironment
+} from './artifacts/store.js'
+import {
+  PROXIED_CONTENT_TYPE,
+  UpstreamResponseTooLargeError,
+  readBoundedUpstreamBody,
+  readBoundedUpstreamJson,
+  sendJson
+} from './http-response.js'
 import {
   buildMemoryTreeArtifact,
   MAX_MEMORY_TREE_ARTIFACT_BYTES,
@@ -30,25 +32,19 @@ import {
   MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES,
   readDiagnosticBundle
 } from './run/diagnostic-bundle.js'
+import { applySecurityHeaders, isSameOrigin } from './request-security.js'
+import { createSessionRoutes } from './session-routes.js'
 
 const MAX_SESSION_BODY_BYTES = 1024 * 1024
 const MAX_UPSTREAM_JSON_BYTES = 4 * 1024 * 1024
 const REVIEW_RUNS_REQUEST_TIMEOUT_MS = 10_000
 const ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS = 30_000
-const ARTIFACT_BUCKET = 'sec-review'
 const MAX_TRAJECTORY_ARTIFACT_BYTES = 16 * 1024 * 1024
 const MAX_TRAJECTORY_CONTENT_BYTES = 8 * 1024 * 1024
 const MAX_TRAJECTORY_LINE_BYTES = 512 * 1024
 const MAX_TRAJECTORY_MESSAGES = 2000
 const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60
 const DEFAULT_MAXIMUM_SESSIONS = 10_000
-
-class UpstreamResponseTooLargeError extends Error {
-  constructor() {
-    super('Upstream JSON response exceeds the size limit.')
-    this.name = 'UpstreamResponseTooLargeError'
-  }
-}
 
 class ArtifactDownloadTimeoutError extends Error {
   constructor() {
@@ -57,65 +53,7 @@ class ArtifactDownloadTimeoutError extends Error {
   }
 }
 
-async function readBoundedUpstreamBody(
-  response: Response,
-  maximumBytes: number
-): Promise<Buffer> {
-  const contentLength = response.headers.get('content-length')
-  if (
-    contentLength !== null &&
-    /^\d+$/.test(contentLength) &&
-    Number(contentLength) > maximumBytes
-  ) {
-    await response.body?.cancel()
-    throw new UpstreamResponseTooLargeError()
-  }
-  if (response.body === null) return Buffer.alloc(0)
-
-  const reader = response.body.getReader()
-  const chunks: Buffer[] = []
-  let size = 0
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      size += value.byteLength
-      if (size > maximumBytes) {
-        await reader.cancel()
-        throw new UpstreamResponseTooLargeError()
-      }
-      chunks.push(Buffer.from(value))
-    }
-  } finally {
-    reader.releaseLock()
-  }
-  return Buffer.concat(chunks, size)
-}
-
-async function readBoundedUpstreamJson(
-  response: Response,
-  maximumBytes: number
-): Promise<unknown> {
-  return JSON.parse(
-    (await readBoundedUpstreamBody(response, maximumBytes)).toString('utf8')
-  )
-}
-
-interface ArtifactObject {
-  body: Readable
-  contentLength?: number
-}
-
-export interface ArtifactStore {
-  getObject(key: string, signal: AbortSignal): Promise<ArtifactObject>
-  putMemoryArtifact?(artifact: {
-    bytes: Buffer
-    digest: string
-    mediaType: string
-    objectKey: string
-    sizeBytes: number
-  }): Promise<void>
-}
+export type { ArtifactStore } from './artifacts/store.js'
 
 interface AvailableArtifact {
   digest: string
@@ -232,39 +170,6 @@ function readTrajectoryArtifact(bytes: Buffer): TrajectoryEvent[] {
       throw new Error('invalid_trajectory_artifact')
   }
   return events
-}
-
-function securityHeaders(response: ServerResponse): void {
-  response.setHeader(
-    'content-security-policy',
-    "default-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'"
-  )
-  response.setHeader('x-content-type-options', 'nosniff')
-  response.setHeader('x-frame-options', 'DENY')
-  response.setHeader('referrer-policy', 'no-referrer')
-}
-
-/** A state-changing request may only come from the console's own origin.
- *
- * The check is self-referential on purpose: there is nothing to configure. A browser
- * sets `Origin` to the page a script runs on, and `Host` to the address actually being
- * dialled, so a same-origin call has matching hosts and a cross-site one does not. The
- * BFF may be reached as a loopback address, a LAN IP or a domain, so comparing against
- * the request's own `Host` works in every deployment without hard-coding one.
- *
- * `Origin` is absent on some requests; `Referer` is its partial fallback. A request
- * carrying neither is refused, because an attacker can also omit them.
- */
-function sameOrigin(request: IncomingMessage): boolean {
-  const source = request.headers.origin ?? request.headers.referer
-  const host = request.headers.host
-  if (source === undefined || host === undefined) return false
-  try {
-    return new URL(source).host === host
-  } catch {
-    // A malformed `Origin`/`Referer` is not a same-origin request.
-    return false
-  }
 }
 
 /**
@@ -401,27 +306,6 @@ function catalogArtifactReference(
   }
 }
 
-/**
- * The `content-type` served for a proxied Review Runs response.
- *
- * Every proxied route (the reads and the admin write) returns JSON, so the BFF answers with a
- * fixed JSON media type instead of echoing the upstream `content-type`. The upstream value is
- * only attacker-influenced if Review Runs is compromised, but copying it verbatim would serve
- * whatever that response claimed (for example `text/html`) from the console's own origin, where
- * a browser could run it as script. A constant cannot be mismatched with the body either: the
- * bytes are forwarded unchanged and the contract says they are JSON.
- */
-const PROXIED_CONTENT_TYPE = 'application/json; charset=utf-8'
-
-function sendJson(
-  response: ServerResponse,
-  status: number,
-  body: object
-): void {
-  response.writeHead(status, { 'content-type': 'application/json' })
-  response.end(JSON.stringify(body))
-}
-
 function availableArtifact(
   value: unknown,
   runId: string,
@@ -458,96 +342,6 @@ function availableArtifact(
   }
 }
 
-function artifactStoreFromEnvironment(): ArtifactStore | undefined {
-  const endpoint = process.env.SEC_REVIEW_ARTIFACT_S3_ENDPOINT?.trim()
-  const bucket = process.env.SEC_REVIEW_ARTIFACT_S3_BUCKET?.trim()
-  const addressingStyle =
-    process.env.SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE?.trim() || 'auto'
-  const accessKeyId = process.env.AWS_ACCESS_KEY_ID?.trim()
-  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY?.trim()
-  if (!endpoint && !bucket) return undefined
-  if (
-    bucket !== ARTIFACT_BUCKET ||
-    !accessKeyId ||
-    !secretAccessKey ||
-    !['auto', 'path', 'virtual'].includes(addressingStyle)
-  )
-    throw new Error(
-      'Control Plane UI artifact storage configuration is invalid.'
-    )
-  const client = new S3Client({
-    ...(endpoint ? { endpoint } : {}),
-    region: process.env.AWS_REGION ?? 'us-east-1',
-    // Omitting forcePathStyle preserves the SDK's native endpoint behavior for auto mode.
-    ...(addressingStyle === 'auto'
-      ? {}
-      : { forcePathStyle: addressingStyle === 'path' }),
-    credentials: { accessKeyId, secretAccessKey }
-  })
-  return {
-    async getObject(key, signal): Promise<ArtifactObject> {
-      const object = await client.send(
-        new GetObjectCommand({ Bucket: ARTIFACT_BUCKET, Key: key }),
-        { abortSignal: signal }
-      )
-      if (!(object.Body instanceof Readable))
-        throw new Error('RustFS returned no readable body.')
-      return {
-        body: object.Body,
-        ...(object.ContentLength === undefined
-          ? {}
-          : { contentLength: object.ContentLength })
-      }
-    },
-    async putMemoryArtifact(artifact): Promise<void> {
-      try {
-        const existing = await client.send(
-          new HeadObjectCommand({
-            Bucket: ARTIFACT_BUCKET,
-            Key: artifact.objectKey
-          })
-        )
-        if (
-          existing.ContentLength !== artifact.sizeBytes ||
-          existing.ContentType !== artifact.mediaType ||
-          existing.Metadata?.sha256 !== artifact.digest.slice('sha256:'.length)
-        )
-          throw new Error('memory_artifact_identity_mismatch')
-        return
-      } catch (error) {
-        if (storageStatus(error) !== 404) throw error
-      }
-      await client.send(
-        new PutObjectCommand({
-          Bucket: ARTIFACT_BUCKET,
-          Key: artifact.objectKey,
-          Body: artifact.bytes,
-          ContentType: artifact.mediaType,
-          IfNoneMatch: '*',
-          Metadata: {
-            sha256: artifact.digest.slice('sha256:'.length),
-            'size-bytes': String(artifact.sizeBytes)
-          }
-        })
-      )
-    }
-  }
-}
-
-function storageStatus(error: unknown): number | undefined {
-  if (typeof error !== 'object' || error === null) return undefined
-  const metadata = '$metadata' in error ? error.$metadata : undefined
-  if (
-    typeof metadata !== 'object' ||
-    metadata === null ||
-    !('httpStatusCode' in metadata)
-  )
-    return undefined
-  return typeof metadata.httpStatusCode === 'number'
-    ? metadata.httpStatusCode
-    : undefined
-}
-
 export function createControlPlaneUiServer({
   reviewRunsUrl,
   reviewRunsToken,
@@ -577,119 +371,22 @@ export function createControlPlaneUiServer({
   maximumSessions?: number
   assets?: string
 }): Server {
-  if (!Number.isSafeInteger(maximumSessions) || maximumSessions < 1)
-    throw new RangeError('maximumSessions must be a positive integer')
-  // Sessions are intentionally process-local: a restart revokes every browser session, and this
-  // store retains only opaque token expirations rather than operator credentials.
-  const sessions = new Map<string, number>()
-  const prepareSessionSlot = (now: number): void => {
-    for (const [session, expiresAt] of sessions)
-      if (expiresAt <= now) sessions.delete(session)
-    while (sessions.size >= maximumSessions) {
-      const oldest = sessions.keys().next().value
-      if (oldest === undefined) break
-      sessions.delete(oldest)
-    }
-  }
-  const sessionCookie = (request: IncomingMessage): string | undefined =>
-    request.headers.cookie
-      ?.split(';')
-      .map((value) => value.trim())
-      .find((value) => value.startsWith('control_plane_ui_session='))
-      ?.slice('control_plane_ui_session='.length)
-  const authenticated = (request: IncomingMessage): boolean => {
-    const session = sessionCookie(request)
-    if (session === undefined) return false
-    const expiresAt = sessions.get(session)
-    if (expiresAt === undefined) return false
-    if (expiresAt <= Date.now()) {
-      sessions.delete(session)
-      return false
-    }
-    return true
-  }
-  const cookieSecurity = secureCookies ? '; Secure' : ''
+  const sessionRoutes = createSessionRoutes({
+    accessToken,
+    maximumSessions,
+    secureCookies,
+    sessionTtlSeconds
+  })
   return createServer(async (request, response) => {
-    securityHeaders(response)
+    applySecurityHeaders(response)
     if (request.url === '/healthz') {
       response.writeHead(200, { 'content-type': 'application/json' })
       response.end('{"status":"ok"}')
       return
     }
-    if (request.url === '/api/session' && request.method === 'POST') {
-      const chunks: Buffer[] = []
-      let size = 0
-      for await (const chunk of request) {
-        const buffer = Buffer.from(chunk)
-        size += buffer.byteLength
-        if (size > MAX_SESSION_BODY_BYTES) {
-          response.writeHead(413, { 'content-type': 'application/json' })
-          response.end('{"error":"request_too_large"}')
-          return
-        }
-        chunks.push(buffer)
-      }
-      const supplied = ((): string => {
-        try {
-          return (
-            (
-              JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
-                token?: string
-              }
-            ).token ?? ''
-          )
-        } catch {
-          return ''
-        }
-      })()
-      const suppliedBytes = Buffer.from(supplied)
-      const accessTokenBytes = Buffer.from(accessToken)
-      const valid =
-        suppliedBytes.byteLength === accessTokenBytes.byteLength &&
-        crypto.timingSafeEqual(suppliedBytes, accessTokenBytes)
-      if (!valid) {
-        response.writeHead(401, { 'content-type': 'application/json' })
-        response.end('{"error":"unauthorized"}')
-        return
-      }
-      const sessionValue = crypto.randomBytes(32).toString('base64url')
-      const now = Date.now()
-      prepareSessionSlot(now)
-      sessions.set(sessionValue, now + sessionTtlSeconds * 1000)
-      response.writeHead(204, {
-        'set-cookie': `control_plane_ui_session=${sessionValue}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionTtlSeconds}${cookieSecurity}`,
-        'cache-control': 'no-store'
-      })
-      response.end()
-      return
-    }
-    // Signing out can only be done by the server: the session cookie is HttpOnly, so
-    // the console cannot clear it from script. Expiring it here forgets the credential
-    // on this browser and removes its opaque value from the process-local session table.
-    // It does not revoke the shared access token itself, which stays valid for anyone
-    // else who holds it.
-    //
-    // There is nothing to authenticate: any caller may clear its own cookie, and a
-    // clear is harmless to a caller that was never signed in. The same-origin check
-    // instead keeps another site from reaching in and signing the reader out, which is
-    // the only thing a cross-site DELETE could do. `SameSite=Strict` on the cookie
-    // already stops the browser attaching it; this stops the request being obeyed.
-    if (request.url === '/api/session' && request.method === 'DELETE') {
-      if (!sameOrigin(request)) {
-        response.writeHead(403, { 'content-type': 'application/json' })
-        response.end('{"error":"cross_origin"}')
-        return
-      }
-      const session = sessionCookie(request)
-      if (session !== undefined) sessions.delete(session)
-      response.writeHead(204, {
-        'set-cookie': `control_plane_ui_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${cookieSecurity}`
-      })
-      response.end()
-      return
-    }
+    if (await sessionRoutes.handle(request, response)) return
     if (request.url?.startsWith('/api/')) {
-      if (!authenticated(request)) {
+      if (!sessionRoutes.authenticated(request)) {
         response.writeHead(401, { 'content-type': 'application/json' })
         response.end('{"error":"unauthorized"}')
         return
@@ -698,7 +395,7 @@ export function createControlPlaneUiServer({
       const memoryWriteMatch =
         /^\/api\/memory\/(pause|resume|edit|restore)$/.exec(request.url ?? '')
       if (request.method === 'POST' && memoryWriteMatch !== null) {
-        if (!sameOrigin(request)) {
+        if (!isSameOrigin(request)) {
           sendJson(response, 403, { error: 'cross_site_request' })
           return
         }
@@ -1269,7 +966,7 @@ export function createControlPlaneUiServer({
           })
         } catch (error) {
           if (response.headersSent || response.destroyed) return
-          const status = storageStatus(error)
+          const status = artifactStorageStatus(error)
           const identityMismatch =
             error instanceof Error &&
             error.message === 'artifact_identity_mismatch'
@@ -1305,7 +1002,7 @@ export function createControlPlaneUiServer({
       if (request.method === 'POST' && decision !== null) {
         // A session cookie alone must not authorise a cross-site POST: the same check the
         // sign-out route uses.
-        if (!sameOrigin(request)) {
+        if (!isSameOrigin(request)) {
           sendJson(response, 403, { error: 'cross_site_request' })
           return
         }
