@@ -22,7 +22,7 @@
 | --- | --- | --- | --- |
 | ⏳ | 增加廉价的应用层安全防护。评估使用 [Jev](https://docs.typesafe.ai/concepts/use-case-map) 等决策模型审查动作，以及使用 [Little Canary](https://github.com/hermes-labs-ai/little-canary) 感知提示注入；结合模型检测、静态检查与规则驱动的审计（启发式，比如拒绝访问宿主密钥），衡量漏报、误报、延迟与成本。 | 2026-10-31 | 待解决 |
 | ⏳ | 等 [langchain-quickjs](https://github.com/langchain-ai/deepagents/tree/main/libs/partners/quickjs) 成熟后评估其适用性。 | 2026-10-31 | 待解决 |
-| ✅ | 给 prompts 增加更多 few-shot 例子。 | 2026-08-31 | 2026-09-28 |
-| ✅ | 增加更多 skills。 | 2026-08-31 | 2026-10-16 |
 | ⏳ | 支持配置 agent 工作语言。 | 2026-08-31 | 待解决 |
 | ⏳ | 完善 experience 审查、评估和提升路径。 | 2026-08-31 | 待解决 |
+| ✅ | 给 prompts 增加更多 few-shot 例子。 | 2026-08-31 | 2026-09-28 |
+| ✅ | 增加更多 skills。 | 2026-08-31 | 2026-10-16 |
