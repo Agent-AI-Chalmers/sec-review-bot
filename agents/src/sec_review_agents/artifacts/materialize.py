@@ -8,15 +8,20 @@ from sec_review_agents.artifacts.s3_adapter import download_s3_object
 from sec_review_agents.artifacts.uri import parse_artifact_uri, parse_local_artifact_uri
 
 
-def materialize_artifact(
+def materialize_verified_artifact_file(
     reference: ArtifactReference,
-    destination: Path,
     *,
-    maximum_size: int,
+    local_destination: Path,
+    maximum_bytes: int,
     expected_s3_key: str | None = None,
 ) -> Path:
-    """Resolve one shared artifact reference to a verified local object."""
-    if reference.size_bytes > maximum_size:
+    """Return a verified local file, downloading remote content when required.
+
+    ``local_destination`` is where a non-local locator is materialized. A
+    ``file:`` reference is verified in place and its existing path is returned
+    instead.
+    """
+    if reference.size_bytes > maximum_bytes:
         raise ValueError("Artifact object exceeds the size limit.")
 
     parsed = parse_artifact_uri(reference.uri)
@@ -25,9 +30,9 @@ def materialize_artifact(
     elif parsed.scheme == "s3":
         artifact_path = download_s3_object(
             reference.uri,
-            destination,
+            local_destination,
             expected_size=reference.size_bytes,
-            maximum_size=maximum_size,
+            maximum_size=maximum_bytes,
             expected_key=expected_s3_key,
         ).resolve()
     else:
@@ -46,4 +51,4 @@ def materialize_artifact(
     return artifact_path
 
 
-__all__ = ["materialize_artifact"]
+__all__ = ["materialize_verified_artifact_file"]

@@ -10,7 +10,9 @@ from typing import Any, Literal
 from urllib.parse import urlparse
 
 from sec_review_agents.artifacts.archive import extract_archive
-from sec_review_agents.artifacts.materialize import materialize_artifact
+from sec_review_agents.artifacts.materialize import (
+    materialize_verified_artifact_file,
+)
 from sec_review_agents.artifacts.reference import (
     ARCHIVE_MEDIA_TYPE,
     ArtifactReference,
@@ -294,10 +296,10 @@ def materialize_diagnostic_trajectory_unit(
     destination: Path,
 ) -> MaterializedTrajectoryUnit:
     require_artifact_media_type(reference, ARCHIVE_MEDIA_TYPE)
-    archive_path = materialize_artifact(
+    archive_path = materialize_verified_artifact_file(
         reference,
-        destination.with_suffix(".tar.zst"),
-        maximum_size=MAX_DIAGNOSTIC_BUNDLE_BYTES,
+        local_destination=destination.with_suffix(".tar.zst"),
+        maximum_bytes=MAX_DIAGNOSTIC_BUNDLE_BYTES,
         expected_s3_key=(
             diagnostic_bundle_s3_key(run_id)
             if urlparse(reference.uri).scheme == "s3"
