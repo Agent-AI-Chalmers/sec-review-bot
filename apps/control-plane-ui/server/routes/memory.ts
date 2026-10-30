@@ -215,19 +215,23 @@ export function createMemoryRoutes({
             : source?.kind === 'maintenance'
               ? source.trajectory_reference
               : undefined
-      const artifact = catalogArtifactReference(
+      const published = catalogArtifactReference(
         rawReference,
         requestedKind === 'artifact' || requestedKind === 'content'
           ? 'tree'
           : 'trajectory'
       )
-      if (artifact === null) {
+      if (published.kind === 'invalid') {
         sendJson(response, 409, { error: 'memory_artifact_unavailable' })
+        return
+      }
+      if (published.kind === 'too_large') {
+        sendJson(response, 413, { error: 'artifact_too_large' })
         return
       }
       const complete = await readVerifiedArtifactBuffer(
         artifactStore,
-        artifact,
+        published.artifact,
         { idleTimeoutMs: artifactDownloadIdleTimeoutMs }
       )
       if (requestedKind === 'content') {

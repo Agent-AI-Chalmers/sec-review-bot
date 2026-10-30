@@ -15,11 +15,11 @@ import {
 import { PROXIED_CONTENT_TYPE, sendJson } from '../http-response.js'
 import type { ReviewRunsClient } from '../upstream/review-runs-client.js'
 import { UpstreamRequestError } from '../upstream/request.js'
-import { availableArtifact } from '../run/artifact-reference.js'
 import {
-  MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES,
-  readDiagnosticBundle
-} from '../run/diagnostic-bundle.js'
+  runDiagnosticBundle,
+  type PublishedRunArtifact
+} from '../run/artifact-reference.js'
+import { readDiagnosticBundle } from '../run/diagnostic-bundle.js'
 
 function decodeRunId(raw: string | undefined): string | null {
   let runId: string
@@ -64,23 +64,20 @@ export function createRunArtifactRoutes({
         return
       }
       const body = JSON.parse(upstream.body.toString('utf8')) as {
-        run?: { run_id?: unknown; artifact_storage?: unknown }
+        run?: PublishedRunArtifact
       }
-      const artifact =
-        body.run?.run_id === runId
-          ? availableArtifact(body.run.artifact_storage, runId, ARTIFACT_BUCKET)
-          : null
-      if (artifact === null) {
+      const published = runDiagnosticBundle(body.run, runId, ARTIFACT_BUCKET)
+      if (published.kind === 'invalid') {
         sendJson(response, 409, { error: 'artifact_unavailable' })
         return
       }
-      if (artifact.sizeBytes > MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES) {
-        sendJson(response, 413, { error: 'artifact_preview_too_large' })
+      if (published.kind === 'too_large') {
+        sendJson(response, 413, { error: 'artifact_too_large' })
         return
       }
       const complete = await readVerifiedArtifactBuffer(
         artifactStore,
-        artifact,
+        published.artifact,
         { idleTimeoutMs: artifactDownloadIdleTimeoutMs }
       )
       const view = await readDiagnosticBundle(complete, runId)
@@ -139,19 +136,20 @@ export function createRunArtifactRoutes({
         return
       }
       const body = JSON.parse(upstream.body.toString('utf8')) as {
-        run?: { run_id?: unknown; artifact_storage?: unknown }
+        run?: PublishedRunArtifact
       }
-      const artifact =
-        body.run?.run_id === runId
-          ? availableArtifact(body.run.artifact_storage, runId, ARTIFACT_BUCKET)
-          : null
-      if (artifact === null) {
+      const published = runDiagnosticBundle(body.run, runId, ARTIFACT_BUCKET)
+      if (published.kind === 'invalid') {
         sendJson(response, 409, { error: 'artifact_unavailable' })
+        return
+      }
+      if (published.kind === 'too_large') {
+        sendJson(response, 413, { error: 'artifact_too_large' })
         return
       }
       await withVerifiedArtifactFile(
         artifactStore,
-        artifact,
+        published.artifact,
         {
           filename: 'diagnostic-tree.v1.tar.zst',
           idleTimeoutMs: artifactDownloadIdleTimeoutMs,

@@ -1,38 +1,35 @@
-import type { AvailableArtifact } from '../artifacts/verified-artifact.js'
+import type { PublishedArtifact } from '../artifacts/published-artifact.js'
+import { publishedArtifact } from '../artifacts/published-artifact.js'
 import { MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES } from './diagnostic-bundle.js'
 
-export function availableArtifact(
-  value: unknown,
+const DIAGNOSTIC_BUNDLE = 'diagnostic-tree.v1.tar.zst'
+const DIAGNOSTIC_BUNDLE_MEDIA_TYPE = 'application/tar+zstd'
+
+/** The part of a Review Runs run body that says which artifact the run published. */
+export interface PublishedRunArtifact {
+  run_id?: unknown
+  artifact_storage?: unknown
+}
+
+/**
+ * The diagnostic bundle one run published, if this body is the run that was asked for.
+ *
+ * The identity check belongs here rather than at each caller: a body for another run must
+ * not resolve to an artifact this request would then serve under the wrong run id.
+ */
+export function runDiagnosticBundle(
+  run: PublishedRunArtifact | undefined,
   runId: string,
   bucket: string
-): AvailableArtifact | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    return null
-  const storage = value as Record<string, unknown>
-  if (storage.status !== 'available') return null
-  if (
-    typeof storage.artifact !== 'object' ||
-    storage.artifact === null ||
-    Array.isArray(storage.artifact)
-  )
-    return null
-  const artifact = storage.artifact as Record<string, unknown>
-  const expectedUri = `s3://${bucket}/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`
-  if (
-    artifact.kind !== 'diagnostic_bundle' ||
-    artifact.uri !== expectedUri ||
-    artifact.media_type !== 'application/tar+zstd' ||
-    typeof artifact.digest !== 'string' ||
-    !/^sha256:[0-9a-f]{64}$/.test(artifact.digest) ||
-    !Number.isSafeInteger(artifact.size_bytes) ||
-    (artifact.size_bytes as number) < 0
-  )
-    return null
-  const key = expectedUri.slice(`s3://${bucket}/`.length)
-  return {
-    digest: artifact.digest,
-    key,
+): PublishedArtifact {
+  if (run?.run_id !== runId) return { kind: 'invalid' }
+  const storage = run.artifact_storage as
+    { status?: unknown; artifact?: unknown } | undefined
+  if (storage?.status !== 'available') return { kind: 'invalid' }
+  return publishedArtifact(storage.artifact, {
+    bucket,
+    mediaType: DIAGNOSTIC_BUNDLE_MEDIA_TYPE,
     maximumSize: MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES,
-    sizeBytes: artifact.size_bytes as number
-  }
+    acceptsKey: (key) => key === `runs/${runId}/artifacts/${DIAGNOSTIC_BUNDLE}`
+  })
 }
