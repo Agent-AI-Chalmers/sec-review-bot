@@ -7,6 +7,7 @@ import { createGitHubApp } from './github-app.js'
 import {
   port,
   repository_review_dispatch_path,
+  webhook_max_body_bytes,
   webhook_path
 } from './config.js'
 import {
@@ -83,6 +84,7 @@ const server = http.createServer(
     port,
     repository_review_dispatch_path,
     repository_review_dispatch_handler: handleRepositoryReviewDispatch,
+    webhook_max_body_bytes,
     webhook_middleware: middleware
   })
 )
