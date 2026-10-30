@@ -1,4 +1,16 @@
-import type { IncomingMessage } from 'node:http'
+import type { IncomingMessage, ServerResponse } from 'node:http'
+
+/** JSON content type for a body this BFF writes itself. */
+export const PROXIED_CONTENT_TYPE = 'application/json; charset=utf-8'
+
+export function sendJson(
+  response: ServerResponse,
+  status: number,
+  body: object
+): void {
+  response.writeHead(status, { 'content-type': 'application/json' })
+  response.end(JSON.stringify(body))
+}
 
 export const MAX_REQUEST_BODY_BYTES = 1024 * 1024
 

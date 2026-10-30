@@ -3,9 +3,9 @@ import type { IncomingMessage, ServerResponse } from 'node:http'
 import { LIST_RUN_QUERY_PARAMS } from '../../shared/list-run-query-params.js'
 import {
   RequestBodyTooLargeError,
-  readBoundedRequestBody
-} from '../http-request.js'
-import { sendJson } from '../http-response.js'
+  readBoundedRequestBody,
+  sendJson
+} from '../http.js'
 import { requireSameOrigin } from '../request-security.js'
 import { sendUpstreamFailure, writeUpstreamResult } from '../upstream/relay.js'
 import type { ReviewRunsClient } from '../upstream/review-runs-client.js'

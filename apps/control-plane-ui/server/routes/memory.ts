@@ -6,10 +6,11 @@ import {
   readVerifiedArtifactBuffer
 } from '../artifacts/verified-artifact.js'
 import {
+  PROXIED_CONTENT_TYPE,
   RequestBodyTooLargeError,
-  readBoundedRequestBody
-} from '../http-request.js'
-import { PROXIED_CONTENT_TYPE, sendJson } from '../http-response.js'
+  readBoundedRequestBody,
+  sendJson
+} from '../http.js'
 import { requireSameOrigin } from '../request-security.js'
 import type { MemoryCatalogClient } from '../upstream/memory-catalog-client.js'
 import { sendUpstreamFailure, writeUpstreamResult } from '../upstream/relay.js'

@@ -1,6 +1,6 @@
 import type { ServerResponse } from 'node:http'
 
-import { PROXIED_CONTENT_TYPE, sendJson } from '../http-response.js'
+import { PROXIED_CONTENT_TYPE, sendJson } from '../http.js'
 import { UpstreamRequestError, type UpstreamResult } from './request.js'
 
 /** The upstreams this BFF proxies, named the way their error codes name them. */
