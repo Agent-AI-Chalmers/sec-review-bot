@@ -23,4 +23,4 @@ COPY --from=builder /app/dist-server ./dist-server
 COPY --from=builder /app/prod/node_modules ./node_modules
 COPY --from=builder /app/prod/package.json ./package.json
 USER node
-CMD ["node", "dist-server/server/index.js"]
+CMD ["node", "dist-server/server/main.js"]

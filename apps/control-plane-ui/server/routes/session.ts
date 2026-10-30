@@ -1,9 +1,11 @@
 import crypto from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
-import { isSameOrigin } from './request-security.js'
-
-const MAX_SESSION_BODY_BYTES = 1024 * 1024
+import {
+  RequestBodyTooLargeError,
+  readBoundedRequestBody
+} from '../http-request.js'
+import { isSameOrigin } from '../request-security.js'
 
 export interface SessionRoutes {
   authenticated(request: IncomingMessage): boolean
@@ -63,23 +65,22 @@ export function createSessionRoutes({
     response: ServerResponse
   ): Promise<boolean> => {
     if (request.url === '/api/session' && request.method === 'POST') {
-      const chunks: Buffer[] = []
-      let size = 0
-      for await (const chunk of request) {
-        const buffer = Buffer.from(chunk)
-        size += buffer.byteLength
-        if (size > MAX_SESSION_BODY_BYTES) {
+      let raw: Buffer
+      try {
+        raw = await readBoundedRequestBody(request)
+      } catch (error) {
+        if (error instanceof RequestBodyTooLargeError) {
           response.writeHead(413, { 'content-type': 'application/json' })
           response.end('{"error":"request_too_large"}')
           return true
         }
-        chunks.push(buffer)
+        throw error
       }
       const supplied = ((): string => {
         try {
           return (
             (
-              JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+              JSON.parse(raw.toString('utf8')) as {
                 token?: string
               }
             ).token ?? ''
