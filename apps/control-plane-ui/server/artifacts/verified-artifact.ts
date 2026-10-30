@@ -4,7 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { Transform, Writable, type Readable } from 'node:stream'
-import { pipeline } from 'node:stream/promises'
+import { finished, pipeline } from 'node:stream/promises'
 
 import type { ArtifactStore } from './store.js'
 
@@ -46,6 +46,10 @@ async function streamVerifiedArtifact(
   options: ReadVerifiedArtifactOptions,
   sink: Writable
 ): Promise<void> {
+  // The sink starts opening before storage metadata is available. Observe errors immediately,
+  // including failures before pipeline takes ownership, and wait for close before the caller
+  // removes its temporary directory. destroy() alone does not wait for a pending file open.
+  const sinkClosed = finished(sink, { cleanup: true }).catch(() => undefined)
   const controller = new AbortController()
   let body: Readable | undefined
   let idleTimeout: NodeJS.Timeout | undefined
@@ -111,6 +115,8 @@ async function streamVerifiedArtifact(
     clearTimeout(idleTimeout)
     options.signal?.removeEventListener('abort', abortFromCaller)
     if (body !== undefined && !body.destroyed) body.destroy()
+    sink.destroy()
+    await sinkClosed
   }
 }
 
