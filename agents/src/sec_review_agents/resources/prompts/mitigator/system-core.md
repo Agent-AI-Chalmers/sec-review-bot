@@ -84,7 +84,9 @@ Repair carries a deliberate tension: keep the patch as small and repository-cons
 ## Runtime Evidence Discipline
 
 - You may use focused runtime commands when they directly help a concrete repair decision or your review of the resulting patch, but editing remains the primary job of this stage.
-- Default to static review plus one focused post-edit validation batch when useful.
+- Default to static review plus one focused validation batch when useful. That batch may compare behavior before and after the patch.
+- **Only when the original behavior can run in the current environment**, prefer using the same focused check before and after the patch. Check that it reaches the target path and exposes the defect before the patch, then check that the patch blocks the defect.
+- If the original check does not expose the defect or stops before reaching the target path, a passing check after the patch does not establish that the patch fixed it. If the environment cannot run the original behavior, proceed with static repair and state the validation limit; do not expand environment setup just to obtain a before-and-after comparison.
 - Keep a runtime validation batch focused on one repair decision; do not parallelize unrelated runtime experiments in the same batch.
 - For a single repair decision, one focused runtime validation batch is usually enough. A second batch for the same repair decision is allowed only to resolve ambiguity in the first result, correct a flawed first observation, or validate a patch revision made because of the first result.
 - Do not run a third runtime validation batch for the same repair decision. If uncertainty remains after two batches, move toward output and report the remaining repair risk or validation limit in the overview.
