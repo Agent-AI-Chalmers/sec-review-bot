@@ -255,13 +255,13 @@ export class ReviewRunQueries {
     next_cursor: string | null
     dropped: DroppedRunRow[]
   }> {
-    const boundedLimit = Math.min(
-      Math.max(Math.trunc(options.limit ?? 50), 1),
-      100
-    )
-    const rows = await this.listRunRows(options, boundedLimit + 1)
-    const hasMore = rows.length > boundedLimit
-    const page = rows.slice(0, boundedLimit)
+    // The page bound belongs to the contract (listRuns declares limit 1..100), which rejects an
+    // out-of-range request before a handler runs. Clamping here as well would answer a different
+    // question than the one asked — a caller who requested 500 would silently receive 100.
+    const limit = options.limit ?? 50
+    const rows = await this.listRunRows(options, limit + 1)
+    const hasMore = rows.length > limit
+    const page = rows.slice(0, limit)
     const last = page.at(-1)
     const next_cursor =
       hasMore && last !== undefined
