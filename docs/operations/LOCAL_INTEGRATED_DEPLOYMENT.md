@@ -88,7 +88,7 @@ The integrated deployment uses four source configuration files. Compose `.env` a
 - `agents/config/model-providers.toml`: model deployments;
 - `ops/systemd/deployment.env`: systemd deployment configuration before installation.
 
-The installer combines these settings with checkout-derived paths and writes the systemd services' effective configuration to `/etc/sec-review-bot/deployment.env`.
+The installer combines these settings with checkout-derived paths, keeps the merged operator copy at `/etc/sec-review-bot/deployment.env`, and writes role-scoped effective files for Compose, execution workers, and memory workers in the same directory.
 
 Create the configuration files from the repository root:
 
@@ -104,7 +104,7 @@ The initialization command copies the maintained samples, generates independent 
 
 Compose-level defaults are documented in [compose.env.sample](../../compose.env.sample). This file controls how Compose starts containers, mounts local directories, and exposes ports.
 
-The initialization command fills the service tokens and PostgreSQL/RustFS credentials with independently generated values. It also copies the Memory Catalog and role-specific storage credentials needed by host workers into `ops/systemd/deployment.env`; no manual token synchronization is required. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
+The initialization command fills the service tokens and PostgreSQL/RustFS credentials with independently generated values. It also copies the Memory Catalog and role-specific storage credentials needed by host workers into `ops/systemd/deployment.env`; no manual token synchronization is required. The installer projects that source into separate worker environment files, so execution and memory processes receive only their own credentials. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
 
 RustFS uses a separate workload identity for each storage responsibility: the integration writes input objects; Execution Worker reads inputs, writes run diagnostic bundles, and reads active memory revisions; the Memory Extraction and Memory Maintenance Workers share one memory-storage identity for run diagnostics, memory revisions, and compressed memory-agent trajectories; and the UI BFF reads stored diagnostics for authenticated downloads. Extraction and maintenance remain separate Temporal worker identities, processes, and task queues. Their shared S3 credential is retained because the current object-store policy covers one common memory artifact namespace; splitting that policy is outside this deployment change and would not improve process isolation by itself.
 
@@ -150,7 +150,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 ### 4. systemd Integrated Service Configuration
 
-`ops/systemd/deployment.env` is the editable source configuration. Every time the installer runs, it combines that file with paths derived from the current checkout and replaces `/etc/sec-review-bot/deployment.env`. Both the Compose stack service and host workers read the installed file.
+`ops/systemd/deployment.env` is the editable source configuration. Every time the installer runs, it combines that file with paths derived from the current checkout and replaces `/etc/sec-review-bot/deployment.env`, `/etc/sec-review-bot/compose.env`, `/etc/sec-review-bot/execution-worker.env`, and `/etc/sec-review-bot/memory-worker.env`. Each unit reads its role-scoped file.
 
 The installer owns `SEC_REVIEW_BOT_DIR` and `SEC_REVIEW_AGENTS_DIR`. Do not add them to the editable source file. The installer removes stale values and regenerates them from its own repository location. Input archives are exchanged through RustFS, so the integration container and host worker no longer share `.agent-input-bundles`.
 

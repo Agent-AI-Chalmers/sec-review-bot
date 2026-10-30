@@ -16,7 +16,7 @@ Environment=TEMPORAL_EXECUTION_TASK_QUEUE=sec-review-execution
 Environment=TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES=2
 Environment=AGENT_SANDBOX_BACKEND=docker
 Environment=AGENT_DOCKER_BIN=docker
-EnvironmentFile=/etc/sec-review-bot/deployment.env
+EnvironmentFile=/etc/sec-review-bot/execution-worker.env
 
 ExecStartPre=/usr/bin/env docker info
 ExecStartPre=/bin/sh -c 'test -n "$SEC_REVIEW_EXECUTION_S3_ACCESS_KEY" -a -n "$SEC_REVIEW_EXECUTION_S3_SECRET_KEY"'
