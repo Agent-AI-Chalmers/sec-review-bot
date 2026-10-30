@@ -1,6 +1,8 @@
 import json
 from email.message import Message
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from io import BytesIO
+from threading import Thread
 from typing import Any
 from unittest.mock import patch
 from urllib.error import HTTPError
@@ -280,7 +282,7 @@ def test_extraction_conflict_preserves_non_retryable_catalog_semantics() -> None
 
     with (
         patch(
-            "sec_review_agents.memory.catalog_client.urlopen",
+            "sec_review_agents.memory.catalog_client._open_catalog_request",
             side_effect=conflict,
         ),
         pytest.raises(MemoryCatalogConflictError, match="HTTP 409"),
@@ -320,7 +322,7 @@ def test_maintenance_pause_preserves_its_own_conflict_semantics() -> None:
 
     with (
         patch(
-            "sec_review_agents.memory.catalog_client.urlopen",
+            "sec_review_agents.memory.catalog_client._open_catalog_request",
             side_effect=paused,
         ),
         pytest.raises(MemoryMaintenancePausedError, match="HTTP 409"),
@@ -335,6 +337,56 @@ def test_maintenance_pause_preserves_its_own_conflict_semantics() -> None:
                 media_type="application/zstd",
             ),
         )
+
+
+def test_catalog_client_does_not_forward_credentials_across_redirects() -> None:
+    received_authorization: list[str | None] = []
+
+    class RedirectTargetHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            received_authorization.append(self.headers.get("Authorization"))
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, format: str, *args: object) -> None:
+            del format, args
+
+    target = ThreadingHTTPServer(("127.0.0.1", 0), RedirectTargetHandler)
+
+    class RedirectingCatalogHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(302)
+            self.send_header(
+                "Location",
+                f"http://127.0.0.1:{target.server_port}/captured",
+            )
+            self.end_headers()
+
+        def log_message(self, format: str, *args: object) -> None:
+            del format, args
+
+    catalog = ThreadingHTTPServer(("127.0.0.1", 0), RedirectingCatalogHandler)
+    target_thread = Thread(target=target.serve_forever, daemon=True)
+    catalog_thread = Thread(target=catalog.serve_forever, daemon=True)
+    target_thread.start()
+    catalog_thread.start()
+    try:
+        client = MemoryCatalogClient(
+            base_url=f"http://127.0.0.1:{catalog.server_port}",
+            token="secret",
+        )
+
+        with pytest.raises(RuntimeError, match="HTTP 302"):
+            client.get_memory_tree()
+
+        assert received_authorization == []
+    finally:
+        catalog.shutdown()
+        target.shutdown()
+        catalog.server_close()
+        target.server_close()
 
 
 def test_operator_revision_and_restore_contracts_are_separate() -> None:
