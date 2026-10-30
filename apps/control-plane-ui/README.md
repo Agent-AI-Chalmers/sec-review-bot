@@ -110,7 +110,7 @@ The local-fixture browser suite also checks WCAG A/AA violations with axe, inclu
 
 The production server requires `REVIEW_RUNS_READ_TOKEN` and `CONTROL_PLANE_UI_ACCESS_TOKEN`, and they answer different questions. The access token decides who may open the console: the browser exchanges it for an HTTP-only session cookie, and the token itself never reaches browser code or Vite variables. The read token is what the backend then uses to call Review Runs query routes on the signed-in user's behalf; it never leaves the server either. Keeping them separate means a console account and a read key can be issued, rotated, and revoked independently — a read-only consumer such as a dashboard holds only the read token and has no console access.
 
-<!-- doc-default: CONTROL_PLANE_UI_HOST; source=apps/control-plane-ui/server/index.ts -->
+<!-- doc-default: CONTROL_PLANE_UI_HOST; source=apps/control-plane-ui/server/main.ts -->
 
 The production server binds to `127.0.0.1` by default. Set `CONTROL_PLANE_UI_HOST` only when a container network or reverse proxy must reach it. Browser sessions use independent random identifiers with a 12-hour server-side lifetime instead of deriving the cookie from the access token.
 

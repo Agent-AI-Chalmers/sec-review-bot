@@ -112,7 +112,7 @@ pnpm run build
 
 生产服务需要 `REVIEW_RUNS_READ_TOKEN` 和 `CONTROL_PLANE_UI_ACCESS_TOKEN`，它们回答的是两个不同的问题。访问 token 决定"谁能打开控制台"：浏览器用它换取 HTTP-only 会话 cookie，token 本身不会进入浏览器代码或 Vite 变量。read token 则是后端在用户登录后调用 Review Runs 查询路由时使用的凭证，同样只存在于服务端。两者分开，意味着控制台账号与读密钥可以独立签发、轮换和吊销——例如只读的监控面板只持有 read token，不具备任何控制台访问能力。
 
-<!-- doc-default: CONTROL_PLANE_UI_HOST; source=apps/control-plane-ui/server/index.ts -->
+<!-- doc-default: CONTROL_PLANE_UI_HOST; source=apps/control-plane-ui/server/main.ts -->
 
 生产服务默认绑定 `127.0.0.1`。只有容器网络或反向代理需要访问时才设置 `CONTROL_PLANE_UI_HOST`。浏览器会话使用独立的随机标识符，并在服务端保留 12 小时，而不是从访问 token 派生 cookie。
 
