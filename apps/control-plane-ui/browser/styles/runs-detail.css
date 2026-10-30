@@ -67,6 +67,25 @@
   border-radius: var(--mantine-radius-sm);
 }
 
+/* aria-selected is the committed value; Mantine's combobox-selected marks keyboard
+   navigation. Keep the value's soft fill while outlining the option being explored. */
+.mantine-Select-option[aria-selected='true'],
+.mantine-Select-option[aria-selected='true']:hover {
+  background-color: var(--brand-soft);
+  color: var(--mantine-color-text);
+}
+
+.mantine-Select-option[data-combobox-selected],
+.mantine-Select-option:not([data-combobox-disabled]):hover {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.mantine-Select-option[data-combobox-selected]:not([aria-selected='true']) {
+  background-color: var(--mantine-color-default-hover);
+  color: var(--mantine-color-text);
+}
+
 .run-id {
   overflow-wrap: anywhere;
 }
