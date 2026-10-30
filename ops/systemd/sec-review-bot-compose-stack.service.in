@@ -11,7 +11,7 @@ StartLimitBurst=3
 [Service]
 Type=simple
 User=@SEC_REVIEW_BOT_USER@
-EnvironmentFile=/etc/sec-review-bot/deployment.env
+EnvironmentFile=/etc/sec-review-bot/compose.env
 
 ExecStartPre=/usr/bin/env docker info
 ExecStartPre=/usr/bin/env docker compose version

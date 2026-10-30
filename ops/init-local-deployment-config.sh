@@ -110,7 +110,6 @@ replace_assignment "$compose_tmp" SEC_REVIEW_UI_S3_SECRET_KEY "$ui_storage_passw
 # identities and Memory Catalog service configured through Compose.
 replace_assignment "$deployment_tmp" SEC_REVIEW_EXECUTION_S3_SECRET_KEY "$execution_storage_password"
 replace_assignment "$deployment_tmp" SEC_REVIEW_MEMORY_S3_SECRET_KEY "$memory_storage_password"
-replace_assignment "$deployment_tmp" SEC_REVIEW_UI_S3_SECRET_KEY "$ui_storage_password"
 replace_assignment "$deployment_tmp" AGENT_MEMORY_CATALOG_TOKEN "$memory_catalog_worker_token"
 
 # Compose overrides this value, but keeping the generated source file coherent

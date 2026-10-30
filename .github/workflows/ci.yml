@@ -103,8 +103,11 @@ jobs:
       # cheaply so a change there cannot land with CI Status green but untested.
       # install.sh is `#!/bin/sh`, so check it with the POSIX shell (dash on the
       # runner), not bash — bash is a superset and would accept syntax dash rejects.
-      - name: Syntax-check the install script
-        run: sh -n ops/systemd/install.sh
+      - name: Check systemd scripts
+        run: |
+          sh -n ops/systemd/install.sh
+          sh -n ops/systemd/test-filter-environment.sh
+          sh ops/systemd/test-filter-environment.sh
 
       - name: Compile the RustFS init script
         run: python3 -m py_compile ops/rustfs-init/init.py

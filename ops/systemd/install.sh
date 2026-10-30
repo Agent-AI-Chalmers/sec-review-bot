@@ -31,11 +31,17 @@ service_gid=$(id -g "$service_user")
 unit_dir=/etc/systemd/system
 config_dir=/etc/sec-review-bot
 deployment_env=$config_dir/deployment.env
+compose_env=$config_dir/compose.env
+execution_worker_env=$config_dir/execution-worker.env
+memory_worker_env=$config_dir/memory-worker.env
 deployment_env_source=$script_dir/deployment.env
 # Render into a private temporary file so a rendering failure cannot truncate
 # the previously installed configuration under /etc.
 rendered_deployment_env=$(mktemp)
-trap 'rm -f "$rendered_deployment_env"' EXIT HUP INT TERM
+rendered_compose_env=$(mktemp)
+rendered_execution_worker_env=$(mktemp)
+rendered_memory_worker_env=$(mktemp)
+trap 'rm -f "$rendered_deployment_env" "$rendered_compose_env" "$rendered_execution_worker_env" "$rendered_memory_worker_env"' EXIT HUP INT TERM
 
 # Fail before installing units that cannot run under the selected service user.
 if [ ! -x "$repository_root/agents/.venv/bin/sec-review-execution-worker" ] ||
@@ -152,18 +158,30 @@ awk -v repository_root="$repository_root" \
         }
     }
 ' "$deployment_env_source" > "$rendered_deployment_env"
-# POSTGRES_PASSWORD belongs in the project `.env` (Compose interpolation), not
-# here: the systemd unit exports this file into the Compose process environment,
-# where it shadows `.env` and leaves the data volume unauthenticated against a
-# later foreground compose run. Refuse a deployment.env that still sets it, so a
-# stale sample placeholder cannot be reinstalled silently.
-if grep -qE '^[[:space:]]*POSTGRES_PASSWORD=' "$rendered_deployment_env"; then
-  echo "Refusing to install: deployment.env sets POSTGRES_PASSWORD." >&2
-  echo "Remove it from $deployment_env_source and set the password in the project .env instead." >&2
-  exit 1
-fi
-# Copy only the completed merged file and keep deployment secrets private.
+# Keep the completed merged source private for operator inspection.
 install -m 0600 "$rendered_deployment_env" "$deployment_env"
+
+filter_environment() {
+  allowed_keys=$1
+  output=$2
+  awk -v allowed_keys="$allowed_keys" \
+    -f "$script_dir/filter-environment.awk" \
+    "$rendered_deployment_env" > "$output"
+}
+
+filter_environment \
+  'SEC_REVIEW_BOT_DIR SEC_REVIEW_SERVICE_UID SEC_REVIEW_SERVICE_GID' \
+  "$rendered_compose_env"
+filter_environment \
+  'SEC_REVIEW_AGENTS_DIR SEC_REVIEW_AGENT_ARTIFACT_ROOT SEC_REVIEW_AGENT_RUN_INPUT_ROOT MODEL_PROVIDERS_CONFIG_TOML TEMPORAL_ADDRESS TEMPORAL_NAMESPACE TEMPORAL_EXECUTION_TASK_QUEUE TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES SEC_REVIEW_ARTIFACT_S3_BUCKET SEC_REVIEW_ARTIFACT_S3_ENDPOINT SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE AWS_REGION SEC_REVIEW_EXECUTION_S3_ACCESS_KEY SEC_REVIEW_EXECUTION_S3_SECRET_KEY AGENT_SANDBOX_BACKEND AGENT_DOCKER_BIN AGENT_DOCKER_NETWORK_MODE AGENT_DOCKER_IMAGE AGENT_MEMORY_CATALOG_URL AGENT_MEMORY_CATALOG_TOKEN AGENT_MEMORY_CONSUMPTION_ENABLED AGENT_SKILLS_ENABLED AGENT_JOERN_ENABLED AGENT_PLAYWRIGHT_ENABLED AGENT_MCP_ENABLED LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY LANGFUSE_BASE_URL' \
+  "$rendered_execution_worker_env"
+filter_environment \
+  'SEC_REVIEW_AGENTS_DIR SEC_REVIEW_AGENT_ARTIFACT_ROOT SEC_REVIEW_AGENT_RUN_INPUT_ROOT MODEL_PROVIDERS_CONFIG_TOML TEMPORAL_ADDRESS TEMPORAL_NAMESPACE TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES SEC_REVIEW_ARTIFACT_S3_BUCKET SEC_REVIEW_ARTIFACT_S3_ENDPOINT SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE AWS_REGION SEC_REVIEW_MEMORY_S3_ACCESS_KEY SEC_REVIEW_MEMORY_S3_SECRET_KEY AGENT_MEMORY_CATALOG_URL AGENT_MEMORY_CATALOG_TOKEN AGENT_MEMORY_PROCESSING_ENABLED AGENT_SKILLS_ENABLED AGENT_JOERN_ENABLED AGENT_PLAYWRIGHT_ENABLED AGENT_MCP_ENABLED LANGFUSE_PUBLIC_KEY LANGFUSE_SECRET_KEY LANGFUSE_BASE_URL' \
+  "$rendered_memory_worker_env"
+
+install -m 0600 "$rendered_compose_env" "$compose_env"
+install -m 0600 "$rendered_execution_worker_env" "$execution_worker_env"
+install -m 0600 "$rendered_memory_worker_env" "$memory_worker_env"
 
 # Unit templates contain only the service-user placeholder. Deployment values
 # remain in the EnvironmentFile so changing them does not rewrite unit files.
@@ -196,5 +214,6 @@ systemctl daemon-reload
 
 echo "Installed Sec Review Bot systemd units for user '$service_user'."
 echo "Installed $deployment_env from $deployment_env_source with repository paths."
+echo "Installed role-scoped environment files under $config_dir."
 echo "Review it, then run:"
 echo "  systemctl enable --now sec-review-bot.target"

@@ -14,7 +14,7 @@ Environment=TEMPORAL_ADDRESS=127.0.0.1:7233
 Environment=TEMPORAL_NAMESPACE=default
 Environment=TEMPORAL_MEMORY_EXTRACTION_TASK_QUEUE=sec-review-memory-extraction
 Environment=TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES=4
-EnvironmentFile=/etc/sec-review-bot/deployment.env
+EnvironmentFile=/etc/sec-review-bot/memory-worker.env
 
 ExecStartPre=/bin/sh -c 'test -n "$AGENT_MEMORY_CATALOG_URL" -a -n "$AGENT_MEMORY_CATALOG_TOKEN"'
 ExecStartPre=/bin/sh -c 'test -n "$SEC_REVIEW_ARTIFACT_S3_BUCKET" -a -n "$SEC_REVIEW_ARTIFACT_S3_ENDPOINT"'
