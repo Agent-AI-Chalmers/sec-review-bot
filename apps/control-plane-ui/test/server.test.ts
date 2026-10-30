@@ -536,6 +536,70 @@ test('memory edit creates a revision while restore only moves the pointer', asyn
   }
 })
 
+test('memory writes classify an unreachable catalog as an upstream failure', async () => {
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    memoryCatalogUrl: 'http://127.0.0.1:1',
+    memoryCatalogOperatorToken: 'catalog-secret'
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  try {
+    const cookie = await loginCookie(base)
+    const response = await fetch(`${base}/api/memory/pause`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ operation_id: 'op-1', expected_generation: 1 })
+    })
+    assert.strictEqual(response.status, 502)
+    assert.deepStrictEqual(await response.json(), {
+      error: 'memory_catalog_unavailable'
+    })
+  } finally {
+    await new Promise<void>((resolve) => ui.close(() => resolve()))
+  }
+})
+
+test('memory writes classify a catalog timeout separately', async () => {
+  const catalog = createServer(() => undefined)
+  await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
+  const catalogAddress = catalog.address()
+  assert(catalogAddress && typeof catalogAddress === 'object')
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
+    memoryCatalogOperatorToken: 'catalog-secret',
+    reviewRunsRequestTimeoutMs: 20
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  try {
+    const cookie = await loginCookie(base)
+    const response = await fetch(`${base}/api/memory/pause`, {
+      method: 'POST',
+      headers: { cookie, origin: base, 'content-type': 'application/json' },
+      body: JSON.stringify({ operation_id: 'op-1', expected_generation: 1 })
+    })
+    assert.strictEqual(response.status, 504)
+    assert.deepStrictEqual(await response.json(), {
+      error: 'memory_catalog_timeout'
+    })
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => catalog.close(() => resolve()))
+    ])
+  }
+})
+
 test('BFF verifies and strictly parses memory trajectories for the viewer', async () => {
   const trajectory = zstdCompressSync(
     Buffer.from(
