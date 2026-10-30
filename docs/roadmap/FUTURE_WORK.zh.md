@@ -24,5 +24,5 @@
 | ⏳ | 等 [langchain-quickjs](https://github.com/langchain-ai/deepagents/tree/main/libs/partners/quickjs) 成熟后评估其适用性。 | 2026-10-31 | 待解决 |
 | ⏳ | 支持配置 agent 工作语言。 | 2026-08-31 | 待解决 |
 | ⏳ | 完善 experience 审查、评估和提升路径。 | 2026-08-31 | 待解决 |
-| ✅ | 给 prompts 增加更多 few-shot 例子。 | 2026-08-31 | 2026-09-28 |
 | ✅ | 增加更多 skills。 | 2026-08-31 | 2026-10-16 |
+| ✅ | 给 prompts 增加更多 few-shot 例子。 | 2026-08-31 | 2026-09-28 |

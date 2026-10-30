@@ -22,5 +22,5 @@ This page records directions that are worth exploring later. Each item records w
 | ⏳ | Reassess the suitability of [langchain-quickjs](https://github.com/langchain-ai/deepagents/tree/main/libs/partners/quickjs) once it matures. | 2026-10-31 | Pending |
 | ⏳ | Support configurable agent working language. | 2026-08-31 | Pending |
 | ⏳ | Improve experience review, evaluation, and promotion paths. | 2026-08-31 | Pending |
-| ✅ | Add more few-shot examples for prompts. | 2026-08-31 | 2026-09-28 |
 | ✅ | Add more skills. | 2026-08-31 | 2026-10-16 |
+| ✅ | Add more few-shot examples for prompts. | 2026-08-31 | 2026-09-28 |
