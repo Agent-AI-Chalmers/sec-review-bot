@@ -38,22 +38,8 @@ export type ExecutionStatisticsSummary = NonNullable<
 >
 
 export type IngressKind = 'github_webhook' | 'github_actions_dispatch'
-export type ExecutionStatus =
-  | 'pending'
-  | 'queued'
-  | 'running'
-  | 'uncertain'
-  | 'succeeded'
-  | 'skipped'
-  | 'failed'
-export type PublicationStatus =
-  | 'pending'
-  | 'publishing'
-  | 'uncertain'
-  | 'disconnected'
-  | 'published'
-  | 'failed'
-  | 'skipped'
+export type ExecutionStatus = ReviewRunRecord['execution']['status']
+export type PublicationStatus = ReviewRunRecord['publication']['status']
 /** The redacted preparation summary's state, as both the contract and the run record use it. */
 export type PreparationStatus = NonNullable<
   ReviewRunRecord['preparation']
