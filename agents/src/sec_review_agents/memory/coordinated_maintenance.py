@@ -14,7 +14,9 @@ from sec_review_agents.memory.memory_tree_artifact import (
     materialize_memory_tree,
     publish_memory_tree_artifact,
 )
-from sec_review_agents.memory.revision_creation import MemoryTreeRevisionCreation
+from sec_review_agents.memory.revision_commit_input import (
+    MemoryTreeRevisionCommitInput,
+)
 from sec_review_agents.memory.trajectory_artifact import (
     publish_memory_agent_trajectory,
 )
@@ -27,7 +29,7 @@ async def prepare_coordinated_memory_revision(
     maintenance_id: str,
     batch_size: int,
     deployment: str | None = None,
-) -> MemoryTreeRevisionCreation | None:
+) -> MemoryTreeRevisionCommitInput | None:
     """Run the maintainer and publish immutable inputs for a later revision commit."""
     maintenance_input = catalog_client.get_maintenance_input(limit=batch_size)
     if maintenance_input is None:
@@ -129,7 +131,7 @@ async def prepare_coordinated_memory_revision(
             raise RuntimeError(
                 "Coordinated memory publication requires configured S3 storage."
             )
-    return MemoryTreeRevisionCreation(
+    return MemoryTreeRevisionCommitInput(
         maintenance_id=maintenance_id,
         expected_active_revision=expected_active_revision,
         extraction_ids=tuple(extraction_ids),
@@ -138,4 +140,4 @@ async def prepare_coordinated_memory_revision(
     )
 
 
-__all__ = ["MemoryTreeRevisionCreation", "prepare_coordinated_memory_revision"]
+__all__ = ["prepare_coordinated_memory_revision"]

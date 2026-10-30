@@ -13,8 +13,8 @@ from sec_review_agents.artifacts.reference import ArtifactReference
 
 
 @dataclass(frozen=True)
-class MemoryTreeRevisionCreation:
-    """Immutable input for creating a memory-tree revision in the Catalog."""
+class MemoryTreeRevisionCommitInput:
+    """Immutable input for committing a memory-tree revision to the Catalog."""
 
     maintenance_id: str
     expected_active_revision: int
@@ -25,7 +25,7 @@ class MemoryTreeRevisionCreation:
     def __post_init__(self) -> None:
         if not isinstance(self.maintenance_id, str) or not self.maintenance_id.strip():
             raise ValueError(
-                "Memory tree revision creation maintenance_id must be non-empty."
+                "Memory tree revision commit input maintenance_id must be non-empty."
             )
         if (
             not isinstance(self.expected_active_revision, int)
@@ -33,7 +33,7 @@ class MemoryTreeRevisionCreation:
             or self.expected_active_revision < 0
         ):
             raise ValueError(
-                "Memory tree revision creation expected_active_revision must be non-negative."
+                "Memory tree revision commit input expected_active_revision must be non-negative."
             )
         if (
             not isinstance(self.extraction_ids, tuple)
@@ -44,18 +44,20 @@ class MemoryTreeRevisionCreation:
             )
         ):
             raise ValueError(
-                "Memory tree revision creation extraction_ids must be non-empty strings."
+                "Memory tree revision commit input extraction_ids must be non-empty strings."
             )
         if len(set(self.extraction_ids)) != len(self.extraction_ids):
             raise ValueError(
-                "Memory tree revision creation extraction_ids must be unique."
+                "Memory tree revision commit input extraction_ids must be unique."
             )
         if not isinstance(self.memory_tree_reference, ArtifactReference):
-            raise TypeError("Memory tree revision creation tree reference is invalid.")
+            raise TypeError(
+                "Memory tree revision commit input tree reference is invalid."
+            )
         if not isinstance(self.maintenance_trajectory_reference, ArtifactReference):
             raise TypeError(
-                "Memory tree revision creation maintenance trajectory reference is invalid."
+                "Memory tree revision commit input maintenance trajectory reference is invalid."
             )
 
 
-__all__ = ["MemoryTreeRevisionCreation"]
+__all__ = ["MemoryTreeRevisionCommitInput"]
