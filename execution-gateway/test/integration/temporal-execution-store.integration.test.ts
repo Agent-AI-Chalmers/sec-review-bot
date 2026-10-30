@@ -54,8 +54,17 @@ await test('Temporal store submits and identifies execution requests', async () 
     assert.deepEqual(await store.get(runId), created)
     assert.equal(await store.get(`missing-${crypto.randomUUID()}`), undefined)
 
+    assert.deepEqual(
+      await store.start({ ...request, timeout_seconds: 120 }),
+      created,
+      'Gateway timeout policy is not part of the caller request identity',
+    )
+
     await assert.rejects(
-      store.start({ ...request, timeout_seconds: 120 }),
+      store.start({
+        ...request,
+        runtime: { workspace_image: 'example.invalid/changed:latest' },
+      }),
       ExecutionRunConflictError,
     )
   } finally {

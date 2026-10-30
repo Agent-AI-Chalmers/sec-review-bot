@@ -23,8 +23,17 @@ import {
 } from './execution.js'
 
 function fingerprint(request: ExecutionWorkflowInput): string {
+  // The fingerprint represents the caller's logical request. `timeout_seconds` is
+  // Gateway execution policy injected after the HTTP boundary, so changing that
+  // deployment setting must not turn a recovery replay into a different request.
+  const requestIdentity = {
+    workflow: request.workflow,
+    run_id: request.run_id,
+    input: request.input,
+    ...(request.runtime === undefined ? {} : { runtime: request.runtime }),
+  }
   return createHash('sha256')
-    .update(JSON.stringify(canonicalValue(request)))
+    .update(JSON.stringify(canonicalValue(requestIdentity)))
     .digest('hex')
 }
 
