@@ -4,6 +4,7 @@ import {
   Card,
   createTheme,
   Paper,
+  Select,
   Table,
   Timeline
 } from '@mantine/core'
@@ -61,6 +62,9 @@ export const mantineTheme = createTheme({
   defaultRadius: 'md',
   cursorType: 'pointer',
   components: {
+    Select: Select.extend({
+      defaultProps: { withCheckIcon: false }
+    }),
     Paper: Paper.extend({
       defaultProps: { radius: 'md', shadow: 'sm' }
     }),

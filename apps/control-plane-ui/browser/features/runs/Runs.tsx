@@ -331,7 +331,7 @@ export function Runs(): React.JSX.Element {
               }))}
             />
             <FilterSelect
-              width={120}
+              width={160}
               label={t('execution')}
               value={search.get('execution_status') ?? ''}
               onChange={(value) => update('execution_status', value)}
