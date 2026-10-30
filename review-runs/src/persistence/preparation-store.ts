@@ -477,7 +477,7 @@ export class PreparationStore {
     runId: string,
     token: string,
     error: { code?: string | null; message: string },
-    options: { retry: boolean; retryAfterMs?: number }
+    options: { retry: boolean; retryAfterMs?: number } = { retry: false }
   ): Promise<{ retry_scheduled: boolean }> {
     return await transaction(this.pool, async (client) => {
       if (options.retry) {

@@ -43,17 +43,23 @@ test('prepared submission persists input before crossing the Execution boundary'
   const events: string[] = []
   const result = await submitPreparedRun(
     {
-      async getRun() {
-        return run
+      queries: {
+        async getRun() {
+          return run
+        }
       },
-      async savePreparedSubmission() {
-        events.push('persist')
+      submissionTransitions: {
+        async savePreparedSubmission() {
+          events.push('persist')
+        },
+        async markQueued() {
+          events.push('queued')
+        }
       },
-      async markQueued() {
-        events.push('queued')
-      },
-      async failPreparation() {
-        assert.fail('successful submission must not fail')
+      preparations: {
+        async fail() {
+          assert.fail('successful submission must not fail')
+        }
       }
     },
     {
@@ -81,15 +87,22 @@ test('uncertain Execution submission is persisted for recovery', async () => {
   await assert.rejects(
     submitPreparedRun(
       {
-        async getRun() {
-          return run
+        queries: {
+          async getRun() {
+            return run
+          }
         },
-        async savePreparedSubmission() {},
-        async markQueued() {
-          assert.fail('uncertain submission must not queue')
+        submissionTransitions: {
+          async savePreparedSubmission() {},
+          async markQueued() {
+            assert.fail('uncertain submission must not queue')
+          }
         },
-        async failPreparation(_runId, _token, value) {
-          failure = value
+        preparations: {
+          async fail(_runId, _token, value) {
+            failure = value
+            return { retry_scheduled: false }
+          }
         }
       },
       {
@@ -115,15 +128,22 @@ test('a queued-state write failure after Execution accepts is recoverable uncert
   await assert.rejects(
     submitPreparedRun(
       {
-        async getRun() {
-          return run
+        queries: {
+          async getRun() {
+            return run
+          }
         },
-        async savePreparedSubmission() {},
-        async markQueued() {
-          throw new Error('database unavailable')
+        submissionTransitions: {
+          async savePreparedSubmission() {},
+          async markQueued() {
+            throw new Error('database unavailable')
+          }
         },
-        async failPreparation(_runId, _token, value) {
-          failure = value
+        preparations: {
+          async fail(_runId, _token, value) {
+            failure = value
+            return { retry_scheduled: false }
+          }
         }
       },
       {

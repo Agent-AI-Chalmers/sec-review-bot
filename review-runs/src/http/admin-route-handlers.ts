@@ -7,7 +7,7 @@ export function buildAdminRouteHandlers(
 ): OperationHandlers {
   return {
     listParkedRuns: async () => ({
-      blocks: await store.listParkedRuns()
+      blocks: await store.queries.listParkedRuns()
     }),
 
     abandonBlockedPreparation: async (request) => {
@@ -15,18 +15,21 @@ export function buildAdminRouteHandlers(
         request.params as PathParams<'abandonBlockedPreparation'>
       const { reason } =
         request.body as RequestBody<'abandonBlockedPreparation'>
-      return await store.abandonBlockedPreparation(runId, reason)
+      return await store.operatorDecisions.abandonBlockedPreparation(
+        runId,
+        reason
+      )
     },
 
     giveUpDisconnectedRun: async (request) => {
       const { runId } = request.params as PathParams<'giveUpDisconnectedRun'>
       const { reason } = request.body as RequestBody<'giveUpDisconnectedRun'>
-      return await store.giveUpDisconnectedRun(runId, reason)
+      return await store.operatorDecisions.giveUpDisconnectedRun(runId, reason)
     },
 
     resumeDisconnectedRun: async (request) => {
       const { runId } = request.params as PathParams<'resumeDisconnectedRun'>
-      return await store.resumeDisconnectedRun(runId)
+      return await store.operatorDecisions.resumeDisconnectedRun(runId)
     }
   }
 }

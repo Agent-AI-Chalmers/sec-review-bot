@@ -1,19 +1,26 @@
-import type {
-  ReviewRunRecord,
-  ReviewRunStore
-} from '../persistence/review-run-store.js'
-
-type SubmissionRecoveryStore = Pick<
-  ReviewRunStore,
-  | 'claimSubmissionRecovery'
-  | 'completeSubmissionRecovery'
-  | 'failSubmissionRecovery'
-  | 'submissionRecoveryAttemptCount'
-  | 'disconnectExhaustedSubmissionRecovery'
-  | 'recordUnknownRecoveryOutcome'
->
+import type { ReviewRunRecord } from '../persistence/review-run-store.js'
 
 type SubmissionError = { code?: string | null; message: string }
+
+interface SubmissionRecoveryStore {
+  executions: {
+    claimSubmissionRecovery(runId: string): Promise<string | null>
+    submissionRecoveryAttemptCount(runId: string): Promise<number | null>
+    disconnectExhaustedSubmissionRecovery(
+      runId: string,
+      maxAttempts: number
+    ): Promise<boolean>
+    recordUnknownRecoveryOutcome(runId: string, token: string): Promise<boolean>
+  }
+  submissionTransitions: {
+    completeSubmissionRecovery(runId: string, token: string): Promise<boolean>
+    failSubmissionRecovery(
+      runId: string,
+      token: string,
+      error: SubmissionError
+    ): Promise<boolean>
+  }
+}
 
 export type SubmissionRecoveryResult =
   | { status: 'claim_unavailable' }
@@ -52,15 +59,19 @@ export async function recoverReviewRunSubmission(
   run: ReviewRunRecord,
   dependencies: SubmissionRecoveryDependencies
 ): Promise<SubmissionRecoveryResult> {
-  const claimToken = await store.claimSubmissionRecovery(run.run_id)
+  const claimToken = await store.executions.claimSubmissionRecovery(run.run_id)
   if (claimToken === null) return { status: 'claim_unavailable' }
 
   if (run.execution_input === undefined) {
-    await store.failSubmissionRecovery(run.run_id, claimToken, {
-      code: 'SUBMISSION_RECOVERY_INPUT_MISSING',
-      message:
-        'The persisted Execution input is missing; this submission cannot be recovered.'
-    })
+    await store.submissionTransitions.failSubmissionRecovery(
+      run.run_id,
+      claimToken,
+      {
+        code: 'SUBMISSION_RECOVERY_INPUT_MISSING',
+        message:
+          'The persisted Execution input is missing; this submission cannot be recovered.'
+      }
+    )
     return { status: 'input_missing' }
   }
 
@@ -70,7 +81,10 @@ export async function recoverReviewRunSubmission(
       run_id: run.run_id,
       input: run.execution_input
     })
-    return (await store.completeSubmissionRecovery(run.run_id, claimToken))
+    return (await store.submissionTransitions.completeSubmissionRecovery(
+      run.run_id,
+      claimToken
+    ))
       ? { status: 'recovered' }
       : { status: 'claim_lost' }
   } catch (error) {
@@ -79,13 +93,20 @@ export async function recoverReviewRunSubmission(
       // The replay's outcome is unknown, which is exactly what `uncertain` already means: the
       // Execution may have accepted it, so nothing may be concluded. Counting the attempt only
       // bounds automatic recovery; exhaustion moves the run to disconnected, never failed.
-      await store.recordUnknownRecoveryOutcome(run.run_id, claimToken)
+      await store.executions.recordUnknownRecoveryOutcome(
+        run.run_id,
+        claimToken
+      )
       return { status: 'deferred', error }
     }
-    await store.failSubmissionRecovery(run.run_id, claimToken, {
-      code: classified.code ?? null,
-      message: classified.message
-    })
+    await store.submissionTransitions.failSubmissionRecovery(
+      run.run_id,
+      claimToken,
+      {
+        code: classified.code ?? null,
+        message: classified.message
+      }
+    )
     return { status: 'failed', error }
   }
 }
@@ -99,12 +120,15 @@ export async function concludeExhaustedSubmissionRecovery(
   store: SubmissionRecoveryStore,
   run: ReviewRunRecord
 ): Promise<SubmissionRecoveryResult | null> {
-  const attempts = await store.submissionRecoveryAttemptCount(run.run_id)
+  const attempts = await store.executions.submissionRecoveryAttemptCount(
+    run.run_id
+  )
   if (attempts === null || attempts < MAX_SUBMISSION_RECOVERY_ATTEMPTS)
     return null
-  const disconnected = await store.disconnectExhaustedSubmissionRecovery(
-    run.run_id,
-    MAX_SUBMISSION_RECOVERY_ATTEMPTS
-  )
+  const disconnected =
+    await store.executions.disconnectExhaustedSubmissionRecovery(
+      run.run_id,
+      MAX_SUBMISSION_RECOVERY_ATTEMPTS
+    )
   return disconnected ? { status: 'disconnected' } : null
 }

@@ -11,7 +11,7 @@ import type { OperationHandlers } from './route-handlers.js'
 import type { PathParams } from './route-types.js'
 
 type ListQueryOptions = NonNullable<
-  Parameters<ReviewRunStore['listRunsPage']>[0]
+  Parameters<ReviewRunStore['queries']['listRunsPage']>[0]
 >
 
 function invalidQuery(message: string): Error {
@@ -81,10 +81,10 @@ export function buildReadRouteHandlers({
 
     listRuns: async (request) => {
       const url = new URL(request.url ?? '/', 'http://review-runs.local')
-      const { runs, next_cursor, dropped } = await store.listRunsPage(
+      const { runs, next_cursor, dropped } = await store.queries.listRunsPage(
         parseListQuery(url)
       )
-      const statistics = await store.getExecutionStatistics(
+      const statistics = await store.queries.getExecutionStatistics(
         runs.map((run) => run.run_id)
       )
       for (const droppedRow of dropped) logDroppedRunRow(droppedRow)
@@ -98,17 +98,19 @@ export function buildReadRouteHandlers({
 
     getRun: async (request, reply) => {
       const { runId } = request.params as PathParams<'getRun'>
-      const run = await store.getRun(runId)
+      const run = await store.queries.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
-      const statistics = await store.getExecutionStatistics([run.run_id])
+      const statistics = await store.queries.getExecutionStatistics([
+        run.run_id
+      ])
       return { run: observeRun(run, statistics.get(run.run_id) ?? null) }
     },
 
     listRunPublicationSteps: async (request, reply) => {
       const { runId } = request.params as PathParams<'listRunPublicationSteps'>
-      const run = await store.getRun(runId)
+      const run = await store.queries.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
-      const steps = await store.listPublicationSteps(run.run_id)
+      const steps = await store.publications.listPublicationSteps(run.run_id)
       return {
         run_id: run.run_id,
         publication_steps: steps.map(observePublicationStep)
@@ -117,9 +119,9 @@ export function buildReadRouteHandlers({
 
     listRunEvents: async (request, reply) => {
       const { runId } = request.params as PathParams<'listRunEvents'>
-      if (!(await store.runExists(runId)))
+      if (!(await store.queries.runExists(runId)))
         return reply.code(404).send({ error: 'run_not_found' })
-      return { run_id: runId, events: await store.listEvents(runId) }
+      return { run_id: runId, events: await store.queries.listEvents(runId) }
     }
   }
 }

@@ -3,10 +3,12 @@
 //
 // This store only performs single-axis transactions on `executions`. Transitions that must
 // also move another axis in the same transaction (submission -> queued, terminal failure ->
-// publication skipped) live in concrete cross-axis transition stores behind `ReviewRunStore`.
-// A resolved recovery changes only execution, but its write still asserts that publication is
-// pending, so it belongs to `SubmissionTransitionStore`. Reading the full run record is likewise
-// not here: the record projection spans all three axes.
+// publication skipped) stay at explicit cross-axis boundaries. Submission changes live in
+// `SubmissionTransitionStore`; terminal execution failure remains on the composition root because
+// it atomically concludes execution and publication. A resolved recovery changes only execution,
+// but its write still asserts that publication is pending, so it also belongs to
+// `SubmissionTransitionStore`. Reading the full run record is likewise not here: the record
+// projection spans all three axes.
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 import type { Database } from '../database/database.js'
@@ -165,6 +167,16 @@ export class ExecutionStore {
       })
       return result.rows[0].claim_token
     })
+  }
+
+  /** How many replays of an uncertain submission ended with the outcome still unknown. */
+  async submissionRecoveryAttemptCount(runId: string): Promise<number | null> {
+    const result = await this.pool.query<{ attempt_count: number }>(
+      `SELECT attempt_count FROM executions
+       WHERE run_id=$1 AND connector_id=$2`,
+      [runId, this.connectorId]
+    )
+    return result.rows[0]?.attempt_count ?? null
   }
 
   /** Hand a disconnected execution back to automatic replay, on an operator's decision.

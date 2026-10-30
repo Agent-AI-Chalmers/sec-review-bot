@@ -27,10 +27,14 @@ async function buildApp(store: Record<string, unknown>, adminToken?: string) {
   const app = Fastify(REVIEW_RUNS_FASTIFY_OPTIONS)
   // registerReviewRunsRoutes installs the error/not-found handlers too, so this exercises
   // the same envelope the deployment returns.
+  const queries = store.queries as Record<string, unknown> | undefined
   await registerReviewRunsRoutes(app, {
     store: {
-      getExecutionStatistics: async () => new Map(),
-      ...store
+      ...store,
+      queries: {
+        getExecutionStatistics: async () => new Map(),
+        ...queries
+      }
     } as never,
     serviceToken: SERVICE_TOKEN,
     readToken: READ_TOKEN,
@@ -131,7 +135,9 @@ test('the two bearer tokens are not interchangeable', async () => {
   // service token on a redacted read), possession of the weaker credential would silently
   // grant the other surface — so pin the separation, not just the "missing" case above.
   const app = await buildApp({
-    listRunsPage: async () => ({ runs: [], next_cursor: null, dropped: [] })
+    queries: {
+      listRunsPage: async () => ({ runs: [], next_cursor: null, dropped: [] })
+    }
   })
   try {
     const readOnWrite = await app.inject({
@@ -181,10 +187,12 @@ test('an internal fault is logged with its identity but not returned to the call
   // diagnosable operationally: without a log, a corrupt stored row (for example an
   // `available` artifact without its reference) surfaces only as a bare "Internal error".
   const app = await buildApp({
-    getRun: async () => {
-      throw new Error(
-        'available artifact storage record is missing its artifact'
-      )
+    queries: {
+      getRun: async () => {
+        throw new Error(
+          'available artifact storage record is missing its artifact'
+        )
+      }
     }
   })
   const logged: string[] = []
@@ -218,9 +226,11 @@ test('an internal fault is logged with its identity but not returned to the call
 test('a request body missing a required contract field is rejected before the handler', async () => {
   let handlerCalls = 0
   const app = await buildApp({
-    admitReviewRun: async () => {
-      handlerCalls += 1
-      return {}
+    admissions: {
+      admit: async () => {
+        handlerCalls += 1
+        return {}
+      }
     }
   })
   try {
@@ -258,9 +268,11 @@ test('schema validation names which part of the request failed', async () => {
   // bad path parameter; reusing one code for all three (as it did) made that impossible.
   let listCalls = 0
   const app = await buildApp({
-    listRunsPage: async () => {
-      listCalls += 1
-      return { runs: [], next_cursor: null, dropped: [] }
+    queries: {
+      listRunsPage: async () => {
+        listCalls += 1
+        return { runs: [], next_cursor: null, dropped: [] }
+      }
     }
   })
   try {
@@ -322,9 +334,11 @@ test('the completion route keeps the comment_url its branch requires', async () 
   // because they never go through schema validation.
   const completed: unknown[][] = []
   const app = await buildApp({
-    completeRunNotice: async (...args: unknown[]) => {
-      completed.push(args)
-      return true
+    preparations: {
+      completeRunNotice: async (...args: unknown[]) => {
+        completed.push(args)
+        return true
+      }
     }
   })
   try {
@@ -378,7 +392,7 @@ test('the completion route keeps the comment_url its branch requires', async () 
 test('an operation with no response body sends an empty 200, not a null body', async () => {
   // The contract declares no content for these; returning `null` produced a literal "null"
   // body that disagreed with the generated `void` type.
-  const app = await buildApp({ failPreparation: async () => {} })
+  const app = await buildApp({ preparations: { fail: async () => {} } })
   try {
     const response = await app.inject({
       method: 'POST',
@@ -399,9 +413,11 @@ test('an operation with no response body sends an empty 200, not a null body', a
 test('a failure notice completion forwards an intentional skip through the HTTP route', async () => {
   const completions: unknown[][] = []
   const app = await buildApp({
-    completeRunNotice: async (...args: unknown[]) => {
-      completions.push(args)
-      return true
+    preparations: {
+      completeRunNotice: async (...args: unknown[]) => {
+        completions.push(args)
+        return true
+      }
     }
   })
   try {
@@ -428,11 +444,13 @@ test('a failure notice completion forwards an intentional skip through the HTTP 
 test('run notice claim renewal and heartbeat configuration are exposed on the service surface', async () => {
   const renewals: unknown[][] = []
   const app = await buildApp({
-    renewRunNoticeClaim: async (...args: unknown[]) => {
-      renewals.push(args)
-      return true
-    },
-    runNoticeHeartbeatIntervalMs: () => 12_345
+    preparations: {
+      renewRunNoticeClaim: async (...args: unknown[]) => {
+        renewals.push(args)
+        return true
+      },
+      heartbeatIntervalMs: () => 12_345
+    }
   })
   try {
     const renewed = await app.inject({
@@ -463,8 +481,10 @@ test('run notice claim renewal and heartbeat configuration are exposed on the se
 test('a preparation input checkpoint is fenced by the HTTP route claim token', async () => {
   const checkpoints: unknown[][] = []
   const app = await buildApp({
-    checkpointPreparationInput: async (...args: unknown[]) => {
-      checkpoints.push(args)
+    preparations: {
+      checkpointInput: async (...args: unknown[]) => {
+        checkpoints.push(args)
+      }
     }
   })
   try {
@@ -495,11 +515,13 @@ test('a deterministic publication failure maps to 409 with its code', async () =
   const { DeterministicReviewRunError, PUBLICATION_STEP_ERROR_CODES } =
     await import(new URL('../dist/errors.js', import.meta.url).href)
   const app = await buildApp({
-    renewPreparationClaim: async () => {
-      throw new DeterministicReviewRunError(
-        'duplicate step set',
-        PUBLICATION_STEP_ERROR_CODES.set_duplicate
-      )
+    preparations: {
+      renewClaim: async () => {
+        throw new DeterministicReviewRunError(
+          'duplicate step set',
+          PUBLICATION_STEP_ERROR_CODES.set_duplicate
+        )
+      }
     }
   })
   try {
@@ -528,17 +550,19 @@ test('an undeclared body field is rejected, matching the contract', async () => 
   // server configures removeAdditional: false so the field is an error instead.
   let handlerCalls = 0
   const app = await buildApp({
-    admitReviewRun: async () => {
-      handlerCalls += 1
-      return {
-        // This test only needs body validation to reject the request before the handler's
-        // result is read, so the record is the minimum the shape needs.
-        record: {
-          run_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
-          workflow: 'issue-review'
-        },
-        created: true,
-        preparation_token: 'token'
+    admissions: {
+      admit: async () => {
+        handlerCalls += 1
+        return {
+          // This test only needs body validation to reject the request before the handler's
+          // result is read, so the record is the minimum the shape needs.
+          record: {
+            run_id: '3f2504e0-4f89-41d3-9a0c-0305e82c3301',
+            workflow: 'issue-review'
+          },
+          created: true,
+          preparation_token: 'token'
+        }
       }
     }
   })
@@ -576,14 +600,16 @@ test('remote_object.id is accepted only in its canonical string form', async () 
   // The client's `String(remote.id)` is what turns a GitHub number into the accepted form.
   let received: unknown
   const app = await buildApp({
-    completePublicationStep: async (
-      _runId: string,
-      _token: string,
-      _stepKey: string,
-      remote: unknown
-    ) => {
-      received = remote
-      return true
+    publications: {
+      completePublicationStep: async (
+        _runId: string,
+        _token: string,
+        _stepKey: string,
+        remote: unknown
+      ) => {
+        received = remote
+        return true
+      }
     }
   })
   try {
@@ -619,9 +645,11 @@ test('a remote_object.id the contract does not declare is rejected', async () =>
   // the default `coerceTypes: true` would have hidden (it turned `true` into `"true"`).
   let handlerCalls = 0
   const app = await buildApp({
-    completePublicationStep: async () => {
-      handlerCalls += 1
-      return true
+    publications: {
+      completePublicationStep: async () => {
+        handlerCalls += 1
+        return true
+      }
     }
   })
   try {
@@ -663,9 +691,11 @@ test('the query string is coerced to the declared types, and only there', async 
   // non-integer is still rejected — coercion never becomes a way to bypass the schema.
   let calls = 0
   const app = await buildApp({
-    listRunsPage: async () => {
-      calls += 1
-      return { runs: [], next_cursor: null, dropped: [] }
+    queries: {
+      listRunsPage: async () => {
+        calls += 1
+        return { runs: [], next_cursor: null, dropped: [] }
+      }
     }
   })
   try {
@@ -731,8 +761,10 @@ test('a request body over the size limit is a 413 with the declared envelope', a
   // (413) response for exactly the operations that read a body, so the wire shape is asserted
   // here rather than left to a Fastify default.
   const app = await buildApp({
-    admitReviewRun: async () =>
-      assert.fail('the handler must not run for an oversized body')
+    admissions: {
+      admit: async () =>
+        assert.fail('the handler must not run for an oversized body')
+    }
   })
   try {
     const response = await app.inject({
@@ -830,8 +862,10 @@ test('the admin surface is absent unless an admin token is configured', async ()
   })
   const store = {
     connectorId: 'github-integration:test',
-    abandonBlockedPreparation: async () => adminRecord('failed'),
-    resumeDisconnectedRun: async () => adminRecord('uncertain')
+    operatorDecisions: {
+      abandonBlockedPreparation: async () => adminRecord('failed'),
+      resumeDisconnectedRun: async () => adminRecord('uncertain')
+    }
   }
   const configured = await buildApp(store, adminToken)
   try {
@@ -903,11 +937,13 @@ test('the resume route answers 409 for a run that is not disconnected', async ()
   const app = await buildApp(
     {
       connectorId: 'github-integration:test',
-      resumeDisconnectedRun: async () => {
-        throw Object.assign(
-          new Error('Review run x has no disconnected axis to resume.'),
-          { statusCode: 409 }
-        )
+      operatorDecisions: {
+        resumeDisconnectedRun: async () => {
+          throw Object.assign(
+            new Error('Review run x has no disconnected axis to resume.'),
+            { statusCode: 409 }
+          )
+        }
       }
     },
     'admin-token'
@@ -929,14 +965,16 @@ test('the blocked preparation queue is readable with the read token', async () =
   // without holding an operator credential. Only acting on it is admin-gated.
   const app = await buildApp({
     connectorId: 'github-integration:test',
-    listParkedRuns: async () => [
-      {
-        run_id: 'run-1',
-        axis: 'preparation',
-        reason: 'EXECUTION_ALREADY_ADVANCED',
-        parked_at: '2026-10-28T10:00:00.000Z'
-      }
-    ]
+    queries: {
+      listParkedRuns: async () => [
+        {
+          run_id: 'run-1',
+          axis: 'preparation',
+          reason: 'EXECUTION_ALREADY_ADVANCED',
+          parked_at: '2026-10-28T10:00:00.000Z'
+        }
+      ]
+    }
   })
   try {
     const response = await app.inject({
