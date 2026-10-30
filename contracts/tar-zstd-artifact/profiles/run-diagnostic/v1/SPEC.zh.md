@@ -8,6 +8,12 @@
 
 artifact 使用受限 POSIX PAX [envelope v1](../../../envelope/v1/SPEC.zh.md)，media type 为 `application/tar+zstd`，文件名为 `diagnostic-tree.v1.tar.zst`。
 
+| 属性 | 限制 |
+| --- | --- |
+| 压缩 archive 大小 | 1 GiB（`1,073,741,824` bytes） |
+| entry 数量 | 100,000，包含文件与目录 |
+| regular file 总大小 | 8 GiB（`8,589,934,592` bytes） |
+
 ## 目录树
 
 archive 包含 `manifest.json`、`result.json`，以及保存 run 持久化诊断文件的 `artifact-tree/` 目录。只允许 regular file 与 directory。路径必须相对 archive root、使用 `/`、不包含空 segment、`.`、`..` 或反斜杠。重复的有效路径无效。
@@ -18,7 +24,7 @@ manifest 是 UTF-8 JSON object，包含 `version: 1`、所属 `run_id`、`result
 
 ## 生产
 
-生产者应用 envelope 的 canonical entry 规则，从 `artifact-tree/` 排除 publication directory 和 symlink，显式选择 POSIX PAX 输出，并在发布前按共享 envelope 与本 profile 校验已完成 archive。
+生产者应用 envelope 的 canonical entry 规则，从 `artifact-tree/` 排除 publication directory 和 symlink，在发布前执行本 profile 的限制，显式选择 POSIX PAX 输出，并按共享 envelope 与本 profile 校验已完成 archive。消费者在读取和解压时执行相同限制。
 
 ## 共享 Corpus
 

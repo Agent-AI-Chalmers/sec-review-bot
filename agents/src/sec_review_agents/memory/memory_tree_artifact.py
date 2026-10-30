@@ -1,11 +1,11 @@
 """Build, publish, and materialize immutable memory tree artifacts."""
 
-import shutil
 import tarfile
 import tempfile
 from pathlib import Path
 from urllib.parse import urlparse
 
+from sec_review_agents.artifacts.archive import extract_archive, validate_archive
 from sec_review_agents.artifacts.materialize import materialize_artifact
 from sec_review_agents.artifacts.reference import (
     ARCHIVE_MEDIA_TYPE,
@@ -15,8 +15,8 @@ from sec_review_agents.artifacts.reference import (
 )
 from sec_review_agents.artifacts.s3_adapter import publish_immutable_s3_artifact
 from sec_review_agents.artifacts.tar_zstd import (
+    TarEnvelopeEntry,
     canonical_tar_info,
-    validate_restricted_pax_archive,
 )
 from sec_review_agents.contract_versions import MEMORY_TREE_ARTIFACT_VERSION
 
@@ -138,89 +138,86 @@ def _write_memory_tree_archive(
             _add_file(archive, name, entry_content)
 
 
-def _validate_archive(archive_path: Path) -> None:
-    envelope_entries = validate_restricted_pax_archive(archive_path)
-    with tarfile.open(archive_path, mode="r:zst") as archive:
-        members = archive.getmembers()
-        if len(envelope_entries) != len(members):
-            raise ValueError("Memory tree tar projection does not match its headers.")
-        if len(members) > MAX_MEMORY_TREE_ARTIFACT_ENTRIES:
-            raise ValueError("Memory tree exceeds the entry count limit.")
-        names: set[str] = set()
-        previous_name = ""
-        total_size = 0
-        for index, member in enumerate(members):
-            name = member.name + (
-                "/" if member.isdir() and not member.name.endswith("/") else ""
-            )
-            if name in names:
-                raise ValueError(f"Memory tree contains a duplicate entry: {name}")
-            names.add(name)
-            if set(member.pax_headers) - {"path"}:
-                raise ValueError(
-                    f"Memory tree contains unsupported PAX metadata: {name}"
-                )
-            if envelope_entries[index].path != name:
-                raise ValueError("Memory tree PAX path projection is inconsistent.")
-            if index == 0 and name != MEMORY_TREE_ARTIFACT_MANIFEST:
-                raise ValueError("Memory tree manifest must be the first entry.")
-            if index > 1 and name <= previous_name:
-                raise ValueError("Memory tree entries are not in canonical order.")
-            previous_name = name
-            if name in {"memory/", "memory/topics/"} or (
-                name.startswith("memory/topics/") and name.endswith("/")
-            ):
-                if not member.isdir():
-                    raise ValueError(f"Memory tree directory is invalid: {name}")
-                continue
-            if name == MEMORY_TREE_ARTIFACT_MANIFEST:
-                source = archive.extractfile(member)
-                if (
-                    not member.isfile()
-                    or source is None
-                    or source.read() != MEMORY_TREE_ARTIFACT_MANIFEST_BYTES
-                ):
-                    raise ValueError("Memory tree manifest is invalid.")
-                total_size += member.size
-                continue
-            if not name.startswith("memory/") or name.endswith("/"):
-                raise ValueError(f"Unexpected memory tree entry: {name}")
-            relative = name.removeprefix("memory/")
-            _validate_content_path(relative)
-            if not member.isfile():
-                raise ValueError(f"Memory tree file is invalid: {name}")
-            if member.size > MAX_MEMORY_TREE_FILE_BYTES:
-                raise ValueError(f"Memory tree file exceeds the size limit: {name}")
+def _validate_memory_tree_contents(
+    envelope_entries: tuple[TarEnvelopeEntry, ...], archive: tarfile.TarFile
+) -> None:
+    """Validate the Memory Tree profile against one already bounded archive."""
+    members = archive.getmembers()
+    if len(envelope_entries) != len(members):
+        raise ValueError("Memory tree tar projection does not match its headers.")
+    if len(members) > MAX_MEMORY_TREE_ARTIFACT_ENTRIES:
+        raise ValueError("Memory tree exceeds the entry count limit.")
+    names: set[str] = set()
+    previous_name = ""
+    total_size = 0
+    for index, member in enumerate(members):
+        name = member.name + (
+            "/" if member.isdir() and not member.name.endswith("/") else ""
+        )
+        if name in names:
+            raise ValueError(f"Memory tree contains a duplicate entry: {name}")
+        names.add(name)
+        if set(member.pax_headers) - {"path"}:
+            raise ValueError(f"Memory tree contains unsupported PAX metadata: {name}")
+        if envelope_entries[index].path != name:
+            raise ValueError("Memory tree PAX path projection is inconsistent.")
+        if index == 0 and name != MEMORY_TREE_ARTIFACT_MANIFEST:
+            raise ValueError("Memory tree manifest must be the first entry.")
+        if index > 1 and name <= previous_name:
+            raise ValueError("Memory tree entries are not in canonical order.")
+        previous_name = name
+        if name in {"memory/", "memory/topics/"} or (
+            name.startswith("memory/topics/") and name.endswith("/")
+        ):
+            if not member.isdir():
+                raise ValueError(f"Memory tree directory is invalid: {name}")
+            continue
+        if name == MEMORY_TREE_ARTIFACT_MANIFEST:
             source = archive.extractfile(member)
-            if source is None:
-                raise ValueError(f"Memory tree file is unreadable: {name}")
-            try:
-                source.read().decode("utf-8")
-            except UnicodeDecodeError as error:
-                raise ValueError(
-                    f"Memory tree file is not valid UTF-8: {name}"
-                ) from error
+            if (
+                not member.isfile()
+                or source is None
+                or source.read() != MEMORY_TREE_ARTIFACT_MANIFEST_BYTES
+            ):
+                raise ValueError("Memory tree manifest is invalid.")
             total_size += member.size
-            if total_size > MAX_EXTRACTED_MEMORY_BYTES:
-                raise ValueError("Memory tree exceeds the extracted size limit.")
-        required = {
-            MEMORY_TREE_ARTIFACT_MANIFEST,
-            "memory/",
-            "memory/MEMORY.md",
-            "memory/topics/",
-        }
-        if not required.issubset(names):
-            raise ValueError("Memory tree required entries are missing.")
+            continue
+        if not name.startswith("memory/") or name.endswith("/"):
+            raise ValueError(f"Unexpected memory tree entry: {name}")
+        relative = name.removeprefix("memory/")
+        _validate_content_path(relative)
+        if not member.isfile():
+            raise ValueError(f"Memory tree file is invalid: {name}")
+        if member.size > MAX_MEMORY_TREE_FILE_BYTES:
+            raise ValueError(f"Memory tree file exceeds the size limit: {name}")
+        source = archive.extractfile(member)
+        if source is None:
+            raise ValueError(f"Memory tree file is unreadable: {name}")
+        try:
+            source.read().decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise ValueError(f"Memory tree file is not valid UTF-8: {name}") from error
+        total_size += member.size
+        if total_size > MAX_EXTRACTED_MEMORY_BYTES:
+            raise ValueError("Memory tree exceeds the extracted size limit.")
+    required = {
+        MEMORY_TREE_ARTIFACT_MANIFEST,
+        "memory/",
+        "memory/MEMORY.md",
+        "memory/topics/",
+    }
+    if not required.issubset(names):
+        raise ValueError("Memory tree required entries are missing.")
 
 
-def _extract_validated_archive(archive_path: Path, destination: Path) -> Path:
-    _validate_archive(archive_path)
-    if destination.exists():
-        shutil.rmtree(destination)
-    destination.mkdir(parents=True)
-    with tarfile.open(archive_path, mode="r:zst") as archive:
-        archive.extractall(destination, filter="data")
-    return destination
+def validate_memory_tree_archive(archive_path: Path) -> None:
+    """Validate a Memory Tree archive without extracting it."""
+    validate_archive(
+        archive_path,
+        maximum_entries=MAX_MEMORY_TREE_ARTIFACT_ENTRIES,
+        maximum_extracted_bytes=MAX_EXTRACTED_MEMORY_BYTES,
+        validate_contents=_validate_memory_tree_contents,
+    )
 
 
 def memory_tree_artifact_s3_key(digest: str) -> str:
@@ -283,7 +280,13 @@ def materialize_memory_tree(
             else None
         ),
     )
-    root = _extract_validated_archive(archive_path, destination)
+    root = extract_archive(
+        archive_path,
+        destination,
+        maximum_entries=MAX_MEMORY_TREE_ARTIFACT_ENTRIES,
+        maximum_extracted_bytes=MAX_EXTRACTED_MEMORY_BYTES,
+        validate_contents=_validate_memory_tree_contents,
+    )
     memory_root = root / "memory"
     return memory_root
 
@@ -295,4 +298,5 @@ __all__ = [
     "materialize_memory_tree",
     "memory_tree_artifact_s3_key",
     "publish_memory_tree_artifact",
+    "validate_memory_tree_archive",
 ]

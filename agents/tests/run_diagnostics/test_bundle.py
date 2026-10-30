@@ -262,6 +262,70 @@ def test_diagnostic_bundle_can_have_no_memory_units(tmp_path: Path) -> None:
     assert publication.unit_ids == ()
 
 
+def test_diagnostic_bundle_rejects_too_many_entries(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    artifact_root.mkdir()
+    (artifact_root / "one.txt").write_text("one", encoding="utf-8")
+
+    with (
+        patch(
+            "sec_review_agents.run_diagnostics.bundle.MAX_DIAGNOSTIC_BUNDLE_ENTRIES",
+            3,
+        ),
+        pytest.raises(ValueError, match="entry count limit"),
+    ):
+        publish_run_diagnostic_bundle(
+            run_id="run-1",
+            artifact_root=artifact_root,
+            review_units=[],
+            result={},
+            destination_scheme="file",
+        )
+
+
+def test_diagnostic_bundle_rejects_too_many_extracted_bytes(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    artifact_root.mkdir()
+    (artifact_root / "large.txt").write_bytes(b"large")
+
+    with (
+        patch(
+            "sec_review_agents.run_diagnostics.bundle.MAX_EXTRACTED_DIAGNOSTIC_BYTES",
+            1,
+        ),
+        pytest.raises(ValueError, match="extracted size limit"),
+    ):
+        publish_run_diagnostic_bundle(
+            run_id="run-1",
+            artifact_root=artifact_root,
+            review_units=[],
+            result={},
+            destination_scheme="file",
+        )
+
+
+def test_diagnostic_bundle_rejects_too_many_compressed_bytes(tmp_path: Path) -> None:
+    artifact_root = tmp_path / "artifacts"
+    artifact_root.mkdir()
+
+    with (
+        patch(
+            "sec_review_agents.run_diagnostics.bundle.MAX_DIAGNOSTIC_BUNDLE_BYTES",
+            1,
+        ),
+        pytest.raises(ValueError, match="compressed size limit"),
+    ):
+        publish_run_diagnostic_bundle(
+            run_id="run-1",
+            artifact_root=artifact_root,
+            review_units=[],
+            result={},
+            destination_scheme="file",
+        )
+
+    assert not (artifact_root / "published" / DIAGNOSTIC_BUNDLE_FILENAME).exists()
+
+
 def test_python_reader_matches_shared_run_diagnostic_corpus(tmp_path: Path) -> None:
     manifest = json.loads((CORPUS / "manifest.json").read_text(encoding="utf-8"))
 

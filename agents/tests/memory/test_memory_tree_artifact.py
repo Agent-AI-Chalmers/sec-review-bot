@@ -8,10 +8,10 @@ import pytest
 from sec_review_agents.contract_versions import MEMORY_TREE_ARTIFACT_VERSION
 from sec_review_agents.memory.memory_tree_artifact import (
     MEMORY_TREE_ARTIFACT_FILENAME,
-    _validate_archive,
     build_memory_tree_artifact,
     materialize_memory_tree,
     publish_memory_tree_artifact,
+    validate_memory_tree_archive,
 )
 from tests.project_paths import CONTRACTS_ROOT
 
@@ -138,7 +138,7 @@ def test_memory_tree_artifact_supports_paths_that_require_pax(
         output_dir=tmp_path / "published",
     )
 
-    _validate_archive(Path(reference.uri.removeprefix("file://")))
+    validate_memory_tree_archive(Path(reference.uri.removeprefix("file://")))
 
 
 def test_python_reader_matches_shared_memory_tree_corpus() -> None:
@@ -147,7 +147,7 @@ def test_python_reader_matches_shared_memory_tree_corpus() -> None:
     for fixture in manifest["corpus"]:
         archive = CORPUS / fixture["file"]
         if fixture["expected"] == "valid":
-            _validate_archive(archive)
+            validate_memory_tree_archive(archive)
         else:
             with pytest.raises(ValueError):
-                _validate_archive(archive)
+                validate_memory_tree_archive(archive)
