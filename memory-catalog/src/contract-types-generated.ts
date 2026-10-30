@@ -534,7 +534,7 @@ export type ListExtractionsQuery = {
    */
   cursor?: string
   /**
-   * @pattern ^[1-9][0-9]*$
+   * @pattern ^(?:[1-9]|[1-9][0-9]|100)$
    * @type string | undefined
    */
   limit?: string
@@ -683,7 +683,7 @@ export type ListObservationsQuery = {
    */
   cursor?: string
   /**
-   * @pattern ^[1-9][0-9]*$
+   * @pattern ^(?:[1-9]|[1-9][0-9]|100)$
    * @type string | undefined
    */
   limit?: string
@@ -756,7 +756,7 @@ export type GetCatalogOverviewResponse = GetCatalogOverviewStatus200
 
 export type GetMaintenanceInputQuery = {
   /**
-   * @pattern ^[1-9][0-9]*$
+   * @pattern ^(?:[1-9]|[1-9][0-9]|100)$
    * @type string
    */
   limit: string
@@ -835,7 +835,7 @@ export type ListMemoryTreeRevisionsQuery = {
    */
   before_revision?: string
   /**
-   * @pattern ^[1-9][0-9]*$
+   * @pattern ^(?:[1-9]|[1-9][0-9]|100)$
    * @type string | undefined
    */
   limit?: string

@@ -529,7 +529,7 @@ paths:
         - in: query
           name: limit
           required: false
-          schema: { type: string, pattern: "^[1-9][0-9]*$" }
+          schema: { type: string, pattern: "^(?:[1-9]|[1-9][0-9]|100)$" }
         - in: query
           name: source_workflow
           required: false
@@ -618,7 +618,7 @@ paths:
         - in: query
           name: limit
           required: false
-          schema: { type: string, pattern: "^[1-9][0-9]*$" }
+          schema: { type: string, pattern: "^(?:[1-9]|[1-9][0-9]|100)$" }
         - in: query
           name: status
           required: false
@@ -666,7 +666,7 @@ paths:
         - in: query
           name: limit
           required: true
-          schema: { type: string, pattern: "^[1-9][0-9]*$" }
+          schema: { type: string, pattern: "^(?:[1-9]|[1-9][0-9]|100)$" }
       responses:
         "200":
           description: Current memory state and bounded pending observations, or null when none are pending.
@@ -723,7 +723,7 @@ paths:
         - in: query
           name: limit
           required: false
-          schema: { type: string, pattern: "^[1-9][0-9]*$" }
+          schema: { type: string, pattern: "^(?:[1-9]|[1-9][0-9]|100)$" }
       responses:
         "200":
           description: One page of immutable memory tree revision history.
