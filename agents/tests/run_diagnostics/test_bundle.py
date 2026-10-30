@@ -183,7 +183,7 @@ def test_diagnostic_bundle_rejects_review_unit_path_traversal(tmp_path: Path) ->
         )
 
 
-def test_s3_diagnostic_bundle_requires_object_storage_configuration(
+def test_s3_diagnostic_bundle_requires_s3_configuration(
     tmp_path: Path,
 ) -> None:
     artifact_root = tmp_path / "artifacts"

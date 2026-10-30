@@ -2,10 +2,10 @@
 
 import hashlib
 from pathlib import Path
-from urllib.parse import unquote, urlparse
 
-from sec_review_agents.artifacts.object_storage import download_s3_object
 from sec_review_agents.artifacts.reference import ArtifactReference
+from sec_review_agents.artifacts.s3_adapter import download_s3_object
+from sec_review_agents.artifacts.uri import parse_artifact_uri, parse_local_artifact_uri
 
 
 def materialize_artifact(
@@ -19,14 +19,9 @@ def materialize_artifact(
     if reference.size_bytes > maximum_size:
         raise ValueError("Artifact object exceeds the size limit.")
 
-    parsed = urlparse(reference.uri)
+    parsed = parse_artifact_uri(reference.uri)
     if parsed.scheme == "file":
-        if parsed.netloc or parsed.query or parsed.fragment:
-            raise ValueError("Local artifact URI must be an absolute file URI.")
-        artifact_path = Path(unquote(parsed.path))
-        if not artifact_path.is_absolute():
-            raise ValueError("Local artifact URI path must be absolute.")
-        artifact_path = artifact_path.resolve()
+        artifact_path = parse_local_artifact_uri(reference.uri).resolve()
     elif parsed.scheme == "s3":
         artifact_path = download_s3_object(
             reference.uri,

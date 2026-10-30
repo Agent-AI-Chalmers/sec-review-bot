@@ -1,4 +1,3 @@
-import hashlib
 import secrets
 import shutil
 import subprocess
@@ -10,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from sec_review_agents.artifacts.reference import local_artifact_reference
 from sec_review_agents.artifacts.tar_zstd import canonical_tar_info
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.entrypoints.setup_declaration import (
@@ -30,7 +30,6 @@ ReviewWorkflow = Literal[
 ]
 BUNDLE_MANIFEST_NAME = "manifest.json"
 LOCAL_INPUT_BUNDLE_ROOT_ENV = "SEC_REVIEW_INPUT_BUNDLE_ROOT"
-INPUT_BUNDLE_MEDIA_TYPE = "application/tar+zstd"
 
 
 def create_local_run_id() -> str:
@@ -199,17 +198,7 @@ def archive_input_bundle(
                 arcname=entry,
                 filter=canonical_tar_info,
             )
-    digest = hashlib.sha256()
-    with archive_path.open("rb") as archive_file:
-        while chunk := archive_file.read(1024 * 1024):
-            digest.update(chunk)
-    size_bytes = archive_path.stat().st_size
-    reference: dict[str, object] = {
-        "uri": archive_path.resolve().as_uri(),
-        "digest": f"sha256:{digest.hexdigest()}",
-        "media_type": INPUT_BUNDLE_MEDIA_TYPE,
-        "size_bytes": size_bytes,
-    }
+    reference = local_artifact_reference(archive_path).as_dict()
     # Local execution consumes the snapshot, not the preparation checkout.
     # Remove the redundant repository copy only after the archive is complete.
     shutil.rmtree(workspace_path(paths), ignore_errors=True)

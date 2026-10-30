@@ -426,7 +426,7 @@ def test_workflow_input_preparation_rejects_nonlocal_file_uri() -> None:
     payload["input_bundle"] = payload["input_bundle"] | {
         "uri": "file://bundle-host/tmp/local-issue.tar.zst"
     }
-    with pytest.raises(ValueError, match="file URI must be local"):
+    with pytest.raises(ValueError, match="input_bundle.uri"):
         prepare_workflow_input(
             payload,
             "issue-review",
@@ -464,7 +464,7 @@ def test_workflow_input_preparation_materializes_s3_archive(
     assert Path(prepared["bundle_paths"]["workspace_snapshot_tar_path"]).is_file()
 
 
-def test_prepare_run_input_rejects_file_bundle_in_object_storage_mode(
+def test_prepare_run_input_rejects_file_bundle_in_s3_mode(
     monkeypatch, tmp_path: Path
 ) -> None:
     payload = _issue_input(str(tmp_path / "bundle"))
@@ -472,7 +472,7 @@ def test_prepare_run_input_rejects_file_bundle_in_object_storage_mode(
     monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
     monkeypatch.setenv(input_preparation.RUN_INPUT_ROOT_ENV, str(tmp_path / "inputs"))
 
-    with pytest.raises(ValueError, match="must use s3 in object-storage mode"):
+    with pytest.raises(ValueError, match="must use s3 in S3 mode"):
         prepare_run_input(payload, run_id="run-1", workflow="issue-review")
 
 

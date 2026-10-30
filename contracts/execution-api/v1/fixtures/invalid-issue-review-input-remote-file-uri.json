@@ -1,0 +1,20 @@
+{
+  "api_version": "v1",
+  "input_bundle": {
+    "uri": "file://artifact-host/tmp/input-bundle.tar.zst",
+    "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "media_type": "application/tar+zstd",
+    "size_bytes": 0
+  },
+  "review_intent": {
+    "objective": "audit"
+  },
+  "issue": {
+    "owner": "octo-org",
+    "repo": "example",
+    "repo_full_name": "octo-org/example",
+    "number": 101,
+    "title": "Unsafe redirect in callback handler",
+    "body": "Please review the callback redirect validation."
+  }
+}

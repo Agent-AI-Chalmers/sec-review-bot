@@ -7,12 +7,12 @@ import tarfile
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
 
-from sec_review_agents.artifacts.object_storage import (
+from sec_review_agents.artifacts.s3_adapter import (
     ARTIFACT_S3_BUCKET_ENV,
     download_s3_object,
 )
+from sec_review_agents.artifacts.uri import parse_artifact_uri, parse_local_artifact_uri
 from sec_review_agents.entrypoints.execution_api_schema import (
     validate_execution_api_input,
     validate_execution_api_input_bundle_manifest,
@@ -144,18 +144,14 @@ def _materialize_input_bundle(
     if media_type != INPUT_BUNDLE_MEDIA_TYPE:
         raise ValueError("Execution input input_bundle.media_type is unsupported.")
 
-    parsed = urlparse(uri.strip())
+    parsed = parse_artifact_uri(uri)
     if parsed.scheme == "file":
         if (
             expected_run_id is not None
             and env_value(ARTIFACT_S3_BUCKET_ENV) is not None
         ):
-            raise ValueError(
-                "Execution input input_bundle.uri must use s3 in object-storage mode."
-            )
-        if parsed.netloc not in {"", "localhost"}:
-            raise ValueError("Execution input input_bundle file URI must be local.")
-        archive_path = Path(unquote(parsed.path))
+            raise ValueError("Execution input input_bundle.uri must use s3 in S3 mode.")
+        archive_path = parse_local_artifact_uri(uri)
         configured_root = env_value(INPUT_BUNDLE_ROOT_ENV)
         resolved_archive = archive_path.expanduser().resolve()
         if configured_root is not None:
@@ -169,7 +165,7 @@ def _materialize_input_bundle(
                 ) from error
     elif parsed.scheme == "s3":
         resolved_archive = download_s3_object(
-            uri.strip(),
+            uri,
             destination.with_suffix(".tar.zst"),
             expected_size=size_bytes,
             maximum_size=MAX_INPUT_BUNDLE_BYTES,

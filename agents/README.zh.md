@@ -141,7 +141,7 @@ flowchart LR
 | Direct `run-local-*`，`single-agent` 或 `two-stage` ablation | 本地 diagnostic bundle | 禁用 |
 | 本地 `--temporal`，标准 workflow | 本地 diagnostic bundle | 由 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
 | 本地 `--temporal`，`single-agent` 或 `two-stage` ablation | 本地 diagnostic bundle | 禁用 |
-| 手动启动 Service 和 Worker | 对象存储中的 diagnostic bundle | 使用生产 workflow 行为 |
+| 手动启动 Service 和 Worker | S3 兼容存储中的 diagnostic bundle | 使用生产 workflow 行为 |
 
 ### `run-local-*` 命令
 

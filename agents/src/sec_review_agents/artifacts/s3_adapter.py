@@ -2,13 +2,16 @@
 
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
 
 import boto3  # type: ignore[import-untyped]
 from botocore.config import Config  # type: ignore[import-untyped]
 from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 
 from sec_review_agents.artifacts.reference import ArtifactReference
+from sec_review_agents.artifacts.uri import (
+    parse_local_artifact_uri,
+    parse_s3_artifact_uri,
+)
 from sec_review_agents.utils.env import env_value
 
 ARTIFACT_S3_BUCKET_ENV = "SEC_REVIEW_ARTIFACT_S3_BUCKET"
@@ -42,15 +45,12 @@ def download_s3_object(
     expected_key: str | None = None,
 ) -> Path:
     """Download one S3 object completely before archive validation begins."""
-    parsed = urlparse(uri)
+    bucket, key = parse_s3_artifact_uri(uri)
     configured_bucket = env_value(ARTIFACT_S3_BUCKET_ENV)
     if configured_bucket is None:
         raise ValueError(f"{ARTIFACT_S3_BUCKET_ENV} is required for S3 artifacts.")
-    if parsed.netloc != configured_bucket:
+    if bucket != configured_bucket:
         raise ValueError("Artifact URI uses an unconfigured S3 bucket.")
-    key = unquote(parsed.path).lstrip("/")
-    if not key or parsed.query or parsed.fragment:
-        raise ValueError("Artifact URI must identify one S3 object.")
     if expected_key is not None and key != expected_key:
         raise ValueError("Artifact URI does not match the expected object key.")
 
@@ -86,7 +86,7 @@ def publish_immutable_s3_artifact(
         raise RuntimeError(
             f"{ARTIFACT_S3_BUCKET_ENV} is required to publish {description}."
         )
-    archive_path = Path(unquote(urlparse(reference.uri).path))
+    archive_path = parse_local_artifact_uri(reference.uri)
     client = _s3_client()
     try:
         with archive_path.open("rb") as archive_file:

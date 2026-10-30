@@ -1,10 +1,12 @@
-"""Immutable artifact references shared by local and object-storage flows."""
+"""Immutable artifact references shared by local and S3 flows."""
 
 import hashlib
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+
+from sec_review_agents.artifacts.uri import parse_artifact_uri
 
 ARCHIVE_MEDIA_TYPE = "application/tar+zstd"
 ZSTD_MEDIA_TYPE = "application/zstd"
@@ -19,8 +21,7 @@ class ArtifactReference:
     size_bytes: int
 
     def __post_init__(self) -> None:
-        if not isinstance(self.uri, str) or not self.uri.strip():
-            raise ValueError("Artifact reference uri must be non-empty.")
+        parse_artifact_uri(self.uri)
         if (
             not isinstance(self.digest, str)
             or _SHA256_DIGEST.fullmatch(self.digest) is None
@@ -34,7 +35,6 @@ class ArtifactReference:
             or self.size_bytes < 0
         ):
             raise ValueError("Artifact reference size_bytes must be non-negative.")
-        object.__setattr__(self, "uri", self.uri.strip())
         object.__setattr__(self, "media_type", self.media_type.strip())
 
     @classmethod

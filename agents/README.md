@@ -139,7 +139,7 @@ The supported local execution paths are:
 | Direct `run-local-*`, `single-agent` or `two-stage` ablation | Local diagnostic bundle | Disabled |
 | Local `--temporal`, standard workflow | Local diagnostic bundle | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED` |
 | Local `--temporal`, `single-agent` or `two-stage` ablation | Local diagnostic bundle | Disabled |
-| Manually started service and workers | Diagnostic bundle in object storage | Production workflow behavior |
+| Manually started service and workers | Diagnostic bundle in S3-compatible storage | Production workflow behavior |
 
 ### `run-local-*` Commands
 

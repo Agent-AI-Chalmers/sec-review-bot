@@ -6,7 +6,7 @@ import boto3  # type: ignore[import-untyped]
 import pytest
 from botocore.config import Config  # type: ignore[import-untyped]
 
-from sec_review_agents.artifacts.object_storage import download_s3_object
+from sec_review_agents.artifacts.s3_adapter import download_s3_object
 
 pytestmark = pytest.mark.integration
 

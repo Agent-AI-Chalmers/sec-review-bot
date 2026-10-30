@@ -1,15 +1,15 @@
-"""Publish immutable compressed trajectories produced by memory agents."""
+"""Build and publish immutable compressed trajectories from memory agents."""
 
 import shutil
 from compression.zstd import ZstdFile
 from pathlib import Path
 
-from sec_review_agents.artifacts.object_storage import publish_immutable_s3_artifact
 from sec_review_agents.artifacts.reference import (
     ZSTD_MEDIA_TYPE,
     ArtifactReference,
     local_artifact_reference,
 )
+from sec_review_agents.artifacts.s3_adapter import publish_immutable_s3_artifact
 from sec_review_agents.runtime.trajectories import TRAJECTORY_SUFFIX
 from sec_review_agents.utils.files import slug_filename_component
 
@@ -27,14 +27,12 @@ def memory_agent_trajectory_s3_key(*, agent_name: str, digest: str) -> str:
     return f"memory/trajectories/{agent}/{sha256}/{MEMORY_AGENT_TRAJECTORY_FILENAME}"
 
 
-def publish_memory_agent_trajectory(
+def build_memory_agent_trajectory(
     *,
-    agent_name: str,
     trajectory_path: Path,
     output_dir: Path,
-    remote: bool = True,
 ) -> ArtifactReference:
-    """Compress and publish one memory-agent invocation trajectory."""
+    """Build one deterministic compressed memory-agent trajectory."""
     source = trajectory_path.resolve()
     if not source.is_file():
         raise ValueError("Memory agent trajectory must be a file.")
@@ -53,9 +51,23 @@ def publish_memory_agent_trajectory(
     ):
         shutil.copyfileobj(source_file, compressed_file)
 
-    reference = local_artifact_reference(
+    return local_artifact_reference(
         compressed_path,
         media_type=ZSTD_MEDIA_TYPE,
+    )
+
+
+def publish_memory_agent_trajectory(
+    *,
+    agent_name: str,
+    trajectory_path: Path,
+    output_dir: Path,
+    remote: bool = True,
+) -> ArtifactReference:
+    """Build and optionally publish one memory-agent invocation trajectory."""
+    reference = build_memory_agent_trajectory(
+        trajectory_path=trajectory_path,
+        output_dir=output_dir,
     )
     if not remote:
         return reference
@@ -71,6 +83,7 @@ def publish_memory_agent_trajectory(
 
 
 __all__ = [
+    "build_memory_agent_trajectory",
     "memory_agent_trajectory_s3_key",
     "publish_memory_agent_trajectory",
 ]
