@@ -1,4 +1,5 @@
 import type { ReviewRunWorkflow } from '../contracts.js'
+import { decodeRunListCursor } from '../persistence/review-run-queries.js'
 import { observePublicationStep, observeRun } from '../observability.js'
 import type {
   ExecutionStatus,
@@ -27,16 +28,10 @@ function parseListQuery(url: URL): ListQueryOptions {
   }
   const cursor = url.searchParams.get('cursor')
   if (cursor !== null) {
-    const decoded = Buffer.from(cursor, 'base64url').toString('utf8')
-    const [createdAt, runId, extra] = decoded.split('|')
-    if (
-      !createdAt ||
-      !runId ||
-      extra !== undefined ||
-      Number.isNaN(Date.parse(createdAt))
-    ) {
+    // The read model owns the cursor format; the handler only decides the status a bad one
+    // gets, so it asks the same decoder the query will use instead of restating the shape.
+    if (decodeRunListCursor(cursor) === null)
       throw invalidQuery('cursor must be a valid run list cursor.')
-    }
     options.cursor = cursor
   }
   const executionStatus = url.searchParams.get('execution_status')
