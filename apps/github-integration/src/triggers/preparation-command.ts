@@ -1,6 +1,6 @@
 // Turning one webhook review request into a durable run.
 //
-// The  queue is the durable boundary: admission creates the run and the preparation
+// Review Runs is the durable boundary: admission creates the run and the preparation
 // claim, the connector prepares and submits its input, and every failure between those two
 // points is recorded against the run so Review Runs can decide whether to retry it.
 //
@@ -49,9 +49,9 @@ export interface PreparationCommandStore {
 
 type SubmitPreparedRun = PreparationCommandStore['submitPreparedRun']
 /** What the connector's publish context looks like once the run is submitted. */
-export type PreparedPublishContext = Parameters<SubmitPreparedRun>[2]
+type PreparedPublishContext = Parameters<SubmitPreparedRun>[2]
 /** The execution input the workflow prepared, as Review Runs stores it. */
-export type PreparedInput = Parameters<SubmitPreparedRun>[3]
+type PreparedInput = Parameters<SubmitPreparedRun>[3]
 
 export interface PreparationAdmission {
   workflow: 'issue-review' | 'pull-request-review'
@@ -105,17 +105,12 @@ export async function runPreparationCommand<T, P>({
 }): Promise<T | { run_id: string }> {
   const admitted =
     claimed_preparation === undefined
-      ? await admitReviewRun(
-          // The helper takes the client's promise-returning method; this slice accepts the
-          // resolved value too, and the await above makes both the same call.
-          store as Pick<typeof reviewRunsClient, 'admitReviewRun'>,
-          {
-            workflow: admission.workflow,
-            ingress_kind: 'github_webhook',
-            ingress_key: admission.ingress_key,
-            preparation_input: admission.preparation_input
-          }
-        )
+      ? await admitReviewRun(store, {
+          workflow: admission.workflow,
+          ingress_kind: 'github_webhook',
+          ingress_key: admission.ingress_key,
+          preparation_input: admission.preparation_input
+        })
       : null
   if (admitted !== null) {
     on_admitted?.({

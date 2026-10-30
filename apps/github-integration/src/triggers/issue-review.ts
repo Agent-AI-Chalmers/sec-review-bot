@@ -14,31 +14,15 @@ import {
 import {
   runPreparationCommand,
   type ClaimedPreparation,
-  type PreparationAdmission
+  type PreparationAdmission,
+  type PreparationCommandStore
 } from './preparation-command.js'
 
 type IssueReviewEventType = 'opened' | 'manual_review'
 type StartIssueReview = typeof startIssueReviewRun
-type IssueReviewReviewRunsClient = {
-  admitReviewRun: (
-    ...args: Parameters<typeof reviewRunsClient.admitReviewRun>
-  ) =>
-    | Awaited<ReturnType<typeof reviewRunsClient.admitReviewRun>>
-    | ReturnType<typeof reviewRunsClient.admitReviewRun>
-  failPreparation: (
-    ...args: Parameters<typeof reviewRunsClient.failPreparation>
-  ) => unknown
-  submitPreparedRun: (
-    ...args: Parameters<typeof reviewRunsClient.submitPreparedRun>
-  ) => unknown
-  renewPreparationClaim: (
-    ...args: Parameters<typeof reviewRunsClient.renewPreparationClaim>
-  ) => Promise<boolean>
-  preparationHeartbeatIntervalMs: typeof reviewRunsClient.preparationHeartbeatIntervalMs
-}
 interface StartIssueReviewCommandDeps {
   start_review: StartIssueReview
-  store: IssueReviewReviewRunsClient
+  store: PreparationCommandStore
 }
 
 interface StartIssueReviewCommandArgs {

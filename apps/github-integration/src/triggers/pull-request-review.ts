@@ -21,11 +21,10 @@ import {
 type PullRequestReviewEventType =
   'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
 type StartPullRequestReview = typeof startPullRequestReviewRun
-type PullRequestReviewReviewRunsClient = PreparationCommandStore
 
 interface StartPullRequestReviewCommandDeps {
   start_review: StartPullRequestReview
-  store: PullRequestReviewReviewRunsClient
+  store: PreparationCommandStore
 }
 
 interface StartPullRequestReviewCommandArgs {
