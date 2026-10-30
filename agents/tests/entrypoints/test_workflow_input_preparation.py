@@ -426,7 +426,7 @@ def test_workflow_input_preparation_rejects_nonlocal_file_uri() -> None:
     payload["input_bundle"] = payload["input_bundle"] | {
         "uri": "file://bundle-host/tmp/local-issue.tar.zst"
     }
-    with pytest.raises(ValueError, match="file URI must be local"):
+    with pytest.raises(ValueError, match="input_bundle.uri"):
         prepare_workflow_input(
             payload,
             "issue-review",

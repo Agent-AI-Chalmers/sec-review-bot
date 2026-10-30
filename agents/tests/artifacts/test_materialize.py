@@ -1,4 +1,3 @@
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -69,15 +68,30 @@ def test_materialize_artifact_decodes_non_ascii_file_uri_path(tmp_path: Path) ->
     )
 
 
-def test_materialize_artifact_rejects_relative_file_uri(tmp_path: Path) -> None:
-    artifact = tmp_path / "artifact.tar.zst"
-    artifact.write_bytes(b"archive")
-    reference = replace(
-        local_artifact_reference(artifact), uri="file:relative/artifact.tar.zst"
-    )
-
-    with pytest.raises(ValueError, match="path must be absolute"):
-        materialize_artifact(reference, tmp_path / "unused", maximum_size=100)
+@pytest.mark.parametrize(
+    ("uri", "message"),
+    [
+        ("file:relative/artifact.tar.zst", "absolute local file URI"),
+        ("file://remote-host/tmp/artifact.tar.zst", "absolute local file URI"),
+        ("file:///tmp/artifact.tar.zst?download=1", "query or fragment"),
+        ("s3:", "bucket and object key"),
+        ("s3://bucket", "bucket and object key"),
+        ("s3://bucket/key#fragment", "query or fragment"),
+        ("s3://user@bucket/key", "bucket and object key"),
+        ("https://artifacts.example/artifact", "scheme must be file or s3"),
+    ],
+)
+def test_artifact_reference_rejects_noncanonical_uri(
+    uri: str,
+    message: str,
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        ArtifactReference(
+            uri=uri,
+            digest=f"sha256:{'a' * 64}",
+            media_type="application/tar+zstd",
+            size_bytes=7,
+        )
 
 
 def test_materialize_artifact_rejects_modified_shared_file(tmp_path: Path) -> None:
