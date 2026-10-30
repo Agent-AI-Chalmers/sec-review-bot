@@ -287,6 +287,76 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
   }
 })
 
+test('BFF rejects an upstream JSON body whose declared size exceeds its budget', async () => {
+  const upstream = createServer((_request, response) => {
+    response.writeHead(200, {
+      'content-type': 'application/json',
+      'content-length': '5'
+    })
+    response.end('12345')
+  })
+  await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
+  const upstreamAddress = upstream.address()
+  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    upstreamJsonMaxBytes: 4
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const uiAddress = ui.address()
+  assert(uiAddress && typeof uiAddress === 'object')
+  const base = `http://127.0.0.1:${uiAddress.port}`
+  try {
+    const cookie = await loginCookie(base)
+    const response = await fetch(`${base}/api/runs`, { headers: { cookie } })
+    assert.strictEqual(response.status, 502)
+    assert.deepStrictEqual(await response.json(), {
+      error: 'upstream_response_too_large'
+    })
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => upstream.close(() => resolve()))
+    ])
+  }
+})
+
+test('BFF stops buffering a chunked upstream JSON body at its budget', async () => {
+  const upstream = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.write('1234')
+    response.end('5')
+  })
+  await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
+  const upstreamAddress = upstream.address()
+  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    upstreamJsonMaxBytes: 4
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const uiAddress = ui.address()
+  assert(uiAddress && typeof uiAddress === 'object')
+  const base = `http://127.0.0.1:${uiAddress.port}`
+  try {
+    const cookie = await loginCookie(base)
+    const response = await fetch(`${base}/api/runs`, { headers: { cookie } })
+    assert.strictEqual(response.status, 502)
+    assert.deepStrictEqual(await response.json(), {
+      error: 'upstream_response_too_large'
+    })
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => upstream.close(() => resolve()))
+    ])
+  }
+})
+
 test('memory writes require configured catalog access', async () => {
   const reviewRuns = createServer((_request, response) => response.end('{}'))
   await new Promise<void>((resolve) =>
