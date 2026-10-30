@@ -1,4 +1,5 @@
 import type {
+  ExecutionArtifactStorage,
   ExecutionWorkflow,
   WorkflowInputByName,
 } from './execution-api-types-generated.js'
@@ -18,18 +19,7 @@ export interface ExecutionRecord {
   result?: unknown
   error?: Record<string, unknown>
   memory_processing?: Record<string, unknown>
-  artifact_storage?: {
-    status: 'available' | 'unavailable' | 'failed'
-    artifact?: {
-      kind: 'diagnostic_bundle'
-      uri: string
-      media_type: string
-      digest: string
-      size_bytes: number
-    }
-    error_code?: string
-    message?: string
-  }
+  artifact_storage?: ExecutionArtifactStorage
 }
 
 export class ExecutionRunConflictError extends Error {

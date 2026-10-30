@@ -16,6 +16,7 @@ import {
   executionWorkflowType,
   validateExecutionWorkflowInput,
 } from './execution-workflow-validation.js'
+import type { ExecutionArtifactStorage } from './execution-api-types-generated.js'
 import {
   ExecutionRunConflictError,
   type ExecutionRecord,
@@ -237,17 +238,19 @@ export class TemporalExecutionStore {
   }
 }
 
-interface ArtifactStorageProjection {
-  status: 'available' | 'unavailable' | 'failed'
-  artifact?: {
-    kind: 'diagnostic_bundle'
-    uri: string
+/**
+ * The published diagnostic bundle, in the shape the contract declares for it.
+ *
+ * Derived from the generated storage type rather than restated: the fields are the contract's,
+ * and only two things are narrowed — the status this parser guarantees, and the media type it
+ * verified. Restating them would let a contract change update the generated file while this
+ * parser kept validating the old shape.
+ */
+type ArtifactStorageProjection = ExecutionArtifactStorage & {
+  status: 'available'
+  artifact: NonNullable<ExecutionArtifactStorage['artifact']> & {
     media_type: 'application/tar+zstd'
-    digest: string
-    size_bytes: number
   }
-  error_code?: string
-  message?: string
 }
 
 export function parseRunDiagnosticArtifact(
