@@ -642,7 +642,9 @@ test('the query string is coerced to the declared types, and only there', async 
     assert.strictEqual(ok.statusCode, 200)
     assert.strictEqual(calls, 1, 'a coerced integer must reach the handler')
 
-    for (const bad of ['abc', '10.5', '']) {
+    // The contract also bounds the page: 0 and 101 are integers the schema refuses, so the
+    // read model never has to clamp a value the caller was allowed to send.
+    for (const bad of ['abc', '10.5', '', '0', '101']) {
       const response = await app.inject({
         method: 'GET',
         url: `/v1/runs?limit=${bad}`,
