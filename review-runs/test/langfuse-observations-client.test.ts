@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { ReadableStream } from 'node:stream/web'
 import test from 'node:test'
 
 import {
@@ -120,6 +121,42 @@ test('invalid observations fail the whole read instead of silently undercounting
     }),
     /root-without-trace has no traceId/
   )
+})
+
+test('Langfuse observation pages have a bounded response body', async (t) => {
+  const originalFetch = globalThis.fetch
+  let bodyCancelled = false
+  globalThis.fetch = async () =>
+    new Response(
+      new ReadableStream({
+        cancel(): void {
+          bodyCancelled = true
+        }
+      }),
+      {
+        status: 200,
+        headers: { 'content-length': String(16 * 1024 * 1024 + 1) }
+      }
+    )
+  t.after(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  const client = new LangfuseObservationsClient(
+    'https://langfuse.example',
+    'public',
+    'secret',
+    1_000
+  )
+  await assert.rejects(
+    client.readRun({
+      runId: 'run-1',
+      fromStartTime: '2026-01-01T00:00:00.000Z',
+      toStartTime: '2026-01-01T00:10:00.000Z'
+    }),
+    /larger than the page budget/
+  )
+  assert.strictEqual(bodyCancelled, true)
 })
 
 test('provider SDK generations fail reconciliation instead of being silently excluded', async (t) => {
