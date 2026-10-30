@@ -4,8 +4,8 @@ import hashlib
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from sec_review_agents.artifacts.object_storage import download_s3_object
 from sec_review_agents.artifacts.reference import ArtifactReference
+from sec_review_agents.artifacts.s3_adapter import download_s3_object
 
 
 def materialize_artifact(

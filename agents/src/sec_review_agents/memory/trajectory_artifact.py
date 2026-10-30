@@ -4,12 +4,12 @@ import shutil
 from compression.zstd import ZstdFile
 from pathlib import Path
 
-from sec_review_agents.artifacts.object_storage import publish_immutable_s3_artifact
 from sec_review_agents.artifacts.reference import (
     ZSTD_MEDIA_TYPE,
     ArtifactReference,
     local_artifact_reference,
 )
+from sec_review_agents.artifacts.s3_adapter import publish_immutable_s3_artifact
 from sec_review_agents.runtime.trajectories import TRAJECTORY_SUFFIX
 from sec_review_agents.utils.files import slug_filename_component
 

@@ -4,11 +4,11 @@ from unittest.mock import Mock, patch
 import pytest
 from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 
-from sec_review_agents.artifacts.object_storage import (
+from sec_review_agents.artifacts.reference import local_artifact_reference
+from sec_review_agents.artifacts.s3_adapter import (
     download_s3_object,
     publish_immutable_s3_artifact,
 )
-from sec_review_agents.artifacts.reference import local_artifact_reference
 
 
 @pytest.mark.parametrize("style", ["auto", "path", "virtual"])
@@ -24,7 +24,7 @@ def test_configures_s3_addressing_style(
     )
 
     with patch(
-        "sec_review_agents.artifacts.object_storage.boto3.client",
+        "sec_review_agents.artifacts.s3_adapter.boto3.client",
         return_value=client,
     ) as create_client:
         download_s3_object(
@@ -67,7 +67,7 @@ def test_downloads_configured_s3_object_to_complete_local_file(
     client.download_fileobj.side_effect = download_fileobj
     destination = tmp_path / "download" / "input-bundle.tar.zst"
     with patch(
-        "sec_review_agents.artifacts.object_storage.boto3.client", return_value=client
+        "sec_review_agents.artifacts.s3_adapter.boto3.client", return_value=client
     ):
         result = download_s3_object(
             "s3://sec-review/runs/run-1/input/input-bundle.v1.tar.zst",
@@ -122,7 +122,7 @@ def test_removes_partial_download_after_failure(monkeypatch, tmp_path: Path) -> 
     destination = tmp_path / "input-bundle.tar.zst"
     with (
         patch(
-            "sec_review_agents.artifacts.object_storage.boto3.client",
+            "sec_review_agents.artifacts.s3_adapter.boto3.client",
             return_value=client,
         ),
         pytest.raises(RuntimeError, match="download failed"),
@@ -144,7 +144,7 @@ def test_rejects_remote_size_before_downloading(monkeypatch, tmp_path: Path) -> 
     client.head_object.return_value = {"ContentLength": 200}
     with (
         patch(
-            "sec_review_agents.artifacts.object_storage.boto3.client",
+            "sec_review_agents.artifacts.s3_adapter.boto3.client",
             return_value=client,
         ),
         pytest.raises(ValueError, match="size does not match"),
@@ -187,7 +187,7 @@ def test_publish_immutable_s3_artifact_uploads_and_returns_s3_reference(
             "os.environ", {"SEC_REVIEW_ARTIFACT_S3_BUCKET": "artifacts"}, clear=True
         ),
         patch(
-            "sec_review_agents.artifacts.object_storage.boto3.client",
+            "sec_review_agents.artifacts.s3_adapter.boto3.client",
             return_value=client,
         ),
     ):
@@ -226,7 +226,7 @@ def test_publish_immutable_s3_artifact_reuses_identical_existing_object(
             "os.environ", {"SEC_REVIEW_ARTIFACT_S3_BUCKET": "artifacts"}, clear=True
         ),
         patch(
-            "sec_review_agents.artifacts.object_storage.boto3.client",
+            "sec_review_agents.artifacts.s3_adapter.boto3.client",
             return_value=client,
         ),
     ):
@@ -263,7 +263,7 @@ def test_publish_immutable_s3_artifact_rejects_conflicting_existing_object(
             "os.environ", {"SEC_REVIEW_ARTIFACT_S3_BUCKET": "artifacts"}, clear=True
         ),
         patch(
-            "sec_review_agents.artifacts.object_storage.boto3.client",
+            "sec_review_agents.artifacts.s3_adapter.boto3.client",
             return_value=client,
         ),
         pytest.raises(RuntimeError, match="differs from immutable publication"),

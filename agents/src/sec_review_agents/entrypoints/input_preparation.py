@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import unquote, urlparse
 
-from sec_review_agents.artifacts.object_storage import (
+from sec_review_agents.artifacts.s3_adapter import (
     ARTIFACT_S3_BUCKET_ENV,
     download_s3_object,
 )

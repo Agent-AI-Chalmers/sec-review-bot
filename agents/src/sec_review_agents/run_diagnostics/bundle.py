@@ -11,13 +11,13 @@ from urllib.parse import urlparse
 
 from sec_review_agents.artifacts.archive import extract_archive
 from sec_review_agents.artifacts.materialize import materialize_artifact
-from sec_review_agents.artifacts.object_storage import publish_immutable_s3_artifact
 from sec_review_agents.artifacts.reference import (
     ARCHIVE_MEDIA_TYPE,
     ArtifactReference,
     local_artifact_reference,
     require_artifact_media_type,
 )
+from sec_review_agents.artifacts.s3_adapter import publish_immutable_s3_artifact
 from sec_review_agents.artifacts.tar_zstd import (
     canonical_tar_info,
     validate_restricted_pax_archive,
