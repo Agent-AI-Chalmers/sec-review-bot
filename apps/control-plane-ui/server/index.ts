@@ -39,6 +39,8 @@ const MAX_TRAJECTORY_ARTIFACT_BYTES = 16 * 1024 * 1024
 const MAX_TRAJECTORY_CONTENT_BYTES = 8 * 1024 * 1024
 const MAX_TRAJECTORY_LINE_BYTES = 512 * 1024
 const MAX_TRAJECTORY_MESSAGES = 2000
+const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60
+const DEFAULT_MAXIMUM_SESSIONS = 10_000
 
 interface ArtifactObject {
   body: Readable
@@ -433,6 +435,9 @@ export function createControlPlaneUiServer({
   artifactStore,
   artifactDownloadIdleTimeoutMs = ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS,
   reviewRunsRequestTimeoutMs = REVIEW_RUNS_REQUEST_TIMEOUT_MS,
+  secureCookies = false,
+  sessionTtlSeconds = DEFAULT_SESSION_TTL_SECONDS,
+  maximumSessions = DEFAULT_MAXIMUM_SESSIONS,
   assets = path.resolve('dist')
 }: {
   reviewRunsUrl: string
@@ -443,17 +448,43 @@ export function createControlPlaneUiServer({
   artifactStore?: ArtifactStore
   artifactDownloadIdleTimeoutMs?: number
   reviewRunsRequestTimeoutMs?: number
+  secureCookies?: boolean
+  sessionTtlSeconds?: number
+  maximumSessions?: number
   assets?: string
 }): Server {
-  const sessionValue = crypto
-    .createHash('sha256')
-    .update(accessToken)
-    .digest('base64url')
-  const authenticated = (cookie: string | undefined): boolean =>
-    cookie
+  if (!Number.isSafeInteger(maximumSessions) || maximumSessions < 1)
+    throw new RangeError('maximumSessions must be a positive integer')
+  // Sessions are intentionally process-local: a restart revokes every browser session, and this
+  // store retains only opaque token expirations rather than operator credentials.
+  const sessions = new Map<string, number>()
+  const prepareSessionSlot = (now: number): void => {
+    for (const [session, expiresAt] of sessions)
+      if (expiresAt <= now) sessions.delete(session)
+    while (sessions.size >= maximumSessions) {
+      const oldest = sessions.keys().next().value
+      if (oldest === undefined) break
+      sessions.delete(oldest)
+    }
+  }
+  const sessionCookie = (request: IncomingMessage): string | undefined =>
+    request.headers.cookie
       ?.split(';')
       .map((value) => value.trim())
-      .includes(`control_plane_ui_session=${sessionValue}`) ?? false
+      .find((value) => value.startsWith('control_plane_ui_session='))
+      ?.slice('control_plane_ui_session='.length)
+  const authenticated = (request: IncomingMessage): boolean => {
+    const session = sessionCookie(request)
+    if (session === undefined) return false
+    const expiresAt = sessions.get(session)
+    if (expiresAt === undefined) return false
+    if (expiresAt <= Date.now()) {
+      sessions.delete(session)
+      return false
+    }
+    return true
+  }
+  const cookieSecurity = secureCookies ? '; Secure' : ''
   return createServer(async (request, response) => {
     securityHeaders(response)
     if (request.url === '/healthz') {
@@ -497,16 +528,22 @@ export function createControlPlaneUiServer({
         response.end('{"error":"unauthorized"}')
         return
       }
+      const sessionValue = crypto.randomBytes(32).toString('base64url')
+      const now = Date.now()
+      prepareSessionSlot(now)
+      sessions.set(sessionValue, now + sessionTtlSeconds * 1000)
       response.writeHead(204, {
-        'set-cookie': `control_plane_ui_session=${sessionValue}; HttpOnly; SameSite=Strict; Path=/`
+        'set-cookie': `control_plane_ui_session=${sessionValue}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionTtlSeconds}${cookieSecurity}`,
+        'cache-control': 'no-store'
       })
       response.end()
       return
     }
     // Signing out can only be done by the server: the session cookie is HttpOnly, so
     // the console cannot clear it from script. Expiring it here forgets the credential
-    // on this browser. It does not revoke the access token itself, which stays valid
-    // for anyone else who holds it — the BFF keeps no session table to invalidate.
+    // on this browser and removes its opaque value from the process-local session table.
+    // It does not revoke the shared access token itself, which stays valid for anyone
+    // else who holds it.
     //
     // There is nothing to authenticate: any caller may clear its own cookie, and a
     // clear is harmless to a caller that was never signed in. The same-origin check
@@ -519,15 +556,16 @@ export function createControlPlaneUiServer({
         response.end('{"error":"cross_origin"}')
         return
       }
+      const session = sessionCookie(request)
+      if (session !== undefined) sessions.delete(session)
       response.writeHead(204, {
-        'set-cookie':
-          'control_plane_ui_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0'
+        'set-cookie': `control_plane_ui_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${cookieSecurity}`
       })
       response.end()
       return
     }
     if (request.url?.startsWith('/api/')) {
-      if (!authenticated(request.headers.cookie)) {
+      if (!authenticated(request)) {
         response.writeHead(401, { 'content-type': 'application/json' })
         response.end('{"error":"unauthorized"}')
         return
@@ -1223,6 +1261,10 @@ if (
 ) {
   const reviewRunsToken = process.env.REVIEW_RUNS_READ_TOKEN
   const accessToken = process.env.CONTROL_PLANE_UI_ACCESS_TOKEN
+  const secureCookiesValue =
+    process.env.CONTROL_PLANE_UI_SECURE_COOKIES?.trim() || 'false'
+  if (!['true', 'false'].includes(secureCookiesValue))
+    throw new Error('CONTROL_PLANE_UI_SECURE_COOKIES must be true or false.')
   if (!reviewRunsToken) throw new Error('REVIEW_RUNS_READ_TOKEN is required.')
   if (!accessToken)
     throw new Error('CONTROL_PLANE_UI_ACCESS_TOKEN is required.')
@@ -1230,11 +1272,12 @@ if (
     reviewRunsUrl: process.env.REVIEW_RUNS_URL ?? 'http://127.0.0.1:8090',
     reviewRunsToken,
     accessToken,
+    secureCookies: secureCookiesValue === 'true',
     memoryCatalogUrl: process.env.MEMORY_CATALOG_URL,
     memoryCatalogToken: process.env.MEMORY_CATALOG_TOKEN,
     artifactStore: artifactStoreFromEnvironment()
   }).listen(
     Number.parseInt(process.env.CONTROL_PLANE_UI_PORT ?? '8091', 10),
-    '0.0.0.0'
+    process.env.CONTROL_PLANE_UI_HOST?.trim() || '127.0.0.1'
   )
 }

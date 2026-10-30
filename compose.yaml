@@ -211,6 +211,9 @@ services:
       args:
         NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
     environment:
+      # The container listens on its network interface, while the published host port below
+      # remains loopback-only. Set secure cookies when placing the BFF behind HTTPS instead.
+      CONTROL_PLANE_UI_HOST: "0.0.0.0"
       CONTROL_PLANE_UI_PORT: "8091"
       REVIEW_RUNS_URL: "http://review-runs:8090"
       REVIEW_RUNS_READ_TOKEN: "${REVIEW_RUNS_READ_TOKEN:?REVIEW_RUNS_READ_TOKEN is required}"

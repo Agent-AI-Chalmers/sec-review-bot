@@ -112,6 +112,12 @@ pnpm run build
 
 生产服务需要 `REVIEW_RUNS_READ_TOKEN` 和 `CONTROL_PLANE_UI_ACCESS_TOKEN`，它们回答的是两个不同的问题。访问 token 决定"谁能打开控制台"：浏览器用它换取 HTTP-only 会话 cookie，token 本身不会进入浏览器代码或 Vite 变量。read token 则是后端在用户登录后调用 Review Runs 查询路由时使用的凭证，同样只存在于服务端。两者分开，意味着控制台账号与读密钥可以独立签发、轮换和吊销——例如只读的监控面板只持有 read token，不具备任何控制台访问能力。
 
+<!-- doc-default: CONTROL_PLANE_UI_HOST; source=apps/control-plane-ui/server/index.ts -->
+
+生产服务默认绑定 `127.0.0.1`。只有容器网络或反向代理需要访问时才设置 `CONTROL_PLANE_UI_HOST`。浏览器会话使用独立的随机标识符，并在服务端保留 12 小时，而不是从访问 token 派生 cookie。
+
+由 HTTPS 反向代理终止 TLS 时，设置 `CONTROL_PLANE_UI_SECURE_COOKIES=true`，使会话和退出登录 cookie 带有 `Secure` 属性。明文 HTTP 监听地址必须对不受信网络不可达；访问 token 只提交到 `/api/session`，但该请求的传输保护仍依赖 TLS。
+
 BFF 还负责代理下载私有 RustFS 中的终态 artifact。它使用单独的 `s3:GetObject` 凭据，该凭据仅可读取 `sec-review/runs/*/artifacts/*`；浏览器只提交 run ID，不会收到存储凭据或对象 URI。BFF 会先将对象写入临时文件，并根据 Review Runs 元数据校验大小和 SHA-256 摘要，再向浏览器返回下载。下载使用同一个 HTTP-only session 鉴权，固定作为附件返回，并受存储空闲超时限制。
 
 服务端 memory tree reader 与 builder 实现版本化的 [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.zh.md)。它们不会进入 browser bundle；BFF 负责校验、digest 计算和规范 object key。
