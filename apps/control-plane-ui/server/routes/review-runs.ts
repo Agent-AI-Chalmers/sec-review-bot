@@ -5,10 +5,10 @@ import {
   RequestBodyTooLargeError,
   readBoundedRequestBody
 } from '../http-request.js'
-import { PROXIED_CONTENT_TYPE, sendJson } from '../http-response.js'
+import { sendJson } from '../http-response.js'
 import { requireSameOrigin } from '../request-security.js'
+import { sendUpstreamFailure, writeUpstreamResult } from '../upstream/relay.js'
 import type { ReviewRunsClient } from '../upstream/review-runs-client.js'
-import { UpstreamRequestError } from '../upstream/request.js'
 
 /** The UUID a Review Runs run id is (see the contract's `runId` path parameter). */
 const RUN_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
@@ -122,21 +122,9 @@ export function createReviewRunsRoutes({
         adminToken,
         body
       )
-      response.writeHead(upstream.status, {
-        'content-type': PROXIED_CONTENT_TYPE
-      })
-      response.end(upstream.body)
+      writeUpstreamResult(response, upstream)
     } catch (error) {
-      const kind =
-        error instanceof UpstreamRequestError ? error.kind : 'unavailable'
-      sendJson(response, kind === 'timeout' ? 504 : 502, {
-        error:
-          kind === 'too_large'
-            ? 'upstream_response_too_large'
-            : kind === 'timeout'
-              ? 'review_runs_timeout'
-              : 'review_runs_unavailable'
-      })
+      sendUpstreamFailure(response, 'review_runs', error)
     }
   }
 
@@ -155,26 +143,9 @@ export function createReviewRunsRoutes({
       return false
     try {
       const upstream = await reviewRuns.read(forwardedPath(request.url ?? '/'))
-      response.writeHead(upstream.status, {
-        'content-type': PROXIED_CONTENT_TYPE
-      })
-      response.end(upstream.body)
+      writeUpstreamResult(response, upstream)
     } catch (error) {
-      const kind =
-        error instanceof UpstreamRequestError ? error.kind : 'unavailable'
-      response.writeHead(kind === 'timeout' ? 504 : 502, {
-        'content-type': 'application/json'
-      })
-      response.end(
-        JSON.stringify({
-          error:
-            kind === 'too_large'
-              ? 'upstream_response_too_large'
-              : kind === 'timeout'
-                ? 'review_runs_timeout'
-                : 'review_runs_unavailable'
-        })
-      )
+      sendUpstreamFailure(response, 'review_runs', error)
     }
     return true
   }
