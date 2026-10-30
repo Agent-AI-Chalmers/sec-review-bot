@@ -340,7 +340,7 @@ test('BFF maps memory tree reads to the catalog memory-tree resource', async () 
     reviewRunsToken: 'read-secret',
     accessToken: 'login-secret',
     memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
-    memoryCatalogToken: 'catalog-secret'
+    memoryCatalogOperatorToken: 'catalog-secret'
   })
   await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
   const address = ui.address()
@@ -402,7 +402,7 @@ test('memory edit creates a revision while restore only moves the pointer', asyn
     reviewRunsToken: 'read-secret',
     accessToken: 'login-secret',
     memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
-    memoryCatalogToken: 'catalog-secret',
+    memoryCatalogOperatorToken: 'catalog-secret',
     artifactStore: {
       getObject: () => Promise.reject(new Error('not used')),
       putMemoryArtifact: async () => {
@@ -433,10 +433,7 @@ test('memory edit creates a revision while restore only moves the pointer', asyn
     )
     assert.strictEqual(uploads, 1)
     const editSource = requests[0]!.body.source as Record<string, unknown>
-    assert.deepStrictEqual(editSource.actor, {
-      kind: 'service',
-      id: 'control-plane-ui'
-    })
+    assert.strictEqual(editSource.actor, undefined)
     assert.strictEqual(editSource.operation_id, 'edit-1')
 
     assert.strictEqual(
@@ -458,8 +455,7 @@ test('memory edit creates a revision while restore only moves the pointer', asyn
     assert.deepStrictEqual(requests[1]!.body, {
       operation_id: 'restore-1',
       expected_active_revision: 3,
-      restored_revision: 1,
-      actor: { kind: 'service', id: 'control-plane-ui' }
+      restored_revision: 1
     })
   } finally {
     await Promise.all([
@@ -513,7 +509,7 @@ test('BFF verifies and strictly parses memory trajectories for the viewer', asyn
     reviewRunsToken: 'read-secret',
     accessToken: 'login-secret',
     memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
-    memoryCatalogToken: 'catalog-secret',
+    memoryCatalogOperatorToken: 'catalog-secret',
     artifactStore: {
       getObject: async () => ({ body: Readable.from([trajectory]) })
     }
@@ -566,8 +562,7 @@ test('BFF rejects a memory tree reference whose object key is not derived from i
         },
         source: {
           kind: 'operator',
-          operation_id: 'edit-1',
-          actor: { kind: 'service', id: 'control-plane-ui' }
+          operation_id: 'edit-1'
         }
       })
     )
@@ -581,7 +576,7 @@ test('BFF rejects a memory tree reference whose object key is not derived from i
     reviewRunsToken: 'read-secret',
     accessToken: 'login-secret',
     memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
-    memoryCatalogToken: 'catalog-secret',
+    memoryCatalogOperatorToken: 'catalog-secret',
     artifactStore: {
       getObject: async () => {
         objectReads += 1
@@ -626,8 +621,7 @@ test('BFF rejects oversized memory artifacts before reading object storage', asy
         },
         source: {
           kind: 'operator',
-          operation_id: 'edit-1',
-          actor: { kind: 'service', id: 'control-plane-ui' }
+          operation_id: 'edit-1'
         }
       })
     )
@@ -641,7 +635,7 @@ test('BFF rejects oversized memory artifacts before reading object storage', asy
     reviewRunsToken: 'read-secret',
     accessToken: 'login-secret',
     memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
-    memoryCatalogToken: 'catalog-secret',
+    memoryCatalogOperatorToken: 'catalog-secret',
     artifactStore: {
       getObject: async () => {
         objectReads += 1
@@ -683,8 +677,7 @@ test('BFF rejects oversized memory objects before buffering their body', async (
         },
         source: {
           kind: 'operator',
-          operation_id: 'edit-1',
-          actor: { kind: 'service', id: 'control-plane-ui' }
+          operation_id: 'edit-1'
         }
       })
     )
@@ -704,7 +697,7 @@ test('BFF rejects oversized memory objects before buffering their body', async (
     reviewRunsToken: 'read-secret',
     accessToken: 'login-secret',
     memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
-    memoryCatalogToken: 'catalog-secret',
+    memoryCatalogOperatorToken: 'catalog-secret',
     artifactStore: {
       getObject: async () => ({
         body,

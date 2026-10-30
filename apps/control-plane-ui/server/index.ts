@@ -431,7 +431,7 @@ export function createControlPlaneUiServer({
   reviewRunsToken,
   accessToken,
   memoryCatalogUrl,
-  memoryCatalogToken,
+  memoryCatalogOperatorToken,
   artifactStore,
   artifactDownloadIdleTimeoutMs = ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS,
   reviewRunsRequestTimeoutMs = REVIEW_RUNS_REQUEST_TIMEOUT_MS,
@@ -444,7 +444,7 @@ export function createControlPlaneUiServer({
   reviewRunsToken: string
   accessToken: string
   memoryCatalogUrl?: string
-  memoryCatalogToken?: string
+  memoryCatalogOperatorToken?: string
   artifactStore?: ArtifactStore
   artifactDownloadIdleTimeoutMs?: number
   reviewRunsRequestTimeoutMs?: number
@@ -578,7 +578,7 @@ export function createControlPlaneUiServer({
           sendJson(response, 403, { error: 'cross_site_request' })
           return
         }
-        if (!memoryCatalogUrl || !memoryCatalogToken) {
+        if (!memoryCatalogUrl || !memoryCatalogOperatorToken) {
           sendJson(response, 503, { error: 'memory_catalog_unavailable' })
           return
         }
@@ -598,15 +598,13 @@ export function createControlPlaneUiServer({
             Buffer.concat(chunks).toString('utf8')
           ) as Record<string, unknown>
           const action = memoryWriteMatch[1]
-          const actor = { kind: 'service', id: 'control-plane-ui' }
           let catalogPath: string
           let catalogBody: Record<string, unknown>
           if (action === 'pause' || action === 'resume') {
             catalogPath = `/v1/maintenance-control/${action}`
             catalogBody = {
               operation_id: body.operation_id,
-              expected_generation: body.expected_generation,
-              actor
+              expected_generation: body.expected_generation
             }
           } else {
             if (action === 'edit') {
@@ -638,8 +636,7 @@ export function createControlPlaneUiServer({
                 memory_tree_reference: reference,
                 source: {
                   kind: 'operator',
-                  operation_id: body.operation_id,
-                  actor
+                  operation_id: body.operation_id
                 }
               }
             } else {
@@ -647,15 +644,14 @@ export function createControlPlaneUiServer({
               catalogBody = {
                 operation_id: body.operation_id,
                 expected_active_revision: body.expected_active_revision,
-                restored_revision: body.restored_revision,
-                actor
+                restored_revision: body.restored_revision
               }
             }
           }
           const upstream = await fetch(`${memoryCatalogUrl}${catalogPath}`, {
             method: 'POST',
             headers: {
-              authorization: `Bearer ${memoryCatalogToken}`,
+              authorization: `Bearer ${memoryCatalogOperatorToken}`,
               'content-type': 'application/json'
             },
             body: JSON.stringify(catalogBody),
@@ -678,7 +674,11 @@ export function createControlPlaneUiServer({
           request.url ?? ''
         )
       if (request.method === 'GET' && memoryArtifactMatch !== null) {
-        if (!memoryCatalogUrl || !memoryCatalogToken || !artifactStore) {
+        if (
+          !memoryCatalogUrl ||
+          !memoryCatalogOperatorToken ||
+          !artifactStore
+        ) {
           sendJson(response, 503, { error: 'memory_artifact_unavailable' })
           return
         }
@@ -701,7 +701,9 @@ export function createControlPlaneUiServer({
           const upstream = await fetch(
             `${memoryCatalogUrl}/v1/${collection === 'revisions' ? 'memory-tree/revisions' : 'extractions'}/${encodeURIComponent(identity)}`,
             {
-              headers: { authorization: `Bearer ${memoryCatalogToken}` },
+              headers: {
+                authorization: `Bearer ${memoryCatalogOperatorToken}`
+              },
               signal: AbortSignal.timeout(REVIEW_RUNS_REQUEST_TIMEOUT_MS)
             }
           )
@@ -810,13 +812,15 @@ export function createControlPlaneUiServer({
         return
       }
       if (request.method === 'GET' && memoryPath !== null) {
-        if (!memoryCatalogUrl || !memoryCatalogToken) {
+        if (!memoryCatalogUrl || !memoryCatalogOperatorToken) {
           sendJson(response, 503, { error: 'memory_catalog_unavailable' })
           return
         }
         try {
           const upstream = await fetch(`${memoryCatalogUrl}${memoryPath}`, {
-            headers: { authorization: `Bearer ${memoryCatalogToken}` },
+            headers: {
+              authorization: `Bearer ${memoryCatalogOperatorToken}`
+            },
             signal: AbortSignal.timeout(REVIEW_RUNS_REQUEST_TIMEOUT_MS)
           })
           const bytes = Buffer.from(await upstream.arrayBuffer())
@@ -1274,7 +1278,7 @@ if (
     accessToken,
     secureCookies: secureCookiesValue === 'true',
     memoryCatalogUrl: process.env.MEMORY_CATALOG_URL,
-    memoryCatalogToken: process.env.MEMORY_CATALOG_TOKEN,
+    memoryCatalogOperatorToken: process.env.MEMORY_CATALOG_OPERATOR_TOKEN,
     artifactStore: artifactStoreFromEnvironment()
   }).listen(
     Number.parseInt(process.env.CONTROL_PLANE_UI_PORT ?? '8091', 10),

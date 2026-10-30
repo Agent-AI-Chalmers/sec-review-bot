@@ -41,9 +41,12 @@ Pause and resume operations have their own idempotency ledger. Identical replay 
 
 ```bash
 MEMORY_CATALOG_DATABASE_URL=postgresql://... \
-MEMORY_CATALOG_TOKEN=... \
+MEMORY_CATALOG_WORKER_TOKEN=... \
+MEMORY_CATALOG_OPERATOR_TOKEN=... \
 pnpm run server
 ```
+
+Worker credentials register extractions and run automatic maintenance. Operator credentials power catalog reads and the Control Plane UI's pause, edit, restore, and resume operations. The server derives operator audit actors from the authenticated role.
 
 ## Checks
 

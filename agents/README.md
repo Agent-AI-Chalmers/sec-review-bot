@@ -332,7 +332,7 @@ The launcher maps the separate object-storage identities to their workers, keeps
 | Variable | Purpose |
 | --- | --- |
 | `AGENT_MEMORY_CATALOG_URL` | Memory Catalog base URL. Without it, review agents have no memory view and memory processing cannot run. |
-| `AGENT_MEMORY_CATALOG_TOKEN` | Bearer token for Memory Catalog. Required when `AGENT_MEMORY_CATALOG_URL` is set. |
+| `AGENT_MEMORY_CATALOG_TOKEN` | Worker bearer token for Memory Catalog extraction and automatic maintenance. Required when `AGENT_MEMORY_CATALOG_URL` is set. |
 | `AGENT_MEMORY_CONSUMPTION_ENABLED` | Whether review agents load the active memory tree. Defaults to `true`. |
 | `AGENT_MEMORY_PROCESSING_ENABLED` | Whether extraction and maintenance activities run. Defaults to `true`. |
 

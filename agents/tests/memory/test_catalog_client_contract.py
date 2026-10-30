@@ -393,7 +393,6 @@ def test_operator_revision_and_restore_contracts_are_separate() -> None:
     source: dict[str, Any] = {
         "kind": "operator",
         "operation_id": "operation-1",
-        "actor": {"kind": "user", "id": "alice"},
     }
     base = {
         "expected_active_revision": 1,
@@ -415,7 +414,6 @@ def test_operator_revision_and_restore_contracts_are_separate() -> None:
         "operation_id": "restore-1",
         "expected_active_revision": 2,
         "restored_revision": 1,
-        "actor": {"kind": "user", "id": "alice"},
     }
     restore_validator = _validator("MemoryTreeRestoreOperation")
     restore_validator.validate(restore)

@@ -338,6 +338,16 @@ export type OperatorRevisionSource = {
   actor: Actor
 }
 
+export type OperatorRevisionCreationSource = {
+  kind: 'operator'
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  operation_id: OperationId
+}
+
 export type MemoryTreeRevisionSource =
   MaintenanceRevisionSource | OperatorRevisionSource
 
@@ -349,7 +359,7 @@ export type MemoryTreeRevisionCreation = {
    */
   expected_active_revision: number
   memory_tree_reference: ArtifactReference
-  source: MemoryTreeRevisionSource
+  source: MaintenanceRevisionSource | OperatorRevisionCreationSource
 }
 
 export type MemoryTreeRevisionCreationResult = {
@@ -428,7 +438,6 @@ export type MemoryTreeRestoreOperation = {
    * @type integer
    */
   restored_revision: number
-  actor: Actor
 }
 
 export type MemoryTreeRestoreOperationResult = {
@@ -483,7 +492,6 @@ export type MaintenanceControlOperation = {
    * @type integer
    */
   expected_generation: number
-  actor: Actor
 }
 
 export type MaintenanceControlOperationResult = {

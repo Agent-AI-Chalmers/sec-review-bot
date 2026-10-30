@@ -179,13 +179,14 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入 run diagnostic bundle，并读取 active memory revision。 |
 | `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | 两个 memory worker 共用的存储凭据；可读取 run diagnostic bundle，并读写 memory revision 和压缩后的 memory-agent trajectory。 |
 | `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 协调状态 API；Compose 默认是 `http://127.0.0.1:8092`。 |
-| `AGENT_MEMORY_CATALOG_TOKEN` | 必须与仓库 `.env` 一致；它只授权 memory 协调，不提供 PostgreSQL 直连权限。 |
+| `AGENT_MEMORY_CATALOG_TOKEN` | Extraction 和自动 maintenance 使用的 worker 凭据；不提供 PostgreSQL 直连权限。 |
+| `AGENT_MEMORY_CATALOG_OPERATOR_TOKEN` | Control Plane UI 用于 memory 读取与人工控制操作的 operator 凭据。 |
 
 Execution Worker 会在 workflow 成功前把权威 run diagnostic 发布到 `runs/*/artifacts/*`。Execution Gateway 只校验并转发该不可变引用，不持有对象存储凭据，也不挂载 worker artifact tree。Agent sandbox 不会收到任何 workload storage 凭据。
 
 Memory Catalog Server 是独立 TypeScript 服务，不属于 Review Runs。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_review_runs` 和 `sec_review_memory_catalog` database 与 login role；每个服务只接收自己的 database URL。Memory Catalog 在自己的 database 中保存 extraction records 及其可选 observations、memory-tree revision history 和 active revision pointer。每个 revision 记录对应的 maintenance identity 和 maintainer trajectory reference。Temporal 负责 extraction 执行和单例 maintenance workflow；PostgreSQL 是持久 catalog 与 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；memory-tree revisions 和 memory-agent trajectories 以不可变对象保存在 RustFS 中。Worker 将这些对象物化到 invocation 级临时 worktree，agent sandbox 只看到最终 filesystem mount。
 
-Compose 会向 Control Plane UI 提供 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_TOKEN`。经过认证的 browser session 可以通过 BFF 查看和管理 memory，而不会获得 Catalog 或对象存储凭据。UI storage identity 可以读取 run artifact、memory tree 和 memory trajectory，但只能在 `memory/trees/*` 下创建不可变对象。编辑或恢复失败后，maintenance 会保持暂停，直到 operator 显式恢复。系统不会自动清理未引用的 memory object。
+Compose 会向 Control Plane UI 提供 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_OPERATOR_TOKEN`。经过认证的 browser session 可以通过 BFF 查看和管理 memory，而不会获得 Catalog 或对象存储凭据。UI storage identity 可以读取 run artifact、memory tree 和 memory trajectory，但只能在 `memory/trees/*` 下创建不可变对象。编辑或恢复失败后，maintenance 会保持暂停，直到 operator 显式恢复。系统不会自动清理未引用的 memory object。
 
 PostgreSQL 初始化脚本只会在 `.agent-postgres-state` 为空时执行。采用或修改 database 名称后，应先停止部署并删除该目录，再重新启动 Compose。此操作会删除已有的 Review Runs 和 Memory Catalog 数据。
 

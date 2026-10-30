@@ -12,6 +12,15 @@ components:
     catalogToken:
       type: http
       scheme: bearer
+      description: Worker or operator credential for shared catalog reads and role-checked revision creation.
+    workerToken:
+      type: http
+      scheme: bearer
+      description: Worker credential for extraction and automatic maintenance operations.
+    operatorToken:
+      type: http
+      scheme: bearer
+      description: Operator credential for maintenance control and manual memory changes.
   schemas:
     ArtifactReference:
       type: object
@@ -308,6 +317,14 @@ components:
           $ref: "#/components/schemas/OperationId"
         actor:
           $ref: "#/components/schemas/Actor"
+    OperatorRevisionCreationSource:
+      type: object
+      additionalProperties: false
+      required: [kind, operation_id]
+      properties:
+        kind: { type: string, const: operator }
+        operation_id:
+          $ref: "#/components/schemas/OperationId"
     MemoryTreeRevisionSource:
       oneOf:
         - $ref: "#/components/schemas/MaintenanceRevisionSource"
@@ -324,7 +341,9 @@ components:
         memory_tree_reference:
           $ref: "#/components/schemas/ArtifactReference"
         source:
-          $ref: "#/components/schemas/MemoryTreeRevisionSource"
+          oneOf:
+            - $ref: "#/components/schemas/MaintenanceRevisionSource"
+            - $ref: "#/components/schemas/OperatorRevisionCreationSource"
     MemoryTreeRevisionCreationResult:
       type: object
       additionalProperties: false
@@ -387,7 +406,6 @@ components:
         - operation_id
         - expected_active_revision
         - restored_revision
-        - actor
       properties:
         operation_id:
           $ref: "#/components/schemas/OperationId"
@@ -397,8 +415,6 @@ components:
         restored_revision:
           type: integer
           minimum: 1
-        actor:
-          $ref: "#/components/schemas/Actor"
     MemoryTreeRestoreOperationResult:
       type: object
       additionalProperties: false
@@ -439,15 +455,13 @@ components:
     MaintenanceControlOperation:
       type: object
       additionalProperties: false
-      required: [operation_id, expected_generation, actor]
+      required: [operation_id, expected_generation]
       properties:
         operation_id:
           $ref: "#/components/schemas/OperationId"
         expected_generation:
           type: integer
           minimum: 0
-        actor:
-          $ref: "#/components/schemas/Actor"
     MaintenanceControlOperationResult:
       type: object
       additionalProperties: false
@@ -554,7 +568,7 @@ paths:
     post:
       description: Register one completed extraction and its optional observation, or replay identical content.
       operationId: registerExtraction
-      security: [{ catalogToken: [] }]
+      security: [{ workerToken: [] }]
       requestBody:
         required: true
         content:
@@ -661,7 +675,7 @@ paths:
     get:
       description: Return a bounded observation set and the active memory state it must be maintained against.
       operationId: getMaintenanceInput
-      security: [{ catalogToken: [] }]
+      security: [{ workerToken: [] }]
       parameters:
         - in: query
           name: limit
@@ -750,7 +764,7 @@ paths:
     post:
       description: Move the active memory pointer to an existing revision without creating a revision.
       operationId: restoreMemoryTree
-      security: [{ catalogToken: [] }]
+      security: [{ operatorToken: [] }]
       requestBody:
         required: true
         content:
@@ -795,7 +809,7 @@ paths:
     post:
       description: Idempotently transition automatic maintenance from enabled to paused.
       operationId: pauseMaintenance
-      security: [{ catalogToken: [] }]
+      security: [{ operatorToken: [] }]
       requestBody:
         required: true
         content:
@@ -827,7 +841,7 @@ paths:
     post:
       description: Idempotently transition automatic maintenance from paused to enabled.
       operationId: resumeMaintenance
-      security: [{ catalogToken: [] }]
+      security: [{ operatorToken: [] }]
       requestBody:
         required: true
         content:

@@ -9,6 +9,13 @@ import {
 } from '../src/catalog-store.js'
 import { createApp } from '../src/server.js'
 
+const auth = {
+  workerToken: 'worker-secret',
+  operatorToken: 'operator-secret',
+}
+const workerHeaders = { authorization: `Bearer ${auth.workerToken}` }
+const operatorHeaders = { authorization: `Bearer ${auth.operatorToken}` }
+
 const revision = {
   revision: 1,
   predecessor_revision: null,
@@ -102,7 +109,7 @@ await test('the contract authenticates and validates extraction registration', a
     listMemoryTreeRevisions: () =>
       Promise.resolve({ revisions: [], next_before_revision: null }),
   }
-  const app = await createApp({ store, token: 'secret' })
+  const app = await createApp({ store, ...auth })
   const unauthorized = await app.inject({
     method: 'POST',
     url: '/v1/extractions',
@@ -111,13 +118,13 @@ await test('the contract authenticates and validates extraction registration', a
   const invalid = await app.inject({
     method: 'POST',
     url: '/v1/extractions',
-    headers: { authorization: 'Bearer secret' },
+    headers: workerHeaders,
     payload: { ...extraction, unknown: true },
   })
   const registered = await app.inject({
     method: 'POST',
     url: '/v1/extractions',
-    headers: { authorization: 'Bearer secret' },
+    headers: workerHeaders,
     payload: extraction,
   })
 
@@ -125,6 +132,49 @@ await test('the contract authenticates and validates extraction registration', a
   assert.equal(invalid.statusCode, 400)
   assert.deepEqual(registered.json(), { ok: true, created: true })
   assert.deepEqual(extractions, [extraction])
+  await app.close()
+})
+
+await test('worker and operator credentials are restricted to their write roles', async () => {
+  const store = storeWithRevisionFailure(new Error('not used'))
+  const app = await createApp({ store, ...auth })
+  const operatorRegistration = await app.inject({
+    method: 'POST',
+    url: '/v1/extractions',
+    headers: operatorHeaders,
+    payload: extraction,
+  })
+  const workerPause = await app.inject({
+    method: 'POST',
+    url: '/v1/maintenance-control/pause',
+    headers: workerHeaders,
+    payload: { operation_id: 'pause-1', expected_generation: 0 },
+  })
+  const workerOperatorRevision = await app.inject({
+    method: 'POST',
+    url: '/v1/memory-tree/revisions',
+    headers: workerHeaders,
+    payload: {
+      expected_active_revision: 0,
+      memory_tree_reference: revision.memory_tree_reference,
+      source: { kind: 'operator', operation_id: 'edit-1' },
+    },
+  })
+  const operatorMaintenanceRevision = await app.inject({
+    method: 'POST',
+    url: '/v1/memory-tree/revisions',
+    headers: operatorHeaders,
+    payload: {
+      expected_active_revision: 0,
+      memory_tree_reference: revision.memory_tree_reference,
+      source: revision.source,
+    },
+  })
+
+  assert.equal(operatorRegistration.statusCode, 401)
+  assert.equal(workerPause.statusCode, 401)
+  assert.equal(workerOperatorRevision.statusCode, 401)
+  assert.equal(operatorMaintenanceRevision.statusCode, 401)
   await app.close()
 })
 
@@ -159,11 +209,11 @@ await test('an extraction identity conflict is a declared 409', async () => {
     listMemoryTreeRevisions: () =>
       Promise.resolve({ revisions: [], next_before_revision: null }),
   }
-  const app = await createApp({ store, token: 'secret' })
+  const app = await createApp({ store, ...auth })
   const response = await app.inject({
     method: 'POST',
     url: '/v1/extractions',
-    headers: { authorization: 'Bearer secret' },
+    headers: workerHeaders,
     payload: extraction,
   })
 
@@ -220,8 +270,8 @@ await test('completed extractions are queryable with or without an observation',
     listMemoryTreeRevisions: () =>
       Promise.resolve({ revisions: [], next_before_revision: null }),
   }
-  const app = await createApp({ store, token: 'secret' })
-  const headers = { authorization: 'Bearer secret' }
+  const app = await createApp({ store, ...auth })
+  const headers = workerHeaders
 
   const produced = await app.inject({
     method: 'GET',
@@ -331,8 +381,8 @@ await test('UI catalog reads expose paginated records and durable control state'
     listMemoryTreeRevisions: () =>
       Promise.resolve({ revisions: [], next_before_revision: null }),
   }
-  const app = await createApp({ store, token: 'secret' })
-  const headers = { authorization: 'Bearer secret' }
+  const app = await createApp({ store, ...auth })
+  const headers = workerHeaders
 
   const extractions = await app.inject({
     method: 'GET',
@@ -458,8 +508,8 @@ await test('maintenance input is read and a revision is created with resource se
     listMemoryTreeRevisions: () =>
       Promise.resolve({ revisions: [], next_before_revision: null }),
   }
-  const app = await createApp({ store, token: 'secret' })
-  const headers = { authorization: 'Bearer secret' }
+  const app = await createApp({ store, ...auth })
+  const headers = workerHeaders
   const input = await app.inject({
     method: 'GET',
     url: '/v1/maintenance-input?limit=10',
@@ -529,12 +579,12 @@ function storeWithRevisionFailure(error: Error): MemoryCatalogStore {
 }
 
 async function postRevision(store: MemoryCatalogStore) {
-  const app = await createApp({ store, token: 'secret' })
+  const app = await createApp({ store, ...auth })
   try {
     return await app.inject({
       method: 'POST',
       url: '/v1/memory-tree/revisions',
-      headers: { authorization: 'Bearer secret' },
+      headers: workerHeaders,
       payload: {
         expected_active_revision: 0,
         memory_tree_reference: revision.memory_tree_reference,
@@ -613,17 +663,16 @@ await test('restore moves the active pointer through its own operation', async (
     listMemoryTreeRevisions: () =>
       Promise.resolve({ revisions: [], next_before_revision: null }),
   }
-  const app = await createApp({ store, token: 'secret' })
+  const app = await createApp({ store, ...auth })
   const payload = {
     operation_id: 'restore-1',
     expected_active_revision: 2,
     restored_revision: 1,
-    actor: { kind: 'user', id: 'alice' },
   }
   const response = await app.inject({
     method: 'POST',
     url: '/v1/memory-tree/restore',
-    headers: { authorization: 'Bearer secret' },
+    headers: operatorHeaders,
     payload,
   })
 
@@ -633,7 +682,12 @@ await test('restore moves the active pointer through its own operation', async (
     active_revision: 1,
     operation_id: 'restore-1',
   })
-  assert.deepEqual(restores, [payload])
+  assert.deepEqual(restores, [
+    {
+      ...payload,
+      actor: { kind: 'service', id: 'memory-catalog-operator' },
+    },
+  ])
   await app.close()
 })
 
@@ -677,8 +731,8 @@ await test('memory tree revision history is queryable through the public contrac
       })
     },
   }
-  const app = await createApp({ store, token: 'secret' })
-  const headers = { authorization: 'Bearer secret' }
+  const app = await createApp({ store, ...auth })
+  const headers = operatorHeaders
 
   const one = await app.inject({
     method: 'GET',

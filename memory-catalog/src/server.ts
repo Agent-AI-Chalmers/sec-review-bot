@@ -15,6 +15,9 @@ import {
   MaintenancePausedError,
   PostgresMemoryCatalogStore,
   MemoryTreeRevisionConflictError,
+  type AuthenticatedMaintenanceControlOperation,
+  type AuthenticatedMemoryTreeRestoreOperation,
+  type AuthenticatedMemoryTreeRevisionCreation,
   type MemoryCatalogStore,
 } from './catalog-store.js'
 import type {
@@ -39,6 +42,19 @@ function bearerTokenMatches(
   const actual = Buffer.from(header.slice(prefix.length))
   const wanted = Buffer.from(expected)
   return actual.length === wanted.length && timingSafeEqual(actual, wanted)
+}
+
+type CatalogRole = 'worker' | 'operator'
+const operatorActor = {
+  kind: 'service' as const,
+  id: 'memory-catalog-operator',
+}
+
+function unauthorized(): Error {
+  return Object.assign(new Error('Unauthorized'), {
+    statusCode: 401,
+    code: 'UNAUTHORIZED',
+  })
 }
 
 function specPath(): string {
@@ -72,9 +88,26 @@ function errorStatusCode(error: unknown): number {
 
 export async function registerMemoryCatalogRoutes(
   app: FastifyInstance,
-  options: { store: MemoryCatalogStore; token: string },
+  options: {
+    store: MemoryCatalogStore
+    workerToken: string
+    operatorToken: string
+  },
 ): Promise<void> {
-  const { store, token } = options
+  const { store, workerToken, operatorToken } = options
+  const authenticatedRoles = new WeakMap<FastifyRequest, CatalogRole>()
+  const authenticate = (
+    request: FastifyRequest,
+    allowedRoles: readonly CatalogRole[],
+  ): void => {
+    const role = bearerTokenMatches(request.headers.authorization, workerToken)
+      ? 'worker'
+      : bearerTokenMatches(request.headers.authorization, operatorToken)
+        ? 'operator'
+        : undefined
+    if (role === undefined || !allowedRoles.includes(role)) throw unauthorized()
+    authenticatedRoles.set(request, role)
+  }
   await app.register(openapiGlue, {
     specification: specPath(),
     serviceHandlers: {
@@ -128,10 +161,10 @@ export async function registerMemoryCatalogRoutes(
         request: FastifyRequest,
         reply: FastifyReply,
       ) => {
-        const result = await store.changeMaintenanceControl(
-          'paused',
-          request.body as RequestBody<'pauseMaintenance'>,
-        )
+        const result = await store.changeMaintenanceControl('paused', {
+          ...(request.body as RequestBody<'pauseMaintenance'>),
+          actor: operatorActor,
+        } satisfies AuthenticatedMaintenanceControlOperation)
         if (result.created) void reply.status(201)
         return result
       },
@@ -139,10 +172,10 @@ export async function registerMemoryCatalogRoutes(
         request: FastifyRequest,
         reply: FastifyReply,
       ) => {
-        const result = await store.changeMaintenanceControl(
-          'enabled',
-          request.body as RequestBody<'resumeMaintenance'>,
-        )
+        const result = await store.changeMaintenanceControl('enabled', {
+          ...(request.body as RequestBody<'resumeMaintenance'>),
+          actor: operatorActor,
+        } satisfies AuthenticatedMaintenanceControlOperation)
         if (result.created) void reply.status(201)
         return result
       },
@@ -156,9 +189,24 @@ export async function registerMemoryCatalogRoutes(
         request: FastifyRequest,
         reply: FastifyReply,
       ) => {
-        const result = await store.createMemoryTreeRevision(
-          request.body as RequestBody<'createMemoryTreeRevision'>,
+        const input = request.body as RequestBody<'createMemoryTreeRevision'>
+        const role = authenticatedRoles.get(request)
+        if (
+          (input.source.kind === 'maintenance' && role !== 'worker') ||
+          (input.source.kind === 'operator' && role !== 'operator')
         )
+          throw unauthorized()
+        const authenticatedInput: AuthenticatedMemoryTreeRevisionCreation =
+          input.source.kind === 'operator'
+            ? {
+                ...input,
+                source: { ...input.source, actor: operatorActor },
+              }
+            : {
+                ...input,
+                source: input.source,
+              }
+        const result = await store.createMemoryTreeRevision(authenticatedInput)
         if (result.created) {
           void reply.header(
             'Location',
@@ -172,9 +220,10 @@ export async function registerMemoryCatalogRoutes(
         request: FastifyRequest,
         reply: FastifyReply,
       ) => {
-        const result = await store.restoreMemoryTree(
-          request.body as RequestBody<'restoreMemoryTree'>,
-        )
+        const result = await store.restoreMemoryTree({
+          ...(request.body as RequestBody<'restoreMemoryTree'>),
+          actor: operatorActor,
+        } satisfies AuthenticatedMemoryTreeRestoreOperation)
         if (result.created) void reply.status(201)
         return result
       },
@@ -205,12 +254,13 @@ export async function registerMemoryCatalogRoutes(
     },
     securityHandlers: {
       catalogToken: (request: FastifyRequest) => {
-        if (!bearerTokenMatches(request.headers.authorization, token)) {
-          throw Object.assign(new Error('Unauthorized'), {
-            statusCode: 401,
-            code: 'UNAUTHORIZED',
-          })
-        }
+        authenticate(request, ['worker', 'operator'])
+      },
+      workerToken: (request: FastifyRequest) => {
+        authenticate(request, ['worker'])
+      },
+      operatorToken: (request: FastifyRequest) => {
+        authenticate(request, ['operator'])
       },
     },
   })
@@ -218,8 +268,11 @@ export async function registerMemoryCatalogRoutes(
 
 export async function createApp(options: {
   store: MemoryCatalogStore
-  token: string
+  workerToken: string
+  operatorToken: string
 }): Promise<FastifyInstance> {
+  if (options.workerToken === options.operatorToken)
+    throw new Error('Worker and operator tokens must be distinct.')
   const app = Fastify({
     ajv: { customOptions: { removeAdditional: false, coerceTypes: false } },
   })
@@ -255,7 +308,8 @@ export async function startMemoryCatalogServer(): Promise<{
   await store.initialize()
   const app = await createApp({
     store,
-    token: requiredEnv('MEMORY_CATALOG_TOKEN'),
+    workerToken: requiredEnv('MEMORY_CATALOG_WORKER_TOKEN'),
+    operatorToken: requiredEnv('MEMORY_CATALOG_OPERATOR_TOKEN'),
   })
   const host = process.env.MEMORY_CATALOG_HOST?.trim() || '127.0.0.1'
   await app.listen({ port, host })
