@@ -7,12 +7,9 @@ import {
   Button,
   Container,
   Group,
-  Modal,
   Paper,
   Stack,
   Text,
-  Textarea,
-  TextInput,
   Timeline,
   Title,
   Tooltip,
@@ -28,16 +25,14 @@ import {
   IconFiles
 } from '@tabler/icons-react'
 import {
-  abandonBlockedRun,
   api,
   ApiError,
-  giveUpDisconnectedRun,
-  resumeDisconnectedRun,
   type ArtifactStorage,
   type Run,
   throwIfUnauthorized,
   type RunEvent
 } from './api.js'
+import { AdminRunActionDialog } from './AdminRunActionDialog.js'
 import { RunTransitions } from './RunTransitions.js'
 import { RunFilesViewer } from './RunFilesViewer.js'
 import { RunJump } from './RunJump.js'
@@ -78,8 +73,7 @@ import {
   observationAgeMs,
   isObservationStale,
   safeExternalUrl,
-  workflowLabel,
-  abandonFailureMessageKey
+  workflowLabel
 } from './format.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
@@ -182,288 +176,6 @@ function Artifact({
         onClose={() => setFilesOpen(false)}
       />
     </>
-  )
-}
-
-/** The operator decision for one blocked run.
- *
- * The admin token is entered here, held only in this component's state, and sent with the single
- * request. The console backend forwards it and keeps no copy, so closing the dialog (or the tab)
- * leaves nothing behind that could act later. Asking again for every abandonment is deliberate:
- * the action concludes a run and cannot be undone.
- */
-function AbandonDialog({
-  runId,
-  keepsResult,
-  opened,
-  onClose,
-  onDone
-}: {
-  runId: string
-  /** Whether the run has a result at all. A run whose execution never produced one has nothing
-   * to keep, so promising it would be kept would describe something that does not exist. */
-  keepsResult: boolean
-  opened: boolean
-  onClose: () => void
-  onDone: () => void | Promise<void>
-}): React.JSX.Element {
-  const t = useMessages()
-  const [reason, setReason] = React.useState('')
-  const [adminToken, setAdminToken] = React.useState('')
-  const [submitting, setSubmitting] = React.useState(false)
-  const [failure, setFailure] = React.useState<string | null>(null)
-
-  // Reset whenever the dialog opens for a different run, so a token typed for one decision is
-  // never silently reused for the next.
-  React.useEffect(() => {
-    if (!opened) return
-    setReason('')
-    setAdminToken('')
-    setFailure(null)
-    setSubmitting(false)
-  }, [opened, runId])
-
-  const submit = async (): Promise<void> => {
-    setSubmitting(true)
-    setFailure(null)
-    try {
-      await abandonBlockedRun(runId, reason.trim(), adminToken.trim())
-      await onDone()
-    } catch (error) {
-      setFailure(t(abandonFailureMessageKey(error)))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <Modal opened={opened} onClose={onClose} title={t('abandonTitle')} centered>
-      <Stack gap="sm">
-        <Text size="sm">
-          {t('abandonExplainer')}
-          {keepsResult && ` ${t('abandonExplainerKeepsResult')}`}
-        </Text>
-        <Text size="xs" ff="monospace" c="dimmed">
-          {runId}
-        </Text>
-        <Textarea
-          label={t('abandonReasonLabel')}
-          description={t('abandonReasonHint')}
-          value={reason}
-          onChange={(event) => setReason(event.currentTarget.value)}
-          autosize
-          minRows={2}
-          required
-        />
-        <TextInput
-          label={t('abandonTokenLabel')}
-          description={t('abandonTokenHint')}
-          type="password"
-          value={adminToken}
-          onChange={(event) => setAdminToken(event.currentTarget.value)}
-          required
-        />
-        {failure !== null && (
-          <Text role="alert" c="red" size="sm">
-            {failure}
-          </Text>
-        )}
-        <Group justify="flex-end" gap="xs">
-          <Button variant="default" onClick={onClose}>
-            {t('cancel')}
-          </Button>
-          <Button
-            color="red"
-            loading={submitting}
-            disabled={reason.trim() === '' || adminToken.trim() === ''}
-            onClick={() => {
-              void submit()
-            }}
-          >
-            {t('abandonConfirm')}
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
-  )
-}
-
-/** Stop waiting for an outcome that cannot be established.
- *
- * Distinct from `AbandonDialog`, which resolves a *contradiction*. This one accepts that the
- * outcome is unknowable — the Execution API may have accepted the task, a publication step may already
- * have taken effect — and records only that the run will not wait for it any longer. A reason is
- * required because the decision is irreversible and says nothing about what actually happened.
- */
-function GiveUpDialog({
-  runId,
-  opened,
-  onClose,
-  onDone
-}: {
-  runId: string
-  opened: boolean
-  onClose: () => void
-  onDone: () => void | Promise<void>
-}): React.JSX.Element {
-  const t = useMessages()
-  const [reason, setReason] = React.useState('')
-  const [adminToken, setAdminToken] = React.useState('')
-  const [submitting, setSubmitting] = React.useState(false)
-  const [failure, setFailure] = React.useState<string | null>(null)
-
-  React.useEffect(() => {
-    if (!opened) return
-    setReason('')
-    setAdminToken('')
-    setFailure(null)
-    setSubmitting(false)
-  }, [opened, runId])
-
-  const submit = async (): Promise<void> => {
-    setSubmitting(true)
-    setFailure(null)
-    try {
-      await giveUpDisconnectedRun(runId, reason.trim(), adminToken.trim())
-      await onDone()
-    } catch (error) {
-      setFailure(t(abandonFailureMessageKey(error)))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <Modal opened={opened} onClose={onClose} title={t('giveUpTitle')} centered>
-      <Stack gap="sm">
-        <Text size="sm">{t('giveUpExplainer')}</Text>
-        <Text size="xs" ff="monospace" c="dimmed">
-          {runId}
-        </Text>
-        <Textarea
-          label={t('abandonReasonLabel')}
-          description={t('abandonReasonHint')}
-          value={reason}
-          onChange={(event) => setReason(event.currentTarget.value)}
-          autosize
-          minRows={2}
-          required
-        />
-        <TextInput
-          label={t('abandonTokenLabel')}
-          description={t('abandonTokenHint')}
-          type="password"
-          value={adminToken}
-          onChange={(event) => setAdminToken(event.currentTarget.value)}
-          required
-        />
-        {failure !== null && (
-          <Text role="alert" c="red" size="sm">
-            {failure}
-          </Text>
-        )}
-        <Group justify="flex-end" gap="xs">
-          <Button variant="default" onClick={onClose}>
-            {t('cancel')}
-          </Button>
-          <Button
-            color="orange"
-            loading={submitting}
-            disabled={reason.trim() === '' || adminToken.trim() === ''}
-            onClick={() => {
-              void submit()
-            }}
-            data-testid="give-up-confirm"
-          >
-            {t('giveUpConfirm')}
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
-  )
-}
-
-/** The other operator decision for a blocked run: try again.
- *
- * Resuming is a request, not a repair: Review Runs puts the row back in `uncertain` with a
- * fresh attempt budget so automatic recovery can establish what the previous owner left behind.
- * It is offered next to abandonment because those are the only two decisions such a run is
- * waiting for. No reason is asked for: nothing is concluded, and the credential handling is the
- * same one-request rule as abandonment.
- */
-function ResumeDialog({
-  runId,
-  opened,
-  onClose,
-  onDone
-}: {
-  runId: string
-  opened: boolean
-  onClose: () => void
-  onDone: () => void | Promise<void>
-}): React.JSX.Element {
-  const t = useMessages()
-  const [adminToken, setAdminToken] = React.useState('')
-  const [submitting, setSubmitting] = React.useState(false)
-  const [failure, setFailure] = React.useState<string | null>(null)
-
-  React.useEffect(() => {
-    if (!opened) return
-    setAdminToken('')
-    setFailure(null)
-    setSubmitting(false)
-  }, [opened, runId])
-
-  const submit = async (): Promise<void> => {
-    setSubmitting(true)
-    setFailure(null)
-    try {
-      await resumeDisconnectedRun(runId, adminToken.trim())
-      await onDone()
-    } catch (error) {
-      setFailure(t(abandonFailureMessageKey(error)))
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  return (
-    <Modal opened={opened} onClose={onClose} title={t('resumeTitle')} centered>
-      <Stack gap="sm">
-        <Text size="sm">{t('resumeExplainer')}</Text>
-        <Text size="xs" ff="monospace" c="dimmed">
-          {runId}
-        </Text>
-        <TextInput
-          label={t('abandonTokenLabel')}
-          description={t('abandonTokenHint')}
-          type="password"
-          value={adminToken}
-          onChange={(event) => setAdminToken(event.currentTarget.value)}
-          required
-        />
-        {failure !== null && (
-          <Text role="alert" c="red" size="sm">
-            {failure}
-          </Text>
-        )}
-        <Group justify="flex-end" gap="xs">
-          <Button variant="default" onClick={onClose}>
-            {t('cancel')}
-          </Button>
-          <Button
-            loading={submitting}
-            disabled={adminToken.trim() === ''}
-            onClick={() => {
-              void submit()
-            }}
-            data-testid="resume-run-confirm"
-          >
-            {t('resumeConfirm')}
-          </Button>
-        </Group>
-      </Stack>
-    </Modal>
   )
 }
 
@@ -859,12 +571,20 @@ export function Detail(): React.JSX.Element {
                 {failureReason(error, t) && ` ${failureReason(error, t)}`}
               </Text>
             )}
-            <AbandonDialog
+            <AdminRunActionDialog
               runId={run.run_id}
-              keepsResult={
-                run.execution.status === 'succeeded' ||
+              config={{
+                action: 'abandon',
+                title: 'abandonTitle',
+                explainer: 'abandonExplainer',
+                ...(run.execution.status === 'succeeded' ||
                 run.execution.status === 'failed'
-              }
+                  ? { extraExplainer: t('abandonExplainerKeepsResult') }
+                  : {}),
+                confirmLabel: 'abandonConfirm',
+                confirmColor: 'red',
+                requiresReason: true
+              }}
               opened={abandoning}
               onClose={() => setAbandoning(false)}
               onDone={async () => {
@@ -872,8 +592,16 @@ export function Detail(): React.JSX.Element {
                 await load()
               }}
             />
-            <ResumeDialog
+            <AdminRunActionDialog
               runId={run.run_id}
+              config={{
+                action: 'resume',
+                title: 'resumeTitle',
+                explainer: 'resumeExplainer',
+                confirmLabel: 'resumeConfirm',
+                requiresReason: false,
+                testId: 'resume-run-confirm'
+              }}
               opened={resuming}
               onClose={() => setResuming(false)}
               onDone={async () => {
@@ -881,8 +609,17 @@ export function Detail(): React.JSX.Element {
                 await load()
               }}
             />
-            <GiveUpDialog
+            <AdminRunActionDialog
               runId={run.run_id}
+              config={{
+                action: 'give-up',
+                title: 'giveUpTitle',
+                explainer: 'giveUpExplainer',
+                confirmLabel: 'giveUpConfirm',
+                confirmColor: 'orange',
+                requiresReason: true,
+                testId: 'give-up-confirm'
+              }}
               opened={givingUp}
               onClose={() => setGivingUp(false)}
               onDone={async () => {

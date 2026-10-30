@@ -53,37 +53,61 @@ export async function errorCode(
   return undefined
 }
 
-export async function api<T>(
+/** One same-origin call to the BFF. */
+export interface ApiRequest {
+  method?: string
+  body?: object
+  headers?: Record<string, string>
+  signal?: AbortSignal | undefined
+}
+
+/**
+ * Perform one BFF call and fail on any non-2xx status.
+ *
+ * Callers that need a body, a method or a credential header state it here instead of opening a
+ * second path to `fetch`: the error mapping and the console's error code live on this one seam,
+ * so a new endpoint cannot answer a failure differently by accident.
+ */
+export async function request(
   path: string,
-  options: { signal?: AbortSignal | undefined } = {}
-): Promise<T> {
+  options: ApiRequest = {}
+): Promise<Response> {
+  const hasBody = options.body !== undefined
+  const headers =
+    options.headers === undefined
+      ? hasBody
+        ? { 'content-type': 'application/json' }
+        : undefined
+      : hasBody
+        ? { 'content-type': 'application/json', ...options.headers }
+        : options.headers
   const response = await fetch(`/api${path}`, {
-    signal: options.signal ?? null
+    method: options.method ?? 'GET',
+    signal: options.signal ?? null,
+    ...(headers === undefined ? {} : { headers }),
+    ...(hasBody ? { body: JSON.stringify(options.body) } : {})
   })
   if (!response.ok)
     throw new ApiError(response.status, await errorCode(response))
+  return response
+}
+
+export async function api<T>(
+  path: string,
+  options: ApiRequest = {}
+): Promise<T> {
+  const response = await request(path, options)
   return (await response.json()) as T
 }
+
 export async function apiPost<T>(path: string, body: object): Promise<T> {
-  const encoded = JSON.stringify(body)
-  let response: Response
   try {
-    response = await fetch(`/api${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: encoded
-    })
-  } catch {
-    // Mutation bodies carry an operation_id. A single transport retry reuses the
-    // exact bytes, allowing the Catalog's idempotency boundary to resolve an
-    // accepted request whose response was lost.
-    response = await fetch(`/api${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: encoded
-    })
+    return await api<T>(path, { method: 'POST', body })
+  } catch (error) {
+    // Mutation bodies carry an operation_id. A single transport retry reuses the exact bytes,
+    // allowing the Catalog's idempotency boundary to resolve an accepted request whose response
+    // was lost. An HTTP failure is an answer, so it is not retried.
+    if (error instanceof ApiError) throw error
+    return api<T>(path, { method: 'POST', body })
   }
-  if (!response.ok)
-    throw new ApiError(response.status, await errorCode(response))
-  return (await response.json()) as T
 }

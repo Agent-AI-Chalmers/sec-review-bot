@@ -231,6 +231,71 @@ test('dev fixtures track sign-out so the console reaches the sign-in form', asyn
   }
 })
 
+/**
+ * The queue offers three decisions, and a dev server that answers two of them teaches the
+ * operator a button that visibly fails. The decision itself must be the one Review Runs
+ * records: the disconnected axis ends as a failure whose code names the operator, so the
+ * detail page after the decision is a state the store can actually produce.
+ */
+test('dev fixtures answer the give-up decision the queue offers', async () => {
+  const fixture = await startFixtureServer()
+  try {
+    const parked = (await (
+      await fetch(`${fixture.base}/api/runs/parked`)
+    ).json()) as { blocks: { run_id: string }[] }
+    const runId = parked.blocks[0]?.run_id
+    assert(runId !== undefined)
+    const endpoint = `${fixture.base}/api/admin/runs/${encodeURIComponent(runId)}/give-up`
+    const headers = {
+      'content-type': 'application/json',
+      'x-review-runs-admin-token': 'fixture-admin-token'
+    }
+
+    assert.strictEqual(
+      (
+        await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ reason: 'not waiting' })
+        })
+      ).status,
+      401
+    )
+    assert.strictEqual(
+      (
+        await fetch(endpoint, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({})
+        })
+      ).status,
+      400
+    )
+
+    const givenUp = await fetch(endpoint, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ reason: 'the outcome cannot be established' })
+    })
+    assert.strictEqual(givenUp.status, 200)
+    const record = (await givenUp.json()) as {
+      run: { notices: { kind: string; reason_code: string | null }[] }
+    }
+    assert.strictEqual(record.run.notices[0]?.kind, 'failure')
+    assert.match(record.run.notices[0]?.reason_code ?? '', /BY_OPERATOR$/)
+
+    const after = (await (
+      await fetch(`${fixture.base}/api/runs/parked`)
+    ).json()) as { blocks: { run_id: string }[] }
+    assert.equal(
+      after.blocks.some((block) => block.run_id === runId),
+      false
+    )
+  } finally {
+    await fixture.close()
+  }
+})
+
 test('dev fixtures leave non-API requests to the next middleware', async () => {
   // The middleware must not claim routes outside `/api/`; the fixture server's `next`
   // handler answers 404, which stands in for Vite's own asset middleware.
