@@ -1,16 +1,9 @@
 import React from 'react'
-import { ActionIcon, Button, Group, Modal, Tooltip } from '@mantine/core'
-import { IconDownload, IconExternalLink } from '@tabler/icons-react'
+import { Modal } from '@mantine/core'
 
-import {
-  api,
-  isAbortError,
-  throwIfUnauthorized
-} from '../../shared/api-client.js'
-import { FileWorkspace } from '../workspace/FileWorkspace.js'
-import { ResourceLoadError } from '../../shared/ResourceLoadError.js'
+import { api } from '../../shared/api-client.js'
 import { useMessages } from '../../shared/i18n.js'
-import { ICON_SIZE } from '../../shared/design.js'
+import { ArtifactWorkspace } from '../workspace/ArtifactWorkspace.js'
 
 export function MemoryFilesContent({
   revision,
@@ -19,98 +12,27 @@ export function MemoryFilesContent({
   revision: number
   fullPage?: boolean
 }): React.JSX.Element {
-  const t = useMessages()
-  const [files, setFiles] = React.useState<Record<string, string>>({})
-  const [selectedFile, setSelectedFile] = React.useState('')
-  const [error, setError] = React.useState<unknown>()
-
-  React.useEffect(() => {
-    const controller = new AbortController()
-    setFiles({})
-    setSelectedFile('')
-    setError(undefined)
-    void api<{ files: Record<string, string> }>(
-      `/memory/revisions/${revision}/content`,
-      { signal: controller.signal }
-    )
-      .then((body) => {
-        if (controller.signal.aborted) return
-        setFiles(body.files)
-        const names = Object.keys(body.files).sort()
-        setSelectedFile(
-          names.includes('MEMORY.md') ? 'MEMORY.md' : (names[0] ?? '')
-        )
-      })
-      .catch((failure: unknown) => {
-        if (!controller.signal.aborted && !isAbortError(failure))
-          setError(failure)
-      })
-    return (): void => controller.abort()
-  }, [revision, t])
-
-  throwIfUnauthorized(error)
-
-  const toolbar = (
-    <Group gap="sm" wrap="nowrap">
-      {!fullPage && (
-        <Tooltip label={t('openFullPage')}>
-          <ActionIcon
-            component="a"
-            href={`/memory/revisions/${revision}/tree`}
-            target="_blank"
-            rel="noreferrer"
-            variant="default"
-            size="lg"
-            aria-label={t('openFullPage')}
-          >
-            <IconExternalLink size={ICON_SIZE.lg} />
-          </ActionIcon>
-        </Tooltip>
-      )}
-      <Tooltip label={t('downloadMemoryTree')}>
-        <ActionIcon
-          component="a"
-          href={`/api/memory/revisions/${revision}/artifact`}
-          download
-          variant="default"
-          size="lg"
-          aria-label={t('downloadMemoryTree')}
-        >
-          <IconDownload size={ICON_SIZE.lg} />
-        </ActionIcon>
-      </Tooltip>
-    </Group>
-  )
-
-  if (error !== undefined)
-    return (
-      <div className="content-load-state">
-        <ResourceLoadError
-          message={t('memoryFilesLoadFailed')}
-          actions={
-            <Button
-              component="a"
-              href={`/api/memory/revisions/${revision}/artifact`}
-              download
-              variant="default"
-              leftSection={<IconDownload size={ICON_SIZE.md} />}
-            >
-              {t('downloadMemoryTree')}
-            </Button>
-          }
-        />
-      </div>
-    )
-
   return (
-    <>
-      <FileWorkspace
-        files={files}
-        selectedFile={selectedFile}
-        onSelectFile={setSelectedFile}
-        toolbar={toolbar}
-      />
-    </>
+    <ArtifactWorkspace
+      key={revision}
+      fullPage={fullPage}
+      source={{
+        load: async (signal) => {
+          const body = await api<{ files: Record<string, string> }>(
+            `/memory/revisions/${revision}/content`,
+            { signal }
+          )
+          return { files: body.files }
+        },
+        preferredFile: 'MEMORY.md',
+        pageHref: `/memory/revisions/${revision}/tree`,
+        loadFailedMessage: 'memoryFilesLoadFailed',
+        download: {
+          href: `/api/memory/revisions/${revision}/artifact`,
+          label: 'downloadMemoryTree'
+        }
+      }}
+    />
   )
 }
 
