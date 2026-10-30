@@ -85,6 +85,46 @@ test('BFF marks session cookies secure for HTTPS proxy deployments', async () =>
   }
 })
 
+test('BFF bounds browser sessions by evicting the oldest login', async () => {
+  const upstream = createServer((_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.end('{"runs":[]}')
+  })
+  await new Promise<void>((resolve) => upstream.listen(0, '127.0.0.1', resolve))
+  const upstreamAddress = upstream.address()
+  assert(upstreamAddress && typeof upstreamAddress === 'object')
+  const ui = createControlPlaneUiServer({
+    reviewRunsUrl: `http://127.0.0.1:${upstreamAddress.port}`,
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    maximumSessions: 2
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const uiAddress = ui.address()
+  assert(uiAddress && typeof uiAddress === 'object')
+  const base = `http://127.0.0.1:${uiAddress.port}`
+  try {
+    const first = await loginCookie(base)
+    const second = await loginCookie(base)
+    const third = await loginCookie(base)
+
+    assert.strictEqual(
+      (await fetch(`${base}/api/runs`, { headers: { cookie: first } })).status,
+      401
+    )
+    for (const cookie of [second, third])
+      assert.strictEqual(
+        (await fetch(`${base}/api/runs`, { headers: { cookie } })).status,
+        200
+      )
+  } finally {
+    await Promise.all([
+      new Promise<void>((resolve) => ui.close(() => resolve())),
+      new Promise<void>((resolve) => upstream.close(() => resolve()))
+    ])
+  }
+})
+
 test('BFF authenticates sessions and proxies only read queries', async () => {
   let authorization = ''
   let upstreamPath = ''

@@ -40,6 +40,7 @@ const MAX_TRAJECTORY_CONTENT_BYTES = 8 * 1024 * 1024
 const MAX_TRAJECTORY_LINE_BYTES = 512 * 1024
 const MAX_TRAJECTORY_MESSAGES = 2000
 const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60
+const DEFAULT_MAXIMUM_SESSIONS = 10_000
 
 interface ArtifactObject {
   body: Readable
@@ -436,6 +437,7 @@ export function createControlPlaneUiServer({
   reviewRunsRequestTimeoutMs = REVIEW_RUNS_REQUEST_TIMEOUT_MS,
   secureCookies = false,
   sessionTtlSeconds = DEFAULT_SESSION_TTL_SECONDS,
+  maximumSessions = DEFAULT_MAXIMUM_SESSIONS,
   assets = path.resolve('dist')
 }: {
   reviewRunsUrl: string
@@ -448,9 +450,23 @@ export function createControlPlaneUiServer({
   reviewRunsRequestTimeoutMs?: number
   secureCookies?: boolean
   sessionTtlSeconds?: number
+  maximumSessions?: number
   assets?: string
 }): Server {
+  if (!Number.isSafeInteger(maximumSessions) || maximumSessions < 1)
+    throw new RangeError('maximumSessions must be a positive integer')
+  // Sessions are intentionally process-local: a restart revokes every browser session, and this
+  // store retains only opaque token expirations rather than operator credentials.
   const sessions = new Map<string, number>()
+  const prepareSessionSlot = (now: number): void => {
+    for (const [session, expiresAt] of sessions)
+      if (expiresAt <= now) sessions.delete(session)
+    while (sessions.size >= maximumSessions) {
+      const oldest = sessions.keys().next().value
+      if (oldest === undefined) break
+      sessions.delete(oldest)
+    }
+  }
   const sessionCookie = (request: IncomingMessage): string | undefined =>
     request.headers.cookie
       ?.split(';')
@@ -513,7 +529,9 @@ export function createControlPlaneUiServer({
         return
       }
       const sessionValue = crypto.randomBytes(32).toString('base64url')
-      sessions.set(sessionValue, Date.now() + sessionTtlSeconds * 1000)
+      const now = Date.now()
+      prepareSessionSlot(now)
+      sessions.set(sessionValue, now + sessionTtlSeconds * 1000)
       response.writeHead(204, {
         'set-cookie': `control_plane_ui_session=${sessionValue}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${sessionTtlSeconds}${cookieSecurity}`,
         'cache-control': 'no-store'
@@ -523,8 +541,9 @@ export function createControlPlaneUiServer({
     }
     // Signing out can only be done by the server: the session cookie is HttpOnly, so
     // the console cannot clear it from script. Expiring it here forgets the credential
-    // on this browser. It does not revoke the access token itself, which stays valid
-    // for anyone else who holds it — the BFF keeps no session table to invalidate.
+    // on this browser and removes its opaque value from the process-local session table.
+    // It does not revoke the shared access token itself, which stays valid for anyone
+    // else who holds it.
     //
     // There is nothing to authenticate: any caller may clear its own cookie, and a
     // clear is harmless to a caller that was never signed in. The same-origin check
