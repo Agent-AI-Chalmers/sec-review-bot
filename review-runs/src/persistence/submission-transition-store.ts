@@ -1,6 +1,7 @@
 // Owns the cross-axis database transitions around Execution submission. Recovery leases and
 // attempt budgets remain in `ExecutionStore` because those writes touch only the execution axis.
 import type { Pool, PoolClient } from 'pg'
+import type { Database } from '../database/database.js'
 
 import type { ReviewRunWorkflow } from '../contracts.js'
 import { transaction } from '../database/transaction.js'
@@ -12,8 +13,13 @@ type JsonObject = Record<string, unknown>
 type SubmissionError = { code?: string | null; message: string }
 
 export class SubmissionTransitionStore {
+  /** The pool, guarded by the database's readiness check. */
+  protected get pool(): Pool {
+    return this.database.pool()
+  }
+
   constructor(
-    private readonly pool: Pool,
+    private readonly database: Database,
     private readonly connectorId: string
   ) {}
 

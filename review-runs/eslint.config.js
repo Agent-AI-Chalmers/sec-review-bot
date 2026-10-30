@@ -23,6 +23,7 @@ export default [
         Request: 'readonly',
         RequestInit: 'readonly',
         Response: 'readonly',
+        ReadableStream: 'readonly',
         AbortController: 'readonly',
         AbortSignal: 'readonly',
         fetch: 'readonly',

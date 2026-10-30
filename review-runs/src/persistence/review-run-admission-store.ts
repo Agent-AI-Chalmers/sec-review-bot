@@ -2,6 +2,7 @@
 // preparation claim, initial events, and ingress-key idempotency.
 import crypto from 'node:crypto'
 import type { Pool, PoolClient } from 'pg'
+import type { Database } from '../database/database.js'
 
 import { transaction } from '../database/transaction.js'
 import type {
@@ -23,8 +24,13 @@ const INGRESS_IDENTITY_CONSTRAINT =
   'review_runs_connector_id_ingress_kind_ingress_key_key'
 
 export class ReviewRunAdmissionStore {
+  /** The pool, guarded by the database's readiness check. */
+  protected get pool(): Pool {
+    return this.database.pool()
+  }
+
   constructor(
-    private readonly pool: Pool,
+    private readonly database: Database,
     private readonly connectorId: string,
     private readonly sourcePlatform: ReviewRunRecord['source_platform']
   ) {}
