@@ -187,6 +187,69 @@ test('repository delivery continues after a deterministic failure', async () => 
   )
 })
 
+test('repository delivery stops the publication when the credential is refused', async () => {
+  const steps = [
+    step('repository:delivery:delivery-a'),
+    step('repository:delivery:delivery-b')
+  ]
+  const attempted: string[] = []
+  const failures: Array<{ stepKey: string; retry: boolean | undefined }> = []
+  const store = {
+    initializePublicationSteps: async () => {},
+    listPublicationSteps: async () => steps,
+    requirePublicationStepClaim: async () => {},
+    completePublicationStep: async () => true,
+    settleExhaustedPublicationStep: async () => true,
+    failPublicationStep: async (
+      _runId: string,
+      _token: string,
+      stepKey: string,
+      _error: unknown,
+      options: { retry?: boolean }
+    ) => {
+      failures.push({ stepKey, retry: options.retry })
+      return true
+    }
+  } satisfies PublicationStepStore
+
+  // A 401 belongs to the credential, not to this delivery: every remaining delivery would fail
+  // the same way, so the publication must stop rather than record the same failure again.
+  await assert.rejects(
+    publishDeliveryDraftPrs({
+      octokit: unusedGitHub().octokit,
+      repo: {
+        owner_login: 'octo',
+        repo_name: 'example',
+        repo_full_name: 'octo/example',
+        default_branch: 'main'
+      },
+      run_id: 'run-1',
+      workspace_ref: 'main',
+      deliveries: [delivery('delivery-a'), delivery('delivery-b')],
+      case_results: [],
+      event_type: 'manual',
+      store,
+      claim_token: 'claim-1',
+      assert_publication_claim: async () => {},
+      create_delivery_draft_pr: async ({ delivery }) => {
+        attempted.push(delivery.delivery_id)
+        throw Object.assign(new Error('Bad credentials'), {
+          response: {
+            status: 401,
+            headers: {},
+            data: { message: 'Bad credentials' }
+          }
+        })
+      }
+    })
+  )
+
+  assert.deepStrictEqual(attempted, ['delivery-a'])
+  assert.deepStrictEqual(failures, [
+    { stepKey: 'repository:delivery:delivery-a', retry: false }
+  ])
+})
+
 test('repository delivery recovery skips terminal failures and reaches later work', async () => {
   const steps = [
     step('repository:delivery:delivery-a', {

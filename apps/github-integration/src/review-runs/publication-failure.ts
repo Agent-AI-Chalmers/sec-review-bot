@@ -3,7 +3,15 @@ import { EXECUTION_PUBLISH_ERROR_CODES } from '../execution/publish-error-code.j
 import { isDeterministicExecutionPublishError } from '../execution/publish-error.js'
 
 interface PublishFailureClassification {
+  /** Whether another attempt could reach a different answer. */
   retry: boolean
+  /**
+   * What the failure is about. A step-scoped failure belongs to one delivery or one publication
+   * step, so the rest of the publication can still be attempted. A publication-scoped failure
+   * says the whole publication cannot proceed — either it will be retried later as a unit, or
+   * nothing else can succeed while the cause stands.
+   */
+  scope: 'step' | 'publication'
   code: string | null
   reason: string
 }
@@ -50,6 +58,7 @@ export function classifyPublicationFailure(
   if (isDeterministicExecutionPublishError(error)) {
     return {
       retry: false,
+      scope: 'step',
       code: errorCode(error),
       reason: 'deterministic-publish-result'
     }
@@ -68,8 +77,10 @@ export function classifyPublicationFailure(
     errorCode(error) ===
     EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
   ) {
+    const retry = isTransportFault(error)
     return {
-      retry: isTransportFault(error),
+      retry,
+      scope: retry ? 'publication' : 'step',
       code: errorCode(error),
       reason: 'publication-step-retry-exhausted'
     }
@@ -81,6 +92,7 @@ export function classifyPublicationFailure(
   ) {
     return {
       retry: false,
+      scope: 'step',
       code: reviewRunsCode,
       reason: 'review-runs-deterministic-publication-fault'
     }
@@ -90,6 +102,7 @@ export function classifyPublicationFailure(
   if (responseStatus === undefined)
     return {
       retry: true,
+      scope: 'publication',
       code: errorCode(error),
       reason: 'unknown-publish-error'
     }
@@ -101,6 +114,7 @@ export function classifyPublicationFailure(
   ) {
     return {
       retry: true,
+      scope: 'publication',
       code: errorCode(error),
       reason: 'github-transient-response'
     }
@@ -108,6 +122,7 @@ export function classifyPublicationFailure(
   if (responseStatus === 403 && isRateLimitOrAbuseLimit(error)) {
     return {
       retry: true,
+      scope: 'publication',
       code: errorCode(error),
       reason: 'github-rate-limited'
     }
@@ -115,6 +130,8 @@ export function classifyPublicationFailure(
   if (responseStatus === 401 || responseStatus === 403) {
     return {
       retry: false,
+      // Nothing else in this publication can succeed while the credential is refused.
+      scope: 'publication',
       code:
         errorCode(error) ?? EXECUTION_PUBLISH_ERROR_CODES.github_auth_rejected,
       reason: 'github-auth-rejected'
@@ -123,6 +140,7 @@ export function classifyPublicationFailure(
   if (responseStatus === 404) {
     return {
       retry: false,
+      scope: 'step',
       code: errorCode(error) ?? EXECUTION_PUBLISH_ERROR_CODES.github_not_found,
       reason: 'github-not-found'
     }
@@ -130,6 +148,7 @@ export function classifyPublicationFailure(
   if (responseStatus === 422) {
     return {
       retry: false,
+      scope: 'step',
       code:
         errorCode(error) ??
         EXECUTION_PUBLISH_ERROR_CODES.github_validation_rejected,
@@ -139,6 +158,7 @@ export function classifyPublicationFailure(
   if (responseStatus >= 400 && responseStatus < 500) {
     return {
       retry: false,
+      scope: 'step',
       code:
         errorCode(error) ??
         EXECUTION_PUBLISH_ERROR_CODES.github_publish_rejected,
@@ -147,6 +167,7 @@ export function classifyPublicationFailure(
   }
   return {
     retry: true,
+    scope: 'publication',
     code: errorCode(error),
     reason: 'github-unclassified-response'
   }
