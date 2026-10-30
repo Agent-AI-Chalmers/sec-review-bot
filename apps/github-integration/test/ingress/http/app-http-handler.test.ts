@@ -15,9 +15,10 @@ function unusedApp(): App {
 
 function requestFor(
   url: string,
-  headers: Record<string, string> = { host: 'example.test' }
+  headers: Record<string, string> = { host: 'example.test' },
+  chunks: Array<Buffer | string> = []
 ): IncomingMessage {
-  const request = Readable.from([]) as IncomingMessage
+  const request = Readable.from(chunks) as IncomingMessage
   request.url = url
   request.headers = headers
   return request
@@ -96,6 +97,61 @@ test('app HTTP handler delegates non-dispatch requests to webhook middleware', a
   assert.deepStrictEqual(calls, ['webhook'])
 })
 
+test('app HTTP handler rejects webhook content lengths above the configured limit', async () => {
+  const response = captureResponse()
+  const handler = createAppHttpHandler({
+    app: unusedApp(),
+    port: 3000,
+    repository_review_dispatch_path: '/repository-review-dispatch',
+    repository_review_dispatch_handler: async () => {},
+    webhook_max_body_bytes: 4,
+    webhook_middleware: () => {
+      throw new Error('webhook middleware should not be called')
+    }
+  })
+
+  await handler(
+    requestFor('/api/github/webhooks', {
+      host: 'example.test',
+      'content-length': '5'
+    }),
+    response
+  )
+
+  assert.strictEqual(response.statusCodeValue, 413)
+  assert.match(String(response.body), /too large/i)
+})
+
+test('app HTTP handler aborts streamed webhook bodies above the configured limit', async () => {
+  const response = captureResponse()
+  let middlewareBytes = 0
+  const handler = createAppHttpHandler({
+    app: unusedApp(),
+    port: 3000,
+    repository_review_dispatch_path: '/repository-review-dispatch',
+    repository_review_dispatch_handler: async () => {},
+    webhook_max_body_bytes: 4,
+    webhook_middleware: (request) => {
+      request.on('data', (chunk: Buffer) => {
+        middlewareBytes += chunk.byteLength
+      })
+    }
+  })
+  const request = requestFor(
+    '/api/github/webhooks',
+    { host: 'example.test', 'transfer-encoding': 'chunked' },
+    [Buffer.from('123'), Buffer.from('45')]
+  )
+
+  await handler(request, response)
+  await new Promise<void>((resolve) => request.once('close', resolve))
+
+  assert.strictEqual(response.statusCodeValue, 413)
+  assert.match(String(response.body), /too large/i)
+  assert.strictEqual(request.destroyed, true)
+  assert.ok(middlewareBytes <= 5)
+})
+
 test('app HTTP handler rejects malformed request URLs', async () => {
   const response = captureResponse()
   const handler = createAppHttpHandler({
@@ -118,4 +174,24 @@ test('app HTTP handler rejects malformed request URLs', async () => {
     'application/json; charset=utf-8'
   )
   assert.match(String(response.body), /Invalid request URL/)
+})
+
+test('app HTTP handler contains rejected async dispatch handlers', async () => {
+  const response = captureResponse()
+  const handler = createAppHttpHandler({
+    app: unusedApp(),
+    port: 3000,
+    repository_review_dispatch_path: '/repository-review-dispatch',
+    repository_review_dispatch_handler: async () => {
+      throw new Error('request stream failed')
+    },
+    webhook_middleware: () => {}
+  })
+
+  await handler(requestFor('/repository-review-dispatch'), response)
+
+  assert.strictEqual(response.statusCodeValue, 500)
+  assert.deepStrictEqual(JSON.parse(String(response.body)), {
+    error: 'Internal server error.'
+  })
 })

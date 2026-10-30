@@ -26,6 +26,10 @@ const enterprise_hostname = process.env['ENTERPRISE_HOSTNAME']
 const github_api_version = process.env['GITHUB_API_VERSION'] || '2026-03-10'
 const port = integerEnv('PORT', 30000, 1, 65_535)
 const webhook_path = '/api/webhook'
+const webhook_max_body_bytes = integerEnv(
+  'SEC_BOT_WEBHOOK_MAX_BODY_BYTES',
+  1_048_576
+)
 const repository_review_dispatch_path = '/api/repository-review/dispatch'
 const repository_review_dispatch_max_body_bytes = integerEnv(
   'SEC_BOT_DISPATCH_MAX_BODY_BYTES',
@@ -69,6 +73,7 @@ export {
   github_api_version,
   port,
   webhook_path,
+  webhook_max_body_bytes,
   repository_review_dispatch_path,
   repository_review_dispatch_max_body_bytes,
   repository_review_dispatch_read_timeout_ms,
