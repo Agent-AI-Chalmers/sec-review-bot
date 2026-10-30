@@ -2,6 +2,7 @@
 // step is parked. Step-level writes remain in `PublicationStore`.
 import crypto from 'node:crypto'
 import type { Pool } from 'pg'
+import type { Database } from '../database/database.js'
 
 import { transaction } from '../database/transaction.js'
 import type { PublicationStatus, PublicationWork } from '../shapes.js'
@@ -15,8 +16,13 @@ import {
 const CLAIM_WAIT_INTERVAL_MS = 250
 
 export class PublicationClaimStore {
+  /** The pool, guarded by the database's readiness check. */
+  protected get pool(): Pool {
+    return this.database.pool()
+  }
+
   constructor(
-    private readonly pool: Pool,
+    private readonly database: Database,
     private readonly connectorId: string,
     private readonly claimTimeoutMs: number
   ) {}

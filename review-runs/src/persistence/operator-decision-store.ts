@@ -1,4 +1,5 @@
 import type { Pool } from 'pg'
+import type { Database } from '../database/database.js'
 
 import { ExecutionStore } from './execution-store.js'
 import { PublicationStore } from './publication-store.js'
@@ -10,8 +11,13 @@ import { transaction } from '../database/transaction.js'
 import type { ReviewRunRecord } from '../shapes.js'
 
 export class OperatorDecisionStore {
+  /** The pool, guarded by the database's readiness check. */
+  protected get pool(): Pool {
+    return this.database.pool()
+  }
+
   constructor(
-    private readonly pool: Pool,
+    private readonly database: Database,
     private readonly connectorId: string,
     private readonly publications: PublicationStore,
     private readonly executions: ExecutionStore

@@ -22,11 +22,9 @@
 // Each concrete store fences its writes with the claim token for the axis it owns.
 import { Pool } from 'pg'
 
+import { Database } from '../database/database.js'
+
 import type { ExecutionArtifactStorage } from '../contracts.js'
-import {
-  applySchemaVersions,
-  KNOWN_SCHEMA_VERSIONS
-} from '../database/schema-version-runner.js'
 import { transaction } from '../database/transaction.js'
 import {
   normalizeArtifactStorage,
@@ -90,7 +88,7 @@ export type {
 } from './review-run-queries.js'
 
 export class ReviewRunStore {
-  private readonly pool: Pool
+  private readonly database: Database
   readonly connectorId: string
   readonly sourcePlatform: ReviewRunRecord['source_platform']
   private readonly claimTimeoutMs: number
@@ -102,7 +100,6 @@ export class ReviewRunStore {
   private readonly admissions: ReviewRunAdmissionStore
   private readonly queries: ReviewRunQueries
   private readonly submissionTransitions: SubmissionTransitionStore
-  private initialized = false
 
   constructor({
     connectionString,
@@ -123,108 +120,74 @@ export class ReviewRunStore {
      * such list and would otherwise discard the fault silently. */
     onDroppedRunRow?: (dropped: DroppedRunRow) => void
   } = {}) {
-    this.pool = pool ?? new Pool({ connectionString })
-    // `pg` emits `error` on the pool when an idle client loses its connection, and an
-    // EventEmitter that emits `error` without a listener throws. A database restart, a
-    // network blip, or the server reaping an idle connection would therefore kill this
-    // process -- taking down every other compose service with it, because the deployment
-    // runs `up --abort-on-container-failure`.
-    //
-    // The event carries no query to fail: the client that died was idle, so whoever needed
-    // it next will get a fresh connection or a normal query error. Log it and keep running
-    // rather than treating a recoverable pool event as a fatal process error.
-    //
-    // Only the message is logged. Printing the Error itself expands the whole pg client --
-    // socket, buffer state, type parsers -- into hundreds of lines per connection, and a
-    // restart severs every pooled connection at once.
-    this.pool.on('error', (error: Error) => {
-      console.error('review_runs_pool_idle_client_error', error.message)
+    this.database = new Database({
+      ...(connectionString === undefined ? {} : { connectionString }),
+      ...(pool === undefined ? {} : { pool })
     })
     this.connectorId = connectorId
     this.sourcePlatform = sourcePlatform
     this.claimTimeoutMs = Math.max(0, claimTimeoutMs)
     this.preparations = new PreparationStore(
-      this.pool,
+      this.database,
       this.connectorId,
       this.claimTimeoutMs
     )
     this.publications = new PublicationStore(
-      this.pool,
+      this.database,
       this.connectorId,
       this.claimTimeoutMs
     )
     this.publicationClaims = new PublicationClaimStore(
-      this.pool,
+      this.database,
       this.connectorId,
       this.claimTimeoutMs
     )
     this.executions = new ExecutionStore(
-      this.pool,
+      this.database,
       this.connectorId,
       this.claimTimeoutMs
     )
     this.operatorDecisions = new OperatorDecisionStore(
-      this.pool,
+      this.database,
       this.connectorId,
       this.publications,
       this.executions
     )
     this.admissions = new ReviewRunAdmissionStore(
-      this.pool,
+      this.database,
       this.connectorId,
       this.sourcePlatform
     )
     this.queries = new ReviewRunQueries(
-      this.pool,
+      this.database,
       this.connectorId,
       this.claimTimeoutMs,
       onDroppedRunRow
     )
     this.submissionTransitions = new SubmissionTransitionStore(
-      this.pool,
+      this.database,
       this.connectorId
     )
   }
 
   async initialize(): Promise<void> {
-    if (this.initialized) return
-    await applySchemaVersions(this.pool)
-    this.initialized = true
+    await this.database.initialize()
   }
 
   /** Verify the dependency boundary required to accept coordination requests. */
   async checkReadiness(): Promise<void> {
-    this.ready()
-    const result = await this.pool.query<{ version: number }>(
-      'SELECT version FROM schema_versions ORDER BY version'
-    )
-    const appliedVersions = result.rows.map(({ version }) => version)
-    if (
-      appliedVersions.length !== KNOWN_SCHEMA_VERSIONS.length ||
-      appliedVersions.some(
-        (version, index) => version !== KNOWN_SCHEMA_VERSIONS[index]
-      )
-    ) {
-      throw new Error('Review Runs schema ledger is not current.')
-    }
-  }
-
-  private ready(): void {
-    if (!this.initialized)
-      throw new Error('ReviewRunStore.initialize() must complete before use.')
+    await this.database.checkLedger()
   }
 
   async createPreparingReviewRun(
     run: CreateReviewRunArgs
   ): Promise<ReviewRunAdmission> {
-    this.ready()
     return await this.admissions.create(run)
   }
   async admitReviewRun(
     run: CreateReviewRunArgs &
       Required<Pick<CreateReviewRunArgs, 'ingress_kind' | 'ingress_key'>>
   ): Promise<ReviewRunAdmission> {
-    this.ready()
     return await this.admissions.admit(run)
   }
   async savePreparedSubmission(
@@ -241,11 +204,9 @@ export class ReviewRunStore {
     )
   }
   async renewPreparationClaim(runId: string, token: string): Promise<boolean> {
-    this.ready()
     return await this.preparations.renewClaim(runId, token)
   }
   async claimNextPreparation(): Promise<PreparationWork | null> {
-    this.ready()
     return await this.preparations.claimNext()
   }
   async checkpointPreparationInput(
@@ -253,11 +214,9 @@ export class ReviewRunStore {
     token: string,
     input: JsonObject
   ): Promise<void> {
-    this.ready()
     await this.preparations.checkpointInput(runId, token, input)
   }
   async claimNextRunNotice(): Promise<RunNoticeWork | null> {
-    this.ready()
     return await this.preparations.claimNextRunNotice()
   }
   async completeRunNotice(
@@ -266,7 +225,6 @@ export class ReviewRunStore {
     delivered: boolean,
     commentUrl?: string | null
   ): Promise<boolean> {
-    this.ready()
     return await this.preparations.completeRunNotice(
       noticeId,
       token,
@@ -285,21 +243,17 @@ export class ReviewRunStore {
     await this.submissionTransitions.markQueued(runId, token, context)
   }
   async runExists(runId: string): Promise<boolean> {
-    this.ready()
     return await this.queries.runExists(runId)
   }
   async listEvents(runId: string): Promise<ReviewRunEvent[]> {
-    this.ready()
     return await this.queries.listEvents(runId)
   }
   async getRun(runId: string): Promise<ReviewRunRecord | null> {
-    this.ready()
     return await this.queries.getRun(runId)
   }
   async getExecutionStatistics(
     runIds: readonly string[]
   ): Promise<Map<string, ExecutionStatisticsSummary>> {
-    this.ready()
     return await this.queries.getExecutionStatistics(runIds)
   }
   async listRunsPage(options: ListRunsOptions = {}): Promise<{
@@ -307,15 +261,12 @@ export class ReviewRunStore {
     next_cursor: string | null
     dropped: DroppedRunRow[]
   }> {
-    this.ready()
     return await this.queries.listRunsPage(options)
   }
   async expireStalePreparations(): Promise<PreparationExpiryResult> {
-    this.ready()
     return await this.preparations.expireStale()
   }
   async listParkedRuns(): Promise<ParkedRun[]> {
-    this.ready()
     return await this.queries.listParkedRuns()
   }
 
@@ -323,17 +274,14 @@ export class ReviewRunStore {
     runId: string,
     reason: string
   ): Promise<ReviewRunRecord> {
-    this.ready()
     return await this.operatorDecisions.abandonBlockedPreparation(runId, reason)
   }
 
   async resumeDisconnectedRun(runId: string): Promise<ReviewRunRecord> {
-    this.ready()
     return await this.operatorDecisions.resumeDisconnectedRun(runId)
   }
 
   async resumeDisconnectedPublication(runId: string): Promise<ReviewRunRecord> {
-    this.ready()
     return await this.operatorDecisions.resumeDisconnectedPublication(runId)
   }
 
@@ -341,22 +289,18 @@ export class ReviewRunStore {
     runId: string,
     reason: string
   ): Promise<ReviewRunRecord> {
-    this.ready()
     return await this.operatorDecisions.giveUpDisconnectedRun(runId, reason)
   }
 
   async resumeDisconnectedExecution(runId: string): Promise<ReviewRunRecord> {
-    this.ready()
     return await this.operatorDecisions.resumeDisconnectedExecution(runId)
   }
 
   async resumeDisconnectedPreparation(runId: string): Promise<ReviewRunRecord> {
-    this.ready()
     return await this.operatorDecisions.resumeDisconnectedPreparation(runId)
   }
 
   async listSubmissionRecoveries(): Promise<RunRowsProjection> {
-    this.ready()
     return await this.queries.listSubmissionRecoveries()
   }
   async claimSubmissionRecovery(runId: string): Promise<string | null> {
@@ -364,7 +308,7 @@ export class ReviewRunStore {
   }
   /** How many replays of an uncertain submission ended with the outcome still unknown. */
   async submissionRecoveryAttemptCount(runId: string): Promise<number | null> {
-    const result = await this.pool.query<{ attempt_count: number }>(
+    const result = await this.database.pool().query<{ attempt_count: number }>(
       `SELECT attempt_count FROM executions
        WHERE run_id=$1 AND connector_id=$2`,
       [runId, this.connectorId]
@@ -427,7 +371,6 @@ export class ReviewRunStore {
   /** Active (queued/running) runs for this connector, as a projection: a row the contract
    * cannot represent is returned in `dropped` instead of aborting the read for every run. */
   async listActiveRuns(): Promise<RunRowsProjection> {
-    this.ready()
     return await this.queries.listActiveRuns()
   }
   /** Record that the Execution was observed just now, without changing state. Writes only
@@ -460,7 +403,7 @@ export class ReviewRunStore {
     error: { code?: string | null; message: string },
     storage?: ExecutionArtifactStorage
   ): Promise<boolean> {
-    return await transaction(this.pool, async (client) => {
+    return await transaction(this.database.pool(), async (client) => {
       // As with success, capture the pre-update status so the event names the real origin.
       const run = await client.query<{ from_status: string }>(
         `
@@ -628,10 +571,9 @@ export class ReviewRunStore {
     error: { code?: string | null; message: string },
     options: { retry: boolean; retryAfterMs?: number } = { retry: false }
   ): Promise<{ retry_scheduled: boolean }> {
-    this.ready()
     return await this.preparations.fail(runId, token, error, options)
   }
   async close(): Promise<void> {
-    await this.pool.end()
+    await this.database.close()
   }
 }

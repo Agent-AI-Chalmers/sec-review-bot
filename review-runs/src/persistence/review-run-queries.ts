@@ -1,6 +1,7 @@
 // Owns the Review Runs read model: connector-fenced record projection, list filtering and
 // pagination, coordination queues, parked work, events, and execution statistics.
 import type { Pool } from 'pg'
+import type { Database } from '../database/database.js'
 
 import type { ReviewRunWorkflow as WorkflowName } from '../contracts.js'
 import type {
@@ -102,8 +103,13 @@ export interface ListRunsOptions {
 }
 
 export class ReviewRunQueries {
+  /** The pool, guarded by the database's readiness check. */
+  protected get pool(): Pool {
+    return this.database.pool()
+  }
+
   constructor(
-    private readonly pool: Pool,
+    private readonly database: Database,
     private readonly connectorId: string,
     private readonly claimTimeoutMs: number,
     private readonly onDroppedRunRow: (dropped: DroppedRunRow) => void

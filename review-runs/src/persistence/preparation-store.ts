@@ -2,6 +2,7 @@
 // checkpoints, retry exhaustion, and terminal-failure notification outbox state.
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
+import type { Database } from '../database/database.js'
 
 import type { PreparationWork as ContractPreparationWork } from '../contract-types-generated.js'
 import type { ReviewRunWorkflow as WorkflowName } from '../contracts.js'
@@ -62,8 +63,13 @@ class ExpiryUnreconcilableError extends Error {
 const MAX_PREPARATION_ATTEMPTS = 8
 
 export class PreparationStore {
+  /** The pool, guarded by the database's readiness check. */
+  protected get pool(): Pool {
+    return this.database.pool()
+  }
+
   constructor(
-    private readonly pool: Pool,
+    private readonly database: Database,
     private readonly connectorId: string,
     private readonly claimTimeoutMs: number
   ) {}

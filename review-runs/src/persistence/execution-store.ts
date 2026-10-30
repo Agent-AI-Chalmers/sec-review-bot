@@ -9,6 +9,7 @@
 // not here: the record projection spans all three axes.
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
+import type { Database } from '../database/database.js'
 
 import type { ExecutionArtifactStorage } from '../contracts.js'
 import { appendEvent } from './review-run-events.js'
@@ -17,8 +18,13 @@ import { transaction } from '../database/transaction.js'
 import { normalizeArtifactStorage } from '../shapes.js'
 
 export class ExecutionStore {
+  /** The pool, guarded by the database's readiness check. */
+  protected get pool(): Pool {
+    return this.database.pool()
+  }
+
   constructor(
-    private readonly pool: Pool,
+    private readonly database: Database,
     private readonly connectorId: string,
     private readonly claimTimeoutMs: number
   ) {}

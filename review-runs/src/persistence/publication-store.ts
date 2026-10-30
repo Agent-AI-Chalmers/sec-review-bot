@@ -11,6 +11,7 @@
 // Resuming a disconnected publication is still a single-axis write: it returns the row to
 // `pending`, where the normal cross-axis selector can claim it after checking execution.
 import { Pool, type PoolClient } from 'pg'
+import type { Database } from '../database/database.js'
 
 import { transaction } from '../database/transaction.js'
 import {
@@ -156,8 +157,13 @@ async function derivePublicationStatus(
 }
 
 export class PublicationStore {
+  /** The pool, guarded by the database's readiness check. */
+  protected get pool(): Pool {
+    return this.database.pool()
+  }
+
   constructor(
-    private readonly pool: Pool,
+    private readonly database: Database,
     private readonly connectorId: string,
     private readonly claimTimeoutMs: number
   ) {}
