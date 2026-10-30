@@ -119,7 +119,7 @@ async function shutdown(signal: ShutdownSignal): Promise<void> {
   shutdownStarted = true
   logInfo('server_shutdown_started', { signal })
 
-  // Finish in-flight HTTP handlers first so every admitted execution has been
+  // Finish in-flight HTTP handlers first so every admitted preparation has been
   // registered before the tracker takes its shutdown snapshot.
   const serverResult = await Promise.allSettled([closeServer()])
   const results = [

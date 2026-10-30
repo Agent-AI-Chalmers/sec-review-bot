@@ -132,7 +132,7 @@ export async function handlePullRequestReadyForReviewWithDeps(
     const admitted = new Promise<void>((resolve) => {
       resolveAdmission = resolve
     })
-    const execution = startPullRequestReviewCommandFn({
+    const preparation = startPullRequestReviewCommandFn({
       octokit,
       trusted_default_branch,
       pr,
@@ -142,12 +142,12 @@ export async function handlePullRequestReadyForReviewWithDeps(
         resolveAdmission?.()
       }
     })
-    backgroundPreparations.start(execution, {
+    backgroundPreparations.start(preparation, {
       ingress: 'pull_request.ready_for_review',
       pr: pr.pr_number,
       repo: pr.repo_full_name
     })
-    await Promise.race([admitted, execution])
+    await Promise.race([admitted, preparation])
   } catch (error: unknown) {
     const errorInfo = asErrorWithResponse(error)
 

@@ -162,7 +162,7 @@ export async function handleIssueCommentCreatedWithDeps(
       const admitted = new Promise<void>((resolve) => {
         resolveAdmission = resolve
       })
-      const execution = startPullRequestReviewCommandFn({
+      const preparation = startPullRequestReviewCommandFn({
         octokit,
         trusted_default_branch,
         preparation_input: {
@@ -189,13 +189,13 @@ export async function handleIssueCommentCreatedWithDeps(
           resolveAdmission?.()
         }
       })
-      backgroundPreparations.start(execution, {
+      backgroundPreparations.start(preparation, {
         ingress: 'issue_comment.created',
         issue: issue.issue_number,
         repo: issue.repo_full_name,
         review_target: 'pull-request'
       })
-      await Promise.race([admitted, execution])
+      await Promise.race([admitted, preparation])
 
       return
     }
@@ -204,7 +204,7 @@ export async function handleIssueCommentCreatedWithDeps(
     const admitted = new Promise<void>((resolve) => {
       resolveAdmission = resolve
     })
-    const execution = startIssueReviewCommandFn({
+    const preparation = startIssueReviewCommandFn({
       octokit,
       issue,
       trusted_default_branch,
@@ -219,13 +219,13 @@ export async function handleIssueCommentCreatedWithDeps(
         resolveAdmission?.()
       }
     })
-    backgroundPreparations.start(execution, {
+    backgroundPreparations.start(preparation, {
       ingress: 'issue_comment.created',
       issue: issue.issue_number,
       repo: issue.repo_full_name,
       review_target: 'issue'
     })
-    await Promise.race([admitted, execution])
+    await Promise.race([admitted, preparation])
   } catch (error: unknown) {
     const errorInfo = asErrorWithResponse(error)
 
