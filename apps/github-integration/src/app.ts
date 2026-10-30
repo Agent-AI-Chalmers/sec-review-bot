@@ -25,6 +25,7 @@ import { verifyGitWorkspaceRuntime } from './artifacts/git-workspace.js'
 import { verifyContractSchemasLoadable } from './execution/execution-api-schema.js'
 import { startPublicationCoordinator } from './review-runs/publication-coordinator.js'
 import { startPreparationCoordinator } from './review-runs/preparation-coordinator.js'
+import { startRunNoticeCoordinator } from './review-runs/run-notice-coordinator.js'
 import { backgroundPreparations } from './reviews/background-preparations.js'
 import { logError, logInfo } from './utils/logger.js'
 
@@ -61,6 +62,7 @@ app.webhooks.on(
 app.webhooks.on('pull_request.synchronize', handlePullRequestSynchronize)
 const publicationCoordinator = startPublicationCoordinator({ app })
 const preparationCoordinator = startPreparationCoordinator({ app })
+const runNoticeCoordinator = startRunNoticeCoordinator({ app })
 
 app.webhooks.onError((error) => {
   if (error.name === 'AggregateError') {
@@ -127,6 +129,7 @@ async function shutdown(signal: ShutdownSignal): Promise<void> {
     ...(await Promise.allSettled([
       publicationCoordinator.stop(),
       preparationCoordinator.stop(),
+      runNoticeCoordinator.stop(),
       backgroundPreparations.stop()
     ]))
   ]

@@ -1,21 +1,14 @@
-// Verifies recovery-only preparation inputs can deliver their terminal notice
-// without a live webhook payload or a fully materialized pull-request context.
+// Verifies durable run notices and recovered preparations through their separate coordinators.
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { prepareReviewRunsOnce } from '../../src/review-runs/preparation-coordinator.js'
+import { deliverRunNoticeOnce } from '../../src/review-runs/run-notice-coordinator.js'
 import type { PreparationCoordinatorStore } from '../../src/review-runs/client.js'
 import { fakeApp } from '../github-app-stubs.js'
 import { fakeGitHub, githubJson } from '../github-client.js'
 
-/**
- * The members `prepareReviewRunsOnce` may reach but a notice-only test never triggers.
- *
- * The coordinator can take either branch (deliver a failure notice, or claim and execute
- * preparation), so its store type includes both. A test that exercises only the notice branch
- * still has to satisfy the type; these members fail loudly if the unreached branch is somehow
- * entered, which is more informative than a silent `undefined`.
- */
+/** Preparation command dependencies that input-validation tests never reach. */
 function unreachedPreparationMembers(): Pick<
   PreparationCoordinatorStore,
   | 'admitReviewRun'
@@ -72,14 +65,10 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
     completeRunNotice: async (...args: unknown[]) => {
       completed.push(args)
       return true
-    },
-    claimNextPreparation: async () => assert.fail('notice takes priority'),
-    failPreparation: async () =>
-      assert.fail('notice path must not fail preparation'),
-    ...unreachedPreparationMembers()
+    }
   }
 
-  assert.strictEqual(await prepareReviewRunsOnce({ app, store }), true)
+  assert.strictEqual(await deliverRunNoticeOnce({ app, store }), true)
   // The installation lookup is the only request the App itself makes.
   assert.strictEqual(requests.length, 1)
   assert.match(requests[0]!.url, /\/repos\/octo\/example\/installation$/)
@@ -100,45 +89,6 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
     // The comment that was posted, so the console can link the requester to it.
     ['notice-test', 'notice-token', true, 'https://example.test/comment/9']
   ])
-})
-
-test('preparation-first scheduling falls back to a terminal notice when no preparation is ready', async () => {
-  const calls: string[] = []
-  const store = {
-    claimNextPreparation: async () => {
-      calls.push('preparation')
-      return null
-    },
-    claimNextRunNotice: async () => {
-      calls.push('notice')
-      return {
-        run_id: 'run-without-reply-target',
-        notice_id: 'notice-test',
-        input: {},
-        axis: 'preparation' as const,
-        reason_code: 'PREPARATION_RETRY_EXHAUSTED',
-        kind: 'failure' as const,
-        claim_token: 'notice-claim'
-      }
-    },
-    completeRunNotice: async () => {
-      calls.push('complete-notice')
-      return true
-    },
-    failPreparation: async () => assert.fail('no preparation should fail here'),
-    ...unreachedPreparationMembers()
-  }
-
-  assert.strictEqual(
-    await prepareReviewRunsOnce({
-      // Nothing here may reach GitHub: any request would surface as a recorded request.
-      app: fakeApp().app,
-      store,
-      preferFailureNotice: false
-    }),
-    true
-  )
-  assert.deepStrictEqual(calls, ['preparation', 'notice', 'complete-notice'])
 })
 
 test('a repository scan failure reports into the repository summary issue', async () => {
@@ -184,14 +134,10 @@ test('a repository scan failure reports into the repository summary issue', asyn
     completeRunNotice: async (...args: unknown[]) => {
       completed.push(args)
       return true
-    },
-    claimNextPreparation: async () => assert.fail('notice takes priority'),
-    failPreparation: async () =>
-      assert.fail('notice path must not fail preparation'),
-    ...unreachedPreparationMembers()
+    }
   }
 
-  assert.strictEqual(await prepareReviewRunsOnce({ app, store }), true)
+  assert.strictEqual(await deliverRunNoticeOnce({ app, store }), true)
   const created = client.requests.find(
     (request) =>
       request.method === 'POST' &&
@@ -233,11 +179,7 @@ test('an unrecoverable notice concludes instead of being retried forever', async
     completeRunNotice: async (...args: unknown[]) => {
       completed.push(args)
       return true
-    },
-    claimNextPreparation: async () => assert.fail('notice takes priority'),
-    failPreparation: async () =>
-      assert.fail('notice path must not fail preparation'),
-    ...unreachedPreparationMembers()
+    }
   }
   // A 404 from the installation lookup is what GitHub answers for "this app is not installed";
   // retrying can never change it, so the notice must be concluded as undelivered.
@@ -245,7 +187,7 @@ test('an unrecoverable notice concludes instead of being retried forever', async
     respond: () => githubJson({ message: 'Not Found' }, 404)
   })
 
-  assert.strictEqual(await prepareReviewRunsOnce({ app, store }), true)
+  assert.strictEqual(await deliverRunNoticeOnce({ app, store }), true)
   assert.deepStrictEqual(
     completed,
     [
@@ -289,19 +231,14 @@ test('a process without the GitHub installation concludes the notice, which the 
     completeRunNotice: async (...args: unknown[]) => {
       completed.push(args)
       return true
-    },
-    claimNextPreparation: async () =>
-      assert.fail('the notice was already handled this pass'),
-    failPreparation: async () =>
-      assert.fail('the notice path must not fail preparation'),
-    ...unreachedPreparationMembers()
+    }
   }
   // No installation is visible to this process: the App answers 404 for the scanned repository.
   const { app } = fakeApp({
     respond: () => githubJson({ message: 'Not Found' }, 404)
   })
 
-  assert.strictEqual(await prepareReviewRunsOnce({ app, store }), true)
+  assert.strictEqual(await deliverRunNoticeOnce({ app, store }), true)
   assert.strictEqual(
     claimed,
     1,
@@ -335,18 +272,14 @@ test('a transient notice failure stays claimable for another attempt', async () 
     completeRunNotice: async (...args: unknown[]) => {
       completed.push(args)
       return true
-    },
-    claimNextPreparation: async () => assert.fail('notice takes priority'),
-    failPreparation: async () =>
-      assert.fail('notice path must not fail preparation'),
-    ...unreachedPreparationMembers()
+    }
   }
   // A 5xx is transient: the notice must stay claimed so the next lease retries it.
   const { app } = fakeApp({
     respond: () => githubJson({ message: 'Server Error' }, 503)
   })
 
-  assert.strictEqual(await prepareReviewRunsOnce({ app, store }), true)
+  assert.strictEqual(await deliverRunNoticeOnce({ app, store }), true)
   assert.deepStrictEqual(
     completed,
     [],
@@ -358,7 +291,6 @@ test('a recovered preparation with a malformed persisted issue is rejected, not 
   // The issue record is replayed from storage, so it is untyped JSON. A missing field must fail as
   // invalid preparation input rather than produce a context whose fields are `undefined`.
   const store = {
-    claimNextRunNotice: async () => null,
     claimNextPreparation: async () => ({
       run_id: 'run-malformed-issue',
       workflow: 'issue-review' as const,
@@ -384,7 +316,6 @@ test('a recovered preparation with a malformed persisted issue is rejected, not 
   const failures: Array<{ message: string }> = []
   const failing = {
     ...store,
-    completeRunNotice: async () => true,
     failPreparation: async (
       _runId: string,
       _token: string,
@@ -397,8 +328,7 @@ test('a recovered preparation with a malformed persisted issue is rejected, not 
 
   await prepareReviewRunsOnce({
     app: fakeApp().app,
-    store: failing,
-    preferFailureNotice: false
+    store: failing
   })
 
   assert.strictEqual(failures.length, 1)
@@ -407,7 +337,6 @@ test('a recovered preparation with a malformed persisted issue is rejected, not 
 
 test('a recovered preparation with a malformed trusted default branch is rejected', async () => {
   const store = {
-    claimNextRunNotice: async () => null,
     claimNextPreparation: async () => ({
       run_id: 'run-malformed-branch',
       workflow: 'issue-review' as const,
@@ -448,7 +377,6 @@ test('a recovered preparation with a malformed trusted default branch is rejecte
   const failures: Array<{ message: string }> = []
   const failing = {
     ...store,
-    completeRunNotice: async () => true,
     failPreparation: async (
       _runId: string,
       _token: string,
@@ -463,8 +391,7 @@ test('a recovered preparation with a malformed trusted default branch is rejecte
     // The installation lookup must succeed: the issue is validated first, then the installation
     // is resolved, and only then is the trusted branch read.
     app: fakeApp({ respond: () => githubJson({ id: 1 }) }).app,
-    store: failing,
-    preferFailureNotice: false
+    store: failing
   })
 
   assert.strictEqual(failures.length, 1)
@@ -505,7 +432,6 @@ test('a recovered issue that omits sender_login or issue_author is rejected', as
     delete partialIssue[missing]
     const failures: Array<{ message: string }> = []
     const store = {
-      claimNextRunNotice: async () => null,
       claimNextPreparation: async () => ({
         run_id: `run-missing-${missing}`,
         workflow: 'issue-review' as const,
@@ -522,7 +448,6 @@ test('a recovered issue that omits sender_login or issue_author is rejected', as
           open_pr: null
         }
       }),
-      completeRunNotice: async () => true,
       failPreparation: async (
         _runId: string,
         _token: string,
@@ -537,8 +462,7 @@ test('a recovered issue that omits sender_login or issue_author is rejected', as
     await prepareReviewRunsOnce({
       // The record must be rejected before any installation or GitHub work.
       app: fakeApp().app,
-      store,
-      preferFailureNotice: false
+      store
     })
 
     assert.strictEqual(
@@ -555,7 +479,6 @@ test('a recovered issue carrying a non-string author is rejected', async () => {
   for (const bad of [null, 123, {}]) {
     const failures: Array<{ message: string }> = []
     const store = {
-      claimNextRunNotice: async () => null,
       claimNextPreparation: async () => ({
         run_id: 'run-bad-author',
         workflow: 'issue-review' as const,
@@ -589,7 +512,6 @@ test('a recovered issue carrying a non-string author is rejected', async () => {
           open_pr: null
         }
       }),
-      completeRunNotice: async () => true,
       failPreparation: async (
         _runId: string,
         _token: string,
@@ -603,8 +525,7 @@ test('a recovered issue carrying a non-string author is rejected', async () => {
 
     await prepareReviewRunsOnce({
       app: fakeApp().app,
-      store,
-      preferFailureNotice: false
+      store
     })
 
     assert.strictEqual(
@@ -708,7 +629,6 @@ test('a claimed synchronize preparation recovers from the payload admission pers
         }
       } as never
     },
-    claimNextRunNotice: async () => null,
     failPreparation: async (_run: string, _token: string, error: unknown) => {
       failures.push(String((error as { message?: string })?.message ?? error))
       return true
@@ -728,8 +648,7 @@ test('a claimed synchronize preparation recovers from the payload admission pers
 
   await prepareReviewRunsOnce({
     app,
-    store: store as never,
-    preferFailureNotice: false
+    store: store as never
   })
 
   // Preparation itself is exercised elsewhere; this test is about whether the
