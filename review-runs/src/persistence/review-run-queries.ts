@@ -18,6 +18,40 @@ import {
   type ReviewRunRow
 } from './run-record-projection.js'
 
+/** A run-list cursor: the full-precision timestamp and id of the last row of a page. */
+export interface RunListCursor {
+  created_at_cursor: string
+  run_id: string
+}
+
+/**
+ * The wire form of a run-list cursor.
+ *
+ * Encoding lives here because the cursor is this read model's implementation detail: it names
+ * a row by the same (timestamp, id) pair the ordering uses, and nothing outside this module
+ * may depend on that shape. Callers treat it as an opaque string.
+ */
+export function encodeRunListCursor(cursor: RunListCursor): string {
+  return Buffer.from(`${cursor.created_at_cursor}|${cursor.run_id}`).toString(
+    'base64url'
+  )
+}
+
+/**
+ * Read a wire cursor, or null when it cannot name a row.
+ *
+ * A cursor must carry exactly the two parts the encoder writes, and the timestamp must be
+ * one the ordering can compare. Anything else is a caller's mistake, not an empty page:
+ * answering it with a page would silently restart pagination from the beginning.
+ */
+export function decodeRunListCursor(cursor: string): RunListCursor | null {
+  const decoded = Buffer.from(cursor, 'base64url').toString('utf8')
+  const [createdAt, runId, extra] = decoded.split('|')
+  if (!createdAt || !runId || extra !== undefined) return null
+  if (Number.isNaN(Date.parse(createdAt))) return null
+  return { created_at_cursor: createdAt, run_id: runId }
+}
+
 /** One run the system stopped working on by itself, and the axis it is parked on. */
 export interface ParkedRun {
   run_id: string
@@ -201,12 +235,10 @@ export class ReviewRunQueries {
     if (options.to !== undefined)
       clauses.push(`r.created_at<${add(options.to)}`)
     if (options.cursor !== undefined) {
-      const [createdAt, runId] = Buffer.from(options.cursor, 'base64url')
-        .toString('utf8')
-        .split('|')
-      if (!createdAt || !runId) throw new Error('Invalid run list cursor.')
+      const cursor = decodeRunListCursor(options.cursor)
+      if (cursor === null) throw new Error('Invalid run list cursor.')
       clauses.push(
-        `(r.created_at, r.run_id)<(${add(createdAt)}, ${add(runId)})`
+        `(r.created_at, r.run_id)<(${add(cursor.created_at_cursor)}, ${add(cursor.run_id)})`
       )
     }
     // The cursor and ordering share the same full-precision timestamp and run-id tie breaker.
@@ -233,9 +265,10 @@ export class ReviewRunQueries {
     const last = page.at(-1)
     const next_cursor =
       hasMore && last !== undefined
-        ? Buffer.from(
-            `${last.trunk.created_at_cursor}|${last.trunk.run_id}`
-          ).toString('base64url')
+        ? encodeRunListCursor({
+            created_at_cursor: last.trunk.created_at_cursor,
+            run_id: last.trunk.run_id
+          })
         : null
     const { runs, dropped } = projectRunRows(page)
     return { runs, next_cursor, dropped }
