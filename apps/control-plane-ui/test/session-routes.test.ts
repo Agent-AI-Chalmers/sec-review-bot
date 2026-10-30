@@ -16,9 +16,10 @@ test('BFF marks session cookies secure for HTTPS proxy deployments', async () =>
   const address = ui.address()
   assert(address && typeof address === 'object')
   try {
-    const login = await fetch(`http://127.0.0.1:${address.port}/api/session`, {
+    const origin = `http://127.0.0.1:${address.port}`
+    const login = await fetch(`${origin}/api/session`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', origin },
       body: '{"token":"login-secret"}'
     })
 
@@ -95,7 +96,7 @@ test('BFF sign-out expires the session cookie it issued', async () => {
   try {
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', origin: base },
       body: '{"token":"login-secret"}'
     })
     const cookie = login.headers.get('set-cookie')
@@ -133,12 +134,46 @@ test('BFF sign-out expires the session cookie it issued', async () => {
 })
 
 /**
+ * Signing in is a state change: a cross-site POST could otherwise put the browser into a
+ * session the reader never asked for. The refusal is the same one every mutating route
+ * sends, so this asserts the shared code rather than a per-route message.
+ */
+test('BFF refuses a cross-site sign-in', async () => {
+  const ui = createControlPlaneUiBffServer({
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret'
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  try {
+    const crossSite = await fetch(`${base}/api/session`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        origin: 'https://attacker.example'
+      },
+      body: '{"token":"login-secret"}'
+    })
+    assert.strictEqual(crossSite.status, 403)
+    assert.deepStrictEqual(await crossSite.json(), {
+      error: 'cross_site_request'
+    })
+    // The refused request still must not mint a session.
+    assert.strictEqual(crossSite.headers.get('set-cookie'), null)
+  } finally {
+    await new Promise<void>((resolve) => ui.close(() => resolve()))
+  }
+})
+
+/**
  * Another site must not be able to sign the reader out. The cookie is `SameSite=Strict`,
  * so a cross-site request will not carry it, but sign-out clears the cookie regardless —
  * a cross-site DELETE would still be obeyed without this check. The regression this
  * prevents is a request the browser would never have sent carrying a session.
  */
-
 test('BFF refuses a cross-site sign-out', async () => {
   const ui = createControlPlaneUiBffServer({
     reviewRunsUrl: 'http://127.0.0.1:1',
@@ -156,7 +191,9 @@ test('BFF refuses a cross-site sign-out', async () => {
       headers: { origin: 'https://attacker.example' }
     })
     assert.strictEqual(crossSite.status, 403)
-    assert.deepStrictEqual(await crossSite.json(), { error: 'cross_origin' })
+    assert.deepStrictEqual(await crossSite.json(), {
+      error: 'cross_site_request'
+    })
     // No cookie is cleared on the rejected path: an attacker cannot even produce the
     // side effect they were after.
     assert.strictEqual(crossSite.headers.get('set-cookie'), null)

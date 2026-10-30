@@ -10,7 +10,7 @@ import {
   readBoundedRequestBody
 } from '../http-request.js'
 import { PROXIED_CONTENT_TYPE, sendJson } from '../http-response.js'
-import { isSameOrigin } from '../request-security.js'
+import { requireSameOrigin } from '../request-security.js'
 import type { MemoryCatalogClient } from '../upstream/memory-catalog-client.js'
 import { UpstreamRequestError } from '../upstream/request.js'
 import { catalogArtifactReference } from '../memory/artifact-reference.js'
@@ -71,10 +71,7 @@ export function createMemoryRoutes({
     response: ServerResponse,
     action: string
   ): Promise<void> => {
-    if (!isSameOrigin(request)) {
-      sendJson(response, 403, { error: 'cross_site_request' })
-      return
-    }
+    if (!requireSameOrigin(request, response)) return
     if (catalog === undefined) {
       sendJson(response, 503, { error: 'memory_catalog_unavailable' })
       return

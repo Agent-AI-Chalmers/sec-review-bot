@@ -46,7 +46,7 @@ export async function diagnosticBundle(runId: string): Promise<Buffer> {
 export async function loginCookie(base: string): Promise<string> {
   const login = await fetch(`${base}/api/session`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', origin: base },
     body: '{"token":"login-secret"}'
   })
   const cookie = login.headers.get('set-cookie')

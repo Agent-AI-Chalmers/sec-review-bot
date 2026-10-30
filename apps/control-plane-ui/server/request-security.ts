@@ -1,5 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
+import { sendJson } from './http-response.js'
+
 export function applySecurityHeaders(response: ServerResponse): void {
   response.setHeader(
     'content-security-policy',
@@ -15,7 +17,7 @@ export function applySecurityHeaders(response: ServerResponse): void {
  * The comparison is self-referential so loopback, LAN and domain deployments need no
  * origin configuration. A request carrying neither Origin nor Referer is refused.
  */
-export function isSameOrigin(request: IncomingMessage): boolean {
+function isSameOrigin(request: IncomingMessage): boolean {
   const source = request.headers.origin ?? request.headers.referer
   const host = request.headers.host
   if (source === undefined || host === undefined) return false
@@ -24,4 +26,19 @@ export function isSameOrigin(request: IncomingMessage): boolean {
   } catch {
     return false
   }
+}
+
+/** Refuse a state-changing request that did not come from the console's own origin.
+ *
+ * Every mutating route shares one refusal: a cross-site request learns the same thing
+ * whichever route it reached, and a new route cannot invent a second error code for the
+ * same policy. Callers return early when this sends the refusal.
+ */
+export function requireSameOrigin(
+  request: IncomingMessage,
+  response: ServerResponse
+): boolean {
+  if (isSameOrigin(request)) return true
+  sendJson(response, 403, { error: 'cross_site_request' })
+  return false
 }
