@@ -354,6 +354,10 @@ class HttpReviewRunsClient {
     return await this.request('claimNextRunNotice', {}, undefined)
   }
 
+  async renewRunNoticeClaim(noticeId: string, token: string): Promise<boolean> {
+    return await this.request('renewRunNoticeClaim', { noticeId }, { token })
+  }
+
   async completeRunNotice(
     noticeId: string,
     token: string,
@@ -385,6 +389,10 @@ class HttpReviewRunsClient {
 
   async preparationHeartbeatIntervalMs(): Promise<number> {
     return await this.request('getPreparationHeartbeatInterval', {})
+  }
+
+  async runNoticeHeartbeatIntervalMs(): Promise<number> {
+    return await this.request('getRunNoticeHeartbeatInterval', {})
   }
 
   /**
@@ -607,8 +615,10 @@ export type ReviewRunsClient = Pick<
   | 'claimNextPreparation'
   | 'checkpointPreparationInput'
   | 'claimNextRunNotice'
+  | 'renewRunNoticeClaim'
   | 'completeRunNotice'
   | 'preparationHeartbeatIntervalMs'
+  | 'runNoticeHeartbeatIntervalMs'
   | 'renewPublicationClaim'
   | 'publicationHeartbeatIntervalMs'
   | 'claimNextPublication'
@@ -663,7 +673,10 @@ export type PreparationCoordinatorStore = Pick<
 /** The run-notice coordinator owns only the connector's durable notification outbox. */
 export type RunNoticeCoordinatorStore = Pick<
   ReviewRunsClient,
-  'claimNextRunNotice' | 'completeRunNotice'
+  | 'claimNextRunNotice'
+  | 'renewRunNoticeClaim'
+  | 'runNoticeHeartbeatIntervalMs'
+  | 'completeRunNotice'
 >
 
 /** The heartbeat slice: what a lease keeper needs, and nothing else.

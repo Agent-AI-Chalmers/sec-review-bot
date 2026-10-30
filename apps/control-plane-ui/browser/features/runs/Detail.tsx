@@ -487,11 +487,13 @@ function NoticeLine({
   // failed" says the same thing twice and still leaves the reader asking whether anyone was told.
   const label =
     notice.kind === 'attention'
-      ? notice.status === 'delivered'
-        ? t('attentionNoticeDelivered')
-        : notice.status === 'failed'
-          ? t('attentionNoticeNotDelivered')
-          : t('attentionNoticeDelivering')
+      ? notice.status === 'superseded'
+        ? t('attentionNoticeSuperseded')
+        : notice.status === 'delivered'
+          ? t('attentionNoticeDelivered')
+          : notice.status === 'failed'
+            ? t('attentionNoticeNotDelivered')
+            : t('attentionNoticeDelivering')
       : notice.status === 'delivered'
         ? t('failureNoticeDelivered')
         : notice.status === 'failed'

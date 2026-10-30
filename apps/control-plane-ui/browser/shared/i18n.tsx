@@ -579,7 +579,9 @@ export const messages = {
     attentionNoticeNotDelivered:
       'The requester could not be told that this outcome needs confirmation',
     attentionNoticeDelivering:
-      'Telling the requester that this outcome needs confirmation'
+      'Telling the requester that this outcome needs confirmation',
+    attentionNoticeSuperseded:
+      'This notice no longer applies because recovery was resumed'
   },
   zh: {
     language: '语言',
@@ -1099,7 +1101,8 @@ export const messages = {
     failureNoticeDelivering: '正在通知发起人这次运行失败',
     attentionNoticeDelivered: '已通知发起人：此次结果仍待确认',
     attentionNoticeNotDelivered: '未能通知发起人：此次结果仍待确认',
-    attentionNoticeDelivering: '正在通知发起人：此次结果仍待确认'
+    attentionNoticeDelivering: '正在通知发起人：此次结果仍待确认',
+    attentionNoticeSuperseded: '恢复已重新启动，此通知已不再适用'
   }
 } as const
 export type Message = keyof typeof messages.en

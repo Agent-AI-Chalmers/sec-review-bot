@@ -20,7 +20,7 @@ import {
 } from '../errors.js'
 import type { PublicationStepRecord } from '../shapes.js'
 import { appendEvent } from './review-run-events.js'
-import { queueRunNotice } from './run-notices.js'
+import { queueRunNotice, supersedeRunAttentionNotices } from './run-notices.js'
 
 /**
  * Why every `publication_steps` write takes the publication row lock FIRST.
@@ -147,13 +147,27 @@ async function derivePublicationStatus(
   if (changed === undefined) return
   // The axis moved because of what a step did, and the audit log records every other transition
   // for the same reason: an axis state that changed with no event would make the timeline lie.
-  await appendEvent(client, {
+  const eventId = await appendEvent(client, {
     runId,
     connectorId,
     axis: 'publication',
     fromStatus: changed.from_status,
     toStatus: changed.to_status
   })
+  if (changed.to_status === 'disconnected') {
+    // A disconnected publication has stopped automatic recovery without establishing whether
+    // its GitHub side effect happened. That is an attention condition, not a failure. Keeping it
+    // in the same transaction as the transition means a crashed coordinator cannot park work
+    // without also leaving the connector something durable to tell the operator.
+    await queueRunNotice(client, {
+      runId,
+      connectorId,
+      sourceEventId: eventId,
+      kind: 'attention',
+      axis: 'publication',
+      reasonCode: 'PUBLICATION_RECOVERY_EXHAUSTED'
+    })
+  }
 }
 
 export class PublicationStore {
@@ -245,6 +259,11 @@ export class PublicationStore {
         fromStatus: row.from_status,
         toStatus: 'pending',
         reasonCode: 'PUBLICATION_RESUMED_BY_OPERATOR'
+      })
+      await supersedeRunAttentionNotices(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'publication'
       })
       return true
     }

@@ -275,6 +275,16 @@ export class PreparationStore {
     })
   }
 
+  async renewRunNoticeClaim(noticeId: string, token: string): Promise<boolean> {
+    const result = await this.pool.query(
+      `UPDATE run_notices
+       SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
+       WHERE notice_id=$1 AND connector_id=$2 AND status='delivering' AND claim_token=$3`,
+      [noticeId, this.connectorId, token]
+    )
+    return result.rowCount === 1
+  }
+
   heartbeatIntervalMs(): number {
     return Math.max(1, Math.min(60_000, Math.floor(this.claimTimeoutMs / 3)))
   }

@@ -4,7 +4,10 @@ import test from 'node:test'
 
 import { prepareReviewRunsOnce } from '../../src/review-runs/preparation-coordinator.js'
 import { deliverRunNoticeOnce } from '../../src/review-runs/run-notice-coordinator.js'
-import type { PreparationCoordinatorStore } from '../../src/review-runs/client.js'
+import type {
+  PreparationCoordinatorStore,
+  RunNoticeCoordinatorStore
+} from '../../src/review-runs/client.js'
 import { fakeApp } from '../github-app-stubs.js'
 import { fakeGitHub, githubJson } from '../github-client.js'
 
@@ -28,6 +31,17 @@ function unreachedPreparationMembers(): Pick<
   }
 }
 
+/** A live notice lease for tests whose behavior is unrelated to lease loss. */
+function liveRunNoticeClaim(): Pick<
+  RunNoticeCoordinatorStore,
+  'renewRunNoticeClaim' | 'runNoticeHeartbeatIntervalMs'
+> {
+  return {
+    renewRunNoticeClaim: async () => true,
+    runNoticeHeartbeatIntervalMs: async () => 60_000
+  }
+}
+
 test('terminal preparation notice reaches a pull request reconstructed from pr_reference', async () => {
   // A real App whose transport answers the installation lookup; the installation client it
   // hands back is a real Octokit over a second fake transport, so every GitHub call below is a
@@ -46,6 +60,7 @@ test('terminal preparation notice reaches a pull request reconstructed from pr_r
   })
   const completed: unknown[] = []
   const store = {
+    ...liveRunNoticeClaim(),
     claimNextRunNotice: async () => ({
       run_id: 'run-pr-reference',
       notice_id: 'notice-test',
@@ -118,6 +133,7 @@ test('a repository scan failure reports into the repository summary issue', asyn
   })
   const completed: unknown[] = []
   const store = {
+    ...liveRunNoticeClaim(),
     claimNextRunNotice: async () => ({
       run_id: 'run-repository',
       notice_id: 'notice-test',
@@ -164,6 +180,7 @@ test('an unrecoverable notice concludes instead of being retried forever', async
   // so the record reflects what happened.
   const completed: unknown[] = []
   const store = {
+    ...liveRunNoticeClaim(),
     claimNextRunNotice: async () => ({
       run_id: 'run-unreachable-repository',
       notice_id: 'notice-test',
@@ -213,6 +230,7 @@ test('a process without the GitHub installation concludes the notice, which the 
   const completed: unknown[] = []
   let claimed = 0
   const store = {
+    ...liveRunNoticeClaim(),
     claimNextRunNotice: async () => {
       claimed += 1
       return {
@@ -257,6 +275,7 @@ test('a transient notice failure stays claimable for another attempt', async () 
   // outcome the requester still has no way to read.
   const completed: unknown[] = []
   const store = {
+    ...liveRunNoticeClaim(),
     claimNextRunNotice: async () => ({
       run_id: 'run-transient',
       notice_id: 'notice-test',
@@ -284,6 +303,45 @@ test('a transient notice failure stays claimable for another attempt', async () 
     completed,
     [],
     'a transient failure leaves the notice claimed for the next lease'
+  )
+})
+
+test('a notice whose claim was superseded never reaches GitHub', async () => {
+  let completed = false
+  const store: RunNoticeCoordinatorStore = {
+    claimNextRunNotice: async () => ({
+      run_id: 'run-resumed',
+      notice_id: 'notice-superseded',
+      input: {
+        kind: 'github_repository_review',
+        verified_repository: 'octo/example'
+      },
+      axis: 'execution',
+      reason_code: 'SUBMISSION_RECOVERY_EXHAUSTED',
+      kind: 'attention',
+      claim_token: 'stale-token'
+    }),
+    renewRunNoticeClaim: async () => false,
+    runNoticeHeartbeatIntervalMs: async () => 60_000,
+    completeRunNotice: async () => {
+      completed = true
+      return false
+    }
+  }
+  const { app, requests } = fakeApp({
+    respond: () => githubJson({ id: 42 })
+  })
+
+  assert.strictEqual(await deliverRunNoticeOnce({ app, store }), true)
+  assert.deepStrictEqual(
+    requests,
+    [],
+    'losing the durable claim must stop before even resolving a GitHub installation'
+  )
+  assert.strictEqual(
+    completed,
+    false,
+    'the stale owner cannot conclude a notice the operator already superseded'
   )
 })
 

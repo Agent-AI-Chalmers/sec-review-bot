@@ -127,7 +127,8 @@ const STAGE_SENTENCE: Record<RunNoticeAxis, string> = {
  * repository against the installation before calling it. */
 async function ensureRepositorySummaryIssue(
   octokit: Octokit,
-  scope: { owner_login: string; repo_name: string }
+  scope: { owner_login: string; repo_name: string },
+  assertNoticeClaim: () => Promise<void>
 ): Promise<number> {
   const repo = {
     owner_login: scope.owner_login,
@@ -135,7 +136,7 @@ async function ensureRepositorySummaryIssue(
     repo_full_name: `${scope.owner_login}/${scope.repo_name}`,
     default_branch: ''
   }
-  return await ensureSummaryIssueNumber(octokit, repo, async () => undefined)
+  return await ensureSummaryIssueNumber(octokit, repo, assertNoticeClaim)
 }
 
 export interface RunNoticeReplyResult {
@@ -155,6 +156,7 @@ export async function sendRunNoticeReply(
      * console knows, because the reader would take it as a unit of the coordination vocabulary. */
     reason_code: string | null
     kind: 'failure' | 'attention'
+    assert_notice_claim: () => Promise<void>
   }
 ): Promise<RunNoticeReplyResult | null> {
   // Resolve where the outcome belongs. A conversation (issue/PR) is named directly by persisted
@@ -181,7 +183,11 @@ export async function sendRunNoticeReply(
     await assertRepositoryIsInstalled(octokit, scanScope)
     target = {
       ...scanScope,
-      issue_number: await ensureRepositorySummaryIssue(octokit, scanScope)
+      issue_number: await ensureRepositorySummaryIssue(
+        octokit,
+        scanScope,
+        args.assert_notice_claim
+      )
     }
   }
 
@@ -197,7 +203,7 @@ export async function sendRunNoticeReply(
     ...target,
     marker,
     body: `${marker}\n\n${attention ? 'The review outcome could not be confirmed. Automatic recovery has stopped and this requires operator follow-up; this is not a failure report.' : STAGE_SENTENCE[args.axis]} Reference: \`${args.run_id}\`. ${reason}`,
-    assert_publication_claim: async () => undefined
+    assert_publication_claim: args.assert_notice_claim
   })
   return { comment_url: posted.html_url }
 }

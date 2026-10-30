@@ -277,7 +277,13 @@
           },
           "status": {
             "type": "string",
-            "enum": ["pending", "delivering", "delivered", "failed"]
+            "enum": [
+              "pending",
+              "delivering",
+              "delivered",
+              "failed",
+              "superseded"
+            ]
           },
           "reason_code": {
             "type": ["string", "null"]

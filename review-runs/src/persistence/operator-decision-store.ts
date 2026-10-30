@@ -6,7 +6,7 @@ import { PublicationStore } from './publication-store.js'
 import { abandonInFlightPublication } from './publication-abandon.js'
 import { appendEvent } from './review-run-events.js'
 import { findRunRecord } from './run-record-projection.js'
-import { queueRunNotice } from './run-notices.js'
+import { queueRunNotice, supersedeRunAttentionNotices } from './run-notices.js'
 import { transaction } from '../database/transaction.js'
 import type { ReviewRunRecord } from '../shapes.js'
 
@@ -504,6 +504,11 @@ export class OperatorDecisionStore {
         fromStatus: 'disconnected',
         toStatus: 'uncertain',
         reasonCode: 'PREPARATION_RESUMED_BY_OPERATOR'
+      })
+      await supersedeRunAttentionNotices(client, {
+        runId,
+        connectorId: this.connectorId,
+        axis: 'preparation'
       })
       const record = await findRunRecord(client, this.connectorId, runId)
       if (record === null)

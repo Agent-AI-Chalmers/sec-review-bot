@@ -184,7 +184,7 @@ export type RunNoticeSummary = {
   notice_id: string
   kind: 'failure' | 'attention'
   axis: 'preparation' | 'execution' | 'publication'
-  status: 'pending' | 'delivering' | 'delivered' | 'failed'
+  status: 'pending' | 'delivering' | 'delivered' | 'failed' | 'superseded'
   reason_code: string | null
   /**
    * @description Where the requester can read the outcome. Always an absolute URI when present, and null only when no message reached them.
@@ -1242,6 +1242,52 @@ export type ClaimNextRunNoticeResponses = {
  */
 export type ClaimNextRunNoticeResponse = ClaimNextRunNoticeStatus200
 
+export type RenewRunNoticeClaimPath = {
+  /**
+   * @description The claimed notice identifier.
+   * @type string
+   */
+  noticeId: string
+}
+
+export type RenewRunNoticeClaimStatus200 = boolean
+
+export type RenewRunNoticeClaimStatus400 = ErrorResponse
+
+export type RenewRunNoticeClaimStatus401 = ErrorResponse
+
+export type RenewRunNoticeClaimStatus413 = ErrorResponse
+
+export type RenewRunNoticeClaimStatus500 = ErrorResponse
+
+export type RenewRunNoticeClaimBody = {
+  /**
+   * @minLength 1
+   * @type string
+   */
+  token: string
+}
+
+export type RenewRunNoticeClaimOptions = {
+  body: RenewRunNoticeClaimBody
+  path: RenewRunNoticeClaimPath
+  query?: never
+  headers?: never
+}
+
+export type RenewRunNoticeClaimResponses = {
+  '200': RenewRunNoticeClaimStatus200
+  '400': RenewRunNoticeClaimStatus400
+  '401': RenewRunNoticeClaimStatus401
+  '413': RenewRunNoticeClaimStatus413
+  '500': RenewRunNoticeClaimStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type RenewRunNoticeClaimResponse = RenewRunNoticeClaimStatus200
+
 export type CompleteRunNoticePath = {
   /**
    * @description The claimed notice identifier.
@@ -2086,6 +2132,31 @@ export type GetPublicationHeartbeatIntervalResponses = {
  */
 export type GetPublicationHeartbeatIntervalResponse =
   GetPublicationHeartbeatIntervalStatus200
+
+export type GetRunNoticeHeartbeatIntervalStatus200 = number
+
+export type GetRunNoticeHeartbeatIntervalStatus401 = ErrorResponse
+
+export type GetRunNoticeHeartbeatIntervalStatus500 = ErrorResponse
+
+export type GetRunNoticeHeartbeatIntervalOptions = {
+  body?: never
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type GetRunNoticeHeartbeatIntervalResponses = {
+  '200': GetRunNoticeHeartbeatIntervalStatus200
+  '401': GetRunNoticeHeartbeatIntervalStatus401
+  '500': GetRunNoticeHeartbeatIntervalStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type GetRunNoticeHeartbeatIntervalResponse =
+  GetRunNoticeHeartbeatIntervalStatus200
 /** Each operation's contract path and HTTP method, keyed by `operationId` and taken from
  * the document itself. The client builds every request from this map, so an operation cannot
  * be sent to another operation's URL or with another operation's method: the call site names
@@ -2116,6 +2187,10 @@ export const operationRoutes = {
     method: 'post'
   },
   claimNextRunNotice: { path: '/v1/run-notices/claims/next', method: 'post' },
+  renewRunNoticeClaim: {
+    path: '/v1/run-notices/{noticeId}/claim',
+    method: 'post'
+  },
   completeRunNotice: {
     path: '/v1/run-notices/{noticeId}/complete',
     method: 'post'
@@ -2178,6 +2253,10 @@ export const operationRoutes = {
   getPublicationHeartbeatInterval: {
     path: '/v1/config/publication-heartbeat-interval',
     method: 'get'
+  },
+  getRunNoticeHeartbeatInterval: {
+    path: '/v1/config/run-notice-heartbeat-interval',
+    method: 'get'
   }
 } as const
 
@@ -2195,6 +2274,7 @@ export interface OperationOptionsById {
   checkpointPreparationInput: CheckpointPreparationInputOptions
   failPreparation: FailPreparationOptions
   claimNextRunNotice: ClaimNextRunNoticeOptions
+  renewRunNoticeClaim: RenewRunNoticeClaimOptions
   completeRunNotice: CompleteRunNoticeOptions
   claimNextPublication: ClaimNextPublicationOptions
   renewPublicationClaim: RenewPublicationClaimOptions
@@ -2213,6 +2293,7 @@ export interface OperationOptionsById {
   resumeDisconnectedRun: ResumeDisconnectedRunOptions
   getPreparationHeartbeatInterval: GetPreparationHeartbeatIntervalOptions
   getPublicationHeartbeatInterval: GetPublicationHeartbeatIntervalOptions
+  getRunNoticeHeartbeatInterval: GetRunNoticeHeartbeatIntervalOptions
 }
 
 export interface OperationResponseById {
@@ -2229,6 +2310,7 @@ export interface OperationResponseById {
   checkpointPreparationInput: CheckpointPreparationInputResponse
   failPreparation: FailPreparationResponse
   claimNextRunNotice: ClaimNextRunNoticeResponse
+  renewRunNoticeClaim: RenewRunNoticeClaimResponse
   completeRunNotice: CompleteRunNoticeResponse
   claimNextPublication: ClaimNextPublicationResponse
   renewPublicationClaim: RenewPublicationClaimResponse
@@ -2247,4 +2329,5 @@ export interface OperationResponseById {
   resumeDisconnectedRun: ResumeDisconnectedRunResponse
   getPreparationHeartbeatInterval: GetPreparationHeartbeatIntervalResponse
   getPublicationHeartbeatInterval: GetPublicationHeartbeatIntervalResponse
+  getRunNoticeHeartbeatInterval: GetRunNoticeHeartbeatIntervalResponse
 }

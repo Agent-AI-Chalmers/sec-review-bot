@@ -7,6 +7,8 @@ import { repositoryFullName } from '../../src/github/repository-service.js'
 import type { Octokit } from 'octokit'
 import { fakeGitHub, githubJson } from '../github-client.js'
 
+const keepNoticeClaim = async (): Promise<void> => {}
+
 /**
  * A real client whose transport serves the endpoints `sendRunNoticeReply` uses, recording what it
  * was asked to create.
@@ -89,7 +91,8 @@ test('a repository failure target must be exactly owner/repo', async () => {
       input: { kind: 'github_repository_review', verified_repository },
       axis: 'preparation',
       reason_code: 'PREPARATION_RETRY_EXHAUSTED',
-      kind: 'failure'
+      kind: 'failure',
+      assert_notice_claim: keepNoticeClaim
     })
     assert.strictEqual(
       result,
@@ -121,7 +124,8 @@ test('a repository failure target tolerates surrounding whitespace', async () =>
     },
     axis: 'preparation',
     reason_code: 'PREPARATION_RETRY_EXHAUSTED',
-    kind: 'failure'
+    kind: 'failure',
+    assert_notice_claim: keepNoticeClaim
   })
   assert.deepStrictEqual(report.created, [{ owner: 'octo', repo: 'example' }])
   assert.deepStrictEqual(report.commented, [9])
@@ -154,7 +158,8 @@ test('the reply target and the installation lookup agree on what names a reposit
       input: { kind: 'github_repository_review', verified_repository },
       axis: 'preparation',
       reason_code: 'PREPARATION_RETRY_EXHAUSTED',
-      kind: 'failure'
+      kind: 'failure',
+      assert_notice_claim: keepNoticeClaim
     })
     const namesARepository = repositoryFullName(verified_repository) !== null
     assert.strictEqual(
@@ -192,7 +197,8 @@ test('a target repository outside the installation is refused before any write',
         input,
         axis: 'preparation',
         reason_code: 'PREPARATION_RETRY_EXHAUSTED',
-        kind: 'failure'
+        kind: 'failure',
+        assert_notice_claim: keepNoticeClaim
       }),
       /not installed on this app/,
       `${JSON.stringify(input)} must be refused`
@@ -220,7 +226,8 @@ test('a transient repository lookup fault stays retryable', async () => {
       },
       axis: 'preparation',
       reason_code: 'PREPARATION_RETRY_EXHAUSTED',
-      kind: 'failure'
+      kind: 'failure',
+      assert_notice_claim: keepNoticeClaim
     }),
     /Server Error/
   )
@@ -246,7 +253,8 @@ test('a notice without a failure code says so instead of inventing one', async (
     },
     axis: 'execution',
     reason_code: null,
-    kind: 'failure'
+    kind: 'failure',
+    assert_notice_claim: keepNoticeClaim
   })
 
   assert.strictEqual(report.bodies.length, 1)
@@ -273,9 +281,46 @@ test('a notice with a failure code still states it', async () => {
     },
     axis: 'execution',
     reason_code: 'EXECUTION_RESULT_MISSING',
-    kind: 'failure'
+    kind: 'failure',
+    assert_notice_claim: keepNoticeClaim
   })
 
   assert.strictEqual(report.bodies.length, 1)
   assert.match(report.bodies[0]!, /Reason: `EXECUTION_RESULT_MISSING`\./)
+})
+
+test('a lost notice claim stops before the public comment write', async () => {
+  const report = {
+    created: [] as Array<{ owner: string; repo: string }>,
+    commented: [] as number[],
+    installed: ['octo/example']
+  }
+
+  await assert.rejects(
+    sendRunNoticeReply(stubOctokit(report), {
+      run_id: 'run-resumed',
+      notice_id: 'notice-superseded',
+      input: {
+        kind: 'github_issue_review',
+        issue: {
+          owner_login: 'octo',
+          repo_name: 'example',
+          issue_number: 7
+        }
+      },
+      axis: 'preparation',
+      reason_code: 'PREPARATION_RECOVERY_EXHAUSTED',
+      kind: 'attention',
+      assert_notice_claim: async () => {
+        throw new Error('notice claim lost')
+      }
+    }),
+    /notice claim lost/
+  )
+  assert.deepStrictEqual(report.created, [])
+  assert.deepStrictEqual(
+    report.commented,
+    [],
+    'the repository may be read, but no comment may be written after claim loss'
+  )
 })
