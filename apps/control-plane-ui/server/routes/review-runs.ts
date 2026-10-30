@@ -6,7 +6,7 @@ import {
   readBoundedRequestBody
 } from '../http-request.js'
 import { PROXIED_CONTENT_TYPE, sendJson } from '../http-response.js'
-import { isSameOrigin } from '../request-security.js'
+import { requireSameOrigin } from '../request-security.js'
 import type { ReviewRunsClient } from '../upstream/review-runs-client.js'
 import { UpstreamRequestError } from '../upstream/request.js'
 
@@ -89,10 +89,7 @@ export function createReviewRunsRoutes({
   ): Promise<void> => {
     // A session cookie alone must not authorise a cross-site POST: the same check the
     // sign-out route uses.
-    if (!isSameOrigin(request)) {
-      sendJson(response, 403, { error: 'cross_site_request' })
-      return
-    }
+    if (!requireSameOrigin(request, response)) return
     const adminToken = request.headers['x-review-runs-admin-token']
     if (typeof adminToken !== 'string' || adminToken.trim() === '') {
       // 401 rather than 400: the request is well-formed, it just carries no operator

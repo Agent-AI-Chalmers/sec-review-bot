@@ -56,6 +56,7 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
     )
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
+      headers: { origin: base },
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
@@ -212,6 +213,7 @@ test('BFF rejects artifact metadata that does not belong to the requested run', 
     const base = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
+      headers: { origin: base },
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
@@ -271,6 +273,7 @@ test('BFF rejects an object whose size does not match the available artifact', a
     const base = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
+      headers: { origin: base },
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
@@ -332,6 +335,7 @@ test('BFF rejects same-size artifact content that does not match the stored dige
     const base = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
+      headers: { origin: base },
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
@@ -398,6 +402,7 @@ test('BFF times out a stalled artifact download', async () => {
     const base = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
+      headers: { origin: base },
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
@@ -443,6 +448,7 @@ test('BFF reports a Review Runs metadata timeout separately', async () => {
     const base = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
+      headers: { origin: base },
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')

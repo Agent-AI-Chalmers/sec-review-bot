@@ -1,11 +1,12 @@
 import crypto from 'node:crypto'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
+import { sendJson } from '../http-response.js'
 import {
   RequestBodyTooLargeError,
   readBoundedRequestBody
 } from '../http-request.js'
-import { isSameOrigin } from '../request-security.js'
+import { requireSameOrigin } from '../request-security.js'
 
 export interface SessionRoutes {
   authenticated(request: IncomingMessage): boolean
@@ -65,13 +66,15 @@ export function createSessionRoutes({
     response: ServerResponse
   ): Promise<boolean> => {
     if (request.url === '/api/session' && request.method === 'POST') {
+      // Signing in is a state change too: without this, another site could force the
+      // browser into a session it did not ask for.
+      if (!requireSameOrigin(request, response)) return true
       let raw: Buffer
       try {
         raw = await readBoundedRequestBody(request)
       } catch (error) {
         if (error instanceof RequestBodyTooLargeError) {
-          response.writeHead(413, { 'content-type': 'application/json' })
-          response.end('{"error":"request_too_large"}')
+          sendJson(response, 413, { error: 'request_too_large' })
           return true
         }
         throw error
@@ -95,8 +98,7 @@ export function createSessionRoutes({
         suppliedBytes.byteLength === accessTokenBytes.byteLength &&
         crypto.timingSafeEqual(suppliedBytes, accessTokenBytes)
       if (!valid) {
-        response.writeHead(401, { 'content-type': 'application/json' })
-        response.end('{"error":"unauthorized"}')
+        sendJson(response, 401, { error: 'unauthorized' })
         return true
       }
       const sessionValue = crypto.randomBytes(32).toString('base64url')
@@ -112,11 +114,7 @@ export function createSessionRoutes({
     }
 
     if (request.url === '/api/session' && request.method === 'DELETE') {
-      if (!isSameOrigin(request)) {
-        response.writeHead(403, { 'content-type': 'application/json' })
-        response.end('{"error":"cross_origin"}')
-        return true
-      }
+      if (!requireSameOrigin(request, response)) return true
       const session = sessionCookie(request)
       if (session !== undefined) sessions.delete(session)
       response.writeHead(204, {

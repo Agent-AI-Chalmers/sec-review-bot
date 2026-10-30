@@ -30,7 +30,7 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
     assert.strictEqual((await fetch(`${base}/api/runs`)).status, 401)
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', origin: base },
       body: '{"token":"login-secret"}'
     })
     assert.strictEqual(login.status, 204)
@@ -150,11 +150,13 @@ test('BFF authenticates sessions and proxies only read queries', async () => {
     )
     const oversizedLogin = await fetch(`${base}/api/session`, {
       method: 'POST',
+      headers: { origin: base },
       body: JSON.stringify({ token: 'x'.repeat(1024 * 1024) })
     })
     assert.strictEqual(oversizedLogin.status, 413)
     const unicodeLogin = await fetch(`${base}/api/session`, {
       method: 'POST',
+      headers: { origin: base },
       body: JSON.stringify({ token: '\u00e9'.repeat('login-secret'.length) })
     })
     assert.strictEqual(unicodeLogin.status, 401)
@@ -250,6 +252,7 @@ test('BFF returns a gateway error when Review Runs is unavailable', async () => 
     const base = `http://127.0.0.1:${address.port}`
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
+      headers: { origin: base },
       body: JSON.stringify({ token: 'login-secret' })
     })
     const cookie = login.headers.get('set-cookie')
@@ -288,7 +291,7 @@ test('BFF does not echo an upstream content-type it would serve as script', asyn
   try {
     const login = await fetch(`${base}/api/session`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', origin: base },
       body: '{"token":"login-secret"}'
     })
     const cookie = login.headers.get('set-cookie')
