@@ -1,16 +1,23 @@
-import type {
-  ReviewRunRecord,
-  ReviewRunStore
-} from '../persistence/review-run-store.js'
+import type { ExecutionArtifactStorage } from '../contracts.js'
+import type { ReviewRunRecord } from '../persistence/review-run-store.js'
 import type { ExecutionRunStatus } from '../execution-client.js'
 
-type ObservationStore = Pick<
-  ReviewRunStore,
-  | 'markRunning'
-  | 'recordExecutionSuccess'
-  | 'failExecution'
-  | 'touchObservation'
->
+interface ObservationStore {
+  executions: {
+    markRunning(runId: string): Promise<boolean>
+    recordExecutionSuccess(
+      runId: string,
+      workflowResult: unknown,
+      storage: ExecutionArtifactStorage | undefined
+    ): Promise<boolean>
+    touchObservation(runId: string): Promise<void>
+  }
+  failExecution(
+    runId: string,
+    error: { code?: string | null; message: string },
+    storage?: ExecutionArtifactStorage
+  ): Promise<boolean>
+}
 export type ExecutionObservationResult =
   'active' | 'succeeded' | 'failed' | 'poll_retry'
 export interface ExecutionObservationEvent {
@@ -79,8 +86,8 @@ export async function observeExecutionRun(
     // `markRunning` only writes on the queued -> running transition; when the run is already
     // running, retry the heartbeat so `execution.updated_at` keeps advancing. If the store has
     // already seen a different state, the UPDATE matches nothing and the run stays as observed.
-    if (!(await store.markRunning(run.run_id))) {
-      await store.touchObservation(run.run_id)
+    if (!(await store.executions.markRunning(run.run_id))) {
+      await store.executions.touchObservation(run.run_id)
       return 'active'
     }
     onEvent({
@@ -95,7 +102,7 @@ export async function observeExecutionRun(
   if (status.status !== 'succeeded' && status.status !== 'failed') {
     // The Execution still reports an unfinished task. Refresh the observation heartbeat only for
     // the states it applies to; `touchObservation` is a no-op for pending/uncertain.
-    await store.touchObservation(run.run_id)
+    await store.executions.touchObservation(run.run_id)
     return 'active'
   }
   if (status.status === 'failed') {
@@ -146,7 +153,7 @@ export async function observeExecutionRun(
     return 'failed'
   }
   if (
-    !(await store.recordExecutionSuccess(
+    !(await store.executions.recordExecutionSuccess(
       run.run_id,
       status.result,
       status.artifact_storage

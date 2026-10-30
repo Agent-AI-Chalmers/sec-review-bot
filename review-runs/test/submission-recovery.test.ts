@@ -47,10 +47,19 @@ function run(
   }
 }
 
-function store(
-  overrides: Partial<Parameters<typeof recoverReviewRunSubmission>[0]> = {}
-): Parameters<typeof recoverReviewRunSubmission>[0] {
-  return {
+type RecoveryStore = Parameters<typeof recoverReviewRunSubmission>[0]
+type FlatRecoveryStore = {
+  claimSubmissionRecovery: RecoveryStore['executions']['claimSubmissionRecovery']
+  submissionRecoveryAttemptCount: RecoveryStore['executions']['submissionRecoveryAttemptCount']
+  completeSubmissionRecovery: RecoveryStore['submissionTransitions']['completeSubmissionRecovery']
+  failSubmissionRecovery: RecoveryStore['submissionTransitions']['failSubmissionRecovery']
+  disconnectExhaustedSubmissionRecovery: RecoveryStore['executions']['disconnectExhaustedSubmissionRecovery']
+  recordUnknownRecoveryOutcome: RecoveryStore['executions']['recordUnknownRecoveryOutcome']
+}
+
+/** The behaviours these tests vary, kept flat; recovery reads them through their axes. */
+function store(overrides: Partial<FlatRecoveryStore> = {}): RecoveryStore {
+  const flat: FlatRecoveryStore = {
     async claimSubmissionRecovery() {
       return 'claim-1'
     },
@@ -70,6 +79,23 @@ function store(
       return true
     },
     ...overrides
+  }
+  return {
+    executions: {
+      claimSubmissionRecovery: (runId) => flat.claimSubmissionRecovery(runId),
+      submissionRecoveryAttemptCount: (runId) =>
+        flat.submissionRecoveryAttemptCount(runId),
+      disconnectExhaustedSubmissionRecovery: (runId, maxAttempts) =>
+        flat.disconnectExhaustedSubmissionRecovery(runId, maxAttempts),
+      recordUnknownRecoveryOutcome: (runId, token) =>
+        flat.recordUnknownRecoveryOutcome(runId, token)
+    },
+    submissionTransitions: {
+      completeSubmissionRecovery: (runId, token) =>
+        flat.completeSubmissionRecovery(runId, token),
+      failSubmissionRecovery: (runId, token, error) =>
+        flat.failSubmissionRecovery(runId, token, error)
+    }
   }
 }
 

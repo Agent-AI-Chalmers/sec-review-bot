@@ -68,18 +68,22 @@ function stubStore() {
   return {
     calls,
     connectorId: 'seam:test',
-    failPreparation: async (...args: unknown[]) => {
-      calls.push({ method: 'failPreparation', args })
+    publications: {
+      initializePublicationSteps: async (...args: unknown[]) => {
+        calls.push({ method: 'initializePublicationSteps', args })
+      },
+      requirePublicationStepClaim: async (...args: unknown[]) => {
+        calls.push({ method: 'requirePublicationStepClaim', args })
+      }
     },
-    initializePublicationSteps: async (...args: unknown[]) => {
-      calls.push({ method: 'initializePublicationSteps', args })
-    },
-    requirePublicationStepClaim: async (...args: unknown[]) => {
-      calls.push({ method: 'requirePublicationStepClaim', args })
-    },
-    renewPreparationClaim: async (...args: unknown[]) => {
-      calls.push({ method: 'renewPreparationClaim', args })
-      return true
+    preparations: {
+      fail: async (...args: unknown[]) => {
+        calls.push({ method: 'failPreparation', args })
+      },
+      renewClaim: async (...args: unknown[]) => {
+        calls.push({ method: 'renewPreparationClaim', args })
+        return true
+      }
     }
   }
 }

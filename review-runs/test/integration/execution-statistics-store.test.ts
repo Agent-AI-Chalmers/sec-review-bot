@@ -150,7 +150,7 @@ test('statistics settle only after two identical reads and persist relational gr
         model_call_count: 1
       }
     ])
-    const readModel = await reviewStore.getExecutionStatistics([runId])
+    const readModel = await reviewStore.queries.getExecutionStatistics([runId])
     assert.deepStrictEqual(readModel.get(runId), {
       reconciliation_status: 'settled',
       ingestion_status: 'settled',

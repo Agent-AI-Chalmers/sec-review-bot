@@ -3,9 +3,9 @@
 // It lives in its own module because it is neither a preparation nor an execution concern, yet
 // both of those axes trigger it when they prove the Execution will produce no result. Putting it in
 // `publication-store.ts` would make `preparation-store.ts` import the publication store, breaking
-// the rule that single-axis stores do not depend on each other; `ReviewRunStore` orchestrates
-// cross-axis transitions, but the stores themselves cannot import it (it constructs them).
-// A small module both can import keeps the dependency graph one-directional.
+// the rule that single-axis stores do not depend on each other. The composition root constructs
+// those stores, while this small transaction helper lets each cross-axis caller share the state
+// change without importing a sibling store.
 import type { PoolClient } from 'pg'
 
 import type { PublicationStatus } from '../shapes.js'

@@ -37,22 +37,32 @@ const run: ReviewRunRecord = {
   artifact_storage: null,
   notices: []
 }
-function store(events: unknown[][]): Parameters<typeof observeExecutionRun>[0] {
-  return {
-    async markRunning(id) {
+type ObservationStore = Parameters<typeof observeExecutionRun>[0]
+
+/** The transitions this test records, kept flat; observation reads them per axis. */
+function store(events: unknown[][]): ObservationStore {
+  const executions = {
+    async markRunning(id: string) {
       events.push(['running', id])
       return true
     },
-    async recordExecutionSuccess(id, result, artifact) {
+    async recordExecutionSuccess(
+      id: string,
+      result: unknown,
+      artifact?: unknown
+    ) {
       events.push(['succeeded', id, result, artifact])
       return true
     },
+    async touchObservation(id: string) {
+      events.push(['touched', id])
+    }
+  }
+  return {
+    executions,
     async failExecution(id, failure, artifact) {
       events.push(['failed', id, failure, artifact])
       return true
-    },
-    async touchObservation(id) {
-      events.push(['touched', id])
     }
   }
 }
@@ -175,7 +185,7 @@ test('a stale running observation does not emit a state-change event', async () 
   const result = await observeExecutionRun(
     {
       ...store([]),
-      markRunning: async () => false
+      executions: { ...store([]).executions, markRunning: async () => false }
     },
     run,
     async () => ({
@@ -195,7 +205,10 @@ test('a stale successful observation does not emit a terminal event', async () =
   const result = await observeExecutionRun(
     {
       ...store([]),
-      recordExecutionSuccess: async () => false
+      executions: {
+        ...store([]).executions,
+        recordExecutionSuccess: async () => false
+      }
     },
     run,
     async () => ({

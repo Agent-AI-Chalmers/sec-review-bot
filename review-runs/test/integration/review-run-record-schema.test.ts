@@ -67,7 +67,7 @@ test('the record getRun returns validates against the shared schema', async () =
   const store = await createStore()
   try {
     const runId = `run-${randomUUID()}`
-    const admission = await store.createPreparingReviewRun({
+    const admission = await store.admissions.create({
       workflow: 'issue-review',
       run_id: runId,
       publish_context: { repository: 'octo/example' },
@@ -76,23 +76,27 @@ test('the record getRun returns validates against the shared schema', async () =
     })
     assert.ok(admission.preparation_token)
 
-    const preparing = await store.getRun(runId)
+    const preparing = await store.queries.getRun(runId)
     assert.strictEqual(
       validate(preparing),
       true,
       `a preparing record must be accepted: ${JSON.stringify(validate.errors)}`
     )
 
-    await store.markQueued(runId, admission.preparation_token, {
-      repository: 'octo/example'
-    })
-    await store.recordExecutionSuccess(
+    await store.submissionTransitions.markQueued(
+      runId,
+      admission.preparation_token,
+      {
+        repository: 'octo/example'
+      }
+    )
+    await store.executions.recordExecutionSuccess(
       runId,
       { run_id: runId },
       { status: 'unavailable' }
     )
 
-    const succeeded = await store.getRun(runId)
+    const succeeded = await store.queries.getRun(runId)
     assert.strictEqual(
       validate(succeeded),
       true,

@@ -3,10 +3,26 @@ import test from 'node:test'
 
 import {
   coordinateReviewRunsOnce,
-  startReviewRunCoordinatorLoop
+  startReviewRunCoordinatorLoop,
+  type CoordinationStore
 } from '../src/runtime/coordinator.js'
 import type { RunRowsProjection } from '../src/persistence/review-run-store.js'
 import type { ReviewRunRecord } from '../src/shapes.js'
+
+/** The coordinator reads through the queries axis; this keeps the doubles flat and readable. */
+function coordinationStore(store: {
+  expireStalePreparations: CoordinationStore['preparations']['expireStale']
+  listSubmissionRecoveries: CoordinationStore['queries']['listSubmissionRecoveries']
+  listActiveRuns: CoordinationStore['queries']['listActiveRuns']
+}): CoordinationStore {
+  return {
+    preparations: { expireStale: () => store.expireStalePreparations() },
+    queries: {
+      listSubmissionRecoveries: () => store.listSubmissionRecoveries(),
+      listActiveRuns: () => store.listActiveRuns()
+    }
+  }
+}
 
 const run: ReviewRunRecord = {
   run_id: 'run-1',
@@ -62,7 +78,7 @@ test('coordination expires preparations before recovery and active observation',
     }
   }
 
-  await coordinateReviewRunsOnce(store, {
+  await coordinateReviewRunsOnce(coordinationStore(store), {
     async recoverSubmission(entry) {
       events.push(`recover:${entry.run_id}`)
     },
@@ -109,7 +125,7 @@ test('one pass reads every active run status in a single request', async () => {
   const reads: string[][] = []
   const observed: string[] = []
 
-  await coordinateReviewRunsOnce(store, {
+  await coordinateReviewRunsOnce(coordinationStore(store), {
     async recoverSubmission() {
       throw new Error('this pass has nothing to recover')
     },
@@ -146,7 +162,7 @@ test('a pass with no active runs asks the Execution nothing', async () => {
     }
   }
 
-  await coordinateReviewRunsOnce(store, {
+  await coordinateReviewRunsOnce(coordinationStore(store), {
     async recoverSubmission() {
       throw new Error('this pass has nothing to recover')
     },
@@ -197,7 +213,7 @@ test('a single row the contract cannot represent degrades that run, not the pass
   const observed: string[] = []
   const reported: Array<{ run_id: string; message: string }> = []
 
-  await coordinateReviewRunsOnce(store, {
+  await coordinateReviewRunsOnce(coordinationStore(store), {
     async recoverSubmission() {},
     async readExecutionStatuses() {
       return { runs: [], missing: [], byRunId: new Map() }
@@ -245,7 +261,7 @@ test('an unclassified submission recovery failure aborts the coordination pass',
   const recovered: string[] = []
 
   await assert.rejects(
-    coordinateReviewRunsOnce(store, {
+    coordinateReviewRunsOnce(coordinationStore(store), {
       async recoverSubmission(entry) {
         recovered.push(entry.run_id)
         throw new Error('database unavailable')
@@ -289,7 +305,7 @@ test('an unclassified execution observation failure aborts the coordination pass
   const observed: string[] = []
 
   await assert.rejects(
-    coordinateReviewRunsOnce(store, {
+    coordinateReviewRunsOnce(coordinationStore(store), {
       async recoverSubmission() {
         assert.fail('this pass has no submission recovery')
       },

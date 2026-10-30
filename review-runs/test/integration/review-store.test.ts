@@ -30,7 +30,7 @@ test('an axis row cannot be written under a connector the trunk does not own', a
   const pool = new Pool({ connectionString: databaseUrl() })
   try {
     const runId = `run-${randomUUID()}`
-    await store.createPreparingReviewRun({
+    await store.admissions.create({
       workflow: 'issue-review',
       run_id: runId,
       publish_context: {}
@@ -109,14 +109,14 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
   const pool = new Pool({ connectionString: databaseUrl() })
   try {
     const runId = `run-${randomUUID()}`
-    const admission = await store.createPreparingReviewRun({
+    const admission = await store.admissions.create({
       workflow: 'issue-review',
       run_id: runId,
       publish_context: {}
     })
     assert.ok(admission.preparation_token)
     // A terminal preparation failure is what creates the notice row.
-    await store.failPreparation(runId, admission.preparation_token, {
+    await store.preparations.fail(runId, admission.preparation_token, {
       code: 'REVIEW_START_FAILED',
       message: 'boom'
     })
@@ -163,7 +163,7 @@ test('the failure-notice outbox is fenced to the connector that owns its prepara
       'the wrong-connector notice was never stored'
     )
     assert.deepStrictEqual(
-      (await store.getRun(runId))?.notices,
+      (await store.queries.getRun(runId))?.notices,
       [],
       'and so the run reports no notice rather than a phantom one'
     )
@@ -182,7 +182,7 @@ test('admission creates exactly one executions row alongside the run trunk', asy
   const pool = new Pool({ connectionString: databaseUrl() })
   try {
     const runId = `run-${randomUUID()}`
-    await store.createPreparingReviewRun({
+    await store.admissions.create({
       workflow: 'issue-review',
       run_id: runId,
       publish_context: { repo: 'octo/example' }
@@ -252,7 +252,7 @@ for (const axis of ['executions', 'preparations'] as const) {
     const pool = new Pool({ connectionString: databaseUrl() })
     try {
       const runId = `run-${randomUUID()}`
-      await store.createPreparingReviewRun({
+      await store.admissions.create({
         workflow: 'issue-review',
         run_id: runId,
         publish_context: {}
@@ -262,7 +262,7 @@ for (const axis of ['executions', 'preparations'] as const) {
       // fixture cleanup below, so this never leaks into another test.
       await pool.query(`DELETE FROM ${axis} WHERE run_id=$1`, [runId])
 
-      const page = await store.listRunsPage({ limit: 10 })
+      const page = await store.queries.listRunsPage({ limit: 10 })
       assert.ok(
         page.dropped.some((entry) => entry.run_id === runId),
         'the corrupt run is reported in dropped'
@@ -274,7 +274,7 @@ for (const axis of ['executions', 'preparations'] as const) {
       // A status filter must not be what hides corruption. A newly admitted run's preparation is
       // `preparing`, so filtering on that state still has to surface the row as dropped: the
       // filter selects on a value, and a corrupt row must be reported rather than filtered away.
-      const matching = await store.listRunsPage({
+      const matching = await store.queries.listRunsPage({
         preparation_status: 'preparing',
         limit: 10
       })
@@ -287,14 +287,14 @@ for (const axis of ['executions', 'preparations'] as const) {
       // through the callback rather than leaving corruption to look like a missing run.
       // An unknown id must NOT report corruption; only a stored row that fails to project does.
       assert.strictEqual(
-        await store.getRun(`run-unknown-${randomUUID()}`),
+        await store.queries.getRun(`run-unknown-${randomUUID()}`),
         null
       )
       assert.ok(
         !dropped.some((entry) => entry.run_id.startsWith('run-unknown-')),
         'an unknown run id is not reported as corruption'
       )
-      assert.strictEqual(await store.getRun(runId), null)
+      assert.strictEqual(await store.queries.getRun(runId), null)
       assert.ok(
         dropped.some((entry) => entry.run_id === runId),
         'the single-run read reports the corrupt row'
@@ -314,14 +314,14 @@ test('Review Runs store initializes its schema and deduplicates ingress', async 
   await store.initialize()
   try {
     const ingressKey = `delivery:${randomUUID()}`
-    const first = await store.admitReviewRun({
+    const first = await store.admissions.admit({
       run_id: `run-${randomUUID()}`,
       workflow: 'issue-review',
       publish_context: {},
       ingress_kind: 'github_webhook',
       ingress_key: ingressKey
     })
-    const replay = await store.admitReviewRun({
+    const replay = await store.admissions.admit({
       run_id: `discarded-${randomUUID()}`,
       workflow: 'issue-review',
       publish_context: {},
@@ -401,12 +401,12 @@ test('Review Runs store fences reads by connector', async () => {
   })
   await Promise.all([first.initialize(), second.initialize()])
   try {
-    await first.createPreparingReviewRun({
+    await first.admissions.create({
       run_id: runId,
       workflow: 'repository-review',
       publish_context: {}
     })
-    assert.strictEqual(await second.getRun(runId), null)
+    assert.strictEqual(await second.queries.getRun(runId), null)
   } finally {
     await Promise.all([first.close(), second.close()])
   }
@@ -422,7 +422,7 @@ test('run queries survive a fresh store connection and preserve stable paginatio
   const runIds = [`run-${randomUUID()}`, `run-${randomUUID()}`]
   try {
     for (const run_id of runIds) {
-      await first.createPreparingReviewRun({
+      await first.admissions.create({
         run_id,
         workflow: 'issue-review',
         publish_context: { private: true },
@@ -440,14 +440,14 @@ test('run queries survive a fresh store connection and preserve stable paginatio
   await restarted.initialize()
   try {
     const { runs: firstPage, next_cursor: cursor } =
-      await restarted.listRunsPage({ limit: 1 })
+      await restarted.queries.listRunsPage({ limit: 1 })
     assert.strictEqual(firstPage.length, 1)
     assert.ok(
       cursor,
       'a second run remains, so the first page must carry a cursor'
     )
     const { runs: secondPage, next_cursor: finalCursor } =
-      await restarted.listRunsPage({
+      await restarted.queries.listRunsPage({
         limit: 1,
         cursor
       })
@@ -455,7 +455,8 @@ test('run queries survive a fresh store connection and preserve stable paginatio
     assert.notStrictEqual(secondPage[0]?.run_id, firstPage[0]?.run_id)
     assert.strictEqual(finalCursor, null)
     assert.strictEqual(
-      (await restarted.getRun(runIds[0] ?? ''))?.execution_input?.secret,
+      (await restarted.queries.getRun(runIds[0] ?? ''))?.execution_input
+        ?.secret,
       true
     )
   } finally {
@@ -471,19 +472,19 @@ test('run queries apply status filters before pagination limits', async () => {
   await store.initialize()
   try {
     const failedRunId = `run-${randomUUID()}`
-    const failed = await store.createPreparingReviewRun({
+    const failed = await store.admissions.create({
       run_id: failedRunId,
       workflow: 'issue-review',
       publish_context: {}
     })
     assert.ok(failed.preparation_token)
-    await store.failPreparation(failedRunId, failed.preparation_token, {
+    await store.preparations.fail(failedRunId, failed.preparation_token, {
       code: 'PREPARATION_FAILED',
       message: 'failed before newer runs were admitted'
     })
 
     for (let index = 0; index < 2; index += 1) {
-      await store.createPreparingReviewRun({
+      await store.admissions.create({
         run_id: `run-${randomUUID()}`,
         workflow: 'issue-review',
         publish_context: {}
@@ -492,7 +493,7 @@ test('run queries apply status filters before pagination limits', async () => {
 
     // The preparation failed before the Execution was called, so execution is `skipped`, not
     // failed; the filter narrows to exactly that terminal run.
-    const { runs: skippedRuns } = await store.listRunsPage({
+    const { runs: skippedRuns } = await store.queries.listRunsPage({
       execution_status: 'skipped',
       limit: 1
     })
@@ -504,7 +505,7 @@ test('run queries apply status filters before pagination limits', async () => {
     // `preparation_status` filters on the redacted preparation summary's state, which the
     // run record exposes alongside the two status axes. The two waiting runs are still
     // `preparing` (claimed); the failed one reached the terminal `failed` state.
-    const { runs: failedPreparations } = await store.listRunsPage({
+    const { runs: failedPreparations } = await store.queries.listRunsPage({
       preparation_status: 'failed',
       limit: 10
     })
@@ -513,7 +514,7 @@ test('run queries apply status filters before pagination limits', async () => {
       [failedRunId]
     )
     assert.strictEqual(failedPreparations[0]?.preparation?.status, 'failed')
-    const { runs: preparingPreparations } = await store.listRunsPage({
+    const { runs: preparingPreparations } = await store.queries.listRunsPage({
       preparation_status: 'preparing',
       limit: 10
     })
@@ -523,7 +524,7 @@ test('run queries apply status filters before pagination limits', async () => {
         (run) => run.preparation?.status === 'preparing'
       )
     )
-    const { runs: githubRuns } = await store.listRunsPage({
+    const { runs: githubRuns } = await store.queries.listRunsPage({
       source_platform: 'github',
       limit: 10
     })
@@ -545,7 +546,7 @@ test('keyset cursors do not skip rows that share a millisecond', async () => {
   const observer = new Pool({ connectionString: databaseUrl() })
   try {
     for (const run_id of runIds) {
-      await store.createPreparingReviewRun({
+      await store.admissions.create({
         run_id,
         workflow: 'issue-review',
         publish_context: {}
@@ -563,12 +564,16 @@ test('keyset cursors do not skip rows that share a millisecond', async () => {
       [runIds[0], connectorId]
     )
 
-    const { runs: firstPage, next_cursor: cursor } = await store.listRunsPage({
-      limit: 1
-    })
+    const { runs: firstPage, next_cursor: cursor } =
+      await store.queries.listRunsPage({
+        limit: 1
+      })
     assert.strictEqual(firstPage.length, 1)
     assert.ok(cursor)
-    const { runs: secondPage } = await store.listRunsPage({ limit: 1, cursor })
+    const { runs: secondPage } = await store.queries.listRunsPage({
+      limit: 1,
+      cursor
+    })
     assert.strictEqual(secondPage.length, 1)
     assert.deepStrictEqual(
       [firstPage[0]?.run_id, secondPage[0]?.run_id].sort(),
@@ -596,13 +601,17 @@ test('a row the contract cannot represent is dropped from a read, not thrown', a
   const poisonedId = `run-${randomUUID()}`
   try {
     for (const runId of [healthyId, poisonedId]) {
-      const admission = await store.createPreparingReviewRun({
+      const admission = await store.admissions.create({
         workflow: 'issue-review',
         run_id: runId,
         publish_context: {}
       })
       assert.ok(admission.preparation_token)
-      await store.markQueued(runId, admission.preparation_token, {})
+      await store.submissionTransitions.markQueued(
+        runId,
+        admission.preparation_token,
+        {}
+      )
     }
 
     const pool = new Pool({ connectionString: databaseUrl() })
@@ -611,7 +620,7 @@ test('a row the contract cannot represent is dropped from a read, not thrown', a
       [poisonedId, JSON.stringify({ status: 'available' })]
     )
     try {
-      const page = await store.listRunsPage({ limit: 10 })
+      const page = await store.queries.listRunsPage({ limit: 10 })
       assert.deepStrictEqual(
         page.dropped.map((entry) => entry.run_id),
         [poisonedId],
@@ -623,7 +632,7 @@ test('a row the contract cannot represent is dropped from a read, not thrown', a
         'the healthy row is still listed'
       )
 
-      const active = await store.listActiveRuns()
+      const active = await store.queries.listActiveRuns()
       assert.deepStrictEqual(
         active.dropped.map((entry) => entry.run_id),
         [poisonedId],
@@ -653,7 +662,11 @@ test('a submission for an unknown run is a 404, not a server fault', async () =>
   await store.initialize()
   try {
     await assert.rejects(
-      store.markQueued(`missing-${randomUUID()}`, randomUUID(), {}),
+      store.submissionTransitions.markQueued(
+        `missing-${randomUUID()}`,
+        randomUUID(),
+        {}
+      ),
       (error: unknown) =>
         typeof error === 'object' &&
         error !== null &&
@@ -678,7 +691,7 @@ test('an execution may hold a recovery claim only while uncertain', async () => 
   const pool = new Pool({ connectionString: databaseUrl() })
   try {
     const runId = `run-${randomUUID()}`
-    await store.createPreparingReviewRun({
+    await store.admissions.create({
       workflow: 'issue-review',
       run_id: runId,
       publish_context: {}

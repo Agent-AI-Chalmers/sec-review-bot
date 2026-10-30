@@ -8,10 +8,13 @@ import type {
 } from '../persistence/review-run-store.js'
 import type { ExecutionRunStatusBatch } from '../execution-client.js'
 
-type CoordinationStore = Pick<
-  ReviewRunStore,
-  'expireStalePreparations' | 'listSubmissionRecoveries' | 'listActiveRuns'
->
+export type CoordinationStore = {
+  preparations: Pick<ReviewRunStore['preparations'], 'expireStale'>
+  queries: Pick<
+    ReviewRunStore['queries'],
+    'listSubmissionRecoveries' | 'listActiveRuns'
+  >
+}
 
 export interface ReviewRunCoordinationHandlers {
   recoverSubmission: (run: ReviewRunRecord) => Promise<void>
@@ -38,14 +41,14 @@ export async function coordinateReviewRunsOnce(
 ): Promise<void> {
   // Expiry isolates each row, so a run whose story contradicts itself no longer aborts the pass
   // before recovery and observation get to run. It is reported and skipped instead.
-  const expiry = await store.expireStalePreparations()
+  const expiry = await store.preparations.expireStale()
   for (const blocked of expiry.blocked) {
     handlers.onBlockedPreparationExpiry(blocked)
   }
 
   // Both reads are fan-outs: a stored row the contract cannot represent would otherwise
   // abort the read (and so the whole pass) for every run. Report the bad row and carry on.
-  const recoveries = await store.listSubmissionRecoveries()
+  const recoveries = await store.queries.listSubmissionRecoveries()
   for (const dropped of recoveries.dropped) {
     handlers.onDroppedRunRow(dropped)
   }
@@ -56,7 +59,7 @@ export async function coordinateReviewRunsOnce(
     await handlers.recoverSubmission(run)
   }
 
-  const { runs: active, dropped } = await store.listActiveRuns()
+  const { runs: active, dropped } = await store.queries.listActiveRuns()
   for (const droppedRow of dropped) {
     handlers.onDroppedRunRow(droppedRow)
   }

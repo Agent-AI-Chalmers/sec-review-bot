@@ -17,7 +17,7 @@ export function buildCoordinationRouteHandlers(
         body.preparation_input_version === undefined
       )
         throw new Error('Preparation input is required for run admission.')
-      return await store.admitReviewRun({
+      return await store.admissions.admit({
         ...body,
         preparation_input: body.preparation_input,
         preparation_input_version: body.preparation_input_version,
@@ -44,32 +44,33 @@ export function buildCoordinationRouteHandlers(
     renewPreparationClaim: async (request) => {
       const { runId } = request.params as PathParams<'renewPreparationClaim'>
       const { token } = request.body as RequestBody<'renewPreparationClaim'>
-      return await store.renewPreparationClaim(runId, token)
+      return await store.preparations.renewClaim(runId, token)
     },
 
-    claimNextPreparation: async () => await store.claimNextPreparation(),
+    claimNextPreparation: async () => await store.preparations.claimNext(),
 
     checkpointPreparationInput: async (request) => {
       const { runId } =
         request.params as PathParams<'checkpointPreparationInput'>
       const { token, input } =
         request.body as RequestBody<'checkpointPreparationInput'>
-      await store.checkpointPreparationInput(runId, token, input)
+      await store.preparations.checkpointInput(runId, token, input)
     },
 
-    claimNextRunNotice: async () => await store.claimNextRunNotice(),
+    claimNextRunNotice: async () =>
+      await store.preparations.claimNextRunNotice(),
 
     renewRunNoticeClaim: async (request) => {
       const { noticeId } = request.params as PathParams<'renewRunNoticeClaim'>
       const { token } = request.body as RequestBody<'renewRunNoticeClaim'>
-      return await store.renewRunNoticeClaim(noticeId, token)
+      return await store.preparations.renewRunNoticeClaim(noticeId, token)
     },
 
     failPreparation: async (request) => {
       const { runId } = request.params as PathParams<'failPreparation'>
       const { token, failure, retry, retry_after_ms } =
         request.body as RequestBody<'failPreparation'>
-      return await store.failPreparation(runId, token, failure, {
+      return await store.preparations.fail(runId, token, failure, {
         retry: retry ?? false,
         ...(retry_after_ms === undefined
           ? {}
@@ -81,24 +82,28 @@ export function buildCoordinationRouteHandlers(
       const { noticeId } = request.params as PathParams<'completeRunNotice'>
       const body = request.body as RequestBody<'completeRunNotice'>
       return body.delivered
-        ? await store.completeRunNotice(
+        ? await store.preparations.completeRunNotice(
             noticeId,
             body.token,
             true,
             body.comment_url
           )
-        : await store.completeRunNotice(noticeId, body.token, false)
+        : await store.preparations.completeRunNotice(
+            noticeId,
+            body.token,
+            false
+          )
     },
 
     claimNextPublication: async (request) => {
       const { wait_ms } = request.body as RequestBody<'claimNextPublication'>
-      return await store.claimNextPublication(wait_ms ?? 0)
+      return await store.publicationClaims.claimNext(wait_ms ?? 0)
     },
 
     renewPublicationClaim: async (request) => {
       const { runId } = request.params as PathParams<'renewPublicationClaim'>
       const { token } = request.body as RequestBody<'renewPublicationClaim'>
-      return await store.renewPublicationClaim(runId, token)
+      return await store.publications.renewClaim(runId, token)
     },
 
     initializePublicationSteps: async (request, reply) => {
@@ -106,7 +111,11 @@ export function buildCoordinationRouteHandlers(
         request.params as PathParams<'initializePublicationSteps'>
       const { token, step_keys } =
         request.body as RequestBody<'initializePublicationSteps'>
-      await store.initializePublicationSteps(runId, token, step_keys)
+      await store.publications.initializePublicationSteps(
+        runId,
+        token,
+        step_keys
+      )
       return reply.code(200).send()
     },
 
@@ -115,7 +124,11 @@ export function buildCoordinationRouteHandlers(
         request.params as PathParams<'requirePublicationStepClaim'>
       const { token } =
         request.body as RequestBody<'requirePublicationStepClaim'>
-      await store.requirePublicationStepClaim(runId, token, stepKey)
+      await store.publications.requirePublicationStepClaim(
+        runId,
+        token,
+        stepKey
+      )
       return reply.code(200).send()
     },
 
@@ -124,7 +137,7 @@ export function buildCoordinationRouteHandlers(
         request.params as PathParams<'completePublicationStep'>
       const { token, remote_object } =
         request.body as RequestBody<'completePublicationStep'>
-      return await store.completePublicationStep(
+      return await store.publications.completePublicationStep(
         runId,
         token,
         stepKey,
@@ -137,7 +150,7 @@ export function buildCoordinationRouteHandlers(
         request.params as PathParams<'settleExhaustedPublicationStep'>
       const { token, found, remote_object } =
         request.body as RequestBody<'settleExhaustedPublicationStep'>
-      return await store.settleExhaustedPublicationStep(
+      return await store.publications.settleExhaustedPublicationStep(
         runId,
         token,
         stepKey,
@@ -150,7 +163,7 @@ export function buildCoordinationRouteHandlers(
         request.params as PathParams<'failPublicationStep'>
       const { token, failure, retry } =
         request.body as RequestBody<'failPublicationStep'>
-      return await store.failPublicationStep(
+      return await store.publications.failPublicationStep(
         runId,
         token,
         stepKey,
@@ -162,19 +175,19 @@ export function buildCoordinationRouteHandlers(
     completePublication: async (request) => {
       const { runId } = request.params as PathParams<'completePublication'>
       const { token } = request.body as RequestBody<'completePublication'>
-      return await store.completePublication(runId, token)
+      return await store.publications.complete(runId, token)
     },
 
     failPublication: async (request) => {
       const { runId } = request.params as PathParams<'failPublication'>
       const { token, failure, retry } =
         request.body as RequestBody<'failPublication'>
-      return await store.failPublication(runId, token, failure, { retry })
+      return await store.publications.fail(runId, token, failure, { retry })
     },
 
     getInternalRun: async (request, reply) => {
       const { runId } = request.params as PathParams<'getInternalRun'>
-      const run = await store.getRun(runId)
+      const run = await store.queries.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
       return reply.send(run)
     },
@@ -182,18 +195,20 @@ export function buildCoordinationRouteHandlers(
     listInternalPublicationSteps: async (request, reply) => {
       const { runId } =
         request.params as PathParams<'listInternalPublicationSteps'>
-      const run = await store.getRun(runId)
+      const run = await store.queries.getRun(runId)
       if (run === null) return reply.code(404).send({ error: 'run_not_found' })
-      return reply.send(await store.listPublicationSteps(run.run_id))
+      return reply.send(
+        await store.publications.listPublicationSteps(run.run_id)
+      )
     },
 
     getPreparationHeartbeatInterval: async () =>
-      store.preparationHeartbeatIntervalMs(),
+      store.preparations.heartbeatIntervalMs(),
 
     getPublicationHeartbeatInterval: async () =>
-      store.publicationHeartbeatIntervalMs(),
+      store.publications.heartbeatIntervalMs(),
 
     getRunNoticeHeartbeatInterval: async () =>
-      store.runNoticeHeartbeatIntervalMs()
+      store.preparations.heartbeatIntervalMs()
   }
 }

@@ -12,15 +12,18 @@ test('fan-out reads refuse to run before initialize()', async () => {
     connectionString: 'postgresql://unused:unused@127.0.0.1:1/unused',
     connectorId: 'readiness'
   })
-  await assert.rejects(() => store.listSubmissionRecoveries(), /initialize/)
-  await assert.rejects(() => store.listActiveRuns(), /initialize/)
+  await assert.rejects(
+    () => store.queries.listSubmissionRecoveries(),
+    /initialize/
+  )
+  await assert.rejects(() => store.queries.listActiveRuns(), /initialize/)
   // Added later than the two above; every read that reaches the pool belongs to this guard, not
   // only the fan-out ones that originally motivated it.
-  await assert.rejects(() => store.listParkedRuns(), /initialize/)
-  await assert.rejects(() => store.listEvents('run-1'), /initialize/)
-  await assert.rejects(() => store.runExists('run-1'), /initialize/)
+  await assert.rejects(() => store.queries.listParkedRuns(), /initialize/)
+  await assert.rejects(() => store.queries.listEvents('run-1'), /initialize/)
+  await assert.rejects(() => store.queries.runExists('run-1'), /initialize/)
   await assert.rejects(
-    () => store.getExecutionStatistics(['run-1']),
+    () => store.queries.getExecutionStatistics(['run-1']),
     /initialize/
   )
 })

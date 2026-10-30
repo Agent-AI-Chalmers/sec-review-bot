@@ -25,15 +25,19 @@ async function createStore(): Promise<ReviewRunStore> {
 /** A run in the state `claimNextPublication` looks for. */
 async function createPublishableRun(store: ReviewRunStore): Promise<string> {
   const runId = `run-${randomUUID()}`
-  const admission = await store.createPreparingReviewRun({
+  const admission = await store.admissions.create({
     workflow: 'issue-review',
     run_id: runId,
     publish_context: {}
   })
   assert.ok(admission.preparation_token)
-  await store.markQueued(runId, admission.preparation_token, {})
+  await store.submissionTransitions.markQueued(
+    runId,
+    admission.preparation_token,
+    {}
+  )
   assert.strictEqual(
-    await store.recordExecutionSuccess(
+    await store.executions.recordExecutionSuccess(
       runId,
       { run_id: runId },
       { status: 'unavailable' }
@@ -50,7 +54,7 @@ test('a waiting claim returns as soon as publishable work appears', async () => 
   const store = await createStore()
   try {
     const started = Date.now()
-    const pending = store.claimNextPublication(5_000)
+    const pending = store.publicationClaims.claimNext(5_000)
     // Let the first attempt run and find nothing before any work exists.
     await new Promise((resolve) => setTimeout(resolve, 300))
     const runId = await createPublishableRun(store)
@@ -74,7 +78,7 @@ test('a waiting claim gives up when its wait elapses', async () => {
   const store = await createStore()
   try {
     const started = Date.now()
-    const work = await store.claimNextPublication(800)
+    const work = await store.publicationClaims.claimNext(800)
     const elapsed = Date.now() - started
 
     assert.strictEqual(work, null)

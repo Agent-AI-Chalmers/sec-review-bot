@@ -50,13 +50,17 @@ async function createQueuedRun(
   runId = `run-${randomUUID()}`
 ): Promise<string> {
   const context = {}
-  const admission = await store.createPreparingReviewRun({
+  const admission = await store.admissions.create({
     workflow: 'issue-review',
     run_id: runId,
     publish_context: context
   })
   assert.ok(admission.preparation_token)
-  await store.markQueued(runId, admission.preparation_token, context)
+  await store.submissionTransitions.markQueued(
+    runId,
+    admission.preparation_token,
+    context
+  )
   return runId
 }
 
@@ -84,7 +88,7 @@ async function claimNoticeFor(
   const deadline = Date.now() + 5_000
   try {
     while (Date.now() < deadline) {
-      const notice = await store.claimNextRunNotice()
+      const notice = await store.preparations.claimNextRunNotice()
       if (notice === null) break
       if (notice.run_id === runId)
         return { notice_id: notice.notice_id, claim_token: notice.claim_token }
@@ -101,7 +105,11 @@ async function claimNoticeFor(
     // than delivered: no reply was attempted for them, so claiming one was delivered would be a
     // lie that the URL check now rejects.
     for (const other of deferred) {
-      await store.completeRunNotice(other.notice_id, other.claim_token, false)
+      await store.preparations.completeRunNotice(
+        other.notice_id,
+        other.claim_token,
+        false
+      )
     }
   }
 }
@@ -132,7 +140,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       token: string
     }> => {
       const runId = `run-${randomUUID()}`
-      const admission = await store.createPreparingReviewRun({
+      const admission = await store.admissions.create({
         workflow: 'issue-review',
         run_id: runId,
         publish_context: {}
@@ -145,7 +153,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       const runId = await createQueuedRun(store)
       runIds.push(runId)
       assert.strictEqual(
-        await store.recordExecutionSuccess(
+        await store.executions.recordExecutionSuccess(
           runId,
           { run_id: runId },
           { status: 'unavailable' }
@@ -159,29 +167,35 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       token: string
     }> => {
       const runId = await newSuccessRun()
-      const token = await store.claimPublication(runId)
+      const token = await store.publicationClaims.claim(runId)
       assert.notStrictEqual(token, null)
-      await store.initializePublicationSteps(runId, token as string, [
-        'issue:summary-comment'
-      ])
+      await store.publications.initializePublicationSteps(
+        runId,
+        token as string,
+        ['issue:summary-comment']
+      )
       return { runId, token: token as string }
     }
 
     // preparation: preparing -> submitted, then execution pending -> queued.
     const submitted = await newPreparingRun()
-    await store.markQueued(submitted.runId, submitted.token, {})
+    await store.submissionTransitions.markQueued(
+      submitted.runId,
+      submitted.token,
+      {}
+    )
 
     // preparation: preparing -> failed, execution pending -> skipped, notice pending -> ...
     const failedPreparation = await newPreparingRun()
-    await store.failPreparation(
+    await store.preparations.fail(
       failedPreparation.runId,
       failedPreparation.token,
       { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
       { retry: false }
     )
-    const preparedNotice = await store.claimNextRunNotice()
+    const preparedNotice = await store.preparations.claimNextRunNotice()
     assert.notStrictEqual(preparedNotice, null)
-    await store.completeRunNotice(
+    await store.preparations.completeRunNotice(
       preparedNotice?.notice_id ?? '',
       preparedNotice?.claim_token ?? '',
       true,
@@ -191,13 +205,13 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     // notice: delivering -> delivering when the delivery lease expires and another worker
     // re-claims, which is the only way a notice becomes retryable again.
     const relased = await newPreparingRun()
-    await store.failPreparation(
+    await store.preparations.fail(
       relased.runId,
       relased.token,
       { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
       { retry: false }
     )
-    assert.notStrictEqual(await store.claimNextRunNotice(), null)
+    assert.notStrictEqual(await store.preparations.claimNextRunNotice(), null)
     // Expire the delivering lease by backdating it. Waiting on the clock instead would make
     // this assertion depend on how fast the worker happens to be.
     await pool.query(
@@ -205,18 +219,18 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
        WHERE connector_id=$1 AND status='delivering'`,
       [store.connectorId]
     )
-    assert.notStrictEqual(await store.claimNextRunNotice(), null)
+    assert.notStrictEqual(await store.preparations.claimNextRunNotice(), null)
 
     // notice: delivering -> failed when the provider cannot be reached.
     const undeliverable = await newPreparingRun()
-    await store.failPreparation(
+    await store.preparations.fail(
       undeliverable.runId,
       undeliverable.token,
       { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
       { retry: false }
     )
     const undeliverableNotice = await claimNoticeFor(store, undeliverable.runId)
-    await store.completeRunNotice(
+    await store.preparations.completeRunNotice(
       undeliverableNotice.notice_id,
       undeliverableNotice.claim_token,
       false
@@ -226,13 +240,13 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     // the next preparer claims it. Both halves matter: the second is the only path that returns
     // a run to active preparation without leaving the phase.
     const retryable = await newPreparingRun()
-    await store.failPreparation(
+    await store.preparations.fail(
       retryable.runId,
       retryable.token,
       { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'retrying' },
       { retry: true }
     )
-    const reclaimed = await store.claimNextPreparation()
+    const reclaimed = await store.preparations.claimNext()
     assert.notStrictEqual(reclaimed, null)
 
     // preparation: preparing -> uncertain when the lease lapses without exhausting retries, and
@@ -245,26 +259,28 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
        WHERE run_id=$1`,
       [lapsing.runId]
     )
-    const expiry = await store.expireStalePreparations()
+    const expiry = await store.preparations.expireStale()
     assert.ok(expiry.concluded >= 1)
-    const fromUncertain = await store.claimNextPreparation()
+    const fromUncertain = await store.preparations.claimNext()
     assert.notStrictEqual(fromUncertain, null)
 
     // execution: pending -> uncertain on an unconfirmed submission, then the recovery claim
     // records uncertain -> uncertain before resolving it.
     const uncertain = await newPreparingRun()
-    await store.failPreparation(
+    await store.preparations.fail(
       uncertain.runId,
       uncertain.token,
       { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
       { retry: false }
     )
-    const recovery = await store.claimSubmissionRecovery(uncertain.runId)
+    const recovery = await store.executions.claimSubmissionRecovery(
+      uncertain.runId
+    )
     assert.notStrictEqual(recovery, null)
     // Resolving the replay moves the run back to `queued`. The unresolved branch stays
     // `uncertain` and is covered by the recovery's own expiry paths in the store tests.
     assert.strictEqual(
-      await store.completeSubmissionRecovery(
+      await store.submissionTransitions.completeSubmissionRecovery(
         uncertain.runId,
         recovery as string
       ),
@@ -274,14 +290,14 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     // execution: uncertain -> disconnected when automatic recovery reaches its budget. This is
     // deliberately not a failure: a prior idempotent submission may still exist at the Execution.
     const uncertainDisconnects = await newPreparingRun()
-    await store.failPreparation(
+    await store.preparations.fail(
       uncertainDisconnects.runId,
       uncertainDisconnects.token,
       { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
       { retry: false }
     )
     assert.strictEqual(
-      await store.disconnectExhaustedSubmissionRecovery(
+      await store.executions.disconnectExhaustedSubmissionRecovery(
         uncertainDisconnects.runId,
         0
       ),
@@ -289,43 +305,45 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     )
     // execution: disconnected -> uncertain when an operator hands it back. Without this the run
     // would stay parked forever: automatic recovery only claims `uncertain`.
-    await store.resumeDisconnectedExecution(uncertainDisconnects.runId)
+    await store.operatorDecisions.resumeDisconnectedExecution(
+      uncertainDisconnects.runId
+    )
 
     // execution: disconnected -> failed when an operator stops waiting. This does not claim the
     // task never ran - the Execution may still have it - only that the outcome will not be awaited.
     const giveUpExecution = await newPreparingRun()
-    await store.failPreparation(
+    await store.preparations.fail(
       giveUpExecution.runId,
       giveUpExecution.token,
       { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
       { retry: false }
     )
     assert.strictEqual(
-      await store.disconnectExhaustedSubmissionRecovery(
+      await store.executions.disconnectExhaustedSubmissionRecovery(
         giveUpExecution.runId,
         0
       ),
       true
     )
-    await store.giveUpDisconnectedRun(
+    await store.operatorDecisions.giveUpDisconnectedRun(
       giveUpExecution.runId,
       'operator stopped waiting'
     )
 
     // execution: uncertain -> failed when the replay concludes the submission was not accepted.
     const uncertainFails = await newPreparingRun()
-    await store.failPreparation(
+    await store.preparations.fail(
       uncertainFails.runId,
       uncertainFails.token,
       { code: 'SUBMISSION_STATE_UNCERTAIN', message: 'unknown' },
       { retry: false }
     )
-    const failingRecovery = await store.claimSubmissionRecovery(
+    const failingRecovery = await store.executions.claimSubmissionRecovery(
       uncertainFails.runId
     )
     assert.notStrictEqual(failingRecovery, null)
     assert.strictEqual(
-      await store.failSubmissionRecovery(
+      await store.submissionTransitions.failSubmissionRecovery(
         uncertainFails.runId,
         failingRecovery as string,
         { code: 'EXECUTION_FAILED', message: 'replay rejected' }
@@ -335,9 +353,13 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
 
     // execution: pending -> queued -> running -> succeeded.
     const observed = await newPreparingRun()
-    await store.markQueued(observed.runId, observed.token, {})
-    await store.markRunning(observed.runId)
-    await store.recordExecutionSuccess(
+    await store.submissionTransitions.markQueued(
+      observed.runId,
+      observed.token,
+      {}
+    )
+    await store.executions.markRunning(observed.runId)
+    await store.executions.recordExecutionSuccess(
       observed.runId,
       { run_id: observed.runId },
       { status: 'unavailable' }
@@ -345,7 +367,11 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
 
     // execution: pending -> queued -> failed without ever running, which also skips publication.
     const queuedFailed = await newPreparingRun()
-    await store.markQueued(queuedFailed.runId, queuedFailed.token, {})
+    await store.submissionTransitions.markQueued(
+      queuedFailed.runId,
+      queuedFailed.token,
+      {}
+    )
     await store.failExecution(queuedFailed.runId, {
       code: 'EXECUTION_FAILED',
       message: 'boom'
@@ -353,8 +379,12 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
 
     // execution: pending -> queued -> running -> failed, which also skips publication.
     const executionFailed = await newPreparingRun()
-    await store.markQueued(executionFailed.runId, executionFailed.token, {})
-    await store.markRunning(executionFailed.runId)
+    await store.submissionTransitions.markQueued(
+      executionFailed.runId,
+      executionFailed.token,
+      {}
+    )
+    await store.executions.markRunning(executionFailed.runId)
     await store.failExecution(executionFailed.runId, {
       code: 'EXECUTION_FAILED',
       message: 'boom'
@@ -368,36 +398,36 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       [published.runId]
     )
     // Re-claiming after the lease expires issues a new token, and the old one is fenced out.
-    const renewedToken = await store.claimPublication(published.runId)
+    const renewedToken = await store.publicationClaims.claim(published.runId)
     assert.notStrictEqual(renewedToken, null)
-    await store.requirePublicationStepClaim(
+    await store.publications.requirePublicationStepClaim(
       published.runId,
       renewedToken as string,
       'issue:summary-comment'
     )
-    await store.completePublicationStep(
+    await store.publications.completePublicationStep(
       published.runId,
       renewedToken as string,
       'issue:summary-comment',
       { id: '1' }
     )
-    await store.completePublication(published.runId, renewedToken as string)
+    await store.publications.complete(published.runId, renewedToken as string)
 
     // publication: publishing -> failed on a terminal step failure.
     const publishFailed = await newPublishingRun()
-    await store.requirePublicationStepClaim(
+    await store.publications.requirePublicationStepClaim(
       publishFailed.runId,
       publishFailed.token,
       'issue:summary-comment'
     )
-    await store.failPublicationStep(
+    await store.publications.failPublicationStep(
       publishFailed.runId,
       publishFailed.token,
       'issue:summary-comment',
       { code: 'GITHUB_VALIDATION_REJECTED', message: 'rejected' },
       { retry: false }
     )
-    await store.failPublication(
+    await store.publications.fail(
       publishFailed.runId,
       publishFailed.token,
       { code: 'GITHUB_VALIDATION_REJECTED', message: 'rejected' },
@@ -409,12 +439,12 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     // its step, which is what puts the run in the operator's view without freezing the rest.
     const publishUncertain = await newPublishingRun()
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      await store.requirePublicationStepClaim(
+      await store.publications.requirePublicationStepClaim(
         publishUncertain.runId,
         publishUncertain.token,
         'issue:summary-comment'
       )
-      await store.failPublicationStep(
+      await store.publications.failPublicationStep(
         publishUncertain.runId,
         publishUncertain.token,
         'issue:summary-comment',
@@ -423,7 +453,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       )
     }
     await assert.rejects(
-      store.requirePublicationStepClaim(
+      store.publications.requirePublicationStepClaim(
         publishUncertain.runId,
         publishUncertain.token,
         'issue:summary-comment'
@@ -434,12 +464,12 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     // without an answer. The step is what becomes disconnected; the axis follows it.
     const publishDisconnected = await newPublishingRun()
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      await store.requirePublicationStepClaim(
+      await store.publications.requirePublicationStepClaim(
         publishDisconnected.runId,
         publishDisconnected.token,
         'issue:summary-comment'
       )
-      await store.failPublicationStep(
+      await store.publications.failPublicationStep(
         publishDisconnected.runId,
         publishDisconnected.token,
         'issue:summary-comment',
@@ -448,7 +478,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       )
     }
     await assert.rejects(
-      store.requirePublicationStepClaim(
+      store.publications.requirePublicationStepClaim(
         publishDisconnected.runId,
         publishDisconnected.token,
         'issue:summary-comment'
@@ -458,12 +488,13 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     // cannot reach the remote system spend its own budget, after which it stops answering for
     // itself and asks a person to look.
     assert.strictEqual(
-      (await store.getRun(publishDisconnected.runId))?.publication.status,
+      (await store.queries.getRun(publishDisconnected.runId))?.publication
+        .status,
       'uncertain',
       'an exhausted step makes the axis uncertain before its reconciliation runs'
     )
     for (let round = 0; round < 3; round += 1) {
-      await store.failPublicationStep(
+      await store.publications.failPublicationStep(
         publishDisconnected.runId,
         publishDisconnected.token,
         'issue:summary-comment',
@@ -472,7 +503,8 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       )
     }
     assert.strictEqual(
-      (await store.getRun(publishDisconnected.runId))?.publication.status,
+      (await store.queries.getRun(publishDisconnected.runId))?.publication
+        .status,
       'disconnected',
       'the axis has to follow its step into disconnected'
     )
@@ -483,12 +515,12 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     // and this edge is about a single step that resolves.
     const publishSettled = await newPublishingRun()
     for (let attempt = 0; attempt < 3; attempt += 1) {
-      await store.requirePublicationStepClaim(
+      await store.publications.requirePublicationStepClaim(
         publishSettled.runId,
         publishSettled.token,
         'issue:summary-comment'
       )
-      await store.failPublicationStep(
+      await store.publications.failPublicationStep(
         publishSettled.runId,
         publishSettled.token,
         'issue:summary-comment',
@@ -497,27 +529,27 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       )
     }
     await assert.rejects(
-      store.requirePublicationStepClaim(
+      store.publications.requirePublicationStepClaim(
         publishSettled.runId,
         publishSettled.token,
         'issue:summary-comment'
       )
     )
-    await store.settleExhaustedPublicationStep(
+    await store.publications.settleExhaustedPublicationStep(
       publishSettled.runId,
       publishSettled.token,
       'issue:summary-comment',
       { found: true, remote: { id: '9', url: 'https://example.test/c/9' } }
     )
     assert.strictEqual(
-      (await store.getRun(publishSettled.runId))?.publication.status,
+      (await store.queries.getRun(publishSettled.runId))?.publication.status,
       'publishing',
       'a settled step hands the axis back to its publisher'
     )
 
     // publication: publishing -> pending on a retryable failure.
     const publishRetried = await newPublishingRun()
-    await store.failPublication(
+    await store.publications.fail(
       publishRetried.runId,
       publishRetried.token,
       { code: 'GITHUB_RATE_LIMITED', message: 'slow down' },
@@ -534,7 +566,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       [abandonedInFlight.runId, randomUUID()]
     )
     // Concluding the run converges the in-flight publication to `skipped`.
-    await store.failPreparation(
+    await store.preparations.fail(
       abandonedInFlight.runId,
       abandonedInFlight.token,
       { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
@@ -558,7 +590,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       [blocked.runId]
     )
     assert.strictEqual(
-      (await store.expireStalePreparations()).blocked.length,
+      (await store.preparations.expireStale()).blocked.length,
       1
     )
 
@@ -577,10 +609,10 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       [resumed.runId]
     )
     assert.strictEqual(
-      (await store.expireStalePreparations()).blocked.length,
+      (await store.preparations.expireStale()).blocked.length,
       1
     )
-    await store.resumeDisconnectedPreparation(resumed.runId)
+    await store.operatorDecisions.resumeDisconnectedPreparation(resumed.runId)
 
     // preparation: disconnected -> failed when an operator gives up on it, which is the plain
     // case (an expired lease that ran out its budget) rather than a contradicted run.
@@ -600,7 +632,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
          finished_at=NULL WHERE run_id=$1`,
       [givenUpPreparation.runId]
     )
-    await store.giveUpDisconnectedRun(
+    await store.operatorDecisions.giveUpDisconnectedRun(
       givenUpPreparation.runId,
       'operator stopped waiting'
     )
@@ -618,21 +650,21 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
          finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
       [givenUpPublication.runId]
     )
-    const publicationToken = await store.claimPublication(
+    const publicationToken = await store.publicationClaims.claim(
       givenUpPublication.runId
     )
-    await store.initializePublicationSteps(
+    await store.publications.initializePublicationSteps(
       givenUpPublication.runId,
       publicationToken as string,
       ['issue:summary-comment']
     )
-    await store.requirePublicationStepClaim(
+    await store.publications.requirePublicationStepClaim(
       givenUpPublication.runId,
       publicationToken as string,
       'issue:summary-comment'
     )
     for (let attempt = 0; attempt < 10; attempt += 1) {
-      await store.failPublicationStep(
+      await store.publications.failPublicationStep(
         givenUpPublication.runId,
         publicationToken as string,
         'issue:summary-comment',
@@ -640,12 +672,16 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         { retry: true }
       )
       const status = (
-        (await store.listPublicationSteps(givenUpPublication.runId))[0] as {
+        (
+          await store.publications.listPublicationSteps(
+            givenUpPublication.runId
+          )
+        )[0] as {
           status: string
         }
       ).status
       if (status === 'disconnected') break
-      await store
+      await store.publications
         .requirePublicationStepClaim(
           givenUpPublication.runId,
           publicationToken as string,
@@ -653,7 +689,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         )
         .catch(() => undefined)
     }
-    await store.giveUpDisconnectedRun(
+    await store.operatorDecisions.giveUpDisconnectedRun(
       givenUpPublication.runId,
       'operator stopped publishing'
     )
@@ -672,8 +708,10 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
          finished_at=clock_timestamp(), workflow_result='{}'::jsonb WHERE run_id=$1`,
       [resumedPublication.runId]
     )
-    const parkedToken = await store.claimPublication(resumedPublication.runId)
-    await store.initializePublicationSteps(
+    const parkedToken = await store.publicationClaims.claim(
+      resumedPublication.runId
+    )
+    await store.publications.initializePublicationSteps(
       resumedPublication.runId,
       parkedToken as string,
       ['issue:summary-comment']
@@ -682,7 +720,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
     // call and then claims the next attempt. The step becomes `uncertain` once its attempts are
     // spent, and a later reconciliation failure is what parks it.
     for (let attempt = 0; attempt < 10; attempt += 1) {
-      await store.failPublicationStep(
+      await store.publications.failPublicationStep(
         resumedPublication.runId,
         parkedToken as string,
         'issue:summary-comment',
@@ -690,11 +728,11 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         { retry: true }
       )
       if (
-        (await store.getRun(resumedPublication.runId))?.publication.status ===
-        'disconnected'
+        (await store.queries.getRun(resumedPublication.runId))?.publication
+          .status === 'disconnected'
       )
         break
-      await store
+      await store.publications
         .requirePublicationStepClaim(
           resumedPublication.runId,
           parkedToken as string,
@@ -703,26 +741,33 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
         .catch(() => undefined)
     }
     assert.strictEqual(
-      (await store.getRun(resumedPublication.runId))?.publication.status,
+      (await store.queries.getRun(resumedPublication.runId))?.publication
+        .status,
       'disconnected',
       'the resume below has to start from a parked publication'
     )
-    await store.resumeDisconnectedRun(resumedPublication.runId)
+    await store.operatorDecisions.resumeDisconnectedRun(
+      resumedPublication.runId
+    )
     assert.strictEqual(
-      (await store.getRun(resumedPublication.runId))?.publication.status,
+      (await store.queries.getRun(resumedPublication.runId))?.publication
+        .status,
       'pending'
     )
     assert.strictEqual(
-      (await store.getRun(blocked.runId))?.preparation?.status,
+      (await store.queries.getRun(blocked.runId))?.preparation?.status,
       'disconnected',
       'the abandonment below has to start from a disconnected row'
     )
 
-    await store.abandonBlockedPreparation(blocked.runId, 'operator decision')
+    await store.operatorDecisions.abandonBlockedPreparation(
+      blocked.runId,
+      'operator decision'
+    )
 
     const recorded: RecordedEdge[] = []
     for (const runId of runIds) {
-      for (const event of await store.listEvents(runId)) {
+      for (const event of await store.queries.listEvents(runId)) {
         if (event.from_status === null) continue
         recorded.push({
           axis: event.axis,

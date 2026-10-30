@@ -5,17 +5,15 @@ import type { ReviewRunStore } from '../persistence/review-run-store.js'
 import { ExecutionSubmissionUncertainError } from '../execution-client.js'
 import { SUBMISSION_STATE_UNCERTAIN } from '../errors.js'
 
-type Store = Pick<
-  ReviewRunStore,
-  'getRun' | 'savePreparedSubmission' | 'markQueued'
-> & {
+type Store = {
+  queries: Pick<ReviewRunStore['queries'], 'getRun'>
+  submissionTransitions: Pick<
+    ReviewRunStore['submissionTransitions'],
+    'savePreparedSubmission' | 'markQueued'
+  >
+  preparations: Pick<ReviewRunStore['preparations'], 'fail'>
   // Submission only needs best-effort terminal cleanup; callers may provide a
   // narrow test double without observing the retry outcome.
-  failPreparation: (
-    runId: string,
-    token: string,
-    error: { code?: string | null; message: string }
-  ) => Promise<void | { retry_scheduled: boolean }>
 }
 
 /** Persists the replayable request before crossing the Execution uncertainty boundary. */
@@ -37,14 +35,14 @@ export async function submitPreparedRun(
   workflow: ReviewRunWorkflow
   status: 'queued'
 }> {
-  const run = await store.getRun(args.runId)
+  const run = await store.queries.getRun(args.runId)
   if (run === null)
     throw Object.assign(new Error(`Review run does not exist: ${args.runId}`), {
       code: 'REVIEW_RUN_NOT_FOUND'
     })
   let executionAccepted = false
   try {
-    await store.savePreparedSubmission(
+    await store.submissionTransitions.savePreparedSubmission(
       args.runId,
       args.preparationToken,
       args.publishContext,
@@ -56,7 +54,7 @@ export async function submitPreparedRun(
       input: args.input
     })
     executionAccepted = true
-    await store.markQueued(
+    await store.submissionTransitions.markQueued(
       args.runId,
       args.preparationToken,
       args.publishContext
@@ -64,7 +62,7 @@ export async function submitPreparedRun(
     return { run_id: args.runId, workflow: run.workflow, status: 'queued' }
   } catch (error) {
     try {
-      await store.failPreparation(args.runId, args.preparationToken, {
+      await store.preparations.fail(args.runId, args.preparationToken, {
         code:
           executionAccepted ||
           error instanceof ExecutionSubmissionUncertainError
