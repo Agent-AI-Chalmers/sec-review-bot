@@ -1,6 +1,10 @@
 import { isIP } from 'node:net'
 import { TextDecoder } from 'node:util'
 
+import {
+  ResponseTooLargeError,
+  readBoundedResponseBody
+} from './bounded-response.js'
 import { integerEnv } from './env.js'
 
 import type {
@@ -104,48 +108,20 @@ export class ExecutionProtocolError extends Error {
 }
 
 async function readBoundedResponseText(response: Response): Promise<string> {
-  const contentLength = response.headers.get('content-length')
-  if (
-    contentLength !== null &&
-    /^\d+$/.test(contentLength) &&
-    Number(contentLength) > MAX_EXECUTION_RESPONSE_BYTES
-  ) {
-    await response.body?.cancel()
+  try {
+    const body = await readBoundedResponseBody(
+      response,
+      MAX_EXECUTION_RESPONSE_BYTES
+    )
+    return new TextDecoder().decode(body)
+  } catch (error) {
+    if (!(error instanceof ResponseTooLargeError)) throw error
     throw new ExecutionProtocolError(
       'EXECUTION_RESPONSE_TOO_LARGE',
-      'Execution returned a response larger than the protocol budget.'
+      'Execution returned a response larger than the protocol budget.',
+      { cause: error }
     )
   }
-  if (response.body === null) return ''
-
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let size = 0
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      size += value.byteLength
-      if (size > MAX_EXECUTION_RESPONSE_BYTES) {
-        await reader.cancel()
-        throw new ExecutionProtocolError(
-          'EXECUTION_RESPONSE_TOO_LARGE',
-          'Execution returned a response larger than the protocol budget.'
-        )
-      }
-      chunks.push(value)
-    }
-  } finally {
-    reader.releaseLock()
-  }
-
-  const body = new Uint8Array(size)
-  let offset = 0
-  for (const chunk of chunks) {
-    body.set(chunk, offset)
-    offset += chunk.byteLength
-  }
-  return new TextDecoder().decode(body)
 }
 
 export function isTerminalExecutionPollingError(error: unknown): boolean {

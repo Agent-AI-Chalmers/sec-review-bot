@@ -1,6 +1,10 @@
 import { TextDecoder } from 'node:util'
 
 import {
+  ResponseTooLargeError,
+  readBoundedResponseBody
+} from '../bounded-response.js'
+import {
   REVIEW_AGENT_NAMES,
   type ExecutionStatisticsRead,
   type LangfuseObservation
@@ -17,41 +21,16 @@ export class LangfuseRateLimitError extends Error {
 }
 
 async function readBoundedPageJson(response: Response): Promise<unknown> {
-  const contentLength = response.headers.get('content-length')
-  if (
-    contentLength !== null &&
-    /^\d+$/.test(contentLength) &&
-    Number(contentLength) > MAX_LANGFUSE_PAGE_BYTES
-  ) {
-    await response.body?.cancel()
-    throw new Error('Langfuse response is larger than the page budget.')
-  }
   if (response.body === null)
     throw new Error('Langfuse observations response has no body.')
-
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let size = 0
+  let body: Uint8Array
   try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      size += value.byteLength
-      if (size > MAX_LANGFUSE_PAGE_BYTES) {
-        await reader.cancel()
-        throw new Error('Langfuse response is larger than the page budget.')
-      }
-      chunks.push(value)
-    }
-  } finally {
-    reader.releaseLock()
-  }
-
-  const body = new Uint8Array(size)
-  let offset = 0
-  for (const chunk of chunks) {
-    body.set(chunk, offset)
-    offset += chunk.byteLength
+    body = await readBoundedResponseBody(response, MAX_LANGFUSE_PAGE_BYTES)
+  } catch (error) {
+    if (!(error instanceof ResponseTooLargeError)) throw error
+    throw new Error('Langfuse response is larger than the page budget.', {
+      cause: error
+    })
   }
   return JSON.parse(new TextDecoder().decode(body)) as unknown
 }
