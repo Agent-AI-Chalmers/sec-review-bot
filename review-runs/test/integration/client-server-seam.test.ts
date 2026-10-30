@@ -11,7 +11,7 @@
 // retryable and the publication looped forever.
 //
 // This test stands up the real server (`registerReviewRunsRoutes` from the compiled
-// `dist/server.js`, so it uses the contract exactly as deployed) on a real port against a stub
+// `dist/http/server-surface.js`, so it uses the contract exactly as deployed) on a real port against a stub
 // store, points the real client at it, and asserts the seam for the void operations and for
 // one that returns a JSON body. A mock cannot reproduce the failure, because it is in the
 // response bytes crossing between the two packages.
@@ -21,15 +21,12 @@ import test from 'node:test'
 
 import Fastify from 'fastify'
 
-// The server's module body starts a real server (and reads required env) unless NODE_ENV is
-// 'test'; set it before the dynamic import.
-process.env.NODE_ENV = 'test'
 // Load the built server via a computed specifier: `tsc` typechecks this file without building,
-// so a literal `'../../dist/server.js'` would be unresolvable there (`TS2307`). The URL form is
+// so a literal built-module import would be unresolvable there (`TS2307`). The URL form is
 // the same file at runtime, but it is not a static module reference, so typechecking stays
 // independent of the build.
 const { REVIEW_RUNS_FASTIFY_OPTIONS, registerReviewRunsRoutes } = await import(
-  new URL('../../dist/server.js', import.meta.url).href
+  new URL('../../dist/http/server-surface.js', import.meta.url).href
 )
 
 // Load the client through `createRequire`, not a static import: it lives in another package

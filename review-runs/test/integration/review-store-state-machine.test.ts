@@ -7,13 +7,13 @@ import { Pool } from 'pg'
 
 import {
   concludeExhaustedSubmissionRecovery,
-  coordinateReviewRunsOnce,
   MAX_SUBMISSION_RECOVERY_ATTEMPTS,
-  recoverReviewRunSubmission,
-  ReviewRunStore,
-  submitPreparedRun,
-  type ExecutionArtifactStorage
-} from '../../src/index.js'
+  recoverReviewRunSubmission
+} from '../../src/runtime/submission-recovery.js'
+import { coordinateReviewRunsOnce } from '../../src/runtime/coordinator.js'
+import { submitPreparedRun } from '../../src/runtime/prepared-submission.js'
+import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
+import type { ExecutionArtifactStorage } from '../../src/contracts.js'
 import { ExecutionSubmissionUncertainError } from '../../src/execution-client.js'
 
 const connectionString =

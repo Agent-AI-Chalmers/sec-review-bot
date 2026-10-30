@@ -4,9 +4,9 @@ import test from 'node:test'
 import {
   concludeExhaustedSubmissionRecovery,
   MAX_SUBMISSION_RECOVERY_ATTEMPTS,
-  recoverReviewRunSubmission,
-  type ReviewRunRecord
-} from '../src/index.js'
+  recoverReviewRunSubmission
+} from '../src/runtime/submission-recovery.js'
+import type { ReviewRunRecord } from '../src/shapes.js'
 
 function run(
   input: Record<string, unknown> | null = { api_version: 'v1' }

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { observeExecutionRun, type ReviewRunRecord } from '../src/index.js'
+import { observeExecutionRun } from '../src/runtime/terminal-coordination.js'
+import type { ReviewRunRecord } from '../src/shapes.js'
 
 const run: ReviewRunRecord = {
   run_id: 'run-1',

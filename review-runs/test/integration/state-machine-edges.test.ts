@@ -20,7 +20,7 @@ import {
 } from '../../src/state-machines.generated.js'
 import { Pool } from 'pg'
 
-import { ReviewRunStore } from '../../src/index.js'
+import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 
 const connectionString =
   process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL

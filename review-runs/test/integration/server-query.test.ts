@@ -23,7 +23,8 @@ test('authenticated run queries are redacted, paginated, and survive a server re
     EXECUTION_API_URL: 'http://127.0.0.1:1',
     EXECUTION_API_TOKEN: 'unused'
   })
-  const { startReviewRunsServer } = await import('../../src/server.js')
+  const { startReviewRunsServer } =
+    await import('../../src/runtime/server-runtime.js')
   const base = `http://127.0.0.1:${port}`
   const readAuth = {
     authorization: `Bearer ${token}`,

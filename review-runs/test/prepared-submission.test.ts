@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { submitPreparedRun, type ReviewRunRecord } from '../src/index.js'
 import { ExecutionSubmissionUncertainError } from '../src/execution-client.js'
+import { submitPreparedRun } from '../src/runtime/prepared-submission.js'
+import type { ReviewRunRecord } from '../src/shapes.js'
 
 const run: ReviewRunRecord = {
   run_id: 'run-1',
