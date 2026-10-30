@@ -4,11 +4,11 @@ import test from 'node:test'
 import Fastify from 'fastify'
 import { Pool } from 'pg'
 
-import { ReviewRunStore } from '../../src/index.js'
+import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 
 process.env.NODE_ENV = 'test'
 const { REVIEW_RUNS_FASTIFY_OPTIONS, registerReviewRunsRoutes } = await import(
-  new URL('../../dist/server.js', import.meta.url).href
+  new URL('../../dist/http/server-surface.js', import.meta.url).href
 )
 
 function databaseUrl() {

@@ -5,7 +5,7 @@ import test from 'node:test'
 
 import { Pool } from 'pg'
 
-import { ReviewRunStore } from '../src/index.js'
+import { ReviewRunStore } from '../src/persistence/review-run-store.js'
 
 test('fan-out reads refuse to run before initialize()', async () => {
   const store = new ReviewRunStore({

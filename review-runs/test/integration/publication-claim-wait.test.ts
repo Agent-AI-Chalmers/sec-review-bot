@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import test from 'node:test'
 
-import { ReviewRunStore } from '../../src/index.js'
+import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 
 const connectionString =
   process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL

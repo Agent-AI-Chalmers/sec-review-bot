@@ -55,7 +55,6 @@ test('the process entry, HTTP surface, and runtime composition stay acyclic', ()
   const surface = importedModules('http/server-surface.ts')
   const runtime = importedModules('runtime/server-runtime.ts')
 
-  assert.ok(entry.includes('server-surface.ts'))
   assert.ok(entry.includes('server-runtime.ts'))
   assert.ok(runtime.includes('server-surface.ts'))
   assert.ok(!runtime.includes('server.ts'))

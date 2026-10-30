@@ -15,7 +15,7 @@ import {
 import * as ajvFormats from 'ajv-formats'
 
 import { REPO_ROOT } from '../generated-paths.js'
-import { ReviewRunStore } from '../../src/index.js'
+import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
 
 // The record contract's value-level check.
 //

@@ -3,10 +3,10 @@ import test from 'node:test'
 
 import {
   coordinateReviewRunsOnce,
-  startReviewRunCoordinatorLoop,
-  type ReviewRunRecord,
-  type RunRowsProjection
-} from '../src/index.js'
+  startReviewRunCoordinatorLoop
+} from '../src/runtime/coordinator.js'
+import type { RunRowsProjection } from '../src/persistence/review-run-store.js'
+import type { ReviewRunRecord } from '../src/shapes.js'
 
 const run: ReviewRunRecord = {
   run_id: 'run-1',

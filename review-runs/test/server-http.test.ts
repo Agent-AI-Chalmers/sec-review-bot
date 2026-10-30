@@ -2,7 +2,7 @@
 //
 // Routes, validation, and security all come from the contract via fastify-openapi-glue, so
 // this exercises the wiring rather than the store: it registers the compiled routes
-// (dist/server.js, so it also proves the contract is locatable from any CWD) against a stub
+// (dist/http/server-surface.js, so it also proves the contract is locatable from any CWD) against a stub
 // store and asserts the transport-level behaviour — health, auth, validation errors, and the
 // deterministic 409 mapping. Without this, a regression that only appears when the server
 // really starts (as with the contract's path resolution) would pass the rest of the suite.
@@ -11,14 +11,11 @@ import test from 'node:test'
 
 import Fastify from 'fastify'
 
-// Set before importing the server: its module body starts a real server unless NODE_ENV is
-// 'test'. The import is dynamic so the assignment below runs first.
-process.env.NODE_ENV = 'test'
 // Each import of a built artifact uses a computed specifier so `tsc` typechecks this file
-// without a prior build: a literal `'../dist/server.js'` is unresolvable when `dist/` is absent
+// without a prior build: a literal import is unresolvable when `dist/` is absent
 // (`TS2307`), but the URL form loads the same file at runtime and is not a static reference.
 const { REVIEW_RUNS_FASTIFY_OPTIONS, registerReviewRunsRoutes } = await import(
-  new URL('../dist/server.js', import.meta.url).href
+  new URL('../dist/http/server-surface.js', import.meta.url).href
 )
 
 const SERVICE_TOKEN = 'service-token'
@@ -44,7 +41,7 @@ async function buildApp(store: Record<string, unknown>, adminToken?: string) {
 }
 
 test('the compiled server registers the contract from any working directory', async () => {
-  // dist/server.js resolves the contract relative to itself, not the CWD; a bare
+  // The compiled HTTP surface resolves the contract relative to itself, not the CWD; a bare
   // registration is the smoke test for that (it throws if the spec cannot be loaded).
   const app = await buildApp({})
   try {
