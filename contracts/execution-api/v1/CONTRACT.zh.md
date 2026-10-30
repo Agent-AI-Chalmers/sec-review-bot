@@ -27,13 +27,18 @@ v1 的公开结果只按 workflow 暴露最终结果，不暴露内部 stage 的
 
 `input_bundle` 是指向完整 input bundle archive 的不可变 artifact reference。调用方准备并上传 archive；Execution Worker 校验后，将其 materialize 到 run-scoped 本地目录，再读取 manifest 或执行 workflow。
 
-v1 Execution 支持本地 `file:` 和持久的 `s3:` URI。Storage endpoint、region 和 credentials 属于部署配置，绝不能来自 workflow input。带有效期的 HTTP presigned URL 不是持久 artifact reference。
+v1 Execution Worker 只接受以下 canonical input-bundle URI 形式：
+
+- 本地文件使用 `file:///absolute/path` 或 `file://localhost/absolute/path`；
+- 持久 S3 object 使用 `s3://bucket/non-empty-key`。
+
+其他 `file:` 写法（包括 `file:/absolute/path`）会被拒绝。S3 URI authority 只能包含 bucket name，不允许 user information 或 port。两种形式都不允许 whitespace、query string 或 fragment。Storage endpoint、region 和 credentials 属于部署配置，绝不能来自 workflow input。带有效期的 HTTP presigned URL 不是持久 artifact reference。
 
 调用方负责 input bundle；Execution Worker 及其 stage 负责 `artifact_paths`、stage artifact roots、writable stage workspaces、retry state 和 delivery assignments 等运行态信息。
 
-`tar.zst` archive 必须符合 [input-bundle artifact v1 profile](../../tar-zstd-artifact/profiles/input-bundle/v1/SPEC.zh.md)，并包含 `manifest.json`、workspace snapshot、history 和声明的 incremental window。manifest 结构由 [`input-bundle-manifest.schema.json`](schemas/input-bundle-manifest.schema.json) 定义，声明 API version 和 bundle-relative path。Execution Worker 将这些路径解析成内部本地 `bundle_paths`。调用方不得直接提供 `bundle_paths`。
+`input_bundle` archive 必须符合 [input-bundle artifact v1 profile](../../tar-zstd-artifact/profiles/input-bundle/v1/SPEC.zh.md)。Execution Worker 会校验并将其中声明的路径解析为内部 `bundle_paths`；调用方不得直接提供 `bundle_paths`。
 
-`input_bundle` 的对象结构由 [`common.schema.json`](schemas/common.schema.json) 定义；`uri` 接受 `file:` 或 `s3:` 引用。
+`input_bundle` 的对象结构和 canonical URI 语法由 [`common.schema.json`](schemas/common.schema.json) 定义。
 
 Repository scan target（[`repository-review-input.schema.json`](schemas/repository-review-input.schema.json) 中的 `scan_target`）：
 

@@ -25,13 +25,18 @@ Every workflow input includes:
 
 `input_bundle` is an immutable artifact reference to a complete input bundle archive. The caller prepares and uploads the archive; the Execution Worker verifies it and materializes it into a local run-scoped directory before reading the manifest or executing a workflow.
 
-The v1 Execution Worker supports local `file:` and durable `s3:` URIs. Storage endpoint, region, and credentials are deployment configuration and never come from workflow input. Presigned HTTP URLs are not durable artifact references.
+The v1 Execution Worker accepts only these canonical input-bundle URI forms:
+
+- `file:///absolute/path` or `file://localhost/absolute/path` for a local file;
+- `s3://bucket/non-empty-key` for a durable S3 object.
+
+Other `file:` spellings, including `file:/absolute/path`, are rejected. An S3 URI authority contains only the bucket name: user information and ports are rejected. Both forms reject whitespace, query strings, and fragments. Storage endpoint, region, and credentials are deployment configuration and never come from workflow input. Presigned HTTP URLs are not durable artifact references.
 
 The caller owns the input bundle. The Execution Worker and its stages own runtime state such as `artifact_paths`, stage artifact roots, writable stage workspaces, retry state, and delivery assignments.
 
-The `tar.zst` archive must conform to the [input-bundle artifact v1 profile](../../tar-zstd-artifact/profiles/input-bundle/v1/SPEC.md) and contain `manifest.json`, the workspace snapshot, history, and any declared incremental window. The manifest shape is defined by [`input-bundle-manifest.schema.json`](schemas/input-bundle-manifest.schema.json). It declares the API version and bundle-relative paths. The Execution Worker parses those paths into internal local `bundle_paths`. Callers must not provide `bundle_paths` directly.
+The `input_bundle` archive must conform to the [input-bundle artifact v1 profile](../../tar-zstd-artifact/profiles/input-bundle/v1/SPEC.md). The Execution Worker validates it and resolves its declared paths into internal `bundle_paths`; callers must not provide `bundle_paths` directly.
 
-The `input_bundle` object shape is defined by [`common.schema.json`](schemas/common.schema.json); `uri` accepts a `file:` or `s3:` reference.
+The `input_bundle` object shape and canonical URI syntax are defined by [`common.schema.json`](schemas/common.schema.json).
 
 Repository scan target (`scan_target` in [`repository-review-input.schema.json`](schemas/repository-review-input.schema.json)):
 
