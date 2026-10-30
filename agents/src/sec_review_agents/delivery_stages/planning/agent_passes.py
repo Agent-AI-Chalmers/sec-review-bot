@@ -303,52 +303,16 @@ def _should_run_another_delivery_planning_pass(
 
 
 def _planning_items(planning_cases: list[dict[str, Any]]) -> list[dict]:
-    items: list[dict] = []
-    for case_entry in planning_cases:
-        case_id = str(case_entry.get("case_id") or "").strip()
-        if not case_id:
-            continue
-        items.append(
-            {
-                "item_id": case_id,
-                "payload": _planning_item_payload(case_entry),
-            }
-        )
-    return items
-
-
-def _planning_item_payload(case_entry: dict) -> dict:
-    payload: dict[str, Any] = {
-        "overview": _planning_overview(case_entry),
-    }
-    changed_files = _planning_changed_files(case_entry)
-    if changed_files:
-        payload["changed_files"] = changed_files
-    return payload
-
-
-def _planning_overview(case_entry: dict) -> str | None:
-    overview = str(case_entry.get("overview") or "").strip()
-    return overview or None
-
-
-def _planning_changed_files(case_entry: dict) -> list[str]:
-    changed_files: list[str] = []
-    seen: set[str] = set()
-    for value in case_entry.get("changed_files") or []:
-        path = _normalized_planning_path(value)
-        if not path or path in seen:
-            continue
-        seen.add(path)
-        changed_files.append(path)
-    return changed_files
-
-
-def _normalized_planning_path(value) -> str | None:
-    if not isinstance(value, str):
-        return None
-    normalized = value.strip().lstrip("/")
-    return normalized or None
+    return [
+        {
+            "item_id": case_entry["case_id"],
+            "payload": {
+                "overview": case_entry["overview"],
+                "changed_files": list(case_entry["changed_files"]),
+            },
+        }
+        for case_entry in planning_cases
+    ]
 
 
 def _planning_cases_for_batch(
