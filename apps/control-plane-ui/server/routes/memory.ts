@@ -12,6 +12,7 @@ import {
 import { PROXIED_CONTENT_TYPE, sendJson } from '../http-response.js'
 import { requireSameOrigin } from '../request-security.js'
 import type { MemoryCatalogClient } from '../upstream/memory-catalog-client.js'
+import { sendUpstreamFailure, writeUpstreamResult } from '../upstream/relay.js'
 import { UpstreamRequestError } from '../upstream/request.js'
 import { catalogArtifactReference } from '../memory/artifact-reference.js'
 import {
@@ -163,22 +164,9 @@ export function createMemoryRoutes({
     }
     try {
       const upstream = await catalog.write(catalogPath, catalogBody)
-      response.writeHead(upstream.status, {
-        'content-type': PROXIED_CONTENT_TYPE,
-        'cache-control': 'no-store'
-      })
-      response.end(upstream.body)
+      writeUpstreamResult(response, upstream, { cacheControl: 'no-store' })
     } catch (error) {
-      const kind =
-        error instanceof UpstreamRequestError ? error.kind : 'unavailable'
-      sendJson(response, kind === 'timeout' ? 504 : 502, {
-        error:
-          kind === 'too_large'
-            ? 'upstream_response_too_large'
-            : kind === 'timeout'
-              ? 'memory_catalog_timeout'
-              : 'memory_catalog_unavailable'
-      })
+      sendUpstreamFailure(response, 'memory_catalog', error)
     }
   }
 
@@ -302,11 +290,7 @@ export function createMemoryRoutes({
     try {
       const upstream = await catalog.read(path)
       if (upstream.status < 200 || upstream.status >= 300) {
-        response.writeHead(upstream.status, {
-          'content-type': PROXIED_CONTENT_TYPE,
-          'cache-control': 'no-store'
-        })
-        response.end(upstream.body)
+        writeUpstreamResult(response, upstream, { cacheControl: 'no-store' })
         return
       }
       const parsed: unknown = JSON.parse(upstream.body.toString('utf8'))
@@ -316,16 +300,7 @@ export function createMemoryRoutes({
       })
       response.end(JSON.stringify(redactArtifactUris(parsed)))
     } catch (error) {
-      const kind =
-        error instanceof UpstreamRequestError ? error.kind : 'unavailable'
-      sendJson(response, kind === 'timeout' ? 504 : 502, {
-        error:
-          kind === 'too_large'
-            ? 'upstream_response_too_large'
-            : kind === 'timeout'
-              ? 'memory_catalog_timeout'
-              : 'memory_catalog_unavailable'
-      })
+      sendUpstreamFailure(response, 'memory_catalog', error)
     }
   }
 
