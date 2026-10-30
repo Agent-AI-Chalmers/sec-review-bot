@@ -1,3 +1,5 @@
+import crypto from 'node:crypto'
+
 import { buildDeliveryDraftPrTitle } from './delivery-title.js'
 import { buildDeliveryDraftPrBody } from './renderer.js'
 import type { Octokit } from 'octokit'
@@ -219,4 +221,3 @@ export async function createRepositoryDeliveryDraftPr({
     reused: published.reused
   }
 }
-import crypto from 'node:crypto'

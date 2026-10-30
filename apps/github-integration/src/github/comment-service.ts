@@ -1,11 +1,12 @@
 import type { Octokit } from 'octokit'
 
+import { wasAuthoredByCurrentAppBot } from './github-app-metadata-service.js'
+import { asErrorWithResponse } from '../utils/error-utils.js'
+
 /** A single pull-request review, as the SDK returns it. */
 type GitHubPullRequestReview = Awaited<
   ReturnType<Octokit['rest']['pulls']['listReviews']>
 >['data'][number]
-import { wasAuthoredByCurrentAppBot } from './github-app-metadata-service.js'
-import { asErrorWithResponse } from '../utils/error-utils.js'
 
 export type ReviewCommentSide = 'LEFT' | 'RIGHT'
 export type PullRequestReviewEvent = 'APPROVE' | 'COMMENT' | 'REQUEST_CHANGES'

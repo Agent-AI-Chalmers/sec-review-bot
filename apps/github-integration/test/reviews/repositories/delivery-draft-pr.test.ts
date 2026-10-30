@@ -5,6 +5,7 @@ import {
   buildRepositoryDeliveryBranchName,
   createRepositoryDeliveryDraftPr as createRepositoryDeliveryDraftPrWithClaim
 } from '../../../src/reviews/repositories/delivery-draft-pr.js'
+import type { FileMode } from '../../../src/reviews/file-change.js'
 import type { RepositoryDelivery } from '../../../src/reviews/repositories/result.js'
 import { PublicationClaimLostError } from '../../../src/review-runs/publication-claim.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
@@ -20,7 +21,6 @@ test('repository delivery branch identity includes both run and delivery', () =>
     /^sec-review-bot\/repo-scan\/run-one-[a-f0-9]{12}\/case-shared-[a-f0-9]{12}$/
   )
 })
-import type { FileMode } from '../../../src/reviews/file-change.js'
 
 type CreateRepositoryDeliveryDraftPrParams = Parameters<
   typeof createRepositoryDeliveryDraftPrWithClaim
