@@ -1,2 +1,0 @@
-CREATE DATABASE sec_review_review_runs;
-CREATE DATABASE sec_review_memory_catalog;

@@ -71,6 +71,8 @@ review_runs_admin_token=$(random_secret)
 execution_api_token=$(random_secret)
 memory_catalog_token=$(random_secret)
 postgres_password=$(random_secret)
+review_runs_postgres_password=$(random_secret)
+memory_catalog_postgres_password=$(random_secret)
 rustfs_root_password=$(random_secret)
 integration_storage_password=$(random_secret)
 execution_storage_password=$(random_secret)
@@ -94,6 +96,8 @@ replace_assignment "$compose_tmp" REVIEW_RUNS_ADMIN_TOKEN "$review_runs_admin_to
 replace_assignment "$compose_tmp" EXECUTION_API_TOKEN "$execution_api_token"
 replace_assignment "$compose_tmp" AGENT_MEMORY_CATALOG_TOKEN "$memory_catalog_token"
 replace_assignment "$compose_tmp" POSTGRES_PASSWORD "$postgres_password"
+replace_assignment "$compose_tmp" REVIEW_RUNS_POSTGRES_PASSWORD "$review_runs_postgres_password"
+replace_assignment "$compose_tmp" MEMORY_CATALOG_POSTGRES_PASSWORD "$memory_catalog_postgres_password"
 replace_assignment "$compose_tmp" RUSTFS_ROOT_PASSWORD "$rustfs_root_password"
 replace_assignment "$compose_tmp" SEC_REVIEW_INTEGRATION_S3_SECRET_KEY "$integration_storage_password"
 replace_assignment "$compose_tmp" SEC_REVIEW_EXECUTION_S3_SECRET_KEY "$execution_storage_password"
