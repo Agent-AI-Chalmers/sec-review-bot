@@ -32,6 +32,7 @@ import {
 } from './run/diagnostic-bundle.js'
 
 const MAX_SESSION_BODY_BYTES = 1024 * 1024
+const MAX_UPSTREAM_JSON_BYTES = 4 * 1024 * 1024
 const REVIEW_RUNS_REQUEST_TIMEOUT_MS = 10_000
 const ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS = 30_000
 const ARTIFACT_BUCKET = 'sec-review'
@@ -41,6 +42,57 @@ const MAX_TRAJECTORY_LINE_BYTES = 512 * 1024
 const MAX_TRAJECTORY_MESSAGES = 2000
 const DEFAULT_SESSION_TTL_SECONDS = 12 * 60 * 60
 const DEFAULT_MAXIMUM_SESSIONS = 10_000
+
+class UpstreamResponseTooLargeError extends Error {
+  constructor() {
+    super('Upstream JSON response exceeds the size limit.')
+    this.name = 'UpstreamResponseTooLargeError'
+  }
+}
+
+async function readBoundedUpstreamBody(
+  response: Response,
+  maximumBytes: number
+): Promise<Buffer> {
+  const contentLength = response.headers.get('content-length')
+  if (
+    contentLength !== null &&
+    /^\d+$/.test(contentLength) &&
+    Number(contentLength) > maximumBytes
+  ) {
+    await response.body?.cancel()
+    throw new UpstreamResponseTooLargeError()
+  }
+  if (response.body === null) return Buffer.alloc(0)
+
+  const reader = response.body.getReader()
+  const chunks: Buffer[] = []
+  let size = 0
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > maximumBytes) {
+        await reader.cancel()
+        throw new UpstreamResponseTooLargeError()
+      }
+      chunks.push(Buffer.from(value))
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  return Buffer.concat(chunks, size)
+}
+
+async function readBoundedUpstreamJson(
+  response: Response,
+  maximumBytes: number
+): Promise<unknown> {
+  return JSON.parse(
+    (await readBoundedUpstreamBody(response, maximumBytes)).toString('utf8')
+  )
+}
 
 interface ArtifactObject {
   body: Readable
@@ -435,6 +487,7 @@ export function createControlPlaneUiServer({
   artifactStore,
   artifactDownloadIdleTimeoutMs = ARTIFACT_DOWNLOAD_IDLE_TIMEOUT_MS,
   reviewRunsRequestTimeoutMs = REVIEW_RUNS_REQUEST_TIMEOUT_MS,
+  upstreamJsonMaxBytes = MAX_UPSTREAM_JSON_BYTES,
   secureCookies = false,
   sessionTtlSeconds = DEFAULT_SESSION_TTL_SECONDS,
   maximumSessions = DEFAULT_MAXIMUM_SESSIONS,
@@ -448,6 +501,7 @@ export function createControlPlaneUiServer({
   artifactStore?: ArtifactStore
   artifactDownloadIdleTimeoutMs?: number
   reviewRunsRequestTimeoutMs?: number
+  upstreamJsonMaxBytes?: number
   secureCookies?: boolean
   sessionTtlSeconds?: number
   maximumSessions?: number
@@ -661,12 +715,20 @@ export function createControlPlaneUiServer({
             body: JSON.stringify(catalogBody),
             signal: AbortSignal.timeout(REVIEW_RUNS_REQUEST_TIMEOUT_MS)
           })
+          const responseBody = await readBoundedUpstreamBody(
+            upstream,
+            upstreamJsonMaxBytes
+          )
           response.writeHead(upstream.status, {
             'content-type': PROXIED_CONTENT_TYPE,
             'cache-control': 'no-store'
           })
-          response.end(Buffer.from(await upstream.arrayBuffer()))
+          response.end(responseBody)
         } catch (error) {
+          if (error instanceof UpstreamResponseTooLargeError) {
+            sendJson(response, 502, { error: 'upstream_response_too_large' })
+            return
+          }
           sendJson(response, 400, {
             error: error instanceof Error ? error.message : 'invalid_request'
           })
@@ -714,7 +776,10 @@ export function createControlPlaneUiServer({
             })
             return
           }
-          const record = (await upstream.json()) as Record<string, unknown>
+          const record = (await readBoundedUpstreamJson(
+            upstream,
+            upstreamJsonMaxBytes
+          )) as Record<string, unknown>
           const source = record.source as Record<string, unknown> | undefined
           const rawReference =
             collection === 'extractions'
@@ -801,10 +866,12 @@ export function createControlPlaneUiServer({
         } catch (error) {
           sendJson(response, 502, {
             error:
-              error instanceof Error &&
-              error.message === 'artifact_identity_mismatch'
-                ? 'artifact_identity_mismatch'
-                : 'memory_artifact_download_failed'
+              error instanceof UpstreamResponseTooLargeError
+                ? 'upstream_response_too_large'
+                : error instanceof Error &&
+                    error.message === 'artifact_identity_mismatch'
+                  ? 'artifact_identity_mismatch'
+                  : 'memory_artifact_download_failed'
           })
         }
         return
@@ -819,7 +886,10 @@ export function createControlPlaneUiServer({
             headers: { authorization: `Bearer ${memoryCatalogToken}` },
             signal: AbortSignal.timeout(REVIEW_RUNS_REQUEST_TIMEOUT_MS)
           })
-          const bytes = Buffer.from(await upstream.arrayBuffer())
+          const bytes = await readBoundedUpstreamBody(
+            upstream,
+            upstreamJsonMaxBytes
+          )
           if (!upstream.ok) {
             response.writeHead(upstream.status, {
               'content-type': PROXIED_CONTENT_TYPE,
@@ -839,9 +909,12 @@ export function createControlPlaneUiServer({
             error instanceof Error &&
             (error.name === 'AbortError' || error.name === 'TimeoutError')
           sendJson(response, timedOut ? 504 : 502, {
-            error: timedOut
-              ? 'memory_catalog_timeout'
-              : 'memory_catalog_unavailable'
+            error:
+              error instanceof UpstreamResponseTooLargeError
+                ? 'upstream_response_too_large'
+                : timedOut
+                  ? 'memory_catalog_timeout'
+                  : 'memory_catalog_unavailable'
           })
         }
         return
@@ -886,7 +959,10 @@ export function createControlPlaneUiServer({
             sendJson(response, 502, { error: 'review_runs_unavailable' })
             return
           }
-          const body = (await upstream.json()) as {
+          const body = (await readBoundedUpstreamJson(
+            upstream,
+            upstreamJsonMaxBytes
+          )) as {
             run?: { run_id?: unknown; artifact_storage?: unknown }
           }
           const artifact =
@@ -950,11 +1026,13 @@ export function createControlPlaneUiServer({
           sendJson(response, timedOut ? 504 : 502, {
             error: timedOut
               ? 'artifact_view_timeout'
-              : message === 'artifact_identity_mismatch'
-                ? 'artifact_identity_mismatch'
-                : message === 'diagnostic_bundle_too_large'
-                  ? 'artifact_preview_too_large'
-                  : 'invalid_diagnostic_bundle'
+              : error instanceof UpstreamResponseTooLargeError
+                ? 'upstream_response_too_large'
+                : message === 'artifact_identity_mismatch'
+                  ? 'artifact_identity_mismatch'
+                  : message === 'diagnostic_bundle_too_large'
+                    ? 'artifact_preview_too_large'
+                    : 'invalid_diagnostic_bundle'
           })
         } finally {
           clearTimeout(timeout)
@@ -1018,7 +1096,10 @@ export function createControlPlaneUiServer({
             sendJson(response, 502, { error: 'review_runs_unavailable' })
             return
           }
-          const body = (await upstream.json()) as {
+          const body = (await readBoundedUpstreamJson(
+            upstream,
+            upstreamJsonMaxBytes
+          )) as {
             run?: { run_id?: unknown; artifact_storage?: unknown }
           }
           clearTimeout(metadataTimeout)
@@ -1178,16 +1259,25 @@ export function createControlPlaneUiServer({
               signal: AbortSignal.timeout(REVIEW_RUNS_REQUEST_TIMEOUT_MS)
             }
           )
+          const responseBody = await readBoundedUpstreamBody(
+            upstream,
+            upstreamJsonMaxBytes
+          )
           response.writeHead(upstream.status, {
             'content-type': PROXIED_CONTENT_TYPE
           })
-          response.end(Buffer.from(await upstream.arrayBuffer()))
+          response.end(responseBody)
         } catch (error) {
           const timedOut =
             error instanceof Error &&
             (error.name === 'AbortError' || error.name === 'TimeoutError')
           sendJson(response, timedOut ? 504 : 502, {
-            error: timedOut ? 'review_runs_timeout' : 'review_runs_unavailable'
+            error:
+              error instanceof UpstreamResponseTooLargeError
+                ? 'upstream_response_too_large'
+                : timedOut
+                  ? 'review_runs_timeout'
+                  : 'review_runs_unavailable'
           })
         }
         return
@@ -1210,10 +1300,14 @@ export function createControlPlaneUiServer({
             signal: controller.signal
           }
         )
+        const responseBody = await readBoundedUpstreamBody(
+          upstream,
+          upstreamJsonMaxBytes
+        )
         response.writeHead(upstream.status, {
           'content-type': PROXIED_CONTENT_TYPE
         })
-        response.end(Buffer.from(await upstream.arrayBuffer()))
+        response.end(responseBody)
       } catch (error) {
         const timedOut = error instanceof Error && error.name === 'AbortError'
         response.writeHead(timedOut ? 504 : 502, {
@@ -1221,7 +1315,12 @@ export function createControlPlaneUiServer({
         })
         response.end(
           JSON.stringify({
-            error: timedOut ? 'review_runs_timeout' : 'review_runs_unavailable'
+            error:
+              error instanceof UpstreamResponseTooLargeError
+                ? 'upstream_response_too_large'
+                : timedOut
+                  ? 'review_runs_timeout'
+                  : 'review_runs_unavailable'
           })
         )
       } finally {
