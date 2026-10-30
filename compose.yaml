@@ -136,8 +136,9 @@ services:
       MEMORY_CATALOG_HOST: "0.0.0.0"
       MEMORY_CATALOG_PORT: "8092"
       # Keep profile-independent Compose commands usable when managed memory is not
-      # enabled. The service itself rejects an empty token before binding its port.
-      MEMORY_CATALOG_TOKEN: "${AGENT_MEMORY_CATALOG_TOKEN:-}"
+      # enabled. The service itself rejects empty credentials before binding its port.
+      MEMORY_CATALOG_WORKER_TOKEN: "${AGENT_MEMORY_CATALOG_TOKEN:-}"
+      MEMORY_CATALOG_OPERATOR_TOKEN: "${AGENT_MEMORY_CATALOG_OPERATOR_TOKEN:-}"
       MEMORY_CATALOG_DATABASE_URL: "postgresql://sec_review_memory_catalog:${MEMORY_CATALOG_POSTGRES_PASSWORD:?MEMORY_CATALOG_POSTGRES_PASSWORD is required}@postgres:5432/sec_review_memory_catalog"
     ports:
       - "127.0.0.1:${MEMORY_CATALOG_HOST_PORT:-8092}:8092"
@@ -226,7 +227,7 @@ services:
       REVIEW_RUNS_READ_TOKEN: "${REVIEW_RUNS_READ_TOKEN:?REVIEW_RUNS_READ_TOKEN is required}"
       CONTROL_PLANE_UI_ACCESS_TOKEN: "${CONTROL_PLANE_UI_ACCESS_TOKEN:?CONTROL_PLANE_UI_ACCESS_TOKEN is required}"
       MEMORY_CATALOG_URL: "http://memory-catalog-server:8092"
-      MEMORY_CATALOG_TOKEN: "${AGENT_MEMORY_CATALOG_TOKEN:?AGENT_MEMORY_CATALOG_TOKEN is required}"
+      MEMORY_CATALOG_OPERATOR_TOKEN: "${AGENT_MEMORY_CATALOG_OPERATOR_TOKEN:?AGENT_MEMORY_CATALOG_OPERATOR_TOKEN is required}"
       SEC_REVIEW_ARTIFACT_S3_ENDPOINT: "http://rustfs:9000"
       SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE: "path"
       SEC_REVIEW_ARTIFACT_S3_BUCKET: "sec-review"

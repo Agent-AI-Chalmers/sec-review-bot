@@ -43,9 +43,12 @@ Pause 与 resume 使用独立的幂等 ledger。相同重放会在检查当前 g
 
 ```bash
 MEMORY_CATALOG_DATABASE_URL=postgresql://... \
-MEMORY_CATALOG_TOKEN=... \
+MEMORY_CATALOG_WORKER_TOKEN=... \
+MEMORY_CATALOG_OPERATOR_TOKEN=... \
 pnpm run server
 ```
+
+Worker 凭据用于注册 extraction 和执行自动 maintenance。Operator 凭据用于 catalog 读取，以及 Control Plane UI 的 pause、edit、restore 和 resume 操作。服务端根据已认证角色生成 operator 审计 actor。
 
 ## 检查
 

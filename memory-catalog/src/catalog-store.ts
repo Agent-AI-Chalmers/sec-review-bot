@@ -20,6 +20,7 @@ import type {
   MemoryTreeRevisionList,
   ObservationBacklog,
   ObservationList,
+  OperatorRevisionSource,
 } from './contract-types-generated.js'
 import { applySchemaVersions } from './database/schema-version-runner.js'
 
@@ -34,6 +35,19 @@ export interface ExtractionListFilters {
 export interface ObservationListFilters {
   status?: 'pending' | 'consumed'
   consumedRevision?: number
+}
+
+export type AuthenticatedMaintenanceControlOperation =
+  MaintenanceControlOperation & { actor: Actor }
+export type AuthenticatedMemoryTreeRestoreOperation =
+  MemoryTreeRestoreOperation & { actor: Actor }
+export type AuthenticatedMemoryTreeRevisionCreation = Omit<
+  MemoryTreeRevisionCreation,
+  'source'
+> & {
+  source:
+    | Extract<MemoryTreeRevisionCreation['source'], { kind: 'maintenance' }>
+    | OperatorRevisionSource
 }
 
 async function inTransaction<T>(
@@ -74,14 +88,14 @@ export interface MemoryCatalogStore {
   getMaintenanceControl(): Promise<MaintenanceControl>
   changeMaintenanceControl(
     targetState: 'enabled' | 'paused',
-    input: MaintenanceControlOperation,
+    input: AuthenticatedMaintenanceControlOperation,
   ): Promise<MaintenanceControlOperationResult>
   getMaintenanceInput(limit: number): Promise<MaintenanceInput | null>
   createMemoryTreeRevision(
-    input: MemoryTreeRevisionCreation,
+    input: AuthenticatedMemoryTreeRevisionCreation,
   ): Promise<MemoryTreeRevisionCreationResult>
   restoreMemoryTree(
-    input: MemoryTreeRestoreOperation,
+    input: AuthenticatedMemoryTreeRestoreOperation,
   ): Promise<MemoryTreeRestoreOperationResult>
   getMemoryTree(): Promise<MemoryTree>
   getMemoryTreeRevision(
@@ -565,7 +579,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
 
   async changeMaintenanceControl(
     targetState: 'enabled' | 'paused',
-    input: MaintenanceControlOperation,
+    input: AuthenticatedMaintenanceControlOperation,
   ): Promise<MaintenanceControlOperationResult> {
     return await inTransaction(this.#pool, async (client) => {
       const replay = await client.query<{
@@ -698,7 +712,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
   }
 
   async createMemoryTreeRevision(
-    input: MemoryTreeRevisionCreation,
+    input: AuthenticatedMemoryTreeRevisionCreation,
   ): Promise<MemoryTreeRevisionCreationResult> {
     return await inTransaction(this.#pool, async (client) => {
       const source = input.source
@@ -837,7 +851,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
   }
 
   async restoreMemoryTree(
-    input: MemoryTreeRestoreOperation,
+    input: AuthenticatedMemoryTreeRestoreOperation,
   ): Promise<MemoryTreeRestoreOperationResult> {
     return await inTransaction(this.#pool, async (client) => {
       const replay = await client.query<{

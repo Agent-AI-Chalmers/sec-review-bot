@@ -334,7 +334,7 @@ launcher 会将不同的对象存储身份传给对应 worker，将 Memory Maint
 | 变量 | 用途 |
 | --- | --- |
 | `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 的基础 URL。未配置时，review agent 不加载 memory，memory processing 也无法运行。 |
-| `AGENT_MEMORY_CATALOG_TOKEN` | Memory Catalog 的 bearer token。配置 `AGENT_MEMORY_CATALOG_URL` 时必须同时配置。 |
+| `AGENT_MEMORY_CATALOG_TOKEN` | Memory Catalog extraction 和自动 maintenance 使用的 worker bearer token。配置 `AGENT_MEMORY_CATALOG_URL` 时必须同时配置。 |
 | `AGENT_MEMORY_CONSUMPTION_ENABLED` | 是否让 review agent 加载 active memory tree。默认为 `true`。 |
 | `AGENT_MEMORY_PROCESSING_ENABLED` | 是否运行 extraction 和 maintenance activities。默认为 `true`。 |
 
