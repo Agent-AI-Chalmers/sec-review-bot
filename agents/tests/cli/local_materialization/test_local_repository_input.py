@@ -1,9 +1,11 @@
 import subprocess
 from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import unquote, urlsplit
 
 import pytest
 
+from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.cli.local_materialization.repository import (
     _build_changed_files,
     build_local_repository_security_bundle,
@@ -96,7 +98,10 @@ def test_full_repository_bundle_creates_limited_history_workspace(
     )
 
     assert not (bundle.local_root_path / "workspace").exists()
-    assert bundle.input["input_bundle"]["uri"].endswith(".tar.zst")
+    reference = ArtifactReference.from_mapping(bundle.input["input_bundle"])
+    parsed_uri = urlsplit(reference.uri)
+    assert parsed_uri.scheme == "file"
+    assert Path(unquote(parsed_uri.path)).is_file()
     assert head_sha
 
 
