@@ -340,8 +340,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
         planning_cases = [
             {
                 "case_id": "case-a",
-                "overview": " Case A mitigation overview. ",
-                "changed_files": ["src/a.ts", ""],
+                "overview": "Case A mitigation overview.",
+                "changed_files": ["src/a.ts"],
             }
         ]
 
@@ -404,8 +404,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
         with tempfile.TemporaryDirectory() as tempdir:
             input_data = self._input_data(Path(tempdir))
             planning_cases = [
-                {"case_id": "case-a", "changed_files": []},
-                {"case_id": "case-b", "changed_files": []},
+                {"case_id": "case-a", "overview": "A", "changed_files": []},
+                {"case_id": "case-b", "overview": "B", "changed_files": []},
             ]
             pass_metas: list[dict | None] = []
 
@@ -462,8 +462,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
         with tempfile.TemporaryDirectory() as tempdir:
             input_data = self._input_data(Path(tempdir))
             planning_cases = [
-                {"case_id": "case-a", "changed_files": []},
-                {"case_id": "case-b", "changed_files": []},
+                {"case_id": "case-a", "overview": "A", "changed_files": []},
+                {"case_id": "case-b", "overview": "B", "changed_files": []},
             ]
             pass_kinds: list[str | None] = []
 
@@ -581,18 +581,22 @@ class TestRepositoryScopeAndDeliveryPlanning:
             planning_cases = [
                 {
                     "case_id": "case-a",
+                    "overview": "A",
                     "changed_files": ["src/a.ts"],
                 },
                 {
                     "case_id": "case-b",
+                    "overview": "B",
                     "changed_files": ["src/a.ts"],
                 },
                 {
                     "case_id": "case-c",
+                    "overview": "C",
                     "changed_files": ["src/b.ts"],
                 },
                 {
                     "case_id": "case-d",
+                    "overview": "D",
                     "changed_files": ["src/b.ts"],
                 },
             ]
