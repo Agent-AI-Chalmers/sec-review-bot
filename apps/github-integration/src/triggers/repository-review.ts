@@ -237,6 +237,17 @@ interface DispatchRepositoryReviewCommandDeps {
   }
 }
 
+/**
+ * Admit, resolve and submit one repository-review dispatch.
+ *
+ * This deliberately does not use `runPreparationCommand`: the dispatcher resolves the
+ * workflow's inputs after admission, and that resolution has its own failure code
+ * (`REVIEW_PREPARATION_FAILED`) and its own error type, because a rejected dispatch is the
+ * workflow author's mistake rather than a review that could not start. The ingress kind also
+ * differs — a GitHub Actions dispatch, not a webhook. Folding those differences into the
+ * command would have meant a prepare hook plus a per-workflow failure policy, which is the
+ * option bag the command exists to avoid.
+ */
 export async function dispatchRepositoryReview({
   app,
   payload,
