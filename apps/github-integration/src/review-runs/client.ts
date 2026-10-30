@@ -644,15 +644,13 @@ export type PublicationStepStore = Pick<
 
 /** The preparation-coordinator slice.
  *
- * It claims preparation work and settles failure notices, and it also hands the same store to the
+ * It claims preparation work, and it also hands the same store to the
  * trigger commands it runs, so the slice includes what those commands need (`admitReviewRun`,
  * `submitPreparedRun`, the preparation lease, and the optional input checkpoint). Naming the union
  * here keeps the coordinator from requiring the whole 22-method client just to call four of them. */
 export type PreparationCoordinatorStore = Pick<
   ReviewRunsClient,
   | 'claimNextPreparation'
-  | 'claimNextRunNotice'
-  | 'completeRunNotice'
   | 'failPreparation'
   | 'admitReviewRun'
   | 'submitPreparedRun'
@@ -661,6 +659,12 @@ export type PreparationCoordinatorStore = Pick<
 > & {
   checkpointPreparationInput?: ReviewRunsClient['checkpointPreparationInput']
 }
+
+/** The run-notice coordinator owns only the connector's durable notification outbox. */
+export type RunNoticeCoordinatorStore = Pick<
+  ReviewRunsClient,
+  'claimNextRunNotice' | 'completeRunNotice'
+>
 
 /** The heartbeat slice: what a lease keeper needs, and nothing else.
  *

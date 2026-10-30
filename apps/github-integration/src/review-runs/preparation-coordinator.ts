@@ -13,7 +13,6 @@ import {
   type PullRequestContext
 } from '../github/pull-request-service.js'
 import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
-import { repositoryFullName } from '../github/repository-service.js'
 import { isRecord } from '../utils/error-utils.js'
 import { integerEnv } from '../utils/env.js'
 import { logError, logInfo } from '../utils/logger.js'
@@ -21,7 +20,6 @@ import {
   classifyPreparationFailure,
   InvalidPreparationInputError
 } from './preparation-failure.js'
-import { sendRunNoticeReply } from './run-notice-reply.js'
 import { installationOctokitForRepo } from '../github/installation-client.js'
 
 interface PreparationCoordinator {
@@ -327,117 +325,13 @@ async function executeClaimedPreparation({
   )
 }
 
-/** The repository a notice belongs to, in `owner/repo` form, or null when it names none.
- *
- * Each workflow carries its repository differently: issue and pull-request inputs nest it, a
- * pull-request reference splits it across two fields, and a repository scan names it directly.
- * The value picks the installation token, but it must agree with the reply path's own check:
- * when it accepted `owner/repo/extra` while the reply path rejected it, the installation lookup
- * threw on every attempt and the notice was re-claimed forever without ever being concluded.
- * Both sides therefore treat anything that is not exactly two non-empty segments as no target. */
-function noticeRepository(input: Record<string, unknown>): string | null {
-  if (isRecord(input.issue)) {
-    return requireText(input.issue.repo_full_name, 'issue.repo_full_name')
-  }
-  if (isRecord(input.pr)) {
-    return requireText(input.pr.repo_full_name, 'pr.repo_full_name')
-  }
-  if (isRecord(input.pr_reference)) {
-    const owner = requireText(
-      input.pr_reference.owner_login,
-      'pr_reference.owner_login'
-    )
-    const name = requireText(
-      input.pr_reference.repo_name,
-      'pr_reference.repo_name'
-    )
-    return `${owner}/${name}`
-  }
-  return repositoryFullName(input.verified_repository)
-}
-
-/** Deliver the oldest queued notice for this connector.
- *
- * A connector is assumed to run one coordinator role, which is why the claim is not filtered by
- * capability: `claimNextRunNotice` takes the oldest pending notice for the connector, and every
- * process in that role holds the GitHub App credentials a reply needs. A process that legitimately
- * does not - a publisher-only deployment under the same connector - would claim a notice it cannot
- * post and could conclude it as undelivered. Should such a deployment exist, the claim needs a
- * role or capability field rather than a second queue: one outbox per connector is what makes
- * "the requester was told" a single fact.
- *
- * That assumption is deliberately recorded rather than enforced, because enforcing it here would
- * mean encoding deployment shape into the coordination protocol.
- */
-async function deliverNextRunNotice({
-  app,
-  store
-}: {
-  app: App
-  store: PreparationCoordinatorStore
-}): Promise<boolean> {
-  const notice = await store.claimNextRunNotice()
-  if (notice === null) return false
-  try {
-    const input = requireRecord(notice.input, 'object')
-    // The repository only selects the installation whose token posts the notice; the reply path
-    // decides which conversation or summary issue the outcome belongs to. A repository scan has
-    // no conversation, so it names its repository directly.
-    const repo = noticeRepository(input)
-    const delivered =
-      repo === null
-        ? null
-        : await sendRunNoticeReply(
-            await installationOctokitForRepo(app, repo),
-            {
-              run_id: notice.run_id,
-              notice_id: notice.notice_id,
-              input,
-              axis: notice.axis,
-              kind: notice.kind,
-              reason_code: notice.reason_code
-            }
-          )
-    // A posted reply names its comment; a failed delivery has none to name.
-    if (delivered === null) {
-      await store.completeRunNotice(notice.notice_id, notice.claim_token, false)
-    } else {
-      await store.completeRunNotice(
-        notice.notice_id,
-        notice.claim_token,
-        true,
-        delivered.comment_url
-      )
-    }
-  } catch (error) {
-    // A transient GitHub or network fault is worth retrying: the lease makes the notice
-    // eligible for another process once it expires, and an eventual delivery is preferable to
-    // silently losing a terminal outcome. A fault that cannot be repaired by retrying - a
-    // repository name that is not `owner/repo`, or a persisted input of the wrong shape - would
-    // otherwise be re-claimed every lease period forever, so it is concluded as an undelivered
-    // notice instead. The distinction is what `classifyPreparationFailure` already encodes.
-    if (!classifyPreparationFailure(error, 1).retry) {
-      await store.completeRunNotice(notice.notice_id, notice.claim_token, false)
-    }
-    logError('review_preparation_terminal_reply_failed', {
-      error,
-      run_id: notice.run_id
-    })
-  }
-  return true
-}
-
 export async function prepareReviewRunsOnce({
   app,
-  store = reviewRunsClient,
-  preferFailureNotice = true
+  store = reviewRunsClient
 }: {
   app: App
   store?: PreparationCoordinatorStore
-  preferFailureNotice?: boolean
 }): Promise<boolean> {
-  if (preferFailureNotice && (await deliverNextRunNotice({ app, store })))
-    return true
   const work = await store.claimNextPreparation()
   if (work !== null) {
     try {
@@ -475,12 +369,7 @@ export async function prepareReviewRunsOnce({
     }
     return true
   }
-  // When this pass gave preparations first chance but found none, keep terminal
-  // feedback responsive. A failed notice remains claimed until its lease expires,
-  // so this fallback never becomes a hot retry loop.
-  return preferFailureNotice
-    ? false
-    : await deliverNextRunNotice({ app, store })
+  return false
 }
 
 export function startPreparationCoordinator({
@@ -496,11 +385,8 @@ export function startPreparationCoordinator({
   const run = (): void => {
     if (active !== null) return
     active = (async () => {
-      let preferFailureNotice = true
-      while (await prepareReviewRunsOnce({ app, store, preferFailureNotice })) {
-        // Alternate only while both queues have work. This keeps terminal replies
-        // prompt without allowing a sustained notice backlog to starve preparation.
-        preferFailureNotice = !preferFailureNotice
+      while (await prepareReviewRunsOnce({ app, store })) {
+        // Drain currently available preparations before returning to the poll interval.
       }
     })()
       .catch((error) => {
