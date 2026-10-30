@@ -12,6 +12,14 @@ import {
 } from '../../src/triggers/repository-review.js'
 import type { Octokit } from 'octokit'
 import { ReviewRunsSubmissionError } from '../../src/review-runs/client.js'
+import type {
+  ReviewRunAdmission,
+  ReviewRunRecord
+} from '../../src/review-runs/client.js'
+import { EXECUTION_API_VERSION } from '../../src/execution/execution-api-version.js'
+import type { RepositoryReviewInput } from '../../src/execution/input.js'
+import type { SubmittedRepositoryReviewRun } from '../../src/reviews/repositories/submit.js'
+import { fakeGitHub, githubJson, unusedGitHub } from '../github-client.js'
 
 /** An admitted run record as Review Runs returns it, with the axis shapes spelled once.
  *
@@ -89,14 +97,6 @@ const preparationClaim = {
   renewPreparationClaim: async () => true,
   preparationHeartbeatIntervalMs: async () => 60_000
 }
-import type { SubmittedRepositoryReviewRun } from '../../src/reviews/repositories/submit.js'
-import type {
-  ReviewRunRecord,
-  ReviewRunAdmission
-} from '../../src/review-runs/client.js'
-import { EXECUTION_API_VERSION } from '../../src/execution/execution-api-version.js'
-import type { RepositoryReviewInput } from '../../src/execution/input.js'
-import { fakeGitHub, githubJson, unusedGitHub } from '../github-client.js'
 
 function fakeApp(): App {
   // Every test below injects `deps.getInstallationOctokit`, so the App only has to answer the

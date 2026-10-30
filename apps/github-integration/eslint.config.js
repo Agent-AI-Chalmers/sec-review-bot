@@ -37,6 +37,14 @@ export default [
     },
     rules: {
       ...tseslint.plugin.configs.recommended.rules,
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Program > :not(ImportDeclaration) ~ ImportDeclaration',
+          message:
+            'Imports must come first in a module: move this import above the code.'
+        }
+      ],
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
