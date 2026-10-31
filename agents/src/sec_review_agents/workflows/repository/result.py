@@ -4,6 +4,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
+from sec_review_agents.delivery_stages.result import DeliveryArtifact, DeliveryResult
 from sec_review_agents.review_stages.record import ReviewRecord
 from sec_review_agents.utils.payloads import mapping_payload
 from sec_review_agents.workflows.repository.scan_result import RepositoryScanResult
@@ -56,7 +57,7 @@ class ScanSummary(BaseModel):
 class RepositoryWorkflowResult(BaseModel):
     api_version: str = EXECUTION_API_VERSION
     scan_summary: ScanSummary
-    deliveries: list[dict[str, Any]] = Field(default_factory=list)
+    deliveries: list[DeliveryArtifact] = Field(default_factory=list)
     case_results: list[RepositoryCaseResult] = Field(default_factory=list)
     # A window with more deletions than review covers skips deletion review for all of them. The
     # count is in scan_summary; this says whether it was acted on, so a run whose deletions went
@@ -64,18 +65,6 @@ class RepositoryWorkflowResult(BaseModel):
     deletion_review_skipped: bool = False
 
     model_config = ConfigDict(extra="ignore")
-
-
-def _repository_deliveries(
-    delivery_result: Mapping[str, Any] | None,
-) -> list[dict[str, Any]]:
-    if not isinstance(delivery_result, Mapping):
-        return []
-    return [
-        item
-        for item in (delivery_result.get("deliveries") or [])
-        if isinstance(item, dict)
-    ]
 
 
 def _repository_review_record(review_record: Any) -> dict[str, Any]:
@@ -130,7 +119,7 @@ def build_scan_summary(
 def build_repository_workflow_result(
     *,
     scan_result: RepositoryScanResult | None,
-    delivery_result: Mapping[str, Any] | None,
+    delivery_result: DeliveryResult | None,
     case_results: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     """Assemble the published result from the run's stage outputs.
@@ -147,7 +136,9 @@ def build_repository_workflow_result(
         {
             "api_version": EXECUTION_API_VERSION,
             "scan_summary": build_scan_summary(scan_result=scan_result),
-            "deliveries": _repository_deliveries(delivery_result),
+            "deliveries": (
+                delivery_result.deliveries if delivery_result is not None else []
+            ),
             "case_results": _repository_case_results(case_results),
             "deletion_review_skipped": (
                 scan_result.deletion_review_skipped

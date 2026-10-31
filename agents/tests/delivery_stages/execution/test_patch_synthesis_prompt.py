@@ -1,6 +1,8 @@
+from sec_review_agents.delivery_stages.execution.input import DeliveryPatchCase
 from sec_review_agents.delivery_stages.execution.patch_synthesis import (
     render_delivery_patch_synthesis_brief,
 )
+from sec_review_agents.delivery_stages.model import DeliveryEntry
 
 
 def test_reference_patch_is_inlined_without_per_patch_truncation() -> None:
@@ -16,16 +18,16 @@ def test_reference_patch_is_inlined_without_per_patch_truncation() -> None:
     )
 
     brief = render_delivery_patch_synthesis_brief(
-        delivery_entry={
-            "delivery_id": "combined-large",
-            "strategy": "combined",
-            "reason": "large-reference-patch",
-            "case_ids": [case_id],
-        },
+        delivery_entry=DeliveryEntry(
+            delivery_id="combined-large",
+            strategy="combined",
+            reason="large-reference-patch",
+            case_ids=[case_id],
+        ),
         case_items=[
-            {
-                "case_id": case_id,
-                "mitigator_file_changes": [
+            DeliveryPatchCase(
+                case_id=case_id,
+                mitigator_file_changes=[
                     {
                         "path": "large.txt",
                         "status": "upsert",
@@ -33,8 +35,8 @@ def test_reference_patch_is_inlined_without_per_patch_truncation() -> None:
                         "content_encoding": "utf-8",
                     }
                 ],
-                "mitigator_patch_diff": patch_text,
-            }
+                mitigator_patch_diff=patch_text,
+            )
         ],
     )
 

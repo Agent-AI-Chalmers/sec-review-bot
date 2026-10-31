@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 from pydantic import BaseModel, ValidationError
 
+from sec_review_agents.delivery_stages.result import DeliveryResult
 from sec_review_agents.review_stages.cvss import (
     CvssMetricDetail,
     CvssStageResult,
@@ -170,12 +171,31 @@ def test_repository_workflow_builder_derives_scan_summary_from_scan_results() ->
 def test_repository_workflow_builder_emits_json_serializable_public_payload() -> None:
     result = build_repository_workflow_result(
         scan_result=scan_result_fixture(),
-        delivery_result={"deliveries": [{"delivery_id": "partial"}]},
+        delivery_result=DeliveryResult.model_validate(
+            {
+                "status": "completed",
+                "deliveries": [
+                    {
+                        "delivery_id": "partial",
+                        "case_ids": ["case-1"],
+                        "patch_diff": "",
+                        "file_changes": [],
+                    }
+                ],
+            }
+        ),
         case_results=[],
     )
 
     assert type(result) is dict
-    assert result["deliveries"] == [{"delivery_id": "partial"}]
+    assert result["deliveries"] == [
+        {
+            "delivery_id": "partial",
+            "case_ids": ["case-1"],
+            "patch_diff": "",
+            "file_changes": [],
+        }
+    ]
     json.dumps(result)
 
 

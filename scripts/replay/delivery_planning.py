@@ -113,10 +113,8 @@ async def main() -> None:
                 "ok": True,
                 "run_id": run_artifacts.name,
                 "keep_case_count": len(keep_case_results),
-                "delivery_plan_status": delivery_plan.get("status"),
-                "delivery_plan_delivery_count": len(
-                    delivery_plan.get("deliveries") or []
-                ),
+                "delivery_plan_status": delivery_plan.status,
+                "delivery_plan_delivery_count": len(delivery_plan.deliveries),
                 "result_path": str(result_path),
             },
             ensure_ascii=False,

@@ -2,12 +2,14 @@ import asyncio
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from sec_review_agents.delivery_stages.execution import (
+from sec_review_agents.delivery_stages.execution.input import (
     build_delivery_execution_input,
-    execute_delivery_entry,
     persist_delivery_execution_input,
 )
+from sec_review_agents.delivery_stages.execution.result import DeliveryExecutionResult
+from sec_review_agents.delivery_stages.execution.stage import execute_delivery_entry
 from sec_review_agents.delivery_stages.result import (
+    DeliveryResult,
     build_delivery_result_from_outcomes,
     build_skipped_delivery_result,
     persist_delivery_result,
@@ -134,9 +136,9 @@ async def run_repository_case_reviews_direct(
 async def run_repository_delivery_direct(
     request: ReviewWorkflowRequest,
     case_results: Sequence[Mapping[str, Any]],
-) -> dict[str, Any]:
+) -> DeliveryResult:
     delivery_plan = await plan_repository_delivery_activity(request, case_results)
-    deliveries = delivery_plan["deliveries"]
+    deliveries = delivery_plan.deliveries
     run_artifacts_root = required_path(
         request.prepared_input["artifact_root_path"],
         label="artifact_root_path",
@@ -171,28 +173,28 @@ async def run_repository_delivery_direct(
         deliveries=deliveries,
         keep_case_results=keep_case_results,
     )
-    patch_outcomes: list[dict[str, Any] | None] = [None] * len(deliveries)
-    for delivery_request in delivery_execution["single_delivery_execution_items"]:
-        patch_outcomes[int(delivery_request["index"])] = await execute_delivery_entry(
+    patch_outcomes: list[DeliveryExecutionResult | None] = [None] * len(deliveries)
+    for delivery_request in delivery_execution.single_delivery_execution_items:
+        patch_outcomes[delivery_request.index] = await execute_delivery_entry(
             run_artifacts_root=run_artifacts_root,
-            delivery_entry=delivery_request["delivery"],
-            case_results=delivery_request["case_items"],
+            delivery_entry=delivery_request.delivery,
+            case_results=delivery_request.case_items,
         )
-    combined_delivery_execution_items = list(
-        delivery_execution["combined_delivery_execution_items"]
+    combined_delivery_execution_items = (
+        delivery_execution.combined_delivery_execution_items
     )
     for delivery_request in combined_delivery_execution_items:
-        delivery_index = int(delivery_request["index"])
+        delivery_index = delivery_request.index
         patch_outcomes[delivery_index] = await execute_delivery_entry(
             run_artifacts_root=run_artifacts_root,
             baseline_snapshot_tar_path=workspace_snapshot_tar_path,
-            delivery_entry=delivery_request["delivery"],
-            case_results=delivery_request["case_items"],
+            delivery_entry=delivery_request.delivery,
+            case_results=delivery_request.case_items,
         )
 
     result = build_delivery_result_from_outcomes(
         deliveries=deliveries,
-        keep_case_ids=delivery_execution["keep_case_ids"],
+        keep_case_ids=delivery_execution.keep_case_ids,
         patch_outcomes=[outcome for outcome in patch_outcomes if outcome is not None],
     )
     persist_delivery_result(run_artifacts_root=run_artifacts_root, result=result)

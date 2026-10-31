@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -18,7 +18,9 @@ from sec_review_agents.agents.delivery_planning.prompts import (
 from sec_review_agents.agents.delivery_planning.workbench_state import (
     DeliveryWorkbenchState,
 )
+from sec_review_agents.delivery_stages.model import DeliveryPlan
 from sec_review_agents.delivery_stages.planning.batching import planning_case_id_batches
+from sec_review_agents.delivery_stages.planning.input import DeliveryPlanningCase
 from sec_review_agents.observability.trace_context import bind_trace_context
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.trajectories import remove_trajectories, trajectory_path
@@ -43,24 +45,24 @@ def _delivery_planning_pass_artifacts_path(
 
 
 def persist_delivery_planning_input(
-    delivery_planning_root: Path, planning_cases: list[dict[str, Any]]
+    delivery_planning_root: Path, planning_cases: list[DeliveryPlanningCase]
 ) -> None:
     """Persist archive-only planning input for operator inspection."""
     persist_json_artifact(
         delivery_planning_root,
         "delivery-planning-input",
-        {"cases": planning_cases},
+        {"cases": [case.model_dump(mode="json") for case in planning_cases]},
     )
 
 
 async def run_delivery_planning(
     *,
     delivery_planning_root: Path,
-    planning_cases: list[dict[str, Any]],
+    planning_cases: list[DeliveryPlanningCase],
     max_passes: int = DEFAULT_DELIVERY_PLANNING_PASSES,
     planning_mode: DeliveryPlanningMode = "batched",
     max_batch_size: int = DEFAULT_DELIVERY_PLANNING_BATCH_SIZE,
-) -> dict:
+) -> DeliveryPlan:
     persist_delivery_planning_input(delivery_planning_root, planning_cases)
     if planning_mode == "batched":
         workbench_state, pass_count = await _run_batched_delivery_planning_passes(
@@ -75,31 +77,31 @@ async def run_delivery_planning(
             planning_cases=planning_cases,
             max_passes=max_passes,
         )
-    finish_result = workbench_state.finish()
-    if not finish_result["ok"]:
+    constraints = workbench_state.constraints()
+    if not constraints["ok"]:
         raise RuntimeError(
             "delivery workbench state is incomplete after agent execution."
         )
-    deliveries = finish_result["deliveries"]
-    return {
-        "deliveries": deliveries,
-        "constraints": finish_result["constraints"],
-        "metadata": {
+    deliveries = workbench_state.export_deliveries()
+    return DeliveryPlan(
+        status="completed",
+        deliveries=deliveries,
+        metadata={
             "planning_mode": planning_mode,
             "planning_pass_count": pass_count,
             "batch_size": max_batch_size if planning_mode == "batched" else None,
         },
-        "counts": {
+        counts={
             "input_case_count": len(planning_cases),
             "delivery_count": len(deliveries),
         },
-    }
+    )
 
 
 async def _run_single_delivery_planning_passes(
     *,
     delivery_planning_root: Path,
-    planning_cases: list[dict[str, Any]],
+    planning_cases: list[DeliveryPlanningCase],
     max_passes: int,
 ) -> tuple[DeliveryWorkbenchState, int]:
     workbench_state = DeliveryWorkbenchState.from_items(_planning_items(planning_cases))
@@ -127,7 +129,7 @@ async def _run_single_delivery_planning_passes(
 async def _run_batched_delivery_planning_passes(
     *,
     delivery_planning_root: Path,
-    planning_cases: list[dict[str, Any]],
+    planning_cases: list[DeliveryPlanningCase],
     max_passes: int,
     max_batch_size: int,
 ) -> tuple[DeliveryWorkbenchState, int]:
@@ -211,7 +213,7 @@ async def _run_batched_delivery_planning_passes(
 async def _run_delivery_planning_batch_draft(
     *,
     delivery_planning_root: Path,
-    planning_cases: list[dict[str, Any]],
+    planning_cases: list[DeliveryPlanningCase],
     batch_case_ids: list[str],
     batch: dict,
 ) -> list[dict]:
@@ -231,7 +233,7 @@ async def _run_delivery_planning_agent_pass(
     *,
     delivery_planning_root: Path,
     workbench_state: DeliveryWorkbenchState,
-    planning_cases: list[dict[str, Any]],
+    planning_cases: list[DeliveryPlanningCase],
     pass_index: int = 0,
     draft_origins: list[dict] | None = None,
     pass_meta: dict | None = None,
@@ -268,7 +270,7 @@ async def _run_delivery_planning_agent_pass(
                     workbench_state=workbench_state,
                     system_prompt=system_prompt,
                     user_prompt=build_repository_delivery_planning_user_prompt(
-                        planning_cases,
+                        [case.model_dump(mode="json") for case in planning_cases],
                         pass_kind=pass_kind,
                         draft_origins=draft_origins,
                     ),
@@ -299,13 +301,13 @@ def _should_run_another_delivery_planning_pass(
     return operations in (["create_groups"], ["delete_groups", "create_groups"])
 
 
-def _planning_items(planning_cases: list[dict[str, Any]]) -> list[dict]:
+def _planning_items(planning_cases: list[DeliveryPlanningCase]) -> list[dict]:
     return [
         {
-            "item_id": case_entry["case_id"],
+            "item_id": case_entry.case_id,
             "payload": {
-                "overview": case_entry["overview"],
-                "changed_files": list(case_entry["changed_files"]),
+                "overview": case_entry.overview,
+                "changed_files": list(case_entry.changed_files),
             },
         }
         for case_entry in planning_cases
@@ -313,17 +315,15 @@ def _planning_items(planning_cases: list[dict[str, Any]]) -> list[dict]:
 
 
 def _planning_cases_for_batch(
-    planning_cases: list[dict[str, Any]], batch_case_ids: list[str]
-) -> list[dict[str, Any]]:
+    planning_cases: list[DeliveryPlanningCase], batch_case_ids: list[str]
+) -> list[DeliveryPlanningCase]:
     requested_case_ids = {
-        str(case_id or "").strip()
-        for case_id in batch_case_ids
-        if str(case_id or "").strip()
+        case_id.strip() for case_id in batch_case_ids if case_id.strip()
     }
     return [
-        dict(case_entry)
+        case_entry
         for case_entry in planning_cases
-        if str(case_entry.get("case_id") or "").strip() in requested_case_ids
+        if case_entry.case_id.strip() in requested_case_ids
     ]
 
 

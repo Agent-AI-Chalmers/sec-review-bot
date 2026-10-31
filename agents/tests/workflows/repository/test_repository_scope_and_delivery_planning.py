@@ -20,6 +20,7 @@ from sec_review_agents.delivery_stages.planning.agent_passes import (
 )
 from sec_review_agents.delivery_stages.planning.batching import planning_case_id_batches
 from sec_review_agents.delivery_stages.planning.input import (
+    DeliveryPlanningCase,
     prepare_delivery_planning_patch_view,
 )
 from sec_review_agents.delivery_stages.planning.stage import (
@@ -80,7 +81,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
         }
 
     async def _run_delivery_planning(
-        self, input_data: dict, planning_cases: list[dict], **kwargs
+        self, input_data: dict, planning_cases: list[DeliveryPlanningCase], **kwargs
     ):
         return await run_delivery_planning(
             delivery_planning_root=Path(input_data["input_bundle_root_path"])
@@ -298,24 +299,34 @@ class TestRepositoryScopeAndDeliveryPlanning:
         self,
     ) -> None:
         planning_cases = [
-            {"case_id": "case-a", "changed_files": []},
-            {"case_id": "case-b", "changed_files": []},
-            {"case_id": "case-c", "changed_files": []},
+            DeliveryPlanningCase.model_validate(
+                {"overview": "", "changed_files": [], **item}
+            )
+            for item in [
+                {"case_id": "case-a", "changed_files": []},
+                {"case_id": "case-b", "changed_files": []},
+                {"case_id": "case-c", "changed_files": []},
+            ]
         ]
 
         subset = _planning_cases_for_batch(
             planning_cases, ["case-c", "case-a", "missing"]
         )
 
-        assert [item["case_id"] for item in subset] == ["case-a", "case-c"]
+        assert [item.case_id for item in subset] == ["case-a", "case-c"]
 
     def test_delivery_planning_items_use_generic_payload_shape(self) -> None:
         planning_cases = [
-            {
-                "case_id": "case-a",
-                "overview": "Case A mitigation overview.",
-                "changed_files": ["src/a.ts"],
-            }
+            DeliveryPlanningCase.model_validate(
+                {"overview": "", "changed_files": [], **item}
+            )
+            for item in [
+                {
+                    "case_id": "case-a",
+                    "overview": "Case A mitigation overview.",
+                    "changed_files": ["src/a.ts"],
+                }
+            ]
         ]
 
         assert _planning_items(planning_cases) == [
@@ -330,30 +341,35 @@ class TestRepositoryScopeAndDeliveryPlanning:
 
     def test_delivery_planning_batches_cases_by_primary_path(self) -> None:
         planning_cases = [
-            {
-                "case_id": "case-a",
-                "changed_files": ["src/api/orders/checkout.ts"],
-            },
-            {
-                "case_id": "case-b",
-                "changed_files": ["src/api/auth/login.ts"],
-            },
-            {
-                "case_id": "case-c",
-                "changed_files": ["src/api/orders/checkout.ts"],
-            },
-            {
-                "case_id": "case-d",
-                "changed_files": ["src/api/auth/login.ts"],
-            },
-            {
-                "case_id": "case-e",
-                "changed_files": ["src/api/assets/route.ts"],
-            },
-            {
-                "case_id": "case-f",
-                "changed_files": ["src/api/assets/route.ts"],
-            },
+            DeliveryPlanningCase.model_validate(
+                {"overview": "", "changed_files": [], **item}
+            )
+            for item in [
+                {
+                    "case_id": "case-a",
+                    "changed_files": ["src/api/orders/checkout.ts"],
+                },
+                {
+                    "case_id": "case-b",
+                    "changed_files": ["src/api/auth/login.ts"],
+                },
+                {
+                    "case_id": "case-c",
+                    "changed_files": ["src/api/orders/checkout.ts"],
+                },
+                {
+                    "case_id": "case-d",
+                    "changed_files": ["src/api/auth/login.ts"],
+                },
+                {
+                    "case_id": "case-e",
+                    "changed_files": ["src/api/assets/route.ts"],
+                },
+                {
+                    "case_id": "case-f",
+                    "changed_files": ["src/api/assets/route.ts"],
+                },
+            ]
         ]
 
         assert planning_case_id_batches(planning_cases, max_batch_size=3) == [
@@ -377,8 +393,13 @@ class TestRepositoryScopeAndDeliveryPlanning:
         with tempfile.TemporaryDirectory() as tempdir:
             input_data = self._input_data(Path(tempdir))
             planning_cases = [
-                {"case_id": "case-a", "overview": "A", "changed_files": []},
-                {"case_id": "case-b", "overview": "B", "changed_files": []},
+                DeliveryPlanningCase.model_validate(
+                    {"overview": "", "changed_files": [], **item}
+                )
+                for item in [
+                    {"case_id": "case-a", "overview": "A", "changed_files": []},
+                    {"case_id": "case-b", "overview": "B", "changed_files": []},
+                ]
             ]
             pass_metas: list[dict | None] = []
 
@@ -420,23 +441,30 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 ).read_text(encoding="utf-8")
             )
 
-        assert result["metadata"]["planning_mode"] == "single"
-        assert "agent_result" not in result
-        assert "agent_results" not in result
-        assert result["metadata"]["planning_pass_count"] == 2
-        assert result["counts"]["input_case_count"] == 2
-        assert result["counts"]["delivery_count"] == 1
-        assert result["constraints"]["ok"] is True
+        assert result.metadata["planning_mode"] == "single"
+        assert "agent_result" not in result.model_dump()
+        assert "agent_results" not in result.model_dump()
+        assert result.metadata["planning_pass_count"] == 2
+        assert result.counts["input_case_count"] == 2
+        assert result.counts["delivery_count"] == 1
+        assert result.status == "completed"
         assert pass_metas == [None, {"kind": "refinement"}]
-        assert archived_input == {"cases": planning_cases}
+        assert archived_input == {
+            "cases": [case.model_dump(mode="json") for case in planning_cases]
+        }
 
     @pytest.mark.asyncio
     async def test_delivery_planning_defaults_to_batched_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             input_data = self._input_data(Path(tempdir))
             planning_cases = [
-                {"case_id": "case-a", "overview": "A", "changed_files": []},
-                {"case_id": "case-b", "overview": "B", "changed_files": []},
+                DeliveryPlanningCase.model_validate(
+                    {"overview": "", "changed_files": [], **item}
+                )
+                for item in [
+                    {"case_id": "case-a", "overview": "A", "changed_files": []},
+                    {"case_id": "case-b", "overview": "B", "changed_files": []},
+                ]
             ]
             pass_kinds: list[str | None] = []
 
@@ -444,7 +472,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 *,
                 delivery_planning_root: Path,
                 workbench_state: DeliveryWorkbenchState,
-                planning_cases: list[dict],
+                planning_cases: list[DeliveryPlanningCase],
                 pass_index: int,
                 **_kwargs,
             ) -> dict:
@@ -457,8 +485,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
                             {
                                 "kind": "delivery",
                                 "item_ids": [
-                                    case_entry["case_id"]
-                                    for case_entry in planning_cases
+                                    case_entry.case_id for case_entry in planning_cases
                                 ],
                                 "reason": "Batch delivery.",
                             }
@@ -472,10 +499,10 @@ class TestRepositoryScopeAndDeliveryPlanning:
             ):
                 result = await self._run_delivery_planning(input_data, planning_cases)
 
-        assert result["metadata"]["planning_mode"] == "batched"
+        assert result.metadata["planning_mode"] == "batched"
         assert "batch" in pass_kinds
         assert "refinement" in pass_kinds
-        assert result["constraints"]["ok"]
+        assert result.status == "completed"
 
     def test_delivery_planning_batch_and_refinement_artifact_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -535,7 +562,11 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 await _run_delivery_planning_agent_pass(
                     delivery_planning_root=delivery_planning_root,
                     workbench_state=DeliveryWorkbenchState.initial(["case-1"]),
-                    planning_cases=[{"case_id": "case-1"}],
+                    planning_cases=[
+                        DeliveryPlanningCase(
+                            case_id="case-1", overview="", changed_files=[]
+                        )
+                    ],
                     pass_meta={
                         "kind": "batch",
                         "index": 1,
@@ -551,26 +582,31 @@ class TestRepositoryScopeAndDeliveryPlanning:
         with tempfile.TemporaryDirectory() as tempdir:
             input_data = self._input_data(Path(tempdir))
             planning_cases = [
-                {
-                    "case_id": "case-a",
-                    "overview": "A",
-                    "changed_files": ["src/a.ts"],
-                },
-                {
-                    "case_id": "case-b",
-                    "overview": "B",
-                    "changed_files": ["src/a.ts"],
-                },
-                {
-                    "case_id": "case-c",
-                    "overview": "C",
-                    "changed_files": ["src/b.ts"],
-                },
-                {
-                    "case_id": "case-d",
-                    "overview": "D",
-                    "changed_files": ["src/b.ts"],
-                },
+                DeliveryPlanningCase.model_validate(
+                    {"overview": "", "changed_files": [], **item}
+                )
+                for item in [
+                    {
+                        "case_id": "case-a",
+                        "overview": "A",
+                        "changed_files": ["src/a.ts"],
+                    },
+                    {
+                        "case_id": "case-b",
+                        "overview": "B",
+                        "changed_files": ["src/a.ts"],
+                    },
+                    {
+                        "case_id": "case-c",
+                        "overview": "C",
+                        "changed_files": ["src/b.ts"],
+                    },
+                    {
+                        "case_id": "case-d",
+                        "overview": "D",
+                        "changed_files": ["src/b.ts"],
+                    },
+                ]
             ]
             seen_batch_cases: list[list[str]] = []
             refinement_seen_groups: list[dict] = []
@@ -580,14 +616,14 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 *,
                 delivery_planning_root: Path,
                 workbench_state: DeliveryWorkbenchState,
-                planning_cases: list[dict],
+                planning_cases: list[DeliveryPlanningCase],
                 pass_index: int,
                 **_kwargs,
             ) -> dict:
                 assert delivery_planning_root.name
                 pass_meta = _kwargs.get("pass_meta") or {}
                 pass_kinds.append(pass_meta.get("kind"))
-                case_ids = [case_entry["case_id"] for case_entry in planning_cases]
+                case_ids = [case_entry.case_id for case_entry in planning_cases]
                 if pass_index == 0:
                     seen_batch_cases.append(case_ids)
                     workbench_state.create_group(
@@ -618,10 +654,10 @@ class TestRepositoryScopeAndDeliveryPlanning:
         assert pass_kinds.count("batch") == 2
         assert pass_kinds.count("refinement") == 1
         assert len(refinement_seen_groups) == 2
-        assert result["constraints"]["ok"]
-        assert result["metadata"]["planning_mode"] == "batched"
-        assert result["metadata"]["planning_pass_count"] == 3
-        assert [item["case_ids"] for item in result["deliveries"]] == [
+        assert result.status == "completed"
+        assert result.metadata["planning_mode"] == "batched"
+        assert result.metadata["planning_pass_count"] == 3
+        assert [item.case_ids for item in result.deliveries] == [
             ["case-a", "case-b"],
             ["case-c", "case-d"],
         ]
@@ -633,7 +669,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
             input_data = self._input_data(root)
-            captured: dict[str, list[dict]] = {}
+            captured: dict[str, list[DeliveryPlanningCase]] = {}
 
             async def run_delivery_planning(**kwargs) -> dict:
                 captured["cases"] = kwargs["planning_cases"]
@@ -682,8 +718,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 / "delivery-plan.json"
             ).exists()
             first_case = captured["cases"][0]
-            assert first_case["changed_files"] == ["src/a.ts"]
-            assert first_case["overview"] == "Case 1 mitigation overview."
+            assert first_case.changed_files == ["src/a.ts"]
+            assert first_case.overview == "Case 1 mitigation overview."
 
     def test_delivery_planning_patch_view_is_materialized_from_case_results(
         self,
@@ -697,36 +733,22 @@ class TestRepositoryScopeAndDeliveryPlanning:
             stale_patch.parent.mkdir(parents=True)
             stale_patch.write_text("stale\n", encoding="utf-8")
             case_results: list[DeliveryCaseInput] = [
-                {
-                    "case_id": "case-1",
-                    "disposition": "keep",
-                    "reason": None,
-                    "analyzer_overview": "",
-                    "analyzer_verdict": None,
-                    "mitigation_overview": "",
-                    "mitigator_file_changes": [],
-                    "mitigator_patch_diff": "diff --git a/src/a.ts b/src/a.ts\n",
-                    "verifier_overview": "",
-                    "verifier_coverage": None,
-                    "verifier_patch_findings": [],
-                    "verifier_findings": [],
-                    "residual_risks": [],
-                },
-                {
-                    "case_id": "case-2",
-                    "disposition": "keep",
-                    "reason": None,
-                    "analyzer_overview": "",
-                    "analyzer_verdict": None,
-                    "mitigation_overview": "",
-                    "mitigator_file_changes": [],
-                    "mitigator_patch_diff": "",
-                    "verifier_overview": "",
-                    "verifier_coverage": None,
-                    "verifier_patch_findings": [],
-                    "verifier_findings": [],
-                    "residual_risks": [],
-                },
+                DeliveryCaseInput(
+                    case_id="case-1",
+                    disposition="keep",
+                    reason=None,
+                    mitigation_overview="",
+                    mitigator_file_changes=[],
+                    mitigator_patch_diff="diff --git a/src/a.ts b/src/a.ts\n",
+                ),
+                DeliveryCaseInput(
+                    case_id="case-2",
+                    disposition="keep",
+                    reason=None,
+                    mitigation_overview="",
+                    mitigator_file_changes=[],
+                    mitigator_patch_diff="",
+                ),
             ]
 
             patch_root = prepare_delivery_planning_patch_view(
@@ -873,3 +895,29 @@ class TestRepositoryScopeAndDeliveryPlanning:
             result["case_results"][0]["review_record"]["analysis"]["verdict"]
             == "confirmed-vulnerability"
         )
+
+
+def test_delivery_projection_requires_only_selected_case_and_mitigation() -> None:
+    """Delivery must not reach into analysis or verification after case selection."""
+    projected = project_repository_case_result_for_delivery(
+        {
+            "case_id": "case-1",
+            "disposition": "keep",
+            "reason": "ready",
+            "review_record": {
+                "mitigation": {
+                    "overview": "Remove unsafe entrypoint",
+                    "file_changes": [{"path": "unsafe.py", "status": "deleted"}],
+                    "patch_diff": "reference patch",
+                }
+            },
+        }
+    )
+    assert projected == DeliveryCaseInput(
+        case_id="case-1",
+        disposition="keep",
+        reason="ready",
+        mitigation_overview="Remove unsafe entrypoint",
+        mitigator_file_changes=[{"path": "unsafe.py", "status": "deleted"}],
+        mitigator_patch_diff="reference patch",
+    )

@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
+from sec_review_agents.delivery_stages.result import DeliveryResult
 from sec_review_agents.review_stages.record import ReviewRecord
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
@@ -186,16 +187,33 @@ def test_repository_result_public_shape() -> None:
     }
     result = build_repository_workflow_result(
         scan_result=scan_result_fixture(),
-        delivery_result={
-            "deliveries": [{"delivery_id": "delivery-1"}],
-            "caseDeliveryAssignments": {"case-1": {"status": "single"}},
-            "case_delivery_assignments": {"case-1": {"status": "single"}},
-        },
+        delivery_result=DeliveryResult.model_validate(
+            {
+                "status": "completed",
+                "deliveries": [
+                    {
+                        "delivery_id": "delivery-1",
+                        "case_ids": ["case-1"],
+                        "patch_diff": "",
+                        "file_changes": [],
+                    }
+                ],
+                "caseDeliveryAssignments": {"case-1": {"status": "single"}},
+                "case_delivery_assignments": {"case-1": {"status": "single"}},
+            }
+        ),
         case_results=[case_result],
     )
 
     assert_public_workflow_result(result)
-    assert result["deliveries"] == [{"delivery_id": "delivery-1"}]
+    assert result["deliveries"] == [
+        {
+            "delivery_id": "delivery-1",
+            "case_ids": ["case-1"],
+            "patch_diff": "",
+            "file_changes": [],
+        }
+    ]
     assert "cases" not in result
     assert_review_record_shape(result["case_results"][0]["review_record"])
 
@@ -212,23 +230,26 @@ def test_repository_workflow_result_builder_output_matches_shared_contract_schem
             case_count=1,
             suppressed_candidate_count=1,
         ),
-        delivery_result={
-            "deliveries": [
-                {
-                    "delivery_id": "delivery-1",
-                    "case_ids": ["case-1"],
-                    "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n",
-                    "file_changes": [
-                        {
-                            "path": "src/webhook.ts",
-                            "status": "upsert",
-                            "content": "export const ok = true\n",
-                            "content_encoding": "utf-8",
-                        }
-                    ],
-                }
-            ],
-        },
+        delivery_result=DeliveryResult.model_validate(
+            {
+                "status": "completed",
+                "deliveries": [
+                    {
+                        "delivery_id": "delivery-1",
+                        "case_ids": ["case-1"],
+                        "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n",
+                        "file_changes": [
+                            {
+                                "path": "src/webhook.ts",
+                                "status": "upsert",
+                                "content": "export const ok = true\n",
+                                "content_encoding": "utf-8",
+                            }
+                        ],
+                    }
+                ],
+            }
+        ),
         case_results=[
             {
                 "case_id": "case-1",

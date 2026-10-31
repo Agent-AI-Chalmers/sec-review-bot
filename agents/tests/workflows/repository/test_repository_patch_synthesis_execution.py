@@ -13,6 +13,8 @@ from sec_review_agents.agents.delivery_planning.workbench_state import (
     DeliveryWorkbenchState,
 )
 from sec_review_agents.agents.patch_synthesis.model import PatchSynthesisOutput
+from sec_review_agents.delivery_stages.execution.input import DeliveryPatchCase
+from sec_review_agents.delivery_stages.model import DeliveryEntry, DeliveryPlan
 from sec_review_agents.utils.files import persist_text_artifact
 from sec_review_agents.workflows.repository import direct as repository_direct
 from sec_review_agents.workflows.repository.workflow import (
@@ -79,7 +81,7 @@ async def _execute_delivery_direct_for_test(
     *,
     input_data: dict,
     keep_case_results: list[dict],
-    delivery_plan: dict,
+    delivery_plan: DeliveryPlan,
 ) -> dict[str, Any]:
     workspace_path = Path(input_data["input_bundle_root_path"]) / "workspace"
     if workspace_path.is_dir():
@@ -99,10 +101,11 @@ async def _execute_delivery_direct_for_test(
         "plan_repository_delivery_activity",
         return_value=delivery_plan,
     ):
-        return await repository_direct.run_repository_delivery_direct(
+        result = await repository_direct.run_repository_delivery_direct(
             request,
             keep_case_results,
         )
+        return result.model_dump(mode="json")
 
 
 async def _run_repository_delivery_workflow_steps_for_test(
@@ -126,10 +129,11 @@ async def _run_repository_delivery_workflow_steps_for_test(
         "plan_repository_delivery_activity",
         side_effect=lambda *args, **kwargs: delivery_plan,
     ):
-        return await repository_direct.run_repository_delivery_direct(
+        result = await repository_direct.run_repository_delivery_direct(
             request,
             case_results,
         )
+        return result.model_dump(mode="json")
 
 
 class TestRepositoryDeliveryExecution:
@@ -178,12 +182,12 @@ class TestRepositoryDeliveryExecution:
             baseline_snapshot_tar_path: Path,
             patch_synthesis_root: Path,
             delivery_entry: dict,
-            case_items: list[dict],
+            case_items: list[DeliveryPatchCase],
         ) -> PatchArtifact:
             changed_files = [
                 path
                 for case_item in case_items
-                for path in file_change_paths(case_item.get("mitigator_file_changes"))
+                for path in file_change_paths(case_item.mitigator_file_changes)
             ]
             file_changes = [
                 {
@@ -333,7 +337,7 @@ class TestRepositoryDeliveryExecution:
         assert calls
         return Path(calls[-1]["workspace_root_path"])
 
-    def _delivery_plan(self, deliveries: list[dict] | None = None) -> dict:
+    def _delivery_plan(self, deliveries: list[dict] | None = None) -> DeliveryPlan:
         raw_deliveries = (
             deliveries
             if deliveries is not None
@@ -363,9 +367,12 @@ class TestRepositoryDeliveryExecution:
                     if isinstance(case_id, str)
                 ],
             )
-        return {
-            "deliveries": workbench_state.export_deliveries(),
-        }
+        return DeliveryPlan(
+            status="completed",
+            metadata={},
+            counts={},
+            deliveries=workbench_state.export_deliveries(),
+        )
 
     def _artifact_path(self, delivery_id: str) -> Path:
         return (
@@ -387,27 +394,40 @@ class TestRepositoryDeliveryExecution:
         case_one["review_record"]["mitigation"]["patch_diff"] = "single diff"
         case_two["review_record"]["mitigation"]["patch_diff"] = "combined diff"
         case_one["review_record"]["mitigation"]["file_changes"] = [
-            {"path": "src/single.py", "content": "single content"}
+            {
+                "path": "src/single.py",
+                "status": "upsert",
+                "content": "single content",
+                "content_encoding": "utf-8",
+            }
         ]
         case_two["review_record"]["mitigation"]["file_changes"] = [
-            {"path": "src/combined.py", "content": "combined content"}
+            {
+                "path": "src/combined.py",
+                "status": "upsert",
+                "content": "combined content",
+                "content_encoding": "utf-8",
+            }
         ]
-        delivery_plan = {
-            "deliveries": [
-                {
-                    "delivery_id": "delivery-single",
-                    "strategy": "single",
-                    "case_ids": ["case-1"],
-                    "reason": "single delivery",
-                },
-                {
-                    "delivery_id": "delivery-combined",
-                    "strategy": "combined",
-                    "case_ids": ["case-2"],
-                    "reason": "combined delivery",
-                },
-            ]
-        }
+        delivery_plan = DeliveryPlan(
+            status="completed",
+            metadata={},
+            counts={},
+            deliveries=[
+                DeliveryEntry(
+                    delivery_id="delivery-single",
+                    strategy="single",
+                    case_ids=["case-1"],
+                    reason="single delivery",
+                ),
+                DeliveryEntry(
+                    delivery_id="delivery-combined",
+                    strategy="combined",
+                    case_ids=["case-2"],
+                    reason="combined delivery",
+                ),
+            ],
+        )
         request = ReviewWorkflowRequest(
             workflow="repository-review",
             run_id=self.run_id,
@@ -419,24 +439,39 @@ class TestRepositoryDeliveryExecution:
         delivery_execution_input = prepare_repository_delivery_execution_activity(
             request,
             [case_one, case_two],
-            delivery_plan,
+            DeliveryPlan(
+                status="completed",
+                metadata={},
+                counts={},
+                deliveries=delivery_plan.deliveries,
+            ),
         )
 
-        assert delivery_execution_input["keep_case_ids"] == ["case-1", "case-2"]
-        assert "cases_artifacts_root_path" not in delivery_execution_input
-        single_case = delivery_execution_input["single_delivery_execution_items"][0][
-            "case_items"
-        ][0]
-        assert single_case["mitigator_file_changes"] == [
-            {"path": "src/single.py", "content": "single content"}
-        ]
-        combined_case = delivery_execution_input["combined_delivery_execution_items"][
+        assert delivery_execution_input.keep_case_ids == ["case-1", "case-2"]
+        assert "cases_artifacts_root_path" not in delivery_execution_input.model_dump()
+        single_case = delivery_execution_input.single_delivery_execution_items[
             0
-        ]["case_items"][0]
-        assert combined_case["mitigator_file_changes"] == [
-            {"path": "src/combined.py", "content": "combined content"}
+        ].case_items[0]
+        assert single_case.mitigator_file_changes == [
+            {
+                "path": "src/single.py",
+                "status": "upsert",
+                "content": "single content",
+                "content_encoding": "utf-8",
+            }
         ]
-        assert combined_case["mitigator_patch_diff"] == "combined diff"
+        combined_case = delivery_execution_input.combined_delivery_execution_items[
+            0
+        ].case_items[0]
+        assert combined_case.mitigator_file_changes == [
+            {
+                "path": "src/combined.py",
+                "status": "upsert",
+                "content": "combined content",
+                "content_encoding": "utf-8",
+            }
+        ]
+        assert combined_case.mitigator_patch_diff == "combined diff"
 
     @pytest.mark.asyncio
     async def test_single_case_publishable_modify(self) -> None:
@@ -1393,20 +1428,23 @@ class TestRepositoryDeliveryExecution:
         self._write_workspace({"src/app.txt": "alpha\n"})
         case_result = self._case_result("case-1", [])
 
-        with pytest.raises(ValueError, match="Unknown delivery strategy: 'legacy'"):
+        with pytest.raises(ValueError, match="strategy"):
             await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
                 keep_case_results=[case_result],
-                delivery_plan={
-                    "deliveries": [
-                        {
-                            "delivery_id": "delivery-invalid",
-                            "strategy": "legacy",
-                            "case_ids": ["case-1"],
-                            "reason": "bad strategy",
-                        }
+                delivery_plan=DeliveryPlan(
+                    status="completed",
+                    metadata={},
+                    counts={},
+                    deliveries=[
+                        DeliveryEntry(
+                            delivery_id="delivery-invalid",
+                            strategy="legacy",  # type: ignore[arg-type]
+                            case_ids=["case-1"],
+                            reason="bad strategy",
+                        )
                     ],
-                },
+                ),
             )
 
     @pytest.mark.asyncio
@@ -1531,16 +1569,16 @@ class TestRepositoryDeliveryExecution:
         def fake_synthesize_combined_delivery_patch(
             *,
             delivery_entry: dict,
-            case_items: list[dict],
+            case_items: list[DeliveryPatchCase],
             **_kwargs,
         ) -> PatchArtifact:
-            case_ids = [item["case_id"] for item in case_items]
+            case_ids = [item.case_id for item in case_items]
             if case_ids == ["case-a", "case-b"]:
                 raise RuntimeError("synthetic patch synthesis failure")
             changed_files = [
                 path
                 for item in case_items
-                for path in file_change_paths(item["mitigator_file_changes"])
+                for path in file_change_paths(item.mitigator_file_changes)
             ]
             file_changes = [
                 {
@@ -1620,7 +1658,7 @@ class TestRepositoryDeliveryExecution:
             *,
             baseline_snapshot_tar_path: Path,
             delivery_entry: dict,
-            case_items: list[dict],
+            case_items: list[DeliveryPatchCase],
             **_kwargs,
         ) -> PatchArtifact:
             baseline_snapshot_tar_paths.append(baseline_snapshot_tar_path)

@@ -2,16 +2,15 @@
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any
 
 from sec_review_agents.delivery_stages.execution.input import (
-    combined_delivery_case_view,
-    delivery_strategy,
+    DeliveryPatchCase,
 )
 from sec_review_agents.delivery_stages.execution.patch_synthesis import (
     synthesize_combined_delivery_patch,
 )
 from sec_review_agents.delivery_stages.execution.result import (
+    DeliveryExecutionResult,
     build_delivery_execution_result,
 )
 from sec_review_agents.delivery_stages.model import (
@@ -22,12 +21,12 @@ from sec_review_agents.delivery_stages.model import (
 def _build_single_delivery_outcome(
     *,
     delivery_entry: DeliveryEntry,
-    case_results_by_case_id: Mapping[str, Mapping[str, Any]],
-) -> dict[str, Any] | None:
-    delivery_id = delivery_entry["delivery_id"]
+    case_results_by_case_id: Mapping[str, DeliveryPatchCase],
+) -> DeliveryExecutionResult | None:
+    delivery_id = delivery_entry.delivery_id
     case_ids = [
         case_id
-        for case_id in delivery_entry["case_ids"]
+        for case_id in delivery_entry.case_ids
         if case_id in case_results_by_case_id
     ]
     if not delivery_id or not case_ids:
@@ -35,8 +34,8 @@ def _build_single_delivery_outcome(
     case_id = case_ids[0]
 
     case_result = case_results_by_case_id[case_id]
-    patch_diff = case_result["mitigator_patch_diff"] or ""
-    file_changes = case_result["mitigator_file_changes"]
+    patch_diff = case_result.mitigator_patch_diff or ""
+    file_changes = case_result.mitigator_file_changes
     has_changes = bool(file_changes)
     return build_delivery_execution_result(
         delivery_id=delivery_id,
@@ -51,21 +50,21 @@ async def execute_delivery_entry(
     *,
     run_artifacts_root: Path,
     delivery_entry: DeliveryEntry,
-    case_results: Sequence[Mapping[str, Any]],
+    case_results: Sequence[DeliveryPatchCase],
     baseline_snapshot_tar_path: Path | None = None,
-) -> dict[str, Any] | None:
-    case_results_by_case_id = {item["case_id"]: item for item in case_results}
-    strategy = delivery_strategy(delivery_entry)
+) -> DeliveryExecutionResult | None:
+    case_results_by_case_id = {item.case_id: item for item in case_results}
+    strategy = delivery_entry.strategy
     if strategy == "single":
         return _build_single_delivery_outcome(
             delivery_entry=delivery_entry,
             case_results_by_case_id=case_results_by_case_id,
         )
 
-    delivery_id = delivery_entry["delivery_id"]
+    delivery_id = delivery_entry.delivery_id
     case_ids = [
         case_id
-        for case_id in delivery_entry["case_ids"]
+        for case_id in delivery_entry.case_ids
         if case_id in case_results_by_case_id
     ]
     if not delivery_id or not case_ids:
@@ -79,10 +78,7 @@ async def execute_delivery_entry(
             baseline_snapshot_tar_path=baseline_snapshot_tar_path,
             patch_synthesis_root=run_artifacts_root / "patch-synthesis",
             delivery_entry=delivery_entry,
-            case_items=[
-                combined_delivery_case_view(case_results_by_case_id[case_id])
-                for case_id in case_ids
-            ],
+            case_items=[case_results_by_case_id[case_id] for case_id in case_ids],
         )
         file_changes = patch_artifact.file_changes
         has_changes = bool(file_changes)

@@ -6,7 +6,16 @@ from typing import Any, TypedDict
 
 from temporalio import activity, workflow
 
-from sec_review_agents.delivery_stages.model import DeliveryCaseInput
+from sec_review_agents.delivery_stages.execution.input import (
+    DeliveryExecutionInput,
+    DeliveryExecutionItem,
+)
+from sec_review_agents.delivery_stages.execution.result import DeliveryExecutionResult
+from sec_review_agents.delivery_stages.model import (
+    DeliveryCaseInput,
+    DeliveryPlan,
+)
+from sec_review_agents.delivery_stages.result import DeliveryResult
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.run_diagnostics.publication import (
     RunDiagnosticPublicationRequest,
@@ -312,24 +321,15 @@ def project_repository_case_result_for_delivery(
     case_result: Mapping[str, Any],
 ) -> DeliveryCaseInput:
     review_record = case_result["review_record"]
-    analysis = review_record["analysis"]
     mitigation = review_record["mitigation"]
-    verification = review_record["verification"]
-    return {
-        "case_id": case_result["case_id"],
-        "disposition": case_result["disposition"],
-        "reason": case_result.get("reason"),
-        "analyzer_overview": analysis["overview"],
-        "analyzer_verdict": analysis["verdict"],
-        "mitigation_overview": mitigation.get("overview") or "",
-        "mitigator_file_changes": mitigation.get("file_changes") or [],
-        "mitigator_patch_diff": mitigation.get("patch_diff"),
-        "verifier_overview": verification["overview"],
-        "verifier_coverage": verification["patch_coverage"],
-        "verifier_patch_findings": verification["patch_findings"],
-        "verifier_findings": verification["verification_findings"],
-        "residual_risks": verification["residual_risks"],
-    }
+    return DeliveryCaseInput(
+        case_id=case_result["case_id"],
+        disposition=case_result["disposition"],
+        reason=case_result.get("reason"),
+        mitigation_overview=mitigation.get("overview") or "",
+        mitigator_file_changes=mitigation.get("file_changes") or [],
+        mitigator_patch_diff=mitigation.get("patch_diff"),
+    )
 
 
 def _delivery_case_inputs(
@@ -345,7 +345,7 @@ def _delivery_case_inputs(
 async def plan_repository_delivery_activity(
     request: ReviewWorkflowRequest,
     case_results: Sequence[Mapping[str, Any]],
-) -> dict[str, Any]:
+) -> DeliveryPlan:
     from sec_review_agents.delivery_stages.planning import (
         build_skipped_delivery_plan,
         generate_delivery_plan,
@@ -384,10 +384,10 @@ async def plan_repository_delivery_activity(
 def prepare_repository_delivery_execution_activity(
     request: ReviewWorkflowRequest,
     case_results: Sequence[Mapping[str, Any]],
-    delivery_plan: Mapping[str, Any],
-) -> dict[str, Any]:
+    delivery_plan: DeliveryPlan,
+) -> DeliveryExecutionInput:
 
-    from sec_review_agents.delivery_stages.execution import (
+    from sec_review_agents.delivery_stages.execution.input import (
         build_delivery_execution_input,
         persist_delivery_execution_input,
     )
@@ -404,7 +404,7 @@ def prepare_repository_delivery_execution_activity(
         label="bundle_paths.workspace_snapshot_tar_path",
     )
     keep_case_results = _delivery_case_inputs(case_results)
-    deliveries = list(delivery_plan["deliveries"])
+    deliveries = list(delivery_plan.deliveries)
     persist_delivery_execution_input(
         run_artifacts_root=run_artifacts_root,
         deliveries=deliveries,
@@ -421,7 +421,7 @@ def prepare_repository_delivery_execution_activity(
 @activity.defn
 def build_skipped_repository_delivery_result_activity(
     request: ReviewWorkflowRequest,
-) -> dict[str, Any]:
+) -> DeliveryResult:
     from sec_review_agents.delivery_stages.result import (
         build_skipped_delivery_result,
         persist_delivery_result,
@@ -440,20 +440,18 @@ def build_skipped_repository_delivery_result_activity(
 @activity.defn
 async def execute_repository_single_deliveries_activity(
     request: ReviewWorkflowRequest,
-    delivery_execution: Mapping[str, Any],
-) -> list[dict[str, Any]]:
+    delivery_execution: DeliveryExecutionInput,
+) -> dict[int, DeliveryExecutionResult]:
     from pathlib import Path
 
-    from sec_review_agents.delivery_stages.execution import (
-        execute_delivery_entry,
-    )
+    from sec_review_agents.delivery_stages.execution.stage import execute_delivery_entry
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.temporal.support import activity_trace_labels
 
-    outcomes = []
-    for delivery_request in delivery_execution["single_delivery_execution_items"]:
-        delivery = delivery_request["delivery"]
-        delivery_id = str(delivery.get("delivery_id") or "").strip() or None
+    outcomes: dict[int, DeliveryExecutionResult] = {}
+    for delivery_request in delivery_execution.single_delivery_execution_items:
+        delivery = delivery_request.delivery
+        delivery_id = str(delivery.delivery_id or "").strip() or None
         with bind_trace_context(
             **activity_trace_labels(
                 workflow_name=request.workflow,
@@ -462,37 +460,30 @@ async def execute_repository_single_deliveries_activity(
             )
         ):
             outcome = await execute_delivery_entry(
-                run_artifacts_root=Path(delivery_execution["run_artifacts_root_path"]),
+                run_artifacts_root=Path(delivery_execution.run_artifacts_root_path),
                 delivery_entry=delivery,
-                case_results=delivery_request["case_items"],
+                case_results=delivery_request.case_items,
             )
         if outcome is not None:
-            outcomes.append(
-                {
-                    "index": delivery_request["index"],
-                    "outcome": outcome,
-                }
-            )
+            outcomes[delivery_request.index] = outcome
     return outcomes
 
 
 @activity.defn
 async def execute_repository_combined_delivery_activity(
     request: ReviewWorkflowRequest,
-    delivery_execution: Mapping[str, Any],
-    delivery_request: Mapping[str, Any],
-) -> dict[str, Any] | None:
+    delivery_execution: DeliveryExecutionInput,
+    delivery_request: DeliveryExecutionItem,
+) -> DeliveryExecutionResult | None:
     from pathlib import Path
 
-    from sec_review_agents.delivery_stages.execution import (
-        execute_delivery_entry,
-    )
+    from sec_review_agents.delivery_stages.execution.stage import execute_delivery_entry
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.temporal.support import activity_trace_labels
 
-    run_artifacts_root = Path(delivery_execution["run_artifacts_root_path"])
-    delivery_entry = delivery_request["delivery"]
-    delivery_id = str(delivery_entry.get("delivery_id") or "").strip() or None
+    run_artifacts_root = Path(delivery_execution.run_artifacts_root_path)
+    delivery_entry = delivery_request.delivery
+    delivery_id = str(delivery_entry.delivery_id or "").strip() or None
     with bind_trace_context(
         **activity_trace_labels(
             workflow_name=request.workflow,
@@ -503,18 +494,18 @@ async def execute_repository_combined_delivery_activity(
         return await execute_delivery_entry(
             run_artifacts_root=run_artifacts_root,
             baseline_snapshot_tar_path=Path(
-                delivery_execution["workspace_snapshot_tar_path"]
+                delivery_execution.workspace_snapshot_tar_path
             ),
             delivery_entry=delivery_entry,
-            case_results=delivery_request["case_items"],
+            case_results=delivery_request.case_items,
         )
 
 
 @activity.defn
 def build_repository_delivery_result_activity(
-    delivery_execution: Mapping[str, Any],
-    patch_outcomes: Sequence[Mapping[str, Any]],
-) -> dict[str, Any]:
+    delivery_execution: DeliveryExecutionInput,
+    patch_outcomes: Sequence[DeliveryExecutionResult],
+) -> DeliveryResult:
     from pathlib import Path
 
     from sec_review_agents.delivery_stages.result import (
@@ -522,10 +513,10 @@ def build_repository_delivery_result_activity(
         persist_delivery_result,
     )
 
-    run_artifacts_root = Path(delivery_execution["run_artifacts_root_path"])
+    run_artifacts_root = Path(delivery_execution.run_artifacts_root_path)
     result = build_delivery_result_from_outcomes(
-        deliveries=delivery_execution["deliveries"],
-        keep_case_ids=delivery_execution["keep_case_ids"],
+        deliveries=delivery_execution.deliveries,
+        keep_case_ids=delivery_execution.keep_case_ids,
         patch_outcomes=patch_outcomes,
     )
     persist_delivery_result(run_artifacts_root=run_artifacts_root, result=result)
@@ -537,7 +528,7 @@ def build_repository_review_result_activity(
     request: ReviewWorkflowRequest,
     scan_result: RepositoryScanResult,
     case_results: Sequence[Mapping[str, Any]],
-    delivery_result: Mapping[str, Any],
+    delivery_result: DeliveryResult,
 ) -> dict[str, Any]:
     from sec_review_agents.utils.files import persist_json_artifact
     from sec_review_agents.utils.paths import required_path
@@ -731,14 +722,14 @@ class RepositoryDeliveryWorkflow:
         self,
         request: ReviewWorkflowRequest,
         case_results: Sequence[Mapping[str, Any]],
-    ) -> dict[str, Any]:
+    ) -> DeliveryResult:
         delivery_plan = await workflow.execute_activity(
             plan_repository_delivery_activity,
             args=[request, case_results],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
-        deliveries = list(delivery_plan["deliveries"])
+        deliveries = list(delivery_plan.deliveries)
         if not deliveries:
             return await workflow.execute_activity(
                 build_skipped_repository_delivery_result_activity,
@@ -759,16 +750,16 @@ class RepositoryDeliveryWorkflow:
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
-        combined_delivery_execution_items = list(
-            delivery_execution["combined_delivery_execution_items"]
+        combined_delivery_execution_items = (
+            delivery_execution.combined_delivery_execution_items
         )
-        max_concurrency = max(1, int(delivery_execution["max_concurrency"]))
-        patch_outcomes: list[dict[str, Any] | None] = [None] * len(deliveries)
+        max_concurrency = max(1, delivery_execution.max_concurrency)
+        patch_outcomes: list[DeliveryExecutionResult | None] = [None] * len(deliveries)
         pending: dict[asyncio.Task, int] = {}
         next_index = 0
 
-        for item in single_outcomes:
-            patch_outcomes[int(item["index"])] = item["outcome"]
+        for index, outcome in single_outcomes.items():
+            patch_outcomes[index] = outcome
 
         def schedule_delivery(index: int) -> None:
             delivery_request = combined_delivery_execution_items[index]
@@ -782,7 +773,7 @@ class RepositoryDeliveryWorkflow:
                     retry_policy=activity_retry_policy(),
                 )
             )
-            pending[task] = int(delivery_request["index"])
+            pending[task] = delivery_request.index
 
         while (
             next_index < len(combined_delivery_execution_items)

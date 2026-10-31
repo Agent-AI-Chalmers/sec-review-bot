@@ -9,12 +9,14 @@ from pathlib import Path
 from typing import Any
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
-from sec_review_agents.delivery_stages.execution import (
+from sec_review_agents.delivery_stages.execution.input import (
     build_delivery_execution_input,
-    execute_delivery_entry,
     persist_delivery_execution_input,
 )
+from sec_review_agents.delivery_stages.execution.stage import execute_delivery_entry
+from sec_review_agents.delivery_stages.model import DeliveryPlan
 from sec_review_agents.delivery_stages.result import (
+    DeliveryResult,
     build_delivery_result_from_outcomes,
     persist_delivery_result,
 )
@@ -72,16 +74,14 @@ def _previous_deletion_review_skipped(result: dict[str, Any]) -> bool:
 def _repository_result_from_delivery_replay(
     *,
     previous_result: dict[str, Any],
-    delivery_result: dict[str, Any],
+    delivery_result: DeliveryResult,
     case_results: list[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
         "api_version": EXECUTION_API_VERSION,
         "scan_summary": _previous_scan_summary(previous_result),
         "deliveries": [
-            item
-            for item in (delivery_result.get("deliveries") or [])
-            if isinstance(item, dict)
+            item.model_dump(mode="json") for item in delivery_result.deliveries
         ],
         "case_results": case_results,
         "deletion_review_skipped": _previous_deletion_review_skipped(previous_result),
@@ -159,9 +159,9 @@ async def main() -> None:
 
     if not plan_path.exists():
         raise FileNotFoundError(f"Delivery plan does not exist: {plan_path}")
-    delivery_plan = read_json(plan_path)
+    delivery_plan = DeliveryPlan.model_validate(read_json(plan_path))
 
-    if not delivery_plan.get("deliveries"):
+    if not delivery_plan.deliveries:
         raise RuntimeError("Delivery plan does not contain deliveries.")
 
     case_results = previous_result.get("case_results") or []
@@ -181,7 +181,7 @@ async def main() -> None:
     ]
     persist_delivery_execution_input(
         run_artifacts_root=run_artifacts,
-        deliveries=delivery_plan["deliveries"],
+        deliveries=delivery_plan.deliveries,
         keep_case_results=delivery_case_inputs,
     )
     workspace_snapshot_tar_path = Path(
@@ -190,26 +190,26 @@ async def main() -> None:
     delivery_execution = build_delivery_execution_input(
         run_artifacts_root=run_artifacts,
         workspace_snapshot_tar_path=workspace_snapshot_tar_path,
-        deliveries=delivery_plan["deliveries"],
+        deliveries=delivery_plan.deliveries,
         keep_case_results=delivery_case_inputs,
     )
     patch_outcomes = []
     for delivery_request in (
-        delivery_execution["single_delivery_execution_items"]
-        + delivery_execution["combined_delivery_execution_items"]
+        delivery_execution.single_delivery_execution_items
+        + delivery_execution.combined_delivery_execution_items
     ):
         outcome = await execute_delivery_entry(
             run_artifacts_root=run_artifacts,
             baseline_snapshot_tar_path=workspace_snapshot_tar_path,
-            delivery_entry=delivery_request["delivery"],
-            case_results=delivery_request["case_items"],
+            delivery_entry=delivery_request.delivery,
+            case_results=delivery_request.case_items,
         )
         if outcome is not None:
             patch_outcomes.append(outcome)
 
     delivery_result = build_delivery_result_from_outcomes(
-        deliveries=delivery_execution["deliveries"],
-        keep_case_ids=delivery_execution["keep_case_ids"],
+        deliveries=delivery_execution.deliveries,
+        keep_case_ids=delivery_execution.keep_case_ids,
         patch_outcomes=patch_outcomes,
     )
     persist_delivery_result(run_artifacts_root=run_artifacts, result=delivery_result)
@@ -226,12 +226,10 @@ async def main() -> None:
             {
                 "ok": True,
                 "run_id": run_artifacts.name,
-                "delivery_plan_status": delivery_plan.get("status"),
-                "delivery_plan_delivery_count": len(
-                    delivery_plan.get("deliveries") or []
-                ),
-                "delivery_status": delivery_result.get("status"),
-                "delivery_count": len(delivery_result.get("deliveries") or []),
+                "delivery_plan_status": delivery_plan.status,
+                "delivery_plan_delivery_count": len(delivery_plan.deliveries),
+                "delivery_status": delivery_result.status,
+                "delivery_count": len(delivery_result.deliveries),
                 "case_result_count": len(case_results),
                 "result_path": str(run_artifacts / "repository-review-result.json"),
             },

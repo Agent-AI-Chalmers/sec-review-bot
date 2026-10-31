@@ -181,21 +181,18 @@ def test_delivery_result_builder_accepts_keep_case_ids() -> None:
 
 
 def test_delivery_result_module_does_not_own_execution_results() -> None:
-    """Keep execution outcomes out of the module that builds the final result.
-
-    The forbidden names are a temporary ownership check. An import check would not
-    catch the same execution classes or builders being recreated in this file, so keep
-    this check until the handoff from execution has a direct behavior test.
-    """
+    """Aggregation may consume execution types, but must not define them itself."""
     source = (PACKAGE_ROOT / "delivery_stages" / "result.py").read_text(
         encoding="utf-8"
     )
-    forbidden_tokens = (
-        "DeliveryExecutionResult",
-        "build_delivery_execution_result",
+    definitions = {
+        node.name
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert definitions.isdisjoint(
+        {"DeliveryExecutionResult", "build_delivery_execution_result"}
     )
-
-    assert [token for token in forbidden_tokens if token in source] == []
 
 
 def test_delivery_planning_stage_does_not_own_input_projection() -> None:
