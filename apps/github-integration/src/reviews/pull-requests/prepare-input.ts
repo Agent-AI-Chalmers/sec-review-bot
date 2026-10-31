@@ -23,7 +23,7 @@ import {
 } from '../../artifacts/git-workspace.js'
 import type { ReviewWindow } from './review-window.js'
 import {
-  archiveInputBundleAndPublish,
+  archiveInputBundleAndBuildInput,
   buildGitRemoteUrl,
   createInputBundleRoot,
   ensureCleanDirectory,
@@ -387,26 +387,25 @@ export async function preparePullRequestReviewInput({
     history_path
   })
   const pullRequestMetadata = historyArtifacts.pr_metadata
-  // The bundle is published only after the input that references it fits, so a failure here
-  // cannot leave an unreferenced immutable bundle behind.
-  const { input } = await archiveInputBundleAndPublish<PullRequestReviewInput>({
-    input_bundle_root,
-    include_incremental_window: true,
-    run_id,
-    workflow: 'pull request review',
-    build_input: (
-      reference: InputBundleArtifactRef
-    ): PullRequestReviewInput => ({
-      api_version: EXECUTION_API_VERSION,
-      review_intent: {
-        objective: 'audit',
-        ...(test_changes ? { test_changes } : {})
-      },
-      pr: pullRequestMetadata,
-      input_bundle: reference,
-      ...(setup_declaration ? { setup_declaration } : {})
+  // The claim-owning command registers and publishes this input bundle after preparation.
+  const { input } =
+    await archiveInputBundleAndBuildInput<PullRequestReviewInput>({
+      input_bundle_root,
+      include_incremental_window: true,
+      workflow: 'pull request review',
+      build_input: (
+        reference: InputBundleArtifactRef
+      ): PullRequestReviewInput => ({
+        api_version: EXECUTION_API_VERSION,
+        review_intent: {
+          objective: 'audit',
+          ...(test_changes ? { test_changes } : {})
+        },
+        pr: pullRequestMetadata,
+        input_bundle: reference,
+        ...(setup_declaration ? { setup_declaration } : {})
+      })
     })
-  })
 
   const input_path = path.join(
     input_bundle_root,

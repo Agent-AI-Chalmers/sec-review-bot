@@ -1,3 +1,4 @@
+import { inputBundlePublicationStore } from '../input-bundle-publication-store.js'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
@@ -15,6 +16,7 @@ const admission = {
 
 function claimedStore(): PreparationCommandStore {
   return {
+    ...inputBundlePublicationStore(),
     admitReviewRun: () => assert.fail('a claimed retry must not admit again'),
     renewPreparationClaim: async () => true,
     preparationHeartbeatIntervalMs: async () => 60_000,

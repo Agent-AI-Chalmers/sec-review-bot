@@ -16,7 +16,7 @@ import type {
 } from '../../execution/input.js'
 import { materializeWorkspaceWithCommitHistory } from '../../artifacts/git-workspace.js'
 import {
-  archiveInputBundleAndPublish,
+  archiveInputBundleAndBuildInput,
   buildGitRemoteUrl,
   createInputBundleRoot,
   ensureCleanDirectory,
@@ -145,12 +145,10 @@ export async function prepareIssueReviewInput({
     issue,
     history_path
   })
-  // The bundle is published only after the input that references it fits, so a failure here
-  // cannot leave an unreferenced immutable bundle behind.
-  const { input } = await archiveInputBundleAndPublish<IssueReviewInput>({
+  // The claim-owning command registers and publishes this input bundle after preparation.
+  const { input } = await archiveInputBundleAndBuildInput<IssueReviewInput>({
     input_bundle_root,
     include_incremental_window: false,
-    run_id,
     workflow: 'issue review',
     build_input: (reference: InputBundleArtifactRef): IssueReviewInput => ({
       api_version: EXECUTION_API_VERSION,

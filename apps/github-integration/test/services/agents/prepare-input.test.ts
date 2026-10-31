@@ -164,7 +164,7 @@ async function assertRunnerInputArtifact<
   )
   assert.doesNotMatch(archiveListing, /^workspace\//m)
   assert.doesNotMatch(archiveListing, /review-input\.json$/m)
-  assert.match(inputBundleRoot, new RegExp(`${runId}$`))
+  assert.strictEqual(path.basename(path.dirname(inputBundleRoot)), runId)
   assertPathIsWithin(suiteInputBundleRoot, inputBundleRoot)
   assertPathIsWithin(inputBundleRoot, inputPath)
   const keys = collectKeys(input)

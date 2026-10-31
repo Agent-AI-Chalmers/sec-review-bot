@@ -11,6 +11,8 @@ Use these documents:
 - [v1/review-run-record.schema.json](v1/review-run-record.schema.json): the coordination record shape.
 - [v1/fixtures](v1/fixtures): executable examples, including the shapes this contract must reject.
 
+Input publication operations reserve a complete immutable publication intent under a preparation claim, list publication intents for recovery, and settle publication presence or abandonment. A prepared submission must match a present or already selected publication intent in full. Identical submission replay is accepted while preparation still owns the run; changing the reference, input, or publish context is rejected. Candidate records contain storage locators and prepared input, so they belong to the authenticated service coordination surface and are not part of the console's observed-run projection.
+
 ## Boundary
 
 Review Runs produces each observed run from `observeRun()` and each record from `rowToRecord()`. The record carries `failure_message`, which the redacted read shape deliberately drops, so it only ever crosses the service-token boundary.

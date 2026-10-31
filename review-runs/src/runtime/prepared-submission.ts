@@ -41,6 +41,7 @@ export async function submitPreparedRun(
       code: 'REVIEW_RUN_NOT_FOUND'
     })
   let executionAccepted = false
+  let submissionStarted = false
   try {
     await store.submissionTransitions.savePreparedSubmission(
       args.runId,
@@ -48,6 +49,7 @@ export async function submitPreparedRun(
       args.publishContext,
       args.input
     )
+    submissionStarted = true
     await submit({
       workflow: run.workflow,
       run_id: args.runId,
@@ -62,18 +64,23 @@ export async function submitPreparedRun(
     return { run_id: args.runId, workflow: run.workflow, status: 'queued' }
   } catch (error) {
     try {
-      await store.preparations.fail(args.runId, args.preparationToken, {
-        code:
-          executionAccepted ||
-          error instanceof ExecutionSubmissionUncertainError
-            ? SUBMISSION_STATE_UNCERTAIN
-            : error instanceof Error &&
-                'code' in error &&
-                typeof error.code === 'string'
-              ? error.code
-              : 'REVIEW_START_FAILED',
-        message: error instanceof Error ? error.message : String(error)
-      })
+      await store.preparations.fail(
+        args.runId,
+        args.preparationToken,
+        {
+          code:
+            executionAccepted ||
+            error instanceof ExecutionSubmissionUncertainError
+              ? SUBMISSION_STATE_UNCERTAIN
+              : error instanceof Error &&
+                  'code' in error &&
+                  typeof error.code === 'string'
+                ? error.code
+                : 'REVIEW_START_FAILED',
+          message: error instanceof Error ? error.message : String(error)
+        },
+        { retry: !submissionStarted }
+      )
     } catch {
       // Preserve the original submission error when best-effort cleanup also fails.
     }

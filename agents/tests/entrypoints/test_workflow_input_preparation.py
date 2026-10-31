@@ -464,6 +464,49 @@ def test_workflow_input_preparation_materializes_s3_archive(
     assert Path(prepared["bundle_paths"]["workspace_snapshot_tar_path"]).is_file()
 
 
+def test_prepare_run_input_binds_s3_bundle_to_run_and_digest(
+    monkeypatch, tmp_path: Path
+) -> None:
+    reference = _write_bundle_manifest(str(tmp_path / "source"))
+    source_uri = reference["uri"]
+    source_digest = reference["digest"]
+    assert isinstance(source_uri, str)
+    assert isinstance(source_digest, str)
+    source_archive = Path(unquote(urlparse(source_uri).path))
+    digest = source_digest.removeprefix("sha256:")
+    key = f"runs/run-1/input/{digest}/input-bundle.v1.tar.zst"
+    payload = _issue_input(str(tmp_path / "unused"))
+    payload["input_bundle"] = reference | {"uri": f"s3://sec-review/{key}"}
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+    monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
+    monkeypatch.setenv(input_preparation.RUN_INPUT_ROOT_ENV, str(tmp_path / "inputs"))
+
+    def download(_uri, destination, *, expected_size, maximum_size, expected_key):
+        assert expected_key == key
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(source_archive.read_bytes())
+        return destination
+
+    monkeypatch.setattr(input_preparation, "download_s3_object", download)
+    prepared = prepare_run_input(payload, run_id="run-1", workflow="issue-review")
+    assert Path(prepared["bundle_paths"]["workspace_snapshot_tar_path"]).is_file()
+
+
+def test_prepare_run_input_rejects_digest_key_for_other_content(
+    monkeypatch, tmp_path: Path
+) -> None:
+    key = f"runs/run-1/input/{'0' * 64}/input-bundle.v1.tar.zst"
+    payload = _issue_input(str(tmp_path / "bundle"))
+    payload["input_bundle"] = payload["input_bundle"] | {
+        "uri": f"s3://sec-review/{key}"
+    }
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+    monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
+    monkeypatch.setenv(input_preparation.RUN_INPUT_ROOT_ENV, str(tmp_path / "inputs"))
+    with pytest.raises(ValueError, match="does not match"):
+        prepare_run_input(payload, run_id="run-1", workflow="issue-review")
+
+
 def test_prepare_run_input_rejects_file_bundle_in_s3_mode(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -480,14 +523,15 @@ def test_prepare_run_input_rejects_s3_bundle_from_another_run(
     monkeypatch, tmp_path: Path
 ) -> None:
     payload = _issue_input(str(tmp_path / "bundle"))
+    digest = payload["input_bundle"]["digest"].removeprefix("sha256:")
     payload["input_bundle"] = payload["input_bundle"] | {
-        "uri": "s3://sec-review/runs/run-other/input/input-bundle.v1.tar.zst"
+        "uri": f"s3://sec-review/runs/run-other/input/{digest}/input-bundle.v1.tar.zst"
     }
     monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
     monkeypatch.setenv(input_preparation.ARTIFACT_ROOT_ENV, str(tmp_path / "artifacts"))
     monkeypatch.setenv(input_preparation.RUN_INPUT_ROOT_ENV, str(tmp_path / "inputs"))
 
-    with pytest.raises(ValueError, match="does not match the expected object key"):
+    with pytest.raises(ValueError, match="does not match"):
         prepare_run_input(payload, run_id="run-1", workflow="issue-review")
 
 

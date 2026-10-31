@@ -48,7 +48,7 @@ test('uploads an immutable input bundle to its deterministic run key', async () 
 
   assert.strictEqual(
     published.uri,
-    's3://sec-review/runs/run-123/input/input-bundle.v1.tar.zst'
+    `s3://sec-review/runs/run-123/input/${'a'.repeat(64)}/input-bundle.v1.tar.zst`
   )
   assert.strictEqual(s3.commandCalls(PutObjectCommand).length, 1)
   assert.strictEqual(
@@ -84,4 +84,32 @@ test('rejects conflicting content at the immutable run key', async () => {
     publishInputBundle(await reference(), 'run-123'),
     /conflicts with existing content/
   )
+})
+
+test('a concurrent identical conditional write is recovered after a 412', async () => {
+  const input = await reference()
+  let heads = 0
+  s3.on(HeadObjectCommand).callsFake(() => {
+    if (heads++ === 0)
+      throw Object.assign(new Error('missing'), {
+        $metadata: { httpStatusCode: 404 }
+      })
+    return {
+      ContentLength: input.size_bytes,
+      Metadata: {
+        sha256: input.digest.slice(7),
+        'media-type': input.media_type
+      }
+    }
+  })
+  s3.on(PutObjectCommand).rejects(
+    Object.assign(new Error('already uploaded'), {
+      $metadata: { httpStatusCode: 412 }
+    })
+  )
+  const { publishInputBundle } =
+    await import('../../src/artifacts/input-storage.js')
+  const result = await publishInputBundle(input, 'run')
+  assert.match(result.uri, /^s3:/)
+  assert.equal(heads, 2)
 })

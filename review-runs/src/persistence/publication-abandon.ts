@@ -30,6 +30,11 @@ export async function abandonInFlightPublication(
   connectorId: string,
   runId: string
 ): Promise<PublicationStatus | null> {
+  await client.query(
+    `UPDATE input_bundle_candidates SET status='abandoned', updated_at=clock_timestamp()
+     WHERE run_id=$1 AND connector_id=$2 AND status IN ('reserved','present')`,
+    [runId, connectorId]
+  )
   const result = await client.query<{ from_status: PublicationStatus }>(
     `WITH previous AS (
        SELECT run_id, status FROM publications
@@ -75,6 +80,11 @@ export async function abandonInFlightPublications(
   runIds: readonly string[]
 ): Promise<Map<string, PublicationStatus>> {
   if (runIds.length === 0) return new Map()
+  await client.query(
+    `UPDATE input_bundle_candidates SET status='abandoned', updated_at=clock_timestamp()
+     WHERE run_id=ANY($1::text[]) AND connector_id=$2 AND status IN ('reserved','present')`,
+    [runIds, connectorId]
+  )
   const result = await client.query<{
     run_id: string
     from_status: PublicationStatus

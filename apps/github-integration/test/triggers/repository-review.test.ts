@@ -1,3 +1,4 @@
+import { inputBundlePublicationStore } from '../input-bundle-publication-store.js'
 // Covers repository-dispatch admission, preparation, and submission boundaries
 // with controlled connector and Review Runs dependencies.
 import assert from 'node:assert/strict'
@@ -94,6 +95,7 @@ function admittedRecord(
 }
 
 const preparationClaim = {
+  ...inputBundlePublicationStore(),
   renewPreparationClaim: async () => true,
   preparationHeartbeatIntervalMs: async () => 60_000
 }
@@ -260,7 +262,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
           workflow: 'repository-review',
           event_type: 'manual'
         }
-        args.on_prepared?.(submitted, repositoryReviewInput())
+        await args.on_prepared?.(submitted, repositoryReviewInput())
         return submitted
       },
       store: {
@@ -573,7 +575,7 @@ test('dispatchRepositoryReview preserves an uncertain Execution submission for r
           correlation_id: 'actions-run-uncertain'
         }),
         submit_run: async (args) => {
-          args.on_prepared?.(
+          await args.on_prepared?.(
             {
               repo: {
                 owner_login: 'octo',
@@ -628,3 +630,42 @@ function withoutPreparationInput<
   delete rest.preparation_input_version
   return rest
 }
+
+test('recovery transport failure retries preparation without rebuilding GitHub input', async () => {
+  const error = new Error('storage unavailable')
+  const failures: unknown[] = []
+  await assert.rejects(
+    dispatchRepositoryReview({
+      app: fakeApp(),
+      payload: {
+        repo_full_name: 'octo/example',
+        target_branch: 'main',
+        scan_mode: 'full',
+        event_type: 'manual',
+        correlation_id: 'recover'
+      },
+      verified_repository: 'octo/example',
+      claimed_preparation: { run_id: 'recover-run', token: 'current' },
+      deps: {
+        getInstallationOctokit: async () =>
+          assert.fail('must reconcile before fetching GitHub'),
+        store: {
+          ...preparationClaim,
+          admitReviewRun: () => assert.fail('already admitted'),
+          async listInputBundleCandidates() {
+            throw error
+          },
+          submitPreparedRun: () =>
+            assert.fail('unconfirmed input must not submit'),
+          failPreparation: (_run, _token, _failure, options) => {
+            failures.push(options)
+          }
+        }
+      }
+    }),
+    (caught) =>
+      caught instanceof RepositoryReviewDispatchValidationError &&
+      caught.message === error.message
+  )
+  assert.equal((failures[0] as { retry: boolean }).retry, true)
+})

@@ -252,6 +252,42 @@ export type ReviewRunAdmission = {
   preparation_token: string | null
 }
 
+export type InputBundleReference = {
+  /**
+   * @minLength 1
+   * @type string
+   */
+  uri: string
+  /**
+   * @pattern ^sha256:[0-9a-f]{64}$
+   * @type string
+   */
+  digest: string
+  media_type: 'application/tar+zstd'
+  /**
+   * @minLength 0
+   * @type integer
+   */
+  size_bytes: number
+}
+
+export type InputBundleCandidate = {
+  run_id: string
+  /**
+   * @pattern ^sha256:[0-9a-f]{64}$
+   * @type string
+   */
+  digest: string
+  reference: InputBundleReference
+  input: {
+    [key: string]: unknown
+  }
+  publish_context: {
+    [key: string]: unknown
+  }
+  status: 'reserved' | 'present' | 'selected' | 'abandoned'
+}
+
 export type PreparationWork = {
   /**
    * @minLength 1
@@ -2163,6 +2199,160 @@ export type GetRunNoticeHeartbeatIntervalResponses = {
 export type GetRunNoticeHeartbeatIntervalResponse =
   GetRunNoticeHeartbeatIntervalStatus200
 
+export type ReserveInputBundleCandidatePath = {
+  /**
+   * @description The admitted run identifier.
+   * @type string
+   */
+  runId: string
+}
+
+export type ReserveInputBundleCandidateStatus200 = InputBundleCandidate
+
+export type ReserveInputBundleCandidateStatus400 = ErrorResponse
+
+export type ReserveInputBundleCandidateStatus401 = ErrorResponse
+
+export type ReserveInputBundleCandidateStatus413 = ErrorResponse
+
+export type ReserveInputBundleCandidateStatus500 = ErrorResponse
+
+export type ReserveInputBundleCandidateBody = {
+  /**
+   * @minLength 1
+   * @type string
+   */
+  token: string
+  reference: InputBundleReference
+  input: {
+    [key: string]: unknown
+  }
+  publish_context: {
+    [key: string]: unknown
+  }
+}
+
+export type ReserveInputBundleCandidateOptions = {
+  body: ReserveInputBundleCandidateBody
+  path: ReserveInputBundleCandidatePath
+  query?: never
+  headers?: never
+}
+
+export type ReserveInputBundleCandidateResponses = {
+  '200': ReserveInputBundleCandidateStatus200
+  '400': ReserveInputBundleCandidateStatus400
+  '401': ReserveInputBundleCandidateStatus401
+  '413': ReserveInputBundleCandidateStatus413
+  '500': ReserveInputBundleCandidateStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type ReserveInputBundleCandidateResponse =
+  ReserveInputBundleCandidateStatus200
+
+export type ListInputBundleCandidatesPath = {
+  /**
+   * @description The admitted run identifier.
+   * @type string
+   */
+  runId: string
+}
+
+export type ListInputBundleCandidatesStatus200 = InputBundleCandidate[]
+
+export type ListInputBundleCandidatesStatus400 = ErrorResponse
+
+export type ListInputBundleCandidatesStatus401 = ErrorResponse
+
+export type ListInputBundleCandidatesStatus413 = ErrorResponse
+
+export type ListInputBundleCandidatesStatus500 = ErrorResponse
+
+export type ListInputBundleCandidatesBody = {
+  /**
+   * @minLength 1
+   * @type string
+   */
+  token: string
+}
+
+export type ListInputBundleCandidatesOptions = {
+  body: ListInputBundleCandidatesBody
+  path: ListInputBundleCandidatesPath
+  query?: never
+  headers?: never
+}
+
+export type ListInputBundleCandidatesResponses = {
+  '200': ListInputBundleCandidatesStatus200
+  '400': ListInputBundleCandidatesStatus400
+  '401': ListInputBundleCandidatesStatus401
+  '413': ListInputBundleCandidatesStatus413
+  '500': ListInputBundleCandidatesStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type ListInputBundleCandidatesResponse =
+  ListInputBundleCandidatesStatus200
+
+export type SettleInputBundleCandidatePath = {
+  /**
+   * @description The admitted run identifier.
+   * @type string
+   */
+  runId: string
+}
+
+export type SettleInputBundleCandidateStatus200 = InputBundleCandidate
+
+export type SettleInputBundleCandidateStatus400 = ErrorResponse
+
+export type SettleInputBundleCandidateStatus401 = ErrorResponse
+
+export type SettleInputBundleCandidateStatus413 = ErrorResponse
+
+export type SettleInputBundleCandidateStatus500 = ErrorResponse
+
+export type SettleInputBundleCandidateBody = {
+  /**
+   * @minLength 1
+   * @type string
+   */
+  token: string
+  /**
+   * @pattern ^sha256:[0-9a-f]{64}$
+   * @type string
+   */
+  digest: string
+  status: 'present' | 'abandoned'
+}
+
+export type SettleInputBundleCandidateOptions = {
+  body: SettleInputBundleCandidateBody
+  path: SettleInputBundleCandidatePath
+  query?: never
+  headers?: never
+}
+
+export type SettleInputBundleCandidateResponses = {
+  '200': SettleInputBundleCandidateStatus200
+  '400': SettleInputBundleCandidateStatus400
+  '401': SettleInputBundleCandidateStatus401
+  '413': SettleInputBundleCandidateStatus413
+  '500': SettleInputBundleCandidateStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type SettleInputBundleCandidateResponse =
+  SettleInputBundleCandidateStatus200
+
 export interface OperationOptionsById {
   getHealth: GetHealthOptions
   getReadiness: GetReadinessOptions
@@ -2197,6 +2387,9 @@ export interface OperationOptionsById {
   getPreparationHeartbeatInterval: GetPreparationHeartbeatIntervalOptions
   getPublicationHeartbeatInterval: GetPublicationHeartbeatIntervalOptions
   getRunNoticeHeartbeatInterval: GetRunNoticeHeartbeatIntervalOptions
+  reserveInputBundleCandidate: ReserveInputBundleCandidateOptions
+  listInputBundleCandidates: ListInputBundleCandidatesOptions
+  settleInputBundleCandidate: SettleInputBundleCandidateOptions
 }
 
 export interface OperationResponseById {
@@ -2233,6 +2426,9 @@ export interface OperationResponseById {
   getPreparationHeartbeatInterval: GetPreparationHeartbeatIntervalResponse
   getPublicationHeartbeatInterval: GetPublicationHeartbeatIntervalResponse
   getRunNoticeHeartbeatInterval: GetRunNoticeHeartbeatIntervalResponse
+  reserveInputBundleCandidate: ReserveInputBundleCandidateResponse
+  listInputBundleCandidates: ListInputBundleCandidatesResponse
+  settleInputBundleCandidate: SettleInputBundleCandidateResponse
 }
 
 export type ObservedStep = ObservedPublicationStep

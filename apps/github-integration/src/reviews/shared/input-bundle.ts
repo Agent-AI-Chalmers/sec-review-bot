@@ -13,10 +13,6 @@ import {
   MAX_WORKFLOW_INPUT_BYTES,
   type InputBundleArtifactRef
 } from '../../execution/input.js'
-import {
-  publishedInputBundleReference,
-  publishInputBundle
-} from '../../artifacts/input-storage.js'
 
 import {
   WORKSPACE_SNAPSHOT_TAR_NAME,
@@ -76,9 +72,11 @@ export function buildGitRemoteUrl(
 }
 
 export function createInputBundleRoot(...segments: string[]): string {
+  // Claim expiry cannot cancel the old process: attempts must never clean each other's files.
   return path.resolve(
     input_bundle_staging_root,
-    ...segments.map(sanitizePathSegment)
+    ...segments.map(sanitizePathSegment),
+    crypto.randomUUID()
   )
 }
 
@@ -283,56 +281,23 @@ export async function archiveInputBundle({
   return reference
 }
 
-/**
- * Archive the bundle, confirm the input that references it fits, then publish.
- *
- * The order matters: publishing first would leave an immutable, unreferenced bundle behind
- * whenever the input turns out to be too large. The bundle has to exist before the input can be
- * sized, because the input carries the bundle's digest, so publication is the step that waits.
- */
-export async function archiveInputBundleAndPublish<T>({
+/** Build and size-check an input bundle; the claim-owning command registers and publishes it. */
+export async function archiveInputBundleAndBuildInput<T>({
   input_bundle_root,
   include_incremental_window,
-  run_id,
   build_input,
-  workflow,
-  publish = publishInputBundle,
-  project_published = publishedInputBundleReference
+  workflow
 }: {
   input_bundle_root: string
   include_incremental_window: boolean
-  run_id: string
   build_input: (reference: InputBundleArtifactRef) => T
   workflow: string
-  /** The publication step, injectable so a test can observe that it runs last. */
-  publish?: typeof publishInputBundle
-  /**
-   * The projection from the archived reference to the published one. Injectable because the
-   * real projection depends on process configuration: under the file-backed store it returns
-   * the reference unchanged, so a test could not otherwise exercise the URI rewrite that the S3
-   * store performs.
-   */
-  project_published?: typeof publishedInputBundleReference
-}): Promise<{
-  input: T
-  input_bundle: InputBundleArtifactRef
-}> {
-  const local_reference = await archiveInputBundle({
+}): Promise<{ input: T; input_bundle: InputBundleArtifactRef }> {
+  const reference = await archiveInputBundle({
     input_bundle_root,
     include_incremental_window
   })
-  // The published URI is known before the upload (it is derived from the run id), so the input
-  // can be built against the reference that will actually be submitted and sized once, before
-  // anything reaches object storage. A local `file:` URI in the input would be unreadable from a
-  // remote worker, and an oversized input rejected after publication would leave an immutable
-  // bundle with nothing pointing at it.
-  const published_reference = project_published(local_reference, run_id)
-  const input = build_input(published_reference)
+  const input = build_input(reference)
   assertWorkflowInputFits(input, workflow)
-
-  await publish(local_reference, run_id)
-  return {
-    input,
-    input_bundle: published_reference
-  }
+  return { input, input_bundle: reference }
 }

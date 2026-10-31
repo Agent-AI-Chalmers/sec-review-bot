@@ -43,6 +43,51 @@ async function createStore(
   return store
 }
 
+/** Freeze the input-publication prerequisite for tests of the later execution/recovery axis.
+ * Future claimed_at is intentional: these tests use a zero timeout to expire recovery leases,
+ * but the initial preparation must still be alive while publishing its input. */
+async function publishedInput(
+  store: ReviewRunStore,
+  runId: string,
+  token: string,
+  input: Record<string, unknown>,
+  context: Record<string, unknown> = {}
+): Promise<Record<string, unknown>> {
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  try {
+    await pool.query(
+      `UPDATE preparations SET claimed_at=clock_timestamp()+interval '1 minute'
+      WHERE run_id=$1 AND status='preparing' AND claim_token=$2`,
+      [runId, token]
+    )
+  } finally {
+    await pool.end()
+  }
+  input.input_bundle = {
+    uri: `file:///tmp/${runId}.tar.zst`,
+    digest: `sha256:${'a'.repeat(64)}`,
+    media_type: 'application/tar+zstd',
+    size_bytes: 1
+  }
+  const candidate = await store.inputBundleCandidates.reserve(runId, token, {
+    reference: input.input_bundle as {
+      uri: string
+      digest: string
+      media_type: 'application/tar+zstd'
+      size_bytes: number
+    },
+    input,
+    publish_context: context
+  })
+  await store.inputBundleCandidates.settle(
+    runId,
+    token,
+    candidate.digest,
+    'present'
+  )
+  return input
+}
+
 async function createQueuedRun(
   store: ReviewRunStore,
   runId = `run-${randomUUID()}`
@@ -331,7 +376,12 @@ test('heartbeats do not refresh an expired recovery lease', async () => {
           runId,
           preparationToken: admission.preparation_token,
           publishContext: {},
-          input: {}
+          input: await publishedInput(
+            store,
+            runId,
+            admission.preparation_token,
+            {}
+          )
         },
         async () => {
           throw new ExecutionSubmissionUncertainError('response lost')
@@ -389,7 +439,12 @@ test('an observation heartbeat never extends the recovery lease', async () => {
           runId,
           preparationToken: admission.preparation_token,
           publishContext: {},
-          input: {}
+          input: await publishedInput(
+            store,
+            runId,
+            admission.preparation_token,
+            {}
+          )
         },
         async () => {
           throw new ExecutionSubmissionUncertainError('response lost')
@@ -668,7 +723,7 @@ test('ReviewRunStore claims an expired preparation from its durable connector in
       await store.preparations.renewClaim(runId, admission.preparation_token),
       false
     )
-    assert.strictEqual(await store.preparations.renewClaim(runId, token), true)
+    assert.strictEqual(await store.preparations.renewClaim(runId, token), false)
   } finally {
     await store.close()
   }
@@ -761,7 +816,7 @@ test('ReviewRunStore renews only the current preparation owner', async () => {
     })
     assert.ok(admission.preparation_token)
     await observer.query(
-      `UPDATE preparations SET claimed_at=clock_timestamp()-interval '1 hour'
+      `UPDATE preparations SET claimed_at=clock_timestamp()-interval '100 milliseconds'
        WHERE run_id=$1`,
       [runId]
     )
@@ -780,6 +835,10 @@ test('ReviewRunStore renews only the current preparation owner', async () => {
       `UPDATE preparations SET claimed_at=clock_timestamp()-interval '1 hour'
        WHERE run_id=$1`,
       [runId]
+    )
+    assert.strictEqual(
+      await store.preparations.renewClaim(runId, admission.preparation_token),
+      false
     )
     assert.strictEqual((await store.preparations.expireStale()).concluded, 1)
   } finally {
@@ -991,7 +1050,7 @@ test('ReviewRunStore leaves ingress replay read-only and lets the coordinator ta
         {},
         {}
       ),
-      /cannot save prepared submission/
+      /Preparation claim was lost/
     )
     await assert.rejects(
       ownerA.submissionTransitions.markQueued(
@@ -1040,7 +1099,12 @@ test('ReviewRunStore recovers an uncertain submission with a fenced claim', asyn
       runId,
       admission.preparation_token,
       {},
-      { api_version: 'v1' }
+      await publishedInput(
+        store,
+        runId,
+        admission.preparation_token as string,
+        { api_version: 'v1' }
+      )
     )
     await store.preparations.fail(runId, admission.preparation_token, {
       code: 'SUBMISSION_STATE_UNCERTAIN',
@@ -1106,7 +1170,12 @@ test('a restarted coordinator replays persisted uncertain submission input', asy
           runId,
           preparationToken: admission.preparation_token,
           publishContext: {},
-          input
+          input: await publishedInput(
+            owner,
+            runId,
+            admission.preparation_token,
+            input
+          )
         },
         async () => {
           throw new ExecutionSubmissionUncertainError('response lost')
@@ -3085,7 +3154,7 @@ test('savePreparedSubmission rolls the publication write back when the execution
         { target: 'overwritten' },
         { api_version: 'v1' }
       ),
-      /cannot save prepared submission outside pending/,
+      /Preparation claim was lost/,
       'a missed execution arm must reject the save'
     )
 
@@ -4655,7 +4724,12 @@ test('an uncertain submission queues no notice until the run is conclusively fai
       runId,
       admission.preparation_token as string,
       {},
-      { api_version: 'v1' }
+      await publishedInput(
+        store,
+        runId,
+        admission.preparation_token as string,
+        { api_version: 'v1' }
+      )
     )
     await store.preparations.fail(
       runId,
@@ -4715,7 +4789,12 @@ test('a rejected replay announces the failure that actually happened', async () 
       runId,
       admission.preparation_token as string,
       {},
-      { api_version: 'v1' }
+      await publishedInput(
+        store,
+        runId,
+        admission.preparation_token as string,
+        { api_version: 'v1' }
+      )
     )
     await store.preparations.fail(
       runId,
@@ -4771,7 +4850,12 @@ test('an uncertain submission that never resolves is concluded once its budget i
       runId,
       admission.preparation_token as string,
       {},
-      { api_version: 'v1' }
+      await publishedInput(
+        store,
+        runId,
+        admission.preparation_token as string,
+        { api_version: 'v1' }
+      )
     )
     await store.preparations.fail(
       runId,

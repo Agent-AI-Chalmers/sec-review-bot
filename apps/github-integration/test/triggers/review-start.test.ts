@@ -1,3 +1,4 @@
+import { inputBundlePublicationStore } from '../input-bundle-publication-store.js'
 // Covers issue and pull-request trigger behavior at the durable admission,
 // preparation-claim, and execution-submission boundaries.
 import assert from 'node:assert/strict'
@@ -73,6 +74,7 @@ const TRUSTED_DEFAULT_BRANCH = {
 }
 
 const preparationClaim = {
+  ...inputBundlePublicationStore(),
   renewPreparationClaim: async () => true,
   preparationHeartbeatIntervalMs: async () => 60_000
 }
@@ -425,7 +427,7 @@ test('startIssueReviewCommand preserves an uncertain Execution submission for re
       delivery_id: 'delivery-uncertain',
       deps: {
         start_review: async (args) => {
-          args.on_prepared?.(
+          await args.on_prepared?.(
             {
               issue: args.issue,
               run_id: 'run-uncertain',
@@ -476,7 +478,7 @@ test('startPullRequestReviewCommand preserves an uncertain Execution submission 
       delivery_id: 'delivery-pr-uncertain',
       deps: {
         start_review: async (args) => {
-          args.on_prepared?.(
+          await args.on_prepared?.(
             {
               pr: args.pr,
               run_id: 'run-pr-uncertain',

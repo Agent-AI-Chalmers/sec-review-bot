@@ -3,6 +3,9 @@ import {
   PutObjectCommand,
   S3Client
 } from '@aws-sdk/client-s3'
+import { createHash } from 'node:crypto'
+import fs from 'node:fs/promises'
+import { pipeline } from 'node:stream/promises'
 import { createReadStream } from 'fs'
 import { fileURLToPath } from 'url'
 
@@ -15,8 +18,8 @@ import {
 } from '../config.js'
 import type { InputBundleArtifactRef } from '../execution/input.js'
 
-function inputObjectKey(runId: string): string {
-  return `runs/${runId}/input/input-bundle.v1.tar.zst`
+function inputObjectKey(runId: string, digest: string): string {
+  return `runs/${runId}/input/${digest.replace(/^sha256:/, '')}/input-bundle.v1.tar.zst`
 }
 
 function configuredClient(): S3Client {
@@ -79,7 +82,7 @@ export function publishedInputBundleReference(
   runId: string
 ): InputBundleArtifactRef {
   if (artifact_store === 'file') return reference
-  const key = inputObjectKey(runId)
+  const key = inputObjectKey(runId, reference.digest)
   return { ...reference, uri: `s3://${artifact_s3_bucket}/${key}` }
 }
 
@@ -98,7 +101,7 @@ export async function publishInputBundle(
   if (source.protocol !== 'file:') {
     throw new Error('Input bundle publication requires a local file reference.')
   }
-  const key = inputObjectKey(runId)
+  const key = inputObjectKey(runId, reference.digest)
   const client = configuredClient()
   const existing = await existingObjectMatches(
     client,
@@ -149,4 +152,45 @@ export async function publishInputBundle(
     }
   }
   return { ...reference, uri: `s3://${artifact_s3_bucket}/${key}` }
+}
+
+/** A failed read is uncertainty, not absence. Only a definitive missing object returns false. */
+export async function inputBundleExists(
+  reference: InputBundleArtifactRef
+): Promise<boolean> {
+  const uri = new URL(reference.uri)
+  if (uri.protocol === 'file:') {
+    try {
+      const source = fileURLToPath(uri)
+      const { size } = await fs.stat(source)
+      const digest = createHash('sha256')
+      await pipeline(createReadStream(source), digest)
+      if (
+        size !== reference.size_bytes ||
+        `sha256:${digest.digest('hex')}` !== reference.digest
+      )
+        throw new Error('Local input bundle differs from its immutable intent.')
+      return true
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      )
+        return false
+      throw error
+    }
+  }
+  if (uri.protocol !== 's3:' || uri.hostname !== artifact_s3_bucket)
+    throw new Error('Input bundle uses an unconfigured store.')
+  const matches = await existingObjectMatches(
+    configuredClient(),
+    uri.hostname,
+    uri.pathname.slice(1),
+    reference
+  )
+  if (matches === false)
+    throw new Error('Input bundle object differs from its immutable intent.')
+  return matches === true
 }

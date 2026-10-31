@@ -134,6 +134,35 @@ CREATE INDEX preparations_disconnected_idx
   ON preparations (connector_id, updated_at)
   WHERE status = 'disconnected';
 
+-- Durable intent precedes the external object write. The intent retains everything needed
+-- to finish submission after the uploader dies; selected is the sole attachment authority.
+CREATE TABLE input_bundle_candidates (
+  run_id text NOT NULL,
+  connector_id text NOT NULL,
+  digest text NOT NULL CHECK (digest ~ '^sha256:[0-9a-f]{64}$'),
+  reference jsonb NOT NULL CHECK (jsonb_typeof(reference) = 'object'),
+  input jsonb NOT NULL CHECK (jsonb_typeof(input) = 'object'),
+  publish_context jsonb NOT NULL CHECK (jsonb_typeof(publish_context) = 'object'),
+  reserved_by uuid NOT NULL,
+  status text NOT NULL CHECK (status IN ('reserved', 'present', 'selected', 'abandoned')),
+  created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+  PRIMARY KEY (run_id, digest),
+  CHECK (reference->>'digest' IS NOT NULL AND reference->>'digest' = digest),
+  CHECK (input->'input_bundle' IS NOT NULL AND input->'input_bundle' = reference),
+  FOREIGN KEY (run_id, connector_id)
+    REFERENCES review_runs (run_id, connector_id) ON DELETE CASCADE
+);
+COMMENT ON TABLE input_bundle_candidates IS
+  'Run-local immutable input intents: reserve before upload, confirm presence, then select atomically with prepared submission. reserved_by records provenance; only the current unexpired preparation claim authorizes mutations.';
+COMMENT ON COLUMN input_bundle_candidates.updated_at IS
+  'Last state transition, retained on identical replay so abandoned retention has a stable start.';
+CREATE UNIQUE INDEX input_bundle_candidates_one_selected_idx
+  ON input_bundle_candidates (run_id) WHERE status = 'selected';
+CREATE INDEX input_bundle_candidates_unfinished_idx
+  ON input_bundle_candidates (connector_id, run_id, created_at)
+  WHERE status IN ('reserved', 'present');
+
 -- Execution is the second lifecycle axis, after preparation and before publication. It has no
 -- externally claimable owner (Review Runs observes the Execution), so its claim token only
 -- fences replay of an uncertain submission. It deliberately mirrors the axis shape:

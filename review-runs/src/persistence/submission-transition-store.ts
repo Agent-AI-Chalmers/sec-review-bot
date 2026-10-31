@@ -7,6 +7,7 @@ import type { ReviewRunWorkflow } from '../contracts.js'
 import { transaction } from '../database/transaction.js'
 import { abandonInFlightPublication } from './publication-abandon.js'
 import { appendEvent } from './review-run-events.js'
+import { requirePreparationClaim } from './input-bundle-candidate-store.js'
 import { queueRunNotice } from './run-notices.js'
 
 type JsonObject = Record<string, unknown>
@@ -20,7 +21,8 @@ export class SubmissionTransitionStore {
 
   constructor(
     private readonly database: Database,
-    private readonly connectorId: string
+    private readonly connectorId: string,
+    private readonly claimTimeoutMs: number
   ) {}
 
   private async findWorkflow(
@@ -41,52 +43,53 @@ export class SubmissionTransitionStore {
     context: JsonObject,
     input: JsonObject
   ): Promise<void> {
-    // The transaction is required even though both writes share one data-modifying CTE: each CTE
-    // arm runs independently, so a failed trailing check must roll the publication write back.
     await transaction(this.pool, async (client) => {
-      const workflow = await this.findWorkflow(client, runId)
-      if (workflow === null)
-        throw new Error(`Review run does not exist: ${runId}`)
-      const result = await client.query(
-        `
-        WITH updated_publication AS (
-          UPDATE publications
-          SET input=$3::jsonb, updated_at=clock_timestamp()
-          WHERE run_id=$1 AND connector_id=$5
-            AND EXISTS (
-              SELECT 1 FROM review_runs r
-              WHERE r.run_id=publications.run_id AND r.connector_id=$5 AND r.workflow=$6
-            )
-          RETURNING run_id
-        ),
-        updated_execution AS (
-          UPDATE executions
-          SET input=$4::jsonb, updated_at=clock_timestamp()
-          WHERE run_id=$1 AND connector_id=$5
-            AND status='pending' AND EXISTS (
-              SELECT 1 FROM preparations
-              WHERE preparations.run_id=executions.run_id
-                AND preparations.connector_id=$5 AND preparations.status='preparing'
-                AND preparations.claim_token=$2
-            )
-          RETURNING run_id
-        )
-        SELECT run_id FROM updated_execution
-        WHERE EXISTS (SELECT 1 FROM updated_publication)
-      `,
+      await requirePreparationClaim(
+        client,
+        runId,
+        this.connectorId,
+        token,
+        this.claimTimeoutMs
+      )
+      // Match the complete persisted intent, not just its digest. A response-loss replay
+      // may repeat a selection, but cannot rewrite the input under an already chosen object.
+      const candidate = await client.query(
+        `UPDATE input_bundle_candidates c SET status='selected',
+           updated_at=CASE WHEN status='selected' THEN updated_at ELSE clock_timestamp() END
+         WHERE run_id=$1 AND connector_id=$2 AND reference=$3::jsonb
+           AND input=$4::jsonb AND publish_context=$5::jsonb
+           AND status IN ('present','selected')
+           AND NOT EXISTS (SELECT 1 FROM input_bundle_candidates other
+             WHERE other.run_id=c.run_id AND other.status='selected' AND other.digest<>c.digest)
+         RETURNING digest`,
         [
           runId,
-          token,
-          JSON.stringify(context),
-          JSON.stringify(input),
           this.connectorId,
-          workflow
+          JSON.stringify(input.input_bundle ?? null),
+          JSON.stringify(input),
+          JSON.stringify(context)
         ]
       )
-      if (result.rowCount !== 1)
-        throw new Error(
-          `Review run ${runId} cannot save prepared submission outside pending.`
-        )
+      if (candidate.rowCount !== 1)
+        throw new Error('Prepared input has no matching published candidate.')
+      const execution = await client.query(
+        `UPDATE executions SET input=$3::jsonb, updated_at=clock_timestamp()
+         WHERE run_id=$1 AND connector_id=$2 AND status='pending'
+           AND (input IS NULL OR input=$3::jsonb)`,
+        [runId, this.connectorId, JSON.stringify(input)]
+      )
+      const publication = await client.query(
+        `UPDATE publications SET input=$3::jsonb, updated_at=clock_timestamp()
+         WHERE run_id=$1 AND connector_id=$2 AND status='pending'`,
+        [runId, this.connectorId, JSON.stringify(context)]
+      )
+      if (execution.rowCount !== 1 || publication.rowCount !== 1)
+        throw new Error('Run cannot save prepared submission outside pending.')
+      await client.query(
+        `UPDATE input_bundle_candidates SET status='abandoned', updated_at=clock_timestamp()
+         WHERE run_id=$1 AND connector_id=$2 AND status IN ('reserved','present')`,
+        [runId, this.connectorId]
+      )
     })
   }
 
@@ -101,6 +104,12 @@ export class SubmissionTransitionStore {
         throw Object.assign(new Error(`Review run does not exist: ${runId}`), {
           statusCode: 404
         })
+      // Execution may have accepted the saved request just as the lease elapsed. Finish
+      // recording that acknowledgement only if no expiry/takeover has replaced this owner.
+      await client.query(
+        `SELECT run_id FROM preparations WHERE run_id=$1 FOR UPDATE`,
+        [runId]
+      )
       const publication = await client.query(
         `UPDATE publications
          SET input=$2::jsonb, updated_at=clock_timestamp()

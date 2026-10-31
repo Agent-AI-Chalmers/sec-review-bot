@@ -34,7 +34,7 @@ test('S3 input upload is immutable and idempotent', async (t) => {
   }
   const runId = `integration-${crypto.randomBytes(8).toString('hex')}`
 
-  const key = `runs/${runId}/input/input-bundle.v1.tar.zst`
+  const key = `runs/${runId}/input/${reference.digest.slice(7)}/input-bundle.v1.tar.zst`
   try {
     const first = await publishInputBundle(reference, runId)
     const retry = await publishInputBundle(reference, runId)

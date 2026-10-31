@@ -41,6 +41,31 @@ export function buildCoordinationRouteHandlers(
       )
     },
 
+    reserveInputBundleCandidate: async (request) => {
+      const { runId } =
+        request.params as PathParams<'reserveInputBundleCandidate'>
+      const { token, ...intent } =
+        request.body as RequestBody<'reserveInputBundleCandidate'>
+      return await store.inputBundleCandidates.reserve(runId, token, intent)
+    },
+    listInputBundleCandidates: async (request) => {
+      const { runId } =
+        request.params as PathParams<'listInputBundleCandidates'>
+      const { token } = request.body as RequestBody<'listInputBundleCandidates'>
+      return await store.inputBundleCandidates.list(runId, token)
+    },
+    settleInputBundleCandidate: async (request) => {
+      const { runId } =
+        request.params as PathParams<'settleInputBundleCandidate'>
+      const { token, digest, status } =
+        request.body as RequestBody<'settleInputBundleCandidate'>
+      return await store.inputBundleCandidates.settle(
+        runId,
+        token,
+        digest,
+        status
+      )
+    },
     renewPreparationClaim: async (request) => {
       const { runId } = request.params as PathParams<'renewPreparationClaim'>
       const { token } = request.body as RequestBody<'renewPreparationClaim'>

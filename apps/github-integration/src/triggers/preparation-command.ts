@@ -7,6 +7,11 @@
 // The order is the protocol, and it was copied into each trigger: admit, stop on replay,
 // require a run id and a claim, start the heartbeat, submit through the lease, and on failure
 // own the decision to record it. Only the workflow, its input and the review call differ.
+import {
+  publishAndSubmitInputBundle,
+  recoverInputBundlePublication,
+  type InputBundlePublicationStore
+} from '../artifacts/input-bundle-publication.js'
 import { admitReviewRun } from '../review-runs/admission.js'
 import {
   ReviewRunsSubmissionError,
@@ -25,7 +30,7 @@ import { isSetupDeclarationError } from '../github/setup-declaration.js'
  * The return types are deliberately unions: a test double may answer synchronously, and the
  * command always awaits, so both shapes describe the same call.
  */
-export interface PreparationCommandStore {
+export interface PreparationCommandStore extends InputBundlePublicationStore {
   admitReviewRun: (
     ...args: Parameters<typeof reviewRunsClient.admitReviewRun>
   ) =>
@@ -138,6 +143,8 @@ export async function runPreparationCommand<T, P>({
   )
 
   try {
+    if (await recoverInputBundlePublication(store, run_id, preparationToken))
+      return { run_id }
     return await start_review({
       run_id,
       checkpoint: async (preparation_input) => {
@@ -153,7 +160,8 @@ export async function runPreparationCommand<T, P>({
         // Confirm the lease immediately before crossing the durable submission
         // boundary; the submission itself remains token-fenced by Review Runs.
         await heartbeat.assertOwned()
-        await store.submitPreparedRun(
+        await publishAndSubmitInputBundle(
+          store,
           run_id,
           preparationToken,
           publish_context(prepared),

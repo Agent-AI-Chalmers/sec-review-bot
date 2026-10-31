@@ -13,6 +13,8 @@
 - [v1/review-run-record.schema.json](v1/review-run-record.schema.json)：协调记录的形状。
 - [v1/fixtures](v1/fixtures)：可执行示例，包含本契约必须拒绝的形状。
 
+Input publication 操作在 preparation claim 下预约完整不可变提案、列出待恢复提案，并确认对象存在或放弃。Prepared submission 必须完整匹配已存在或已选中的提案。Preparation 仍持有 run 时接受完全相同的提交重放；修改 reference、input 或 publish context 会被拒绝。候选记录包含存储 locator 和 prepared input，因此属于经过认证的 service 协调面，不进入 console 的 observed-run 投影。
+
 ## 边界
 
 Review Runs 通过 `observeRun()` 产出每个 observed run，通过 `rowToRecord()` 产出每条记录。记录携带 `failure_message`，而脱敏后的读取形状刻意丢弃了它，因此它只跨越 service token 那条边界。
