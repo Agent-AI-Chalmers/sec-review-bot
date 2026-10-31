@@ -140,8 +140,16 @@ def mitigation_feedback_retry_context(
 
     history = retry_context.get("history")
     has_history = isinstance(history, list)
-    previous_mitigation = mitigation_result_summary(
-        retry_context.get("previous_mitigation_result")
+    # feedback_retry_context already projected the stage result. Reapplying
+    # mitigation_result_summary would look for file_changes and lose changed_files.
+    previous_summary = retry_context.get("previous_mitigation_result")
+    previous_mitigation = (
+        {
+            "overview": previous_summary.get("overview"),
+            "changed_files": previous_summary.get("changed_files") or [],
+        }
+        if isinstance(previous_summary, Mapping)
+        else None
     )
     latest_verifier = verifier_result_summary(
         retry_context.get("previous_verifier_result")

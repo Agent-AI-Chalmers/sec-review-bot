@@ -125,3 +125,29 @@ def test_feedback_retry_context_accumulates_previous_verifier_history() -> None:
     assert second_retry_context["previous_verifier_result"]["overview"] == (
         "second verifier"
     )
+
+
+def test_retry_prompt_retains_changed_paths_after_summary_projection() -> None:
+    """A compact summary must not be interpreted again as a raw stage result."""
+    context = feedback_loop.feedback_retry_context(
+        retry_index=1,
+        mitigation_result={
+            "overview": "Added a guard",
+            "file_changes": [
+                {"path": "src/guard.py", "status": "upsert", "content": "secret body"}
+            ],
+            "patch_diff": "private raw patch",
+        },
+        verifier_result={"overview": "Guard needs revision"},
+    )
+    projected = feedback_loop.mitigation_feedback_retry_context(context)
+    assert projected is not None
+    assert projected["previous_mitigation"] == {
+        "overview": "Added a guard",
+        "changed_files": ["src/guard.py"],
+    }
+    rendered = feedback_loop.render_retry_revision_context_section(projected)
+    assert rendered is not None
+    assert "src/guard.py" in rendered
+    assert "secret body" not in rendered
+    assert "private raw patch" not in rendered

@@ -298,7 +298,7 @@ def test_retry_mitigation_prompt_keeps_verifier_as_primary_corrective_signal() -
         "retry_index": 1,
         "previous_mitigation_result": {
             "overview": "Old mitigation",
-            "file_changes": [{"path": "a.py", "status": "deleted"}],
+            "changed_files": ["a.py"],
         },
         "previous_verifier_result": {
             "overview": "Old verifier",
