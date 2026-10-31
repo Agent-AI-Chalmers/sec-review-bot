@@ -1,5 +1,6 @@
 import {
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client
 } from '@aws-sdk/client-s3'
@@ -65,7 +66,13 @@ async function existingObjectMatches(
         ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata
             ?.httpStatusCode
         : undefined
-    if (status === 404) return undefined
+    if (status === 403 || status === 404) {
+      // A narrowly scoped LIST can establish absence even when HEAD returns 403.
+      const listed = await client.send(
+        new ListObjectsV2Command({ Bucket: bucket, Prefix: key, MaxKeys: 1 })
+      )
+      if (!listed.Contents?.some((item) => item.Key === key)) return undefined
+    }
     throw error
   }
 }

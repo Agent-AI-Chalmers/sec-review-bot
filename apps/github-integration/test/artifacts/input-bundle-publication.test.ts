@@ -7,6 +7,7 @@ import { pathToFileURL } from 'node:url'
 import test from 'node:test'
 import {
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client
 } from '@aws-sdk/client-s3'
@@ -66,6 +67,7 @@ for (const crash of [
       }
     }
     s3.reset()
+    s3.on(ListObjectsV2Command).resolves({ Contents: [] })
     s3.on(HeadObjectCommand).callsFake(() => {
       if (!uploaded)
         throw Object.assign(new Error('missing'), {

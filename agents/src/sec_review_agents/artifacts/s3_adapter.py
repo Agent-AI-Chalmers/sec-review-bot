@@ -134,11 +134,17 @@ def s3_artifact_exists(reference: ArtifactReference) -> bool:
     bucket, key = parse_s3_artifact_uri(reference.uri)
     if bucket != env_value(ARTIFACT_S3_BUCKET_ENV):
         raise ValueError("Artifact URI uses an unconfigured S3 bucket.")
+    client = _s3_client()
     try:
-        head = _s3_client().head_object(Bucket=bucket, Key=key)
+        head = client.head_object(Bucket=bucket, Key=key)
     except ClientError as error:
-        if error.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
-            return False
+        status = error.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
+        if status in {403, 404}:
+            # HEAD cannot distinguish absence from denied access without broad
+            # ListBucket. An exact-prefix LIST uses the narrower publisher grant.
+            listed = client.list_objects_v2(Bucket=bucket, Prefix=key, MaxKeys=1)
+            if not any(item["Key"] == key for item in listed.get("Contents", [])):
+                return False
         raise
     _assert_existing_object_matches(
         head, reference=reference, description="memory artifact", error=None

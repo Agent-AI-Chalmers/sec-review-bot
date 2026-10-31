@@ -17,8 +17,11 @@ test('S3 input upload is immutable and idempotent', async (t) => {
   process.env['SEC_REVIEW_ARTIFACT_STORE'] = 's3'
   process.env['SEC_REVIEW_ARTIFACT_S3_ENDPOINT'] = endpoint
   process.env['SEC_REVIEW_ARTIFACT_S3_BUCKET'] = bucket
-  const { publishInputBundle } =
-    await import('../../../src/artifacts/input-storage.js')
+  const {
+    publishInputBundle,
+    inputBundleExists,
+    publishedInputBundleReference
+  } = await import('../../../src/artifacts/input-storage.js')
   const directory = await fs.mkdtemp(
     path.join(os.tmpdir(), 's3-input-storage-')
   )
@@ -36,7 +39,12 @@ test('S3 input upload is immutable and idempotent', async (t) => {
 
   const key = `runs/${runId}/input/${reference.digest.slice(7)}/input-bundle.v1.tar.zst`
   try {
+    assert.equal(
+      await inputBundleExists(publishedInputBundleReference(reference, runId)),
+      false
+    )
     const first = await publishInputBundle(reference, runId)
+    assert.equal(await inputBundleExists(first), true)
     const retry = await publishInputBundle(reference, runId)
     assert.strictEqual(first.uri, retry.uri)
     assert.strictEqual(first.uri, `s3://${bucket}/${key}`)
