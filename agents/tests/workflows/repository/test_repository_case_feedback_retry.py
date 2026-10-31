@@ -239,6 +239,7 @@ async def _run_case_workflow(state: _CaseWorkflowState) -> dict[str, Any]:
     def fake_prepare_repository_case(request: dict[str, Any]) -> dict[str, Any]:
         return {
             "case_execution_input": request["case_execution_input"],
+            "published_trajectories_path": request["published_trajectories_path"],
             "artifact_paths": {
                 "analyzer": "/tmp/cases/case-1/analyzer",
                 "cvss": "/tmp/cases/case-1/cvss",

@@ -293,6 +293,7 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
         case_id = request["case_execution_input"]["case_id"]
         return {
             "case_execution_input": request["case_execution_input"],
+            "published_trajectories_path": request["published_trajectories_path"],
             "artifact_paths": {
                 "analyzer": f"/tmp/cases/{case_id}/analyzer",
                 "cvss": f"/tmp/cases/{case_id}/cvss",
@@ -548,20 +549,26 @@ async def test_direct_repository_case_review_fanout_is_bounded() -> None:
 
 
 @pytest.mark.asyncio
-async def test_repository_discovery_workflow_refills_chunk_window() -> None:
+async def test_repository_discovery_workflow_refills_chunk_window(
+    tmp_path: Path,
+) -> None:
     chunk_3_started = threading.Event()
+    observed_chunk_ids: list[str] = []
 
     @activity.defn(name="build_repository_discovery_manifest_activity")
     def fake_build_discovery_manifest(
         _request: ReviewWorkflowRequest,
     ) -> dict:
         return {
+            "workspace_root": str(tmp_path),
+            "discovery_artifacts_path": str(tmp_path / "discovery"),
+            "chunk_strategy": "batched",
             "entries": [],
             "skipped_files": [],
             "chunks": [
-                {"chunk_id": "discovery-chunk-0001"},
-                {"chunk_id": "discovery-chunk-0002"},
-                {"chunk_id": "discovery-chunk-0003"},
+                {"chunk_id": "discovery-chunk-0001", "entries": [], "token_count": 0},
+                {"chunk_id": "discovery-chunk-0002", "entries": [], "token_count": 0},
+                {"chunk_id": "discovery-chunk-0003", "entries": [], "token_count": 0},
             ],
             "deployment_input_limit_tokens": 625_000,
             "chunk_target_tokens": 100_000,
@@ -573,7 +580,9 @@ async def test_repository_discovery_workflow_refills_chunk_window() -> None:
 
     @activity.defn(name="scan_repository_discovery_chunk_activity")
     def fake_scan_discovery_chunk(
-        _request: ReviewWorkflowRequest, _manifest: dict, chunk: dict
+        _request: ReviewWorkflowRequest,
+        _manifest: dict,
+        chunk: dict,
     ) -> dict:
         chunk_id = chunk["chunk_id"]
         if chunk_id == "discovery-chunk-0001" and not chunk_3_started.wait(2.0):
@@ -585,7 +594,6 @@ async def test_repository_discovery_workflow_refills_chunk_window() -> None:
             "file_candidates": [],
             "file_results": [],
             "skipped_files": [],
-            "tokenUsages": [],
         }
 
     @activity.defn(name="build_repository_discovery_result_activity")
@@ -593,9 +601,14 @@ async def test_repository_discovery_workflow_refills_chunk_window() -> None:
         _manifest: dict,
         chunk_results: list[dict],
     ) -> dict:
-        return {
-            "chunk_ids": [item["chunk_id"] for item in chunk_results],
-        }
+        from sec_review_agents.workflows.repository.workflow import (
+            build_repository_discovery_result_activity,
+        )
+
+        observed_chunk_ids.extend(item["chunk_id"] for item in chunk_results)
+        return dict(
+            build_repository_discovery_result_activity(_manifest, chunk_results)
+        )
 
     async def run_workflow() -> dict:
         async with temporal_time_skipping_environment() as env:
@@ -611,23 +624,25 @@ async def test_repository_discovery_workflow_refills_chunk_window() -> None:
                     ],
                     activity_executor=executor,
                 ):
-                    return await env.client.execute_workflow(
-                        RepositoryDiscoveryWorkflow.run,
-                        ReviewWorkflowRequest(
-                            workflow="repository-review",
-                            run_id="run-test",
-                            prepared_input={},
-                            timeout_seconds=30,
-                            runtime_context={},
-                        ),
-                        id="repository-discovery-concurrency-test",
-                        task_queue="repository-discovery-concurrency-test",
+                    return dict(
+                        await env.client.execute_workflow(
+                            RepositoryDiscoveryWorkflow.run,
+                            ReviewWorkflowRequest(
+                                workflow="repository-review",
+                                run_id="run-test",
+                                prepared_input={},
+                                timeout_seconds=30,
+                                runtime_context={},
+                            ),
+                            id="repository-discovery-concurrency-test",
+                            task_queue="repository-discovery-concurrency-test",
+                        )
                     )
         raise AssertionError("Temporal test worker exited before returning.")
 
-    result = await run_workflow()
+    await run_workflow()
 
-    assert result["chunk_ids"] == [
+    assert observed_chunk_ids == [
         "discovery-chunk-0001",
         "discovery-chunk-0002",
         "discovery-chunk-0003",
@@ -643,6 +658,7 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
     def fake_prepare_repository_case(request: dict) -> dict:
         return {
             "case_execution_input": request["case_execution_input"],
+            "published_trajectories_path": request["published_trajectories_path"],
             "artifact_paths": {
                 "analyzer": "/tmp/cases/case-1/analyzer",
                 "cvss": "/tmp/cases/case-1/cvss",
@@ -769,6 +785,7 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
     def fake_prepare_repository_case(request: dict) -> dict:
         return {
             "case_execution_input": request["case_execution_input"],
+            "published_trajectories_path": request["published_trajectories_path"],
             "artifact_paths": {
                 "analyzer": "/tmp/cases/case-1/analyzer",
                 "cvss": "/tmp/cases/case-1/cvss",

@@ -495,8 +495,8 @@ def test_module_documentation_precedes_imports() -> None:
     assert misplaced == []
 
 
-def test_temporal_connection_creation_has_one_owner() -> None:
-    """Worker and CLI connections share one owner for SDK connection configuration."""
+def test_temporal_connection_protocol_has_one_owner() -> None:
+    """New entrypoints must not bypass the converter configured by temporal.client."""
     owner = PACKAGE_ROOT / "temporal" / "client.py"
     violations: list[str] = []
     for path in PACKAGE_ROOT.rglob("*.py"):
@@ -525,4 +525,5 @@ def test_temporal_connection_creation_has_one_owner() -> None:
                 parts.insert(0, imports.get(value.id, value.id))
                 if ".".join(parts) == "temporalio.client.Client.connect":
                     violations.append(f"{path.relative_to(PACKAGE_ROOT)}:{node.lineno}")
+        violations.extend(import_violations(path, ("temporalio.contrib.pydantic",)))
     assert violations == []
