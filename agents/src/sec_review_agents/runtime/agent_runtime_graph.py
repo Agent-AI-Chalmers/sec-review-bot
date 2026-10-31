@@ -11,7 +11,6 @@ from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.config import merge_configs
 from langgraph.graph.state import CompiledStateGraph
 
-from sec_review_agents.mcp.client import load_mcp_tools_async
 from sec_review_agents.observability.diagnostics import (
     log_agent_configuration,
     log_agent_invocation_failed,
@@ -34,17 +33,13 @@ async def build_agent_runtime_graph(
     system_prompt: str,
     response_format: Any | None = None,
     tools: list[Any] | None = None,
-    mcp_connections: Mapping[str, Any] | None = None,
     middleware: Sequence[AgentMiddleware[Any, Any, Any]] | None = None,
 ) -> CompiledStateGraph:
+    """Build a graph without taking ownership of tool resources.
+
+    Keep resources used by the supplied tools alive while executing the graph.
+    """
     agent_middleware = middleware or ()
-    # This is the lowest-level agent runtime graph: model, middleware, tools,
-    # MCP, and structured output. Stage graphs compose around it.
-    # Keep MCP loading here so callers pass connections, not already-materialized
-    # tools. That avoids sync wrappers around MCP setup and keeps normal tools
-    # and MCP tools ordered in one place.
-    mcp_tools = await load_mcp_tools_async(mcp_connections)
-    agent_tools = [*(tools or []), *mcp_tools]
 
     agent = create_agent(
         model=model,
@@ -52,7 +47,7 @@ async def build_agent_runtime_graph(
         system_prompt=system_prompt,
         name=agent_name,
         response_format=response_format,
-        tools=agent_tools,
+        tools=list(tools or []),
     )
     log_agent_configuration(
         agent_name=agent_name,

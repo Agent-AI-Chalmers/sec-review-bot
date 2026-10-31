@@ -48,10 +48,7 @@ async def _run_mitigation_stage_for_workspace_capture(
         captured_workspace_paths.append(workspace_path)
         return object()
 
-    async def create_agent_graph(**_kwargs: Any) -> object:
-        return object()
-
-    async def invoke_agent_graph(**_kwargs: Any) -> dict[str, Any]:
+    async def run_agent(**_kwargs: Any) -> dict[str, Any]:
         return {
             "overview": "No changes needed.",
             "declared_changed_files": [],
@@ -59,12 +56,8 @@ async def _run_mitigation_stage_for_workspace_capture(
 
     with (
         patch(
-            "sec_review_agents.review_stages.mitigation.stage.create_mitigation_agent_graph",
-            side_effect=create_agent_graph,
-        ),
-        patch(
-            "sec_review_agents.review_stages.mitigation.stage.invoke_agent_runtime_graph",
-            side_effect=invoke_agent_graph,
+            "sec_review_agents.review_stages.mitigation.stage.run_mitigation_agent",
+            side_effect=run_agent,
         ),
         patch(
             "sec_review_agents.review_stages.mitigation.stage.build_patch_artifact",

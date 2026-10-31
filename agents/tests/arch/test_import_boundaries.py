@@ -130,6 +130,23 @@ def test_runtime_package_does_not_import_domain_or_workflow_packages() -> None:
     assert violations == []
 
 
+def test_stages_and_runtime_do_not_manage_agent_mcp_connections() -> None:
+    """Agent invocation owns MCP sessions; callers must not assemble its tools."""
+    forbidden = (
+        "sec_review_agents.mcp",
+        "langchain_mcp_adapters",
+        "mcp",
+        "sec_review_agents.agents.analysis.mcp",
+        "sec_review_agents.agents.mitigation.mcp",
+        "sec_review_agents.agents.verification.mcp",
+        "sec_review_agents.agents.single_agent.mcp",
+    )
+    violations = []
+    for name in ("review_stages", "scan_stages", "delivery_stages", "runtime"):
+        violations.extend(import_violations(PACKAGE_ROOT / name, forbidden))
+    assert violations == []
+
+
 def test_run_diagnostics_package_does_not_import_orchestration_packages() -> None:
     violations = import_violations(
         PACKAGE_ROOT / "run_diagnostics",

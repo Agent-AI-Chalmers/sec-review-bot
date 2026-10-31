@@ -202,10 +202,7 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
         "residual_risks": [],
     }
 
-    async def fake_create_mitigation_agent_graph(**_kwargs):
-        return object()
-
-    async def fake_invoke_agent_runtime_graph(**kwargs):
+    async def fake_run_agent(**kwargs):
         assert kwargs["trajectory_paths"] == (
             mitigator_root / "trajectories" / "retry-1.jsonl",
         )
@@ -225,12 +222,8 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
 
     with (
         patch(
-            "sec_review_agents.review_stages.mitigation.stage.create_mitigation_agent_graph",
-            side_effect=fake_create_mitigation_agent_graph,
-        ),
-        patch(
-            "sec_review_agents.review_stages.mitigation.stage.invoke_agent_runtime_graph",
-            side_effect=fake_invoke_agent_runtime_graph,
+            "sec_review_agents.review_stages.mitigation.stage.run_mitigation_agent",
+            side_effect=fake_run_agent,
         ),
         patch(
             "sec_review_agents.review_stages.mitigation.stage.build_patch_artifact",

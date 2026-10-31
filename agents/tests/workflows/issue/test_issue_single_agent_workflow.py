@@ -59,11 +59,7 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
             return_value=object(),
         ),
         patch(
-            "sec_review_agents.review_stages.single_agent.stage.create_single_agent_graph",
-            return_value=object(),
-        ),
-        patch(
-            "sec_review_agents.review_stages.single_agent.stage.invoke_agent_runtime_graph",
+            "sec_review_agents.review_stages.single_agent.stage.run_single_agent",
             return_value=structured_payload,
         ),
         patch(
@@ -131,11 +127,7 @@ async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_dec
             return_value=object(),
         ),
         patch(
-            "sec_review_agents.review_stages.single_agent.stage.create_single_agent_graph",
-            return_value=object(),
-        ),
-        patch(
-            "sec_review_agents.review_stages.single_agent.stage.invoke_agent_runtime_graph",
+            "sec_review_agents.review_stages.single_agent.stage.run_single_agent",
             return_value=structured_payload,
         ),
         patch(
