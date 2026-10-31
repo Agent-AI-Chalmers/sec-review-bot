@@ -471,3 +471,25 @@ def test_repository_case_does_not_import_parent_repository_workflow() -> None:
         )
         == []
     )
+
+
+def test_module_documentation_precedes_imports() -> None:
+    """A string after an import is not a module docstring, even if formatters accept it."""
+    misplaced: list[str] = []
+    for path in PACKAGE_ROOT.rglob("*.py"):
+        tree = ast.parse(path.read_text(), filename=str(path))
+        for index, node in enumerate(tree.body):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                break
+            if (
+                index > 0
+                and isinstance(node, ast.Expr)
+                and isinstance(node.value, ast.Constant)
+                and isinstance(node.value.value, str)
+                and any(
+                    isinstance(previous, (ast.Import, ast.ImportFrom))
+                    for previous in tree.body[:index]
+                )
+            ):
+                misplaced.append(f"{path.relative_to(PACKAGE_ROOT)}:{node.lineno}")
+    assert misplaced == []

@@ -1,8 +1,3 @@
-import os
-import re
-from pathlib import Path
-from typing import overload
-
 """Environment value helpers used as the configuration semantics layer.
 
 This module can bootstrap the agents-side `.env` file, then interpret values
@@ -12,6 +7,11 @@ with project-specific rules:
 - selected path values from `.env` are resolved relative to the `.env` file
   itself, not the process current working directory
 """
+
+import os
+import re
+from pathlib import Path
+from typing import overload
 
 _AGENTS_ENV_BOOTSTRAPPED = False
 # These `.env` path settings use config-file-relative semantics so they stay
