@@ -37,6 +37,21 @@ await test('extraction registration atomically stores its optional observation',
   const client = {
     query: (sql: string, parameters?: unknown[]) => {
       statements.push({ sql, ...(parameters ? { parameters } : {}) })
+      if (
+        sql.includes('select 1 from memory_revision_publications') &&
+        sql.includes('and tree_digest=$3')
+      )
+        return Promise.resolve({ rows: [{}], rowCount: 1 })
+      if (sql.includes('select digest from extraction_publications'))
+        return Promise.resolve({
+          rows: [{ digest: extractionTrajectory.digest }],
+          rowCount: 1,
+        })
+      if (
+        sql.includes('select 1 from memory_revision_publications') &&
+        sql.includes('and tree_digest=$3')
+      )
+        return Promise.resolve({ rows: [{}], rowCount: 1 })
       if (sql.includes('insert into extractions'))
         return Promise.resolve({ rows: [], rowCount: 1 })
       return Promise.resolve({ rows: [], rowCount: 1 })
@@ -64,7 +79,14 @@ await test('extraction registration atomically stores its optional observation',
 
   const operations = statements
     .map(({ sql }) => sql.trim())
-    .filter((sql) => sql !== 'begin' && sql !== 'commit')
+    .filter(
+      (sql) =>
+        sql !== 'begin' &&
+        sql !== 'commit' &&
+        !sql.includes('extraction_publications') &&
+        !sql.includes('memory_revision_publications') &&
+        !sql.includes('pg_advisory_xact_lock'),
+    )
   assert.match(operations[0] ?? '', /insert into extractions/)
   assert.match(operations[1] ?? '', /insert into observations/)
 })
@@ -72,6 +94,21 @@ await test('extraction registration atomically stores its optional observation',
 await test('extraction replay compares the optional observation as part of identity', async () => {
   const client = {
     query: (sql: string) => {
+      if (
+        sql.includes('select 1 from memory_revision_publications') &&
+        sql.includes('and tree_digest=$3')
+      )
+        return Promise.resolve({ rows: [{}], rowCount: 1 })
+      if (sql.includes('select digest from extraction_publications'))
+        return Promise.resolve({
+          rows: [{ digest: extractionTrajectory.digest }],
+          rowCount: 1,
+        })
+      if (
+        sql.includes('select 1 from memory_revision_publications') &&
+        sql.includes('and tree_digest=$3')
+      )
+        return Promise.resolve({ rows: [{}], rowCount: 1 })
       if (sql.includes('insert into extractions'))
         return Promise.resolve({ rows: [], rowCount: 0 })
       if (sql.includes('as identical'))
@@ -105,6 +142,11 @@ await test('maintenance commit records immutable history before moving the activ
   const client = {
     query: (sql: string, parameters?: unknown[]) => {
       statements.push({ sql, ...(parameters ? { parameters } : {}) })
+      if (
+        sql.includes('select 1 from memory_revision_publications') &&
+        sql.includes('and tree_digest=$3')
+      )
+        return Promise.resolve({ rows: [{}], rowCount: 1 })
       if (
         sql.includes(
           'select active_revision as revision from memory_tree_state',
@@ -150,7 +192,14 @@ await test('maintenance commit records immutable history before moving the activ
 
   const operations = statements
     .map(({ sql }) => sql.trim())
-    .filter((sql) => sql !== 'begin' && sql !== 'commit')
+    .filter(
+      (sql) =>
+        sql !== 'begin' &&
+        sql !== 'commit' &&
+        !sql.includes('extraction_publications') &&
+        !sql.includes('memory_revision_publications') &&
+        !sql.includes('pg_advisory_xact_lock'),
+    )
   assert.match(operations[0] ?? '', /maintenance_id/)
   assert.match(operations[1] ?? '', /maintenance_control/)
   assert.match(operations[2] ?? '', /memory_tree_state/)
@@ -159,13 +208,26 @@ await test('maintenance commit records immutable history before moving the activ
   assert.match(operations[5] ?? '', /insert into memory_tree_revisions/)
   assert.match(operations[6] ?? '', /set consumed_revision=/)
   assert.match(operations[7] ?? '', /update memory_tree_state/)
-  assert.deepEqual(statements[7]?.parameters, [4, ['extraction-1']])
-  assert.deepEqual(statements[8]?.parameters, [4])
+  assert.deepEqual(
+    statements.find(({ sql }) => sql.includes('set consumed_revision='))
+      ?.parameters,
+    [4, ['extraction-1']],
+  )
+  assert.deepEqual(
+    statements.find(({ sql }) => sql.includes('update memory_tree_state'))
+      ?.parameters,
+    [4],
+  )
 })
 
 await test('an identical maintenance id replays the created revision', async () => {
   const client = {
     query: (sql: string) => {
+      if (
+        sql.includes('select 1 from memory_revision_publications') &&
+        sql.includes('and tree_digest=$3')
+      )
+        return Promise.resolve({ rows: [{}], rowCount: 1 })
       if (sql.includes('revision.maintenance_id=$1')) {
         return Promise.resolve({
           rows: [{ revision: '4', identical: true }],
@@ -205,6 +267,11 @@ await test('paused control rejects a new maintenance commit before active CAS', 
   const statements: string[] = []
   const client = {
     query: (sql: string) => {
+      if (
+        sql.includes('select 1 from memory_revision_publications') &&
+        sql.includes('and tree_digest=$3')
+      )
+        return Promise.resolve({ rows: [{}], rowCount: 1 })
       statements.push(sql)
       if (sql.includes('select state from maintenance_control'))
         return Promise.resolve({ rows: [{ state: 'paused' }], rowCount: 1 })
@@ -245,6 +312,11 @@ await test('operator edit commits without consuming observations', async () => {
         sql,
         ...(parameters === undefined ? {} : { parameters }),
       })
+      if (
+        sql.includes('select 1 from memory_revision_publications') &&
+        sql.includes('and tree_digest=$3')
+      )
+        return Promise.resolve({ rows: [{}], rowCount: 1 })
       if (sql.includes('select active_revision as revision'))
         return Promise.resolve({ rows: [{ revision: '1' }], rowCount: 1 })
       if (sql.includes('coalesce(max(revision)'))
@@ -293,6 +365,11 @@ await test('operator operation id replays identical content and rejects drift', 
   let identical = true
   const client = {
     query: (sql: string) => {
+      if (
+        sql.includes('select 1 from memory_revision_publications') &&
+        sql.includes('and tree_digest=$3')
+      )
+        return Promise.resolve({ rows: [{}], rowCount: 1 })
       if (sql.includes('revision.operation_id=$1'))
         return Promise.resolve({
           rows: [{ revision: '5', identical }],
@@ -333,7 +410,17 @@ await test('restore moves the active pointer without creating a revision', async
   const statements: string[] = []
   const client = {
     query: (sql: string) => {
+      if (
+        sql.includes('select 1 from memory_revision_publications') &&
+        sql.includes('and tree_digest=$3')
+      )
+        return Promise.resolve({ rows: [{}], rowCount: 1 })
       statements.push(sql)
+      if (
+        sql.includes('select 1 from memory_revision_publications') &&
+        sql.includes('and tree_digest=$3')
+      )
+        return Promise.resolve({ rows: [{}], rowCount: 1 })
       if (sql.includes('select active_revision as revision'))
         return Promise.resolve({ rows: [{ revision: '4' }], rowCount: 1 })
       if (sql.includes('select 1 from memory_tree_revisions'))
@@ -689,6 +776,11 @@ await test('control replay precedes generation checks and returns stored result'
     connect: () =>
       Promise.resolve({
         query: (sql: string) => {
+          if (
+            sql.includes('select 1 from memory_revision_publications') &&
+            sql.includes('and tree_digest=$3')
+          )
+            return Promise.resolve({ rows: [{}], rowCount: 1 })
           statements.push(sql)
           if (sql.includes('from maintenance_control_operations'))
             return Promise.resolve({
@@ -739,6 +831,11 @@ await test('new control operation locks, checks, updates, and records the transi
     connect: () =>
       Promise.resolve({
         query: (sql: string) => {
+          if (
+            sql.includes('select 1 from memory_revision_publications') &&
+            sql.includes('and tree_digest=$3')
+          )
+            return Promise.resolve({ rows: [{}], rowCount: 1 })
           statements.push(sql)
           if (sql.includes('from maintenance_control_operations'))
             return Promise.resolve({ rows: [], rowCount: 0 })

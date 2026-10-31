@@ -191,6 +191,44 @@ components:
           type:
             - string
             - "null"
+    InputBundleReference:
+      type: object
+      additionalProperties: false
+      required: [uri, digest, media_type, size_bytes]
+      properties:
+        uri:
+          type: string
+          minLength: 1
+        digest:
+          type: string
+          pattern: "^sha256:[0-9a-f]{64}$"
+        media_type:
+          type: string
+          enum: [application/tar+zstd]
+        size_bytes:
+          type: integer
+          minimum: 0
+    InputBundleCandidate:
+      type: object
+      additionalProperties: false
+      required: [run_id, digest, reference, input, publish_context, status]
+      properties:
+        run_id:
+          type: string
+        digest:
+          type: string
+          pattern: "^sha256:[0-9a-f]{64}$"
+        reference:
+          $ref: "#/components/schemas/InputBundleReference"
+        input:
+          type: object
+          additionalProperties: {}
+        publish_context:
+          type: object
+          additionalProperties: {}
+        status:
+          type: string
+          enum: [reserved, present, selected, abandoned]
     PreparationWork:
       type: object
       additionalProperties: false
@@ -416,7 +454,7 @@ components:
         last_attempt_at:
           type:
             - string
-            - 'null'
+            - "null"
           format: date-time
           description: >-
             When the latest claim of this step started; null until the step is claimed once.
@@ -1055,15 +1093,40 @@ x-state-machines:
       - { from: uncertain, to: preparing, label: reclaim to confirm }
       # `disconnected` stops automation on a run whose own records contradict each other. What an
       # operator may do about it is the state's outgoing edges below, not part of its meaning.
-      - { from: preparing, to: disconnected, reason: EXECUTION_ALREADY_ADVANCED, label: cannot be concluded automatically }
+      - {
+          from: preparing,
+          to: disconnected,
+          reason: EXECUTION_ALREADY_ADVANCED,
+          label: cannot be concluded automatically,
+        }
       # Operator decisions can resume the preparation, give up on its outcome, or abandon the
       # contradicted run. Abandon writes EXECUTION_ALREADY_ADVANCED. PREPARATION_ABANDONED remains
       # declared because stored records may expose it, and every exposed reason must be named by
       # the contract. Both failure edges end the preparation as `failed`.
-      - { from: disconnected, to: uncertain, reason: PREPARATION_RESUMED_BY_OPERATOR, label: resumed by an operator }
-      - { from: disconnected, to: failed, reason: PREPARATION_GIVEN_UP_BY_OPERATOR, label: given up by an operator }
-      - { from: disconnected, to: failed, reason: EXECUTION_ALREADY_ADVANCED, label: abandoned by an operator }
-      - { from: disconnected, to: failed, reason: PREPARATION_ABANDONED, label: abandoned by an operator }
+      - {
+          from: disconnected,
+          to: uncertain,
+          reason: PREPARATION_RESUMED_BY_OPERATOR,
+          label: resumed by an operator,
+        }
+      - {
+          from: disconnected,
+          to: failed,
+          reason: PREPARATION_GIVEN_UP_BY_OPERATOR,
+          label: given up by an operator,
+        }
+      - {
+          from: disconnected,
+          to: failed,
+          reason: EXECUTION_ALREADY_ADVANCED,
+          label: abandoned by an operator,
+        }
+      - {
+          from: disconnected,
+          to: failed,
+          reason: PREPARATION_ABANDONED,
+          label: abandoned by an operator,
+        }
       # Two write paths reach `failed`: a preparer reporting a terminal error (any
       # connector-supplied failure code) and the lease expiring on the final allowed attempt.
       # Only the second one carries a reason code, so the edge is declared without one; a
@@ -1119,20 +1182,45 @@ x-state-machines:
       # could not be confirmed — never from a run that was already queued or running.
       - { from: pending, to: queued, label: input submitted }
       - { from: pending, to: skipped, label: preparation failed }
-      - { from: pending, to: uncertain, reason: SUBMISSION_STATE_UNCERTAIN, label: submission unconfirmed }
+      - {
+          from: pending,
+          to: uncertain,
+          reason: SUBMISSION_STATE_UNCERTAIN,
+          label: submission unconfirmed,
+        }
       # Taking the recovery claim is not a state change, but it is audited as a self-event so the
       # timeline shows when a replay started. The edge is declared because the log writes it.
-      - { from: uncertain, to: uncertain, reason: SUBMISSION_RECOVERY_CLAIMED, label: replay claimed }
+      - {
+          from: uncertain,
+          to: uncertain,
+          reason: SUBMISSION_RECOVERY_CLAIMED,
+          label: replay claimed,
+        }
       - { from: uncertain, to: queued, label: replay accepted }
       - { from: uncertain, to: failed, label: replay rejected }
-      - { from: uncertain, to: disconnected, reason: SUBMISSION_RECOVERY_EXHAUSTED, label: recovery disconnected }
+      - {
+          from: uncertain,
+          to: disconnected,
+          reason: SUBMISSION_RECOVERY_EXHAUSTED,
+          label: recovery disconnected,
+        }
       # The only way out of a disconnected recovery other than failing the run: an operator hands
       # it back with a fresh replay budget, so automatic replay can try to resolve it again.
-      - { from: disconnected, to: uncertain, reason: SUBMISSION_RECOVERY_RESUMED_BY_OPERATOR, label: resumed by an operator }
+      - {
+          from: disconnected,
+          to: uncertain,
+          reason: SUBMISSION_RECOVERY_RESUMED_BY_OPERATOR,
+          label: resumed by an operator,
+        }
       # Giving up does NOT claim the task never ran: the Execution API provider may have accepted it. It records
       # only that the outcome will not be waited for, so this axis ends as `failed` with a reason
       # that says so, and the publication is skipped because there is no result to deliver.
-      - { from: disconnected, to: failed, reason: SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR, label: given up by an operator }
+      - {
+          from: disconnected,
+          to: failed,
+          reason: SUBMISSION_RECOVERY_ABANDONED_BY_OPERATOR,
+          label: given up by an operator,
+        }
       # Observation (a read): the console learns the Execution API provider's progress by polling. A short task
       # can be observed as already finished on the first poll, so `queued` reaches `succeeded`
       # without ever being seen `running`.
@@ -1178,24 +1266,48 @@ x-state-machines:
       # The axis follows its steps: a step that may have taken effect makes the publication
       # uncertain, and a step whose reconciliation could not conclude makes it disconnected.
       - { from: publishing, to: uncertain, label: a step may have taken effect }
-      - { from: uncertain, to: publishing, label: step settled, publishing continues }
+      - {
+          from: uncertain,
+          to: publishing,
+          label: step settled,
+          publishing continues,
+        }
       # The axis follows its strongest step. A reconciliation that keeps failing (an outage, a
       # provider that answers 5xx every time) moves its step from `uncertain` to `disconnected`,
       # and the axis then reports that too — an operator queue must be able to find it without
       # walking every step. So `disconnected` is reachable only after at least one step was
       # `uncertain`; a publisher whose steps all settled cleanly never passes through it.
-      - { from: uncertain, to: disconnected, label: reconciliation could not conclude }
+      - {
+          from: uncertain,
+          to: disconnected,
+          label: reconciliation could not conclude,
+        }
       # An operator hands a parked publication back to the normal claim queue. No hidden owner is
       # created: the publisher that claims `pending` receives the token it needs to perform work.
-      - { from: disconnected, to: pending, reason: PUBLICATION_RESUMED_BY_OPERATOR, label: resumed by an operator }
+      - {
+          from: disconnected,
+          to: pending,
+          reason: PUBLICATION_RESUMED_BY_OPERATOR,
+          label: resumed by an operator,
+        }
       # Giving up stops publishing what remains. It cannot say nothing was published: a step in
       # this state may already have taken effect remotely, and the axis ends as `failed` rather
       # than `skipped` precisely so that no reader concludes the result was never delivered.
-      - { from: disconnected, to: failed, reason: PUBLICATION_ABANDONED_BY_OPERATOR, label: given up by an operator }
+      - {
+          from: disconnected,
+          to: failed,
+          reason: PUBLICATION_ABANDONED_BY_OPERATOR,
+          label: given up by an operator,
+        }
       - { from: publishing, to: published, label: published }
       # Re-claiming an expired lease is audited as a self-event; there is no state change, but the
       # log records that the previous owner's claim lapsed and a new one took over.
-      - { from: publishing, to: publishing, reason: PUBLICATION_LEASE_EXPIRED, label: publishing lease expired }
+      - {
+          from: publishing,
+          to: publishing,
+          reason: PUBLICATION_LEASE_EXPIRED,
+          label: publishing lease expired,
+        }
       - { from: publishing, to: pending, label: retryable failure }
       - { from: publishing, to: failed, label: terminal failure }
       - { from: pending, to: skipped, label: execution not published }
@@ -1203,7 +1315,12 @@ x-state-machines:
       # unusable, so the execution-failure paths converge it from `publishing` as well as from
       # `pending`. Without this edge that row would stay `publishing` with no writer able to
       # move it.
-      - { from: publishing, to: skipped, reason: PUBLICATION_ABANDONED, label: execution failed }
+      - {
+          from: publishing,
+          to: skipped,
+          reason: PUBLICATION_ABANDONED,
+          label: execution failed,
+        }
 paths:
   /healthz:
     get:
@@ -2726,5 +2843,141 @@ paths:
                 type: integer
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/input-bundle-candidates:
+    post:
+      operationId: reserveInputBundleCandidate
+      description: Reserve an immutable prepared publication intent before publishing bytes.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The admitted run identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token, reference, input, publish_context]
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                reference:
+                  $ref: "#/components/schemas/InputBundleReference"
+                input:
+                  type: object
+                  additionalProperties: {}
+                publish_context:
+                  type: object
+                  additionalProperties: {}
+      responses:
+        "200":
+          description: Publication intent state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InputBundleCandidate"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/input-bundle-candidates/reconcile:
+    post:
+      operationId: listInputBundleCandidates
+      description: Read unfinished publication intents under the active preparation claim before rebuilding input.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The admitted run identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token]
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+      responses:
+        "200":
+          description: Publication intent state.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InputBundleCandidate"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
+        "500":
+          $ref: "#/components/responses/InternalError"
+  /v1/runs/{runId}/input-bundle-candidates/settle:
+    post:
+      operationId: settleInputBundleCandidate
+      description: Confirm matching publication or abandon an unused publication intent under the current claim.
+      security:
+        - serviceToken: []
+      parameters:
+        - in: path
+          name: runId
+          required: true
+          description: The admitted run identifier.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [token, digest, status]
+              properties:
+                token:
+                  type: string
+                  minLength: 1
+                digest:
+                  type: string
+                  pattern: "^sha256:[0-9a-f]{64}$"
+                status:
+                  type: string
+                  enum: [present, abandoned]
+      responses:
+        "200":
+          description: Publication intent state.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InputBundleCandidate"
+        "400":
+          $ref: "#/components/responses/InvalidRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
+          $ref: "#/components/responses/PayloadTooLarge"
         "500":
           $ref: "#/components/responses/InternalError"

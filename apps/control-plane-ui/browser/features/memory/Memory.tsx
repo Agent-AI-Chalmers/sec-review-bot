@@ -74,6 +74,14 @@ export function Memory(): React.JSX.Element {
   const [initialFiles, setInitialFiles] = React.useState<
     Record<string, string>
   >({})
+  const editAttempt = React.useRef<
+    | {
+        content: string
+        operation_id: string
+        expected_active_revision: number
+      }
+    | undefined
+  >(undefined)
   const [editOpen, setEditOpen] = React.useState(false)
   const [restoreRevision, setRestoreRevision] = React.useState<number>()
   const [viewRevision, setViewRevision] = React.useState<number>()
@@ -157,6 +165,7 @@ export function Memory(): React.JSX.Element {
   }
   const beginEdit = async (): Promise<void> => {
     if (activeRevision === undefined) return
+    editAttempt.current = undefined
     if (activeRevision === 0) {
       const initial = { 'MEMORY.md': '# Security Review Experience Memory\n' }
       setFiles(initial)
@@ -181,9 +190,19 @@ export function Memory(): React.JSX.Element {
     setBusy(true)
     setError('')
     try {
+      const content = JSON.stringify(
+        Object.entries(files).sort(([a], [b]) => a.localeCompare(b))
+      )
+      if (editAttempt.current?.content !== content) {
+        editAttempt.current = {
+          content,
+          operation_id: operationId(),
+          expected_active_revision: activeRevision
+        }
+      }
       await apiPost('/memory/edit', {
-        operation_id: operationId(),
-        expected_active_revision: activeRevision,
+        operation_id: editAttempt.current.operation_id,
+        expected_active_revision: editAttempt.current.expected_active_revision,
         files
       })
       setEditOpen(false)

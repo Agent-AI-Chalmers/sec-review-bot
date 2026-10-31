@@ -25,7 +25,7 @@ import {
   type ChangedFileRecord
 } from './incremental-artifacts.js'
 import {
-  archiveInputBundleAndPublish,
+  archiveInputBundleAndBuildInput,
   buildGitRemoteUrl,
   createInputBundleRoot,
   ensureCleanDirectory,
@@ -272,44 +272,43 @@ export async function prepareRepositoryReviewInput({
       : { changed_file_count: changedFilesForScanScope.length })
   })
 
-  // The bundle is published only after the input that references it fits, so a failure here
-  // cannot leave an unreferenced immutable bundle behind.
-  const { input } = await archiveInputBundleAndPublish<RepositoryReviewInput>({
-    input_bundle_root,
-    include_incremental_window: resolvedScanMode === 'incremental',
-    run_id,
-    workflow: 'repository review',
-    build_input: (
-      reference: InputBundleArtifactRef
-    ): RepositoryReviewInput => ({
-      api_version: EXECUTION_API_VERSION,
-      input_bundle: reference,
-      review_intent: {
-        objective: 'audit',
-        ...(test_changes ? { test_changes } : {})
-      },
-      scan_target: {
-        target_branch: targetBranchForResolution,
-        default_branch: trusted_default_branch.default_branch,
-        event_type,
-        scan_mode: resolvedScanMode,
-        base_sha: resolvedBaseSha,
-        head_sha: resolvedHeadSha,
-        commit_shas: commitShasForScanTarget
-      },
-      scan_scope: {
-        paths_ignore: Array.isArray(paths_ignore) ? paths_ignore : [],
-        incremental_changed_files: Array.isArray(changedFilesForScanScope)
-          ? changedFilesForScanScope.map((item) => ({
-              path: item.path,
-              status: item.status,
-              previous_path: item.previous_path
-            }))
-          : []
-      },
-      ...(setup_declaration ? { setup_declaration } : {})
+  // The claim-owning command registers and publishes this input bundle after preparation.
+  const { input } =
+    await archiveInputBundleAndBuildInput<RepositoryReviewInput>({
+      input_bundle_root,
+      include_incremental_window: resolvedScanMode === 'incremental',
+      workflow: 'repository review',
+      build_input: (
+        reference: InputBundleArtifactRef
+      ): RepositoryReviewInput => ({
+        api_version: EXECUTION_API_VERSION,
+        input_bundle: reference,
+        review_intent: {
+          objective: 'audit',
+          ...(test_changes ? { test_changes } : {})
+        },
+        scan_target: {
+          target_branch: targetBranchForResolution,
+          default_branch: trusted_default_branch.default_branch,
+          event_type,
+          scan_mode: resolvedScanMode,
+          base_sha: resolvedBaseSha,
+          head_sha: resolvedHeadSha,
+          commit_shas: commitShasForScanTarget
+        },
+        scan_scope: {
+          paths_ignore: Array.isArray(paths_ignore) ? paths_ignore : [],
+          incremental_changed_files: Array.isArray(changedFilesForScanScope)
+            ? changedFilesForScanScope.map((item) => ({
+                path: item.path,
+                status: item.status,
+                previous_path: item.previous_path
+              }))
+            : []
+        },
+        ...(setup_declaration ? { setup_declaration } : {})
+      })
     })
-  })
 
   const input_path = path.join(
     input_bundle_root,

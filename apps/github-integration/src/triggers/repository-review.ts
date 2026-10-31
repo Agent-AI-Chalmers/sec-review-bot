@@ -1,3 +1,8 @@
+import {
+  publishAndSubmitInputBundle,
+  recoverInputBundlePublication,
+  type InputBundlePublicationStore
+} from '../artifacts/input-bundle-publication.js'
 // Accepts repository-dispatch reviews, validates their local contract, and
 // prepares a durable Execution submission under a fenced preparation claim.
 import type { App } from 'octokit'
@@ -218,7 +223,7 @@ interface DispatchRepositoryReviewCommandDeps {
   getInstallationOctokit: (repo_full_name: string) => Promise<Octokit>
   resolve_dispatch: typeof resolveRepositoryReviewDispatch
   submit_run: typeof startRepositoryReviewRun
-  store: {
+  store: InputBundlePublicationStore & {
     admitReviewRun: (
       ...args: Parameters<typeof reviewRunsClient.admitReviewRun>
     ) =>
@@ -312,6 +317,10 @@ export async function dispatchRepositoryReview({
   let octokit: Octokit
   let resolved: Awaited<ReturnType<typeof resolveRepositoryReviewDispatch>>
   try {
+    if (await recoverInputBundlePublication(store, run_id, preparationToken)) {
+      await heartbeat.stop()
+      return { run_id, replayed: false }
+    }
     octokit = await getInstallationOctokit(repo_full_name)
     resolved = await resolve_dispatch({ octokit, payload })
   } catch (error) {
@@ -320,7 +329,11 @@ export async function dispatchRepositoryReview({
       preparationAttempt,
       error instanceof RepositoryReviewDispatchValidationError
     )
-    if (await heartbeat.stop()) {
+    if (
+      (await heartbeat.stop()) &&
+      !(error instanceof ReviewRunsSubmissionError) &&
+      !(error instanceof PreparationClaimLostError)
+    ) {
       await store.failPreparation(
         run_id,
         preparationToken,
@@ -352,7 +365,8 @@ export async function dispatchRepositoryReview({
         // Confirm the lease immediately before crossing the durable submission
         // boundary; the submission itself remains token-fenced by Review Runs.
         await heartbeat.assertOwned()
-        await store.submitPreparedRun(
+        await publishAndSubmitInputBundle(
+          store,
           run_id,
           preparationToken,
           repositoryReviewPublishContext(prepared),

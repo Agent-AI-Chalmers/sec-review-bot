@@ -150,6 +150,16 @@ test('memory edit creates a revision while restore only moves the pointer', asyn
       201
     )
     assert.strictEqual(uploads, 1)
+    assert.deepStrictEqual(
+      requests.map(({ path }) => path),
+      [
+        '/v1/memory-tree/revisions/publications/reserve',
+        '/v1/memory-tree/revisions/publications/confirm',
+        '/v1/memory-tree/revisions'
+      ]
+    )
+    assert.deepStrictEqual(requests[0]!.body, requests[1]!.body)
+    assert.deepStrictEqual(requests[0]!.body, requests[2]!.body)
     const editSource = requests[0]!.body.source as Record<string, unknown>
     assert.strictEqual(editSource.actor, undefined)
     assert.strictEqual(editSource.operation_id, 'edit-1')
@@ -169,8 +179,8 @@ test('memory edit creates a revision while restore only moves the pointer', asyn
       201
     )
     assert.strictEqual(uploads, 1, 'restore must not publish another object')
-    assert.strictEqual(requests[1]!.path, '/v1/memory-tree/restore')
-    assert.deepStrictEqual(requests[1]!.body, {
+    assert.strictEqual(requests[3]!.path, '/v1/memory-tree/restore')
+    assert.deepStrictEqual(requests[3]!.body, {
       operation_id: 'restore-1',
       expected_active_revision: 3,
       restored_revision: 1

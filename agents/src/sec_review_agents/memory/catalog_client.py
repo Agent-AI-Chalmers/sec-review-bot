@@ -101,6 +101,42 @@ class MemoryCatalogClient:
             raise RuntimeError("Memory catalog returned a non-object response.")
         return value
 
+    def list_extraction_publications(self, extraction_id: str) -> list[dict[str, Any]]:
+        value = self._request(
+            "GET",
+            f"{_API_ROOT}/extractions/publications/{quote(extraction_id, safe='')}",
+        )
+        publications = value.get("publications")
+        if not isinstance(publications, list):
+            raise RuntimeError("Invalid extraction publication list.")
+        return publications
+
+    def reserve_extraction_publication(self, intent: dict[str, Any]) -> None:
+        self._request("POST", f"{_API_ROOT}/extractions/publications/reserve", intent)
+
+    def confirm_extraction_publication(self, intent: dict[str, Any]) -> None:
+        self._request("POST", f"{_API_ROOT}/extractions/publications/confirm", intent)
+
+    def list_revision_publications(self, maintenance_id: str) -> list[dict[str, Any]]:
+        value = self._request(
+            "GET",
+            f"{_API_ROOT}/memory-tree/revisions/publications/maintenance/{quote(maintenance_id, safe='')}",
+        )
+        publications = value.get("publications")
+        if not isinstance(publications, list):
+            raise RuntimeError("Invalid revision publication list.")
+        return publications
+
+    def reserve_revision_publication(self, intent: dict[str, Any]) -> None:
+        self._request(
+            "POST", f"{_API_ROOT}/memory-tree/revisions/publications/reserve", intent
+        )
+
+    def confirm_revision_publication(self, intent: dict[str, Any]) -> None:
+        self._request(
+            "POST", f"{_API_ROOT}/memory-tree/revisions/publications/confirm", intent
+        )
+
     def register_extraction(
         self,
         *,

@@ -125,3 +125,5 @@ BFF 还负责代理下载私有 RustFS 中的终态 artifact。它使用单独�
 设置 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_OPERATOR_TOKEN` 后启用 memory 管理。BFF 会从 Catalog JSON 中移除存储 URI，自行读取 artifact，并在返回内容或下载前校验 size 和 SHA-256 digest。
 
 经过认证的 control plane 可以暂停或恢复 maintenance、编辑 active memory tree，以及恢复已有 revision。BFF 在服务端确定 actor identity，并使用 expected active revision 和 control generation 的 compare-and-swap。其 S3 identity 只能在 `memory/trees/*` 下创建不可变对象；run artifact 和 memory 相关执行轨迹仍然只读。编辑或恢复失败后不会自动恢复 maintenance。
+
+Memory edit 会在 BFF 上传 tree 前向 Catalog 预留完整 revision intent，完成不可变上传后确认，再提交 revision。编辑器保持打开且内容未变化时，重试会复用 operation ID 和最初的 expected revision，包括响应丢失的情况。关闭或重新加载编辑器会开始新的编辑操作。并发的相同 S3 上传会验证并复用已成功写入的对象。

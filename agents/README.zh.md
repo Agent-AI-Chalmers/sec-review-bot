@@ -123,7 +123,10 @@ flowchart LR
     direct --> execution
 ```
 
-外部 TypeScript Gateway 接收 HTTP run 请求，并通过 Temporal client 启动和查询 workflow；它不执行 agent。Temporal Server 持久化 workflow 状态，并通过独立的 worker 和 task queue 分发 review、memory extraction 与 memory maintenance 工作。Direct local execution 绕过 HTTP service 和 Temporal，但会复用 activity functions；`run-local-* --temporal` 绕过 HTTP service，但会经过 Temporal Server 和 Execution Worker。
+外部 TypeScript Gateway 接收 HTTP run 请求，并通过 Temporal client 启动和查询 workflow。Temporal Server 持久化 workflow 状态，并通过 task queue 将 review 工作分发给 Execution Worker。
+
+- Direct local execution 绕过 HTTP service 和 Temporal，但会复用 activity functions。
+- `run-local-* --temporal` 绕过 HTTP service，但会经过 Temporal Server 和 Execution Worker。
 
 ## 本地运行
 
@@ -144,8 +147,6 @@ flowchart LR
 | 手动启动 Service 和 Worker | S3 兼容存储中的 diagnostic bundle | 使用生产 workflow 行为 |
 
 ### `run-local-*` 命令
-
-`run-local-*` 命令通过 `cli/local_materialization/` 准备 workspace snapshot、history 和 incremental window，再复用生产 workflow input preparation 边界派生 artifacts 目录。默认使用 direct local execution，不需要 HTTP service 或 Temporal。
 
 安装依赖后，可以使用以下命令：
 
@@ -219,44 +220,29 @@ sec-review-agents-run-local-repository \
 
 只有需要调试内部 Temporal workflow / activity 编排时，才使用 `--temporal`。
 
-显式传 `--temporal` 时，同一个本地命令仍然在开发机上准备输入，但后续 workflow stages 会通过 Temporal workflow / activity 调度执行。这个模式适合调试 workflow 编排、retry、activity 边界或 Temporal 中可见的状态。它仍然绕过 HTTP Execution Gateway，因此不等同于完整 service path。
+显式传 `--temporal` 时，同一个本地命令仍然在开发机上准备输入，但后续 workflow stages 会通过 Temporal workflow / activity 调度执行。这个模式适合调试 workflow 编排、retry、activity 边界或 Temporal 中可见的状态。
 
-本地 Temporal 执行会把 run diagnostic bundle 保存在本地文件系统中，并通过经过校验的 `file://` 引用在 Execution Worker 与 Memory Extraction Worker 之间传递。因此，这两个 worker 必须共享该 artifact 文件系统，并以相同的绝对路径访问它。
-
-运行 `--temporal` local command 前，先启动本地 Temporal dev server：
-
-```bash
-temporal server start-dev --ip 127.0.0.1 --port 7233
-```
-
-然后另开一个 terminal，把 Execution Worker 作为宿主机进程启动：
-
-```bash
-cd agents
-cp .env.sample .env
-cp config/model-providers.sample.toml config/model-providers.toml
-# 填好 .env 和 config/model-providers.toml
-
-set -a
-. .env
-set +a
-
-TEMPORAL_ADDRESS=127.0.0.1:7233 \
-TEMPORAL_NAMESPACE=default \
-TEMPORAL_EXECUTION_TASK_QUEUE=sec-review-execution \
-sec-review-execution-worker
-```
+按[手动启动 Workers](#手动启动-workers)中的步骤启动 Temporal Server 和 Execution Worker，再为 `run-local-*` 命令添加 `--temporal`。
 
 ### 手动启动 Workers
 
-分别启动 Temporal 和各个 worker 进程。
+运行 review 需要 Temporal Server 和 Execution Worker。启用 memory processing 时，先按 [Memory](#memory) 小节配置依赖，再启动 Memory Extraction 和 Memory Maintenance workers。
 
-最小本地启动形状：
+先按[模型配置](#llm-配置)准备 `agents/.env` 和 `agents/config/model-providers.toml`。在每个 worker 终端中，先加载环境变量，再执行对应的启动命令：
+
+```bash
+cd agents
+set -a
+source .env
+set +a
+```
+
+在不同终端中分别启动 Temporal 和 workers：
 
 终端 1，Temporal Server：
 
 ```bash
-temporal server start-dev
+temporal server start-dev --ip 127.0.0.1 --port 7233
 ```
 
 终端 2，Execution Worker：
@@ -297,6 +283,15 @@ Agent 可以声明自己需要的 skills。worker 启动 agent 时会自动准�
 
 Memory 依赖 Temporal、使用 PostgreSQL 的 Memory Catalog，以及 S3 兼容对象存储。
 
+首次使用建议先阅读 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)，了解 memory 的基本概念和工作流程。
+
+| 变量 | 用途 |
+| --- | --- |
+| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 的基础 URL。未配置时，review agent 不加载 memory，memory processing 也无法运行。 |
+| `AGENT_MEMORY_CATALOG_TOKEN` | Memory Catalog extraction 和自动 maintenance 使用的 worker bearer token。配置 `AGENT_MEMORY_CATALOG_URL` 时必须同时配置。 |
+| `AGENT_MEMORY_CONSUMPTION_ENABLED` | 是否让 review agent 加载 active memory tree。默认为 `true`。 |
+| `AGENT_MEMORY_PROCESSING_ENABLED` | 是否运行 extraction 和 maintenance activities。默认为 `true`。 |
+
 本地 Memory 开发由 Compose 运行基础设施，各个 worker 则作为宿主机进程运行。
 
 > [!WARNING]
@@ -331,14 +326,9 @@ uv run sec-review-agents-memory dev-workers \
 
 launcher 会将不同的对象存储身份传给对应 worker，将 Memory Maintenance Worker 的 activity concurrency 保持为 `1`，并在任一 worker 退出或收到 `SIGINT`/`SIGTERM` 时停止整个 worker 组。它不负责启动或停止 Compose services。
 
-| 变量 | 用途 |
-| --- | --- |
-| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 的基础 URL。未配置时，review agent 不加载 memory，memory processing 也无法运行。 |
-| `AGENT_MEMORY_CATALOG_TOKEN` | Memory Catalog extraction 和自动 maintenance 使用的 worker bearer token。配置 `AGENT_MEMORY_CATALOG_URL` 时必须同时配置。 |
-| `AGENT_MEMORY_CONSUMPTION_ENABLED` | 是否让 review agent 加载 active memory tree。默认为 `true`。 |
-| `AGENT_MEMORY_PROCESSING_ENABLED` | 是否运行 extraction 和 maintenance activities。默认为 `true`。 |
+本地 Temporal 模式启用 memory processing 时，Memory Extraction Worker 会从本地文件系统读取 Execution Worker 生成的 diagnostic bundle，因此两个 worker 必须能访问同一个文件路径。提取结果仍通过 Memory Catalog 保存 observations 和产物引用，通过 S3 兼容存储保存 extractor 的执行轨迹。
 
-每次 review invocation 都会在临时目录中物化 active memory tree，并在结束后删除。架构和生命周期见 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)。
+每次 review invocation 都会在临时目录中物化 active memory tree，并在结束后删除。
 
 - `sec-review-agents-memory maintain`：请求 Temporal Server 启动一次 memory maintenance workflow。
 - `sec-review-agents-memory schedules maintenance ensure`：在 Temporal Server 中创建或更新周期性 maintenance schedule。
@@ -356,11 +346,11 @@ launcher 会将不同的对象存储身份传给对应 worker，将 Memory Maint
 
 没有任何取值可以选择本地 filesystem backend。它没有 shell，把它交给审查代码的 stage，等于悄悄让那一步无法执行任何命令。不需要 shell 的 stage 会自行选择它，因此这不是部署配置。
 
-benchmark 和本地调试可以设置 `runtime.workspace_image`，指定承载目标代码库的隔离容器镜像。
+使用 Docker sandbox 时，可通过 `AGENT_DOCKER_IMAGE` 设置默认的 workspace 容器镜像。
 
 ### Workspace 工具
 
-可选的 workspace tools 镜像在 Docker sandbox 中安装了 Joern、CodeGraph、Playwright 和 Chromium。构建镜像，并在本地运行时选用它：
+可选的 workspace tools 镜像在 Docker sandbox 中安装了 [Joern](https://joern.io/)、[CodeGraph](https://github.com/colbymchenry/codegraph)、[Playwright](https://playwright.dev/) 和 [Chromium](https://www.chromium.org/)。构建镜像，并在本地运行时选用它：
 
 ```bash
 docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
@@ -369,7 +359,9 @@ export AGENT_JOERN_ENABLED=true
 export AGENT_PLAYWRIGHT_ENABLED=true
 ```
 
-Joern 和 Playwright 计划通过 bash 和各自的 CLI 使用。现有 CodeGraph 和 Playwright MCP 集成仍然可用，但默认关闭；需要时显式开启：
+本项目计划通过 bash 和各自的 CLI 使用 Joern 和 Playwright。
+
+现有 CodeGraph 和 Playwright MCP 集成仍然可用，但默认关闭；需要时显式开启：
 
 ```bash
 export AGENT_MCP_ENABLED=true

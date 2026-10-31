@@ -5,6 +5,16 @@
       "Effect": "Allow",
       "Action": ["s3:GetObject", "s3:PutObject"],
       "Resource": ["arn:aws:s3:::sec-review/runs/*/input/*"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": ["arn:aws:s3:::sec-review"],
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": ["runs/*/input/*"]
+        }
+      }
     }
   ]
 }

@@ -143,6 +143,8 @@ def _materialize_input_bundle(
     if media_type != INPUT_BUNDLE_MEDIA_TYPE:
         raise ValueError("Execution input input_bundle.media_type is unsupported.")
 
+    if not isinstance(digest, str):
+        raise ValueError("Execution input input_bundle.digest must be a string.")
     parsed = parse_artifact_uri(uri)
     if parsed.scheme == "file":
         if (
@@ -163,16 +165,18 @@ def _materialize_input_bundle(
                     f"{INPUT_BUNDLE_ROOT_ENV}."
                 ) from error
     elif parsed.scheme == "s3":
+        expected_key = (
+            f"runs/{expected_run_id}/input/{digest.removeprefix('sha256:')}"
+            "/input-bundle.v1.tar.zst"
+            if expected_run_id is not None
+            else None
+        )
         resolved_archive = download_s3_object(
             uri,
             destination.with_suffix(".tar.zst"),
             expected_size=size_bytes,
             maximum_size=MAX_INPUT_BUNDLE_BYTES,
-            expected_key=(
-                f"runs/{expected_run_id}/input/input-bundle.v1.tar.zst"
-                if expected_run_id is not None
-                else None
-            ),
+            expected_key=expected_key,
         ).resolve()
     else:
         raise ValueError(f"Unsupported input_bundle URI scheme: {parsed.scheme}")

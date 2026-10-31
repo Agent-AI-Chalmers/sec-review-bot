@@ -77,8 +77,9 @@ export class PreparationStore {
   async renewClaim(runId: string, token: string): Promise<boolean> {
     const result = await this.pool.query(
       `UPDATE preparations SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
-       WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3`,
-      [runId, this.connectorId, token]
+       WHERE run_id=$1 AND connector_id=$2 AND status='preparing' AND claim_token=$3
+         AND claimed_at > clock_timestamp()-($4*interval '1 millisecond')`,
+      [runId, this.connectorId, token, this.claimTimeoutMs]
     )
     return result.rowCount === 1
   }

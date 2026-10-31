@@ -110,9 +110,60 @@ export async function registerMemoryCatalogRoutes(
     if (role === undefined || !allowedRoles.includes(role)) throw unauthorized()
     authenticatedRoles.set(request, role)
   }
+  const authenticatedRevisionInput = (
+    request: FastifyRequest,
+  ): AuthenticatedMemoryTreeRevisionCreation => {
+    const input = request.body as RequestBody<'createMemoryTreeRevision'>
+    if (
+      (input.source.kind === 'maintenance' &&
+        authenticatedRoles.get(request) !== 'worker') ||
+      (input.source.kind === 'operator' &&
+        authenticatedRoles.get(request) !== 'operator')
+    )
+      throw unauthorized()
+    return input.source.kind === 'operator'
+      ? { ...input, source: { ...input.source, actor: operatorActor } }
+      : { ...input, source: input.source }
+  }
   await app.register(openapiGlue, {
     specification: specPath(),
     serviceHandlers: {
+      reserveExtractionPublication: async (request: FastifyRequest) =>
+        await store.reserveExtractionPublication(
+          request.body as RequestBody<'reserveExtractionPublication'>,
+        ),
+      confirmExtractionPublication: async (request: FastifyRequest) =>
+        await store.confirmExtractionPublication(
+          request.body as RequestBody<'confirmExtractionPublication'>,
+        ),
+      listExtractionPublications: async (request: FastifyRequest) => ({
+        publications: await store.listExtractionPublications(
+          (request.params as PathParameters<'listExtractionPublications'>)
+            .extraction_id,
+        ),
+      }),
+      reserveRevisionPublication: async (request: FastifyRequest) =>
+        await store.reserveRevisionPublication(
+          authenticatedRevisionInput(request),
+        ),
+      confirmRevisionPublication: async (request: FastifyRequest) =>
+        await store.confirmRevisionPublication(
+          authenticatedRevisionInput(request),
+        ),
+      listRevisionPublications: async (request: FastifyRequest) => {
+        const { kind, owner_id } =
+          request.params as PathParameters<'listRevisionPublications'>
+        if (
+          (kind === 'maintenance' &&
+            authenticatedRoles.get(request) !== 'worker') ||
+          (kind === 'operator' &&
+            authenticatedRoles.get(request) !== 'operator')
+        )
+          throw unauthorized()
+        return {
+          publications: await store.listRevisionPublications(kind, owner_id),
+        }
+      },
       health: () => ({ status: 'ok' }),
       registerExtraction: async (request: FastifyRequest) => ({
         ok: true,
@@ -191,24 +242,9 @@ export async function registerMemoryCatalogRoutes(
         request: FastifyRequest,
         reply: FastifyReply,
       ) => {
-        const input = request.body as RequestBody<'createMemoryTreeRevision'>
-        const role = authenticatedRoles.get(request)
-        if (
-          (input.source.kind === 'maintenance' && role !== 'worker') ||
-          (input.source.kind === 'operator' && role !== 'operator')
+        const result = await store.createMemoryTreeRevision(
+          authenticatedRevisionInput(request),
         )
-          throw unauthorized()
-        const authenticatedInput: AuthenticatedMemoryTreeRevisionCreation =
-          input.source.kind === 'operator'
-            ? {
-                ...input,
-                source: { ...input.source, actor: operatorActor },
-              }
-            : {
-                ...input,
-                source: input.source,
-              }
-        const result = await store.createMemoryTreeRevision(authenticatedInput)
         if (result.created) {
           void reply.header(
             'Location',

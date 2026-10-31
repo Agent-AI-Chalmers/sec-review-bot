@@ -228,7 +228,7 @@ async def test_prepare_extraction_returns_complete_serializable_payload(
         AsyncMock(return_value=preview),
     )
     monkeypatch.setattr(
-        "sec_review_agents.memory.trajectory_artifact.publish_memory_agent_trajectory",
+        "sec_review_agents.memory.trajectory_artifact.build_memory_agent_trajectory",
         lambda **_kwargs: extraction_trajectory,
     )
     request = MemoryExtractionRequest(
@@ -239,6 +239,20 @@ async def test_prepare_extraction_returns_complete_serializable_payload(
         timeout_seconds=30,
     )
 
+    catalog = Mock()
+    catalog.list_extraction_publications.return_value = []
+    monkeypatch.setattr(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        lambda: catalog,
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.artifacts.s3_adapter.planned_s3_artifact",
+        lambda reference, **_: reference,
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.artifacts.s3_adapter.publish_immutable_s3_artifact",
+        lambda *_, **__: extraction_trajectory,
+    )
     result = await prepare_memory_extraction(request)
 
     assert result == MemoryExtractionRegistrationPayload(

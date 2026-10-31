@@ -1,22 +1,28 @@
 import {
   HeadObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client
 } from '@aws-sdk/client-s3'
+import { createHash } from 'node:crypto'
+import fs from 'node:fs/promises'
+import { pipeline } from 'node:stream/promises'
 import { createReadStream } from 'fs'
-import { fileURLToPath } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
+import path from 'node:path'
 
 import {
   artifact_s3_addressing_style,
   artifact_s3_bucket,
   artifact_s3_endpoint,
   artifact_s3_region,
-  artifact_store
+  artifact_store,
+  input_bundle_staging_root
 } from '../config.js'
 import type { InputBundleArtifactRef } from '../execution/input.js'
 
-function inputObjectKey(runId: string): string {
-  return `runs/${runId}/input/input-bundle.v1.tar.zst`
+function inputObjectKey(runId: string, digest: string): string {
+  return `runs/${runId}/input/${digest.replace(/^sha256:/, '')}/input-bundle.v1.tar.zst`
 }
 
 function configuredClient(): S3Client {
@@ -62,7 +68,13 @@ async function existingObjectMatches(
         ? (error as { $metadata?: { httpStatusCode?: number } }).$metadata
             ?.httpStatusCode
         : undefined
-    if (status === 404) return undefined
+    if (status === 403 || status === 404) {
+      // A narrowly scoped LIST can establish absence even when HEAD returns 403.
+      const listed = await client.send(
+        new ListObjectsV2Command({ Bucket: bucket, Prefix: key, MaxKeys: 1 })
+      )
+      if (!listed.Contents?.some((item) => item.Key === key)) return undefined
+    }
     throw error
   }
 }
@@ -70,7 +82,7 @@ async function existingObjectMatches(
 /**
  * The reference a local bundle will have once published.
  *
- * The bucket and key are known before the upload, so a caller can build and size the workflow
+ * The final S3 key or local run/digest path is known before publication, so a caller can build and size the workflow
  * input against the URI that will actually be submitted, and refuse an oversized input before
  * anything is written to object storage.
  */
@@ -78,8 +90,23 @@ export function publishedInputBundleReference(
   reference: InputBundleArtifactRef,
   runId: string
 ): InputBundleArtifactRef {
-  if (artifact_store === 'file') return reference
-  const key = inputObjectKey(runId)
+  if (artifact_store === 'file') {
+    if (
+      !/^[A-Za-z0-9_-]+$/.test(runId) ||
+      !/^sha256:[0-9a-f]{64}$/.test(reference.digest)
+    )
+      throw new Error('Invalid input bundle publication identity.')
+    return {
+      ...reference,
+      uri: pathToFileURL(
+        path.join(
+          input_bundle_staging_root,
+          inputObjectKey(runId, reference.digest)
+        )
+      ).href
+    }
+  }
+  const key = inputObjectKey(runId, reference.digest)
   return { ...reference, uri: `s3://${artifact_s3_bucket}/${key}` }
 }
 
@@ -87,7 +114,45 @@ export async function publishInputBundle(
   reference: InputBundleArtifactRef,
   runId: string
 ): Promise<InputBundleArtifactRef> {
-  if (artifact_store === 'file') return reference
+  if (artifact_store === 'file') {
+    const published = publishedInputBundleReference(reference, runId)
+    if (await inputBundleExists(published)) return published
+    const source = fileURLToPath(reference.uri)
+    const destination = fileURLToPath(published.uri)
+    await fs.mkdir(path.dirname(destination), { recursive: true })
+    const temporary = await fs.mkdtemp(
+      path.join(path.dirname(destination), '.publish-')
+    )
+    try {
+      const staged = path.join(temporary, 'bundle')
+      await fs.copyFile(source, staged)
+      if (
+        !(await inputBundleExists({
+          ...reference,
+          uri: pathToFileURL(staged).href
+        }))
+      )
+        throw new Error('Local input bundle publication source is missing.')
+      // Link only the complete verified copy. Unlike rename, link cannot replace
+      // a concurrent winner. Attempts remove only their own temporary directory.
+      try {
+        await fs.link(staged, destination)
+      } catch (error) {
+        if (!(
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === 'EEXIST'
+        ))
+          throw error
+      }
+      if (!(await inputBundleExists(published)))
+        throw new Error('Published local input bundle is missing.')
+      return published
+    } finally {
+      await fs.rm(temporary, { recursive: true, force: true })
+    }
+  }
   if (!artifact_s3_bucket) {
     throw new Error(
       'SEC_REVIEW_ARTIFACT_S3_BUCKET is required for the S3 artifact store.'
@@ -98,7 +163,7 @@ export async function publishInputBundle(
   if (source.protocol !== 'file:') {
     throw new Error('Input bundle publication requires a local file reference.')
   }
-  const key = inputObjectKey(runId)
+  const key = inputObjectKey(runId, reference.digest)
   const client = configuredClient()
   const existing = await existingObjectMatches(
     client,
@@ -149,4 +214,45 @@ export async function publishInputBundle(
     }
   }
   return { ...reference, uri: `s3://${artifact_s3_bucket}/${key}` }
+}
+
+/** A failed read is uncertainty, not absence. Only a definitive missing object returns false. */
+export async function inputBundleExists(
+  reference: InputBundleArtifactRef
+): Promise<boolean> {
+  const uri = new URL(reference.uri)
+  if (uri.protocol === 'file:') {
+    try {
+      const source = fileURLToPath(uri)
+      const { size } = await fs.stat(source)
+      const digest = createHash('sha256')
+      await pipeline(createReadStream(source), digest)
+      if (
+        size !== reference.size_bytes ||
+        `sha256:${digest.digest('hex')}` !== reference.digest
+      )
+        throw new Error('Local input bundle differs from its immutable intent.')
+      return true
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      )
+        return false
+      throw error
+    }
+  }
+  if (uri.protocol !== 's3:' || uri.hostname !== artifact_s3_bucket)
+    throw new Error('Input bundle uses an unconfigured store.')
+  const matches = await existingObjectMatches(
+    configuredClient(),
+    uri.hostname,
+    uri.pathname.slice(1),
+    reference
+  )
+  if (matches === false)
+    throw new Error('Input bundle object differs from its immutable intent.')
+  return matches === true
 }

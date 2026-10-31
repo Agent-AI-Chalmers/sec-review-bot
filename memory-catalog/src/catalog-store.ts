@@ -1,6 +1,9 @@
 import { Pool, type PoolClient } from 'pg'
 
 import type {
+  ExtractionPublication,
+  ExtractionPublicationIntent,
+  RevisionPublication,
   Actor,
   ArtifactReference,
   CatalogOverview,
@@ -71,6 +74,25 @@ async function inTransaction<T>(
 export interface MemoryCatalogStore {
   initialize(): Promise<void>
   close(): Promise<void>
+  reserveExtractionPublication(
+    intent: ExtractionPublicationIntent,
+  ): Promise<ExtractionPublication>
+  confirmExtractionPublication(
+    intent: ExtractionPublicationIntent,
+  ): Promise<ExtractionPublication>
+  listExtractionPublications(
+    extractionId: string,
+  ): Promise<ExtractionPublication[]>
+  reserveRevisionPublication(
+    intent: AuthenticatedMemoryTreeRevisionCreation,
+  ): Promise<RevisionPublication>
+  confirmRevisionPublication(
+    intent: AuthenticatedMemoryTreeRevisionCreation,
+  ): Promise<RevisionPublication>
+  listRevisionPublications(
+    kind: 'maintenance' | 'operator',
+    ownerId: string,
+  ): Promise<RevisionPublication[]>
   registerExtraction(input: ExtractionRegistration): Promise<boolean>
   getExtraction(extractionId: string): Promise<ExtractionRecord | undefined>
   listExtractions(
@@ -180,8 +202,158 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
     await this.#pool.end()
   }
 
+  async reserveExtractionPublication(
+    intent: ExtractionPublicationIntent,
+  ): Promise<ExtractionPublication> {
+    return await inTransaction(this.#pool, async (client) => {
+      const identity = [
+        intent.registration.extraction_id,
+        intent.registration.trajectory_reference.digest,
+      ]
+      await client.query(
+        `insert into extraction_publications (extraction_id, digest, intent)
+        values ($1,$2,$3) on conflict do nothing`,
+        [...identity, intent],
+      )
+      const result = await client.query<
+        ExtractionPublication & { identical: boolean }
+      >(
+        `select intent, status, intent=$3::jsonb as identical from extraction_publications
+         where extraction_id=$1 and digest=$2 for update`,
+        [...identity, intent],
+      )
+      const row = result.rows[0]!
+      if (!row.identical)
+        throw new ExtractionConflictError(
+          'Extraction publication intent changed.',
+        )
+      return { intent: row.intent, status: row.status }
+    })
+  }
+
+  async confirmExtractionPublication(
+    intent: ExtractionPublicationIntent,
+  ): Promise<ExtractionPublication> {
+    const result = await this.#pool.query<ExtractionPublication>(
+      `update extraction_publications set status=case when status='selected' then status else 'present' end
+       where extraction_id=$1 and digest=$2 and intent=$3::jsonb returning intent,status`,
+      [
+        intent.registration.extraction_id,
+        intent.registration.trajectory_reference.digest,
+        intent,
+      ],
+    )
+    if (!result.rows[0])
+      throw new ExtractionConflictError(
+        'Matching extraction publication reservation is required.',
+      )
+    return result.rows[0]
+  }
+
+  async listExtractionPublications(
+    extractionId: string,
+  ): Promise<ExtractionPublication[]> {
+    const result = await this.#pool.query<ExtractionPublication>(
+      `select intent,status from extraction_publications where extraction_id=$1
+       order by (status='selected') desc, created_at, digest`,
+      [extractionId],
+    )
+    return result.rows
+  }
+
+  async reserveRevisionPublication(
+    intent: AuthenticatedMemoryTreeRevisionCreation,
+  ): Promise<RevisionPublication> {
+    return await inTransaction(this.#pool, async (client) => {
+      const identity = revisionPublicationIdentity(intent)
+      await client.query(
+        `insert into memory_revision_publications
+        (source_kind, owner_id, tree_digest, trajectory_digest, intent)
+        values ($1,$2,$3,$4,$5) on conflict do nothing`,
+        [...identity, intent],
+      )
+      const result = await client.query<{
+        intent: AuthenticatedMemoryTreeRevisionCreation
+        status: RevisionPublication['status']
+        identical: boolean
+      }>(
+        `select intent, status, intent=$5::jsonb as identical from memory_revision_publications
+         where source_kind=$1 and owner_id=$2 and tree_digest=$3 and trajectory_digest=$4 for update`,
+        [...identity, intent],
+      )
+      const row = result.rows[0]!
+      if (!row.identical)
+        throw new MemoryTreeRevisionConflictError(
+          'Revision publication intent changed.',
+        )
+      return projectRevisionPublication(row)
+    })
+  }
+
+  async confirmRevisionPublication(
+    intent: AuthenticatedMemoryTreeRevisionCreation,
+  ): Promise<RevisionPublication> {
+    const result = await this.#pool.query<{
+      intent: AuthenticatedMemoryTreeRevisionCreation
+      status: RevisionPublication['status']
+    }>(
+      `update memory_revision_publications set status=case when status='selected' then status else 'present' end
+       where source_kind=$1 and owner_id=$2 and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb
+       returning intent,status`,
+      [...revisionPublicationIdentity(intent), intent],
+    )
+    if (!result.rows[0])
+      throw new MemoryTreeRevisionConflictError(
+        'Matching revision publication reservation is required.',
+      )
+    return projectRevisionPublication(result.rows[0])
+  }
+
+  async listRevisionPublications(
+    kind: 'maintenance' | 'operator',
+    ownerId: string,
+  ): Promise<RevisionPublication[]> {
+    const result = await this.#pool.query<{
+      intent: AuthenticatedMemoryTreeRevisionCreation
+      status: RevisionPublication['status']
+    }>(
+      `select intent,status from memory_revision_publications where source_kind=$1 and owner_id=$2
+       order by (status='selected') desc, created_at, tree_digest, trajectory_digest`,
+      [kind, ownerId],
+    )
+    return result.rows.map(projectRevisionPublication)
+  }
+
   async registerExtraction(input: ExtractionRegistration): Promise<boolean> {
     return await inTransaction(this.#pool, async (client) => {
+      // Serialize candidates by owner even before an authoritative extraction row exists.
+      await client.query(
+        `select pg_advisory_xact_lock(hashtextextended($1, 0))`,
+        [`extraction:${input.extraction_id}`],
+      )
+      const selected = await client.query(
+        `select 1 from extraction_publications
+        where extraction_id=$1 and status='selected' and intent->'registration'<>$2::jsonb`,
+        [input.extraction_id, input],
+      )
+      if (selected.rows[0])
+        throw new ExtractionConflictError(
+          'A different extraction publication is already selected.',
+        )
+      const publication = await client.query<{ digest: string }>(
+        `select digest from extraction_publications where extraction_id=$1
+         and intent->'registration'=$2::jsonb and status in ('present','selected') for update`,
+        [input.extraction_id, input],
+      )
+      if (!publication.rows[0])
+        throw new ExtractionConflictError(
+          'A confirmed extraction publication is required.',
+        )
+      await client.query(
+        `update extraction_publications set status='selected'
+        where extraction_id=$1 and digest=$2`,
+        [input.extraction_id, publication.rows[0].digest],
+      )
       const inserted = await client.query(
         `insert into extractions (
            extraction_id, source_workflow, source_run_id, source_unit_id,
@@ -716,6 +888,36 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
   ): Promise<MemoryTreeRevisionCreationResult> {
     return await inTransaction(this.#pool, async (client) => {
       const source = input.source
+      const identity = revisionPublicationIdentity(input)
+      // Competing candidates must observe the winner before trying to select themselves.
+      await client.query(
+        `select pg_advisory_xact_lock(hashtextextended($1, 0))`,
+        [`revision:${identity[0]}:${identity[1]}`],
+      )
+      const selected = await client.query(
+        `select 1 from memory_revision_publications
+        where source_kind=$1 and owner_id=$2 and status='selected' and intent<>$3::jsonb`,
+        [identity[0], identity[1], input],
+      )
+      if (selected.rows[0])
+        throw new MemoryTreeRevisionConflictError(
+          'A different revision publication is already selected.',
+        )
+      const publication = await client.query(
+        `select 1 from memory_revision_publications where source_kind=$1 and owner_id=$2
+         and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb
+         and status in ('present','selected') for update`,
+        [...revisionPublicationIdentity(input), input],
+      )
+      if (!publication.rows[0])
+        throw new MemoryTreeRevisionConflictError(
+          'A confirmed revision publication is required.',
+        )
+      await client.query(
+        `update memory_revision_publications set status='selected'
+        where source_kind=$1 and owner_id=$2 and tree_digest=$3 and trajectory_digest=$4`,
+        revisionPublicationIdentity(input),
+      )
       const replay = await client.query<{
         revision: string
         identical: boolean
@@ -1049,4 +1251,36 @@ function requireValue<T>(value: T | null, field: string): T {
   if (value === null)
     throw new Error(`Memory revision is missing source field: ${field}.`)
   return value
+}
+
+function revisionPublicationIdentity(
+  input: AuthenticatedMemoryTreeRevisionCreation,
+): string[] {
+  return [
+    input.source.kind,
+    input.source.kind === 'maintenance'
+      ? input.source.maintenance_id
+      : input.source.operation_id,
+    input.memory_tree_reference.digest,
+    input.source.kind === 'maintenance'
+      ? input.source.trajectory_reference.digest
+      : '',
+  ]
+}
+
+function projectRevisionPublication(row: {
+  intent: AuthenticatedMemoryTreeRevisionCreation
+  status: RevisionPublication['status']
+}): RevisionPublication {
+  const { source, ...rest } = row.intent
+  return {
+    status: row.status,
+    intent: {
+      ...rest,
+      source:
+        source.kind === 'operator'
+          ? { kind: source.kind, operation_id: source.operation_id }
+          : source,
+    },
+  }
 }

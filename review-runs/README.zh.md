@@ -40,6 +40,10 @@ flowchart LR
 
 Run 在接纳后立即进入 `pending`：在 Execution API provider 轴上表示其 input 尚未提交。准备进度单独记录在 `preparations` 中，其自身的 `preparing` 状态表示当前有 preparer 持有用于隔离 input 构造的 claim。GitHub integration 准备并上传 input bundle，再使用该 claim 提交可重放的 Execution input。Review Runs 记录 input，并且只在 Execution API provider 接受请求后将 run 转为 `queued`。
 
+Input bundle publication 由独立的 `input_bundle_candidates` ledger 跟踪。Connector 在上传字节前预约完整 artifact reference、prepared input 和 publish context，确认对象存在后，在保存 prepared submission 的同一事务中选中候选。预约、确认和选择都要求当前未过期的 preparation claim。接管者先检查已有提案再重建：对象匹配则恢复原提交，未采用对象确实缺失则放弃候选，存储不可访问只能视为错误，不能当成对象不存在。Preparation 仍有效时，完全相同的提案可以重新预约并激活已放弃的候选；已选中的 input 不能替换。
+
+S3 input 对象使用包含 run 和 digest 的 key。选中另一份 input 或 preparation 终止时会放弃未采用候选；放弃不删除远端字节，因为旧上传者仍可能完成，同一内容的提案也可能共享对象。系统不自动回收对象。初始 SQL 可用于新部署，但已应用 `001` checksum 的数据库需要重建或显式升级，才能启动此版本。
+
 Review Runs 轮询 `queued` 和 `running` run。Execution API provider 成功后，Review Runs 将结果保存为 `succeeded`，使其可以被领取并发布。Integration 领取该工作，执行 GitHub 副作用，再记录 `published`、可重试的 publication 失败或终态 publication 失败。
 
 <!-- doc-default: DEFAULT_CLAIM_TIMEOUT_MS; source=review-runs/src/persistence/review-run-store.ts -->
@@ -54,15 +58,16 @@ Review Runs 轮询 `queued` 和 `running` run。Execution API provider 成功后
 
 run 主干和各条生命周期轴分别存放在不同的表中。`review_runs` 只保存被接纳的身份；每条轴各自保存自己的状态和输入：
 
-| 表                  | 职责                                        | 状态                                                                                          |
-| ------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `review_runs`       | 所有轴共享的接纳身份（没有更新路径）        | —                                                                                             |
-| `preparations`      | 可领取的 input preparation                  | `pending`、`preparing`、`uncertain`、`disconnected`、`submitted`、`failed`                    |
-| `run_notices`       | connector 所有的用户可见失败与待确认通知    | `pending`、`delivering`、`delivered`、`failed`                                                |
-| `executions`        | Execution API provider 提交、观察和终态结果 | `pending`、`queued`、`running`、`uncertain`、`disconnected`、`succeeded`、`skipped`、`failed` |
-| `publications`      | 整体发布的所有权和结果                      | `pending`、`publishing`、`uncertain`、`disconnected`、`published`、`failed`、`skipped`        |
-| `publication_steps` | 可恢复的单个 connector 副作用               | `pending`、`running`、`uncertain`、`disconnected`、`succeeded`、`failed`、`terminal_failed`   |
-| `review_run_events` | 每条轴状态转换的只追加审计日志              | —                                                                                             |
+| 表                        | 职责                                        | 状态                                                                                          |
+| ------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `review_runs`             | 所有轴共享的接纳身份（没有更新路径）        | —                                                                                             |
+| `preparations`            | 可领取的 input preparation                  | `pending`、`preparing`、`uncertain`、`disconnected`、`submitted`、`failed`                    |
+| `input_bundle_candidates` | 持久 input publication 提案与原子选择       | `reserved`, `present`, `selected`, `abandoned`                                                |
+| `run_notices`             | connector 所有的用户可见失败与待确认通知    | `pending`、`delivering`、`delivered`、`failed`                                                |
+| `executions`              | Execution API provider 提交、观察和终态结果 | `pending`、`queued`、`running`、`uncertain`、`disconnected`、`succeeded`、`skipped`、`failed` |
+| `publications`            | 整体发布的所有权和结果                      | `pending`、`publishing`、`uncertain`、`disconnected`、`published`、`failed`、`skipped`        |
+| `publication_steps`       | 可恢复的单个 connector 副作用               | `pending`、`running`、`uncertain`、`disconnected`、`succeeded`、`failed`、`terminal_failed`   |
+| `review_run_events`       | 每条轴状态转换的只追加审计日志              | —                                                                                             |
 
 `preparations.status`：
 

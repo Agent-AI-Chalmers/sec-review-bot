@@ -18,6 +18,8 @@ Worker 凭据用于注册 extraction、读取 maintenance input 和提交 mainte
 
 Maintenance control 只提供 `enabled` 与 `paused`。Pause 和 resume 请求使用幂等 `operation_id` 与 `expected_generation` compare-and-swap。相同重放返回原 operation 的结果 control snapshot，即使当前状态后来已经改变。
 
+Publication reserve/confirm endpoints 接受完整 extraction 或 revision 发布意图；list endpoints 按 extraction ID 或 revision source identity 恢复 发布意图。确认表示已认证 producer 声明所有引用对象都已存在。正式挂接要求精确匹配已确认的 发布意图，并在事务内选中它。Revision publication endpoints 执行与 revision 创建一致的 worker/operator source 角色限制。Extraction 恢复会同时保留 summary 和完整 registration payload。Candidate 保留用于恢复和检查；API 不表示会删除对象或自动执行 reconciliation。
+
 ## 工具
 
 在 `tools/` 中运行：

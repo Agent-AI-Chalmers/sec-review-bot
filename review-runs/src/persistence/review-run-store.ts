@@ -37,6 +37,7 @@ import { ReviewRunAdmissionStore } from './review-run-admission-store.js'
 import { ReviewRunQueries, type DroppedRunRow } from './review-run-queries.js'
 import { queueRunNotice } from './run-notices.js'
 import { ExecutionStore } from './execution-store.js'
+import { InputBundleCandidateStore } from './input-bundle-candidate-store.js'
 import { SubmissionTransitionStore } from './submission-transition-store.js'
 
 export type {
@@ -76,6 +77,7 @@ export class ReviewRunStore {
   readonly operatorDecisions: OperatorDecisionStore
   readonly admissions: ReviewRunAdmissionStore
   readonly queries: ReviewRunQueries
+  readonly inputBundleCandidates: InputBundleCandidateStore
   readonly submissionTransitions: SubmissionTransitionStore
 
   constructor({
@@ -141,9 +143,15 @@ export class ReviewRunStore {
       this.claimTimeoutMs,
       onDroppedRunRow
     )
+    this.inputBundleCandidates = new InputBundleCandidateStore(
+      this.database,
+      this.connectorId,
+      this.claimTimeoutMs
+    )
     this.submissionTransitions = new SubmissionTransitionStore(
       this.database,
-      this.connectorId
+      this.connectorId,
+      this.claimTimeoutMs
     )
   }
 

@@ -1,3 +1,4 @@
+import { inputBundlePublicationStore } from '../input-bundle-publication-store.js'
 // Verifies durable run notices and recovered preparations through their separate coordinators.
 import assert from 'node:assert/strict'
 import test from 'node:test'
@@ -14,6 +15,9 @@ import { fakeGitHub, githubJson } from '../github-client.js'
 /** Preparation command dependencies that input-validation tests never reach. */
 function unreachedPreparationMembers(): Pick<
   PreparationCoordinatorStore,
+  | 'reserveInputBundleCandidate'
+  | 'listInputBundleCandidates'
+  | 'settleInputBundleCandidate'
   | 'admitReviewRun'
   | 'submitPreparedRun'
   | 'renewPreparationClaim'
@@ -23,6 +27,7 @@ function unreachedPreparationMembers(): Pick<
     throw new Error(`the ${name} branch should not be reached in this test`)
   }
   return {
+    ...inputBundlePublicationStore(),
     admitReviewRun: async () => unreached('admitReviewRun'),
     submitPreparedRun: async () => unreached('submitPreparedRun'),
     renewPreparationClaim: async () => unreached('renewPreparationClaim'),
@@ -691,6 +696,7 @@ test('a claimed synchronize preparation recovers from the payload admission pers
       failures.push(String((error as { message?: string })?.message ?? error))
       return true
     },
+    ...inputBundlePublicationStore(),
     renewPreparationClaim: async () => true,
     preparationHeartbeatIntervalMs: () => 60_000,
     ...(() => {

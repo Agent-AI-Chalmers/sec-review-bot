@@ -100,19 +100,35 @@ export function artifactStoreFromEnvironment(): ArtifactStore | undefined {
       } catch (error) {
         if (artifactStorageStatus(error) !== 404) throw error
       }
-      await client.send(
-        new PutObjectCommand({
-          Bucket: ARTIFACT_BUCKET,
-          Key: artifact.objectKey,
-          Body: artifact.bytes,
-          ContentType: artifact.mediaType,
-          IfNoneMatch: '*',
-          Metadata: {
-            sha256: artifact.digest.slice('sha256:'.length),
-            'size-bytes': String(artifact.sizeBytes)
-          }
-        })
-      )
+      try {
+        await client.send(
+          new PutObjectCommand({
+            Bucket: ARTIFACT_BUCKET,
+            Key: artifact.objectKey,
+            Body: artifact.bytes,
+            ContentType: artifact.mediaType,
+            IfNoneMatch: '*',
+            Metadata: {
+              sha256: artifact.digest.slice('sha256:'.length),
+              'size-bytes': String(artifact.sizeBytes)
+            }
+          })
+        )
+      } catch (error) {
+        if (artifactStorageStatus(error) !== 412) throw error
+        const existing = await client.send(
+          new HeadObjectCommand({
+            Bucket: ARTIFACT_BUCKET,
+            Key: artifact.objectKey
+          })
+        )
+        if (
+          existing.ContentLength !== artifact.sizeBytes ||
+          existing.ContentType !== artifact.mediaType ||
+          existing.Metadata?.sha256 !== artifact.digest.slice('sha256:'.length)
+        )
+          throw new Error('memory_artifact_identity_mismatch', { cause: error })
+      }
     }
   }
 }

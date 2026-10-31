@@ -1,3 +1,9 @@
+import fs from 'node:fs/promises'
+import os from 'node:os'
+import path from 'node:path'
+import { createHash } from 'node:crypto'
+import { pathToFileURL } from 'node:url'
+import { inputBundlePublicationStore } from '../input-bundle-publication-store.js'
 // Covers issue and pull-request trigger behavior at the durable admission,
 // preparation-claim, and execution-submission boundaries.
 import assert from 'node:assert/strict'
@@ -20,6 +26,17 @@ import type {
   ReviewRunRecord
 } from '../../src/review-runs/client.js'
 import { unusedGitHub } from '../github-client.js'
+
+const bundleRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'trigger-input-'))
+const bundlePath = path.join(bundleRoot, 'bundle.tar.zst')
+await fs.writeFile(bundlePath, 'x')
+test.after(() => fs.rm(bundleRoot, { recursive: true, force: true }))
+const localBundle = {
+  uri: pathToFileURL(bundlePath).href,
+  digest: `sha256:${createHash('sha256').update('x').digest('hex')}`,
+  media_type: 'application/tar+zstd' as const,
+  size_bytes: 1
+}
 
 /** An admitted run record as Review Runs returns it, with the axis shapes spelled once.
  *
@@ -73,6 +90,7 @@ const TRUSTED_DEFAULT_BRANCH = {
 }
 
 const preparationClaim = {
+  ...inputBundlePublicationStore(),
   renewPreparationClaim: async () => true,
   preparationHeartbeatIntervalMs: async () => 60_000
 }
@@ -139,12 +157,7 @@ function pullRequestContext(): PullRequestContext {
 function issueReviewInput(): IssueReviewInput & Record<string, unknown> {
   return {
     api_version: EXECUTION_API_VERSION,
-    input_bundle: {
-      uri: 's3://bucket/input.tar.zst',
-      digest: `sha256:${'a'.repeat(64)}`,
-      media_type: 'application/tar+zstd',
-      size_bytes: 1
-    },
+    input_bundle: localBundle,
     review_intent: { objective: 'audit' },
     issue: {
       owner: 'octo',
@@ -162,12 +175,7 @@ function pullRequestReviewInput(): PullRequestReviewInput &
   Record<string, unknown> {
   return {
     api_version: EXECUTION_API_VERSION,
-    input_bundle: {
-      uri: 's3://bucket/input.tar.zst',
-      digest: `sha256:${'a'.repeat(64)}`,
-      media_type: 'application/tar+zstd',
-      size_bytes: 1
-    },
+    input_bundle: localBundle,
     review_intent: { objective: 'audit' },
     pr: {
       owner: 'octo',
@@ -425,7 +433,7 @@ test('startIssueReviewCommand preserves an uncertain Execution submission for re
       delivery_id: 'delivery-uncertain',
       deps: {
         start_review: async (args) => {
-          args.on_prepared?.(
+          await args.on_prepared?.(
             {
               issue: args.issue,
               run_id: 'run-uncertain',
@@ -476,7 +484,7 @@ test('startPullRequestReviewCommand preserves an uncertain Execution submission 
       delivery_id: 'delivery-pr-uncertain',
       deps: {
         start_review: async (args) => {
-          args.on_prepared?.(
+          await args.on_prepared?.(
             {
               pr: args.pr,
               run_id: 'run-pr-uncertain',

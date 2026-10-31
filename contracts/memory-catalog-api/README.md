@@ -16,6 +16,8 @@ Worker credentials register extractions, read maintenance input, and submit main
 
 Maintenance control exposes only `enabled` and `paused`. Pause and resume requests use an idempotent `operation_id` and `expected_generation` compare-and-swap. An identical replay returns the original resulting control snapshot even if current state has since changed.
 
+Publication reserve/confirm endpoints accept complete extraction or revision publication intents; list endpoints recover them by extraction ID or revision source identity. Confirmation is the authenticated producer's assertion that every referenced object is present. Attachment requires an exactly matching confirmed publication intent and atomically selects it. Revision publication endpoints enforce the same worker/operator source roles as revision creation. Extraction recovery retains the summary alongside the full registration payload. Candidates are retained for recovery and inspection; the API does not imply object deletion or automatic reconciliation.
+
 ## Tooling
 
 Run from `tools/`:

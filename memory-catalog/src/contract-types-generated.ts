@@ -96,6 +96,62 @@ export type ExtractionRegistration = {
   observation: ExtractionObservation | null
 }
 
+export type ExtractionPublicationIntent = {
+  registration: ExtractionRegistration
+  summary: string
+}
+
+export type ExtractionPublication = {
+  intent: ExtractionPublicationIntent
+  status: 'reserved' | 'present' | 'selected'
+}
+
+export type ExtractionPublicationList = {
+  publications: ExtractionPublication[]
+}
+
+export type MaintenanceRevisionSource = {
+  kind: 'maintenance'
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  maintenance_id: MaintenanceId
+  extraction_ids: ExtractionId[]
+  trajectory_reference: ArtifactReference
+}
+
+export type OperatorRevisionCreationSource = {
+  kind: 'operator'
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  operation_id: OperationId
+}
+
+export type MemoryTreeRevisionCreation = {
+  /**
+   * @description Active revision that must still be current for this compare-and-swap commit.
+   * @minLength 0
+   * @type integer
+   */
+  expected_active_revision: number
+  memory_tree_reference: ArtifactReference
+  source: MaintenanceRevisionSource | OperatorRevisionCreationSource
+}
+
+export type RevisionPublication = {
+  intent: MemoryTreeRevisionCreation
+  status: 'reserved' | 'present' | 'selected'
+}
+
+export type RevisionPublicationList = {
+  publications: RevisionPublication[]
+}
+
 export type ExtractionRegistrationResult = {
   ok: true
   created: boolean
@@ -315,18 +371,6 @@ export type MaintenanceInputResult = {
   input: MaintenanceInput | null
 }
 
-export type MaintenanceRevisionSource = {
-  kind: 'maintenance'
-  /**
-   * @minLength 1
-   * @pattern ^[A-Za-z0-9._:-]+$
-   * @type string
-   */
-  maintenance_id: MaintenanceId
-  extraction_ids: ExtractionId[]
-  trajectory_reference: ArtifactReference
-}
-
 export type OperatorRevisionSource = {
   kind: 'operator'
   /**
@@ -338,29 +382,8 @@ export type OperatorRevisionSource = {
   actor: Actor
 }
 
-export type OperatorRevisionCreationSource = {
-  kind: 'operator'
-  /**
-   * @minLength 1
-   * @pattern ^[A-Za-z0-9._:-]+$
-   * @type string
-   */
-  operation_id: OperationId
-}
-
 export type MemoryTreeRevisionSource =
   MaintenanceRevisionSource | OperatorRevisionSource
-
-export type MemoryTreeRevisionCreation = {
-  /**
-   * @description Active revision that must still be current for this compare-and-swap commit.
-   * @minLength 0
-   * @type integer
-   */
-  expected_active_revision: number
-  memory_tree_reference: ArtifactReference
-  source: MaintenanceRevisionSource | OperatorRevisionCreationSource
-}
 
 export type MemoryTreeRevisionCreationResult = {
   created: boolean
@@ -1078,6 +1101,224 @@ export type GetMemoryTreeRevisionResponses = {
  * @description Union of all possible responses
  */
 export type GetMemoryTreeRevisionResponse = GetMemoryTreeRevisionStatus200
+
+export type ReserveExtractionPublicationStatus200 = ExtractionPublication
+
+export type ReserveExtractionPublicationStatus400 = ErrorResponse
+
+export type ReserveExtractionPublicationStatus401 = ErrorResponse
+
+export type ReserveExtractionPublicationStatus409 = ErrorResponse
+
+export type ReserveExtractionPublicationStatus413 = ErrorResponse
+
+export type ReserveExtractionPublicationStatus500 = ErrorResponse
+
+export type ReserveExtractionPublicationBody = ExtractionPublicationIntent
+
+export type ReserveExtractionPublicationOptions = {
+  body: ReserveExtractionPublicationBody
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type ReserveExtractionPublicationResponses = {
+  '200': ReserveExtractionPublicationStatus200
+  '400': ReserveExtractionPublicationStatus400
+  '401': ReserveExtractionPublicationStatus401
+  '409': ReserveExtractionPublicationStatus409
+  '413': ReserveExtractionPublicationStatus413
+  '500': ReserveExtractionPublicationStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type ReserveExtractionPublicationResponse =
+  ReserveExtractionPublicationStatus200
+
+export type ConfirmExtractionPublicationStatus200 = ExtractionPublication
+
+export type ConfirmExtractionPublicationStatus400 = ErrorResponse
+
+export type ConfirmExtractionPublicationStatus401 = ErrorResponse
+
+export type ConfirmExtractionPublicationStatus409 = ErrorResponse
+
+export type ConfirmExtractionPublicationStatus413 = ErrorResponse
+
+export type ConfirmExtractionPublicationStatus500 = ErrorResponse
+
+export type ConfirmExtractionPublicationBody = ExtractionPublicationIntent
+
+export type ConfirmExtractionPublicationOptions = {
+  body: ConfirmExtractionPublicationBody
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type ConfirmExtractionPublicationResponses = {
+  '200': ConfirmExtractionPublicationStatus200
+  '400': ConfirmExtractionPublicationStatus400
+  '401': ConfirmExtractionPublicationStatus401
+  '409': ConfirmExtractionPublicationStatus409
+  '413': ConfirmExtractionPublicationStatus413
+  '500': ConfirmExtractionPublicationStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type ConfirmExtractionPublicationResponse =
+  ConfirmExtractionPublicationStatus200
+
+export type ListExtractionPublicationsPath = {
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  extraction_id: string
+}
+
+export type ListExtractionPublicationsStatus200 = ExtractionPublicationList
+
+export type ListExtractionPublicationsStatus400 = ErrorResponse
+
+export type ListExtractionPublicationsStatus401 = ErrorResponse
+
+export type ListExtractionPublicationsStatus500 = ErrorResponse
+
+export type ListExtractionPublicationsOptions = {
+  body?: never
+  path: ListExtractionPublicationsPath
+  query?: never
+  headers?: never
+}
+
+export type ListExtractionPublicationsResponses = {
+  '200': ListExtractionPublicationsStatus200
+  '400': ListExtractionPublicationsStatus400
+  '401': ListExtractionPublicationsStatus401
+  '500': ListExtractionPublicationsStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type ListExtractionPublicationsResponse =
+  ListExtractionPublicationsStatus200
+
+export type ReserveRevisionPublicationStatus200 = RevisionPublication
+
+export type ReserveRevisionPublicationStatus400 = ErrorResponse
+
+export type ReserveRevisionPublicationStatus401 = ErrorResponse
+
+export type ReserveRevisionPublicationStatus409 = ErrorResponse
+
+export type ReserveRevisionPublicationStatus413 = ErrorResponse
+
+export type ReserveRevisionPublicationStatus500 = ErrorResponse
+
+export type ReserveRevisionPublicationBody = MemoryTreeRevisionCreation
+
+export type ReserveRevisionPublicationOptions = {
+  body: ReserveRevisionPublicationBody
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type ReserveRevisionPublicationResponses = {
+  '200': ReserveRevisionPublicationStatus200
+  '400': ReserveRevisionPublicationStatus400
+  '401': ReserveRevisionPublicationStatus401
+  '409': ReserveRevisionPublicationStatus409
+  '413': ReserveRevisionPublicationStatus413
+  '500': ReserveRevisionPublicationStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type ReserveRevisionPublicationResponse =
+  ReserveRevisionPublicationStatus200
+
+export type ConfirmRevisionPublicationStatus200 = RevisionPublication
+
+export type ConfirmRevisionPublicationStatus400 = ErrorResponse
+
+export type ConfirmRevisionPublicationStatus401 = ErrorResponse
+
+export type ConfirmRevisionPublicationStatus409 = ErrorResponse
+
+export type ConfirmRevisionPublicationStatus413 = ErrorResponse
+
+export type ConfirmRevisionPublicationStatus500 = ErrorResponse
+
+export type ConfirmRevisionPublicationBody = MemoryTreeRevisionCreation
+
+export type ConfirmRevisionPublicationOptions = {
+  body: ConfirmRevisionPublicationBody
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type ConfirmRevisionPublicationResponses = {
+  '200': ConfirmRevisionPublicationStatus200
+  '400': ConfirmRevisionPublicationStatus400
+  '401': ConfirmRevisionPublicationStatus401
+  '409': ConfirmRevisionPublicationStatus409
+  '413': ConfirmRevisionPublicationStatus413
+  '500': ConfirmRevisionPublicationStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type ConfirmRevisionPublicationResponse =
+  ConfirmRevisionPublicationStatus200
+
+export type ListRevisionPublicationsPath = {
+  kind: 'maintenance' | 'operator'
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  owner_id: string
+}
+
+export type ListRevisionPublicationsStatus200 = RevisionPublicationList
+
+export type ListRevisionPublicationsStatus400 = ErrorResponse
+
+export type ListRevisionPublicationsStatus401 = ErrorResponse
+
+export type ListRevisionPublicationsStatus500 = ErrorResponse
+
+export type ListRevisionPublicationsOptions = {
+  body?: never
+  path: ListRevisionPublicationsPath
+  query?: never
+  headers?: never
+}
+
+export type ListRevisionPublicationsResponses = {
+  '200': ListRevisionPublicationsStatus200
+  '400': ListRevisionPublicationsStatus400
+  '401': ListRevisionPublicationsStatus401
+  '500': ListRevisionPublicationsStatus500
+}
+
+/**
+ * @description Union of all possible responses
+ */
+export type ListRevisionPublicationsResponse = ListRevisionPublicationsStatus200
 export interface OperationOptionsById {
   health: HealthOptions
   listExtractions: ListExtractionsOptions
@@ -1095,4 +1336,10 @@ export interface OperationOptionsById {
   pauseMaintenance: PauseMaintenanceOptions
   resumeMaintenance: ResumeMaintenanceOptions
   getMemoryTreeRevision: GetMemoryTreeRevisionOptions
+  reserveExtractionPublication: ReserveExtractionPublicationOptions
+  confirmExtractionPublication: ConfirmExtractionPublicationOptions
+  listExtractionPublications: ListExtractionPublicationsOptions
+  reserveRevisionPublication: ReserveRevisionPublicationOptions
+  confirmRevisionPublication: ConfirmRevisionPublicationOptions
+  listRevisionPublications: ListRevisionPublicationsOptions
 }

@@ -54,6 +54,12 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
   try {
     await store.initialize()
 
+    const publication = {
+      registration: extraction,
+      summary: 'Observation produced.',
+    }
+    await store.reserveExtractionPublication(publication)
+    await store.confirmExtractionPublication(publication)
     assert.equal(await store.registerExtraction(extraction), true)
     assert.equal(await store.registerExtraction(extraction), false)
     await assert.rejects(
@@ -96,6 +102,8 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
         ),
       },
     }
+    await store.reserveRevisionPublication(revisionInput)
+    await store.confirmRevisionPublication(revisionInput)
     assert.deepEqual(await store.createMemoryTreeRevision(revisionInput), {
       created: true,
       revision: 1,

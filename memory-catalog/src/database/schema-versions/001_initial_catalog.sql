@@ -139,3 +139,33 @@ create table maintenance_control_operations (
 
 comment on table maintenance_control_operations is
   'Idempotency ledger for explicit pause and resume transitions.';
+
+-- Full intents survive worker/BFF loss between object publication and attachment.
+-- Multiple model attempts may produce different bytes for the same logical owner.
+create table extraction_publications (
+  extraction_id text not null,
+  digest text not null,
+  intent jsonb not null,
+  status text not null default 'reserved' check (status in ('reserved', 'present', 'selected')),
+  created_at timestamptz not null default clock_timestamp(),
+  primary key (extraction_id, digest),
+  check (extraction_id = intent #>> '{registration,extraction_id}'),
+  check (digest = intent #>> '{registration,trajectory_reference,digest}')
+);
+create unique index extraction_publications_selected on extraction_publications (extraction_id) where status = 'selected';
+
+create table memory_revision_publications (
+  source_kind text not null check (source_kind in ('maintenance', 'operator')),
+  owner_id text not null,
+  tree_digest text not null,
+  trajectory_digest text not null,
+  intent jsonb not null,
+  status text not null default 'reserved' check (status in ('reserved', 'present', 'selected')),
+  created_at timestamptz not null default clock_timestamp(),
+  primary key (source_kind, owner_id, tree_digest, trajectory_digest),
+  check (source_kind = intent #>> '{source,kind}'),
+  check (owner_id = coalesce(intent #>> '{source,maintenance_id}', intent #>> '{source,operation_id}')),
+  check (tree_digest = intent #>> '{memory_tree_reference,digest}'),
+  check (trajectory_digest = coalesce(intent #>> '{source,trajectory_reference,digest}', ''))
+);
+create unique index memory_revision_publications_selected on memory_revision_publications (source_kind, owner_id) where status = 'selected';

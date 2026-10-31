@@ -293,6 +293,38 @@ class HttpReviewRunsClient {
     return await this.request('admitRun', {}, run)
   }
 
+  async reserveInputBundleCandidate(
+    runId: string,
+    token: string,
+    intent: Omit<
+      OperationOptionsById['reserveInputBundleCandidate']['body'],
+      'token'
+    >
+  ): Promise<OperationResponseById['reserveInputBundleCandidate']> {
+    return await this.request(
+      'reserveInputBundleCandidate',
+      { runId },
+      { token, ...intent }
+    )
+  }
+  async listInputBundleCandidates(
+    runId: string,
+    token: string
+  ): Promise<OperationResponseById['listInputBundleCandidates']> {
+    return await this.request('listInputBundleCandidates', { runId }, { token })
+  }
+  async settleInputBundleCandidate(
+    runId: string,
+    token: string,
+    digest: string,
+    status: 'present' | 'abandoned'
+  ): Promise<OperationResponseById['settleInputBundleCandidate']> {
+    return await this.request(
+      'settleInputBundleCandidate',
+      { runId },
+      { token, digest, status }
+    )
+  }
   async submitPreparedRun(
     runId: string,
     token: string,
@@ -613,6 +645,9 @@ export type ReviewRunsClient = Pick<
   | 'getRun'
   | 'renewPreparationClaim'
   | 'claimNextPreparation'
+  | 'reserveInputBundleCandidate'
+  | 'listInputBundleCandidates'
+  | 'settleInputBundleCandidate'
   | 'checkpointPreparationInput'
   | 'claimNextRunNotice'
   | 'renewRunNoticeClaim'
@@ -661,6 +696,9 @@ export type PublicationStepStore = Pick<
 export type PreparationCoordinatorStore = Pick<
   ReviewRunsClient,
   | 'claimNextPreparation'
+  | 'reserveInputBundleCandidate'
+  | 'listInputBundleCandidates'
+  | 'settleInputBundleCandidate'
   | 'failPreparation'
   | 'admitReviewRun'
   | 'submitPreparedRun'

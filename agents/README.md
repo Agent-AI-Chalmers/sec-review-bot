@@ -121,7 +121,10 @@ flowchart LR
     direct --> execution
 ```
 
-The external TypeScript Gateway receives HTTP run requests and uses the Temporal client to start and query workflows; it does not execute agents. Temporal Server persists workflow state and dispatches review work, memory extraction, and memory maintenance to their separate workers and task queues. Direct local execution bypasses both the HTTP service and Temporal while reusing activity functions; `run-local-* --temporal` bypasses the HTTP service but uses Temporal Server and Execution Worker.
+The external TypeScript Gateway receives HTTP run requests and uses the Temporal client to start and query workflows. Temporal Server persists workflow state and dispatches review work to Execution Worker through its task queue.
+
+- Direct local execution bypasses the HTTP service and Temporal while reusing activity functions.
+- `run-local-* --temporal` bypasses the HTTP service but uses Temporal Server and Execution Worker.
 
 ## Local Runs
 
@@ -142,8 +145,6 @@ The supported local execution paths are:
 | Manually started service and workers | Diagnostic bundle in S3-compatible storage | Production workflow behavior |
 
 ### `run-local-*` Commands
-
-The `run-local-*` commands prepare workspace snapshots, history, and incremental windows through `cli/local_materialization/`, then reuse the production workflow input preparation boundary to derive artifact directories. They use direct local execution by default, without the HTTP service or Temporal.
 
 After installing dependencies, these commands are available:
 
@@ -217,44 +218,29 @@ sec-review-agents-run-local-repository \
 
 Use `--temporal` only when you specifically want to exercise internal Temporal workflow / activity orchestration.
 
-With `--temporal`, the same local command still prepares input on the developer machine, but the workflow stages run through Temporal workflow / activity scheduling. This is useful when debugging workflow orchestration, retries, activity boundaries, or Temporal-visible state. It still bypasses the HTTP Execution Gateway, so it is not the same as the full service path.
+With `--temporal`, the same local command still prepares input on the developer machine, but the workflow stages run through Temporal workflow / activity scheduling. This is useful when debugging workflow orchestration, retries, activity boundaries, or Temporal-visible state.
 
-Local Temporal execution keeps the run diagnostic bundle on the local filesystem and passes a verified `file://` reference between the Execution Worker and Memory Extraction Worker. Those workers must therefore share that artifact filesystem and see it at the same absolute path.
-
-Before running a `--temporal` local command, start a local Temporal dev server:
-
-```bash
-temporal server start-dev --ip 127.0.0.1 --port 7233
-```
-
-Then start the Execution Worker as a host process in another terminal:
-
-```bash
-cd agents
-cp .env.sample .env
-cp config/model-providers.sample.toml config/model-providers.toml
-# Fill .env and config/model-providers.toml.
-
-set -a
-. .env
-set +a
-
-TEMPORAL_ADDRESS=127.0.0.1:7233 \
-TEMPORAL_NAMESPACE=default \
-TEMPORAL_EXECUTION_TASK_QUEUE=sec-review-execution \
-sec-review-execution-worker
-```
+Start Temporal Server and Execution Worker as described in [Run the Workers Manually](#run-the-workers-manually), then add `--temporal` to a `run-local-*` command.
 
 ### Run the Workers Manually
 
-Start Temporal and the worker processes in separate terminals.
+Review execution requires Temporal Server and Execution Worker. When memory processing is enabled, configure the dependencies described in [Memory](#memory) and start the Memory Extraction and Memory Maintenance workers as well.
 
-Minimal local startup shape:
+Prepare `agents/.env` and `agents/config/model-providers.toml` as described in [LLM Setup](#llm-setup). In each worker terminal, load the environment before running the worker command:
+
+```bash
+cd agents
+set -a
+source .env
+set +a
+```
+
+Start Temporal and the workers in separate terminals:
 
 Terminal 1, Temporal Server:
 
 ```bash
-temporal server start-dev
+temporal server start-dev --ip 127.0.0.1 --port 7233
 ```
 
 Terminal 2, Execution Worker:
@@ -295,6 +281,15 @@ Agents can declare the skills they need. The worker prepares and mounts the decl
 
 Memory requires Temporal, a Memory Catalog backed by PostgreSQL, and S3-compatible object storage.
 
+If you are new to Memory, start with [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the basic concepts and workflow.
+
+| Variable | Purpose |
+| --- | --- |
+| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog base URL. Without it, review agents have no memory view and memory processing cannot run. |
+| `AGENT_MEMORY_CATALOG_TOKEN` | Worker bearer token for Memory Catalog extraction and automatic maintenance. Required when `AGENT_MEMORY_CATALOG_URL` is set. |
+| `AGENT_MEMORY_CONSUMPTION_ENABLED` | Whether review agents load the active memory tree. Defaults to `true`. |
+| `AGENT_MEMORY_PROCESSING_ENABLED` | Whether extraction and maintenance activities run. Defaults to `true`. |
+
 For local Memory development, Compose runs the infrastructure and the workers run as host processes.
 
 > [!WARNING]
@@ -329,14 +324,9 @@ uv run sec-review-agents-memory dev-workers \
 
 The launcher maps the separate object-storage identities to their workers, keeps Memory Maintenance Worker activity concurrency at `1`, and stops the worker group when one worker exits or the launcher receives `SIGINT`/`SIGTERM`. It does not start or stop Compose services.
 
-| Variable | Purpose |
-| --- | --- |
-| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog base URL. Without it, review agents have no memory view and memory processing cannot run. |
-| `AGENT_MEMORY_CATALOG_TOKEN` | Worker bearer token for Memory Catalog extraction and automatic maintenance. Required when `AGENT_MEMORY_CATALOG_URL` is set. |
-| `AGENT_MEMORY_CONSUMPTION_ENABLED` | Whether review agents load the active memory tree. Defaults to `true`. |
-| `AGENT_MEMORY_PROCESSING_ENABLED` | Whether extraction and maintenance activities run. Defaults to `true`. |
+When memory processing is enabled in local Temporal mode, Memory Extraction Worker reads the diagnostic bundle produced by Execution Worker from the local filesystem. Both workers must be able to access the same file path. Extraction results still use Memory Catalog to store observations and artifact references, and S3-compatible storage to store the extractor trajectory.
 
-Each review invocation materializes the active memory tree in a temporary directory and removes it afterward. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the architecture and lifecycle.
+Each review invocation materializes the active memory tree in a temporary directory and removes it afterward.
 
 - `sec-review-agents-memory maintain` asks Temporal Server to start one memory maintenance workflow.
 - `sec-review-agents-memory schedules maintenance ensure` creates or updates the periodic maintenance schedule in Temporal Server.
@@ -354,11 +344,11 @@ Agent stages that review code run in a sandbox that can execute commands, becaus
 
 There is no value that selects the local filesystem backend. It has no shell, so handing it to a stage that reviews code would quietly remove that stage's ability to run anything. Stages that do not need one select it themselves, so this is not a deployment setting.
 
-Benchmark and local debug runs can set `runtime.workspace_image` to choose the image for the isolated container that hosts the target repository.
+When using Docker sandbox, set `AGENT_DOCKER_IMAGE` to choose the default workspace container image.
 
 ### Workspace Tools
 
-The optional workspace tools image installs Joern, CodeGraph, Playwright, and Chromium in the Docker sandbox. Build the image and select it for a local run:
+The optional workspace tools image installs [Joern](https://joern.io/), [CodeGraph](https://github.com/colbymchenry/codegraph), [Playwright](https://playwright.dev/), and [Chromium](https://www.chromium.org/) in the Docker sandbox. Build the image and select it for a local run:
 
 ```bash
 docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
@@ -367,7 +357,9 @@ export AGENT_JOERN_ENABLED=true
 export AGENT_PLAYWRIGHT_ENABLED=true
 ```
 
-Joern and Playwright are intended for use through bash and their CLIs. The existing CodeGraph and Playwright MCP integrations remain available but are disabled by default. Enable them explicitly when needed:
+This project intends to use Joern and Playwright through bash and their CLIs.
+
+The existing CodeGraph and Playwright MCP integrations remain available but are disabled by default. Enable them explicitly when needed:
 
 ```bash
 export AGENT_MCP_ENABLED=true
