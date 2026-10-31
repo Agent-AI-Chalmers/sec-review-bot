@@ -20,10 +20,8 @@ import {
   MemoryRevisionDiffContent,
   MemoryRevisionDiffTitle
 } from './MemoryRevisionDiff.js'
-import {
-  TrajectoryContent,
-  type TrajectoryTarget
-} from '../trajectory/TrajectoryViewer.js'
+import { TrajectoryContent } from '../trajectory/TrajectoryContent.js'
+import type { TrajectoryTarget } from '../trajectory/TrajectoryViewer.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
 function numericRevision(value: string | undefined): number | undefined {
@@ -148,7 +146,7 @@ function TrajectoryPage({
           </ActionIcon>
         </Tooltip>
       </Group>
-      <TrajectoryContent target={target} />
+      <TrajectoryContent contentHref={target.contentHref} />
     </Container>
   )
 }

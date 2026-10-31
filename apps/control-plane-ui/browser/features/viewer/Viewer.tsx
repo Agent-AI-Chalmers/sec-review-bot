@@ -20,10 +20,8 @@ import {
 } from '@tabler/icons-react'
 
 import { useMessages } from '../../shared/i18n.js'
-import {
-  TrajectoryTimeline,
-  type TrajectoryEvent
-} from '../trajectory/TrajectoryViewer.js'
+import { TrajectoryTimeline } from '../trajectory/TrajectoryTimeline.js'
+import type { TrajectoryEvent } from '../trajectory/trajectory-model.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
 function messageRecord(value: unknown): Record<string, unknown> | null {
