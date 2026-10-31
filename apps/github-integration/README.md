@@ -99,8 +99,6 @@ For local GitHub App webhook and Actions dispatch routing, see the [local GitHub
 - Submit prepared inputs to Review Runs and claim publication work
 - Publish structured results back to GitHub
 
-Input preparation builds a local archive without publishing it. The claim-owning command reserves the full intent in Review Runs, uploads to an immutable run/digest S3 key, confirms presence, then submits that intent. Preparation retries reconcile stored intents before fetching or rebuilding review input. Local staging uses separate directories so an expired preparer cannot delete a replacement preparer's checkout. Execution Workers validate that the object key matches the run and content digest.
-
 ## Layout
 
 - `reviews/` - input preparation, submission, publishing, and rendering for review workflows

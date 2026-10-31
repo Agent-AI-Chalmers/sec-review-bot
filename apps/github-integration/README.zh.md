@@ -101,8 +101,6 @@ GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 
 - 向 Review Runs 提交已准备的输入并领取发布任务
 - 把结构化结果发布回 GitHub
 
-Input preparation 构建本地 archive，但不直接发布。持有 claim 的命令先在 Review Runs 预约完整提案，再上传到不可变的 run/digest S3 key、确认存在并提交该提案。Preparation 重试会先对账已有提案，再获取或重建 review input。本地 staging 使用独立目录，避免过期 preparer 删除接管者的 checkout。Execution Worker 校验对象 key 与 run 和内容 digest 一致。
-
 ## 目录
 
 - `reviews/` - 各类 review workflow 的输入准备、提交、发布与渲染

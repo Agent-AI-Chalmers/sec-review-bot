@@ -8,14 +8,16 @@ import { createHash } from 'node:crypto'
 import fs from 'node:fs/promises'
 import { pipeline } from 'node:stream/promises'
 import { createReadStream } from 'fs'
-import { fileURLToPath } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
+import path from 'node:path'
 
 import {
   artifact_s3_addressing_style,
   artifact_s3_bucket,
   artifact_s3_endpoint,
   artifact_s3_region,
-  artifact_store
+  artifact_store,
+  input_bundle_staging_root
 } from '../config.js'
 import type { InputBundleArtifactRef } from '../execution/input.js'
 
@@ -80,7 +82,7 @@ async function existingObjectMatches(
 /**
  * The reference a local bundle will have once published.
  *
- * The bucket and key are known before the upload, so a caller can build and size the workflow
+ * The final S3 key or local run/digest path is known before publication, so a caller can build and size the workflow
  * input against the URI that will actually be submitted, and refuse an oversized input before
  * anything is written to object storage.
  */
@@ -88,7 +90,22 @@ export function publishedInputBundleReference(
   reference: InputBundleArtifactRef,
   runId: string
 ): InputBundleArtifactRef {
-  if (artifact_store === 'file') return reference
+  if (artifact_store === 'file') {
+    if (
+      !/^[A-Za-z0-9_-]+$/.test(runId) ||
+      !/^sha256:[0-9a-f]{64}$/.test(reference.digest)
+    )
+      throw new Error('Invalid input bundle publication identity.')
+    return {
+      ...reference,
+      uri: pathToFileURL(
+        path.join(
+          input_bundle_staging_root,
+          inputObjectKey(runId, reference.digest)
+        )
+      ).href
+    }
+  }
   const key = inputObjectKey(runId, reference.digest)
   return { ...reference, uri: `s3://${artifact_s3_bucket}/${key}` }
 }
@@ -97,7 +114,45 @@ export async function publishInputBundle(
   reference: InputBundleArtifactRef,
   runId: string
 ): Promise<InputBundleArtifactRef> {
-  if (artifact_store === 'file') return reference
+  if (artifact_store === 'file') {
+    const published = publishedInputBundleReference(reference, runId)
+    if (await inputBundleExists(published)) return published
+    const source = fileURLToPath(reference.uri)
+    const destination = fileURLToPath(published.uri)
+    await fs.mkdir(path.dirname(destination), { recursive: true })
+    const temporary = await fs.mkdtemp(
+      path.join(path.dirname(destination), '.publish-')
+    )
+    try {
+      const staged = path.join(temporary, 'bundle')
+      await fs.copyFile(source, staged)
+      if (
+        !(await inputBundleExists({
+          ...reference,
+          uri: pathToFileURL(staged).href
+        }))
+      )
+        throw new Error('Local input bundle publication source is missing.')
+      // Link only the complete verified copy. Unlike rename, link cannot replace
+      // a concurrent winner. Attempts remove only their own temporary directory.
+      try {
+        await fs.link(staged, destination)
+      } catch (error) {
+        if (!(
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          error.code === 'EEXIST'
+        ))
+          throw error
+      }
+      if (!(await inputBundleExists(published)))
+        throw new Error('Published local input bundle is missing.')
+      return published
+    } finally {
+      await fs.rm(temporary, { recursive: true, force: true })
+    }
+  }
   if (!artifact_s3_bucket) {
     throw new Error(
       'SEC_REVIEW_ARTIFACT_S3_BUCKET is required for the S3 artifact store.'
