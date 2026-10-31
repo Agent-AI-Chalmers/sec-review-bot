@@ -48,10 +48,7 @@ async def _run(
     artifacts = tmp_path / "artifacts" / "analyzer"
     agent_called = {"value": False}
 
-    async def create_graph(**_kwargs: Any) -> object:
-        return object()
-
-    async def invoke_graph(**_kwargs: Any) -> dict[str, Any]:
+    async def run_agent(**_kwargs: Any) -> dict[str, Any]:
         agent_called["value"] = True
         return {
             "overview": "n/a",
@@ -61,12 +58,8 @@ async def _run(
 
     with (
         patch(
-            "sec_review_agents.review_stages.analysis.stage.create_analysis_agent_graph",
-            side_effect=create_graph,
-        ),
-        patch(
-            "sec_review_agents.review_stages.analysis.stage.invoke_agent_runtime_graph",
-            side_effect=invoke_graph,
+            "sec_review_agents.review_stages.analysis.stage.run_analysis_agent",
+            side_effect=run_agent,
         ),
     ):
         await run_analysis_stage(

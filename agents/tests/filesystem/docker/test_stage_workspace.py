@@ -1,7 +1,7 @@
 import shlex
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -46,15 +46,11 @@ async def test_issue_analyzer_docker_workspace_is_writable_stage_copy(
 
     stage_workspaces: list[Path] = []
 
-    async def fake_create_agent_graph(**kwargs: Any) -> object:
-        return Mock(backend=kwargs["backend"])
-
-    async def fake_invoke_agent_runtime_graph(
+    async def fake_run_agent(
         *,
-        agent: Any,
+        backend: Any,
         **_kwargs: Any,
     ) -> dict[str, Any]:
-        backend = agent.backend
         stage_workspaces.append(_workspace_mount_host(backend, source_workspace))
         _write_workspace_probe(backend, "analyzer")
         return {
@@ -69,12 +65,8 @@ async def test_issue_analyzer_docker_workspace_is_writable_stage_copy(
             return_value="docker",
         ),
         patch(
-            "sec_review_agents.review_stages.analysis.stage.create_analysis_agent_graph",
-            side_effect=fake_create_agent_graph,
-        ),
-        patch(
-            "sec_review_agents.review_stages.analysis.stage.invoke_agent_runtime_graph",
-            side_effect=fake_invoke_agent_runtime_graph,
+            "sec_review_agents.review_stages.analysis.stage.run_analysis_agent",
+            side_effect=fake_run_agent,
         ),
     ):
         await analyze_issue(
@@ -118,13 +110,9 @@ async def test_issue_verifier_docker_workspace_is_writable_stage_copy(
 
     stage_workspaces: list[Path] = []
 
-    def fake_create_agent_graph(**kwargs: Any) -> object:
-        backend = kwargs["backend"]
-        return Mock(backend=backend)
-
-    async def fake_invoke_agent_runtime_graph(
+    async def fake_run_agent(
         *,
-        agent: Any,
+        backend: Any,
         user_prompt: str,
         config: dict[str, Any] | None = None,
         **_kwargs: Any,
@@ -133,7 +121,6 @@ async def test_issue_verifier_docker_workspace_is_writable_stage_copy(
             user_prompt,
             config,
         )
-        backend = agent.backend
         assert backend is not None
         stage_workspaces.append(_workspace_mount_host(backend, source_workspace))
         _write_workspace_probe(backend, "verifier")
@@ -155,12 +142,8 @@ async def test_issue_verifier_docker_workspace_is_writable_stage_copy(
             return_value="docker",
         ),
         patch(
-            "sec_review_agents.review_stages.verification.stage.create_verification_agent_graph",
-            side_effect=fake_create_agent_graph,
-        ),
-        patch(
-            "sec_review_agents.review_stages.verification.stage.invoke_agent_runtime_graph",
-            side_effect=fake_invoke_agent_runtime_graph,
+            "sec_review_agents.review_stages.verification.stage.run_verification_agent",
+            side_effect=fake_run_agent,
         ),
     ):
         result = await verify_issue(

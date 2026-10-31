@@ -6,17 +6,13 @@ from pathlib import Path
 from typing import Any
 
 from sec_review_agents.agents.single_agent.agent import (
-    create_single_agent_graph,
+    run_single_agent,
 )
-from sec_review_agents.agents.single_agent.mcp import SINGLE_AGENT_MCP_TOOLS
 from sec_review_agents.filesystem.path_views import PathView
-from sec_review_agents.mcp.client import managed_mcp_tools_async
-from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
 from sec_review_agents.memory.runtime_view import materialized_memory_view
 from sec_review_agents.review_stages.single_agent.result import (
     build_single_agent_fix_outcome,
 )
-from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
@@ -76,33 +72,19 @@ async def run_single_agent_stage(
                     backend, setup_declaration_content=setup_declaration_content
                 ),
             )
-            # The agent package owns MCP capability selection. The stage
-            # materializes those tools so their sessions span graph construction
-            # and the complete invocation.
-            mcp_connections = resolve_agent_mcp_connections(
-                SINGLE_AGENT_MCP_TOOLS,
-                backend,
+            agent_output = await run_single_agent(
+                agent_name=agent_name,
+                backend=backend,
+                system_prompt=system_prompt,
+                filesystem_system_prompt=filesystem_system_prompt,
+                todo_system_prompt=todo_system_prompt,
+                todo_tool_description=todo_tool_description,
+                baseline_snapshot_tar_path=baseline_snapshot_tar_path,
+                workspace_root_path=workspace_path,
+                user_prompt=user_prompt,
+                trajectory_paths=(trajectory,),
+                memory_enabled=memory_path_view is not None,
             )
-            async with managed_mcp_tools_async(mcp_connections) as mcp_tools:
-                agent = await create_single_agent_graph(
-                    agent_name=agent_name,
-                    backend=backend,
-                    system_prompt=system_prompt,
-                    filesystem_system_prompt=filesystem_system_prompt,
-                    todo_system_prompt=todo_system_prompt,
-                    todo_tool_description=todo_tool_description,
-                    baseline_snapshot_tar_path=baseline_snapshot_tar_path,
-                    workspace_root_path=workspace_path,
-                    mcp_tools=mcp_tools,
-                    memory_enabled=memory_path_view is not None,
-                )
-                agent_output = await invoke_agent_runtime_graph(
-                    agent=agent,
-                    agent_name=agent_name,
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    trajectory_paths=(trajectory,),
-                )
         raw_declared_paths = agent_output.get("declared_changed_files")
         if raw_declared_paths is None:
             declared_patch_paths: list[str] = []

@@ -24,15 +24,11 @@ async def test_issue_analyzer_uses_stage_owned_workspace_copy(tmp_path: Path) ->
     )
     captured_workspace: list[Path] = []
 
-    async def fake_create_agent_graph(**kwargs: Any) -> object:
-        return Mock(backend=kwargs["backend"])
-
-    async def fake_invoke_agent_runtime_graph(
+    async def fake_run_agent(
         *,
-        agent: Any,
+        backend: Any,
         **_kwargs: Any,
     ) -> dict[str, Any]:
-        backend = agent.backend
         workspace = backend.routes["/workspace/"].root_dir
         assert isinstance(workspace, Path)
         captured_workspace.append(workspace)
@@ -50,12 +46,8 @@ async def test_issue_analyzer_uses_stage_owned_workspace_copy(tmp_path: Path) ->
             return_value="local",
         ),
         patch(
-            "sec_review_agents.review_stages.analysis.stage.create_analysis_agent_graph",
-            side_effect=fake_create_agent_graph,
-        ),
-        patch(
-            "sec_review_agents.review_stages.analysis.stage.invoke_agent_runtime_graph",
-            side_effect=fake_invoke_agent_runtime_graph,
+            "sec_review_agents.review_stages.analysis.stage.run_analysis_agent",
+            side_effect=fake_run_agent,
         ),
     ):
         await analyze_issue(

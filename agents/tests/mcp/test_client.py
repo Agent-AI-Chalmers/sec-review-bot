@@ -5,18 +5,8 @@ from unittest.mock import patch
 import pytest
 
 from sec_review_agents.mcp.client import (
-    load_mcp_tools_async,
     managed_mcp_tools_async,
 )
-
-
-class FakeMultiServerMCPClient:
-    def __init__(self, connections, *, tool_name_prefix):
-        self.connections = connections
-        self.tool_name_prefix = tool_name_prefix
-
-    async def get_tools(self):
-        return ["tool-a", "tool-b"]
 
 
 class FakeManagedMultiServerMCPClient:
@@ -36,22 +26,11 @@ class FakeManagedMultiServerMCPClient:
 
 
 @pytest.mark.asyncio
-async def test_load_mcp_tools_async_empty_connections_returns_without_adapter() -> None:
-    assert await load_mcp_tools_async({}) == []
-
-
-@pytest.mark.asyncio
-async def test_load_mcp_tools_async_awaits_adapter_client() -> None:
-    with patch(
-        "langchain_mcp_adapters.client.MultiServerMCPClient",
-        FakeMultiServerMCPClient,
-    ):
-        tools = await load_mcp_tools_async(
-            {"codegraph": {"transport": "stdio"}},
-            tool_name_prefix=False,
-        )
-
-    assert tools == ["tool-a", "tool-b"]
+async def test_empty_connections_do_not_create_a_client() -> None:
+    with patch("langchain_mcp_adapters.client.MultiServerMCPClient") as client:
+        async with managed_mcp_tools_async({}) as tools:
+            assert tools == []
+    client.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -98,3 +77,47 @@ async def test_managed_mcp_tools_share_sessions_until_context_exit() -> None:
         "close:playwright",
         "close:codegraph",
     ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["connect", "load"])
+async def test_partial_initialization_closes_sessions(
+    failure: str, monkeypatch
+) -> None:
+    """A later server failure must release sessions opened for earlier servers."""
+    FakeManagedMultiServerMCPClient.events = []
+
+    class Client(FakeManagedMultiServerMCPClient):
+        @asynccontextmanager
+        async def session(self, server_name):
+            if failure == "connect" and server_name == "playwright":
+                raise RuntimeError("connect failed")
+            async with super().session(server_name) as session:
+                yield session
+
+    async def load_tools(session, *, server_name, tool_name_prefix):
+        if failure == "load" and server_name == "playwright":
+            raise RuntimeError("load failed")
+        return [session]
+
+    monkeypatch.setattr("langchain_mcp_adapters.client.MultiServerMCPClient", Client)
+    monkeypatch.setattr("langchain_mcp_adapters.tools.load_mcp_tools", load_tools)
+    with pytest.raises(RuntimeError, match=f"{failure} failed"):
+        async with managed_mcp_tools_async(
+            {
+                "codegraph": {"transport": "stdio"},
+                "playwright": {"transport": "stdio"},
+            }
+        ):
+            pytest.fail("An incompletely initialized tool set must not escape.")
+
+    assert FakeManagedMultiServerMCPClient.events == (
+        ["open:codegraph", "close:codegraph"]
+        if failure == "connect"
+        else [
+            "open:codegraph",
+            "open:playwright",
+            "close:playwright",
+            "close:codegraph",
+        ]
+    )

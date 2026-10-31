@@ -8,7 +8,7 @@ from deepagents.backends import CompositeBackend
 from langchain.agents.middleware.types import ModelRequest
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 
-from sec_review_agents.agents.analysis.agent import create_analysis_agent_graph
+from sec_review_agents.agents.analysis.agent import run_analysis_agent
 from sec_review_agents.agents.memory_extractor.backend import (
     create_memory_extractor_backend,
 )
@@ -587,13 +587,17 @@ async def test_analysis_agent_enables_memory_when_runtime_memory_exists(
             "sec_review_agents.agents.analysis.agent.build_agent_runtime_graph",
             side_effect=fake_build_agent_runtime_graph,
         ),
+        patch(
+            "sec_review_agents.agents.analysis.agent.invoke_agent_runtime_graph",
+            return_value={},
+        ),
     ):
-        await create_analysis_agent_graph(
+        await run_analysis_agent(
             agent_name="issue-analyzer",
             backend=LocalFilesystemBackend(tmp_path / "workspace"),
             system_prompt="system",
             filesystem_system_prompt="filesystem",
-            mcp_tools=[],
+            user_prompt="user",
             memory_enabled=True,
         )
 
@@ -667,13 +671,17 @@ async def test_analysis_agent_leaves_memory_disabled_when_runtime_memory_is_miss
             "sec_review_agents.agents.analysis.agent.build_agent_runtime_graph",
             side_effect=fake_build_agent_runtime_graph,
         ),
+        patch(
+            "sec_review_agents.agents.analysis.agent.invoke_agent_runtime_graph",
+            return_value={},
+        ),
     ):
-        await create_analysis_agent_graph(
+        await run_analysis_agent(
             agent_name="issue-analyzer",
             backend=LocalFilesystemBackend(tmp_path / "workspace"),
             system_prompt="system",
             filesystem_system_prompt="filesystem",
-            mcp_tools=[],
+            user_prompt="user",
             memory_enabled=False,
         )
 

@@ -79,11 +79,7 @@ async def _mitigation_error_stage_result(tmp_path: Path) -> dict[str, Any]:
             return_value=object(),
         ),
         patch(
-            "sec_review_agents.review_stages.mitigation.stage.create_mitigation_agent_graph",
-            return_value=object(),
-        ),
-        patch(
-            "sec_review_agents.review_stages.mitigation.stage.invoke_agent_runtime_graph",
+            "sec_review_agents.review_stages.mitigation.stage.run_mitigation_agent",
             side_effect=RuntimeError("mitigator exploded"),
         ),
     ):
@@ -119,11 +115,7 @@ async def test_repository_case_verifier_exception_is_raised_for_activity_retry(
             return_value=object(),
         ),
         patch(
-            "sec_review_agents.review_stages.verification.stage.create_verification_agent_graph",
-            return_value=object(),
-        ),
-        patch(
-            "sec_review_agents.review_stages.verification.stage.invoke_agent_runtime_graph",
+            "sec_review_agents.review_stages.verification.stage.run_verification_agent",
             side_effect=RuntimeError("verifier exploded"),
         ),
         pytest.raises(RuntimeError, match="verifier exploded"),

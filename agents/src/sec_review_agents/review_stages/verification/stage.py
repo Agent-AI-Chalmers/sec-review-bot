@@ -7,19 +7,15 @@ from pathlib import Path
 from typing import Any
 
 from sec_review_agents.agents.verification.agent import (
-    create_verification_agent_graph,
+    run_verification_agent,
 )
-from sec_review_agents.agents.verification.mcp import VERIFICATION_AGENT_MCP_TOOLS
 from sec_review_agents.filesystem.path_views import PathView
-from sec_review_agents.mcp.client import managed_mcp_tools_async
-from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
 from sec_review_agents.memory.runtime_view import materialized_memory_view
 from sec_review_agents.review_stages.feedback_loop import MAX_FEEDBACK_RETRY_ATTEMPTS
 from sec_review_agents.review_stages.verification.result import (
     build_skipped_verification_result,
     build_verification_stage_result,
 )
-from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
@@ -246,29 +242,15 @@ async def run_verification_stage(
                     backend, setup_declaration_content=setup_declaration_content
                 ),
             )
-            # The agent package owns MCP capability selection. The stage
-            # materializes those tools so their sessions span graph construction
-            # and the complete invocation.
-            mcp_connections = resolve_agent_mcp_connections(
-                VERIFICATION_AGENT_MCP_TOOLS,
-                backend,
+            agent_output = await run_verification_agent(
+                agent_name=agent_name,
+                backend=backend,
+                system_prompt=system_prompt,
+                filesystem_system_prompt=filesystem_system_prompt,
+                user_prompt=user_prompt,
+                trajectory_paths=trajectory_paths,
+                memory_enabled=memory_path_view is not None,
             )
-            async with managed_mcp_tools_async(mcp_connections) as mcp_tools:
-                agent = await create_verification_agent_graph(
-                    agent_name=agent_name,
-                    backend=backend,
-                    system_prompt=system_prompt,
-                    filesystem_system_prompt=filesystem_system_prompt,
-                    mcp_tools=mcp_tools,
-                    memory_enabled=memory_path_view is not None,
-                )
-                agent_output = await invoke_agent_runtime_graph(
-                    agent=agent,
-                    agent_name=agent_name,
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    trajectory_paths=trajectory_paths,
-                )
 
         validate_verification_coverages(agent_output, mitigation_result)
         result = build_verification_stage_result(

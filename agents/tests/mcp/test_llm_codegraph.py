@@ -15,6 +15,7 @@ from sec_review_agents.agents.analysis.repository import (
     create_repository_analyzer_backend,
 )
 from sec_review_agents.llm.factory import create_chat_model
+from sec_review_agents.mcp.client import managed_mcp_tools_async
 from sec_review_agents.mcp.codegraph import codegraph_mcp_connections_for_backend
 from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
@@ -76,6 +77,11 @@ async def test_llm_uses_codegraph_mcp_to_find_symbol_and_caller(
             scan_mode="full",
         )
 
+    async with amanaged_backend(backend):
+        await _run_codegraph_probe(backend, workspace)
+
+
+async def _run_codegraph_probe(backend: Any, workspace: Path) -> None:
     with patch.dict(
         "os.environ",
         {"AGENT_MCP_ENABLED": "true"},
@@ -91,33 +97,33 @@ async def test_llm_uses_codegraph_mcp_to_find_symbol_and_caller(
             "workspace. Do not guess from the prompt. Return structured "
             "output only."
         )
-        agent = await build_agent_runtime_graph(
-            model=model,
-            agent_name="codegraph-mcp-probe",
-            backend=backend,
-            system_prompt=system_prompt,
-            response_format=CodeGraphMcpProbeOutput,
-            mcp_connections=codegraph_mcp_connections_for_backend(
-                backend,
-                host_workspace_path=workspace,
-            ),
+        connections = codegraph_mcp_connections_for_backend(
+            backend,
+            host_workspace_path=workspace,
         )
-
-    async with amanaged_backend(backend):
-        result = await agent.ainvoke(
-            {
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": (
-                            "Find the symbol named build_admin_report. "
-                            "Return its file path and one function that calls it."
-                        ),
-                    }
-                ]
-            },
-            config={"recursion_limit": 25},
-        )
+        async with managed_mcp_tools_async(connections) as tools:
+            agent = await build_agent_runtime_graph(
+                model=model,
+                agent_name="codegraph-mcp-probe",
+                backend=backend,
+                system_prompt=system_prompt,
+                response_format=CodeGraphMcpProbeOutput,
+                tools=tools,
+            )
+            result = await agent.ainvoke(
+                {
+                    "messages": [
+                        {
+                            "role": "user",
+                            "content": (
+                                "Find the symbol named build_admin_report. "
+                                "Return its file path and one function that calls it."
+                            ),
+                        }
+                    ]
+                },
+                config={"recursion_limit": 25},
+            )
 
     parsed = result.get("structured_response")
     if isinstance(parsed, dict):

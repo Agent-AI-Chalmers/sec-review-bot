@@ -215,12 +215,16 @@ async def test_review_agents_load_guidance_independently_of_experience_memory(
     monkeypatch.setattr(module, "agent_skills_enabled", lambda: False)
     build = AsyncMock()
     monkeypatch.setattr(module, "build_agent_runtime_graph", build)
+    monkeypatch.setattr(
+        module, "invoke_agent_runtime_graph", AsyncMock(return_value={})
+    )
+    monkeypatch.setenv("AGENT_MCP_ENABLED", "false")
     kwargs = {
         "agent_name": "test",
         "backend": backend,
         "system_prompt": "Stage role.",
         "filesystem_system_prompt": "Tools.",
-        "mcp_tools": [],
+        "user_prompt": "Review.",
         "memory_enabled": False,
     }
     if role in {"mitigation", "single_agent"}:
@@ -231,10 +235,10 @@ async def test_review_agents_load_guidance_independently_of_experience_memory(
     if role == "single_agent":
         kwargs.update(todo_system_prompt="Todo.", todo_tool_description="Plan.")
     function_name = {
-        "analysis": "create_analysis_agent_graph",
-        "mitigation": "create_mitigation_agent_graph",
-        "verification": "create_verification_agent_graph",
-        "single_agent": "create_single_agent_graph",
+        "analysis": "run_analysis_agent",
+        "mitigation": "run_mitigation_agent",
+        "verification": "run_verification_agent",
+        "single_agent": "run_single_agent",
     }[role]
     await getattr(module, function_name)(**kwargs)
     middleware = build.call_args.kwargs["middleware"]
