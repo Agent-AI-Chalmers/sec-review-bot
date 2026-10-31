@@ -1,7 +1,7 @@
 import hashlib
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, NotRequired, TypedDict
+from typing import Any
 
 from sec_review_agents.utils.markdown import (
     bullet_section,
@@ -12,6 +12,9 @@ from sec_review_agents.utils.markdown import (
 from sec_review_agents.utils.paths_ignore import (
     matches_paths_ignore,
     normalize_paths_ignore,
+)
+from sec_review_agents.workflows.repository_case.input import (
+    RepositoryCaseExecutionInput,
 )
 from sec_review_agents.workflows.review_intent import TestChangesPolicy
 
@@ -24,17 +27,6 @@ DELETION_CASE_CATEGORY = "deleted-file"
 # skipping deletion review for the whole window rather than splitting it into pieces that would
 # look reviewed. Ordinary triaged cases still run.
 MAX_DELETED_FILES = 200
-
-
-class RepositoryCaseExecutionInput(TypedDict):
-    case_id: str
-    review_input: str
-    workspace_snapshot_tar_path: str
-    history_path: str
-    scan_mode: str
-    incremental_window_path: str | None
-    test_changes: TestChangesPolicy
-    setup_declaration_content: NotRequired[str | None]
 
 
 def prepare_case_execution_input(
@@ -341,7 +333,6 @@ def _anchor_locations_section(locations: list[Any]) -> str:
 
 
 __all__ = [
-    "RepositoryCaseExecutionInput",
     "build_review_input",
     "prepare_case_execution_input",
 ]

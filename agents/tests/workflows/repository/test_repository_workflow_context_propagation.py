@@ -3,11 +3,13 @@ from unittest.mock import patch
 
 import pytest
 
-import sec_review_agents.workflows.repository.workflow as repository_workflow
-from sec_review_agents.workflows.repository.case_execution_input import (
+import sec_review_agents.workflows.repository_case.workflow as repository_case_workflow
+from sec_review_agents.workflows.repository_case.input import (
     RepositoryCaseExecutionInput,
 )
-from sec_review_agents.workflows.repository.workflow import RepositoryCaseReviewRequest
+from sec_review_agents.workflows.repository_case.workflow import (
+    RepositoryCaseReviewRequest,
+)
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 
 
@@ -45,12 +47,15 @@ async def test_repository_case_activity_binds_trace_context() -> None:
             "timeout_seconds": 30,
             "runtime_context": {},
         }
-        result = await repository_workflow.analyze_repository_case_activity(
+        result = await repository_case_workflow.analyze_repository_case_activity(
             request,
             {
                 "case_execution_input": repository_case_execution_input("case-1"),
                 "artifact_paths": {
                     "analyzer": "/tmp/cases/case-1/analyzer",
+                    "cvss": "/tmp/cases/case-1/cvss",
+                    "mitigator": "/tmp/cases/case-1/mitigator",
+                    "verifier": "/tmp/cases/case-1/verifier",
                 },
                 "published_trajectories_path": published_trajectories_path,
             },

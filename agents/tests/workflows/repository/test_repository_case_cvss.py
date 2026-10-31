@@ -25,6 +25,10 @@ async def test_cvss_stage_persists_failure_before_reraising(tmp_path: Path) -> N
         await score_repository_case_cvss_stage(
             {
                 "case_id": "case-1",
+                "history_path": str(tmp_path / "history"),
+                "scan_mode": "full",
+                "incremental_window_path": None,
+                "test_changes": "allow",
                 "review_input": "Review the reported vulnerability.",
                 "workspace_snapshot_tar_path": str(tmp_path / "workspace.snapshot.tar"),
             },
@@ -55,6 +59,10 @@ async def test_cvss_stage_does_not_report_cancellation_as_scoring_failure(
         await score_repository_case_cvss_stage(
             {
                 "case_id": "case-1",
+                "history_path": str(tmp_path / "history"),
+                "scan_mode": "full",
+                "incremental_window_path": None,
+                "test_changes": "allow",
                 "review_input": "Review the reported vulnerability.",
                 "workspace_snapshot_tar_path": str(tmp_path / "workspace.snapshot.tar"),
             },

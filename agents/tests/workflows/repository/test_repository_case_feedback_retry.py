@@ -7,14 +7,14 @@ import pytest
 from temporalio import activity
 from temporalio.worker import Worker
 
-from sec_review_agents.workflows.repository.case_execution_input import (
+from sec_review_agents.workflows.repository_case import stage as case_workflow
+from sec_review_agents.workflows.repository_case.input import (
     RepositoryCaseExecutionInput,
 )
-from sec_review_agents.workflows.repository.workflow import (
+from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
     RepositoryCaseReviewWorkflow,
 )
-from sec_review_agents.workflows.repository_case import stage as case_workflow
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
 from tests.temporal_test_utils import temporal_time_skipping_environment
@@ -68,10 +68,9 @@ async def _mitigation_error_stage_result(tmp_path: Path) -> dict[str, Any]:
     snapshot_tar = tmp_path / "workspace.snapshot.tar"
     create_workspace_snapshot_tar(workspace_path=workspace, tar_path=snapshot_tar)
 
-    case_input = repository_case_execution_input("case-mitigation-error") | {
-        "workspace_snapshot_tar_path": str(snapshot_tar),
-        "history_path": str(tmp_path / "history"),
-    }
+    case_input = repository_case_execution_input("case-mitigation-error")
+    case_input["workspace_snapshot_tar_path"] = str(snapshot_tar)
+    case_input["history_path"] = str(tmp_path / "history")
 
     with (
         patch(
@@ -104,10 +103,9 @@ async def test_repository_case_verifier_exception_is_raised_for_activity_retry(
     snapshot_tar = tmp_path / "workspace.snapshot.tar"
     create_workspace_snapshot_tar(workspace_path=workspace, tar_path=snapshot_tar)
 
-    case_input = repository_case_execution_input("case-verification-error") | {
-        "workspace_snapshot_tar_path": str(snapshot_tar),
-        "history_path": str(tmp_path / "history"),
-    }
+    case_input = repository_case_execution_input("case-verification-error")
+    case_input["workspace_snapshot_tar_path"] = str(snapshot_tar)
+    case_input["history_path"] = str(tmp_path / "history")
 
     with (
         patch(
