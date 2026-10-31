@@ -17,9 +17,9 @@
  * under which trigger context the result should be published to GitHub. It is
  * an internal recovery record, not a copy of the original request payload.
  */
-import type { SubmittedIssueReviewRun } from '../reviews/issues/submit.js'
-import type { SubmittedPullRequestReviewRun } from '../reviews/pull-requests/submit.js'
-import type { SubmittedRepositoryReviewRun } from '../reviews/repositories/submit.js'
+import type { PreparedIssueReviewRun } from '../reviews/issues/prepare-review.js'
+import type { PreparedPullRequestReviewRun } from '../reviews/pull-requests/prepare-review.js'
+import type { PreparedRepositoryReviewRun } from '../reviews/repositories/prepare-review.js'
 import { splitRepoFullName } from '../github/repository-service.js'
 import { DeterministicExecutionPublishError } from '../execution/publish-error.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../execution/publish-error-code.js'
@@ -240,34 +240,34 @@ function scanTarget(value: unknown): PersistedRepositoryScanTarget {
 }
 
 export function issueReviewPublishContext(
-  submitted: SubmittedIssueReviewRun
+  prepared: PreparedIssueReviewRun
 ): IssueReviewPublishContext {
   return parseIssueReviewPublishContext({
-    issue: submitted.issue,
-    workspace_ref: submitted.workspace_ref,
-    event_type: submitted.event_type,
-    open_pr: submitted.open_pr
+    issue: prepared.issue,
+    workspace_ref: prepared.workspace_ref,
+    event_type: prepared.event_type,
+    open_pr: prepared.open_pr
   })
 }
 
 export function pullRequestReviewPublishContext(
-  submitted: SubmittedPullRequestReviewRun
+  prepared: PreparedPullRequestReviewRun
 ): PullRequestReviewPublishContext {
   return parsePullRequestReviewPublishContext({
-    pr: submitted.pr,
-    files: submitted.files,
-    event_type: submitted.event_type
+    pr: prepared.pr,
+    files: prepared.files,
+    event_type: prepared.event_type
   })
 }
 
 export function repositoryReviewPublishContext(
-  submitted: SubmittedRepositoryReviewRun
+  prepared: PreparedRepositoryReviewRun
 ): RepositoryReviewPublishContext {
   return parseRepositoryReviewPublishContext({
-    repo: submitted.repo,
-    workspace_ref: submitted.workspace_ref,
-    scan_target: submitted.scan_target,
-    event_type: submitted.event_type
+    repo: prepared.repo,
+    workspace_ref: prepared.workspace_ref,
+    scan_target: prepared.scan_target,
+    event_type: prepared.event_type
   })
 }
 

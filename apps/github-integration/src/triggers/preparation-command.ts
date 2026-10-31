@@ -75,7 +75,7 @@ export interface ClaimedPreparation {
  * Admit, prepare, submit — and record a preparation failure against the run that owns it.
  *
  * A webhook redelivery is answered with the run it originally admitted, so the caller must
- * treat the returned run id as either a fresh submission or a replay. `start_review` is only
+ * treat the returned run id as either a fresh submission or a replay. `prepare_review` is only
  * called for a run this invocation admitted or claimed, which is what makes its side effects
  * safe to retry: the review itself is idempotent per run.
  *
@@ -83,13 +83,13 @@ export interface ClaimedPreparation {
  * preparing this run, and a submission error means Review Runs already answered the boundary,
  * so in both cases writing a failure here would contradict the record.
  */
-export async function runPreparationCommand<T, P>({
+export async function runPreparationCommand<P>({
   store,
   admission,
   claimed_preparation,
   on_admitted,
   publish_context,
-  start_review
+  prepare_review
 }: {
   store: PreparationCommandStore
   admission: PreparationAdmission
@@ -101,13 +101,12 @@ export async function runPreparationCommand<T, P>({
   }) => void
   /** How this workflow's prepared review becomes the run's publish context. */
   publish_context: (prepared: P) => PreparedPublishContext
-  start_review: (context: {
+  prepare_review: (context: {
     run_id: string
-    on_prepared: (prepared: P, input: PreparedInput) => Promise<void>
     /** Store connector input against this claim, so a restart resumes it instead of re-resolving. */
     checkpoint: (preparation_input: Record<string, unknown>) => Promise<void>
-  }) => Promise<T>
-}): Promise<T | { run_id: string }> {
+  }) => Promise<{ review: P; input: PreparedInput }>
+}): Promise<{ run_id: string }> {
   const admitted =
     claimed_preparation === undefined
       ? await admitReviewRun(store, {
@@ -145,7 +144,7 @@ export async function runPreparationCommand<T, P>({
   try {
     if (await recoverInputBundlePublication(store, run_id, preparationToken))
       return { run_id }
-    return await start_review({
+    const prepared = await prepare_review({
       run_id,
       checkpoint: async (preparation_input) => {
         if (store.checkpointPreparationInput === undefined)
@@ -155,20 +154,18 @@ export async function runPreparationCommand<T, P>({
           preparationToken,
           preparation_input
         )
-      },
-      on_prepared: async (prepared, input) => {
-        // Confirm the lease immediately before crossing the durable submission
-        // boundary; the submission itself remains token-fenced by Review Runs.
-        await heartbeat.assertOwned()
-        await publishAndSubmitInputBundle(
-          store,
-          run_id,
-          preparationToken,
-          publish_context(prepared),
-          input
-        )
       }
     })
+    // Renew immediately before publishing; Review Runs also fences the submission token.
+    await heartbeat.assertOwned()
+    await publishAndSubmitInputBundle(
+      store,
+      run_id,
+      preparationToken,
+      publish_context(prepared.review),
+      prepared.input
+    )
+    return { run_id }
   } catch (error) {
     const ownsClaim = await heartbeat.stop()
     if (

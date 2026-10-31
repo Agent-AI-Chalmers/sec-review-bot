@@ -5,8 +5,8 @@ import { setGitHubAppMetadata } from '../../../../src/github/github-app-metadata
 import type { ManualCommandAuthorizationDecision } from '../../../../src/github/manual-command-authorization.js'
 import type { IssueContext } from '../../../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../../../src/github/pull-request-service.js'
-import type { SubmittedIssueReviewRun } from '../../../../src/reviews/issues/submit.js'
-import type { SubmittedPullRequestReviewRun } from '../../../../src/reviews/pull-requests/submit.js'
+import type { PreparedIssueReviewRun } from '../../../../src/reviews/issues/prepare-review.js'
+import type { PreparedPullRequestReviewRun } from '../../../../src/reviews/pull-requests/prepare-review.js'
 import { handleIssueCommentCreatedWithDeps } from '../../../../src/ingress/github/webhooks/issue-comment-created.js'
 import { createLogThrottle } from '../../../../src/utils/log-throttle.js'
 import { unusedGitHub } from '../../../github-client.js'
@@ -103,7 +103,7 @@ function pullRequestContext(): PullRequestContext {
   }
 }
 
-function submittedIssueRun(issue: IssueContext): SubmittedIssueReviewRun {
+function submittedIssueRun(issue: IssueContext): PreparedIssueReviewRun {
   return {
     issue,
     run_id: 'run-issue-test',
@@ -116,7 +116,7 @@ function submittedIssueRun(issue: IssueContext): SubmittedIssueReviewRun {
 
 function submittedPullRequestRun(
   pr: PullRequestContext
-): SubmittedPullRequestReviewRun {
+): PreparedPullRequestReviewRun {
   return {
     pr,
     run_id: 'run-pr-test',

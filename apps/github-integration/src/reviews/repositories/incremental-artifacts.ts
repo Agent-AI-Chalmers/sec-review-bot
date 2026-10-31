@@ -5,7 +5,7 @@ import type { Octokit } from 'octokit'
 
 import { exportWorkspaceWindow } from '../../artifacts/git-workspace.js'
 import type { RepositoryScanScope } from '../../execution/input.js'
-import type { RepositoryContext } from './submit.js'
+import type { RepositoryContext } from './prepare-review.js'
 
 /**
  * One entry of `changed-files.json`.

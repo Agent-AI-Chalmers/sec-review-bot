@@ -25,7 +25,7 @@ import type {
 } from '../../src/review-runs/client.js'
 import { EXECUTION_API_VERSION } from '../../src/execution/execution-api-version.js'
 import type { RepositoryReviewInput } from '../../src/execution/input.js'
-import type { SubmittedRepositoryReviewRun } from '../../src/reviews/repositories/submit.js'
+import type { PreparedRepositoryReviewRun } from '../../src/reviews/repositories/prepare-review.js'
 import { fakeGitHub, githubJson, unusedGitHub } from '../github-client.js'
 
 /** An admitted run record as Review Runs returns it, with the axis shapes spelled once.
@@ -44,7 +44,7 @@ const bundlePath = path.join(bundleRoot, 'bundle.tar.zst')
 await fs.writeFile(bundlePath, 'x')
 test.after(() => fs.rm(bundleRoot, { recursive: true, force: true }))
 
-/** A complete `RepositoryReviewInput`, the second argument of `on_prepared`. */
+/** A complete `RepositoryReviewInput`, returned by preparation. */
 function repositoryReviewInput(): RepositoryReviewInput &
   Record<string, unknown> {
   return {
@@ -252,9 +252,9 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
         assert.strictEqual(args.payload.test_changes, 'deny')
         return resolved
       },
-      submit_run: async (args) => {
+      prepare_review: async (args) => {
         submit_calls.push(args)
-        const submitted: SubmittedRepositoryReviewRun = {
+        const submitted: PreparedRepositoryReviewRun = {
           repo: {
             owner_login: 'octo',
             repo_name: 'example',
@@ -275,8 +275,7 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
           workflow: 'repository-review',
           event_type: 'manual'
         }
-        await args.on_prepared?.(submitted, repositoryReviewInput())
-        return submitted
+        return { review: submitted, input: repositoryReviewInput() }
       },
       store: {
         ...preparationClaim,
@@ -299,7 +298,6 @@ test('dispatchRepositoryReview resolves, submits, and persists a queued reposito
   assert.strictEqual(submitted.run_id, 'run-1')
   assert.strictEqual(submit_calls.length, 1)
   const submitCall = submit_calls[0] as Record<string, unknown>
-  assert.strictEqual(typeof submitCall.on_prepared, 'function')
   assert.deepStrictEqual(
     {
       octokit: submitCall.octokit,
@@ -378,7 +376,7 @@ test('dispatchRepositoryReview reuses the run admitted for the same repository d
         test_changes: null,
         correlation_id: 'actions-run-replayed'
       }),
-      submit_run: async () => {
+      prepare_review: async () => {
         submissions += 1
         throw new Error('replayed dispatch must not submit another run')
       },
@@ -429,8 +427,8 @@ test('dispatchRepositoryReview maps resolver errors to validation errors', async
         resolve_dispatch: async () => {
           throw new Error('manual incremental scan requires base_sha.')
         },
-        submit_run: async () => {
-          throw new Error('submit_run should not be called')
+        prepare_review: async () => {
+          throw new Error('prepare_review should not be called')
         },
         store: {
           ...preparationClaim,
@@ -479,7 +477,8 @@ test('dispatchRepositoryReview rejects invalid pure contract fields before admis
           assert.fail('invalid contract must not call GitHub'),
         resolve_dispatch: async () =>
           assert.fail('invalid contract must not resolve refs'),
-        submit_run: async () => assert.fail('invalid contract must not submit'),
+        prepare_review: async () =>
+          assert.fail('invalid contract must not submit'),
         store: {
           ...preparationClaim,
           admitReviewRun: () =>
@@ -521,7 +520,7 @@ test('dispatchRepositoryReview records an accepted run when preparation or submi
           test_changes: 'allow',
           correlation_id: 'actions-run-failed'
         }),
-        submit_run: async ({ run_id }) => {
+        prepare_review: async ({ run_id }) => {
           assert.strictEqual(run_id, 'run-repo-failed')
           throw new Error('bundle preparation failed')
         },
@@ -591,9 +590,9 @@ test('dispatchRepositoryReview preserves an uncertain Execution submission for r
           test_changes: null,
           correlation_id: 'actions-run-uncertain'
         }),
-        submit_run: async (args) => {
-          await args.on_prepared?.(
-            {
+        prepare_review: async () => {
+          return {
+            review: {
               repo: {
                 owner_login: 'octo',
                 repo_name: 'example',
@@ -614,9 +613,8 @@ test('dispatchRepositoryReview preserves an uncertain Execution submission for r
               workflow: 'repository-review',
               event_type: 'manual'
             },
-            repositoryReviewInput()
-          )
-          throw error
+            input: repositoryReviewInput()
+          }
         },
         store: {
           ...preparationClaim,
@@ -626,8 +624,10 @@ test('dispatchRepositoryReview preserves an uncertain Execution submission for r
               created: true,
               preparation_token: 'claim'
             }) satisfies ReviewRunAdmission,
-          submitPreparedRun: (run_id, _token, context, input) =>
-            transitions.push(['prepared', run_id, context, input]),
+          submitPreparedRun: (run_id, _token, context, input) => {
+            transitions.push(['prepared', run_id, context, input])
+            throw error
+          },
           failPreparation: (run_id, _token, failure) =>
             transitions.push([run_id, failure])
         }

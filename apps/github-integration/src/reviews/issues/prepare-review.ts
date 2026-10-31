@@ -8,7 +8,7 @@ import type {
   TestChangesPolicy
 } from '../../execution/input.js'
 
-interface RunIssueReviewArgs {
+interface PrepareIssueReviewArgs {
   run_id: string
   octokit: Octokit
   issue: IssueContext
@@ -19,20 +19,15 @@ interface RunIssueReviewArgs {
   // Whether this run may open a draft PR when the review record contains a ready patch.
   // The end user opts in per comment; automatic triggers leave this false.
   open_pr?: boolean | null
-  // The caller hands the prepared input to Review Runs for durable submission.
-  on_prepared?: (
-    submitted: SubmittedIssueReviewRun,
-    input: IssueReviewInput & Record<string, unknown>
-  ) => void | Promise<void>
 }
 
-interface StartIssueReviewRunDeps {
+interface PrepareIssueReviewDeps {
   // Test seam: defaults to the real preparer. Lets a unit test assert what this
   // layer forwards to the execution input without materializing a git workspace.
   prepare_input: typeof prepareIssueReviewInput
 }
 
-export interface SubmittedIssueReviewRun {
+export interface PreparedIssueReviewRun {
   issue: IssueContext
   run_id: string
   workspace_ref: string
@@ -45,28 +40,28 @@ function assertIssueReviewInput(
   input: IssueReviewInput
 ): asserts input is IssueReviewInput & Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    throw new Error(
-      'Issue review input is missing before execution submission.'
-    )
+    throw new Error('Issue review input is missing after preparation.')
   }
 }
 
-async function materializeIssueReviewInput(
+export async function prepareIssueReview(
+  args: PrepareIssueReviewArgs,
   {
+    prepare_input = prepareIssueReviewInput
+  }: Partial<PrepareIssueReviewDeps> = {}
+): Promise<{
+  review: PreparedIssueReviewRun
+  input: IssueReviewInput & Record<string, unknown>
+}> {
+  const {
     run_id,
     octokit,
     issue,
     trusted_default_branch,
-    event_type = 'manual_review',
-    review_objective = 'audit',
+    event_type,
+    review_objective,
     test_changes
-  }: RunIssueReviewArgs,
-  prepare_input: typeof prepareIssueReviewInput
-): Promise<{
-  run_id: string
-  input: IssueReviewInput
-  workspace_ref: string
-}> {
+  } = args
   const resolvedEventType = event_type ?? 'manual_review'
   const resolvedReviewObjective = review_objective ?? 'audit'
   // `test_changes` constrains the mitigation patch, not the objective. An `audit`
@@ -96,17 +91,8 @@ async function materializeIssueReviewInput(
     ...(resolvedTestChanges ? { test_changes: resolvedTestChanges } : {})
   })
 
-  const analysisInput = prepared?.input ?? null
-
-  if (
-    !analysisInput ||
-    typeof analysisInput !== 'object' ||
-    Array.isArray(analysisInput)
-  ) {
-    throw new Error(
-      `Issue input materialization returned an invalid value for issue #${issue.issue_number}.`
-    )
-  }
+  const input = prepared.input
+  assertIssueReviewInput(input)
 
   logInfo('issue_review_input_completed', {
     event_type: resolvedEventType,
@@ -116,38 +102,14 @@ async function materializeIssueReviewInput(
   })
 
   return {
-    run_id: prepared.run_id,
-    input: analysisInput,
-    workspace_ref: prepared.workspace_ref
+    review: {
+      issue,
+      run_id: prepared.run_id,
+      workspace_ref: prepared.workspace_ref,
+      workflow: 'issue-review',
+      event_type: resolvedEventType,
+      open_pr: args.open_pr ?? false
+    },
+    input
   }
-}
-
-export async function startIssueReviewRun(
-  args: RunIssueReviewArgs,
-  deps: Partial<StartIssueReviewRunDeps> = {}
-): Promise<SubmittedIssueReviewRun> {
-  const { prepare_input = prepareIssueReviewInput } = deps
-  const prepared = await materializeIssueReviewInput(args, prepare_input)
-  const input = prepared.input
-  const event_type = args.event_type ?? 'manual_review'
-  assertIssueReviewInput(input)
-  const preparedRun: SubmittedIssueReviewRun = {
-    issue: args.issue,
-    run_id: prepared.run_id,
-    workspace_ref: prepared.workspace_ref,
-    workflow: 'issue-review',
-    event_type,
-    open_pr: args.open_pr ?? false
-  }
-  if (args.on_prepared === undefined)
-    throw new Error('Issue review submission callback is required.')
-  await args.on_prepared(preparedRun, input)
-  logInfo('issue_review_execution_submitted', {
-    event_type,
-    issue: args.issue.issue_number,
-    repo: args.issue.repo_full_name,
-    run_id: prepared.run_id,
-    workflow: preparedRun.workflow
-  })
-  return preparedRun
 }

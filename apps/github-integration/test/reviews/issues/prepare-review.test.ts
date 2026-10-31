@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { startIssueReviewRun } from '../../../src/reviews/issues/submit.js'
+import { prepareIssueReview } from '../../../src/reviews/issues/prepare-review.js'
 import type { IssueContext } from '../../../src/github/issue-service.js'
 import type {
   IssueReviewInput,
@@ -64,7 +64,7 @@ async function runWith(
   test_changes: TestChangesPolicy | null
 ) {
   const { calls, prepare_input } = fakePrepareInput()
-  await startIssueReviewRun(
+  const prepared = await prepareIssueReview(
     {
       run_id: 'run-issue-1',
       octokit: unusedGitHub().octokit,
@@ -75,11 +75,19 @@ async function runWith(
       },
       event_type: 'manual_review',
       review_objective,
-      test_changes,
-      on_prepared: async () => {}
+      test_changes
     },
     { prepare_input }
   )
+  assert.deepStrictEqual(prepared.review, {
+    issue: issueContext(),
+    run_id: 'run-issue-1',
+    workspace_ref: 'workspace-ref',
+    workflow: 'issue-review',
+    event_type: 'manual_review',
+    open_pr: false
+  })
+  assert.strictEqual(prepared.input.api_version, EXECUTION_API_VERSION)
   return calls
 }
 

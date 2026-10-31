@@ -11,7 +11,7 @@ import test from 'node:test'
 
 import { startIssueReviewCommand } from '../../src/triggers/issue-review.js'
 import { startPullRequestReviewCommand } from '../../src/triggers/pull-request-review.js'
-import type { SubmittedPullRequestReviewRun } from '../../src/reviews/pull-requests/submit.js'
+import type { PreparedPullRequestReviewRun } from '../../src/reviews/pull-requests/prepare-review.js'
 import type { IssueContext } from '../../src/github/issue-service.js'
 import type { PullRequestContext } from '../../src/github/pull-request-service.js'
 import { ReviewRunsSubmissionError } from '../../src/review-runs/client.js'
@@ -149,7 +149,7 @@ function pullRequestContext(): PullRequestContext {
   }
 }
 
-/** A complete `IssueReviewInput`, the second argument of `on_prepared`.
+/** A complete `IssueReviewInput`, returned by preparation.
  *
  * `satisfies` keeps this honest: the trigger reads the field set, so an incomplete stub would
  * silently hand it `undefined` where the real submission always supplies a value.
@@ -170,7 +170,7 @@ function issueReviewInput(): IssueReviewInput & Record<string, unknown> {
   } satisfies IssueReviewInput
 }
 
-/** A complete `PullRequestReviewInput`, the second argument of `on_prepared` for PR runs. */
+/** A complete `PullRequestReviewInput`, returned by PR preparation. */
 function pullRequestReviewInput(): PullRequestReviewInput &
   Record<string, unknown> {
   return {
@@ -202,6 +202,7 @@ function pullRequestReviewInput(): PullRequestReviewInput &
 test('startIssueReviewCommand starts and persists a queued issue review run', async () => {
   const issue = issueContext()
   const transitions: unknown[] = []
+  const phases: string[] = []
 
   const submitted = await startIssueReviewCommand({
     octokit: unusedGitHub().octokit,
@@ -210,13 +211,12 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
     event_type: 'opened',
     delivery_id: 'delivery-issue-1',
     deps: {
-      start_review: async ({
+      prepare_review: async ({
         issue: submittedIssue,
         run_id,
         event_type,
         review_objective,
-        test_changes,
-        on_prepared
+        test_changes
       }) => {
         assert.strictEqual(run_id, 'run-issue-1')
         assert.strictEqual(event_type, 'opened')
@@ -230,11 +230,27 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
           event_type: 'opened' as const,
           open_pr: false
         }
-        await on_prepared?.(prepared, issueReviewInput())
-        return prepared
+        phases.push('prepared')
+        return { review: prepared, input: issueReviewInput() }
       },
       store: {
         ...preparationClaim,
+        renewPreparationClaim: async () => {
+          phases.push('renew')
+          return true
+        },
+        reserveInputBundleCandidate: async (...args) => {
+          phases.push('reserve')
+          return await inputBundlePublicationStore().reserveInputBundleCandidate(
+            ...args
+          )
+        },
+        settleInputBundleCandidate: async (...args) => {
+          phases.push('present')
+          return await inputBundlePublicationStore().settleInputBundleCandidate(
+            ...args
+          )
+        },
         admitReviewRun: (run) => {
           transitions.push(['pending', withoutPreparationInput(run)])
           return {
@@ -243,8 +259,10 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
             preparation_token: 'claim'
           }
         },
-        submitPreparedRun: (run_id, _token, publish_context) =>
-          transitions.push(['queued', run_id, publish_context]),
+        submitPreparedRun: (run_id, _token, publish_context) => {
+          phases.push('submit')
+          transitions.push(['queued', run_id, publish_context])
+        },
         failPreparation: () =>
           assert.fail('successful review must not be marked failed')
       }
@@ -252,6 +270,14 @@ test('startIssueReviewCommand starts and persists a queued issue review run', as
   })
 
   assert.strictEqual(submitted.run_id, 'run-issue-1')
+  assert.deepStrictEqual(phases, [
+    'renew',
+    'prepared',
+    'renew',
+    'reserve',
+    'present',
+    'submit'
+  ])
   assert.deepStrictEqual(transitions, [
     [
       'pending',
@@ -294,12 +320,11 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
     delivery_id: 'delivery-pr-1',
     test_changes: 'deny',
     deps: {
-      start_review: async ({
+      prepare_review: async ({
         pr: submittedPr,
         run_id,
         event_type,
-        test_changes,
-        on_prepared
+        test_changes
       }) => {
         assert.strictEqual(run_id, 'run-pr-1')
         assert.strictEqual(event_type, 'manual_review')
@@ -311,8 +336,7 @@ test('startPullRequestReviewCommand starts and persists a queued PR review run',
           workflow: 'pull-request-review',
           event_type: 'manual_review' as const
         }
-        await on_prepared?.(prepared, pullRequestReviewInput())
-        return prepared
+        return { review: prepared, input: pullRequestReviewInput() }
       },
       store: {
         ...preparationClaim,
@@ -375,7 +399,7 @@ test('startPullRequestReviewCommand records a failed run when preparation or sub
       event_type: 'opened',
       delivery_id: 'delivery-pr-failed',
       deps: {
-        start_review: async ({ run_id }) => {
+        prepare_review: async ({ run_id }) => {
           assert.strictEqual(run_id, 'run-pr-failed')
           throw new Error('workspace clone failed')
         },
@@ -432,9 +456,9 @@ test('startIssueReviewCommand preserves an uncertain Execution submission for re
       event_type: 'opened',
       delivery_id: 'delivery-uncertain',
       deps: {
-        start_review: async (args) => {
-          await args.on_prepared?.(
-            {
+        prepare_review: async (args) => {
+          return {
+            review: {
               issue: args.issue,
               run_id: 'run-uncertain',
               workspace_ref: 'workspace-ref',
@@ -442,9 +466,8 @@ test('startIssueReviewCommand preserves an uncertain Execution submission for re
               event_type: 'opened',
               open_pr: false
             },
-            issueReviewInput()
-          )
-          throw error
+            input: issueReviewInput()
+          }
         },
         store: {
           ...preparationClaim,
@@ -454,8 +477,10 @@ test('startIssueReviewCommand preserves an uncertain Execution submission for re
               created: true,
               preparation_token: 'claim'
             }) satisfies ReviewRunAdmission,
-          submitPreparedRun: (run_id, _token, context, input) =>
-            transitions.push(['prepared', run_id, context, input]),
+          submitPreparedRun: (run_id, _token, context, input) => {
+            transitions.push(['prepared', run_id, context, input])
+            throw error
+          },
           failPreparation: (run_id, _token, failure) =>
             transitions.push([run_id, failure])
         }
@@ -483,18 +508,17 @@ test('startPullRequestReviewCommand preserves an uncertain Execution submission 
       event_type: 'opened',
       delivery_id: 'delivery-pr-uncertain',
       deps: {
-        start_review: async (args) => {
-          await args.on_prepared?.(
-            {
+        prepare_review: async (args) => {
+          return {
+            review: {
               pr: args.pr,
               run_id: 'run-pr-uncertain',
               files: [],
               workflow: 'pull-request-review',
               event_type: 'opened'
             },
-            pullRequestReviewInput()
-          )
-          throw error
+            input: pullRequestReviewInput()
+          }
         },
         store: {
           ...preparationClaim,
@@ -504,8 +528,10 @@ test('startPullRequestReviewCommand preserves an uncertain Execution submission 
               created: true,
               preparation_token: 'claim'
             }) satisfies ReviewRunAdmission,
-          submitPreparedRun: (run_id, _token, context, input) =>
-            transitions.push(['prepared', run_id, context, input]),
+          submitPreparedRun: (run_id, _token, context, input) => {
+            transitions.push(['prepared', run_id, context, input])
+            throw error
+          },
           failPreparation: (run_id, _token, failure) =>
             transitions.push([run_id, failure])
         }
@@ -543,7 +569,7 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
         throw new Error('GitHub PR lookup failed')
       },
       deps: {
-        start_review: async () =>
+        prepare_review: async () =>
           assert.fail('review must not start without PR context'),
         store: {
           ...preparationClaim,
@@ -597,16 +623,17 @@ test('startPullRequestReviewCommand checkpoints a resolved comment PR before pre
     },
     resolve_pr: async () => pr,
     deps: {
-      start_review: async ({ pr: preparedPr }) => {
+      prepare_review: async ({ pr: preparedPr }) => {
         assert.strictEqual(preparedPr, pr)
         assert.strictEqual(checkpoints.length, 1)
-        return {
+        const review = {
           pr: preparedPr,
           run_id: 'run-checkpoint',
           files: [],
           workflow: 'pull-request-review',
           event_type: 'manual_review'
-        } satisfies SubmittedPullRequestReviewRun
+        } satisfies PreparedPullRequestReviewRun
+        return { review, input: pullRequestReviewInput() }
       },
       store: {
         ...preparationClaim,
@@ -619,8 +646,7 @@ test('startPullRequestReviewCommand checkpoints a resolved comment PR before pre
         checkpointPreparationInput: async (...args) => {
           checkpoints.push(args)
         },
-        submitPreparedRun: () =>
-          assert.fail('test preparation does not submit'),
+        submitPreparedRun: () => {},
         failPreparation: () => assert.fail('checkpointed review must not fail')
       }
     }
@@ -654,7 +680,7 @@ test('startPullRequestReviewCommand reuses a webhook delivery without starting a
     event_type: 'opened',
     delivery_id: 'delivery-1',
     deps: {
-      start_review: async () => {
+      prepare_review: async () => {
         starts += 1
         throw new Error('replayed delivery must not start')
       },
@@ -694,7 +720,7 @@ test('startIssueReviewCommand reuses a webhook delivery without starting another
     event_type: 'opened',
     delivery_id: 'delivery-issue-1',
     deps: {
-      start_review: async () => {
+      prepare_review: async () => {
         starts += 1
         throw new Error('replayed delivery must not start')
       },
@@ -736,7 +762,7 @@ test('startPullRequestReviewCommand reports an invalid setup declaration distinc
       event_type: 'opened',
       delivery_id: 'delivery-pr-setup-invalid',
       deps: {
-        start_review: async () => {
+        prepare_review: async () => {
           throw new SetupDeclarationError(
             'setup[0] has unsupported key(s): shell',
             {
@@ -788,7 +814,7 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
       event_type: 'manual_review',
       delivery_id: 'delivery-issue-setup-invalid',
       deps: {
-        start_review: async () => {
+        prepare_review: async () => {
           throw new SetupDeclarationError(
             'setup declaration is not valid YAML',
             {
