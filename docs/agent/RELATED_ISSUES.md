@@ -43,6 +43,33 @@ Even so, having a default compression mechanism is still a good fallback.
 
 The current fallback is LangChain `SummarizationMiddleware` with a project-specific handoff prompt. A run usually begins with one authoritative stage input, so compaction must preserve that input boundary and keep user requests separate from repository and tool content.
 
+## Should Agents Read Repository Instructions and Documentation Broadly?
+
+Agents should not be required by default to read repository instructions and documentation broadly before addressing a problem. Reading should serve the current task, rather than making familiarity with the entire repository a prerequisite.
+
+A better approach combines two practices:
+
+1. **Load repository guidance from `AGENTS.md` at startup.** Supply common project requirements and essential documentation pointers.
+2. **Start from the given task description.** Investigate code against the issue, PR, or case objective, consulting related documentation as needed.
+
+These practices work together: repository guidance supplies background, while the task description directs the investigation.
+
+### Load Repository Guidance from AGENTS.md at Startup
+
+- **Code does not explain every contract.** Intended compatibility, deployment assumptions, and architectural constraints may live in documentation. An agent that only follows the reported code path can miss them.
+- **A stable entry point reduces discovery work.** The [AGENTS.md specification](https://agents.md/) provides a predictable place for project instructions, build commands, and conventions. A short, maintained entry point can avoid a broad documentation search.
+- **Common requirements need not be repeated.** Keeping build commands, test requirements, and development conventions in `AGENTS.md` and loading it at the start of a task reduces what users need to repeat in each issue or PR.
+
+The value depends on the file. Loaded instructions consume attention on every task. Outdated requirements, unrelated instructions, or directions to read the entire repository can misdirect the agent or cause unnecessary exploration. Automatically loading an entry point does not require loading every document it links to.
+
+### Start from the Given Task Description
+
+- **Finding and reading context takes time.** Asking an agent to “find all relevant documentation” can keep expanding its reading scope. [Anthropic's context-engineering guidance](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) recommends a small set of high-signal context and on-demand retrieval, while acknowledging exploration latency and dead ends.
+- **Task authors must state the goal.** [GitHub's coding-agent guidance](https://docs.github.com/en/copilot/using-github-copilot/coding-agent/best-practices-for-using-copilot-to-work-on-tasks) calls for clear descriptions and complete acceptance criteria. [Claude Code's best practices](https://code.claude.com/docs/en/best-practices) asks users to state preferences that code cannot reveal. An agent cannot be expected to guess unstated requirements quickly and accurately.
+- **Let the task guide further reading.** With or without a preloaded `AGENTS.md`, agents can inspect relevant code, callers, tests, and documentation. GitHub also notes that agents can often locate code without exact file paths. Users need not supply an implementation plan.
+
+On-demand reading can still miss a documented constraint. A concise entry point can help expose important requirements, but neither it nor a generic instruction to read more guarantees that every contract will be found.
+
 ## Is the Agent Auditing or Repairing?
 
 The system explicitly distinguishes `audit` / `repair` through `review_intent.objective`. `review_intent.test_changes` can also constrain whether the final mitigation patch may contain test changes, independently of the objective. Therefore, whether the agent is currently auditing or repairing is not guessed by the model on the spot, and is not implied by output text; it is part of the input contract.

@@ -73,9 +73,19 @@ Probe-agent tests also require `LLM_TEST_DEPLOYMENT=<deployment name>`. Product 
 | --- | --- | --- | --- |
 | Changed-files response correction | `RUN_LLM_STRUCTURED_CORRECTION_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Checks that the model corrects a rejected changed-files declaration in the same thread. |
 | Context summarization | `RUN_LLM_CONTEXT_SUMMARIZATION_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Checks real summarization middleware behavior. |
+| Project instructions | `RUN_LLM_PROJECT_INSTRUCTIONS_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Uses a local workspace to check that the agent uses a preloaded project validation command, inspects source, and leaves guidance unchanged. |
 | Memory probes | `RUN_LLM_MEMORY_MIDDLEWARE_INTEGRATION=1`, `RUN_LLM_MEMORY_EXTRACTION_INTEGRATION=1`, `RUN_LLM_MEMORY_MAINTENANCE_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Checks memory topic use, trajectory extraction, and candidate memory-tree maintenance. |
 | Bundled skill cases | `RUN_LLM_SKILL_CASES=1` | `LLM_TEST_DEPLOYMENT` | Runs JSON-defined prompted, discovery, and compare cases, including web, CI, and CWE checks. Compare cases record paired Skills OFF/ON outputs without automatically declaring a winner. |
 | CodeGraph MCP smoke | `RUN_LLM_CODEGRAPH_MCP_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT`, `codegraph` on `PATH` | Checks local CodeGraph MCP wiring. |
+
+Run the project-instructions probe with:
+
+```bash
+cd agents
+RUN_LLM_PROJECT_INSTRUCTIONS_INTEGRATION=1 \
+LLM_TEST_DEPLOYMENT=deepseek-v4-pro \
+uv run python -m pytest tests/runtime/test_llm_project_instructions.py -q -s
+```
 
 Example:
 

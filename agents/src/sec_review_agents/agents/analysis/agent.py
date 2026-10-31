@@ -19,6 +19,9 @@ from sec_review_agents.runtime.model_turn_diagnostics import (
     ModelTurnDiagnosticsMiddleware,
     model_turn_diagnostics_enabled,
 )
+from sec_review_agents.runtime.project_instructions_middleware import (
+    ProjectInstructionsMiddleware,
+)
 from sec_review_agents.runtime.structured_response_middleware import (
     MissingStructuredResponseMiddleware,
     missing_structured_response_max_retries,
@@ -43,6 +46,7 @@ async def create_analysis_agent_graph(
             max_retries=missing_structured_response_max_retries(),
         ),
     ]
+    agent_middleware.append(ProjectInstructionsMiddleware(backend=backend))
     if agent_skills_enabled():
         agent_middleware.append(SkillsMiddleware(backend=backend, sources=["/skills/"]))
     if memory_enabled:
