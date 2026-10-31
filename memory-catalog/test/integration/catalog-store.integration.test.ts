@@ -70,7 +70,7 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
       ExtractionConflictError,
     )
 
-    const stored = await store.getExtraction(extraction.extraction_id)
+    const stored = await store.queries.getExtraction(extraction.extraction_id)
     assert.equal(
       stored?.observation?.body_markdown,
       extraction.observation?.body_markdown,
@@ -78,6 +78,21 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
     assert.deepEqual(
       stored?.trajectory_reference,
       extraction.trajectory_reference,
+    )
+
+    const extractionPage = await store.queries.listExtractions(undefined, 10, {
+      sourceRunId: extraction.source_run_id,
+      hasObservation: true,
+    })
+    assert.deepEqual(extractionPage.extractions, [stored])
+    assert.equal(extractionPage.next_cursor, null)
+    assert.equal(
+      (
+        await store.queries.listObservations(undefined, 10, {
+          status: 'pending',
+        })
+      ).observations[0]?.extraction_id,
+      extraction.extraction_id,
     )
 
     const maintenanceInput = await store.getMaintenanceInput(10)
@@ -115,11 +130,30 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
       source: { kind: 'maintenance', maintenance_id: 'maintenance-1' },
     })
 
-    assert.equal((await store.getObservationBacklog()).pending_count, 0)
-    assert.equal((await store.getMemoryTree()).revision, 1)
+    assert.equal((await store.queries.getObservationBacklog()).pending_count, 0)
+    assert.equal((await store.queries.getMemoryTree()).revision, 1)
     assert.equal(
-      (await store.getMemoryTreeRevision(1))?.predecessor_revision,
+      (await store.queries.getMemoryTreeRevision(1))?.predecessor_revision,
       null,
+    )
+
+    const history = await store.queries.listMemoryTreeRevisions(undefined, 10)
+    assert.deepEqual(history.revisions, [
+      await store.queries.getMemoryTreeRevision(1),
+    ])
+    assert.equal(history.next_before_revision, null)
+    const consumed = await store.queries.listObservations(undefined, 10, {
+      status: 'consumed',
+      consumedRevision: 1,
+    })
+    assert.equal(consumed.observations[0]?.consumed_revision, 1)
+    assert.deepEqual(
+      (
+        await store.queries.listObservations(undefined, 10, {
+          status: 'pending',
+        })
+      ).observations,
+      [],
     )
 
     await assert.rejects(
