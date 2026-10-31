@@ -684,7 +684,7 @@ export async function runMemoryFlow({
       .waitFor()
     await maintenanceDialog
       .locator('.trajectory-message')
-      .getByText('AI response', { exact: true })
+      .getByText('AI message', { exact: true })
       .waitFor()
     const trajectoryLayout = await maintenanceDialog.evaluate((dialog) => {
       const layout = dialog.querySelector('.trajectory-layout')

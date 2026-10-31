@@ -3,10 +3,8 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, test } from 'vitest'
 
-import {
-  TrajectoryTimeline,
-  type TrajectoryEvent
-} from '../../browser/features/trajectory/TrajectoryViewer.js'
+import { TrajectoryTimeline } from '../../browser/features/trajectory/TrajectoryTimeline.js'
+import type { TrajectoryEvent } from '../../browser/features/trajectory/trajectory-model.js'
 import { renderComponent } from './render.js'
 
 const events: TrajectoryEvent[] = [
