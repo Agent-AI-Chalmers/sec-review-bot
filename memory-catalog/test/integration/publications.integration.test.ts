@@ -122,8 +122,8 @@ await test('publication recovery preserves intents and attachment transactions s
       failed?.status === 'rejected' &&
         failed.reason instanceof MemoryTreeRevisionConflictError,
     )
-    assert.equal((await store.getMemoryTree()).revision, 1)
-    assert.equal((await store.getObservationBacklog()).pending_count, 0)
+    assert.equal((await store.queries.getMemoryTree()).revision, 1)
+    assert.equal((await store.queries.getObservationBacklog()).pending_count, 0)
     const publications = await store.listRevisionPublications(
       'maintenance',
       'maintain-1',
@@ -162,7 +162,7 @@ await test('publication recovery preserves intents and attachment transactions s
       'present',
       'CAS failure rolls back candidate selection',
     )
-    assert.equal((await store.getMemoryTree()).revision, 1)
+    assert.equal((await store.queries.getMemoryTree()).revision, 1)
   } finally {
     await store.close()
     await admin.query(`drop schema ${schema} cascade`)

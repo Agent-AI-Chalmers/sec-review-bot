@@ -90,30 +90,32 @@ await test('the contract authenticates and validates extraction registration', a
       extractions.push(input)
       return Promise.resolve(true)
     },
-    getExtraction: () => Promise.resolve(undefined),
-    listExtractions: () =>
-      Promise.resolve({ extractions: [], next_cursor: null }),
-    listObservations: () =>
-      Promise.resolve({ observations: [], next_cursor: null }),
-    getObservationBacklog: () =>
-      Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
-    getCatalogOverview: () => Promise.resolve(emptyOverview),
-    getMaintenanceControl: () =>
-      Promise.resolve({
-        state: 'enabled',
-        generation: 0,
-        changed_by: { kind: 'service', id: 'memory-catalog' },
-        changed_at: '2026-10-23T00:00:00.000Z',
-      }),
     changeMaintenanceControl: () => Promise.reject(new Error('not used')),
     getMaintenanceInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.resolve(revisionCreationResult),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
-    getMemoryTree: () =>
-      Promise.resolve({ revision: 0, memory_tree_reference: null }),
-    getMemoryTreeRevision: () => Promise.resolve(undefined),
-    listMemoryTreeRevisions: () =>
-      Promise.resolve({ revisions: [], next_before_revision: null }),
+    queries: {
+      getExtraction: () => Promise.resolve(undefined),
+      listExtractions: () =>
+        Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () =>
+        Promise.resolve({ observations: [], next_cursor: null }),
+      getObservationBacklog: () =>
+        Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
+      getCatalogOverview: () => Promise.resolve(emptyOverview),
+      getMaintenanceControl: () =>
+        Promise.resolve({
+          state: 'enabled',
+          generation: 0,
+          changed_by: { kind: 'service', id: 'memory-catalog' },
+          changed_at: '2026-10-23T00:00:00.000Z',
+        }),
+      getMemoryTree: () =>
+        Promise.resolve({ revision: 0, memory_tree_reference: null }),
+      getMemoryTreeRevision: () => Promise.resolve(undefined),
+      listMemoryTreeRevisions: () =>
+        Promise.resolve({ revisions: [], next_before_revision: null }),
+    },
   }
   const app = await createApp({ store, ...auth })
   const unauthorized = await app.inject({
@@ -196,30 +198,32 @@ await test('an extraction identity conflict is a declared 409', async () => {
     close: () => Promise.resolve(),
     registerExtraction: () =>
       Promise.reject(new ExtractionConflictError('different content')),
-    getExtraction: () => Promise.resolve(undefined),
-    listExtractions: () =>
-      Promise.resolve({ extractions: [], next_cursor: null }),
-    listObservations: () =>
-      Promise.resolve({ observations: [], next_cursor: null }),
-    getObservationBacklog: () =>
-      Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
-    getCatalogOverview: () => Promise.resolve(emptyOverview),
-    getMaintenanceControl: () =>
-      Promise.resolve({
-        state: 'enabled',
-        generation: 0,
-        changed_by: { kind: 'service', id: 'memory-catalog' },
-        changed_at: '2026-10-23T00:00:00.000Z',
-      }),
     changeMaintenanceControl: () => Promise.reject(new Error('not used')),
     getMaintenanceInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.resolve(revisionCreationResult),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
-    getMemoryTree: () =>
-      Promise.resolve({ revision: 0, memory_tree_reference: null }),
-    getMemoryTreeRevision: () => Promise.resolve(undefined),
-    listMemoryTreeRevisions: () =>
-      Promise.resolve({ revisions: [], next_before_revision: null }),
+    queries: {
+      getExtraction: () => Promise.resolve(undefined),
+      listExtractions: () =>
+        Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () =>
+        Promise.resolve({ observations: [], next_cursor: null }),
+      getObservationBacklog: () =>
+        Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
+      getCatalogOverview: () => Promise.resolve(emptyOverview),
+      getMaintenanceControl: () =>
+        Promise.resolve({
+          state: 'enabled',
+          generation: 0,
+          changed_by: { kind: 'service', id: 'memory-catalog' },
+          changed_at: '2026-10-23T00:00:00.000Z',
+        }),
+      getMemoryTree: () =>
+        Promise.resolve({ revision: 0, memory_tree_reference: null }),
+      getMemoryTreeRevision: () => Promise.resolve(undefined),
+      listMemoryTreeRevisions: () =>
+        Promise.resolve({ revisions: [], next_before_revision: null }),
+    },
   }
   const app = await createApp({ store, ...auth })
   const response = await app.inject({
@@ -263,30 +267,33 @@ await test('completed extractions are queryable with or without an observation',
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
-    getExtraction: (extractionId) => Promise.resolve(records.get(extractionId)),
-    listExtractions: () =>
-      Promise.resolve({ extractions: [], next_cursor: null }),
-    listObservations: () =>
-      Promise.resolve({ observations: [], next_cursor: null }),
-    getObservationBacklog: () =>
-      Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
-    getCatalogOverview: () => Promise.resolve(emptyOverview),
-    getMaintenanceControl: () =>
-      Promise.resolve({
-        state: 'enabled',
-        generation: 0,
-        changed_by: { kind: 'service', id: 'memory-catalog' },
-        changed_at: '2026-10-23T00:00:00.000Z',
-      }),
     changeMaintenanceControl: () => Promise.reject(new Error('not used')),
     getMaintenanceInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.resolve(revisionCreationResult),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
-    getMemoryTree: () =>
-      Promise.resolve({ revision: 0, memory_tree_reference: null }),
-    getMemoryTreeRevision: () => Promise.resolve(undefined),
-    listMemoryTreeRevisions: () =>
-      Promise.resolve({ revisions: [], next_before_revision: null }),
+    queries: {
+      getExtraction: (extractionId) =>
+        Promise.resolve(records.get(extractionId)),
+      listExtractions: () =>
+        Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () =>
+        Promise.resolve({ observations: [], next_cursor: null }),
+      getObservationBacklog: () =>
+        Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
+      getCatalogOverview: () => Promise.resolve(emptyOverview),
+      getMaintenanceControl: () =>
+        Promise.resolve({
+          state: 'enabled',
+          generation: 0,
+          changed_by: { kind: 'service', id: 'memory-catalog' },
+          changed_at: '2026-10-23T00:00:00.000Z',
+        }),
+      getMemoryTree: () =>
+        Promise.resolve({ revision: 0, memory_tree_reference: null }),
+      getMemoryTreeRevision: () => Promise.resolve(undefined),
+      listMemoryTreeRevisions: () =>
+        Promise.resolve({ revisions: [], next_before_revision: null }),
+    },
   }
   const app = await createApp({ store, ...auth })
   const headers = workerHeaders
@@ -336,74 +343,76 @@ await test('UI catalog reads expose paginated records and durable control state'
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
-    getExtraction: () => Promise.resolve(undefined),
-    listExtractions: (cursor, limit, filters) => {
-      calls.push(['extractions', cursor, limit, filters])
-      return Promise.resolve({
-        extractions: [
-          { ...extraction, created_at: '2026-10-23T00:00:00.000Z' },
-        ],
-        next_cursor: 'next-extraction',
-      })
-    },
-    listObservations: (cursor, limit, filters) => {
-      calls.push(['observations', cursor, limit, filters])
-      return Promise.resolve({
-        observations: [
-          {
-            extraction_id: 'extraction-1',
-            source_run_id: 'run-1',
-            source_unit_id: 'review',
-            body_markdown: 'Remember this.',
-            consumed_revision: 1,
-            created_at: '2026-10-23T00:00:00.000Z',
-          },
-        ],
-        next_cursor: null,
-      })
-    },
-    getObservationBacklog: () =>
-      Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
-    getCatalogOverview: (range) => {
-      overviewRanges.push(range)
-      return Promise.resolve({
-        totals: {
-          completed_extraction_count: 4,
-          extracted_unit_count: 3,
-          units_with_observation_count: 2,
-          units_without_observation_count: 1,
-          observation_count: 2,
-          pending_observation_count: 1,
-          consumed_observation_count: 1,
-        },
-        trend_granularity: 'day',
-        trend_points: [
-          {
-            period_start: '2026-10-23',
-            extracted_unit_count: 3,
-            units_with_observation_count: 2,
-          },
-        ],
-        workflows: [
-          {
-            source_workflow: 'issue-review',
-            extracted_unit_count: 3,
-            units_with_observation_count: 2,
-            units_without_observation_count: 1,
-          },
-        ],
-      })
-    },
-    getMaintenanceControl: () => Promise.resolve(control),
     changeMaintenanceControl: () => Promise.reject(new Error('not used')),
     getMaintenanceInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.resolve(revisionCreationResult),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
-    getMemoryTree: () =>
-      Promise.resolve({ revision: 0, memory_tree_reference: null }),
-    getMemoryTreeRevision: () => Promise.resolve(undefined),
-    listMemoryTreeRevisions: () =>
-      Promise.resolve({ revisions: [], next_before_revision: null }),
+    queries: {
+      getExtraction: () => Promise.resolve(undefined),
+      listExtractions: (cursor, limit, filters) => {
+        calls.push(['extractions', cursor, limit, filters])
+        return Promise.resolve({
+          extractions: [
+            { ...extraction, created_at: '2026-10-23T00:00:00.000Z' },
+          ],
+          next_cursor: 'next-extraction',
+        })
+      },
+      listObservations: (cursor, limit, filters) => {
+        calls.push(['observations', cursor, limit, filters])
+        return Promise.resolve({
+          observations: [
+            {
+              extraction_id: 'extraction-1',
+              source_run_id: 'run-1',
+              source_unit_id: 'review',
+              body_markdown: 'Remember this.',
+              consumed_revision: 1,
+              created_at: '2026-10-23T00:00:00.000Z',
+            },
+          ],
+          next_cursor: null,
+        })
+      },
+      getObservationBacklog: () =>
+        Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
+      getCatalogOverview: (range) => {
+        overviewRanges.push(range)
+        return Promise.resolve({
+          totals: {
+            completed_extraction_count: 4,
+            extracted_unit_count: 3,
+            units_with_observation_count: 2,
+            units_without_observation_count: 1,
+            observation_count: 2,
+            pending_observation_count: 1,
+            consumed_observation_count: 1,
+          },
+          trend_granularity: 'day',
+          trend_points: [
+            {
+              period_start: '2026-10-23',
+              extracted_unit_count: 3,
+              units_with_observation_count: 2,
+            },
+          ],
+          workflows: [
+            {
+              source_workflow: 'issue-review',
+              extracted_unit_count: 3,
+              units_with_observation_count: 2,
+              units_without_observation_count: 1,
+            },
+          ],
+        })
+      },
+      getMaintenanceControl: () => Promise.resolve(control),
+      getMemoryTree: () =>
+        Promise.resolve({ revision: 0, memory_tree_reference: null }),
+      getMemoryTreeRevision: () => Promise.resolve(undefined),
+      listMemoryTreeRevisions: () =>
+        Promise.resolve({ revisions: [], next_before_revision: null }),
+    },
   }
   const app = await createApp({ store, ...auth })
   const headers = workerHeaders
@@ -501,21 +510,6 @@ await test('maintenance input is read and a revision is created with resource se
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
-    getExtraction: () => Promise.resolve(undefined),
-    listExtractions: () =>
-      Promise.resolve({ extractions: [], next_cursor: null }),
-    listObservations: () =>
-      Promise.resolve({ observations: [], next_cursor: null }),
-    getObservationBacklog: () =>
-      Promise.resolve({ pending_count: 1, oldest_pending_created_at: null }),
-    getCatalogOverview: () => Promise.resolve(emptyOverview),
-    getMaintenanceControl: () =>
-      Promise.resolve({
-        state: 'enabled',
-        generation: 0,
-        changed_by: { kind: 'service', id: 'memory-catalog' },
-        changed_at: '2026-10-23T00:00:00.000Z',
-      }),
     changeMaintenanceControl: () => Promise.reject(new Error('not used')),
     getMaintenanceInput: (limit) =>
       Promise.resolve(limit === 10 ? maintenanceInput : null),
@@ -532,11 +526,28 @@ await test('maintenance input is read and a revision is created with resource se
             : { kind: 'operator', operation_id: input.source.operation_id },
       }),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
-    getMemoryTree: () =>
-      Promise.resolve({ revision: 0, memory_tree_reference: null }),
-    getMemoryTreeRevision: () => Promise.resolve(undefined),
-    listMemoryTreeRevisions: () =>
-      Promise.resolve({ revisions: [], next_before_revision: null }),
+    queries: {
+      getExtraction: () => Promise.resolve(undefined),
+      listExtractions: () =>
+        Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () =>
+        Promise.resolve({ observations: [], next_cursor: null }),
+      getObservationBacklog: () =>
+        Promise.resolve({ pending_count: 1, oldest_pending_created_at: null }),
+      getCatalogOverview: () => Promise.resolve(emptyOverview),
+      getMaintenanceControl: () =>
+        Promise.resolve({
+          state: 'enabled',
+          generation: 0,
+          changed_by: { kind: 'service', id: 'memory-catalog' },
+          changed_at: '2026-10-23T00:00:00.000Z',
+        }),
+      getMemoryTree: () =>
+        Promise.resolve({ revision: 0, memory_tree_reference: null }),
+      getMemoryTreeRevision: () => Promise.resolve(undefined),
+      listMemoryTreeRevisions: () =>
+        Promise.resolve({ revisions: [], next_before_revision: null }),
+    },
   }
   const app = await createApp({ store, ...auth })
   const headers = workerHeaders
@@ -587,30 +598,32 @@ function storeWithRevisionFailure(error: Error): MemoryCatalogStore {
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
-    getExtraction: () => Promise.resolve(undefined),
-    listExtractions: () =>
-      Promise.resolve({ extractions: [], next_cursor: null }),
-    listObservations: () =>
-      Promise.resolve({ observations: [], next_cursor: null }),
-    getObservationBacklog: () =>
-      Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
-    getCatalogOverview: () => Promise.resolve(emptyOverview),
-    getMaintenanceControl: () =>
-      Promise.resolve({
-        state: 'enabled',
-        generation: 0,
-        changed_by: { kind: 'service', id: 'memory-catalog' },
-        changed_at: '2026-10-23T00:00:00.000Z',
-      }),
     changeMaintenanceControl: () => Promise.reject(new Error('not used')),
     getMaintenanceInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.reject(error),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
-    getMemoryTree: () =>
-      Promise.resolve({ revision: 0, memory_tree_reference: null }),
-    getMemoryTreeRevision: () => Promise.resolve(undefined),
-    listMemoryTreeRevisions: () =>
-      Promise.resolve({ revisions: [], next_before_revision: null }),
+    queries: {
+      getExtraction: () => Promise.resolve(undefined),
+      listExtractions: () =>
+        Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () =>
+        Promise.resolve({ observations: [], next_cursor: null }),
+      getObservationBacklog: () =>
+        Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
+      getCatalogOverview: () => Promise.resolve(emptyOverview),
+      getMaintenanceControl: () =>
+        Promise.resolve({
+          state: 'enabled',
+          generation: 0,
+          changed_by: { kind: 'service', id: 'memory-catalog' },
+          changed_at: '2026-10-23T00:00:00.000Z',
+        }),
+      getMemoryTree: () =>
+        Promise.resolve({ revision: 0, memory_tree_reference: null }),
+      getMemoryTreeRevision: () => Promise.resolve(undefined),
+      listMemoryTreeRevisions: () =>
+        Promise.resolve({ revisions: [], next_before_revision: null }),
+    },
   }
 }
 
@@ -673,21 +686,6 @@ await test('restore moves the active pointer through its own operation', async (
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
-    getExtraction: () => Promise.resolve(undefined),
-    listExtractions: () =>
-      Promise.resolve({ extractions: [], next_cursor: null }),
-    listObservations: () =>
-      Promise.resolve({ observations: [], next_cursor: null }),
-    getObservationBacklog: () =>
-      Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
-    getCatalogOverview: () => Promise.resolve(emptyOverview),
-    getMaintenanceControl: () =>
-      Promise.resolve({
-        state: 'enabled',
-        generation: 0,
-        changed_by: { kind: 'service', id: 'memory-catalog' },
-        changed_at: '2026-10-23T00:00:00.000Z',
-      }),
     changeMaintenanceControl: () => Promise.reject(new Error('not used')),
     getMaintenanceInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.resolve(revisionCreationResult),
@@ -699,11 +697,28 @@ await test('restore moves the active pointer through its own operation', async (
         operation_id: input.operation_id,
       })
     },
-    getMemoryTree: () =>
-      Promise.resolve({ revision: 2, memory_tree_reference: null }),
-    getMemoryTreeRevision: () => Promise.resolve(undefined),
-    listMemoryTreeRevisions: () =>
-      Promise.resolve({ revisions: [], next_before_revision: null }),
+    queries: {
+      getExtraction: () => Promise.resolve(undefined),
+      listExtractions: () =>
+        Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () =>
+        Promise.resolve({ observations: [], next_cursor: null }),
+      getObservationBacklog: () =>
+        Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
+      getCatalogOverview: () => Promise.resolve(emptyOverview),
+      getMaintenanceControl: () =>
+        Promise.resolve({
+          state: 'enabled',
+          generation: 0,
+          changed_by: { kind: 'service', id: 'memory-catalog' },
+          changed_at: '2026-10-23T00:00:00.000Z',
+        }),
+      getMemoryTree: () =>
+        Promise.resolve({ revision: 2, memory_tree_reference: null }),
+      getMemoryTreeRevision: () => Promise.resolve(undefined),
+      listMemoryTreeRevisions: () =>
+        Promise.resolve({ revisions: [], next_before_revision: null }),
+    },
   }
   const app = await createApp({ store, ...auth })
   const payload = {
@@ -745,38 +760,40 @@ await test('memory tree revision history is queryable through the public contrac
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
-    getExtraction: () => Promise.resolve(undefined),
-    listExtractions: () =>
-      Promise.resolve({ extractions: [], next_cursor: null }),
-    listObservations: () =>
-      Promise.resolve({ observations: [], next_cursor: null }),
-    getObservationBacklog: () =>
-      Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
-    getCatalogOverview: () => Promise.resolve(emptyOverview),
-    getMaintenanceControl: () =>
-      Promise.resolve({
-        state: 'enabled',
-        generation: 0,
-        changed_by: { kind: 'service', id: 'memory-catalog' },
-        changed_at: '2026-10-23T00:00:00.000Z',
-      }),
     changeMaintenanceControl: () => Promise.reject(new Error('not used')),
     getMaintenanceInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.resolve(revisionCreationResult),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
-    getMemoryTree: () =>
-      Promise.resolve({
-        revision: revision.revision,
-        memory_tree_reference: revision.memory_tree_reference,
-      }),
-    getMemoryTreeRevision: (requested) =>
-      Promise.resolve(requested === revision.revision ? revision : undefined),
-    listMemoryTreeRevisions: (beforeRevision, limit) => {
-      calls.push({ beforeRevision, limit })
-      return Promise.resolve({
-        revisions: [revision],
-        next_before_revision: null,
-      })
+    queries: {
+      getExtraction: () => Promise.resolve(undefined),
+      listExtractions: () =>
+        Promise.resolve({ extractions: [], next_cursor: null }),
+      listObservations: () =>
+        Promise.resolve({ observations: [], next_cursor: null }),
+      getObservationBacklog: () =>
+        Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
+      getCatalogOverview: () => Promise.resolve(emptyOverview),
+      getMaintenanceControl: () =>
+        Promise.resolve({
+          state: 'enabled',
+          generation: 0,
+          changed_by: { kind: 'service', id: 'memory-catalog' },
+          changed_at: '2026-10-23T00:00:00.000Z',
+        }),
+      getMemoryTree: () =>
+        Promise.resolve({
+          revision: revision.revision,
+          memory_tree_reference: revision.memory_tree_reference,
+        }),
+      getMemoryTreeRevision: (requested) =>
+        Promise.resolve(requested === revision.revision ? revision : undefined),
+      listMemoryTreeRevisions: (beforeRevision, limit) => {
+        calls.push({ beforeRevision, limit })
+        return Promise.resolve({
+          revisions: [revision],
+          next_before_revision: null,
+        })
+      },
     },
   }
   const app = await createApp({ store, ...auth })

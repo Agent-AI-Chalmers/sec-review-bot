@@ -174,7 +174,7 @@ export async function registerMemoryCatalogRoutes(
       getExtraction: async (request: FastifyRequest, reply: FastifyReply) => {
         const extractionId = (request.params as PathParameters<'getExtraction'>)
           .extraction_id
-        const record = await store.getExtraction(extractionId)
+        const record = await store.queries.getExtraction(extractionId)
         if (record) return record
         return await reply.status(404).send({
           error: `Memory extraction not found: ${extractionId}`,
@@ -184,7 +184,7 @@ export async function registerMemoryCatalogRoutes(
       listExtractions: async (request: FastifyRequest) => {
         const query = request.query as QueryParameters<'listExtractions'>
         const limit = query.limit ? Number(query.limit) : 50
-        return await store.listExtractions(query.cursor, limit, {
+        return await store.queries.listExtractions(query.cursor, limit, {
           ...(query.source_workflow
             ? { sourceWorkflow: query.source_workflow }
             : {}),
@@ -197,19 +197,21 @@ export async function registerMemoryCatalogRoutes(
       listObservations: async (request: FastifyRequest) => {
         const query = request.query as QueryParameters<'listObservations'>
         const limit = query.limit ? Number(query.limit) : 50
-        return await store.listObservations(query.cursor, limit, {
+        return await store.queries.listObservations(query.cursor, limit, {
           ...(query.status ? { status: query.status } : {}),
           ...(query.consumed_revision
             ? { consumedRevision: Number(query.consumed_revision) }
             : {}),
         })
       },
-      getObservationBacklog: async () => await store.getObservationBacklog(),
+      getObservationBacklog: async () =>
+        await store.queries.getObservationBacklog(),
       getCatalogOverview: async (request: FastifyRequest) => {
         const query = request.query as QueryParameters<'getCatalogOverview'>
-        return await store.getCatalogOverview(query.range ?? '30d')
+        return await store.queries.getCatalogOverview(query.range ?? '30d')
       },
-      getMaintenanceControl: async () => await store.getMaintenanceControl(),
+      getMaintenanceControl: async () =>
+        await store.queries.getMaintenanceControl(),
       pauseMaintenance: async (
         request: FastifyRequest,
         reply: FastifyReply,
@@ -265,7 +267,7 @@ export async function registerMemoryCatalogRoutes(
         if (result.created) void reply.status(201)
         return result
       },
-      getMemoryTree: async () => await store.getMemoryTree(),
+      getMemoryTree: async () => await store.queries.getMemoryTree(),
       getMemoryTreeRevision: async (
         request: FastifyRequest,
         reply: FastifyReply,
@@ -273,7 +275,7 @@ export async function registerMemoryCatalogRoutes(
         const revision = Number(
           (request.params as PathParameters<'getMemoryTreeRevision'>).revision,
         )
-        const record = await store.getMemoryTreeRevision(revision)
+        const record = await store.queries.getMemoryTreeRevision(revision)
         if (record) return record
         return await reply.status(404).send({
           error: `Memory tree revision not found: ${revision}`,
@@ -287,7 +289,10 @@ export async function registerMemoryCatalogRoutes(
           ? Number(query.before_revision)
           : undefined
         const limit = query.limit ? Number(query.limit) : 50
-        return await store.listMemoryTreeRevisions(beforeRevision, limit)
+        return await store.queries.listMemoryTreeRevisions(
+          beforeRevision,
+          limit,
+        )
       },
     },
     securityHandlers: {
