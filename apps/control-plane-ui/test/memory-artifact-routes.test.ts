@@ -2,9 +2,10 @@ import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import { createServer } from 'node:http'
 import { Readable } from 'node:stream'
-import test from 'node:test'
+import test, { type TestContext } from 'node:test'
 import { zstdCompressSync } from 'node:zlib'
 
+import { buildMemoryTreeArtifact } from '../server/memory/memory-tree-artifact.js'
 import { createControlPlaneUiBffServer } from '../server/create-bff.js'
 import { loginCookie } from './server-support.js'
 
@@ -408,4 +409,217 @@ test('BFF rejects same-size memory content that does not match the stored digest
       new Promise<void>((resolve) => catalog.close(() => resolve()))
     ])
   }
+})
+
+/** Distinct stored objects make incorrect reference selection observable through HTTP. */
+async function memoryArtifactFixture(t: TestContext): Promise<{
+  get(path: string): Promise<Response>
+  catalogReply: { status: number; body: string }
+  catalogReads: string[]
+  objectReads: string[]
+  tree: Buffer
+  maintenance: Buffer
+  extraction: Buffer
+}> {
+  const tree = await buildMemoryTreeArtifact(
+    new Map([['MEMORY.md', '# Memory\n']])
+  )
+  const trajectory = (content: string): Buffer =>
+    zstdCompressSync(
+      Buffer.from(
+        JSON.stringify({
+          seq: 1,
+          event: 'message',
+          message: { type: 'ai', content, tool_calls: [] }
+        }) + '\n'
+      )
+    )
+  const maintenance = trajectory('Maintenance trajectory')
+  const extraction = trajectory('Extraction trajectory')
+  const maintenanceKey =
+    'memory/trajectories/maintenance/trajectory.v1.jsonl.zst'
+  const extractionKey = 'memory/trajectories/extraction/trajectory.v1.jsonl.zst'
+  const trajectoryReference = (key: string, bytes: Buffer): object => ({
+    uri: `s3://sec-review/${key}`,
+    digest: `sha256:${crypto.createHash('sha256').update(bytes).digest('hex')}`,
+    size_bytes: bytes.length,
+    media_type: 'application/zstd'
+  })
+  const catalogReply = {
+    status: 200,
+    body: JSON.stringify({
+      memory_tree_reference: {
+        uri: `s3://sec-review/${tree.objectKey}`,
+        digest: tree.digest,
+        size_bytes: tree.sizeBytes,
+        media_type: tree.mediaType
+      },
+      trajectory_reference: trajectoryReference(extractionKey, extraction),
+      source: {
+        kind: 'maintenance',
+        trajectory_reference: trajectoryReference(maintenanceKey, maintenance)
+      }
+    })
+  }
+  const catalogReads: string[] = []
+  const objectReads: string[] = []
+  const objects = new Map([
+    [tree.objectKey, tree.bytes],
+    [maintenanceKey, maintenance],
+    [extractionKey, extraction]
+  ])
+  const catalog = createServer((request, response) => {
+    catalogReads.push(request.url ?? '')
+    response.writeHead(catalogReply.status, {
+      'content-type': 'application/json'
+    })
+    response.end(catalogReply.body)
+  })
+  await new Promise<void>((resolve) => catalog.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise<void>((resolve) => catalog.close(() => resolve())))
+  const catalogAddress = catalog.address()
+  assert(catalogAddress && typeof catalogAddress === 'object')
+  const ui = createControlPlaneUiBffServer({
+    reviewRunsUrl: 'http://127.0.0.1:1',
+    reviewRunsToken: 'read-secret',
+    accessToken: 'login-secret',
+    memoryCatalogUrl: `http://127.0.0.1:${catalogAddress.port}`,
+    memoryCatalogOperatorToken: 'catalog-secret',
+    artifactStore: {
+      getObject: async (key) => {
+        objectReads.push(key)
+        const bytes = objects.get(key)
+        assert(bytes, `unexpected object ${key}`)
+        return { body: Readable.from([bytes]), contentLength: bytes.length }
+      }
+    }
+  })
+  await new Promise<void>((resolve) => ui.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise<void>((resolve) => ui.close(() => resolve())))
+  const address = ui.address()
+  assert(address && typeof address === 'object')
+  const base = `http://127.0.0.1:${address.port}`
+  const cookie = await loginCookie(base)
+  return {
+    get: (path) => fetch(`${base}/api/memory${path}`, { headers: { cookie } }),
+    catalogReply,
+    catalogReads,
+    objectReads,
+    tree: tree.bytes,
+    maintenance,
+    extraction
+  }
+}
+
+test('memory artifact routes select the declared source for downloads and content previews', async (t) => {
+  const fixture = await memoryArtifactFixture(t)
+  for (const [path, bytes, filename] of [
+    ['/revisions/2/artifact', fixture.tree, 'memory-tree.v1.tar.zst'],
+    [
+      '/revisions/2/trajectory',
+      fixture.maintenance,
+      'memory-trajectory.v1.jsonl.zst'
+    ],
+    [
+      '/extractions/extract-1/trajectory',
+      fixture.extraction,
+      'memory-trajectory.v1.jsonl.zst'
+    ]
+  ] as const) {
+    const response = await fixture.get(path)
+    assert.equal(response.status, 200, path)
+    assert.equal(
+      response.headers.get('content-disposition'),
+      `attachment; filename="${filename}"`
+    )
+    assert.equal(response.headers.get('cache-control'), 'no-store')
+    assert.deepEqual(Buffer.from(await response.arrayBuffer()), bytes)
+  }
+  const tree = await fixture.get('/revisions/2/content')
+  assert.equal(tree.status, 200)
+  assert.deepEqual(await tree.json(), { files: { 'MEMORY.md': '# Memory\n' } })
+  for (const [path, content] of [
+    ['/revisions/2/trajectory/content', 'Maintenance trajectory'],
+    ['/extractions/extract-1/trajectory/content', 'Extraction trajectory']
+  ]) {
+    const response = await fixture.get(path)
+    assert.equal(response.status, 200)
+    assert.deepEqual(await response.json(), {
+      events: [
+        {
+          seq: 1,
+          event: 'message',
+          message: { type: 'ai', content, tool_calls: [] }
+        }
+      ]
+    })
+  }
+  assert.equal(fixture.objectReads.length, 6)
+  assert.deepEqual(fixture.catalogReads, [
+    '/v1/memory-tree/revisions/2',
+    '/v1/memory-tree/revisions/2',
+    '/v1/extractions/extract-1',
+    '/v1/memory-tree/revisions/2',
+    '/v1/memory-tree/revisions/2',
+    '/v1/extractions/extract-1'
+  ])
+})
+
+test('invalid artifact identities and extraction tree requests never reach Catalog or storage', async (t) => {
+  const fixture = await memoryArtifactFixture(t)
+  for (const path of [
+    '/extractions/extract-1/artifact',
+    '/extractions/extract-1/content',
+    '/revisions/0/artifact',
+    '/revisions/01/content',
+    '/revisions/abc/trajectory',
+    '/extractions/invalid%2Fid/trajectory'
+  ]) {
+    const response = await fixture.get(path)
+    assert.equal(response.status, 404, path)
+    assert.deepEqual(await response.json(), {
+      error: 'memory_artifact_not_found'
+    })
+  }
+  assert.deepEqual(fixture.catalogReads, [])
+  assert.deepEqual(fixture.objectReads, [])
+})
+
+test('malformed Catalog records fail as upstream errors before reading object storage', async (t) => {
+  const fixture = await memoryArtifactFixture(t)
+  for (const body of ['null', '[]', '"record"', '42', '{']) {
+    fixture.catalogReply.body = body
+    const response = await fixture.get('/revisions/2/artifact')
+    assert.equal(response.status, 502, body)
+    assert.deepEqual(await response.json(), {
+      error: 'memory_artifact_download_failed'
+    })
+  }
+  assert.deepEqual(fixture.objectReads, [])
+})
+
+test('revision trajectories require a maintenance source while unavailable references remain 409', async (t) => {
+  const fixture = await memoryArtifactFixture(t)
+  const record: unknown = JSON.parse(fixture.catalogReply.body)
+  assert(
+    record && typeof record === 'object' && 'trajectory_reference' in record
+  )
+  for (const source of [
+    undefined,
+    null,
+    [],
+    'maintenance',
+    { kind: 'operator', trajectory_reference: record.trajectory_reference }
+  ]) {
+    fixture.catalogReply.body = JSON.stringify({
+      source,
+      trajectory_reference: record.trajectory_reference
+    })
+    const response = await fixture.get('/revisions/2/trajectory')
+    assert.equal(response.status, 409)
+    assert.deepEqual(await response.json(), {
+      error: 'memory_artifact_unavailable'
+    })
+  }
+  assert.deepEqual(fixture.objectReads, [])
 })
