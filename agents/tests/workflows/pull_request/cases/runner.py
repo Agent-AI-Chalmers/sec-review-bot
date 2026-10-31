@@ -99,7 +99,7 @@ async def run_pull_request_case(
         return_value="local",
     ):
         create_workspace_snapshot_tar(workspace_path=workspace, tar_path=snapshot_tar)
-        return await analyze_pull_request(
+        result = await analyze_pull_request(
             pr={
                 **case.pull_request.model_dump(),
                 "base_sha": base_sha,
@@ -111,6 +111,8 @@ async def run_pull_request_case(
             incremental_window_path=incremental_window,
             analyzer_artifacts_path=analyzer_artifacts,
         )
+
+        return result.model_dump(mode="json", by_alias=True)
 
 
 def _location_files(narrative: Mapping[str, Any]) -> set[str]:

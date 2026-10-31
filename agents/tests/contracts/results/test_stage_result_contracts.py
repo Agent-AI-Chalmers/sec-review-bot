@@ -1,10 +1,10 @@
 import json
 from annotationlib import Format, get_annotations
-from typing import Any
+
+import pytest
 
 from sec_review_agents.review_stages.analysis.result import (
     AnalysisStageResult,
-    build_analysis_stage_result,
 )
 from sec_review_agents.review_stages.mitigation.result import (
     MitigationStageResult,
@@ -26,16 +26,12 @@ from sec_review_agents.scan_stages.triage.stage import run_repository_triage_sta
 
 def test_stage_result_builder_return_annotations_are_public_payloads() -> None:
     assert (
-        get_annotations(build_analysis_stage_result, format=Format.VALUE)["return"]
-        == dict[str, Any]
-    )
-    assert (
         get_annotations(build_mitigation_stage_result, format=Format.VALUE)["return"]
-        == dict[str, Any]
+        == MitigationStageResult
     )
     assert (
         get_annotations(build_verification_stage_result, format=Format.VALUE)["return"]
-        == dict[str, Any]
+        == VerificationStageResult
     )
 
 
@@ -68,21 +64,21 @@ def test_mitigation_stage_builder_emits_required_file_changes() -> None:
         overview="No mitigation target.",
     )
 
-    assert result["file_changes"] == []
-    assert result["patch_diff"] == ""
+    assert result.file_changes == []
+    assert result.patch_diff == ""
 
 
 def test_stage_result_builders_emit_json_serializable_public_payloads() -> None:
     results = [
-        build_analysis_stage_result(
+        AnalysisStageResult(
             overview="Analysis complete.",
-            narratives=[{"summary": "checked"}],
+            narratives=[],
             verdict="confirmed-defect",
-        ),
+        ).model_dump(mode="json", by_alias=True),
         build_mitigation_stage_result(
             overview="Patched input validation.",
             file_changes=[{"path": "src/app.py", "status": "deleted"}],
-        ),
+        ).model_dump(mode="json"),
         build_verification_stage_result(
             overview="Patch covers the target claim.",
             review_target_claim="Input is validated before use.",
@@ -93,7 +89,7 @@ def test_stage_result_builders_emit_json_serializable_public_payloads() -> None:
             validation_level="static",
             regression_status="not-run",
             residual_risks=[],
-        ),
+        ).model_dump(mode="json"),
     ]
 
     for result in results:
@@ -114,7 +110,7 @@ def test_verification_stage_builder_keeps_nullable_public_fields() -> None:
         residual_risks=[],
     )
 
-    assert result["review_target_claim"] is None
+    assert result.review_target_claim is None
 
 
 def test_scan_stage_entrypoint_return_annotation_is_named_contract() -> None:
@@ -125,7 +121,7 @@ def test_scan_stage_entrypoint_return_annotation_is_named_contract() -> None:
 
 
 def test_scan_stage_contracts_track_required_sections() -> None:
-    assert DiscoveryResult.__required_keys__ == {
+    assert set(DiscoveryResult.model_fields) == {
         "status",
         "metadata",
         "counts",
@@ -133,16 +129,89 @@ def test_scan_stage_contracts_track_required_sections() -> None:
         "skipped_files",
         "candidates",
     }
-    assert DiscoveryFileResult.__required_keys__ == {
+    assert set(DiscoveryFileResult.model_fields) == {
         "path",
         "language",
         "size_bytes",
         "candidate_count",
     }
-    assert TriageResult.__required_keys__ == {
+    assert {
+        name for name, field in TriageResult.model_fields.items() if field.is_required()
+    } == {
         "status",
         "metadata",
         "counts",
         "cases",
         "suppressed_candidates",
     }
+
+
+def test_analysis_stage_preserves_nested_narrative_models_in_json() -> None:
+    from sec_review_agents.agents.analysis.model import Narrative
+
+    narrative = Narrative.model_validate(
+        {
+            "priority": 1,
+            "verdict": "confirmed-defect",
+            "title": "Unchecked state",
+            "description": "The transition skips a required check.",
+            "locations": [{"file": "app.py", "line": 3}],
+            "scope_review": {
+                "scope_shape": "unresolved",
+                "outcome_deciding_control_point": "transition",
+                "scope_analysis": "Checked the transition.",
+            },
+        }
+    )
+    result = AnalysisStageResult(
+        overview="Defect found.", narratives=[narrative], verdict="confirmed-defect"
+    )
+    assert result.narratives[0] is narrative
+    assert result.model_dump(mode="json", by_alias=True)["narratives"] == [
+        narrative.model_dump(mode="json", by_alias=True)
+    ]
+    json.dumps(result.model_dump(mode="json", by_alias=True))
+
+
+@pytest.mark.asyncio
+async def test_triage_artifact_preserves_file_only_anchors_and_nullable_metadata(
+    tmp_path, monkeypatch
+) -> None:
+    """Replay JSON omits absent anchor lines while keeping nullable stage metadata."""
+    from unittest.mock import AsyncMock
+
+    from sec_review_agents.agents.discovery.model import (
+        DiscoveryCandidate,
+        DiscoveryLocation,
+    )
+    from sec_review_agents.scan_stages.discovery.result import DiscoveryCandidateResult
+    from tests.repository_scan_fixtures import scan_result_fixture
+
+    scan = scan_result_fixture(candidate_count=1, case_count=1)
+    location = DiscoveryLocation(file="src/routes.py", label="route")
+    scan.discovery_result.candidates = [
+        DiscoveryCandidateResult(
+            candidate_id="candidate-1",
+            candidate=DiscoveryCandidate(
+                category="xss",
+                description="Route signal",
+                locations=[location],
+                evidence=[],
+            ),
+            grounding_status="needs-grounding",
+        )
+    ]
+    scan.triage_result.cases[0].anchor_locations = [location]
+    monkeypatch.setattr(
+        "sec_review_agents.scan_stages.triage.agent_passes.run_repository_triage_agent",
+        AsyncMock(return_value=scan.triage_result),
+    )
+    result = await run_repository_triage_stage(
+        triage_root=tmp_path, discovery_result=scan.discovery_result
+    )
+    artifact = json.loads((tmp_path / "triage-result.json").read_text())
+    assert artifact["cases"][0]["anchor_locations"] == [
+        {"file": "src/routes.py", "label": "route"}
+    ]
+    assert artifact["metadata"]["batch_size"] is None
+    assert TriageResult.model_validate(artifact) == result

@@ -106,23 +106,23 @@ async def test_failed_step_stops_and_marks_incomplete() -> None:
 
 
 def test_setup_declaration_content_for_backend_docker_only(monkeypatch) -> None:
-    prepared_input = {"setup_declaration": "setup:\n  - run: echo hi\n"}
+    setup_declaration = "setup:\n  - run: echo hi\n"
 
     monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "docker")
     assert (
-        setup_declaration_content_for_backend(prepared_input)
+        setup_declaration_content_for_backend(setup_declaration)
         == "setup:\n  - run: echo hi\n"
     )
 
     # bwrap is the non-docker backend an operator can still select; `local` is
     # no longer a deployment value.
     monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "bwrap")
-    assert setup_declaration_content_for_backend(prepared_input) is None
+    assert setup_declaration_content_for_backend(setup_declaration) is None
 
 
 def test_setup_declaration_content_for_backend_absent(monkeypatch) -> None:
     monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "docker")
-    assert setup_declaration_content_for_backend({}) is None
+    assert setup_declaration_content_for_backend(None) is None
 
 
 def test_record_bootstrap_result_truncates_large_output(tmp_path) -> None:

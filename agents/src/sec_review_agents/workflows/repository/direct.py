@@ -1,19 +1,26 @@
 import asyncio
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any
 
-from sec_review_agents.delivery_stages.execution import (
+from sec_review_agents.delivery_stages.execution.input import (
     build_delivery_execution_input,
-    execute_delivery_entry,
     persist_delivery_execution_input,
 )
+from sec_review_agents.delivery_stages.execution.result import DeliveryExecutionResult
+from sec_review_agents.delivery_stages.execution.stage import execute_delivery_entry
 from sec_review_agents.delivery_stages.result import (
+    DeliveryResult,
     build_delivery_result_from_outcomes,
     build_skipped_delivery_result,
     persist_delivery_result,
 )
-from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
+from sec_review_agents.scan_stages.discovery.input import DiscoveryChunk
+from sec_review_agents.scan_stages.discovery.result import (
+    DiscoveryChunkResult,
+    DiscoveryResult,
+)
 from sec_review_agents.utils.paths import required_path
+from sec_review_agents.workflows.repository.scan_result import RepositoryScanResult
 from sec_review_agents.workflows.repository.workflow import (
     build_blocked_repository_case_result,
     build_repository_discovery_manifest_activity,
@@ -26,6 +33,7 @@ from sec_review_agents.workflows.repository.workflow import (
     window_deletion_summary_activity,
 )
 from sec_review_agents.workflows.repository_case import direct as repository_case_direct
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
 )
@@ -48,36 +56,36 @@ async def run_repository_review_direct(
 
 async def run_repository_scan_direct(
     request: ReviewWorkflowRequest,
-) -> dict[str, Any]:
+) -> RepositoryScanResult:
     discovery_result = await run_repository_discovery_direct(request)
     triage_result = await triage_repository_activity(request, discovery_result)
     window_deletions = window_deletion_summary_activity(request)
-    return {
-        "discovery_result": discovery_result,
-        "triage_result": triage_result,
-        # The scan's verdict on the window itself, taken before any case exists.
-        **window_deletions,
-    }
+    return RepositoryScanResult(
+        discovery_result=discovery_result,
+        triage_result=triage_result,
+        deleted_file_count=window_deletions.deleted_file_count,
+        deletion_review_skipped=window_deletions.deletion_review_skipped,
+    )
 
 
 async def run_repository_discovery_direct(
     request: ReviewWorkflowRequest,
 ) -> DiscoveryResult:
     manifest = build_repository_discovery_manifest_activity(request)
-    max_concurrency = max(1, int(manifest["max_concurrency"]))
-    chunks = list(manifest["chunks"])
+    max_concurrency = max(1, manifest.max_concurrency)
+    chunks = manifest.chunks
 
     semaphore = asyncio.Semaphore(max_concurrency)
 
     async def scan_chunk(
-        index: int, chunk: Mapping[str, Any]
-    ) -> tuple[int, dict[str, Any]]:
+        index: int, chunk: DiscoveryChunk
+    ) -> tuple[int, DiscoveryChunkResult]:
         async with semaphore:
             return index, await scan_repository_discovery_chunk_activity(
                 request, manifest, chunk
             )
 
-    chunk_results: list[dict[str, Any] | None] = [None] * len(chunks)
+    chunk_results: list[DiscoveryChunkResult | None] = [None] * len(chunks)
     for index, result in await asyncio.gather(
         *(scan_chunk(index, chunk) for index, chunk in enumerate(chunks))
     ):
@@ -91,17 +99,17 @@ async def run_repository_discovery_direct(
 
 async def run_repository_case_reviews_direct(
     request: ReviewWorkflowRequest,
-    scan_result: dict[str, Any],
-) -> list[dict[str, Any]]:
-    cases = list(scan_result["triage_result"]["cases"])
+    scan_result: RepositoryScanResult,
+) -> list[RepositoryCaseResult]:
+    cases = scan_result.triage_result.cases
     case_batch = prepare_repository_case_review_inputs_activity(request, cases)
-    case_requests = list(case_batch["case_requests"])
-    max_concurrency = max(1, int(case_batch["max_concurrency"]))
+    case_requests = case_batch.case_requests
+    max_concurrency = case_batch.max_concurrency
     semaphore = asyncio.Semaphore(max_concurrency)
 
     async def run_case(
         index: int, case_request: RepositoryCaseReviewRequest
-    ) -> tuple[int, dict[str, Any]]:
+    ) -> tuple[int, RepositoryCaseResult]:
         async with semaphore:
             try:
                 return (
@@ -116,7 +124,7 @@ async def run_repository_case_reviews_direct(
                     f"Case processing failed: {error}",
                 )
 
-    case_results: list[dict[str, Any] | None] = [None] * len(case_requests)
+    case_results: list[RepositoryCaseResult | None] = [None] * len(case_requests)
     for index, result in await asyncio.gather(
         *(
             run_case(index, case_request)
@@ -129,12 +137,12 @@ async def run_repository_case_reviews_direct(
 
 async def run_repository_delivery_direct(
     request: ReviewWorkflowRequest,
-    case_results: Sequence[Mapping[str, Any]],
-) -> dict[str, Any]:
+    case_results: Sequence[RepositoryCaseResult],
+) -> DeliveryResult:
     delivery_plan = await plan_repository_delivery_activity(request, case_results)
-    deliveries = delivery_plan["deliveries"]
+    deliveries = delivery_plan.deliveries
     run_artifacts_root = required_path(
-        request.prepared_input["artifact_root_path"],
+        request.prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
     if not deliveries:
@@ -149,17 +157,16 @@ async def run_repository_delivery_direct(
     keep_case_results = [
         project_repository_case_result_for_delivery(item)
         for item in case_results
-        if item.get("disposition") == "keep"
+        if item.disposition == "keep"
     ]
     persist_delivery_execution_input(
         run_artifacts_root=run_artifacts_root,
         deliveries=deliveries,
         keep_case_results=keep_case_results,
     )
-    bundle_paths = request.prepared_input["bundle_paths"]
     workspace_snapshot_tar_path = required_path(
-        bundle_paths["workspace_snapshot_tar_path"],
-        label="bundle_paths.workspace_snapshot_tar_path",
+        request.prepared_input.workspace_snapshot_tar_path,
+        label="workspace_snapshot_tar_path",
     )
     delivery_execution = build_delivery_execution_input(
         run_artifacts_root=run_artifacts_root,
@@ -167,28 +174,28 @@ async def run_repository_delivery_direct(
         deliveries=deliveries,
         keep_case_results=keep_case_results,
     )
-    patch_outcomes: list[dict[str, Any] | None] = [None] * len(deliveries)
-    for delivery_request in delivery_execution["single_delivery_execution_items"]:
-        patch_outcomes[int(delivery_request["index"])] = await execute_delivery_entry(
+    patch_outcomes: list[DeliveryExecutionResult | None] = [None] * len(deliveries)
+    for delivery_request in delivery_execution.single_delivery_execution_items:
+        patch_outcomes[delivery_request.index] = await execute_delivery_entry(
             run_artifacts_root=run_artifacts_root,
-            delivery_entry=delivery_request["delivery"],
-            case_results=delivery_request["case_items"],
+            delivery_entry=delivery_request.delivery,
+            case_results=delivery_request.case_items,
         )
-    combined_delivery_execution_items = list(
-        delivery_execution["combined_delivery_execution_items"]
+    combined_delivery_execution_items = (
+        delivery_execution.combined_delivery_execution_items
     )
     for delivery_request in combined_delivery_execution_items:
-        delivery_index = int(delivery_request["index"])
+        delivery_index = delivery_request.index
         patch_outcomes[delivery_index] = await execute_delivery_entry(
             run_artifacts_root=run_artifacts_root,
             baseline_snapshot_tar_path=workspace_snapshot_tar_path,
-            delivery_entry=delivery_request["delivery"],
-            case_results=delivery_request["case_items"],
+            delivery_entry=delivery_request.delivery,
+            case_results=delivery_request.case_items,
         )
 
     result = build_delivery_result_from_outcomes(
         deliveries=deliveries,
-        keep_case_ids=delivery_execution["keep_case_ids"],
+        keep_case_ids=delivery_execution.keep_case_ids,
         patch_outcomes=[outcome for outcome in patch_outcomes if outcome is not None],
     )
     persist_delivery_result(run_artifacts_root=run_artifacts_root, result=result)

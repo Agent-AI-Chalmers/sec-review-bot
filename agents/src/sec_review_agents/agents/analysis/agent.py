@@ -45,7 +45,7 @@ async def run_analysis_agent(
     user_prompt: str,
     memory_enabled: bool,
     trajectory_paths: tuple[Path, ...] = (),
-) -> dict[str, Any]:
+) -> AnalysisOutput:
     """Run the agent and return its structured output.
 
     Own MCP sessions through graph construction and invocation. The caller owns
@@ -98,4 +98,4 @@ async def run_analysis_agent(
         )
 
         # These stage callers still consume the existing dictionary contract.
-        return result.model_dump(by_alias=True)
+        return result

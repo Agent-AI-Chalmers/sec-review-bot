@@ -2,7 +2,10 @@ from pathlib import Path
 
 import pytest
 
-from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
+from sec_review_agents.review_stages.feedback_loop import (
+    feedback_retry_context,
+    review_stage_attempt_order,
+)
 from sec_review_agents.runtime.trajectories import trajectory_path
 
 
@@ -24,11 +27,21 @@ def test_review_stage_attempt_order_preserves_review_stage_order() -> None:
     assert review_stage_attempt_order(stage="mitigator", retry_context=None) == 2
     assert review_stage_attempt_order(stage="verifier", retry_context=None) == 3
     assert (
-        review_stage_attempt_order(stage="mitigator", retry_context={"retry_index": 1})
+        review_stage_attempt_order(
+            stage="mitigator",
+            retry_context=feedback_retry_context(
+                retry_index=1, mitigation_result=None, verifier_result=None
+            ),
+        )
         == 4
     )
     assert (
-        review_stage_attempt_order(stage="verifier", retry_context={"retry_index": 1})
+        review_stage_attempt_order(
+            stage="verifier",
+            retry_context=feedback_retry_context(
+                retry_index=1, mitigation_result=None, verifier_result=None
+            ),
+        )
         == 5
     )
 

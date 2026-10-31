@@ -14,6 +14,11 @@ from sec_review_agents.entrypoints.input_preparation import (
     prepare_run_input,
     prepare_workflow_input,
 )
+from sec_review_agents.workflows.prepared_input import (
+    PreparedIssueInput,
+    PreparedPullRequestInput,
+    PreparedRepositoryInput,
+)
 from tests.contract_fixtures import contract_fixture
 
 
@@ -97,20 +102,19 @@ def test_prepare_run_input_derives_bundle_and_artifact_paths(tmp_path: Path) -> 
             run_id="run-input-preparation",
             workflow="issue-review",
         )
+        assert isinstance(prepared, PreparedIssueInput)
     finally:
         monkeypatch.undo()
 
-    assert prepared["input_bundle_root_path"] == str(run_input_root)
-    assert prepared["artifact_root_path"] == str(artifact_root)
-    assert prepared["artifact_paths"] == {
-        "analyzer": str(artifact_root / "analyzer"),
-        "mitigator": str(artifact_root / "mitigator"),
-        "verifier": str(artifact_root / "verifier"),
-    }
-    assert prepared["bundle_paths"] == {
-        "workspace_snapshot_tar_path": str(run_input_root / "workspace.snapshot.tar"),
-        "history_path": str(run_input_root / "history"),
-    }
+    assert prepared.input_bundle_root_path == str(run_input_root)
+    assert prepared.artifact_root_path == str(artifact_root)
+    assert prepared.analyzer_artifacts_path == str(artifact_root / "analyzer")
+    assert prepared.mitigator_artifacts_path == str(artifact_root / "mitigator")
+    assert prepared.verifier_artifacts_path == str(artifact_root / "verifier")
+    assert prepared.workspace_snapshot_tar_path == str(
+        run_input_root / "workspace.snapshot.tar"
+    )
+    assert prepared.history_path == str(run_input_root / "history")
 
 
 def test_prepare_run_input_keeps_inline_setup_declaration(tmp_path: Path) -> None:
@@ -140,12 +144,13 @@ def test_prepare_run_input_keeps_inline_setup_declaration(tmp_path: Path) -> Non
             run_id="run-input-setup",
             workflow="issue-review",
         )
+        assert isinstance(prepared, PreparedIssueInput)
     finally:
         monkeypatch.undo()
 
     # The declaration travels inline in the workflow input, not via bundle_paths.
-    assert prepared["setup_declaration"] == "setup:\n  - run: echo hi\n"
-    assert "setup_declaration_content" not in prepared["bundle_paths"]
+    assert prepared.setup_declaration == "setup:\n  - run: echo hi\n"
+    assert not hasattr(prepared, "setup_declaration_content")
 
 
 def test_prepare_run_input_omits_setup_declaration_when_absent(tmp_path: Path) -> None:
@@ -174,11 +179,12 @@ def test_prepare_run_input_omits_setup_declaration_when_absent(tmp_path: Path) -
             run_id="run-input-no-setup",
             workflow="issue-review",
         )
+        assert isinstance(prepared, PreparedIssueInput)
     finally:
         monkeypatch.undo()
 
-    assert "setup_declaration" not in prepared
-    assert "setup_declaration_content" not in prepared["bundle_paths"]
+    assert prepared.setup_declaration is None
+    assert not hasattr(prepared, "setup_declaration_content")
 
 
 def test_prepare_run_input_rejects_unsupported_workflow() -> None:
@@ -276,28 +282,17 @@ def test_issue_workflow_input_preparation_derives_stage_artifacts() -> None:
         "issue-review",
         artifact_root_path="/tmp/local-issue/artifacts",
     )
+    assert isinstance(prepared, PreparedIssueInput)
 
+    assert prepared.input_bundle_root_path == "/tmp/local-issue/artifacts/input-bundle"
+    assert not hasattr(prepared, "run_id")
+    assert prepared.artifact_root_path == "/tmp/local-issue/artifacts"
+    assert prepared.analyzer_artifacts_path == "/tmp/local-issue/artifacts/analyzer"
+    assert prepared.mitigator_artifacts_path == "/tmp/local-issue/artifacts/mitigator"
+    assert prepared.verifier_artifacts_path == "/tmp/local-issue/artifacts/verifier"
+    assert prepared.history_path == "/tmp/local-issue/artifacts/input-bundle/history"
     assert (
-        prepared["input_bundle_root_path"] == "/tmp/local-issue/artifacts/input-bundle"
-    )
-    assert "run_id" not in prepared
-    assert prepared["artifact_root_path"] == "/tmp/local-issue/artifacts"
-    assert (
-        prepared["artifact_paths"]["analyzer"] == "/tmp/local-issue/artifacts/analyzer"
-    )
-    assert (
-        prepared["artifact_paths"]["mitigator"]
-        == "/tmp/local-issue/artifacts/mitigator"
-    )
-    assert (
-        prepared["artifact_paths"]["verifier"] == "/tmp/local-issue/artifacts/verifier"
-    )
-    assert (
-        prepared["bundle_paths"]["history_path"]
-        == "/tmp/local-issue/artifacts/input-bundle/history"
-    )
-    assert (
-        prepared["bundle_paths"]["workspace_snapshot_tar_path"]
+        prepared.workspace_snapshot_tar_path
         == "/tmp/local-issue/artifacts/input-bundle/workspace.snapshot.tar"
     )
 
@@ -313,9 +308,10 @@ def test_shared_issue_input_fixture_prepares() -> None:
         "issue-review",
         artifact_root_path="/tmp/sec-review-fixtures/issue-review-artifacts",
     )
+    assert isinstance(prepared, PreparedIssueInput)
 
-    assert prepared["api_version"] == "v1"
-    assert prepared["review_intent"]["objective"] == "audit"
+    assert prepared.workflow == "issue-review"
+    assert prepared.review_intent.objective == "audit"
 
 
 def test_shared_pull_request_input_fixture_prepares() -> None:
@@ -329,9 +325,10 @@ def test_shared_pull_request_input_fixture_prepares() -> None:
         "pull-request-review",
         artifact_root_path="/tmp/sec-review-fixtures/pull-request-review-artifacts",
     )
+    assert isinstance(prepared, PreparedPullRequestInput)
 
-    assert prepared["api_version"] == "v1"
-    assert prepared["pr"]["number"] == 42
+    assert prepared.workflow == "pull-request-review"
+    assert prepared.pr["number"] == 42
 
 
 def test_shared_repository_input_fixtures_prepare() -> None:
@@ -344,6 +341,7 @@ def test_shared_repository_input_fixtures_prepare() -> None:
         "repository-review",
         artifact_root_path="/tmp/sec-review-fixtures/repository-review-full-artifacts",
     )
+    assert isinstance(full_prepared, PreparedRepositoryInput)
 
     incremental_payload = contract_fixture("repository-review-input-incremental.json")
     incremental_payload["input_bundle"] = _write_bundle_manifest(
@@ -354,9 +352,10 @@ def test_shared_repository_input_fixtures_prepare() -> None:
         "repository-review",
         artifact_root_path="/tmp/sec-review-fixtures/repository-review-incremental-artifacts",
     )
+    assert isinstance(incremental_prepared, PreparedRepositoryInput)
 
-    assert full_prepared["scan_target"]["scan_mode"] == "full"
-    assert incremental_prepared["scan_target"]["scan_mode"] == "incremental"
+    assert full_prepared.scan_mode == "full"
+    assert incremental_prepared.scan_mode == "incremental"
 
 
 def test_workflow_input_preparation_rejects_bundle_root_outside_configured_root(
@@ -460,8 +459,9 @@ def test_workflow_input_preparation_materializes_s3_archive(
         "issue-review",
         artifact_root_path=tmp_path / "artifacts",
     )
+    assert isinstance(prepared, PreparedIssueInput)
 
-    assert Path(prepared["bundle_paths"]["workspace_snapshot_tar_path"]).is_file()
+    assert Path(prepared.workspace_snapshot_tar_path).is_file()
 
 
 def test_prepare_run_input_binds_s3_bundle_to_run_and_digest(
@@ -489,7 +489,8 @@ def test_prepare_run_input_binds_s3_bundle_to_run_and_digest(
 
     monkeypatch.setattr(input_preparation, "download_s3_object", download)
     prepared = prepare_run_input(payload, run_id="run-1", workflow="issue-review")
-    assert Path(prepared["bundle_paths"]["workspace_snapshot_tar_path"]).is_file()
+    assert isinstance(prepared, PreparedIssueInput)
+    assert Path(prepared.workspace_snapshot_tar_path).is_file()
 
 
 def test_prepare_run_input_rejects_digest_key_for_other_content(
@@ -578,14 +579,13 @@ def test_pull_request_workflow_input_preparation_derives_stage_artifacts() -> No
         "pull-request-review",
         artifact_root_path="/tmp/local-pr/artifacts",
     )
+    assert isinstance(prepared, PreparedPullRequestInput)
 
-    assert prepared["artifact_paths"]["analyzer"] == "/tmp/local-pr/artifacts/analyzer"
+    assert prepared.analyzer_artifacts_path == "/tmp/local-pr/artifacts/analyzer"
+    assert prepared.mitigator_artifacts_path == "/tmp/local-pr/artifacts/mitigator"
+    assert prepared.verifier_artifacts_path == "/tmp/local-pr/artifacts/verifier"
     assert (
-        prepared["artifact_paths"]["mitigator"] == "/tmp/local-pr/artifacts/mitigator"
-    )
-    assert prepared["artifact_paths"]["verifier"] == "/tmp/local-pr/artifacts/verifier"
-    assert (
-        prepared["bundle_paths"]["incremental_window_path"]
+        prepared.incremental_window_path
         == "/tmp/local-pr/artifacts/input-bundle/incremental-window"
     )
 
@@ -639,7 +639,7 @@ def test_workflow_input_preparation_accepts_common_test_changes(
         artifact_root_path=_bundle_root_from_ref(payload["input_bundle"]) / "artifacts",
     )
 
-    assert prepared["review_intent"]["test_changes"] == "deny"
+    assert prepared.review_intent.test_changes == "deny"
 
 
 def test_repository_workflow_input_preparation_derives_stage_artifacts() -> None:
@@ -649,18 +649,14 @@ def test_repository_workflow_input_preparation_derives_stage_artifacts() -> None
         "repository-review",
         artifact_root_path="/tmp/local-repository/artifacts",
     )
+    assert isinstance(prepared, PreparedRepositoryInput)
 
-    assert "manifest" not in prepared["artifact_paths"]
+    assert not hasattr(prepared, "manifest_artifacts_path")
     assert (
-        prepared["artifact_paths"]["discovery"]
-        == "/tmp/local-repository/artifacts/discovery"
+        prepared.discovery_artifacts_path == "/tmp/local-repository/artifacts/discovery"
     )
-    assert (
-        prepared["artifact_paths"]["triage"] == "/tmp/local-repository/artifacts/triage"
-    )
-    assert (
-        prepared["artifact_paths"]["cases"] == "/tmp/local-repository/artifacts/cases"
-    )
+    assert prepared.triage_artifacts_path == "/tmp/local-repository/artifacts/triage"
+    assert prepared.cases_artifacts_path == "/tmp/local-repository/artifacts/cases"
 
 
 def test_workflow_input_preparation_uses_configured_artifact_root(
@@ -677,12 +673,12 @@ def test_workflow_input_preparation_uses_configured_artifact_root(
         payload,
         "issue-review",
         artifact_root_path=input_preparation.workflow_artifact_root(
-            payload,
             run_id="run-issue",
         ),
     )
+    assert isinstance(prepared, PreparedIssueInput)
 
-    assert prepared["artifact_paths"]["analyzer"] == str(
+    assert prepared.analyzer_artifacts_path == str(
         tmp_path / "artifacts" / "run-issue" / "analyzer"
     )
 
@@ -695,7 +691,6 @@ def test_workflow_artifact_root_rejects_configured_root_escape(monkeypatch) -> N
 
     with pytest.raises(ValueError, match="resolves outside"):
         input_preparation.workflow_artifact_root(
-            {"input_bundle_uri": "/tmp/local-configured-artifacts"},
             run_id="../outside",
         )
 
@@ -791,9 +786,10 @@ def test_repository_incremental_input_uses_bundle_manifest_for_incremental_windo
         "repository-review",
         artifact_root_path="/tmp/local-repository-incremental/artifacts",
     )
+    assert isinstance(prepared, PreparedRepositoryInput)
 
     assert (
-        prepared["bundle_paths"]["incremental_window_path"]
+        prepared.incremental_window_path
         == "/tmp/local-repository-incremental/artifacts/input-bundle/incremental-window"
     )
 
@@ -915,3 +911,28 @@ def test_repository_workflow_input_preparation_rejects_bad_event_type() -> None:
             "repository-review",
             artifact_root_path="/tmp/local-repository/artifacts",
         )
+
+
+def test_preparation_isolates_nested_public_pr_metadata(tmp_path: Path) -> None:
+    """Direct execution must not share mutable metadata with its caller."""
+    payload = _pull_request_input(str(tmp_path / "pr-bundle"))
+    prepared = prepare_workflow_input(
+        payload, "pull-request-review", artifact_root_path=tmp_path / "artifacts"
+    )
+    assert isinstance(prepared, PreparedPullRequestInput)
+    prepared.pr["commit_shas"].append("worker-change")
+    assert payload["pr"]["commit_shas"] == ["b" * 40]
+    payload["pr"]["review_window"]["reason"] = "caller-change"
+    assert prepared.pr["review_window"]["reason"] == "pull-request-scope"
+
+
+def test_preparation_isolates_nested_public_scan_scope(tmp_path: Path) -> None:
+    payload = _repository_input(str(tmp_path / "repo-bundle"))
+    prepared = prepare_workflow_input(
+        payload, "repository-review", artifact_root_path=tmp_path / "artifacts"
+    )
+    assert isinstance(prepared, PreparedRepositoryInput)
+    prepared.scan_scope.paths_ignore.append("worker-change")
+    assert payload["scan_scope"]["paths_ignore"] == []
+    payload["scan_scope"]["incremental_changed_files"].append({"path": "caller-change"})
+    assert prepared.scan_scope.incremental_changed_files == []

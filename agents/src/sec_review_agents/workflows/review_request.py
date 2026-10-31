@@ -1,7 +1,8 @@
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Literal
 
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
+from sec_review_agents.workflows.prepared_input import PreparedWorkflowInput
 
 
 @dataclass(frozen=True)
@@ -15,7 +16,7 @@ class ReviewPostProcessingPolicy:
 class ReviewWorkflowRequest:
     workflow: str
     run_id: str
-    prepared_input: dict[str, Any]
+    prepared_input: PreparedWorkflowInput
     timeout_seconds: int
     runtime_context: ExecutionRuntimeContext
     post_processing: ReviewPostProcessingPolicy = ReviewPostProcessingPolicy()

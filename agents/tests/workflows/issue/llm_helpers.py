@@ -100,5 +100,5 @@ async def analyze_issue_case(
                 review_objective="audit",
             )
 
-        print(json.dumps(result, indent=2, sort_keys=True))
-        return result
+        print(result.model_dump_json(indent=2, by_alias=True))
+        return result.model_dump(mode="json", by_alias=True)

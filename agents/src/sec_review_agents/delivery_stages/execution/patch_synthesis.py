@@ -1,7 +1,7 @@
 """Synthesize patches for combined deliveries."""
 
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +15,7 @@ from sec_review_agents.agents.patch_synthesis.prompts import (
     build_patch_synthesis_system_prompt,
     build_patch_synthesis_user_prompt,
 )
+from sec_review_agents.delivery_stages.execution.input import DeliveryPatchCase
 from sec_review_agents.delivery_stages.model import (
     DeliveryEntry,
 )
@@ -27,24 +28,24 @@ from sec_review_agents.utils.files import (
 from sec_review_agents.utils.markdown import inline_code, md
 from sec_review_agents.workspace.file_changes import file_change_paths
 from sec_review_agents.workspace.patches import (
+    PatchArtifact,
     build_patch_artifact,
-    normalize_declared_changed_files,
 )
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
 
 def _file_overlap_summary(
-    case_payloads: Sequence[Mapping[str, Any]],
+    case_payloads: Sequence[DeliveryPatchCase],
 ) -> dict[str, Any]:
     cases_by_file: dict[str, list[str]] = {}
     files_by_case: dict[str, list[str]] = {}
     for case_payload in case_payloads:
-        case_id = str(case_payload.get("case_id") or "").strip()
+        case_id = case_payload.case_id
         if not case_id:
             continue
         changed_files: list[str] = []
         seen_paths: set[str] = set()
-        for path in file_change_paths(case_payload.get("mitigator_file_changes")):
+        for path in file_change_paths(case_payload.mitigator_file_changes):
             if path in seen_paths:
                 continue
             seen_paths.add(path)
@@ -72,16 +73,16 @@ def _file_overlap_summary(
 def render_delivery_patch_synthesis_brief(
     *,
     delivery_entry: DeliveryEntry,
-    case_items: Sequence[Mapping[str, Any]],
+    case_items: Sequence[DeliveryPatchCase],
     case_ids: list[str] | None = None,
 ) -> str:
-    resolved_case_ids = case_ids or [item["case_id"] for item in case_items]
+    resolved_case_ids = case_ids or [item.case_id for item in case_items]
     case_payloads = list(case_items)
     overlap = _file_overlap_summary(case_payloads)
     lines = [
         "# Patch Synthesis Brief",
         "",
-        md(t"- Reason: {delivery_entry.get('reason') or 'unspecified'}"),
+        md(t"- Reason: {delivery_entry.reason or 'unspecified'}"),
         "- Case IDs: "
         + ", ".join(inline_code(case_id) for case_id in resolved_case_ids),
     ]
@@ -100,11 +101,11 @@ def render_delivery_patch_synthesis_brief(
 
     lines.extend(["", "## Cases"])
     for case in case_payloads:
-        case_id = str(case.get("case_id") or "")
+        case_id = case.case_id
         changed_files = (
             ", ".join(
                 inline_code(path)
-                for path in file_change_paths(case.get("mitigator_file_changes"))
+                for path in file_change_paths(case.mitigator_file_changes)
             )
             or "none"
         )
@@ -117,7 +118,7 @@ def render_delivery_patch_synthesis_brief(
                 "#### Reference Patch",
             ]
         )
-        patch_text = str(case.get("mitigator_patch_diff") or "")
+        patch_text = case.mitigator_patch_diff or ""
         if patch_text:
             lines.extend(["", "```diff", patch_text.rstrip("\n"), "```", ""])
         else:
@@ -129,7 +130,7 @@ def render_delivery_patch_synthesis_brief(
 def build_delivery_patch_synthesis_user_prompt(
     *,
     delivery_entry: DeliveryEntry,
-    case_items: Sequence[Mapping[str, Any]],
+    case_items: Sequence[DeliveryPatchCase],
     case_ids: list[str],
 ) -> str:
     return build_patch_synthesis_user_prompt(
@@ -146,14 +147,14 @@ async def synthesize_combined_delivery_patch(
     baseline_snapshot_tar_path: Path,
     patch_synthesis_root: Path,
     delivery_entry: DeliveryEntry,
-    case_items: Sequence[Mapping[str, Any]],
-) -> dict[str, Any]:
+    case_items: Sequence[DeliveryPatchCase],
+) -> PatchArtifact:
     """Build and persist the patch artifact for one combined delivery.
 
     Delivery execution owns status and error reporting. This function returns only
     patch data, using an empty artifact when the agent declares no changed files.
     """
-    delivery_id = delivery_entry["delivery_id"]
+    delivery_id = delivery_entry.delivery_id
     if not delivery_id:
         raise ValueError("Missing delivery_id for combined patch synthesis.")
 
@@ -163,7 +164,7 @@ async def synthesize_combined_delivery_patch(
             f"{baseline_snapshot_tar_path}."
         )
 
-    case_ids = [item["case_id"] for item in case_items]
+    case_ids = [item.case_id for item in case_items]
     user_prompt = build_delivery_patch_synthesis_user_prompt(
         delivery_entry=delivery_entry,
         case_items=case_items,
@@ -190,27 +191,16 @@ async def synthesize_combined_delivery_patch(
             workspace_writable=True,
         )
         async with amanaged_backend(backend):
-            structured_payload = (
-                await run_patch_synthesis_agent(
-                    backend=backend,
-                    workspace_root_path=workspace_path,
-                    baseline_snapshot_tar_path=baseline_snapshot_tar_path,
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    trajectory_paths=(trajectory_path(delivery_artifacts_root),),
-                )
-            ).model_dump(by_alias=True)
-
-        raw_declared_changed_files = structured_payload.get("declared_changed_files")
-        if not isinstance(raw_declared_changed_files, list):
-            raise ValueError(
-                "Patch synthesis agent output requires declared_changed_files."
+            structured_payload = await run_patch_synthesis_agent(
+                backend=backend,
+                workspace_root_path=workspace_path,
+                baseline_snapshot_tar_path=baseline_snapshot_tar_path,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                trajectory_paths=(trajectory_path(delivery_artifacts_root),),
             )
-        declared_changed_files = normalize_declared_changed_files(
-            raw_declared_changed_files
-        )
-        if not declared_changed_files:
-            return {"patch_diff": "", "file_changes": []}
+
+        declared_changed_files = structured_payload.declared_changed_files
 
         patch_artifact = build_patch_artifact(
             workspace_path,
@@ -219,6 +209,6 @@ async def synthesize_combined_delivery_patch(
         persist_text_artifact(
             delivery_artifacts_root,
             "workspace.patch",
-            patch_artifact["patch_diff"],
+            patch_artifact.patch_diff,
         )
         return patch_artifact

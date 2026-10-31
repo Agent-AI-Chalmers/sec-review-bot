@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.agents.analysis.model import AnalysisOutput
 from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
 from sec_review_agents.workspace.snapshots import (
@@ -49,13 +50,15 @@ async def _run(
     artifacts = tmp_path / "artifacts" / "analyzer"
     agent_called = {"value": False}
 
-    async def run_agent(**_kwargs: Any) -> dict[str, Any]:
+    async def run_agent(**_kwargs: Any) -> AnalysisOutput:
         agent_called["value"] = True
-        return {
-            "overview": "n/a",
-            "narratives": [],
-            "overall_verdict": "no-actionable-finding",
-        }
+        return AnalysisOutput.model_validate(
+            {
+                "overview": "n/a",
+                "narratives": [],
+                "overall_verdict": "no-actionable-finding",
+            }
+        )
 
     with (
         patch(
@@ -188,11 +191,11 @@ async def test_stage_assembles_invocation_mounts(
         assert kwargs["backend"] is backend
         assert kwargs["memory_enabled"] is with_memory
         assert memory_root.exists()
-        return {
-            "overview": "ok",
-            "narratives": [],
-            "overall_verdict": "no-actionable-finding",
-        }
+        return AnalysisOutput(
+            overview="ok",
+            narratives=[],
+            overall_verdict="no-actionable-finding",
+        )
 
     with (
         patch(

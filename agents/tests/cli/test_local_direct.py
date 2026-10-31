@@ -124,9 +124,7 @@ def test_local_direct_uses_materialized_artifact_root(
 
     request = build_local_workflow_request(bundle, timeout_seconds=60)
 
-    assert request.prepared_input["artifact_root_path"] == str(
-        bundle.artifact_root_path
-    )
+    assert request.prepared_input.artifact_root_path == str(bundle.artifact_root_path)
 
 
 def test_local_direct_runs_review_only(

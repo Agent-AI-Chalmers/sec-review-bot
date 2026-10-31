@@ -20,25 +20,15 @@ from sec_review_agents.entrypoints.execution_protocol import validate_run_id
 from sec_review_agents.entrypoints.input_bundle_artifact import (
     validate_input_bundle_entries,
 )
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 from sec_review_agents.utils.env import env_value
-
-ISSUE_ARTIFACT_PATHS = {
-    "analyzer": "analyzer",
-    "mitigator": "mitigator",
-    "verifier": "verifier",
-}
-
-PULL_REQUEST_ARTIFACT_PATHS = {
-    "analyzer": "analyzer",
-    "mitigator": "mitigator",
-    "verifier": "verifier",
-}
-
-REPOSITORY_ARTIFACT_PATHS = {
-    "discovery": "discovery",
-    "triage": "triage",
-    "cases": "cases",
-}
+from sec_review_agents.workflows.prepared_input import (
+    PreparedIssueInput,
+    PreparedPullRequestInput,
+    PreparedRepositoryInput,
+    PreparedWorkflowInput,
+)
+from sec_review_agents.workflows.review_intent import require_review_intent
 
 INPUT_BUNDLE_MANIFEST_NAME = "manifest.json"
 ARTIFACT_ROOT_ENV = "SEC_REVIEW_AGENT_ARTIFACT_ROOT"
@@ -55,13 +45,12 @@ def prepare_run_input(
     *,
     run_id: str,
     workflow: str,
-) -> dict[str, Any]:
+) -> PreparedWorkflowInput:
     validated_run_id = validate_run_id(run_id)
     return prepare_workflow_input(
         caller_input,
         workflow,
         artifact_root_path=workflow_artifact_root(
-            caller_input,
             run_id=validated_run_id,
         ),
         input_root_path=_resolve_run_input_root(run_id=validated_run_id),
@@ -76,52 +65,63 @@ def prepare_workflow_input(
     artifact_root_path: str | Path,
     input_root_path: str | Path | None = None,
     expected_run_id: str | None = None,
-) -> dict[str, Any]:
-    """Turn public workflow input into the filesystem-ready runtime form.
-
-    The caller supplies the review target and an input bundle URI. This function
-    keeps that public object unchanged and returns a copy enriched with worker-owned
-    paths: ``input_bundle_root_path``, ``artifact_root_path``, ``artifact_paths``,
-    and ``bundle_paths``. All bundle paths are read from the manifest and constrained
-    to remain inside the input bundle.
-    """
-
-    # Validate before adding worker-owned fields, which are not part of the public
-    # workflow input contract.
+) -> PreparedWorkflowInput:
+    """Validate public JSON, materialize its bundle, then construct runtime input."""
     validate_execution_api_input(input_data, workflow)
-    prepared = deepcopy(input_data)
-
-    # Resolve the caller's bundle URI at the trusted filesystem boundary.
-    prepared["input_bundle_root_path"] = str(
-        _materialize_input_bundle(
-            prepared.get("input_bundle"),
-            destination=(
-                Path(input_root_path)
-                if input_root_path is not None
-                else Path(artifact_root_path) / "input-bundle"
-            ),
-            expected_run_id=expected_run_id,
-        )
+    bundle_root = _materialize_input_bundle(
+        input_data.get("input_bundle"),
+        destination=(
+            Path(input_root_path)
+            if input_root_path is not None
+            else Path(artifact_root_path) / "input-bundle"
+        ),
+        expected_run_id=expected_run_id,
     )
-
-    # Artifact paths come from worker configuration, never from caller input.
-    _set_workflow_artifact_paths(
-        prepared,
-        workflow,
-        artifact_root_path=artifact_root_path,
-    )
+    artifact_root = Path(artifact_root_path)
+    scan_target = input_data.get("scan_target") or {}
     if workflow == "repository-review":
-        _validate_repository_incremental_range(prepared)
-
-    # Translate bundle-relative manifest entries into paths consumed by workflows.
-    _set_bundle_paths_from_manifest(prepared, workflow)
-    return prepared
-
-
-def workflow_artifact_root(input_data: dict[str, Any], *, run_id: str) -> Path:
-    return _resolve_artifact_root(
-        run_id=run_id,
+        _validate_repository_incremental_range(input_data)
+    bundle_paths = _read_bundle_paths(
+        bundle_root, workflow, scan_target.get("scan_mode")
     )
+    common: dict[str, Any] = {
+        "input_bundle_root_path": str(bundle_root),
+        "artifact_root_path": str(artifact_root),
+        "workspace_snapshot_tar_path": bundle_paths["workspace_snapshot_tar_path"],
+        "history_path": bundle_paths["history_path"],
+        "review_intent": require_review_intent(input_data.get("review_intent")),
+        "setup_declaration": input_data.get("setup_declaration"),
+    }
+    if workflow == "issue-review":
+        return PreparedIssueInput(
+            **common,
+            issue=deepcopy(input_data["issue"]),
+            analyzer_artifacts_path=str(artifact_root / "analyzer"),
+            mitigator_artifacts_path=str(artifact_root / "mitigator"),
+            verifier_artifacts_path=str(artifact_root / "verifier"),
+        )
+    if workflow == "pull-request-review":
+        return PreparedPullRequestInput(
+            **common,
+            pr=deepcopy(input_data["pr"]),
+            incremental_window_path=bundle_paths["incremental_window_path"],
+            analyzer_artifacts_path=str(artifact_root / "analyzer"),
+            mitigator_artifacts_path=str(artifact_root / "mitigator"),
+            verifier_artifacts_path=str(artifact_root / "verifier"),
+        )
+    if workflow == "repository-review":
+        return PreparedRepositoryInput(
+            **common,
+            scan_mode=scan_target["scan_mode"],
+            base_sha=scan_target.get("base_sha"),
+            head_sha=scan_target.get("head_sha"),
+            scan_scope=RepositoryScanScope.model_validate(input_data["scan_scope"]),
+            incremental_window_path=bundle_paths.get("incremental_window_path"),
+            discovery_artifacts_path=str(artifact_root / "discovery"),
+            triage_artifacts_path=str(artifact_root / "triage"),
+            cases_artifacts_path=str(artifact_root / "cases"),
+        )
+    raise AssertionError(f"Unsupported prepared workflow: {workflow}")
 
 
 def _materialize_input_bundle(
@@ -208,33 +208,7 @@ def _materialize_input_bundle(
     )
 
 
-def _set_workflow_artifact_paths(
-    input_data: dict[str, Any],
-    workflow: str,
-    *,
-    artifact_root_path: str | Path,
-) -> None:
-    artifact_root = Path(artifact_root_path)
-
-    if workflow == "issue-review":
-        artifact_paths = ISSUE_ARTIFACT_PATHS
-    elif workflow == "pull-request-review":
-        artifact_paths = PULL_REQUEST_ARTIFACT_PATHS
-    elif workflow == "repository-review":
-        artifact_paths = REPOSITORY_ARTIFACT_PATHS
-    else:
-        raise AssertionError(f"Unsupported prepared workflow: {workflow}")
-
-    # Prepared workflow input may include worker-owned artifact paths
-    # after caller validation. Keep those fields out of caller input.
-    input_data["artifact_root_path"] = str(artifact_root)
-    input_data["artifact_paths"] = {
-        key: str(artifact_root / directory_name)
-        for key, directory_name in artifact_paths.items()
-    }
-
-
-def _resolve_artifact_root(*, run_id: str) -> Path:
+def workflow_artifact_root(*, run_id: str) -> Path:
     configured_root = env_value(ARTIFACT_ROOT_ENV)
     if configured_root is not None:
         artifact_root = Path(configured_root).expanduser().resolve()
@@ -269,11 +243,11 @@ def _resolve_run_input_root(*, run_id: str) -> Path:
     return run_input_root
 
 
-def _set_bundle_paths_from_manifest(
-    input_data: dict[str, Any],
+def _read_bundle_paths(
+    local_root: Path,
     workflow: str,
-) -> None:
-    local_root = Path(input_data["input_bundle_root_path"])
+    scan_mode: str | None,
+) -> dict[str, str]:
     manifest_path = local_root / INPUT_BUNDLE_MANIFEST_NAME
     if not manifest_path.is_file():
         raise ValueError(f"Input bundle manifest not found: {manifest_path}")
@@ -311,15 +285,12 @@ def _set_bundle_paths_from_manifest(
         raise ValueError(
             "Pull request input bundle manifest requires incremental_window.path."
         )
-    elif (
-        workflow == "repository-review"
-        and (input_data.get("scan_target") or {}).get("scan_mode") == "incremental"
-    ):
+    elif workflow == "repository-review" and scan_mode == "incremental":
         raise ValueError(
             "Incremental repository input bundle manifest requires incremental_window.path."
         )
 
-    input_data["bundle_paths"] = bundle_paths
+    return bundle_paths
 
 
 def _read_required_manifest_path(value: object, label: str) -> str:

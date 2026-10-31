@@ -19,7 +19,9 @@ from sec_review_agents.filesystem.path_views import (
     workspace_view,
 )
 from sec_review_agents.resources.loader import join_prompt_sections
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.feedback_loop import (
+    FeedbackRetryContext,
     mitigation_feedback_retry_context,
     render_retry_revision_context_section,
 )
@@ -123,8 +125,8 @@ def build_pr_mitigation_filesystem_system_prompt() -> str:
 def build_pr_mitigation_user_prompt(
     *,
     pr: Mapping[str, Any],
-    retry_context: Mapping[str, Any] | None,
-    analysis_result: Mapping[str, Any],
+    retry_context: FeedbackRetryContext | None,
+    analysis_result: AnalysisStageResult,
 ) -> str:
     feedback_retry = mitigation_feedback_retry_context(retry_context)
     title = pr.get("title")
@@ -137,7 +139,7 @@ def build_pr_mitigation_user_prompt(
     sections = [
         (
             PR_MITIGATION_RETRY_INTRO
-            if isinstance(feedback_retry, dict)
+            if feedback_retry is not None
             else PR_MITIGATION_INITIAL_INTRO
         ),
         "",
@@ -194,7 +196,7 @@ def build_pr_mitigation_user_prompt(
             "",
             render_structured_markdown_section(
                 "Analyzer Context",
-                analysis_result,
+                analysis_result.model_dump(mode="json", by_alias=True),
                 profile="prompt",
             ),
         ]

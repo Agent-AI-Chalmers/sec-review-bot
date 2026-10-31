@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import pytest
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.testing import WorkflowEnvironment
 
 TEMPORAL_TEST_SERVER_EXISTING_PATH_ENV = "TEMPORAL_TEST_SERVER_EXISTING_PATH"
@@ -16,6 +17,7 @@ async def temporal_time_skipping_environment() -> AsyncIterator[WorkflowEnvironm
     try:
         async with await WorkflowEnvironment.start_time_skipping(
             test_server_existing_path=existing_path or None,
+            data_converter=pydantic_data_converter,
         ) as env:
             yield env
     except RuntimeError as error:

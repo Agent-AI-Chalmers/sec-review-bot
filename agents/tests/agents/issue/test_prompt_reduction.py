@@ -9,33 +9,35 @@ from sec_review_agents.agents.verification.pull_request import (
     build_pr_verification_user_prompt,
 )
 from sec_review_agents.review_stages.feedback_loop import (
+    feedback_retry_context,
     verification_feedback_retry_context,
 )
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
+from sec_review_agents.review_stages.verification.result import VerificationStageResult
+from tests.analysis_fixtures import analysis_fixture, narrative_fixture
 
 WORKSPACE_PATCH = "diff --git a/a.py b/a.py"
 
 
 def test_repair_prompt_uses_all_analysis_narratives_as_context() -> None:
-    """Keep mitigation context complete, including entries with unexpected shapes."""
+    """Retain unconfirmed narratives so mitigation sees the complete analysis."""
     prompt = build_issue_mitigation_user_prompt(
         issue={"title": "Issue title", "body": "Issue body"},
         retry_context=None,
-        analysis_result={
-            "overview": "Analyzer overview",
-            "verdict": "plausible-risk",
-            "narratives": [
-                {
-                    "priority": 1,
-                    "title": "Unconfirmed issue narrative",
-                    "verdict": "no-actionable-finding",
-                },
-                "not-a-narrative",
+        analysis_result=analysis_fixture(
+            overview="Analyzer overview",
+            verdict="plausible-risk",
+            narratives=[
+                narrative_fixture(
+                    verdict="no-actionable-finding",
+                    title="Unconfirmed issue narrative",
+                    priority=1,
+                )
             ],
-        },
+        ),
     )
 
     assert "Unconfirmed issue narrative" in prompt
-    assert "not-a-narrative" in prompt
 
 
 def test_self_check_prompt_uses_repair_narratives_context() -> None:
@@ -45,17 +47,17 @@ def test_self_check_prompt_uses_repair_narratives_context() -> None:
             "title": "Issue title",
             "body": "Issue body",
         },
-        analysis_result={
-            "overview": "Analyzer overview",
-            "verdict": "plausible-risk",
-            "narratives": [
-                {
-                    "priority": 1,
-                    "title": "Unconfirmed target",
-                    "verdict": "no-actionable-finding",
-                }
+        analysis_result=analysis_fixture(
+            overview="Analyzer overview",
+            verdict="plausible-risk",
+            narratives=[
+                narrative_fixture(
+                    verdict="no-actionable-finding",
+                    title="Unconfirmed target",
+                    priority=1,
+                )
             ],
-        },
+        ),
     )
 
     assert "Unconfirmed target" in prompt
@@ -69,21 +71,19 @@ def test_initial_verification_prompt_omits_narratives_section() -> None:
             "body": "Remote URL fetch may be unsafe.",
         }
     }
-    analysis_result = {
-        "overview": "Analyzer overview",
-        "verdict": "confirmed-vulnerability",
-        "narratives": [
-            {
-                "title": "Should not appear",
-                "verdict": "confirmed-vulnerability",
-            }
+    analysis_result = analysis_fixture(
+        overview="Analyzer overview",
+        verdict="confirmed-vulnerability",
+        narratives=[
+            narrative_fixture(
+                verdict="confirmed-vulnerability", title="Should not appear"
+            )
         ],
-    }
-    mitigation_result = {
-        "overview": "Mitigation overview",
-        "file_changes": [{"path": "a.py", "status": "deleted"}],
-        "residual_risks": ["risk-b"],
-    }
+    )
+    mitigation_result = MitigationStageResult(
+        overview="Mitigation overview",
+        file_changes=[{"path": "a.py", "status": "deleted"}],
+    )
 
     prompt = build_issue_verification_user_prompt(
         issue=input_data["issue"],
@@ -109,37 +109,47 @@ def test_initial_verification_prompt_omits_narratives_section() -> None:
 def test_retry_verifier_feedback_keeps_only_lightweight_fields() -> None:
     """Pass corrective verifier fields forward without replaying the full result."""
     input_data = {
-        "retry_context": {
-            "retry_index": 1,
-            "history": [
-                {
-                    "retry_index": 0,
-                    "patch_coverage": "partial",
-                    "resolution_next_step": "retry-ai",
-                    "patch_findings": ["gap"],
-                    "verification_findings": ["verbose note"],
-                }
+        "retry_context": feedback_retry_context(
+            retry_index=1,
+            mitigation_result=None,
+            verifier_result=VerificationStageResult(
+                overview="Previous verifier found a gap.",
+                review_target_claim="claim",
+                patch_coverage="partial",
+                resolution_next_step="retry-ai",
+                patch_findings=["concern"],
+                validation_level="static",
+                verification_findings=["verbose note"],
+                regression_status=None,
+            ),
+            history=[
+                *feedback_retry_context(
+                    retry_index=1,
+                    mitigation_result=None,
+                    verifier_result=VerificationStageResult(
+                        patch_coverage="partial",
+                        resolution_next_step="retry-ai",
+                        patch_findings=["gap"],
+                        verification_findings=["verbose note"],
+                        overview="Test verification",
+                        review_target_claim=None,
+                        validation_level=None,
+                        regression_status=None,
+                    ),
+                ).history
             ],
-            "previous_verifier_result": {
-                "overview": "Previous verifier found a gap.",
-                "review_target_claim": "claim",
-                "patch_coverage": "partial",
-                "resolution_next_step": "retry-ai",
-                "patch_findings": ["concern"],
-                "validation_level": "static",
-                "verification_findings": ["verbose note"],
-            },
-        }
+        )
     }
 
     payload = verification_feedback_retry_context(input_data.get("retry_context"))
     assert payload is not None
-    latest = payload["latest_verifier"]
+    latest = payload.latest_verifier
+    assert latest is not None
 
-    assert latest["review_target_claim"] == "claim"
-    assert latest["resolution_next_step"] == "retry-ai"
-    assert latest["patch_findings"] == ["concern"]
-    assert latest["verification_findings"] == ["verbose note"]
+    assert latest.review_target_claim == "claim"
+    assert latest.resolution_next_step == "retry-ai"
+    assert latest.patch_findings == ["concern"]
+    assert latest.verification_findings == ["verbose note"]
 
 
 def test_retry_issue_verification_prompt_inlines_original_issue_text() -> None:
@@ -149,17 +159,23 @@ def test_retry_issue_verification_prompt_inlines_original_issue_text() -> None:
             "title": "Original issue title",
             "body": "Original issue body",
         },
-        retry_context={
-            "retry_index": 1,
-            "previous_verifier_result": {
-                "review_target_claim": "claim",
-                "patch_coverage": "partial",
-                "resolution_next_step": "retry-ai",
-                "patch_findings": ["gap"],
-            },
-        },
-        analysis_result={"overview": "analysis"},
-        mitigation_result={"overview": "new mitigation"},
+        retry_context=feedback_retry_context(
+            retry_index=1,
+            mitigation_result=None,
+            verifier_result=VerificationStageResult(
+                review_target_claim="claim",
+                patch_coverage="partial",
+                resolution_next_step="retry-ai",
+                patch_findings=["gap"],
+                overview="Test verification",
+                validation_level=None,
+                regression_status=None,
+            ),
+        ),
+        analysis_result=analysis_fixture(
+            overview="analysis", verdict=None, narratives=[]
+        ),
+        mitigation_result=MitigationStageResult(overview="new mitigation"),
         workspace_patch=WORKSPACE_PATCH,
     )
 
@@ -192,18 +208,30 @@ def test_retry_issue_verification_prompt_renders_history_without_json_block() ->
             "title": "Original issue title",
             "body": "Original issue body",
         },
-        retry_context={
-            "retry_index": 2,
-            "history": [
-                {
-                    "retry_index": 1,
-                    "patch_coverage": "partial",
-                    "patch_findings": ["still misses retry path"],
-                }
+        retry_context=feedback_retry_context(
+            retry_index=2,
+            mitigation_result=None,
+            verifier_result=None,
+            history=[
+                *feedback_retry_context(
+                    retry_index=1,
+                    mitigation_result=None,
+                    verifier_result=VerificationStageResult(
+                        patch_coverage="partial",
+                        patch_findings=["still misses retry path"],
+                        overview="Test verification",
+                        review_target_claim=None,
+                        resolution_next_step="none",
+                        validation_level=None,
+                        regression_status=None,
+                    ),
+                ).history
             ],
-        },
-        analysis_result={"overview": "analysis"},
-        mitigation_result={"overview": "new mitigation"},
+        ),
+        analysis_result=analysis_fixture(
+            overview="analysis", verdict=None, narratives=[]
+        ),
+        mitigation_result=MitigationStageResult(overview="new mitigation"),
         workspace_patch=WORKSPACE_PATCH,
     )
 
@@ -227,17 +255,23 @@ def test_retry_pr_verification_prompt_inlines_original_pr_text() -> None:
             "head_sha": "head",
             "commit_shas": ["head"],
         },
-        retry_context={
-            "retry_index": 1,
-            "previous_verifier_result": {
-                "review_target_claim": "claim",
-                "patch_coverage": "partial",
-                "resolution_next_step": "retry-ai",
-                "patch_findings": ["gap"],
-            },
-        },
-        analysis_result={"overview": "analysis"},
-        mitigation_result={"overview": "new mitigation"},
+        retry_context=feedback_retry_context(
+            retry_index=1,
+            mitigation_result=None,
+            verifier_result=VerificationStageResult(
+                review_target_claim="claim",
+                patch_coverage="partial",
+                resolution_next_step="retry-ai",
+                patch_findings=["gap"],
+                overview="Test verification",
+                validation_level=None,
+                regression_status=None,
+            ),
+        ),
+        analysis_result=analysis_fixture(
+            overview="analysis", verdict=None, narratives=[]
+        ),
+        mitigation_result=MitigationStageResult(overview="new mitigation"),
         workspace_patch=WORKSPACE_PATCH,
     )
 
@@ -260,17 +294,16 @@ def test_initial_pr_verification_prompt_omits_narratives_section() -> None:
             "commit_shas": ["head"],
         },
         retry_context=None,
-        analysis_result={
-            "overview": "Analyzer overview",
-            "verdict": "confirmed-vulnerability",
-            "narratives": [
-                {
-                    "title": "Should not appear",
-                    "verdict": "confirmed-vulnerability",
-                }
+        analysis_result=analysis_fixture(
+            overview="Analyzer overview",
+            verdict="confirmed-vulnerability",
+            narratives=[
+                narrative_fixture(
+                    verdict="confirmed-vulnerability", title="Should not appear"
+                )
             ],
-        },
-        mitigation_result={"overview": "new mitigation"},
+        ),
+        mitigation_result=MitigationStageResult(overview="new mitigation"),
         workspace_patch=WORKSPACE_PATCH,
     )
 
@@ -289,35 +322,41 @@ def test_retry_mitigation_prompt_keeps_verifier_as_primary_corrective_signal() -
             "body": "Issue body",
         }
     }
-    analysis_result = {
-        "overview": "Analyzer overview",
-        "verdict": "confirmed-vulnerability",
-        "narratives": [],
-    }
-    retry_context = {
-        "retry_index": 1,
-        "previous_mitigation_result": {
-            "overview": "Old mitigation",
-            "changed_files": ["a.py"],
-        },
-        "previous_verifier_result": {
-            "overview": "Old verifier",
-            "review_target_claim": "claim",
-            "patch_coverage": "partial",
-            "resolution_next_step": "retry-ai",
-            "validation_level": "static",
-            "patch_findings": ["gap"],
-            "verification_findings": ["note"],
-        },
-        "history": [
-            {
-                "retry_index": 1,
-                "patch_coverage": "partial",
-                "resolution_next_step": "retry-ai",
-                "patch_findings": ["old gap"],
-            }
+    analysis_result = analysis_fixture(
+        overview="Analyzer overview", verdict="confirmed-vulnerability", narratives=[]
+    )
+    retry_context = feedback_retry_context(
+        retry_index=1,
+        mitigation_result=MitigationStageResult(
+            overview="Old mitigation",
+            file_changes=[{"path": path, "status": "deleted"} for path in ["a.py"]],
+        ),
+        verifier_result=VerificationStageResult(
+            overview="Old verifier",
+            review_target_claim="claim",
+            patch_coverage="partial",
+            resolution_next_step="retry-ai",
+            validation_level="static",
+            patch_findings=["gap"],
+            verification_findings=["note"],
+            regression_status=None,
+        ),
+        history=[
+            *feedback_retry_context(
+                retry_index=1,
+                mitigation_result=None,
+                verifier_result=VerificationStageResult(
+                    patch_coverage="partial",
+                    resolution_next_step="retry-ai",
+                    patch_findings=["old gap"],
+                    overview="Test verification",
+                    review_target_claim=None,
+                    validation_level=None,
+                    regression_status=None,
+                ),
+            ).history
         ],
-    }
+    )
 
     prompt = build_issue_mitigation_user_prompt(
         issue=input_data["issue"],

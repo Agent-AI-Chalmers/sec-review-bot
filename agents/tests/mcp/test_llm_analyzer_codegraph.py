@@ -91,7 +91,9 @@ async def test_repository_analyzer_codegraph_comparison_for_cross_file_ssti() ->
         result = with_codegraph["result"]
         assert result["verdict"] == "confirmed-vulnerability"
         assert with_codegraph["toolUsage"]["usedCodeGraph"]
-        result_text = json.dumps(result, ensure_ascii=False).lower()
+        result_text = json.dumps(
+            result.model_dump(mode="json", by_alias=True), ensure_ascii=False
+        ).lower()
         assert "template" in result_text
         assert "jinja" in result_text
         assert "render_user_template" in result_text
@@ -137,9 +139,11 @@ async def _run_probe(
                 "repository-grounded analysis, not a generic Jinja2 warning."
             ),
         )
-    result_text = json.dumps(result, ensure_ascii=False).lower()
+    result_text = json.dumps(
+        result.model_dump(mode="json", by_alias=True), ensure_ascii=False
+    ).lower()
     return {
-        "verdict": result.get("verdict"),
+        "verdict": result.verdict,
         "mentionsJinja": "jinja" in result_text,
         "mentionsRenderUserTemplate": "render_user_template" in result_text,
         "toolUsage": tool_usage_from_trajectory(

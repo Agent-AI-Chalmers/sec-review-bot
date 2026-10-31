@@ -1,4 +1,3 @@
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +7,7 @@ from sec_review_agents.filesystem.path_views import (
     workspace_view,
 )
 from sec_review_agents.resources.loader import join_prompt_sections
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.utils.markdown import json_section
 
 REPOSITORY_CVSS_V4_SCORER_NAME = "repository-cvss-v4-scorer"
@@ -76,7 +76,7 @@ def build_repository_cvss_v4_filesystem_system_prompt() -> str:
 def build_repository_cvss_v4_user_prompt(
     *,
     review_input: str,
-    analysis_result: Mapping[str, Any],
+    analysis_result: AnalysisStageResult,
 ) -> str:
     top_priority_narrative = _top_priority_narrative(analysis_result)
     return "\n".join(
@@ -88,9 +88,12 @@ def build_repository_cvss_v4_user_prompt(
             json_section(
                 "Analysis Result For Scoring",
                 {
-                    "overview": analysis_result.get("overview"),
-                    "verdict": analysis_result.get("verdict"),
-                    "narratives": analysis_result.get("narratives") or [],
+                    "overview": analysis_result.overview,
+                    "verdict": analysis_result.verdict,
+                    "narratives": [
+                        item.model_dump(mode="json", by_alias=True)
+                        for item in analysis_result.narratives
+                    ],
                     "top_priority_narrative": top_priority_narrative,
                 },
             ),
@@ -100,24 +103,14 @@ def build_repository_cvss_v4_user_prompt(
     )
 
 
-def _top_priority_narrative(analysis_result: Mapping[str, Any]) -> dict[str, Any]:
-    narratives = analysis_result.get("narratives") or []
-    if not isinstance(narratives, list):
+def _top_priority_narrative(analysis_result: AnalysisStageResult) -> dict[str, Any]:
+    confirmed = [
+        item
+        for item in analysis_result.narratives
+        if item.verdict == "confirmed-vulnerability"
+    ]
+    if not confirmed:
         return {}
-
-    ranked: list[tuple[int, int, dict]] = []
-    for index, narrative in enumerate(narratives):
-        if not isinstance(narrative, dict):
-            continue
-        if narrative.get("verdict") != "confirmed-vulnerability":
-            continue
-        priority = narrative.get("priority")
-        if not isinstance(priority, int) or priority < 1:
-            priority = 10_000
-        ranked.append((priority, index, narrative))
-
-    if ranked:
-        ranked.sort(key=lambda item: (item[0], item[1]))
-        return ranked[0][2]
-
-    return {}
+    return min(confirmed, key=lambda item: item.priority).model_dump(
+        mode="json", by_alias=True
+    )

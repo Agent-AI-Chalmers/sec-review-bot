@@ -5,13 +5,17 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.agents.analysis.model import AnalysisOutput
+from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
     is_docker_runtime_available,
 )
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.workflows.issue.analysis import analyze_issue
 from sec_review_agents.workflows.issue.verification import verify_issue
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
+from tests.analysis_fixtures import analysis_fixture
 
 pytestmark = pytest.mark.integration
 
@@ -50,14 +54,16 @@ async def test_issue_analyzer_docker_workspace_is_writable_stage_copy(
         *,
         backend: Any,
         **_kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> AnalysisOutput:
         stage_workspaces.append(_workspace_mount_host(backend, source_workspace))
         _write_workspace_probe(backend, "analyzer")
-        return {
-            "overview": "ok",
-            "narratives": [],
-            "overall_verdict": "no-actionable-finding",
-        }
+        return AnalysisOutput.model_validate(
+            {
+                "overview": "ok",
+                "narratives": [],
+                "overall_verdict": "no-actionable-finding",
+            }
+        )
 
     with (
         patch(
@@ -116,7 +122,7 @@ async def test_issue_verifier_docker_workspace_is_writable_stage_copy(
         user_prompt: str,
         config: dict[str, Any] | None = None,
         **_kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> VerificationOutput:
         del (
             user_prompt,
             config,
@@ -124,17 +130,19 @@ async def test_issue_verifier_docker_workspace_is_writable_stage_copy(
         assert backend is not None
         stage_workspaces.append(_workspace_mount_host(backend, source_workspace))
         _write_workspace_probe(backend, "verifier")
-        return {
-            "overview": "No patch was available.",
-            "review_target_claim": "demo claim",
-            "patch_coverage": "no-patch",
-            "resolution_next_step": "manual-review",
-            "patch_findings": [],
-            "verification_findings": ["No patch was available."],
-            "validation_level": "static",
-            "regression_status": "not-applicable",
-            "residual_risks": [],
-        }
+        return VerificationOutput.model_validate(
+            {
+                "overview": "No patch was available.",
+                "review_target_claim": "demo claim",
+                "patch_coverage": "no-patch",
+                "resolution_next_step": "manual-review",
+                "patch_findings": [],
+                "verification_findings": ["No patch was available."],
+                "validation_level": "static",
+                "regression_status": "not-applicable",
+                "residual_risks": [],
+            }
+        )
 
     with (
         patch(
@@ -151,16 +159,14 @@ async def test_issue_verifier_docker_workspace_is_writable_stage_copy(
             workspace_snapshot_tar_path=snapshot_tar,
             history_path=history,
             verifier_artifacts_path=verifier_artifacts,
-            analysis_result={
-                "status": "completed",
-                "overview": "analysis",
-                "narratives": [],
-            },
-            mitigation_result={"changed_files": []},
+            analysis_result=analysis_fixture(
+                overview="analysis", verdict=None, narratives=[]
+            ),
+            mitigation_result=MitigationStageResult(overview="Test mitigation"),
             retry_context=None,
         )
 
-    assert result["patch_coverage"] == "no-patch"
+    assert result.patch_coverage == "no-patch"
     assert len(stage_workspaces) == 1
     assert not (source_workspace / ".agent-index").exists()
     assert not stage_workspaces[0].exists()

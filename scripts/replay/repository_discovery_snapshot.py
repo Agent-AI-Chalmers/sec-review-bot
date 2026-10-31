@@ -15,12 +15,18 @@ import tempfile
 from fractions import Fraction
 from pathlib import Path
 
+from sec_review_agents.scan_stages.discovery.input import DiscoveryChunk
+from sec_review_agents.scan_stages.discovery.result import (
+    DiscoveryChunkResult,
+    DiscoveryResult,
+)
 from sec_review_agents.scan_stages.discovery.stage import (
     build_discovery_result_from_chunks,
     persist_discovery_result,
     prepare_discovery_chunks,
     scan_discovery_chunk,
 )
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 from sec_review_agents.utils.env import bootstrap_agents_env
 
 
@@ -90,11 +96,13 @@ async def _run_discovery(
     chunk_target_ratio: Fraction,
     chunk_strategy: str | None,
     paths_ignore: list[str],
-) -> dict:
+) -> DiscoveryResult:
     manifest = prepare_discovery_chunks(
         workspace_root=workspace,
         scan_mode="full",
-        scan_scope={"paths_ignore": paths_ignore},
+        scan_scope=RepositoryScanScope(
+            paths_ignore=paths_ignore, incremental_changed_files=[]
+        ),
         discovery_artifacts_path=artifacts,
         chunk_target_ratio=(
             chunk_target_ratio.numerator,
@@ -102,10 +110,12 @@ async def _run_discovery(
         ),
         chunk_strategy=chunk_strategy,
     )
-    chunks = list(manifest["chunks"])
-    semaphore = asyncio.Semaphore(max(1, int(manifest["max_concurrency"])))
+    chunks = manifest.chunks
+    semaphore = asyncio.Semaphore(max(1, manifest.max_concurrency))
 
-    async def scan(index: int, chunk: dict) -> tuple[int, dict]:
+    async def scan(
+        index: int, chunk: DiscoveryChunk
+    ) -> tuple[int, DiscoveryChunkResult]:
         async with semaphore:
             result = await scan_discovery_chunk(
                 chunk=chunk,
@@ -114,24 +124,24 @@ async def _run_discovery(
             )
             return index, result
 
-    ordered_results: list[dict | None] = [None] * len(chunks)
+    ordered_results: list[DiscoveryChunkResult | None] = [None] * len(chunks)
     for index, result in await asyncio.gather(
         *(scan(index, chunk) for index, chunk in enumerate(chunks))
     ):
         ordered_results[index] = result
 
     result = build_discovery_result_from_chunks(
-        entries=manifest["entries"],
-        skipped_files=manifest["skipped_files"],
+        entries=manifest.entries,
+        skipped_files=manifest.skipped_files,
         chunks=chunks,
         chunk_results=[item for item in ordered_results if item is not None],
         scan_mode="full",
-        deployment_input_limit_tokens=int(manifest["deployment_input_limit_tokens"]),
-        chunk_target_tokens=int(manifest["chunk_target_tokens"]),
-        chunk_target_ratio=str(manifest["chunk_target_ratio"]),
-        chunk_hard_limit_tokens=int(manifest["chunk_hard_limit_tokens"]),
-        discovery_concurrency=int(manifest["max_concurrency"]),
-        chunk_strategy=str(manifest["chunk_strategy"]),
+        deployment_input_limit_tokens=manifest.deployment_input_limit_tokens,
+        chunk_target_tokens=manifest.chunk_target_tokens,
+        chunk_target_ratio=manifest.chunk_target_ratio,
+        chunk_hard_limit_tokens=manifest.chunk_hard_limit_tokens,
+        discovery_concurrency=manifest.max_concurrency,
+        chunk_strategy=manifest.chunk_strategy,
     )
     persist_discovery_result(discovery_artifacts_path=artifacts, result=result)
     return result
@@ -169,14 +179,14 @@ async def _main() -> None:
         paths_ignore=args.paths_ignore,
     )
     result_path = output_dir / "discovery-result.json"
-    result_path.write_text(json.dumps(result, indent=2), encoding="utf-8")
+    persist_discovery_result(discovery_artifacts_path=output_dir, result=result)
     print(
         json.dumps(
             {
                 "output_dir": str(output_dir),
                 "result_path": str(result_path),
-                "counts": result["counts"],
-                "metadata": result["metadata"],
+                "counts": result.counts.model_dump(),
+                "metadata": result.metadata.model_dump(),
             },
             indent=2,
         )

@@ -2,12 +2,14 @@ from pathlib import Path
 
 import pytest
 
+from sec_review_agents.scan_stages.discovery.input import DiscoverySkippedFile
 from sec_review_agents.scan_stages.discovery.stage import (
     DEFAULT_DISCOVERY_MAX_FILE_BYTES,
     _build_incremental_scan_manifest,
     _build_scan_manifest,
     _resolve_discovery_max_file_bytes,
 )
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 
 EXCLUDED_EXTENSIONS = (".md", ".rst", ".txt", ".text", ".csv", ".tsv", ".log")
 SCANNABLE_EXTENSIONS = (".yaml", ".yml", ".json", ".sql", ".unknown")
@@ -26,10 +28,10 @@ def _write_selection_fixture(workspace: Path) -> list[str]:
     return paths
 
 
-def _scan_scope(*, paths_ignore: list[str] | None = None) -> dict[str, object]:
-    return {
-        "paths_ignore": paths_ignore or [],
-    }
+def _scan_scope(*, paths_ignore: list[str] | None = None) -> RepositoryScanScope:
+    return RepositoryScanScope(
+        paths_ignore=paths_ignore or [], incremental_changed_files=[]
+    )
 
 
 def test_full_manifest_excludes_only_denylisted_discovery_kinds(
@@ -45,11 +47,11 @@ def test_full_manifest_excludes_only_denylisted_discovery_kinds(
         discovery_artifacts_path=tmp_path / "artifacts",
     )
 
-    assert {item["path"] for item in entries} == {
+    assert {item.path for item in entries} == {
         *(f"scannable/file{extension}" for extension in SCANNABLE_EXTENSIONS),
         "scannable/Dockerfile",
     }
-    assert {item["path"]: item["reason"] for item in skipped} == {
+    assert {item.path: item.reason for item in skipped} == {
         f"excluded/file{extension}": "excluded-discovery-kind"
         for extension in EXCLUDED_EXTENSIONS
     }
@@ -64,16 +66,20 @@ def test_incremental_manifest_uses_same_discovery_kind_policy(tmp_path: Path) ->
 
     entries, skipped = _build_incremental_scan_manifest(
         workspace_root=workspace,
-        scan_scope=_scan_scope(),
-        changed_files=changed_files,
+        scan_scope=RepositoryScanScope.model_validate(
+            {
+                "paths_ignore": _scan_scope().paths_ignore,
+                "incremental_changed_files": changed_files,
+            }
+        ),
         discovery_artifacts_path=tmp_path / "artifacts",
     )
 
-    assert {item["path"] for item in entries} == {
+    assert {item.path for item in entries} == {
         *(f"scannable/file{extension}" for extension in SCANNABLE_EXTENSIONS),
         "scannable/Dockerfile",
     }
-    assert {item["path"]: item["reason"] for item in skipped} == {
+    assert {item.path: item.reason for item in skipped} == {
         f"excluded/file{extension}": "excluded-discovery-kind"
         for extension in EXCLUDED_EXTENSIONS
     }
@@ -93,14 +99,18 @@ def test_paths_ignore_takes_precedence_over_discovery_kind_policy(
     if incremental:
         _, skipped = _build_incremental_scan_manifest(
             workspace_root=workspace,
-            scan_scope=scan_scope,
-            changed_files=[
+            scan_scope=RepositoryScanScope.model_validate(
                 {
-                    "path": "docs/ignored.md",
-                    "status": "modified",
-                    "previous_path": None,
+                    "paths_ignore": scan_scope.paths_ignore,
+                    "incremental_changed_files": [
+                        {
+                            "path": "docs/ignored.md",
+                            "status": "modified",
+                            "previous_path": None,
+                        }
+                    ],
                 }
-            ],
+            ),
             discovery_artifacts_path=tmp_path / "artifacts",
         )
     else:
@@ -111,11 +121,13 @@ def test_paths_ignore_takes_precedence_over_discovery_kind_policy(
         )
 
     assert skipped == [
-        {
-            "path": "docs/ignored.md",
-            "reason": "paths-ignore",
-            "size_bytes": len("ignored\n"),
-        }
+        DiscoverySkippedFile.model_validate(
+            {
+                "path": "docs/ignored.md",
+                "reason": "paths-ignore",
+                "size_bytes": len("ignored\n"),
+            }
+        )
     ]
 
 
@@ -128,19 +140,23 @@ def test_discovery_kind_policy_takes_precedence_over_size_limit(
     path.parent.mkdir(parents=True)
     path.write_text("large document\n", encoding="utf-8")
     monkeypatch.setenv("AGENT_DISCOVERY_MAX_FILE_BYTES", "1")
-    scan_scope: dict[str, object] = {"paths_ignore": []}
+    scan_scope = _scan_scope()
 
     if incremental:
         _, skipped = _build_incremental_scan_manifest(
             workspace_root=workspace,
-            scan_scope=scan_scope,
-            changed_files=[
+            scan_scope=RepositoryScanScope.model_validate(
                 {
-                    "path": "docs/large.md",
-                    "status": "modified",
-                    "previous_path": None,
+                    "paths_ignore": scan_scope.paths_ignore,
+                    "incremental_changed_files": [
+                        {
+                            "path": "docs/large.md",
+                            "status": "modified",
+                            "previous_path": None,
+                        }
+                    ],
                 }
-            ],
+            ),
             discovery_artifacts_path=tmp_path / "artifacts",
         )
     else:
@@ -150,7 +166,7 @@ def test_discovery_kind_policy_takes_precedence_over_size_limit(
             discovery_artifacts_path=tmp_path / "artifacts",
         )
 
-    assert skipped[0]["reason"] == "excluded-discovery-kind"
+    assert skipped[0].reason == "excluded-discovery-kind"
 
 
 def test_discovery_max_file_bytes_uses_environment_or_default(

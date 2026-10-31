@@ -3,6 +3,10 @@ from datetime import timedelta
 import pytest
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
+from sec_review_agents.review_stages.record import ReviewRecord
+from sec_review_agents.review_stages.verification.result import (
+    build_skipped_verification_result,
+)
 from sec_review_agents.run_diagnostics.publication import (
     RunDiagnosticPublicationRequest,
 )
@@ -11,9 +15,15 @@ from sec_review_agents.workflows.issue import two_stage as two_stage_workflow
 from sec_review_agents.workflows.issue import workflow as issue_workflow
 from sec_review_agents.workflows.pull_request import workflow as pr_workflow
 from sec_review_agents.workflows.repository import workflow as repository_workflow
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.review_request import (
     ReviewPostProcessingPolicy,
     ReviewWorkflowRequest,
+)
+from tests.prepared_input_fixtures import (
+    prepared_issue_input,
+    prepared_pull_request_input,
+    prepared_repository_input,
 )
 
 
@@ -72,7 +82,9 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
         ReviewWorkflowRequest(
             workflow="issue-review",
             run_id="run-1",
-            prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+            prepared_input=prepared_issue_input(
+                artifact_root_path="/tmp/run-1/artifacts"
+            ),
             timeout_seconds=30,
             runtime_context={},
             post_processing=ReviewPostProcessingPolicy(diagnostic_scheme="file"),
@@ -126,6 +138,8 @@ async def test_single_review_publishes_before_scheduling_memory(
             events.append("publish")
             publications.append(activity_args[0])
             return _finalized("review")
+        if activity_fn.__name__.startswith("verify_"):
+            return build_skipped_verification_result(reason="Test verification skipped")
         return {}
 
     async def fake_schedule(**kwargs):
@@ -142,7 +156,11 @@ async def test_single_review_publishes_before_scheduling_memory(
         ReviewWorkflowRequest(
             workflow=workflow_name,
             run_id="run-1",
-            prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+            prepared_input=(
+                prepared_issue_input
+                if workflow_name == "issue-review"
+                else prepared_pull_request_input
+            )(artifact_root_path="/tmp/run-1/artifacts"),
             timeout_seconds=30,
             runtime_context={},
         )
@@ -166,8 +184,12 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
         [
             {"scan": "done"},
             [
-                {"case_id": "case-a", "disposition": "keep"},
-                {"case_id": "case-b", "disposition": "drop"},
+                RepositoryCaseResult(
+                    case_id="case-a", disposition="keep", review_record=ReviewRecord()
+                ),
+                RepositoryCaseResult(
+                    case_id="case-b", disposition="drop", review_record=ReviewRecord()
+                ),
             ],
             {"delivery": "done"},
         ]
@@ -181,6 +203,8 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
         if activity_fn is repository_workflow.publish_run_diagnostic_activity:
             publications.append(activity_args[0])
             return _finalized("case-a", "case-b")
+        if activity_fn.__name__.startswith("verify_"):
+            return build_skipped_verification_result(reason="Test verification skipped")
         return {}
 
     async def fake_execute_child_workflow(*_args, **_kwargs):
@@ -206,7 +230,9 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
         ReviewWorkflowRequest(
             workflow="repository-review",
             run_id="run-1",
-            prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+            prepared_input=prepared_repository_input(
+                artifact_root_path="/tmp/run-1/artifacts"
+            ),
             timeout_seconds=30,
             runtime_context={},
         )
@@ -236,6 +262,8 @@ async def test_repository_without_cases_still_publishes_run_diagnostic(
         if activity_fn is repository_workflow.publish_run_diagnostic_activity:
             publications.append(activity_args[0])
             return _finalized()
+        if activity_fn.__name__.startswith("verify_"):
+            return build_skipped_verification_result(reason="Test verification skipped")
         return {}
 
     async def fake_execute_child_workflow(*_args, **_kwargs):
@@ -256,7 +284,9 @@ async def test_repository_without_cases_still_publishes_run_diagnostic(
         ReviewWorkflowRequest(
             workflow="repository-review",
             run_id="run-1",
-            prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+            prepared_input=prepared_repository_input(
+                artifact_root_path="/tmp/run-1/artifacts"
+            ),
             timeout_seconds=30,
             runtime_context={},
         )
@@ -277,6 +307,8 @@ async def test_disabling_memory_does_not_skip_review_publication(monkeypatch) ->
         if activity_fn is issue_workflow.publish_run_diagnostic_activity:
             events.append("publish")
             return _finalized("review")
+        if activity_fn.__name__.startswith("verify_"):
+            return build_skipped_verification_result(reason="Test verification skipped")
         return {}
 
     async def fake_schedule(**kwargs):
@@ -293,7 +325,9 @@ async def test_disabling_memory_does_not_skip_review_publication(monkeypatch) ->
         ReviewWorkflowRequest(
             workflow="issue-review",
             run_id="run-1",
-            prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+            prepared_input=prepared_issue_input(
+                artifact_root_path="/tmp/run-1/artifacts"
+            ),
             timeout_seconds=30,
             runtime_context={},
             post_processing=ReviewPostProcessingPolicy(memory_processing_enabled=False),
@@ -312,6 +346,8 @@ async def test_publication_failure_fails_review_before_memory_scheduling(
             return {"api_version": EXECUTION_API_VERSION}
         if activity_fn is issue_workflow.publish_run_diagnostic_activity:
             raise RuntimeError("storage unavailable")
+        if activity_fn.__name__.startswith("verify_"):
+            return build_skipped_verification_result(reason="Test verification skipped")
         return {}
 
     async def unexpected_schedule(**_kwargs):
@@ -331,7 +367,9 @@ async def test_publication_failure_fails_review_before_memory_scheduling(
             ReviewWorkflowRequest(
                 workflow="issue-review",
                 run_id="run-1",
-                prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+                prepared_input=prepared_issue_input(
+                    artifact_root_path="/tmp/run-1/artifacts"
+                ),
                 timeout_seconds=30,
                 runtime_context={},
             )

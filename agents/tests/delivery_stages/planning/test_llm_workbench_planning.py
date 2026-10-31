@@ -5,6 +5,7 @@ import pytest
 from sec_review_agents.delivery_stages.planning.agent_passes import (
     run_delivery_planning,
 )
+from sec_review_agents.delivery_stages.planning.input import DeliveryPlanningCase
 from tests.llm_probe import llm_probe
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
@@ -28,18 +29,23 @@ async def test_llm_can_drive_delivery_planning_workbench_state_to_valid_export(
     run_artifacts.mkdir(parents=True, exist_ok=True)
 
     planning_cases = [
-        {
-            "case_id": "case-auth-header",
-            "changed_files": ["src/auth.ts"],
-        },
-        {
-            "case_id": "case-auth-token",
-            "changed_files": ["src/auth.ts"],
-        },
-        {
-            "case_id": "case-logging",
-            "changed_files": ["src/logging.ts"],
-        },
+        DeliveryPlanningCase.model_validate(
+            {"overview": "", "changed_files": [], **item}
+        )
+        for item in [
+            {
+                "case_id": "case-auth-header",
+                "changed_files": ["src/auth.ts"],
+            },
+            {
+                "case_id": "case-auth-token",
+                "changed_files": ["src/auth.ts"],
+            },
+            {
+                "case_id": "case-logging",
+                "changed_files": ["src/logging.ts"],
+            },
+        ]
     ]
 
     result = await run_delivery_planning(
@@ -47,9 +53,9 @@ async def test_llm_can_drive_delivery_planning_workbench_state_to_valid_export(
         planning_cases=planning_cases,
     )
 
-    assert result["constraints"]["ok"] is True
+    assert result.status == "completed"
     delivered_case_ids = sorted(
-        case_id for delivery in result["deliveries"] for case_id in delivery["case_ids"]
+        case_id for delivery in result.deliveries for case_id in delivery.case_ids
     )
     assert delivered_case_ids == [
         "case-auth-header",

@@ -7,11 +7,21 @@ import pytest
 from pydantic import ValidationError
 
 import sec_review_agents.scan_stages.discovery.stage as discovery_stage
-from sec_review_agents.agents.discovery.model import DiscoveryLocation, DiscoveryOutput
+from sec_review_agents.agents.discovery.model import (
+    DiscoveryCandidate,
+    DiscoveryLocation,
+    DiscoveryOutput,
+)
 from sec_review_agents.runtime.trajectories import (
     TrajectoryWriter,
     read_trajectory_messages,
 )
+from sec_review_agents.scan_stages.discovery.input import (
+    DiscoveryChunk,
+    DiscoveryEntry,
+    DiscoverySkippedFile,
+)
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 
 
 def test_discovery_location_accepts_file_level_anchor() -> None:
@@ -32,62 +42,56 @@ def test_normalize_candidate_preserves_schema_valid_location_label() -> None:
     content = "const price = book.price;\naddItem({ price });\n"
 
     candidate = discovery_stage._normalize_candidate(
-        {
-            "src/components/AddToCartButton.tsx": {
-                "path": "src/components/AddToCartButton.tsx"
-            }
-        },
         {"src/components/AddToCartButton.tsx": content},
-        {
-            "category": "business-logic",
-            "description": "Price flows from client-side props into cart state.",
-            "locations": [
-                {
-                    "file": "src/components/AddToCartButton.tsx",
-                    "line": 2,
-                    "label": label,
-                }
-            ],
-            "evidence": ["addItem({ price });"],
-        },
+        DiscoveryCandidate.model_validate(
+            {
+                "category": "business-logic",
+                "description": "Price flows from client-side props into cart state.",
+                "locations": [
+                    {
+                        "file": "src/components/AddToCartButton.tsx",
+                        "line": 2,
+                        "label": label,
+                    }
+                ],
+                "evidence": ["addItem({ price });"],
+            }
+        ),
     )
 
     assert candidate is not None
-    assert candidate["locations"][0]["label"] == label
+    assert candidate.locations[0].label == label
     assert not {
         "fixabilityHint",
         "mitigationHandler",
         "priorityBoost",
         "groundingNotes",
         "discoverySource",
-    }.intersection(candidate)
+    }.intersection(candidate.model_dump())
 
 
 def test_normalize_candidate_preserves_file_level_location() -> None:
     content = "const price = book.price;\naddItem({ price });\n"
 
     candidate = discovery_stage._normalize_candidate(
-        {
-            "src/components/AddToCartButton.tsx": {
-                "path": "src/components/AddToCartButton.tsx"
-            }
-        },
         {"src/components/AddToCartButton.tsx": content},
-        {
-            "category": "business-logic",
-            "description": "Price flows from client-side props into cart state.",
-            "locations": [
-                {
-                    "file": "src/components/AddToCartButton.tsx",
-                    "label": "Cart component",
-                }
-            ],
-            "evidence": ["addItem({ price });"],
-        },
+        DiscoveryCandidate.model_validate(
+            {
+                "category": "business-logic",
+                "description": "Price flows from client-side props into cart state.",
+                "locations": [
+                    {
+                        "file": "src/components/AddToCartButton.tsx",
+                        "label": "Cart component",
+                    }
+                ],
+                "evidence": ["addItem({ price });"],
+            }
+        ),
     )
 
     assert candidate is not None
-    assert candidate["locations"][0] == {
+    assert candidate.locations[0].model_dump(exclude_none=True) == {
         "file": "src/components/AddToCartButton.tsx",
         "label": "Cart component",
     }
@@ -98,18 +102,21 @@ def test_normalize_candidate_preserves_full_grounded_evidence() -> None:
     content = f"{snippet}\n"
 
     candidate = discovery_stage._normalize_candidate(
-        {"src/app.ts": {"path": "src/app.ts"}},
         {"src/app.ts": content},
-        {
-            "category": "information-disclosure",
-            "description": "Long evidence remains intact when it is grounded.",
-            "locations": [{"file": "src/app.ts", "line": 1, "label": "long evidence"}],
-            "evidence": [snippet],
-        },
+        DiscoveryCandidate.model_validate(
+            {
+                "category": "information-disclosure",
+                "description": "Long evidence remains intact when it is grounded.",
+                "locations": [
+                    {"file": "src/app.ts", "line": 1, "label": "long evidence"}
+                ],
+                "evidence": [snippet],
+            }
+        ),
     )
 
     assert candidate is not None
-    assert candidate["evidence"] == [snippet]
+    assert candidate.evidence == [snippet]
 
 
 @pytest.mark.asyncio
@@ -128,17 +135,21 @@ async def test_execute_discovery_raises_agent_runtime_errors() -> None:
         ),
         pytest.raises(RuntimeError, match="missing structured response"),
     ):
-        await discovery_stage.execute_discovery(
-            chunk={
-                "chunk_id": "discovery-chunk-0001",
-                "entries": [
-                    {
-                        "path": "src/app.py",
-                        "language": "python",
-                        "size_bytes": 12,
-                    }
-                ],
-            },
+        await discovery_stage.run_repository_discovery_agent(
+            chunk=DiscoveryChunk.model_validate(
+                {
+                    "chunk_id": "discovery-chunk-0001",
+                    "token_count": 0,
+                    "entries": [
+                        {
+                            "path": "src/app.py",
+                            "language": "python",
+                            "size_bytes": 12,
+                            "include_reason": "text-candidate",
+                        }
+                    ],
+                }
+            ),
             sources={"src/app.py": "print('ok')\n"},
         )
 
@@ -164,7 +175,7 @@ async def test_execute_discovery_persists_chunk_message_history(
     async def fake_invoke_agent_runtime_graph(**kwargs):
         writer = TrajectoryWriter(kwargs["trajectory_paths"])
         writer.write_messages([FakeMessage()])
-        return DiscoveryOutput(candidates=[])
+        return DiscoveryOutput()
 
     artifact_root = tmp_path
     with (
@@ -177,17 +188,21 @@ async def test_execute_discovery_persists_chunk_message_history(
             return_value="scan prompt",
         ),
     ):
-        await discovery_stage.execute_discovery(
-            chunk={
-                "chunk_id": "discovery-chunk-0001",
-                "entries": [
-                    {
-                        "path": "src/app.py",
-                        "language": "python",
-                        "size_bytes": 12,
-                    }
-                ],
-            },
+        await discovery_stage.run_repository_discovery_agent(
+            chunk=DiscoveryChunk.model_validate(
+                {
+                    "chunk_id": "discovery-chunk-0001",
+                    "token_count": 0,
+                    "entries": [
+                        {
+                            "path": "src/app.py",
+                            "language": "python",
+                            "size_bytes": 12,
+                            "include_reason": "text-candidate",
+                        }
+                    ],
+                }
+            ),
             sources={"src/app.py": "print('ok')\n"},
             discovery_artifacts_path=artifact_root,
         )
@@ -204,27 +219,38 @@ async def test_scan_chunk_uses_current_trace_context(tmp_path: Path) -> None:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text("print('ok')\n", encoding="utf-8")
 
-    entry = {"path": "src/app.py", "language": "python", "size_bytes": 12}
+    entry: DiscoveryEntry = DiscoveryEntry.model_validate(
+        {
+            "path": "src/app.py",
+            "language": "python",
+            "size_bytes": 12,
+            "include_reason": "text-candidate",
+        }
+    )
 
     with patch(
-        "sec_review_agents.scan_stages.discovery.stage.execute_discovery",
+        "sec_review_agents.scan_stages.discovery.stage.run_repository_discovery_agent",
         new=AsyncMock(
-            return_value={
-                "candidates": [],
-                "tokenUsages": [],
-            }
+            return_value=DiscoveryOutput.model_validate(
+                {
+                    "candidates": [],
+                    "tokenUsages": [],
+                }
+            )
         ),
     ):
         result = await discovery_stage.scan_discovery_chunk(
-            chunk={
-                "chunk_id": "discovery-chunk-0001",
-                "entries": [entry],
-                "token_count": 12,
-            },
+            chunk=DiscoveryChunk.model_validate(
+                {
+                    "chunk_id": "discovery-chunk-0001",
+                    "entries": [entry],
+                    "token_count": 12,
+                }
+            ),
             root=root,
         )
 
-    assert result["file_results"][0]["candidate_count"] == 0
+    assert result.file_results[0].candidate_count == 0
 
 
 def test_discovery_chunk_token_limits_use_bound_deployment_context() -> None:
@@ -257,17 +283,19 @@ def test_discovery_artifacts_record_target_and_hard_token_limits(
         manifest = discovery_stage.prepare_discovery_chunks(
             workspace_root=workspace,
             scan_mode="full",
-            scan_scope={"paths_ignore": []},
+            scan_scope=RepositoryScanScope.model_validate(
+                {"incremental_changed_files": [], "paths_ignore": []}
+            ),
             discovery_artifacts_path=artifacts,
         )
 
     chunks_artifact = json.loads(
         (artifacts / "discovery-chunks.json").read_text(encoding="utf-8")
     )
-    assert manifest["deployment_input_limit_tokens"] == 250_000
-    assert manifest["chunk_target_tokens"] == 50_000
-    assert manifest["chunk_target_ratio"] == "1/5"
-    assert manifest["chunk_hard_limit_tokens"] == 200_000
+    assert manifest.deployment_input_limit_tokens == 250_000
+    assert manifest.chunk_target_tokens == 50_000
+    assert manifest.chunk_target_ratio == "1/5"
+    assert manifest.chunk_hard_limit_tokens == 200_000
     assert chunks_artifact["metadata"] == {
         "deployment_input_limit_tokens": 250_000,
         "chunk_target_tokens": 50_000,
@@ -295,11 +323,13 @@ def test_discovery_artifacts_record_target_and_hard_token_limits(
         discovery_artifacts_path=artifacts,
         result=result,
     )
-    assert json.loads(result_path.read_text(encoding="utf-8")) == result
-    assert result["metadata"]["discovery_deployment_input_limit_tokens"] == 250_000
-    assert result["metadata"]["discovery_chunk_target_tokens"] == 50_000
-    assert result["metadata"]["discovery_chunk_target_ratio"] == "1/5"
-    assert result["metadata"]["discovery_chunk_hard_limit_tokens"] == 200_000
+    assert json.loads(result_path.read_text(encoding="utf-8")) == result.model_dump(
+        mode="json", exclude_none=True
+    )
+    assert result.metadata.discovery_deployment_input_limit_tokens == 250_000
+    assert result.metadata.discovery_chunk_target_tokens == 50_000
+    assert result.metadata.discovery_chunk_target_ratio == "1/5"
+    assert result.metadata.discovery_chunk_hard_limit_tokens == 200_000
 
 
 def test_discovery_chunk_token_budget_rejects_limit_below_system_prompt() -> None:
@@ -338,20 +368,22 @@ def test_discovery_chunk_packing_stops_before_target_overflow(tmp_path: Path) ->
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
 
-    entries = [
-        {
-            "path": relative_path,
-            "language": "python",
-            "size_bytes": len(content),
-            "include_reason": "text-candidate",
-        }
+    entries: list[DiscoveryEntry] = [
+        DiscoveryEntry.model_validate(
+            {
+                "path": relative_path,
+                "language": "python",
+                "size_bytes": len(content),
+                "include_reason": "text-candidate",
+            }
+        )
         for relative_path, content in files.items()
     ]
 
     with patch(
         "sec_review_agents.scan_stages.discovery.stage._estimate_discovery_prompt_tokens",
         side_effect=lambda **kwargs: sum(
-            int(entry["size_bytes"]) for entry in kwargs["entries"]
+            int(entry.size_bytes) for entry in kwargs["entries"]
         ),
     ):
         chunks, skipped = discovery_stage._pack_discovery_chunks(
@@ -363,7 +395,7 @@ def test_discovery_chunk_packing_stops_before_target_overflow(tmp_path: Path) ->
         )
 
     assert skipped == []
-    assert [[entry["path"] for entry in chunk["entries"]] for chunk in chunks] == [
+    assert [[entry.path for entry in chunk.entries] for chunk in chunks] == [
         ["src/a.py"],
         ["src/b.py", "src/c.py"],
     ]
@@ -376,13 +408,15 @@ def test_discovery_chunk_packing_keeps_single_file_over_target(
     path = root / "src" / "large.py"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("x" * 100, encoding="utf-8")
-    entries = [
-        {
-            "path": "src/large.py",
-            "language": "python",
-            "size_bytes": 100,
-            "include_reason": "text-candidate",
-        }
+    entries: list[DiscoveryEntry] = [
+        DiscoveryEntry.model_validate(
+            {
+                "path": "src/large.py",
+                "language": "python",
+                "size_bytes": 100,
+                "include_reason": "text-candidate",
+            }
+        )
     ]
 
     with patch(
@@ -397,7 +431,7 @@ def test_discovery_chunk_packing_keeps_single_file_over_target(
         )
 
     assert skipped == []
-    assert [[entry["path"] for entry in chunk["entries"]] for chunk in chunks] == [
+    assert [[entry.path for entry in chunk.entries] for chunk in chunks] == [
         ["src/large.py"]
     ]
 
@@ -409,13 +443,15 @@ def test_discovery_chunk_packing_skips_single_file_over_hard_limit(
     path = root / "src" / "large.py"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("x" * 100, encoding="utf-8")
-    entries = [
-        {
-            "path": "src/large.py",
-            "language": "python",
-            "size_bytes": 100,
-            "include_reason": "text-candidate",
-        }
+    entries: list[DiscoveryEntry] = [
+        DiscoveryEntry.model_validate(
+            {
+                "path": "src/large.py",
+                "language": "python",
+                "size_bytes": 100,
+                "include_reason": "text-candidate",
+            }
+        )
     ]
 
     with patch(
@@ -431,11 +467,60 @@ def test_discovery_chunk_packing_skips_single_file_over_hard_limit(
 
     assert chunks == []
     assert skipped == [
-        {
-            "path": "src/large.py",
-            "reason": "token-budget-exceeded",
-            "size_bytes": 100,
-            "token_count": 501,
-            "hard_limit_tokens": 500,
-        }
+        DiscoverySkippedFile.model_validate(
+            {
+                "path": "src/large.py",
+                "reason": "token-budget-exceeded",
+                "size_bytes": 100,
+                "token_count": 501,
+                "hard_limit_tokens": 500,
+            }
+        )
     ]
+
+
+def test_filtering_preserves_candidate_type_and_original_evidence() -> None:
+    """The model requires evidence, but triage may receive a filtered empty list."""
+    from sec_review_agents.agents.discovery.model import DiscoveryCandidate
+
+    proposal = DiscoveryCandidate(
+        category="example",
+        description="An unverified claim",
+        locations=[DiscoveryLocation(file="app.py", label="call")],
+        evidence=["not in the source"],
+    )
+    original = proposal.model_dump()
+    candidate = discovery_stage._normalize_candidate(
+        {"app.py": "print('ok')\n"},
+        proposal,
+    )
+    assert candidate is not None
+    assert type(candidate) is type(proposal)
+    assert proposal.model_dump() == original
+    assert candidate.evidence == []
+    assert [
+        location.model_dump(exclude_none=True) for location in candidate.locations
+    ] == [{"file": "app.py", "label": "call"}]
+
+
+@pytest.mark.parametrize("evidence", [["execute(query)"], ["missing snippet"]])
+def test_normalize_candidate_recovers_location_or_discards_candidate(evidence) -> None:
+    candidate = DiscoveryCandidate(
+        category="injection",
+        description="Untrusted query",
+        locations=[DiscoveryLocation(file="missing.py", line=99, label="query")],
+        evidence=evidence,
+    )
+    original = candidate.model_dump()
+    result = discovery_stage._normalize_candidate(
+        {"app.py": "# query\nexecute(query)\n"}, candidate
+    )
+    assert candidate.model_dump() == original
+    if evidence == ["missing snippet"]:
+        assert result is None
+    else:
+        assert result is not None
+        assert result.locations == [
+            DiscoveryLocation(file="app.py", line=2, label="execute(query)")
+        ]
+        assert result.evidence == evidence

@@ -2,6 +2,7 @@ from typing import Any
 
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
+    VerifierHistoryEntry,
     feedback_retry_context,
     should_retry_from_verifier_result,
 )
@@ -12,11 +13,13 @@ from sec_review_agents.workflows.issue.workflow import (
     mitigate_issue_activity,
     verify_issue_activity,
 )
+from sec_review_agents.workflows.prepared_input import PreparedIssueInput
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 
 async def run_issue_review_direct(request: ReviewWorkflowRequest) -> dict[str, Any]:
     prepared_input = request.prepared_input
+    assert isinstance(prepared_input, PreparedIssueInput)
     analysis_result = await analyze_issue_activity(request)
     mitigation_result = await mitigate_issue_activity(
         request,
@@ -30,7 +33,7 @@ async def run_issue_review_direct(request: ReviewWorkflowRequest) -> dict[str, A
         None,
     )
     retry_count = 0
-    history: list[dict[str, Any]] = []
+    history: list[VerifierHistoryEntry] = []
     while (
         retry_count < MAX_FEEDBACK_RETRY_ATTEMPTS
         and should_retry_from_verifier_result(verifier_result)
@@ -42,7 +45,7 @@ async def run_issue_review_direct(request: ReviewWorkflowRequest) -> dict[str, A
             verifier_result=verifier_result,
             history=history,
         )
-        history = retry_context["history"]
+        history = retry_context.history
         archive_issue_feedback_attempt_activity(prepared_input, retry_context)
         mitigation_result = await mitigate_issue_activity(
             request,

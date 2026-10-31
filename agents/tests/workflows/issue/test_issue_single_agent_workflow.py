@@ -4,9 +4,11 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.agents.single_agent.model import SingleAgentFixOutput
 from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.workflows.issue.single_agent import execute_issue_single_agent
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
+from sec_review_agents.workspace.patches import PatchArtifact
 from sec_review_agents.workspace.snapshots import (
     WORKSPACE_SNAPSHOT_TAR_NAME,
     create_workspace_snapshot_tar,
@@ -66,14 +68,16 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
         ),
         patch(
             "sec_review_agents.review_stages.single_agent.stage.run_single_agent",
-            return_value=structured_payload,
+            return_value=SingleAgentFixOutput.model_validate(structured_payload),
         ),
         patch(
             "sec_review_agents.review_stages.single_agent.stage.build_patch_artifact",
-            return_value={
-                "patch_diff": "diff --git a/app.py b/app.py\n",
-                "file_changes": [{"path": "app.py", "status": "deleted"}],
-            },
+            return_value=PatchArtifact.model_validate(
+                {
+                    "patch_diff": "diff --git a/app.py b/app.py\n",
+                    "file_changes": [{"path": "app.py", "status": "deleted"}],
+                }
+            ),
         ),
     ):
         result = await execute_issue_single_agent(
@@ -139,14 +143,16 @@ async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_dec
         ),
         patch(
             "sec_review_agents.review_stages.single_agent.stage.run_single_agent",
-            return_value=structured_payload,
+            return_value=SingleAgentFixOutput.model_validate(structured_payload),
         ),
         patch(
             "sec_review_agents.review_stages.single_agent.stage.build_patch_artifact",
-            return_value={
-                "patch_diff": "diff --git a/app.py b/app.py\n",
-                "file_changes": [{"path": "app.py", "status": "deleted"}],
-            },
+            return_value=PatchArtifact.model_validate(
+                {
+                    "patch_diff": "diff --git a/app.py b/app.py\n",
+                    "file_changes": [{"path": "app.py", "status": "deleted"}],
+                }
+            ),
         ),
     ):
         result = await execute_issue_single_agent(
@@ -167,3 +173,46 @@ async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_dec
         {"path": "app.py", "status": "deleted"}
     ]
     assert default_artifact_result_exists
+
+
+@pytest.mark.asyncio
+async def test_single_agent_activity_result_restores_model_before_public_projection() -> (
+    None
+):
+    """The registered activity return type must restore the full fix outcome."""
+    from temporalio import activity
+    from temporalio.contrib.pydantic import pydantic_data_converter
+
+    from sec_review_agents.review_stages.single_agent.result import (
+        SingleAgentFixOutcome,
+        build_single_agent_fix_outcome,
+    )
+    from sec_review_agents.workflows.issue.single_agent import (
+        build_issue_single_agent_review_record,
+        run_issue_single_agent_activity,
+    )
+
+    outcome = build_single_agent_fix_outcome(
+        overview="Removed unsafe entrypoint",
+        verdict="confirmed-defect",
+        validation_level="static",
+        regression_status="not-run",
+        target_claim="Unsafe entrypoint",
+        file_changes=[{"path": "unsafe.py", "status": "deleted"}],
+        patch_diff="reference patch",
+        self_check_notes=["Checked callers"],
+    )
+    definition = activity._Definition.must_from_callable(
+        run_issue_single_agent_activity
+    )
+    assert definition.ret_type is SingleAgentFixOutcome
+    restored = (
+        await pydantic_data_converter.decode(
+            await pydantic_data_converter.encode([outcome]), [definition.ret_type]
+        )
+    )[0]
+    assert isinstance(restored, SingleAgentFixOutcome)
+    assert restored == outcome
+    public = build_issue_single_agent_review_record(single_agent_result=restored)
+    assert public["mitigation"]["file_changes"] == outcome.file_changes
+    assert public["verification"]["verification_findings"] == ["Checked callers"]

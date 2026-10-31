@@ -104,6 +104,4 @@ def test_local_temporal_uses_materialized_artifact_root(
         timeout_seconds=config.workflow_timeout_seconds,
     )
 
-    assert request.prepared_input["artifact_root_path"] == str(
-        bundle.artifact_root_path
-    )
+    assert request.prepared_input.artifact_root_path == str(bundle.artifact_root_path)

@@ -249,7 +249,9 @@ class DeliveryWorkbenchState:
             }
         return {
             "ok": True,
-            "deliveries": self.export_deliveries(),
+            "deliveries": [
+                item.model_dump(mode="json") for item in self.export_deliveries()
+            ],
             "constraints": constraints,
         }
 
@@ -289,15 +291,15 @@ class DeliveryWorkbenchState:
             key=lambda group: self.ordered_item_ids.index(group.item_ids[0]),
         )
         return [
-            {
-                "delivery_id": _system_delivery_id(
+            DeliveryEntry(
+                delivery_id=_system_delivery_id(
                     strategy=_strategy_for_item_ids(group.item_ids),
                     case_ids=group.item_ids,
                 ),
-                "strategy": _strategy_for_item_ids(group.item_ids),
-                "case_ids": list(group.item_ids),
-                "reason": group.reason or "Independent delivery.",
-            }
+                strategy=_strategy_for_item_ids(group.item_ids),
+                case_ids=list(group.item_ids),
+                reason=group.reason or "Independent delivery.",
+            )
             for group in ordered_groups
         ]
 

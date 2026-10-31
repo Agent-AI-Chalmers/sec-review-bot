@@ -9,9 +9,14 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 from deepagents.backends.protocol import BackendProtocol
+from pydantic import BaseModel
 
 from sec_review_agents.mcp import resolver
 from sec_review_agents.runtime import agent_runtime_graph
+
+
+class ProbeOutput(BaseModel):
+    overview: str
 
 
 @pytest.fixture(params=["analysis", "mitigation", "verification", "single_agent"])
@@ -61,6 +66,7 @@ def agent_call(request, monkeypatch, tmp_path: Path):
     name = "single" if role == "single_agent" else role
     return SimpleNamespace(
         module=module,
+        output=ProbeOutput(overview="done"),
         run=getattr(module, f"run_{name}_agent"),
         kwargs=kwargs,
         servers=(
@@ -128,7 +134,7 @@ async def test_agent_owns_sessions_through_build_and_invocation(
             raise RuntimeError("invoke failed")
         if outcome == "cancel":
             await asyncio.Event().wait()
-        return Mock(model_dump=Mock(return_value={"overview": "done"}))
+        return agent_call.output
 
     monkeypatch.setattr("langchain_mcp_adapters.client.MultiServerMCPClient", Client)
     monkeypatch.setattr("langchain_mcp_adapters.tools.load_mcp_tools", load_tools)
@@ -145,7 +151,7 @@ async def test_agent_owns_sessions_through_build_and_invocation(
         with pytest.raises(RuntimeError, match=outcome.replace("-error", " failed")):
             await agent_call.run(**agent_call.kwargs)
     else:
-        assert await agent_call.run(**agent_call.kwargs) == {"overview": "done"}
+        assert await agent_call.run(**agent_call.kwargs) is agent_call.output
 
     assert not any(session.active for session in sessions)
     assert events == [
@@ -172,9 +178,9 @@ async def test_disabled_mcp_runs_agent_without_connecting(
         return object()
 
     async def invoke(**kwargs):
-        return Mock(model_dump=Mock(return_value={"overview": "done"}))
+        return agent_call.output
 
     monkeypatch.setattr(agent_runtime_graph, "build_agent_runtime_graph", build)
     monkeypatch.setattr(agent_runtime_graph, "invoke_agent_runtime_graph", invoke)
-    assert await agent_call.run(**agent_call.kwargs) == {"overview": "done"}
+    assert await agent_call.run(**agent_call.kwargs) is agent_call.output
     client.assert_not_called()

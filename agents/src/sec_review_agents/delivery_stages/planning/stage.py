@@ -1,8 +1,7 @@
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
 
-from sec_review_agents.delivery_stages.model import DeliveryCaseInput
+from sec_review_agents.delivery_stages.model import DeliveryCaseInput, DeliveryPlan
 from sec_review_agents.delivery_stages.planning.agent_passes import (
     run_delivery_planning,
 )
@@ -22,7 +21,7 @@ async def generate_delivery_plan(
     *,
     run_artifacts_root: Path,
     case_results: Sequence[DeliveryCaseInput],
-) -> dict[str, Any]:
+) -> DeliveryPlan:
     started_at = log_stage_started(
         stage="delivery-planning",
         case_count=len(case_results),
@@ -35,25 +34,14 @@ async def generate_delivery_plan(
         )
         planning_cases = build_delivery_planning_cases(case_results)
 
-        agent_run = await run_delivery_planning(
+        result = await run_delivery_planning(
             delivery_planning_root=delivery_planning_root,
             planning_cases=planning_cases,
         )
-        planned_entries = agent_run["deliveries"]
-
-        if not planned_entries:
+        if not result.deliveries:
             raise RuntimeError(
                 "Repository delivery-planning workbench state returned no usable deliveries."
             )
-
-        counts = dict(agent_run["counts"])
-        counts["delivery_count"] = len(planned_entries)
-        result: dict[str, Any] = {
-            "status": "completed",
-            "metadata": agent_run["metadata"],
-            "counts": counts,
-            "deliveries": planned_entries,
-        }
         persist_delivery_plan(run_artifacts_root=run_artifacts_root, result=result)
         log_stage_completed(
             stage="delivery-planning",
@@ -72,29 +60,29 @@ async def generate_delivery_plan(
         raise
 
 
-def build_skipped_delivery_plan(*, total_case_count: int) -> dict[str, Any]:
+def build_skipped_delivery_plan(*, total_case_count: int) -> DeliveryPlan:
     """Build a skipped plan; the workflow activity owns persistence."""
-    return {
-        "status": "skipped",
-        "metadata": {
+    return DeliveryPlan(
+        status="skipped",
+        metadata={
             "planning_mode": "skipped",
             "planning_pass_count": 0,
             "batch_size": None,
         },
-        "counts": {
+        counts={
             "input_case_count": 0,
             "delivery_count": 0,
             "total_case_count": total_case_count,
         },
-        "deliveries": [],
-    }
+        deliveries=[],
+    )
 
 
-def persist_delivery_plan(*, run_artifacts_root: Path, result: dict[str, Any]) -> None:
+def persist_delivery_plan(*, run_artifacts_root: Path, result: DeliveryPlan) -> None:
     persist_json_artifact(
         run_artifacts_root / "delivery-planning",
         "delivery-plan",
-        result,
+        result.model_dump(mode="json"),
     )
 
 

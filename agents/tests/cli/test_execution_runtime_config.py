@@ -5,6 +5,7 @@ import pytest
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.entrypoints.input_preparation import prepare_run_input
 from sec_review_agents.runtime.runtime_config import runtime_context_from_config
+from sec_review_agents.workflows.prepared_input import PreparedIssueInput
 from tests.input_bundle import write_test_input_bundle
 
 
@@ -41,9 +42,9 @@ def test_execution_runtime_config_is_applied_after_workflow_input_preparation(
         workflow="issue-review",
     )
 
-    assert "workspace_image" not in prepared_input
-    assert "runtime_context" not in prepared_input
-    assert "run_id" not in prepared_input
+    assert not hasattr(prepared_input, "workspace_image")
+    assert not hasattr(prepared_input, "runtime_context")
+    assert not hasattr(prepared_input, "run_id")
     runtime_context = runtime_context_from_config(runtime)
     assert runtime_context.get("workspace_image") == "benchmark-image:latest"
 
@@ -62,8 +63,10 @@ def test_execution_input_preparation_does_not_mutate_payload_input() -> None:
         workflow="issue-review",
     )
 
-    assert "analyzer" in first_input["artifact_paths"]
-    assert "analyzer" in second_input["artifact_paths"]
+    assert isinstance(first_input, PreparedIssueInput)
+    assert first_input.analyzer_artifacts_path
+    assert isinstance(second_input, PreparedIssueInput)
+    assert second_input.analyzer_artifacts_path
     assert "artifact_paths" not in input_data
     assert "run_id" not in input_data
 

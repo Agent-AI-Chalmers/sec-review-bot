@@ -1,11 +1,15 @@
 import hashlib
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+from typing import Literal
 
 from langchain_core.messages.utils import count_tokens_approximately
 
+from sec_review_agents.agents.discovery.model import (
+    DiscoveryCandidate,
+    DiscoveryLocation,
+)
 from sec_review_agents.agents.discovery.prompts import (
     build_repository_discovery_system_prompt,
     build_repository_discovery_user_prompt,
@@ -16,10 +20,21 @@ from sec_review_agents.runtime.deployment_limits import (
 from sec_review_agents.scan_stages.discovery.execution import (
     run_repository_discovery_agent,
 )
+from sec_review_agents.scan_stages.discovery.input import (
+    DiscoveryChunk,
+    DiscoveryEntry,
+    DiscoveryManifest,
+    DiscoverySkippedFile,
+)
 from sec_review_agents.scan_stages.discovery.result import (
+    DiscoveryCandidateResult,
+    DiscoveryChunkResult,
+    DiscoveryCounts,
     DiscoveryFileResult,
+    DiscoveryMetadata,
     DiscoveryResult,
 )
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 from sec_review_agents.utils.env import int_env
 from sec_review_agents.utils.files import persist_json_artifact, remove_json_artifacts
 from sec_review_agents.utils.paths_ignore import (
@@ -105,8 +120,8 @@ DEFAULT_DISCOVERY_CHUNK_STRATEGY = "single-file"
 # This is a host-side safety limit for bounded reads and prompt preparation. It
 # is independent of the deployment token limits that decide model input fit.
 DEFAULT_DISCOVERY_MAX_FILE_BYTES = 262_144
-GROUNDED_STATUS = "grounded"
-NEEDS_GROUNDING_STATUS = "needs-grounding"
+GROUNDED_STATUS: Literal["grounded"] = "grounded"
+NEEDS_GROUNDING_STATUS: Literal["needs-grounding"] = "needs-grounding"
 
 
 def read_utf8_text_file(path: Path) -> str | None:
@@ -184,15 +199,15 @@ def _resolve_discovery_chunk_strategy() -> str:
 def _build_scan_manifest(
     *,
     workspace_root: Path,
-    scan_scope: dict[str, Any],
+    scan_scope: RepositoryScanScope,
     discovery_artifacts_path: Path,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[DiscoveryEntry], list[DiscoverySkippedFile]]:
     max_file_bytes, max_file_bytes_source = _resolve_discovery_max_file_bytes()
     paths_ignore = normalize_paths_ignore(
-        scan_scope.get("paths_ignore"), source="Repository discovery"
+        scan_scope.paths_ignore, source="Repository discovery"
     )
-    entries: list[dict[str, Any]] = []
-    skipped: list[dict[str, Any]] = []
+    entries: list[DiscoveryEntry] = []
+    skipped: list[DiscoverySkippedFile] = []
 
     for current_root, dir_names, file_names in os.walk(workspace_root):
         dir_names[:] = [name for name in dir_names if name not in EXCLUDED_DIR_NAMES]
@@ -209,52 +224,52 @@ def _build_scan_manifest(
 
             if matches_paths_ignore(relative_path, paths_ignore):
                 skipped.append(
-                    {
-                        "path": relative_path_text,
-                        "reason": "paths-ignore",
-                        "size_bytes": size_bytes,
-                    }
+                    DiscoverySkippedFile(
+                        path=relative_path_text,
+                        reason="paths-ignore",
+                        size_bytes=size_bytes,
+                    )
                 )
                 continue
             if not include_file:
                 skipped.append(
-                    {
-                        "path": relative_path_text,
-                        "reason": include_reason,
-                        "size_bytes": size_bytes,
-                    }
+                    DiscoverySkippedFile(
+                        path=relative_path_text,
+                        reason=include_reason,
+                        size_bytes=size_bytes,
+                    )
                 )
                 continue
             if max_file_bytes > 0 and size_bytes > max_file_bytes:
                 skipped.append(
-                    {
-                        "path": relative_path_text,
-                        "reason": "oversized",
-                        "size_bytes": size_bytes,
-                    }
+                    DiscoverySkippedFile(
+                        path=relative_path_text,
+                        reason="oversized",
+                        size_bytes=size_bytes,
+                    )
                 )
                 continue
             if read_utf8_text_file(absolute_path) is None:
                 skipped.append(
-                    {
-                        "path": relative_path_text,
-                        "reason": "binary-or-unreadable",
-                        "size_bytes": size_bytes,
-                    }
+                    DiscoverySkippedFile(
+                        path=relative_path_text,
+                        reason="binary-or-unreadable",
+                        size_bytes=size_bytes,
+                    )
                 )
                 continue
 
             entries.append(
-                {
-                    "path": relative_path_text,
-                    "size_bytes": size_bytes,
-                    "language": language,
-                    "include_reason": include_reason,
-                }
+                DiscoveryEntry(
+                    path=relative_path_text,
+                    size_bytes=size_bytes,
+                    language=language,
+                    include_reason=include_reason,
+                )
             )
 
-    entries.sort(key=lambda item: item["path"])
-    skipped.sort(key=lambda item: item["path"])
+    entries.sort(key=lambda item: item.path)
+    skipped.sort(key=lambda item: item.path)
 
     manifest = {
         "metadata": {
@@ -266,8 +281,8 @@ def _build_scan_manifest(
             "scannable_file_count": len(entries),
             "skipped_file_count": len(skipped),
         },
-        "files": entries,
-        "skipped_files": skipped,
+        "files": [entry.model_dump() for entry in entries],
+        "skipped_files": [item.model_dump(exclude_none=True) for item in skipped],
     }
     persist_json_artifact(
         discovery_artifacts_path,
@@ -277,73 +292,13 @@ def _build_scan_manifest(
     return entries, skipped
 
 
-# The scan scope's change vocabulary, mirroring `changedFileStatus` in the Execution API.
-# `deleted` is the only status that removes a file from discovery; the rest describe how a file
-# changed and all of them are scanned.
-INCREMENTAL_CHANGED_FILE_STATUSES = frozenset(
-    {"added", "modified", "deleted", "renamed", "copied", "type_changed"}
-)
-
-
-def _load_incremental_changed_files(
-    scan_scope: dict[str, Any],
-) -> list[dict[str, Any]]:
-    raw_files = scan_scope.get("incremental_changed_files")
-    if isinstance(raw_files, list):
-        normalized: list[dict[str, Any]] = []
-        for index, item in enumerate(raw_files):
-            if not isinstance(item, dict):
-                raise ValueError(
-                    "Repository incremental discovery requires "
-                    "scan_scope.incremental_changed_files"
-                    f"[{index}] to be an object."
-                )
-            file_path = str(item.get("path") or "").strip()
-            if not file_path:
-                raise ValueError(
-                    "Repository incremental discovery requires "
-                    "scan_scope.incremental_changed_files"
-                    f"[{index}].path to be non-empty."
-                )
-            status = str(item.get("status") or "").strip().lower()
-            if not status:
-                raise ValueError(
-                    "Repository incremental discovery requires "
-                    "scan_scope.incremental_changed_files"
-                    f"[{index}].status to be non-empty."
-                )
-            previous_path = item.get("previous_path")
-            if previous_path is not None and not isinstance(previous_path, str):
-                raise ValueError(
-                    "Repository incremental discovery requires "
-                    "scan_scope.incremental_changed_files"
-                    f"[{index}].previous_path to be a string or null."
-                )
-            normalized.append(
-                {
-                    "path": file_path.replace("\\", "/"),
-                    "status": status,
-                    "previous_path": (
-                        previous_path.strip()
-                        if isinstance(previous_path, str) and previous_path.strip()
-                        else None
-                    ),
-                }
-            )
-        return normalized
-
-    raise ValueError(
-        "Repository incremental discovery requires scan_scope.incremental_changed_files."
-    )
-
-
 def _entry_from_incremental_record(
     *,
     root: Path,
     path_value: Path,
     max_file_bytes: int,
     paths_ignore: list[str],
-) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+) -> tuple[DiscoveryEntry | None, DiscoverySkippedFile | None]:
     normalized_path = path_value.as_posix()
     include_file, include_reason, language = _classify_candidate_file(path_value)
     absolute_path = root / path_value
@@ -351,80 +306,69 @@ def _entry_from_incremental_record(
     size_bytes = absolute_path.stat().st_size if exists_now else 0
 
     if matches_paths_ignore(path_value, paths_ignore):
-        return None, {
-            "path": normalized_path,
-            "reason": "paths-ignore",
-            "size_bytes": size_bytes,
-        }
+        return None, DiscoverySkippedFile(
+            path=normalized_path,
+            reason="paths-ignore",
+            size_bytes=size_bytes,
+        )
     if not include_file:
-        return None, {
-            "path": normalized_path,
-            "reason": include_reason,
-            "size_bytes": size_bytes,
-        }
+        return None, DiscoverySkippedFile(
+            path=normalized_path,
+            reason=include_reason,
+            size_bytes=size_bytes,
+        )
     if not exists_now:
-        return None, {
-            "path": normalized_path,
-            "reason": "missing-from-workspace",
-            "size_bytes": 0,
-        }
+        return None, DiscoverySkippedFile(
+            path=normalized_path,
+            reason="missing-from-workspace",
+            size_bytes=0,
+        )
     if max_file_bytes > 0 and size_bytes > max_file_bytes:
-        return None, {
-            "path": normalized_path,
-            "reason": "oversized",
-            "size_bytes": size_bytes,
-        }
+        return None, DiscoverySkippedFile(
+            path=normalized_path,
+            reason="oversized",
+            size_bytes=size_bytes,
+        )
     if read_utf8_text_file(absolute_path) is None:
-        return None, {
-            "path": normalized_path,
-            "reason": "binary-or-unreadable",
-            "size_bytes": size_bytes,
-        }
+        return None, DiscoverySkippedFile(
+            path=normalized_path,
+            reason="binary-or-unreadable",
+            size_bytes=size_bytes,
+        )
 
-    return {
-        "path": normalized_path,
-        "size_bytes": size_bytes,
-        "language": language,
-        "include_reason": include_reason,
-    }, None
+    return (
+        DiscoveryEntry(
+            path=normalized_path,
+            size_bytes=size_bytes,
+            language=language,
+            include_reason=include_reason,
+        ),
+        None,
+    )
 
 
 def _build_incremental_scan_manifest(
     *,
     workspace_root: Path,
-    scan_scope: dict[str, Any],
-    changed_files: Sequence[Mapping[str, Any]],
+    scan_scope: RepositoryScanScope,
     discovery_artifacts_path: Path,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[DiscoveryEntry], list[DiscoverySkippedFile]]:
     max_file_bytes, max_file_bytes_source = _resolve_discovery_max_file_bytes()
     paths_ignore = normalize_paths_ignore(
-        scan_scope.get("paths_ignore"), source="Repository discovery"
+        scan_scope.paths_ignore, source="Repository discovery"
     )
 
-    entries: list[dict[str, Any]] = []
-    skipped: list[dict[str, Any]] = []
+    entries: list[DiscoveryEntry] = []
+    skipped: list[DiscoverySkippedFile] = []
     seen_paths: set[str] = set()
 
-    for item in changed_files:
-        current_path = str(item.get("path") or "").strip()
-        if not current_path:
-            raise ValueError(
-                "Repository incremental discovery received an empty changed-file path."
-            )
-        normalized_path = Path(current_path.replace("\\", "/"))
+    for item in scan_scope.incremental_changed_files:
+        normalized_path = Path(item.path.strip().replace("\\", "/"))
         normalized_path_text = normalized_path.as_posix()
         if normalized_path_text in seen_paths:
             continue
         seen_paths.add(normalized_path_text)
-        status = str(item.get("status") or "").strip().lower()
-        if status not in INCREMENTAL_CHANGED_FILE_STATUSES:
-            # A status outside the contract means the producer and this consumer disagree about
-            # the vocabulary. Skipping it (or scanning it) would silently change which files are
-            # analyzed, so the disagreement has to stop the run.
-            raise ValueError(
-                "Repository incremental discovery received an unsupported changed-file status "
-                f"{status!r}; expected one of {sorted(INCREMENTAL_CHANGED_FILE_STATUSES)}."
-            )
+        status = item.status
         if status == "deleted":
             continue
 
@@ -439,8 +383,8 @@ def _build_incremental_scan_manifest(
         if skip is not None:
             skipped.append(skip)
 
-    entries.sort(key=lambda item: item["path"])
-    skipped.sort(key=lambda item: item["path"])
+    entries.sort(key=lambda item: item.path)
+    skipped.sort(key=lambda item: item.path)
 
     manifest = {
         "metadata": {
@@ -452,8 +396,8 @@ def _build_incremental_scan_manifest(
             "scannable_file_count": len(entries),
             "skipped_file_count": len(skipped),
         },
-        "files": entries,
-        "skipped_files": skipped,
+        "files": [entry.model_dump() for entry in entries],
+        "skipped_files": [item.model_dump(exclude_none=True) for item in skipped],
     }
     persist_json_artifact(
         discovery_artifacts_path,
@@ -507,55 +451,28 @@ def _evidence_location_label(evidence_item: str) -> str:
 
 
 def _normalize_candidate(
-    entries_by_path: dict[str, dict[str, Any]],
     content_by_path: dict[str, str],
-    candidate: dict[str, Any],
-) -> dict[str, Any] | None:
-    category = str(candidate.get("category") or "").strip()
-    description = str(candidate.get("description") or "").strip()
+    candidate: DiscoveryCandidate,
+) -> DiscoveryCandidate | None:
+    """Filter source references and recover a location from matching evidence.
 
-    if not category or not description:
-        return None
+    Return new candidate content, or discard candidates with neither signal.
+    Identity and grounding status belong to stage result assembly.
+    """
+    normalized_locations: list[DiscoveryLocation] = []
+    for location in candidate.locations:
+        file = location.file.lstrip("/")
+        if file not in content_by_path:
+            continue
+        line_count = len(content_by_path[file].splitlines()) or 1
+        if location.line is not None and location.line > line_count:
+            continue
+        normalized_locations.append(
+            DiscoveryLocation(file=file, label=location.label, line=location.line)
+        )
 
-    raw_locations = candidate.get("locations")
-    normalized_locations: list[dict[str, Any]] = []
-    if isinstance(raw_locations, list):
-        for item in raw_locations:
-            if not isinstance(item, dict):
-                continue
-            raw_file = str(item.get("file") or "").strip().lstrip("/")
-            if not raw_file and len(entries_by_path) == 1:
-                raw_file = next(iter(entries_by_path))
-            if raw_file not in content_by_path:
-                continue
-            label = str(item.get("label") or "").strip()
-            if not label:
-                continue
-            line_count = len(content_by_path[raw_file].splitlines()) or 1
-            location: dict[str, Any] = {
-                "file": raw_file,
-                "label": label,
-            }
-            raw_line = item.get("line")
-            if raw_line is not None:
-                if not isinstance(raw_line, str | int):
-                    continue
-                try:
-                    line_value = max(1, int(raw_line))
-                except TypeError, ValueError, OverflowError:
-                    continue
-                if line_value > line_count:
-                    continue
-                location["line"] = line_value
-            normalized_locations.append(location)
-
-    evidence_items = [
-        str(item).strip()
-        for item in (candidate.get("evidence") or [])
-        if str(item).strip()
-    ]
     grounded_evidence_items, evidence_files = _grounded_evidence_by_file(
-        content_by_path, evidence_items
+        content_by_path, candidate.evidence
     )
     if not normalized_locations and grounded_evidence_items:
         evidence_file = evidence_files[grounded_evidence_items[0]]
@@ -564,11 +481,11 @@ def _normalize_candidate(
         )
         if grounded_line is not None:
             normalized_locations.append(
-                {
-                    "file": evidence_file,
-                    "line": grounded_line,
-                    "label": _evidence_location_label(grounded_evidence_items[0]),
-                }
+                DiscoveryLocation(
+                    file=evidence_file,
+                    line=grounded_line,
+                    label=_evidence_location_label(grounded_evidence_items[0]),
+                )
             )
 
     # Structural constraint: drop candidates that have no verifiable anchor signal at all.
@@ -576,34 +493,12 @@ def _normalize_candidate(
     if not normalized_locations and not grounded_evidence_items:
         return None
 
-    # Grounding validator: classify as grounded only when both signals are present.
-    # This makes grounding stricter and keeps one-signal candidates visible but explicitly weaker.
-    grounding_status = (
-        GROUNDED_STATUS
-        if normalized_locations and grounded_evidence_items
-        else NEEDS_GROUNDING_STATUS
+    return DiscoveryCandidate(
+        category=candidate.category,
+        description=candidate.description,
+        locations=normalized_locations,
+        evidence=grounded_evidence_items,
     )
-
-    primary_line = 0
-    if normalized_locations:
-        raw_primary_line = normalized_locations[0].get("line")
-        if isinstance(raw_primary_line, int):
-            primary_line = raw_primary_line
-    primary_file = (
-        str(normalized_locations[0].get("file"))
-        if normalized_locations
-        else next(iter(entries_by_path))
-    )
-    return {
-        "candidate_id": _candidate_id(
-            primary_file, category, primary_line, description
-        ),
-        "category": category,
-        "locations": normalized_locations,
-        "evidence": grounded_evidence_items,
-        "description": description,
-        "grounding_status": grounding_status,
-    }
 
 
 #########################################################################
@@ -642,10 +537,11 @@ def discovery_chunk_token_limits(
 
 
 def _estimate_discovery_prompt_tokens(
-    *, chunk_id: str, entries: Sequence[Mapping[str, Any]], sources: dict[str, str]
+    *, chunk_id: str, entries: Sequence[DiscoveryEntry], sources: dict[str, str]
 ) -> int:
     user_prompt = build_repository_discovery_user_prompt(
-        chunk={"chunk_id": chunk_id, "entries": [dict(item) for item in entries]},
+        chunk_id=chunk_id,
+        entries=entries,
         sources=sources,
     )
     return count_tokens_approximately(
@@ -664,15 +560,15 @@ def _estimate_discovery_prompt_tokens(
 
 def _pack_discovery_chunks(
     *,
-    entries: Sequence[Mapping[str, Any]],
+    entries: Sequence[DiscoveryEntry],
     root: Path,
     target_tokens: int,
     hard_limit_tokens: int,
     strategy: str = DEFAULT_DISCOVERY_CHUNK_STRATEGY,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
-    chunks: list[dict[str, Any]] = []
-    skipped: list[dict[str, Any]] = []
-    current_entries: list[dict[str, Any]] = []
+) -> tuple[list[DiscoveryChunk], list[DiscoverySkippedFile]]:
+    chunks: list[DiscoveryChunk] = []
+    skipped: list[DiscoverySkippedFile] = []
+    current_entries: list[DiscoveryEntry] = []
     current_sources: dict[str, str] = {}
     current_tokens = 0
 
@@ -681,26 +577,26 @@ def _pack_discovery_chunks(
         if not current_entries:
             return
         chunks.append(
-            {
-                "chunk_id": f"discovery-chunk-{len(chunks) + 1:04d}",
-                "entries": list(current_entries),
-                "token_count": current_tokens,
-            }
+            DiscoveryChunk(
+                chunk_id=f"discovery-chunk-{len(chunks) + 1:04d}",
+                entries=list(current_entries),
+                token_count=current_tokens,
+            )
         )
         current_entries = []
         current_sources = {}
         current_tokens = 0
 
     for entry in entries:
-        path = str(entry["path"])
+        path = entry.path
         content = read_utf8_text_file(root / path)
         if content is None:
             skipped.append(
-                {
-                    "path": path,
-                    "reason": "binary-or-unreadable",
-                    "size_bytes": entry["size_bytes"],
-                }
+                DiscoverySkippedFile(
+                    path=path,
+                    reason="binary-or-unreadable",
+                    size_bytes=entry.size_bytes,
+                )
             )
             continue
 
@@ -712,21 +608,21 @@ def _pack_discovery_chunks(
             )
             if candidate_tokens > hard_limit_tokens:
                 skipped.append(
-                    {
-                        "path": path,
-                        "reason": "token-budget-exceeded",
-                        "size_bytes": entry["size_bytes"],
-                        "token_count": candidate_tokens,
-                        "hard_limit_tokens": hard_limit_tokens,
-                    }
+                    DiscoverySkippedFile(
+                        path=path,
+                        reason="token-budget-exceeded",
+                        size_bytes=entry.size_bytes,
+                        token_count=candidate_tokens,
+                        hard_limit_tokens=hard_limit_tokens,
+                    )
                 )
                 continue
             chunks.append(
-                {
-                    "chunk_id": f"discovery-chunk-{len(chunks) + 1:04d}",
-                    "entries": [dict(entry)],
-                    "token_count": candidate_tokens,
-                }
+                DiscoveryChunk(
+                    chunk_id=f"discovery-chunk-{len(chunks) + 1:04d}",
+                    entries=[entry.model_copy()],
+                    token_count=candidate_tokens,
+                )
             )
             continue
 
@@ -752,16 +648,16 @@ def _pack_discovery_chunks(
         # file may exceed it; only the deployment input limit makes it unscannable.
         if not current_entries and candidate_tokens > hard_limit_tokens:
             skipped.append(
-                {
-                    "path": path,
-                    "reason": "token-budget-exceeded",
-                    "size_bytes": entry["size_bytes"],
-                    "token_count": candidate_tokens,
-                    "hard_limit_tokens": hard_limit_tokens,
-                }
+                DiscoverySkippedFile(
+                    path=path,
+                    reason="token-budget-exceeded",
+                    size_bytes=entry.size_bytes,
+                    token_count=candidate_tokens,
+                    hard_limit_tokens=hard_limit_tokens,
+                )
             )
             continue
-        current_entries = [dict(item) for item in candidate_entries]
+        current_entries = [item.model_copy() for item in candidate_entries]
         current_sources = candidate_sources
         current_tokens = candidate_tokens
         if current_tokens >= target_tokens:
@@ -769,22 +665,6 @@ def _pack_discovery_chunks(
 
     emit_current()
     return chunks, skipped
-
-
-async def execute_discovery(
-    *,
-    chunk: Mapping[str, Any],
-    sources: Mapping[str, str],
-    discovery_artifacts_path: Path | None = None,
-) -> dict[str, Any]:
-    discovery_result = await run_repository_discovery_agent(
-        chunk=chunk,
-        sources=sources,
-        discovery_artifacts_path=discovery_artifacts_path,
-    )
-    return {
-        "candidates": discovery_result.get("candidates") or [],
-    }
 
 
 def _resolve_discovery_max_concurrency(entry_count: int) -> int:
@@ -800,87 +680,101 @@ def _resolve_discovery_max_concurrency(entry_count: int) -> int:
 
 async def scan_discovery_chunk(
     *,
-    chunk: Mapping[str, Any],
+    chunk: DiscoveryChunk,
     root: Path,
     discovery_artifacts_path: Path | None = None,
-) -> dict[str, Any]:
-    entries = [item for item in chunk.get("entries") or [] if isinstance(item, dict)]
-    entries_by_path = {str(entry["path"]): entry for entry in entries}
+) -> DiscoveryChunkResult:
+    entries = chunk.entries
     sources: dict[str, str] = {}
-    skipped_files: list[dict[str, Any]] = []
+    skipped_files: list[DiscoverySkippedFile] = []
 
     for entry in entries:
-        path = str(entry["path"])
+        path = entry.path
         content = read_utf8_text_file(root / path)
         if content is None:
             skipped_files.append(
-                {
-                    "path": path,
-                    "reason": "binary-or-unreadable",
-                    "size_bytes": entry["size_bytes"],
-                }
+                DiscoverySkippedFile(
+                    path=path,
+                    reason="binary-or-unreadable",
+                    size_bytes=entry.size_bytes,
+                )
             )
             continue
         sources[path] = content
 
     if not sources:
-        return {
-            "chunk_id": chunk["chunk_id"],
-            "file_candidates": [],
-            "file_results": [],
-            "skipped_files": skipped_files,
-        }
+        return DiscoveryChunkResult(
+            chunk_id=chunk.chunk_id,
+            file_candidates=[],
+            file_results=[],
+            skipped_files=skipped_files,
+        )
 
-    discovery_run = await execute_discovery(
+    discovery_run = await run_repository_discovery_agent(
         chunk=chunk,
         sources=sources,
         discovery_artifacts_path=discovery_artifacts_path,
     )
-    candidates_by_file: dict[str, list[dict[str, Any]]] = {path: [] for path in sources}
-    all_candidates: list[dict[str, Any]] = []
-    for item in discovery_run.get("candidates") or []:
-        if not isinstance(item, dict):
+    candidates_by_file: dict[str, list[DiscoveryCandidateResult]] = {
+        path: [] for path in sources
+    }
+    all_candidates: list[DiscoveryCandidateResult] = []
+    for item in discovery_run.candidates:
+        normalized = _normalize_candidate(sources, item)
+        if normalized is None:
             continue
-        candidate = _normalize_candidate(entries_by_path, sources, item)
-        if not candidate:
-            continue
+        primary = normalized.locations[0] if normalized.locations else None
+        candidate = DiscoveryCandidateResult(
+            candidate_id=_candidate_id(
+                primary.file if primary else next(iter(sources)),
+                normalized.category,
+                (primary.line or 0) if primary else 0,
+                normalized.description,
+            ),
+            candidate=normalized,
+            grounding_status=(
+                GROUNDED_STATUS
+                if normalized.locations and normalized.evidence
+                else NEEDS_GROUNDING_STATUS
+            ),
+        )
         all_candidates.append(candidate)
         candidate_files = {
-            str(location.get("file"))
-            for location in candidate.get("locations") or []
-            if isinstance(location, dict) and str(location.get("file")) in sources
+            location.file
+            for location in candidate.candidate.locations
+            if location.file in sources
         }
         for path in candidate_files or {next(iter(sources))}:
             candidates_by_file.setdefault(path, []).append(candidate)
 
     file_results: list[DiscoveryFileResult] = []
     for entry in entries:
-        path = str(entry["path"])
+        path = entry.path
         if path not in sources:
             continue
         file_results.append(
-            {
-                "path": path,
-                "language": entry["language"],
-                "size_bytes": entry["size_bytes"],
-                "candidate_count": len(candidates_by_file.get(path, [])),
-            }
+            DiscoveryFileResult(
+                path=path,
+                language=entry.language,
+                size_bytes=entry.size_bytes,
+                candidate_count=len(candidates_by_file.get(path, [])),
+            )
         )
 
-    return {
-        "chunk_id": chunk["chunk_id"],
-        "file_candidates": all_candidates,
-        "file_results": file_results,
-        "skipped_files": skipped_files,
-    }
+    return DiscoveryChunkResult(
+        chunk_id=chunk.chunk_id,
+        file_candidates=all_candidates,
+        file_results=file_results,
+        skipped_files=skipped_files,
+    )
 
 
 def build_discovery_result_from_chunks(
     *,
-    entries: Sequence[Mapping[str, Any]],
-    skipped_files: Sequence[Mapping[str, Any]],
-    chunks: Sequence[Mapping[str, Any]],
-    chunk_results: Sequence[Mapping[str, Any]],
+    entries: Sequence[DiscoveryEntry],
+    skipped_files: Sequence[DiscoverySkippedFile],
+    chunks: Sequence[DiscoveryChunk],
+    chunk_results: Sequence[DiscoveryChunkResult],
     scan_mode: str,
     deployment_input_limit_tokens: int,
     chunk_target_tokens: int,
@@ -890,41 +784,37 @@ def build_discovery_result_from_chunks(
     chunk_strategy: str = DEFAULT_DISCOVERY_CHUNK_STRATEGY,
 ) -> DiscoveryResult:
     """Combine ordered chunk outcomes into the stage result without side effects."""
-    candidates: list[dict[str, Any]] = []
+    candidates: list[DiscoveryCandidateResult] = []
     file_results: list[DiscoveryFileResult] = []
-    all_skipped_files = [dict(item) for item in skipped_files]
+    all_skipped_files = list(skipped_files)
 
     for scan_result in chunk_results:
-        all_skipped_files.extend(
-            dict(item) for item in (scan_result.get("skipped_files") or [])
-        )
-        chunk_file_results = scan_result.get("file_results") or []
+        all_skipped_files.extend(scan_result.skipped_files)
+        candidates.extend(scan_result.file_candidates)
+        file_results.extend(scan_result.file_results)
 
-        candidates.extend(scan_result.get("file_candidates") or [])
-        file_results.extend(chunk_file_results)
-
-    result: DiscoveryResult = {
-        "status": "completed",
-        "metadata": {
-            "scan_mode": scan_mode,
-            "discovery_concurrency": discovery_concurrency,
-            "discovery_deployment_input_limit_tokens": deployment_input_limit_tokens,
-            "discovery_chunk_target_tokens": chunk_target_tokens,
-            "discovery_chunk_target_ratio": chunk_target_ratio,
-            "discovery_chunk_hard_limit_tokens": chunk_hard_limit_tokens,
-            "discovery_chunk_strategy": chunk_strategy,
-            "discovery_chunk_count": len(chunks),
-        },
-        "counts": {
-            "scannable_file_count": len(entries),
-            "scanned_file_count": len(file_results),
-            "skipped_file_count": len(all_skipped_files),
-            "candidate_count": len(candidates),
-        },
-        "files": file_results,
-        "skipped_files": all_skipped_files,
-        "candidates": candidates,
-    }
+    result: DiscoveryResult = DiscoveryResult(
+        status="completed",
+        metadata=DiscoveryMetadata(
+            scan_mode=scan_mode,
+            discovery_concurrency=discovery_concurrency,
+            discovery_deployment_input_limit_tokens=deployment_input_limit_tokens,
+            discovery_chunk_target_tokens=chunk_target_tokens,
+            discovery_chunk_target_ratio=chunk_target_ratio,
+            discovery_chunk_hard_limit_tokens=chunk_hard_limit_tokens,
+            discovery_chunk_strategy=chunk_strategy,
+            discovery_chunk_count=len(chunks),
+        ),
+        counts=DiscoveryCounts(
+            scannable_file_count=len(entries),
+            scanned_file_count=len(file_results),
+            skipped_file_count=len(all_skipped_files),
+            candidate_count=len(candidates),
+        ),
+        files=file_results,
+        skipped_files=all_skipped_files,
+        candidates=candidates,
+    )
     return result
 
 
@@ -932,18 +822,22 @@ def persist_discovery_result(
     *, discovery_artifacts_path: Path, result: DiscoveryResult
 ) -> None:
     """Persist the canonical discovery stage result."""
-    persist_json_artifact(discovery_artifacts_path, "discovery-result", result)
+    persist_json_artifact(
+        discovery_artifacts_path,
+        "discovery-result",
+        result.model_dump(mode="json", exclude_none=True),
+    )
 
 
 def prepare_discovery_chunks(
     *,
     workspace_root: Path,
     scan_mode: str,
-    scan_scope: dict[str, Any],
+    scan_scope: RepositoryScanScope,
     discovery_artifacts_path: Path,
     chunk_target_ratio: tuple[int, int] = (1, 5),
     chunk_strategy: str | None = None,
-) -> dict[str, Any]:
+) -> DiscoveryManifest:
     remove_json_artifacts(
         discovery_artifacts_path,
         ("discovery-result", "discovery-chunks"),
@@ -953,7 +847,6 @@ def prepare_discovery_chunks(
         entries, skipped_files = _build_incremental_scan_manifest(
             workspace_root=workspace_root,
             scan_scope=scan_scope,
-            changed_files=_load_incremental_changed_files(scan_scope),
             discovery_artifacts_path=discovery_artifacts_path,
         )
     else:
@@ -993,22 +886,22 @@ def prepare_discovery_chunks(
             },
             "counts": {
                 "chunk_count": len(chunks),
-                "file_count": sum(len(chunk.get("entries") or []) for chunk in chunks),
+                "file_count": sum(len(chunk.entries) for chunk in chunks),
             },
-            "chunks": chunks,
+            "chunks": [chunk.model_dump(exclude_none=True) for chunk in chunks],
         },
     )
-    return {
-        "workspace_root": str(workspace_root),
-        "discovery_artifacts_path": str(discovery_artifacts_path),
-        "scan_mode": "incremental" if is_incremental else "full",
-        "entries": entries,
-        "skipped_files": skipped_files,
-        "chunks": chunks,
-        "deployment_input_limit_tokens": deployment_input_limit_tokens,
-        "chunk_target_tokens": chunk_target_tokens,
-        "chunk_target_ratio": chunk_target_ratio_text,
-        "chunk_hard_limit_tokens": chunk_hard_limit_tokens,
-        "chunk_strategy": resolved_chunk_strategy,
-        "max_concurrency": _resolve_discovery_max_concurrency(len(chunks)),
-    }
+    return DiscoveryManifest(
+        workspace_root=str(workspace_root),
+        discovery_artifacts_path=str(discovery_artifacts_path),
+        scan_mode="incremental" if is_incremental else "full",
+        entries=entries,
+        skipped_files=skipped_files,
+        chunks=chunks,
+        deployment_input_limit_tokens=deployment_input_limit_tokens,
+        chunk_target_tokens=chunk_target_tokens,
+        chunk_target_ratio=chunk_target_ratio_text,
+        chunk_hard_limit_tokens=chunk_hard_limit_tokens,
+        chunk_strategy=resolved_chunk_strategy,
+        max_concurrency=_resolve_discovery_max_concurrency(len(chunks)),
+    )

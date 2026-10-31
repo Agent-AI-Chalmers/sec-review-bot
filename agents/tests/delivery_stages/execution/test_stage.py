@@ -2,22 +2,21 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from sec_review_agents.delivery_stages.execution.input import DeliveryPatchCase
 from sec_review_agents.delivery_stages.execution.stage import execute_delivery_entry
+from sec_review_agents.delivery_stages.model import DeliveryEntry
+from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
+from sec_review_agents.workspace.patches import PatchArtifact
 
 
-def _case_result(*, file_changes: list[dict]) -> dict:
-    return {
-        "case_id": "case-1",
-        "analyzer_overview": "analysis",
-        "analyzer_verdict": "confirmed",
-        "mitigator_file_changes": file_changes,
-        "mitigator_patch_diff": "patch",
-        "verifier_overview": "verified",
-        "verifier_coverage": None,
-        "verifier_patch_findings": [],
-        "verifier_findings": [],
-        "residual_risks": [],
-    }
+def _case_result(
+    *, file_changes: list[DeletedFileChange | UpsertFileChange]
+) -> DeliveryPatchCase:
+    return DeliveryPatchCase(
+        case_id="case-1",
+        mitigator_file_changes=file_changes,
+        mitigator_patch_diff="patch",
+    )
 
 
 @pytest.mark.asyncio
@@ -25,16 +24,17 @@ async def test_single_execution_classifies_empty_file_changes(tmp_path) -> None:
     """Do not publish a single delivery whose mitigation produced no files."""
     result = await execute_delivery_entry(
         run_artifacts_root=tmp_path,
-        delivery_entry={
-            "delivery_id": "delivery-1",
-            "strategy": "single",
-            "case_ids": ["case-1"],
-            "reason": "independent case",
-        },
+        delivery_entry=DeliveryEntry(
+            delivery_id="delivery-1",
+            strategy="single",
+            case_ids=["case-1"],
+            reason="independent case",
+        ),
         case_results=[_case_result(file_changes=[])],
     )
 
-    assert result == {
+    assert result is not None
+    assert result.model_dump() == {
         "delivery_id": "delivery-1",
         "status": "no-changes",
         "error": "Single delivery has no file changes.",
@@ -46,7 +46,7 @@ async def test_single_execution_classifies_empty_file_changes(tmp_path) -> None:
 @pytest.mark.asyncio
 async def test_combined_execution_builds_status_from_patch_artifact(tmp_path) -> None:
     """Keep delivery status ownership in execution rather than patch synthesis."""
-    file_changes = [
+    file_changes: list[DeletedFileChange | UpsertFileChange] = [
         {
             "path": "src/app.py",
             "status": "upsert",
@@ -55,7 +55,9 @@ async def test_combined_execution_builds_status_from_patch_artifact(tmp_path) ->
         }
     ]
     synthesis = AsyncMock(
-        return_value={"patch_diff": "combined patch", "file_changes": file_changes}
+        return_value=PatchArtifact.model_validate(
+            {"patch_diff": "combined patch", "file_changes": file_changes}
+        )
     )
 
     with patch(
@@ -66,16 +68,17 @@ async def test_combined_execution_builds_status_from_patch_artifact(tmp_path) ->
         result = await execute_delivery_entry(
             run_artifacts_root=tmp_path,
             baseline_snapshot_tar_path=tmp_path / "baseline.tar",
-            delivery_entry={
-                "delivery_id": "delivery-1",
-                "strategy": "combined",
-                "case_ids": ["case-1"],
-                "reason": "overlap",
-            },
+            delivery_entry=DeliveryEntry(
+                delivery_id="delivery-1",
+                strategy="combined",
+                case_ids=["case-1"],
+                reason="overlap",
+            ),
             case_results=[_case_result(file_changes=file_changes)],
         )
 
-    assert result == {
+    assert result is not None
+    assert result.model_dump() == {
         "delivery_id": "delivery-1",
         "status": "ready",
         "error": None,
@@ -86,7 +89,11 @@ async def test_combined_execution_builds_status_from_patch_artifact(tmp_path) ->
 
 @pytest.mark.asyncio
 async def test_combined_execution_classifies_empty_patch_artifact(tmp_path) -> None:
-    synthesis = AsyncMock(return_value={"patch_diff": "", "file_changes": []})
+    synthesis = AsyncMock(
+        return_value=PatchArtifact.model_validate(
+            {"patch_diff": "", "file_changes": []}
+        )
+    )
 
     with patch(
         "sec_review_agents.delivery_stages.execution.stage."
@@ -96,18 +103,18 @@ async def test_combined_execution_classifies_empty_patch_artifact(tmp_path) -> N
         result = await execute_delivery_entry(
             run_artifacts_root=tmp_path,
             baseline_snapshot_tar_path=tmp_path / "baseline.tar",
-            delivery_entry={
-                "delivery_id": "delivery-1",
-                "strategy": "combined",
-                "case_ids": ["case-1"],
-                "reason": "overlap",
-            },
+            delivery_entry=DeliveryEntry(
+                delivery_id="delivery-1",
+                strategy="combined",
+                case_ids=["case-1"],
+                reason="overlap",
+            ),
             case_results=[_case_result(file_changes=[])],
         )
 
     assert result is not None
-    assert result["status"] == "no-changes"
-    assert result["error"] == "Patch synthesis produced no delivery file changes."
+    assert result.status == "no-changes"
+    assert result.error == "Patch synthesis produced no delivery file changes."
 
 
 @pytest.mark.asyncio
@@ -122,15 +129,15 @@ async def test_combined_execution_converts_synthesis_failure(tmp_path) -> None:
         result = await execute_delivery_entry(
             run_artifacts_root=tmp_path,
             baseline_snapshot_tar_path=tmp_path / "baseline.tar",
-            delivery_entry={
-                "delivery_id": "delivery-1",
-                "strategy": "combined",
-                "case_ids": ["case-1"],
-                "reason": "overlap",
-            },
+            delivery_entry=DeliveryEntry(
+                delivery_id="delivery-1",
+                strategy="combined",
+                case_ids=["case-1"],
+                reason="overlap",
+            ),
             case_results=[_case_result(file_changes=[])],
         )
 
     assert result is not None
-    assert result["status"] == "failed"
-    assert result["error"] == "Patch synthesis failed: agent failed"
+    assert result.status == "failed"
+    assert result.error == "Patch synthesis failed: agent failed"

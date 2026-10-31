@@ -1,18 +1,21 @@
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 from sec_review_agents.workflows.repository.case_execution_input import (
-    DELETION_CASE_ORIGIN,
     MAX_DELETED_FILES,
     build_review_input,
     deleted_repository_cases,
 )
 
 
-def _scope(*statuses: tuple[str, str]) -> dict:
-    return {
-        "incremental_changed_files": [
-            {"path": path, "status": status, "previous_path": None}
-            for path, status in statuses
-        ]
-    }
+def _scope(*statuses: tuple[str, str]) -> RepositoryScanScope:
+    return RepositoryScanScope.model_validate(
+        {
+            "paths_ignore": [],
+            "incremental_changed_files": [
+                {"path": path, "status": status, "previous_path": None}
+                for path, status in statuses
+            ],
+        }
+    )
 
 
 def test_only_deleted_files_become_deletion_cases() -> None:
@@ -32,9 +35,7 @@ def test_only_deleted_files_become_deletion_cases() -> None:
     )
 
     assert len(cases) == 1
-    assert cases[0]["deleted_paths"] == ["a/deleted.py"]
-    assert cases[0]["origin"] == DELETION_CASE_ORIGIN
-    assert cases[0]["category"] == "deleted-file"
+    assert cases[0].deleted_paths == ["a/deleted.py"]
 
 
 def test_deletion_cases_honour_paths_ignore() -> None:
@@ -44,23 +45,29 @@ def test_deletion_cases_honour_paths_ignore() -> None:
     analysed and could also push the deletion count past its bound, failing a legitimate window.
     """
     cases = deleted_repository_cases(
-        scan_scope={
-            "paths_ignore": ["vendor/**", "node_modules"],
-            "incremental_changed_files": [
-                {"path": "src/auth.py", "status": "deleted", "previous_path": None},
-                {"path": "vendor/lib/x.py", "status": "deleted", "previous_path": None},
-                {
-                    "path": "node_modules/y.js",
-                    "status": "deleted",
-                    "previous_path": None,
-                },
-            ],
-        },
+        scan_scope=RepositoryScanScope.model_validate(
+            {
+                "paths_ignore": ["vendor/**", "node_modules"],
+                "incremental_changed_files": [
+                    {"path": "src/auth.py", "status": "deleted", "previous_path": None},
+                    {
+                        "path": "vendor/lib/x.py",
+                        "status": "deleted",
+                        "previous_path": None,
+                    },
+                    {
+                        "path": "node_modules/y.js",
+                        "status": "deleted",
+                        "previous_path": None,
+                    },
+                ],
+            }
+        ),
         base_sha="base",
         head_sha="head",
     )
 
-    assert [case["deleted_paths"] for case in cases] == [["src/auth.py"]]
+    assert [case.deleted_paths for case in cases] == [["src/auth.py"]]
 
 
 def test_no_deleted_files_produce_no_case() -> None:
@@ -92,15 +99,14 @@ def test_deleted_files_group_by_nearest_parent_directory() -> None:
     )
 
     grouped = {
-        case["deleted_paths"][0].rsplit("/", 1)[0]: case["deleted_paths"]
-        for case in cases
+        case.deleted_paths[0].rsplit("/", 1)[0]: case.deleted_paths for case in cases
     }
     assert grouped == {
         "setup.py": ["setup.py"],
         "src/auth": ["src/auth/middleware.py", "src/auth/policy.py"],
         "src/tls": ["src/tls/root-ca.pem"],
     }
-    assert all(case["case_id"].startswith("deletion-") for case in cases)
+    assert all(case.case_id.startswith("deletion-") for case in cases)
 
 
 def test_case_ids_stay_unique_for_directories_that_print_alike() -> None:
@@ -118,7 +124,7 @@ def test_case_ids_stay_unique_for_directories_that_print_alike() -> None:
         head_sha="head",
     )
 
-    assert len({case["case_id"] for case in cases}) == 2
+    assert len({case.case_id for case in cases}) == 2
 
 
 def test_too_many_deleted_files_produce_no_cases_at_all() -> None:
@@ -199,3 +205,21 @@ def test_deletion_review_input_names_the_shapes_worth_investigating() -> None:
     assert "call sites" in review_input
     assert "denylist" in review_input
     assert "still relies on it" in review_input
+
+
+def test_deletion_scope_preserves_strip_only_path_semantics():
+    """Backslashes remain literal for deletion grouping and ignore matching on Unix."""
+    scope = RepositoryScanScope.model_validate(
+        {
+            "paths_ignore": ["src/**"],
+            "incremental_changed_files": [
+                {"path": " src\\gone.py ", "status": "deleted", "previous_path": None},
+                {"path": "src/gone.py", "status": "deleted", "previous_path": None},
+            ],
+        }
+    )
+    cases = deleted_repository_cases(scan_scope=scope, base_sha="base", head_sha="head")
+    assert [case.deleted_paths for case in cases] == [["src\\gone.py"]]
+    assert cases == deleted_repository_cases(
+        scan_scope=_scope(("src\\gone.py", "deleted")), base_sha="base", head_sha="head"
+    )

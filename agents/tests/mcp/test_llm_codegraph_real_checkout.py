@@ -241,10 +241,12 @@ async def _run_analyzer_probe(
             runtime_context={"workspace_image": _WORKSPACE_IMAGE},
         )
 
-    result_text = json.dumps(result, ensure_ascii=False).lower()
+    result_text = json.dumps(
+        result.model_dump(mode="json", by_alias=True), ensure_ascii=False
+    ).lower()
     return {
         "label": "with-codegraph" if codegraph_enabled else "filesystem-only",
-        "verdict": result.get("verdict"),
+        "verdict": result.verdict,
         "mentionsKnownVulnerableFiles": _mentions_known_vulnerable_files(
             case,
             result_text,

@@ -41,8 +41,7 @@ def test_delivery_planning_workbench_state_moves_items_between_groups() -> None:
     assert workbench_state.constraints()["ok"] is True
     assert workbench_state.constraints()["errors"] == []
     assert [
-        (item["strategy"], item["case_ids"])
-        for item in workbench_state.export_deliveries()
+        (item.strategy, item.case_ids) for item in workbench_state.export_deliveries()
     ] == [
         ("single", ["case-a"]),
         ("single", ["case-b"]),
@@ -98,7 +97,7 @@ def test_delivery_planning_workbench_state_groups_cases_without_losing_coverage(
 
     assert workbench_state.constraints()["ok"] is True
     deliveries = workbench_state.export_deliveries()
-    assert [(item["strategy"], item["case_ids"]) for item in deliveries] == [
+    assert [(item.strategy, item.case_ids) for item in deliveries] == [
         ("combined", ["case-a", "case-b"]),
         ("single", ["case-c"]),
     ]
@@ -169,8 +168,7 @@ def test_delivery_planning_workbench_state_updates_group_membership() -> None:
 
     assert workbench_state.constraints()["ok"] is True
     assert [
-        (item["strategy"], item["case_ids"])
-        for item in workbench_state.export_deliveries()
+        (item.strategy, item.case_ids) for item in workbench_state.export_deliveries()
     ] == [
         ("single", ["case-a"]),
         ("single", ["case-b"]),
@@ -511,8 +509,7 @@ def test_delivery_planning_group_drafts_snapshot_can_seed_global_state() -> None
 
     assert global_state.constraints()["ok"] is True
     assert [
-        (item["strategy"], item["case_ids"])
-        for item in global_state.export_deliveries()
+        (item.strategy, item.case_ids) for item in global_state.export_deliveries()
     ] == [
         ("combined", ["case-a", "case-b"]),
         ("single", ["case-c"]),
@@ -554,7 +551,7 @@ def test_delivery_planning_batch_tools_accept_llm_contract() -> None:
             ]
         }
     )
-    assert workbench_state.export_deliveries()[0]["case_ids"] == ["case-a"]
+    assert workbench_state.export_deliveries()[0].case_ids == ["case-a"]
     tools["delete_groups"].invoke({"group_ids": [group_id]})
     assert workbench_state.check_constraints()["errors"] == [
         {"code": "incomplete_coverage", "item_ids": ["case-a", "case-b"]}
@@ -587,4 +584,4 @@ def test_delivery_workbench_defaults_missing_reason_to_entry_string() -> None:
     workbench_state.create_group(item_ids=["case-a"])
     deliveries = workbench_state.export_deliveries()
 
-    assert deliveries[0]["reason"] == "Independent delivery."
+    assert deliveries[0].reason == "Independent delivery."

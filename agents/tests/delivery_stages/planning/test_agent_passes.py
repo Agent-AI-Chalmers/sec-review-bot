@@ -20,7 +20,9 @@ def test_skipped_delivery_plan_build_and_persistence_are_separate(tmp_path) -> N
 
     persist_delivery_plan(run_artifacts_root=tmp_path, result=result)
 
-    assert json.loads(result_path.read_text(encoding="utf-8")) == result
+    assert json.loads(result_path.read_text(encoding="utf-8")) == result.model_dump(
+        mode="json"
+    )
 
 
 def test_delivery_planning_reentrant_pass_gate_preserves_single_pass_default() -> None:

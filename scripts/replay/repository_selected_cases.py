@@ -15,6 +15,7 @@ from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.review_stages.trajectories import (
     review_trajectories_root,
 )
+from sec_review_agents.scan_stages.triage.result import TriageCase, TriageResult
 from sec_review_agents.temporal.config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 from sec_review_agents.utils.env import bootstrap_agents_env
 from sec_review_agents.workflows.repository.case_execution_input import (
@@ -196,7 +197,7 @@ async def _replay_one_case(
     run_id: str,
     bundle_paths: dict[str, Path],
     case_index: int,
-    case: dict[str, Any],
+    case: TriageCase,
     test_changes: Any,
 ) -> dict[str, Any]:
     async with semaphore:
@@ -209,19 +210,20 @@ async def _replay_one_case(
             case=case,
             test_changes=test_changes,
         )
-        request: RepositoryCaseReviewRequest = {
-            "run_id": run_id,
-            "case_execution_input": case_execution_input,
-            "cases_artifacts_path": cases_artifacts_path,
-            "published_trajectories_path": str(
+        request: RepositoryCaseReviewRequest = RepositoryCaseReviewRequest(
+            run_id=run_id,
+            case_execution_input=case_execution_input,
+            cases_artifacts_path=cases_artifacts_path,
+            published_trajectories_path=str(
                 review_trajectories_root(
-                    Path(cases_artifacts_path) / case_execution_input["case_id"],
+                    Path(cases_artifacts_path) / case_execution_input.case_id
                 )
             ),
-            "timeout_seconds": DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
-            "runtime_context": {},
-        }
-        return await run_repository_case_review_direct(request)
+            timeout_seconds=DEFAULT_WORKFLOW_TIMEOUT_SECONDS,
+            runtime_context={},
+        )
+        result = await run_repository_case_review_direct(request)
+        return result.model_dump(mode="json", by_alias=True)
 
 
 async def _replay_case_outcome(
@@ -232,7 +234,7 @@ async def _replay_case_outcome(
     run_id: str,
     bundle_paths: dict[str, Path],
     case_index: int,
-    case: dict[str, Any],
+    case: TriageCase,
     test_changes: Any,
 ) -> tuple[str, dict[str, Any] | None, str | None]:
     try:
@@ -290,7 +292,7 @@ def _repository_result_from_replay(
         "scan_summary": (
             scan_summary
             if isinstance(scan_summary, dict)
-            else build_scan_summary(scan_result=None)
+            else build_scan_summary(scan_result=None).model_dump(mode="json")
         ),
         "deliveries": [
             item for item in (result.get("deliveries") or []) if isinstance(item, dict)
@@ -328,17 +330,15 @@ async def main() -> None:
     test_changes = require_review_intent(replay_input.get("review_intent")).test_changes
     bundle_paths = read_replay_bundle_paths(run_root)
     result = read_json(result_paths[0])
-    triage_result = read_json(triage_path)
+    triage_result = TriageResult.model_validate(read_json(triage_path))
     case_results = result.get("case_results") or []
     if not isinstance(case_results, list) or not case_results:
         raise RuntimeError("Repository result does not contain case_results.")
-    triage_cases = [
-        case for case in (triage_result.get("cases") or []) if isinstance(case, dict)
-    ]
+    triage_cases = triage_result.cases
 
-    def find_case_source(case_id: str) -> tuple[int, dict[str, Any]] | None:
+    def find_case_source(case_id: str) -> tuple[int, TriageCase] | None:
         for index, case in enumerate(triage_cases, start=1):
-            if _case_id(case) == case_id:
+            if case.case_id.strip() == case_id:
                 return index, case
         return None
 
@@ -347,12 +347,12 @@ async def main() -> None:
     for case_id in case_ids:
         item = case_results[_case_index(case_results, case_id)]
         case_source = find_case_source(case_id)
-        case = case_source[1] if case_source else {}
+        case = case_source[1] if case_source else None
         analysis_status, analysis_error = _analysis_status(run_artifacts, case_id)
         dry_run_rows.append(
             {
                 "case_id": case_id,
-                "title": case.get("title"),
+                "title": case.summary if case is not None else None,
                 "current_disposition": item.get("disposition"),
                 "analysis_status": analysis_status,
                 "analysis_error": analysis_error,
@@ -400,7 +400,7 @@ async def main() -> None:
                 f"Raw case source not found for {case_id}; triage result must contain cases."
             )
         case_index, case = case_source
-        print(f":: replay {case_id}: {case.get('title')}", flush=True)
+        print(f":: replay {case_id}: {case.summary}", flush=True)
         task = asyncio.create_task(
             _replay_case_outcome(
                 case_id=case_id,

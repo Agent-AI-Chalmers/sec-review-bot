@@ -2,8 +2,10 @@ import json
 from annotationlib import Format, get_annotations
 from typing import Any
 
-from pydantic import BaseModel
+import pytest
+from pydantic import BaseModel, ValidationError
 
+from sec_review_agents.delivery_stages.result import DeliveryResult
 from sec_review_agents.review_stages.cvss import (
     CvssMetricDetail,
     CvssStageResult,
@@ -13,11 +15,11 @@ from sec_review_agents.review_stages.cvss.stage import (
     run_cvss_v4_scoring_stage,
 )
 from sec_review_agents.review_stages.record import (
+    ReviewRecord,
     ReviewRecordAnalysis,
     ReviewRecordCvss,
     ReviewRecordMitigation,
     ReviewRecordVerification,
-    build_review_record,
 )
 from sec_review_agents.review_stages.single_agent import SingleAgentFixOutcome
 from sec_review_agents.review_stages.types import (
@@ -38,6 +40,7 @@ from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
 from tests.contract_fixtures import contract_schema
+from tests.repository_scan_fixtures import scan_result_fixture
 
 
 def test_review_record_public_contract_tracks_current_shape() -> None:
@@ -139,24 +142,16 @@ def test_repository_workflow_contract_tracks_required_sections() -> None:
 
 def test_repository_workflow_builder_derives_scan_summary_from_scan_results() -> None:
     result = build_repository_workflow_result(
-        scan_result={
-            "discovery_result": {
-                "counts": {
-                    "scannable_file_count": 10,
-                    "scanned_file_count": 8,
-                    "skipped_file_count": 2,
-                    "candidate_count": 4,
-                }
-            },
-            "triage_result": {
-                "counts": {
-                    "case_count": 3,
-                    "suppressed_candidate_count": 1,
-                }
-            },
-            "deleted_file_count": 5,
-            "deletion_review_skipped": False,
-        },
+        scan_result=scan_result_fixture(
+            scannable_file_count=10,
+            scanned_file_count=8,
+            skipped_file_count=2,
+            candidate_count=4,
+            case_count=3,
+            suppressed_candidate_count=1,
+            deleted_file_count=5,
+            deletion_review_skipped=False,
+        ),
         delivery_result=None,
         case_results=[],
     )
@@ -175,27 +170,43 @@ def test_repository_workflow_builder_derives_scan_summary_from_scan_results() ->
 
 def test_repository_workflow_builder_emits_json_serializable_public_payload() -> None:
     result = build_repository_workflow_result(
-        scan_result={
-            "discovery_result": {"counts": {}},
-            "triage_result": {"counts": {}},
-        },
-        delivery_result={"deliveries": [{"delivery_id": "partial"}]},
+        scan_result=scan_result_fixture(),
+        delivery_result=DeliveryResult.model_validate(
+            {
+                "status": "completed",
+                "deliveries": [
+                    {
+                        "delivery_id": "partial",
+                        "case_ids": ["case-1"],
+                        "patch_diff": "",
+                        "file_changes": [],
+                    }
+                ],
+            }
+        ),
         case_results=[],
     )
 
     assert type(result) is dict
-    assert result["deliveries"] == [{"delivery_id": "partial"}]
+    assert result["deliveries"] == [
+        {
+            "delivery_id": "partial",
+            "case_ids": ["case-1"],
+            "patch_diff": "",
+            "file_changes": [],
+        }
+    ]
     json.dumps(result)
 
 
-def test_repository_cvss_stage_return_annotations_are_public_payloads() -> None:
+def test_repository_cvss_stage_return_annotations_preserve_model() -> None:
     assert (
         get_annotations(build_skipped_cvss_v4_result, format=Format.VALUE)["return"]
-        == dict[str, Any]
+        == CvssStageResult
     )
     assert (
         get_annotations(run_cvss_v4_scoring_stage, format=Format.VALUE)["return"]
-        == dict[str, Any]
+        == CvssStageResult
     )
 
 
@@ -216,33 +227,27 @@ def test_repository_cvss_stage_compiler_models_track_public_fields() -> None:
     }
 
 
-def test_repository_cvss_stage_builder_emits_json_serializable_public_payload() -> None:
+def test_repository_cvss_stage_builder_retains_optional_scoring_fields() -> None:
     result = build_skipped_cvss_v4_result(reason="Not scoreable.")
 
-    assert type(result) is dict
-    json.dumps(result)
-    assert result["version"] is None
-    assert result["vector"] is None
-    assert result["base_score"] is None
-    assert result["severity"] is None
-    assert "not_scored_reason" not in result
+    assert isinstance(result, CvssStageResult)
+    json.dumps(result.model_dump(mode="json"))
+    assert result.version is None
+    assert result.vector is None
+    assert result.base_score is None
+    assert result.severity is None
+    assert result.not_scored_reason is None
 
 
 def test_review_record_cvss_outcome_is_limited_to_the_schema_enum() -> None:
     """An outcome outside the contract enum must not reach the public review record."""
-    unknown = build_review_record(
-        analysis_result=None,
-        mitigation_result=None,
-        verifier_result=None,
-        cvss_result={"outcome": "invented", "overview": "Unrecognized outcome."},
-    )
-    assert unknown["cvss"]["outcome"] is None
-    assert unknown["cvss"]["overview"] == "Unrecognized outcome."
+    with pytest.raises(ValidationError) as error:
+        ReviewRecord.model_validate(
+            {"cvss": {"outcome": "invented", "overview": "Unrecognized outcome."}}
+        )
+    assert error.value.errors()[0]["loc"] == ("cvss", "outcome")
 
-    known = build_review_record(
-        analysis_result=None,
-        mitigation_result=None,
-        verifier_result=None,
-        cvss_result={"outcome": "not-scored", "overview": "No score."},
-    )
+    known = ReviewRecord.model_validate(
+        {"cvss": {"outcome": "not-scored", "overview": "No score."}}
+    ).model_dump(mode="json", by_alias=True)
     assert known["cvss"]["outcome"] == "not-scored"

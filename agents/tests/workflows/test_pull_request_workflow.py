@@ -4,6 +4,9 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
+from sec_review_agents.review_stages.verification.result import VerificationStageResult
+from sec_review_agents.workflows.prepared_input import PreparedPullRequestInput
 from sec_review_agents.workflows.pull_request.direct import (
     run_pull_request_review_direct,
 )
@@ -12,20 +15,18 @@ from sec_review_agents.workflows.pull_request.workflow import (
     verify_pull_request_activity,
 )
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
+from tests.analysis_fixtures import analysis_fixture, narrative_fixture
+from tests.prepared_input_fixtures import prepared_pull_request_input
 
 
-def _prepared_input(artifact_root: Path) -> dict[str, Any]:
-    return {
-        "artifact_root_path": str(artifact_root),
-        "artifact_paths": {"mitigator": str(artifact_root / "mitigator")},
-        "bundle_paths": {
-            "workspace_snapshot_tar_path": str(artifact_root / "workspace.tar"),
-            "history_path": str(artifact_root / "history"),
-            "incremental_window_path": str(artifact_root / "incremental.json"),
-        },
-        "pr": {},
-        "review_intent": {"objective": "audit"},
-    }
+def _prepared_input(artifact_root: Path) -> PreparedPullRequestInput:
+    return prepared_pull_request_input(
+        artifact_root_path=str(artifact_root),
+        mitigator_artifacts_path=str(artifact_root / "mitigator"),
+        workspace_snapshot_tar_path=str(artifact_root / "workspace.tar"),
+        history_path=str(artifact_root / "history"),
+        incremental_window_path=str(artifact_root / "incremental.json"),
+    )
 
 
 def _request(artifact_root: Path) -> ReviewWorkflowRequest:
@@ -47,11 +48,11 @@ async def test_mitigation_activity_skip_accepts_serialized_artifact_root(
 
     result = await mitigate_pull_request_activity(
         request=_request(artifact_root),
-        analysis_result={"narratives": []},
+        analysis_result=analysis_fixture(verdict=None, narratives=[]),
         retry_context=None,
     )
 
-    assert result["file_changes"] == []
+    assert result.file_changes == []
     assert (artifact_root / "mitigator" / "mitigation-result.json").is_file()
 
 
@@ -63,9 +64,12 @@ async def test_mitigation_activity_run_accepts_serialized_artifact_root(
     artifact_root = tmp_path / "artifacts"
     captured: dict[str, Any] = {}
 
-    async def fake_mitigate_pull_request(**kwargs: Any) -> dict[str, Any]:
+    async def fake_mitigate_pull_request(**kwargs: Any) -> MitigationStageResult:
         captured.update(kwargs)
-        return {"changed_files": []}
+        return MitigationStageResult(
+            overview="Test mitigation",
+            file_changes=[],
+        )
 
     monkeypatch.setattr(
         "sec_review_agents.workflows.pull_request.mitigation.mitigate_pull_request",
@@ -74,13 +78,14 @@ async def test_mitigation_activity_run_accepts_serialized_artifact_root(
 
     result = await mitigate_pull_request_activity(
         request=_request(artifact_root),
-        analysis_result={
-            "narratives": [{"verdict": "confirmed-defect"}],
-        },
+        analysis_result=analysis_fixture(
+            verdict=None, narratives=[narrative_fixture(verdict="confirmed-defect")]
+        ),
         retry_context=None,
     )
 
-    assert result == {"changed_files": []}
+    assert result.file_changes == []
+    assert result.overview == "Test mitigation"
     assert captured["workspace_snapshot_tar_path"] == artifact_root / "workspace.tar"
     assert captured["history_path"] == artifact_root / "history"
     assert captured["incremental_window_path"] == artifact_root / "incremental.json"
@@ -94,21 +99,22 @@ async def test_mitigation_activity_run_accepts_serialized_artifact_root(
 async def test_direct_review_records_skipped_verification_without_confirmed_target() -> (
     None
 ):
-    analysis_result = {"verdict": "no-actionable-finding", "narratives": []}
-    mitigation_result = {
-        "overview": "No confirmed repair target.",
-        "changed_files": [],
-        "file_changes": [],
-        "patch_diff": "",
-    }
-    verifier_result = {
-        "overview": "Verification skipped.",
-        "resolution_next_step": "none",
-    }
+    analysis_result = analysis_fixture(verdict="no-actionable-finding", narratives=[])
+    mitigation_result = MitigationStageResult(
+        overview="No confirmed repair target.", file_changes=[], patch_diff=""
+    )
+    verifier_result = VerificationStageResult(
+        overview="Verification skipped.",
+        resolution_next_step="none",
+        review_target_claim=None,
+        patch_coverage=None,
+        validation_level=None,
+        regression_status=None,
+    )
     request = ReviewWorkflowRequest(
         workflow="pull-request-review",
         run_id="run-no-target",
-        prepared_input={},
+        prepared_input=prepared_pull_request_input(),
         timeout_seconds=30,
         runtime_context={},
     )
@@ -151,10 +157,10 @@ async def test_verification_activity_persists_skip_without_running_verifier(
     tmp_path: Path,
 ) -> None:
     artifact_root = tmp_path / "artifacts"
-    prepared_input = {
-        "artifact_root_path": str(artifact_root),
-        "artifact_paths": {"verifier": str(artifact_root / "verifier")},
-    }
+    prepared_input = prepared_pull_request_input(
+        artifact_root_path=str(artifact_root),
+        verifier_artifacts_path=str(artifact_root / "verifier"),
+    )
 
     with patch(
         "sec_review_agents.workflows.pull_request.verification.verify_pull_request"
@@ -167,11 +173,11 @@ async def test_verification_activity_persists_skip_without_running_verifier(
                 timeout_seconds=30,
                 runtime_context={},
             ),
-            {"verdict": "no-actionable-finding", "narratives": []},
-            {"changed_files": []},
+            analysis_fixture(verdict="no-actionable-finding", narratives=[]),
+            MitigationStageResult(overview="Test mitigation"),
             None,
         )
 
     verify_mock.assert_not_called()
-    assert result["patch_coverage"] is None
+    assert result.patch_coverage is None
     assert (artifact_root / "verifier" / "verification-result.json").is_file()

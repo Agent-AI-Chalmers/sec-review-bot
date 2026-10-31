@@ -3,6 +3,9 @@ import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
+from pydantic import BaseModel
+
+from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
 from sec_review_agents.workspace.paths import normalize_declared_file_path
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -242,11 +245,23 @@ def check_workspace_patch_applies_to_fresh_baseline(
         )
 
 
+class PatchArtifact(BaseModel):
+    """Review diff and publishable final contents exported from one workspace scope.
+
+    File changes are authoritative for applying the patch; the diff is for review.
+    Keeping both together ensures synthesis and repair stages consume the same
+    export rather than reconstructing file contents from diff text.
+    """
+
+    patch_diff: str
+    file_changes: list[DeletedFileChange | UpsertFileChange]
+
+
 def build_patch_artifact(
     workspace_path: Path,
     *,
     include_paths: Sequence[str],
-) -> dict:
+) -> PatchArtifact:
     """Build review diff and final-file changes from the same workspace paths."""
     from sec_review_agents.workspace.file_changes import (
         collect_publishable_file_changes,
@@ -261,10 +276,9 @@ def build_patch_artifact(
         workspace_patch["changed_files"],
     )
 
-    return {
-        "patch_diff": workspace_patch["patch_content"],
-        "file_changes": file_changes,
-    }
+    return PatchArtifact(
+        patch_diff=workspace_patch["patch_content"], file_changes=file_changes
+    )
 
 
 def observe_workspace_changed_files(worktree_path: Path) -> list[str]:

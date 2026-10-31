@@ -20,11 +20,13 @@ from sec_review_agents.delivery_stages.planning.agent_passes import (
 )
 from sec_review_agents.delivery_stages.planning.batching import planning_case_id_batches
 from sec_review_agents.delivery_stages.planning.input import (
+    DeliveryPlanningCase,
     prepare_delivery_planning_patch_view,
 )
 from sec_review_agents.delivery_stages.planning.stage import (
     generate_delivery_plan,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.cvss import (
     CVSS_VECTOR_ORDER,
     CvssV4ScoringOutput,
@@ -32,65 +34,37 @@ from sec_review_agents.review_stages.cvss import (
 from sec_review_agents.review_stages.cvss.stage import (
     is_cvss_v4_scoring_target,
 )
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
+from sec_review_agents.review_stages.types import RegressionStatus
+from sec_review_agents.review_stages.verification.result import VerificationStageResult
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
 from sec_review_agents.workflows.repository.workflow import (
     project_repository_case_result_for_delivery,
 )
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.repository_case.stage import (
     derive_case_disposition,
 )
+from tests.analysis_fixtures import analysis_fixture, narrative_fixture
+from tests.repository_scan_fixtures import scan_result_fixture
 
 
 class TestRepositoryScopeAndDeliveryPlanning:
-    def _confirmed_analysis(self) -> dict:
-        return {
-            "summary": {
-                "title": "Confirmed case",
-                "overview": "Analyzer overview",
-                "case_id": "case-77",
-            },
-            "narratives": [
-                {
-                    "priority": 1,
-                    "verdict": "confirmed-vulnerability",
-                    "title": "Primary",
-                    "description": "description",
-                    "vulnerability_type": "path-traversal",
-                    "validation_level": "static",
-                    "locations": [
-                        {"file": "src/server.js", "line": 33, "label": "loc"}
-                    ],
-                    "flow_review": {
-                        "source_facts": ["source"],
-                        "sink_facts": ["sink"],
-                    },
-                    "support_review": {
-                        "supported_inferences": [],
-                        "proof_gaps": [],
-                    },
-                    "cwe_mapping": {
-                        "cwe_id": "CWE-22",
-                        "cwe_name": "Path Traversal",
-                        "cwe_rationale": "matches",
-                    },
-                }
+    def _confirmed_analysis(self) -> AnalysisStageResult:
+        return analysis_fixture(
+            verdict="confirmed-vulnerability",
+            narratives=[
+                narrative_fixture(
+                    verdict="confirmed-vulnerability", title="Primary", priority=1
+                )
             ],
-            "verdict": "confirmed-vulnerability",
-        }
+        )
 
-    def _no_actionable_analysis(self) -> dict:
-        return {
-            "summary": {
-                "title": "Current case not confirmed",
-                "overview": "The trigger case was not confirmed in current code.",
-                "case_id": "case-77",
-            },
-            "narratives": [],
-            "verdict": "no-actionable-finding",
-        }
+    def _no_actionable_analysis(self) -> AnalysisStageResult:
+        return analysis_fixture(verdict="no-actionable-finding", narratives=[])
 
     def _input_data(self, root: Path) -> dict:
         local_root = root / "local"
@@ -108,7 +82,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
         }
 
     async def _run_delivery_planning(
-        self, input_data: dict, planning_cases: list[dict], **kwargs
+        self, input_data: dict, planning_cases: list[DeliveryPlanningCase], **kwargs
     ):
         return await run_delivery_planning(
             delivery_planning_root=Path(input_data["input_bundle_root_path"])
@@ -173,15 +147,15 @@ class TestRepositoryScopeAndDeliveryPlanning:
     def test_t1_no_actionable_does_not_enter_mitigation(self) -> None:
         analysis = self._no_actionable_analysis()
 
-        assert analysis["verdict"] == "no-actionable-finding"
-        assert analysis["narratives"] == []
+        assert analysis.verdict == "no-actionable-finding"
+        assert analysis.narratives == []
         assert not has_confirmed_repair_target(analysis)
 
     def test_t2_confirmed_case_enters_mitigation(self) -> None:
         analysis = self._confirmed_analysis()
 
-        assert analysis["verdict"] == "confirmed-vulnerability"
-        assert len(analysis["narratives"]) == 1
+        assert analysis.verdict == "confirmed-vulnerability"
+        assert len(analysis.narratives) == 1
         assert has_confirmed_repair_target(analysis)
         assert is_cvss_v4_scoring_target(analysis)
 
@@ -193,17 +167,17 @@ class TestRepositoryScopeAndDeliveryPlanning:
         assert not is_cvss_v4_scoring_target(analysis)
 
     def test_confirmed_defect_without_vulnerability_is_not_cvss_scored(self) -> None:
-        analysis = {
-            "verdict": "confirmed-defect",
-            "overview": "Confirmed repository defect without confirmed security impact.",
-            "narratives": [
-                {
-                    "priority": 1,
-                    "verdict": "confirmed-defect",
-                    "title": "Defect without confirmed vulnerability",
-                }
+        analysis = analysis_fixture(
+            overview="Confirmed repository defect without confirmed security impact.",
+            verdict="confirmed-defect",
+            narratives=[
+                narrative_fixture(
+                    verdict="confirmed-defect",
+                    title="Defect without confirmed vulnerability",
+                    priority=1,
+                )
             ],
-        }
+        )
 
         assert not is_cvss_v4_scoring_target(analysis)
 
@@ -309,9 +283,11 @@ class TestRepositoryScopeAndDeliveryPlanning:
         ]
 
         result = build_repository_workflow_result(
-            scan_result={"discovery_result": {}, "triage_result": {}},
+            scan_result=scan_result_fixture(),
             delivery_result=None,
-            case_results=case_results,
+            case_results=[
+                RepositoryCaseResult.model_validate(item) for item in case_results
+            ],
         )
         assert len(result["case_results"]) == len(case_results)
 
@@ -326,24 +302,34 @@ class TestRepositoryScopeAndDeliveryPlanning:
         self,
     ) -> None:
         planning_cases = [
-            {"case_id": "case-a", "changed_files": []},
-            {"case_id": "case-b", "changed_files": []},
-            {"case_id": "case-c", "changed_files": []},
+            DeliveryPlanningCase.model_validate(
+                {"overview": "", "changed_files": [], **item}
+            )
+            for item in [
+                {"case_id": "case-a", "changed_files": []},
+                {"case_id": "case-b", "changed_files": []},
+                {"case_id": "case-c", "changed_files": []},
+            ]
         ]
 
         subset = _planning_cases_for_batch(
             planning_cases, ["case-c", "case-a", "missing"]
         )
 
-        assert [item["case_id"] for item in subset] == ["case-a", "case-c"]
+        assert [item.case_id for item in subset] == ["case-a", "case-c"]
 
     def test_delivery_planning_items_use_generic_payload_shape(self) -> None:
         planning_cases = [
-            {
-                "case_id": "case-a",
-                "overview": "Case A mitigation overview.",
-                "changed_files": ["src/a.ts"],
-            }
+            DeliveryPlanningCase.model_validate(
+                {"overview": "", "changed_files": [], **item}
+            )
+            for item in [
+                {
+                    "case_id": "case-a",
+                    "overview": "Case A mitigation overview.",
+                    "changed_files": ["src/a.ts"],
+                }
+            ]
         ]
 
         assert _planning_items(planning_cases) == [
@@ -358,30 +344,35 @@ class TestRepositoryScopeAndDeliveryPlanning:
 
     def test_delivery_planning_batches_cases_by_primary_path(self) -> None:
         planning_cases = [
-            {
-                "case_id": "case-a",
-                "changed_files": ["src/api/orders/checkout.ts"],
-            },
-            {
-                "case_id": "case-b",
-                "changed_files": ["src/api/auth/login.ts"],
-            },
-            {
-                "case_id": "case-c",
-                "changed_files": ["src/api/orders/checkout.ts"],
-            },
-            {
-                "case_id": "case-d",
-                "changed_files": ["src/api/auth/login.ts"],
-            },
-            {
-                "case_id": "case-e",
-                "changed_files": ["src/api/assets/route.ts"],
-            },
-            {
-                "case_id": "case-f",
-                "changed_files": ["src/api/assets/route.ts"],
-            },
+            DeliveryPlanningCase.model_validate(
+                {"overview": "", "changed_files": [], **item}
+            )
+            for item in [
+                {
+                    "case_id": "case-a",
+                    "changed_files": ["src/api/orders/checkout.ts"],
+                },
+                {
+                    "case_id": "case-b",
+                    "changed_files": ["src/api/auth/login.ts"],
+                },
+                {
+                    "case_id": "case-c",
+                    "changed_files": ["src/api/orders/checkout.ts"],
+                },
+                {
+                    "case_id": "case-d",
+                    "changed_files": ["src/api/auth/login.ts"],
+                },
+                {
+                    "case_id": "case-e",
+                    "changed_files": ["src/api/assets/route.ts"],
+                },
+                {
+                    "case_id": "case-f",
+                    "changed_files": ["src/api/assets/route.ts"],
+                },
+            ]
         ]
 
         assert planning_case_id_batches(planning_cases, max_batch_size=3) == [
@@ -405,8 +396,13 @@ class TestRepositoryScopeAndDeliveryPlanning:
         with tempfile.TemporaryDirectory() as tempdir:
             input_data = self._input_data(Path(tempdir))
             planning_cases = [
-                {"case_id": "case-a", "overview": "A", "changed_files": []},
-                {"case_id": "case-b", "overview": "B", "changed_files": []},
+                DeliveryPlanningCase.model_validate(
+                    {"overview": "", "changed_files": [], **item}
+                )
+                for item in [
+                    {"case_id": "case-a", "overview": "A", "changed_files": []},
+                    {"case_id": "case-b", "overview": "B", "changed_files": []},
+                ]
             ]
             pass_metas: list[dict | None] = []
 
@@ -448,23 +444,30 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 ).read_text(encoding="utf-8")
             )
 
-        assert result["metadata"]["planning_mode"] == "single"
-        assert "agent_result" not in result
-        assert "agent_results" not in result
-        assert result["metadata"]["planning_pass_count"] == 2
-        assert result["counts"]["input_case_count"] == 2
-        assert result["counts"]["delivery_count"] == 1
-        assert result["constraints"]["ok"] is True
+        assert result.metadata["planning_mode"] == "single"
+        assert "agent_result" not in result.model_dump()
+        assert "agent_results" not in result.model_dump()
+        assert result.metadata["planning_pass_count"] == 2
+        assert result.counts["input_case_count"] == 2
+        assert result.counts["delivery_count"] == 1
+        assert result.status == "completed"
         assert pass_metas == [None, {"kind": "refinement"}]
-        assert archived_input == {"cases": planning_cases}
+        assert archived_input == {
+            "cases": [case.model_dump(mode="json") for case in planning_cases]
+        }
 
     @pytest.mark.asyncio
     async def test_delivery_planning_defaults_to_batched_mode(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             input_data = self._input_data(Path(tempdir))
             planning_cases = [
-                {"case_id": "case-a", "overview": "A", "changed_files": []},
-                {"case_id": "case-b", "overview": "B", "changed_files": []},
+                DeliveryPlanningCase.model_validate(
+                    {"overview": "", "changed_files": [], **item}
+                )
+                for item in [
+                    {"case_id": "case-a", "overview": "A", "changed_files": []},
+                    {"case_id": "case-b", "overview": "B", "changed_files": []},
+                ]
             ]
             pass_kinds: list[str | None] = []
 
@@ -472,7 +475,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 *,
                 delivery_planning_root: Path,
                 workbench_state: DeliveryWorkbenchState,
-                planning_cases: list[dict],
+                planning_cases: list[DeliveryPlanningCase],
                 pass_index: int,
                 **_kwargs,
             ) -> dict:
@@ -485,8 +488,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
                             {
                                 "kind": "delivery",
                                 "item_ids": [
-                                    case_entry["case_id"]
-                                    for case_entry in planning_cases
+                                    case_entry.case_id for case_entry in planning_cases
                                 ],
                                 "reason": "Batch delivery.",
                             }
@@ -500,10 +502,10 @@ class TestRepositoryScopeAndDeliveryPlanning:
             ):
                 result = await self._run_delivery_planning(input_data, planning_cases)
 
-        assert result["metadata"]["planning_mode"] == "batched"
+        assert result.metadata["planning_mode"] == "batched"
         assert "batch" in pass_kinds
         assert "refinement" in pass_kinds
-        assert result["constraints"]["ok"]
+        assert result.status == "completed"
 
     def test_delivery_planning_batch_and_refinement_artifact_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
@@ -563,7 +565,11 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 await _run_delivery_planning_agent_pass(
                     delivery_planning_root=delivery_planning_root,
                     workbench_state=DeliveryWorkbenchState.initial(["case-1"]),
-                    planning_cases=[{"case_id": "case-1"}],
+                    planning_cases=[
+                        DeliveryPlanningCase(
+                            case_id="case-1", overview="", changed_files=[]
+                        )
+                    ],
                     pass_meta={
                         "kind": "batch",
                         "index": 1,
@@ -579,26 +585,31 @@ class TestRepositoryScopeAndDeliveryPlanning:
         with tempfile.TemporaryDirectory() as tempdir:
             input_data = self._input_data(Path(tempdir))
             planning_cases = [
-                {
-                    "case_id": "case-a",
-                    "overview": "A",
-                    "changed_files": ["src/a.ts"],
-                },
-                {
-                    "case_id": "case-b",
-                    "overview": "B",
-                    "changed_files": ["src/a.ts"],
-                },
-                {
-                    "case_id": "case-c",
-                    "overview": "C",
-                    "changed_files": ["src/b.ts"],
-                },
-                {
-                    "case_id": "case-d",
-                    "overview": "D",
-                    "changed_files": ["src/b.ts"],
-                },
+                DeliveryPlanningCase.model_validate(
+                    {"overview": "", "changed_files": [], **item}
+                )
+                for item in [
+                    {
+                        "case_id": "case-a",
+                        "overview": "A",
+                        "changed_files": ["src/a.ts"],
+                    },
+                    {
+                        "case_id": "case-b",
+                        "overview": "B",
+                        "changed_files": ["src/a.ts"],
+                    },
+                    {
+                        "case_id": "case-c",
+                        "overview": "C",
+                        "changed_files": ["src/b.ts"],
+                    },
+                    {
+                        "case_id": "case-d",
+                        "overview": "D",
+                        "changed_files": ["src/b.ts"],
+                    },
+                ]
             ]
             seen_batch_cases: list[list[str]] = []
             refinement_seen_groups: list[dict] = []
@@ -608,14 +619,14 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 *,
                 delivery_planning_root: Path,
                 workbench_state: DeliveryWorkbenchState,
-                planning_cases: list[dict],
+                planning_cases: list[DeliveryPlanningCase],
                 pass_index: int,
                 **_kwargs,
             ) -> dict:
                 assert delivery_planning_root.name
                 pass_meta = _kwargs.get("pass_meta") or {}
                 pass_kinds.append(pass_meta.get("kind"))
-                case_ids = [case_entry["case_id"] for case_entry in planning_cases]
+                case_ids = [case_entry.case_id for case_entry in planning_cases]
                 if pass_index == 0:
                     seen_batch_cases.append(case_ids)
                     workbench_state.create_group(
@@ -646,10 +657,10 @@ class TestRepositoryScopeAndDeliveryPlanning:
         assert pass_kinds.count("batch") == 2
         assert pass_kinds.count("refinement") == 1
         assert len(refinement_seen_groups) == 2
-        assert result["constraints"]["ok"]
-        assert result["metadata"]["planning_mode"] == "batched"
-        assert result["metadata"]["planning_pass_count"] == 3
-        assert [item["case_ids"] for item in result["deliveries"]] == [
+        assert result.status == "completed"
+        assert result.metadata["planning_mode"] == "batched"
+        assert result.metadata["planning_pass_count"] == 3
+        assert [item.case_ids for item in result.deliveries] == [
             ["case-a", "case-b"],
             ["case-c", "case-d"],
         ]
@@ -661,7 +672,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
         with tempfile.TemporaryDirectory() as tempdir:
             root = Path(tempdir)
             input_data = self._input_data(root)
-            captured: dict[str, list[dict]] = {}
+            captured: dict[str, list[DeliveryPlanningCase]] = {}
 
             async def run_delivery_planning(**kwargs) -> dict:
                 captured["cases"] = kwargs["planning_cases"]
@@ -698,7 +709,9 @@ class TestRepositoryScopeAndDeliveryPlanning:
                     run_artifacts_root=Path(input_data["input_bundle_root_path"])
                     / "artifacts",
                     case_results=[
-                        project_repository_case_result_for_delivery(item)
+                        project_repository_case_result_for_delivery(
+                            RepositoryCaseResult.model_validate(item)
+                        )
                         for item in case_results
                     ],
                 )
@@ -710,8 +723,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 / "delivery-plan.json"
             ).exists()
             first_case = captured["cases"][0]
-            assert first_case["changed_files"] == ["src/a.ts"]
-            assert first_case["overview"] == "Case 1 mitigation overview."
+            assert first_case.changed_files == ["src/a.ts"]
+            assert first_case.overview == "Case 1 mitigation overview."
 
     def test_delivery_planning_patch_view_is_materialized_from_case_results(
         self,
@@ -725,36 +738,22 @@ class TestRepositoryScopeAndDeliveryPlanning:
             stale_patch.parent.mkdir(parents=True)
             stale_patch.write_text("stale\n", encoding="utf-8")
             case_results: list[DeliveryCaseInput] = [
-                {
-                    "case_id": "case-1",
-                    "disposition": "keep",
-                    "reason": None,
-                    "analyzer_overview": "",
-                    "analyzer_verdict": None,
-                    "mitigation_overview": "",
-                    "mitigator_file_changes": [],
-                    "mitigator_patch_diff": "diff --git a/src/a.ts b/src/a.ts\n",
-                    "verifier_overview": "",
-                    "verifier_coverage": None,
-                    "verifier_patch_findings": [],
-                    "verifier_findings": [],
-                    "residual_risks": [],
-                },
-                {
-                    "case_id": "case-2",
-                    "disposition": "keep",
-                    "reason": None,
-                    "analyzer_overview": "",
-                    "analyzer_verdict": None,
-                    "mitigation_overview": "",
-                    "mitigator_file_changes": [],
-                    "mitigator_patch_diff": "",
-                    "verifier_overview": "",
-                    "verifier_coverage": None,
-                    "verifier_patch_findings": [],
-                    "verifier_findings": [],
-                    "residual_risks": [],
-                },
+                DeliveryCaseInput(
+                    case_id="case-1",
+                    disposition="keep",
+                    reason=None,
+                    mitigation_overview="",
+                    mitigator_file_changes=[],
+                    mitigator_patch_diff="diff --git a/src/a.ts b/src/a.ts\n",
+                ),
+                DeliveryCaseInput(
+                    case_id="case-2",
+                    disposition="keep",
+                    reason=None,
+                    mitigation_overview="",
+                    mitigator_file_changes=[],
+                    mitigator_patch_diff="",
+                ),
             ]
 
             patch_root = prepare_delivery_planning_patch_view(
@@ -772,19 +771,21 @@ class TestRepositoryScopeAndDeliveryPlanning:
         self,
     ) -> None:
         """Keep `not-run` delivery-neutral unless project policy changes."""
-        analyzer_result = {
-            "verdict": "confirmed-vulnerability",
-        }
-        mitigator_result = {
-            "file_changes": [{"path": "src/server.js", "status": "deleted"}],
-        }
-        verifier_result = {
-            "overview": "Patch fully covers the target claim.",
-            "review_target_claim": "target claim",
-            "patch_coverage": "full",
-            "regression_status": "not-run",
-            "resolution_next_step": "none",
-        }
+        analyzer_result = analysis_fixture(
+            verdict="confirmed-vulnerability", narratives=[]
+        )
+        mitigator_result = MitigationStageResult(
+            overview="Test mitigation",
+            file_changes=[{"path": "src/server.js", "status": "deleted"}],
+        )
+        verifier_result = VerificationStageResult(
+            overview="Patch fully covers the target claim.",
+            review_target_claim="target claim",
+            patch_coverage="full",
+            regression_status="not-run",
+            resolution_next_step="none",
+            validation_level=None,
+        )
         case_disposition = derive_case_disposition(
             analyzer_result,
             mitigator_result=mitigator_result,
@@ -796,19 +797,23 @@ class TestRepositoryScopeAndDeliveryPlanning:
 
     @pytest.mark.parametrize("regression_status", ["failed", "unresolved", None])
     def test_case_disposition_blocks_uncleared_regression(
-        self, regression_status: str | None
+        self, regression_status: RegressionStatus | None
     ) -> None:
         """Fail closed when regression evidence is failed, unresolved, or absent."""
         case_disposition = derive_case_disposition(
-            {"verdict": "confirmed-vulnerability"},
-            mitigator_result={
-                "file_changes": [{"path": "src/server.js", "status": "deleted"}]
-            },
-            verifier_result={
-                "patch_coverage": "full",
-                "regression_status": regression_status,
-                "resolution_next_step": "manual-review",
-            },
+            analysis_fixture(verdict="confirmed-vulnerability", narratives=[]),
+            mitigator_result=MitigationStageResult(
+                overview="Test mitigation",
+                file_changes=[{"path": "src/server.js", "status": "deleted"}],
+            ),
+            verifier_result=VerificationStageResult(
+                patch_coverage="full",
+                regression_status=regression_status,
+                resolution_next_step="manual-review",
+                overview="Test verification",
+                review_target_claim=None,
+                validation_level=None,
+            ),
         )
 
         assert case_disposition["disposition"] == "blocked"
@@ -817,32 +822,40 @@ class TestRepositoryScopeAndDeliveryPlanning:
     def test_case_disposition_blocks_pending_follow_up(self) -> None:
         """Block delivery whenever the verifier still requests follow-up."""
         case_disposition = derive_case_disposition(
-            {"verdict": "confirmed-vulnerability"},
-            mitigator_result={
-                "file_changes": [{"path": "src/server.js", "status": "deleted"}]
-            },
-            verifier_result={
-                "patch_coverage": "full",
-                "regression_status": "passed",
-                "resolution_next_step": "manual-review",
-            },
+            analysis_fixture(verdict="confirmed-vulnerability", narratives=[]),
+            mitigator_result=MitigationStageResult(
+                overview="Test mitigation",
+                file_changes=[{"path": "src/server.js", "status": "deleted"}],
+            ),
+            verifier_result=VerificationStageResult(
+                patch_coverage="full",
+                regression_status="passed",
+                resolution_next_step="manual-review",
+                overview="Test verification",
+                review_target_claim=None,
+                validation_level=None,
+            ),
         )
 
         assert case_disposition["disposition"] == "blocked"
         assert "requires follow-up" in case_disposition["reason"]
 
     def test_partial_verifier_coverage_is_confirmed_unresolved(self) -> None:
-        analyzer_result = {
-            "verdict": "confirmed-vulnerability",
-        }
-        mitigator_result = {
-            "file_changes": [{"path": "src/server.js", "status": "deleted"}],
-        }
-        verifier_result = {
-            "overview": "Patch partially covers the target claim.",
-            "review_target_claim": "target claim",
-            "patch_coverage": "partial",
-        }
+        analyzer_result = analysis_fixture(
+            verdict="confirmed-vulnerability", narratives=[]
+        )
+        mitigator_result = MitigationStageResult(
+            overview="Test mitigation",
+            file_changes=[{"path": "src/server.js", "status": "deleted"}],
+        )
+        verifier_result = VerificationStageResult(
+            overview="Patch partially covers the target claim.",
+            review_target_claim="target claim",
+            patch_coverage="partial",
+            resolution_next_step="none",
+            validation_level=None,
+            regression_status=None,
+        )
         case_disposition = derive_case_disposition(
             analyzer_result,
             mitigator_result=mitigator_result,
@@ -854,31 +867,34 @@ class TestRepositoryScopeAndDeliveryPlanning:
 
     def test_workflow_result_includes_confirmed_unresolved_case_summaries(self) -> None:
         result = build_repository_workflow_result(
-            scan_result={"discovery_result": {}, "triage_result": {}},
+            scan_result=scan_result_fixture(),
             delivery_result=None,
             case_results=[
-                {
-                    "case_id": "case-1",
-                    "disposition": "blocked",
-                    "reason": "The verifier did not fully approve the patch.",
-                    "review_record": {
-                        "analysis": {
-                            "verdict": "confirmed-vulnerability",
-                            "overview": "User input reaches a raw SQL query.",
+                RepositoryCaseResult.model_validate(item)
+                for item in [
+                    {
+                        "case_id": "case-1",
+                        "disposition": "blocked",
+                        "reason": "The verifier did not fully approve the patch.",
+                        "review_record": {
+                            "analysis": {
+                                "verdict": "confirmed-vulnerability",
+                                "overview": "User input reaches a raw SQL query.",
+                            },
+                            "verification": {
+                                "patch_coverage": "partial",
+                            },
+                            "cvss": {"severity": "high", "base_score": 8.1},
                         },
-                        "verification": {
-                            "patch_coverage": "partial",
+                    },
+                    {
+                        "case_id": "case-2",
+                        "disposition": "keep",
+                        "review_record": {
+                            "analysis": {"verdict": "confirmed-vulnerability"}
                         },
-                        "cvss": {"severity": "high", "base_score": 8.1},
                     },
-                },
-                {
-                    "case_id": "case-2",
-                    "disposition": "keep",
-                    "review_record": {
-                        "analysis": {"verdict": "confirmed-vulnerability"}
-                    },
-                },
+                ]
             ],
         )
 
@@ -887,3 +903,31 @@ class TestRepositoryScopeAndDeliveryPlanning:
             result["case_results"][0]["review_record"]["analysis"]["verdict"]
             == "confirmed-vulnerability"
         )
+
+
+def test_delivery_projection_requires_only_selected_case_and_mitigation() -> None:
+    """Delivery must not reach into analysis or verification after case selection."""
+    projected = project_repository_case_result_for_delivery(
+        RepositoryCaseResult.model_validate(
+            {
+                "case_id": "case-1",
+                "disposition": "keep",
+                "reason": "ready",
+                "review_record": {
+                    "mitigation": {
+                        "overview": "Remove unsafe entrypoint",
+                        "file_changes": [{"path": "unsafe.py", "status": "deleted"}],
+                        "patch_diff": "reference patch",
+                    }
+                },
+            }
+        )
+    )
+    assert projected == DeliveryCaseInput(
+        case_id="case-1",
+        disposition="keep",
+        reason="ready",
+        mitigation_overview="Remove unsafe entrypoint",
+        mitigator_file_changes=[{"path": "unsafe.py", "status": "deleted"}],
+        mitigator_patch_diff="reference patch",
+    )

@@ -1,19 +1,19 @@
 """Build and archive delivery execution input payloads."""
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any
+
+from pydantic import BaseModel
 
 from sec_review_agents.delivery_stages.model import (
     DeliveryCaseInput,
     DeliveryEntry,
-    DeliveryStrategy,
 )
 from sec_review_agents.utils.env import int_env
 from sec_review_agents.utils.files import persist_json_artifact
+from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
 
 DELIVERY_PATCH_MAX_CONCURRENCY = 4
-DELIVERY_STRATEGIES = {"single", "combined"}
 
 
 def resolve_delivery_patch_max_concurrency(delivery_count: int) -> int:
@@ -25,34 +25,46 @@ def resolve_delivery_patch_max_concurrency(delivery_count: int) -> int:
     return min(delivery_count, DELIVERY_PATCH_MAX_CONCURRENCY)
 
 
-def delivery_strategy(delivery_entry: DeliveryEntry) -> DeliveryStrategy:
-    strategy = delivery_entry.get("strategy")
-    if strategy not in DELIVERY_STRATEGIES:
-        raise ValueError(f"Unknown delivery strategy: {strategy!r}.")
-    return strategy
+class DeliveryPatchCase(BaseModel):
+    """A case's proposed patch, used by both single and combined deliveries.
+
+    Execution needs the patch and file contents, not the full review narrative.
+    The preparation step projects these fields once from DeliveryCaseInput;
+    synthesis renders them as reference patches rather than review verdicts.
+    """
+
+    case_id: str
+    mitigator_file_changes: list[DeletedFileChange | UpsertFileChange]
+    mitigator_patch_diff: str | None
 
 
-def single_delivery_case_view(case_result: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "case_id": case_result["case_id"],
-        "mitigator_file_changes": case_result["mitigator_file_changes"],
-        "mitigator_patch_diff": case_result["mitigator_patch_diff"],
-    }
+class DeliveryExecutionItem(BaseModel):
+    """One planned delivery and its available case patches.
+
+    Index preserves the plan's ordering across concurrent completion. Case items
+    follow the plan's case order and contain only cases retained for delivery.
+    """
+
+    index: int
+    delivery: DeliveryEntry
+    case_items: list[DeliveryPatchCase]
 
 
-def combined_delivery_case_view(case_result: Mapping[str, Any]) -> dict[str, Any]:
-    return {
-        "case_id": case_result["case_id"],
-        "analyzer_overview": case_result["analyzer_overview"],
-        "analyzer_verdict": case_result["analyzer_verdict"],
-        "mitigator_file_changes": case_result["mitigator_file_changes"],
-        "mitigator_patch_diff": case_result["mitigator_patch_diff"],
-        "verifier_overview": case_result["verifier_overview"],
-        "verifier_coverage": case_result["verifier_coverage"],
-        "verifier_patch_findings": case_result["verifier_patch_findings"],
-        "verifier_findings": case_result["verifier_findings"],
-        "residual_risks": case_result["residual_risks"],
-    }
+class DeliveryExecutionInput(BaseModel):
+    """Prepared delivery work shared by local and Temporal execution.
+
+    Single deliveries reuse case patches; combined deliveries need synthesis and
+    its concurrency limit. Paths locate worker-local artifacts and the immutable
+    baseline used to synthesize combined patches.
+    """
+
+    run_artifacts_root_path: str
+    workspace_snapshot_tar_path: str
+    max_concurrency: int
+    deliveries: list[DeliveryEntry]
+    keep_case_ids: list[str]
+    single_delivery_execution_items: list[DeliveryExecutionItem]
+    combined_delivery_execution_items: list[DeliveryExecutionItem]
 
 
 def build_delivery_execution_input(
@@ -61,44 +73,44 @@ def build_delivery_execution_input(
     workspace_snapshot_tar_path: Path,
     deliveries: Sequence[DeliveryEntry],
     keep_case_results: Sequence[DeliveryCaseInput],
-) -> dict[str, Any]:
-    keep_case_results_by_case_id = {item["case_id"]: item for item in keep_case_results}
+) -> DeliveryExecutionInput:
+    keep_case_results_by_case_id = {item.case_id: item for item in keep_case_results}
     delivery_items = list(deliveries)
-    single_delivery_execution_items = []
-    combined_delivery_execution_items = []
+    single_delivery_execution_items: list[DeliveryExecutionItem] = []
+    combined_delivery_execution_items: list[DeliveryExecutionItem] = []
     for index, delivery_entry in enumerate(delivery_items):
         delivery_case_results = [
             keep_case_results_by_case_id[case_id]
-            for case_id in delivery_entry["case_ids"]
+            for case_id in delivery_entry.case_ids
             if case_id in keep_case_results_by_case_id
         ]
-        delivery_request: dict[str, Any] = {
-            "index": index,
-            "delivery": delivery_entry,
-            "case_ids": [item["case_id"] for item in delivery_case_results],
-        }
-        strategy = delivery_strategy(delivery_entry)
-        if strategy == "combined":
-            delivery_request["case_items"] = [
-                combined_delivery_case_view(item) for item in delivery_case_results
-            ]
+        delivery_request = DeliveryExecutionItem(
+            index=index,
+            delivery=delivery_entry,
+            case_items=[
+                DeliveryPatchCase(
+                    case_id=item.case_id,
+                    mitigator_file_changes=item.mitigator_file_changes,
+                    mitigator_patch_diff=item.mitigator_patch_diff,
+                )
+                for item in delivery_case_results
+            ],
+        )
+        if delivery_entry.strategy == "combined":
             combined_delivery_execution_items.append(delivery_request)
         else:
-            delivery_request["case_items"] = [
-                single_delivery_case_view(item) for item in delivery_case_results
-            ]
             single_delivery_execution_items.append(delivery_request)
-    return {
-        "run_artifacts_root_path": str(run_artifacts_root),
-        "workspace_snapshot_tar_path": str(workspace_snapshot_tar_path),
-        "max_concurrency": resolve_delivery_patch_max_concurrency(
+    return DeliveryExecutionInput(
+        run_artifacts_root_path=str(run_artifacts_root),
+        workspace_snapshot_tar_path=str(workspace_snapshot_tar_path),
+        max_concurrency=resolve_delivery_patch_max_concurrency(
             len(combined_delivery_execution_items)
         ),
-        "deliveries": delivery_items,
-        "keep_case_ids": [item["case_id"] for item in keep_case_results],
-        "single_delivery_execution_items": single_delivery_execution_items,
-        "combined_delivery_execution_items": combined_delivery_execution_items,
-    }
+        deliveries=delivery_items,
+        keep_case_ids=[item.case_id for item in keep_case_results],
+        single_delivery_execution_items=single_delivery_execution_items,
+        combined_delivery_execution_items=combined_delivery_execution_items,
+    )
 
 
 def persist_delivery_execution_input(
@@ -108,7 +120,7 @@ def persist_delivery_execution_input(
     keep_case_results: Sequence[DeliveryCaseInput],
 ) -> None:
     combined_delivery_count = sum(
-        1 for item in deliveries if delivery_strategy(item) == "combined"
+        1 for item in deliveries if item.strategy == "combined"
     )
     execution_payload = {
         "summary": {
@@ -117,12 +129,12 @@ def persist_delivery_execution_input(
             "keep_case_count": len(keep_case_results),
             "combined_delivery_count": combined_delivery_count,
         },
-        "deliveries": deliveries,
+        "deliveries": [item.model_dump(mode="json") for item in deliveries],
         "cases": [
             {
-                "case_id": item["case_id"],
-                "disposition": item["disposition"],
-                "reason": item.get("reason"),
+                "case_id": item.case_id,
+                "disposition": item.disposition,
+                "reason": item.reason,
             }
             for item in keep_case_results
         ],
@@ -136,9 +148,6 @@ def persist_delivery_execution_input(
 
 __all__ = [
     "build_delivery_execution_input",
-    "combined_delivery_case_view",
-    "delivery_strategy",
     "persist_delivery_execution_input",
     "resolve_delivery_patch_max_concurrency",
-    "single_delivery_case_view",
 ]

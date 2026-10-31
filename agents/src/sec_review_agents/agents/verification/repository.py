@@ -1,4 +1,3 @@
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -22,11 +21,14 @@ from sec_review_agents.resources.loader import (
     join_prompt_sections,
     load_prompt_resource,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.feedback_loop import (
+    FeedbackRetryContext,
+    VerificationRetryPromptContext,
     render_history_projection_section,
     verification_feedback_retry_context,
-    verifier_result_summary,
 )
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.runtime.runtime_config import (
     ExecutionRuntimeContext,
     runtime_workspace_image,
@@ -156,9 +158,9 @@ def build_repository_verification_user_prompt(
     *,
     review_input: str,
     scan_mode: str,
-    retry_context: Mapping[str, Any] | None,
-    analysis_result: Mapping[str, Any],
-    mitigation_result: Mapping[str, Any] | None,
+    retry_context: FeedbackRetryContext | None,
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult | None,
     workspace_patch: str | None,
 ) -> str:
     incremental_scope_rule = (
@@ -167,7 +169,7 @@ def build_repository_verification_user_prompt(
         else None
     )
     feedback_retry = verification_feedback_retry_context(retry_context)
-    if isinstance(feedback_retry, dict):
+    if feedback_retry is not None:
         return _build_retry_repository_verification_user_prompt(
             review_input=review_input,
             mitigation_result=mitigation_result,
@@ -186,12 +188,14 @@ def build_repository_verification_user_prompt(
 
 
 def _mitigation_summary(
-    mitigation_result: Mapping[str, Any] | None,
+    mitigation_result: MitigationStageResult | None,
 ) -> dict[str, Any]:
     return {
-        "overview": (mitigation_result or {}).get("overview"),
+        "overview": (
+            mitigation_result.overview if mitigation_result is not None else None
+        ),
         "changed_files": file_change_paths(
-            (mitigation_result or {}).get("file_changes")
+            mitigation_result.file_changes if mitigation_result is not None else None
         ),
     }
 
@@ -199,8 +203,8 @@ def _mitigation_summary(
 def _build_initial_repository_verification_user_prompt(
     *,
     review_input: str,
-    analysis_result: Mapping[str, Any],
-    mitigation_result: Mapping[str, Any] | None,
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult | None,
     workspace_patch: str | None,
     incremental_scope_rule: str | None,
 ) -> str:
@@ -215,9 +219,9 @@ def _build_initial_repository_verification_user_prompt(
             render_structured_markdown_section(
                 "Analysis Summary",
                 {
-                    "overview": str(analysis_result.get("overview") or "").strip()
+                    "overview": str(analysis_result.overview or "").strip()
                     or "(missing)",
-                    "verdict": analysis_result.get("verdict"),
+                    "verdict": analysis_result.verdict,
                 },
                 profile="prompt",
             ),
@@ -239,13 +243,13 @@ def _build_initial_repository_verification_user_prompt(
 def _build_retry_repository_verification_user_prompt(
     *,
     review_input: str,
-    mitigation_result: Mapping[str, Any] | None,
+    mitigation_result: MitigationStageResult | None,
     workspace_patch: str | None,
     incremental_scope_rule: str | None,
-    feedback_retry: Mapping[str, Any],
+    feedback_retry: VerificationRetryPromptContext,
 ) -> str:
-    latest_verifier = feedback_retry.get("latest_verifier")
-    history = feedback_retry.get("history")
+    latest_verifier = feedback_retry.latest_verifier
+    history = feedback_retry.history
 
     sections = [REPOSITORY_VERIFICATION_RETRY_INTRO]
     if incremental_scope_rule:
@@ -266,14 +270,14 @@ def _build_retry_repository_verification_user_prompt(
         sections.extend(
             ["", "# Workspace Patch", "", code_block("diff", workspace_patch)]
         )
-    latest_verifier_summary = verifier_result_summary(latest_verifier)
+    latest_verifier_summary = latest_verifier
     if latest_verifier_summary is not None:
         sections.extend(
             [
                 "",
                 render_structured_markdown_section(
                     "Previous Verifier Result",
-                    dict(latest_verifier_summary),
+                    latest_verifier_summary.model_dump(mode="json"),
                     profile="prompt",
                 ),
             ]

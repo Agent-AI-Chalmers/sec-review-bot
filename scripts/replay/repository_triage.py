@@ -7,9 +7,9 @@ import asyncio
 import json
 from pathlib import Path
 
+from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
 from sec_review_agents.scan_stages.triage.stage import run_repository_triage_stage
 from sec_review_agents.utils.env import bootstrap_agents_env
-from sec_review_agents.utils.paths import artifact_path
 
 from scripts.replay.input_bundle import materialize_replay_input, read_json
 
@@ -101,20 +101,10 @@ def _resolve_paths(args: argparse.Namespace) -> tuple[Path, Path, Path | None]:
     return input_path, discovery_path, run_artifacts_path
 
 
-def _run_artifacts_path(replay_input: dict, run_artifacts_path: Path | None) -> Path:
+def _run_artifacts_path(run_artifacts_path: Path | None) -> Path:
     if run_artifacts_path is not None:
         return run_artifacts_path
     return Path(".agent-artifacts") / "replay-triage"
-
-
-def _hydrate_artifact_paths(replay_input: dict, run_artifacts_path: Path) -> None:
-    # Stage replay starts after runner input preparation. Hydrate only
-    # prepared-input runtime roots, not caller input.
-    replay_input["artifact_paths"] = {
-        "discovery": str(run_artifacts_path / "discovery"),
-        "triage": str(run_artifacts_path / "triage"),
-        "cases": str(run_artifacts_path / "cases"),
-    }
 
 
 async def main() -> None:
@@ -123,40 +113,36 @@ async def main() -> None:
     input_path, discovery_path, requested_run_artifacts_path = _resolve_paths(args)
 
     public_input = read_json(input_path)
-    discovery_result = read_json(discovery_path)
-    run_artifacts_path = _run_artifacts_path(public_input, requested_run_artifacts_path)
+    discovery_result = DiscoveryResult.model_validate(read_json(discovery_path))
+    run_artifacts_path = _run_artifacts_path(requested_run_artifacts_path)
     replay_input = materialize_replay_input(
-        public_input, workflow="repository-review", artifact_root=run_artifacts_path
+        public_input, artifact_root=run_artifacts_path
     )
 
     triage_result = await run_repository_triage_stage(
-        triage_root=artifact_path(replay_input["artifact_paths"], "triage"),
+        triage_root=Path(replay_input.triage_artifacts_path),
         discovery_result=discovery_result,
         triage_mode=args.triage_mode,
         max_batch_size=args.batch_size,
     )
 
-    triage_artifacts_path = Path(
-        artifact_path(replay_input["artifact_paths"], "triage")
-    ).resolve()
+    triage_artifacts_path = Path(replay_input.triage_artifacts_path).resolve()
     triage_result_path = triage_artifacts_path / "triage-result.json"
-    triage_counts = triage_result.get("counts") or {}
+    triage_counts = triage_result.counts
 
     print(
         json.dumps(
             {
                 "ok": True,
                 "run_id": run_artifacts_path.name,
-                "triage_status": triage_result.get("status"),
+                "triage_status": triage_result.status,
                 "triage_mode": args.triage_mode,
                 "batch_size": (
                     args.batch_size if args.triage_mode == "batched" else None
                 ),
-                "input_candidate_count": triage_counts.get("input_candidate_count"),
-                "case_count": triage_counts.get("case_count"),
-                "suppressed_candidate_count": triage_counts.get(
-                    "suppressed_candidate_count"
-                ),
+                "input_candidate_count": triage_counts.input_candidate_count,
+                "case_count": triage_counts.case_count,
+                "suppressed_candidate_count": triage_counts.suppressed_candidate_count,
                 "triage_result_path": str(triage_result_path),
                 "triage_input_path": str(triage_artifacts_path / "triage-input.json"),
             },

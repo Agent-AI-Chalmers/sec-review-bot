@@ -322,6 +322,7 @@ def test_execution_protocol_does_not_leak_into_workflow_input_consumers() -> Non
 
 
 def test_input_preparation_import_does_not_eagerly_load_upper_layers() -> None:
+    """Preparation consumes data contracts without loading workflow execution or runtime."""
     src_root = str(PACKAGE_ROOT.parent)
     env = {
         **os.environ,
@@ -342,7 +343,15 @@ prefixes = (
     "sec_review_agents.llm",
     "sec_review_agents.runtime",
 )
-print(json.dumps(sorted(name for name in sys.modules if name.startswith(prefixes))))
+data_modules = {
+    "sec_review_agents.workflows",
+    "sec_review_agents.workflows.prepared_input",
+    "sec_review_agents.workflows.review_intent",
+}
+print(json.dumps(sorted(
+    name for name in sys.modules
+    if name.startswith(prefixes) and name not in data_modules
+)))
 """
     result = subprocess.run(
         [sys.executable, "-c", script],
@@ -495,8 +504,8 @@ def test_module_documentation_precedes_imports() -> None:
     assert misplaced == []
 
 
-def test_temporal_connection_creation_has_one_owner() -> None:
-    """Worker and CLI connections share one owner for SDK connection configuration."""
+def test_temporal_connection_protocol_has_one_owner() -> None:
+    """New entrypoints must not bypass the converter configured by temporal.client."""
     owner = PACKAGE_ROOT / "temporal" / "client.py"
     violations: list[str] = []
     for path in PACKAGE_ROOT.rglob("*.py"):
@@ -525,4 +534,5 @@ def test_temporal_connection_creation_has_one_owner() -> None:
                 parts.insert(0, imports.get(value.id, value.id))
                 if ".".join(parts) == "temporalio.client.Client.connect":
                     violations.append(f"{path.relative_to(PACKAGE_ROOT)}:{node.lineno}")
+        violations.extend(import_violations(path, ("temporalio.contrib.pydantic",)))
     assert violations == []

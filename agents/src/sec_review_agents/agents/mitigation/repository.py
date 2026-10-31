@@ -1,6 +1,4 @@
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from sec_review_agents.agents.mitigation.external_tools import (
     MITIGATION_AGENT_EXTERNAL_TOOLS,
@@ -22,7 +20,9 @@ from sec_review_agents.resources.loader import (
     join_prompt_sections,
     load_prompt_resource,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.feedback_loop import (
+    FeedbackRetryContext,
     mitigation_feedback_retry_context,
     render_retry_revision_context_section,
 )
@@ -143,8 +143,8 @@ def build_repository_mitigation_user_prompt(
     *,
     review_input: str,
     scan_mode: str,
-    retry_context: Mapping[str, Any] | None,
-    analysis_result: Mapping[str, Any],
+    retry_context: FeedbackRetryContext | None,
+    analysis_result: AnalysisStageResult,
 ) -> str:
     incremental_scope_rule = (
         load_prompt_resource("shared/incremental-window-scope-rule.md")
@@ -156,7 +156,7 @@ def build_repository_mitigation_user_prompt(
     sections = [
         (
             REPOSITORY_MITIGATION_RETRY_INTRO
-            if isinstance(feedback_retry, dict)
+            if feedback_retry is not None
             else REPOSITORY_MITIGATION_INITIAL_INTRO
         )
     ]
@@ -171,7 +171,7 @@ def build_repository_mitigation_user_prompt(
             "",
             render_structured_markdown_section(
                 "Analyzer Context",
-                analysis_result,
+                analysis_result.model_dump(mode="json", by_alias=True),
                 profile="prompt",
             ),
         ]

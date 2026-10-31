@@ -1,6 +1,4 @@
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from sec_review_agents.agents.verification.repository import (
     build_repository_verification_backend_config,
@@ -8,6 +6,10 @@ from sec_review_agents.agents.verification.repository import (
     build_repository_verification_system_prompt,
     build_repository_verification_user_prompt,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
+from sec_review_agents.review_stages.feedback_loop import FeedbackRetryContext
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
+from sec_review_agents.review_stages.verification.result import VerificationStageResult
 from sec_review_agents.review_stages.verification.stage import (
     reset_verification_attempt_artifacts,
     run_verification_stage,
@@ -25,18 +27,18 @@ async def verify_repository_case(
     published_trajectory_path: Path | None = None,
     scan_mode: str,
     review_input: str,
-    analysis_result: Mapping[str, Any],
-    mitigation_result: Mapping[str, Any] | None,
-    retry_context: Mapping[str, Any] | None = None,
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult | None,
+    retry_context: FeedbackRetryContext | None = None,
     runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> VerificationStageResult:
     attempt_label = verification_attempt_label(retry_context)
     reset_verification_attempt_artifacts(
         verifier_artifacts_path,
         attempt_label=attempt_label,
     )
-    patch_diff = (mitigation_result or {}).get("patch_diff")
+    patch_diff = mitigation_result.patch_diff if mitigation_result is not None else None
     workspace_patch = (
         patch_diff if isinstance(patch_diff, str) and patch_diff.strip() else None
     )
@@ -45,7 +47,7 @@ async def verify_repository_case(
         scan_mode=scan_mode,
         retry_context=retry_context,
         analysis_result=analysis_result,
-        mitigation_result=mitigation_result or {},
+        mitigation_result=mitigation_result,
         workspace_patch=workspace_patch,
     )
     return await run_verification_stage(
@@ -65,7 +67,7 @@ async def verify_repository_case(
             runtime_context=runtime_context,
         ),
         system_prompt=build_repository_verification_system_prompt(
-            is_retry=isinstance(retry_context, Mapping)
+            is_retry=retry_context is not None
         ),
         filesystem_system_prompt=build_repository_verification_filesystem_system_prompt(
             scan_mode
