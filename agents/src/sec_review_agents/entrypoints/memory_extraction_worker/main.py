@@ -10,7 +10,7 @@ from sec_review_agents.entrypoints.memory_extraction_worker.workflows import (
     WORKFLOWS,
 )
 from sec_review_agents.temporal.config import DEFAULT_MEMORY_EXTRACTION_TASK_QUEUE
-from sec_review_agents.temporal.worker_runtime import connect_temporal_client
+from sec_review_agents.temporal.worker_runtime import connect_worker_client
 from sec_review_agents.utils.env import int_env
 
 DEFAULT_MAX_CONCURRENT_ACTIVITIES = 4
@@ -22,7 +22,7 @@ async def run_worker() -> None:
         DEFAULT_MAX_CONCURRENT_ACTIVITIES,
         minimum=1,
     )
-    client = await connect_temporal_client()
+    client = await connect_worker_client()
     with ThreadPoolExecutor(max_workers=max_concurrent_activities) as executor:
         worker = Worker(
             client,

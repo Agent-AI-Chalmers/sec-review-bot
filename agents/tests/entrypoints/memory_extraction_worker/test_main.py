@@ -32,7 +32,7 @@ async def test_extraction_worker_owns_only_extraction_registration(monkeypatch) 
         async def run(self) -> None:
             return None
 
-    monkeypatch.setattr(worker_module, "connect_temporal_client", AsyncMock())
+    monkeypatch.setattr(worker_module, "connect_worker_client", AsyncMock())
     monkeypatch.setattr(worker_module, "ThreadPoolExecutor", FakeExecutor)
     monkeypatch.setattr(worker_module, "Worker", FakeWorker)
 
@@ -56,7 +56,7 @@ async def test_extraction_worker_rejects_invalid_concurrency_before_connecting(
         "many",
     )
     connect = AsyncMock()
-    monkeypatch.setattr(worker_module, "connect_temporal_client", connect)
+    monkeypatch.setattr(worker_module, "connect_worker_client", connect)
 
     with pytest.raises(
         ValueError,

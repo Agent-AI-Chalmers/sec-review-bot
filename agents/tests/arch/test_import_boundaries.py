@@ -493,3 +493,36 @@ def test_module_documentation_precedes_imports() -> None:
             ):
                 misplaced.append(f"{path.relative_to(PACKAGE_ROOT)}:{node.lineno}")
     assert misplaced == []
+
+
+def test_temporal_connection_creation_has_one_owner() -> None:
+    """Worker and CLI connections share one owner for SDK connection configuration."""
+    owner = PACKAGE_ROOT / "temporal" / "client.py"
+    violations: list[str] = []
+    for path in PACKAGE_ROOT.rglob("*.py"):
+        if path == owner:
+            continue
+        tree = ast.parse(path.read_text(), filename=str(path))
+        imports: dict[str, str] = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ImportFrom):
+                for alias in node.names:
+                    imports[alias.asname or alias.name] = f"{node.module}.{alias.name}"
+            elif isinstance(node, ast.Import):
+                for alias in node.names:
+                    imports[alias.asname or alias.name.split(".")[0]] = (
+                        alias.name if alias.asname else alias.name.split(".")[0]
+                    )
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Attribute):
+                continue
+            parts = [node.attr]
+            value = node.value
+            while isinstance(value, ast.Attribute):
+                parts.insert(0, value.attr)
+                value = value.value
+            if isinstance(value, ast.Name):
+                parts.insert(0, imports.get(value.id, value.id))
+                if ".".join(parts) == "temporalio.client.Client.connect":
+                    violations.append(f"{path.relative_to(PACKAGE_ROOT)}:{node.lineno}")
+    assert violations == []

@@ -131,7 +131,9 @@ async def test_manual_maintenance_starts_singleton_workflow(monkeypatch) -> None
     start = AsyncMock()
     client = AsyncMock()
     client.start_workflow = start
-    monkeypatch.setattr(memory.Client, "connect", AsyncMock(return_value=client))
+    monkeypatch.setattr(
+        memory, "connect_temporal_client", AsyncMock(return_value=client)
+    )
     args = Namespace(
         temporal_address="temporal:7233",
         temporal_namespace="default",
@@ -152,7 +154,9 @@ async def test_manual_maintenance_starts_singleton_workflow(monkeypatch) -> None
 @pytest.mark.asyncio
 async def test_schedule_ensure_uses_maintenance_contract(monkeypatch) -> None:
     client = object()
-    monkeypatch.setattr(memory.Client, "connect", AsyncMock(return_value=client))
+    monkeypatch.setattr(
+        memory, "connect_temporal_client", AsyncMock(return_value=client)
+    )
     ensure = AsyncMock(
         return_value={
             "action": "created",
