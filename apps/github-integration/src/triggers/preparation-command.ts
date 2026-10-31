@@ -46,8 +46,7 @@ export interface PreparationCommandStore extends InputBundlePublicationStore {
     ...args: Parameters<typeof reviewRunsClient.renewPreparationClaim>
   ) => Promise<boolean>
   preparationHeartbeatIntervalMs: typeof reviewRunsClient.preparationHeartbeatIntervalMs
-  /** Available only on clients that can checkpoint the connector's input mid-preparation. */
-  checkpointPreparationInput?: (
+  checkpointPreparationInput: (
     ...args: Parameters<typeof reviewRunsClient.checkpointPreparationInput>
   ) => Promise<void>
 }
@@ -147,8 +146,6 @@ export async function runPreparationCommand<P>({
     const prepared = await prepare_review({
       run_id,
       checkpoint: async (preparation_input) => {
-        if (store.checkpointPreparationInput === undefined)
-          throw new Error('Preparation input checkpointing is unavailable.')
         await store.checkpointPreparationInput(
           run_id,
           preparationToken,

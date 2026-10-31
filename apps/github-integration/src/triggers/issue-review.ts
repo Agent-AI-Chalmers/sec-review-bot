@@ -18,7 +18,10 @@ import {
   type PreparationCommandStore
 } from './preparation-command.js'
 
-type IssueReviewEventType = 'opened' | 'manual_review'
+import type {
+  IssueReviewEventType,
+  IssuePreparationInput
+} from '../review-runs/preparation-input.js'
 interface StartIssueReviewCommandDeps {
   prepare_review: typeof prepareIssueReview
   store: PreparationCommandStore
@@ -73,7 +76,7 @@ export async function startIssueReviewCommand({
       review_objective,
       test_changes,
       open_pr
-    }
+    } satisfies IssuePreparationInput
   }
   const started = await runPreparationCommand<PreparedIssueReviewRun>({
     store,

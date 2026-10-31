@@ -9,6 +9,11 @@ import { inputBundlePublicationStore } from '../input-bundle-publication-store.j
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import {
+  parseIssuePreparationInput,
+  parsePullRequestPreparationInput
+} from '../../src/review-runs/preparation-input.js'
+import { extractIssueContext } from '../../src/github/issue-service.js'
 import { startIssueReviewCommand } from '../../src/triggers/issue-review.js'
 import { startPullRequestReviewCommand } from '../../src/triggers/pull-request-review.js'
 import type { PreparedPullRequestReviewRun } from '../../src/reviews/pull-requests/prepare-review.js'
@@ -90,6 +95,8 @@ const TRUSTED_DEFAULT_BRANCH = {
 }
 
 const preparationClaim = {
+  checkpointPreparationInput: async () =>
+    assert.fail('snapshot input must not need checkpointing'),
   ...inputBundlePublicationStore(),
   renewPreparationClaim: async () => true,
   preparationHeartbeatIntervalMs: async () => 60_000
@@ -553,22 +560,16 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
       trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
       event_type: 'manual_review',
       delivery_id: 'delivery-context-failure',
-      preparation_input: {
-        kind: 'github_pull_request_review',
-        pr_reference: {
-          owner_login: 'octo',
-          repo_name: 'example',
-          pr_number: 7
-        },
-        trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
-        event_type: 'manual_review',
-        test_changes: null
-      },
-      resolve_pr: async () => {
-        transitions.push(['context'])
-        throw new Error('GitHub PR lookup failed')
+      pr_reference: {
+        owner_login: 'octo',
+        repo_name: 'example',
+        pr_number: 7
       },
       deps: {
+        get_pull_request_context: async () => {
+          transitions.push(['context'])
+          throw new Error('GitHub PR lookup failed')
+        },
         prepare_review: async () =>
           assert.fail('review must not start without PR context'),
         store: {
@@ -602,74 +603,75 @@ test('startPullRequestReviewCommand admits a comment delivery before loading PR 
   ])
 })
 
-test('startPullRequestReviewCommand checkpoints a resolved comment PR before preparation', async () => {
-  const pr = pullRequestContext()
-  const checkpoints: unknown[][] = []
-  await startPullRequestReviewCommand({
-    octokit: unusedGitHub().octokit,
-    trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
-    event_type: 'manual_review',
-    delivery_id: 'delivery-checkpoint',
-    preparation_input: {
-      kind: 'github_pull_request_review',
+for (const recovering of [false, true]) {
+  test(`startPullRequestReviewCommand checkpoints a resolved comment PR before preparation (recovery: ${recovering})`, async () => {
+    const pr = pullRequestContext()
+    const checkpoints: unknown[][] = []
+    await startPullRequestReviewCommand({
+      octokit: unusedGitHub().octokit,
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
+      event_type: 'manual_review',
+      delivery_id: 'delivery-checkpoint',
+      ...(recovering
+        ? { claimed_preparation: { run_id: 'run-checkpoint', token: 'claim' } }
+        : {}),
       pr_reference: {
         owner_login: 'octo',
         repo_name: 'example-repo',
         pr_number: 7
       },
-      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
-      event_type: 'manual_review',
-      test_changes: null
-    },
-    resolve_pr: async () => pr,
-    deps: {
-      prepare_review: async ({ pr: preparedPr }) => {
-        assert.strictEqual(preparedPr, pr)
-        assert.strictEqual(checkpoints.length, 1)
-        const review = {
-          pr: preparedPr,
-          run_id: 'run-checkpoint',
-          files: [],
-          workflow: 'pull-request-review',
-          event_type: 'manual_review'
-        } satisfies PreparedPullRequestReviewRun
-        return { review, input: pullRequestReviewInput() }
-      },
-      store: {
-        ...preparationClaim,
-        admitReviewRun: (run) =>
-          ({
-            record: admittedRecord({ ...run, run_id: 'run-checkpoint' }),
-            created: true,
-            preparation_token: 'claim'
-          }) satisfies ReviewRunAdmission,
-        checkpointPreparationInput: async (...args) => {
-          checkpoints.push(args)
+      deps: {
+        get_pull_request_context: async () => pr,
+        prepare_review: async ({ pr: preparedPr }) => {
+          assert.strictEqual(preparedPr, pr)
+          assert.strictEqual(checkpoints.length, 1)
+          const review = {
+            pr: preparedPr,
+            run_id: 'run-checkpoint',
+            files: [],
+            workflow: 'pull-request-review',
+            event_type: 'manual_review'
+          } satisfies PreparedPullRequestReviewRun
+          return { review, input: pullRequestReviewInput() }
         },
-        submitPreparedRun: () => {},
-        failPreparation: () => assert.fail('checkpointed review must not fail')
+        store: {
+          ...preparationClaim,
+          admitReviewRun: (run) => {
+            assert.equal(recovering, false, 'recovery must reuse its claim')
+            return {
+              record: admittedRecord({ ...run, run_id: 'run-checkpoint' }),
+              created: true,
+              preparation_token: 'claim'
+            } satisfies ReviewRunAdmission
+          },
+          checkpointPreparationInput: async (...args) => {
+            const recovered = parsePullRequestPreparationInput(
+              JSON.parse(JSON.stringify(args[2]))
+            )
+            assert.deepEqual(recovered.pr, pr)
+            checkpoints.push(args)
+          },
+          submitPreparedRun: () => {},
+          failPreparation: () =>
+            assert.fail('checkpointed review must not fail')
+        }
       }
-    }
+    })
+    assert.deepStrictEqual(checkpoints, [
+      [
+        'run-checkpoint',
+        'claim',
+        {
+          kind: 'github_pull_request_review',
+          trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
+          event_type: 'manual_review',
+          test_changes: null,
+          pr
+        }
+      ]
+    ])
   })
-  assert.deepStrictEqual(checkpoints, [
-    [
-      'run-checkpoint',
-      'claim',
-      {
-        kind: 'github_pull_request_review',
-        pr_reference: {
-          owner_login: 'octo',
-          repo_name: 'example-repo',
-          pr_number: 7
-        },
-        trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
-        event_type: 'manual_review',
-        test_changes: null,
-        pr
-      }
-    ]
-  ])
-})
+}
 
 test('startPullRequestReviewCommand reuses a webhook delivery without starting another review', async () => {
   let starts = 0
@@ -862,3 +864,93 @@ function withoutPreparationInput<
   delete rest.preparation_input_version
   return rest
 }
+
+test('admission output roundtrips through recovery using the actual issue producer', async () => {
+  const issue = extractIssueContext({
+    action: 'opened',
+    repository: {
+      name: 'example',
+      full_name: 'octo/example',
+      owner: { login: 'octo' },
+      default_branch: 'main'
+    },
+    issue: { number: 1, title: 'Claim', state: 'open' }
+  })
+  let parsed = false
+  await startIssueReviewCommand({
+    octokit: unusedGitHub().octokit,
+    issue,
+    trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
+    event_type: 'manual_review',
+    review_objective: 'repair',
+    test_changes: 'deny',
+    open_pr: true,
+    delivery_id: 'roundtrip',
+    deps: {
+      store: {
+        ...preparationClaim,
+        admitReviewRun: (run) => {
+          const recovered = parseIssuePreparationInput(
+            JSON.parse(JSON.stringify(run.preparation_input))
+          )
+          assert.deepEqual(recovered.issue, issue)
+          assert.equal(recovered.review_objective, 'repair')
+          assert.equal(recovered.test_changes, 'deny')
+          assert.equal(recovered.open_pr, true)
+          parsed = true
+          return {
+            record: admittedRecord({ ...run, run_id: 'roundtrip' }),
+            created: false,
+            preparation_token: null
+          }
+        },
+        submitPreparedRun: () => assert.fail('a replay must not submit'),
+        failPreparation: () => assert.fail('a replay must not fail')
+      }
+    }
+  })
+  assert.equal(parsed, true)
+})
+
+test('a failed PR checkpoint prevents preparation and submission', async () => {
+  const error = new Error('checkpoint transport failed')
+  const failures: unknown[][] = []
+  await assert.rejects(
+    startPullRequestReviewCommand({
+      octokit: unusedGitHub().octokit,
+      pr_reference: {
+        owner_login: 'octo',
+        repo_name: 'example-repo',
+        pr_number: 7
+      },
+      trusted_default_branch: TRUSTED_DEFAULT_BRANCH,
+      event_type: 'manual_review',
+      delivery_id: 'checkpoint-failure',
+      claimed_preparation: { run_id: 'existing-run', token: 'claim' },
+      deps: {
+        get_pull_request_context: async () => pullRequestContext(),
+        prepare_review: async () =>
+          assert.fail('an uncheckpointed snapshot must not prepare'),
+        store: {
+          ...preparationClaim,
+          admitReviewRun: () => assert.fail('a retry must not admit again'),
+          checkpointPreparationInput: async () => {
+            throw error
+          },
+          submitPreparedRun: () =>
+            assert.fail('an uncheckpointed snapshot must not submit'),
+          failPreparation: (...args) => {
+            failures.push(args)
+          }
+        }
+      }
+    }),
+    error
+  )
+  assert.equal(failures.length, 1)
+  assert.deepEqual(failures[0]?.slice(0, 3), [
+    'existing-run',
+    'claim',
+    { code: 'REVIEW_START_FAILED', message: error.message }
+  ])
+})

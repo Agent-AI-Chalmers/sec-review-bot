@@ -126,8 +126,8 @@ export async function handlePullRequestOpenedWithDeps(
   }
 
   if (pr.is_draft) {
-    // Draft PR 在默认策略下不做首次自动审查，
-    // 等作者显式切到 ready_for_review 再进入完整 workflow。
+    // Skip the initial automatic review for draft PRs; wait until the author
+    // explicitly marks the PR ready_for_review before starting a full review.
     logInfo('workflow_skipped', {
       event: 'pull_request.opened',
       pr: pr.pr_number,
@@ -137,26 +137,22 @@ export async function handlePullRequestOpenedWithDeps(
   }
 
   try {
-    let resolveAdmission: (() => void) | undefined
-    const admitted = new Promise<void>((resolve) => {
-      resolveAdmission = resolve
-    })
-    const preparation = startPullRequestReviewCommandFn({
-      octokit,
-      trusted_default_branch,
-      pr,
-      event_type: 'opened',
-      delivery_id: id,
-      on_admitted: () => {
-        resolveAdmission?.()
+    await backgroundPreparations.startAndWaitForAdmission(
+      (on_admitted) =>
+        startPullRequestReviewCommandFn({
+          octokit,
+          trusted_default_branch,
+          pr,
+          event_type: 'opened',
+          delivery_id: id,
+          on_admitted
+        }),
+      {
+        ingress: 'pull_request.opened',
+        pr: pr.pr_number,
+        repo: pr.repo_full_name
       }
-    })
-    backgroundPreparations.start(preparation, {
-      ingress: 'pull_request.opened',
-      pr: pr.pr_number,
-      repo: pr.repo_full_name
-    })
-    await Promise.race([admitted, preparation])
+    )
   } catch (error: unknown) {
     const errorInfo = asErrorWithResponse(error)
 

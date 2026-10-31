@@ -257,12 +257,16 @@ test('issue-comment-created starts pull request manual review for write commente
       authorizeManualCommentCommandFn: async () => authorizationDecision(),
       getPullRequestContextFn: async () => pullRequestContext(),
       startPullRequestReviewCommandFn: async ({
-        resolve_pr,
+        octokit,
+        pr_reference,
+        deps,
         trusted_default_branch
       }) => {
         pullRequestReviewCalled = true
         forwarded_trusted = trusted_default_branch
-        const pr = await resolve_pr?.()
+        assert.ok(pr_reference)
+        assert.ok(deps?.get_pull_request_context)
+        const pr = await deps.get_pull_request_context(octokit, pr_reference)
         assert.ok(pr)
         return submittedPullRequestRun(pr)
       }
@@ -299,16 +303,25 @@ test('issue-comment-created delegates PR context loading until after command adm
         contextLoaded = true
         throw new Error('GitHub PR lookup failed')
       },
-      startPullRequestReviewCommandFn: async ({ resolve_pr, on_admitted }) => {
+      startPullRequestReviewCommandFn: async ({
+        octokit,
+        pr_reference,
+        deps,
+        on_admitted
+      }) => {
         commandStarted = true
         assert.strictEqual(contextLoaded, false)
-        assert.ok(resolve_pr)
+        assert.ok(pr_reference)
+        assert.ok(deps?.get_pull_request_context)
         on_admitted?.({
           run_id: 'run-pr-context',
           status: 'pending',
           replayed: false
         })
-        await assert.rejects(resolve_pr(), /GitHub PR lookup failed/)
+        await assert.rejects(
+          deps.get_pull_request_context(octokit, pr_reference),
+          /GitHub PR lookup failed/
+        )
         return { run_id: 'run-pr-context' }
       }
     }

@@ -17,6 +17,8 @@ const admission = {
 function claimedStore(): PreparationCommandStore {
   return {
     ...inputBundlePublicationStore(),
+    checkpointPreparationInput: async () =>
+      assert.fail('this command must not checkpoint'),
     admitReviewRun: () => assert.fail('a claimed retry must not admit again'),
     renewPreparationClaim: async () => true,
     preparationHeartbeatIntervalMs: async () => 60_000,
