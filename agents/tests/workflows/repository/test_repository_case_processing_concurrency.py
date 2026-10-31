@@ -19,6 +19,15 @@ from sec_review_agents.review_stages.cvss.result import (
 from sec_review_agents.review_stages.feedback_loop import FeedbackRetryContext
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.verification.result import VerificationStageResult
+from sec_review_agents.scan_stages.discovery.input import (
+    DiscoveryChunk,
+    DiscoveryManifest,
+)
+from sec_review_agents.scan_stages.discovery.result import (
+    DiscoveryChunkResult,
+    DiscoveryResult,
+)
+from sec_review_agents.scan_stages.triage.result import TriageResult
 from sec_review_agents.workflows.repository import direct as repository_direct
 from sec_review_agents.workflows.repository.workflow import (
     RepositoryCaseProcessingWorkflow,
@@ -38,6 +47,7 @@ from sec_review_agents.workflows.repository_case.workflow import (
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from tests.analysis_fixtures import analysis_fixture, narrative_fixture
+from tests.repository_scan_fixtures import scan_result_fixture
 from tests.temporal_test_utils import temporal_time_skipping_environment
 
 
@@ -194,8 +204,48 @@ async def test_case_verification_activity_persists_skip_without_running_verifier
 @pytest.mark.asyncio
 async def test_direct_repository_scan_awaits_async_triage_activity() -> None:
     request = _review_workflow_request()
-    discovery_result = {"candidates": [{"candidate_id": "candidate-a"}]}
-    triage_result = {"cases": [{"case_id": "case-a"}]}
+    from sec_review_agents.scan_stages.discovery.stage import (
+        build_discovery_result_from_chunks,
+    )
+
+    discovery_result = build_discovery_result_from_chunks(
+        entries=[],
+        skipped_files=[],
+        chunks=[],
+        chunk_results=[],
+        scan_mode="full",
+        deployment_input_limit_tokens=1000,
+        chunk_target_tokens=200,
+        chunk_target_ratio="1/5",
+        chunk_hard_limit_tokens=800,
+        discovery_concurrency=1,
+    )
+    triage_result = TriageResult.model_validate(
+        {
+            "status": "completed",
+            "metadata": {
+                "triage_mode": "single",
+                "triage_pass_count": 1,
+                "batch_size": None,
+            },
+            "counts": {
+                "input_candidate_count": 1,
+                "case_count": 1,
+                "suppressed_candidate_count": 0,
+            },
+            "cases": [
+                {
+                    "case_id": "case-a",
+                    "category": "test",
+                    "summary": "test",
+                    "evidence": [],
+                    "member_candidate_ids": [],
+                    "anchor_locations": [],
+                }
+            ],
+            "suppressed_candidates": [],
+        }
+    )
 
     async def fake_triage(_request, _discovery_result):
         assert _request is request
@@ -216,22 +266,36 @@ async def test_direct_repository_scan_awaits_async_triage_activity() -> None:
     ):
         result = await repository_direct.run_repository_scan_direct(request)
 
-    assert result == {
-        "discovery_result": discovery_result,
-        "triage_result": triage_result,
-        "deleted_file_count": 0,
-        "deletion_review_skipped": False,
-    }
+    assert result.discovery_result is discovery_result
+    assert result.triage_result is triage_result
+    assert result.deleted_file_count == 0
+    assert result.deletion_review_skipped is False
 
 
 @pytest.mark.asyncio
 async def test_direct_repository_discovery_refills_sliding_window() -> None:
-    chunks = [{"chunk_id": f"chunk-{index}"} for index in range(4)]
+    chunks = [
+        DiscoveryChunk(chunk_id=f"chunk-{index}", entries=[], token_count=0)
+        for index in range(4)
+    ]
     active_count = 0
     max_active_count = 0
 
     def fake_build_manifest(_request):
-        return {"max_concurrency": 2, "chunks": chunks}
+        return DiscoveryManifest(
+            workspace_root="/tmp/source",
+            discovery_artifacts_path="/tmp/discovery",
+            scan_mode="full",
+            entries=[],
+            skipped_files=[],
+            chunks=chunks,
+            deployment_input_limit_tokens=1000,
+            chunk_target_tokens=200,
+            chunk_target_ratio="1/5",
+            chunk_hard_limit_tokens=800,
+            chunk_strategy="batched",
+            max_concurrency=2,
+        )
 
     async def fake_scan_chunk(_request, _manifest, chunk):
         nonlocal active_count, max_active_count
@@ -239,7 +303,7 @@ async def test_direct_repository_discovery_refills_sliding_window() -> None:
         max_active_count = max(max_active_count, active_count)
         await asyncio.sleep(0)
         active_count -= 1
-        return {"chunk_id": chunk["chunk_id"]}
+        return {"chunk_id": chunk.chunk_id}
 
     def fake_build_result(_manifest, chunk_results):
         return {"chunk_ids": [item["chunk_id"] for item in chunk_results]}
@@ -460,7 +524,7 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
                                 timeout_seconds=30,
                                 runtime_context={},
                             ),
-                            {"triage_result": {"cases": [{}, {}, {}]}},
+                            scan_result_fixture(case_count=3),
                         ],
                         id="repository-review-concurrency-test",
                         task_queue="repository-review-concurrency-test",
@@ -520,7 +584,7 @@ async def test_direct_repository_review_isolates_case_failure() -> None:
                 timeout_seconds=30,
                 runtime_context={},
             ),
-            {"triage_result": {"cases": [{}, {}, {}]}},
+            scan_result_fixture(case_count=3),
         )
 
     assert [item["case_id"] for item in results] == ["case-1", "case-2", "case-3"]
@@ -572,7 +636,7 @@ async def test_direct_repository_case_review_fanout_is_bounded() -> None:
                 timeout_seconds=30,
                 runtime_context={},
             ),
-            {"triage_result": {"cases": [{}, {}, {}, {}, {}]}},
+            scan_result_fixture(case_count=5),
         )
 
     assert [item["case_id"] for item in results] == [
@@ -595,57 +659,77 @@ async def test_repository_discovery_workflow_refills_chunk_window(
     @activity.defn(name="build_repository_discovery_manifest_activity")
     def fake_build_discovery_manifest(
         _request: ReviewWorkflowRequest,
-    ) -> dict:
-        return {
-            "workspace_root": str(tmp_path),
-            "discovery_artifacts_path": str(tmp_path / "discovery"),
-            "chunk_strategy": "batched",
-            "entries": [],
-            "skipped_files": [],
-            "chunks": [
-                {"chunk_id": "discovery-chunk-0001", "entries": [], "token_count": 0},
-                {"chunk_id": "discovery-chunk-0002", "entries": [], "token_count": 0},
-                {"chunk_id": "discovery-chunk-0003", "entries": [], "token_count": 0},
-            ],
-            "deployment_input_limit_tokens": 625_000,
-            "chunk_target_tokens": 100_000,
-            "chunk_target_ratio": "1/5",
-            "chunk_hard_limit_tokens": 500_000,
-            "max_concurrency": 2,
-            "scan_mode": "full",
-        }
+    ) -> DiscoveryManifest:
+        return DiscoveryManifest.model_validate(
+            {
+                "workspace_root": str(tmp_path),
+                "discovery_artifacts_path": str(tmp_path / "discovery"),
+                "chunk_strategy": "batched",
+                "entries": [],
+                "skipped_files": [],
+                "chunks": [
+                    DiscoveryChunk.model_validate(
+                        {
+                            "chunk_id": "discovery-chunk-0001",
+                            "entries": [],
+                            "token_count": 0,
+                        }
+                    ),
+                    DiscoveryChunk.model_validate(
+                        {
+                            "chunk_id": "discovery-chunk-0002",
+                            "entries": [],
+                            "token_count": 0,
+                        }
+                    ),
+                    DiscoveryChunk.model_validate(
+                        {
+                            "chunk_id": "discovery-chunk-0003",
+                            "entries": [],
+                            "token_count": 0,
+                        }
+                    ),
+                ],
+                "deployment_input_limit_tokens": 625_000,
+                "chunk_target_tokens": 100_000,
+                "chunk_target_ratio": "1/5",
+                "chunk_hard_limit_tokens": 500_000,
+                "max_concurrency": 2,
+                "scan_mode": "full",
+            }
+        )
 
     @activity.defn(name="scan_repository_discovery_chunk_activity")
     def fake_scan_discovery_chunk(
         _request: ReviewWorkflowRequest,
-        _manifest: dict,
-        chunk: dict,
-    ) -> dict:
-        chunk_id = chunk["chunk_id"]
+        _manifest: DiscoveryManifest,
+        chunk: DiscoveryChunk,
+    ) -> DiscoveryChunkResult:
+        chunk_id = chunk.chunk_id
         if chunk_id == "discovery-chunk-0001" and not chunk_3_started.wait(2.0):
             raise RuntimeError("discovery chunk window was not refilled")
         if chunk_id == "discovery-chunk-0003":
             chunk_3_started.set()
-        return {
-            "chunk_id": chunk_id,
-            "file_candidates": [],
-            "file_results": [],
-            "skipped_files": [],
-        }
+        return DiscoveryChunkResult.model_validate(
+            {
+                "chunk_id": chunk_id,
+                "file_candidates": [],
+                "file_results": [],
+                "skipped_files": [],
+            }
+        )
 
     @activity.defn(name="build_repository_discovery_result_activity")
     def fake_build_discovery_result(
-        _manifest: dict,
-        chunk_results: list[dict],
-    ) -> dict:
+        _manifest: DiscoveryManifest,
+        chunk_results: list[DiscoveryChunkResult],
+    ) -> DiscoveryResult:
         from sec_review_agents.workflows.repository.workflow import (
             build_repository_discovery_result_activity,
         )
 
-        observed_chunk_ids.extend(item["chunk_id"] for item in chunk_results)
-        return dict(
-            build_repository_discovery_result_activity(_manifest, chunk_results)
-        )
+        observed_chunk_ids.extend(item.chunk_id for item in chunk_results)
+        return build_repository_discovery_result_activity(_manifest, chunk_results)
 
     async def run_workflow() -> dict:
         async with temporal_time_skipping_environment() as env:

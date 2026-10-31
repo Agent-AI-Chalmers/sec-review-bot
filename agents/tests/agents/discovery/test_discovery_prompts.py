@@ -3,16 +3,20 @@ import json
 from sec_review_agents.agents.discovery.prompts import (
     build_repository_discovery_user_prompt,
 )
+from sec_review_agents.scan_stages.discovery.input import DiscoveryEntry
 
 
 def test_discovery_prompt_exposes_chunk_runtime_boundary() -> None:
     prompt = build_repository_discovery_user_prompt(
-        chunk={
-            "chunk_id": "discovery-chunk-0001",
-            "entries": [
-                {"path": "src/app.ts", "language": "typescript", "size_bytes": 123}
-            ],
-        },
+        chunk_id="discovery-chunk-0001",
+        entries=[
+            DiscoveryEntry(
+                path="src/app.ts",
+                language="typescript",
+                size_bytes=123,
+                include_reason="text-candidate",
+            )
+        ],
         scan_virtual_path="/scan-target",
         sources={"src/app.ts": "console.log('hi')"},
     )

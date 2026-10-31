@@ -1,5 +1,9 @@
 import pytest
 
+from sec_review_agents.agents.discovery.model import (
+    DiscoveryCandidate,
+    DiscoveryLocation,
+)
 from sec_review_agents.agents.triage.workbench_state import (
     TriageWorkbenchState,
     build_case_from_candidates,
@@ -7,44 +11,60 @@ from sec_review_agents.agents.triage.workbench_state import (
 from sec_review_agents.agents.triage.workbench_tools import (
     build_triage_workbench_tools,
 )
+from sec_review_agents.scan_stages.discovery.result import DiscoveryCandidateResult
 
 
 def test_case_id_includes_candidate_id() -> None:
-    base_candidate = {
-        "category": "xss",
-        "locations": [{"file": "app/views.py", "line": 10, "label": "sink"}],
-        "evidence": ["render_template_string(user_input)"],
-    }
+    base_candidate = DiscoveryCandidate(
+        category="xss",
+        description="Candidate signal",
+        locations=[DiscoveryLocation(file="app/views.py", line=10, label="sink")],
+        evidence=["render_template_string(user_input)"],
+    )
     first = build_case_from_candidates(
         category="xss",
         summary="First",
         evidence=["render_template_string(user_input)"],
-        member_candidates=[{**base_candidate, "candidate_id": "cand-a"}],
+        member_candidates=[
+            DiscoveryCandidateResult(
+                candidate_id="cand-a",
+                candidate=base_candidate,
+                grounding_status="grounded",
+            )
+        ],
     )
     second = build_case_from_candidates(
         category="xss",
         summary="Second",
         evidence=["render_template_string(user_input)"],
-        member_candidates=[{**base_candidate, "candidate_id": "cand-b"}],
+        member_candidates=[
+            DiscoveryCandidateResult(
+                candidate_id="cand-b",
+                candidate=base_candidate,
+                grounding_status="grounded",
+            )
+        ],
     )
 
-    assert first["case_id"] != second["case_id"]
+    assert first.case_id != second.case_id
 
 
 def test_case_build_preserves_all_member_candidate_locations() -> None:
     candidates = [
-        {
-            "candidate_id": f"cand-{index}",
-            "category": "xss",
-            "locations": [
-                {
-                    "file": f"app/file_{index}.py",
-                    "line": index,
-                    "label": f"sink {index}",
-                }
-            ],
-            "evidence": [f"evidence {index}"],
-        }
+        DiscoveryCandidateResult(
+            candidate_id=f"cand-{index}",
+            candidate=DiscoveryCandidate(
+                category="xss",
+                description="Candidate signal",
+                locations=[
+                    DiscoveryLocation(
+                        file=f"app/file_{index}.py", line=index, label=f"sink {index}"
+                    )
+                ],
+                evidence=[f"evidence {index}"],
+            ),
+            grounding_status="grounded",
+        )
         for index in range(1, 6)
     ]
 
@@ -55,7 +75,7 @@ def test_case_build_preserves_all_member_candidate_locations() -> None:
         member_candidates=candidates,
     )
 
-    assert [item["label"] for item in case["anchor_locations"]] == [
+    assert [item.label for item in case.anchor_locations] == [
         "sink 1",
         "sink 2",
         "sink 3",
@@ -67,20 +87,28 @@ def test_case_build_preserves_all_member_candidate_locations() -> None:
 def test_triage_workbench_state_exports_cases_and_suppressions() -> None:
     state = TriageWorkbenchState.from_candidates(
         [
-            {
-                "candidate_id": "cand-a",
-                "category": "xss",
-                "description": "Raw HTML sink",
-                "locations": [{"file": "app/page.tsx", "line": 10}],
-                "evidence": ["dangerouslySetInnerHTML receives query"],
-            },
-            {
-                "candidate_id": "cand-b",
-                "category": "metadata",
-                "description": "Public app title",
-                "locations": [],
-                "evidence": ["title is public"],
-            },
+            DiscoveryCandidateResult(
+                candidate_id="cand-a",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Raw HTML sink",
+                    locations=[
+                        DiscoveryLocation(file="app/page.tsx", line=10, label="sink")
+                    ],
+                    evidence=["dangerouslySetInnerHTML receives query"],
+                ),
+                grounding_status="grounded",
+            ),
+            DiscoveryCandidateResult(
+                candidate_id="cand-b",
+                candidate=DiscoveryCandidate(
+                    category="metadata",
+                    description="Public app title",
+                    locations=[],
+                    evidence=["title is public"],
+                ),
+                grounding_status="grounded",
+            ),
         ]
     )
 
@@ -111,8 +139,26 @@ def test_triage_workbench_state_exports_cases_and_suppressions() -> None:
 def test_triage_workbench_state_auto_moves_duplicate_assignment() -> None:
     state = TriageWorkbenchState.from_candidates(
         [
-            {"candidate_id": "cand-a", "category": "xss", "evidence": ["a"]},
-            {"candidate_id": "cand-b", "category": "xss", "evidence": ["b"]},
+            DiscoveryCandidateResult(
+                candidate_id="cand-a",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["a"],
+                ),
+                grounding_status="grounded",
+            ),
+            DiscoveryCandidateResult(
+                candidate_id="cand-b",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["b"],
+                ),
+                grounding_status="grounded",
+            ),
         ]
     )
 
@@ -137,7 +183,16 @@ def test_triage_workbench_state_auto_moves_duplicate_assignment() -> None:
 def test_triage_workbench_state_rejects_unknown_item_ids() -> None:
     state = TriageWorkbenchState.from_candidates(
         [
-            {"candidate_id": "cand-a", "category": "xss", "evidence": ["a"]},
+            DiscoveryCandidateResult(
+                candidate_id="cand-a",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["a"],
+                ),
+                grounding_status="grounded",
+            ),
         ]
     )
 
@@ -157,8 +212,26 @@ def test_triage_workbench_state_rejects_unknown_item_ids() -> None:
 def test_triage_workbench_state_rejects_incomplete_create_metadata() -> None:
     state = TriageWorkbenchState.from_candidates(
         [
-            {"candidate_id": "cand-a", "category": "xss", "evidence": ["a"]},
-            {"candidate_id": "cand-b", "category": "metadata", "evidence": ["b"]},
+            DiscoveryCandidateResult(
+                candidate_id="cand-a",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["a"],
+                ),
+                grounding_status="grounded",
+            ),
+            DiscoveryCandidateResult(
+                candidate_id="cand-b",
+                candidate=DiscoveryCandidate(
+                    category="metadata",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["b"],
+                ),
+                grounding_status="grounded",
+            ),
         ]
     )
 
@@ -183,8 +256,26 @@ def test_triage_workbench_state_rejects_unknown_group_kind_at_mutation_boundary(
 ):
     state = TriageWorkbenchState.from_candidates(
         [
-            {"candidate_id": "cand-a", "category": "xss", "evidence": ["a"]},
-            {"candidate_id": "cand-b", "category": "xss", "evidence": ["b"]},
+            DiscoveryCandidateResult(
+                candidate_id="cand-a",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["a"],
+                ),
+                grounding_status="grounded",
+            ),
+            DiscoveryCandidateResult(
+                candidate_id="cand-b",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["b"],
+                ),
+                grounding_status="grounded",
+            ),
         ]
     )
 
@@ -223,8 +314,26 @@ def test_triage_workbench_state_rejects_unknown_group_kind_at_mutation_boundary(
 def test_triage_update_groups_rolls_back_late_failure() -> None:
     state = TriageWorkbenchState.from_candidates(
         [
-            {"candidate_id": "cand-a", "category": "xss", "evidence": ["a"]},
-            {"candidate_id": "cand-b", "category": "xss", "evidence": ["b"]},
+            DiscoveryCandidateResult(
+                candidate_id="cand-a",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["a"],
+                ),
+                grounding_status="grounded",
+            ),
+            DiscoveryCandidateResult(
+                candidate_id="cand-b",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["b"],
+                ),
+                grounding_status="grounded",
+            ),
         ]
     )
     create_result = state.create_groups(
@@ -280,7 +389,18 @@ def test_triage_update_groups_rolls_back_late_failure() -> None:
 
 def test_triage_tool_schema_rejects_incomplete_create_metadata() -> None:
     state = TriageWorkbenchState.from_candidates(
-        [{"candidate_id": "cand-a", "category": "xss", "evidence": ["a"]}]
+        [
+            DiscoveryCandidateResult(
+                candidate_id="cand-a",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["a"],
+                ),
+                grounding_status="grounded",
+            )
+        ]
     )
     tools = {tool.name: tool for tool in build_triage_workbench_tools(state)}
 
@@ -303,7 +423,18 @@ def test_triage_tool_schema_rejects_incomplete_create_metadata() -> None:
 
 def test_triage_tool_schema_rejects_unknown_group_kind() -> None:
     state = TriageWorkbenchState.from_candidates(
-        [{"candidate_id": "cand-a", "category": "xss", "evidence": ["a"]}]
+        [
+            DiscoveryCandidateResult(
+                candidate_id="cand-a",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["a"],
+                ),
+                grounding_status="grounded",
+            )
+        ]
     )
     tools = {tool.name: tool for tool in build_triage_workbench_tools(state)}
 
@@ -326,8 +457,26 @@ def test_triage_tool_schema_rejects_unknown_group_kind() -> None:
 def test_triage_workbench_state_mutations_return_compact_ack() -> None:
     state = TriageWorkbenchState.from_candidates(
         [
-            {"candidate_id": "cand-a", "category": "xss", "evidence": ["a"]},
-            {"candidate_id": "cand-b", "category": "xss", "evidence": ["b"]},
+            DiscoveryCandidateResult(
+                candidate_id="cand-a",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["a"],
+                ),
+                grounding_status="grounded",
+            ),
+            DiscoveryCandidateResult(
+                candidate_id="cand-b",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["b"],
+                ),
+                grounding_status="grounded",
+            ),
         ]
     )
 
@@ -359,7 +508,18 @@ def test_triage_workbench_state_mutations_return_compact_ack() -> None:
 
 def test_triage_workbench_state_rejects_create_time_group_ids() -> None:
     state = TriageWorkbenchState.from_candidates(
-        [{"candidate_id": "cand-a", "category": "xss", "evidence": ["a"]}]
+        [
+            DiscoveryCandidateResult(
+                candidate_id="cand-a",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["a"],
+                ),
+                grounding_status="grounded",
+            )
+        ]
     )
 
     with pytest.raises(ValueError) as context:
@@ -382,7 +542,18 @@ def test_triage_workbench_state_rejects_create_time_group_ids() -> None:
 
 def test_triage_tools_do_not_expose_item_or_group_detail_reads() -> None:
     state = TriageWorkbenchState.from_candidates(
-        [{"candidate_id": "cand-a", "category": "xss", "evidence": ["a"]}]
+        [
+            DiscoveryCandidateResult(
+                candidate_id="cand-a",
+                candidate=DiscoveryCandidate(
+                    category="xss",
+                    description="Candidate signal",
+                    locations=[],
+                    evidence=["a"],
+                ),
+                grounding_status="grounded",
+            )
+        ]
     )
     tools = {tool.name: tool for tool in build_triage_workbench_tools(state)}
 
@@ -391,3 +562,52 @@ def test_triage_tools_do_not_expose_item_or_group_detail_reads() -> None:
     assert "read_group" not in tools
     assert "read_item" not in tools
     assert "read_items" not in tools
+
+
+def test_typed_candidates_preserve_file_anchors_prompt_and_case_identity() -> None:
+    """File-only anchors omit line in JSON and do not enter the existing ID hash."""
+    candidate = DiscoveryCandidateResult(
+        candidate_id="cand-file",
+        candidate=DiscoveryCandidate(
+            category="xss",
+            description="File-only signal",
+            locations=[DiscoveryLocation(file="app/page.tsx", label="sink")],
+            evidence=["render(user_input)"],
+        ),
+        grounding_status="needs-grounding",
+    )
+    state = TriageWorkbenchState.from_candidates([candidate, candidate])
+    assert state.items_by_id["cand-file"].candidate is candidate
+    assert state.ordered_item_ids == ["cand-file"]
+    assert state.prompt_items() == [
+        {
+            "item_id": "cand-file",
+            "payload": {
+                "category": "xss",
+                "description": "File-only signal",
+                "locations": [{"file": "app/page.tsx", "label": "sink"}],
+                "evidence": ["render(user_input)"],
+                "grounding_status": "needs-grounding",
+            },
+        }
+    ]
+    case = build_case_from_candidates(
+        category="xss",
+        summary="Case",
+        evidence=["render(user_input)"],
+        member_candidates=[candidate],
+    )
+    assert case.anchor_locations == candidate.candidate.locations
+    assert case.anchor_locations[0] is candidate.candidate.locations[0]
+    assert case.case_id == "15e57a5a716639"
+
+    state.create_group(
+        kind="keep",
+        category="xss",
+        summary="Case",
+        evidence=["render(user_input)"],
+        item_ids=["cand-file"],
+    )
+    assert state.finish()["cases"][0]["anchor_locations"] == [
+        {"file": "app/page.tsx", "label": "sink"}
+    ]

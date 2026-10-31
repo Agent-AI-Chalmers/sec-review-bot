@@ -7,6 +7,7 @@ import asyncio
 import json
 from pathlib import Path
 
+from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
 from sec_review_agents.scan_stages.triage.stage import run_repository_triage_stage
 from sec_review_agents.utils.env import bootstrap_agents_env
 from sec_review_agents.utils.paths import artifact_path
@@ -123,7 +124,7 @@ async def main() -> None:
     input_path, discovery_path, requested_run_artifacts_path = _resolve_paths(args)
 
     public_input = read_json(input_path)
-    discovery_result = read_json(discovery_path)
+    discovery_result = DiscoveryResult.model_validate(read_json(discovery_path))
     run_artifacts_path = _run_artifacts_path(public_input, requested_run_artifacts_path)
     replay_input = materialize_replay_input(
         public_input, workflow="repository-review", artifact_root=run_artifacts_path
@@ -140,23 +141,21 @@ async def main() -> None:
         artifact_path(replay_input["artifact_paths"], "triage")
     ).resolve()
     triage_result_path = triage_artifacts_path / "triage-result.json"
-    triage_counts = triage_result.get("counts") or {}
+    triage_counts = triage_result.counts
 
     print(
         json.dumps(
             {
                 "ok": True,
                 "run_id": run_artifacts_path.name,
-                "triage_status": triage_result.get("status"),
+                "triage_status": triage_result.status,
                 "triage_mode": args.triage_mode,
                 "batch_size": (
                     args.batch_size if args.triage_mode == "batched" else None
                 ),
-                "input_candidate_count": triage_counts.get("input_candidate_count"),
-                "case_count": triage_counts.get("case_count"),
-                "suppressed_candidate_count": triage_counts.get(
-                    "suppressed_candidate_count"
-                ),
+                "input_candidate_count": triage_counts.input_candidate_count,
+                "case_count": triage_counts.case_count,
+                "suppressed_candidate_count": triage_counts.suppressed_candidate_count,
                 "triage_result_path": str(triage_result_path),
                 "triage_input_path": str(triage_artifacts_path / "triage-input.json"),
             },

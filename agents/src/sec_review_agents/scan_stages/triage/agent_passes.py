@@ -1,6 +1,6 @@
 import asyncio
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -18,7 +18,13 @@ from sec_review_agents.agents.triage.workbench_state import TriageWorkbenchState
 from sec_review_agents.observability.trace_context import bind_trace_context
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.trajectories import remove_trajectories, trajectory_path
+from sec_review_agents.scan_stages.discovery.result import DiscoveryCandidateResult
 from sec_review_agents.scan_stages.triage.batching import triage_candidate_batches
+from sec_review_agents.scan_stages.triage.result import (
+    TriageCounts,
+    TriageMetadata,
+    TriageResult,
+)
 from sec_review_agents.utils.files import persist_json_artifact
 
 DEFAULT_TRIAGE_PASSES = 2
@@ -44,11 +50,11 @@ def _triage_pass_artifacts_path(
 async def run_repository_triage_agent(
     *,
     triage_root: Path,
-    triage_candidates: list[dict[str, Any]],
+    triage_candidates: list[DiscoveryCandidateResult],
     max_passes: int = DEFAULT_TRIAGE_PASSES,
     triage_mode: TriageMode = "single",
     max_batch_size: int = DEFAULT_TRIAGE_BATCH_SIZE,
-) -> dict:
+) -> TriageResult:
     persist_json_artifact(
         triage_root,
         "triage-input",
@@ -56,7 +62,14 @@ async def run_repository_triage_agent(
             "summary": {
                 "candidate_count": len(triage_candidates),
             },
-            "candidates": triage_candidates,
+            "candidates": [
+                {
+                    **item.candidate.model_dump(mode="json", exclude_none=True),
+                    "candidate_id": item.candidate_id,
+                    "grounding_status": item.grounding_status,
+                }
+                for item in triage_candidates
+            ],
         },
     )
     if triage_mode == "batched":
@@ -73,26 +86,30 @@ async def run_repository_triage_agent(
             max_passes=max_passes,
         )
 
-    finish_result = workbench_state.finish()
-    if not finish_result["ok"]:
+    if not workbench_state.constraints()["ok"]:
         raise RuntimeError("triage workbench is incomplete after agent execution.")
-    result = {
-        "cases": finish_result["cases"],
-        "suppressed_candidates": finish_result["suppressed_candidates"],
-        "constraints": finish_result["constraints"],
-        "metadata": {
-            "triage_mode": triage_mode,
-            "triage_pass_count": pass_count,
-            "batch_size": max_batch_size if triage_mode == "batched" else None,
-        },
-    }
-    return result
+    cases, suppressed_candidates = workbench_state.export_cases_and_suppressions()
+    return TriageResult(
+        status="completed",
+        metadata=TriageMetadata(
+            triage_mode=triage_mode,
+            triage_pass_count=pass_count,
+            batch_size=max_batch_size if triage_mode == "batched" else None,
+        ),
+        counts=TriageCounts(
+            input_candidate_count=len(triage_candidates),
+            case_count=len(cases),
+            suppressed_candidate_count=len(suppressed_candidates),
+        ),
+        cases=cases,
+        suppressed_candidates=suppressed_candidates,
+    )
 
 
 async def _run_single_triage_passes(
     *,
     triage_root: Path,
-    triage_candidates: list[dict[str, Any]],
+    triage_candidates: list[DiscoveryCandidateResult],
     max_passes: int,
 ) -> tuple[TriageWorkbenchState, int]:
     workbench_state = TriageWorkbenchState.from_candidates(triage_candidates)
@@ -119,7 +136,7 @@ async def _run_single_triage_passes(
 async def _run_batched_triage_passes(
     *,
     triage_root: Path,
-    triage_candidates: list[dict[str, Any]],
+    triage_candidates: list[DiscoveryCandidateResult],
     max_passes: int,
     max_batch_size: int,
 ) -> tuple[TriageWorkbenchState, int]:
@@ -201,7 +218,7 @@ async def _run_batched_triage_passes(
 async def _run_triage_batch_draft(
     *,
     triage_root: Path,
-    triage_candidates: list[dict[str, Any]],
+    triage_candidates: list[DiscoveryCandidateResult],
     batch_candidate_ids: list[str],
     batch: dict,
 ) -> list[dict]:
@@ -211,9 +228,9 @@ async def _run_triage_batch_draft(
         if str(candidate_id or "").strip()
     }
     batch_candidates = [
-        dict(candidate)
+        candidate
         for candidate in triage_candidates
-        if str(candidate.get("candidate_id") or "").strip() in requested_candidate_ids
+        if candidate.candidate_id.strip() in requested_candidate_ids
     ]
     batch_state = TriageWorkbenchState.from_candidates(batch_candidates)
     await _run_repository_triage_agent_pass(

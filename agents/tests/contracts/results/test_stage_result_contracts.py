@@ -1,6 +1,8 @@
 import json
 from annotationlib import Format, get_annotations
 
+import pytest
+
 from sec_review_agents.review_stages.analysis.result import (
     AnalysisStageResult,
 )
@@ -119,7 +121,7 @@ def test_scan_stage_entrypoint_return_annotation_is_named_contract() -> None:
 
 
 def test_scan_stage_contracts_track_required_sections() -> None:
-    assert DiscoveryResult.__required_keys__ == {
+    assert set(DiscoveryResult.model_fields) == {
         "status",
         "metadata",
         "counts",
@@ -127,13 +129,15 @@ def test_scan_stage_contracts_track_required_sections() -> None:
         "skipped_files",
         "candidates",
     }
-    assert DiscoveryFileResult.__required_keys__ == {
+    assert set(DiscoveryFileResult.model_fields) == {
         "path",
         "language",
         "size_bytes",
         "candidate_count",
     }
-    assert TriageResult.__required_keys__ == {
+    assert {
+        name for name, field in TriageResult.model_fields.items() if field.is_required()
+    } == {
         "status",
         "metadata",
         "counts",
@@ -167,3 +171,47 @@ def test_analysis_stage_preserves_nested_narrative_models_in_json() -> None:
         narrative.model_dump(mode="json", by_alias=True)
     ]
     json.dumps(result.model_dump(mode="json", by_alias=True))
+
+
+@pytest.mark.asyncio
+async def test_triage_artifact_preserves_file_only_anchors_and_nullable_metadata(
+    tmp_path, monkeypatch
+) -> None:
+    """Replay JSON omits absent anchor lines while keeping nullable stage metadata."""
+    from unittest.mock import AsyncMock
+
+    from sec_review_agents.agents.discovery.model import (
+        DiscoveryCandidate,
+        DiscoveryLocation,
+    )
+    from sec_review_agents.scan_stages.discovery.result import DiscoveryCandidateResult
+    from tests.repository_scan_fixtures import scan_result_fixture
+
+    scan = scan_result_fixture(candidate_count=1, case_count=1)
+    location = DiscoveryLocation(file="src/routes.py", label="route")
+    scan.discovery_result.candidates = [
+        DiscoveryCandidateResult(
+            candidate_id="candidate-1",
+            candidate=DiscoveryCandidate(
+                category="xss",
+                description="Route signal",
+                locations=[location],
+                evidence=[],
+            ),
+            grounding_status="needs-grounding",
+        )
+    ]
+    scan.triage_result.cases[0].anchor_locations = [location]
+    monkeypatch.setattr(
+        "sec_review_agents.scan_stages.triage.agent_passes.run_repository_triage_agent",
+        AsyncMock(return_value=scan.triage_result),
+    )
+    result = await run_repository_triage_stage(
+        triage_root=tmp_path, discovery_result=scan.discovery_result
+    )
+    artifact = json.loads((tmp_path / "triage-result.json").read_text())
+    assert artifact["cases"][0]["anchor_locations"] == [
+        {"file": "src/routes.py", "label": "route"}
+    ]
+    assert artifact["metadata"]["batch_size"] is None
+    assert TriageResult.model_validate(artifact) == result

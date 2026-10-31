@@ -12,8 +12,13 @@ from sec_review_agents.delivery_stages.result import (
     build_skipped_delivery_result,
     persist_delivery_result,
 )
-from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
+from sec_review_agents.scan_stages.discovery.input import DiscoveryChunk
+from sec_review_agents.scan_stages.discovery.result import (
+    DiscoveryChunkResult,
+    DiscoveryResult,
+)
 from sec_review_agents.utils.paths import required_path
+from sec_review_agents.workflows.repository.scan_result import RepositoryScanResult
 from sec_review_agents.workflows.repository.workflow import (
     build_blocked_repository_case_result,
     build_repository_discovery_manifest_activity,
@@ -48,36 +53,35 @@ async def run_repository_review_direct(
 
 async def run_repository_scan_direct(
     request: ReviewWorkflowRequest,
-) -> dict[str, Any]:
+) -> RepositoryScanResult:
     discovery_result = await run_repository_discovery_direct(request)
     triage_result = await triage_repository_activity(request, discovery_result)
     window_deletions = window_deletion_summary_activity(request)
-    return {
-        "discovery_result": discovery_result,
-        "triage_result": triage_result,
-        # The scan's verdict on the window itself, taken before any case exists.
+    return RepositoryScanResult(
+        discovery_result=discovery_result,
+        triage_result=triage_result,
         **window_deletions,
-    }
+    )
 
 
 async def run_repository_discovery_direct(
     request: ReviewWorkflowRequest,
 ) -> DiscoveryResult:
     manifest = build_repository_discovery_manifest_activity(request)
-    max_concurrency = max(1, int(manifest["max_concurrency"]))
-    chunks = list(manifest["chunks"])
+    max_concurrency = max(1, manifest.max_concurrency)
+    chunks = manifest.chunks
 
     semaphore = asyncio.Semaphore(max_concurrency)
 
     async def scan_chunk(
-        index: int, chunk: Mapping[str, Any]
-    ) -> tuple[int, dict[str, Any]]:
+        index: int, chunk: DiscoveryChunk
+    ) -> tuple[int, DiscoveryChunkResult]:
         async with semaphore:
             return index, await scan_repository_discovery_chunk_activity(
                 request, manifest, chunk
             )
 
-    chunk_results: list[dict[str, Any] | None] = [None] * len(chunks)
+    chunk_results: list[DiscoveryChunkResult | None] = [None] * len(chunks)
     for index, result in await asyncio.gather(
         *(scan_chunk(index, chunk) for index, chunk in enumerate(chunks))
     ):
@@ -91,9 +95,9 @@ async def run_repository_discovery_direct(
 
 async def run_repository_case_reviews_direct(
     request: ReviewWorkflowRequest,
-    scan_result: dict[str, Any],
+    scan_result: RepositoryScanResult,
 ) -> list[dict[str, Any]]:
-    cases = list(scan_result["triage_result"]["cases"])
+    cases = [case.model_dump(mode="json") for case in scan_result.triage_result.cases]
     case_batch = prepare_repository_case_review_inputs_activity(request, cases)
     case_requests = list(case_batch["case_requests"])
     max_concurrency = max(1, int(case_batch["max_concurrency"]))

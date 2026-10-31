@@ -1,11 +1,12 @@
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
+from tests.repository_scan_fixtures import scan_result_fixture
 
 
 def _result(scan: dict) -> dict:
     return build_repository_workflow_result(
-        scan_result=scan,
+        scan_result=scan_result_fixture(**scan),
         delivery_result=None,
         case_results=[],
     )

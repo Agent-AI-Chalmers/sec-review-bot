@@ -47,6 +47,7 @@ from sec_review_agents.workflows.repository_case.stage import (
     derive_case_disposition,
 )
 from tests.analysis_fixtures import analysis_fixture, narrative_fixture
+from tests.repository_scan_fixtures import scan_result_fixture
 
 
 class TestRepositoryScopeAndDeliveryPlanning:
@@ -280,7 +281,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
         ]
 
         result = build_repository_workflow_result(
-            scan_result={"discovery_result": {}, "triage_result": {}},
+            scan_result=scan_result_fixture(),
             delivery_result=None,
             case_results=case_results,
         )
@@ -839,7 +840,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
 
     def test_workflow_result_includes_confirmed_unresolved_case_summaries(self) -> None:
         result = build_repository_workflow_result(
-            scan_result={"discovery_result": {}, "triage_result": {}},
+            scan_result=scan_result_fixture(),
             delivery_result=None,
             case_results=[
                 {

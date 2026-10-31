@@ -7,7 +7,6 @@
 # read /skills; the normal SkillsMiddleware exposure should be enough for the
 # model to load the scanner-finding triage reference when it needs reachability
 # and context guidance.
-
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,6 +15,11 @@ from uuid import uuid4
 
 import pytest
 
+from sec_review_agents.agents.discovery.model import (
+    DiscoveryCandidate,
+    DiscoveryLocation,
+)
+from sec_review_agents.scan_stages.discovery.result import DiscoveryCandidateResult
 from sec_review_agents.scan_stages.triage.agent_passes import (
     run_repository_triage_agent,
 )
@@ -59,7 +63,7 @@ async def test_triage_workflow_handles_scanner_noise_and_uses_guidance() -> None
                 "readScannerFindingSkill": (
                     "/skills/scanner-finding-triage/SKILL.md" in read_paths
                 ),
-                "result": result,
+                "result": result.model_dump(mode="json"),
             },
             ensure_ascii=False,
             indent=2,
@@ -73,12 +77,11 @@ async def test_triage_workflow_handles_scanner_noise_and_uses_guidance() -> None
     ), read_paths
     kept_candidate_ids = {
         candidate_id
-        for case in result.get("cases") or []
-        for candidate_id in case.get("member_candidate_ids") or []
+        for case in result.cases
+        for candidate_id in case.member_candidate_ids
     }
     suppressed_candidate_ids = {
-        candidate.get("candidate_id")
-        for candidate in result.get("suppressed_candidates") or []
+        candidate.candidate_id for candidate in result.suppressed_candidates
     }
 
     assert "internal-export-unknown-guard" in kept_candidate_ids
@@ -96,166 +99,148 @@ def _artifact_root() -> Path:
     )
 
 
-def _scanner_style_candidates() -> list[dict]:
+def _scanner_style_candidates() -> list[DiscoveryCandidateResult]:
     return [
-        {
-            "candidate_id": "internal-export-unknown-guard",
-            "title": "Internal tenant export accepts a requester-selected object",
-            "category": "Access control",
-            "paths": ["src/internal/export.py"],
-            "locations": [
-                {"file": "src/internal/export.py", "line": 20, "label": "Export lookup"}
-            ],
-            "confidence": "medium",
-            "description": (
-                "An authenticated tenant user supplies object_id to the internal "
+        DiscoveryCandidateResult(
+            candidate_id="internal-export-unknown-guard",
+            candidate=DiscoveryCandidate(
+                category="Access control",
+                description="An authenticated tenant user supplies object_id to the internal "
                 "export endpoint, which returns load_export(object_id). The payload "
                 "does not establish whether middleware enforces object ownership. "
                 "The internal label alone does not establish tenant isolation; "
-                "the ownership guard needs repository analysis."
+                "the ownership guard needs repository analysis.",
+                locations=[
+                    DiscoveryLocation(
+                        file="src/internal/export.py", line=20, label="Export lookup"
+                    )
+                ],
+                evidence=["return load_export(request.json['object_id'])"],
             ),
-            "evidence": ["return load_export(request.json['object_id'])"],
-            "grounding_status": "grounded",
-        },
-        {
-            "candidate_id": "sca-minimist-lockfile-only",
-            "title": "Scanner flags minimist CVE from package-lock entry",
-            "category": "Dependency vulnerability",
-            "paths": ["package-lock.json"],
-            "locations": [
-                {
-                    "file": "package-lock.json",
-                    "line": 412,
-                    "label": "minimist 0.0.8 appears in lockfile",
-                }
-            ],
-            "confidence": "high",
-            "description": (
-                "A dependency scanner reports a high-severity prototype "
+            grounding_status="grounded",
+        ),
+        DiscoveryCandidateResult(
+            candidate_id="sca-minimist-lockfile-only",
+            candidate=DiscoveryCandidate(
+                category="Dependency vulnerability",
+                description="A dependency scanner reports a high-severity prototype "
                 "pollution CVE because minimist 0.0.8 appears in package-lock. "
                 "The candidate payload contains no repository import, call site, "
-                "CLI entry point, or parser path that uses minimist."
+                "CLI entry point, or parser path that uses minimist.",
+                locations=[
+                    DiscoveryLocation(
+                        file="package-lock.json",
+                        line=412,
+                        label="minimist 0.0.8 appears in lockfile",
+                    )
+                ],
+                evidence=[
+                    '"node_modules/minimist": {"version": "0.0.8"}',
+                    "No locations outside package-lock.json were reported.",
+                ],
             ),
-            "evidence": [
-                '"node_modules/minimist": {"version": "0.0.8"}',
-                "No locations outside package-lock.json were reported.",
-            ],
-            "grounding_status": "grounded",
-        },
-        {
-            "candidate_id": "eval-test-fixture-only",
-            "title": "Scanner flags eval() in test fixture",
-            "category": "Code execution",
-            "paths": ["tests/fixtures/legacy-eval.js"],
-            "locations": [
-                {
-                    "file": "tests/fixtures/legacy-eval.js",
-                    "line": 18,
-                    "label": "eval() appears in a test fixture",
-                }
-            ],
-            "confidence": "medium",
-            "description": (
-                "A static scanner reports eval() usage. The only anchor is a "
+            grounding_status="grounded",
+        ),
+        DiscoveryCandidateResult(
+            candidate_id="eval-test-fixture-only",
+            candidate=DiscoveryCandidate(
+                category="Code execution",
+                description="A static scanner reports eval() usage. The only anchor is a "
                 "test fixture used to assert that the linter catches eval in "
                 "sample code; no runtime route, exported API, or application "
-                "handler is shown."
+                "handler is shown.",
+                locations=[
+                    DiscoveryLocation(
+                        file="tests/fixtures/legacy-eval.js",
+                        line=18,
+                        label="eval() appears in a test fixture",
+                    )
+                ],
+                evidence=[
+                    "tests/fixtures/legacy-eval.js",
+                    "eval(sample)",
+                    "Referenced from tests/lint-rules.test.js only.",
+                ],
             ),
-            "evidence": [
-                "tests/fixtures/legacy-eval.js",
-                "eval(sample)",
-                "Referenced from tests/lint-rules.test.js only.",
-            ],
-            "grounding_status": "grounded",
-        },
-        {
-            "candidate_id": "copy-dot-with-dockerignore",
-            "title": "Scanner flags broad COPY . . as possible secret leakage",
-            "category": "Container image exposure",
-            "paths": ["Dockerfile", ".dockerignore"],
-            "locations": [
-                {
-                    "file": "Dockerfile",
-                    "line": 8,
-                    "label": "Broad COPY . . instruction",
-                },
-                {
-                    "file": ".dockerignore",
-                    "line": 1,
-                    "label": "Build context excludes common secret files",
-                },
-            ],
-            "confidence": "medium",
-            "description": (
-                "A scanner reports that COPY . . may copy secrets into image "
+            grounding_status="grounded",
+        ),
+        DiscoveryCandidateResult(
+            candidate_id="copy-dot-with-dockerignore",
+            candidate=DiscoveryCandidate(
+                category="Container image exposure",
+                description="A scanner reports that COPY . . may copy secrets into image "
                 "layers. The same candidate payload shows .dockerignore entries "
                 "for .env, .git, *.pem, id_rsa, and production-secrets.txt, and "
-                "does not identify any actual sensitive file in the build context."
+                "does not identify any actual sensitive file in the build context.",
+                locations=[
+                    DiscoveryLocation(
+                        file="Dockerfile", line=8, label="Broad COPY . . instruction"
+                    ),
+                    DiscoveryLocation(
+                        file=".dockerignore",
+                        line=1,
+                        label="Build context excludes common secret files",
+                    ),
+                ],
+                evidence=[
+                    "Dockerfile: COPY . .",
+                    ".dockerignore: .env",
+                    ".dockerignore: .git",
+                    ".dockerignore: *.pem",
+                    ".dockerignore: production-secrets.txt",
+                ],
             ),
-            "evidence": [
-                "Dockerfile: COPY . .",
-                ".dockerignore: .env",
-                ".dockerignore: .git",
-                ".dockerignore: *.pem",
-                ".dockerignore: production-secrets.txt",
-            ],
-            "grounding_status": "grounded",
-        },
-        {
-            "candidate_id": "signed-cache-deserialize",
-            "title": "Scanner flags deserialize() on cached blob",
-            "category": "Deserialization",
-            "paths": ["src/cache/session_store.py"],
-            "locations": [
-                {
-                    "file": "src/cache/session_store.py",
-                    "line": 44,
-                    "label": "deserialize() called after signature verification",
-                },
-            ],
-            "confidence": "medium",
-            "description": (
-                "A scanner reports a deserialization sink. The candidate evidence "
+            grounding_status="grounded",
+        ),
+        DiscoveryCandidateResult(
+            candidate_id="signed-cache-deserialize",
+            candidate=DiscoveryCandidate(
+                category="Deserialization",
+                description="A scanner reports a deserialization sink. The candidate evidence "
                 "shows the blob is loaded from an internal Redis key and "
                 "verify_hmac(blob, SESSION_CACHE_KEY) must pass before "
                 "deserialize(blob) is called. No attacker-controlled request "
-                "source is shown."
+                "source is shown.",
+                locations=[
+                    DiscoveryLocation(
+                        file="src/cache/session_store.py",
+                        line=44,
+                        label="deserialize() called after signature verification",
+                    ),
+                ],
+                evidence=[
+                    "blob = redis.get(cache_key)",
+                    "if not verify_hmac(blob, SESSION_CACHE_KEY): return None",
+                    "return deserialize(blob)",
+                ],
             ),
-            "evidence": [
-                "blob = redis.get(cache_key)",
-                "if not verify_hmac(blob, SESSION_CACHE_KEY): return None",
-                "return deserialize(blob)",
-            ],
-            "grounding_status": "grounded",
-        },
-        {
-            "candidate_id": "runtime-yaml-import",
-            "title": "Runtime YAML import endpoint parses uploaded user content unsafely",
-            "category": "Unsafe deserialization",
-            "paths": ["src/routes/imports.py"],
-            "locations": [
-                {
-                    "file": "src/routes/imports.py",
-                    "line": 27,
-                    "label": "Uploaded file body read from request",
-                },
-                {
-                    "file": "src/routes/imports.py",
-                    "line": 31,
-                    "label": "yaml.load called with unsafe Loader",
-                },
-            ],
-            "confidence": "high",
-            "description": (
-                "The /admin/import-yaml endpoint reads an uploaded request body "
+            grounding_status="grounded",
+        ),
+        DiscoveryCandidateResult(
+            candidate_id="runtime-yaml-import",
+            candidate=DiscoveryCandidate(
+                category="Unsafe deserialization",
+                description="The /admin/import-yaml endpoint reads an uploaded request body "
                 "and passes it to yaml.load(..., Loader=yaml.Loader). This is a "
                 "runtime route with attacker-controlled file content reaching an "
-                "unsafe parser sink."
+                "unsafe parser sink.",
+                locations=[
+                    DiscoveryLocation(
+                        file="src/routes/imports.py",
+                        line=27,
+                        label="Uploaded file body read from request",
+                    ),
+                    DiscoveryLocation(
+                        file="src/routes/imports.py",
+                        line=31,
+                        label="yaml.load called with unsafe Loader",
+                    ),
+                ],
+                evidence=[
+                    "body = request.files['config'].read()",
+                    "parsed = yaml.load(body, Loader=yaml.Loader)",
+                ],
             ),
-            "evidence": [
-                "body = request.files['config'].read()",
-                "parsed = yaml.load(body, Loader=yaml.Loader)",
-            ],
-            "grounding_status": "grounded",
-        },
+            grounding_status="grounded",
+        ),
     ]

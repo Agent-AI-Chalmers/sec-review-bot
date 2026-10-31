@@ -26,6 +26,7 @@ from sec_review_agents.workflows.repository.case_execution_input import (
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
+from sec_review_agents.workflows.repository.scan_result import RepositoryScanResult
 from sec_review_agents.workflows.repository.workflow import (
     resolve_repository_case_processing_max_concurrency,
 )
@@ -289,9 +290,22 @@ async def main() -> None:
     bundle_paths = read_replay_bundle_paths(local_root)
     test_changes = require_review_intent(replay_input.get("review_intent")).test_changes
 
-    cases = [
-        case for case in (triage_result.get("cases") or []) if isinstance(case, dict)
-    ]
+    existing_result = _load_existing_result(run_artifacts) or {}
+    scan_result = RepositoryScanResult.model_validate(
+        {
+            "discovery_result": discovery_result,
+            "triage_result": triage_result,
+            # Deletion counts are a reading of the window, not of discovery or triage, so they
+            # survive only in the previous result. Rebuilding without them would turn a window
+            # whose deletions were skipped into one that claims they were reviewed.
+            **_window_deletions(
+                existing_result=existing_result,
+                replay_input=replay_input,
+            ),
+        }
+    )
+
+    cases = [case.model_dump(mode="json") for case in scan_result.triage_result.cases]
     if not cases:
         raise RuntimeError("Triage result does not contain cases.")
 
@@ -303,7 +317,6 @@ async def main() -> None:
     )
     selected_cases = cases[start_index:end_index]
 
-    existing_result = _load_existing_result(run_artifacts) or {}
     existing_results = [
         item
         for item in (existing_result.get("case_results") or [])
@@ -344,17 +357,7 @@ async def main() -> None:
     ]
     status = "completed" if len(ordered_case_results) == len(cases) else "in-progress"
     workflow_result = build_repository_workflow_result(
-        scan_result={
-            "discovery_result": discovery_result,
-            "triage_result": triage_result,
-            # Deletion counts are a reading of the window, not of discovery or triage, so they
-            # survive only in the previous result. Rebuilding without them would turn a window
-            # whose deletions were skipped into one that claims they were reviewed.
-            **_window_deletions(
-                existing_result=existing_result,
-                replay_input=replay_input,
-            ),
-        },
+        scan_result=scan_result,
         delivery_result=None,
         case_results=ordered_case_results,
     )

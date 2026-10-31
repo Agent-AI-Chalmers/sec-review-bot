@@ -78,23 +78,23 @@ async def main() -> None:
     )
     chunk_results = [
         await scan_discovery_chunk(chunk=chunk, root=workspace_root)
-        for chunk in manifest["chunks"]
+        for chunk in manifest.chunks
     ]
     discovery_result = build_discovery_result_from_chunks(
-        entries=list(manifest["entries"]),
-        skipped_files=list(manifest["skipped_files"]),
-        chunks=list(manifest["chunks"]),
+        entries=manifest.entries,
+        skipped_files=manifest.skipped_files,
+        chunks=manifest.chunks,
         chunk_results=chunk_results,
-        scan_mode=str(manifest["scan_mode"]),
-        deployment_input_limit_tokens=int(manifest["deployment_input_limit_tokens"]),
-        chunk_target_tokens=int(manifest["chunk_target_tokens"]),
-        chunk_target_ratio=str(manifest["chunk_target_ratio"]),
-        chunk_hard_limit_tokens=int(manifest["chunk_hard_limit_tokens"]),
-        discovery_concurrency=int(manifest["max_concurrency"]),
-        chunk_strategy=str(manifest["chunk_strategy"]),
+        scan_mode=manifest.scan_mode,
+        deployment_input_limit_tokens=manifest.deployment_input_limit_tokens,
+        chunk_target_tokens=manifest.chunk_target_tokens,
+        chunk_target_ratio=manifest.chunk_target_ratio,
+        chunk_hard_limit_tokens=manifest.chunk_hard_limit_tokens,
+        discovery_concurrency=manifest.max_concurrency,
+        chunk_strategy=manifest.chunk_strategy,
     )
     persist_discovery_result(
-        discovery_artifacts_path=Path(manifest["discovery_artifacts_path"]),
+        discovery_artifacts_path=Path(manifest.discovery_artifacts_path),
         result=discovery_result,
     )
 
@@ -102,16 +102,16 @@ async def main() -> None:
         artifact_path(replay_input["artifact_paths"], "discovery")
     ).resolve()
     discovery_result_path = discovery_artifacts_path / "discovery-result.json"
-    discovery_counts = discovery_result.get("counts") or {}
+    discovery_counts = discovery_result.counts
 
     print(
         json.dumps(
             {
                 "ok": True,
                 "run_id": run_id,
-                "discovery_status": discovery_result.get("status"),
-                "scannable_file_count": discovery_counts.get("scannable_file_count"),
-                "candidate_count": discovery_counts.get("candidate_count"),
+                "discovery_status": discovery_result.status,
+                "scannable_file_count": discovery_counts.scannable_file_count,
+                "candidate_count": discovery_counts.candidate_count,
                 "discovery_result_path": str(discovery_result_path),
             },
             ensure_ascii=False,

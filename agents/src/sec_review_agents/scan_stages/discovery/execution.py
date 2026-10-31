@@ -1,6 +1,5 @@
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from sec_review_agents.agents.discovery.agent import (
     run_repository_discovery_agent as run_discovery_agent,
@@ -14,15 +13,16 @@ from sec_review_agents.agents.discovery.prompts import (
 )
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.trajectories import trajectory_path
+from sec_review_agents.scan_stages.discovery.input import DiscoveryChunk
 
 
 async def run_repository_discovery_agent(
     *,
-    chunk: Mapping[str, Any],
+    chunk: DiscoveryChunk,
     sources: Mapping[str, str],
     discovery_artifacts_path: Path | None = None,
-) -> dict:
-    chunk_id = str((chunk or {}).get("chunk_id") or "").strip()
+) -> DiscoveryOutput:
+    chunk_id = chunk.chunk_id
     trajectory_paths = (
         (
             trajectory_path(
@@ -48,4 +48,4 @@ async def run_repository_discovery_agent(
             )
         )
 
-    return structured_payload.model_dump(mode="json", by_alias=True)
+    return structured_payload

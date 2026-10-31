@@ -12,12 +12,20 @@ from sec_review_agents.run_diagnostics.publication import (
     RunDiagnosticPublicationRequest,
     publish_run_diagnostic_activity,
 )
-from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
+from sec_review_agents.scan_stages.discovery.input import (
+    DiscoveryChunk,
+    DiscoveryManifest,
+)
+from sec_review_agents.scan_stages.discovery.result import (
+    DiscoveryChunkResult,
+    DiscoveryResult,
+)
 from sec_review_agents.scan_stages.triage.result import TriageResult
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
 from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
+from sec_review_agents.workflows.repository.scan_result import RepositoryScanResult
 from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
     RepositoryCaseReviewWorkflow,
@@ -82,7 +90,7 @@ def resolve_repository_case_processing_max_concurrency(case_count: int) -> int:
 @activity.defn
 def build_repository_discovery_manifest_activity(
     request: ReviewWorkflowRequest,
-) -> dict[str, Any]:
+) -> DiscoveryManifest:
     from sec_review_agents.scan_stages.discovery.stage import (
         prepare_discovery_chunks,
     )
@@ -124,9 +132,9 @@ def build_repository_discovery_manifest_activity(
 @activity.defn
 async def scan_repository_discovery_chunk_activity(
     request: ReviewWorkflowRequest,
-    manifest: Mapping[str, Any],
-    chunk: Mapping[str, Any],
-) -> dict[str, Any]:
+    manifest: DiscoveryManifest,
+    chunk: DiscoveryChunk,
+) -> DiscoveryChunkResult:
     from pathlib import Path
 
     from sec_review_agents.observability.trace_context import bind_trace_context
@@ -137,20 +145,20 @@ async def scan_repository_discovery_chunk_activity(
         **activity_trace_labels(
             workflow_name=request.workflow,
             run_id=request.run_id,
-            chunk_id=str(chunk["chunk_id"]),
+            chunk_id=chunk.chunk_id,
         )
     ):
         return await scan_discovery_chunk(
             chunk=chunk,
-            root=Path(manifest["workspace_root"]),
-            discovery_artifacts_path=Path(str(manifest["discovery_artifacts_path"])),
+            root=Path(manifest.workspace_root),
+            discovery_artifacts_path=Path(manifest.discovery_artifacts_path),
         )
 
 
 @activity.defn
 def build_repository_discovery_result_activity(
-    manifest: Mapping[str, Any],
-    chunk_results: Sequence[Mapping[str, Any]],
+    manifest: DiscoveryManifest,
+    chunk_results: Sequence[DiscoveryChunkResult],
 ) -> DiscoveryResult:
     from sec_review_agents.scan_stages.discovery.stage import (
         build_discovery_result_from_chunks,
@@ -158,20 +166,20 @@ def build_repository_discovery_result_activity(
     )
 
     result = build_discovery_result_from_chunks(
-        entries=list(manifest["entries"]),
-        skipped_files=list(manifest["skipped_files"]),
-        chunks=list(manifest["chunks"]),
+        entries=manifest.entries,
+        skipped_files=manifest.skipped_files,
+        chunks=manifest.chunks,
         chunk_results=chunk_results,
-        scan_mode=str(manifest["scan_mode"]),
-        deployment_input_limit_tokens=int(manifest["deployment_input_limit_tokens"]),
-        chunk_target_tokens=int(manifest["chunk_target_tokens"]),
-        chunk_target_ratio=str(manifest["chunk_target_ratio"]),
-        chunk_hard_limit_tokens=int(manifest["chunk_hard_limit_tokens"]),
-        discovery_concurrency=int(manifest["max_concurrency"]),
-        chunk_strategy=str(manifest["chunk_strategy"]),
+        scan_mode=manifest.scan_mode,
+        deployment_input_limit_tokens=manifest.deployment_input_limit_tokens,
+        chunk_target_tokens=manifest.chunk_target_tokens,
+        chunk_target_ratio=manifest.chunk_target_ratio,
+        chunk_hard_limit_tokens=manifest.chunk_hard_limit_tokens,
+        discovery_concurrency=manifest.max_concurrency,
+        chunk_strategy=manifest.chunk_strategy,
     )
     persist_discovery_result(
-        discovery_artifacts_path=Path(str(manifest["discovery_artifacts_path"])),
+        discovery_artifacts_path=Path(manifest.discovery_artifacts_path),
         result=result,
     )
     return result
@@ -180,7 +188,7 @@ def build_repository_discovery_result_activity(
 @activity.defn
 async def triage_repository_activity(
     request: ReviewWorkflowRequest,
-    discovery_result: Mapping[str, Any],
+    discovery_result: DiscoveryResult,
 ) -> TriageResult:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.scan_stages.triage.stage import run_repository_triage_stage
@@ -527,7 +535,7 @@ def build_repository_delivery_result_activity(
 @activity.defn
 def build_repository_review_result_activity(
     request: ReviewWorkflowRequest,
-    scan_result: Mapping[str, Any],
+    scan_result: RepositoryScanResult,
     case_results: Sequence[Mapping[str, Any]],
     delivery_result: Mapping[str, Any],
 ) -> dict[str, Any]:
@@ -557,16 +565,16 @@ def build_repository_review_result_activity(
 @workflow.defn
 class RepositoryDiscoveryWorkflow:
     @workflow.run
-    async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
+    async def run(self, request: ReviewWorkflowRequest) -> DiscoveryResult:
         manifest = await workflow.execute_activity(
             build_repository_discovery_manifest_activity,
             args=[request],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
-        max_concurrency = max(1, int(manifest["max_concurrency"]))
-        chunks = list(manifest["chunks"])
-        chunk_results: list[dict[str, Any] | None] = [None] * len(chunks)
+        max_concurrency = max(1, manifest.max_concurrency)
+        chunks = manifest.chunks
+        chunk_results: list[DiscoveryChunkResult | None] = [None] * len(chunks)
         pending: dict[asyncio.Task, int] = {}
         next_index = 0
 
@@ -608,7 +616,7 @@ class RepositoryDiscoveryWorkflow:
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
-        return dict(discovery_result)
+        return discovery_result
 
 
 @activity.defn
@@ -628,7 +636,7 @@ def window_deletion_summary_activity(
 @workflow.defn
 class RepositoryScanWorkflow:
     @workflow.run
-    async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
+    async def run(self, request: ReviewWorkflowRequest) -> RepositoryScanResult:
         discovery_result = await workflow.execute_child_workflow(
             RepositoryDiscoveryWorkflow.run,
             request,
@@ -646,13 +654,11 @@ class RepositoryScanWorkflow:
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
-        return {
-            "discovery_result": discovery_result,
-            "triage_result": triage_result,
-            # Part of the scan's verdict on the window, not of any case: the window's own size
-            # decided it, before discovery or triage ever ran.
+        return RepositoryScanResult(
+            discovery_result=discovery_result,
+            triage_result=triage_result,
             **window_deletions,
-        }
+        )
 
 
 @workflow.defn
@@ -662,9 +668,11 @@ class RepositoryCaseProcessingWorkflow:
     async def run(
         self,
         request: ReviewWorkflowRequest,
-        scan_result: dict[str, Any],
+        scan_result: RepositoryScanResult,
     ) -> list[dict[str, Any]]:
-        cases = list(scan_result["triage_result"]["cases"])
+        cases = [
+            case.model_dump(mode="json") for case in scan_result.triage_result.cases
+        ]
         case_batch = await workflow.execute_activity(
             prepare_repository_case_review_inputs_activity,
             args=[request, cases],

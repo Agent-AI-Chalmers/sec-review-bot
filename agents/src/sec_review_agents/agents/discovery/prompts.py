@@ -1,7 +1,8 @@
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from sec_review_agents.resources.loader import join_prompt_sections
+from sec_review_agents.scan_stages.discovery.input import DiscoveryEntry
 from sec_review_agents.utils.markdown import (
     code_block,
     json_section,
@@ -57,13 +58,12 @@ def _render_line_numbered_source(content: str) -> str:
 
 def build_repository_discovery_user_prompt(
     *,
-    chunk: Mapping[str, Any],
+    chunk_id: str,
+    entries: Sequence[DiscoveryEntry],
     scan_virtual_path: str | None = None,
     sources: Mapping[str, str],
 ) -> str:
-    resolved_scan_path = str(
-        scan_virtual_path or chunk.get("chunk_id") or "discovery-chunk"
-    ).strip()
+    resolved_scan_path = str(scan_virtual_path or chunk_id or "discovery-chunk").strip()
     if not resolved_scan_path:
         raise ValueError(
             "Discovery prompt requires scan_virtual_path or chunk.chunk_id."
@@ -73,20 +73,16 @@ def build_repository_discovery_user_prompt(
 
     rendered_sources: list[dict[str, Any]] = []
     source_sections: list[str] = []
-    for entry in chunk.get("entries") or []:
-        if not isinstance(entry, Mapping):
-            continue
-        path = str(entry.get("path") or "").strip()
-        if not path:
-            continue
+    for entry in entries:
+        path = entry.path
         content = sources.get(path)
         if content is None:
             continue
         rendered_sources.append(
             {
                 "path": path,
-                "language": entry.get("language"),
-                "size_bytes": entry.get("size_bytes"),
+                "language": entry.language,
+                "size_bytes": entry.size_bytes,
                 "inline_source_provided": True,
             }
         )
@@ -105,7 +101,7 @@ def build_repository_discovery_user_prompt(
         json_section(
             "Scan Target",
             {
-                "chunk_id": chunk["chunk_id"],
+                "chunk_id": chunk_id,
                 "scan_path": resolved_scan_path,
                 "files": rendered_sources,
             },

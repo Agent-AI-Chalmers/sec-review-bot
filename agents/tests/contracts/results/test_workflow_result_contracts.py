@@ -39,6 +39,7 @@ from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
 from tests.contract_fixtures import contract_schema
+from tests.repository_scan_fixtures import scan_result_fixture
 
 
 def test_review_record_public_contract_tracks_current_shape() -> None:
@@ -140,24 +141,16 @@ def test_repository_workflow_contract_tracks_required_sections() -> None:
 
 def test_repository_workflow_builder_derives_scan_summary_from_scan_results() -> None:
     result = build_repository_workflow_result(
-        scan_result={
-            "discovery_result": {
-                "counts": {
-                    "scannable_file_count": 10,
-                    "scanned_file_count": 8,
-                    "skipped_file_count": 2,
-                    "candidate_count": 4,
-                }
-            },
-            "triage_result": {
-                "counts": {
-                    "case_count": 3,
-                    "suppressed_candidate_count": 1,
-                }
-            },
-            "deleted_file_count": 5,
-            "deletion_review_skipped": False,
-        },
+        scan_result=scan_result_fixture(
+            scannable_file_count=10,
+            scanned_file_count=8,
+            skipped_file_count=2,
+            candidate_count=4,
+            case_count=3,
+            suppressed_candidate_count=1,
+            deleted_file_count=5,
+            deletion_review_skipped=False,
+        ),
         delivery_result=None,
         case_results=[],
     )
@@ -176,10 +169,7 @@ def test_repository_workflow_builder_derives_scan_summary_from_scan_results() ->
 
 def test_repository_workflow_builder_emits_json_serializable_public_payload() -> None:
     result = build_repository_workflow_result(
-        scan_result={
-            "discovery_result": {"counts": {}},
-            "triage_result": {"counts": {}},
-        },
+        scan_result=scan_result_fixture(),
         delivery_result={"deliveries": [{"delivery_id": "partial"}]},
         case_results=[],
     )

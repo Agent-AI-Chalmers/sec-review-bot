@@ -27,6 +27,7 @@ from sec_review_agents.runtime.structured_response_middleware import (
 from sec_review_agents.runtime.summarization_middleware import (
     create_summarization_middleware,
 )
+from sec_review_agents.scan_stages.discovery.input import DiscoveryChunk
 
 DISCOVERY_AGENT_NAME = "repository-discovery"
 
@@ -34,12 +35,12 @@ DISCOVERY_AGENT_NAME = "repository-discovery"
 async def run_repository_discovery_agent(
     *,
     backend,
-    chunk: Mapping[str, Any],
+    chunk: DiscoveryChunk,
     system_prompt: str | None = None,
     user_prompt: str,
     trajectory_paths: tuple[Path, ...] = (),
 ) -> DiscoveryOutput:
-    chunk_id = str((chunk or {}).get("chunk_id") or "").strip()
+    chunk_id = chunk.chunk_id
     if not chunk_id:
         raise ValueError("Discovery agent requires chunk.chunk_id.")
 

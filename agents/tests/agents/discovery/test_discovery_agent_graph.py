@@ -7,11 +7,12 @@ from sec_review_agents.agents.discovery.agent import (
     run_repository_discovery_agent,
 )
 from sec_review_agents.agents.discovery.model import DiscoveryOutput
+from sec_review_agents.scan_stages.discovery.input import DiscoveryChunk
 
 
 @pytest.mark.asyncio
 async def test_create_agent_uses_skills_filesystem_and_diagnostics_middleware() -> None:
-    entry = {"chunk_id": "chunk-1", "path": "src/server.js"}
+    entry = DiscoveryChunk(chunk_id="chunk-1", entries=[], token_count=0)
 
     with (
         patch(

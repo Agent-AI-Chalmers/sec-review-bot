@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, model_validator
 
+from sec_review_agents.scan_stages.discovery.result import DiscoveryCandidateResult
 from sec_review_agents.scan_stages.triage.result import (
     SuppressedCandidate,
     TriageCase,
@@ -97,8 +98,7 @@ class _TriageItem:
     item_id: str
     # Keep the original discovery candidate for system export; expose only payload
     # to the agent as the workbench item's evidence.
-    candidate: dict[str, Any] = field(default_factory=dict)
-    payload: dict[str, Any] = field(default_factory=dict)
+    candidate: DiscoveryCandidateResult
 
 
 @dataclass
@@ -121,19 +121,18 @@ class TriageWorkbenchState:
     _next_group_number: int = 1
 
     @classmethod
-    def from_candidates(cls, candidates: list[dict[str, Any]]) -> TriageWorkbenchState:
+    def from_candidates(
+        cls, candidates: list[DiscoveryCandidateResult]
+    ) -> TriageWorkbenchState:
         ordered_item_ids: list[str] = []
         items_by_id: dict[str, _TriageItem] = {}
         for candidate in candidates:
-            if not isinstance(candidate, dict):
-                continue
-            item_id = _normalized_id(candidate.get("candidate_id"))
+            item_id = _normalized_id(candidate.candidate_id)
             if item_id is None or item_id in items_by_id:
                 continue
             items_by_id[item_id] = _TriageItem(
                 item_id=item_id,
-                candidate=dict(candidate),
-                payload=_candidate_payload(candidate),
+                candidate=candidate,
             )
             ordered_item_ids.append(item_id)
         return cls(ordered_item_ids=ordered_item_ids, items_by_id=items_by_id)
@@ -285,8 +284,12 @@ class TriageWorkbenchState:
         cases, suppressed_candidates = self.export_cases_and_suppressions()
         return {
             "ok": True,
-            "cases": cases,
-            "suppressed_candidates": suppressed_candidates,
+            "cases": [
+                case.model_dump(mode="json", exclude_none=True) for case in cases
+            ],
+            "suppressed_candidates": [
+                item.model_dump(mode="json") for item in suppressed_candidates
+            ],
             "constraints": constraints,
         }
 
@@ -354,9 +357,9 @@ class TriageWorkbenchState:
                 cases.append(
                     build_case_from_candidates(
                         category=_normalized_text(group.category)
-                        or str(member_candidates[0].get("category") or "").strip(),
+                        or member_candidates[0].candidate.category.strip(),
                         summary=_normalized_text(group.summary)
-                        or str(member_candidates[0].get("description") or "").strip(),
+                        or member_candidates[0].candidate.description.strip(),
                         evidence=_non_empty_strings(group.evidence)
                         or _candidate_case_evidence(member_candidates[0]),
                         member_candidates=member_candidates,
@@ -366,13 +369,13 @@ class TriageWorkbenchState:
                 reason = _normalized_text(group.reason) or "suppressed"
                 for candidate in member_candidates:
                     suppressed_candidates.append(
-                        {
-                            "candidate_id": candidate["candidate_id"],
-                            "reason": reason,
-                            "category": candidate.get("category"),
-                        }
+                        SuppressedCandidate(
+                            candidate_id=candidate.candidate_id,
+                            reason=reason,
+                            category=candidate.candidate.category,
+                        )
                     )
-        cases.sort(key=lambda item: item["case_id"])
+        cases.sort(key=lambda item: item.case_id)
         return cases, suppressed_candidates
 
     def group_drafts(self) -> list[dict[str, Any]]:
@@ -391,7 +394,10 @@ class TriageWorkbenchState:
 
     def prompt_items(self) -> list[dict[str, Any]]:
         return [
-            {"item_id": item_id, "payload": self.items_by_id[item_id].payload}
+            {
+                "item_id": item_id,
+                "payload": _candidate_payload(self.items_by_id[item_id].candidate),
+            }
             for item_id in self.ordered_item_ids
             if item_id in self.items_by_id
         ]
@@ -569,13 +575,10 @@ class TriageWorkbenchState:
         self.edit_events.append({"operation": operation})
 
 
-def _candidate_payload(candidate: dict[str, Any]) -> dict[str, Any]:
+def _candidate_payload(candidate: DiscoveryCandidateResult) -> dict[str, Any]:
     return {
-        "category": candidate.get("category"),
-        "locations": candidate.get("locations") or [],
-        "description": candidate.get("description"),
-        "evidence": candidate.get("evidence") or [],
-        "grounding_status": candidate.get("grounding_status"),
+        **candidate.candidate.model_dump(mode="json", exclude_none=True),
+        "grounding_status": candidate.grounding_status,
     }
 
 
@@ -584,27 +587,27 @@ def build_case_from_candidates(
     category: str,
     summary: str,
     evidence: list[str],
-    member_candidates: list[dict[str, Any]],
+    member_candidates: list[DiscoveryCandidateResult],
 ) -> TriageCase:
     case_id = _stable_case_id(member_candidates)
     locations = [
         location
         for candidate in member_candidates
-        for location in candidate.get("locations") or []
+        for location in candidate.candidate.locations
     ]
-    return {
-        "case_id": case_id,
-        "category": category,
-        "summary": summary,
-        "evidence": _non_empty_strings(evidence),
-        "member_candidate_ids": [
-            candidate["candidate_id"] for candidate in member_candidates
+    return TriageCase(
+        case_id=case_id,
+        category=category,
+        summary=summary,
+        evidence=_non_empty_strings(evidence),
+        member_candidate_ids=[
+            candidate.candidate_id for candidate in member_candidates
         ],
-        "anchor_locations": locations,
-    }
+        anchor_locations=locations,
+    )
 
 
-def _stable_case_id(member_candidates: list[dict[str, Any]]) -> str:
+def _stable_case_id(member_candidates: list[DiscoveryCandidateResult]) -> str:
     candidate_components = sorted(
         _candidate_case_component(candidate) for candidate in member_candidates
     )
@@ -612,18 +615,18 @@ def _stable_case_id(member_candidates: list[dict[str, Any]]) -> str:
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:14]
 
 
-def _candidate_case_component(candidate: dict[str, Any]) -> str:
+def _candidate_case_component(candidate: DiscoveryCandidateResult) -> str:
     payload = {
-        "candidate_id": candidate.get("candidate_id"),
-        "category": candidate.get("category"),
+        "candidate_id": candidate.candidate_id,
+        "category": candidate.candidate.category,
         "locations": sorted(
-            f"{item.get('file') or ''!s}:{int(item.get('line') or 0)}"
-            for item in (candidate.get("locations") or [])
-            if int(item.get("line") or 0) > 0
+            f"{item.file}:{item.line}"
+            for item in candidate.candidate.locations
+            if item.line is not None and item.line > 0
         ),
         "evidence": [
             _normalized_key_fragment(item)[:120]
-            for item in (candidate.get("evidence") or [])
+            for item in candidate.candidate.evidence
             if _normalized_key_fragment(item)
         ],
     }
@@ -632,14 +635,12 @@ def _candidate_case_component(candidate: dict[str, Any]) -> str:
     ).hexdigest()[:24]
 
 
-def _candidate_case_evidence(candidate: dict[str, Any]) -> list[str]:
-    evidence = _non_empty_strings(candidate.get("evidence") or [])
+def _candidate_case_evidence(candidate: DiscoveryCandidateResult) -> list[str]:
+    evidence = _non_empty_strings(candidate.candidate.evidence)
     if evidence:
         return evidence
-    labels = _non_empty_strings(
-        [item.get("label") for item in (candidate.get("locations") or [])]
-    )
-    summary = str(candidate.get("description") or "").strip()
+    labels = _non_empty_strings([item.label for item in candidate.candidate.locations])
+    summary = candidate.candidate.description.strip()
     return labels or ([summary] if summary else [])
 
 

@@ -56,8 +56,8 @@ def test_paths_ignore_filters_scannable_entries(tmp_path: Path) -> None:
         scan_scope=input_data["scan_scope"],
         discovery_artifacts_path=Path(input_data["artifact_paths"]["discovery"]),
     )
-    entry_paths = {item["path"] for item in entries}
-    skipped_paths = {item["path"]: item["reason"] for item in skipped}
+    entry_paths = {item.path for item in entries}
+    skipped_paths = {item.path: item.reason for item in skipped}
 
     assert entry_paths == {"src/main.ts"}
     assert skipped_paths.get("src/bundle.min.js") == "paths-ignore"
@@ -72,8 +72,8 @@ def test_empty_paths_ignore_keeps_regular_files(tmp_path: Path) -> None:
         scan_scope=input_data["scan_scope"],
         discovery_artifacts_path=Path(input_data["artifact_paths"]["discovery"]),
     )
-    entry_paths = {item["path"] for item in entries}
-    skipped_paths = {item["path"]: item["reason"] for item in skipped}
+    entry_paths = {item.path for item in entries}
+    skipped_paths = {item.path: item.reason for item in skipped}
 
     assert "src/main.ts" in entry_paths
     assert "src/bundle.min.js" in entry_paths
@@ -126,8 +126,8 @@ def test_incremental_scan_manifest_scans_only_changed_files(tmp_path: Path) -> N
         changed_files=_load_incremental_changed_files(input_data["scan_scope"]),
         discovery_artifacts_path=Path(input_data["artifact_paths"]["discovery"]),
     )
-    entry_paths = {item["path"] for item in entries}
-    skipped_reasons = {item["path"]: item["reason"] for item in skipped}
+    entry_paths = {item.path for item in entries}
+    skipped_reasons = {item.path: item.reason for item in skipped}
 
     assert entry_paths == {"src/main.ts"}
     assert skipped_reasons.get("src/ignored.min.js") == "paths-ignore"

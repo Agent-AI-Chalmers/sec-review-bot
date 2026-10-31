@@ -4,9 +4,11 @@ from unittest.mock import patch, sentinel
 
 import pytest
 
+from sec_review_agents.agents.discovery.model import DiscoveryCandidate
 from sec_review_agents.agents.triage.agent import (
     run_repository_triage_agent as run_triage_agent,
 )
+from sec_review_agents.scan_stages.discovery.result import DiscoveryCandidateResult
 from sec_review_agents.scan_stages.triage.agent_passes import (
     run_repository_triage_agent,
 )
@@ -157,19 +159,36 @@ async def test_repository_triage_single_mode_passes_explicit_runtime_inputs(
     ) as pass_mock:
         result = await run_repository_triage_agent(
             triage_root=triage_root,
-            triage_candidates=[{"candidate_id": "candidate-a", "description": "A"}],
+            triage_candidates=[
+                DiscoveryCandidateResult(
+                    candidate_id="candidate-a",
+                    candidate=DiscoveryCandidate(
+                        category="xss", description="A", locations=[], evidence=[]
+                    ),
+                    grounding_status="grounded",
+                )
+            ],
             max_passes=2,
             triage_mode="single",
         )
 
-    assert result["metadata"]["triage_pass_count"] == 1
-    assert "agent_result" not in result
-    assert "agent_results" not in result
+    assert result.metadata.triage_pass_count == 1
+    assert "agent_result" not in result.model_dump()
+    assert "agent_results" not in result.model_dump()
     assert pass_mock.call_args.kwargs["triage_root"] == triage_root
     assert pass_metas == [None]
     assert json.loads((triage_root / "triage-input.json").read_text()) == {
         "summary": {"candidate_count": 1},
-        "candidates": [{"candidate_id": "candidate-a", "description": "A"}],
+        "candidates": [
+            {
+                "candidate_id": "candidate-a",
+                "category": "xss",
+                "description": "A",
+                "locations": [],
+                "evidence": [],
+                "grounding_status": "grounded",
+            }
+        ],
     }
 
 
@@ -185,6 +204,6 @@ async def test_repository_triage_batched_mode_uses_explicit_runtime_inputs(
         max_batch_size=2,
     )
 
-    assert result["metadata"]["triage_pass_count"] == 0
-    assert "agent_result" not in result
-    assert "agent_results" not in result
+    assert result.metadata.triage_pass_count == 0
+    assert "agent_result" not in result.model_dump()
+    assert "agent_results" not in result.model_dump()

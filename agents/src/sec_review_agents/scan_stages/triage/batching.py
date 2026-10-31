@@ -1,10 +1,11 @@
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
-from typing import Any
+from collections.abc import Sequence
+
+from sec_review_agents.scan_stages.discovery.result import DiscoveryCandidateResult
 
 
 def triage_candidate_batches(
-    candidates: Sequence[Mapping[str, Any]], *, max_batch_size: int
+    candidates: Sequence[DiscoveryCandidateResult], *, max_batch_size: int
 ) -> list[list[str]]:
     if max_batch_size <= 0:
         raise ValueError("max_batch_size must be positive.")
@@ -13,7 +14,7 @@ def triage_candidate_batches(
 
     buckets: dict[str, list[str]] = defaultdict(list)
     for candidate in candidates:
-        candidate_id = str(candidate.get("candidate_id") or "").strip()
+        candidate_id = candidate.candidate_id.strip()
         if not candidate_id:
             continue
         buckets[_primary_path_key(candidate)].append(candidate_id)
@@ -44,19 +45,17 @@ def triage_candidate_batches(
     return batches
 
 
-def _primary_path_key(candidate: Mapping[str, Any]) -> str:
+def _primary_path_key(candidate: DiscoveryCandidateResult) -> str:
     paths = sorted(
         {
-            str(location.get("file") or "").strip()
-            for location in (candidate.get("locations") or [])
-            if isinstance(location, dict) and str(location.get("file") or "").strip()
+            location.file.strip()
+            for location in candidate.candidate.locations
+            if location.file.strip()
         }
     )
     if paths:
         return paths[0]
-    return (
-        f"__no_location_file__::{str(candidate.get('category') or '').strip().lower()}"
-    )
+    return f"__no_location_file__::{candidate.candidate.category.strip().lower()}"
 
 
 __all__ = ["triage_candidate_batches"]
