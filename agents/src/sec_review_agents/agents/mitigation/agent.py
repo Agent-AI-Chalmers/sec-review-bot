@@ -14,8 +14,7 @@ from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.mcp.client import managed_mcp_tools_async
 from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
 from sec_review_agents.runtime.agent_runtime_graph import (
-    build_agent_runtime_graph,
-    invoke_agent_runtime_graph,
+    run_agent_runtime_graph,
 )
 from sec_review_agents.runtime.changed_files_acceptance_middleware import (
     ChangedFilesAcceptanceMiddleware,
@@ -97,7 +96,7 @@ async def run_mitigation_agent(
 
     connections = resolve_agent_mcp_connections(MITIGATION_AGENT_MCP_TOOLS, backend)
     async with managed_mcp_tools_async(connections) as mcp_tools:
-        agent = await build_agent_runtime_graph(
+        result = await run_agent_runtime_graph(
             model=model,
             agent_name=agent_name,
             backend=backend,
@@ -105,11 +104,9 @@ async def run_mitigation_agent(
             response_format=MitigationOutput,
             tools=mcp_tools,
             middleware=agent_middleware,
-        )
-        return await invoke_agent_runtime_graph(
-            agent=agent,
-            agent_name=agent_name,
-            system_prompt=system_prompt,
             user_prompt=user_prompt,
             trajectory_paths=trajectory_paths,
         )
+
+        # These stage callers still consume the existing dictionary contract.
+        return result.model_dump(by_alias=True)

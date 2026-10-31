@@ -1,13 +1,13 @@
+from pathlib import Path
 from typing import Any
 
 from deepagents.backends.protocol import BackendProtocol
 from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from langchain.agents.middleware import AgentMiddleware
-from langgraph.graph.state import CompiledStateGraph
 
 from sec_review_agents.agents.cvss.model import CvssV4ScoringOutput
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
+from sec_review_agents.runtime.agent_runtime_graph import run_agent_runtime_graph
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
 from sec_review_agents.runtime.model_turn_diagnostics import (
     ModelTurnDiagnosticsMiddleware,
@@ -22,13 +22,15 @@ from sec_review_agents.runtime.summarization_middleware import (
 )
 
 
-async def create_cvss_agent_graph(
+async def run_cvss_agent(
     *,
     agent_name: str,
     backend: BackendProtocol,
     system_prompt: str,
     filesystem_system_prompt: str,
-) -> CompiledStateGraph:
+    user_prompt: str,
+    trajectory_paths: tuple[Path, ...] = (),
+) -> CvssV4ScoringOutput:
     model = create_chat_model(agent_name=agent_name)
     agent_middleware: list[AgentMiddleware[Any, Any, Any]] = [
         MissingStructuredResponseMiddleware(
@@ -47,7 +49,9 @@ async def create_cvss_agent_graph(
     if model_turn_diagnostics_enabled():
         agent_middleware.append(ModelTurnDiagnosticsMiddleware(agent_name=agent_name))
 
-    return await build_agent_runtime_graph(
+    return await run_agent_runtime_graph(
+        user_prompt=user_prompt,
+        trajectory_paths=trajectory_paths,
         model=model,
         agent_name=agent_name,
         backend=backend,

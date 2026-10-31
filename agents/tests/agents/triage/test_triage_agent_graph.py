@@ -5,7 +5,7 @@ from unittest.mock import patch, sentinel
 import pytest
 
 from sec_review_agents.agents.triage.agent import (
-    create_repository_triage_agent_graph,
+    run_repository_triage_agent as run_triage_agent,
 )
 from sec_review_agents.scan_stages.triage.agent_passes import (
     run_repository_triage_agent,
@@ -16,6 +16,10 @@ from sec_review_agents.scan_stages.triage.stage import REPOSITORY_TRIAGER_AGENT_
 @pytest.mark.asyncio
 async def test_repository_triage_enables_scanner_finding_skill_without_todo() -> None:
     with (
+        patch(
+            "sec_review_agents.runtime.agent_runtime_graph.invoke_agent_runtime_graph",
+            return_value=sentinel.agent,
+        ),
         patch(
             "sec_review_agents.agents.triage.agent.SkillsMiddleware",
             return_value=sentinel.skills_middleware,
@@ -62,7 +66,7 @@ async def test_repository_triage_enables_scanner_finding_skill_without_todo() ->
             return_value=True,
         ),
     ):
-        agent = await create_repository_triage_agent_graph(backend=sentinel.backend)
+        agent = await run_triage_agent(user_prompt="task", backend=sentinel.backend)
 
     assert agent is sentinel.agent
     kwargs = create_mock.call_args.kwargs
@@ -85,6 +89,10 @@ async def test_repository_triage_respects_missing_structured_response_retry_env(
     None
 ):
     with (
+        patch(
+            "sec_review_agents.runtime.agent_runtime_graph.invoke_agent_runtime_graph",
+            return_value=sentinel.agent,
+        ),
         patch.dict(
             "os.environ",
             {"AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES": "0"},
@@ -120,7 +128,7 @@ async def test_repository_triage_respects_missing_structured_response_retry_env(
             return_value=True,
         ),
     ):
-        await create_repository_triage_agent_graph(backend=sentinel.backend)
+        await run_triage_agent(user_prompt="task", backend=sentinel.backend)
 
     missing_structured_response_mock.assert_called_once_with(max_retries=0)
 

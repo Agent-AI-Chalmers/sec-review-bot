@@ -3,10 +3,10 @@ from pathlib import Path
 from typing import Any
 
 from sec_review_agents.agents.verification.issue import (
+    build_issue_verification_backend_config,
     build_issue_verification_filesystem_system_prompt,
     build_issue_verification_system_prompt,
     build_issue_verification_user_prompt,
-    create_issue_verification_backend,
 )
 from sec_review_agents.review_stages.verification.stage import (
     reset_verification_attempt_artifacts,
@@ -55,10 +55,9 @@ async def verify_issue(
         workspace_patch=workspace_patch,
         mitigation_result=mitigation_result,
         setup_declaration_content=setup_declaration_content,
-        build_backend=lambda workspace_root_path, memory_path_view: create_issue_verification_backend(
+        build_backend_config=lambda workspace_root_path: build_issue_verification_backend_config(
             workspace_root_path=workspace_root_path,
             history_path=history_path,
-            memory_path_view=memory_path_view,
             runtime_context=runtime_context,
         ),
         system_prompt=build_issue_verification_system_prompt(

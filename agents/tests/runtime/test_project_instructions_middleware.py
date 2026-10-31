@@ -213,11 +213,8 @@ async def test_review_agents_load_guidance_independently_of_experience_memory(
     monkeypatch.setattr(module, "create_chat_model", Mock())
     monkeypatch.setattr(module, "create_summarization_middleware", Mock())
     monkeypatch.setattr(module, "agent_skills_enabled", lambda: False)
-    build = AsyncMock()
-    monkeypatch.setattr(module, "build_agent_runtime_graph", build)
-    monkeypatch.setattr(
-        module, "invoke_agent_runtime_graph", AsyncMock(return_value={})
-    )
+    build = AsyncMock(return_value=Mock(model_dump=Mock(return_value={})))
+    monkeypatch.setattr(module, "run_agent_runtime_graph", build)
     monkeypatch.setenv("AGENT_MCP_ENABLED", "false")
     kwargs = {
         "agent_name": "test",

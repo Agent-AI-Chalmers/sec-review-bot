@@ -7,6 +7,7 @@ import pytest
 from temporalio import activity
 from temporalio.worker import Worker
 
+from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.workflows.repository_case import stage as case_workflow
 from sec_review_agents.workflows.repository_case.input import (
     RepositoryCaseExecutionInput,
@@ -74,8 +75,13 @@ async def _mitigation_error_stage_result(tmp_path: Path) -> dict[str, Any]:
 
     with (
         patch(
-            "sec_review_agents.workflows.repository_case.mitigation.create_repository_mitigation_backend",
-            return_value=object(),
+            "sec_review_agents.workflows.repository_case.mitigation.build_repository_mitigation_backend_config",
+            return_value=BackendConfig(
+                container_name_prefix="test",
+                path_views=[],
+                image=None,
+                backend_kind="local",
+            ),
         ),
         patch(
             "sec_review_agents.review_stages.mitigation.stage.run_mitigation_agent",
@@ -109,8 +115,13 @@ async def test_repository_case_verifier_exception_is_raised_for_activity_retry(
 
     with (
         patch(
-            "sec_review_agents.workflows.repository_case.verification.create_repository_verification_backend",
-            return_value=object(),
+            "sec_review_agents.workflows.repository_case.verification.build_repository_verification_backend_config",
+            return_value=BackendConfig(
+                container_name_prefix="test",
+                path_views=[],
+                image=None,
+                backend_kind="local",
+            ),
         ),
         patch(
             "sec_review_agents.review_stages.verification.stage.run_verification_agent",

@@ -6,6 +6,7 @@ import pytest
 from deepagents.backends import CompositeBackend
 
 from sec_review_agents.filesystem.backend_factory import (
+    BackendConfig,
     create_backend_with_path_views,
 )
 from sec_review_agents.filesystem.backend_selection import (
@@ -412,3 +413,31 @@ def test_docker_path_view_rejects_missing_source_directory(tmp_path: Path) -> No
         )
 
     assert not missing_source.exists()
+
+
+@pytest.mark.parametrize("explicit_none", [False, True])
+def test_backend_config_uses_factory_defaults(monkeypatch, explicit_none: bool) -> None:
+    config = BackendConfig(container_name_prefix="defaults-probe", path_views=[])
+    if explicit_none:
+        config.update({"image": None, "backend_kind": None})
+    monkeypatch.setattr(
+        "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
+        lambda: "bwrap",
+    )
+    backend = create_backend_with_path_views(**config)
+    assert isinstance(backend, BwrapSandboxBackend)
+    assert backend.working_directory == "/workspace"
+    assert not backend._is_allowed_path("/workspace/app.py")
+
+
+def test_backend_config_can_override_working_directory(tmp_path: Path) -> None:
+    config = BackendConfig(
+        container_name_prefix="directory-probe",
+        path_views=[read_only_path_view(agent_path="/source", host_path=tmp_path)],
+        working_directory="/source",
+        backend_kind="bwrap",
+    )
+    backend = create_backend_with_path_views(**config)
+    assert isinstance(backend, BwrapSandboxBackend)
+    assert backend.working_directory == "/source"
+    assert backend._is_allowed_path("/source/app.py")

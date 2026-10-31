@@ -5,10 +5,15 @@ from unittest.mock import Mock, patch, sentinel
 import pytest
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.callbacks.manager import CallbackManager
+from pydantic import BaseModel
 
 from sec_review_agents.observability.tracing import TracingConfig
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.trajectories import read_trajectory_messages
+
+
+class ProbeOutput(BaseModel):
+    status: str
 
 
 def _stream(*updates: dict[str, Any], error: Exception | None = None):
@@ -29,7 +34,7 @@ def _successful_agent(*, messages: list[Any] | None = None) -> Mock:
             {
                 "model": {
                     "messages": messages or [],
-                    "structured_response": {"status": "ok"},
+                    "structured_response": ProbeOutput(status="ok"),
                 }
             }
         )
@@ -60,6 +65,7 @@ async def test_invoke_returns_structured_response_after_success(
     ):
         trajectory_path = tmp_path / "trajectory.jsonl"
         result = await invoke_agent_runtime_graph(
+            response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
             system_prompt="",
@@ -69,7 +75,7 @@ async def test_invoke_returns_structured_response_after_success(
         )
         trajectory_messages = read_trajectory_messages(trajectory_path)
 
-    assert result == {"status": "ok"}
+    assert result == ProbeOutput(status="ok")
     invoke_config = agent.astream.call_args.kwargs["config"]
     assert invoke_config["metadata"] == {
         "scope": "unit",
@@ -116,6 +122,7 @@ async def test_trajectory_callback_does_not_mark_langfuse_tracing_enabled(
         ),
     ):
         await invoke_agent_runtime_graph(
+            response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
             system_prompt="",
@@ -168,6 +175,7 @@ async def test_trajectory_export_preserves_callback_manager(
         ),
     ):
         await invoke_agent_runtime_graph(
+            response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
             system_prompt="",
@@ -194,7 +202,7 @@ async def test_invoke_uses_async_agent_stream() -> None:
                 "stream_mode": stream_mode,
             }
         )
-        yield {"model": {"structured_response": {"status": "ok"}}}
+        yield {"model": {"structured_response": ProbeOutput(status="ok")}}
 
     agent = Mock()
     agent.astream = astream
@@ -216,13 +224,14 @@ async def test_invoke_uses_async_agent_stream() -> None:
         ),
     ):
         result = await invoke_agent_runtime_graph(
+            response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
             system_prompt="",
             user_prompt="prompt",
         )
 
-    assert result == {"status": "ok"}
+    assert result == ProbeOutput(status="ok")
     assert len(astream_calls) == 1
     assert astream_calls[0]["payload"]["messages"][0].content == "prompt"
     assert astream_calls[0]["stream_mode"] == "updates"
@@ -249,13 +258,14 @@ async def test_invoke_uses_async_agent_without_sync_wrapper() -> None:
         ),
     ):
         result = await invoke_agent_runtime_graph(
+            response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
             system_prompt="",
             user_prompt="prompt",
         )
 
-    assert result == {"status": "ok"}
+    assert result == ProbeOutput(status="ok")
     agent.astream.assert_called_once()
 
 
@@ -282,6 +292,7 @@ async def test_invoke_logs_failure_and_reraises() -> None:
         pytest.raises(RuntimeError, match="boom"),
     ):
         await invoke_agent_runtime_graph(
+            response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
             system_prompt="",
@@ -316,6 +327,7 @@ async def test_stream_failure_preserves_completed_message_updates(
 
     with pytest.raises(RuntimeError, match="boom"):
         await invoke_agent_runtime_graph(
+            response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
             system_prompt="system",
@@ -358,6 +370,7 @@ async def test_missing_structured_response_raises() -> None:
         pytest.raises(RuntimeError, match="without structured_response"),
     ):
         await invoke_agent_runtime_graph(
+            response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
             system_prompt="",
@@ -406,6 +419,7 @@ async def test_trajectory_messages_cover_message_dump_fields(
         ),
     ):
         await invoke_agent_runtime_graph(
+            response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
             system_prompt="",
@@ -430,3 +444,53 @@ async def test_trajectory_messages_cover_message_dump_fields(
         "usage_metadata",
     }
     assert message["content"] == "hello"
+
+
+@pytest.mark.asyncio
+async def test_model_response_is_preserved_without_serialization() -> None:
+    """Discovery must keep the validated model rather than dump and reconstruct it."""
+    from sec_review_agents.agents.discovery.model import DiscoveryOutput
+
+    output = DiscoveryOutput.model_validate(
+        {
+            "candidates": [
+                {
+                    "category": "injection",
+                    "description": "Untrusted query",
+                    "locations": [{"file": "app.py", "label": "query", "line": 2}],
+                    "evidence": ["execute(query)"],
+                }
+            ]
+        }
+    )
+    agent = _successful_agent()
+    agent.astream = Mock(
+        side_effect=_stream({"model": {"structured_response": output}})
+    )
+    result = await invoke_agent_runtime_graph(
+        agent=agent,
+        response_format=DiscoveryOutput,
+        agent_name="model-probe",
+        system_prompt="",
+        user_prompt="probe",
+    )
+    assert result is output
+    assert result.candidates[0].locations[0].line == 2
+
+
+@pytest.mark.asyncio
+async def test_model_consumer_rejects_unvalidated_dictionary() -> None:
+    from sec_review_agents.agents.discovery.model import DiscoveryOutput
+
+    agent = _successful_agent()
+    agent.astream = Mock(
+        side_effect=_stream({"model": {"structured_response": {"candidates": []}}})
+    )
+    with pytest.raises(TypeError, match="Expected DiscoveryOutput"):
+        await invoke_agent_runtime_graph(
+            agent=agent,
+            response_format=DiscoveryOutput,
+            agent_name="model-probe",
+            system_prompt="",
+            user_prompt="probe",
+        )

@@ -5,11 +5,12 @@ from unittest.mock import patch
 import pytest
 
 from sec_review_agents.agents.analysis.repository import (
-    create_repository_analyzer_backend,
+    build_repository_analyzer_backend_config,
 )
 from sec_review_agents.agents.verification.repository import (
-    create_repository_verification_backend,
+    build_repository_verification_backend_config,
 )
+from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.filesystem.docker_backend import DockerSandboxBackend
 from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
@@ -40,11 +41,13 @@ def test_repository_analyzer_docker_tmp_write_and_execute_contract(
         "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
         return_value="docker",
     ):
-        backend = create_repository_analyzer_backend(
-            workspace_root_path=workspace,
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
+        backend = create_backend_with_path_views(
+            **build_repository_analyzer_backend_config(
+                workspace_root_path=workspace,
+                history_path=None,
+                incremental_window_path=None,
+                scan_mode="full",
+            )
         )
     assert isinstance(backend, DockerSandboxBackend)
 
@@ -69,11 +72,13 @@ def test_repository_verifier_docker_tmp_execute_contract(tmp_path: Path) -> None
         "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
         return_value="docker",
     ):
-        backend = create_repository_verification_backend(
-            workspace_root_path=workspace,
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
+        backend = create_backend_with_path_views(
+            **build_repository_verification_backend_config(
+                workspace_root_path=workspace,
+                history_path=None,
+                incremental_window_path=None,
+                scan_mode="full",
+            )
         )
     assert isinstance(backend, DockerSandboxBackend)
 

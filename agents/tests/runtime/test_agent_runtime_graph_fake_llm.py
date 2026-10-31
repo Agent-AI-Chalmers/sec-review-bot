@@ -9,7 +9,10 @@ from langchain.agents.middleware import SummarizationMiddleware
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from pydantic import BaseModel, Field
 
-from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
+from sec_review_agents.runtime.agent_runtime_graph import (
+    invoke_agent_runtime_graph,
+    run_agent_runtime_graph,
+)
 from sec_review_agents.runtime.changed_files_acceptance_middleware import (
     ChangedFilesAcceptanceMiddleware,
 )
@@ -76,16 +79,12 @@ async def test_structured_output_agent_continues_after_prose_only_model_turn() -
             ),
         ]
     )
-    agent = create_agent(
-        model=model,
-        tools=[],
-        response_format=PatchClaimProbeOutput,
-        system_prompt="Return the configured structured response.",
-    )
     with tempfile.TemporaryDirectory() as tempdir:
         trajectory_path = Path(tempdir) / "trajectory.jsonl"
-        result = await invoke_agent_runtime_graph(
-            agent=agent,
+        result = await run_agent_runtime_graph(
+            response_format=PatchClaimProbeOutput,
+            model=model,
+            backend=None,
             agent_name="fake-missing-structured-response",
             system_prompt="Return the configured structured response.",
             user_prompt="Return a patch claim.",
@@ -93,7 +92,7 @@ async def test_structured_output_agent_continues_after_prose_only_model_turn() -
         )
         trajectory_messages = read_trajectory_messages(trajectory_path)
 
-    assert result["changed_files"] == ["a.txt"]
+    assert result.changed_files == ["a.txt"]
     assert trajectory_messages[0]["type"] == "system"
     assert (
         trajectory_messages[2]["content"] == "I found the answer but forgot the schema."
@@ -157,6 +156,7 @@ async def test_trajectory_preserves_messages_replaced_by_summarization(
     trajectory_path = tmp_path / "trajectory.jsonl"
 
     await invoke_agent_runtime_graph(
+        response_format=PatchClaimProbeOutput,
         agent=agent,
         agent_name="summarized-trajectory-probe",
         system_prompt="Review redirect behavior.",

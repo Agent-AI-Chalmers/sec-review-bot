@@ -10,6 +10,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.config import merge_configs
 from langgraph.graph.state import CompiledStateGraph
+from pydantic import BaseModel
 
 from sec_review_agents.observability.diagnostics import (
     log_agent_configuration,
@@ -23,6 +24,44 @@ from sec_review_agents.observability.tracing import (
 )
 from sec_review_agents.runtime.trajectories import TrajectoryWriter
 from sec_review_agents.utils.limit import compute_graph_recursion_limit
+
+
+async def run_agent_runtime_graph[T: BaseModel](
+    *,
+    agent_name: str,
+    model: BaseChatModel,
+    backend: BackendProtocol | None,
+    system_prompt: str,
+    response_format: type[T],
+    user_prompt: str,
+    tools: list[Any] | None = None,
+    middleware: Sequence[AgentMiddleware[Any, Any, Any]] | None = None,
+    trajectory_paths: tuple[Path, ...] = (),
+    config: RunnableConfig | None = None,
+) -> T:
+    """Build and invoke a graph with one shared output type, name, and prompt.
+
+    response_format must be a Pydantic model class.
+    The caller must keep tool resources alive for the duration of this call.
+    """
+    agent = await build_agent_runtime_graph(
+        agent_name=agent_name,
+        model=model,
+        backend=backend,
+        system_prompt=system_prompt,
+        response_format=response_format,
+        tools=tools,
+        middleware=middleware,
+    )
+    return await invoke_agent_runtime_graph(
+        agent=agent,
+        response_format=response_format,
+        agent_name=agent_name,
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+        trajectory_paths=trajectory_paths,
+        config=config,
+    )
 
 
 async def build_agent_runtime_graph(
@@ -60,16 +99,22 @@ async def build_agent_runtime_graph(
     return agent
 
 
-async def invoke_agent_runtime_graph(
+async def invoke_agent_runtime_graph[T: BaseModel](
     *,
     agent: CompiledStateGraph,
+    response_format: type[T],
     agent_name: str,
     system_prompt: str,
     user_prompt: str,
     trajectory_paths: tuple[Path, ...] = (),
     config: RunnableConfig | None = None,
-) -> dict:
-    """Return only the agent's structured payload, not its messages or graph state."""
+) -> T:
+    """Return the graph's validated model instance without serializing it.
+
+    response_format is the Pydantic model class already configured on the graph;
+    it checks the result without changing the graph's output schema. Callers
+    that require dictionaries serialize the model at their own boundary.
+    """
 
     recursion_limit = compute_graph_recursion_limit(agent)
     tracing_config = build_tracing_config(
@@ -95,7 +140,7 @@ async def invoke_agent_runtime_graph(
             [SystemMessage(content=system_prompt), user_message]
         )
 
-    async def invoke_agent() -> dict:
+    async def invoke_agent() -> Any:
         structured_result: Any | None = None
         async for update in agent.astream(
             {"messages": [user_message]},
@@ -114,27 +159,24 @@ async def invoke_agent_runtime_graph(
                 candidate = node_update.get("structured_response")
                 if candidate is not None:
                     structured_result = candidate
-        return {"structured_response": structured_result}
+        return structured_result
 
     try:
-        agent_result_mapping = await invoke_agent()
-        structured_result = agent_result_mapping.get("structured_response")
+        structured_result = await invoke_agent()
         if structured_result is None:
             raise RuntimeError("Agent completed without structured_response.")
 
+        if not isinstance(structured_result, response_format):
+            raise TypeError(
+                f"Expected {response_format.__name__} structured response, "
+                f"got {type(structured_result).__name__}."
+            )
         log_agent_invocation_succeeded(
             agent_name=agent_name,
             started_at=started_at,
             structured_response=structured_result,
         )
-
-        if hasattr(structured_result, "model_dump"):
-            structured_payload = structured_result.model_dump(by_alias=True)
-        elif isinstance(structured_result, Mapping):
-            structured_payload = dict(structured_result)
-        else:
-            structured_payload = dict(structured_result)
-        return structured_payload
+        return structured_result
     except Exception as error:
         log_agent_invocation_failed(
             agent_name=agent_name,

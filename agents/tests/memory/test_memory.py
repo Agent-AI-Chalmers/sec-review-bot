@@ -584,12 +584,12 @@ async def test_analysis_agent_enables_memory_when_runtime_memory_exists(
             return_value=Mock(),
         ),
         patch(
-            "sec_review_agents.agents.analysis.agent.build_agent_runtime_graph",
+            "sec_review_agents.runtime.agent_runtime_graph.build_agent_runtime_graph",
             side_effect=fake_build_agent_runtime_graph,
         ),
         patch(
-            "sec_review_agents.agents.analysis.agent.invoke_agent_runtime_graph",
-            return_value={},
+            "sec_review_agents.runtime.agent_runtime_graph.invoke_agent_runtime_graph",
+            return_value=Mock(model_dump=Mock(return_value={})),
         ),
     ):
         await run_analysis_agent(
@@ -668,12 +668,12 @@ async def test_analysis_agent_leaves_memory_disabled_when_runtime_memory_is_miss
             return_value=Mock(),
         ),
         patch(
-            "sec_review_agents.agents.analysis.agent.build_agent_runtime_graph",
+            "sec_review_agents.runtime.agent_runtime_graph.build_agent_runtime_graph",
             side_effect=fake_build_agent_runtime_graph,
         ),
         patch(
-            "sec_review_agents.agents.analysis.agent.invoke_agent_runtime_graph",
-            return_value={},
+            "sec_review_agents.runtime.agent_runtime_graph.invoke_agent_runtime_graph",
+            return_value=Mock(model_dump=Mock(return_value={})),
         ),
     ):
         await run_analysis_agent(

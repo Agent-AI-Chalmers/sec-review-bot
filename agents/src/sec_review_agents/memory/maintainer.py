@@ -6,17 +6,15 @@ from pathlib import Path
 
 from sec_review_agents.agents.memory_maintainer.agent import (
     MEMORY_MAINTAINER_AGENT_NAME,
-    create_memory_maintainer_agent_graph,
+    run_memory_maintainer_agent,
 )
 from sec_review_agents.agents.memory_maintainer.prompts import (
-    MEMORY_MAINTAINER_SYSTEM_PROMPT,
     build_maintenance_prompt,
 )
 from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.filesystem.path_views import writable_memory_view
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.memory.memory_tree_artifact import DEFAULT_MEMORY_INDEX
-from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 
@@ -89,15 +87,10 @@ async def maintain_memory_tree(
         deployment_override=deployment,
     )
     async with amanaged_backend(backend):
-        agent = await create_memory_maintainer_agent_graph(
+        await run_memory_maintainer_agent(
             model=model,
             backend=backend,
             worktree_root=worktree_root,
-        )
-        await invoke_agent_runtime_graph(
-            agent=agent,
-            agent_name=MEMORY_MAINTAINER_AGENT_NAME,
-            system_prompt=MEMORY_MAINTAINER_SYSTEM_PROMPT,
             user_prompt=build_maintenance_prompt(prompt_observations),
             trajectory_paths=(maintainer_trajectory_path,),
         )

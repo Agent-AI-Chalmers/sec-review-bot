@@ -7,7 +7,7 @@ import pytest
 from pydantic import ValidationError
 
 import sec_review_agents.scan_stages.discovery.stage as discovery_stage
-from sec_review_agents.agents.discovery.model import DiscoveryLocation
+from sec_review_agents.agents.discovery.model import DiscoveryLocation, DiscoveryOutput
 from sec_review_agents.runtime.trajectories import (
     TrajectoryWriter,
     read_trajectory_messages,
@@ -119,12 +119,8 @@ async def test_execute_discovery_raises_agent_runtime_errors() -> None:
 
     with (
         patch(
-            "sec_review_agents.scan_stages.discovery.execution.invoke_agent_runtime_graph",
+            "sec_review_agents.scan_stages.discovery.execution.run_discovery_agent",
             side_effect=fake_invoke_agent_runtime_graph,
-        ),
-        patch(
-            "sec_review_agents.scan_stages.discovery.execution.create_repository_discovery_agent_graph",
-            return_value=object(),
         ),
         patch(
             "sec_review_agents.scan_stages.discovery.execution.build_repository_discovery_user_prompt",
@@ -168,17 +164,13 @@ async def test_execute_discovery_persists_chunk_message_history(
     async def fake_invoke_agent_runtime_graph(**kwargs):
         writer = TrajectoryWriter(kwargs["trajectory_paths"])
         writer.write_messages([FakeMessage()])
-        return {"candidates": []}
+        return DiscoveryOutput(candidates=[])
 
     artifact_root = tmp_path
     with (
         patch(
-            "sec_review_agents.scan_stages.discovery.execution.invoke_agent_runtime_graph",
+            "sec_review_agents.scan_stages.discovery.execution.run_discovery_agent",
             side_effect=fake_invoke_agent_runtime_graph,
-        ),
-        patch(
-            "sec_review_agents.scan_stages.discovery.execution.create_repository_discovery_agent_graph",
-            return_value=object(),
         ),
         patch(
             "sec_review_agents.scan_stages.discovery.execution.build_repository_discovery_user_prompt",

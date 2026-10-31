@@ -3,20 +3,17 @@ from pathlib import Path
 from typing import Any, Literal
 
 from sec_review_agents.agents.triage.agent import (
-    REPOSITORY_TRIAGER_AGENT_NAME,
-    create_repository_triage_agent_graph,
+    run_repository_triage_agent as run_triage_agent,
 )
 from sec_review_agents.agents.triage.backend import (
     create_repository_triage_backend,
 )
 from sec_review_agents.agents.triage.prompts import (
     TriagePassKind,
-    build_repository_triage_system_prompt,
     build_repository_triage_user_prompt,
 )
 from sec_review_agents.agents.triage.workbench_state import TriageWorkbenchState
 from sec_review_agents.observability.trace_context import bind_trace_context
-from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.trajectories import remove_trajectories, trajectory_path
 from sec_review_agents.scan_stages.triage.batching import triage_candidate_batches
@@ -244,11 +241,6 @@ async def _run_repository_triage_agent_pass(
     remove_trajectories((trajectory_path(pass_artifacts_path),))
     backend = create_repository_triage_backend()
     async with amanaged_backend(backend):
-        agent = await create_repository_triage_agent_graph(
-            backend=backend,
-            workbench_state=workbench_state,
-            pass_kind=pass_kind,
-        )
         # The activity-level context identifies the run. These local labels explain
         # why one triage stage can produce several otherwise identical invocations.
         with bind_trace_context(
@@ -256,19 +248,21 @@ async def _run_repository_triage_agent_pass(
             pass_index=str(pass_index),
             batch_index=batch_index,
         ):
-            return await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=REPOSITORY_TRIAGER_AGENT_NAME,
-                system_prompt=build_repository_triage_system_prompt(
-                    pass_kind=pass_kind
-                ),
-                user_prompt=build_repository_triage_user_prompt(
-                    items=workbench_state.prompt_items(),
+            # The graph owns a per-run completion model bound to this workbench.
+            # Its validator checks completion; this caller only exports its fields.
+            return (
+                await run_triage_agent(
+                    backend=backend,
+                    workbench_state=workbench_state,
                     pass_kind=pass_kind,
-                    draft_origins=draft_origins,
-                ),
-                trajectory_paths=(trajectory_path(pass_artifacts_path),),
-            )
+                    user_prompt=build_repository_triage_user_prompt(
+                        items=workbench_state.prompt_items(),
+                        pass_kind=pass_kind,
+                        draft_origins=draft_origins,
+                    ),
+                    trajectory_paths=(trajectory_path(pass_artifacts_path),),
+                )
+            ).model_dump(by_alias=True)
 
 
 def _should_run_another_triage_pass(

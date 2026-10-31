@@ -8,13 +8,16 @@ from deepagents.backends import CompositeBackend
 from deepagents.backends.protocol import BackendProtocol
 from langchain.agents.middleware import AgentMiddleware
 
-from sec_review_agents.agents.analysis.pull_request import create_pr_analyzer_backend
+from sec_review_agents.agents.analysis.pull_request import (
+    build_pr_analyzer_backend_config,
+)
 from sec_review_agents.agents.analysis.repository import (
-    create_repository_analyzer_backend,
+    build_repository_analyzer_backend_config,
 )
 from sec_review_agents.agents.patch_synthesis.backend import (
     create_patch_synthesis_backend,
 )
+from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.filesystem.docker_backend import DockerRoute
 from sec_review_agents.filesystem.docker_runtime import DockerContainerResource
 from sec_review_agents.filesystem.local_backend import LocalFilesystemBackend
@@ -287,11 +290,13 @@ def test_repository_analyzer_backend_creates_docker_backend_without_pooling(
             "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
         ) as docker_backend_mock,
     ):
-        backend = create_repository_analyzer_backend(
-            workspace_root_path=local_root / "workspace",
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
+        backend = create_backend_with_path_views(
+            **build_repository_analyzer_backend_config(
+                workspace_root_path=local_root / "workspace",
+                history_path=None,
+                incremental_window_path=None,
+                scan_mode="full",
+            )
         )
 
     assert backend is docker_backend_mock.return_value
@@ -314,11 +319,13 @@ def test_repository_analyzer_backend_uses_container_tmp_under_docker(
             "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
         ) as docker_backend_mock,
     ):
-        create_repository_analyzer_backend(
-            workspace_root_path=workspace,
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
+        create_backend_with_path_views(
+            **build_repository_analyzer_backend_config(
+                workspace_root_path=workspace,
+                history_path=None,
+                incremental_window_path=None,
+                scan_mode="full",
+            )
         )
 
     container = docker_backend_mock.call_args.kwargs["container"]
@@ -343,11 +350,13 @@ def test_repository_analyzer_backend_uses_host_tmp_under_local(tmp_path: Path) -
         "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
         return_value="local",
     ):
-        backend = create_repository_analyzer_backend(
-            workspace_root_path=workspace,
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
+        backend = create_backend_with_path_views(
+            **build_repository_analyzer_backend_config(
+                workspace_root_path=workspace,
+                history_path=None,
+                incremental_window_path=None,
+                scan_mode="full",
+            )
         )
 
     assert isinstance(backend, CompositeBackend)
@@ -371,11 +380,13 @@ def test_repository_analyzer_backend_omits_skills_when_globally_disabled(
             return_value="local",
         ),
     ):
-        backend = create_repository_analyzer_backend(
-            workspace_root_path=workspace,
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
+        backend = create_backend_with_path_views(
+            **build_repository_analyzer_backend_config(
+                workspace_root_path=workspace,
+                history_path=None,
+                incremental_window_path=None,
+                scan_mode="full",
+            )
         )
 
     assert "/skills/" not in backend.routes
@@ -398,11 +409,13 @@ def test_repository_analyzer_backend_omits_memory_when_globally_disabled(
             return_value="local",
         ),
     ):
-        backend = create_repository_analyzer_backend(
-            workspace_root_path=workspace,
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
+        backend = create_backend_with_path_views(
+            **build_repository_analyzer_backend_config(
+                workspace_root_path=workspace,
+                history_path=None,
+                incremental_window_path=None,
+                scan_mode="full",
+            )
         )
 
     assert "/memory/" not in backend.routes
@@ -432,18 +445,22 @@ def test_runtime_workspace_image_reaches_pr_and_repository_docker_backends(
             "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
         ) as docker_backend_mock,
     ):
-        create_pr_analyzer_backend(
-            workspace_root_path=workspace,
-            history_path=history,
-            incremental_window_path=incremental_window,
-            runtime_context=runtime_context,
+        create_backend_with_path_views(
+            **build_pr_analyzer_backend_config(
+                workspace_root_path=workspace,
+                history_path=history,
+                incremental_window_path=incremental_window,
+                runtime_context=runtime_context,
+            )
         )
-        create_repository_analyzer_backend(
-            workspace_root_path=workspace,
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
-            runtime_context=runtime_context,
+        create_backend_with_path_views(
+            **build_repository_analyzer_backend_config(
+                workspace_root_path=workspace,
+                history_path=None,
+                incremental_window_path=None,
+                scan_mode="full",
+                runtime_context=runtime_context,
+            )
         )
 
     assert docker_backend_mock.call_count == 2

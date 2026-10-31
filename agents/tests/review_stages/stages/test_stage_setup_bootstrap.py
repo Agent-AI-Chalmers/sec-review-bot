@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
 from sec_review_agents.workspace.snapshots import (
     WORKSPACE_SNAPSHOT_TAR_NAME,
@@ -58,6 +59,10 @@ async def _run(
 
     with (
         patch(
+            "sec_review_agents.review_stages.analysis.stage.create_backend_with_path_views",
+            return_value=backend,
+        ),
+        patch(
             "sec_review_agents.review_stages.analysis.stage.run_analysis_agent",
             side_effect=run_agent,
         ),
@@ -66,7 +71,12 @@ async def _run(
             analyzer_artifacts_path=artifacts,
             agent_name="analyzer",
             baseline_snapshot_tar_path=_seed(tmp_path),
-            build_backend=lambda _ws, _memory_view: backend,
+            build_backend_config=lambda _ws: BackendConfig(
+                container_name_prefix="test",
+                path_views=[],
+                image=None,
+                backend_kind="local",
+            ),
             system_prompt="system",
             filesystem_system_prompt="filesystem",
             user_prompt="user",
@@ -126,3 +136,85 @@ async def test_failed_step_marks_incomplete_but_agent_still_runs(
     env = json.loads((artifacts / "environment.json").read_text(encoding="utf-8"))
     assert env["environment_incomplete"] is True
     assert env["setup_status"] == "incomplete"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("with_memory", [False, True])
+async def test_stage_assembles_invocation_mounts(
+    tmp_path: Path, with_memory: bool
+) -> None:
+    """Memory reaches backend creation without entering the layout callback."""
+    from contextlib import contextmanager
+
+    from sec_review_agents.filesystem.path_views import memory_view, workspace_view
+
+    memory_root = tmp_path / "memory"
+    closed: list[bool] = []
+
+    @contextmanager
+    def materialize():
+        memory_root.mkdir()
+        try:
+            yield memory_view(host_path=memory_root) if with_memory else None
+        finally:
+            assert closed == [True]
+            memory_root.rmdir()
+
+    class Backend(_FakeBackend):
+        async def aclose(self) -> None:
+            assert memory_root.exists()
+            closed.append(True)
+
+    backend = Backend()
+
+    def configure(workspace: Path) -> BackendConfig:
+        assert (workspace / "src/app.ts").exists()
+        config = BackendConfig(
+            container_name_prefix="probe",
+            path_views=[workspace_view(host_path=workspace, writable=True)],
+            image=None,
+            backend_kind="local",
+        )
+        return config
+
+    def create(**kwargs):
+        assert memory_root.exists()
+        assert [view.agent_path for view in kwargs["path_views"]] == (
+            ["/workspace", "/memory"] if with_memory else ["/workspace"]
+        )
+        return backend
+
+    async def run_agent(**kwargs):
+        assert kwargs["backend"] is backend
+        assert kwargs["memory_enabled"] is with_memory
+        assert memory_root.exists()
+        return {
+            "overview": "ok",
+            "narratives": [],
+            "overall_verdict": "no-actionable-finding",
+        }
+
+    with (
+        patch(
+            "sec_review_agents.review_stages.analysis.stage.materialized_memory_view",
+            materialize,
+        ),
+        patch(
+            "sec_review_agents.review_stages.analysis.stage.create_backend_with_path_views",
+            side_effect=create,
+        ),
+        patch(
+            "sec_review_agents.review_stages.analysis.stage.run_analysis_agent",
+            side_effect=run_agent,
+        ),
+    ):
+        await run_analysis_stage(
+            analyzer_artifacts_path=tmp_path / "artifacts",
+            agent_name="probe",
+            baseline_snapshot_tar_path=_seed(tmp_path),
+            build_backend_config=configure,
+            system_prompt="system",
+            filesystem_system_prompt="filesystem",
+            user_prompt="user",
+        )
+    assert not memory_root.exists()

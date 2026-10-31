@@ -5,6 +5,7 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
+from pydantic import BaseModel
 
 from sec_review_agents.agents.delivery_planning.workbench_state import (
     DeliveryWorkbenchState,
@@ -541,6 +542,9 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 / "delivery-planning"
             )
 
+            class PlanningDone(BaseModel):
+                done: bool = True
+
             async def fake_invoke_agent_runtime_graph(**kwargs):
                 assert kwargs["trajectory_paths"] == (
                     delivery_planning_root
@@ -548,15 +552,11 @@ class TestRepositoryScopeAndDeliveryPlanning:
                     / "batch-0001"
                     / "trajectory.jsonl",
                 )
-                return {}
+                return PlanningDone()
 
             with (
                 patch(
-                    "sec_review_agents.delivery_stages.planning.agent_passes.create_delivery_planning_agent_graph",
-                    return_value=object(),
-                ),
-                patch(
-                    "sec_review_agents.delivery_stages.planning.agent_passes.invoke_agent_runtime_graph",
+                    "sec_review_agents.delivery_stages.planning.agent_passes.run_delivery_planning_agent",
                     side_effect=fake_invoke_agent_runtime_graph,
                 ),
             ):

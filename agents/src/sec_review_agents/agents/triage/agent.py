@@ -1,9 +1,9 @@
+from pathlib import Path
 from typing import Any, Literal
 
 from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from deepagents.middleware.skills import SkillsMiddleware
 from langchain.agents.middleware import AgentMiddleware
-from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field, model_validator
 
 from sec_review_agents.agents.triage.backend import (
@@ -20,7 +20,7 @@ from sec_review_agents.agents.triage.workbench_tools import (
 from sec_review_agents.features import agent_skills_enabled
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.runtime.agent_runtime_graph import (
-    build_agent_runtime_graph,
+    run_agent_runtime_graph,
 )
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
 from sec_review_agents.runtime.model_turn_diagnostics import (
@@ -38,12 +38,14 @@ from sec_review_agents.runtime.summarization_middleware import (
 REPOSITORY_TRIAGER_AGENT_NAME = "repository-triager"
 
 
-async def create_repository_triage_agent_graph(
+async def run_repository_triage_agent(
     *,
     backend,
     workbench_state: TriageWorkbenchState | None = None,
     pass_kind: TriagePassKind = "draft",
-) -> CompiledStateGraph:
+    user_prompt: str,
+    trajectory_paths: tuple[Path, ...] = (),
+) -> BaseModel:
     workbench_state = workbench_state or TriageWorkbenchState.from_candidates([])
     model = create_chat_model(agent_name=REPOSITORY_TRIAGER_AGENT_NAME)
     agent_middleware: list[AgentMiddleware[Any, Any, Any]] = [
@@ -66,7 +68,9 @@ async def create_repository_triage_agent_graph(
             ModelTurnDiagnosticsMiddleware(agent_name=REPOSITORY_TRIAGER_AGENT_NAME)
         )
     system_prompt = build_repository_triage_system_prompt(pass_kind=pass_kind)
-    return await build_agent_runtime_graph(
+    return await run_agent_runtime_graph(
+        user_prompt=user_prompt,
+        trajectory_paths=trajectory_paths,
         model=model,
         agent_name=REPOSITORY_TRIAGER_AGENT_NAME,
         backend=backend,
@@ -98,6 +102,6 @@ def _triage_done_model(workbench_state: TriageWorkbenchState) -> type[BaseModel]
 
 
 __all__ = [
-    "create_repository_triage_agent_graph",
     "create_repository_triage_backend",
+    "run_repository_triage_agent",
 ]

@@ -3,8 +3,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from sec_review_agents.agents.delivery_planning.agent import (
-    DELIVERY_PLANNING_AGENT_NAME,
-    create_delivery_planning_agent_graph,
+    run_delivery_planning_agent,
 )
 from sec_review_agents.agents.delivery_planning.backend import (
     create_repository_delivery_planning_backend,
@@ -19,7 +18,6 @@ from sec_review_agents.agents.delivery_planning.workbench_state import (
 )
 from sec_review_agents.delivery_stages.planning.batching import planning_case_id_batches
 from sec_review_agents.observability.trace_context import bind_trace_context
-from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.trajectories import remove_trajectories, trajectory_path
 from sec_review_agents.utils.files import persist_json_artifact
@@ -255,11 +253,6 @@ async def _run_delivery_planning_agent_pass(
         system_prompt = build_repository_delivery_planning_workbench_system_prompt(
             pass_kind=pass_kind
         )
-        agent = await create_delivery_planning_agent_graph(
-            backend=backend,
-            workbench_state=workbench_state,
-            system_prompt=system_prompt,
-        )
         # Planning may fan out into draft batches before one global refinement.
         # Preserve that shape on every model call instead of flattening it later.
         with bind_trace_context(
@@ -267,17 +260,21 @@ async def _run_delivery_planning_agent_pass(
             pass_index=str(pass_index),
             batch_index=batch_index,
         ):
-            return await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=DELIVERY_PLANNING_AGENT_NAME,
-                system_prompt=system_prompt,
-                user_prompt=build_repository_delivery_planning_user_prompt(
-                    planning_cases,
-                    pass_kind=pass_kind,
-                    draft_origins=draft_origins,
-                ),
-                trajectory_paths=(trajectory_path(pass_artifacts_path),),
-            )
+            # The graph owns a per-run completion model bound to this workbench.
+            # Its validator checks completion; this caller only exports its fields.
+            return (
+                await run_delivery_planning_agent(
+                    backend=backend,
+                    workbench_state=workbench_state,
+                    system_prompt=system_prompt,
+                    user_prompt=build_repository_delivery_planning_user_prompt(
+                        planning_cases,
+                        pass_kind=pass_kind,
+                        draft_origins=draft_origins,
+                    ),
+                    trajectory_paths=(trajectory_path(pass_artifacts_path),),
+                )
+            ).model_dump(by_alias=True)
 
 
 def _should_run_another_delivery_planning_pass(

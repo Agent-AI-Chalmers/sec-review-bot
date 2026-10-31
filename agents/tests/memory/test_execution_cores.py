@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
+from sec_review_agents.agents.memory_extractor.model import MemoryObservationOutput
+from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.memory.coordinated_maintenance import (
     prepare_coordinated_memory_revision,
@@ -39,16 +41,12 @@ async def test_extractor_returns_preview_and_records_to_explicit_trajectory(
             return_value=Mock(name="memory-extractor-model"),
         ) as create_model,
         patch(
-            "sec_review_agents.memory.extractor.create_memory_extractor_agent_graph",
-            AsyncMock(return_value=Mock()),
-        ),
-        patch(
-            "sec_review_agents.memory.extractor.invoke_agent_runtime_graph",
+            "sec_review_agents.memory.extractor.run_memory_extractor_agent",
             AsyncMock(
-                return_value={
-                    "has_observation": True,
-                    "observation_markdown": "Reuse the verified boundary.",
-                }
+                return_value=MemoryObservationOutput(
+                    has_observation=True,
+                    observation_markdown="Reuse the verified boundary.",
+                )
             ),
         ) as invoke,
     ):
@@ -77,16 +75,11 @@ async def test_extractor_skips_without_trajectories_or_agent_execution(
 ) -> None:
     empty_review = tmp_path / "empty-review"
     empty_review.mkdir()
-    create_agent = AsyncMock()
     invoke = AsyncMock()
 
     with (
         patch(
-            "sec_review_agents.memory.extractor.create_memory_extractor_agent_graph",
-            create_agent,
-        ),
-        patch(
-            "sec_review_agents.memory.extractor.invoke_agent_runtime_graph",
+            "sec_review_agents.memory.extractor.run_memory_extractor_agent",
             invoke,
         ),
     ):
@@ -100,7 +93,6 @@ async def test_extractor_skips_without_trajectories_or_agent_execution(
     assert result.skipped is True
     assert result.observation_markdown is None
     assert result.extractor_trajectory_path is None
-    create_agent.assert_not_awaited()
     invoke.assert_not_awaited()
 
 
@@ -118,16 +110,11 @@ async def test_extractor_skips_when_agent_produces_no_observation(
             return_value=Mock(name="memory-extractor-model"),
         ) as create_model,
         patch(
-            "sec_review_agents.memory.extractor.create_memory_extractor_agent_graph",
-            AsyncMock(return_value=Mock()),
-        ),
-        patch(
-            "sec_review_agents.memory.extractor.invoke_agent_runtime_graph",
+            "sec_review_agents.memory.extractor.run_memory_extractor_agent",
             AsyncMock(
-                return_value={
-                    "has_observation": False,
-                    "observation_markdown": "ignored text",
-                }
+                return_value=MemoryObservationOutput(
+                    has_observation=False, observation_markdown="ignored text"
+                )
             ),
         ),
     ):
@@ -161,13 +148,13 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
     candidate = tmp_path / "candidate"
     agent_trajectory = tmp_path / "maintainer.jsonl"
 
-    async def invoke_agent(**kwargs) -> dict[str, object]:
+    async def invoke_agent(**kwargs) -> MemoryMaintenanceOutput:
         worktree = candidate
         assert (worktree / "observations" / "observation-0001.md").read_text(
             encoding="utf-8"
         ) == "New lesson.\n"
         (worktree / "MEMORY.md").write_text("# Updated\n", encoding="utf-8")
-        return {}
+        return MemoryMaintenanceOutput()
 
     with (
         patch(
@@ -175,11 +162,7 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
             return_value=Mock(name="memory-maintainer-model"),
         ) as create_model,
         patch(
-            "sec_review_agents.memory.maintainer.create_memory_maintainer_agent_graph",
-            AsyncMock(return_value=Mock()),
-        ),
-        patch(
-            "sec_review_agents.memory.maintainer.invoke_agent_runtime_graph",
+            "sec_review_agents.memory.maintainer.run_memory_maintainer_agent",
             AsyncMock(side_effect=invoke_agent),
         ) as invoke,
     ):
@@ -248,16 +231,11 @@ async def test_maintainer_rejects_invalid_explicit_inputs_before_agent_execution
         if body is not None:
             path.write_text(body, encoding="utf-8")
         inputs.append((extraction_id, path))
-    create_agent = AsyncMock()
     invoke = AsyncMock()
 
     with (
         patch(
-            "sec_review_agents.memory.maintainer.create_memory_maintainer_agent_graph",
-            create_agent,
-        ),
-        patch(
-            "sec_review_agents.memory.maintainer.invoke_agent_runtime_graph",
+            "sec_review_agents.memory.maintainer.run_memory_maintainer_agent",
             invoke,
         ),
         pytest.raises(expected_exception),
@@ -269,7 +247,6 @@ async def test_maintainer_rejects_invalid_explicit_inputs_before_agent_execution
             maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
         )
 
-    create_agent.assert_not_awaited()
     invoke.assert_not_awaited()
 
 

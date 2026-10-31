@@ -1,13 +1,14 @@
 from pathlib import Path
 from unittest.mock import patch
 
-from sec_review_agents.agents.analysis.issue import create_issue_analyzer_backend
+from sec_review_agents.agents.analysis.issue import build_issue_analyzer_backend_config
 from sec_review_agents.agents.mitigation.repository import (
-    create_repository_mitigation_backend,
+    build_repository_mitigation_backend_config,
 )
 from sec_review_agents.agents.verification.pull_request import (
-    create_pr_verification_backend,
+    build_pr_verification_backend_config,
 )
+from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.filesystem.path_views import memory_view
 
 
@@ -60,26 +61,26 @@ def test_review_backends_mount_materialized_memory_view_when_configured(
         return_value="local",
     ):
         mounted_memory = memory_view(host_path=memory_materialized)
-        backends = (
-            create_issue_analyzer_backend(
-                workspace_root_path=workspace,
-                history_path=history,
-                memory_path_view=mounted_memory,
+        configs = (
+            build_issue_analyzer_backend_config(
+                workspace_root_path=workspace, history_path=history
             ),
-            create_pr_verification_backend(
+            build_pr_verification_backend_config(
                 workspace_root_path=workspace,
                 history_path=history,
                 incremental_window_path=incremental,
-                memory_path_view=mounted_memory,
             ),
-            create_repository_mitigation_backend(
+            build_repository_mitigation_backend_config(
                 workspace_root=workspace,
                 history_path=None,
                 incremental_window_path=None,
                 scan_mode="full",
-                memory_path_view=mounted_memory,
             ),
         )
+        backends = []
+        for config in configs:
+            config["path_views"].append(mounted_memory)
+            backends.append(create_backend_with_path_views(**config))
 
     for backend in backends:
         memory_root = _default_route_root(backend, "/memory/")

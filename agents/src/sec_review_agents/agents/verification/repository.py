@@ -11,9 +11,8 @@ from sec_review_agents.external_tools import (
 )
 from sec_review_agents.features import agent_skills_enabled
 from sec_review_agents.filesystem import backend_selection
-from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
+from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.filesystem.path_views import (
-    PathView,
     read_only_path_view,
     skill_view,
     tmp_view_for_backend,
@@ -56,15 +55,14 @@ REPOSITORY_VERIFICATION_RETRY_INTRO = "\n".join(
 )
 
 
-def create_repository_verification_backend(
+def build_repository_verification_backend_config(
     *,
     workspace_root_path: Path,
     history_path: Path | None,
     incremental_window_path: Path | None,
     scan_mode: str,
     runtime_context: ExecutionRuntimeContext | None = None,
-    memory_path_view: PathView | None = None,
-):
+) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
     if not workspace_root_path.is_dir():
         raise FileNotFoundError(
@@ -81,8 +79,6 @@ def create_repository_verification_backend(
                 host_path=materialize_agent_skills_view(VERIFICATION_AGENT_SKILLS)
             )
         )
-    if memory_path_view is not None:
-        path_views.append(memory_path_view)
     if tmp_view is not None:
         path_views.append(tmp_view)
     if scan_mode == "incremental":
@@ -103,7 +99,7 @@ def create_repository_verification_backend(
             ]
         )
 
-    return create_backend_with_path_views(
+    return BackendConfig(
         container_name_prefix="repository-verifier",
         path_views=path_views,
         image=workspace_image,

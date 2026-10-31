@@ -3,7 +3,6 @@ from typing import Any
 
 from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from langchain.agents.middleware import AgentMiddleware
-from langgraph.graph.state import CompiledStateGraph
 
 from sec_review_agents.agents.patch_synthesis.model import PatchSynthesisOutput
 from sec_review_agents.agents.patch_synthesis.prompts import (
@@ -11,7 +10,7 @@ from sec_review_agents.agents.patch_synthesis.prompts import (
     build_patch_synthesis_system_prompt,
 )
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
+from sec_review_agents.runtime.agent_runtime_graph import run_agent_runtime_graph
 from sec_review_agents.runtime.changed_files_acceptance_middleware import (
     ChangedFilesAcceptanceMiddleware,
 )
@@ -31,13 +30,15 @@ from sec_review_agents.runtime.summarization_middleware import (
 PATCH_SYNTHESIS_AGENT_NAME = "patch-synthesizer"
 
 
-async def create_patch_synthesis_agent_graph(
+async def run_patch_synthesis_agent(
     *,
     backend,
     workspace_root_path: Path,
     baseline_snapshot_tar_path: Path | None = None,
     system_prompt: str | None = None,
-) -> CompiledStateGraph:
+    user_prompt: str,
+    trajectory_paths: tuple[Path, ...] = (),
+) -> PatchSynthesisOutput:
     if system_prompt is None:
         system_prompt = build_patch_synthesis_system_prompt()
     filesystem_system_prompt = build_patch_synthesis_filesystem_system_prompt()
@@ -72,7 +73,9 @@ async def create_patch_synthesis_agent_graph(
             ModelTurnDiagnosticsMiddleware(agent_name=PATCH_SYNTHESIS_AGENT_NAME)
         )
 
-    return await build_agent_runtime_graph(
+    return await run_agent_runtime_graph(
+        user_prompt=user_prompt,
+        trajectory_paths=trajectory_paths,
         model=model,
         agent_name=PATCH_SYNTHESIS_AGENT_NAME,
         backend=backend,

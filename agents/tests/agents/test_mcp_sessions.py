@@ -11,6 +11,7 @@ import pytest
 from deepagents.backends.protocol import BackendProtocol
 
 from sec_review_agents.mcp import resolver
+from sec_review_agents.runtime import agent_runtime_graph
 
 
 @pytest.fixture(params=["analysis", "mitigation", "verification", "single_agent"])
@@ -127,12 +128,12 @@ async def test_agent_owns_sessions_through_build_and_invocation(
             raise RuntimeError("invoke failed")
         if outcome == "cancel":
             await asyncio.Event().wait()
-        return {"overview": "done"}
+        return Mock(model_dump=Mock(return_value={"overview": "done"}))
 
     monkeypatch.setattr("langchain_mcp_adapters.client.MultiServerMCPClient", Client)
     monkeypatch.setattr("langchain_mcp_adapters.tools.load_mcp_tools", load_tools)
-    monkeypatch.setattr(agent_call.module, "build_agent_runtime_graph", build)
-    monkeypatch.setattr(agent_call.module, "invoke_agent_runtime_graph", invoke)
+    monkeypatch.setattr(agent_runtime_graph, "build_agent_runtime_graph", build)
+    monkeypatch.setattr(agent_runtime_graph, "invoke_agent_runtime_graph", invoke)
 
     if outcome == "cancel":
         task = asyncio.create_task(agent_call.run(**agent_call.kwargs))
@@ -171,9 +172,9 @@ async def test_disabled_mcp_runs_agent_without_connecting(
         return object()
 
     async def invoke(**kwargs):
-        return {"overview": "done"}
+        return Mock(model_dump=Mock(return_value={"overview": "done"}))
 
-    monkeypatch.setattr(agent_call.module, "build_agent_runtime_graph", build)
-    monkeypatch.setattr(agent_call.module, "invoke_agent_runtime_graph", invoke)
+    monkeypatch.setattr(agent_runtime_graph, "build_agent_runtime_graph", build)
+    monkeypatch.setattr(agent_runtime_graph, "invoke_agent_runtime_graph", invoke)
     assert await agent_call.run(**agent_call.kwargs) == {"overview": "done"}
     client.assert_not_called()
