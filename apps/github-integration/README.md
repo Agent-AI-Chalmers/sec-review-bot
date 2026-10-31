@@ -12,7 +12,7 @@ For local development, install Review Runs service and integration dependencies 
 
 ```bash
 corepack install --global pnpm@12
-pnpm --dir review-runs install
+pnpm --dir services/review-runs install
 pnpm --dir apps/github-integration install
 ```
 
@@ -106,7 +106,7 @@ For local GitHub App webhook and Actions dispatch routing, see the [local GitHub
   - `reviews/pull-requests/` - pull request review and suggestion comments
   - `reviews/repositories/` - repository review, summary issue, and repair draft PR
 - `github/` - thin GitHub API wrappers and webhook helpers
-- `review-runs/` - Review Runs client, claim handling, and publication coordination
+- `services/review-runs/` - Review Runs client, claim handling, and publication coordination
 - `execution/` - Execution input, result, and error contracts consumed by this connector
 - `artifacts/` - input bundle storage and Git workspace preparation
 - `ingress/` - inbound HTTP, GitHub Actions, and GitHub webhook handling

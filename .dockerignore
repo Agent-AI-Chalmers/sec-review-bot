@@ -6,8 +6,8 @@ ops/systemd/deployment.env
 node_modules
 apps/*/node_modules
 apps/*/dist
-review-runs/node_modules
-review-runs/dist
+services/*/node_modules
+services/*/dist
 __pycache__
 *.pyc
 .pytest_cache

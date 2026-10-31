@@ -17,7 +17,7 @@ import { renderKubbTypes } from './render-kubb-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
-export const REVIEW_RUNS_ROOT = path.join(REPO_ROOT, 'review-runs')
+export const REVIEW_RUNS_ROOT = path.join(REPO_ROOT, 'services', 'review-runs')
 export const SPEC_PATH = path.resolve(
   REPO_ROOT,
   'contracts',
@@ -32,6 +32,7 @@ export const REVIEW_RUNS_OUTPUT_PATH = path.join(
 )
 export const GATEWAY_OUTPUT_PATH = path.join(
   REPO_ROOT,
+  'services',
   'execution-gateway',
   'src',
   'execution-api-types-generated.ts'

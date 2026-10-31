@@ -43,11 +43,11 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
 本仓库负责的运行角色包括 GitHub Integration、Review Runs、Control Plane UI、Execution Gateway、Execution Worker、Memory Extraction Worker、Memory Maintenance Worker 和 Memory Catalog Server。它们通过受认证的 HTTP、Temporal、对象存储和持久化 PostgreSQL 状态协作。Langfuse 是受信任但独立部署的可观测性依赖，不属于本仓库负责的运行角色。
 
 - [`apps/github-integration/`](apps/github-integration/README.zh.md)：TypeScript 编写的 GitHub integration service，负责 GitHub App webhook、由 GitHub Actions 鉴权的 HTTP dispatch、输入材料准备和 GitHub 发布
-- [`review-runs/`](review-runs/README.zh.md)：独立部署的 TypeScript 服务，负责 review run 接纳和持久化协调
+- [`services/review-runs/`](services/review-runs/README.zh.md)：独立部署的 TypeScript 服务，负责 review run 接纳和持久化协调
 - [`apps/control-plane-ui/`](apps/control-plane-ui/README.zh.md)：独立部署的 Review Runs 运维界面
-- [`execution-gateway/`](execution-gateway/README.zh.md)：独立的 TypeScript HTTP 服务，负责校验请求并提交 Temporal execution
+- [`services/execution-gateway/`](services/execution-gateway/README.zh.md)：独立的 TypeScript HTTP 服务，负责校验请求并提交 Temporal execution
 - [`agents/`](agents/README.zh.md)：Python 编写的 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker
-- [`memory-catalog/`](memory-catalog/README.zh.md)：独立的 TypeScript HTTP 服务，负责 managed memory catalog 状态和 revision 提交
+- [`services/memory-catalog/`](services/memory-catalog/README.zh.md)：独立的 TypeScript HTTP 服务，负责 managed memory catalog 状态和 revision 提交
 
 ![Sec Review Bot 运行拓扑](assets/architecture/runtime-topology.zh.svg)
 

@@ -87,7 +87,7 @@ services:
   execution-gateway:
     restart: "on-failure:5"
     build:
-      context: execution-gateway
+      context: services/execution-gateway
       dockerfile: Dockerfile
       additional_contexts:
         contracts: contracts
@@ -126,7 +126,7 @@ services:
     restart: "on-failure:5"
     profiles: ["app", "memory"]
     build:
-      context: memory-catalog
+      context: services/memory-catalog
       dockerfile: Dockerfile
       additional_contexts:
         contracts: contracts
@@ -161,7 +161,7 @@ services:
     restart: "on-failure:5"
     profiles: ["app"]
     build:
-      context: review-runs
+      context: services/review-runs
       dockerfile: Dockerfile
       additional_contexts:
         contracts: contracts

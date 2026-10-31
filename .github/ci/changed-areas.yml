@@ -37,26 +37,26 @@ contract-tools:
   # Every projection a contract tool renders into another package. The validator derives this
   # set from the tools' generated-artifacts.json manifests, so a new projection cannot be added
   # without wiring it here.
-  - "review-runs/src/contract-types-generated.ts"
-  - "review-runs/src/error-codes-generated.ts"
-  - "review-runs/src/execution-api-schema.ts"
+  - "services/review-runs/src/contract-types-generated.ts"
+  - "services/review-runs/src/error-codes-generated.ts"
+  - "services/review-runs/src/execution-api-schema.ts"
   - "apps/github-integration/src/review-runs/review-runs-api.ts"
   - "apps/control-plane-ui/shared/list-run-query-params.ts"
   - "apps/control-plane-ui/browser/features/runs/api-types.generated.ts"
   - "apps/control-plane-ui/browser/features/runs/state-machines.generated.ts"
-  - "review-runs/src/state-machines.generated.ts"
+  - "services/review-runs/src/state-machines.generated.ts"
   - "apps/github-integration/src/execution/execution-api-types-generated.ts"
   - "apps/github-integration/src/execution/execution-api-version.ts"
-  - "execution-gateway/src/execution-api-types-generated.ts"
-  - "execution-gateway/src/execution-api-version.ts"
-  - "memory-catalog/src/contract-types-generated.ts"
+  - "services/execution-gateway/src/execution-api-types-generated.ts"
+  - "services/execution-gateway/src/execution-api-version.ts"
+  - "services/memory-catalog/src/contract-types-generated.ts"
   - "apps/control-plane-ui/browser/features/memory/api-types.generated.ts"
   # CI tooling.
   - ".github/ci/**"
   - ".github/workflows/ci.yml"
 
 review-runs:
-  - "review-runs/**"
+  - "services/review-runs/**"
   # It validates requests against the shared contract schemas.
   - "contracts/**"
   # Its integration suite's client<->server seam test drives the GitHub integration client
@@ -68,7 +68,7 @@ review-runs:
   - ".github/workflows/ci.yml"
 
 execution-gateway:
-  - "execution-gateway/**"
+  - "services/execution-gateway/**"
   - "contracts/execution-api/**"
   - "contracts/execution-workflow/**"
   - ".github/workflows/ci.yml"
@@ -76,8 +76,8 @@ execution-gateway:
 system-tests:
   # The single cross-service path joins these production boundaries and their shared contracts.
   - "scripts/system-tests/**"
-  - "review-runs/**"
-  - "execution-gateway/**"
+  - "services/review-runs/**"
+  - "services/execution-gateway/**"
   - "contracts/execution-api/**"
   - "contracts/execution-workflow/**"
   - "compose.yaml"
@@ -85,7 +85,7 @@ system-tests:
   - ".github/workflows/ci.yml"
 
 memory-catalog:
-  - "memory-catalog/**"
+  - "services/memory-catalog/**"
   - "contracts/memory-catalog-api/**"
   - ".github/workflows/ci.yml"
 

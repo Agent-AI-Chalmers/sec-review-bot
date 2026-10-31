@@ -3,7 +3,7 @@
 # (compose's `additional_contexts`). Without this file every family tool's local `node_modules`
 # and any stray secret would be sent to the daemon — and, for github-integration, copied into
 # the runtime image by `COPY --from=contracts . /app/contracts`. The sibling service contexts
-# (agents/, review-runs/, apps/*/) exclude the same patterns; keep them in step.
+# (agents/, services/review-runs/, apps/*/) exclude the same patterns; keep them in step.
 **/node_modules
 .env
 *.pem

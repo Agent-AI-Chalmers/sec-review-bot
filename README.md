@@ -43,11 +43,11 @@ A draft PR includes modified files, case details, analyzer / verifier output, an
 The repository-owned runtime roles are GitHub Integration, Review Runs, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server. They cooperate through authenticated HTTP, Temporal, object storage, and durable PostgreSQL state. Langfuse is a trusted but independently deployed observability dependency rather than a repository-owned runtime role.
 
 - [`apps/github-integration/`](apps/github-integration/README.md): TypeScript GitHub integration service for webhooks, Actions-authenticated HTTP dispatch, input bundle preparation, and GitHub publishing
-- [`review-runs/`](review-runs/README.md): independently deployed TypeScript service for review-run admission and durable coordination
+- [`services/review-runs/`](services/review-runs/README.md): independently deployed TypeScript service for review-run admission and durable coordination
 - [`apps/control-plane-ui/`](apps/control-plane-ui/README.md): independently deployed web console for inspecting review runs
-- [`execution-gateway/`](execution-gateway/README.md): independent TypeScript HTTP service that validates requests and submits Temporal executions
+- [`services/execution-gateway/`](services/execution-gateway/README.md): independent TypeScript HTTP service that validates requests and submits Temporal executions
 - [`agents/`](agents/README.md): Python Execution Worker, Memory Extraction Worker, and Memory Maintenance Worker
-- [`memory-catalog/`](memory-catalog/README.md): independent TypeScript HTTP service for managed-memory catalog state and revision commits
+- [`services/memory-catalog/`](services/memory-catalog/README.md): independent TypeScript HTTP service for managed-memory catalog state and revision commits
 
 Each contract family under [`contracts/`](contracts/README.md) owns the tool that renders and checks its projections (`contracts/<family>/tools/`); that is build-time, not a runtime entity.
 

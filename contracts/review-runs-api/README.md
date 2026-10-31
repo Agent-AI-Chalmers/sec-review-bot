@@ -53,7 +53,7 @@ pnpm test
 
 The console's `Run` type is generated from the contract, and a committed fixture pins it at build time: if the fixture gains, loses, or renames a field, the console stops compiling until the generated type and the fixture agree again. That check compares key sets rather than values, because TypeScript widens JSON strings and a value-level assignment would reject a correct fixture.
 
-Review Runs owns the value-level half in `review-runs/test/observed-run-contract.test.ts`: it validates every fixture as the manifest claims, and validates what `observeRun()` actually returns. The type↔schema binding needs no separate key-set comparison because both derive from the same `ObservedRun` in the contract (`openapi.yaml`). A status outside the schema enums, a broken pattern, or a malformed timestamp therefore fails the suite instead of reaching the console.
+Review Runs owns the value-level half in `services/review-runs/test/observed-run-contract.test.ts`: it validates every fixture as the manifest claims, and validates what `observeRun()` actually returns. The type↔schema binding needs no separate key-set comparison because both derive from the same `ObservedRun` in the contract (`openapi.yaml`). A status outside the schema enums, a broken pattern, or a malformed timestamp therefore fails the suite instead of reaching the console.
 
 ## Error codes
 

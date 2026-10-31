@@ -277,6 +277,7 @@ export function generatedArtifacts(): GeneratedArtifact[] {
     {
       output: path.resolve(
         REPO_ROOT,
+        'services',
         'review-runs',
         'src',
         'state-machines.generated.ts'

@@ -330,6 +330,7 @@ async function renderFile(): Promise<string> {
 function gatewayVersionOutput(): string {
   return path.join(
     REPO_ROOT,
+    'services',
     'execution-gateway',
     'src',
     'execution-api-version.ts'

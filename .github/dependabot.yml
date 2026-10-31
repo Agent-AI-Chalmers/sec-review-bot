@@ -64,7 +64,7 @@ updates:
       prefix-development: "build(deps-dev)"
 
   - package-ecosystem: "npm"
-    directory: "/review-runs"
+    directory: "/services/review-runs"
     schedule:
       interval: "monthly"
       time: "06:00"

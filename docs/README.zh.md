@@ -23,13 +23,13 @@ Package README 负责本地 setup、命令、配置与实现布局。运行角�
 | 运行角色 | Package 指南 |
 | --- | --- |
 | GitHub Integration | [`apps/github-integration/README.md`](../apps/github-integration/README.zh.md) |
-| Review Runs | [`review-runs/README.md`](../review-runs/README.zh.md) |
+| Review Runs | [`services/review-runs/README.md`](../services/review-runs/README.zh.md) |
 | Control Plane UI | [`apps/control-plane-ui/README.md`](../apps/control-plane-ui/README.md) |
-| Execution Gateway | [`execution-gateway/README.md`](../execution-gateway/README.zh.md) |
+| Execution Gateway | [`services/execution-gateway/README.md`](../services/execution-gateway/README.zh.md) |
 | Execution Worker | [`agents/README.md`](../agents/README.zh.md) |
 | Memory Extraction Worker | [`agents/README.md`](../agents/README.zh.md) |
 | Memory Maintenance Worker | [`agents/README.md`](../agents/README.zh.md) |
-| Memory Catalog Server | [`memory-catalog/README.md`](../memory-catalog/README.zh.md) |
+| Memory Catalog Server | [`services/memory-catalog/README.md`](../services/memory-catalog/README.zh.md) |
 
 ### agent/
 

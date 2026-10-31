@@ -19,7 +19,7 @@ import { renderKubbTypes } from './render-kubb-types.js'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
-export const REVIEW_RUNS_ROOT = path.join(REPO_ROOT, 'review-runs')
+export const REVIEW_RUNS_ROOT = path.join(REPO_ROOT, 'services', 'review-runs')
 export const SPEC_PATH = path.resolve(
   REPO_ROOT,
   'contracts',
@@ -187,7 +187,7 @@ export function publicationStepCodes(spec: OpenApiDocument): string[] {
   )
 }
 
-/** The committed content of `review-runs/src/error-codes-generated.ts`. */
+/** The committed content of `services/review-runs/src/error-codes-generated.ts`. */
 export async function renderErrorCodeTypes(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenApiDocument
   const codes = publicationStepCodes(spec)
@@ -222,7 +222,7 @@ export const CONTRACT_TYPES_PATH = path.resolve(
   'contract-types-generated.ts'
 )
 
-/** The committed content of `review-runs/src/contract-types-generated.ts`. */
+/** The committed content of `services/review-runs/src/contract-types-generated.ts`. */
 export async function renderContractTypes(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenApiDocument
   const body =

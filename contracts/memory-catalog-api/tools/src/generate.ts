@@ -12,6 +12,7 @@ const repositoryRoot = path.resolve(toolsRoot, '../../..')
 const outputPaths = [
   path.resolve(
     repositoryRoot,
+    'services',
     'memory-catalog',
     'src',
     'contract-types-generated.ts'

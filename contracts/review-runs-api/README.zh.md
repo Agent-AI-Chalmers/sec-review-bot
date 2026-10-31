@@ -41,7 +41,7 @@ Review Runs 通过 `observeRun()` 产出每个 observed run，通过 `rowToRecor
 
 控制台的 `Run` 类型由契约生成，并由本 fixture 在构建期钉住：如果 fixture 增加、删除或改名了某个字段，控制台会停止编译，直到生成类型与 fixture 重新一致。该检查比较的是**键集合**而不是值，因为 TypeScript 会放宽 JSON 字符串，值层面的赋值会拒绝一个正确的 fixture。
 
-值层面的一半由 Review Runs 在 `review-runs/test/observed-run-contract.test.ts` 中承担：它按 manifest 的声明校验每个 fixture，并校验 `observeRun()` 的真实输出。类型与 schema 的绑定不再需要单独的键集合对照，因为两者都源自契约（`openapi.yaml`）里同一个 `ObservedRun`。因此，schema 枚举之外的某个状态、被破坏的 pattern、或格式错误的 timestamp 都会让测试失败，而不是流到控制台。
+值层面的一半由 Review Runs 在 `services/review-runs/test/observed-run-contract.test.ts` 中承担：它按 manifest 的声明校验每个 fixture，并校验 `observeRun()` 的真实输出。类型与 schema 的绑定不再需要单独的键集合对照，因为两者都源自契约（`openapi.yaml`）里同一个 `ObservedRun`。因此，schema 枚举之外的某个状态、被破坏的 pattern、或格式错误的 timestamp 都会让测试失败，而不是流到控制台。
 
 ## 工具
 

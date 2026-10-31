@@ -14,7 +14,7 @@
 
 ```bash
 corepack install --global pnpm@12
-pnpm --dir review-runs install
+pnpm --dir services/review-runs install
 pnpm --dir apps/github-integration install
 ```
 
@@ -108,7 +108,7 @@ GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 
   - `reviews/pull-requests/` - PR review、建议评论
   - `reviews/repositories/` - repository review、摘要 issue 与修复 draft PR
 - `github/` - GitHub API 薄封装和 webhook 辅助函数
-- `review-runs/` - Review Runs client、claim 处理与发布协调
+- `services/review-runs/` - Review Runs client、claim 处理与发布协调
 - `execution/` - 此 connector 消费的 Execution input、result 与错误契约
 - `artifacts/` - input bundle 存储与 Git workspace 准备
 - `ingress/` - HTTP、GitHub Actions 和 GitHub webhook 的入站处理
