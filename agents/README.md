@@ -50,7 +50,7 @@ When running from this repository, local commands read `agents/.env` and `agents
 
 The local `run-local-*` CLIs and `sec-review-agents-check-llm-deployments` load `agents/.env`, but never overwrite environment variables already set in the process.
 
-`sec-review-execution-worker`, `sec-review-memory-extraction-worker`, and `sec-review-memory-maintenance-worker` do not load `.env` themselves. Pass their environment through the shell, process supervisor, or CI. Execution Gateway is a separate TypeScript service under [`execution-gateway/`](../execution-gateway/README.md).
+`sec-review-execution-worker`, `sec-review-memory-extraction-worker`, and `sec-review-memory-maintenance-worker` do not load `.env` themselves. Pass their environment through the shell, process supervisor, or CI. Execution Gateway is a separate TypeScript service under [`services/execution-gateway/`](../services/execution-gateway/README.md).
 
 There is no `.env` path override. `MODEL_PROVIDERS_CONFIG_TOML` has the highest priority for model config; set it only when using another TOML location or when the run layout does not preserve the project-relative path.
 
@@ -110,7 +110,7 @@ The Python package is easiest to read by responsibility:
 
 ```mermaid
 flowchart LR
-    gateway["execution-gateway/<br/>TypeScript + Fastify"] <-->|"start / query workflow"| temporal["Temporal Server"]
+    gateway["services/execution-gateway/<br/>TypeScript + Fastify"] <-->|"start / query workflow"| temporal["Temporal Server"]
 
     local["run-local-*"] --> materialize["Local input materialization"]
     materialize --> direct["Direct execution"]

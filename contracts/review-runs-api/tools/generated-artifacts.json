@@ -8,13 +8,13 @@
       "command": "pnpm --dir contracts/review-runs-api/tools run generate",
       "inputs": [
         "contracts/review-runs-api/v1/openapi.yaml",
-        "review-runs/.prettierrc.json",
+        "services/review-runs/.prettierrc.json",
         "apps/github-integration/.prettierrc.json",
         "apps/control-plane-ui/.prettierrc.json"
       ],
       "outputs": [
-        "review-runs/src/contract-types-generated.ts",
-        "review-runs/src/error-codes-generated.ts",
+        "services/review-runs/src/contract-types-generated.ts",
+        "services/review-runs/src/error-codes-generated.ts",
         "apps/github-integration/src/review-runs/review-runs-api.ts",
         "apps/control-plane-ui/browser/features/runs/api-types.generated.ts",
         "apps/control-plane-ui/shared/list-run-query-params.ts"
@@ -37,7 +37,7 @@
       "inputs": ["contracts/review-runs-api/v1/openapi.yaml"],
       "outputs": [
         "apps/control-plane-ui/browser/features/runs/state-machines.generated.ts",
-        "review-runs/src/state-machines.generated.ts"
+        "services/review-runs/src/state-machines.generated.ts"
       ]
     }
   ]

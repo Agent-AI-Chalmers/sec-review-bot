@@ -19,15 +19,15 @@ Control Plane UI manages Memory Catalog through its BFF and never exposes Catalo
 | Runtime role | Code | Owns | Local guide |
 | --- | --- | --- | --- |
 | GitHub Integration | `apps/github-integration/` | GitHub ingress, input preparation, Review Runs client, and GitHub publication | [README](../../apps/github-integration/README.md) |
-| Review Runs | `review-runs/` | Admission, durable run state, recovery, execution observation, and publication coordination | [README](../../review-runs/README.md) |
+| Review Runs | `services/review-runs/` | Admission, durable run state, recovery, execution observation, and publication coordination | [README](../../services/review-runs/README.md) |
 | Control Plane UI | `apps/control-plane-ui/` | Authenticated operator console for Review Runs inspection and memory management | [README](../../apps/control-plane-ui/README.md) |
-| Execution Gateway | `execution-gateway/` | Authenticated Execution API and HTTP-to-Temporal translation | [README](../../execution-gateway/README.md) |
+| Execution Gateway | `services/execution-gateway/` | Authenticated Execution API and HTTP-to-Temporal translation | [README](../../services/execution-gateway/README.md) |
 | Execution Worker | `agents/` | Review workflows, activities, agent runtime, stage artifacts, and run diagnostic publication | [README](../../agents/README.md) |
 | Memory Extraction Worker | `agents/` | Per-run diagnostic consumption, extractor invocation, trajectory publication, and extraction registration | [README](../../agents/README.md) |
 | Memory Maintenance Worker | `agents/` | Batched maintenance input consumption, maintainer invocation, memory tree publication, and revision commit | [README](../../agents/README.md) |
-| Memory Catalog Server | `memory-catalog/` | Observation catalog, immutable memory revision history, and active revision coordination | [README](../../memory-catalog/README.md) |
+| Memory Catalog Server | `services/memory-catalog/` | Observation catalog, immutable memory revision history, and active revision coordination | [README](../../services/memory-catalog/README.md) |
 
-The runtime roles communicate through project-owned boundaries under [`contracts/`](../../contracts/README.md). Package location does not determine process topology: `agents/` implements independently deployed Temporal workers. Applications under `apps/` remain independently deployed services.
+The runtime roles communicate through project-owned boundaries under [`contracts/`](../../contracts/README.md). `services/` groups the internal HTTP service packages; each retains its own configuration, build, and deployment. Package location does not determine process topology: `agents/` implements independently deployed Temporal workers. Applications under `apps/` remain independently deployed services.
 
 ## Main review path
 
@@ -155,7 +155,7 @@ After an interruption, retries check the recorded publication intent and object 
 
 UI restore moves the active pointer to an existing revision in a Catalog transaction; it creates neither a revision nor an object and does not repair missing bytes.
 
-The input and memory protocols are described in the [Review Runs](../../review-runs/README.md) and [Memory Catalog](../../memory-catalog/README.md) guides. Storage errors remain uncertain and fail the attempt; they are not evidence that an object is missing. Recorded publication intents support retries, but do not provide automatic background completion after retries are exhausted.
+The input and memory protocols are described in the [Review Runs](../../services/review-runs/README.md) and [Memory Catalog](../../services/memory-catalog/README.md) guides. Storage errors remain uncertain and fail the attempt; they are not evidence that an object is missing. Recorded publication intents support retries, but do not provide automatic background completion after retries are exhausted.
 
 <!-- doc-time-sensitive: artifact-conditional-write-semantics; checked=2026-10-31; source=https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html -->
 

@@ -203,7 +203,7 @@ jobs:
           --health-retries 30
     defaults:
       run:
-        working-directory: review-runs
+        working-directory: services/review-runs
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -217,10 +217,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version-file: review-runs/package.json
+          node-version-file: services/review-runs/package.json
           check-latest: true
           cache: pnpm
-          cache-dependency-path: review-runs/pnpm-lock.yaml
+          cache-dependency-path: services/review-runs/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -246,7 +246,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: execution-gateway
+        working-directory: services/execution-gateway
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -260,10 +260,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version-file: execution-gateway/package.json
+          node-version-file: services/execution-gateway/package.json
           check-latest: true
           cache: pnpm
-          cache-dependency-path: execution-gateway/pnpm-lock.yaml
+          cache-dependency-path: services/execution-gateway/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -298,19 +298,19 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version-file: execution-gateway/package.json
+          node-version-file: services/execution-gateway/package.json
           check-latest: true
           cache: pnpm
           cache-dependency-path: |
-            execution-gateway/pnpm-lock.yaml
-            review-runs/pnpm-lock.yaml
+            services/execution-gateway/pnpm-lock.yaml
+            services/review-runs/pnpm-lock.yaml
 
       - name: Install Execution Gateway dependencies
-        working-directory: execution-gateway
+        working-directory: services/execution-gateway
         run: pnpm install --frozen-lockfile
 
       - name: Install Review Runs dependencies
-        working-directory: review-runs
+        working-directory: services/review-runs
         run: pnpm install --frozen-lockfile
 
       - name: Test execution submission boundary
@@ -339,7 +339,7 @@ jobs:
           --health-retries 30
     defaults:
       run:
-        working-directory: memory-catalog
+        working-directory: services/memory-catalog
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -353,10 +353,10 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v7
         with:
-          node-version-file: memory-catalog/package.json
+          node-version-file: services/memory-catalog/package.json
           check-latest: true
           cache: pnpm
-          cache-dependency-path: memory-catalog/pnpm-lock.yaml
+          cache-dependency-path: services/memory-catalog/pnpm-lock.yaml
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -418,7 +418,7 @@ jobs:
       # upload check, which self-skips without `SEC_REVIEW_TEST_S3_ENDPOINT`, so a CI step would
       # pass vacuously. The integration↔review-runs boundary is covered by Review Runs's own
       # integration suite (real PostgreSQL store) and by
-      # `review-runs/test/integration/client-server-seam.test.ts`, which drives this package's
+      # `services/review-runs/test/integration/client-server-seam.test.ts`, which drives this package's
       # real client against the real server; both jobs provision what they need.
 
   control-plane-ui:

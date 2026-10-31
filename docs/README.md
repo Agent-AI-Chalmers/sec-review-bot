@@ -21,13 +21,13 @@ Package READMEs own local setup, commands, configuration, and implementation lay
 | Runtime role | Package guide |
 | --- | --- |
 | GitHub Integration | [`apps/github-integration/README.md`](../apps/github-integration/README.md) |
-| Review Runs | [`review-runs/README.md`](../review-runs/README.md) |
+| Review Runs | [`services/review-runs/README.md`](../services/review-runs/README.md) |
 | Control Plane UI | [`apps/control-plane-ui/README.md`](../apps/control-plane-ui/README.md) |
-| Execution Gateway | [`execution-gateway/README.md`](../execution-gateway/README.md) |
+| Execution Gateway | [`services/execution-gateway/README.md`](../services/execution-gateway/README.md) |
 | Execution Worker | [`agents/README.md`](../agents/README.md) |
 | Memory Extraction Worker | [`agents/README.md`](../agents/README.md) |
 | Memory Maintenance Worker | [`agents/README.md`](../agents/README.md) |
-| Memory Catalog Server | [`memory-catalog/README.md`](../memory-catalog/README.md) |
+| Memory Catalog Server | [`services/memory-catalog/README.md`](../services/memory-catalog/README.md) |
 
 ### agent/
 
