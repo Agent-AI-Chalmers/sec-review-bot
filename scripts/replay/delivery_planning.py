@@ -13,6 +13,7 @@ from sec_review_agents.utils.env import bootstrap_agents_env, env_value
 from sec_review_agents.workflows.repository.workflow import (
     project_repository_case_result_for_delivery,
 )
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 
 from scripts.replay.input_bundle import read_json
 
@@ -101,7 +102,9 @@ async def main() -> None:
     delivery_plan = await generate_delivery_plan(
         run_artifacts_root=run_artifacts,
         case_results=[
-            project_repository_case_result_for_delivery(item)
+            project_repository_case_result_for_delivery(
+                RepositoryCaseResult.model_validate(item)
+            )
             for item in keep_case_results
         ],
     )

@@ -3,6 +3,7 @@ from datetime import timedelta
 import pytest
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
+from sec_review_agents.review_stages.record import ReviewRecord
 from sec_review_agents.review_stages.verification.result import (
     build_skipped_verification_result,
 )
@@ -14,6 +15,7 @@ from sec_review_agents.workflows.issue import two_stage as two_stage_workflow
 from sec_review_agents.workflows.issue import workflow as issue_workflow
 from sec_review_agents.workflows.pull_request import workflow as pr_workflow
 from sec_review_agents.workflows.repository import workflow as repository_workflow
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.review_request import (
     ReviewPostProcessingPolicy,
     ReviewWorkflowRequest,
@@ -171,8 +173,12 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
         [
             {"scan": "done"},
             [
-                {"case_id": "case-a", "disposition": "keep"},
-                {"case_id": "case-b", "disposition": "drop"},
+                RepositoryCaseResult(
+                    case_id="case-a", disposition="keep", review_record=ReviewRecord()
+                ),
+                RepositoryCaseResult(
+                    case_id="case-b", disposition="drop", review_record=ReviewRecord()
+                ),
             ],
             {"delivery": "done"},
         ]

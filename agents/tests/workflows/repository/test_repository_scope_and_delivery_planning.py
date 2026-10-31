@@ -44,6 +44,7 @@ from sec_review_agents.workflows.repository.result import (
 from sec_review_agents.workflows.repository.workflow import (
     project_repository_case_result_for_delivery,
 )
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.repository_case.stage import (
     derive_case_disposition,
 )
@@ -284,7 +285,9 @@ class TestRepositoryScopeAndDeliveryPlanning:
         result = build_repository_workflow_result(
             scan_result=scan_result_fixture(),
             delivery_result=None,
-            case_results=case_results,
+            case_results=[
+                RepositoryCaseResult.model_validate(item) for item in case_results
+            ],
         )
         assert len(result["case_results"]) == len(case_results)
 
@@ -706,7 +709,9 @@ class TestRepositoryScopeAndDeliveryPlanning:
                     run_artifacts_root=Path(input_data["input_bundle_root_path"])
                     / "artifacts",
                     case_results=[
-                        project_repository_case_result_for_delivery(item)
+                        project_repository_case_result_for_delivery(
+                            RepositoryCaseResult.model_validate(item)
+                        )
                         for item in case_results
                     ],
                 )
@@ -865,28 +870,31 @@ class TestRepositoryScopeAndDeliveryPlanning:
             scan_result=scan_result_fixture(),
             delivery_result=None,
             case_results=[
-                {
-                    "case_id": "case-1",
-                    "disposition": "blocked",
-                    "reason": "The verifier did not fully approve the patch.",
-                    "review_record": {
-                        "analysis": {
-                            "verdict": "confirmed-vulnerability",
-                            "overview": "User input reaches a raw SQL query.",
+                RepositoryCaseResult.model_validate(item)
+                for item in [
+                    {
+                        "case_id": "case-1",
+                        "disposition": "blocked",
+                        "reason": "The verifier did not fully approve the patch.",
+                        "review_record": {
+                            "analysis": {
+                                "verdict": "confirmed-vulnerability",
+                                "overview": "User input reaches a raw SQL query.",
+                            },
+                            "verification": {
+                                "patch_coverage": "partial",
+                            },
+                            "cvss": {"severity": "high", "base_score": 8.1},
                         },
-                        "verification": {
-                            "patch_coverage": "partial",
+                    },
+                    {
+                        "case_id": "case-2",
+                        "disposition": "keep",
+                        "review_record": {
+                            "analysis": {"verdict": "confirmed-vulnerability"}
                         },
-                        "cvss": {"severity": "high", "base_score": 8.1},
                     },
-                },
-                {
-                    "case_id": "case-2",
-                    "disposition": "keep",
-                    "review_record": {
-                        "analysis": {"verdict": "confirmed-vulnerability"}
-                    },
-                },
+                ]
             ],
         )
 
@@ -900,18 +908,20 @@ class TestRepositoryScopeAndDeliveryPlanning:
 def test_delivery_projection_requires_only_selected_case_and_mitigation() -> None:
     """Delivery must not reach into analysis or verification after case selection."""
     projected = project_repository_case_result_for_delivery(
-        {
-            "case_id": "case-1",
-            "disposition": "keep",
-            "reason": "ready",
-            "review_record": {
-                "mitigation": {
-                    "overview": "Remove unsafe entrypoint",
-                    "file_changes": [{"path": "unsafe.py", "status": "deleted"}],
-                    "patch_diff": "reference patch",
-                }
-            },
-        }
+        RepositoryCaseResult.model_validate(
+            {
+                "case_id": "case-1",
+                "disposition": "keep",
+                "reason": "ready",
+                "review_record": {
+                    "mitigation": {
+                        "overview": "Remove unsafe entrypoint",
+                        "file_changes": [{"path": "unsafe.py", "status": "deleted"}],
+                        "patch_diff": "reference patch",
+                    }
+                },
+            }
+        )
     )
     assert projected == DeliveryCaseInput(
         case_id="case-1",

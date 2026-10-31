@@ -28,6 +28,7 @@ from sec_review_agents.workflows.repository.result import (
 from sec_review_agents.workflows.repository.workflow import (
     project_repository_case_result_for_delivery,
 )
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 
 from scripts.replay.input_bundle import materialize_replay_input, read_json
 
@@ -53,7 +54,7 @@ def _previous_scan_summary(result: dict[str, Any]) -> dict[str, Any]:
     value = result.get("scan_summary")
     if isinstance(value, dict):
         return value
-    return build_scan_summary(scan_result=None)
+    return build_scan_summary(scan_result=None).model_dump(mode="json")
 
 
 def _previous_deletion_review_skipped(result: dict[str, Any]) -> bool:
@@ -177,7 +178,10 @@ async def main() -> None:
         )
 
     delivery_case_inputs = [
-        project_repository_case_result_for_delivery(item) for item in keep_case_results
+        project_repository_case_result_for_delivery(
+            RepositoryCaseResult.model_validate(item)
+        )
+        for item in keep_case_results
     ]
     persist_delivery_execution_input(
         run_artifacts_root=run_artifacts,

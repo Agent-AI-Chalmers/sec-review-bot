@@ -4,6 +4,18 @@ from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
 from sec_review_agents.scan_stages.triage.result import TriageResult
 
 
+class WindowDeletionSummary(BaseModel):
+    """Deletion count and review coverage decision for the selected repository window.
+
+    Discovery cannot inspect removed files. This reading is computed from the
+    window itself and accompanies scan results so skipped deletion review remains
+    visible even when discovery and triage succeed.
+    """
+
+    deleted_file_count: int
+    deletion_review_skipped: bool
+
+
 class RepositoryScanResult(BaseModel):
     """The scan's discovery, triage, and deletion decision for one repository window.
 

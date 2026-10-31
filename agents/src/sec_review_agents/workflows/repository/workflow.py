@@ -1,9 +1,10 @@
 import asyncio
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from datetime import timedelta
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any
 
+from pydantic import BaseModel, Field
 from temporalio import activity, workflow
 
 from sec_review_agents.delivery_stages.execution.input import (
@@ -29,12 +30,16 @@ from sec_review_agents.scan_stages.discovery.result import (
     DiscoveryChunkResult,
     DiscoveryResult,
 )
-from sec_review_agents.scan_stages.triage.result import TriageResult
+from sec_review_agents.scan_stages.triage.result import TriageCase, TriageResult
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
 from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
-from sec_review_agents.workflows.repository.scan_result import RepositoryScanResult
+from sec_review_agents.workflows.repository.scan_result import (
+    RepositoryScanResult,
+    WindowDeletionSummary,
+)
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
     RepositoryCaseReviewWorkflow,
@@ -48,26 +53,32 @@ from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 DEFAULT_CASE_PROCESSING_MAX_CONCURRENCY = 1
 
 
-class RepositoryCaseRequestBatch(TypedDict):
-    max_concurrency: int
+class RepositoryCaseRequestBatch(BaseModel):
+    """Ordered case requests with the concurrency chosen during preparation.
+
+    Both execution modes consume the same validated scheduling limit. Request
+    order determines output order even when cases finish at different times.
+    """
+
+    max_concurrency: int = Field(strict=True, gt=0)
     case_requests: list[RepositoryCaseReviewRequest]
 
 
 def build_blocked_repository_case_result(
     case_request: RepositoryCaseReviewRequest,
     reason: str,
-) -> dict[str, Any]:
-    return {
-        "case_id": case_request["case_execution_input"]["case_id"].strip(),
-        "disposition": "blocked",
-        "reason": reason,
-        "review_record": build_review_record(
+) -> RepositoryCaseResult:
+    return RepositoryCaseResult(
+        case_id=case_request.case_execution_input.case_id.strip(),
+        disposition="blocked",
+        reason=reason,
+        review_record=build_review_record(
             analysis_result=None,
             mitigation_result=None,
             verifier_result=None,
             cvss_result=None,
-        ).model_dump(mode="json", by_alias=True),
-    }
+        ),
+    )
 
 
 def _repository_case_timeout_seconds(
@@ -221,7 +232,7 @@ async def triage_repository_activity(
 @activity.defn
 def prepare_repository_case_review_inputs_activity(
     request: ReviewWorkflowRequest,
-    cases: Sequence[Mapping[str, Any]],
+    cases: list[TriageCase],
 ) -> RepositoryCaseRequestBatch:
     from sec_review_agents.review_stages.trajectories import (
         review_trajectories_root,
@@ -234,6 +245,7 @@ def prepare_repository_case_review_inputs_activity(
         required_path,
     )
     from sec_review_agents.workflows.repository.case_execution_input import (
+        DeletedRepositoryCase,
         deleted_repository_cases,
         prepare_case_execution_input,
     )
@@ -273,20 +285,20 @@ def prepare_repository_case_review_inputs_activity(
         if scan_mode == "incremental"
         else []
     )
-    all_cases = [*cases, *deletion_cases]
+    all_cases: list[TriageCase | DeletedRepositoryCase] = [*cases, *deletion_cases]
     # Both kinds end up as case workflows under one run id, so a repeated id would make two cases
     # collide on the same child workflow and artifact directory.
-    case_ids = [str(case.get("case_id") or "") for case in all_cases]
+    case_ids = [case.case_id.strip() for case in all_cases]
     if len(set(case_ids)) != len(case_ids):
         raise ValueError("Repository case ids must be unique within a run.")
-    return {
-        "max_concurrency": resolve_repository_case_processing_max_concurrency(
+    return RepositoryCaseRequestBatch(
+        max_concurrency=resolve_repository_case_processing_max_concurrency(
             len(all_cases)
         ),
-        "case_requests": [
-            {
-                "run_id": request.run_id,
-                "case_execution_input": prepare_case_execution_input(
+        case_requests=[
+            RepositoryCaseReviewRequest(
+                run_id=request.run_id,
+                case_execution_input=prepare_case_execution_input(
                     workspace_snapshot_tar_path=workspace_snapshot_tar_path,
                     history_path=history_path,
                     incremental_window_path=incremental_window_path,
@@ -297,43 +309,42 @@ def prepare_repository_case_review_inputs_activity(
                         prepared_input
                     ),
                 ),
-                "cases_artifacts_path": str(cases_artifacts_path),
-                "published_trajectories_path": str(
+                cases_artifacts_path=str(cases_artifacts_path),
+                published_trajectories_path=str(
                     review_trajectories_root(
-                        cases_artifacts_path / str(case.get("case_id") or index),
+                        cases_artifacts_path / case.case_id.strip()
                     )
                 ),
-                "timeout_seconds": timeout_seconds,
-                "runtime_context": request.runtime_context,
-            }
-            for index, case in enumerate(all_cases, start=1)
+                timeout_seconds=timeout_seconds,
+                runtime_context=request.runtime_context,
+            )
+            for case in all_cases
         ],
-    }
+    )
 
 
 def _keep_repository_case_results(
-    case_results: Sequence[Mapping[str, Any]],
-) -> list[Mapping[str, Any]]:
-    return [item for item in case_results if item["disposition"] == "keep"]
+    case_results: Sequence[RepositoryCaseResult],
+) -> list[RepositoryCaseResult]:
+    return [item for item in case_results if item.disposition == "keep"]
 
 
 def project_repository_case_result_for_delivery(
-    case_result: Mapping[str, Any],
+    case_result: RepositoryCaseResult,
 ) -> DeliveryCaseInput:
-    review_record = case_result["review_record"]
-    mitigation = review_record["mitigation"]
+    mitigation = case_result.review_record.mitigation
     return DeliveryCaseInput(
-        case_id=case_result["case_id"],
-        disposition=case_result["disposition"],
-        reason=case_result.get("reason"),
-        mitigation_overview=mitigation.get("overview") or "",
-        mitigator_file_changes=mitigation.get("file_changes") or [],
-        mitigator_patch_diff=mitigation.get("patch_diff"),
+        case_id=case_result.case_id,
+        disposition=case_result.disposition,
+        reason=case_result.reason,
+        mitigation_overview=mitigation.overview or "",
+        mitigator_file_changes=mitigation.file_changes,
+        mitigator_patch_diff=mitigation.patch_diff,
     )
 
 
 def _delivery_case_inputs(
-    case_results: Sequence[Mapping[str, Any]],
+    case_results: Sequence[RepositoryCaseResult],
 ) -> list[DeliveryCaseInput]:
     return [
         project_repository_case_result_for_delivery(item)
@@ -344,7 +355,7 @@ def _delivery_case_inputs(
 @activity.defn
 async def plan_repository_delivery_activity(
     request: ReviewWorkflowRequest,
-    case_results: Sequence[Mapping[str, Any]],
+    case_results: Sequence[RepositoryCaseResult],
 ) -> DeliveryPlan:
     from sec_review_agents.delivery_stages.planning import (
         build_skipped_delivery_plan,
@@ -383,7 +394,7 @@ async def plan_repository_delivery_activity(
 @activity.defn
 def prepare_repository_delivery_execution_activity(
     request: ReviewWorkflowRequest,
-    case_results: Sequence[Mapping[str, Any]],
+    case_results: Sequence[RepositoryCaseResult],
     delivery_plan: DeliveryPlan,
 ) -> DeliveryExecutionInput:
 
@@ -527,7 +538,7 @@ def build_repository_delivery_result_activity(
 def build_repository_review_result_activity(
     request: ReviewWorkflowRequest,
     scan_result: RepositoryScanResult,
-    case_results: Sequence[Mapping[str, Any]],
+    case_results: Sequence[RepositoryCaseResult],
     delivery_result: DeliveryResult,
 ) -> dict[str, Any]:
     from sec_review_agents.utils.files import persist_json_artifact
@@ -613,7 +624,7 @@ class RepositoryDiscoveryWorkflow:
 @activity.defn
 def window_deletion_summary_activity(
     request: ReviewWorkflowRequest,
-) -> dict[str, Any]:
+) -> WindowDeletionSummary:
     from sec_review_agents.workflows.repository.case_execution_input import (
         window_deletion_summary,
     )
@@ -648,7 +659,8 @@ class RepositoryScanWorkflow:
         return RepositoryScanResult(
             discovery_result=discovery_result,
             triage_result=triage_result,
-            **window_deletions,
+            deleted_file_count=window_deletions.deleted_file_count,
+            deletion_review_skipped=window_deletions.deletion_review_skipped,
         )
 
 
@@ -660,19 +672,17 @@ class RepositoryCaseProcessingWorkflow:
         self,
         request: ReviewWorkflowRequest,
         scan_result: RepositoryScanResult,
-    ) -> list[dict[str, Any]]:
-        cases = [
-            case.model_dump(mode="json") for case in scan_result.triage_result.cases
-        ]
+    ) -> list[RepositoryCaseResult]:
+        cases = scan_result.triage_result.cases
         case_batch = await workflow.execute_activity(
             prepare_repository_case_review_inputs_activity,
             args=[request, cases],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
-        case_requests = list(case_batch["case_requests"])
-        max_concurrency = max(1, int(case_batch["max_concurrency"]))
-        case_results: list[dict[str, Any] | None] = [None] * len(case_requests)
+        case_requests = case_batch.case_requests
+        max_concurrency = case_batch.max_concurrency
+        case_results: list[RepositoryCaseResult | None] = [None] * len(case_requests)
         pending: dict[asyncio.Task, int] = {}
         next_index = 0
 
@@ -721,7 +731,7 @@ class RepositoryDeliveryWorkflow:
     async def run(
         self,
         request: ReviewWorkflowRequest,
-        case_results: Sequence[Mapping[str, Any]],
+        case_results: Sequence[RepositoryCaseResult],
     ) -> DeliveryResult:
         delivery_plan = await workflow.execute_activity(
             plan_repository_delivery_activity,
@@ -836,16 +846,12 @@ class RepositoryReviewWorkflow:
         artifact_root = Path(str(request.prepared_input["artifact_root_path"]))
         review_units = [
             {
-                "unit_id": str(case_result["case_id"]),
+                "unit_id": case_result.case_id,
                 "trajectory_root": str(
-                    artifact_root
-                    / "cases"
-                    / str(case_result["case_id"])
-                    / "trajectories"
+                    artifact_root / "cases" / case_result.case_id / "trajectories"
                 ),
             }
             for case_result in case_results
-            if isinstance(case_result.get("case_id"), str)
         ]
         finalized = await workflow.execute_activity(
             publish_run_diagnostic_activity,
@@ -883,7 +889,7 @@ def _repository_case_workflow_id(
     request: ReviewWorkflowRequest,
     case_request: RepositoryCaseReviewRequest,
 ) -> str:
-    case_id = str(case_request["case_execution_input"]["case_id"]).strip()
+    case_id = str(case_request.case_execution_input.case_id).strip()
     return f"{request.run_id}:case:{case_id}"
 
 

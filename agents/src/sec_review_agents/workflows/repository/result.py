@@ -1,38 +1,12 @@
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.delivery_stages.result import DeliveryArtifact, DeliveryResult
-from sec_review_agents.review_stages.record import ReviewRecord
-from sec_review_agents.utils.payloads import mapping_payload
 from sec_review_agents.workflows.repository.scan_result import RepositoryScanResult
-
-
-class RepositoryCaseResult(BaseModel):
-    # The published repository result requires a non-empty `case_id`, a non-empty
-    # `disposition`, and a `review_record`. Keeping them optional here would serialize
-    # `null` into that result and make the integration parser reject the whole run, so
-    # fail at the builder instead.
-    case_id: str
-    disposition: str
-    reason: str | None = None
-    review_record: dict[str, Any]
-
-    model_config = ConfigDict(extra="ignore")
-
-    @field_validator("case_id", "disposition", mode="before")
-    @classmethod
-    def required_stripped_string(cls, value: Any) -> str:
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-        raise ValueError("a repository case result requires a non-empty value")
-
-    @field_validator("reason", mode="before")
-    @classmethod
-    def stripped_string_or_none(cls, value: Any) -> str | None:
-        return value.strip() if isinstance(value, str) and value.strip() else None
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 
 
 class ScanSummary(BaseModel):
@@ -67,42 +41,17 @@ class RepositoryWorkflowResult(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
 
-def _repository_review_record(review_record: Any) -> dict[str, Any]:
-    return ReviewRecord.model_validate(mapping_payload(review_record)).model_dump(
-        mode="json", by_alias=True
-    )
-
-
-def _repository_case_results(
-    case_results: Sequence[Mapping[str, Any]],
-) -> list[dict[str, Any]]:
-    results: list[dict[str, Any]] = []
-    for item in case_results:
-        payload = mapping_payload(item)
-        review_record = _repository_review_record(payload.get("review_record"))
-        model = RepositoryCaseResult.model_validate(
-            {
-                "case_id": payload.get("case_id"),
-                "disposition": payload.get("disposition"),
-                "reason": payload.get("reason"),
-                "review_record": review_record,
-            }
-        )
-        results.append(model.model_dump(mode="json"))
-    return results
-
-
 def build_scan_summary(
     *,
     scan_result: RepositoryScanResult | None,
-) -> dict[str, Any]:
+) -> ScanSummary:
     """Project the scan stage results into the published summary.
 
     Everything counted here is something the scan observed about the window, so it is read from
     the scan result rather than passed alongside it.
     """
     if scan_result is None:
-        return ScanSummary().model_dump(mode="json")
+        return ScanSummary()
     discovery_counts = scan_result.discovery_result.counts
     triage_counts = scan_result.triage_result.counts
     return ScanSummary(
@@ -113,14 +62,14 @@ def build_scan_summary(
         case_count=triage_counts.case_count,
         suppressed_candidate_count=triage_counts.suppressed_candidate_count,
         deleted_file_count=scan_result.deleted_file_count,
-    ).model_dump(mode="json")
+    )
 
 
 def build_repository_workflow_result(
     *,
     scan_result: RepositoryScanResult | None,
     delivery_result: DeliveryResult | None,
-    case_results: Sequence[Mapping[str, Any]],
+    case_results: Sequence[RepositoryCaseResult],
 ) -> dict[str, Any]:
     """Assemble the published result from the run's stage outputs.
 
@@ -139,7 +88,7 @@ def build_repository_workflow_result(
             "deliveries": (
                 delivery_result.deliveries if delivery_result is not None else []
             ),
-            "case_results": _repository_case_results(case_results),
+            "case_results": case_results,
             "deletion_review_skipped": (
                 scan_result.deletion_review_skipped
                 if scan_result is not None

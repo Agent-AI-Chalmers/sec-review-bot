@@ -3,6 +3,10 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from pydantic import BaseModel
+
+from sec_review_agents.agents.discovery.model import DiscoveryLocation
+from sec_review_agents.scan_stages.triage.result import TriageCase
 from sec_review_agents.utils.markdown import (
     bullet_section,
     heading,
@@ -13,20 +17,29 @@ from sec_review_agents.utils.paths_ignore import (
     matches_paths_ignore,
     normalize_paths_ignore,
 )
+from sec_review_agents.workflows.repository.scan_result import WindowDeletionSummary
 from sec_review_agents.workflows.repository_case.input import (
     RepositoryCaseExecutionInput,
 )
 from sec_review_agents.workflows.review_intent import TestChangesPolicy
 
-# A deletion case is not a candidate: it is produced from the window's own file list and handed
-# straight to the analyzer. It carries no anchor, because the file it names is already gone.
-DELETION_CASE_ORIGIN = "deleted-file"
-DELETION_CASE_CATEGORY = "deleted-file"
 # Beyond this many deleted files the window is a bulk removal, not a change anyone reviews. The
 # caller chose the window, so an oversized one is the caller's mistake; the system answers by
 # skipping deletion review for the whole window rather than splitting it into pieces that would
 # look reviewed. Ordinary triaged cases still run.
 MAX_DELETED_FILES = 200
+
+
+class DeletedRepositoryCase(BaseModel):
+    """Repository-owned review of files removed by an incremental window.
+
+    This is not a triage candidate and carries no anchor: its files are already gone.
+    """
+
+    case_id: str
+    deleted_paths: list[str]
+    base_sha: str
+    head_sha: str
 
 
 def prepare_case_execution_input(
@@ -35,41 +48,42 @@ def prepare_case_execution_input(
     history_path: Path,
     incremental_window_path: Path | None,
     scan_mode: str,
-    case: Mapping[str, Any],
+    case: TriageCase | DeletedRepositoryCase,
     test_changes: TestChangesPolicy,
     setup_declaration_content: str | None = None,
 ) -> RepositoryCaseExecutionInput:
-    case_id = str(case.get("case_id") or "").strip()
+    case_id = case.case_id.strip()
     if not case_id:
         raise ValueError("Repository case is missing case_id.")
-    # Repository owns the raw triage-case adapter. This function compiles it into
+    # Repository owns the triage-case adapter. This function compiles it into
     # the runtime payload required by repository case execution.
     review_input = build_review_input(
         case=case,
         scan_mode=scan_mode,
     )
-    case_execution_input: RepositoryCaseExecutionInput = {
-        "case_id": case_id,
-        "review_input": review_input,
-        "workspace_snapshot_tar_path": str(workspace_snapshot_tar_path),
-        "history_path": str(history_path),
-        "scan_mode": scan_mode,
-        "incremental_window_path": (
-            str(incremental_window_path)
-            if incremental_window_path is not None
-            else None
-        ),
-        "test_changes": test_changes,
-        "setup_declaration_content": setup_declaration_content,
-    }
-    return case_execution_input
+    return RepositoryCaseExecutionInput.model_validate(
+        {
+            "case_id": case_id,
+            "review_input": review_input,
+            "workspace_snapshot_tar_path": str(workspace_snapshot_tar_path),
+            "history_path": str(history_path),
+            "scan_mode": scan_mode,
+            "incremental_window_path": (
+                str(incremental_window_path)
+                if incremental_window_path is not None
+                else None
+            ),
+            "test_changes": test_changes,
+            "setup_declaration_content": setup_declaration_content,
+        }
+    )
 
 
 def window_deletion_summary(
     *,
     scan_scope: Mapping[str, Any],
     scan_mode: str,
-) -> dict[str, Any]:
+) -> WindowDeletionSummary:
     """Summarize what this window deleted and whether review covers it.
 
     The answer belongs to the scan, not to a case: the window decided it before discovery or triage
@@ -79,10 +93,10 @@ def window_deletion_summary(
     deleted_file_count = (
         0 if scan_mode != "incremental" else len(_deleted_paths_for_review(scan_scope))
     )
-    return {
-        "deleted_file_count": deleted_file_count,
-        "deletion_review_skipped": deleted_file_count > MAX_DELETED_FILES,
-    }
+    return WindowDeletionSummary(
+        deleted_file_count=deleted_file_count,
+        deletion_review_skipped=deleted_file_count > MAX_DELETED_FILES,
+    )
 
 
 def _deleted_paths_for_review(scan_scope: Mapping[str, Any]) -> list[str]:
@@ -114,7 +128,7 @@ def deleted_repository_cases(
     scan_scope: Mapping[str, Any],
     base_sha: str,
     head_sha: str,
-) -> list[dict[str, Any]]:
+) -> list[DeletedRepositoryCase]:
     """Build one deletion case per directory that lost files in this window.
 
     A deleted file leaves nothing in the current tree, so no single-file scan can reach it: the
@@ -132,30 +146,20 @@ def deleted_repository_cases(
     by the scan (deletion_review_skipped in the result), not here: nothing in this window is
     reviewable deletion-wise, so there is no case to attach the fact to.
     """
-    if window_deletion_summary(scan_scope=scan_scope, scan_mode="incremental")[
-        "deletion_review_skipped"
-    ]:
+    if window_deletion_summary(
+        scan_scope=scan_scope, scan_mode="incremental"
+    ).deletion_review_skipped:
         return []
     by_directory: dict[str, list[str]] = {}
     for path in _deleted_paths_for_review(scan_scope):
         by_directory.setdefault(Path(path).parent.as_posix(), []).append(path)
     return [
-        {
-            "case_id": f"deletion-{_deletion_case_slug(directory)}",
-            "category": DELETION_CASE_CATEGORY,
-            "summary": (
-                f"These files were deleted from {directory} by this window and may have "
-                "carried security boundaries: " + ", ".join(paths)
-            ),
-            "evidence": [],
-            "member_candidate_ids": [],
-            "anchor_locations": [],
-            # Read by build_review_input. No discovery or triage stage ever sees this case.
-            "origin": DELETION_CASE_ORIGIN,
-            "deleted_paths": paths,
-            "base_sha": base_sha,
-            "head_sha": head_sha,
-        }
+        DeletedRepositoryCase(
+            case_id=f"deletion-{_deletion_case_slug(directory)}",
+            deleted_paths=paths,
+            base_sha=base_sha,
+            head_sha=head_sha,
+        )
         for directory, paths in sorted(by_directory.items())
     ]
 
@@ -172,7 +176,7 @@ def _deletion_case_slug(directory: str) -> str:
     return f"{readable}-{digest}"
 
 
-def _deletion_section(case: Mapping[str, Any]) -> str:
+def _deletion_section(case: DeletedRepositoryCase) -> str:
     """Render a deletion case for the analyzer.
 
     The case quotes no code on purpose: the deleted content is not in the workspace, and inventing
@@ -181,12 +185,10 @@ def _deletion_section(case: Mapping[str, Any]) -> str:
     starts from the right question instead of re-deriving why the case exists.
     """
     deleted_paths = [
-        str(path).strip()
-        for path in case.get("deleted_paths") or []
-        if str(path).strip()
+        str(path).strip() for path in case.deleted_paths if str(path).strip()
     ]
-    base_sha = inline_code(str(case.get("base_sha") or "?"))
-    head_sha = inline_code(str(case.get("head_sha") or "?"))
+    base_sha = inline_code(case.base_sha or "?")
+    head_sha = inline_code(case.head_sha or "?")
     reading_hint = (
         f"Window {base_sha}..{head_sha}. Read what these files contained from "
         + "`/incremental-window/incremental.patch`"
@@ -243,20 +245,22 @@ def _deletion_section(case: Mapping[str, Any]) -> str:
     )
 
 
-def build_review_input(*, case: Mapping[str, Any], scan_mode: str) -> str:
+def build_review_input(
+    *, case: TriageCase | DeletedRepositoryCase, scan_mode: str
+) -> str:
     """Compile repository-scope case data into the opaque review-stage input."""
-    if str(case.get("origin") or "") == DELETION_CASE_ORIGIN:
+    if isinstance(case, DeletedRepositoryCase):
         return _deletion_section(case)
     sections = [
         markdown_section("Review Input", _case_overview(case)),
         "",
         bullet_section(
             "Candidate Evidence",
-            _normalized_text_items(case["evidence"]),
+            _normalized_text_items(case.evidence),
             level=2,
         ),
         "",
-        _anchor_locations_section(case["anchor_locations"]),
+        _anchor_locations_section(case.anchor_locations),
     ]
     if scan_mode == "incremental":
         sections.extend(
@@ -274,11 +278,11 @@ def build_review_input(*, case: Mapping[str, Any], scan_mode: str) -> str:
     return "\n".join(sections).strip()
 
 
-def _case_overview(case: Mapping[str, Any]) -> str:
+def _case_overview(case: TriageCase) -> str:
     lines: list[str] = []
     for value in (
-        case["category"],
-        case["summary"],
+        case.category,
+        case.summary,
     ):
         text = str(value or "").strip()
         if text and text not in lines:
@@ -298,20 +302,18 @@ def _normalized_text_items(items: list[Any]) -> list[str]:
     return normalized
 
 
-def _render_anchor_locations(locations: list[Any]) -> list[str]:
+def _render_anchor_locations(locations: list[DiscoveryLocation]) -> list[str]:
     rendered: list[str] = []
     seen: set[str] = set()
     for item in locations:
-        if not isinstance(item, dict):
-            continue
-        file_path = str(item.get("file") or "").strip().lstrip("/")
+        file_path = item.file.strip().lstrip("/")
         if not file_path:
             continue
-        line = item.get("line")
-        label = str(item.get("label") or "").strip()
+        line = item.line
+        label = item.label.strip()
         anchor = (
             inline_code(f"{file_path}:{line}")
-            if isinstance(line, int)
+            if line is not None
             else inline_code(file_path)
         )
         text = f"{anchor}: {label}" if label else anchor
@@ -322,7 +324,7 @@ def _render_anchor_locations(locations: list[Any]) -> list[str]:
     return rendered
 
 
-def _anchor_locations_section(locations: list[Any]) -> str:
+def _anchor_locations_section(locations: list[DiscoveryLocation]) -> str:
     anchors = _render_anchor_locations(locations)
     lines = [heading("Candidate Anchors", level=2), ""]
     if not anchors:

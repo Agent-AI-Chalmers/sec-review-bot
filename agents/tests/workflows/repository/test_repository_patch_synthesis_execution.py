@@ -21,6 +21,7 @@ from sec_review_agents.workflows.repository.workflow import (
     plan_repository_delivery_activity,
     prepare_repository_delivery_execution_activity,
 )
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from sec_review_agents.workspace.file_changes import (
     DeletedFileChange,
@@ -103,7 +104,7 @@ async def _execute_delivery_direct_for_test(
     ):
         result = await repository_direct.run_repository_delivery_direct(
             request,
-            keep_case_results,
+            [RepositoryCaseResult.model_validate(item) for item in keep_case_results],
         )
         return result.model_dump(mode="json")
 
@@ -122,7 +123,7 @@ async def _run_repository_delivery_workflow_steps_for_test(
     )
     delivery_plan = await plan_repository_delivery_activity(
         request,
-        case_results,
+        [RepositoryCaseResult.model_validate(item) for item in case_results],
     )
     with patch.object(
         repository_direct,
@@ -131,7 +132,7 @@ async def _run_repository_delivery_workflow_steps_for_test(
     ):
         result = await repository_direct.run_repository_delivery_direct(
             request,
-            case_results,
+            [RepositoryCaseResult.model_validate(item) for item in case_results],
         )
         return result.model_dump(mode="json")
 
@@ -438,7 +439,10 @@ class TestRepositoryDeliveryExecution:
 
         delivery_execution_input = prepare_repository_delivery_execution_activity(
             request,
-            [case_one, case_two],
+            [
+                RepositoryCaseResult.model_validate(item)
+                for item in [case_one, case_two]
+            ],
             DeliveryPlan(
                 status="completed",
                 metadata={},

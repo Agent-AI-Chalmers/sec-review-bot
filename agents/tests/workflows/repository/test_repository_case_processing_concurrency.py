@@ -3,7 +3,6 @@ import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -27,10 +26,11 @@ from sec_review_agents.scan_stages.discovery.result import (
     DiscoveryChunkResult,
     DiscoveryResult,
 )
-from sec_review_agents.scan_stages.triage.result import TriageResult
+from sec_review_agents.scan_stages.triage.result import TriageCase, TriageResult
 from sec_review_agents.workflows.repository import direct as repository_direct
 from sec_review_agents.workflows.repository.workflow import (
     RepositoryCaseProcessingWorkflow,
+    RepositoryCaseRequestBatch,
     RepositoryDiscoveryWorkflow,
     resolve_repository_case_processing_max_concurrency,
 )
@@ -39,6 +39,7 @@ from sec_review_agents.workflows.repository_case.input import (
     PreparedRepositoryCase,
     RepositoryCaseExecutionInput,
 )
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
     RepositoryCaseReviewWorkflow,
@@ -59,15 +60,17 @@ def assert_not_run_review_record(review_record: dict) -> None:
 
 
 def repository_case_execution_input(case_id: str) -> RepositoryCaseExecutionInput:
-    return {
-        "case_id": case_id,
-        "review_input": f"Prepared {case_id} review input.",
-        "workspace_snapshot_tar_path": "/tmp/workspace.snapshot.tar",
-        "history_path": "/tmp/history",
-        "scan_mode": "full",
-        "incremental_window_path": None,
-        "test_changes": TEST_CHANGES_ALLOW,
-    }
+    return RepositoryCaseExecutionInput.model_validate(
+        {
+            "case_id": case_id,
+            "review_input": f"Prepared {case_id} review input.",
+            "workspace_snapshot_tar_path": "/tmp/workspace.snapshot.tar",
+            "history_path": "/tmp/history",
+            "scan_mode": "full",
+            "incremental_window_path": None,
+            "test_changes": TEST_CHANGES_ALLOW,
+        }
+    )
 
 
 def _review_workflow_request(run_id: str = "run-test") -> ReviewWorkflowRequest:
@@ -85,30 +88,34 @@ def _review_workflow_request(run_id: str = "run-test") -> ReviewWorkflowRequest:
 
 
 def repository_case_review_request(case_id: str) -> RepositoryCaseReviewRequest:
-    return {
-        "run_id": "run-test",
-        "case_execution_input": repository_case_execution_input(case_id),
-        "cases_artifacts_path": "/tmp/cases",
-        "published_trajectories_path": f"/tmp/cases/{case_id}/trajectories",
-        "timeout_seconds": 30,
-        "runtime_context": {},
-    }
+    return RepositoryCaseReviewRequest.model_validate(
+        {
+            "run_id": "run-test",
+            "case_execution_input": repository_case_execution_input(case_id),
+            "cases_artifacts_path": "/tmp/cases",
+            "published_trajectories_path": f"/tmp/cases/{case_id}/trajectories",
+            "timeout_seconds": 30,
+            "runtime_context": {},
+        }
+    )
 
 
 @pytest.mark.asyncio
 async def test_direct_case_records_skipped_verification_without_confirmed_target() -> (
     None
 ):
-    prepared_case: PreparedRepositoryCase = {
-        "published_trajectories_path": "/tmp/cases/case-1/trajectories",
-        "case_execution_input": repository_case_execution_input("case-1"),
-        "artifact_paths": {
-            "analyzer": "/tmp/cases/case-1/analyzer",
-            "cvss": "/tmp/cases/case-1/cvss",
-            "mitigator": "/tmp/cases/case-1/mitigator",
-            "verifier": "/tmp/cases/case-1/verifier",
-        },
-    }
+    prepared_case: PreparedRepositoryCase = PreparedRepositoryCase.model_validate(
+        {
+            "published_trajectories_path": "/tmp/cases/case-1/trajectories",
+            "case_execution_input": repository_case_execution_input("case-1"),
+            "artifact_paths": {
+                "analyzer": "/tmp/cases/case-1/analyzer",
+                "cvss": "/tmp/cases/case-1/cvss",
+                "mitigator": "/tmp/cases/case-1/mitigator",
+                "verifier": "/tmp/cases/case-1/verifier",
+            },
+        }
+    )
     analysis_result = analysis_fixture(verdict="no-actionable-finding", narratives=[])
     mitigation_result: MitigationStageResult = MitigationStageResult(
         overview="Test mitigation",
@@ -174,16 +181,18 @@ async def test_direct_case_records_skipped_verification_without_confirmed_target
 async def test_case_verification_activity_persists_skip_without_running_verifier(
     tmp_path: Path,
 ) -> None:
-    prepared_case: PreparedRepositoryCase = {
-        "case_execution_input": repository_case_execution_input("case-1"),
-        "artifact_paths": {
-            "verifier": str(tmp_path / "verifier"),
-            "analyzer": str(tmp_path / "analyzer"),
-            "mitigator": str(tmp_path / "mitigator"),
-            "cvss": str(tmp_path / "cvss"),
-        },
-        "published_trajectories_path": str(tmp_path / "trajectories"),
-    }
+    prepared_case: PreparedRepositoryCase = PreparedRepositoryCase.model_validate(
+        {
+            "case_execution_input": repository_case_execution_input("case-1"),
+            "artifact_paths": {
+                "verifier": str(tmp_path / "verifier"),
+                "analyzer": str(tmp_path / "analyzer"),
+                "mitigator": str(tmp_path / "mitigator"),
+                "cvss": str(tmp_path / "cvss"),
+            },
+            "published_trajectories_path": str(tmp_path / "trajectories"),
+        }
+    )
 
     with patch(
         "sec_review_agents.workflows.repository_case.stage.run_repository_case_verification_stage"
@@ -359,34 +368,42 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
     @activity.defn(name="prepare_repository_case_review_inputs_activity")
     def fake_prepare_case_review_inputs(
         _request: ReviewWorkflowRequest,
-        _cases: list[dict],
-    ) -> dict:
-        return {
-            "max_concurrency": 2,
-            "case_requests": [
+        _cases: list[TriageCase],
+    ) -> RepositoryCaseRequestBatch:
+        assert all(isinstance(case, TriageCase) for case in _cases)
+        assert [case.case_id for case in _cases] == ["case-0", "case-1", "case-2"]
+        return RepositoryCaseRequestBatch(
+            max_concurrency=2,
+            case_requests=[
                 repository_case_review_request("case-1"),
                 repository_case_review_request("case-2"),
                 repository_case_review_request("case-3"),
             ],
-        }
+        )
 
     @activity.defn(name="prepare_repository_case_activity")
-    def fake_prepare_repository_case(request: dict) -> dict:
-        case_id = request["case_execution_input"]["case_id"]
-        return {
-            "case_execution_input": request["case_execution_input"],
-            "published_trajectories_path": request["published_trajectories_path"],
-            "artifact_paths": {
-                "analyzer": f"/tmp/cases/{case_id}/analyzer",
-                "cvss": f"/tmp/cases/{case_id}/cvss",
-                "mitigator": f"/tmp/cases/{case_id}/mitigator",
-                "verifier": f"/tmp/cases/{case_id}/verifier",
-            },
-        }
+    def fake_prepare_repository_case(
+        request: RepositoryCaseReviewRequest,
+    ) -> PreparedRepositoryCase:
+        case_id = request.case_execution_input.case_id
+        return PreparedRepositoryCase.model_validate(
+            {
+                "case_execution_input": request.case_execution_input,
+                "published_trajectories_path": request.published_trajectories_path,
+                "artifact_paths": {
+                    "analyzer": f"/tmp/cases/{case_id}/analyzer",
+                    "cvss": f"/tmp/cases/{case_id}/cvss",
+                    "mitigator": f"/tmp/cases/{case_id}/mitigator",
+                    "verifier": f"/tmp/cases/{case_id}/verifier",
+                },
+            }
+        )
 
     @activity.defn(name="analyze_repository_case_activity")
-    def fake_analyzer(_request: dict, prepared_case: dict) -> AnalysisStageResult:
-        case_id = prepared_case["case_execution_input"]["case_id"]
+    def fake_analyzer(
+        _request: dict, prepared_case: PreparedRepositoryCase
+    ) -> AnalysisStageResult:
+        case_id = prepared_case.case_execution_input.case_id
         if case_id == "case-2":
             # This test targets failure isolation and immediate window refill,
             # not Temporal's production retry delays. Retry policy is covered
@@ -408,7 +425,9 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
 
     @activity.defn(name="score_repository_case_cvss_activity")
     def fake_cvss(
-        _request: dict, _prepared_case: dict, _analysis_result: AnalysisStageResult
+        _request: dict,
+        _prepared_case: PreparedRepositoryCase,
+        _analysis_result: AnalysisStageResult,
     ) -> CvssStageResult:
         return build_cvss_v4_stage_result(
             outcome="scored",
@@ -420,11 +439,11 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigator(
         _request: dict,
-        prepared_case: dict,
+        prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         _retry_context: FeedbackRetryContext | None,
     ) -> MitigationStageResult:
-        case_id = prepared_case["case_execution_input"]["case_id"]
+        case_id = prepared_case.case_execution_input.case_id
         if case_id == "case-1" and not case_3_started.wait(2.0):
             raise RuntimeError("case window was not refilled while case-1 ran")
         return MitigationStageResult(
@@ -437,7 +456,7 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
     @activity.defn(name="verify_repository_case_activity")
     def fake_verifier(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         _mitigation_result: MitigationStageResult | None,
         _retry_context: FeedbackRetryContext | None,
@@ -456,43 +475,45 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
 
     @activity.defn(name="archive_repository_case_feedback_attempt_activity")
     def fake_archive(
-        _prepared_case: dict, _retry_context: FeedbackRetryContext
+        _prepared_case: PreparedRepositoryCase, _retry_context: FeedbackRetryContext
     ) -> None:
         return None
 
     @activity.defn(name="build_repository_case_result_activity")
     def fake_build_result(
-        prepared_case: dict,
+        prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         cvss_result: CvssStageResult | None,
         mitigation_result: MitigationStageResult | None,
         verifier_result: VerificationStageResult | None,
-    ) -> dict:
-        case_id = prepared_case["case_execution_input"]["case_id"]
-        return {
-            "case_id": case_id,
-            "disposition": "keep",
-            "reason": "unit-test",
-            "review_record": {
-                "cvss": (
-                    cvss_result.model_dump(mode="json")
-                    if cvss_result is not None
-                    else None
-                ),
-                "mitigation": (
-                    mitigation_result.model_dump(mode="json")
-                    if mitigation_result is not None
-                    else {}
-                ),
-                "verification": (
-                    verifier_result.model_dump(mode="json")
-                    if verifier_result is not None
-                    else {}
-                ),
-            },
-        }
+    ) -> RepositoryCaseResult:
+        case_id = prepared_case.case_execution_input.case_id
+        return RepositoryCaseResult.model_validate(
+            {
+                "case_id": case_id,
+                "disposition": "keep",
+                "reason": "unit-test",
+                "review_record": {
+                    "cvss": (
+                        cvss_result.model_dump(mode="json")
+                        if cvss_result is not None
+                        else None
+                    ),
+                    "mitigation": (
+                        mitigation_result.model_dump(mode="json")
+                        if mitigation_result is not None
+                        else {}
+                    ),
+                    "verification": (
+                        verifier_result.model_dump(mode="json")
+                        if verifier_result is not None
+                        else {}
+                    ),
+                },
+            }
+        )
 
-    async def run_workflow() -> list[dict]:
+    async def run_workflow() -> list[RepositoryCaseResult]:
         async with temporal_time_skipping_environment() as env:
             with ThreadPoolExecutor(max_workers=4) as executor:
                 async with Worker(
@@ -533,43 +554,38 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
 
     results = await run_workflow()
 
-    assert [item["case_id"] for item in results] == ["case-1", "case-2", "case-3"]
-    assert results[0]["disposition"] == "keep"
-    assert results[1]["disposition"] == "blocked"
-    assert "Case processing failed after retries" in results[1]["reason"]
-    assert_not_run_review_record(results[1]["review_record"])
-    assert results[2]["disposition"] == "keep"
+    assert [item.case_id for item in results] == ["case-1", "case-2", "case-3"]
+    assert results[0].disposition == "keep"
+    assert results[1].disposition == "blocked"
+    assert "Case processing failed after retries" in (results[1].reason or "")
+    assert_not_run_review_record(results[1].review_record.model_dump(mode="json"))
+    assert results[2].disposition == "keep"
 
 
 @pytest.mark.asyncio
 async def test_direct_repository_review_isolates_case_failure() -> None:
     case_requests = [
-        {
-            "case_execution_input": repository_case_execution_input("case-1"),
-        },
-        {
-            "case_execution_input": repository_case_execution_input("case-2"),
-        },
-        {
-            "case_execution_input": repository_case_execution_input("case-3"),
-        },
+        repository_case_review_request(f"case-{index}") for index in range(1, 4)
     ]
 
-    def fake_run_case(case_request: dict) -> dict:
-        case_id = case_request["case_execution_input"]["case_id"]
+    def fake_run_case(
+        case_request: RepositoryCaseReviewRequest,
+    ) -> RepositoryCaseResult:
+        case_id = case_request.case_execution_input.case_id
         if case_id == "case-2":
             raise RuntimeError("case-2 failed")
-        return {
-            "case_id": case_id,
-            "disposition": "keep",
-        }
+        return RepositoryCaseResult.model_validate(
+            {"review_record": {}, "case_id": case_id, "disposition": "keep"}
+        )
 
     with (
         patch.object(
             repository_direct,
             "prepare_repository_case_review_inputs_activity",
-            return_value={"max_concurrency": 2, "case_requests": case_requests},
-        ),
+            return_value=RepositoryCaseRequestBatch(
+                max_concurrency=2, case_requests=case_requests
+            ),
+        ) as prepare_cases,
         patch.object(
             repository_case_direct,
             "run_repository_case_review_direct",
@@ -587,40 +603,42 @@ async def test_direct_repository_review_isolates_case_failure() -> None:
             scan_result_fixture(case_count=3),
         )
 
-    assert [item["case_id"] for item in results] == ["case-1", "case-2", "case-3"]
-    assert results[1]["disposition"] == "blocked"
-    assert "Case processing failed" in results[1]["reason"]
-    assert_not_run_review_record(results[1]["review_record"])
+    assert [item.case_id for item in results] == ["case-1", "case-2", "case-3"]
+    assert results[1].disposition == "blocked"
+    assert "Case processing failed" in (results[1].reason or "")
+    assert_not_run_review_record(results[1].review_record.model_dump(mode="json"))
+
+    assert all(isinstance(case, TriageCase) for case in prepare_cases.call_args.args[1])
 
 
 @pytest.mark.asyncio
 async def test_direct_repository_case_review_fanout_is_bounded() -> None:
     case_requests = [
-        {
-            "case_execution_input": repository_case_execution_input(f"case-{index}"),
-        }
-        for index in range(1, 6)
+        repository_case_review_request(f"case-{index}") for index in range(1, 6)
     ]
     active_count = 0
     max_active_count = 0
 
-    async def fake_run_case(case_request: dict) -> dict:
+    async def fake_run_case(
+        case_request: RepositoryCaseReviewRequest,
+    ) -> RepositoryCaseResult:
         nonlocal active_count, max_active_count
-        case_id = case_request["case_execution_input"]["case_id"]
+        case_id = case_request.case_execution_input.case_id
         active_count += 1
         max_active_count = max(max_active_count, active_count)
         await asyncio.sleep(0)
         active_count -= 1
-        return {
-            "case_id": case_id,
-            "disposition": "keep",
-        }
+        return RepositoryCaseResult.model_validate(
+            {"review_record": {}, "case_id": case_id, "disposition": "keep"}
+        )
 
     with (
         patch.object(
             repository_direct,
             "prepare_repository_case_review_inputs_activity",
-            return_value={"max_concurrency": 2, "case_requests": case_requests},
+            return_value=RepositoryCaseRequestBatch(
+                max_concurrency=2, case_requests=case_requests
+            ),
         ),
         patch.object(
             repository_case_direct,
@@ -639,7 +657,7 @@ async def test_direct_repository_case_review_fanout_is_bounded() -> None:
             scan_result_fixture(case_count=5),
         )
 
-    assert [item["case_id"] for item in results] == [
+    assert [item.case_id for item in results] == [
         "case-1",
         "case-2",
         "case-3",
@@ -776,20 +794,24 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
     mitigator_started = threading.Event()
 
     @activity.defn(name="prepare_repository_case_activity")
-    def fake_prepare_repository_case(request: dict) -> dict:
-        return {
-            "case_execution_input": request["case_execution_input"],
-            "published_trajectories_path": request["published_trajectories_path"],
-            "artifact_paths": {
-                "analyzer": "/tmp/cases/case-1/analyzer",
-                "cvss": "/tmp/cases/case-1/cvss",
-                "mitigator": "/tmp/cases/case-1/mitigator",
-                "verifier": "/tmp/cases/case-1/verifier",
-            },
-        }
+    def fake_prepare_repository_case(request: dict) -> PreparedRepositoryCase:
+        return PreparedRepositoryCase.model_validate(
+            {
+                "case_execution_input": request["case_execution_input"],
+                "published_trajectories_path": request["published_trajectories_path"],
+                "artifact_paths": {
+                    "analyzer": "/tmp/cases/case-1/analyzer",
+                    "cvss": "/tmp/cases/case-1/cvss",
+                    "mitigator": "/tmp/cases/case-1/mitigator",
+                    "verifier": "/tmp/cases/case-1/verifier",
+                },
+            }
+        )
 
     @activity.defn(name="analyze_repository_case_activity")
-    def fake_analyzer(_request: dict, _prepared_case: dict) -> AnalysisStageResult:
+    def fake_analyzer(
+        _request: dict, _prepared_case: PreparedRepositoryCase
+    ) -> AnalysisStageResult:
         return analysis_fixture(
             verdict="confirmed-vulnerability",
             narratives=[
@@ -801,7 +823,9 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
 
     @activity.defn(name="score_repository_case_cvss_activity")
     def fake_cvss(
-        _request: dict, _prepared_case: dict, _analysis_result: AnalysisStageResult
+        _request: dict,
+        _prepared_case: PreparedRepositoryCase,
+        _analysis_result: AnalysisStageResult,
     ) -> CvssStageResult:
         cvss_started.set()
         if not mitigator_started.wait(1.0):
@@ -816,7 +840,7 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigator(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         _retry_context: FeedbackRetryContext | None,
     ) -> MitigationStageResult:
@@ -831,7 +855,7 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
     @activity.defn(name="verify_repository_case_activity")
     def fake_verifier(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         _mitigation_result: MitigationStageResult | None,
         _retry_context: FeedbackRetryContext | None,
@@ -850,36 +874,38 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
 
     @activity.defn(name="archive_repository_case_feedback_attempt_activity")
     def fake_archive(
-        _prepared_case: dict, _retry_context: FeedbackRetryContext
+        _prepared_case: PreparedRepositoryCase, _retry_context: FeedbackRetryContext
     ) -> None:
         return None
 
     @activity.defn(name="build_repository_case_result_activity")
     def fake_build_result(
-        prepared_case: dict,
+        prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         cvss_result: CvssStageResult,
         _mitigation_result: MitigationStageResult | None,
         verifier_result: VerificationStageResult | None,
-    ) -> dict:
-        return {
-            "case_id": prepared_case["case_execution_input"]["case_id"],
-            "disposition": "blocked",
-            "review_record": {
-                "cvss": (
-                    cvss_result.model_dump(mode="json")
-                    if cvss_result is not None
-                    else None
-                ),
-                "verification": (
-                    verifier_result.model_dump(mode="json")
-                    if verifier_result is not None
-                    else {}
-                ),
-            },
-        }
+    ) -> RepositoryCaseResult:
+        return RepositoryCaseResult.model_validate(
+            {
+                "case_id": prepared_case.case_execution_input.case_id,
+                "disposition": "blocked",
+                "review_record": {
+                    "cvss": (
+                        cvss_result.model_dump(mode="json")
+                        if cvss_result is not None
+                        else None
+                    ),
+                    "verification": (
+                        verifier_result.model_dump(mode="json")
+                        if verifier_result is not None
+                        else {}
+                    ),
+                },
+            }
+        )
 
-    async def run_workflow() -> dict:
+    async def run_workflow() -> RepositoryCaseResult:
         async with temporal_time_skipping_environment() as env:
             with ThreadPoolExecutor(max_workers=2) as executor:
                 async with Worker(
@@ -908,29 +934,34 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
 
     result = await run_workflow()
 
-    assert result["case_id"] == "case-1"
-    assert result["review_record"]["cvss"]["outcome"] == "scored"
-    assert result["review_record"]["verification"]["patch_coverage"] == "no-patch"
-    assert "diagnostics" not in result
+    assert result.case_id == "case-1"
+    assert result.review_record.cvss is not None
+    assert result.review_record.cvss.outcome == "scored"
+    assert result.review_record.verification.patch_coverage == "no-patch"
+    assert "diagnostics" not in result.model_dump()
 
 
 @pytest.mark.asyncio
 async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
     @activity.defn(name="prepare_repository_case_activity")
-    def fake_prepare_repository_case(request: dict) -> dict:
-        return {
-            "case_execution_input": request["case_execution_input"],
-            "published_trajectories_path": request["published_trajectories_path"],
-            "artifact_paths": {
-                "analyzer": "/tmp/cases/case-1/analyzer",
-                "cvss": "/tmp/cases/case-1/cvss",
-                "mitigator": "/tmp/cases/case-1/mitigator",
-                "verifier": "/tmp/cases/case-1/verifier",
-            },
-        }
+    def fake_prepare_repository_case(request: dict) -> PreparedRepositoryCase:
+        return PreparedRepositoryCase.model_validate(
+            {
+                "case_execution_input": request["case_execution_input"],
+                "published_trajectories_path": request["published_trajectories_path"],
+                "artifact_paths": {
+                    "analyzer": "/tmp/cases/case-1/analyzer",
+                    "cvss": "/tmp/cases/case-1/cvss",
+                    "mitigator": "/tmp/cases/case-1/mitigator",
+                    "verifier": "/tmp/cases/case-1/verifier",
+                },
+            }
+        )
 
     @activity.defn(name="analyze_repository_case_activity")
-    def fake_analyzer(_request: dict, _prepared_case: dict) -> AnalysisStageResult:
+    def fake_analyzer(
+        _request: dict, _prepared_case: PreparedRepositoryCase
+    ) -> AnalysisStageResult:
         return analysis_fixture(
             verdict="confirmed-vulnerability",
             narratives=[narrative_fixture(verdict="confirmed-vulnerability")],
@@ -938,14 +969,16 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
 
     @activity.defn(name="score_repository_case_cvss_activity")
     def fake_cvss(
-        _request: dict, _prepared_case: dict, _analysis_result: AnalysisStageResult
+        _request: dict,
+        _prepared_case: PreparedRepositoryCase,
+        _analysis_result: AnalysisStageResult,
     ) -> CvssStageResult:
         raise RuntimeError("cvss failed after retries")
 
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigator(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         _retry_context: FeedbackRetryContext | None,
     ) -> MitigationStageResult:
@@ -957,7 +990,7 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
     @activity.defn(name="verify_repository_case_activity")
     def fake_verifier(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         _mitigation_result: MitigationStageResult | None,
         _retry_context: FeedbackRetryContext | None,
@@ -976,36 +1009,38 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
 
     @activity.defn(name="archive_repository_case_feedback_attempt_activity")
     def fake_archive(
-        _prepared_case: dict, _retry_context: FeedbackRetryContext
+        _prepared_case: PreparedRepositoryCase, _retry_context: FeedbackRetryContext
     ) -> None:
         return None
 
     @activity.defn(name="build_repository_case_result_activity")
     def fake_build_result(
-        prepared_case: dict,
+        prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         cvss_result: CvssStageResult | None,
         _mitigation_result: MitigationStageResult | None,
         verifier_result: VerificationStageResult | None,
-    ) -> dict:
-        return {
-            "case_id": prepared_case["case_execution_input"]["case_id"],
-            "disposition": "keep",
-            "review_record": {
-                "cvss": (
-                    cvss_result.model_dump(mode="json")
-                    if cvss_result is not None
-                    else None
-                ),
-                "verification": (
-                    verifier_result.model_dump(mode="json")
-                    if verifier_result is not None
-                    else {}
-                ),
-            },
-        }
+    ) -> RepositoryCaseResult:
+        return RepositoryCaseResult.model_validate(
+            {
+                "case_id": prepared_case.case_execution_input.case_id,
+                "disposition": "keep",
+                "review_record": {
+                    "cvss": (
+                        cvss_result.model_dump(mode="json")
+                        if cvss_result is not None
+                        else None
+                    ),
+                    "verification": (
+                        verifier_result.model_dump(mode="json")
+                        if verifier_result is not None
+                        else {}
+                    ),
+                },
+            }
+        )
 
-    async def run_workflow() -> dict:
+    async def run_workflow() -> RepositoryCaseResult:
         async with temporal_time_skipping_environment() as env:
             with ThreadPoolExecutor(max_workers=2) as executor:
                 async with Worker(
@@ -1034,9 +1069,9 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
 
     result = await run_workflow()
 
-    assert result["disposition"] == "keep"
-    assert result["review_record"]["cvss"] is None
-    assert result["review_record"]["verification"]["patch_coverage"] == "full"
+    assert result.disposition == "keep"
+    assert result.review_record.cvss is None
+    assert result.review_record.verification.patch_coverage == "full"
 
 
 @pytest.mark.asyncio
@@ -1044,19 +1079,22 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
     cvss_started = threading.Event()
     mitigator_started = threading.Event()
 
-    prepared_case: dict[str, Any] = {
-        "case_execution_input": repository_case_execution_input("case-1"),
-        "artifact_paths": {
-            "analyzer": "/tmp/cases/case-1/analyzer",
-            "cvss": "/tmp/cases/case-1/cvss",
-            "mitigator": "/tmp/cases/case-1/mitigator",
-            "verifier": "/tmp/cases/case-1/verifier",
-        },
-    }
+    prepared_case: PreparedRepositoryCase = PreparedRepositoryCase.model_validate(
+        {
+            "published_trajectories_path": "/tmp/cases/case-1/trajectories",
+            "case_execution_input": repository_case_execution_input("case-1"),
+            "artifact_paths": {
+                "analyzer": "/tmp/cases/case-1/analyzer",
+                "cvss": "/tmp/cases/case-1/cvss",
+                "mitigator": "/tmp/cases/case-1/mitigator",
+                "verifier": "/tmp/cases/case-1/verifier",
+            },
+        }
+    )
 
     async def fake_cvss(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
     ) -> CvssStageResult:
         cvss_started.set()
@@ -1073,7 +1111,7 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
 
     async def fake_mitigator(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         _retry_context: FeedbackRetryContext | None,
     ) -> MitigationStageResult:
@@ -1089,7 +1127,7 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
 
     async def fake_analyzer(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
     ) -> AnalysisStageResult:
         return analysis_fixture(
             verdict="confirmed-vulnerability",
@@ -1098,7 +1136,7 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
 
     async def fake_verifier(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         _mitigation_result: MitigationStageResult | None,
         _retry_context: FeedbackRetryContext | None,
@@ -1113,22 +1151,25 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
         )
 
     def fake_build_result(
-        prepared_case: dict,
+        prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         cvss_result: CvssStageResult,
         _mitigation_result: MitigationStageResult | None,
         _verifier_result: VerificationStageResult | None,
-    ) -> dict:
-        return {
-            "case_id": prepared_case["case_execution_input"]["case_id"],
-            "review_record": {
-                "cvss": (
-                    cvss_result.model_dump(mode="json")
-                    if cvss_result is not None
-                    else None
-                ),
-            },
-        }
+    ) -> RepositoryCaseResult:
+        return RepositoryCaseResult.model_validate(
+            {
+                "case_id": prepared_case.case_execution_input.case_id,
+                "disposition": "keep",
+                "review_record": {
+                    "cvss": (
+                        cvss_result.model_dump(mode="json")
+                        if cvss_result is not None
+                        else None
+                    ),
+                },
+            }
+        )
 
     with (
         patch.object(
@@ -1168,35 +1209,41 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
         ),
     ):
         result = await repository_case_direct.run_repository_case_review_direct(
-            {
-                "run_id": "run-test",
-                "case_execution_input": prepared_case["case_execution_input"],
-                "cases_artifacts_path": "/tmp/local/artifacts/run-test/cases",
-                "published_trajectories_path": "/tmp/local/artifacts/run-test/cases/case-1/trajectories",
-                "timeout_seconds": 30,
-                "runtime_context": {},
-            }
+            RepositoryCaseReviewRequest.model_validate(
+                {
+                    "run_id": "run-test",
+                    "case_execution_input": prepared_case.case_execution_input,
+                    "cases_artifacts_path": "/tmp/local/artifacts/run-test/cases",
+                    "published_trajectories_path": "/tmp/local/artifacts/run-test/cases/case-1/trajectories",
+                    "timeout_seconds": 30,
+                    "runtime_context": {},
+                }
+            )
         )
 
-    assert result["case_id"] == "case-1"
-    assert result["review_record"]["cvss"]["outcome"] == "scored"
+    assert result.case_id == "case-1"
+    assert result.review_record.cvss is not None
+    assert result.review_record.cvss.outcome == "scored"
 
 
 @pytest.mark.asyncio
 async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None:
-    prepared_case: dict[str, Any] = {
-        "case_execution_input": repository_case_execution_input("case-1"),
-        "artifact_paths": {
-            "analyzer": "/tmp/cases/case-1/analyzer",
-            "cvss": "/tmp/cases/case-1/cvss",
-            "mitigator": "/tmp/cases/case-1/mitigator",
-            "verifier": "/tmp/cases/case-1/verifier",
-        },
-    }
+    prepared_case: PreparedRepositoryCase = PreparedRepositoryCase.model_validate(
+        {
+            "published_trajectories_path": "/tmp/cases/case-1/trajectories",
+            "case_execution_input": repository_case_execution_input("case-1"),
+            "artifact_paths": {
+                "analyzer": "/tmp/cases/case-1/analyzer",
+                "cvss": "/tmp/cases/case-1/cvss",
+                "mitigator": "/tmp/cases/case-1/mitigator",
+                "verifier": "/tmp/cases/case-1/verifier",
+            },
+        }
+    )
 
     async def fake_analyzer(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
     ) -> AnalysisStageResult:
         return analysis_fixture(
             verdict="confirmed-vulnerability",
@@ -1205,14 +1252,14 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
 
     async def fake_cvss(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
     ) -> CvssStageResult:
         raise RuntimeError("cvss model failed")
 
     async def fake_mitigator(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         _retry_context: FeedbackRetryContext | None,
     ) -> MitigationStageResult:
@@ -1223,7 +1270,7 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
 
     async def fake_verifier(
         _request: dict,
-        _prepared_case: dict,
+        _prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         _mitigation_result: MitigationStageResult | None,
         _retry_context: FeedbackRetryContext | None,
@@ -1238,22 +1285,25 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
         )
 
     def fake_build_result(
-        prepared_case: dict,
+        prepared_case: PreparedRepositoryCase,
         _analysis_result: AnalysisStageResult,
         cvss_result: CvssStageResult | None,
         _mitigation_result: MitigationStageResult | None,
         _verifier_result: VerificationStageResult | None,
-    ) -> dict:
-        return {
-            "case_id": prepared_case["case_execution_input"]["case_id"],
-            "review_record": {
-                "cvss": (
-                    cvss_result.model_dump(mode="json")
-                    if cvss_result is not None
-                    else None
-                ),
-            },
-        }
+    ) -> RepositoryCaseResult:
+        return RepositoryCaseResult.model_validate(
+            {
+                "case_id": prepared_case.case_execution_input.case_id,
+                "disposition": "keep",
+                "review_record": {
+                    "cvss": (
+                        cvss_result.model_dump(mode="json")
+                        if cvss_result is not None
+                        else None
+                    ),
+                },
+            }
+        )
 
     with (
         patch.object(
@@ -1293,15 +1343,17 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
         ),
     ):
         result = await repository_case_direct.run_repository_case_review_direct(
-            {
-                "run_id": "run-test",
-                "case_execution_input": prepared_case["case_execution_input"],
-                "cases_artifacts_path": "/tmp/local/artifacts/run-test/cases",
-                "published_trajectories_path": "/tmp/local/artifacts/run-test/cases/case-1/trajectories",
-                "timeout_seconds": 30,
-                "runtime_context": {},
-            }
+            RepositoryCaseReviewRequest.model_validate(
+                {
+                    "run_id": "run-test",
+                    "case_execution_input": prepared_case.case_execution_input,
+                    "cases_artifacts_path": "/tmp/local/artifacts/run-test/cases",
+                    "published_trajectories_path": "/tmp/local/artifacts/run-test/cases/case-1/trajectories",
+                    "timeout_seconds": 30,
+                    "runtime_context": {},
+                }
+            )
         )
 
-    assert result["case_id"] == "case-1"
-    assert result["review_record"]["cvss"] is None
+    assert result.case_id == "case-1"
+    assert result.review_record.cvss is None

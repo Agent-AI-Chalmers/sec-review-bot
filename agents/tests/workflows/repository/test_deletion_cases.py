@@ -1,5 +1,4 @@
 from sec_review_agents.workflows.repository.case_execution_input import (
-    DELETION_CASE_ORIGIN,
     MAX_DELETED_FILES,
     build_review_input,
     deleted_repository_cases,
@@ -32,9 +31,7 @@ def test_only_deleted_files_become_deletion_cases() -> None:
     )
 
     assert len(cases) == 1
-    assert cases[0]["deleted_paths"] == ["a/deleted.py"]
-    assert cases[0]["origin"] == DELETION_CASE_ORIGIN
-    assert cases[0]["category"] == "deleted-file"
+    assert cases[0].deleted_paths == ["a/deleted.py"]
 
 
 def test_deletion_cases_honour_paths_ignore() -> None:
@@ -60,7 +57,7 @@ def test_deletion_cases_honour_paths_ignore() -> None:
         head_sha="head",
     )
 
-    assert [case["deleted_paths"] for case in cases] == [["src/auth.py"]]
+    assert [case.deleted_paths for case in cases] == [["src/auth.py"]]
 
 
 def test_no_deleted_files_produce_no_case() -> None:
@@ -92,15 +89,14 @@ def test_deleted_files_group_by_nearest_parent_directory() -> None:
     )
 
     grouped = {
-        case["deleted_paths"][0].rsplit("/", 1)[0]: case["deleted_paths"]
-        for case in cases
+        case.deleted_paths[0].rsplit("/", 1)[0]: case.deleted_paths for case in cases
     }
     assert grouped == {
         "setup.py": ["setup.py"],
         "src/auth": ["src/auth/middleware.py", "src/auth/policy.py"],
         "src/tls": ["src/tls/root-ca.pem"],
     }
-    assert all(case["case_id"].startswith("deletion-") for case in cases)
+    assert all(case.case_id.startswith("deletion-") for case in cases)
 
 
 def test_case_ids_stay_unique_for_directories_that_print_alike() -> None:
@@ -118,7 +114,7 @@ def test_case_ids_stay_unique_for_directories_that_print_alike() -> None:
         head_sha="head",
     )
 
-    assert len({case["case_id"] for case in cases}) == 2
+    assert len({case.case_id for case in cases}) == 2
 
 
 def test_too_many_deleted_files_produce_no_cases_at_all() -> None:

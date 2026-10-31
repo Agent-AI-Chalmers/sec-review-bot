@@ -1,6 +1,5 @@
 import asyncio
 import contextlib
-from typing import Any
 
 from sec_review_agents.review_stages.cvss.result import CvssStageResult
 from sec_review_agents.review_stages.feedback_loop import (
@@ -9,6 +8,7 @@ from sec_review_agents.review_stages.feedback_loop import (
     feedback_retry_context,
     should_retry_from_verifier_result,
 )
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
     analyze_repository_case_activity,
@@ -23,7 +23,7 @@ from sec_review_agents.workflows.repository_case.workflow import (
 
 async def run_repository_case_review_direct(
     request: RepositoryCaseReviewRequest,
-) -> dict[str, Any]:
+) -> RepositoryCaseResult:
     """Run one repository case review locally through activity functions."""
     # Local direct runs reuse activity functions for artifact parity, but they do
     # not emulate Temporal retries. Runtime failures must still propagate.

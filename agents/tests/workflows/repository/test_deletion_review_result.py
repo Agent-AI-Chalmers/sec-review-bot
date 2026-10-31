@@ -56,7 +56,7 @@ def test_the_scan_counts_only_deletions_review_covers() -> None:
             ],
         },
         scan_mode="incremental",
-    ) == {"deleted_file_count": 1, "deletion_review_skipped": False}
+    ).model_dump() == {"deleted_file_count": 1, "deletion_review_skipped": False}
 
 
 def test_a_window_past_the_limit_reports_the_skip() -> None:
@@ -75,7 +75,7 @@ def test_a_window_past_the_limit_reports_the_skip() -> None:
         scan_mode="incremental",
     )
 
-    assert summary == {
+    assert summary.model_dump() == {
         "deleted_file_count": MAX_DELETED_FILES + 1,
         "deletion_review_skipped": True,
     }
@@ -88,4 +88,4 @@ def test_a_full_scan_counts_no_deletions() -> None:
 
     assert window_deletion_summary(
         scan_scope={"incremental_changed_files": []}, scan_mode="full"
-    ) == {"deleted_file_count": 0, "deletion_review_skipped": False}
+    ).model_dump() == {"deleted_file_count": 0, "deletion_review_skipped": False}

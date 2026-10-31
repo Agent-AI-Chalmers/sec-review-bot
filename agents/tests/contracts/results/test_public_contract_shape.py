@@ -10,6 +10,7 @@ from sec_review_agents.review_stages.record import ReviewRecord
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from tests.contract_fixtures import contract_validator, format_schema_errors
 from tests.repository_scan_fixtures import scan_result_fixture
 
@@ -202,7 +203,9 @@ def test_repository_result_public_shape() -> None:
                 "case_delivery_assignments": {"case-1": {"status": "single"}},
             }
         ),
-        case_results=[case_result],
+        case_results=[
+            RepositoryCaseResult.model_validate(item) for item in [case_result]
+        ],
     )
 
     assert_public_workflow_result(result)
@@ -251,45 +254,48 @@ def test_repository_workflow_result_builder_output_matches_shared_contract_schem
             }
         ),
         case_results=[
-            {
-                "case_id": "case-1",
-                "disposition": "keep",
-                "reason": None,
-                "review_record": ReviewRecord.model_validate(
-                    {
-                        "analysis": {
-                            "verdict": "confirmed-vulnerability",
-                            "overview": "Webhook retry payloads can reuse stale metadata.",
-                            "narratives": [],
-                        },
-                        "mitigation": {
-                            "overview": "Recompute signature metadata before enqueueing.",
-                            "changed_files": ["src/webhook.ts"],
-                            "file_changes": [],
-                            "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n",
-                        },
-                        "verification": {
-                            "overview": "The patch covers the retry enqueue path.",
-                            "review_target_claim": "Retry payloads must be signed with current metadata.",
-                            "validation_level": "static",
-                            "patch_coverage": "full",
-                            "regression_status": "not-run",
-                            "resolution_next_step": "none",
-                            "patch_findings": [],
-                            "verification_findings": [],
-                            "residual_risks": [],
-                        },
-                        "cvss": {
-                            "outcome": "scored",
-                            "base_score": 5.8,
-                            "severity": "medium",
-                            "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N",
-                            "overview": "Authenticated users can replay stale retry payloads.",
-                            "not_scored_reason": None,
-                        },
-                    }
-                ).model_dump(mode="json", by_alias=True),
-            }
+            RepositoryCaseResult.model_validate(item)
+            for item in [
+                {
+                    "case_id": "case-1",
+                    "disposition": "keep",
+                    "reason": None,
+                    "review_record": ReviewRecord.model_validate(
+                        {
+                            "analysis": {
+                                "verdict": "confirmed-vulnerability",
+                                "overview": "Webhook retry payloads can reuse stale metadata.",
+                                "narratives": [],
+                            },
+                            "mitigation": {
+                                "overview": "Recompute signature metadata before enqueueing.",
+                                "changed_files": ["src/webhook.ts"],
+                                "file_changes": [],
+                                "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n",
+                            },
+                            "verification": {
+                                "overview": "The patch covers the retry enqueue path.",
+                                "review_target_claim": "Retry payloads must be signed with current metadata.",
+                                "validation_level": "static",
+                                "patch_coverage": "full",
+                                "regression_status": "not-run",
+                                "resolution_next_step": "none",
+                                "patch_findings": [],
+                                "verification_findings": [],
+                                "residual_risks": [],
+                            },
+                            "cvss": {
+                                "outcome": "scored",
+                                "base_score": 5.8,
+                                "severity": "medium",
+                                "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N",
+                                "overview": "Authenticated users can replay stale retry payloads.",
+                                "not_scored_reason": None,
+                            },
+                        }
+                    ).model_dump(mode="json", by_alias=True),
+                }
+            ]
         ],
     )
 
@@ -317,7 +323,9 @@ def test_repository_case_results_drop_internal_case_fields() -> None:
     result = build_repository_workflow_result(
         scan_result=scan_result_fixture(),
         delivery_result=None,
-        case_results=[case_result],
+        case_results=[
+            RepositoryCaseResult.model_validate(item) for item in [case_result]
+        ],
     )
 
     assert set(result["case_results"][0]) == {
@@ -337,17 +345,20 @@ def test_repository_case_results_normalize_partial_review_record_shape() -> None
         scan_result=scan_result_fixture(),
         delivery_result=None,
         case_results=[
-            {
-                "case_id": "case-1",
-                "disposition": "keep",
-                "reason": None,
-                "review_record": {
-                    "analysis": {
-                        "verdict": "confirmed-defect",
-                        "unexpected": "dropped",
+            RepositoryCaseResult.model_validate(item)
+            for item in [
+                {
+                    "case_id": "case-1",
+                    "disposition": "keep",
+                    "reason": None,
+                    "review_record": {
+                        "analysis": {
+                            "verdict": "confirmed-defect",
+                            "unexpected": "dropped",
+                        },
                     },
-                },
-            }
+                }
+            ]
         ],
     )
 
@@ -365,17 +376,20 @@ def test_repository_case_result_reason_is_always_present_and_nullable() -> None:
         scan_result=scan_result_fixture(),
         delivery_result=None,
         case_results=[
-            {
-                "case_id": "case-1",
-                "disposition": "blocked",
-                "review_record": not_run_review_record(),
-            },
-            {
-                "case_id": "case-2",
-                "disposition": "blocked",
-                "reason": "  needs manual review  ",
-                "review_record": not_run_review_record(),
-            },
+            RepositoryCaseResult.model_validate(item)
+            for item in [
+                {
+                    "case_id": "case-1",
+                    "disposition": "blocked",
+                    "review_record": not_run_review_record(),
+                },
+                {
+                    "case_id": "case-2",
+                    "disposition": "blocked",
+                    "reason": "  needs manual review  ",
+                    "review_record": not_run_review_record(),
+                },
+            ]
         ],
     )
 
@@ -388,12 +402,15 @@ def test_repository_blocked_case_result_keeps_required_review_record() -> None:
         scan_result=scan_result_fixture(),
         delivery_result=None,
         case_results=[
-            {
-                "case_id": "case-1",
-                "disposition": "blocked",
-                "reason": "case processing failed",
-                "review_record": not_run_review_record(),
-            },
+            RepositoryCaseResult.model_validate(item)
+            for item in [
+                {
+                    "case_id": "case-1",
+                    "disposition": "blocked",
+                    "reason": "case processing failed",
+                    "review_record": not_run_review_record(),
+                },
+            ]
         ],
     )
 
@@ -410,23 +427,16 @@ def test_repository_blocked_case_result_keeps_required_review_record() -> None:
     assert review_record["cvss"] is None
 
 
-def test_repository_case_result_defaults_missing_review_record_to_not_run() -> None:
-    """A public case result must carry a schema-valid review_record, never null."""
-    result = build_repository_workflow_result(
-        scan_result=scan_result_fixture(),
-        delivery_result=None,
-        case_results=[
+def test_repository_case_result_requires_explicit_review_record() -> None:
+    """Missing records must not hide broken case execution as an unrun review."""
+    with pytest.raises(ValidationError, match="review_record"):
+        RepositoryCaseResult.model_validate(
             {
                 "case_id": "case-1",
                 "disposition": "blocked",
                 "reason": "case processing failed",
-            },
-        ],
-    )
-
-    review_record = result["case_results"][0]["review_record"]
-    assert review_record == not_run_review_record()
-    assert_matches_contract_schema(result, "repository-review-result.schema.json")
+            }
+        )
 
 
 @pytest.mark.parametrize(
@@ -456,5 +466,5 @@ def test_repository_case_result_rejects_a_null_public_identity(
         build_repository_workflow_result(
             scan_result=scan_result_fixture(),
             delivery_result=None,
-            case_results=[case],
+            case_results=[RepositoryCaseResult.model_validate(item) for item in [case]],
         )

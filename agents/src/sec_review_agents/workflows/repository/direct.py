@@ -1,5 +1,5 @@
 import asyncio
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from typing import Any
 
 from sec_review_agents.delivery_stages.execution.input import (
@@ -33,6 +33,7 @@ from sec_review_agents.workflows.repository.workflow import (
     window_deletion_summary_activity,
 )
 from sec_review_agents.workflows.repository_case import direct as repository_case_direct
+from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
 )
@@ -62,7 +63,8 @@ async def run_repository_scan_direct(
     return RepositoryScanResult(
         discovery_result=discovery_result,
         triage_result=triage_result,
-        **window_deletions,
+        deleted_file_count=window_deletions.deleted_file_count,
+        deletion_review_skipped=window_deletions.deletion_review_skipped,
     )
 
 
@@ -98,16 +100,16 @@ async def run_repository_discovery_direct(
 async def run_repository_case_reviews_direct(
     request: ReviewWorkflowRequest,
     scan_result: RepositoryScanResult,
-) -> list[dict[str, Any]]:
-    cases = [case.model_dump(mode="json") for case in scan_result.triage_result.cases]
+) -> list[RepositoryCaseResult]:
+    cases = scan_result.triage_result.cases
     case_batch = prepare_repository_case_review_inputs_activity(request, cases)
-    case_requests = list(case_batch["case_requests"])
-    max_concurrency = max(1, int(case_batch["max_concurrency"]))
+    case_requests = case_batch.case_requests
+    max_concurrency = case_batch.max_concurrency
     semaphore = asyncio.Semaphore(max_concurrency)
 
     async def run_case(
         index: int, case_request: RepositoryCaseReviewRequest
-    ) -> tuple[int, dict[str, Any]]:
+    ) -> tuple[int, RepositoryCaseResult]:
         async with semaphore:
             try:
                 return (
@@ -122,7 +124,7 @@ async def run_repository_case_reviews_direct(
                     f"Case processing failed: {error}",
                 )
 
-    case_results: list[dict[str, Any] | None] = [None] * len(case_requests)
+    case_results: list[RepositoryCaseResult | None] = [None] * len(case_requests)
     for index, result in await asyncio.gather(
         *(
             run_case(index, case_request)
@@ -135,7 +137,7 @@ async def run_repository_case_reviews_direct(
 
 async def run_repository_delivery_direct(
     request: ReviewWorkflowRequest,
-    case_results: Sequence[Mapping[str, Any]],
+    case_results: Sequence[RepositoryCaseResult],
 ) -> DeliveryResult:
     delivery_plan = await plan_repository_delivery_activity(request, case_results)
     deliveries = delivery_plan.deliveries
@@ -155,7 +157,7 @@ async def run_repository_delivery_direct(
     keep_case_results = [
         project_repository_case_result_for_delivery(item)
         for item in case_results
-        if item.get("disposition") == "keep"
+        if item.disposition == "keep"
     ]
     persist_delivery_execution_input(
         run_artifacts_root=run_artifacts_root,

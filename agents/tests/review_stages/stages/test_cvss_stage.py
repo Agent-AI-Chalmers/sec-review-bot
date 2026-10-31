@@ -6,6 +6,7 @@ from sec_review_agents.review_stages.cvss.stage import (
     persist_cvss_failure,
     persist_cvss_stage_result,
 )
+from sec_review_agents.workflows.repository_case.input import PreparedRepositoryCase
 from tests.analysis_fixtures import analysis_fixture
 
 
@@ -110,20 +111,23 @@ def test_unscored_reason_survives_artifact_and_case_record(tmp_path: Path) -> No
     assert artifact["not_scored_reason"] == "Defense in depth"
     assert artifact["base_score"] is None
     record = build_repository_case_result_activity(
-        {
-            "case_execution_input": repository_case_execution_input("case-1"),
-            "published_trajectories_path": str(tmp_path),
-            "artifact_paths": {
-                "analyzer": str(tmp_path),
-                "cvss": str(tmp_path),
-                "mitigator": str(tmp_path),
-                "verifier": str(tmp_path),
-            },
-        },
+        PreparedRepositoryCase.model_validate(
+            {
+                "case_execution_input": repository_case_execution_input("case-1"),
+                "published_trajectories_path": str(tmp_path),
+                "artifact_paths": {
+                    "analyzer": str(tmp_path),
+                    "cvss": str(tmp_path),
+                    "mitigator": str(tmp_path),
+                    "verifier": str(tmp_path),
+                },
+            }
+        ),
         analysis_fixture(narratives=[]),
         result,
         None,
         None,
-    )["review_record"]
-    assert record["cvss"]["outcome"] == "not-scored"
-    assert record["cvss"]["overview"] == result.overview
+    ).review_record
+    assert record.cvss is not None
+    assert record.cvss.outcome == "not-scored"
+    assert record.cvss.overview == result.overview

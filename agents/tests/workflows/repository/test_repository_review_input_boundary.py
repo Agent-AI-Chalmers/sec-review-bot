@@ -1,3 +1,4 @@
+from sec_review_agents.scan_stages.triage.result import TriageCase
 from sec_review_agents.workflows.repository.case_execution_input import (
     build_review_input,
 )
@@ -6,27 +7,29 @@ from tests.project_paths import PACKAGE_ROOT
 
 def test_repository_review_input_renders_summary_evidence_and_anchors() -> None:
     markdown = build_review_input(
-        case={
-            "case_id": "case-1",
-            "category": "business-logic",
-            "summary": "Client supplied price may reach checkout.",
-            "evidence": [
-                "AddToCartButton passes book.price into cart state.",
-                "Checkout must verify canonical prices before charging.",
-            ],
-            "anchor_locations": [
-                {
-                    "file": "src/components/AddToCartButton.tsx",
-                    "line": 23,
-                    "label": "book.price enters cart state",
-                },
-                {
-                    "file": "src/app/checkout/page.tsx",
-                    "label": "checkout flow",
-                },
-            ],
-            "member_candidate_ids": ["cand-1"],
-        },
+        case=TriageCase.model_validate(
+            {
+                "case_id": "case-1",
+                "category": "business-logic",
+                "summary": "Client supplied price may reach checkout.",
+                "evidence": [
+                    "AddToCartButton passes book.price into cart state.",
+                    "Checkout must verify canonical prices before charging.",
+                ],
+                "anchor_locations": [
+                    {
+                        "file": "src/components/AddToCartButton.tsx",
+                        "line": 23,
+                        "label": "book.price enters cart state",
+                    },
+                    {
+                        "file": "src/app/checkout/page.tsx",
+                        "label": "checkout flow",
+                    },
+                ],
+                "member_candidate_ids": ["cand-1"],
+            }
+        ),
         scan_mode="full",
     )
 
@@ -41,14 +44,16 @@ def test_repository_review_input_renders_summary_evidence_and_anchors() -> None:
 
 def test_repository_review_input_renders_incremental_evidence_paths() -> None:
     markdown = build_review_input(
-        case={
-            "case_id": "case-1",
-            "category": "business-logic",
-            "summary": "Incremental case",
-            "evidence": [],
-            "anchor_locations": [],
-            "member_candidate_ids": ["cand-1"],
-        },
+        case=TriageCase.model_validate(
+            {
+                "case_id": "case-1",
+                "category": "business-logic",
+                "summary": "Incremental case",
+                "evidence": [],
+                "anchor_locations": [],
+                "member_candidate_ids": ["cand-1"],
+            }
+        ),
         scan_mode="incremental",
     )
 
