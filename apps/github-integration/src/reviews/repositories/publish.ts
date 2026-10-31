@@ -38,7 +38,7 @@ import {
   type RepositoryDelivery,
   type RepositoryWorkflowResult
 } from './result.js'
-import type { RepositoryContext } from './submit.js'
+import type { RepositoryContext } from './prepare-review.js'
 import type { PersistedRepositoryScanTarget } from '../../review-runs/publish-context.js'
 
 interface PublishedDeliveryEntry {

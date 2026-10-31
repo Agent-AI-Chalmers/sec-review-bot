@@ -8,9 +8,9 @@ import type { PullRequestContext } from '../github/pull-request-service.js'
 import { reviewRunsClient } from '../review-runs/client.js'
 import { pullRequestReviewPublishContext } from '../review-runs/publish-context.js'
 import {
-  startPullRequestReviewRun,
-  type SubmittedPullRequestReviewRun
-} from '../reviews/pull-requests/submit.js'
+  preparePullRequestReview,
+  type PreparedPullRequestReviewRun
+} from '../reviews/pull-requests/prepare-review.js'
 import {
   runPreparationCommand,
   type ClaimedPreparation,
@@ -20,10 +20,9 @@ import {
 
 type PullRequestReviewEventType =
   'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
-type StartPullRequestReview = typeof startPullRequestReviewRun
 
 interface StartPullRequestReviewCommandDeps {
-  start_review: StartPullRequestReview
+  prepare_review: typeof preparePullRequestReview
   store: PreparationCommandStore
 }
 
@@ -65,8 +64,10 @@ export async function startPullRequestReviewCommand({
   on_admitted,
   deps = {}
 }: StartPullRequestReviewCommandArgs): Promise<StartedPullRequestReview> {
-  const { start_review = startPullRequestReviewRun, store = reviewRunsClient } =
-    deps
+  const {
+    prepare_review = preparePullRequestReview,
+    store = reviewRunsClient
+  } = deps
   const durableInput =
     preparation_input ??
     (pr === undefined
@@ -85,16 +86,13 @@ export async function startPullRequestReviewCommand({
     ingress_key: delivery_id,
     preparation_input: durableInput
   }
-  return await runPreparationCommand<
-    SubmittedPullRequestReviewRun,
-    SubmittedPullRequestReviewRun
-  >({
+  return await runPreparationCommand<PreparedPullRequestReviewRun>({
     store,
     admission,
     ...(claimed_preparation === undefined ? {} : { claimed_preparation }),
     ...(on_admitted === undefined ? {} : { on_admitted }),
     publish_context: pullRequestReviewPublishContext,
-    start_review: async ({ run_id, on_prepared, checkpoint }) => {
+    prepare_review: async ({ run_id, checkpoint }) => {
       // Admission happens before PR lookup, input preparation, and Execution
       // submission. Any failure below therefore remains attached to this run_id
       // instead of becoming an untracked pre-run error.
@@ -107,14 +105,13 @@ export async function startPullRequestReviewCommand({
         // so a crash resumes this PR snapshot instead of resolving a newer head.
         await checkpoint({ ...durableInput, pr: resolvedPr })
       }
-      return await start_review({
+      return await prepare_review({
         octokit,
         pr: resolvedPr,
         trusted_default_branch,
         run_id,
         event_type,
-        test_changes: event_type === 'manual_review' ? test_changes : null,
-        on_prepared
+        test_changes: event_type === 'manual_review' ? test_changes : null
       })
     }
   })

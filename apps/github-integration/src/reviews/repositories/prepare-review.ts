@@ -16,7 +16,7 @@ export interface RepositoryContext {
   default_branch: string
 }
 
-interface RunRepositoryReviewArgs {
+interface PrepareRepositoryReviewArgs {
   run_id: string
   octokit: Octokit
   repo_full_name: string
@@ -26,15 +26,9 @@ interface RunRepositoryReviewArgs {
   head_sha?: string | null
   event_type?: 'manual' | 'scheduled'
   test_changes?: TestChangesPolicy | null
-  // Runs after preparation and before the Execution API request, so callers can durably
-  // retain the context needed if the submission response is lost.
-  on_prepared?: (
-    submitted: SubmittedRepositoryReviewRun,
-    input: RepositoryReviewInput & Record<string, unknown>
-  ) => void | Promise<void>
 }
 
-export interface SubmittedRepositoryReviewRun {
+export interface PreparedRepositoryReviewRun {
   repo: RepositoryContext
   run_id: string
   workspace_ref: string
@@ -47,13 +41,11 @@ function assertRepositoryReviewInput(
   input: RepositoryReviewInput
 ): asserts input is RepositoryReviewInput & Record<string, unknown> {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    throw new Error(
-      'Repository review input is missing before execution submission.'
-    )
+    throw new Error('Repository review input is missing after preparation.')
   }
 }
 
-async function materializeRepositoryReviewInput({
+export async function prepareRepositoryReview({
   run_id,
   octokit,
   repo_full_name,
@@ -63,11 +55,9 @@ async function materializeRepositoryReviewInput({
   head_sha = null,
   event_type = 'manual',
   test_changes = null
-}: RunRepositoryReviewArgs): Promise<{
-  run_id: string
-  repo: RepositoryContext
-  workspace_ref: string
-  input: RepositoryReviewInput
+}: PrepareRepositoryReviewArgs): Promise<{
+  review: PreparedRepositoryReviewRun
+  input: RepositoryReviewInput & Record<string, unknown>
 }> {
   logInfo('repository_review_workflow_started', {
     event_type,
@@ -103,61 +93,16 @@ async function materializeRepositoryReviewInput({
     test_changes
   })
   const input = prepared.input
-  const repo = prepared.repo
-
-  return {
-    run_id: prepared.run_id,
-    input,
-    repo,
-    workspace_ref: prepared.workspace_ref
-  }
-}
-
-export async function startRepositoryReviewRun({
-  run_id,
-  octokit,
-  repo_full_name,
-  target_branch = null,
-  scan_mode,
-  base_sha = null,
-  head_sha = null,
-  event_type = 'manual',
-  test_changes = null,
-  on_prepared
-}: RunRepositoryReviewArgs): Promise<SubmittedRepositoryReviewRun> {
-  const { input, repo, workspace_ref } = await materializeRepositoryReviewInput(
-    {
-      run_id,
-      octokit,
-      repo_full_name,
-      target_branch,
-      scan_mode,
-      base_sha,
-      head_sha,
-      event_type,
-      test_changes
-    }
-  )
-
   assertRepositoryReviewInput(input)
-  const preparedRun: SubmittedRepositoryReviewRun = {
-    repo,
-    run_id,
-    workspace_ref,
-    scan_target: input.scan_target,
-    workflow: 'repository-review',
-    event_type
+  return {
+    review: {
+      repo: prepared.repo,
+      run_id,
+      workspace_ref: prepared.workspace_ref,
+      scan_target: input.scan_target,
+      workflow: 'repository-review',
+      event_type
+    },
+    input
   }
-  if (on_prepared === undefined)
-    throw new Error('Repository review submission callback is required.')
-  await on_prepared(preparedRun, input)
-
-  logInfo('repository_review_execution_submitted', {
-    event_type,
-    repo: repo.repo_full_name,
-    run_id: run_id,
-    workflow: preparedRun.workflow
-  })
-
-  return preparedRun
 }

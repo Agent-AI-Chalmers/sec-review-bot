@@ -17,10 +17,7 @@ import {
   getRepositoryRefSha,
   splitRepoFullName
 } from '../github/repository-service.js'
-import {
-  startRepositoryReviewRun,
-  type SubmittedRepositoryReviewRun
-} from '../reviews/repositories/submit.js'
+import { prepareRepositoryReview } from '../reviews/repositories/prepare-review.js'
 import type { TestChangesPolicy } from '../execution/input.js'
 import { repositoryReviewPublishContext } from '../review-runs/publish-context.js'
 import { reviewRunsClient } from '../review-runs/client.js'
@@ -222,7 +219,7 @@ export interface DispatchedRepositoryReview {
 interface DispatchRepositoryReviewCommandDeps {
   getInstallationOctokit: (repo_full_name: string) => Promise<Octokit>
   resolve_dispatch: typeof resolveRepositoryReviewDispatch
-  submit_run: typeof startRepositoryReviewRun
+  prepare_review: typeof prepareRepositoryReview
   store: InputBundlePublicationStore & {
     admitReviewRun: (
       ...args: Parameters<typeof reviewRunsClient.admitReviewRun>
@@ -265,7 +262,7 @@ export async function dispatchRepositoryReview({
     getInstallationOctokit = async (repo_full_name) =>
       installationOctokitForRepo(app, repo_full_name),
     resolve_dispatch = resolveRepositoryReviewDispatch,
-    submit_run = startRepositoryReviewRun,
+    prepare_review = prepareRepositoryReview,
     store = reviewRunsClient
   } = deps
   let validated: ValidatedRepositoryReviewDispatch
@@ -355,25 +352,20 @@ export async function dispatchRepositoryReview({
     )
   }
 
-  let submitted: SubmittedRepositoryReviewRun
   try {
-    submitted = await submit_run({
+    const prepared = await prepare_review({
       octokit,
       run_id,
-      ...resolved,
-      on_prepared: async (prepared, input) => {
-        // Confirm the lease immediately before crossing the durable submission
-        // boundary; the submission itself remains token-fenced by Review Runs.
-        await heartbeat.assertOwned()
-        await publishAndSubmitInputBundle(
-          store,
-          run_id,
-          preparationToken,
-          repositoryReviewPublishContext(prepared),
-          input
-        )
-      }
+      ...resolved
     })
+    await heartbeat.assertOwned()
+    await publishAndSubmitInputBundle(
+      store,
+      run_id,
+      preparationToken,
+      repositoryReviewPublishContext(prepared.review),
+      prepared.input
+    )
   } catch (error) {
     const ownsClaim = await heartbeat.stop()
     if (
@@ -412,7 +404,7 @@ export async function dispatchRepositoryReview({
   logInfo('repository_review_dispatch_queued', {
     event: 'repository-review-dispatch',
     repo: resolved.repo_full_name,
-    run_id: submitted.run_id,
+    run_id,
     target_branch: resolved.target_branch ?? '(workflow-branch)',
     scan_mode: resolved.scan_mode,
     base_sha: resolved.base_sha ?? '(missing)',
@@ -421,7 +413,7 @@ export async function dispatchRepositoryReview({
     test_changes: resolved.test_changes ?? '(default)'
   })
 
-  return { run_id: submitted.run_id, replayed: false }
+  return { run_id, replayed: false }
 }
 
 function requiredString(value: unknown, label: string): string {

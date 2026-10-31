@@ -8,9 +8,9 @@ import type { IssueContext } from '../github/issue-service.js'
 import { reviewRunsClient } from '../review-runs/client.js'
 import { issueReviewPublishContext } from '../review-runs/publish-context.js'
 import {
-  startIssueReviewRun,
-  type SubmittedIssueReviewRun
-} from '../reviews/issues/submit.js'
+  prepareIssueReview,
+  type PreparedIssueReviewRun
+} from '../reviews/issues/prepare-review.js'
 import {
   runPreparationCommand,
   type ClaimedPreparation,
@@ -19,9 +19,8 @@ import {
 } from './preparation-command.js'
 
 type IssueReviewEventType = 'opened' | 'manual_review'
-type StartIssueReview = typeof startIssueReviewRun
 interface StartIssueReviewCommandDeps {
-  start_review: StartIssueReview
+  prepare_review: typeof prepareIssueReview
   store: PreparationCommandStore
 }
 
@@ -60,7 +59,7 @@ export async function startIssueReviewCommand({
   on_admitted,
   deps = {}
 }: StartIssueReviewCommandArgs): Promise<StartedIssueReview> {
-  const { start_review = startIssueReviewRun, store = reviewRunsClient } = deps
+  const { prepare_review = prepareIssueReview, store = reviewRunsClient } = deps
   // Automatic triggers have no per-run comment to opt in, so they never open a PR, and an
   // opened issue is always an audit rather than a requested repair.
   const admission: PreparationAdmission = {
@@ -76,17 +75,14 @@ export async function startIssueReviewCommand({
       open_pr
     }
   }
-  const started = await runPreparationCommand<
-    SubmittedIssueReviewRun,
-    SubmittedIssueReviewRun
-  >({
+  const started = await runPreparationCommand<PreparedIssueReviewRun>({
     store,
     admission,
     ...(claimed_preparation === undefined ? {} : { claimed_preparation }),
     ...(on_admitted === undefined ? {} : { on_admitted }),
     publish_context: issueReviewPublishContext,
-    start_review: async ({ run_id, on_prepared }) =>
-      await start_review({
+    prepare_review: async ({ run_id }) =>
+      await prepare_review({
         octokit,
         issue,
         trusted_default_branch,
@@ -94,8 +90,7 @@ export async function startIssueReviewCommand({
         event_type,
         review_objective: event_type === 'opened' ? 'audit' : review_objective,
         test_changes: event_type === 'opened' ? null : test_changes,
-        open_pr: event_type === 'opened' ? false : open_pr,
-        on_prepared
+        open_pr: event_type === 'opened' ? false : open_pr
       })
   })
   return started

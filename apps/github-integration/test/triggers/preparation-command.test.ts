@@ -49,7 +49,7 @@ test('claimed preparation retains its run, fencing token, and retry budget', asy
       },
       on_admitted: () => assert.fail('a retry is not a fresh admission'),
       publish_context: () => assert.fail('ownership must be proven first'),
-      start_review: async ({ run_id }) => {
+      prepare_review: async ({ run_id }) => {
         assert.equal(run_id, 'original-run')
         throw error
       }
@@ -79,10 +79,7 @@ test('claim loss immediately before submission leaves the new owner responsible'
       admission,
       claimed_preparation: { run_id: 'original-run', token: 'expired-token' },
       publish_context: () => assert.fail('ownership must be proven first'),
-      start_review: async ({ on_prepared }) => {
-        // The input is unused: ownership must be proven before submission receives it.
-        await on_prepared({}, {} as Parameters<typeof on_prepared>[1])
-      }
+      prepare_review: async () => ({ review: {}, input: {} })
     }),
     PreparationClaimLostError
   )
