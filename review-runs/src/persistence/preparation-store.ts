@@ -1,5 +1,5 @@
 // Owns Review Runs's durable preparation work: claim leases, recoverable input
-// checkpoints, retry exhaustion, and terminal-failure notification outbox state.
+// checkpoints, and retry exhaustion.
 import crypto from 'node:crypto'
 import { Pool, type PoolClient } from 'pg'
 import type { Database } from '../database/database.js'
@@ -15,7 +15,6 @@ import {
 } from './publication-abandon.js'
 import { skipPendingExecutions } from './execution-skip.js'
 import { queueRunNotice } from './run-notices.js'
-import type { RunNoticeWork } from '../shapes.js'
 
 type JsonObject = Record<string, unknown>
 
@@ -25,10 +24,6 @@ type JsonObject = Record<string, unknown>
 // honours. The claim's origin state is exactly that - it is read below to name the audit event and
 // must stay out of the returned message.
 export type PreparationWork = ContractPreparationWork
-
-// The notice is a cross-service message, so its field set belongs to the contract and is
-// re-exported rather than restated; a local copy would drift from the schema the connector reads.
-export type { RunNoticeWork }
 
 /** One run whose expired lease could not be concluded, and why.
  *
@@ -163,127 +158,6 @@ export class PreparationStore {
       throw new Error(
         `Preparation claim was lost before checkpointing input for ${runId}.`
       )
-  }
-
-  /** Claim the oldest deliverable notice for this connector.
-   *
-   * Delivery is a connector capability, not a per-process one: the oldest pending (or lapsed
-   * `delivering`) notice wins, whoever asks. That is deliberate - one outbox per connector is
-   * what lets "the requester was told" be a single fact rather than a race between processes -
-   * but it carries an assumption the claim cannot check: every process that runs this claim
-   * holds the GitHub App credentials the reply needs. A process that does not will take the
-   * notice, fail to reach the installation, and conclude it undelivered, which is wrong but not
-   * recoverable by retrying; `apps/github-integration` pins that consequence in
-   * `preparation-coordinator.test.ts`.
-   *
-   * If a deployment ever runs a notice-less role under the same connector, the fix is a role or
-   * capability field on this claim, not a second queue: a second queue would split the very
-   * fact it exists to keep single. */
-  async claimNextRunNotice(): Promise<RunNoticeWork | null> {
-    return await transaction(this.pool, async (client) => {
-      const candidate = await client.query<{
-        notice_id: string
-        run_id: string
-        input: JsonObject
-        kind: 'failure' | 'attention'
-        axis: 'preparation' | 'execution' | 'publication'
-        reason_code: string | null
-        status: 'pending' | 'delivering'
-      }>(
-        // The run's input lives on the preparation row: it is `NOT NULL` there and no path
-        // deletes that row, so an execution- or publication-originated notice still finds it.
-        // Reading it from the other axes was defensive code with nothing to defend against.
-        // The join stays `LEFT` on purpose - a notice whose preparation row is somehow missing
-        // must still be delivered, with an empty input rather than not at all.
-        `SELECT n.notice_id,n.run_id,COALESCE(p.input,'{}'::jsonb) AS input,
-                n.kind,n.axis,n.reason_code,n.status AS status
-         FROM run_notices n
-         LEFT JOIN preparations p
-           ON p.run_id=n.run_id AND p.connector_id=n.connector_id
-         WHERE n.connector_id=$1 AND (n.status='pending' OR
-           (n.status='delivering' AND n.claimed_at <= clock_timestamp()-($2*interval '1 millisecond')))
-         ORDER BY n.updated_at,n.run_id FOR UPDATE OF n SKIP LOCKED LIMIT 1`,
-        [this.connectorId, this.claimTimeoutMs]
-      )
-      const work = candidate.rows[0]
-      if (work === undefined) return null
-      const token = crypto.randomUUID()
-      // Restate the claimable predicate instead of trusting the SELECT's row lock alone. The
-      // lock makes this safe today, but repeating the condition (and returning the row) keeps
-      // the event's `from_status` pinned to a state this UPDATE actually moved, exactly as
-      // `claimNextPublicationOnce` does. `FOR UPDATE OF n` means the locked row cannot change
-      // under us, so a mismatch is a bug rather than a race.
-      const claimedNotice = await client.query<{
-        status: 'pending' | 'delivering'
-      }>(
-        `UPDATE run_notices
-         SET status='delivering', claim_token=$2,
-             claimed_at=clock_timestamp(), updated_at=clock_timestamp()
-         WHERE notice_id=$1 AND connector_id=$3 AND status=$4
-           AND ($4 <> 'delivering' OR claimed_at <= clock_timestamp()-($5*interval '1 millisecond'))
-         RETURNING status`,
-        [
-          work.notice_id,
-          token,
-          this.connectorId,
-          work.status,
-          this.claimTimeoutMs
-        ]
-      )
-      if (claimedNotice.rowCount !== 1)
-        throw new Error(`Run notice ${work.notice_id} could not be claimed.`)
-      return { ...work, claim_token: token }
-    })
-  }
-
-  async completeRunNotice(
-    noticeId: string,
-    token: string,
-    delivered: boolean,
-    /** The comment the requester can read. Required for a delivery, rejected without one. */
-    commentUrl?: string | null
-  ): Promise<boolean> {
-    if (delivered && (commentUrl === undefined || commentUrl === null)) {
-      // A delivered notice with nowhere to point would claim the requester was told while giving
-      // no way to verify it, so the caller's mistake is surfaced instead of stored.
-      throw new Error(
-        `Run notice ${noticeId} cannot be delivered without a comment_url.`
-      )
-    }
-    if (!delivered && commentUrl !== undefined && commentUrl !== null) {
-      // The other half of the same contract: an undelivered notice has no destination, so a URL
-      // here means the caller believes something was posted. Discarding it silently would hide
-      // that disagreement.
-      throw new Error(
-        `Run notice ${noticeId} cannot carry a comment_url when delivery failed.`
-      )
-    }
-    return await transaction(this.pool, async (client) => {
-      const result = await client.query(
-        `UPDATE run_notices SET status=$4, claim_token=NULL,
-           claimed_at=NULL, comment_url=$5, updated_at=clock_timestamp()
-         WHERE notice_id=$1 AND connector_id=$2 AND status='delivering' AND claim_token=$3`,
-        // `failed`, not `skipped`: the connector attempted delivery and could not complete it.
-        [
-          noticeId,
-          this.connectorId,
-          token,
-          delivered ? 'delivered' : 'failed',
-          commentUrl ?? null
-        ]
-      )
-      return result.rowCount === 1
-    })
-  }
-
-  async renewRunNoticeClaim(noticeId: string, token: string): Promise<boolean> {
-    const result = await this.pool.query(
-      `UPDATE run_notices
-       SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
-       WHERE notice_id=$1 AND connector_id=$2 AND status='delivering' AND claim_token=$3`,
-      [noticeId, this.connectorId, token]
-    )
-    return result.rowCount === 1
   }
 
   heartbeatIntervalMs(): number {

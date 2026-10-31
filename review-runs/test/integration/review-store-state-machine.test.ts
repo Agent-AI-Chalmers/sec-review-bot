@@ -491,7 +491,7 @@ test('a failure notice reports the reason captured when it was created', async (
       code: 'REVIEW_START_FAILED',
       message: 'preparation could not start'
     })
-    const notice = await store.preparations.claimNextRunNotice()
+    const notice = await store.notices.claimNext()
     assert.ok(notice)
     assert.strictEqual(notice.reason_code, 'REVIEW_START_FAILED')
 
@@ -524,7 +524,7 @@ test('a failure notice reports the reason captured when it was created', async (
     } finally {
       await pool2.end()
     }
-    const reclaimed = await store.preparations.claimNextRunNotice()
+    const reclaimed = await store.notices.claimNext()
     assert.ok(reclaimed)
     assert.strictEqual(
       reclaimed.reason_code,
@@ -599,7 +599,7 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
     )
     assert.strictEqual(await store.preparations.claimNext(), null)
     assert.strictEqual(await store.publicationClaims.claim(runId), null)
-    const notice = await store.preparations.claimNextRunNotice()
+    const notice = await store.notices.claimNext()
     assert.ok(notice)
     assert.strictEqual(notice.run_id, runId)
     assert.deepStrictEqual(notice.input, {})
@@ -611,7 +611,7 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
     assert.strictEqual(
       // A stale claim is rejected, not thrown at: the delivery is well-formed, it simply no
       // longer owns the notice.
-      await store.preparations.completeRunNotice(
+      await store.notices.complete(
         notice.notice_id,
         randomUUID(),
         true,
@@ -620,7 +620,7 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
       false
     )
     assert.strictEqual(
-      await store.preparations.completeRunNotice(
+      await store.notices.complete(
         notice.notice_id,
         notice.claim_token,
         true,
@@ -632,7 +632,7 @@ test('ReviewRunStore exhausts a preparation whose final claim lease expires', as
       (await store.queries.getRun(runId))?.notices?.[0]?.status,
       'delivered'
     )
-    assert.strictEqual(await store.preparations.claimNextRunNotice(), null)
+    assert.strictEqual(await store.notices.claimNext(), null)
   } finally {
     await observer.end()
     await store.close()
@@ -666,8 +666,8 @@ test('concurrent failure notice consumers cannot own the same outbox work', asyn
     assert.strictEqual((await producer.preparations.expireStale()).concluded, 1)
 
     const claims = await Promise.all([
-      first.preparations.claimNextRunNotice(),
-      second.preparations.claimNextRunNotice()
+      first.notices.claimNext(),
+      second.notices.claimNext()
     ])
     assert.strictEqual(claims.filter((claim) => claim !== null).length, 1)
   } finally {
@@ -1728,13 +1728,13 @@ test('ReviewRunStore records execution failure without publication failure', asy
     // An execution failure ends the run, so the requester has to be told. The notice names the
     // axis that failed, because the reply says the review started but could not finish rather
     // than claiming it never started.
-    const notice = await store.preparations.claimNextRunNotice()
+    const notice = await store.notices.claimNext()
     assert.notStrictEqual(notice, null)
     assert.strictEqual(notice?.run_id, runId)
     assert.strictEqual(notice?.axis, 'execution')
     assert.strictEqual(notice?.reason_code, 'EXECUTION_FAILED')
     assert.strictEqual(
-      await store.preparations.completeRunNotice(
+      await store.notices.complete(
         notice?.notice_id ?? '',
         notice?.claim_token ?? '',
         true,
@@ -1760,22 +1760,18 @@ test('ReviewRunStore stores the comment a delivered notice points at', async () 
       }),
       true
     )
-    const notice = await store.preparations.claimNextRunNotice()
+    const notice = await store.notices.claimNext()
     assert.ok(notice)
 
     // A delivery has to name where the requester can read it. Storing `delivered` with no URL
     // would claim someone was told while giving no way to check.
     await assert.rejects(
-      store.preparations.completeRunNotice(
-        notice.notice_id,
-        notice.claim_token,
-        true
-      ),
+      store.notices.complete(notice.notice_id, notice.claim_token, true),
       /cannot be delivered without a comment_url/
     )
 
     assert.strictEqual(
-      await store.preparations.completeRunNotice(
+      await store.notices.complete(
         notice.notice_id,
         notice.claim_token,
         true,
@@ -1803,17 +1799,13 @@ test('ReviewRunStore records an undeliverable notice as failed, not skipped', as
       }),
       true
     )
-    const notice = await store.preparations.claimNextRunNotice()
+    const notice = await store.notices.claimNext()
     assert.ok(notice)
     // The connector could not reach the provider. That is a failed delivery, not a decision to
     // skip one, and the two must not share a state: an operator reading `skipped` would think
     // nothing was attempted.
     assert.strictEqual(
-      await store.preparations.completeRunNotice(
-        notice.notice_id,
-        notice.claim_token,
-        false
-      ),
+      await store.notices.complete(notice.notice_id, notice.claim_token, false),
       true
     )
     assert.strictEqual(
@@ -1822,7 +1814,7 @@ test('ReviewRunStore records an undeliverable notice as failed, not skipped', as
     )
     // The notice stays terminal: nothing retries it, by design. Reaching the provider is an
     // operator problem, not one this loop can solve by trying again.
-    assert.strictEqual(await store.preparations.claimNextRunNotice(), null)
+    assert.strictEqual(await store.notices.claimNext(), null)
   } finally {
     await store.close()
   }
@@ -2040,7 +2032,7 @@ test('ReviewRunStore announces only a publication failure that ends the run', as
       true
     )
     assert.strictEqual(
-      await store.preparations.claimNextRunNotice(),
+      await store.notices.claimNext(),
       null,
       'a retryable step failure must not produce a notice'
     )
@@ -2063,7 +2055,7 @@ test('ReviewRunStore announces only a publication failure that ends the run', as
       ),
       true
     )
-    const notice = await store.preparations.claimNextRunNotice()
+    const notice = await store.notices.claimNext()
     assert.strictEqual(notice?.run_id, runId)
     assert.strictEqual(notice?.axis, 'publication')
     assert.strictEqual(notice?.reason_code, 'GITHUB_VALIDATION_REJECTED')
@@ -2744,7 +2736,7 @@ test('an exhausted preparation keeps the last real failure reason instead of the
       'pending->skipped'
     ])
 
-    const notice = await store.preparations.claimNextRunNotice()
+    const notice = await store.notices.claimNext()
     assert.ok(notice)
     assert.strictEqual(notice.reason_code, 'GITHUB_RATE_LIMITED')
   } finally {
@@ -2773,7 +2765,7 @@ test('a preparation failure with no recorded reason still reports the exhaustion
     )
     await store.preparations.expireStale()
 
-    const notice = await store.preparations.claimNextRunNotice()
+    const notice = await store.notices.claimNext()
     assert.ok(notice)
     assert.strictEqual(notice.reason_code, 'PREPARATION_RETRY_EXHAUSTED')
   } finally {
@@ -3612,7 +3604,7 @@ test('resuming a disconnected run grants a fresh attempt budget, not just a fres
       (await store.preparations.expireStale()).blocked.length,
       1
     )
-    const attention = await store.preparations.claimNextRunNotice()
+    const attention = await store.notices.claimNext()
     assert.ok(attention)
     assert.strictEqual(attention.run_id, runId)
     assert.strictEqual(attention.axis, 'preparation')
@@ -3653,7 +3645,7 @@ test('resuming a disconnected run grants a fresh attempt budget, not just a fres
       claimed_at: null
     })
     assert.strictEqual(
-      await store.preparations.renewRunNoticeClaim(
+      await store.notices.renewClaim(
         attention.notice_id,
         attention.claim_token
       ),
@@ -3661,7 +3653,7 @@ test('resuming a disconnected run grants a fresh attempt budget, not just a fres
       'resuming fences the connector that claimed the old attention notice'
     )
     assert.strictEqual(
-      await store.preparations.completeRunNotice(
+      await store.notices.complete(
         attention.notice_id,
         attention.claim_token,
         true,
@@ -3727,7 +3719,7 @@ test('a disconnected execution has no automatic way out, so an operator resumes 
       true,
       'a spent budget disconnects the run'
     )
-    const attention = await store.preparations.claimNextRunNotice()
+    const attention = await store.notices.claimNext()
     assert.ok(attention)
     assert.strictEqual(attention.run_id, runId)
     assert.strictEqual(attention.axis, 'execution')
@@ -3759,7 +3751,7 @@ test('a disconnected execution has no automatic way out, so an operator resumes 
       claimed_at: null
     })
     assert.strictEqual(
-      await store.preparations.renewRunNoticeClaim(
+      await store.notices.renewClaim(
         attention.notice_id,
         attention.claim_token
       ),
@@ -4260,7 +4252,7 @@ test('a disconnected publication is parked until an operator resumes it', async 
       'disconnected',
       'the axis reports the step uncertainty so the run surfaces for an operator'
     )
-    const attention = await store.preparations.claimNextRunNotice()
+    const attention = await store.notices.claimNext()
     assert.ok(attention)
     assert.strictEqual(attention.run_id, runId)
     assert.strictEqual(attention.axis, 'publication')
@@ -4317,7 +4309,7 @@ test('a disconnected publication is parked until an operator resumes it', async 
       claimed_at: null
     })
     assert.strictEqual(
-      await store.preparations.renewRunNoticeClaim(
+      await store.notices.renewClaim(
         attention.notice_id,
         attention.claim_token
       ),
@@ -4746,7 +4738,7 @@ test('an uncertain submission queues no notice until the run is conclusively fai
       'an unknown outcome must not be announced as a failure'
     )
     assert.strictEqual(
-      await store.preparations.claimNextRunNotice(),
+      await store.notices.claimNext(),
       null,
       'nothing may be deliverable while the run can still succeed'
     )
@@ -4768,7 +4760,7 @@ test('an uncertain submission queues no notice until the run is conclusively fai
       [],
       'a recovered run must not carry a failure notice'
     )
-    assert.strictEqual(await store.preparations.claimNextRunNotice(), null)
+    assert.strictEqual(await store.notices.claimNext(), null)
   } finally {
     await store.close()
   }
