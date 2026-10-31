@@ -23,9 +23,11 @@ from sec_review_agents.workflows.repository.case_execution_input import (
 from sec_review_agents.workflows.repository.result import (
     build_scan_summary,
 )
-from sec_review_agents.workflows.repository.workflow import RepositoryCaseReviewRequest
 from sec_review_agents.workflows.repository_case.direct import (
     run_repository_case_review_direct,
+)
+from sec_review_agents.workflows.repository_case.workflow import (
+    RepositoryCaseReviewRequest,
 )
 from sec_review_agents.workflows.review_intent import require_review_intent
 from sec_review_agents.workspace.file_changes import file_change_paths

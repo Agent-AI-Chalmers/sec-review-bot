@@ -7,7 +7,7 @@ from sec_review_agents.review_stages.feedback_loop import (
     feedback_retry_context,
     should_retry_from_verifier_result,
 )
-from sec_review_agents.workflows.repository.workflow import (
+from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
     analyze_repository_case_activity,
     archive_repository_case_feedback_attempt_activity,

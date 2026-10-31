@@ -4,13 +4,17 @@ from typing import Any
 import pytest
 
 from sec_review_agents.workflows.repository.case_execution_input import (
-    RepositoryCaseExecutionInput,
     prepare_case_execution_input,
 )
 from sec_review_agents.workflows.repository.workflow import (
+    prepare_repository_case_review_inputs_activity,
+)
+from sec_review_agents.workflows.repository_case.input import (
+    RepositoryCaseExecutionInput,
+)
+from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
     prepare_repository_case_activity,
-    prepare_repository_case_review_inputs_activity,
 )
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
@@ -249,3 +253,106 @@ def test_repository_case_execution_input_rejects_missing_case_id(tmp_path) -> No
                 "member_candidate_ids": ["cand-1"],
             },
         )
+
+
+@pytest.mark.asyncio
+async def test_prepared_case_survives_temporal_payload_round_trip(tmp_path) -> None:
+    """Internal type declarations must retain the dictionary wire format and reviewInput isolation."""
+    from temporalio.converter import DataConverter
+
+    from sec_review_agents.workflows.repository_case.input import PreparedRepositoryCase
+
+    execution_input = prepare_case_execution_input(
+        workspace_snapshot_tar_path=tmp_path / "workspace.tar",
+        history_path=tmp_path / "history",
+        incremental_window_path=None,
+        scan_mode="full",
+        test_changes=TEST_CHANGES_ALLOW,
+        case={
+            "case_id": "case-1",
+            "category": "access-control",
+            "summary": "Review authorization.",
+            "evidence": [],
+            "anchor_locations": [],
+            "member_candidate_ids": ["private-triage-id"],
+        },
+    )
+    prepared = prepare_repository_case_activity(
+        {
+            "run_id": "run-1",
+            "case_execution_input": execution_input,
+            "cases_artifacts_path": str(tmp_path / "cases"),
+            "published_trajectories_path": str(tmp_path / "trajectories"),
+            "timeout_seconds": 30,
+            "runtime_context": {},
+        }
+    )
+    converter = DataConverter.default
+    payloads = await converter.encode([prepared])
+    untyped = (await converter.decode(payloads))[0]
+    typed = (await converter.decode(payloads, [PreparedRepositoryCase]))[0]
+    assert typed == untyped == prepared
+    assert typed["case_execution_input"] == execution_input
+    assert "member_candidate_ids" not in typed["case_execution_input"]
+    assert "case" not in typed["case_execution_input"]
+    assert typed["artifact_paths"] == {
+        name: str(tmp_path / "cases" / "case-1" / name)
+        for name in ("analyzer", "cvss", "mitigator", "verifier")
+    }
+
+
+@pytest.fixture
+def case_review_request(tmp_path) -> RepositoryCaseReviewRequest:
+    return {
+        "run_id": "run-1",
+        "case_execution_input": {
+            "case_id": "case-1",
+            "review_input": "Review authorization.",
+            "workspace_snapshot_tar_path": str(tmp_path / "workspace.tar"),
+            "history_path": str(tmp_path / "history"),
+            "scan_mode": "full",
+            "incremental_window_path": None,
+            "test_changes": "allow",
+        },
+        "cases_artifacts_path": str(tmp_path / "cases"),
+        "published_trajectories_path": str(tmp_path / "trajectories"),
+        "timeout_seconds": 30,
+        "runtime_context": {},
+    }
+
+
+@pytest.mark.parametrize("value", [None, "", " \n ", "/tmp/window"])
+def test_case_preparation_normalizes_optional_values_without_mutating_request(
+    case_review_request: RepositoryCaseReviewRequest, value: str | None
+) -> None:
+    source = case_review_request["case_execution_input"]
+    source["incremental_window_path"] = value
+    source["setup_declaration_content"] = value
+    prepared = prepare_repository_case_activity(case_review_request)
+    expected = value if value and value.strip() else None
+    assert prepared["case_execution_input"]["incremental_window_path"] == expected
+    assert prepared["case_execution_input"].get("setup_declaration_content") == expected
+    assert source["incremental_window_path"] == value
+    assert source["setup_declaration_content"] == value
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("workspace_snapshot_tar_path", " "),
+        ("history_path", ""),
+        ("history_path", None),
+        ("incremental_window_path", 42),
+        ("setup_declaration_content", {}),
+        ("test_changes", "unknown"),
+        ("scan_mode", "unknown"),
+    ],
+)
+def test_case_preparation_rejects_invalid_fields_before_stages(
+    case_review_request: RepositoryCaseReviewRequest, field: str, value: Any
+) -> None:
+    """Malformed serialized inputs must fail before stages rely on their types."""
+    malformed: Any = case_review_request["case_execution_input"]
+    malformed[field] = value
+    with pytest.raises(ValueError, match=field):
+        prepare_repository_case_activity(case_review_request)

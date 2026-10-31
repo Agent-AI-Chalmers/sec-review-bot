@@ -15,7 +15,6 @@ from sec_review_agents.delivery_stages.result import (
 from sec_review_agents.scan_stages.discovery.result import DiscoveryResult
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.repository.workflow import (
-    RepositoryCaseReviewRequest,
     build_blocked_repository_case_result,
     build_repository_discovery_manifest_activity,
     build_repository_discovery_result_activity,
@@ -27,6 +26,9 @@ from sec_review_agents.workflows.repository.workflow import (
     window_deletion_summary_activity,
 )
 from sec_review_agents.workflows.repository_case import direct as repository_case_direct
+from sec_review_agents.workflows.repository_case.workflow import (
+    RepositoryCaseReviewRequest,
+)
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 

@@ -1,7 +1,7 @@
-"""Repository-case review stage glue.
+"""Single-case review orchestration and stage execution.
 
-This package owns the per-case analysis / mitigation / verification / CVSS
-stage path used by the higher-level repository workflow.
+Owns Temporal and direct execution of a prepared case. The parent repository
+workflow owns triage adaptation, batch scheduling, and delivery.
 """
 
 __all__: list[str] = []

@@ -12,18 +12,21 @@ from temporalio.exceptions import ApplicationError
 from temporalio.worker import Worker
 
 from sec_review_agents.workflows.repository import direct as repository_direct
-from sec_review_agents.workflows.repository.case_execution_input import (
-    RepositoryCaseExecutionInput,
-)
 from sec_review_agents.workflows.repository.workflow import (
     RepositoryCaseProcessingWorkflow,
-    RepositoryCaseReviewRequest,
-    RepositoryCaseReviewWorkflow,
     RepositoryDiscoveryWorkflow,
     resolve_repository_case_processing_max_concurrency,
-    verify_repository_case_activity,
 )
 from sec_review_agents.workflows.repository_case import direct as repository_case_direct
+from sec_review_agents.workflows.repository_case.input import (
+    PreparedRepositoryCase,
+    RepositoryCaseExecutionInput,
+)
+from sec_review_agents.workflows.repository_case.workflow import (
+    RepositoryCaseReviewRequest,
+    RepositoryCaseReviewWorkflow,
+    verify_repository_case_activity,
+)
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from tests.temporal_test_utils import temporal_time_skipping_environment
@@ -77,7 +80,8 @@ def repository_case_review_request(case_id: str) -> RepositoryCaseReviewRequest:
 async def test_direct_case_records_skipped_verification_without_confirmed_target() -> (
     None
 ):
-    prepared_case = {
+    prepared_case: PreparedRepositoryCase = {
+        "published_trajectories_path": "/tmp/cases/case-1/trajectories",
         "case_execution_input": repository_case_execution_input("case-1"),
         "artifact_paths": {
             "analyzer": "/tmp/cases/case-1/analyzer",
@@ -142,9 +146,14 @@ async def test_direct_case_records_skipped_verification_without_confirmed_target
 async def test_case_verification_activity_persists_skip_without_running_verifier(
     tmp_path: Path,
 ) -> None:
-    prepared_case = {
+    prepared_case: PreparedRepositoryCase = {
         "case_execution_input": repository_case_execution_input("case-1"),
-        "artifact_paths": {"verifier": str(tmp_path / "verifier")},
+        "artifact_paths": {
+            "verifier": str(tmp_path / "verifier"),
+            "analyzer": str(tmp_path / "analyzer"),
+            "mitigator": str(tmp_path / "mitigator"),
+            "cvss": str(tmp_path / "cvss"),
+        },
         "published_trajectories_path": str(tmp_path / "trajectories"),
     }
 

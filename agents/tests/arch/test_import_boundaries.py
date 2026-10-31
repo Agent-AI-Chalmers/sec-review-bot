@@ -460,3 +460,14 @@ def test_workflow_entrypoints_stay_thin() -> None:
                         )
 
     assert violations == []
+
+
+def test_repository_case_does_not_import_parent_repository_workflow() -> None:
+    """A prepared case runs independently of triage, batch scheduling, and delivery."""
+    assert (
+        import_violations(
+            PACKAGE_ROOT / "workflows" / "repository_case",
+            ("sec_review_agents.workflows.repository.",),
+        )
+        == []
+    )
