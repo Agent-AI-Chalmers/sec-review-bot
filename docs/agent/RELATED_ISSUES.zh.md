@@ -45,6 +45,33 @@ agent 设计里也有其他的机制用来遏制上下文的恶性增长，如�
 
 当前保底机制是 LangChain `SummarizationMiddleware` 加项目定制的 handoff prompt。一次运行通常从一条权威的阶段输入开始，所以压缩时必须保留这条输入的边界，并把用户要求和仓库/工具内容分开。
 
+## Agent 是否应该广泛阅读仓库指令和文档？
+
+不应默认要求 agent 先广泛阅读仓库指令和文档，再开始处理问题。阅读范围应服务于当前任务，而不是把熟悉整个仓库当作前置工作。
+
+更合适的是结合两种做法：
+
+1. **开始时加载仓库指导 `AGENTS.md`。** 提供项目通用要求和必要的文档入口。
+2. **从给定任务描述出发。** 围绕 issue、PR 或 case 的目标调查代码，按需补充相关文档。
+
+两者可以同时采用：入口指导提供背景，任务描述决定调查方向。
+
+### 开始时加载仓库指导 AGENTS.md
+
+- **代码无法解释全部契约。** 预期兼容性、部署假设和架构约束可能写在文档里。只沿着问题所指代码调查，可能遗漏这些信息。
+- **固定入口可以减少探索。** [AGENTS.md 规范](https://agents.md/) 约定了存放项目指令、构建命令和开发约定的位置。一份简短、持续维护的入口文件，可以避免广泛搜索文档。
+- **通用要求不必反复说明。** 把构建命令、测试要求和开发约定集中写进 `AGENTS.md`，并在任务开始时加载，可以减少用户在每个 issue 或 PR 中重复交代的工作。
+
+效果取决于文件内容。加载的指令会在每项任务里占用注意力；过时要求、无关指令，或“通读整个仓库”这样的要求，可能让 agent 跑偏或花费大量时间探索。自动加载一份入口文件，也不意味着要读完它链接的所有文档。
+
+### 从给定任务描述出发
+
+- **查找和阅读也有成本。** 要求“找到所有相关文档”，容易让 agent 不断扩大阅读范围。[Anthropic 的上下文工程指南](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents) 建议只保留最有用的上下文、按需获取资料，也指出探索需要时间，可能找不到有用信息。
+- **任务作者需要说清目标。** [GitHub 的 coding-agent 指南](https://docs.github.com/en/copilot/using-github-copilot/coding-agent/best-practices-for-using-copilot-to-work-on-tasks) 要求清晰描述和完整验收条件。[Claude Code 最佳实践](https://code.claude.com/docs/en/best-practices) 要求用户说出代码无法体现的偏好。不能期待 agent 又快又准地猜出用户没说的要求。
+- **让任务决定后续阅读。** 无论是否预加载 `AGENTS.md`，agent 都可以检查相关代码、调用方、测试和文档。GitHub 也指出，agent 通常可以在没有精确文件路径时自行定位代码。用户不必提供实现方案。
+
+按需阅读仍可能遗漏文档中的约束。一份简短的入口文件可以帮助提示重要要求，但它和笼统的“多读一些”都不能保证发现全部契约。
+
 ## Agent 到底是在审计还是修复？
 
 系统通过显式 `review_intent.objective` 区分 `audit` / `repair`。`review_intent.test_changes` 还可以独立于 objective 约束最终 mitigation patch 是否允许包含测试改动。因此 agent 当前是在审计还是修复，不是由模型临场猜测，也不是由输出文本暗示，而是输入契约的一部分。

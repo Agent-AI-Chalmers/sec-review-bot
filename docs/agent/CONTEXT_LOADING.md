@@ -6,7 +6,7 @@ Agents in this project receive context in two ways: some content arrives already
 
 ## Two Strategies
 
-**Preload.** Content goes into the user prompt. The model reads it on the first turn with no tool call, no extra round trip, and no chance of fetching the wrong thing. The cost is unconditional: every request carries the content whether or not this task needs it, and the prompt stops being reusable when the underlying data changes.
+**Preload.** Content goes directly into the prompt. The model reads it on the first turn with no tool call, no extra round trip, and no chance of fetching the wrong thing. The cost is unconditional: every request carries the content whether or not this task needs it, and the prompt stops being reusable when the underlying data changes.
 
 **On demand.** Content stays in a mounted path and the agent fetches it with `read_file`, `grep`, `ls`, or `execute`. The model pays for a tool turn and some latency, chooses what to read, and can read only the part a question needs. The cost is paid only when a task actually needs the content.
 
@@ -50,6 +50,14 @@ Two of these are costs that on-demand reading adds. When an agent decides what t
 | Repository case analyzer, mitigator, verifier | On demand | The workspace, `/history`, and `/incremental-window` are mounted, and the case review input names the anchors rather than quoting the files. |
 | CVSS | Mixed | Scoring needs the code once, so the workspace is mounted and the finding under scoring is preloaded. |
 | Deletion cases | Preload, paths only | The case carries file paths and the window, never file contents. There is no current file to read, so the paths are the complete input; the content comes from the patch or git. |
+
+## Repository Guidance
+
+Providing repository conventions from `AGENTS.md` at startup is compatible with reading on demand for a task. The former supplies general expectations; the latter determines which code and documentation the current question needs. Loading repository guidance does not mean asking the agent to read the entire repository or follow every documentation link.
+
+`AGENTS.md` should be maintained by maintainers, rather than used as a scratchpad for agent-learned experience. Project conventions can help interpret and validate code, but should not tell the agent to leave vulnerabilities unreported or redirect the review. Including them in context does not guarantee that a model will handle conflicting instructions correctly.
+
+See [Agent-Related Issues](RELATED_ISSUES.md#should-agents-read-repository-instructions-and-documentation-broadly) for the reading-scope discussion.
 
 ## Applying This
 
