@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
 
-from temporalio.client import Client
 from temporalio.exceptions import WorkflowAlreadyStartedError
 
 from sec_review_agents.cli.local_execution import (
@@ -16,6 +15,7 @@ from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
     effective_issue_strategy,
 )
+from sec_review_agents.temporal.client import connect_temporal_client
 from sec_review_agents.temporal.config import (
     DEFAULT_EXECUTION_TASK_QUEUE,
     DEFAULT_TEMPORAL_ADDRESS,
@@ -55,7 +55,10 @@ def run_local_temporal_workflow(bundle: ReviewBundle) -> dict[str, Any]:
 
 async def _run_local_temporal_workflow(bundle: ReviewBundle) -> dict[str, Any]:
     config = LocalTemporalConfig.from_env()
-    client = await Client.connect(config.address, namespace=config.namespace)
+    client = await connect_temporal_client(
+        address=config.address,
+        namespace=config.namespace,
+    )
     request = build_local_workflow_request(
         bundle,
         timeout_seconds=config.workflow_timeout_seconds,

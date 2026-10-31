@@ -49,7 +49,7 @@ async def test_worker_applies_activity_concurrency_to_temporal_and_executor(
         monkeypatch.setenv(
             "TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES", configured_value
         )
-    monkeypatch.setattr(worker_module, "connect_temporal_client", AsyncMock())
+    monkeypatch.setattr(worker_module, "connect_worker_client", AsyncMock())
     monkeypatch.setattr(worker_module, "ThreadPoolExecutor", FakeExecutor)
     monkeypatch.setattr(worker_module, "Worker", FakeWorker)
     await worker_module.run_worker()
@@ -65,7 +65,7 @@ async def test_worker_rejects_invalid_concurrency_before_connecting(
 ) -> None:
     monkeypatch.setenv("TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES", "many")
     connect = AsyncMock()
-    monkeypatch.setattr(worker_module, "connect_temporal_client", connect)
+    monkeypatch.setattr(worker_module, "connect_worker_client", connect)
 
     with pytest.raises(
         ValueError,

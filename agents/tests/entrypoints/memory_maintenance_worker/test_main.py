@@ -39,7 +39,7 @@ async def test_maintenance_worker_owns_maintenance_registration_and_schedule(
 
     ensure_schedules = AsyncMock()
     connect = AsyncMock(return_value=object())
-    monkeypatch.setattr(worker_module, "connect_temporal_client", connect)
+    monkeypatch.setattr(worker_module, "connect_worker_client", connect)
     monkeypatch.setattr(worker_module, "ThreadPoolExecutor", FakeExecutor)
     monkeypatch.setattr(worker_module, "Worker", FakeWorker)
     monkeypatch.setattr(
@@ -73,7 +73,7 @@ async def test_maintenance_worker_rejects_concurrency_above_one_before_connectin
         "2",
     )
     connect = AsyncMock()
-    monkeypatch.setattr(worker_module, "connect_temporal_client", connect)
+    monkeypatch.setattr(worker_module, "connect_worker_client", connect)
 
     with pytest.raises(
         ValueError,

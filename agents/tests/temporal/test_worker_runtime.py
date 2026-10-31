@@ -19,7 +19,8 @@ async def test_connect_temporal_client_retries_startup_failures(monkeypatch) -> 
     monkeypatch.setattr(worker_runtime, "TEMPORAL_CONNECT_MAX_BACKOFF_SECONDS", 0.0)
     monkeypatch.setattr(worker_runtime, "TEMPORAL_CONNECT_TIMEOUT_SECONDS", 30.0)
 
-    assert await worker_runtime.connect_temporal_client(connect=connect) is client
+    monkeypatch.setattr(worker_runtime, "connect_temporal_client", connect)
+    assert await worker_runtime.connect_worker_client() is client
     assert connect.await_count == 3
 
 
@@ -28,6 +29,7 @@ async def test_connect_temporal_client_has_bounded_wait(monkeypatch) -> None:
     connect = AsyncMock(side_effect=RuntimeError("connection refused"))
     monkeypatch.setattr(worker_runtime, "TEMPORAL_CONNECT_TIMEOUT_SECONDS", 0.0)
 
+    monkeypatch.setattr(worker_runtime, "connect_temporal_client", connect)
     with pytest.raises(RuntimeError, match="connection refused"):
-        await worker_runtime.connect_temporal_client(connect=connect)
+        await worker_runtime.connect_worker_client()
     assert connect.await_count == 1

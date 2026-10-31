@@ -8,7 +8,6 @@ import sys
 import time
 from pathlib import Path
 
-from temporalio.client import Client
 from temporalio.exceptions import WorkflowAlreadyStartedError
 
 from sec_review_agents.entrypoints.memory_maintenance_worker.schedules import (
@@ -17,6 +16,7 @@ from sec_review_agents.entrypoints.memory_maintenance_worker.schedules import (
     MemoryMaintenanceScheduleRequest,
     ensure_memory_maintenance_schedule,
 )
+from sec_review_agents.temporal.client import connect_temporal_client
 from sec_review_agents.temporal.config import (
     DEFAULT_MEMORY_MAINTENANCE_TASK_QUEUE,
     DEFAULT_TEMPORAL_ADDRESS,
@@ -313,8 +313,8 @@ def _run_maintain(args: argparse.Namespace) -> int:
 
 
 async def _start_memory_maintenance_workflow(args: argparse.Namespace) -> str:
-    client = await Client.connect(
-        args.temporal_address,
+    client = await connect_temporal_client(
+        address=args.temporal_address,
         namespace=args.temporal_namespace,
     )
     request = MemoryMaintenanceRequest(
@@ -358,8 +358,8 @@ def _run_schedule_ensure(args: argparse.Namespace) -> int:
 
 
 async def _ensure_memory_schedule(args: argparse.Namespace) -> dict[str, object]:
-    client = await Client.connect(
-        args.temporal_address,
+    client = await connect_temporal_client(
+        address=args.temporal_address,
         namespace=args.temporal_namespace,
     )
     return await ensure_memory_maintenance_schedule(
