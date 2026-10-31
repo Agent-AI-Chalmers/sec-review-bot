@@ -273,3 +273,65 @@ def test_publish_immutable_s3_artifact_rejects_conflicting_existing_object(
             key="memory/test.tar.zst",
             description="test artifact",
         )
+
+
+@pytest.mark.parametrize("status", [403, 404, 500])
+def test_publication_probe_distinguishes_absence_from_uncertainty(monkeypatch, status):
+    from sec_review_agents.artifacts.reference import ArtifactReference
+    from sec_review_agents.artifacts.s3_adapter import s3_artifact_exists
+
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+    client = Mock()
+    client.head_object.side_effect = ClientError(
+        {
+            "ResponseMetadata": {"HTTPStatusCode": status},
+            "Error": {"Code": str(status)},
+        },
+        "HeadObject",
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.artifacts.s3_adapter._s3_client", lambda: client
+    )
+    reference = ArtifactReference(
+        uri="s3://sec-review/memory/tree",
+        digest=f"sha256:{'a' * 64}",
+        media_type="application/zstd",
+        size_bytes=42,
+    )
+    if status == 404:
+        assert s3_artifact_exists(reference) is False
+    else:
+        with pytest.raises(ClientError):
+            s3_artifact_exists(reference)
+
+
+def test_publication_probe_checks_complete_immutable_identity(monkeypatch):
+    from sec_review_agents.artifacts.reference import ArtifactReference
+    from sec_review_agents.artifacts.s3_adapter import (
+        planned_s3_artifact,
+        s3_artifact_exists,
+    )
+
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+    local = ArtifactReference(
+        uri="file:///unused",
+        digest=f"sha256:{'a' * 64}",
+        media_type="application/zstd",
+        size_bytes=42,
+    )
+    reference = planned_s3_artifact(local, key="memory/tree")
+    assert reference.uri == "s3://sec-review/memory/tree"
+    client = Mock()
+    head = {
+        "ContentLength": 42,
+        "ContentType": "application/zstd",
+        "Metadata": {"sha256": "a" * 64, "size-bytes": "42"},
+    }
+    client.head_object.return_value = head
+    monkeypatch.setattr(
+        "sec_review_agents.artifacts.s3_adapter._s3_client", lambda: client
+    )
+    assert s3_artifact_exists(reference) is True
+    head["Metadata"]["sha256"] = "b" * 64
+    with pytest.raises(RuntimeError, match="differs"):
+        s3_artifact_exists(reference)

@@ -78,6 +78,12 @@ const emptyOverview = {
 await test('the contract authenticates and validates extraction registration', async () => {
   const extractions: unknown[] = []
   const store: MemoryCatalogStore = {
+    reserveExtractionPublication: () => Promise.reject(new Error('unused')),
+    confirmExtractionPublication: () => Promise.reject(new Error('unused')),
+    listExtractionPublications: () => Promise.resolve([]),
+    reserveRevisionPublication: () => Promise.reject(new Error('unused')),
+    confirmRevisionPublication: () => Promise.reject(new Error('unused')),
+    listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: (input) => {
@@ -180,6 +186,12 @@ await test('worker and operator credentials are restricted to their write roles'
 
 await test('an extraction identity conflict is a declared 409', async () => {
   const store: MemoryCatalogStore = {
+    reserveExtractionPublication: () => Promise.reject(new Error('unused')),
+    confirmExtractionPublication: () => Promise.reject(new Error('unused')),
+    listExtractionPublications: () => Promise.resolve([]),
+    reserveRevisionPublication: () => Promise.reject(new Error('unused')),
+    confirmRevisionPublication: () => Promise.reject(new Error('unused')),
+    listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () =>
@@ -242,6 +254,12 @@ await test('completed extractions are queryable with or without an observation',
     ],
   ])
   const store: MemoryCatalogStore = {
+    reserveExtractionPublication: () => Promise.reject(new Error('unused')),
+    confirmExtractionPublication: () => Promise.reject(new Error('unused')),
+    listExtractionPublications: () => Promise.resolve([]),
+    reserveRevisionPublication: () => Promise.reject(new Error('unused')),
+    confirmRevisionPublication: () => Promise.reject(new Error('unused')),
+    listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
@@ -309,6 +327,12 @@ await test('UI catalog reads expose paginated records and durable control state'
     changed_at: '2026-10-23T01:00:00.000Z',
   }
   const store: MemoryCatalogStore = {
+    reserveExtractionPublication: () => Promise.reject(new Error('unused')),
+    confirmExtractionPublication: () => Promise.reject(new Error('unused')),
+    listExtractionPublications: () => Promise.resolve([]),
+    reserveRevisionPublication: () => Promise.reject(new Error('unused')),
+    confirmRevisionPublication: () => Promise.reject(new Error('unused')),
+    listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
@@ -468,6 +492,12 @@ await test('maintenance input is read and a revision is created with resource se
     ],
   }
   const store: MemoryCatalogStore = {
+    reserveExtractionPublication: () => Promise.reject(new Error('unused')),
+    confirmExtractionPublication: () => Promise.reject(new Error('unused')),
+    listExtractionPublications: () => Promise.resolve([]),
+    reserveRevisionPublication: () => Promise.reject(new Error('unused')),
+    confirmRevisionPublication: () => Promise.reject(new Error('unused')),
+    listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
@@ -548,6 +578,12 @@ await test('maintenance input is read and a revision is created with resource se
 
 function storeWithRevisionFailure(error: Error): MemoryCatalogStore {
   return {
+    reserveExtractionPublication: () => Promise.reject(new Error('unused')),
+    confirmExtractionPublication: () => Promise.reject(new Error('unused')),
+    listExtractionPublications: () => Promise.resolve([]),
+    reserveRevisionPublication: () => Promise.reject(new Error('unused')),
+    confirmRevisionPublication: () => Promise.reject(new Error('unused')),
+    listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
@@ -628,6 +664,12 @@ await test('a paused maintenance commit has its own 409 code', async () => {
 await test('restore moves the active pointer through its own operation', async () => {
   const restores: unknown[] = []
   const store: MemoryCatalogStore = {
+    reserveExtractionPublication: () => Promise.reject(new Error('unused')),
+    confirmExtractionPublication: () => Promise.reject(new Error('unused')),
+    listExtractionPublications: () => Promise.resolve([]),
+    reserveRevisionPublication: () => Promise.reject(new Error('unused')),
+    confirmRevisionPublication: () => Promise.reject(new Error('unused')),
+    listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
@@ -694,6 +736,12 @@ await test('restore moves the active pointer through its own operation', async (
 await test('memory tree revision history is queryable through the public contract', async () => {
   const calls: unknown[] = []
   const store: MemoryCatalogStore = {
+    reserveExtractionPublication: () => Promise.reject(new Error('unused')),
+    confirmExtractionPublication: () => Promise.reject(new Error('unused')),
+    listExtractionPublications: () => Promise.resolve([]),
+    reserveRevisionPublication: () => Promise.reject(new Error('unused')),
+    confirmRevisionPublication: () => Promise.reject(new Error('unused')),
+    listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
@@ -781,4 +829,86 @@ await test('memory tree revision history is queryable through the public contrac
   assert.equal(excessivePage.json<{ code?: string }>().code, 'INVALID_BODY')
   assert.deepEqual(calls, [{ beforeRevision: 3, limit: 10 }])
   await app.close()
+})
+
+await test('publication endpoints enforce producer roles and return complete recovery intents', async () => {
+  const store = storeWithRevisionFailure(new Error('unused'))
+  const intent = {
+    expected_active_revision: 0,
+    memory_tree_reference: revision.memory_tree_reference,
+    source: revision.source,
+  }
+  const calls: unknown[] = []
+  store.reserveRevisionPublication = (input) => {
+    calls.push(input)
+    return Promise.resolve({ intent: input, status: 'reserved' })
+  }
+  store.confirmRevisionPublication = (input) =>
+    Promise.resolve({ intent: input, status: 'present' })
+  store.listRevisionPublications = () =>
+    Promise.resolve([{ intent, status: 'reserved' }])
+  store.reserveExtractionPublication = (input) =>
+    Promise.resolve({ intent: input, status: 'reserved' })
+  const app = await createApp({ store, ...auth })
+  try {
+    for (const action of ['reserve', 'confirm']) {
+      const denied = await app.inject({
+        method: 'POST',
+        url: `/v1/memory-tree/revisions/publications/${action}`,
+        headers: operatorHeaders,
+        payload: intent,
+      })
+      assert.equal(denied.statusCode, 401)
+      const accepted = await app.inject({
+        method: 'POST',
+        url: `/v1/memory-tree/revisions/publications/${action}`,
+        headers: workerHeaders,
+        payload: intent,
+      })
+      assert.equal(accepted.statusCode, 200)
+      assert.deepEqual(accepted.json<{ intent: unknown }>().intent, intent)
+    }
+    const listed = await app.inject({
+      method: 'GET',
+      url: '/v1/memory-tree/revisions/publications/maintenance/maintenance-1',
+      headers: workerHeaders,
+    })
+    assert.deepEqual(listed.json(), {
+      publications: [{ intent, status: 'reserved' }],
+    })
+    const forbidden = await app.inject({
+      method: 'GET',
+      url: '/v1/memory-tree/revisions/publications/operator/edit-1',
+      headers: workerHeaders,
+    })
+    assert.equal(forbidden.statusCode, 401)
+    const extractionIntent = {
+      registration: extraction,
+      summary: 'Original summary.',
+    }
+    assert.equal(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/v1/extractions/publications/reserve',
+          headers: operatorHeaders,
+          payload: extractionIntent,
+        })
+      ).statusCode,
+      401,
+    )
+    const reserved = await app.inject({
+      method: 'POST',
+      url: '/v1/extractions/publications/reserve',
+      headers: workerHeaders,
+      payload: extractionIntent,
+    })
+    assert.deepEqual(reserved.json(), {
+      intent: extractionIntent,
+      status: 'reserved',
+    })
+    assert.equal(calls.length, 1)
+  } finally {
+    await app.close()
+  }
 })

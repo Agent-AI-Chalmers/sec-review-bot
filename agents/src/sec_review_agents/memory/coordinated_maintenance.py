@@ -8,17 +8,24 @@ from sec_review_agents.agents.memory_maintainer.agent import (
     MEMORY_MAINTAINER_AGENT_NAME,
 )
 from sec_review_agents.artifacts.reference import ArtifactReference
+from sec_review_agents.artifacts.s3_adapter import (
+    planned_s3_artifact,
+    publish_immutable_s3_artifact,
+    s3_artifact_exists,
+)
 from sec_review_agents.memory.catalog_client import MemoryCatalogClient
 from sec_review_agents.memory.maintainer import maintain_memory_tree
 from sec_review_agents.memory.memory_tree_artifact import (
+    build_memory_tree_artifact,
     materialize_memory_tree,
-    publish_memory_tree_artifact,
+    memory_tree_artifact_s3_key,
 )
 from sec_review_agents.memory.revision_commit_input import (
     MemoryTreeRevisionCommitInput,
 )
 from sec_review_agents.memory.trajectory_artifact import (
-    publish_memory_agent_trajectory,
+    build_memory_agent_trajectory,
+    memory_agent_trajectory_s3_key,
 )
 from sec_review_agents.runtime.trajectories import trajectory_path
 
@@ -31,6 +38,31 @@ async def prepare_coordinated_memory_revision(
     deployment: str | None = None,
 ) -> MemoryTreeRevisionCommitInput | None:
     """Run the maintainer and publish immutable inputs for a later revision commit."""
+    for publication in catalog_client.list_revision_publications(maintenance_id):
+        intent = publication["intent"]
+        if all(
+            s3_artifact_exists(ArtifactReference.from_mapping(value))
+            for value in (
+                intent["memory_tree_reference"],
+                intent["source"]["trajectory_reference"],
+            )
+        ):
+            catalog_client.confirm_revision_publication(intent)
+            return MemoryTreeRevisionCommitInput(
+                maintenance_id=maintenance_id,
+                expected_active_revision=intent["expected_active_revision"],
+                extraction_ids=tuple(intent["source"]["extraction_ids"]),
+                memory_tree_reference=ArtifactReference.from_mapping(
+                    intent["memory_tree_reference"]
+                ),
+                maintenance_trajectory_reference=ArtifactReference.from_mapping(
+                    intent["source"]["trajectory_reference"]
+                ),
+            )
+        if publication["status"] == "selected":
+            raise RuntimeError(
+                "Selected memory revision publication artifact is missing."
+            )
     maintenance_input = catalog_client.get_maintenance_input(limit=batch_size)
     if maintenance_input is None:
         return None
@@ -114,23 +146,38 @@ async def prepare_coordinated_memory_revision(
             deployment=deployment,
         )
 
-        maintenance_trajectory_reference = publish_memory_agent_trajectory(
-            agent_name=MEMORY_MAINTAINER_AGENT_NAME,
+        trajectory = build_memory_agent_trajectory(
             trajectory_path=result.maintainer_trajectory_path,
             output_dir=temp_root / "published-trajectories",
         )
-        if urlparse(maintenance_trajectory_reference.uri).scheme != "s3":
-            raise RuntimeError(
-                "Maintenance trajectory publication requires configured S3 storage."
-            )
-        memory_tree_reference = publish_memory_tree_artifact(
+        tree = build_memory_tree_artifact(
             memory_content_root=result.memory_tree_path,
             output_dir=temp_root / "published",
         )
-        if urlparse(memory_tree_reference.uri).scheme != "s3":
-            raise RuntimeError(
-                "Coordinated memory publication requires configured S3 storage."
-            )
+        trajectory_key = memory_agent_trajectory_s3_key(
+            agent_name=MEMORY_MAINTAINER_AGENT_NAME, digest=trajectory.digest
+        )
+        tree_key = memory_tree_artifact_s3_key(tree.digest)
+        maintenance_trajectory_reference = planned_s3_artifact(
+            trajectory, key=trajectory_key
+        )
+        memory_tree_reference = planned_s3_artifact(tree, key=tree_key)
+        intent = {
+            "expected_active_revision": expected_active_revision,
+            "memory_tree_reference": memory_tree_reference.as_dict(),
+            "source": {
+                "kind": "maintenance",
+                "maintenance_id": maintenance_id,
+                "extraction_ids": extraction_ids,
+                "trajectory_reference": maintenance_trajectory_reference.as_dict(),
+            },
+        }
+        catalog_client.reserve_revision_publication(intent)
+        publish_immutable_s3_artifact(
+            trajectory, key=trajectory_key, description="maintenance trajectory"
+        )
+        publish_immutable_s3_artifact(tree, key=tree_key, description="memory tree")
+        catalog_client.confirm_revision_publication(intent)
     return MemoryTreeRevisionCommitInput(
         maintenance_id=maintenance_id,
         expected_active_revision=expected_active_revision,

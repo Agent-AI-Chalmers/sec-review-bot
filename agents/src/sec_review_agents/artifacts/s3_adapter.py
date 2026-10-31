@@ -74,6 +74,36 @@ def download_s3_object(
     return destination
 
 
+def planned_s3_artifact(reference: ArtifactReference, *, key: str) -> ArtifactReference:
+    """Describe an immutable upload before performing any storage write."""
+    bucket = env_value(ARTIFACT_S3_BUCKET_ENV)
+    if bucket is None:
+        raise RuntimeError(f"{ARTIFACT_S3_BUCKET_ENV} is required for publication.")
+    return ArtifactReference(
+        uri=f"s3://{bucket}/{key}",
+        digest=reference.digest,
+        media_type=reference.media_type,
+        size_bytes=reference.size_bytes,
+    )
+
+
+def s3_artifact_exists(reference: ArtifactReference) -> bool:
+    """Return false only for definite absence; preserve storage uncertainty."""
+    bucket, key = parse_s3_artifact_uri(reference.uri)
+    if bucket != env_value(ARTIFACT_S3_BUCKET_ENV):
+        raise ValueError("Artifact URI uses an unconfigured S3 bucket.")
+    try:
+        head = _s3_client().head_object(Bucket=bucket, Key=key)
+    except ClientError as error:
+        if error.response.get("ResponseMetadata", {}).get("HTTPStatusCode") == 404:
+            return False
+        raise
+    _assert_existing_object_matches(
+        head, reference=reference, description="memory artifact", error=None
+    )
+    return True
+
+
 def publish_immutable_s3_artifact(
     reference: ArtifactReference,
     *,
@@ -123,7 +153,7 @@ def _assert_existing_object_matches(
     *,
     reference: ArtifactReference,
     description: str,
-    error: ClientError,
+    error: ClientError | None,
 ) -> None:
     if (
         head.get("Metadata", {}).get("sha256")
@@ -142,5 +172,7 @@ __all__ = [
     "ARTIFACT_S3_BUCKET_ENV",
     "ARTIFACT_S3_ENDPOINT_ENV",
     "download_s3_object",
+    "planned_s3_artifact",
     "publish_immutable_s3_artifact",
+    "s3_artifact_exists",
 ]

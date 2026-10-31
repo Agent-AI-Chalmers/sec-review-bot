@@ -142,12 +142,6 @@ export function createMemoryRoutes({
         })
         return
       }
-      try {
-        await artifactStore.putMemoryArtifact(artifact)
-      } catch {
-        sendJson(response, 502, { error: 'memory_artifact_upload_failed' })
-        return
-      }
       catalogPath = '/v1/memory-tree/revisions'
       catalogBody = {
         expected_active_revision: body.expected_active_revision,
@@ -161,6 +155,38 @@ export function createMemoryRoutes({
           kind: 'operator',
           operation_id: body.operation_id
         }
+      }
+      try {
+        const reserved = await catalog.write(
+          '/v1/memory-tree/revisions/publications/reserve',
+          catalogBody
+        )
+        if (reserved.status < 200 || reserved.status >= 300) {
+          writeUpstreamResult(response, reserved, { cacheControl: 'no-store' })
+          return
+        }
+      } catch (error) {
+        sendUpstreamFailure(response, 'memory_catalog', error)
+        return
+      }
+      try {
+        await artifactStore.putMemoryArtifact(artifact)
+      } catch {
+        sendJson(response, 502, { error: 'memory_artifact_upload_failed' })
+        return
+      }
+      try {
+        const confirmed = await catalog.write(
+          '/v1/memory-tree/revisions/publications/confirm',
+          catalogBody
+        )
+        if (confirmed.status < 200 || confirmed.status >= 300) {
+          writeUpstreamResult(response, confirmed, { cacheControl: 'no-store' })
+          return
+        }
+      } catch (error) {
+        sendUpstreamFailure(response, 'memory_catalog', error)
+        return
       }
     }
     try {

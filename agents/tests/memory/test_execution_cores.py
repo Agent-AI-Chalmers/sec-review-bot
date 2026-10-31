@@ -284,6 +284,7 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
     active_reference: dict[str, object] | None,
 ) -> None:
     client = Mock()
+    client.list_revision_publications.return_value = []
     client.get_maintenance_input.return_value = {
         "expected_active_revision": expected_active_revision,
         "active_memory_tree_reference": active_reference,
@@ -302,6 +303,13 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
 
     with (
         patch(
+            "sec_review_agents.memory.coordinated_maintenance.planned_s3_artifact",
+            side_effect=lambda reference, **_: reference,
+        ),
+        patch(
+            "sec_review_agents.memory.coordinated_maintenance.publish_immutable_s3_artifact"
+        ),
+        patch(
             "sec_review_agents.memory.coordinated_maintenance.materialize_memory_tree",
             return_value=base_tree,
         ) as materialize,
@@ -310,11 +318,11 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
             AsyncMock(return_value=result),
         ) as maintain,
         patch(
-            "sec_review_agents.memory.coordinated_maintenance.publish_memory_agent_trajectory",
+            "sec_review_agents.memory.coordinated_maintenance.build_memory_agent_trajectory",
             return_value=trajectory_reference,
         ),
         patch(
-            "sec_review_agents.memory.coordinated_maintenance.publish_memory_tree_artifact",
+            "sec_review_agents.memory.coordinated_maintenance.build_memory_tree_artifact",
             return_value=memory_reference,
         ),
     ):
@@ -420,6 +428,7 @@ async def test_coordinated_maintenance_rejects_invalid_catalog_payloads(
     message: str,
 ) -> None:
     client = Mock()
+    client.list_revision_publications.return_value = []
     client.get_maintenance_input.return_value = maintenance_input
 
     with pytest.raises(ValueError, match=message):

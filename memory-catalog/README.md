@@ -31,13 +31,19 @@ Collection cursors are opaque and exclusive. Extractions and observations are or
 
 Only one maintainer may execute at a time. Temporal enforces that invariant with one fixed workflow ID and a schedule overlap policy of `SKIP`; the catalog therefore does not implement batch leases or concurrent claims.
 
-Temporal records the published artifact references before dispatching the revision commit activity. A commit retry therefore repeats the same idempotent `POST` without rerunning the maintainer.
+Before uploading, producers reserve complete extraction or revision publication intents through the publication endpoints. An extraction publication intent includes its observation and summary; a maintenance publication intent keeps the tree, trajectory, observation IDs, and expected active revision together. Producers confirm only after all objects are present. Registration and revision creation require a matching confirmed publication intent and select it in the same transaction as the authoritative records. Different model attempts may reserve different digest candidates, but each logical owner has at most one selected publication intent.
+
+Preparation retries list recorded publication intents and verify immutable S3 metadata before rerunning a model. Storage errors remain uncertain and stop recovery; definite absence permits a new candidate unless the publication intent is already selected. Candidates remain recorded after CAS/pause conflicts or partial uploads; this protocol does not delete unreferenced objects or provide automatic background completion after retries are exhausted. The UI BFF can reconstruct an operator publication intent from the same edit request and retries its immutable upload. The browser retains the operation ID and original expected revision for retries of unchanged content within the open editor.
+
+Temporal also records the prepared result before dispatching the registration or revision commit activity, so commit retries reuse the same payload.
 
 Revision provenance is a tagged maintenance/operator source. Every revision records the active revision from which it was created as `predecessor_revision`; revision numbers remain globally increasing even after the active pointer moves backward. Operator `operation_id` values are unique: identical replays return the original revision, while changed content conflicts. Operator edits never consume observations. Restore has its own idempotency ledger and moves only the active pointer, so the next automatic or operator revision names the restored revision as its predecessor.
 
 Pause and resume operations have their own idempotency ledger. Identical replay returns the operation's stored result before inspecting the current generation; a new operation locks the control singleton, checks `expected_generation` and the legal transition, then increments generation. A new maintenance revision locks that same row in its commit transaction and is rejected while paused with the `MAINTENANCE_PAUSED` conflict code, distinct from a revision compare-and-swap conflict. Operator revisions are unaffected. Worker preflight reads only avoid unnecessary work and do not replace this transaction boundary.
 
 ## Run Locally
+
+The schema runner verifies applied SQL checksums. An existing database whose applied `001` differs from the checked-in schema must be explicitly upgraded or recreated; editing the SQL file does not migrate it.
 
 ```bash
 MEMORY_CATALOG_DATABASE_URL=postgresql://... \

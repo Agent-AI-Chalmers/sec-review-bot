@@ -948,7 +948,34 @@ export async function runMemoryFlow({
     await discardDialog
       .getByRole('button', { name: 'Continue editing' })
       .click()
+    const editRequests = []
+    await page.route('**/api/memory/edit', async (route) => {
+      editRequests.push(route.request().postDataJSON())
+      if (editRequests.length === 1) {
+        await route.fulfill({
+          status: 502,
+          contentType: 'application/json',
+          body: '{"error":"memory_catalog_unavailable"}'
+        })
+      } else {
+        await route.continue()
+      }
+    })
     await editDialog.getByRole('button', { name: 'Commit revision' }).click()
+    await page
+      .getByText('The edit could not be committed.', { exact: true })
+      .waitFor()
+    await editDialog.getByRole('button', { name: 'Commit revision' }).click()
+    await waitUntil(
+      async () => editRequests.length === 2,
+      `${name} edit retry must be submitted`
+    )
+    assert.deepStrictEqual(
+      editRequests[0],
+      editRequests[1],
+      `${name} edit retry must reuse its operation ID and original revision`
+    )
+    await page.unroute('**/api/memory/edit')
     await waitUntil(
       async () =>
         (

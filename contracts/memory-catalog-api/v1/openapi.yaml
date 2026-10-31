@@ -94,6 +94,48 @@ components:
           oneOf:
             - $ref: "#/components/schemas/ExtractionObservation"
             - type: "null"
+    ExtractionPublicationIntent:
+      type: object
+      additionalProperties: false
+      required: [registration, summary]
+      properties:
+        registration:
+          $ref: "#/components/schemas/ExtractionRegistration"
+        summary: { type: string }
+    ExtractionPublication:
+      type: object
+      additionalProperties: false
+      required: [intent, status]
+      properties:
+        intent:
+          $ref: "#/components/schemas/ExtractionPublicationIntent"
+        status: { type: string, enum: [reserved, present, selected] }
+    ExtractionPublicationList:
+      type: object
+      additionalProperties: false
+      required: [publications]
+      properties:
+        publications:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtractionPublication"
+    RevisionPublication:
+      type: object
+      additionalProperties: false
+      required: [intent, status]
+      properties:
+        intent:
+          $ref: "#/components/schemas/MemoryTreeRevisionCreation"
+        status: { type: string, enum: [reserved, present, selected] }
+    RevisionPublicationList:
+      type: object
+      additionalProperties: false
+      required: [publications]
+      properties:
+        publications:
+          type: array
+          items:
+            $ref: "#/components/schemas/RevisionPublication"
     ExtractionRegistrationResult:
       type: object
       additionalProperties: false
@@ -566,7 +608,7 @@ paths:
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
     post:
-      description: Register one completed extraction and its optional observation, or replay identical content.
+      description: Register one completed extraction from a matching confirmed publication intent, or replay identical content.
       operationId: registerExtraction
       security: [{ workerToken: [] }]
       requestBody:
@@ -692,7 +734,7 @@ paths:
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/memory-tree/revisions:
     post:
-      description: Create an immutable memory tree revision with compare-and-swap and consume its source observations.
+      description: Select a matching confirmed publication intent, create its immutable revision with compare-and-swap, and consume its source observations.
       operationId: createMemoryTreeRevision
       security: [{ catalogToken: [] }]
       requestBody:
@@ -888,4 +930,130 @@ paths:
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "404": { $ref: "#/components/responses/NotFound" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/extractions/publications/reserve:
+    post:
+      description: Reserve the complete intent before uploading its immutable artifacts.
+      operationId: reserveExtractionPublication
+      security: [{ workerToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExtractionPublicationIntent" }
+      responses:
+        "200":
+          description: The durable publication state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExtractionPublication" }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/extractions/publications/confirm:
+    post:
+      description: Confirm that every artifact in the reserved intent is present.
+      operationId: confirmExtractionPublication
+      security: [{ workerToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ExtractionPublicationIntent" }
+      responses:
+        "200":
+          description: The durable publication state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExtractionPublication" }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/extractions/publications/{extraction_id}:
+    get:
+      description: Recover complete publication intents before regenerating artifacts.
+      operationId: listExtractionPublications
+      security: [{ workerToken: [] }]
+      parameters:
+        - in: path
+          name: extraction_id
+          required: true
+          schema: { type: string, minLength: 1, pattern: "^[A-Za-z0-9._:-]+$" }
+      responses:
+        "200":
+          description: Recorded intents, with the selected intent first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ExtractionPublicationList" }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/memory-tree/revisions/publications/reserve:
+    post:
+      description: Reserve the complete intent before uploading its immutable artifacts.
+      operationId: reserveRevisionPublication
+      security: [{ catalogToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MemoryTreeRevisionCreation" }
+      responses:
+        "200":
+          description: The durable publication state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RevisionPublication" }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/memory-tree/revisions/publications/confirm:
+    post:
+      description: Confirm that every artifact in the reserved intent is present.
+      operationId: confirmRevisionPublication
+      security: [{ catalogToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MemoryTreeRevisionCreation" }
+      responses:
+        "200":
+          description: The durable publication state.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RevisionPublication" }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409": { $ref: "#/components/responses/Conflict" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "500": { $ref: "#/components/responses/InternalError" }
+  /v1/memory-tree/revisions/publications/{kind}/{owner_id}:
+    get:
+      description: Recover complete publication intents before regenerating artifacts.
+      operationId: listRevisionPublications
+      security: [{ catalogToken: [] }]
+      parameters:
+        - in: path
+          name: kind
+          required: true
+          schema: { type: string, enum: [maintenance, operator] }
+        - in: path
+          name: owner_id
+          required: true
+          schema: { type: string, minLength: 1, pattern: "^[A-Za-z0-9._:-]+$" }
+      responses:
+        "200":
+          description: Recorded intents, with the selected intent first.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RevisionPublicationList" }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }

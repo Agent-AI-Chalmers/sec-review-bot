@@ -33,13 +33,19 @@
 
 任何时刻只允许一个 maintainer 执行。Temporal 使用固定 workflow ID 和 `SKIP` schedule overlap policy 强制该约束，因此 catalog 不实现 batch lease 或并发 claim。
 
-Temporal 会先记录已发布的 artifact references，再调度 revision 提交 activity。因此提交重试会使用相同内容重复执行幂等 `POST`，而不会再次运行 maintainer。
+Producer 在上传前通过 publication endpoints 预留完整 extraction 或 revision 发布意图。Extraction 发布意图 包含 observation 和 summary；maintenance 发布意图 把 tree、trajectory、observation IDs 和 expected active revision 保存为一组。全部对象上传后才允许确认。注册 extraction 和创建 revision 必须匹配已确认的 发布意图，并在写入正式记录的同一事务内选中它。模型的不同执行可预留不同 digest candidate，但每个逻辑 owner 最多选中一个 发布意图。
+
+Preparation 重试先列出已记录的 发布意图，验证 S3 不可变对象元数据，再决定是否重跑模型。存储错误仍属于不确定结果，会中止恢复；明确缺失允许生成新 candidate，但已选中的 发布意图 缺失时会报错。CAS、pause 冲突和部分上传留下的 candidate 会继续保留；此协议不删除无引用对象，也不在重试耗尽后自动后台完成提交。UI BFF 可由相同编辑请求重建 operator 发布意图 并重试不可变上传。浏览器在编辑器保持打开且内容未变化时，重试会复用 operation ID 和最初的 expected revision。
+
+Temporal 也会在调度注册或 revision 提交 activity 前记录 prepared result，因此 commit 重试复用同一 payload。
 
 Revision provenance 使用带标签的 maintenance/operator source。每个 revision 通过 `predecessor_revision` 记录创建时的 active revision；即使 active pointer 回退，revision 编号仍保持全局递增。Operator `operation_id` 全局唯一：相同内容重放返回原 revision，不同内容则冲突。Operator edit 不消费 observations。Restore 使用独立的幂等 ledger，只移动 active pointer；下一次自动或人工 revision 会把恢复后的 revision 记录为前驱。
 
 Pause 与 resume 使用独立的幂等 ledger。相同重放会在检查当前 generation 前返回该 operation 保存的结果；新 operation 锁定 control 单例，检查 `expected_generation` 与合法转换后增加 generation。新的 maintenance revision 在提交事务中锁定同一行，并在 paused 时以 `MAINTENANCE_PAUSED` 冲突码被拒绝，与 revision compare-and-swap 冲突区分；operator revision 不受影响。Worker 的开始前读取只用于避免无效工作，不能替代该事务边界。
 
 ## 本地运行
+
+Schema runner 会校验已应用 SQL 的 checksum。已有数据库的 `001` 与仓库 schema 不一致时，必须显式升级或重建；编辑 SQL 文件不会自动迁移数据库。
 
 ```bash
 MEMORY_CATALOG_DATABASE_URL=postgresql://... \
