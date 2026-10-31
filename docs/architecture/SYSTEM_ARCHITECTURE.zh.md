@@ -31,27 +31,6 @@ Control Plane UI 通过自身 BFF 管理 Memory Catalog，browser 不会获得 C
 
 这些运行角色通过 [`contracts/`](../../contracts/README.zh.md) 下由项目维护的边界通信。Package 位置并不决定进程拓扑：`agents/` 实现彼此独立部署的 Temporal worker。`apps/` 下的应用也分别独立部署。
 
-## 可观测性与统计链路
-
-```mermaid
-sequenceDiagram
-  participant Workers as Agent Workers
-  participant Langfuse as Langfuse（独立部署）
-  participant Runs as Review Runs
-  participant Database as PostgreSQL
-  participant UI as Control Plane UI
-
-  Workers-->>Langfuse: 可选地导出 LLM traces 和 generations
-  Note over Workers,Langfuse: Review execution 不等待可观测性数据送达
-  Runs->>Langfuse: 按 run_id 读取终态 run observations
-  Langfuse-->>Runs: 返回 review roots 和 model generations
-  Runs->>Database: 保存 reconciliation 状态和聚合 snapshot
-  UI->>Runs: 读取 run 详情
-  Runs-->>UI: 返回 snapshot、等待状态或无 observation 记录
-```
-
-Langfuse 保存每次模型调用的 observation。Review Runs 读取并汇总这些数据，写入自己的数据库，供 Control Plane UI 展示。
-
 ## 主 Review 链路
 
 ```mermaid
@@ -124,3 +103,64 @@ sequenceDiagram
     Catalog-->>MaintenanceWorker: 返回新建或幂等重放的 revision，或 revision conflict
   end
 ```
+
+## 可观测性与统计链路
+
+```mermaid
+sequenceDiagram
+  participant Workers as Agent Workers
+  participant Langfuse as Langfuse（独立部署）
+  participant Runs as Review Runs
+  participant Database as PostgreSQL
+  participant UI as Control Plane UI
+
+  Workers-->>Langfuse: 可选地导出 LLM traces 和 generations
+  Note over Workers,Langfuse: Review execution 不等待可观测性数据送达
+  Runs->>Langfuse: 按 run_id 读取终态 run observations
+  Langfuse-->>Runs: 返回 review roots 和 model generations
+  Runs->>Database: 保存 reconciliation 状态和聚合 snapshot
+  UI->>Runs: 读取 run 详情
+  Runs-->>UI: 返回 snapshot、等待状态或无 observation 记录
+```
+
+Langfuse 保存每次模型调用的 observation。Review Runs 读取并汇总这些数据，写入自己的数据库，供 Control Plane UI 展示。
+
+## Artifact 发布与恢复
+
+PostgreSQL 与对象存储分别提交。Input 与 memory 的发布方先持久化发布意图记录（publication intent），记录预期的产物引用，以及崩溃后完成挂接所需的业务数据。
+
+```mermaid
+sequenceDiagram
+  participant Publisher as 发布方
+  participant Database as 所属数据库
+  participant Storage as 对象存储
+
+  Publisher->>Database: 预留完整发布意图
+  Database-->>Publisher: 预留成功
+  Publisher->>Storage: 条件 PUT
+  Storage-->>Publisher: 上传成功，或已有对象匹配
+  Publisher->>Database: 确认对象已存在
+  Publisher->>Database: 请求提交或注册
+  Note over Database: 同一事务内选择发布意图、<br/>挂接引用并写入业务记录
+  Database-->>Publisher: 提交结果
+```
+
+中途失败后，重试先检查已记录的发布意图和对象状态。[Temporal Activity 重试](https://docs.temporal.io/activity-definition#idempotency)可能在完成响应丢失后重复上传，但不会把对象存储与 SQL 合成一个事务。
+
+| 产物 | 持久化恢复依据 | 恢复边界 |
+| --- | --- | --- |
+| Review input bundle | Review Runs 发布意图：reference、prepared input 与 publish context | 新 preparation claim 可在对象存在时复用原 发布意图；只有明确不存在时，才允许放弃未选中的 candidate 并重建。 |
+| Extraction trajectory | Memory Catalog 发布意图：trajectory reference、observation 与 summary | 重试先检查已记录的 candidate，再决定是否重新运行模型；选择与 extraction 注册在同一事务中提交。 |
+| Maintenance revision | Memory Catalog 发布意图：tree、trajectory、observation IDs 与 expected active revision 作为一组 | 不同模型输出可以形成不同 candidate；选择、revision 创建、observation 消费与 active pointer 更新在同一事务中提交。 |
+| Operator edit revision | Memory Catalog 发布意图：tree reference、operation ID 与 expected active revision；UI BFF 上传 tree | 编辑器保持打开且内容未变时，重试保留 operation ID 与原 expected revision。BFF 重复执行预留、条件上传、确认与幂等 revision 创建。 |
+| S3 中的 run diagnostic bundle | Temporal publication request 与固定 run key | 恢复先按 request 校验已有 bundle，再考虑本地文件。如果完整上传的 bundle 与本地产物均已丢失，request 无法重建诊断字节。 |
+
+UI restore 在 Catalog 事务中将 active pointer 移到已有 revision，不创建 revision 或对象，也不会修复丢失的字节。
+
+Input 与 memory 的具体协议见 [Review Runs](../../review-runs/README.zh.md) 和 [Memory Catalog](../../memory-catalog/README.md)。存储错误仍是不确定状态，会使本次尝试失败，不能当作对象不存在。已记录的 发布意图 支持重试，但不提供重试耗尽后的自动后台完成机制。
+
+<!-- doc-time-sensitive: artifact-conditional-write-semantics; checked=2026-10-31; source=https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html -->
+
+[条件 PUT](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html) 阻止遵守协议的发布方覆盖已有 key，但不保证对象能抵抗其他具有覆盖或删除权限的身份。Consumer 在使用前校验大小与 SHA-256：这能拒绝替换内容，却不能找回丢失的字节。S3 兼容部署必须针对实际部署的存储版本验证所依赖的 API 与策略条件。
+
+放弃 candidate 不会删除对象，目前也没有自动对象垃圾回收。旧上传进程仍可能完成上传，不同 candidate 也可能共享内容 key。未来清理必须考虑历史 revision、extraction reference，以及 Temporal history 中保留的尚未挂接引用，不能把当前没有数据库挂接的对象直接视为可删除。

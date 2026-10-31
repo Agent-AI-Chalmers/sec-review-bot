@@ -29,27 +29,6 @@ Control Plane UI manages Memory Catalog through its BFF and never exposes Catalo
 
 The runtime roles communicate through project-owned boundaries under [`contracts/`](../../contracts/README.md). Package location does not determine process topology: `agents/` implements independently deployed Temporal workers. Applications under `apps/` remain independently deployed services.
 
-## Observability and statistics path
-
-```mermaid
-sequenceDiagram
-  participant Workers as Agent Workers
-  participant Langfuse as Langfuse (independent deployment)
-  participant Runs as Review Runs
-  participant Database as PostgreSQL
-  participant UI as Control Plane UI
-
-  Workers-->>Langfuse: Export optional LLM traces and generations
-  Note over Workers,Langfuse: Review execution does not wait for observability delivery
-  Runs->>Langfuse: Read terminal run observations by run_id
-  Langfuse-->>Runs: Review roots and model generations
-  Runs->>Database: Persist reconciliation state and aggregate snapshot
-  UI->>Runs: Read run details
-  Runs-->>UI: Return snapshot, pending state, or no observation record
-```
-
-Langfuse stores the individual model-call observations. Review Runs reads and aggregates them into its own database for display in the Control Plane UI.
-
 ## Main review path
 
 ```mermaid
@@ -122,3 +101,64 @@ sequenceDiagram
     Catalog-->>MaintenanceWorker: Created or idempotently replayed revision, or revision conflict
   end
 ```
+
+## Observability and statistics path
+
+```mermaid
+sequenceDiagram
+  participant Workers as Agent Workers
+  participant Langfuse as Langfuse (independent deployment)
+  participant Runs as Review Runs
+  participant Database as PostgreSQL
+  participant UI as Control Plane UI
+
+  Workers-->>Langfuse: Export optional LLM traces and generations
+  Note over Workers,Langfuse: Review execution does not wait for observability delivery
+  Runs->>Langfuse: Read terminal run observations by run_id
+  Langfuse-->>Runs: Review roots and model generations
+  Runs->>Database: Persist reconciliation state and aggregate snapshot
+  UI->>Runs: Read run details
+  Runs-->>UI: Return snapshot, pending state, or no observation record
+```
+
+Langfuse stores the individual model-call observations. Review Runs reads and aggregates them into its own database for display in the Control Plane UI.
+
+## Artifact publication and recovery
+
+PostgreSQL and object storage commit separately. Input and memory publishers first persist a publication intent: the intended artifact references and the business payload needed to finish attachment after a crash.
+
+```mermaid
+sequenceDiagram
+  participant Publisher
+  participant Database as Owner database
+  participant Storage as Object Storage
+
+  Publisher->>Database: Reserve complete publication intent
+  Database-->>Publisher: Reservation accepted
+  Publisher->>Storage: Conditional PUT
+  Storage-->>Publisher: Upload succeeds, or existing object matches
+  Publisher->>Database: Confirm object presence
+  Publisher->>Database: Request submission or registration
+  Note over Database: One transaction selects the publication intent,<br/>attaches references, and writes business records
+  Database-->>Publisher: Commit result
+```
+
+After an interruption, retries check the recorded publication intent and object state first. A [Temporal Activity retry](https://docs.temporal.io/activity-definition#idempotency) can repeat an upload after a lost completion response; it does not make storage and SQL one transaction.
+
+| Artifact | Durable recovery basis | Recovery boundary |
+| --- | --- | --- |
+| Review input bundle | Review Runs publication intent: reference, prepared input, and publish context | A replacement preparation claim can reuse the original publication intent when the object is present. Only definite absence permits abandoning an unused candidate and rebuilding. |
+| Extraction trajectory | Memory Catalog publication intent containing the trajectory reference, observation, and summary | Retries check recorded candidates before rerunning the model; selection and extraction registration commit together. |
+| Maintenance revision | Memory Catalog publication intent grouping the tree, trajectory, observation IDs, and expected active revision | Different model outputs can be separate candidates; selection, revision creation, observation consumption, and active pointer update commit together. |
+| Operator edit revision | Memory Catalog publication intent containing the tree reference, operation ID, and expected active revision; the UI BFF uploads the tree | Retries of unchanged content within the open editor retain the operation ID and original expected revision. The BFF repeats reservation, conditional upload, confirmation, and idempotent revision creation. |
+| Run diagnostic bundle in S3 | Temporal publication request and the fixed run key | Recovery verifies the existing bundle against the request before using local files. If neither a complete uploaded bundle nor local artifacts remain, the request cannot reconstruct the diagnostic bytes. |
+
+UI restore moves the active pointer to an existing revision in a Catalog transaction; it creates neither a revision nor an object and does not repair missing bytes.
+
+The input and memory protocols are described in the [Review Runs](../../review-runs/README.md) and [Memory Catalog](../../memory-catalog/README.md) guides. Storage errors remain uncertain and fail the attempt; they are not evidence that an object is missing. Recorded publication intents support retries, but do not provide automatic background completion after retries are exhausted.
+
+<!-- doc-time-sensitive: artifact-conditional-write-semantics; checked=2026-10-31; source=https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html -->
+
+[Conditional PUT](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html) prevents cooperating publishers from overwriting an occupied key. It does not enforce retention against other identities with overwrite or delete permission. Consumers verify size and SHA-256 before use: this rejects replacement content but cannot recover lost bytes. S3-compatible deployments must verify the APIs and policy conditions they rely on against their deployed storage version.
+
+Abandoning a candidate does not delete its object, and no automatic object garbage collection is implemented. A stale uploader may still finish, and candidates may share content keys. Future cleanup must account for historical revisions, extraction references, and prepared references retained in Temporal history, rather than treating every object without a current database attachment as disposable.
