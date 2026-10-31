@@ -8,6 +8,7 @@
 // really starts (as with the contract's path resolution) would pass the rest of the suite.
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { URLSearchParams } from 'node:url'
 
 import Fastify from 'fastify'
 
@@ -756,6 +757,51 @@ test('the query string is coerced to the declared types, and only there', async 
       )
     }
     assert.strictEqual(calls, 1, 'a rejected query must not reach the handler')
+  } finally {
+    await app.close()
+  }
+})
+
+test('run list filters reach the store as validated values with normalized dates', async () => {
+  // The contract explodes its filter object into top-level query keys. Reading a nested
+  // filter or reparsing raw URL strings would lose the shape Fastify already validated.
+  const calls: unknown[] = []
+  const app = await buildApp({
+    queries: {
+      listRunsPage: async (options: unknown) => {
+        calls.push(options)
+        return { runs: [], next_cursor: null, dropped: [] }
+      }
+    }
+  })
+  try {
+    const filters = {
+      limit: '10',
+      execution_status: 'running',
+      preparation_status: 'submitted',
+      publication_status: 'pending',
+      source_platform: 'github',
+      workflow: 'issue-review',
+      from: '2026-10-01T08:00:00+08:00',
+      to: '2026-10-02T08:00:00+08:00'
+    }
+    for (const query of ['', `?${new URLSearchParams(filters)}`]) {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/v1/runs${query}`,
+        headers: { authorization: `Bearer ${READ_TOKEN}` }
+      })
+      assert.strictEqual(response.statusCode, 200)
+    }
+    assert.deepStrictEqual(calls, [
+      { limit: 50 },
+      {
+        ...filters,
+        limit: 10,
+        from: '2026-10-01T00:00:00.000Z',
+        to: '2026-10-02T00:00:00.000Z'
+      }
+    ])
   } finally {
     await app.close()
   }

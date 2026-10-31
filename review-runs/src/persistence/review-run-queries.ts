@@ -58,11 +58,11 @@ export interface ParkedRun {
   run_id: string
   axis: 'preparation' | 'execution' | 'publication'
   parked_at: string
+  // Disconnected preparations have a reason by database constraint; other axes use literals.
   reason:
     | 'EXECUTION_ALREADY_ADVANCED'
     | 'SUBMISSION_RECOVERY_EXHAUSTED'
     | 'PUBLICATION_RECONCILIATION_EXHAUSTED'
-    | null
 }
 
 /** A stored row the contract cannot represent, kept so a fan-out read can report it. */
