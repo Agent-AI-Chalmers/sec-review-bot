@@ -53,7 +53,7 @@ async def run_single_agent(
     user_prompt: str,
     memory_enabled: bool,
     trajectory_paths: tuple[Path, ...] = (),
-) -> dict[str, Any]:
+) -> SingleAgentFixOutput:
     """Run the agent and return its structured output.
 
     Own MCP sessions through graph construction and invocation. The caller owns

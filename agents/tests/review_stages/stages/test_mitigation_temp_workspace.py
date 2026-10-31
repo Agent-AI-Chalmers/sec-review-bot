@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 
 from sec_review_agents.filesystem.backend_factory import BackendConfig
+from sec_review_agents.agents.mitigation.model import MitigationOutput
 from sec_review_agents.review_stages.mitigation.stage import (
     create_skipped_mitigation_result,
     run_mitigation_stage,
@@ -54,11 +55,13 @@ async def _run_mitigation_stage_for_workspace_capture(
             backend_kind="local",
         )
 
-    async def run_agent(**_kwargs: Any) -> dict[str, Any]:
-        return {
-            "overview": "No changes needed.",
-            "declared_changed_files": [],
-        }
+    async def run_agent(**_kwargs: Any) -> MitigationOutput:
+        return MitigationOutput.model_validate(
+            {
+                "overview": "No changes needed.",
+                "declared_changed_files": [],
+            }
+        )
 
     with (
         patch(

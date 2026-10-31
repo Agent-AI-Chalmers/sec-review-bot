@@ -81,9 +81,9 @@ async def run_analysis_stage(
                 memory_enabled=memory_path_view is not None,
             )
         result = build_analysis_stage_result(
-            overview=agent_output["overview"],
-            narratives=agent_output["narratives"],
-            verdict=agent_output["overall_verdict"],
+            overview=agent_output.overview,
+            narratives=agent_output.narratives,
+            verdict=agent_output.overall_verdict,
         )
         persist_analysis_stage_result(
             analyzer_artifacts_path=analyzer_artifacts_path,

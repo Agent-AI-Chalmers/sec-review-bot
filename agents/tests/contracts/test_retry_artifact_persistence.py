@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from sec_review_agents.filesystem.backend_factory import BackendConfig
+from sec_review_agents.agents.mitigation.model import MitigationOutput
 from sec_review_agents.review_stages.mitigation.stage import (
     create_skipped_mitigation_result,
     persist_mitigation_result,
@@ -207,7 +208,7 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
         assert kwargs["trajectory_paths"] == (
             mitigator_root / "trajectories" / "retry-1.jsonl",
         )
-        return structured_payload
+        return MitigationOutput.model_validate(structured_payload)
 
     def fake_build_patch_artifact(
         workspace_path,

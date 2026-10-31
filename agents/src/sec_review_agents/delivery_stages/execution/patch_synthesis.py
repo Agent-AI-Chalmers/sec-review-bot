@@ -11,6 +11,7 @@ from sec_review_agents.agents.patch_synthesis.agent import (
 from sec_review_agents.agents.patch_synthesis.backend import (
     create_patch_synthesis_backend,
 )
+from sec_review_agents.agents.patch_synthesis.model import PatchSynthesisOutput
 from sec_review_agents.agents.patch_synthesis.prompts import (
     build_patch_synthesis_system_prompt,
     build_patch_synthesis_user_prompt,
@@ -28,7 +29,6 @@ from sec_review_agents.utils.markdown import inline_code, md
 from sec_review_agents.workspace.file_changes import file_change_paths
 from sec_review_agents.workspace.patches import (
     build_patch_artifact,
-    normalize_declared_changed_files,
 )
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -199,18 +199,9 @@ async def synthesize_combined_delivery_patch(
                     user_prompt=user_prompt,
                     trajectory_paths=(trajectory_path(delivery_artifacts_root),),
                 )
-            ).model_dump(by_alias=True)
-
-        raw_declared_changed_files = structured_payload.get("declared_changed_files")
-        if not isinstance(raw_declared_changed_files, list):
-            raise ValueError(
-                "Patch synthesis agent output requires declared_changed_files."
             )
-        declared_changed_files = normalize_declared_changed_files(
-            raw_declared_changed_files
-        )
-        if not declared_changed_files:
-            return {"patch_diff": "", "file_changes": []}
+
+        declared_changed_files = structured_payload.declared_changed_files
 
         patch_artifact = build_patch_artifact(
             workspace_path,

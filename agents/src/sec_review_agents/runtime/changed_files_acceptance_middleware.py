@@ -33,14 +33,13 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Annotated, Any, NotRequired, override
+from typing import Annotated, Any, NotRequired, Protocol, TypeVar, override
 
 from langchain.agents.middleware.types import (
     AgentMiddleware,
     AgentState,
     ContextT,
     OmitFromSchema,
-    ResponseT,
     hook_config,
 )
 from langchain_core.messages import HumanMessage
@@ -57,27 +56,19 @@ from sec_review_agents.workspace.patches import (
 PRIVATE_STATE_ATTR = OmitFromSchema(input=True, output=True)
 
 
+class DeclaredChangedFilesOutput(Protocol):
+    """Shared repair-agent acceptance input, independent of concrete agent models."""
+
+    declared_changed_files: list[str]
+
+
+ResponseT = TypeVar("ResponseT", bound=DeclaredChangedFilesOutput)
+
+
 class ChangedFilesAcceptanceState(AgentState[ResponseT]):
     changed_files_acceptance_retry_count: NotRequired[
         Annotated[int, UntrackedValue, PRIVATE_STATE_ATTR]
     ]
-
-
-def _structured_payload_dict(structured_response: Any) -> dict[str, Any]:
-    if hasattr(structured_response, "model_dump"):
-        return structured_response.model_dump(by_alias=True)
-    if isinstance(structured_response, dict):
-        return structured_response
-    return {}
-
-
-def _declared_changed_files(payload: dict[str, Any]) -> list[str]:
-    raw_declared_paths = payload.get("declared_changed_files")
-    if raw_declared_paths is None:
-        return []
-    if not isinstance(raw_declared_paths, list):
-        raise ValueError("declared_changed_files must be a list.")
-    return normalize_declared_changed_files(raw_declared_paths)
 
 
 def _format_path_list(paths: list[str]) -> str:
@@ -151,15 +142,16 @@ class ChangedFilesAcceptanceResult:
 
 def check_changed_files_acceptance(
     *,
-    structured_response: Any,
+    structured_response: DeclaredChangedFilesOutput,
     worktree_path: Path,
     baseline_snapshot_tar_path: Path,
     retry_attempts: int,
     max_retries: int,
 ) -> ChangedFilesAcceptanceResult:
-    structured_payload = _structured_payload_dict(structured_response)
     try:
-        declared_paths = _declared_changed_files(structured_payload)
+        declared_paths = normalize_declared_changed_files(
+            structured_response.declared_changed_files
+        )
     except ValueError as error:
         if retry_attempts >= max_retries:
             return ChangedFilesAcceptanceResult(accepted=False, error=error)

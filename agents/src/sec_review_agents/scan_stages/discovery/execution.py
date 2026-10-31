@@ -8,6 +8,7 @@ from sec_review_agents.agents.discovery.agent import (
 from sec_review_agents.agents.discovery.backend import (
     create_repository_discovery_backend,
 )
+from sec_review_agents.agents.discovery.model import DiscoveryOutput
 from sec_review_agents.agents.discovery.prompts import (
     build_repository_discovery_user_prompt,
 )
@@ -45,11 +46,6 @@ async def run_repository_discovery_agent(
                 ),
                 trajectory_paths=trajectory_paths,
             )
-        ).model_dump(by_alias=True)
+        )
 
-    candidates = structured_payload.get("candidates")
-    if not isinstance(candidates, list):
-        candidates = []
-    return {
-        "candidates": [item for item in candidates if isinstance(item, dict)],
-    }
+    return structured_payload.model_dump(mode="json", by_alias=True)

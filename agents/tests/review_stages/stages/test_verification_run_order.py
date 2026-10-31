@@ -5,21 +5,24 @@ from unittest.mock import patch
 import pytest
 
 from sec_review_agents.filesystem.backend_factory import BackendConfig
+from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.review_stages.verification.stage import run_verification_stage
 
 
-def _verification_payload(*, patch_coverage: str = "full") -> dict[str, Any]:
-    return {
-        "overview": "Patch fully covers the target claim.",
-        "review_target_claim": "target claim",
-        "patch_coverage": patch_coverage,
-        "resolution_next_step": "none",
-        "validation_level": "static",
-        "regression_status": "not-run",
-        "patch_findings": [],
-        "verification_findings": ["ok"],
-        "residual_risks": [],
-    }
+def _verification_payload(*, patch_coverage: str = "full") -> VerificationOutput:
+    return VerificationOutput.model_validate(
+        {
+            "overview": "Patch fully covers the target claim.",
+            "review_target_claim": "target claim",
+            "patch_coverage": patch_coverage,
+            "resolution_next_step": "none",
+            "validation_level": "static",
+            "regression_status": "not-run",
+            "patch_findings": [],
+            "verification_findings": ["ok"],
+            "residual_risks": [],
+        }
+    )
 
 
 @pytest.mark.asyncio
@@ -45,7 +48,7 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
             backend_kind="local",
         )
 
-    async def _run_agent(**_kwargs: Any) -> dict[str, Any]:
+    async def _run_agent(**_kwargs: Any) -> VerificationOutput:
         call_order.append("invoke")
         return _verification_payload()
 

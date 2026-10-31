@@ -13,6 +13,7 @@ from sec_review_agents.agents.memory_extractor.agent import (
 from sec_review_agents.agents.memory_extractor.backend import (
     create_memory_extractor_backend,
 )
+from sec_review_agents.agents.memory_extractor.model import MemoryObservationOutput
 from sec_review_agents.agents.memory_extractor.prompts import (
     build_extractor_prompt,
 )
@@ -213,12 +214,10 @@ async def _generate_memory_observation(
                     user_prompt=build_extractor_prompt(staged_trajectories),
                     trajectory_paths=(extractor_trajectory_path,),
                 )
-            ).model_dump(by_alias=True)
+            )
 
-        observation_body = str(
-            structured_result.get("observation_markdown") or ""
-        ).strip()
-        if not structured_result.get("has_observation") or not observation_body:
+        observation_body = structured_result.observation_markdown.strip()
+        if not structured_result.has_observation or not observation_body:
             return MemoryObservationPreviewResult(
                 extraction_id=resolved_extraction_id,
                 skipped=True,

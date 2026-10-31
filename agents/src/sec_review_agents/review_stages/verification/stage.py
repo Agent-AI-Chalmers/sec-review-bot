@@ -13,6 +13,7 @@ from sec_review_agents.filesystem.backend_factory import (
     BackendConfig,
     create_backend_with_path_views,
 )
+from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.memory.runtime_view import materialized_memory_view
 from sec_review_agents.review_stages.feedback_loop import MAX_FEEDBACK_RETRY_ATTEMPTS
 from sec_review_agents.review_stages.verification.result import (
@@ -180,9 +181,9 @@ def _apply_workspace_patch(
 # ====================== Result Normalization And Validation ============
 #########################################################################
 def validate_verification_coverages(
-    structured_result: Mapping[str, Any], mitigation_result: Mapping[str, Any] | None
+    structured_result: VerificationOutput, mitigation_result: Mapping[str, Any] | None
 ) -> None:
-    patch_coverage = structured_result.get("patch_coverage")
+    patch_coverage = structured_result.patch_coverage
     changed_files = file_change_paths((mitigation_result or {}).get("file_changes"))
     if changed_files and patch_coverage in {
         "no-patch",
@@ -260,15 +261,15 @@ async def run_verification_stage(
 
         validate_verification_coverages(agent_output, mitigation_result)
         result = build_verification_stage_result(
-            overview=agent_output["overview"],
-            review_target_claim=agent_output["review_target_claim"],
-            patch_coverage=agent_output["patch_coverage"],
-            resolution_next_step=agent_output["resolution_next_step"],
-            patch_findings=agent_output["patch_findings"],
-            verification_findings=agent_output["verification_findings"],
-            validation_level=agent_output["validation_level"],
-            regression_status=agent_output["regression_status"],
-            residual_risks=agent_output["residual_risks"],
+            overview=agent_output.overview,
+            review_target_claim=agent_output.review_target_claim,
+            patch_coverage=agent_output.patch_coverage,
+            resolution_next_step=agent_output.resolution_next_step,
+            patch_findings=agent_output.patch_findings,
+            verification_findings=agent_output.verification_findings,
+            validation_level=agent_output.validation_level,
+            regression_status=agent_output.regression_status,
+            residual_risks=agent_output.residual_risks,
         )
         persist_verification_result(
             verifier_artifacts_path,

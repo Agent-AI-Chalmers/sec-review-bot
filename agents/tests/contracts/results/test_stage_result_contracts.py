@@ -76,7 +76,7 @@ def test_stage_result_builders_emit_json_serializable_public_payloads() -> None:
     results = [
         build_analysis_stage_result(
             overview="Analysis complete.",
-            narratives=[{"summary": "checked"}],
+            narratives=[],
             verdict="confirmed-defect",
         ),
         build_mitigation_stage_result(
@@ -146,3 +146,27 @@ def test_scan_stage_contracts_track_required_sections() -> None:
         "cases",
         "suppressed_candidates",
     }
+
+
+def test_analysis_stage_preserves_nested_narrative_models_in_json() -> None:
+    from sec_review_agents.agents.analysis.model import Narrative
+
+    narrative = Narrative.model_validate(
+        {
+            "priority": 1,
+            "verdict": "confirmed-defect",
+            "title": "Unchecked state",
+            "description": "The transition skips a required check.",
+            "locations": [{"file": "app.py", "line": 3}],
+            "scope_review": {
+                "scope_shape": "unresolved",
+                "outcome_deciding_control_point": "transition",
+                "scope_analysis": "Checked the transition.",
+            },
+        }
+    )
+    result = build_analysis_stage_result(
+        overview="Defect found.", narratives=[narrative], verdict="confirmed-defect"
+    )
+    assert result["narratives"] == [narrative.model_dump(mode="json", by_alias=True)]
+    json.dumps(result)

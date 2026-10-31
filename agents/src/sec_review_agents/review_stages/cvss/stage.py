@@ -37,25 +37,26 @@ def persist_cvss_stage_result(
     )
 
 
-def _build_metric_details(structured_payload: dict) -> dict[str, dict[str, str]]:
-    rationale_by_metric = {
-        str(item.get("metric")): str(item.get("rationale") or "").strip()
-        for item in structured_payload.get("metric_rationales") or []
+def _build_metric_details(
+    structured_payload: CvssV4ScoringOutput,
+) -> dict[str, dict[str, str]]:
+    rationale_by_metric: dict[str, str] = {
+        item.metric: item.rationale for item in structured_payload.metric_rationales
     }
 
     details: dict[str, dict[str, str]] = {}
     for metric in CVSS_VECTOR_ORDER:
         details[metric] = {
-            "value": str(structured_payload.get(metric) or "").strip(),
+            "value": getattr(structured_payload, metric.lower()) or "",
             "rationale": rationale_by_metric.get(metric, ""),
         }
     return details
 
 
-def _build_cvss_v4_vector(structured_payload: dict) -> str:
+def _build_cvss_v4_vector(structured_payload: CvssV4ScoringOutput) -> str:
     parts = ["CVSS:4.0"]
     for metric in CVSS_VECTOR_ORDER:
-        parts.append(f"{metric}:{structured_payload[metric]}")
+        parts.append(f"{metric}:{getattr(structured_payload, metric.lower())}")
     return "/".join(parts)
 
 
@@ -139,7 +140,7 @@ async def run_cvss_v4_scoring_stage(
                     user_prompt=user_prompt,
                     trajectory_paths=(trajectory,),
                 )
-            ).model_dump(by_alias=True)
+            )
         result = build_cvss_stage_result_from_agent_output(agent_output)
         persist_cvss_stage_result(
             cvss_artifacts_path=cvss_artifacts_path, result=result
@@ -156,13 +157,13 @@ def reset_cvss_artifacts(*, cvss_artifacts_path: Path) -> None:
 
 
 def build_cvss_stage_result_from_agent_output(
-    agent_output: dict[str, Any],
+    agent_output: CvssV4ScoringOutput,
 ) -> dict[str, Any]:
-    if agent_output.get("scoring_status") == "not-scored":
-        reason = str(agent_output.get("not_scored_reason") or "").strip()
+    if agent_output.scoring_status == "not-scored":
+        reason = str(agent_output.not_scored_reason or "").strip()
         return build_cvss_v4_stage_result(
             outcome="not-scored",
-            overview=agent_output["overview"],
+            overview=agent_output.overview,
             metrics={},
             not_scored_reason=reason,
         )
@@ -172,7 +173,7 @@ def build_cvss_stage_result_from_agent_output(
 
     return build_cvss_v4_stage_result(
         outcome="scored",
-        overview=agent_output["overview"],
+        overview=agent_output.overview,
         version="4.0",
         vector=clean_vector,
         base_score=score,

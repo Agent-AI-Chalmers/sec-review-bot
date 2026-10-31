@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.agents.analysis.model import AnalysisOutput
 from sec_review_agents.agents.cvss.model import CvssV4ScoringOutput
 from sec_review_agents.workflows.issue.analysis import analyze_issue
 from sec_review_agents.workflows.repository_case.cvss import score_repository_cvss_v4
@@ -29,17 +30,19 @@ async def test_issue_analyzer_uses_stage_owned_workspace_copy(tmp_path: Path) ->
         *,
         backend: Any,
         **_kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> AnalysisOutput:
         workspace = backend.routes["/workspace/"].root_dir
         assert isinstance(workspace, Path)
         captured_workspace.append(workspace)
         assert workspace != source_workspace
         assert (workspace / "app.py").read_text() == "print('source')\n"
-        return {
-            "overview": "ok",
-            "narratives": [],
-            "overall_verdict": "no-actionable-finding",
-        }
+        return AnalysisOutput.model_validate(
+            {
+                "overview": "ok",
+                "narratives": [],
+                "overall_verdict": "no-actionable-finding",
+            }
+        )
 
     with (
         patch(

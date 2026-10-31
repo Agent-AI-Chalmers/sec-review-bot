@@ -2,6 +2,8 @@ import asyncio
 from pathlib import Path
 from typing import Any, Literal
 
+from pydantic import BaseModel
+
 from sec_review_agents.agents.delivery_planning.agent import (
     run_delivery_planning_agent,
 )
@@ -233,7 +235,7 @@ async def _run_delivery_planning_agent_pass(
     pass_index: int = 0,
     draft_origins: list[dict] | None = None,
     pass_meta: dict | None = None,
-) -> dict | None:
+) -> None:
     pass_artifacts_path = _delivery_planning_pass_artifacts_path(
         delivery_planning_root, pass_meta
     )
@@ -260,9 +262,7 @@ async def _run_delivery_planning_agent_pass(
             pass_index=str(pass_index),
             batch_index=batch_index,
         ):
-            # The graph owns a per-run completion model bound to this workbench.
-            # Its validator checks completion; this caller only exports its fields.
-            return (
+            (
                 await run_delivery_planning_agent(
                     backend=backend,
                     workbench_state=workbench_state,
@@ -274,7 +274,7 @@ async def _run_delivery_planning_agent_pass(
                     ),
                     trajectory_paths=(trajectory_path(pass_artifacts_path),),
                 )
-            ).model_dump(by_alias=True)
+            )
 
 
 def _should_run_another_delivery_planning_pass(

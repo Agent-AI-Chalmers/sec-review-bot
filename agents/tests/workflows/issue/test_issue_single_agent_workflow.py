@@ -5,6 +5,7 @@ from unittest.mock import patch
 import pytest
 
 from sec_review_agents.filesystem.backend_factory import BackendConfig
+from sec_review_agents.agents.single_agent.model import SingleAgentFixOutput
 from sec_review_agents.workflows.issue.single_agent import execute_issue_single_agent
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workspace.snapshots import (
@@ -66,7 +67,7 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
         ),
         patch(
             "sec_review_agents.review_stages.single_agent.stage.run_single_agent",
-            return_value=structured_payload,
+            return_value=SingleAgentFixOutput.model_validate(structured_payload),
         ),
         patch(
             "sec_review_agents.review_stages.single_agent.stage.build_patch_artifact",
@@ -139,7 +140,7 @@ async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_dec
         ),
         patch(
             "sec_review_agents.review_stages.single_agent.stage.run_single_agent",
-            return_value=structured_payload,
+            return_value=SingleAgentFixOutput.model_validate(structured_payload),
         ),
         patch(
             "sec_review_agents.review_stages.single_agent.stage.build_patch_artifact",

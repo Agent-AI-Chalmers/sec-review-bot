@@ -2,6 +2,8 @@ import asyncio
 from pathlib import Path
 from typing import Any, Literal
 
+from pydantic import BaseModel
+
 from sec_review_agents.agents.triage.agent import (
     run_repository_triage_agent as run_triage_agent,
 )
@@ -230,7 +232,7 @@ async def _run_repository_triage_agent_pass(
     pass_index: int,
     draft_origins: list[dict] | None = None,
     pass_meta: dict | None = None,
-) -> dict | None:
+) -> None:
     pass_kind: TriagePassKind = "draft" if pass_index <= 0 else "refinement"
     batch_index = (
         str(pass_meta["index"])
@@ -248,9 +250,7 @@ async def _run_repository_triage_agent_pass(
             pass_index=str(pass_index),
             batch_index=batch_index,
         ):
-            # The graph owns a per-run completion model bound to this workbench.
-            # Its validator checks completion; this caller only exports its fields.
-            return (
+            (
                 await run_triage_agent(
                     backend=backend,
                     workbench_state=workbench_state,
@@ -262,7 +262,7 @@ async def _run_repository_triage_agent_pass(
                     ),
                     trajectory_paths=(trajectory_path(pass_artifacts_path),),
                 )
-            ).model_dump(by_alias=True)
+            )
 
 
 def _should_run_another_triage_pass(

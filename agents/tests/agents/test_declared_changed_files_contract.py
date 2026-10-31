@@ -50,19 +50,37 @@ def test_declared_changed_files_preserve_repository_prefix() -> None:
     assert output.declared_changed_files == ["a/src/app.py", "src/app.py"]
 
 
-def test_declared_changed_files_reject_workspace_root() -> None:
-    with pytest.raises(ValidationError, match="must name repository files"):
-        MitigationOutput.model_validate(
+@pytest.mark.parametrize(
+    ("declared_files", "error_type"),
+    [
+        ("a.txt", "list_type"),
+        ({"path": "a.txt"}, "list_type"),
+        (None, "list_type"),
+        (["/workspace"], "value_error"),
+        (["workspace"], "value_error"),
+        (["../escape.txt"], "value_error"),
+        ([".git/config"], "value_error"),
+    ],
+)
+@pytest.mark.parametrize(
+    "output_type", [MitigationOutput, SingleAgentFixOutput, PatchSynthesisOutput]
+)
+def test_output_rejects_invalid_declared_files(
+    output_type: type[MitigationOutput | SingleAgentFixOutput | PatchSynthesisOutput],
+    declared_files: object,
+    error_type: str,
+) -> None:
+    """Malformed declarations fail at structured output parsing, before acceptance."""
+    with pytest.raises(ValidationError) as error:
+        output_type.model_validate(
             {
                 "overview": "Updated one file.",
-                "declared_changed_files": ["/workspace"],
+                "verdict": "no-actionable-finding",
+                "validation_level": "static",
+                "regression_status": "not-applicable",
+                "target_claim": "",
+                "self_check_notes": ["No patch target."],
+                "declared_changed_files": declared_files,
             }
         )
-
-    with pytest.raises(ValidationError, match="must name repository files"):
-        MitigationOutput.model_validate(
-            {
-                "overview": "Updated one file.",
-                "declared_changed_files": ["workspace"],
-            }
-        )
+    assert any(item["type"] == error_type for item in error.value.errors())

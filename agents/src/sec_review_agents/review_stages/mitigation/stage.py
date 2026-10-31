@@ -35,7 +35,6 @@ from sec_review_agents.utils.files import (
 )
 from sec_review_agents.workspace.patches import (
     build_patch_artifact,
-    normalize_declared_changed_files,
 )
 from sec_review_agents.workspace.snapshots import (
     restore_workspace_from_snapshot_tar,
@@ -219,13 +218,7 @@ async def run_mitigation_stage(
                 trajectory_paths=trajectory_paths,
                 memory_enabled=memory_path_view is not None,
             )
-        raw_declared_paths = agent_output.get("declared_changed_files")
-        if raw_declared_paths is None:
-            declared_patch_paths: list[str] = []
-        elif isinstance(raw_declared_paths, list):
-            declared_patch_paths = normalize_declared_changed_files(raw_declared_paths)
-        else:
-            raise ValueError("declared_changed_files must be a list.")
+        declared_patch_paths = agent_output.declared_changed_files
         patch_artifact = build_patch_artifact(
             workspace_path,
             include_paths=declared_patch_paths,
@@ -236,7 +229,7 @@ async def run_mitigation_stage(
             attempt_label=attempt_label,
         )
         result = build_mitigation_stage_result(
-            overview=agent_output["overview"],
+            overview=agent_output.overview,
             file_changes=patch_artifact["file_changes"],
             patch_diff=patch_artifact["patch_diff"],
         )

@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.agents.analysis.model import AnalysisOutput
+from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
     is_docker_runtime_available,
@@ -50,14 +52,16 @@ async def test_issue_analyzer_docker_workspace_is_writable_stage_copy(
         *,
         backend: Any,
         **_kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> AnalysisOutput:
         stage_workspaces.append(_workspace_mount_host(backend, source_workspace))
         _write_workspace_probe(backend, "analyzer")
-        return {
-            "overview": "ok",
-            "narratives": [],
-            "overall_verdict": "no-actionable-finding",
-        }
+        return AnalysisOutput.model_validate(
+            {
+                "overview": "ok",
+                "narratives": [],
+                "overall_verdict": "no-actionable-finding",
+            }
+        )
 
     with (
         patch(
@@ -116,7 +120,7 @@ async def test_issue_verifier_docker_workspace_is_writable_stage_copy(
         user_prompt: str,
         config: dict[str, Any] | None = None,
         **_kwargs: Any,
-    ) -> dict[str, Any]:
+    ) -> VerificationOutput:
         del (
             user_prompt,
             config,
@@ -124,17 +128,19 @@ async def test_issue_verifier_docker_workspace_is_writable_stage_copy(
         assert backend is not None
         stage_workspaces.append(_workspace_mount_host(backend, source_workspace))
         _write_workspace_probe(backend, "verifier")
-        return {
-            "overview": "No patch was available.",
-            "review_target_claim": "demo claim",
-            "patch_coverage": "no-patch",
-            "resolution_next_step": "manual-review",
-            "patch_findings": [],
-            "verification_findings": ["No patch was available."],
-            "validation_level": "static",
-            "regression_status": "not-applicable",
-            "residual_risks": [],
-        }
+        return VerificationOutput.model_validate(
+            {
+                "overview": "No patch was available.",
+                "review_target_claim": "demo claim",
+                "patch_coverage": "no-patch",
+                "resolution_next_step": "manual-review",
+                "patch_findings": [],
+                "verification_findings": ["No patch was available."],
+                "validation_level": "static",
+                "regression_status": "not-applicable",
+                "residual_risks": [],
+            }
+        )
 
     with (
         patch(
