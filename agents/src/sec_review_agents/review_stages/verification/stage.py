@@ -4,16 +4,15 @@ import subprocess
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 from sec_review_agents.agents.verification.agent import (
     run_verification_agent,
 )
+from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.filesystem.backend_factory import (
     BackendConfig,
     create_backend_with_path_views,
 )
-from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.memory.runtime_view import materialized_memory_view
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,

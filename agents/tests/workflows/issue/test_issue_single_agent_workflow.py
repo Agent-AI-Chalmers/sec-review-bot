@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
-from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.agents.single_agent.model import SingleAgentFixOutput
+from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.workflows.issue.single_agent import execute_issue_single_agent
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workspace.patches import PatchArtifact

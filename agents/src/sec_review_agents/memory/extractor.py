@@ -13,7 +13,6 @@ from sec_review_agents.agents.memory_extractor.agent import (
 from sec_review_agents.agents.memory_extractor.backend import (
     create_memory_extractor_backend,
 )
-from sec_review_agents.agents.memory_extractor.model import MemoryObservationOutput
 from sec_review_agents.agents.memory_extractor.prompts import (
     build_extractor_prompt,
 )
@@ -207,13 +206,11 @@ async def _generate_memory_observation(
             deployment_override=deployment,
         )
         async with amanaged_backend(backend):
-            structured_result = (
-                await run_memory_extractor_agent(
-                    model=model,
-                    backend=backend,
-                    user_prompt=build_extractor_prompt(staged_trajectories),
-                    trajectory_paths=(extractor_trajectory_path,),
-                )
+            structured_result = await run_memory_extractor_agent(
+                model=model,
+                backend=backend,
+                user_prompt=build_extractor_prompt(staged_trajectories),
+                trajectory_paths=(extractor_trajectory_path,),
             )
 
         observation_body = structured_result.observation_markdown.strip()

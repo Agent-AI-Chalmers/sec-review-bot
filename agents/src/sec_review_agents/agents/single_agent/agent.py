@@ -116,4 +116,4 @@ async def run_single_agent(
         )
 
         # These stage callers still consume the existing dictionary contract.
-        return result.model_dump(by_alias=True)
+        return result

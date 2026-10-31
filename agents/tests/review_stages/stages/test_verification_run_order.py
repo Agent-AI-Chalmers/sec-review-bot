@@ -4,8 +4,8 @@ from unittest.mock import patch
 
 import pytest
 
-from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.agents.verification.model import VerificationOutput
+from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.verification.stage import run_verification_stage
 

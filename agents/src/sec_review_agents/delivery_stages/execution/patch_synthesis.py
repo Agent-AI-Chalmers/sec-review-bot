@@ -11,7 +11,6 @@ from sec_review_agents.agents.patch_synthesis.agent import (
 from sec_review_agents.agents.patch_synthesis.backend import (
     create_patch_synthesis_backend,
 )
-from sec_review_agents.agents.patch_synthesis.model import PatchSynthesisOutput
 from sec_review_agents.agents.patch_synthesis.prompts import (
     build_patch_synthesis_system_prompt,
     build_patch_synthesis_user_prompt,
@@ -192,15 +191,13 @@ async def synthesize_combined_delivery_patch(
             workspace_writable=True,
         )
         async with amanaged_backend(backend):
-            structured_payload = (
-                await run_patch_synthesis_agent(
-                    backend=backend,
-                    workspace_root_path=workspace_path,
-                    baseline_snapshot_tar_path=baseline_snapshot_tar_path,
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                    trajectory_paths=(trajectory_path(delivery_artifacts_root),),
-                )
+            structured_payload = await run_patch_synthesis_agent(
+                backend=backend,
+                workspace_root_path=workspace_path,
+                baseline_snapshot_tar_path=baseline_snapshot_tar_path,
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                trajectory_paths=(trajectory_path(delivery_artifacts_root),),
             )
 
         declared_changed_files = structured_payload.declared_changed_files

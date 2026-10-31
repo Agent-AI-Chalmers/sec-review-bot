@@ -133,15 +133,13 @@ async def run_cvss_v4_scoring_stage(
         trajectory = trajectory_path(cvss_artifacts_path)
         backend = build_backend(workspace_path)
         async with amanaged_backend(backend):
-            agent_output = (
-                await run_cvss_agent(
-                    agent_name=agent_name,
-                    backend=backend,
-                    system_prompt=system_prompt,
-                    filesystem_system_prompt=filesystem_system_prompt,
-                    user_prompt=user_prompt,
-                    trajectory_paths=(trajectory,),
-                )
+            agent_output = await run_cvss_agent(
+                agent_name=agent_name,
+                backend=backend,
+                system_prompt=system_prompt,
+                filesystem_system_prompt=filesystem_system_prompt,
+                user_prompt=user_prompt,
+                trajectory_paths=(trajectory,),
             )
         result = build_cvss_stage_result_from_agent_output(agent_output)
         persist_cvss_stage_result(

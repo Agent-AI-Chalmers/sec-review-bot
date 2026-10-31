@@ -8,7 +8,6 @@ from sec_review_agents.agents.memory_maintainer.agent import (
     MEMORY_MAINTAINER_AGENT_NAME,
     run_memory_maintainer_agent,
 )
-from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.agents.memory_maintainer.prompts import (
     build_maintenance_prompt,
 )

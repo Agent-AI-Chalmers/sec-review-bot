@@ -5,8 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
-from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.agents.mitigation.model import MitigationOutput
+from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.review_stages.mitigation.stage import (
     create_skipped_mitigation_result,
     run_mitigation_stage,

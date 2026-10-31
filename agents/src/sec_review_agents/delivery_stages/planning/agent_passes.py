@@ -2,8 +2,6 @@ import asyncio
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel
-
 from sec_review_agents.agents.delivery_planning.agent import (
     run_delivery_planning_agent,
 )
@@ -264,18 +262,16 @@ async def _run_delivery_planning_agent_pass(
             pass_index=str(pass_index),
             batch_index=batch_index,
         ):
-            (
-                await run_delivery_planning_agent(
-                    backend=backend,
-                    workbench_state=workbench_state,
-                    system_prompt=system_prompt,
-                    user_prompt=build_repository_delivery_planning_user_prompt(
-                        [case.model_dump(mode="json") for case in planning_cases],
-                        pass_kind=pass_kind,
-                        draft_origins=draft_origins,
-                    ),
-                    trajectory_paths=(trajectory_path(pass_artifacts_path),),
-                )
+            await run_delivery_planning_agent(
+                backend=backend,
+                workbench_state=workbench_state,
+                system_prompt=system_prompt,
+                user_prompt=build_repository_delivery_planning_user_prompt(
+                    [case.model_dump(mode="json") for case in planning_cases],
+                    pass_kind=pass_kind,
+                    draft_origins=draft_origins,
+                ),
+                trajectory_paths=(trajectory_path(pass_artifacts_path),),
             )
 
 

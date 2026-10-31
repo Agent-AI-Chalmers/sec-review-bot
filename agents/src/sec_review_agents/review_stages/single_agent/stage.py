@@ -3,7 +3,6 @@
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 from sec_review_agents.agents.single_agent.agent import (
     run_single_agent,

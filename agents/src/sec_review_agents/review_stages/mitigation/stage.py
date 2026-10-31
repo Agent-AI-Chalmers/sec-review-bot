@@ -3,7 +3,6 @@
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 from sec_review_agents.agents.mitigation.agent import (
     run_mitigation_agent,

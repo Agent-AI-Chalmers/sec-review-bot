@@ -2,8 +2,6 @@ import asyncio
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel
-
 from sec_review_agents.agents.triage.agent import (
     run_repository_triage_agent as run_triage_agent,
 )
@@ -267,18 +265,16 @@ async def _run_repository_triage_agent_pass(
             pass_index=str(pass_index),
             batch_index=batch_index,
         ):
-            (
-                await run_triage_agent(
-                    backend=backend,
-                    workbench_state=workbench_state,
+            await run_triage_agent(
+                backend=backend,
+                workbench_state=workbench_state,
+                pass_kind=pass_kind,
+                user_prompt=build_repository_triage_user_prompt(
+                    items=workbench_state.prompt_items(),
                     pass_kind=pass_kind,
-                    user_prompt=build_repository_triage_user_prompt(
-                        items=workbench_state.prompt_items(),
-                        pass_kind=pass_kind,
-                        draft_origins=draft_origins,
-                    ),
-                    trajectory_paths=(trajectory_path(pass_artifacts_path),),
-                )
+                    draft_origins=draft_origins,
+                ),
+                trajectory_paths=(trajectory_path(pass_artifacts_path),),
             )
 
 

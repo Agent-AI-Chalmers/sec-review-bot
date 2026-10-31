@@ -36,16 +36,15 @@ async def run_repository_discovery_agent(
 
     backend = create_repository_discovery_backend()
     async with amanaged_backend(backend):
-        structured_payload = (
-            await run_discovery_agent(
-                backend=backend,
-                chunk=chunk,
-                user_prompt=build_repository_discovery_user_prompt(
-                    chunk=chunk,
-                    sources=sources,
-                ),
-                trajectory_paths=trajectory_paths,
-            )
+        structured_payload = await run_discovery_agent(
+            backend=backend,
+            chunk=chunk,
+            user_prompt=build_repository_discovery_user_prompt(
+                chunk_id=chunk.chunk_id,
+                entries=chunk.entries,
+                sources=sources,
+            ),
+            trajectory_paths=trajectory_paths,
         )
 
     return structured_payload
