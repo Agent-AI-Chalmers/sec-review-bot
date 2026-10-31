@@ -14,7 +14,7 @@ import { ReviewRunStore } from '../persistence/review-run-store.js'
 import { buildReadRouteHandlers } from './read-route-handlers.js'
 import { DeterministicReviewRunError } from '../errors.js'
 import { ERROR_RESPONSE_CODES_FROM_CONTRACT } from '../error-codes-generated.js'
-import type { OperationHandlers } from './route-handlers.js'
+import type { OperationHandlers, OperationId } from './route-handlers.js'
 
 const MAX_BODY_BYTES = 1024 * 1024
 
@@ -205,7 +205,7 @@ export async function registerReviewRunsRoutes(
   // The handlers, keyed by operationId. Each handler calls the store directly and does only
   // the domain logic: routing, body/query/path validation, and auth come from the OpenAPI
   // spec via fastify-openapi-glue, so nothing here re-states a schema. Each handler's body
-  // and params types come from its own operation in the contract (`route-types.ts`), so a
+  // and params types come from its own operation in the contract (`route-handlers.ts`), so a
   // field renamed in `openapi.yaml` breaks the handler that reads it at compile time.
   const handlers: OperationHandlers = {
     ...buildReadRouteHandlers({
@@ -358,10 +358,15 @@ export async function registerReviewRunsRoutes(
   await app.register(openapiGlue, {
     specification: resolveSpecPath(),
     operationResolver: (operationId) => {
-      const handler = handlers[operationId]
-      if (handler === undefined) {
+      if (!Object.hasOwn(handlers, operationId)) {
         throw new Error(`No handler registered for operation ${operationId}`)
       }
+      // The plugin supplies a string and a generic request. Its OpenAPI validation establishes
+      // the operation-specific shape before invocation; erase types only at this boundary.
+      const handler = handlers[operationId as OperationId] as (
+        request: FastifyRequest,
+        reply: FastifyReply
+      ) => unknown
       // Log the state-changing operations with their identity (the README promises
       // durable-operation logs carrying connector_id and run_id). Reads — the health probe and
       // the GET queries — are deliberately not logged: they carry no durable effect and would
