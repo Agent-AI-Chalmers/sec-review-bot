@@ -122,26 +122,22 @@ export async function handleIssueOpenedWithDeps(
   }
 
   try {
-    let resolveAdmission: (() => void) | undefined
-    const admitted = new Promise<void>((resolve) => {
-      resolveAdmission = resolve
-    })
-    const preparation = startIssueReviewCommandFn({
-      octokit,
-      issue,
-      trusted_default_branch,
-      event_type: 'opened',
-      delivery_id: id,
-      on_admitted: () => {
-        resolveAdmission?.()
+    await backgroundPreparations.startAndWaitForAdmission(
+      (on_admitted) =>
+        startIssueReviewCommandFn({
+          octokit,
+          issue,
+          trusted_default_branch,
+          event_type: 'opened',
+          delivery_id: id,
+          on_admitted
+        }),
+      {
+        ingress: 'issues.opened',
+        issue: issue.issue_number,
+        repo: issue.repo_full_name
       }
-    })
-    backgroundPreparations.start(preparation, {
-      ingress: 'issues.opened',
-      issue: issue.issue_number,
-      repo: issue.repo_full_name
-    })
-    await Promise.race([admitted, preparation])
+    )
   } catch (error: unknown) {
     const errorInfo = asErrorWithResponse(error)
 

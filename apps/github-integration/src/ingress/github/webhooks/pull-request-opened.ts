@@ -137,26 +137,22 @@ export async function handlePullRequestOpenedWithDeps(
   }
 
   try {
-    let resolveAdmission: (() => void) | undefined
-    const admitted = new Promise<void>((resolve) => {
-      resolveAdmission = resolve
-    })
-    const preparation = startPullRequestReviewCommandFn({
-      octokit,
-      trusted_default_branch,
-      pr,
-      event_type: 'opened',
-      delivery_id: id,
-      on_admitted: () => {
-        resolveAdmission?.()
+    await backgroundPreparations.startAndWaitForAdmission(
+      (on_admitted) =>
+        startPullRequestReviewCommandFn({
+          octokit,
+          trusted_default_branch,
+          pr,
+          event_type: 'opened',
+          delivery_id: id,
+          on_admitted
+        }),
+      {
+        ingress: 'pull_request.opened',
+        pr: pr.pr_number,
+        repo: pr.repo_full_name
       }
-    })
-    backgroundPreparations.start(preparation, {
-      ingress: 'pull_request.opened',
-      pr: pr.pr_number,
-      repo: pr.repo_full_name
-    })
-    await Promise.race([admitted, preparation])
+    )
   } catch (error: unknown) {
     const errorInfo = asErrorWithResponse(error)
 

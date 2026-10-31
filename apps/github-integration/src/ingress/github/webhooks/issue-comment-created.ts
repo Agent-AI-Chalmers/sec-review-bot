@@ -158,63 +158,55 @@ export async function handleIssueCommentCreatedWithDeps(
     )
 
     if (issue.is_pull_request) {
-      let resolveAdmission: (() => void) | undefined
-      const admitted = new Promise<void>((resolve) => {
-        resolveAdmission = resolve
-      })
-      const preparation = startPullRequestReviewCommandFn({
-        octokit,
-        trusted_default_branch,
-        pr_reference: {
-          owner_login: issue.owner_login,
-          repo_name: issue.repo_name,
-          pr_number: issue.issue_number
-        },
-        event_type: 'manual_review',
-        delivery_id: id,
-        test_changes: command.test_changes,
-        deps: { get_pull_request_context: getPullRequestContextFn },
-        on_admitted: () => {
-          resolveAdmission?.()
+      await backgroundPreparations.startAndWaitForAdmission(
+        (on_admitted) =>
+          startPullRequestReviewCommandFn({
+            octokit,
+            trusted_default_branch,
+            pr_reference: {
+              owner_login: issue.owner_login,
+              repo_name: issue.repo_name,
+              pr_number: issue.issue_number
+            },
+            event_type: 'manual_review',
+            delivery_id: id,
+            test_changes: command.test_changes,
+            deps: { get_pull_request_context: getPullRequestContextFn },
+            on_admitted
+          }),
+        {
+          ingress: 'issue_comment.created',
+          issue: issue.issue_number,
+          repo: issue.repo_full_name,
+          review_target: 'pull-request'
         }
-      })
-      backgroundPreparations.start(preparation, {
-        ingress: 'issue_comment.created',
-        issue: issue.issue_number,
-        repo: issue.repo_full_name,
-        review_target: 'pull-request'
-      })
-      await Promise.race([admitted, preparation])
+      )
 
       return
     }
 
-    let resolveAdmission: (() => void) | undefined
-    const admitted = new Promise<void>((resolve) => {
-      resolveAdmission = resolve
-    })
-    const preparation = startIssueReviewCommandFn({
-      octokit,
-      issue,
-      trusted_default_branch,
-      event_type: 'manual_review',
-      delivery_id: id,
-      // The GitHub integration always audits an issue: it is an unverified claim. `repair` is
-      // only reachable from trusted callers (the PatchEval harness), never from a comment.
-      review_objective: 'audit',
-      test_changes: command.test_changes,
-      open_pr: command.open_pr,
-      on_admitted: () => {
-        resolveAdmission?.()
+    await backgroundPreparations.startAndWaitForAdmission(
+      (on_admitted) =>
+        startIssueReviewCommandFn({
+          octokit,
+          issue,
+          trusted_default_branch,
+          event_type: 'manual_review',
+          delivery_id: id,
+          // The GitHub integration always audits an issue: it is an unverified claim. `repair` is
+          // only reachable from trusted callers (the PatchEval harness), never from a comment.
+          review_objective: 'audit',
+          test_changes: command.test_changes,
+          open_pr: command.open_pr,
+          on_admitted
+        }),
+      {
+        ingress: 'issue_comment.created',
+        issue: issue.issue_number,
+        repo: issue.repo_full_name,
+        review_target: 'issue'
       }
-    })
-    backgroundPreparations.start(preparation, {
-      ingress: 'issue_comment.created',
-      issue: issue.issue_number,
-      repo: issue.repo_full_name,
-      review_target: 'issue'
-    })
-    await Promise.race([admitted, preparation])
+    )
   } catch (error: unknown) {
     const errorInfo = asErrorWithResponse(error)
 
