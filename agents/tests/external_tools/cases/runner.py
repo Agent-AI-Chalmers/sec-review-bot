@@ -7,12 +7,14 @@ from pathlib import Path
 from time import monotonic
 from unittest.mock import patch
 
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.utils.files import write_json
 from sec_review_agents.workflows.repository_case.analysis import analyze_repository_case
 from sec_review_agents.workflows.repository_case.verification import (
     verify_repository_case,
 )
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
+from tests.analysis_fixtures import analysis_fixture
 from tests.external_tools.cases.models import (
     ExternalToolCase,
     ExternalToolCaseMode,
@@ -70,7 +72,7 @@ async def run_external_tool_case(
         clear=False,
     ):
         if agent_case.workflow == "analysis":
-            result = await analyze_repository_case(
+            analysis = await analyze_repository_case(
                 workspace_snapshot_tar_path=snapshot,
                 history_path=None,
                 incremental_window_path=None,
@@ -78,26 +80,27 @@ async def run_external_tool_case(
                 scan_mode="full",
                 review_input=agent_case.review_input,
             )
+            result = analysis.model_dump(mode="json", by_alias=True)
             trajectory = artifacts / "trajectory.jsonl"
         else:
-            result = await verify_repository_case(
+            verification = await verify_repository_case(
                 workspace_snapshot_tar_path=snapshot,
                 history_path=None,
                 incremental_window_path=None,
                 verifier_artifacts_path=artifacts,
                 scan_mode="full",
                 review_input=agent_case.review_input,
-                analysis_result={
-                    "overview": agent_case.analysis_overview,
-                    "verdict": "confirmed-vulnerability",
-                },
-                mitigation_result={
-                    "overview": "No mitigation patch was supplied.",
-                    "changed_files": [],
-                    "patch_diff": "",
-                },
+                analysis_result=analysis_fixture(
+                    overview=agent_case.analysis_overview,
+                    verdict="confirmed-vulnerability",
+                    narratives=[],
+                ),
+                mitigation_result=MitigationStageResult(
+                    overview="No mitigation patch was supplied.", patch_diff=""
+                ),
                 setup_declaration_content=setup_content,
             )
+            result = verification.model_dump(mode="json")
             trajectory = artifacts / "trajectories" / "initial.jsonl"
     duration_seconds = monotonic() - started_at
 

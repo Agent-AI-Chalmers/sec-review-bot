@@ -6,6 +6,7 @@ import pytest
 
 from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.agents.verification.model import VerificationOutput
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.verification.stage import run_verification_stage
 
 
@@ -75,7 +76,7 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
             attempt_label="initial",
             baseline_snapshot_tar_path=Path("/tmp/workspace.snapshot.tar"),
             workspace_patch="diff --git a/a b/a\n",
-            mitigation_result={"changed_files": []},
+            mitigation_result=MitigationStageResult(overview="Test mitigation"),
             build_backend_config=_build_backend,
             system_prompt="base prompt",
             filesystem_system_prompt="filesystem prompt",
@@ -83,7 +84,7 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
         )
 
     assert call_order == ["restore", "apply", "backend", "invoke"]
-    assert result["patch_coverage"] == "full"
+    assert result.patch_coverage == "full"
 
 
 @pytest.mark.asyncio
@@ -121,7 +122,7 @@ async def test_run_verification_stage_uses_unpatched_workspace_when_no_patch() -
             attempt_label="initial",
             baseline_snapshot_tar_path=Path("/tmp/workspace.snapshot.tar"),
             workspace_patch=None,
-            mitigation_result={"changed_files": []},
+            mitigation_result=MitigationStageResult(overview="Test mitigation"),
             build_backend_config=_build_backend,
             system_prompt="base prompt",
             filesystem_system_prompt="filesystem prompt",
@@ -133,4 +134,4 @@ async def test_run_verification_stage_uses_unpatched_workspace_when_no_patch() -
     agent_mock.assert_called_once()
     assert len(captured_workspace_roots) == 1
     assert captured_workspace_roots[0].name.startswith("sec-review-verifier-")
-    assert result["patch_coverage"] == "no-patch"
+    assert result.patch_coverage == "no-patch"

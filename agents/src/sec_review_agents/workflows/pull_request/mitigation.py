@@ -8,6 +8,9 @@ from sec_review_agents.agents.mitigation.pull_request import (
     build_pr_mitigation_system_prompt,
     build_pr_mitigation_user_prompt,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
+from sec_review_agents.review_stages.feedback_loop import FeedbackRetryContext
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.mitigation.stage import run_mitigation_stage
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.workflows.review_intent import (
@@ -24,12 +27,12 @@ async def mitigate_pull_request(
     incremental_window_path: Path,
     mitigator_artifacts_path: Path,
     published_trajectory_path: Path | None = None,
-    analysis_result: Mapping[str, Any],
-    retry_context: Mapping[str, Any] | None = None,
+    analysis_result: AnalysisStageResult,
+    retry_context: FeedbackRetryContext | None = None,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> MitigationStageResult:
     return await run_mitigation_stage(
         agent_name="pull-request-mitigator",
         mitigator_artifacts_path=mitigator_artifacts_path,
@@ -44,7 +47,7 @@ async def mitigate_pull_request(
             runtime_context=runtime_context,
         ),
         system_prompt=build_pr_mitigation_system_prompt(
-            test_changes=test_changes, is_retry=isinstance(retry_context, dict)
+            test_changes=test_changes, is_retry=retry_context is not None
         ),
         filesystem_system_prompt=build_pr_mitigation_filesystem_system_prompt(),
         user_prompt=build_pr_mitigation_user_prompt(

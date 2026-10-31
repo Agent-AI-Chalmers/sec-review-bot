@@ -11,6 +11,14 @@ from temporalio import activity
 from temporalio.exceptions import ApplicationError
 from temporalio.worker import Worker
 
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
+from sec_review_agents.review_stages.cvss.result import (
+    CvssStageResult,
+    build_cvss_v4_stage_result,
+)
+from sec_review_agents.review_stages.feedback_loop import FeedbackRetryContext
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
+from sec_review_agents.review_stages.verification.result import VerificationStageResult
 from sec_review_agents.workflows.repository import direct as repository_direct
 from sec_review_agents.workflows.repository.workflow import (
     RepositoryCaseProcessingWorkflow,
@@ -29,6 +37,7 @@ from sec_review_agents.workflows.repository_case.workflow import (
 )
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
+from tests.analysis_fixtures import analysis_fixture, narrative_fixture
 from tests.temporal_test_utils import temporal_time_skipping_environment
 
 
@@ -90,12 +99,19 @@ async def test_direct_case_records_skipped_verification_without_confirmed_target
             "verifier": "/tmp/cases/case-1/verifier",
         },
     }
-    analysis_result = {"verdict": "no-actionable-finding", "narratives": []}
-    mitigation_result: dict[str, Any] = {"changed_files": []}
-    verifier_result = {
-        "overview": "Verification skipped.",
-        "resolution_next_step": "none",
-    }
+    analysis_result = analysis_fixture(verdict="no-actionable-finding", narratives=[])
+    mitigation_result: MitigationStageResult = MitigationStageResult(
+        overview="Test mitigation",
+        file_changes=[],
+    )
+    verifier_result = VerificationStageResult(
+        overview="Verification skipped.",
+        resolution_next_step="none",
+        review_target_claim=None,
+        patch_coverage=None,
+        validation_level=None,
+        regression_status=None,
+    )
 
     with (
         patch.object(
@@ -111,7 +127,9 @@ async def test_direct_case_records_skipped_verification_without_confirmed_target
         patch.object(
             repository_case_direct,
             "score_repository_case_cvss_activity",
-            return_value={"outcome": "skipped"},
+            return_value=build_cvss_v4_stage_result(
+                outcome="skipped", overview="Test scoring outcome"
+            ),
         ),
         patch.object(
             repository_case_direct,
@@ -163,13 +181,13 @@ async def test_case_verification_activity_persists_skip_without_running_verifier
         result = await verify_repository_case_activity(
             repository_case_review_request("case-1"),
             prepared_case,
-            {"verdict": "no-actionable-finding", "narratives": []},
-            {"changed_files": []},
+            analysis_fixture(verdict="no-actionable-finding", narratives=[]),
+            MitigationStageResult(overview="Test mitigation"),
             None,
         )
 
     verify_mock.assert_not_called()
-    assert result["patch_coverage"] is None
+    assert result.patch_coverage is None
     assert (tmp_path / "verifier" / "verification-result.json").is_file()
 
 
@@ -303,7 +321,7 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
         }
 
     @activity.defn(name="analyze_repository_case_activity")
-    def fake_analyzer(_request: dict, prepared_case: dict) -> dict:
+    def fake_analyzer(_request: dict, prepared_case: dict) -> AnalysisStageResult:
         case_id = prepared_case["case_execution_input"]["case_id"]
         if case_id == "case-2":
             # This test targets failure isolation and immediate window refill,
@@ -315,69 +333,76 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
             )
         if case_id == "case-3":
             case_3_started.set()
-        return {
-            "verdict": "confirmed-vulnerability",
-            "narratives": [
-                {
-                    "priority": 1,
-                    "verdict": "confirmed-defect",
-                    "title": f"{case_id} narrative",
-                }
+        return analysis_fixture(
+            verdict="confirmed-vulnerability",
+            narratives=[
+                narrative_fixture(
+                    verdict="confirmed-defect", title=f"{case_id} narrative", priority=1
+                )
             ],
-        }
+        )
 
     @activity.defn(name="score_repository_case_cvss_activity")
-    def fake_cvss(_request: dict, _prepared_case: dict, _analysis_result: dict) -> dict:
-        return {
-            "outcome": "scored",
-            "base_score": 7.5,
-            "severity": "high",
-        }
+    def fake_cvss(
+        _request: dict, _prepared_case: dict, _analysis_result: AnalysisStageResult
+    ) -> CvssStageResult:
+        return build_cvss_v4_stage_result(
+            outcome="scored",
+            base_score=7.5,
+            severity="high",
+            overview="Test scoring outcome",
+        )
 
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigator(
         _request: dict,
         prepared_case: dict,
-        _analysis_result: dict,
-        _retry_context: dict | None,
-    ) -> dict:
+        _analysis_result: AnalysisStageResult,
+        _retry_context: FeedbackRetryContext | None,
+    ) -> MitigationStageResult:
         case_id = prepared_case["case_execution_input"]["case_id"]
         if case_id == "case-1" and not case_3_started.wait(2.0):
             raise RuntimeError("case window was not refilled while case-1 ran")
-        return {
-            "status": "completed",
-            "changed_files": [f"{case_id}.py"],
-        }
+        return MitigationStageResult(
+            overview="Test mitigation",
+            file_changes=[
+                {"path": path, "status": "deleted"} for path in [f"{case_id}.py"]
+            ],
+        )
 
     @activity.defn(name="verify_repository_case_activity")
     def fake_verifier(
         _request: dict,
         _prepared_case: dict,
-        _analysis_result: dict,
-        _mitigation_result: dict | None,
-        _retry_context: dict | None,
-    ) -> dict:
-        return {
-            "overview": "Verified.",
-            "review_target_claim": "target claim",
-            "patch_coverage": "full",
-            "resolution_next_step": "none",
-            "patch_findings": [],
-            "verification_findings": [],
-            "residual_risks": [],
-        }
+        _analysis_result: AnalysisStageResult,
+        _mitigation_result: MitigationStageResult | None,
+        _retry_context: FeedbackRetryContext | None,
+    ) -> VerificationStageResult:
+        return VerificationStageResult(
+            overview="Verified.",
+            review_target_claim="target claim",
+            patch_coverage="full",
+            resolution_next_step="none",
+            patch_findings=[],
+            verification_findings=[],
+            residual_risks=[],
+            validation_level=None,
+            regression_status=None,
+        )
 
     @activity.defn(name="archive_repository_case_feedback_attempt_activity")
-    def fake_archive(_prepared_case: dict, _retry_context: dict) -> None:
+    def fake_archive(
+        _prepared_case: dict, _retry_context: FeedbackRetryContext
+    ) -> None:
         return None
 
     @activity.defn(name="build_repository_case_result_activity")
     def fake_build_result(
         prepared_case: dict,
-        _analysis_result: dict,
-        cvss_result: dict | None,
-        mitigation_result: dict | None,
-        verifier_result: dict | None,
+        _analysis_result: AnalysisStageResult,
+        cvss_result: CvssStageResult | None,
+        mitigation_result: MitigationStageResult | None,
+        verifier_result: VerificationStageResult | None,
     ) -> dict:
         case_id = prepared_case["case_execution_input"]["case_id"]
         return {
@@ -385,9 +410,21 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
             "disposition": "keep",
             "reason": "unit-test",
             "review_record": {
-                "cvss": cvss_result,
-                "mitigation": mitigation_result or {},
-                "verification": verifier_result or {},
+                "cvss": (
+                    cvss_result.model_dump(mode="json")
+                    if cvss_result is not None
+                    else None
+                ),
+                "mitigation": (
+                    mitigation_result.model_dump(mode="json")
+                    if mitigation_result is not None
+                    else {}
+                ),
+                "verification": (
+                    verifier_result.model_dump(mode="json")
+                    if verifier_result is not None
+                    else {}
+                ),
             },
         }
 
@@ -668,79 +705,93 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
         }
 
     @activity.defn(name="analyze_repository_case_activity")
-    def fake_analyzer(_request: dict, _prepared_case: dict) -> dict:
-        return {
-            "verdict": "confirmed-vulnerability",
-            "narratives": [
-                {
-                    "priority": 1,
-                    "verdict": "confirmed-defect",
-                    "title": "demo narrative",
-                }
+    def fake_analyzer(_request: dict, _prepared_case: dict) -> AnalysisStageResult:
+        return analysis_fixture(
+            verdict="confirmed-vulnerability",
+            narratives=[
+                narrative_fixture(
+                    verdict="confirmed-defect", title="demo narrative", priority=1
+                )
             ],
-        }
+        )
 
     @activity.defn(name="score_repository_case_cvss_activity")
-    def fake_cvss(_request: dict, _prepared_case: dict, _analysis_result: dict) -> dict:
+    def fake_cvss(
+        _request: dict, _prepared_case: dict, _analysis_result: AnalysisStageResult
+    ) -> CvssStageResult:
         cvss_started.set()
         if not mitigator_started.wait(1.0):
             raise RuntimeError("Mitigator did not start while CVSS stage was running.")
-        return {
-            "outcome": "scored",
-            "base_score": 8.8,
-            "severity": "high",
-        }
+        return build_cvss_v4_stage_result(
+            outcome="scored",
+            base_score=8.8,
+            severity="high",
+            overview="Test scoring outcome",
+        )
 
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigator(
         _request: dict,
         _prepared_case: dict,
-        _analysis_result: dict,
-        _retry_context: dict | None,
-    ) -> dict:
+        _analysis_result: AnalysisStageResult,
+        _retry_context: FeedbackRetryContext | None,
+    ) -> MitigationStageResult:
         mitigator_started.set()
         if not cvss_started.wait(1.0):
             raise RuntimeError("CVSS did not start while mitigation stage was running.")
-        return {
-            "changed_files": ["demo.py"],
-        }
+        return MitigationStageResult(
+            overview="Test mitigation",
+            file_changes=[{"path": path, "status": "deleted"} for path in ["demo.py"]],
+        )
 
     @activity.defn(name="verify_repository_case_activity")
     def fake_verifier(
         _request: dict,
         _prepared_case: dict,
-        _analysis_result: dict,
-        _mitigation_result: dict | None,
-        _retry_context: dict | None,
-    ) -> dict:
-        return {
-            "overview": "No patch was available to verify.",
-            "review_target_claim": "target claim",
-            "patch_coverage": "no-patch",
-            "resolution_next_step": "manual-review",
-            "patch_findings": [],
-            "verification_findings": [],
-            "residual_risks": [],
-        }
+        _analysis_result: AnalysisStageResult,
+        _mitigation_result: MitigationStageResult | None,
+        _retry_context: FeedbackRetryContext | None,
+    ) -> VerificationStageResult:
+        return VerificationStageResult(
+            overview="No patch was available to verify.",
+            review_target_claim="target claim",
+            patch_coverage="no-patch",
+            resolution_next_step="manual-review",
+            patch_findings=[],
+            verification_findings=[],
+            residual_risks=[],
+            validation_level=None,
+            regression_status=None,
+        )
 
     @activity.defn(name="archive_repository_case_feedback_attempt_activity")
-    def fake_archive(_prepared_case: dict, _retry_context: dict) -> None:
+    def fake_archive(
+        _prepared_case: dict, _retry_context: FeedbackRetryContext
+    ) -> None:
         return None
 
     @activity.defn(name="build_repository_case_result_activity")
     def fake_build_result(
         prepared_case: dict,
-        _analysis_result: dict,
-        cvss_result: dict,
-        _mitigation_result: dict | None,
-        verifier_result: dict | None,
+        _analysis_result: AnalysisStageResult,
+        cvss_result: CvssStageResult,
+        _mitigation_result: MitigationStageResult | None,
+        verifier_result: VerificationStageResult | None,
     ) -> dict:
         return {
             "case_id": prepared_case["case_execution_input"]["case_id"],
             "disposition": "blocked",
             "review_record": {
-                "cvss": cvss_result,
-                "verification": verifier_result or {},
+                "cvss": (
+                    cvss_result.model_dump(mode="json")
+                    if cvss_result is not None
+                    else None
+                ),
+                "verification": (
+                    verifier_result.model_dump(mode="json")
+                    if verifier_result is not None
+                    else {}
+                ),
             },
         }
 
@@ -795,61 +846,78 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
         }
 
     @activity.defn(name="analyze_repository_case_activity")
-    def fake_analyzer(_request: dict, _prepared_case: dict) -> dict:
-        return {
-            "verdict": "confirmed-vulnerability",
-            "narratives": [{"verdict": "confirmed-vulnerability"}],
-        }
+    def fake_analyzer(_request: dict, _prepared_case: dict) -> AnalysisStageResult:
+        return analysis_fixture(
+            verdict="confirmed-vulnerability",
+            narratives=[narrative_fixture(verdict="confirmed-vulnerability")],
+        )
 
     @activity.defn(name="score_repository_case_cvss_activity")
-    def fake_cvss(_request: dict, _prepared_case: dict, _analysis_result: dict) -> dict:
+    def fake_cvss(
+        _request: dict, _prepared_case: dict, _analysis_result: AnalysisStageResult
+    ) -> CvssStageResult:
         raise RuntimeError("cvss failed after retries")
 
     @activity.defn(name="mitigate_repository_case_activity")
     def fake_mitigator(
         _request: dict,
         _prepared_case: dict,
-        _analysis_result: dict,
-        _retry_context: dict | None,
-    ) -> dict:
-        return {"changed_files": ["demo.py"]}
+        _analysis_result: AnalysisStageResult,
+        _retry_context: FeedbackRetryContext | None,
+    ) -> MitigationStageResult:
+        return MitigationStageResult(
+            overview="Test mitigation",
+            file_changes=[{"path": path, "status": "deleted"} for path in ["demo.py"]],
+        )
 
     @activity.defn(name="verify_repository_case_activity")
     def fake_verifier(
         _request: dict,
         _prepared_case: dict,
-        _analysis_result: dict,
-        _mitigation_result: dict | None,
-        _retry_context: dict | None,
-    ) -> dict:
-        return {
-            "overview": "Verified.",
-            "review_target_claim": "target claim",
-            "patch_coverage": "full",
-            "resolution_next_step": "none",
-            "patch_findings": [],
-            "verification_findings": [],
-            "residual_risks": [],
-        }
+        _analysis_result: AnalysisStageResult,
+        _mitigation_result: MitigationStageResult | None,
+        _retry_context: FeedbackRetryContext | None,
+    ) -> VerificationStageResult:
+        return VerificationStageResult(
+            overview="Verified.",
+            review_target_claim="target claim",
+            patch_coverage="full",
+            resolution_next_step="none",
+            patch_findings=[],
+            verification_findings=[],
+            residual_risks=[],
+            validation_level=None,
+            regression_status=None,
+        )
 
     @activity.defn(name="archive_repository_case_feedback_attempt_activity")
-    def fake_archive(_prepared_case: dict, _retry_context: dict) -> None:
+    def fake_archive(
+        _prepared_case: dict, _retry_context: FeedbackRetryContext
+    ) -> None:
         return None
 
     @activity.defn(name="build_repository_case_result_activity")
     def fake_build_result(
         prepared_case: dict,
-        _analysis_result: dict,
-        cvss_result: dict | None,
-        _mitigation_result: dict | None,
-        verifier_result: dict | None,
+        _analysis_result: AnalysisStageResult,
+        cvss_result: CvssStageResult | None,
+        _mitigation_result: MitigationStageResult | None,
+        verifier_result: VerificationStageResult | None,
     ) -> dict:
         return {
             "case_id": prepared_case["case_execution_input"]["case_id"],
             "disposition": "keep",
             "review_record": {
-                "cvss": cvss_result,
-                "verification": verifier_result or {},
+                "cvss": (
+                    cvss_result.model_dump(mode="json")
+                    if cvss_result is not None
+                    else None
+                ),
+                "verification": (
+                    verifier_result.model_dump(mode="json")
+                    if verifier_result is not None
+                    else {}
+                ),
             },
         }
 
@@ -905,63 +973,76 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
     async def fake_cvss(
         _request: dict,
         _prepared_case: dict,
-        _analysis_result: dict,
-    ) -> dict:
+        _analysis_result: AnalysisStageResult,
+    ) -> CvssStageResult:
         cvss_started.set()
         if not await asyncio.to_thread(mitigator_started.wait, 1.0):
             raise RuntimeError(
                 "Mitigator did not start while direct CVSS stage was running."
             )
-        return {
-            "outcome": "scored",
-            "base_score": 8.8,
-            "severity": "high",
-        }
+        return build_cvss_v4_stage_result(
+            outcome="scored",
+            base_score=8.8,
+            severity="high",
+            overview="Test scoring outcome",
+        )
 
     async def fake_mitigator(
         _request: dict,
         _prepared_case: dict,
-        _analysis_result: dict,
-        _retry_context: dict | None,
-    ) -> dict:
+        _analysis_result: AnalysisStageResult,
+        _retry_context: FeedbackRetryContext | None,
+    ) -> MitigationStageResult:
         mitigator_started.set()
         if not await asyncio.to_thread(cvss_started.wait, 1.0):
             raise RuntimeError(
                 "CVSS did not start while direct mitigation stage was running."
             )
-        return {
-            "changed_files": ["demo.py"],
-        }
+        return MitigationStageResult(
+            overview="Test mitigation",
+            file_changes=[{"path": path, "status": "deleted"} for path in ["demo.py"]],
+        )
 
     async def fake_analyzer(
         _request: dict,
         _prepared_case: dict,
-    ) -> dict:
-        return {
-            "verdict": "confirmed-vulnerability",
-            "narratives": [{"verdict": "confirmed-vulnerability"}],
-        }
+    ) -> AnalysisStageResult:
+        return analysis_fixture(
+            verdict="confirmed-vulnerability",
+            narratives=[narrative_fixture(verdict="confirmed-vulnerability")],
+        )
 
     async def fake_verifier(
         _request: dict,
         _prepared_case: dict,
-        _analysis_result: dict,
-        _mitigation_result: dict | None,
-        _retry_context: dict | None,
-    ) -> dict:
-        return {"patch_coverage": "no-patch"}
+        _analysis_result: AnalysisStageResult,
+        _mitigation_result: MitigationStageResult | None,
+        _retry_context: FeedbackRetryContext | None,
+    ) -> VerificationStageResult:
+        return VerificationStageResult(
+            patch_coverage="no-patch",
+            overview="Test verification",
+            review_target_claim=None,
+            resolution_next_step="none",
+            validation_level=None,
+            regression_status=None,
+        )
 
     def fake_build_result(
         prepared_case: dict,
-        _analysis_result: dict,
-        cvss_result: dict,
-        _mitigation_result: dict | None,
-        _verifier_result: dict | None,
+        _analysis_result: AnalysisStageResult,
+        cvss_result: CvssStageResult,
+        _mitigation_result: MitigationStageResult | None,
+        _verifier_result: VerificationStageResult | None,
     ) -> dict:
         return {
             "case_id": prepared_case["case_execution_input"]["case_id"],
             "review_record": {
-                "cvss": cvss_result,
+                "cvss": (
+                    cvss_result.model_dump(mode="json")
+                    if cvss_result is not None
+                    else None
+                ),
             },
         }
 
@@ -1032,47 +1113,61 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
     async def fake_analyzer(
         _request: dict,
         _prepared_case: dict,
-    ) -> dict:
-        return {
-            "verdict": "confirmed-vulnerability",
-            "narratives": [{"verdict": "confirmed-vulnerability"}],
-        }
+    ) -> AnalysisStageResult:
+        return analysis_fixture(
+            verdict="confirmed-vulnerability",
+            narratives=[narrative_fixture(verdict="confirmed-vulnerability")],
+        )
 
     async def fake_cvss(
         _request: dict,
         _prepared_case: dict,
-        _analysis_result: dict,
-    ) -> dict:
+        _analysis_result: AnalysisStageResult,
+    ) -> CvssStageResult:
         raise RuntimeError("cvss model failed")
 
     async def fake_mitigator(
         _request: dict,
         _prepared_case: dict,
-        _analysis_result: dict,
-        _retry_context: dict | None,
-    ) -> dict:
-        return {"changed_files": ["demo.py"]}
+        _analysis_result: AnalysisStageResult,
+        _retry_context: FeedbackRetryContext | None,
+    ) -> MitigationStageResult:
+        return MitigationStageResult(
+            overview="Test mitigation",
+            file_changes=[{"path": path, "status": "deleted"} for path in ["demo.py"]],
+        )
 
     async def fake_verifier(
         _request: dict,
         _prepared_case: dict,
-        _analysis_result: dict,
-        _mitigation_result: dict | None,
-        _retry_context: dict | None,
-    ) -> dict:
-        return {"patch_coverage": "full"}
+        _analysis_result: AnalysisStageResult,
+        _mitigation_result: MitigationStageResult | None,
+        _retry_context: FeedbackRetryContext | None,
+    ) -> VerificationStageResult:
+        return VerificationStageResult(
+            patch_coverage="full",
+            overview="Test verification",
+            review_target_claim=None,
+            resolution_next_step="none",
+            validation_level=None,
+            regression_status=None,
+        )
 
     def fake_build_result(
         prepared_case: dict,
-        _analysis_result: dict,
-        cvss_result: dict | None,
-        _mitigation_result: dict | None,
-        _verifier_result: dict | None,
+        _analysis_result: AnalysisStageResult,
+        cvss_result: CvssStageResult | None,
+        _mitigation_result: MitigationStageResult | None,
+        _verifier_result: VerificationStageResult | None,
     ) -> dict:
         return {
             "case_id": prepared_case["case_execution_input"]["case_id"],
             "review_record": {
-                "cvss": cvss_result,
+                "cvss": (
+                    cvss_result.model_dump(mode="json")
+                    if cvss_result is not None
+                    else None
+                ),
             },
         }
 

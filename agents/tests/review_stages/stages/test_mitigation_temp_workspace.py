@@ -11,6 +11,7 @@ from sec_review_agents.review_stages.mitigation.stage import (
     create_skipped_mitigation_result,
     run_mitigation_stage,
 )
+from sec_review_agents.workspace.patches import PatchArtifact
 from sec_review_agents.workspace.snapshots import (
     WORKSPACE_SNAPSHOT_TAR_NAME,
     create_workspace_snapshot_tar,
@@ -70,10 +71,7 @@ async def _run_mitigation_stage_for_workspace_capture(
         ),
         patch(
             "sec_review_agents.review_stages.mitigation.stage.build_patch_artifact",
-            return_value={
-                "file_changes": [],
-                "patch_diff": "",
-            },
+            return_value=PatchArtifact(file_changes=[], patch_diff=""),
         ),
     ):
         await run_mitigation_stage(
@@ -145,4 +143,4 @@ def test_create_skipped_mitigation_result_persists_empty_patch_without_temp_work
     tmp_root = run_artifacts / "tmp-workspaces" / "mitigation"
     assert not tmp_root.exists()
 
-    assert "change_status" not in result
+    assert "change_status" not in result.model_dump()

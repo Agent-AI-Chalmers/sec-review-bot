@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from sec_review_agents.delivery_stages.execution.stage import execute_delivery_entry
+from sec_review_agents.workspace.patches import PatchArtifact
 
 
 def _case_result(*, file_changes: list[dict]) -> dict:
@@ -55,7 +56,9 @@ async def test_combined_execution_builds_status_from_patch_artifact(tmp_path) ->
         }
     ]
     synthesis = AsyncMock(
-        return_value={"patch_diff": "combined patch", "file_changes": file_changes}
+        return_value=PatchArtifact.model_validate(
+            {"patch_diff": "combined patch", "file_changes": file_changes}
+        )
     )
 
     with patch(
@@ -86,7 +89,11 @@ async def test_combined_execution_builds_status_from_patch_artifact(tmp_path) ->
 
 @pytest.mark.asyncio
 async def test_combined_execution_classifies_empty_patch_artifact(tmp_path) -> None:
-    synthesis = AsyncMock(return_value={"patch_diff": "", "file_changes": []})
+    synthesis = AsyncMock(
+        return_value=PatchArtifact.model_validate(
+            {"patch_diff": "", "file_changes": []}
+        )
+    )
 
     with patch(
         "sec_review_agents.delivery_stages.execution.stage."

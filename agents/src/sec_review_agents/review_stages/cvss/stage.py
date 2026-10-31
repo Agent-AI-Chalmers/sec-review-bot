@@ -1,7 +1,7 @@
 """Reusable CVSS scoring stage runtime; workflows own review-specific prompts."""
 
 import tempfile
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +12,9 @@ from sec_review_agents.agents.cvss.model import (
     CVSS_VECTOR_ORDER,
     CvssV4ScoringOutput,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.cvss.result import (
+    CvssMetricDetail,
     CvssStageResult,
     build_cvss_v4_stage_result,
 )
@@ -27,29 +29,34 @@ CVSS_V4_SCORING_STAGE = "cvss-v4-scoring"
 def persist_cvss_stage_result(
     *,
     cvss_artifacts_path: Path,
-    result: Mapping[str, Any],
+    result: CvssStageResult,
 ) -> None:
     remove_json_artifacts(cvss_artifacts_path, ("cvss-v4-failure",))
     persist_json_artifact(
         cvss_artifacts_path,
         "cvss-v4-result",
-        result,
+        result.model_dump(
+            mode="json",
+            exclude=(
+                {"not_scored_reason"} if result.not_scored_reason is None else set()
+            ),
+        ),
     )
 
 
 def _build_metric_details(
     structured_payload: CvssV4ScoringOutput,
-) -> dict[str, dict[str, str]]:
+) -> dict[str, CvssMetricDetail]:
     rationale_by_metric: dict[str, str] = {
         item.metric: item.rationale for item in structured_payload.metric_rationales
     }
 
-    details: dict[str, dict[str, str]] = {}
+    details: dict[str, CvssMetricDetail] = {}
     for metric in CVSS_VECTOR_ORDER:
-        details[metric] = {
-            "value": getattr(structured_payload, metric.lower()) or "",
-            "rationale": rationale_by_metric.get(metric, ""),
-        }
+        details[metric] = CvssMetricDetail(
+            value=getattr(structured_payload, metric.lower()) or "",
+            rationale=rationale_by_metric.get(metric, ""),
+        )
     return details
 
 
@@ -95,19 +102,14 @@ def persist_cvss_failure(
     )
 
 
-def is_cvss_v4_scoring_target(analysis_result: Mapping[str, Any] | None) -> bool:
-    verdict = str((analysis_result or {}).get("verdict") or "").strip()
-    if verdict != "confirmed-vulnerability":
-        return False
-
-    narratives = (analysis_result or {}).get("narratives")
-    if not isinstance(narratives, list):
-        return False
-
-    return any(
-        isinstance(narrative, dict)
-        and narrative.get("verdict") == "confirmed-vulnerability"
-        for narrative in narratives
+def is_cvss_v4_scoring_target(analysis_result: AnalysisStageResult | None) -> bool:
+    return (
+        analysis_result is not None
+        and analysis_result.verdict == "confirmed-vulnerability"
+        and any(
+            narrative.verdict == "confirmed-vulnerability"
+            for narrative in analysis_result.narratives
+        )
     )
 
 
@@ -120,7 +122,7 @@ async def run_cvss_v4_scoring_stage(
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
-) -> dict[str, Any]:
+) -> CvssStageResult:
     with tempfile.TemporaryDirectory(prefix="sec-review-cvss-") as tempdir:
         reset_cvss_artifacts(cvss_artifacts_path=cvss_artifacts_path)
         workspace_path = Path(tempdir)
@@ -158,7 +160,7 @@ def reset_cvss_artifacts(*, cvss_artifacts_path: Path) -> None:
 
 def build_cvss_stage_result_from_agent_output(
     agent_output: CvssV4ScoringOutput,
-) -> dict[str, Any]:
+) -> CvssStageResult:
     if agent_output.scoring_status == "not-scored":
         reason = str(agent_output.not_scored_reason or "").strip()
         return build_cvss_v4_stage_result(

@@ -1,16 +1,20 @@
-from collections.abc import Mapping
 from datetime import timedelta
 from typing import Any
 
 from temporalio import activity, workflow
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
+    FeedbackRetryContext,
+    VerifierHistoryEntry,
     feedback_retry_context,
     should_retry_from_verifier_result,
 )
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
+from sec_review_agents.review_stages.verification.result import VerificationStageResult
 from sec_review_agents.run_diagnostics.publication import (
     RunDiagnosticPublicationRequest,
     publish_run_diagnostic_activity,
@@ -29,7 +33,7 @@ from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 @activity.defn
 async def analyze_issue_activity(
     request: ReviewWorkflowRequest,
-) -> dict[str, Any]:
+) -> AnalysisStageResult:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.trajectories import (
         review_trajectories_root,
@@ -91,9 +95,9 @@ async def analyze_issue_activity(
 @activity.defn
 async def mitigate_issue_activity(
     request: ReviewWorkflowRequest,
-    analysis_result: Mapping[str, Any],
-    retry_context: Mapping[str, Any] | None,
-) -> dict[str, Any]:
+    analysis_result: AnalysisStageResult,
+    retry_context: FeedbackRetryContext | None,
+) -> MitigationStageResult:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.mitigation.stage import (
@@ -139,7 +143,7 @@ async def mitigate_issue_activity(
             reason="No confirmed, reparable mitigation target was available from the issue analyzer output.",
         )
     bundle_paths = prepared_input["bundle_paths"]
-    pass_index = int((retry_context or {}).get("retry_index") or 0)
+    pass_index = retry_context.retry_index if retry_context is not None else 0
     with bind_trace_context(
         **activity_trace_labels(
             workflow_name=request.workflow,
@@ -180,10 +184,10 @@ async def mitigate_issue_activity(
 @activity.defn
 async def verify_issue_activity(
     request: ReviewWorkflowRequest,
-    analysis_result: Mapping[str, Any],
-    mitigation_result: Mapping[str, Any] | None,
-    retry_context: Mapping[str, Any] | None,
-) -> dict[str, Any]:
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult | None,
+    retry_context: FeedbackRetryContext | None,
+) -> VerificationStageResult:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.trajectories import (
@@ -232,7 +236,7 @@ async def verify_issue_activity(
         bundle_paths["workspace_snapshot_tar_path"],
         label="bundle_paths.workspace_snapshot_tar_path",
     )
-    pass_index = int((retry_context or {}).get("retry_index") or 0)
+    pass_index = retry_context.retry_index if retry_context is not None else 0
     with bind_trace_context(
         **activity_trace_labels(
             workflow_name=request.workflow,
@@ -270,7 +274,7 @@ async def verify_issue_activity(
 @activity.defn
 def archive_issue_feedback_attempt_activity(
     prepared_input: dict[str, Any],
-    retry_context: dict[str, Any],
+    retry_context: FeedbackRetryContext,
 ) -> None:
     from sec_review_agents.review_stages.feedback_loop import (
         archive_initial_feedback_attempt,
@@ -286,9 +290,9 @@ def archive_issue_feedback_attempt_activity(
 
 @activity.defn
 def build_issue_review_result_activity(
-    analysis_result: Mapping[str, Any],
-    mitigation_result: Mapping[str, Any] | None,
-    verifier_result: Mapping[str, Any] | None,
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult | None,
+    verifier_result: VerificationStageResult | None,
 ) -> dict[str, Any]:
     from sec_review_agents.review_stages.record import build_review_record
 
@@ -299,7 +303,7 @@ def build_issue_review_result_activity(
             mitigation_result=mitigation_result,
             verifier_result=verifier_result,
             cvss_result=None,
-        ),
+        ).model_dump(mode="json", by_alias=True),
     }
 
 
@@ -331,7 +335,7 @@ class IssueReviewWorkflow:
             retry_policy=activity_retry_policy(),
         )
         retry_count = 0
-        history: list[dict[str, Any]] = []
+        history: list[VerifierHistoryEntry] = []
         while (
             retry_count < MAX_FEEDBACK_RETRY_ATTEMPTS
             and should_retry_from_verifier_result(verifier_result)
@@ -343,7 +347,7 @@ class IssueReviewWorkflow:
                 verifier_result=verifier_result,
                 history=history,
             )
-            history = retry_context["history"]
+            history = retry_context.history
             await workflow.execute_activity(
                 archive_issue_feedback_attempt_activity,
                 args=[request.prepared_input, retry_context],

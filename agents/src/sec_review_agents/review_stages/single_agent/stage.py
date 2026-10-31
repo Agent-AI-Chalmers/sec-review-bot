@@ -14,6 +14,7 @@ from sec_review_agents.filesystem.backend_factory import (
 )
 from sec_review_agents.memory.runtime_view import materialized_memory_view
 from sec_review_agents.review_stages.single_agent.result import (
+    SingleAgentFixOutcome,
     build_single_agent_fix_outcome,
 )
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
@@ -46,7 +47,7 @@ async def run_single_agent_stage(
     todo_system_prompt: str,
     todo_tool_description: str,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> SingleAgentFixOutcome:
     # The backend mounts both resources, so their lifetimes must cover backend
     # construction, graph construction, and the complete agent invocation.
     with (
@@ -98,7 +99,7 @@ async def run_single_agent_stage(
         persist_text_artifact(
             single_agent_artifacts_path,
             "workspace.patch",
-            patch_artifact["patch_diff"],
+            patch_artifact.patch_diff,
         )
         return build_single_agent_fix_outcome(
             overview=agent_output.overview,
@@ -106,8 +107,8 @@ async def run_single_agent_stage(
             validation_level=agent_output.validation_level,
             regression_status=agent_output.regression_status,
             target_claim=agent_output.target_claim,
-            file_changes=patch_artifact["file_changes"],
-            patch_diff=patch_artifact["patch_diff"],
+            file_changes=patch_artifact.file_changes,
+            patch_diff=patch_artifact.patch_diff,
             residual_risks=agent_output.residual_risks,
             self_check_notes=agent_output.self_check_notes,
         )

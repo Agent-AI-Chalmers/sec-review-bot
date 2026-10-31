@@ -1,6 +1,4 @@
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from sec_review_agents.agents.mitigation.repository import (
     build_repository_mitigation_backend_config,
@@ -8,6 +6,9 @@ from sec_review_agents.agents.mitigation.repository import (
     build_repository_mitigation_system_prompt,
     build_repository_mitigation_user_prompt,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
+from sec_review_agents.review_stages.feedback_loop import FeedbackRetryContext
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.mitigation.stage import run_mitigation_stage
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.workflows.review_intent import (
@@ -25,12 +26,12 @@ async def mitigate_repository_case(
     published_trajectory_path: Path | None = None,
     scan_mode: str,
     review_input: str,
-    analysis_result: Mapping[str, Any],
-    retry_context: Mapping[str, Any] | None = None,
+    analysis_result: AnalysisStageResult,
+    retry_context: FeedbackRetryContext | None = None,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> MitigationStageResult:
     return await run_mitigation_stage(
         agent_name="repository-mitigator",
         mitigator_artifacts_path=mitigator_artifacts_path,
@@ -46,7 +47,7 @@ async def mitigate_repository_case(
             runtime_context=runtime_context,
         ),
         system_prompt=build_repository_mitigation_system_prompt(
-            test_changes=test_changes, is_retry=isinstance(retry_context, Mapping)
+            test_changes=test_changes, is_retry=retry_context is not None
         ),
         filesystem_system_prompt=build_repository_mitigation_filesystem_system_prompt(
             scan_mode

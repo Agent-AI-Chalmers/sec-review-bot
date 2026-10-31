@@ -19,11 +19,14 @@ from sec_review_agents.filesystem.path_views import (
     workspace_view,
 )
 from sec_review_agents.resources.loader import join_prompt_sections
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.feedback_loop import (
+    FeedbackRetryContext,
+    VerificationRetryPromptContext,
     render_history_projection_section,
     verification_feedback_retry_context,
-    verifier_result_summary,
 )
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.runtime.runtime_config import (
     ExecutionRuntimeContext,
     runtime_workspace_image,
@@ -136,13 +139,13 @@ def build_pr_verification_filesystem_system_prompt() -> str:
 def build_pr_verification_user_prompt(
     *,
     pr: Mapping[str, Any],
-    retry_context: Mapping[str, Any] | None,
-    analysis_result: Mapping[str, Any],
-    mitigation_result: Mapping[str, Any] | None,
+    retry_context: FeedbackRetryContext | None,
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult | None,
     workspace_patch: str | None,
 ) -> str:
     feedback_retry = verification_feedback_retry_context(retry_context)
-    if isinstance(feedback_retry, dict):
+    if feedback_retry is not None:
         return _build_retry_pr_verification_user_prompt(
             pr=pr,
             mitigation_result=mitigation_result,
@@ -159,12 +162,14 @@ def build_pr_verification_user_prompt(
 
 
 def _mitigation_summary(
-    mitigation_result: Mapping[str, Any] | None,
+    mitigation_result: MitigationStageResult | None,
 ) -> dict[str, Any]:
     return {
-        "overview": (mitigation_result or {}).get("overview"),
+        "overview": (
+            mitigation_result.overview if mitigation_result is not None else None
+        ),
         "changed_files": file_change_paths(
-            (mitigation_result or {}).get("file_changes")
+            mitigation_result.file_changes if mitigation_result is not None else None
         ),
     }
 
@@ -172,8 +177,8 @@ def _mitigation_summary(
 def _build_initial_pr_verification_user_prompt(
     *,
     pr: Mapping[str, Any],
-    analysis_result: Mapping[str, Any],
-    mitigation_result: Mapping[str, Any] | None,
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult | None,
     workspace_patch: str | None,
 ) -> str:
     title = pr.get("title")
@@ -233,9 +238,8 @@ def _build_initial_pr_verification_user_prompt(
         render_structured_markdown_section(
             "Analysis Summary",
             {
-                "overview": str(analysis_result.get("overview") or "").strip()
-                or "(missing)",
-                "verdict": analysis_result.get("verdict"),
+                "overview": str(analysis_result.overview or "").strip() or "(missing)",
+                "verdict": analysis_result.verdict,
             },
             profile="prompt",
         ),
@@ -256,12 +260,12 @@ def _build_initial_pr_verification_user_prompt(
 def _build_retry_pr_verification_user_prompt(
     *,
     pr: Mapping[str, Any],
-    mitigation_result: Mapping[str, Any] | None,
+    mitigation_result: MitigationStageResult | None,
     workspace_patch: str | None,
-    feedback_retry: Mapping[str, Any],
+    feedback_retry: VerificationRetryPromptContext,
 ) -> str:
-    latest_verifier = feedback_retry.get("latest_verifier")
-    history = feedback_retry.get("history")
+    latest_verifier = feedback_retry.latest_verifier
+    history = feedback_retry.history
     title = pr.get("title")
     body = pr.get("body")
     base_ref = pr.get("base_ref")
@@ -326,14 +330,14 @@ def _build_retry_pr_verification_user_prompt(
         sections.extend(
             ["", "# Workspace Patch", "", code_block("diff", workspace_patch)]
         )
-    latest_verifier_summary = verifier_result_summary(latest_verifier)
+    latest_verifier_summary = latest_verifier
     if latest_verifier_summary is not None:
         sections.extend(
             [
                 "",
                 render_structured_markdown_section(
                     "Previous Verifier Result",
-                    dict(latest_verifier_summary),
+                    latest_verifier_summary.model_dump(mode="json"),
                     profile="prompt",
                 ),
             ]

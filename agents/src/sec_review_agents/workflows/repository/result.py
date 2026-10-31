@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
-from sec_review_agents.review_stages.record import build_review_record
+from sec_review_agents.review_stages.record import ReviewRecord
 from sec_review_agents.utils.payloads import mapping_payload
 
 
@@ -78,22 +78,8 @@ def _repository_deliveries(
 
 
 def _repository_review_record(review_record: Any) -> dict[str, Any]:
-    if not isinstance(review_record, Mapping):
-        return build_review_record(
-            analysis_result=None,
-            mitigation_result=None,
-            verifier_result=None,
-            cvss_result=None,
-        )
-    return build_review_record(
-        analysis_result=mapping_payload(review_record.get("analysis")),
-        mitigation_result=mapping_payload(review_record.get("mitigation")),
-        verifier_result=mapping_payload(review_record.get("verification")),
-        cvss_result=(
-            mapping_payload(review_record.get("cvss"))
-            if isinstance(review_record.get("cvss"), Mapping)
-            else None
-        ),
+    return ReviewRecord.model_validate(mapping_payload(review_record)).model_dump(
+        mode="json", by_alias=True
     )
 
 

@@ -1,10 +1,8 @@
 import json
 from annotationlib import Format, get_annotations
-from typing import Any
 
 from sec_review_agents.review_stages.analysis.result import (
     AnalysisStageResult,
-    build_analysis_stage_result,
 )
 from sec_review_agents.review_stages.mitigation.result import (
     MitigationStageResult,
@@ -26,16 +24,12 @@ from sec_review_agents.scan_stages.triage.stage import run_repository_triage_sta
 
 def test_stage_result_builder_return_annotations_are_public_payloads() -> None:
     assert (
-        get_annotations(build_analysis_stage_result, format=Format.VALUE)["return"]
-        == dict[str, Any]
-    )
-    assert (
         get_annotations(build_mitigation_stage_result, format=Format.VALUE)["return"]
-        == dict[str, Any]
+        == MitigationStageResult
     )
     assert (
         get_annotations(build_verification_stage_result, format=Format.VALUE)["return"]
-        == dict[str, Any]
+        == VerificationStageResult
     )
 
 
@@ -68,21 +62,21 @@ def test_mitigation_stage_builder_emits_required_file_changes() -> None:
         overview="No mitigation target.",
     )
 
-    assert result["file_changes"] == []
-    assert result["patch_diff"] == ""
+    assert result.file_changes == []
+    assert result.patch_diff == ""
 
 
 def test_stage_result_builders_emit_json_serializable_public_payloads() -> None:
     results = [
-        build_analysis_stage_result(
+        AnalysisStageResult(
             overview="Analysis complete.",
             narratives=[],
             verdict="confirmed-defect",
-        ),
+        ).model_dump(mode="json", by_alias=True),
         build_mitigation_stage_result(
             overview="Patched input validation.",
             file_changes=[{"path": "src/app.py", "status": "deleted"}],
-        ),
+        ).model_dump(mode="json"),
         build_verification_stage_result(
             overview="Patch covers the target claim.",
             review_target_claim="Input is validated before use.",
@@ -93,7 +87,7 @@ def test_stage_result_builders_emit_json_serializable_public_payloads() -> None:
             validation_level="static",
             regression_status="not-run",
             residual_risks=[],
-        ),
+        ).model_dump(mode="json"),
     ]
 
     for result in results:
@@ -114,7 +108,7 @@ def test_verification_stage_builder_keeps_nullable_public_fields() -> None:
         residual_risks=[],
     )
 
-    assert result["review_target_claim"] is None
+    assert result.review_target_claim is None
 
 
 def test_scan_stage_entrypoint_return_annotation_is_named_contract() -> None:
@@ -165,8 +159,11 @@ def test_analysis_stage_preserves_nested_narrative_models_in_json() -> None:
             },
         }
     )
-    result = build_analysis_stage_result(
+    result = AnalysisStageResult(
         overview="Defect found.", narratives=[narrative], verdict="confirmed-defect"
     )
-    assert result["narratives"] == [narrative.model_dump(mode="json", by_alias=True)]
-    json.dumps(result)
+    assert result.narratives[0] is narrative
+    assert result.model_dump(mode="json", by_alias=True)["narratives"] == [
+        narrative.model_dump(mode="json", by_alias=True)
+    ]
+    json.dumps(result.model_dump(mode="json", by_alias=True))

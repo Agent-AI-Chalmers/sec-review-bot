@@ -21,11 +21,13 @@ from sec_review_agents.workflows.repository.workflow import (
 )
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from sec_review_agents.workspace.file_changes import (
-    FileChange,
+    DeletedFileChange,
+    UpsertFileChange,
     collect_publishable_file_changes,
     file_change_paths,
 )
 from sec_review_agents.workspace.patches import (
+    PatchArtifact,
     build_patch_artifact,
     observe_workspace_changed_files,
 )
@@ -37,7 +39,7 @@ def _build_file_changes_from_workspace_patch(
     source_workspace_path: Path,
     patch_path: Path | str | None,
     include_paths: list[str] | None = None,
-) -> list[FileChange]:
+) -> list[DeletedFileChange | UpsertFileChange]:
     if patch_path is None:
         return []
     patch_path = Path(patch_path)
@@ -177,7 +179,7 @@ class TestRepositoryDeliveryExecution:
             patch_synthesis_root: Path,
             delivery_entry: dict,
             case_items: list[dict],
-        ) -> dict:
+        ) -> PatchArtifact:
             changed_files = [
                 path
                 for case_item in case_items
@@ -192,10 +194,12 @@ class TestRepositoryDeliveryExecution:
                 }
                 for path in changed_files
             ]
-            return {
-                "patch_diff": "",
-                "file_changes": file_changes,
-            }
+            return PatchArtifact.model_validate(
+                {
+                    "patch_diff": "",
+                    "file_changes": file_changes,
+                }
+            )
 
         return patch(
             "sec_review_agents.delivery_stages.execution.stage.synthesize_combined_delivery_patch",
@@ -260,7 +264,7 @@ class TestRepositoryDeliveryExecution:
         patch_artifact = build_patch_artifact(
             case_workspace_root,
             include_paths=observe_workspace_changed_files(case_workspace_root),
-        )
+        ).model_dump(mode="json")
         patch_path = persist_text_artifact(
             self.case_artifacts / case_id / "mitigator",
             "workspace.patch",
@@ -495,7 +499,7 @@ class TestRepositoryDeliveryExecution:
         patch_artifact = build_patch_artifact(
             self.workspace_root,
             include_paths=observe_workspace_changed_files(self.workspace_root),
-        )
+        ).model_dump(mode="json")
 
         assert file_change_paths(patch_artifact["file_changes"]) == ["src/app.txt"]
         assert "diff --git a/src/app.txt b/src/app.txt" in patch_artifact["patch_diff"]
@@ -532,7 +536,7 @@ class TestRepositoryDeliveryExecution:
             build_patch_artifact(
                 self.workspace_root,
                 include_paths=["src/app.txt"],
-            )
+            ).model_dump(mode="json")
 
         assert observed_git_diff_commands
         assert all("--no-color" in command for command in observed_git_diff_commands)
@@ -545,7 +549,7 @@ class TestRepositoryDeliveryExecution:
             build_patch_artifact(
                 self.local_root,
                 include_paths=[],
-            )
+            ).model_dump(mode="json")
 
     def test_build_patch_artifact_can_scope_to_declared_paths(self) -> None:
         self._write_workspace(
@@ -569,7 +573,7 @@ class TestRepositoryDeliveryExecution:
         patch_artifact = build_patch_artifact(
             self.workspace_root,
             include_paths=["src/app.txt"],
-        )
+        ).model_dump(mode="json")
 
         assert file_change_paths(patch_artifact["file_changes"]) == ["src/app.txt"]
         assert "diff --git a/src/app.txt b/src/app.txt" in patch_artifact["patch_diff"]
@@ -600,7 +604,7 @@ class TestRepositoryDeliveryExecution:
         patch_artifact = build_patch_artifact(
             self.workspace_root,
             include_paths=observe_workspace_changed_files(self.workspace_root),
-        )
+        ).model_dump(mode="json")
 
         assert file_change_paths(patch_artifact["file_changes"]) == [
             "src/new.txt",
@@ -637,7 +641,7 @@ class TestRepositoryDeliveryExecution:
         patch_artifact = build_patch_artifact(
             self.workspace_root,
             include_paths=[],
-        )
+        ).model_dump(mode="json")
 
         assert patch_artifact["patch_diff"] == ""
         assert file_change_paths(patch_artifact["file_changes"]) == []
@@ -659,7 +663,7 @@ class TestRepositoryDeliveryExecution:
         patch_artifact = build_patch_artifact(
             self.workspace_root,
             include_paths=observe_workspace_changed_files(self.workspace_root),
-        )
+        ).model_dump(mode="json")
 
         assert file_change_paths(patch_artifact["file_changes"]) == [
             "contrib/gce/configure.sh"
@@ -1529,7 +1533,7 @@ class TestRepositoryDeliveryExecution:
             delivery_entry: dict,
             case_items: list[dict],
             **_kwargs,
-        ) -> dict:
+        ) -> PatchArtifact:
             case_ids = [item["case_id"] for item in case_items]
             if case_ids == ["case-a", "case-b"]:
                 raise RuntimeError("synthetic patch synthesis failure")
@@ -1547,10 +1551,12 @@ class TestRepositoryDeliveryExecution:
                 }
                 for path in changed_files
             ]
-            return {
-                "patch_diff": "synthetic combined patch",
-                "file_changes": file_changes,
-            }
+            return PatchArtifact.model_validate(
+                {
+                    "patch_diff": "synthetic combined patch",
+                    "file_changes": file_changes,
+                }
+            )
 
         with patch(
             "sec_review_agents.delivery_stages.execution.stage.synthesize_combined_delivery_patch",
@@ -1616,12 +1622,14 @@ class TestRepositoryDeliveryExecution:
             delivery_entry: dict,
             case_items: list[dict],
             **_kwargs,
-        ) -> dict:
+        ) -> PatchArtifact:
             baseline_snapshot_tar_paths.append(baseline_snapshot_tar_path)
-            return {
-                "patch_diff": "",
-                "file_changes": [],
-            }
+            return PatchArtifact.model_validate(
+                {
+                    "patch_diff": "",
+                    "file_changes": [],
+                }
+            )
 
         with patch(
             "sec_review_agents.delivery_stages.execution.stage.synthesize_combined_delivery_patch",

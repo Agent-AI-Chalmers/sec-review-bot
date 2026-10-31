@@ -13,7 +13,9 @@ from sec_review_agents.filesystem.backend_factory import (
     create_backend_with_path_views,
 )
 from sec_review_agents.memory.runtime_view import materialized_memory_view
-from sec_review_agents.review_stages.analysis.result import build_analysis_stage_result
+from sec_review_agents.review_stages.analysis.result import (
+    AnalysisStageResult,
+)
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
@@ -41,7 +43,7 @@ async def run_analysis_stage(
     filesystem_system_prompt: str,
     user_prompt: str,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> AnalysisStageResult:
     # The backend mounts both resources, so their lifetimes must cover backend
     # construction, graph construction, and the complete agent invocation.
     with (
@@ -80,7 +82,7 @@ async def run_analysis_stage(
                 trajectory_paths=trajectory_paths,
                 memory_enabled=memory_path_view is not None,
             )
-        result = build_analysis_stage_result(
+        result = AnalysisStageResult(
             overview=agent_output.overview,
             narratives=agent_output.narratives,
             verdict=agent_output.overall_verdict,
@@ -113,13 +115,13 @@ def prepare_analysis_trajectory(
 def persist_analysis_stage_result(
     *,
     analyzer_artifacts_path: Path,
-    result: dict[str, Any],
+    result: AnalysisStageResult,
 ) -> None:
     """Persist an already-built analysis result."""
     persist_json_artifact(
         analyzer_artifacts_path,
         "analysis-result",
-        result,
+        result.model_dump(mode="json", by_alias=True),
     )
 
 

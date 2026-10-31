@@ -11,9 +11,11 @@ from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
     is_docker_runtime_available,
 )
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.workflows.issue.analysis import analyze_issue
 from sec_review_agents.workflows.issue.verification import verify_issue
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
+from tests.analysis_fixtures import analysis_fixture
 
 pytestmark = pytest.mark.integration
 
@@ -157,16 +159,14 @@ async def test_issue_verifier_docker_workspace_is_writable_stage_copy(
             workspace_snapshot_tar_path=snapshot_tar,
             history_path=history,
             verifier_artifacts_path=verifier_artifacts,
-            analysis_result={
-                "status": "completed",
-                "overview": "analysis",
-                "narratives": [],
-            },
-            mitigation_result={"changed_files": []},
+            analysis_result=analysis_fixture(
+                overview="analysis", verdict=None, narratives=[]
+            ),
+            mitigation_result=MitigationStageResult(overview="Test mitigation"),
             retry_context=None,
         )
 
-    assert result["patch_coverage"] == "no-patch"
+    assert result.patch_coverage == "no-patch"
     assert len(stage_workspaces) == 1
     assert not (source_workspace / ".agent-index").exists()
     assert not stage_workspaces[0].exists()

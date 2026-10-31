@@ -25,6 +25,7 @@ from sec_review_agents.delivery_stages.planning.input import (
 from sec_review_agents.delivery_stages.planning.stage import (
     generate_delivery_plan,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.cvss import (
     CVSS_VECTOR_ORDER,
     CvssV4ScoringOutput,
@@ -32,7 +33,10 @@ from sec_review_agents.review_stages.cvss import (
 from sec_review_agents.review_stages.cvss.stage import (
     is_cvss_v4_scoring_target,
 )
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
+from sec_review_agents.review_stages.types import RegressionStatus
+from sec_review_agents.review_stages.verification.result import VerificationStageResult
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
@@ -42,55 +46,22 @@ from sec_review_agents.workflows.repository.workflow import (
 from sec_review_agents.workflows.repository_case.stage import (
     derive_case_disposition,
 )
+from tests.analysis_fixtures import analysis_fixture, narrative_fixture
 
 
 class TestRepositoryScopeAndDeliveryPlanning:
-    def _confirmed_analysis(self) -> dict:
-        return {
-            "summary": {
-                "title": "Confirmed case",
-                "overview": "Analyzer overview",
-                "case_id": "case-77",
-            },
-            "narratives": [
-                {
-                    "priority": 1,
-                    "verdict": "confirmed-vulnerability",
-                    "title": "Primary",
-                    "description": "description",
-                    "vulnerability_type": "path-traversal",
-                    "validation_level": "static",
-                    "locations": [
-                        {"file": "src/server.js", "line": 33, "label": "loc"}
-                    ],
-                    "flow_review": {
-                        "source_facts": ["source"],
-                        "sink_facts": ["sink"],
-                    },
-                    "support_review": {
-                        "supported_inferences": [],
-                        "proof_gaps": [],
-                    },
-                    "cwe_mapping": {
-                        "cwe_id": "CWE-22",
-                        "cwe_name": "Path Traversal",
-                        "cwe_rationale": "matches",
-                    },
-                }
+    def _confirmed_analysis(self) -> AnalysisStageResult:
+        return analysis_fixture(
+            verdict="confirmed-vulnerability",
+            narratives=[
+                narrative_fixture(
+                    verdict="confirmed-vulnerability", title="Primary", priority=1
+                )
             ],
-            "verdict": "confirmed-vulnerability",
-        }
+        )
 
-    def _no_actionable_analysis(self) -> dict:
-        return {
-            "summary": {
-                "title": "Current case not confirmed",
-                "overview": "The trigger case was not confirmed in current code.",
-                "case_id": "case-77",
-            },
-            "narratives": [],
-            "verdict": "no-actionable-finding",
-        }
+    def _no_actionable_analysis(self) -> AnalysisStageResult:
+        return analysis_fixture(verdict="no-actionable-finding", narratives=[])
 
     def _input_data(self, root: Path) -> dict:
         local_root = root / "local"
@@ -173,15 +144,15 @@ class TestRepositoryScopeAndDeliveryPlanning:
     def test_t1_no_actionable_does_not_enter_mitigation(self) -> None:
         analysis = self._no_actionable_analysis()
 
-        assert analysis["verdict"] == "no-actionable-finding"
-        assert analysis["narratives"] == []
+        assert analysis.verdict == "no-actionable-finding"
+        assert analysis.narratives == []
         assert not has_confirmed_repair_target(analysis)
 
     def test_t2_confirmed_case_enters_mitigation(self) -> None:
         analysis = self._confirmed_analysis()
 
-        assert analysis["verdict"] == "confirmed-vulnerability"
-        assert len(analysis["narratives"]) == 1
+        assert analysis.verdict == "confirmed-vulnerability"
+        assert len(analysis.narratives) == 1
         assert has_confirmed_repair_target(analysis)
         assert is_cvss_v4_scoring_target(analysis)
 
@@ -193,17 +164,17 @@ class TestRepositoryScopeAndDeliveryPlanning:
         assert not is_cvss_v4_scoring_target(analysis)
 
     def test_confirmed_defect_without_vulnerability_is_not_cvss_scored(self) -> None:
-        analysis = {
-            "verdict": "confirmed-defect",
-            "overview": "Confirmed repository defect without confirmed security impact.",
-            "narratives": [
-                {
-                    "priority": 1,
-                    "verdict": "confirmed-defect",
-                    "title": "Defect without confirmed vulnerability",
-                }
+        analysis = analysis_fixture(
+            overview="Confirmed repository defect without confirmed security impact.",
+            verdict="confirmed-defect",
+            narratives=[
+                narrative_fixture(
+                    verdict="confirmed-defect",
+                    title="Defect without confirmed vulnerability",
+                    priority=1,
+                )
             ],
-        }
+        )
 
         assert not is_cvss_v4_scoring_target(analysis)
 
@@ -772,19 +743,21 @@ class TestRepositoryScopeAndDeliveryPlanning:
         self,
     ) -> None:
         """Keep `not-run` delivery-neutral unless project policy changes."""
-        analyzer_result = {
-            "verdict": "confirmed-vulnerability",
-        }
-        mitigator_result = {
-            "file_changes": [{"path": "src/server.js", "status": "deleted"}],
-        }
-        verifier_result = {
-            "overview": "Patch fully covers the target claim.",
-            "review_target_claim": "target claim",
-            "patch_coverage": "full",
-            "regression_status": "not-run",
-            "resolution_next_step": "none",
-        }
+        analyzer_result = analysis_fixture(
+            verdict="confirmed-vulnerability", narratives=[]
+        )
+        mitigator_result = MitigationStageResult(
+            overview="Test mitigation",
+            file_changes=[{"path": "src/server.js", "status": "deleted"}],
+        )
+        verifier_result = VerificationStageResult(
+            overview="Patch fully covers the target claim.",
+            review_target_claim="target claim",
+            patch_coverage="full",
+            regression_status="not-run",
+            resolution_next_step="none",
+            validation_level=None,
+        )
         case_disposition = derive_case_disposition(
             analyzer_result,
             mitigator_result=mitigator_result,
@@ -796,19 +769,23 @@ class TestRepositoryScopeAndDeliveryPlanning:
 
     @pytest.mark.parametrize("regression_status", ["failed", "unresolved", None])
     def test_case_disposition_blocks_uncleared_regression(
-        self, regression_status: str | None
+        self, regression_status: RegressionStatus | None
     ) -> None:
         """Fail closed when regression evidence is failed, unresolved, or absent."""
         case_disposition = derive_case_disposition(
-            {"verdict": "confirmed-vulnerability"},
-            mitigator_result={
-                "file_changes": [{"path": "src/server.js", "status": "deleted"}]
-            },
-            verifier_result={
-                "patch_coverage": "full",
-                "regression_status": regression_status,
-                "resolution_next_step": "manual-review",
-            },
+            analysis_fixture(verdict="confirmed-vulnerability", narratives=[]),
+            mitigator_result=MitigationStageResult(
+                overview="Test mitigation",
+                file_changes=[{"path": "src/server.js", "status": "deleted"}],
+            ),
+            verifier_result=VerificationStageResult(
+                patch_coverage="full",
+                regression_status=regression_status,
+                resolution_next_step="manual-review",
+                overview="Test verification",
+                review_target_claim=None,
+                validation_level=None,
+            ),
         )
 
         assert case_disposition["disposition"] == "blocked"
@@ -817,32 +794,40 @@ class TestRepositoryScopeAndDeliveryPlanning:
     def test_case_disposition_blocks_pending_follow_up(self) -> None:
         """Block delivery whenever the verifier still requests follow-up."""
         case_disposition = derive_case_disposition(
-            {"verdict": "confirmed-vulnerability"},
-            mitigator_result={
-                "file_changes": [{"path": "src/server.js", "status": "deleted"}]
-            },
-            verifier_result={
-                "patch_coverage": "full",
-                "regression_status": "passed",
-                "resolution_next_step": "manual-review",
-            },
+            analysis_fixture(verdict="confirmed-vulnerability", narratives=[]),
+            mitigator_result=MitigationStageResult(
+                overview="Test mitigation",
+                file_changes=[{"path": "src/server.js", "status": "deleted"}],
+            ),
+            verifier_result=VerificationStageResult(
+                patch_coverage="full",
+                regression_status="passed",
+                resolution_next_step="manual-review",
+                overview="Test verification",
+                review_target_claim=None,
+                validation_level=None,
+            ),
         )
 
         assert case_disposition["disposition"] == "blocked"
         assert "requires follow-up" in case_disposition["reason"]
 
     def test_partial_verifier_coverage_is_confirmed_unresolved(self) -> None:
-        analyzer_result = {
-            "verdict": "confirmed-vulnerability",
-        }
-        mitigator_result = {
-            "file_changes": [{"path": "src/server.js", "status": "deleted"}],
-        }
-        verifier_result = {
-            "overview": "Patch partially covers the target claim.",
-            "review_target_claim": "target claim",
-            "patch_coverage": "partial",
-        }
+        analyzer_result = analysis_fixture(
+            verdict="confirmed-vulnerability", narratives=[]
+        )
+        mitigator_result = MitigationStageResult(
+            overview="Test mitigation",
+            file_changes=[{"path": "src/server.js", "status": "deleted"}],
+        )
+        verifier_result = VerificationStageResult(
+            overview="Patch partially covers the target claim.",
+            review_target_claim="target claim",
+            patch_coverage="partial",
+            resolution_next_step="none",
+            validation_level=None,
+            regression_status=None,
+        )
         case_disposition = derive_case_disposition(
             analyzer_result,
             mitigator_result=mitigator_result,

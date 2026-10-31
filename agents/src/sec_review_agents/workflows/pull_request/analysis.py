@@ -8,6 +8,7 @@ from sec_review_agents.agents.analysis.pull_request import (
     build_pr_analyzer_system_prompt,
     build_pr_analyzer_user_prompt,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 
@@ -22,7 +23,7 @@ async def analyze_pull_request(
     published_trajectory_path: Path | None = None,
     runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> AnalysisStageResult:
     return await run_analysis_stage(
         analyzer_artifacts_path=analyzer_artifacts_path,
         published_trajectory_path=published_trajectory_path,

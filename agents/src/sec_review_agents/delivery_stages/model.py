@@ -3,7 +3,7 @@
 from typing import Any, Literal, TypedDict
 
 from sec_review_agents.review_stages.types import PatchCoverage
-from sec_review_agents.workspace.file_changes import FileChange
+from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
 
 # Domain types
 
@@ -36,7 +36,7 @@ class DeliveryCaseInput(TypedDict):
     analyzer_overview: str
     analyzer_verdict: str | None
     mitigation_overview: str
-    mitigator_file_changes: list[FileChange]
+    mitigator_file_changes: list[DeletedFileChange | UpsertFileChange]
     mitigator_patch_diff: str | None
     verifier_overview: str
     verifier_coverage: PatchCoverage | None

@@ -7,6 +7,8 @@ from typing import Any
 
 from temporalio import activity, workflow
 
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
 from sec_review_agents.run_diagnostics.publication import (
@@ -33,8 +35,8 @@ from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 @activity.defn
 async def mitigate_issue_self_check_activity(
     request: ReviewWorkflowRequest,
-    analysis_result: Mapping[str, Any],
-) -> dict[str, Any]:
+    analysis_result: AnalysisStageResult,
+) -> MitigationStageResult:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.mitigation.stage import (
         create_skipped_mitigation_result,
@@ -114,11 +116,12 @@ async def mitigate_issue_self_check_activity(
 
 @activity.defn
 def build_issue_two_stage_result_activity(
-    two_stage_result: dict[str, Any],
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult,
 ) -> dict[str, Any]:
     return build_issue_two_stage_result(
-        analysis_result=two_stage_result["analysis_result"],
-        mitigation_result=two_stage_result["mitigation_result"],
+        analysis_result=analysis_result,
+        mitigation_result=mitigation_result,
     )
 
 
@@ -141,12 +144,7 @@ class IssueTwoStageWorkflow:
         )
         public_result = await workflow.execute_activity(
             build_issue_two_stage_result_activity,
-            args=[
-                {
-                    "analysis_result": analysis_result,
-                    "mitigation_result": mitigation_result,
-                }
-            ],
+            args=[analysis_result, mitigation_result],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
@@ -180,7 +178,7 @@ class IssueTwoStageWorkflow:
         }
 
 
-async def run_issue_two_stage(
+async def execute_issue_two_stage(
     *,
     issue: Mapping[str, Any],
     workspace_snapshot_tar_path: Path,
@@ -192,7 +190,7 @@ async def run_issue_two_stage(
     runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
-    """Run analyzer plus self-checking mitigation and return raw stage outputs."""
+    """Run analyzer and self-checking mitigation, then publish their review record."""
     from sec_review_agents.review_stages.mitigation.stage import (
         create_skipped_mitigation_result,
     )
@@ -212,7 +210,7 @@ async def run_issue_two_stage(
     )
 
     if not has_confirmed_repair_target(analysis_result):
-        mitigation_result: dict[str, Any] = create_skipped_mitigation_result(
+        mitigation_result: MitigationStageResult = create_skipped_mitigation_result(
             mitigator_artifacts_path=mitigator_artifacts_path,
             retry_context=None,
             reason="No confirmed, reparable mitigation target was available from the issue analyzer output.",
@@ -229,29 +227,29 @@ async def run_issue_two_stage(
             setup_declaration_content=setup_declaration_content,
         )
 
-    return {
-        "analysis_result": analysis_result,
-        "mitigation_result": mitigation_result,
-    }
+    return build_issue_two_stage_result(
+        analysis_result=analysis_result,
+        mitigation_result=mitigation_result,
+    )
 
 
 def build_issue_two_stage_review_record(
     *,
-    analysis_result: Mapping[str, Any],
-    mitigation_result: Mapping[str, Any],
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult,
 ) -> dict[str, Any]:
     return build_review_record(
         analysis_result=analysis_result,
         mitigation_result=mitigation_result,
         verifier_result=None,
         cvss_result=None,
-    )
+    ).model_dump(mode="json", by_alias=True)
 
 
 def build_issue_two_stage_result(
     *,
-    analysis_result: Mapping[str, Any],
-    mitigation_result: Mapping[str, Any],
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult,
 ) -> dict[str, Any]:
     return {
         "kind": "issue-two-stage-strategy-result",
@@ -262,36 +260,6 @@ def build_issue_two_stage_result(
     }
 
 
-async def execute_issue_two_stage(
-    *,
-    issue: Mapping[str, Any],
-    workspace_snapshot_tar_path: Path,
-    history_path: Path,
-    analyzer_artifacts_path: Path,
-    mitigator_artifacts_path: Path,
-    review_objective: ReviewObjective,
-    test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
-    runtime_context: ExecutionRuntimeContext | None = None,
-    setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
-    """Run the stages and project them into the public ablation result shape."""
-    two_stage_result = await run_issue_two_stage(
-        issue=issue,
-        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
-        history_path=history_path,
-        analyzer_artifacts_path=analyzer_artifacts_path,
-        mitigator_artifacts_path=mitigator_artifacts_path,
-        review_objective=review_objective,
-        test_changes=test_changes,
-        runtime_context=runtime_context,
-        setup_declaration_content=setup_declaration_content,
-    )
-    return build_issue_two_stage_result(
-        analysis_result=two_stage_result["analysis_result"],
-        mitigation_result=two_stage_result["mitigation_result"],
-    )
-
-
 async def run_issue_two_stage_direct(
     request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
@@ -300,12 +268,7 @@ async def run_issue_two_stage_direct(
         request,
         analysis_result,
     )
-    return build_issue_two_stage_result_activity(
-        {
-            "analysis_result": analysis_result,
-            "mitigation_result": mitigation_result,
-        }
-    )
+    return build_issue_two_stage_result_activity(analysis_result, mitigation_result)
 
 
 __all__ = [
@@ -315,6 +278,5 @@ __all__ = [
     "build_issue_two_stage_review_record",
     "execute_issue_two_stage",
     "mitigate_issue_self_check_activity",
-    "run_issue_two_stage",
     "run_issue_two_stage_direct",
 ]

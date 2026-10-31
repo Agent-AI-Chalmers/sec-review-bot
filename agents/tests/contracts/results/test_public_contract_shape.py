@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
-from sec_review_agents.review_stages.record import build_review_record
+from sec_review_agents.review_stages.record import ReviewRecord
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
@@ -45,11 +45,8 @@ FORBIDDEN_INTERNAL_MITIGATION_KEYS = {
 
 
 def not_run_review_record() -> dict[str, Any]:
-    return build_review_record(
-        analysis_result=None,
-        mitigation_result=None,
-        verifier_result=None,
-        cvss_result=None,
+    return ReviewRecord.model_validate({"cvss": None}).model_dump(
+        mode="json", by_alias=True
     )
 
 
@@ -88,26 +85,25 @@ def assert_matches_contract_schema(
 def test_pull_request_result_public_shape() -> None:
     result: dict[str, Any] = {
         "api_version": EXECUTION_API_VERSION,
-        "review_record": build_review_record(
-            analysis_result={
-                "verdict": "no-actionable-finding",
-                "narratives": [],
-            },
-            mitigation_result={
-                "overview": "No target.",
-                "changed_files": [],
-                "file_changes": [],
-            },
-            verifier_result={
-                "status": "completed",
-                "patch_coverage": "not-applicable",
-                "resolution_next_step": "manual-review",
-                "verification_findings": [],
-                "patch_findings": [],
-                "residual_risks": [],
-            },
-            cvss_result=None,
-        ),
+        "review_record": ReviewRecord.model_validate(
+            {
+                "analysis": {"verdict": "no-actionable-finding", "narratives": []},
+                "mitigation": {
+                    "overview": "No target.",
+                    "changed_files": [],
+                    "file_changes": [],
+                },
+                "verification": {
+                    "status": "completed",
+                    "patch_coverage": "not-applicable",
+                    "resolution_next_step": "manual-review",
+                    "verification_findings": [],
+                    "patch_findings": [],
+                    "residual_risks": [],
+                },
+                "cvss": None,
+            }
+        ).model_dump(mode="json", by_alias=True),
     }
 
     assert_public_workflow_result(result)
@@ -115,45 +111,47 @@ def test_pull_request_result_public_shape() -> None:
 
 
 def test_review_record_builder_output_matches_shared_contract_schema() -> None:
-    result = build_review_record(
-        analysis_result={
-            "verdict": "confirmed-vulnerability",
-            "overview": "Webhook retry payloads can reuse stale signature metadata.",
-            "narratives": [],
-        },
-        mitigation_result={
-            "overview": "Recompute signature metadata before enqueueing retry payloads.",
-            "changed_files": ["src/webhook.ts"],
-            "file_changes": [
-                {
-                    "path": "src/webhook.ts",
-                    "status": "upsert",
-                    "content": "export const ok = true\n",
-                    "content_encoding": "utf-8",
-                }
-            ],
-            "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n",
-        },
-        verifier_result={
-            "overview": "The patch covers the retry enqueue path.",
-            "review_target_claim": "Retry payloads must be signed with current metadata.",
-            "validation_level": "static",
-            "patch_coverage": "full",
-            "regression_status": "not-run",
-            "resolution_next_step": "none",
-            "patch_findings": [],
-            "verification_findings": [],
-            "residual_risks": [],
-        },
-        cvss_result={
-            "outcome": "scored",
-            "base_score": 5.8,
-            "severity": "medium",
-            "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N",
-            "overview": "Authenticated users can replay stale retry payloads.",
-            "not_scored_reason": None,
-        },
-    )
+    result = ReviewRecord.model_validate(
+        {
+            "analysis": {
+                "verdict": "confirmed-vulnerability",
+                "overview": "Webhook retry payloads can reuse stale signature metadata.",
+                "narratives": [],
+            },
+            "mitigation": {
+                "overview": "Recompute signature metadata before enqueueing retry payloads.",
+                "changed_files": ["src/webhook.ts"],
+                "file_changes": [
+                    {
+                        "path": "src/webhook.ts",
+                        "status": "upsert",
+                        "content": "export const ok = true\n",
+                        "content_encoding": "utf-8",
+                    }
+                ],
+                "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n",
+            },
+            "verification": {
+                "overview": "The patch covers the retry enqueue path.",
+                "review_target_claim": "Retry payloads must be signed with current metadata.",
+                "validation_level": "static",
+                "patch_coverage": "full",
+                "regression_status": "not-run",
+                "resolution_next_step": "none",
+                "patch_findings": [],
+                "verification_findings": [],
+                "residual_risks": [],
+            },
+            "cvss": {
+                "outcome": "scored",
+                "base_score": 5.8,
+                "severity": "medium",
+                "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N",
+                "overview": "Authenticated users can replay stale retry payloads.",
+                "not_scored_reason": None,
+            },
+        }
+    ).model_dump(mode="json", by_alias=True)
 
     assert_matches_contract_schema(result, "review-record.schema.json")
 
@@ -243,40 +241,40 @@ def test_repository_workflow_result_builder_output_matches_shared_contract_schem
                 "case_id": "case-1",
                 "disposition": "keep",
                 "reason": None,
-                "review_record": build_review_record(
-                    analysis_result={
-                        "verdict": "confirmed-vulnerability",
-                        "overview": "Webhook retry payloads can reuse stale metadata.",
-                        "narratives": [],
-                    },
-                    mitigation_result={
-                        "overview": "Recompute signature metadata before enqueueing.",
-                        "changed_files": ["src/webhook.ts"],
-                        "file_changes": [],
-                        "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n",
-                    },
-                    verifier_result={
-                        "overview": "The patch covers the retry enqueue path.",
-                        "review_target_claim": (
-                            "Retry payloads must be signed with current metadata."
-                        ),
-                        "validation_level": "static",
-                        "patch_coverage": "full",
-                        "regression_status": "not-run",
-                        "resolution_next_step": "none",
-                        "patch_findings": [],
-                        "verification_findings": [],
-                        "residual_risks": [],
-                    },
-                    cvss_result={
-                        "outcome": "scored",
-                        "base_score": 5.8,
-                        "severity": "medium",
-                        "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N",
-                        "overview": "Authenticated users can replay stale retry payloads.",
-                        "not_scored_reason": None,
-                    },
-                ),
+                "review_record": ReviewRecord.model_validate(
+                    {
+                        "analysis": {
+                            "verdict": "confirmed-vulnerability",
+                            "overview": "Webhook retry payloads can reuse stale metadata.",
+                            "narratives": [],
+                        },
+                        "mitigation": {
+                            "overview": "Recompute signature metadata before enqueueing.",
+                            "changed_files": ["src/webhook.ts"],
+                            "file_changes": [],
+                            "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n",
+                        },
+                        "verification": {
+                            "overview": "The patch covers the retry enqueue path.",
+                            "review_target_claim": "Retry payloads must be signed with current metadata.",
+                            "validation_level": "static",
+                            "patch_coverage": "full",
+                            "regression_status": "not-run",
+                            "resolution_next_step": "none",
+                            "patch_findings": [],
+                            "verification_findings": [],
+                            "residual_risks": [],
+                        },
+                        "cvss": {
+                            "outcome": "scored",
+                            "base_score": 5.8,
+                            "severity": "medium",
+                            "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:L/UI:N",
+                            "overview": "Authenticated users can replay stale retry payloads.",
+                            "not_scored_reason": None,
+                        },
+                    }
+                ).model_dump(mode="json", by_alias=True),
             }
         ],
     )

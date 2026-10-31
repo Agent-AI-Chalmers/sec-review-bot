@@ -8,21 +8,28 @@ from sec_review_agents.review_stages.types import (
     ValidationLevel,
     Verdict,
 )
-from sec_review_agents.workspace.file_changes import FileChange
+from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
 
 # Workflow result payload
 
 
 class SingleAgentFixOutcome(BaseModel):
-    # Intentionally not a standard stage-result envelope: one single-agent run
-    # spans analysis, repair, and self-check. Workflow adapters wrap this compact
-    # fix outcome into their own public result contracts.
+    """One agent's analysis, repair and self-check retained across activities.
+
+    This is a combined outcome rather than evidence that separate review stages
+    ran. Workflow-specific projection derives the public sections from it. Application
+    code converts it to JSON at publication or artifact boundaries; Temporal
+    restores the model after transporting it between activities.
+    """
+
     overview: str
     verdict: Verdict
     validation_level: ValidationLevel
     regression_status: RegressionStatus
     target_claim: str
-    file_changes: list[FileChange] = Field(default_factory=list)
+    file_changes: list[DeletedFileChange | UpsertFileChange] = Field(
+        default_factory=list
+    )
     patch_diff: str = ""
     residual_risks: list[str] = Field(default_factory=list)
     self_check_notes: list[str] = Field(default_factory=list)
@@ -41,7 +48,7 @@ def build_single_agent_fix_outcome(
     patch_diff: str = "",
     residual_risks: list[str] | None = None,
     self_check_notes: list[str] | None = None,
-) -> dict[str, Any]:
+) -> SingleAgentFixOutcome:
     return SingleAgentFixOutcome.model_validate(
         {
             "overview": overview,
@@ -54,7 +61,7 @@ def build_single_agent_fix_outcome(
             "residual_risks": residual_risks or [],
             "self_check_notes": self_check_notes or [],
         }
-    ).model_dump(mode="json")
+    )
 
 
 # Public exports

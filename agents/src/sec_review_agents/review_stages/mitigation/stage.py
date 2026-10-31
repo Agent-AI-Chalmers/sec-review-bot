@@ -1,7 +1,7 @@
 """Reusable mitigation stage runtime; workflows own review-specific prompts."""
 
 import tempfile
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -13,8 +13,12 @@ from sec_review_agents.filesystem.backend_factory import (
     create_backend_with_path_views,
 )
 from sec_review_agents.memory.runtime_view import materialized_memory_view
-from sec_review_agents.review_stages.feedback_loop import MAX_FEEDBACK_RETRY_ATTEMPTS
+from sec_review_agents.review_stages.feedback_loop import (
+    MAX_FEEDBACK_RETRY_ATTEMPTS,
+    FeedbackRetryContext,
+)
 from sec_review_agents.review_stages.mitigation.result import (
+    MitigationStageResult,
     build_mitigation_stage_result,
     build_skipped_mitigation_result,
 )
@@ -43,7 +47,7 @@ from sec_review_agents.workspace.snapshots import (
 
 def persist_mitigation_result(
     mitigator_artifacts_path: Path,
-    result: Any,
+    result: MitigationStageResult,
     *,
     attempt_label: str,
 ) -> None:
@@ -51,13 +55,13 @@ def persist_mitigation_result(
     persist_json_artifact(
         mitigator_artifacts_path,
         "mitigation-result",
-        result,
+        result.model_dump(mode="json"),
     )
     if attempt_label != "initial":
         persist_json_artifact(
             mitigator_artifacts_path,
             f"mitigation-result.{attempt_label}",
-            result,
+            result.model_dump(mode="json"),
         )
 
 
@@ -81,12 +85,10 @@ def persist_mitigation_patch(
         )
 
 
-def mitigation_attempt_label(retry_context: Mapping[str, Any] | None) -> str:
-    if isinstance(retry_context, Mapping):
-        retry_index = retry_context.get("retry_index")
-        if isinstance(retry_index, int) and retry_index >= 1:
-            return f"retry-{retry_index}"
-    return "initial"
+def mitigation_attempt_label(retry_context: FeedbackRetryContext | None) -> str:
+    return (
+        f"retry-{retry_context.retry_index}" if retry_context is not None else "initial"
+    )
 
 
 def reset_mitigation_attempt_artifacts(
@@ -135,9 +137,9 @@ def reset_mitigation_attempt_artifacts(
 def create_skipped_mitigation_result(
     *,
     mitigator_artifacts_path: Path,
-    retry_context: Mapping[str, Any] | None,
+    retry_context: FeedbackRetryContext | None,
     reason: str,
-) -> dict[str, Any]:
+) -> MitigationStageResult:
     attempt_label = mitigation_attempt_label(retry_context)
     reset_mitigation_attempt_artifacts(
         mitigator_artifacts_path=mitigator_artifacts_path,
@@ -166,13 +168,13 @@ async def run_mitigation_stage(
     mitigator_artifacts_path: Path,
     published_trajectory_path: Path | None = None,
     baseline_snapshot_tar_path: Path,
-    retry_context: Mapping[str, Any] | None,
+    retry_context: FeedbackRetryContext | None,
     build_backend_config: Callable[[Path], BackendConfig],
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> MitigationStageResult:
     attempt_label = mitigation_attempt_label(retry_context)
     # The backend mounts both resources, so their lifetimes must cover backend
     # construction, graph construction, and the complete agent invocation.
@@ -225,13 +227,13 @@ async def run_mitigation_stage(
         )
         persist_mitigation_patch(
             mitigator_artifacts_path,
-            patch_artifact["patch_diff"],
+            patch_artifact.patch_diff,
             attempt_label=attempt_label,
         )
         result = build_mitigation_stage_result(
             overview=agent_output.overview,
-            file_changes=patch_artifact["file_changes"],
-            patch_diff=patch_artifact["patch_diff"],
+            file_changes=patch_artifact.file_changes,
+            patch_diff=patch_artifact.patch_diff,
         )
         persist_mitigation_result(
             mitigator_artifacts_path,

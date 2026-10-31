@@ -1,5 +1,3 @@
-from typing import Any
-
 from pydantic import BaseModel, ConfigDict, Field
 
 from sec_review_agents.review_stages.types import CvssOutcome
@@ -15,7 +13,14 @@ class CvssMetricDetail(BaseModel):
 
 
 class CvssStageResult(BaseModel):
-    outcome: str
+    """Scoring outcome carried through case execution before record publication.
+
+    Skipped and unscored outcomes retain absent scoring fields as None. The optional
+    reason is omitted from artifacts when absent; the public review record owns
+    its own projection rather than consuming this artifact.
+    """
+
+    outcome: CvssOutcome
     overview: str
     version: str | None
     vector: str | None
@@ -35,27 +40,22 @@ def build_cvss_v4_stage_result(
     vector: str | None = None,
     base_score: float | None = None,
     severity: str | None = None,
-    metrics: dict[str, dict[str, str]] | None = None,
+    metrics: dict[str, CvssMetricDetail] | None = None,
     not_scored_reason: str | None = None,
-) -> dict[str, Any]:
-    result = CvssStageResult.model_validate(
-        {
-            "outcome": outcome,
-            "overview": overview,
-            "version": version,
-            "vector": vector,
-            "base_score": base_score,
-            "severity": severity,
-            "metrics": metrics or {},
-            "not_scored_reason": not_scored_reason,
-        }
-    ).model_dump(mode="json")
-    if not_scored_reason is None:
-        result.pop("not_scored_reason", None)
-    return result
+) -> CvssStageResult:
+    return CvssStageResult(
+        outcome=outcome,
+        overview=overview,
+        version=version,
+        vector=vector,
+        base_score=base_score,
+        severity=severity,
+        metrics=metrics or {},
+        not_scored_reason=not_scored_reason,
+    )
 
 
-def build_skipped_cvss_v4_result(*, reason: str) -> dict[str, Any]:
+def build_skipped_cvss_v4_result(*, reason: str) -> CvssStageResult:
     return build_cvss_v4_stage_result(outcome="skipped", overview=reason)
 
 

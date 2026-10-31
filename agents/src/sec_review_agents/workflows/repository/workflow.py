@@ -49,7 +49,7 @@ def build_blocked_repository_case_result(
             mitigation_result=None,
             verifier_result=None,
             cvss_result=None,
-        ),
+        ).model_dump(mode="json", by_alias=True),
     }
 
 

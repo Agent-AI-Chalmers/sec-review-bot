@@ -3,11 +3,13 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.workflows.issue.verification import verify_issue
 from sec_review_agents.workflows.pull_request.verification import verify_pull_request
 from sec_review_agents.workflows.repository_case.verification import (
     verify_repository_case,
 )
+from tests.analysis_fixtures import analysis_fixture
 
 
 @pytest.mark.asyncio
@@ -34,8 +36,10 @@ async def test_issue_verification_resets_artifacts_before_workspace_prepare_fail
             workspace_snapshot_tar_path=tmp_path / "workspace.snapshot.tar",
             history_path=tmp_path / "history.json",
             verifier_artifacts_path=verifier_artifacts,
-            analysis_result={"overview": "analysis"},
-            mitigation_result={"changed_files": ["demo.txt"]},
+            analysis_result=analysis_fixture(
+                overview="analysis", verdict=None, narratives=[]
+            ),
+            mitigation_result=MitigationStageResult(overview="Test mitigation"),
             retry_context=None,
         )
 
@@ -79,8 +83,10 @@ async def test_pr_verification_resets_artifacts_before_workspace_prepare_failure
             history_path=tmp_path / "history.json",
             incremental_window_path=tmp_path / "incremental-window",
             verifier_artifacts_path=verifier_artifacts,
-            analysis_result={"overview": "analysis"},
-            mitigation_result={"changed_files": []},
+            analysis_result=analysis_fixture(
+                overview="analysis", verdict=None, narratives=[]
+            ),
+            mitigation_result=MitigationStageResult(overview="Test mitigation"),
             retry_context=None,
         )
 
@@ -109,8 +115,10 @@ async def test_repository_verification_does_not_prepare_workspace_when_prompt_bu
             verifier_artifacts_path=tmp_path / "verifier",
             scan_mode="full",
             review_input="review input",
-            analysis_result={"overview": "analysis"},
-            mitigation_result={"changed_files": []},
+            analysis_result=analysis_fixture(
+                overview="analysis", verdict=None, narratives=[]
+            ),
+            mitigation_result=MitigationStageResult(overview="Test mitigation"),
         )
 
     run_verification_stage_mock.assert_not_called()
@@ -143,11 +151,12 @@ async def test_repository_verification_preserves_patch_terminal_newline(
             verifier_artifacts_path=tmp_path / "verifier",
             scan_mode="full",
             review_input="review input",
-            analysis_result={"overview": "analysis"},
-            mitigation_result={
-                "changed_files": ["a.txt"],
-                "patch_diff": patch_diff,
-            },
+            analysis_result=analysis_fixture(
+                overview="analysis", verdict=None, narratives=[]
+            ),
+            mitigation_result=MitigationStageResult(
+                overview="Test mitigation", patch_diff=patch_diff
+            ),
         )
 
     assert build_prompt.call_args.kwargs["workspace_patch"] == patch_diff

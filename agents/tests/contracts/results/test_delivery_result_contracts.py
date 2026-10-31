@@ -25,6 +25,7 @@ from sec_review_agents.workspace.file_changes import (
     DeletedFileChange,
     UpsertFileChange,
 )
+from sec_review_agents.workspace.patches import PatchArtifact
 from tests.contract_fixtures import contract_schema
 
 
@@ -72,7 +73,7 @@ def test_delivery_execution_result_return_annotation_is_public_payload() -> None
         get_annotations(synthesize_combined_delivery_patch, format=Format.VALUE)[
             "return"
         ]
-        == dict[str, Any]
+        == PatchArtifact
     )
 
 

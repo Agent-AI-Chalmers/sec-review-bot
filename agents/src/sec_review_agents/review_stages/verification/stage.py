@@ -2,7 +2,7 @@
 
 import subprocess
 import tempfile
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -15,8 +15,13 @@ from sec_review_agents.filesystem.backend_factory import (
 )
 from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.memory.runtime_view import materialized_memory_view
-from sec_review_agents.review_stages.feedback_loop import MAX_FEEDBACK_RETRY_ATTEMPTS
+from sec_review_agents.review_stages.feedback_loop import (
+    MAX_FEEDBACK_RETRY_ATTEMPTS,
+    FeedbackRetryContext,
+)
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.verification.result import (
+    VerificationStageResult,
     build_skipped_verification_result,
     build_verification_stage_result,
 )
@@ -39,29 +44,27 @@ from sec_review_agents.workspace.snapshots import restore_workspace_from_snapsho
 
 def persist_verification_result(
     verifier_artifacts_path: Path,
-    result: Any,
+    result: VerificationStageResult,
     *,
     attempt_label: str,
 ) -> None:
     persist_json_artifact(
         verifier_artifacts_path,
         "verification-result",
-        result,
+        result.model_dump(mode="json"),
     )
     if attempt_label != "initial":
         persist_json_artifact(
             verifier_artifacts_path,
             f"verification-result.{attempt_label}",
-            result,
+            result.model_dump(mode="json"),
         )
 
 
-def verification_attempt_label(retry_context: Mapping[str, Any] | None) -> str:
-    if isinstance(retry_context, Mapping):
-        retry_index = retry_context.get("retry_index")
-        if isinstance(retry_index, int) and retry_index >= 1:
-            return f"retry-{retry_index}"
-    return "initial"
+def verification_attempt_label(retry_context: FeedbackRetryContext | None) -> str:
+    return (
+        f"retry-{retry_context.retry_index}" if retry_context is not None else "initial"
+    )
 
 
 def reset_verification_attempt_artifacts(
@@ -97,9 +100,9 @@ def reset_verification_attempt_artifacts(
 def create_skipped_verification_result(
     *,
     verifier_artifacts_path: Path,
-    retry_context: Mapping[str, Any] | None,
+    retry_context: FeedbackRetryContext | None,
     reason: str,
-) -> dict[str, Any]:
+) -> VerificationStageResult:
     attempt_label = verification_attempt_label(retry_context)
     reset_verification_attempt_artifacts(
         verifier_artifacts_path,
@@ -181,10 +184,13 @@ def _apply_workspace_patch(
 # ====================== Result Normalization And Validation ============
 #########################################################################
 def validate_verification_coverages(
-    structured_result: VerificationOutput, mitigation_result: Mapping[str, Any] | None
+    structured_result: VerificationOutput,
+    mitigation_result: MitigationStageResult | None,
 ) -> None:
     patch_coverage = structured_result.patch_coverage
-    changed_files = file_change_paths((mitigation_result or {}).get("file_changes"))
+    changed_files = file_change_paths(
+        mitigation_result.file_changes if mitigation_result is not None else None
+    )
     if changed_files and patch_coverage in {
         "no-patch",
         "not-applicable",
@@ -205,13 +211,13 @@ async def run_verification_stage(
     published_trajectory_path: Path | None = None,
     baseline_snapshot_tar_path: Path,
     workspace_patch: str | None,
-    mitigation_result: Mapping[str, Any] | None,
+    mitigation_result: MitigationStageResult | None,
     build_backend_config: Callable[[Path], BackendConfig],
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> VerificationStageResult:
     # The backend mounts both resources, so their lifetimes must cover backend
     # construction, graph construction, and the complete agent invocation.
     with (

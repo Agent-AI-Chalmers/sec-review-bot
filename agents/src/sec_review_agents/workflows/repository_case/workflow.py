@@ -1,20 +1,25 @@
 """Temporal orchestration and activities for one prepared repository case."""
 
 import asyncio
-from collections.abc import Mapping
 from datetime import timedelta
 from pathlib import Path
 from typing import Any, TypedDict
 
 from temporalio import activity, workflow
 
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
+from sec_review_agents.review_stages.cvss.result import CvssStageResult
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
+    FeedbackRetryContext,
+    VerifierHistoryEntry,
     feedback_retry_context,
     should_retry_from_verifier_result,
 )
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
+from sec_review_agents.review_stages.verification.result import VerificationStageResult
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
@@ -131,7 +136,7 @@ def prepare_repository_case_activity(
 async def analyze_repository_case_activity(
     request: RepositoryCaseReviewRequest,
     prepared_case: PreparedRepositoryCase,
-) -> dict[str, Any]:
+) -> AnalysisStageResult:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.workflows.repository_case.stage import (
@@ -163,8 +168,8 @@ async def analyze_repository_case_activity(
 async def score_repository_case_cvss_activity(
     request: RepositoryCaseReviewRequest,
     prepared_case: PreparedRepositoryCase,
-    analysis_result: Mapping[str, Any],
-) -> dict[str, Any]:
+    analysis_result: AnalysisStageResult,
+) -> CvssStageResult:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.workflows.repository_case.stage import (
@@ -191,9 +196,9 @@ async def score_repository_case_cvss_activity(
 async def mitigate_repository_case_activity(
     request: RepositoryCaseReviewRequest,
     prepared_case: PreparedRepositoryCase,
-    analysis_result: Mapping[str, Any],
-    retry_context: Mapping[str, Any] | None,
-) -> dict[str, Any]:
+    analysis_result: AnalysisStageResult,
+    retry_context: FeedbackRetryContext | None,
+) -> MitigationStageResult:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.mitigation.stage import (
@@ -221,7 +226,7 @@ async def mitigate_repository_case_activity(
             retry_context=retry_context,
             reason=MITIGATION_NO_TARGET_REASON,
         )
-    pass_index = int((retry_context or {}).get("retry_index") or 0)
+    pass_index = retry_context.retry_index if retry_context is not None else 0
     with bind_trace_context(
         **activity_trace_labels(
             workflow_name="repository-review",
@@ -252,10 +257,10 @@ async def mitigate_repository_case_activity(
 async def verify_repository_case_activity(
     request: RepositoryCaseReviewRequest,
     prepared_case: PreparedRepositoryCase,
-    analysis_result: Mapping[str, Any],
-    mitigation_result: dict[str, Any] | None,
-    retry_context: Mapping[str, Any] | None,
-) -> dict[str, Any]:
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult | None,
+    retry_context: FeedbackRetryContext | None,
+) -> VerificationStageResult:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.verification.stage import (
@@ -282,7 +287,7 @@ async def verify_repository_case_activity(
             retry_context=retry_context,
             reason="Verification was skipped because analysis produced no confirmed repair target.",
         )
-    pass_index = int((retry_context or {}).get("retry_index") or 0)
+    pass_index = retry_context.retry_index if retry_context is not None else 0
     with bind_trace_context(
         **activity_trace_labels(
             workflow_name="repository-review",
@@ -313,7 +318,7 @@ async def verify_repository_case_activity(
 @activity.defn
 def archive_repository_case_feedback_attempt_activity(
     prepared_case: PreparedRepositoryCase,
-    retry_context: dict[str, Any],
+    retry_context: FeedbackRetryContext,
 ) -> None:
     from sec_review_agents.review_stages.feedback_loop import (
         archive_initial_feedback_attempt,
@@ -329,10 +334,10 @@ def archive_repository_case_feedback_attempt_activity(
 @activity.defn
 def build_repository_case_result_activity(
     prepared_case: PreparedRepositoryCase,
-    analysis_result: Mapping[str, Any],
-    cvss_result: dict[str, Any] | None,
-    mitigation_result: dict[str, Any] | None,
-    verifier_result: dict[str, Any] | None,
+    analysis_result: AnalysisStageResult,
+    cvss_result: CvssStageResult | None,
+    mitigation_result: MitigationStageResult | None,
+    verifier_result: VerificationStageResult | None,
 ) -> dict[str, Any]:
     from sec_review_agents.workflows.repository_case.stage import (
         derive_case_disposition,
@@ -342,8 +347,8 @@ def build_repository_case_result_activity(
     case_id = case_execution_input["case_id"].strip()
     case_disposition = derive_case_disposition(
         analysis_result,
-        mitigation_result or {},
-        verifier_result or {},
+        mitigation_result,
+        verifier_result,
     )
     return {
         "case_id": case_id,
@@ -354,7 +359,7 @@ def build_repository_case_result_activity(
             mitigation_result=mitigation_result,
             verifier_result=verifier_result,
             cvss_result=cvss_result,
-        ),
+        ).model_dump(mode="json", by_alias=True),
     }
 
 
@@ -408,7 +413,7 @@ class RepositoryCaseReviewWorkflow:
                 retry_policy=retry_policy,
             )
             retry_count = 0
-            history: list[dict[str, Any]] = []
+            history: list[VerifierHistoryEntry] = []
             while (
                 retry_count < MAX_FEEDBACK_RETRY_ATTEMPTS
                 and should_retry_from_verifier_result(verifier_result)
@@ -420,7 +425,7 @@ class RepositoryCaseReviewWorkflow:
                     verifier_result=verifier_result,
                     history=history,
                 )
-                history = retry_context["history"]
+                history = retry_context.history
                 await workflow.execute_activity(
                     archive_repository_case_feedback_attempt_activity,
                     args=[prepared_case, retry_context],

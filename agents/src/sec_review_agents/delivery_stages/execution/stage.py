@@ -84,7 +84,7 @@ async def execute_delivery_entry(
                 for case_id in case_ids
             ],
         )
-        file_changes = patch_artifact["file_changes"]
+        file_changes = patch_artifact.file_changes
         has_changes = bool(file_changes)
         return build_delivery_execution_result(
             delivery_id=delivery_id,
@@ -95,7 +95,7 @@ async def execute_delivery_entry(
                 else "Patch synthesis produced no delivery file changes."
             ),
             file_changes=file_changes,
-            patch_diff=patch_artifact["patch_diff"],
+            patch_diff=patch_artifact.patch_diff,
         )
     except Exception as error:
         return build_delivery_execution_result(

@@ -7,7 +7,14 @@ from typing import Any
 
 from temporalio import activity, workflow
 
-from sec_review_agents.review_stages.record import build_review_record
+from sec_review_agents.review_stages.record import (
+    ReviewRecord,
+    ReviewRecordAnalysis,
+    ReviewRecordMitigation,
+    ReviewRecordVerification,
+)
+from sec_review_agents.review_stages.single_agent.result import SingleAgentFixOutcome
+from sec_review_agents.review_stages.types import PatchCoverage
 from sec_review_agents.run_diagnostics.publication import (
     RunDiagnosticPublicationRequest,
     publish_run_diagnostic_activity,
@@ -36,7 +43,7 @@ async def run_issue_single_agent(
     test_changes: TestChangesPolicy,
     runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> SingleAgentFixOutcome:
     """Run the single-agent stage and return its raw result.
 
     Shared by the Temporal activity and the direct/public entrypoints so the
@@ -80,7 +87,7 @@ async def run_issue_single_agent(
 @activity.defn
 async def run_issue_single_agent_activity(
     request: ReviewWorkflowRequest,
-) -> dict[str, Any]:
+) -> SingleAgentFixOutcome:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.runtime.setup_bootstrap import (
         setup_declaration_content_for_backend,
@@ -128,7 +135,7 @@ async def run_issue_single_agent_activity(
 @activity.defn
 def build_issue_single_agent_result_activity(
     request: ReviewWorkflowRequest,
-    single_agent_result: dict[str, Any],
+    single_agent_result: SingleAgentFixOutcome,
 ) -> dict[str, Any]:
     from sec_review_agents.utils.files import persist_json_artifact
     from sec_review_agents.utils.paths import required_path
@@ -193,75 +200,42 @@ class IssueSingleAgentWorkflow:
         }
 
 
-def _single_agent_analysis_projection(
-    result: Mapping[str, Any] | None,
-) -> dict[str, Any] | None:
-    if not isinstance(result, Mapping):
-        return None
-    return {
-        "status": "completed",
-        "overview": result.get("overview"),
-        "verdict": result.get("verdict"),
-        "validation_level": result.get("validation_level"),
-    }
-
-
-def _single_agent_mitigation_projection(
-    result: Mapping[str, Any] | None,
-) -> dict[str, Any] | None:
-    if not isinstance(result, Mapping):
-        return None
-    file_changes = result.get("file_changes") or []
-    changed_files = file_change_paths(file_changes)
-    status = (
-        "skipped"
-        if result.get("verdict") == "no-actionable-finding" and not changed_files
-        else "completed"
-    )
-    return {
-        "status": status,
-        "overview": result.get("overview"),
-        "file_changes": file_changes,
-        "patch_diff": result.get("patch_diff"),
-    }
-
-
-def _single_agent_verification_projection(
-    result: Mapping[str, Any] | None,
-) -> dict[str, Any] | None:
-    if not isinstance(result, Mapping):
-        return None
-    patch_coverage = (
-        "full" if file_change_paths(result.get("file_changes")) else "not-applicable"
-    )
-    return {
-        "overview": result.get("overview"),
-        "validation_level": result.get("validation_level"),
-        "patch_coverage": patch_coverage,
-        "regression_status": result.get("regression_status")
-        or ("not-run" if patch_coverage == "full" else "not-applicable"),
-        "resolution_next_step": "none" if patch_coverage == "full" else "manual-review",
-        "patch_findings": [],
-        "verification_findings": result.get("self_check_notes") or [],
-        "residual_risks": result.get("residual_risks") or [],
-    }
-
-
 def build_issue_single_agent_review_record(
     *,
-    single_agent_result: Mapping[str, Any],
+    single_agent_result: SingleAgentFixOutcome,
 ) -> dict[str, Any]:
-    return build_review_record(
-        analysis_result=_single_agent_analysis_projection(single_agent_result),
-        mitigation_result=_single_agent_mitigation_projection(single_agent_result),
-        verifier_result=_single_agent_verification_projection(single_agent_result),
-        cvss_result=None,
+    patch_coverage: PatchCoverage = (
+        "full"
+        if file_change_paths(single_agent_result.file_changes)
+        else "not-applicable"
     )
+    return ReviewRecord(
+        analysis=ReviewRecordAnalysis(
+            overview=single_agent_result.overview,
+            verdict=single_agent_result.verdict,
+        ),
+        mitigation=ReviewRecordMitigation(
+            overview=single_agent_result.overview,
+            file_changes=single_agent_result.file_changes,
+            patch_diff=single_agent_result.patch_diff,
+        ),
+        verification=ReviewRecordVerification(
+            overview=single_agent_result.overview,
+            validation_level=single_agent_result.validation_level,
+            patch_coverage=patch_coverage,
+            regression_status=single_agent_result.regression_status,
+            resolution_next_step=(
+                "none" if patch_coverage == "full" else "manual-review"
+            ),
+            verification_findings=single_agent_result.self_check_notes,
+            residual_risks=single_agent_result.residual_risks,
+        ),
+    ).model_dump(mode="json", by_alias=True)
 
 
 def build_issue_single_agent_result(
     *,
-    single_agent_result: Mapping[str, Any],
+    single_agent_result: SingleAgentFixOutcome,
 ) -> dict[str, Any]:
     return {
         "kind": "issue-single-agent-strategy-result",

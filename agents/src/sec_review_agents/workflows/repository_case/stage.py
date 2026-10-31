@@ -1,4 +1,3 @@
-from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -7,7 +6,12 @@ from sec_review_agents.observability.diagnostics import (
     log_stage_failed,
     log_stage_started,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
+from sec_review_agents.review_stages.cvss.result import CvssStageResult
 from sec_review_agents.review_stages.cvss.stage import persist_cvss_failure
+from sec_review_agents.review_stages.feedback_loop import FeedbackRetryContext
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
+from sec_review_agents.review_stages.verification.result import VerificationStageResult
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.workflows.repository_case.analysis import (
     analyze_repository_case,
@@ -41,22 +45,24 @@ def _blocked_case_disposition(reason: str) -> dict[str, Any]:
 
 
 def derive_case_disposition(
-    analyzer_result: Mapping[str, Any],
-    mitigator_result: Mapping[str, Any],
-    verifier_result: Mapping[str, Any],
+    analyzer_result: AnalysisStageResult,
+    mitigator_result: MitigationStageResult | None,
+    verifier_result: VerificationStageResult | None,
 ) -> dict[str, Any]:
-    verdict = analyzer_result.get("verdict")
-    if not file_change_paths(mitigator_result.get("file_changes")):
+    verdict = analyzer_result.verdict
+    if not file_change_paths(
+        mitigator_result.file_changes if mitigator_result is not None else None
+    ):
         return _blocked_case_disposition("The case did not produce an applied patch.")
 
-    if verifier_result.get("patch_coverage") != "full":
+    if verifier_result is None or verifier_result.patch_coverage != "full":
         return _blocked_case_disposition(
             "The verifier did not fully approve the patch for delivery execution."
         )
 
     # Full coverage answers only the security-target question. Known or unresolved
     # regressions still make the overall patch unsafe to send to delivery.
-    if verifier_result.get("regression_status") not in {
+    if verifier_result.regression_status not in {
         "passed",
         "not-run",
         "not-applicable",
@@ -65,7 +71,7 @@ def derive_case_disposition(
             "The verifier did not clear regression risk for delivery execution."
         )
 
-    if verifier_result.get("resolution_next_step") != "none":
+    if verifier_result.resolution_next_step != "none":
         return _blocked_case_disposition(
             "The verifier requires follow-up before delivery execution."
         )
@@ -99,7 +105,7 @@ async def analyze_repository_case_stage(
     analyzer_artifacts_path: Path,
     published_trajectory_path: Path | None = None,
     runtime_context: ExecutionRuntimeContext | None,
-) -> dict[str, Any]:
+) -> AnalysisStageResult:
     case_id = case_execution_input["case_id"]
     scan_mode = case_execution_input["scan_mode"]
     review_input = case_execution_input["review_input"]
@@ -135,7 +141,7 @@ async def analyze_repository_case_stage(
             stage="analyzer",
             started_at=started_at,
             case_id=case_id,
-            verdict=result.get("verdict"),
+            verdict=result.verdict,
         )
         return result
     except Exception as error:
@@ -150,10 +156,10 @@ async def analyze_repository_case_stage(
 
 async def score_repository_case_cvss_stage(
     case_execution_input: RepositoryCaseExecutionInput,
-    analyzer_result: Mapping[str, Any],
+    analyzer_result: AnalysisStageResult,
     *,
     cvss_artifacts_path: Path,
-) -> dict[str, Any]:
+) -> CvssStageResult:
     """Score CVSS and persist failures raised during the scoring execution."""
     case_id = case_execution_input["case_id"]
     workspace_snapshot_tar_path = Path(
@@ -175,9 +181,9 @@ async def score_repository_case_cvss_stage(
             stage="cvss-v4-scoring",
             started_at=started_at,
             case_id=case_id,
-            outcome=result.get("outcome"),
-            base_score=result.get("base_score"),
-            severity=result.get("severity"),
+            outcome=result.outcome,
+            base_score=result.base_score,
+            severity=result.severity,
         )
         return result
     except Exception as error:
@@ -198,13 +204,13 @@ async def score_repository_case_cvss_stage(
 
 async def run_repository_case_mitigation_stage(
     case_execution_input: RepositoryCaseExecutionInput,
-    analyzer_result: Mapping[str, Any],
-    retry_context: Mapping[str, Any] | None,
+    analyzer_result: AnalysisStageResult,
+    retry_context: FeedbackRetryContext | None,
     runtime_context: ExecutionRuntimeContext | None,
     *,
     mitigator_artifacts_path: Path,
     published_trajectory_path: Path | None = None,
-) -> dict[str, Any]:
+) -> MitigationStageResult:
     case_id = case_execution_input["case_id"]
     started_at = log_stage_started(
         stage="mitigator",
@@ -238,7 +244,7 @@ async def run_repository_case_mitigation_stage(
             stage="mitigator",
             started_at=started_at,
             case_id=case_id,
-            changed_file_count=len(file_change_paths(result.get("file_changes"))),
+            changed_file_count=len(file_change_paths(result.file_changes)),
         )
         return result
     except Exception as error:
@@ -253,14 +259,14 @@ async def run_repository_case_mitigation_stage(
 
 async def run_repository_case_verification_stage(
     case_execution_input: RepositoryCaseExecutionInput,
-    analyzer_result: Mapping[str, Any],
-    mitigator_result: Mapping[str, Any] | None,
-    retry_context: Mapping[str, Any] | None,
+    analyzer_result: AnalysisStageResult,
+    mitigator_result: MitigationStageResult | None,
+    retry_context: FeedbackRetryContext | None,
     runtime_context: ExecutionRuntimeContext | None,
     *,
     verifier_artifacts_path: Path,
     published_trajectory_path: Path | None = None,
-) -> dict[str, Any]:
+) -> VerificationStageResult:
     case_id = case_execution_input["case_id"]
     started_at = log_stage_started(
         stage="verifier",
@@ -294,7 +300,7 @@ async def run_repository_case_verification_stage(
             stage="verifier",
             started_at=started_at,
             case_id=case_id,
-            patch_coverage=result.get("patch_coverage"),
+            patch_coverage=result.patch_coverage,
         )
         return result
     except Exception as error:

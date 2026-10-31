@@ -8,6 +8,10 @@ from sec_review_agents.agents.verification.issue import (
     build_issue_verification_system_prompt,
     build_issue_verification_user_prompt,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
+from sec_review_agents.review_stages.feedback_loop import FeedbackRetryContext
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
+from sec_review_agents.review_stages.verification.result import VerificationStageResult
 from sec_review_agents.review_stages.verification.stage import (
     reset_verification_attempt_artifacts,
     run_verification_stage,
@@ -23,18 +27,18 @@ async def verify_issue(
     history_path: Path,
     verifier_artifacts_path: Path,
     published_trajectory_path: Path | None = None,
-    analysis_result: Mapping[str, Any],
-    mitigation_result: Mapping[str, Any] | None,
-    retry_context: Mapping[str, Any] | None,
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult | None,
+    retry_context: FeedbackRetryContext | None,
     runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> VerificationStageResult:
     attempt_label = verification_attempt_label(retry_context)
     reset_verification_attempt_artifacts(
         verifier_artifacts_path,
         attempt_label=attempt_label,
     )
-    patch_diff = (mitigation_result or {}).get("patch_diff")
+    patch_diff = mitigation_result.patch_diff if mitigation_result is not None else None
     # you have to pass it originally without stripping, because the patch diff may have leading/trailing whitespace that is significant
     workspace_patch = (
         patch_diff if isinstance(patch_diff, str) and patch_diff.strip() else None
@@ -43,7 +47,7 @@ async def verify_issue(
         issue=issue,
         retry_context=retry_context,
         analysis_result=analysis_result,
-        mitigation_result=mitigation_result or {},
+        mitigation_result=mitigation_result,
         workspace_patch=workspace_patch,
     )
     return await run_verification_stage(
@@ -61,7 +65,7 @@ async def verify_issue(
             runtime_context=runtime_context,
         ),
         system_prompt=build_issue_verification_system_prompt(
-            is_retry=isinstance(retry_context, Mapping)
+            is_retry=retry_context is not None
         ),
         filesystem_system_prompt=build_issue_verification_filesystem_system_prompt(),
         user_prompt=user_prompt,

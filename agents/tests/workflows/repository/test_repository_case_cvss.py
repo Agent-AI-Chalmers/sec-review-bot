@@ -8,6 +8,7 @@ import pytest
 from sec_review_agents.workflows.repository_case.stage import (
     score_repository_case_cvss_stage,
 )
+from tests.analysis_fixtures import analysis_fixture
 
 
 @pytest.mark.asyncio
@@ -32,7 +33,7 @@ async def test_cvss_stage_persists_failure_before_reraising(tmp_path: Path) -> N
                 "review_input": "Review the reported vulnerability.",
                 "workspace_snapshot_tar_path": str(tmp_path / "workspace.snapshot.tar"),
             },
-            {"verdict": "confirmed-vulnerability"},
+            analysis_fixture(verdict="confirmed-vulnerability", narratives=[]),
             cvss_artifacts_path=cvss_artifacts_path,
         )
 
@@ -66,7 +67,7 @@ async def test_cvss_stage_does_not_report_cancellation_as_scoring_failure(
                 "review_input": "Review the reported vulnerability.",
                 "workspace_snapshot_tar_path": str(tmp_path / "workspace.snapshot.tar"),
             },
-            {"verdict": "confirmed-vulnerability"},
+            analysis_fixture(verdict="confirmed-vulnerability", narratives=[]),
             cvss_artifacts_path=cvss_artifacts_path,
         )
 

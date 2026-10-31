@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Any
 
 from sec_review_agents.agents.analysis.repository import (
     build_repository_analyzer_backend_config,
@@ -7,6 +6,7 @@ from sec_review_agents.agents.analysis.repository import (
     build_repository_analyzer_system_prompt,
     build_repository_analyzer_user_prompt,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 
@@ -22,7 +22,7 @@ async def analyze_repository_case(
     review_input: str,
     runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> AnalysisStageResult:
     return await run_analysis_stage(
         analyzer_artifacts_path=analyzer_artifacts_path,
         published_trajectory_path=published_trajectory_path,

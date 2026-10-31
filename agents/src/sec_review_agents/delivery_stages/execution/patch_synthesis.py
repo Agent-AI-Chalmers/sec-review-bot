@@ -28,6 +28,7 @@ from sec_review_agents.utils.files import (
 from sec_review_agents.utils.markdown import inline_code, md
 from sec_review_agents.workspace.file_changes import file_change_paths
 from sec_review_agents.workspace.patches import (
+    PatchArtifact,
     build_patch_artifact,
 )
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
@@ -147,7 +148,7 @@ async def synthesize_combined_delivery_patch(
     patch_synthesis_root: Path,
     delivery_entry: DeliveryEntry,
     case_items: Sequence[Mapping[str, Any]],
-) -> dict[str, Any]:
+) -> PatchArtifact:
     """Build and persist the patch artifact for one combined delivery.
 
     Delivery execution owns status and error reporting. This function returns only
@@ -210,6 +211,6 @@ async def synthesize_combined_delivery_patch(
         persist_text_artifact(
             delivery_artifacts_root,
             "workspace.patch",
-            patch_artifact["patch_diff"],
+            patch_artifact.patch_diff,
         )
         return patch_artifact

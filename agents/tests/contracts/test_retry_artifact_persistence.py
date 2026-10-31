@@ -6,9 +6,14 @@ import pytest
 
 from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.agents.mitigation.model import MitigationOutput
+from sec_review_agents.review_stages.feedback_loop import feedback_retry_context
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.mitigation.stage import (
     create_skipped_mitigation_result,
     persist_mitigation_result,
+)
+from sec_review_agents.review_stages.verification.result import (
+    build_skipped_verification_result,
 )
 from sec_review_agents.review_stages.verification.stage import (
     create_skipped_verification_result,
@@ -17,6 +22,7 @@ from sec_review_agents.review_stages.verification.stage import (
     verification_attempt_label,
 )
 from sec_review_agents.runtime.trajectories import TrajectoryWriter
+from sec_review_agents.workspace.patches import PatchArtifact
 from sec_review_agents.workspace.snapshots import (
     WORKSPACE_SNAPSHOT_TAR_NAME,
     create_workspace_snapshot_tar,
@@ -92,7 +98,9 @@ def test_retry_mitigation_attempt_preserves_initial_archive(tmp_path: Path) -> N
 
     create_skipped_mitigation_result(
         mitigator_artifacts_path=root,
-        retry_context={"retry_index": 1},
+        retry_context=feedback_retry_context(
+            retry_index=1, mitigation_result=None, verifier_result=None
+        ),
         reason="no target",
     )
 
@@ -110,9 +118,7 @@ def test_mitigation_persists_latest_and_attempt_specific_files(
     tmp_path: Path,
 ) -> None:
     root = tmp_path
-    result = {
-        "overview": "retry",
-    }
+    result = MitigationStageResult(overview="retry")
 
     persist_mitigation_result(root, result, attempt_label="retry-1")
 
@@ -126,7 +132,7 @@ def test_verification_persists_latest_and_attempt_specific_files(
     tmp_path: Path,
 ) -> None:
     root = tmp_path
-    result = {"overview": "verified"}
+    result = build_skipped_verification_result(reason="verified")
 
     persist_verification_result(root, result, attempt_label="retry-1")
 
@@ -144,10 +150,10 @@ def test_skipped_verification_persists_explicit_stage_result(tmp_path: Path) -> 
     )
 
     persisted = json.loads((tmp_path / "verification-result.json").read_text())
-    assert result == persisted
-    assert result["overview"] == "No confirmed repair target."
-    assert result["patch_coverage"] is None
-    assert result["resolution_next_step"] == "none"
+    assert result.model_dump(mode="json") == persisted
+    assert result.overview == "No confirmed repair target."
+    assert result.patch_coverage is None
+    assert result.resolution_next_step == "none"
 
 
 def test_verification_attempt_reset_uses_retry_context_for_attempt_label(
@@ -165,7 +171,11 @@ def test_verification_attempt_reset_uses_retry_context_for_attempt_label(
         encoding="utf-8",
     )
 
-    attempt_label = verification_attempt_label({"retry_index": 1})
+    attempt_label = verification_attempt_label(
+        feedback_retry_context(
+            retry_index=1, mitigation_result=None, verifier_result=None
+        )
+    )
     reset_verification_attempt_artifacts(
         verifier_root,
         attempt_label=attempt_label,
@@ -192,12 +202,9 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
         tar_path=root / WORKSPACE_SNAPSHOT_TAR_NAME,
     )
 
-    retry_context: dict[str, object] = {
-        "retry_index": 1,
-        "previous_mitigation_result": None,
-        "previous_verifier_result": None,
-        "history": [],
-    }
+    retry_context = feedback_retry_context(
+        retry_index=1, mitigation_result=None, verifier_result=None
+    )
     structured_payload = {
         "overview": "retry patch",
         "declared_changed_files": ["demo.txt"],
@@ -217,10 +224,10 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
     ):
         _ = workspace_path
         assert include_paths == ["demo.txt"]
-        return {
-            "patch_diff": "diff --git a/demo.txt b/demo.txt\n",
-            "file_changes": [{"path": "demo.txt", "status": "deleted"}],
-        }
+        return PatchArtifact(
+            patch_diff="diff --git a/demo.txt b/demo.txt\n",
+            file_changes=[{"path": "demo.txt", "status": "deleted"}],
+        )
 
     with (
         patch(

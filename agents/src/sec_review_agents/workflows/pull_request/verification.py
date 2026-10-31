@@ -8,6 +8,10 @@ from sec_review_agents.agents.verification.pull_request import (
     build_pr_verification_system_prompt,
     build_pr_verification_user_prompt,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
+from sec_review_agents.review_stages.feedback_loop import FeedbackRetryContext
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
+from sec_review_agents.review_stages.verification.result import VerificationStageResult
 from sec_review_agents.review_stages.verification.stage import (
     reset_verification_attempt_artifacts,
     run_verification_stage,
@@ -24,18 +28,18 @@ async def verify_pull_request(
     incremental_window_path: Path,
     verifier_artifacts_path: Path,
     published_trajectory_path: Path | None = None,
-    analysis_result: Mapping[str, Any],
-    mitigation_result: Mapping[str, Any] | None,
-    retry_context: Mapping[str, Any] | None,
+    analysis_result: AnalysisStageResult,
+    mitigation_result: MitigationStageResult | None,
+    retry_context: FeedbackRetryContext | None,
     runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> VerificationStageResult:
     attempt_label = verification_attempt_label(retry_context)
     reset_verification_attempt_artifacts(
         verifier_artifacts_path,
         attempt_label=attempt_label,
     )
-    patch_diff = (mitigation_result or {}).get("patch_diff")
+    patch_diff = mitigation_result.patch_diff if mitigation_result is not None else None
     workspace_patch = (
         patch_diff if isinstance(patch_diff, str) and patch_diff.strip() else None
     )
@@ -62,7 +66,7 @@ async def verify_pull_request(
             runtime_context=runtime_context,
         ),
         system_prompt=build_pr_verification_system_prompt(
-            is_retry=isinstance(retry_context, Mapping)
+            is_retry=retry_context is not None
         ),
         filesystem_system_prompt=build_pr_verification_filesystem_system_prompt(),
         user_prompt=user_prompt,

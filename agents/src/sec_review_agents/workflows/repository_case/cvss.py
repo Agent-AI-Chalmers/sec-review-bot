@@ -1,6 +1,4 @@
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from sec_review_agents.agents.cvss.repository import (
     REPOSITORY_CVSS_V4_SCORER_NAME,
@@ -9,7 +7,11 @@ from sec_review_agents.agents.cvss.repository import (
     build_repository_cvss_v4_user_prompt,
     create_repository_cvss_backend,
 )
-from sec_review_agents.review_stages.cvss.result import build_skipped_cvss_v4_result
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
+from sec_review_agents.review_stages.cvss.result import (
+    CvssStageResult,
+    build_skipped_cvss_v4_result,
+)
 from sec_review_agents.review_stages.cvss.stage import (
     is_cvss_v4_scoring_target,
     persist_cvss_stage_result,
@@ -24,8 +26,8 @@ async def score_repository_cvss_v4(
     cvss_artifacts_path: Path,
     workspace_snapshot_tar_path: Path,
     review_input: str,
-    analysis_result: Mapping[str, Any],
-) -> dict[str, Any]:
+    analysis_result: AnalysisStageResult,
+) -> CvssStageResult:
     if not is_cvss_v4_scoring_target(analysis_result):
         result = build_skipped_cvss_v4_result(reason=CVSS_NO_TARGET_REASON)
         persist_cvss_stage_result(

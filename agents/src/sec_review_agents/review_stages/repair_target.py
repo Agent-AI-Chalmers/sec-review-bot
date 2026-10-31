@@ -1,18 +1,11 @@
-from collections.abc import Mapping
-from typing import Any
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 
 
-def has_confirmed_repair_target(
-    analysis_result: Mapping[str, Any] | None,
-) -> bool:
+def has_confirmed_repair_target(analysis_result: AnalysisStageResult | None) -> bool:
     """Return whether analysis accepted a narrative as a confirmed repair target."""
-    narratives = (analysis_result or {}).get("narratives")
-    if not isinstance(narratives, list):
-        return False
-    return any(
-        isinstance(narrative, dict)
-        and narrative.get("verdict") in {"confirmed-vulnerability", "confirmed-defect"}
-        for narrative in narratives
+    return analysis_result is not None and any(
+        narrative.verdict in {"confirmed-vulnerability", "confirmed-defect"}
+        for narrative in analysis_result.narratives
     )
 
 

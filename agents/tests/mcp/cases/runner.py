@@ -4,10 +4,12 @@ import shutil
 from pathlib import Path
 from unittest.mock import patch
 
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.workflows.repository_case.verification import (
     verify_repository_case,
 )
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
+from tests.analysis_fixtures import analysis_fixture
 from tests.mcp.cases.models import McpCase, McpCaseMode
 from tests.runtime.trajectory_artifact_helpers import (
     tool_interactions_from_trajectory,
@@ -52,15 +54,14 @@ async def run_mcp_case(
             verifier_artifacts_path=artifacts,
             scan_mode="full",
             review_input=agent_case.review_input,
-            analysis_result={
-                "overview": agent_case.analysis_overview,
-                "verdict": "confirmed-vulnerability",
-            },
-            mitigation_result={
-                "overview": "No mitigation patch was supplied.",
-                "changed_files": [],
-                "patch_diff": "",
-            },
+            analysis_result=analysis_fixture(
+                overview=agent_case.analysis_overview,
+                verdict="confirmed-vulnerability",
+                narratives=[],
+            ),
+            mitigation_result=MitigationStageResult(
+                overview="No mitigation patch was supplied.", patch_diff=""
+            ),
             setup_declaration_content=(
                 case.setup_path.read_text(encoding="utf-8")
                 if case.setup_path is not None
@@ -78,7 +79,7 @@ async def run_mcp_case(
         "toolNames": usage["toolNames"],
         "toolErrors": usage["toolErrors"],
         "toolInteractions": tool_interactions_from_trajectory(trajectory),
-        "result": result,
+        "result": result.model_dump(mode="json"),
     }
 
 

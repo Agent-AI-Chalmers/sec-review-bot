@@ -2,6 +2,7 @@ from typing import Any
 
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
+    VerifierHistoryEntry,
     feedback_retry_context,
     should_retry_from_verifier_result,
 )
@@ -32,7 +33,7 @@ async def run_pull_request_review_direct(
         None,
     )
     retry_count = 0
-    history: list[dict[str, Any]] = []
+    history: list[VerifierHistoryEntry] = []
     while (
         retry_count < MAX_FEEDBACK_RETRY_ATTEMPTS
         and should_retry_from_verifier_result(verifier_result)
@@ -44,7 +45,7 @@ async def run_pull_request_review_direct(
             verifier_result=verifier_result,
             history=history,
         )
-        history = retry_context["history"]
+        history = retry_context.history
         archive_pull_request_feedback_attempt_activity(prepared_input, retry_context)
         mitigation_result = await mitigate_pull_request_activity(
             request,

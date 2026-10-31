@@ -8,6 +8,8 @@ from sec_review_agents.agents.mitigation.issue import (
     build_issue_self_check_mitigation_system_prompt,
     build_issue_self_check_mitigation_user_prompt,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
+from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.mitigation.stage import (
     run_mitigation_stage,
 )
@@ -25,11 +27,11 @@ async def mitigate_issue_with_self_check(
     history_path: Path,
     mitigator_artifacts_path: Path,
     published_trajectory_path: Path | None = None,
-    analysis_result: Mapping[str, Any],
+    analysis_result: AnalysisStageResult,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
-) -> dict[str, Any]:
+) -> MitigationStageResult:
     return await run_mitigation_stage(
         agent_name="issue-mitigator-self-check",
         mitigator_artifacts_path=mitigator_artifacts_path,

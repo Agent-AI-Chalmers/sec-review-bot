@@ -4,7 +4,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from sec_review_agents.workspace.file_changes import FileChange
+from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
 
 
 class DeliveryExecutionResult(BaseModel):
@@ -12,7 +12,9 @@ class DeliveryExecutionResult(BaseModel):
     status: Literal["ready", "no-changes", "failed"]
     error: str | None
     patch_diff: str
-    file_changes: list[FileChange] = Field(default_factory=list)
+    file_changes: list[DeletedFileChange | UpsertFileChange] = Field(
+        default_factory=list
+    )
 
     model_config = ConfigDict(extra="ignore")
 
@@ -22,7 +24,7 @@ def build_delivery_execution_result(
     delivery_id: str,
     status: Literal["ready", "no-changes", "failed"],
     error: str | None,
-    file_changes: list[FileChange] | None,
+    file_changes: list[DeletedFileChange | UpsertFileChange] | None,
     patch_diff: str,
 ) -> dict[str, Any]:
     return DeliveryExecutionResult.model_validate(

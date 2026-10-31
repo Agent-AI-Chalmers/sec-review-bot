@@ -2,8 +2,10 @@ import asyncio
 import contextlib
 from typing import Any
 
+from sec_review_agents.review_stages.cvss.result import CvssStageResult
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
+    VerifierHistoryEntry,
     feedback_retry_context,
     should_retry_from_verifier_result,
 )
@@ -52,7 +54,7 @@ async def run_repository_case_review_direct(
             None,
         )
         retry_count = 0
-        history: list[dict[str, Any]] = []
+        history: list[VerifierHistoryEntry] = []
         while (
             retry_count < MAX_FEEDBACK_RETRY_ATTEMPTS
             and should_retry_from_verifier_result(verifier_result)
@@ -64,7 +66,7 @@ async def run_repository_case_review_direct(
                 verifier_result=verifier_result,
                 history=history,
             )
-            history = retry_context["history"]
+            history = retry_context.history
             archive_repository_case_feedback_attempt_activity(
                 prepared_case,
                 retry_context,
@@ -84,7 +86,7 @@ async def run_repository_case_review_direct(
             )
         # Match the workflow path: observed scoring failures are persisted by the
         # stage, while CVSS remains advisory to the case result.
-        cvss_result: dict[str, Any] | None
+        cvss_result: CvssStageResult | None
         try:
             cvss_result = await cvss_result_task
         except Exception:
