@@ -1,9 +1,10 @@
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.agents.cvss.model import CvssV4ScoringOutput
 from sec_review_agents.workflows.issue.analysis import analyze_issue
 from sec_review_agents.workflows.repository_case.cvss import score_repository_cvss_v4
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
@@ -76,26 +77,22 @@ async def test_repository_cvss_uses_stage_owned_workspace_copy(tmp_path: Path) -
     )
     captured_workspace: list[Path] = []
 
-    async def fake_create_cvss_agent_graph(**kwargs: Any) -> object:
-        return Mock(backend=kwargs["backend"])
-
     async def fake_invoke_cvss_agent(
         *,
-        agent: Any,
+        backend: Any,
         **_kwargs: Any,
-    ) -> dict[str, Any]:
-        backend = agent.backend
+    ) -> CvssV4ScoringOutput:
         workspace_route = backend.routes["/workspace/"]
         workspace = workspace_route.root_dir
         assert isinstance(workspace, Path)
         captured_workspace.append(workspace)
         assert workspace != source_workspace
         assert (workspace / "app.py").read_text() == "print('source')\n"
-        return {
-            "scoring_status": "not-scored",
-            "overview": "ok",
-            "not_scored_reason": "test case",
-        }
+        return CvssV4ScoringOutput(
+            scoring_status="not-scored",
+            overview="ok",
+            not_scored_reason="test case",
+        )
 
     with (
         patch(
@@ -103,11 +100,7 @@ async def test_repository_cvss_uses_stage_owned_workspace_copy(tmp_path: Path) -
             return_value="local",
         ),
         patch(
-            "sec_review_agents.review_stages.cvss.stage.create_cvss_agent_graph",
-            side_effect=fake_create_cvss_agent_graph,
-        ),
-        patch(
-            "sec_review_agents.review_stages.cvss.stage.invoke_agent_runtime_graph",
+            "sec_review_agents.review_stages.cvss.stage.run_cvss_agent",
             side_effect=fake_invoke_cvss_agent,
         ),
     ):

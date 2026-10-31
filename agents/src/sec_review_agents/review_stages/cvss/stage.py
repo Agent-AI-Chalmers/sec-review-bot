@@ -7,7 +7,7 @@ from typing import Any
 
 import cvss  # type: ignore[import-untyped]
 
-from sec_review_agents.agents.cvss.agent import create_cvss_agent_graph
+from sec_review_agents.agents.cvss.agent import run_cvss_agent
 from sec_review_agents.agents.cvss.model import (
     CVSS_VECTOR_ORDER,
     CvssV4ScoringOutput,
@@ -16,7 +16,6 @@ from sec_review_agents.review_stages.cvss.result import (
     CvssStageResult,
     build_cvss_v4_stage_result,
 )
-from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.trajectories import remove_trajectories, trajectory_path
 from sec_review_agents.utils.files import persist_json_artifact, remove_json_artifacts
@@ -131,19 +130,16 @@ async def run_cvss_v4_scoring_stage(
         trajectory = trajectory_path(cvss_artifacts_path)
         backend = build_backend(workspace_path)
         async with amanaged_backend(backend):
-            agent = await create_cvss_agent_graph(
-                agent_name=agent_name,
-                backend=backend,
-                system_prompt=system_prompt,
-                filesystem_system_prompt=filesystem_system_prompt,
-            )
-            agent_output = await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=agent_name,
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                trajectory_paths=(trajectory,),
-            )
+            agent_output = (
+                await run_cvss_agent(
+                    agent_name=agent_name,
+                    backend=backend,
+                    system_prompt=system_prompt,
+                    filesystem_system_prompt=filesystem_system_prompt,
+                    user_prompt=user_prompt,
+                    trajectory_paths=(trajectory,),
+                )
+            ).model_dump(by_alias=True)
         result = build_cvss_stage_result_from_agent_output(agent_output)
         persist_cvss_stage_result(
             cvss_artifacts_path=cvss_artifacts_path, result=result

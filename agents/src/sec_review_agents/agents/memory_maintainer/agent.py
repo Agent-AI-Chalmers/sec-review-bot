@@ -2,7 +2,6 @@ from pathlib import Path
 
 from deepagents.backends.protocol import BackendProtocol
 from langchain_core.language_models import BaseChatModel
-from langgraph.graph.state import CompiledStateGraph
 
 from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.agents.memory_maintainer.prompts import (
@@ -11,7 +10,7 @@ from sec_review_agents.agents.memory_maintainer.prompts import (
 from sec_review_agents.agents.memory_maintainer.tools import (
     build_memory_delete_file_tool,
 )
-from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
+from sec_review_agents.runtime.agent_runtime_graph import run_agent_runtime_graph
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
 from sec_review_agents.runtime.structured_response_middleware import (
     MissingStructuredResponseMiddleware,
@@ -21,13 +20,17 @@ from sec_review_agents.runtime.structured_response_middleware import (
 MEMORY_MAINTAINER_AGENT_NAME = "memory-maintainer"
 
 
-async def create_memory_maintainer_agent_graph(
+async def run_memory_maintainer_agent(
     *,
     model: BaseChatModel,
     backend: BackendProtocol,
     worktree_root: Path,
-) -> CompiledStateGraph:
-    return await build_agent_runtime_graph(
+    user_prompt: str,
+    trajectory_paths: tuple[Path, ...] = (),
+) -> MemoryMaintenanceOutput:
+    return await run_agent_runtime_graph(
+        user_prompt=user_prompt,
+        trajectory_paths=trajectory_paths,
         model=model,
         agent_name=MEMORY_MAINTAINER_AGENT_NAME,
         backend=backend,

@@ -15,6 +15,7 @@
 ### architecture/
 
 - [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：逻辑运行角色、当前部署边界、职责所有权，以及主 review 与异步 memory 链路。
+- [STAGE_AGENT_OWNERSHIP.zh.md](architecture/STAGE_AGENT_OWNERSHIP.zh.md)：stage 与 agent 的职责、资源生命周期和 MCP 会话归属。
 
 ### Packages 与服务
 

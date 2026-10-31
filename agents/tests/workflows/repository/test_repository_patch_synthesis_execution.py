@@ -5,13 +5,14 @@ import subprocess
 import tempfile
 from pathlib import Path
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import patch
 
 import pytest
 
 from sec_review_agents.agents.delivery_planning.workbench_state import (
     DeliveryWorkbenchState,
 )
+from sec_review_agents.agents.patch_synthesis.model import PatchSynthesisOutput
 from sec_review_agents.utils.files import persist_text_artifact
 from sec_review_agents.workflows.repository import direct as repository_direct
 from sec_review_agents.workflows.repository.workflow import (
@@ -321,17 +322,8 @@ class TestRepositoryDeliveryExecution:
             "reason": "Ready for delivery execution.",
         }
 
-    def _delivery_agent_response(self, paths: list[str]) -> dict:
-        return {
-            "declared_changed_files": paths,
-        }
-
-    def _record_patch_synthesis_agent_graph(self, calls: list[dict]):
-        def _side_effect(*args, **kwargs):
-            calls.append(kwargs)
-            return Mock()
-
-        return _side_effect
+    def _delivery_agent_response(self, paths: list[str]) -> PatchSynthesisOutput:
+        return PatchSynthesisOutput(declared_changed_files=paths)
 
     def _latest_patch_synthesis_workspace(self, calls: list[dict]) -> Path:
         assert calls
@@ -842,6 +834,7 @@ class TestRepositoryDeliveryExecution:
         create_agent_calls: list[dict] = []
 
         def _invoke_side_effect(*args, **kwargs):
+            create_agent_calls.append(kwargs)
             invoke_calls["count"] += 1
             for trajectory_path in kwargs["trajectory_paths"]:
                 trajectory_path.parent.mkdir(parents=True, exist_ok=True)
@@ -857,13 +850,7 @@ class TestRepositoryDeliveryExecution:
 
         with (
             patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.create_patch_synthesis_agent_graph",
-                side_effect=self._record_patch_synthesis_agent_graph(
-                    create_agent_calls
-                ),
-            ),
-            patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.invoke_agent_runtime_graph",
+                "sec_review_agents.delivery_stages.execution.patch_synthesis.run_patch_synthesis_agent",
                 side_effect=_invoke_side_effect,
             ),
         ):
@@ -927,6 +914,7 @@ class TestRepositoryDeliveryExecution:
         create_agent_calls: list[dict] = []
 
         def _invoke_side_effect(*args, **kwargs):
+            create_agent_calls.append(kwargs)
             invoke_calls["count"] += 1
             if invoke_calls["count"] == 1:
                 merge_workspace = self._latest_patch_synthesis_workspace(
@@ -939,13 +927,7 @@ class TestRepositoryDeliveryExecution:
 
         with (
             patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.create_patch_synthesis_agent_graph",
-                side_effect=self._record_patch_synthesis_agent_graph(
-                    create_agent_calls
-                ),
-            ),
-            patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.invoke_agent_runtime_graph",
+                "sec_review_agents.delivery_stages.execution.patch_synthesis.run_patch_synthesis_agent",
                 side_effect=_invoke_side_effect,
             ),
         ):
@@ -996,6 +978,7 @@ class TestRepositoryDeliveryExecution:
         create_agent_calls: list[dict] = []
 
         def _invoke_side_effect(*args, **kwargs):
+            create_agent_calls.append(kwargs)
             merge_workspace = self._latest_patch_synthesis_workspace(create_agent_calls)
             (merge_workspace / "src/app.txt").write_text("value=3\n", encoding="utf-8")
             (merge_workspace / "dist").mkdir(parents=True, exist_ok=True)
@@ -1006,13 +989,7 @@ class TestRepositoryDeliveryExecution:
 
         with (
             patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.create_patch_synthesis_agent_graph",
-                side_effect=self._record_patch_synthesis_agent_graph(
-                    create_agent_calls
-                ),
-            ),
-            patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.invoke_agent_runtime_graph",
+                "sec_review_agents.delivery_stages.execution.patch_synthesis.run_patch_synthesis_agent",
                 side_effect=_invoke_side_effect,
             ),
         ):
@@ -1066,11 +1043,7 @@ class TestRepositoryDeliveryExecution:
 
         with (
             patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.create_patch_synthesis_agent_graph",
-                side_effect=self._record_patch_synthesis_agent_graph([]),
-            ),
-            patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.invoke_agent_runtime_graph",
+                "sec_review_agents.delivery_stages.execution.patch_synthesis.run_patch_synthesis_agent",
                 side_effect=_invoke_side_effect,
             ),
         ):
@@ -1120,6 +1093,7 @@ class TestRepositoryDeliveryExecution:
         create_agent_calls: list[dict] = []
 
         def _invoke_side_effect(*args, **kwargs):
+            create_agent_calls.append(kwargs)
             invoke_calls["count"] += 1
             if invoke_calls["count"] == 1:
                 merge_workspace = self._latest_patch_synthesis_workspace(
@@ -1133,13 +1107,7 @@ class TestRepositoryDeliveryExecution:
 
         with (
             patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.create_patch_synthesis_agent_graph",
-                side_effect=self._record_patch_synthesis_agent_graph(
-                    create_agent_calls
-                ),
-            ),
-            patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.invoke_agent_runtime_graph",
+                "sec_review_agents.delivery_stages.execution.patch_synthesis.run_patch_synthesis_agent",
                 side_effect=_invoke_side_effect,
             ),
         ):
@@ -1191,6 +1159,7 @@ class TestRepositoryDeliveryExecution:
         create_agent_calls: list[dict] = []
 
         def _invoke_side_effect(*args, **kwargs):
+            create_agent_calls.append(kwargs)
             invoke_calls["count"] += 1
             invoke_user_prompts.append(kwargs["user_prompt"])
             if invoke_calls["count"] == 1:
@@ -1205,13 +1174,7 @@ class TestRepositoryDeliveryExecution:
 
         with (
             patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.create_patch_synthesis_agent_graph",
-                side_effect=self._record_patch_synthesis_agent_graph(
-                    create_agent_calls
-                ),
-            ),
-            patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.invoke_agent_runtime_graph",
+                "sec_review_agents.delivery_stages.execution.patch_synthesis.run_patch_synthesis_agent",
                 side_effect=_invoke_side_effect,
             ),
         ):
@@ -1283,6 +1246,7 @@ class TestRepositoryDeliveryExecution:
         create_agent_calls: list[dict] = []
 
         def _invoke_side_effect(*args, **kwargs):
+            create_agent_calls.append(kwargs)
             invoke_calls["count"] += 1
             if invoke_calls["count"] == 1:
                 merge_workspace = self._latest_patch_synthesis_workspace(
@@ -1294,13 +1258,7 @@ class TestRepositoryDeliveryExecution:
 
         with (
             patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.create_patch_synthesis_agent_graph",
-                side_effect=self._record_patch_synthesis_agent_graph(
-                    create_agent_calls
-                ),
-            ),
-            patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.invoke_agent_runtime_graph",
+                "sec_review_agents.delivery_stages.execution.patch_synthesis.run_patch_synthesis_agent",
                 side_effect=_invoke_side_effect,
             ),
         ):
@@ -1408,7 +1366,7 @@ class TestRepositoryDeliveryExecution:
         case_result = self._case_result("case-1", _patch_paths(patch_artifact))
 
         with patch(
-            "sec_review_agents.delivery_stages.execution.patch_synthesis.create_patch_synthesis_agent_graph"
+            "sec_review_agents.delivery_stages.execution.patch_synthesis.run_patch_synthesis_agent"
         ) as create_graph:
             result = await _execute_delivery_direct_for_test(
                 input_data=self.input_data,
@@ -1755,6 +1713,7 @@ class TestRepositoryDeliveryExecution:
         create_agent_calls: list[dict] = []
 
         def _invoke_side_effect(*args, **kwargs):
+            create_agent_calls.append(kwargs)
             merge_workspace = self._latest_patch_synthesis_workspace(create_agent_calls)
             (merge_workspace / "src/a.txt").write_text(
                 "alpha updated\n", encoding="utf-8"
@@ -1766,13 +1725,7 @@ class TestRepositoryDeliveryExecution:
 
         with (
             patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.create_patch_synthesis_agent_graph",
-                side_effect=self._record_patch_synthesis_agent_graph(
-                    create_agent_calls
-                ),
-            ),
-            patch(
-                "sec_review_agents.delivery_stages.execution.patch_synthesis.invoke_agent_runtime_graph",
+                "sec_review_agents.delivery_stages.execution.patch_synthesis.run_patch_synthesis_agent",
                 side_effect=_invoke_side_effect,
             ),
         ):

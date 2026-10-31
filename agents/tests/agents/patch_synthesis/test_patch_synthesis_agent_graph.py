@@ -3,13 +3,13 @@ from unittest.mock import patch
 import pytest
 
 from sec_review_agents.agents.patch_synthesis.agent import (
-    create_patch_synthesis_agent_graph,
+    run_patch_synthesis_agent,
 )
 from sec_review_agents.agents.patch_synthesis.model import PatchSynthesisOutput
 
 
 @pytest.mark.asyncio
-async def test_create_patch_synthesis_agent_graph_uses_fixed_response_format(
+async def test_run_patch_synthesis_agent_uses_fixed_response_format(
     tmp_path,
 ) -> None:
     created_kwargs: dict = {}
@@ -23,6 +23,10 @@ async def test_create_patch_synthesis_agent_graph_uses_fixed_response_format(
         return agent
 
     with (
+        patch(
+            "sec_review_agents.runtime.agent_runtime_graph.invoke_agent_runtime_graph",
+            return_value=agent,
+        ),
         patch(
             "sec_review_agents.agents.patch_synthesis.agent.model_turn_diagnostics_enabled",
             return_value=False,
@@ -51,7 +55,8 @@ async def test_create_patch_synthesis_agent_graph_uses_fixed_response_format(
             return_value=False,
         ),
     ):
-        created_agent = await create_patch_synthesis_agent_graph(
+        created_agent = await run_patch_synthesis_agent(
+            user_prompt="task",
             backend=backend,
             workspace_root_path=tmp_path,
         )

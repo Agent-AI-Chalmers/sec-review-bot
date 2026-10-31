@@ -13,6 +13,7 @@ For a project overview, start with the repository [README](../README.md).
 ### architecture/
 
 - [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md): Logical runtime roles, current deployment boundaries, ownership, and the main review and asynchronous memory paths.
+- [STAGE_AGENT_OWNERSHIP.md](architecture/STAGE_AGENT_OWNERSHIP.md): Stage and agent responsibilities, resource lifetimes, and MCP session ownership.
 
 ### Packages and services
 

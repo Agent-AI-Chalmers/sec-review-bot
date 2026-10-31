@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 from langchain_core.messages import ToolMessage
+from pydantic import BaseModel
 
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.trajectories import (
@@ -138,15 +139,19 @@ def test_trajectory_does_not_merge_distinct_idless_immutable_messages(
 
 @pytest.mark.asyncio
 async def test_agent_runtime_graph_prepends_system_message(tmp_path: Path) -> None:
+    class ProbeOutput(BaseModel):
+        ok: bool
+
     trajectory_path = tmp_path / "trajectory.jsonl"
     agent = Mock()
 
     async def astream(*args: Any, **kwargs: Any):
         _ = args, kwargs
-        yield {"model": {"structured_response": {"ok": True}}}
+        yield {"model": {"structured_response": ProbeOutput(ok=True)}}
 
     agent.astream = astream
     await invoke_agent_runtime_graph(
+        response_format=ProbeOutput,
         agent=agent,
         agent_name="test-agent",
         system_prompt="Base system prompt.",

@@ -71,6 +71,7 @@ async def test_llm_corrects_rejected_changed_files_response_in_same_thread(
         ],
     )
     result = await invoke_agent_runtime_graph(
+        response_format=PatchClaimProbeOutput,
         agent=agent,
         agent_name="structured-correction-probe",
         system_prompt="Return only the configured structured response.",
@@ -82,4 +83,4 @@ async def test_llm_corrects_rejected_changed_files_response_in_same_thread(
         trajectory_paths=(tmp_path / "trajectory.jsonl",),
     )
 
-    assert result["declared_changed_files"] == ["a.txt"]
+    assert result.declared_changed_files == ["a.txt"]

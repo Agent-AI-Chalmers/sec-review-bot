@@ -8,13 +8,12 @@ from pathlib import Path
 
 from sec_review_agents.agents.memory_extractor.agent import (
     MEMORY_EXTRACTOR_AGENT_NAME,
-    create_memory_extractor_agent_graph,
+    run_memory_extractor_agent,
 )
 from sec_review_agents.agents.memory_extractor.backend import (
     create_memory_extractor_backend,
 )
 from sec_review_agents.agents.memory_extractor.prompts import (
-    MEMORY_EXTRACTOR_SYSTEM_PROMPT,
     build_extractor_prompt,
 )
 from sec_review_agents.llm.factory import create_chat_model
@@ -22,7 +21,6 @@ from sec_review_agents.review_stages.trajectories import (
     TRAJECTORIES_DIRNAME,
     review_trajectories_root,
 )
-from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.trajectories import (
     TRAJECTORY_SUFFIX,
@@ -208,17 +206,14 @@ async def _generate_memory_observation(
             deployment_override=deployment,
         )
         async with amanaged_backend(backend):
-            agent = await create_memory_extractor_agent_graph(
-                model=model,
-                backend=backend,
-            )
-            structured_result = await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
-                system_prompt=MEMORY_EXTRACTOR_SYSTEM_PROMPT,
-                user_prompt=build_extractor_prompt(staged_trajectories),
-                trajectory_paths=(extractor_trajectory_path,),
-            )
+            structured_result = (
+                await run_memory_extractor_agent(
+                    model=model,
+                    backend=backend,
+                    user_prompt=build_extractor_prompt(staged_trajectories),
+                    trajectory_paths=(extractor_trajectory_path,),
+                )
+            ).model_dump(by_alias=True)
 
         observation_body = str(
             structured_result.get("observation_markdown") or ""

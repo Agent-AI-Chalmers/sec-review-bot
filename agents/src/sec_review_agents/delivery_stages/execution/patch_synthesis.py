@@ -6,8 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from sec_review_agents.agents.patch_synthesis.agent import (
-    PATCH_SYNTHESIS_AGENT_NAME,
-    create_patch_synthesis_agent_graph,
+    run_patch_synthesis_agent,
 )
 from sec_review_agents.agents.patch_synthesis.backend import (
     create_patch_synthesis_backend,
@@ -19,7 +18,6 @@ from sec_review_agents.agents.patch_synthesis.prompts import (
 from sec_review_agents.delivery_stages.model import (
     DeliveryEntry,
 )
-from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.trajectories import remove_trajectories, trajectory_path
 from sec_review_agents.utils.files import (
@@ -192,19 +190,16 @@ async def synthesize_combined_delivery_patch(
             workspace_writable=True,
         )
         async with amanaged_backend(backend):
-            agent = await create_patch_synthesis_agent_graph(
-                backend=backend,
-                workspace_root_path=workspace_path,
-                baseline_snapshot_tar_path=baseline_snapshot_tar_path,
-                system_prompt=system_prompt,
-            )
-            structured_payload = await invoke_agent_runtime_graph(
-                agent=agent,
-                agent_name=PATCH_SYNTHESIS_AGENT_NAME,
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                trajectory_paths=(trajectory_path(delivery_artifacts_root),),
-            )
+            structured_payload = (
+                await run_patch_synthesis_agent(
+                    backend=backend,
+                    workspace_root_path=workspace_path,
+                    baseline_snapshot_tar_path=baseline_snapshot_tar_path,
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    trajectory_paths=(trajectory_path(delivery_artifacts_root),),
+                )
+            ).model_dump(by_alias=True)
 
         raw_declared_changed_files = structured_payload.get("declared_changed_files")
         if not isinstance(raw_declared_changed_files, list):

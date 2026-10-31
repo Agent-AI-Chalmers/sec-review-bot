@@ -1,8 +1,8 @@
+from pathlib import Path
 from typing import Any, Literal
 
 from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from langchain.agents.middleware import AgentMiddleware
-from langgraph.graph.state import CompiledStateGraph
 from pydantic import BaseModel, Field, model_validator
 
 from sec_review_agents.agents.delivery_planning.prompts import (
@@ -16,7 +16,7 @@ from sec_review_agents.agents.delivery_planning.workbench_tools import (
 )
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.runtime.agent_runtime_graph import (
-    build_agent_runtime_graph,
+    run_agent_runtime_graph,
 )
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
 from sec_review_agents.runtime.model_turn_diagnostics import (
@@ -34,12 +34,14 @@ from sec_review_agents.runtime.summarization_middleware import (
 DELIVERY_PLANNING_AGENT_NAME = "repository-delivery-planner"
 
 
-async def create_delivery_planning_agent_graph(
+async def run_delivery_planning_agent(
     *,
     backend,
     workbench_state: DeliveryWorkbenchState,
     system_prompt: str,
-) -> CompiledStateGraph:
+    user_prompt: str,
+    trajectory_paths: tuple[Path, ...] = (),
+) -> BaseModel:
     filesystem_system_prompt = (
         build_repository_delivery_planning_filesystem_system_prompt()
     )
@@ -63,7 +65,9 @@ async def create_delivery_planning_agent_graph(
             ModelTurnDiagnosticsMiddleware(agent_name=DELIVERY_PLANNING_AGENT_NAME)
         )
 
-    return await build_agent_runtime_graph(
+    return await run_agent_runtime_graph(
+        user_prompt=user_prompt,
+        trajectory_paths=trajectory_paths,
         model=model,
         agent_name=DELIVERY_PLANNING_AGENT_NAME,
         backend=backend,

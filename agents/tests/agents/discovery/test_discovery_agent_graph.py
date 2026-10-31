@@ -4,7 +4,7 @@ import pytest
 
 from sec_review_agents.agents.discovery.agent import (
     DISCOVERY_AGENT_NAME,
-    create_repository_discovery_agent_graph,
+    run_repository_discovery_agent,
 )
 from sec_review_agents.agents.discovery.model import DiscoveryOutput
 
@@ -14,6 +14,10 @@ async def test_create_agent_uses_skills_filesystem_and_diagnostics_middleware() 
     entry = {"chunk_id": "chunk-1", "path": "src/server.js"}
 
     with (
+        patch(
+            "sec_review_agents.runtime.agent_runtime_graph.invoke_agent_runtime_graph",
+            return_value=sentinel.agent,
+        ),
         patch(
             "sec_review_agents.agents.discovery.agent.SkillsMiddleware",
             return_value=sentinel.skills_middleware,
@@ -62,7 +66,8 @@ async def test_create_agent_uses_skills_filesystem_and_diagnostics_middleware() 
             return_value=True,
         ),
     ):
-        agent = await create_repository_discovery_agent_graph(
+        agent = await run_repository_discovery_agent(
+            user_prompt="task",
             backend=sentinel.backend,
             chunk=entry,
         )
