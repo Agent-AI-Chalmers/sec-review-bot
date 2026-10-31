@@ -3,6 +3,7 @@ import { inputBundlePublicationStore } from '../input-bundle-publication-store.j
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { parsePullRequestPreparationInput } from '../../src/review-runs/preparation-input.js'
 import { prepareReviewRunsOnce } from '../../src/review-runs/preparation-coordinator.js'
 import { deliverRunNoticeOnce } from '../../src/review-runs/run-notice-coordinator.js'
 import type {
@@ -19,6 +20,7 @@ function unreachedPreparationMembers(): Pick<
   | 'listInputBundleCandidates'
   | 'settleInputBundleCandidate'
   | 'admitReviewRun'
+  | 'checkpointPreparationInput'
   | 'submitPreparedRun'
   | 'renewPreparationClaim'
   | 'preparationHeartbeatIntervalMs'
@@ -28,6 +30,8 @@ function unreachedPreparationMembers(): Pick<
   }
   return {
     ...inputBundlePublicationStore(),
+    checkpointPreparationInput: async () =>
+      unreached('checkpointPreparationInput'),
     admitReviewRun: async () => unreached('admitReviewRun'),
     submitPreparedRun: async () => unreached('submitPreparedRun'),
     renewPreparationClaim: async () => unreached('renewPreparationClaim'),
@@ -661,4 +665,72 @@ test('a claimed synchronize preparation recovers from the payload admission pers
     false,
     'recovery must not re-read the pull request'
   )
+})
+
+test('reference recovery renews its claim and checkpoints the resolved PR before preparation', async () => {
+  // Stop at the checkpoint so this probe covers the recovery protocol without
+  // downloading repositories or invoking unrelated preparation dependencies.
+  const events: string[] = []
+  const checkpoints: unknown[][] = []
+  const failures: string[] = []
+  const client = fakeGitHub(({ url }) => {
+    assert.equal(new URL(url).pathname, '/repos/octo/demo/pulls/7')
+    assert.deepEqual(events, ['renew'])
+    events.push('resolve')
+    return githubJson({
+      number: 7,
+      title: 'Resolved PR',
+      base: { ref: 'main', sha: 'base' },
+      head: { ref: 'topic', sha: 'captured-head' }
+    })
+  })
+  const { app } = fakeApp({
+    respond: () => githubJson({ id: 1 }),
+    installationOctokit: client.octokit
+  })
+  const store: PreparationCoordinatorStore = {
+    ...unreachedPreparationMembers(),
+    ...inputBundlePublicationStore(),
+    claimNextPreparation: async () => ({
+      run_id: 'reference-run',
+      workflow: 'pull-request-review',
+      input_version: 'v1',
+      attempt_count: 2,
+      claim_token: 'recovery-token',
+      input: {
+        kind: 'github_pull_request_review',
+        pr_reference: { owner_login: 'octo', repo_name: 'demo', pr_number: 7 },
+        trusted_default_branch: { default_branch: 'main', head_sha: 'trusted' },
+        event_type: 'manual_review',
+        test_changes: 'deny'
+      }
+    }),
+    renewPreparationClaim: async () => {
+      events.push('renew')
+      return true
+    },
+    preparationHeartbeatIntervalMs: async () => 60_000,
+    checkpointPreparationInput: async (...args) => {
+      events.push('checkpoint')
+      checkpoints.push(args)
+      throw new Error('stop at checkpoint')
+    },
+    failPreparation: async (_run, _token, failure) => {
+      failures.push(failure.message)
+      return { retry_scheduled: false }
+    }
+  }
+  await prepareReviewRunsOnce({ app, store })
+  assert.deepEqual(events, ['renew', 'resolve', 'checkpoint'])
+  assert.equal(checkpoints.length, 1)
+  assert.deepEqual(checkpoints[0]?.slice(0, 2), [
+    'reference-run',
+    'recovery-token'
+  ])
+  const checkpoint = parsePullRequestPreparationInput(checkpoints[0]?.[2])
+  assert.equal(checkpoint.pr?.head_sha, 'captured-head')
+  assert.equal(checkpoint.test_changes, 'deny')
+  assert.equal(checkpoint.pr_reference, undefined)
+  assert.ok(failures.length > 0)
+  assert.ok(failures.every((message) => message === 'stop at checkpoint'))
 })

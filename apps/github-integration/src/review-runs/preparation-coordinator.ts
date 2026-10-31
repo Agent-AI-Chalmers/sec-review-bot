@@ -7,7 +7,6 @@ import { reviewRunsClient, type PreparationCoordinatorStore } from './client.js'
 import { startIssueReviewCommand } from '../triggers/issue-review.js'
 import { startPullRequestReviewCommand } from '../triggers/pull-request-review.js'
 import { dispatchRepositoryReview } from '../triggers/repository-review.js'
-import { getPullRequestContext } from '../github/pull-request-service.js'
 import { isRecord } from '../utils/error-utils.js'
 import { integerEnv } from '../utils/env.js'
 import { logError, logInfo } from '../utils/logger.js'
@@ -90,21 +89,10 @@ async function executeClaimedPreparation({
       app,
       persistedPr?.repo_full_name ?? `${owner_login}/${repo_name}`
     )
-    const pr =
-      persistedPr ??
-      (await getPullRequestContext(octokit, {
-        owner_login,
-        repo_name,
-        pr_number: identity.pr_number
-      }))
     await startPullRequestReviewCommand({
       octokit,
-      pr,
-      trusted_default_branch: recovered.trusted_default_branch,
-      event_type: recovered.event_type,
-      test_changes: recovered.test_changes,
+      ...recovered,
       delivery_id: `recovered:${work.run_id}`,
-      preparation_input: { ...recovered, pr },
       claimed_preparation,
       deps: { store }
     })

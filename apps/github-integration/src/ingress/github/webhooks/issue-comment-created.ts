@@ -165,26 +165,15 @@ export async function handleIssueCommentCreatedWithDeps(
       const preparation = startPullRequestReviewCommandFn({
         octokit,
         trusted_default_branch,
-        preparation_input: {
-          kind: 'github_pull_request_review',
-          pr_reference: {
-            owner_login: issue.owner_login,
-            repo_name: issue.repo_name,
-            pr_number: issue.issue_number
-          },
-          trusted_default_branch,
-          event_type: 'manual_review',
-          test_changes: command.test_changes
+        pr_reference: {
+          owner_login: issue.owner_login,
+          repo_name: issue.repo_name,
+          pr_number: issue.issue_number
         },
         event_type: 'manual_review',
         delivery_id: id,
         test_changes: command.test_changes,
-        resolve_pr: async () =>
-          await getPullRequestContextFn(octokit, {
-            owner_login: issue.owner_login,
-            repo_name: issue.repo_name,
-            pr_number: issue.issue_number
-          }),
+        deps: { get_pull_request_context: getPullRequestContextFn },
         on_admitted: () => {
           resolveAdmission?.()
         }

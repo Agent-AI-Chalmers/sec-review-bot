@@ -4,7 +4,10 @@ import type { Octokit } from 'octokit'
 
 import type { TestChangesPolicy } from '../execution/input.js'
 import type { TrustedDefaultBranch } from '../github/default-branch-service.js'
-import type { PullRequestContext } from '../github/pull-request-service.js'
+import {
+  getPullRequestContext,
+  type PullRequestContext
+} from '../github/pull-request-service.js'
 import { reviewRunsClient } from '../review-runs/client.js'
 import { pullRequestReviewPublishContext } from '../review-runs/publish-context.js'
 import {
@@ -20,18 +23,18 @@ import {
 
 import type {
   PullRequestReviewEventType,
-  PullRequestPreparationInput
+  PullRequestPreparationInput,
+  PullRequestReference
 } from '../review-runs/preparation-input.js'
 
 interface StartPullRequestReviewCommandDeps {
   prepare_review: typeof preparePullRequestReview
   store: PreparationCommandStore
+  get_pull_request_context: typeof getPullRequestContext
 }
 
-interface StartPullRequestReviewCommandArgs {
+type StartPullRequestReviewCommandArgs = {
   octokit: Octokit
-  pr?: PullRequestContext
-  resolve_pr?: () => Promise<PullRequestContext>
   trusted_default_branch: TrustedDefaultBranch
   event_type: PullRequestReviewEventType
   // The PR path's only policy knob. The objective is fixed to `audit`, but an
@@ -39,7 +42,6 @@ interface StartPullRequestReviewCommandArgs {
   // patch-level test-changes constraint stays meaningful here.
   test_changes?: TestChangesPolicy | null
   delivery_id: string
-  preparation_input?: Record<string, unknown>
   claimed_preparation?: ClaimedPreparation
   on_admitted?: (admission: {
     run_id: string
@@ -47,7 +49,10 @@ interface StartPullRequestReviewCommandArgs {
     replayed: boolean
   }) => void
   deps?: Partial<StartPullRequestReviewCommandDeps>
-}
+} & (
+  | { pr: PullRequestContext; pr_reference?: never }
+  | { pr_reference: PullRequestReference; pr?: never }
+)
 
 interface StartedPullRequestReview {
   run_id: string
@@ -56,33 +61,28 @@ interface StartedPullRequestReview {
 export async function startPullRequestReviewCommand({
   octokit,
   pr,
-  resolve_pr,
+  pr_reference,
   trusted_default_branch,
   event_type,
   test_changes = null,
   delivery_id,
-  preparation_input,
   claimed_preparation,
   on_admitted,
   deps = {}
 }: StartPullRequestReviewCommandArgs): Promise<StartedPullRequestReview> {
   const {
     prepare_review = preparePullRequestReview,
+    get_pull_request_context = getPullRequestContext,
     store = reviewRunsClient
   } = deps
-  const durableInput =
-    preparation_input ??
-    (pr === undefined
-      ? undefined
-      : ({
-          kind: 'github_pull_request_review',
-          pr,
-          trusted_default_branch,
-          event_type,
-          test_changes
-        } satisfies PullRequestPreparationInput))
-  if (durableInput === undefined)
-    throw new Error('Pull request preparation input is required for admission.')
+  const commonInput = {
+    kind: 'github_pull_request_review' as const,
+    trusted_default_branch,
+    event_type,
+    test_changes
+  }
+  const durableInput: PullRequestPreparationInput =
+    pr === undefined ? { ...commonInput, pr_reference } : { ...commonInput, pr }
   const admission: PreparationAdmission = {
     workflow: 'pull-request-review',
     ingress_key: delivery_id,
@@ -98,14 +98,15 @@ export async function startPullRequestReviewCommand({
       // Admission happens before PR lookup, input preparation, and Execution
       // submission. Any failure below therefore remains attached to this run_id
       // instead of becoming an untracked pre-run error.
-      const resolvedPr = pr ?? (await resolve_pr?.())
-      if (resolvedPr === undefined)
-        throw new Error('Pull request context is missing after admission.')
-      if (durableInput.pr === undefined) {
-        // The initial comment webhook has only a PR reference. Once that reference
-        // resolves, checkpoint the full connector input before expensive preparation
-        // so a crash resumes this PR snapshot instead of resolving a newer head.
-        await checkpoint({ ...durableInput, pr: resolvedPr })
+      const resolvedPr =
+        pr ?? (await get_pull_request_context(octokit, pr_reference))
+      if (pr === undefined) {
+        // Capture the resolved snapshot before expensive work. Recovery follows the
+        // same path, so subsequent attempts never silently move to a newer HEAD.
+        await checkpoint({
+          ...commonInput,
+          pr: resolvedPr
+        } satisfies PullRequestPreparationInput)
       }
       return await prepare_review({
         octokit,
