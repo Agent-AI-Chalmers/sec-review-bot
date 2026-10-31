@@ -18,8 +18,10 @@ import {
   type PreparationCommandStore
 } from './preparation-command.js'
 
-type PullRequestReviewEventType =
-  'opened' | 'ready_for_review' | 'synchronize' | 'manual_review'
+import type {
+  PullRequestReviewEventType,
+  PullRequestPreparationInput
+} from '../review-runs/preparation-input.js'
 
 interface StartPullRequestReviewCommandDeps {
   prepare_review: typeof preparePullRequestReview
@@ -72,13 +74,13 @@ export async function startPullRequestReviewCommand({
     preparation_input ??
     (pr === undefined
       ? undefined
-      : {
+      : ({
           kind: 'github_pull_request_review',
           pr,
           trusted_default_branch,
           event_type,
           test_changes
-        })
+        } satisfies PullRequestPreparationInput))
   if (durableInput === undefined)
     throw new Error('Pull request preparation input is required for admission.')
   const admission: PreparationAdmission = {

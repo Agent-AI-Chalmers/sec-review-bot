@@ -126,8 +126,8 @@ export async function handlePullRequestOpenedWithDeps(
   }
 
   if (pr.is_draft) {
-    // Draft PR 在默认策略下不做首次自动审查，
-    // 等作者显式切到 ready_for_review 再进入完整 workflow。
+    // Skip the initial automatic review for draft PRs; wait until the author
+    // explicitly marks the PR ready_for_review before starting a full review.
     logInfo('workflow_skipped', {
       event: 'pull_request.opened',
       pr: pr.pr_number,
