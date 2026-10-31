@@ -16,7 +16,6 @@ function sameFiles(
 }
 
 export function MemoryEditorDialog({
-  opened,
   files,
   initialFiles,
   busy,
@@ -24,7 +23,6 @@ export function MemoryEditorDialog({
   onClose,
   onCommit
 }: {
-  opened: boolean
   files: Record<string, string>
   initialFiles: Record<string, string>
   busy: boolean
@@ -44,10 +42,6 @@ export function MemoryEditorDialog({
     [files, initialFiles]
   )
 
-  React.useEffect(() => {
-    if (opened) setSelectedFile('MEMORY.md')
-  }, [opened])
-
   const requestClose = (): void => {
     if (dirty) setDiscardOpen(true)
     else onClose()
@@ -56,7 +50,7 @@ export function MemoryEditorDialog({
   return (
     <>
       <Modal
-        opened={opened}
+        opened
         onClose={requestClose}
         title={t('editMemoryTreeTitle')}
         size="calc(100vw - 64px)"
