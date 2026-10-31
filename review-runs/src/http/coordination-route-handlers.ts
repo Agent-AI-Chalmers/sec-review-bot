@@ -82,13 +82,12 @@ export function buildCoordinationRouteHandlers(
       await store.preparations.checkpointInput(runId, token, input)
     },
 
-    claimNextRunNotice: async () =>
-      await store.preparations.claimNextRunNotice(),
+    claimNextRunNotice: async () => await store.notices.claimNext(),
 
     renewRunNoticeClaim: async (request) => {
       const { noticeId } = request.params as PathParams<'renewRunNoticeClaim'>
       const { token } = request.body as RequestBody<'renewRunNoticeClaim'>
-      return await store.preparations.renewRunNoticeClaim(noticeId, token)
+      return await store.notices.renewClaim(noticeId, token)
     },
 
     failPreparation: async (request) => {
@@ -107,17 +106,13 @@ export function buildCoordinationRouteHandlers(
       const { noticeId } = request.params as PathParams<'completeRunNotice'>
       const body = request.body as RequestBody<'completeRunNotice'>
       return body.delivered
-        ? await store.preparations.completeRunNotice(
+        ? await store.notices.complete(
             noticeId,
             body.token,
             true,
             body.comment_url
           )
-        : await store.preparations.completeRunNotice(
-            noticeId,
-            body.token,
-            false
-          )
+        : await store.notices.complete(noticeId, body.token, false)
     },
 
     claimNextPublication: async (request) => {
@@ -234,6 +229,6 @@ export function buildCoordinationRouteHandlers(
       store.publications.heartbeatIntervalMs(),
 
     getRunNoticeHeartbeatInterval: async () =>
-      store.preparations.heartbeatIntervalMs()
+      store.notices.heartbeatIntervalMs()
   }
 }

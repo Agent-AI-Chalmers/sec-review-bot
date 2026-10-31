@@ -88,7 +88,7 @@ async function claimNoticeFor(
   const deadline = Date.now() + 5_000
   try {
     while (Date.now() < deadline) {
-      const notice = await store.preparations.claimNextRunNotice()
+      const notice = await store.notices.claimNext()
       if (notice === null) break
       if (notice.run_id === runId)
         return { notice_id: notice.notice_id, claim_token: notice.claim_token }
@@ -105,11 +105,7 @@ async function claimNoticeFor(
     // than delivered: no reply was attempted for them, so claiming one was delivered would be a
     // lie that the URL check now rejects.
     for (const other of deferred) {
-      await store.preparations.completeRunNotice(
-        other.notice_id,
-        other.claim_token,
-        false
-      )
+      await store.notices.complete(other.notice_id, other.claim_token, false)
     }
   }
 }
@@ -193,9 +189,9 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
       { retry: false }
     )
-    const preparedNotice = await store.preparations.claimNextRunNotice()
+    const preparedNotice = await store.notices.claimNext()
     assert.notStrictEqual(preparedNotice, null)
-    await store.preparations.completeRunNotice(
+    await store.notices.complete(
       preparedNotice?.notice_id ?? '',
       preparedNotice?.claim_token ?? '',
       true,
@@ -211,7 +207,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { code: 'PREPARATION_RETRY_EXHAUSTED', message: 'exhausted' },
       { retry: false }
     )
-    assert.notStrictEqual(await store.preparations.claimNextRunNotice(), null)
+    assert.notStrictEqual(await store.notices.claimNext(), null)
     // Expire the delivering lease by backdating it. Waiting on the clock instead would make
     // this assertion depend on how fast the worker happens to be.
     await pool.query(
@@ -219,7 +215,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
        WHERE connector_id=$1 AND status='delivering'`,
       [store.connectorId]
     )
-    assert.notStrictEqual(await store.preparations.claimNextRunNotice(), null)
+    assert.notStrictEqual(await store.notices.claimNext(), null)
 
     // notice: delivering -> failed when the provider cannot be reached.
     const undeliverable = await newPreparingRun()
@@ -230,7 +226,7 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { retry: false }
     )
     const undeliverableNotice = await claimNoticeFor(store, undeliverable.runId)
-    await store.preparations.completeRunNotice(
+    await store.notices.complete(
       undeliverableNotice.notice_id,
       undeliverableNotice.claim_token,
       false

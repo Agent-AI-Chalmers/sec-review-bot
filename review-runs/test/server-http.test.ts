@@ -334,8 +334,8 @@ test('the completion route keeps the comment_url its branch requires', async () 
   // because they never go through schema validation.
   const completed: unknown[][] = []
   const app = await buildApp({
-    preparations: {
-      completeRunNotice: async (...args: unknown[]) => {
+    notices: {
+      complete: async (...args: unknown[]) => {
         completed.push(args)
         return true
       }
@@ -413,8 +413,8 @@ test('an operation with no response body sends an empty 200, not a null body', a
 test('a failure notice completion forwards an intentional skip through the HTTP route', async () => {
   const completions: unknown[][] = []
   const app = await buildApp({
-    preparations: {
-      completeRunNotice: async (...args: unknown[]) => {
+    notices: {
+      complete: async (...args: unknown[]) => {
         completions.push(args)
         return true
       }
@@ -441,11 +441,41 @@ test('a failure notice completion forwards an intentional skip through the HTTP 
   }
 })
 
+test('run notice claims use the notice store for every lifecycle axis', async () => {
+  const pending = ['preparation', 'execution', 'publication'].map((axis) => ({
+    notice_id: `notice-${axis}`,
+    run_id: `run-${axis}`,
+    input: { kind: 'github_issue_review' },
+    kind: 'failure',
+    axis,
+    reason_code: 'REVIEW_FAILED',
+    claim_token: `claim-${axis}`
+  }))
+  let next = 0
+  // No preparation store is supplied: delivery is independent of the originating axis.
+  const app = await buildApp({
+    notices: { claimNext: async () => pending[next++] ?? null }
+  })
+  try {
+    for (const expected of [...pending, null]) {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/v1/run-notices/claims/next',
+        headers: { authorization: `Bearer ${SERVICE_TOKEN}` }
+      })
+      assert.strictEqual(response.statusCode, 200, response.body)
+      assert.deepStrictEqual(response.json(), expected)
+    }
+  } finally {
+    await app.close()
+  }
+})
+
 test('run notice claim renewal and heartbeat configuration are exposed on the service surface', async () => {
   const renewals: unknown[][] = []
   const app = await buildApp({
-    preparations: {
-      renewRunNoticeClaim: async (...args: unknown[]) => {
+    notices: {
+      renewClaim: async (...args: unknown[]) => {
         renewals.push(args)
         return true
       },

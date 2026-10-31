@@ -7,6 +7,7 @@
 // - `execution-store.ts` owns single-axis execution writes (status transitions, observation
 //   heartbeat, artifact/result, submission-recovery claims).
 // - `preparation-store.ts` / `publication-store.ts` own their own axes.
+// - `run-notices.ts` owns notification delivery and transaction-aware enqueue/supersession.
 // - This store owns the run trunk, composes the concrete stores, and retains the terminal
 //   execution-failure transition that skips publication. Submission transitions live in
 //   `submission-transition-store.ts`; preparations initiating an execution skip stay in the
@@ -35,7 +36,7 @@ import { appendEvent } from './review-run-events.js'
 import { OperatorDecisionStore } from './operator-decision-store.js'
 import { ReviewRunAdmissionStore } from './review-run-admission-store.js'
 import { ReviewRunQueries, type DroppedRunRow } from './review-run-queries.js'
-import { queueRunNotice } from './run-notices.js'
+import { queueRunNotice, RunNoticeStore } from './run-notices.js'
 import { ExecutionStore } from './execution-store.js'
 import { InputBundleCandidateStore } from './input-bundle-candidate-store.js'
 import { SubmissionTransitionStore } from './submission-transition-store.js'
@@ -56,7 +57,6 @@ const DEFAULT_CLAIM_TIMEOUT_MS = 10 * 60 * 1000
 export type {
   PreparationExpiryBlocked,
   PreparationExpiryResult,
-  RunNoticeWork,
   PreparationWork
 } from './preparation-store.js'
 export type {
@@ -70,6 +70,7 @@ export class ReviewRunStore {
   readonly connectorId: string
   readonly sourcePlatform: ReviewRunRecord['source_platform']
   private readonly claimTimeoutMs: number
+  readonly notices: RunNoticeStore
   readonly preparations: PreparationStore
   readonly publications: PublicationStore
   readonly publicationClaims: PublicationClaimStore
@@ -106,6 +107,11 @@ export class ReviewRunStore {
     this.connectorId = connectorId
     this.sourcePlatform = sourcePlatform
     this.claimTimeoutMs = Math.max(0, claimTimeoutMs)
+    this.notices = new RunNoticeStore(
+      this.database,
+      this.connectorId,
+      this.claimTimeoutMs
+    )
     this.preparations = new PreparationStore(
       this.database,
       this.connectorId,
