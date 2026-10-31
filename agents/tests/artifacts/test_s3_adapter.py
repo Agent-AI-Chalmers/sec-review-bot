@@ -1,3 +1,4 @@
+import io
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -18,10 +19,10 @@ def test_configures_s3_addressing_style(
     monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
     monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE", style)
     client = Mock()
-    client.head_object.return_value = {"ContentLength": 7}
-    client.download_fileobj.side_effect = lambda _bucket, _key, output: output.write(
-        b"archive"
-    )
+    client.get_object.return_value = {
+        "ContentLength": 7,
+        "Body": io.BytesIO(b"archive"),
+    }
 
     with patch(
         "sec_review_agents.artifacts.s3_adapter.boto3.client",
@@ -57,14 +58,10 @@ def test_downloads_configured_s3_object_to_complete_local_file(
 ) -> None:
     monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
     client = Mock()
-    client.head_object.return_value = {"ContentLength": 7}
-
-    def download_fileobj(bucket, key, output):
-        assert bucket == "sec-review"
-        assert key == "runs/run-1/input/input-bundle.v1.tar.zst"
-        output.write(b"archive")
-
-    client.download_fileobj.side_effect = download_fileobj
+    client.get_object.return_value = {
+        "ContentLength": 7,
+        "Body": io.BytesIO(b"archive"),
+    }
     destination = tmp_path / "download" / "input-bundle.tar.zst"
     with patch(
         "sec_review_agents.artifacts.s3_adapter.boto3.client", return_value=client
@@ -77,6 +74,9 @@ def test_downloads_configured_s3_object_to_complete_local_file(
             expected_key="runs/run-1/input/input-bundle.v1.tar.zst",
         )
 
+    client.get_object.assert_called_once_with(
+        Bucket="sec-review", Key="runs/run-1/input/input-bundle.v1.tar.zst"
+    )
     assert result == destination
     assert destination.read_bytes() == b"archive"
     assert not destination.with_suffix(".zst.partial").exists()
@@ -112,13 +112,9 @@ def test_rejects_s3_object_outside_expected_run(monkeypatch, tmp_path: Path) -> 
 def test_removes_partial_download_after_failure(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
     client = Mock()
-    client.head_object.return_value = {"ContentLength": 7}
-
-    def fail_download(_bucket, _key, output):
-        output.write(b"partial")
-        raise RuntimeError("download failed")
-
-    client.download_fileobj.side_effect = fail_download
+    body = Mock()
+    body.read.side_effect = [b"part", RuntimeError("download failed")]
+    client.get_object.return_value = {"ContentLength": 7, "Body": body}
     destination = tmp_path / "input-bundle.tar.zst"
     with (
         patch(
@@ -141,7 +137,8 @@ def test_removes_partial_download_after_failure(monkeypatch, tmp_path: Path) -> 
 def test_rejects_remote_size_before_downloading(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
     client = Mock()
-    client.head_object.return_value = {"ContentLength": 200}
+    body = io.BytesIO(b"unused")
+    client.get_object.return_value = {"ContentLength": 200, "Body": body}
     with (
         patch(
             "sec_review_agents.artifacts.s3_adapter.boto3.client",
@@ -156,7 +153,7 @@ def test_rejects_remote_size_before_downloading(monkeypatch, tmp_path: Path) -> 
             maximum_size=100,
         )
 
-    client.download_fileobj.assert_not_called()
+    assert body.closed
 
 
 def test_publish_immutable_s3_artifact_requires_bucket(tmp_path: Path) -> None:
@@ -335,3 +332,43 @@ def test_publication_probe_checks_complete_immutable_identity(monkeypatch):
     head["Metadata"]["sha256"] = "b" * 64
     with pytest.raises(RuntimeError, match="differs"):
         s3_artifact_exists(reference)
+
+
+@pytest.mark.parametrize("payload", [b"short", b"archive-extra"])
+def test_stream_length_is_enforced_and_destination_survives_failure(
+    monkeypatch, tmp_path, payload
+):
+    """A response length header alone cannot authorize unbounded writes."""
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+    client = Mock()
+    body = io.BytesIO(payload)
+    client.get_object.return_value = {"ContentLength": 7, "Body": body}
+    monkeypatch.setattr(
+        "sec_review_agents.artifacts.s3_adapter._s3_client", lambda: client
+    )
+    destination = tmp_path / "artifact"
+    destination.write_bytes(b"previous")
+    with pytest.raises(ValueError, match="size"):
+        download_s3_object(
+            "s3://sec-review/test", destination, expected_size=7, maximum_size=7
+        )
+    assert destination.read_bytes() == b"previous"
+    assert body.closed
+    assert not destination.with_suffix(".partial").exists()
+    client.head_object.assert_not_called()
+
+
+def test_size_limit_rejects_before_storage_read(monkeypatch, tmp_path):
+    monkeypatch.setenv("SEC_REVIEW_ARTIFACT_S3_BUCKET", "sec-review")
+    client = Mock()
+    monkeypatch.setattr(
+        "sec_review_agents.artifacts.s3_adapter._s3_client", lambda: client
+    )
+    with pytest.raises(ValueError, match="size limit"):
+        download_s3_object(
+            "s3://sec-review/test",
+            tmp_path / "artifact",
+            expected_size=8,
+            maximum_size=7,
+        )
+    client.get_object.assert_not_called()

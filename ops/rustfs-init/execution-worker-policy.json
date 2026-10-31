@@ -15,6 +15,16 @@
       "Effect": "Allow",
       "Action": ["s3:GetObject"],
       "Resource": ["arn:aws:s3:::sec-review/memory/trees/*"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": ["arn:aws:s3:::sec-review"],
+      "Condition": {
+        "StringLike": {
+          "s3:prefix": ["runs/*/artifacts/*"]
+        }
+      }
     }
   ]
 }

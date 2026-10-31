@@ -19,7 +19,10 @@ from sec_review_agents.artifacts.reference import (
     local_artifact_reference,
     require_artifact_media_type,
 )
-from sec_review_agents.artifacts.s3_adapter import publish_immutable_s3_artifact
+from sec_review_agents.artifacts.s3_adapter import (
+    publish_immutable_s3_artifact,
+    read_s3_artifact_reference,
+)
 from sec_review_agents.artifacts.tar_zstd import (
     canonical_tar_info,
     validate_restricted_pax_archive,
@@ -81,6 +84,15 @@ def publish_run_diagnostic_bundle(
             f"Unsupported diagnostic artifact scheme: {destination_scheme}"
         )
     _validate_path_component(run_id, label="run_id")
+    if destination_scheme == "s3":
+        recovered = _recover_s3_publication(
+            run_id=run_id,
+            artifact_root=artifact_root,
+            review_units=review_units,
+            result=result,
+        )
+        if recovered is not None:
+            return recovered
     artifact_root = artifact_root.resolve()
     output_dir = artifact_root / "published"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -116,6 +128,84 @@ def publish_run_diagnostic_bundle(
         reference=reference,
         unit_ids=tuple(str(unit["id"]) for unit in manifest_units),
     )
+
+
+def _recover_s3_publication(
+    *,
+    run_id: str,
+    artifact_root: Path,
+    review_units: list[DiagnosticReviewUnit],
+    result: dict[str, Any],
+) -> PublishedDiagnosticBundle | None:
+    # Use request paths without inspecting the lost worker's filesystem. The
+    # immutable archive, not a new glob over local trajectories, owns its unit IDs.
+    request_root = Path(os.path.abspath(artifact_root))
+    relative_units: list[DiagnosticReviewUnit] = []
+    seen: set[str] = set()
+    for unit in review_units:
+        _validate_path_component(unit.unit_id, label="unit_id")
+        if unit.unit_id in seen:
+            raise ValueError(
+                f"Diagnostic bundle review unit is duplicated: {unit.unit_id}"
+            )
+        seen.add(unit.unit_id)
+        try:
+            relative_root = Path(os.path.abspath(unit.trajectory_root)).relative_to(
+                request_root
+            )
+        except ValueError as error:
+            raise ValueError(
+                "Diagnostic bundle trajectory root must be inside artifact root."
+            ) from error
+        relative_units.append(DiagnosticReviewUnit(unit.unit_id, relative_root))
+
+    key = diagnostic_bundle_s3_key(run_id)
+    reference = read_s3_artifact_reference(key=key)
+    if reference is None:
+        return None
+    require_artifact_media_type(reference, ARCHIVE_MEDIA_TYPE)
+    with tempfile.TemporaryDirectory(
+        prefix="sec-review-diagnostic-recovery-"
+    ) as tempdir:
+        recovery_root = Path(tempdir)
+        archive = materialize_verified_artifact_file(
+            reference,
+            local_destination=recovery_root / DIAGNOSTIC_BUNDLE_FILENAME,
+            maximum_bytes=MAX_DIAGNOSTIC_BUNDLE_BYTES,
+            expected_s3_key=key,
+        )
+        root = extract_archive(
+            archive,
+            recovery_root / "bundle",
+            maximum_entries=MAX_DIAGNOSTIC_BUNDLE_ENTRIES,
+            maximum_extracted_bytes=MAX_EXTRACTED_DIAGNOSTIC_BYTES,
+        )
+        units = _validate_materialized_bundle(root, run_id=run_id)
+        stored_result = json.loads((root / "result.json").read_text(encoding="utf-8"))
+        if json.dumps(
+            stored_result, sort_keys=True, separators=(",", ":")
+        ) != json.dumps(result, sort_keys=True, separators=(",", ":")):
+            raise ValueError(
+                "Existing diagnostic bundle result does not match publication request."
+            )
+        tree = root / DIAGNOSTIC_TREE_DIR
+        if not tree.is_dir():
+            raise ValueError("Existing diagnostic bundle artifact tree is missing.")
+        expected_units = _manifest_units(
+            tree,
+            [
+                DiagnosticReviewUnit(unit.unit_id, tree / unit.trajectory_root)
+                for unit in relative_units
+            ],
+        )
+        manifest = json.loads(
+            (root / DIAGNOSTIC_BUNDLE_MANIFEST).read_text(encoding="utf-8")
+        )
+        if manifest["review_units"] != expected_units:
+            raise ValueError(
+                "Existing diagnostic bundle review units do not match publication request."
+            )
+    return PublishedDiagnosticBundle(reference=reference, unit_ids=tuple(units))
 
 
 def _temporary_archive_path(output_dir: Path) -> Path:
@@ -338,9 +428,7 @@ def _validate_materialized_bundle(
         or manifest.get("run_id") != run_id
         or manifest.get("result") != "result.json"
     ):
-        raise ValueError(
-            "Diagnostic bundle manifest does not match extraction request."
-        )
+        raise ValueError("Diagnostic bundle manifest does not match the requested run.")
     units = manifest.get("review_units")
     if not isinstance(units, list):
         raise ValueError("Diagnostic bundle manifest has no review units.")
