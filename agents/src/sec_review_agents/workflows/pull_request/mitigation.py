@@ -3,10 +3,10 @@ from pathlib import Path
 from typing import Any
 
 from sec_review_agents.agents.mitigation.pull_request import (
+    build_pr_mitigation_backend_config,
     build_pr_mitigation_filesystem_system_prompt,
     build_pr_mitigation_system_prompt,
     build_pr_mitigation_user_prompt,
-    create_pr_mitigation_backend,
 )
 from sec_review_agents.review_stages.mitigation.stage import run_mitigation_stage
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
@@ -37,11 +37,10 @@ async def mitigate_pull_request(
         baseline_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=retry_context,
         setup_declaration_content=setup_declaration_content,
-        build_backend=lambda workspace_root, memory_path_view: create_pr_mitigation_backend(
+        build_backend_config=lambda workspace_root: build_pr_mitigation_backend_config(
             workspace_root=workspace_root,
             history_path=history_path,
             incremental_window_path=incremental_window_path,
-            memory_path_view=memory_path_view,
             runtime_context=runtime_context,
         ),
         system_prompt=build_pr_mitigation_system_prompt(

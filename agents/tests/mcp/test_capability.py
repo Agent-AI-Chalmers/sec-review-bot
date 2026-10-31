@@ -16,11 +16,12 @@ import pytest
 from langchain_core.tools import BaseTool
 
 from sec_review_agents.agents.analysis.repository import (
-    create_repository_analyzer_backend,
+    build_repository_analyzer_backend_config,
 )
 from sec_review_agents.agents.verification.repository import (
-    create_repository_verification_backend,
+    build_repository_verification_backend_config,
 )
+from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.filesystem.docker_runtime import (
     default_docker_bin,
     is_docker_runtime_available,
@@ -78,11 +79,13 @@ async def _playwright_tools(case: McpCase, tmp_path: Path) -> AsyncIterator[list
         },
         clear=False,
     ):
-        backend = create_repository_verification_backend(
-            workspace_root_path=workspace,
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
+        backend = create_backend_with_path_views(
+            **build_repository_verification_backend_config(
+                workspace_root_path=workspace,
+                history_path=None,
+                incremental_window_path=None,
+                scan_mode="full",
+            )
         )
         async with amanaged_backend(backend):
             bootstrap = await bootstrap_environment(
@@ -116,11 +119,13 @@ async def test_codegraph_capability(case: McpCase, tmp_path: Path) -> None:
         },
         clear=False,
     ):
-        backend = create_repository_analyzer_backend(
-            workspace_root_path=workspace,
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
+        backend = create_backend_with_path_views(
+            **build_repository_analyzer_backend_config(
+                workspace_root_path=workspace,
+                history_path=None,
+                incremental_window_path=None,
+                scan_mode="full",
+            )
         )
         async with amanaged_backend(backend):
             connections = codegraph_mcp_connections_for_backend(backend)

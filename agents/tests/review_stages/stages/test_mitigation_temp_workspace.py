@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.review_stages.mitigation.stage import (
     create_skipped_mitigation_result,
     run_mitigation_stage,
@@ -43,10 +44,15 @@ async def _run_mitigation_stage_for_workspace_capture(
 ) -> list[Path]:
     captured_workspace_paths: list[Path] = []
 
-    def build_backend(workspace_path: Path, _memory_view) -> object:
+    def build_backend(workspace_path: Path) -> BackendConfig:
         assert (workspace_path / "src" / "app.js").exists()
         captured_workspace_paths.append(workspace_path)
-        return object()
+        return BackendConfig(
+            container_name_prefix="test",
+            path_views=[],
+            image=None,
+            backend_kind="local",
+        )
 
     async def run_agent(**_kwargs: Any) -> dict[str, Any]:
         return {
@@ -72,7 +78,7 @@ async def _run_mitigation_stage_for_workspace_capture(
             mitigator_artifacts_path=tmp_path / "artifacts" / "mitigator",
             baseline_snapshot_tar_path=baseline_snapshot_tar_path,
             retry_context=None,
-            build_backend=build_backend,
+            build_backend_config=build_backend,
             system_prompt="system",
             filesystem_system_prompt="filesystem",
             user_prompt="user",

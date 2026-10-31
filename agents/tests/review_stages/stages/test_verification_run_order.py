@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.review_stages.verification.stage import run_verification_stage
 
 
@@ -34,10 +35,15 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
         call_order.append("apply")
         assert kwargs["workspace_patch"] == "diff --git a/a b/a\n"
 
-    def _build_backend(workspace_root: Path, _memory_view) -> object:
+    def _build_backend(workspace_root: Path) -> BackendConfig:
         call_order.append("backend")
         assert workspace_root.name.startswith("sec-review-verifier-")
-        return object()
+        return BackendConfig(
+            container_name_prefix="test",
+            path_views=[],
+            image=None,
+            backend_kind="local",
+        )
 
     async def _run_agent(**_kwargs: Any) -> dict[str, Any]:
         call_order.append("invoke")
@@ -67,7 +73,7 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
             baseline_snapshot_tar_path=Path("/tmp/workspace.snapshot.tar"),
             workspace_patch="diff --git a/a b/a\n",
             mitigation_result={"changed_files": []},
-            build_backend=_build_backend,
+            build_backend_config=_build_backend,
             system_prompt="base prompt",
             filesystem_system_prompt="filesystem prompt",
             user_prompt="user prompt",
@@ -81,9 +87,14 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
 async def test_run_verification_stage_uses_unpatched_workspace_when_no_patch() -> None:
     captured_workspace_roots: list[Path] = []
 
-    def _build_backend(workspace_root: Path, _memory_view) -> object:
+    def _build_backend(workspace_root: Path) -> BackendConfig:
         captured_workspace_roots.append(workspace_root)
-        return object()
+        return BackendConfig(
+            container_name_prefix="test",
+            path_views=[],
+            image=None,
+            backend_kind="local",
+        )
 
     with (
         patch(
@@ -108,7 +119,7 @@ async def test_run_verification_stage_uses_unpatched_workspace_when_no_patch() -
             baseline_snapshot_tar_path=Path("/tmp/workspace.snapshot.tar"),
             workspace_patch=None,
             mitigation_result={"changed_files": []},
-            build_backend=_build_backend,
+            build_backend_config=_build_backend,
             system_prompt="base prompt",
             filesystem_system_prompt="filesystem prompt",
             user_prompt="user prompt",

@@ -9,6 +9,7 @@ from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from deepagents.middleware.skills import SkillsMiddleware
 from langchain.agents.middleware import AgentMiddleware
 
+from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
@@ -91,7 +92,7 @@ async def _create_case_agent(
     response_model: type[SkillReadOutput],
 ):
     from sec_review_agents.agents.analysis.repository import (
-        create_repository_analyzer_backend,
+        build_repository_analyzer_backend_config,
     )
     from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
 
@@ -109,11 +110,13 @@ async def _create_case_agent(
             return_value=False,
         ),
     ):
-        backend = create_repository_analyzer_backend(
-            workspace_root_path=workspace,
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
+        backend = create_backend_with_path_views(
+            **build_repository_analyzer_backend_config(
+                workspace_root_path=workspace,
+                history_path=None,
+                incremental_window_path=None,
+                scan_mode="full",
+            )
         )
 
     deployment = llm_test_deployment()

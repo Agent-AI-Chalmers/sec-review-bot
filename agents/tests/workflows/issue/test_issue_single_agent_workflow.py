@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.workflows.issue.single_agent import execute_issue_single_agent
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workspace.snapshots import (
@@ -55,8 +56,13 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
             side_effect=lambda **kwargs: kwargs["destination_path"],
         ),
         patch(
-            "sec_review_agents.agents.single_agent.issue.create_issue_single_agent_backend",
-            return_value=object(),
+            "sec_review_agents.agents.single_agent.issue.build_issue_single_agent_backend_config",
+            return_value=BackendConfig(
+                container_name_prefix="test",
+                path_views=[],
+                image=None,
+                backend_kind="local",
+            ),
         ),
         patch(
             "sec_review_agents.review_stages.single_agent.stage.run_single_agent",
@@ -123,8 +129,13 @@ async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_dec
             side_effect=lambda **kwargs: kwargs["destination_path"],
         ),
         patch(
-            "sec_review_agents.agents.single_agent.issue.create_issue_single_agent_backend",
-            return_value=object(),
+            "sec_review_agents.agents.single_agent.issue.build_issue_single_agent_backend_config",
+            return_value=BackendConfig(
+                container_name_prefix="test",
+                path_views=[],
+                image=None,
+                backend_kind="local",
+            ),
         ),
         patch(
             "sec_review_agents.review_stages.single_agent.stage.run_single_agent",

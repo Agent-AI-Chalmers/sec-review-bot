@@ -4,6 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.review_stages.mitigation.stage import (
     create_skipped_mitigation_result,
     persist_mitigation_result,
@@ -243,7 +244,12 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
             mitigator_artifacts_path=mitigator_root,
             baseline_snapshot_tar_path=root / WORKSPACE_SNAPSHOT_TAR_NAME,
             retry_context=retry_context,
-            build_backend=lambda _workspace_path, _memory_view: object(),
+            build_backend_config=lambda _workspace_path: BackendConfig(
+                container_name_prefix="test",
+                path_views=[],
+                image=None,
+                backend_kind="local",
+            ),
             system_prompt="base",
             filesystem_system_prompt="fs",
             user_prompt="user",

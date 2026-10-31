@@ -8,7 +8,10 @@ from typing import Any
 from sec_review_agents.agents.analysis.agent import (
     run_analysis_agent,
 )
-from sec_review_agents.filesystem.path_views import PathView
+from sec_review_agents.filesystem.backend_factory import (
+    BackendConfig,
+    create_backend_with_path_views,
+)
 from sec_review_agents.memory.runtime_view import materialized_memory_view
 from sec_review_agents.review_stages.analysis.result import build_analysis_stage_result
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
@@ -33,7 +36,7 @@ async def run_analysis_stage(
     published_trajectory_path: Path | None = None,
     agent_name: str,
     baseline_snapshot_tar_path: Path,
-    build_backend: Callable[[Path, PathView | None], Any],
+    build_backend_config: Callable[[Path], BackendConfig],
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
@@ -57,7 +60,10 @@ async def run_analysis_stage(
             analyzer_artifacts_path=analyzer_artifacts_path,
             published_trajectory_path=published_trajectory_path,
         )
-        backend = build_backend(workspace_path, memory_path_view)
+        config = build_backend_config(workspace_path)
+        if memory_path_view is not None:
+            config["path_views"].append(memory_path_view)
+        backend = create_backend_with_path_views(**config)
         async with amanaged_backend(backend):
             record_bootstrap_result(
                 analyzer_artifacts_path,

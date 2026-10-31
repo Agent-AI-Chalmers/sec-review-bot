@@ -11,9 +11,8 @@ from sec_review_agents.external_tools import (
 )
 from sec_review_agents.features import agent_skills_enabled
 from sec_review_agents.filesystem import backend_selection
-from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
+from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.filesystem.path_views import (
-    PathView,
     read_only_path_view,
     skill_view,
     tmp_view_for_backend,
@@ -63,13 +62,12 @@ ISSUE_SELF_CHECK_MITIGATION_INITIAL_INTRO = "\n".join(
 )
 
 
-def create_issue_mitigation_backend(
+def build_issue_mitigation_backend_config(
     *,
     workspace_root: Path,
     history_path: Path,
-    memory_path_view: PathView | None = None,
     runtime_context: ExecutionRuntimeContext | None = None,
-):
+) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
     backend_kind = backend_selection.selected_sandbox_backend_kind()
     tmp_view = tmp_view_for_backend(backend_kind)
@@ -81,12 +79,10 @@ def create_issue_mitigation_backend(
         path_views.append(
             skill_view(host_path=materialize_agent_skills_view(MITIGATION_AGENT_SKILLS))
         )
-    if memory_path_view is not None:
-        path_views.append(memory_path_view)
     if tmp_view is not None:
         path_views.append(tmp_view)
 
-    return create_backend_with_path_views(
+    return BackendConfig(
         container_name_prefix="issue-mitigator",
         path_views=path_views,
         image=workspace_image,

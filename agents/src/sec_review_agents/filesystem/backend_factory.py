@@ -1,4 +1,5 @@
 import posixpath
+from typing import NotRequired, TypedDict
 
 from deepagents.backends import CompositeBackend, StateBackend
 from deepagents.backends.protocol import BackendProtocol
@@ -18,6 +19,22 @@ from sec_review_agents.filesystem.docker_runtime import (
 )
 from sec_review_agents.filesystem.local_backend import LocalFilesystemBackend
 from sec_review_agents.filesystem.path_views import PathView
+
+
+class BackendConfig(TypedDict):
+    """Fresh construction inputs; the stage completes this invocation's mounts.
+
+    Omitted fields use create_backend_with_path_views defaults:
+    /workspace as the working directory, no image override, and the configured
+    sandbox kind. TypedDict describes these inputs; it does not insert defaults.
+    """
+
+    container_name_prefix: str
+    path_views: list[PathView]
+    working_directory: NotRequired[str]
+    image: NotRequired[str | None]
+    backend_kind: NotRequired[str | None]
+
 
 _DEEPAGENTS_ARTIFACT_VIEWS = (
     PathView(

@@ -6,9 +6,9 @@ from unittest.mock import patch
 import pytest
 from deepagents.middleware.skills import SkillsMiddleware
 
-from sec_review_agents.agents.analysis.issue import create_issue_analyzer_backend
+from sec_review_agents.agents.analysis.issue import build_issue_analyzer_backend_config
 from sec_review_agents.agents.analysis.repository import (
-    create_repository_analyzer_backend,
+    build_repository_analyzer_backend_config,
 )
 from sec_review_agents.agents.cvss.repository import create_repository_cvss_backend
 from sec_review_agents.agents.delivery_planning.backend import (
@@ -18,7 +18,7 @@ from sec_review_agents.agents.discovery.backend import (
     create_repository_discovery_backend,
 )
 from sec_review_agents.agents.mitigation.repository import (
-    create_repository_mitigation_backend,
+    build_repository_mitigation_backend_config,
 )
 from sec_review_agents.agents.patch_synthesis.backend import (
     create_patch_synthesis_backend,
@@ -27,8 +27,9 @@ from sec_review_agents.agents.triage.backend import (
     create_repository_triage_backend,
 )
 from sec_review_agents.agents.verification.repository import (
-    create_repository_verification_backend,
+    build_repository_verification_backend_config,
 )
+from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.filesystem.bwrap_backend import BwrapSandboxBackend
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 
@@ -95,14 +96,18 @@ def _repository_analyzer_backend(
 ):
     local_root = _local_root(input_data)
     scan_mode = _scan_mode(input_data)
-    return create_repository_analyzer_backend(
-        workspace_root_path=local_root / "workspace",
-        history_path=local_root / "history" if scan_mode == "incremental" else None,
-        incremental_window_path=(
-            local_root / "incremental-window" if scan_mode == "incremental" else None
-        ),
-        scan_mode=scan_mode,
-        runtime_context=runtime_context,
+    return create_backend_with_path_views(
+        **build_repository_analyzer_backend_config(
+            workspace_root_path=local_root / "workspace",
+            history_path=local_root / "history" if scan_mode == "incremental" else None,
+            incremental_window_path=(
+                local_root / "incremental-window"
+                if scan_mode == "incremental"
+                else None
+            ),
+            scan_mode=scan_mode,
+            runtime_context=runtime_context,
+        )
     )
 
 
@@ -115,26 +120,34 @@ def _repository_cvss_backend(input_data: dict):
 def _repository_mitigation_backend(input_data: dict, *, workspace_root: Path):
     local_root = _local_root(input_data)
     scan_mode = _scan_mode(input_data)
-    return create_repository_mitigation_backend(
-        workspace_root=workspace_root,
-        history_path=local_root / "history" if scan_mode == "incremental" else None,
-        incremental_window_path=(
-            local_root / "incremental-window" if scan_mode == "incremental" else None
-        ),
-        scan_mode=scan_mode,
+    return create_backend_with_path_views(
+        **build_repository_mitigation_backend_config(
+            workspace_root=workspace_root,
+            history_path=local_root / "history" if scan_mode == "incremental" else None,
+            incremental_window_path=(
+                local_root / "incremental-window"
+                if scan_mode == "incremental"
+                else None
+            ),
+            scan_mode=scan_mode,
+        )
     )
 
 
 def _repository_verification_backend(input_data: dict, *, workspace_root_path: Path):
     local_root = _local_root(input_data)
     scan_mode = _scan_mode(input_data)
-    return create_repository_verification_backend(
-        workspace_root_path=workspace_root_path,
-        history_path=local_root / "history" if scan_mode == "incremental" else None,
-        incremental_window_path=(
-            local_root / "incremental-window" if scan_mode == "incremental" else None
-        ),
-        scan_mode=scan_mode,
+    return create_backend_with_path_views(
+        **build_repository_verification_backend_config(
+            workspace_root_path=workspace_root_path,
+            history_path=local_root / "history" if scan_mode == "incremental" else None,
+            incremental_window_path=(
+                local_root / "incremental-window"
+                if scan_mode == "incremental"
+                else None
+            ),
+            scan_mode=scan_mode,
+        )
     )
 
 
@@ -286,11 +299,12 @@ def test_bwrap_env_reaches_workflow_backend_factory(tmp_path: Path) -> None:
         {"AGENT_SANDBOX_BACKEND": "bwrap"},
         clear=False,
     ):
-        backend = create_issue_analyzer_backend(
+        config = build_issue_analyzer_backend_config(
             workspace_root_path=workspace,
             history_path=history,
         )
 
+    backend = create_backend_with_path_views(**config)
     assert isinstance(backend, BwrapSandboxBackend)
     assert backend._is_allowed_path("/workspace/app.py")
     assert not backend._is_allowed_path("/tmp/app.py")

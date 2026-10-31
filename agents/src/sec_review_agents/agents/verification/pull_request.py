@@ -11,9 +11,8 @@ from sec_review_agents.external_tools import (
 )
 from sec_review_agents.features import agent_skills_enabled
 from sec_review_agents.filesystem import backend_selection
-from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
+from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.filesystem.path_views import (
-    PathView,
     read_only_path_view,
     skill_view,
     tmp_view_for_backend,
@@ -53,14 +52,13 @@ PR_VERIFICATION_RETRY_INTRO = "\n".join(
 )
 
 
-def create_pr_verification_backend(
+def build_pr_verification_backend_config(
     *,
     workspace_root_path: Path,
     history_path: Path,
     incremental_window_path: Path,
     runtime_context: ExecutionRuntimeContext | None = None,
-    memory_path_view: PathView | None = None,
-):
+) -> BackendConfig:
     if not workspace_root_path.is_dir():
         raise FileNotFoundError(
             f"Verifier workspace does not exist: {workspace_root_path}"
@@ -82,12 +80,10 @@ def create_pr_verification_backend(
                 host_path=materialize_agent_skills_view(VERIFICATION_AGENT_SKILLS)
             )
         )
-    if memory_path_view is not None:
-        path_views.append(memory_path_view)
     if tmp_view is not None:
         path_views.append(tmp_view)
 
-    return create_backend_with_path_views(
+    return BackendConfig(
         container_name_prefix="pr-verifier",
         path_views=path_views,
         image=workspace_image,

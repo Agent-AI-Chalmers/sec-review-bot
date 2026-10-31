@@ -9,7 +9,10 @@ from typing import Any
 from sec_review_agents.agents.verification.agent import (
     run_verification_agent,
 )
-from sec_review_agents.filesystem.path_views import PathView
+from sec_review_agents.filesystem.backend_factory import (
+    BackendConfig,
+    create_backend_with_path_views,
+)
 from sec_review_agents.memory.runtime_view import materialized_memory_view
 from sec_review_agents.review_stages.feedback_loop import MAX_FEEDBACK_RETRY_ATTEMPTS
 from sec_review_agents.review_stages.verification.result import (
@@ -202,7 +205,7 @@ async def run_verification_stage(
     baseline_snapshot_tar_path: Path,
     workspace_patch: str | None,
     mitigation_result: Mapping[str, Any] | None,
-    build_backend: Callable[[Path, PathView | None], Any],
+    build_backend_config: Callable[[Path], BackendConfig],
     system_prompt: str,
     filesystem_system_prompt: str,
     user_prompt: str,
@@ -232,7 +235,10 @@ async def run_verification_stage(
             workspace_path=workspace_path,
             workspace_patch=workspace_patch,
         )
-        backend = build_backend(workspace_path, memory_path_view)
+        config = build_backend_config(workspace_path)
+        if memory_path_view is not None:
+            config["path_views"].append(memory_path_view)
+        backend = create_backend_with_path_views(**config)
         # Keep backend lifetime around both agent construction and invocation; some
         # middleware resolves tools against backend resources during graph creation.
         async with amanaged_backend(backend):

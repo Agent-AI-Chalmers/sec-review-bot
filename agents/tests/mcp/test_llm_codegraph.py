@@ -2,7 +2,6 @@
 #
 # This intentionally uses the local fallback path and does not enable filesystem
 # tools. The model must use CodeGraph MCP tools to inspect the small workspace.
-
 import shutil
 from pathlib import Path
 from typing import Any, Literal
@@ -12,8 +11,9 @@ import pytest
 from pydantic import BaseModel, Field
 
 from sec_review_agents.agents.analysis.repository import (
-    create_repository_analyzer_backend,
+    build_repository_analyzer_backend_config,
 )
+from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.mcp.client import managed_mcp_tools_async
 from sec_review_agents.mcp.codegraph import codegraph_mcp_connections_for_backend
@@ -70,11 +70,13 @@ async def test_llm_uses_codegraph_mcp_to_find_symbol_and_caller(
         "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
         return_value="local",
     ):
-        backend = create_repository_analyzer_backend(
-            workspace_root_path=workspace,
-            history_path=None,
-            incremental_window_path=None,
-            scan_mode="full",
+        backend = create_backend_with_path_views(
+            **build_repository_analyzer_backend_config(
+                workspace_root_path=workspace,
+                history_path=None,
+                incremental_window_path=None,
+                scan_mode="full",
+            )
         )
 
     async with amanaged_backend(backend):
