@@ -1,8 +1,3 @@
-import fnmatch
-from collections.abc import Sequence
-from pathlib import Path
-from typing import Any
-
 """The repository's paths_ignore rule, shared by every stage that selects files.
 
 Two callers need the same answer to "is this path excluded": discovery, when it builds the scan
@@ -10,6 +5,11 @@ set from the window's changed files, and deletion-case construction, which walks
 Keeping one implementation means a repository only has to read its ignore config once, and a
 window that deletes an ignored tree is treated the same by both.
 """
+
+import fnmatch
+from collections.abc import Sequence
+from pathlib import Path
+from typing import Any
 
 
 def normalize_paths_ignore(raw_patterns: Any, *, source: str) -> list[str]:

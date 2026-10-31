@@ -80,7 +80,7 @@ target-version = "py314"
 line-length = 88
 
 [tool.ruff.lint]
-extend-select = ["I"]
+extend-select = ["I", "E402"]
 ignore = [
   "B008",   # FastAPI dependency defaults intentionally call Body/Depends.
   "B017",   # Temporal tests intentionally assert framework-wrapped failures.
