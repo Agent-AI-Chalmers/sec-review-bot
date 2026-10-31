@@ -142,7 +142,7 @@ async def run_repository_delivery_direct(
     delivery_plan = await plan_repository_delivery_activity(request, case_results)
     deliveries = delivery_plan.deliveries
     run_artifacts_root = required_path(
-        request.prepared_input["artifact_root_path"],
+        request.prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
     if not deliveries:
@@ -164,10 +164,9 @@ async def run_repository_delivery_direct(
         deliveries=deliveries,
         keep_case_results=keep_case_results,
     )
-    bundle_paths = request.prepared_input["bundle_paths"]
     workspace_snapshot_tar_path = required_path(
-        bundle_paths["workspace_snapshot_tar_path"],
-        label="bundle_paths.workspace_snapshot_tar_path",
+        request.prepared_input.workspace_snapshot_tar_path,
+        label="workspace_snapshot_tar_path",
     )
     delivery_execution = build_delivery_execution_input(
         run_artifacts_root=run_artifacts_root,

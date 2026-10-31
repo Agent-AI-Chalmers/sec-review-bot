@@ -1,4 +1,5 @@
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 from temporalio import activity, workflow
@@ -24,9 +25,7 @@ from sec_review_agents.temporal.support import (
 )
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
-from sec_review_agents.workflows.review_intent import (
-    require_review_intent,
-)
+from sec_review_agents.workflows.prepared_input import PreparedIssueInput
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 
@@ -44,21 +43,20 @@ async def analyze_issue_activity(
     )
     from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import (
-        artifact_path,
         required_path,
     )
     from sec_review_agents.workflows.issue.analysis import analyze_issue
 
     prepared_input = request.prepared_input
+    assert isinstance(prepared_input, PreparedIssueInput)
     run_artifacts_root = required_path(
-        prepared_input["artifact_root_path"],
+        prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
-    bundle_paths = prepared_input["bundle_paths"]
-    review_intent = require_review_intent(prepared_input.get("review_intent"))
+    review_intent = prepared_input.review_intent
     workspace_snapshot_tar_path = required_path(
-        bundle_paths["workspace_snapshot_tar_path"],
-        label="bundle_paths.workspace_snapshot_tar_path",
+        prepared_input.workspace_snapshot_tar_path,
+        label="workspace_snapshot_tar_path",
     )
     with bind_trace_context(
         **activity_trace_labels(
@@ -69,16 +67,13 @@ async def analyze_issue_activity(
         )
     ):
         return await analyze_issue(
-            issue=prepared_input["issue"],
+            issue=prepared_input.issue,
             workspace_snapshot_tar_path=workspace_snapshot_tar_path,
             history_path=required_path(
-                bundle_paths["history_path"],
-                label="bundle_paths.history_path",
+                prepared_input.history_path,
+                label="history_path",
             ),
-            analyzer_artifacts_path=artifact_path(
-                prepared_input["artifact_paths"],
-                "analyzer",
-            ),
+            analyzer_artifacts_path=Path(prepared_input.analyzer_artifacts_path),
             published_trajectory_path=review_trajectory_path(
                 review_trajectories_root(run_artifacts_root),
                 order=1,
@@ -86,7 +81,7 @@ async def analyze_issue_activity(
             ),
             review_objective=review_intent.objective,
             setup_declaration_content=setup_declaration_content_for_backend(
-                prepared_input
+                prepared_input.setup_declaration
             ),
             runtime_context=request.runtime_context,
         )
@@ -113,21 +108,18 @@ async def mitigate_issue_activity(
     )
     from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import (
-        artifact_path,
         required_path,
     )
     from sec_review_agents.workflows.issue.mitigation import mitigate_issue
 
     prepared_input = request.prepared_input
-    mitigator_artifacts_path = artifact_path(
-        prepared_input["artifact_paths"],
-        "mitigator",
-    )
+    assert isinstance(prepared_input, PreparedIssueInput)
+    mitigator_artifacts_path = Path(prepared_input.mitigator_artifacts_path)
     run_artifacts_root = required_path(
-        prepared_input["artifact_root_path"],
+        prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
-    review_intent = require_review_intent(prepared_input.get("review_intent"))
+    review_intent = prepared_input.review_intent
     if not has_confirmed_repair_target(analysis_result):
         review_trajectory_path(
             review_trajectories_root(run_artifacts_root),
@@ -142,7 +134,6 @@ async def mitigate_issue_activity(
             retry_context=retry_context,
             reason="No confirmed, reparable mitigation target was available from the issue analyzer output.",
         )
-    bundle_paths = prepared_input["bundle_paths"]
     pass_index = retry_context.retry_index if retry_context is not None else 0
     with bind_trace_context(
         **activity_trace_labels(
@@ -153,14 +144,14 @@ async def mitigate_issue_activity(
         )
     ):
         return await mitigate_issue(
-            issue=prepared_input["issue"],
+            issue=prepared_input.issue,
             workspace_snapshot_tar_path=required_path(
-                bundle_paths["workspace_snapshot_tar_path"],
-                label="bundle_paths.workspace_snapshot_tar_path",
+                prepared_input.workspace_snapshot_tar_path,
+                label="workspace_snapshot_tar_path",
             ),
             history_path=required_path(
-                bundle_paths["history_path"],
-                label="bundle_paths.history_path",
+                prepared_input.history_path,
+                label="history_path",
             ),
             mitigator_artifacts_path=mitigator_artifacts_path,
             published_trajectory_path=review_trajectory_path(
@@ -175,7 +166,7 @@ async def mitigate_issue_activity(
             analysis_result=analysis_result,
             retry_context=retry_context,
             setup_declaration_content=setup_declaration_content_for_backend(
-                prepared_input
+                prepared_input.setup_declaration
             ),
             runtime_context=request.runtime_context,
         )
@@ -203,20 +194,17 @@ async def verify_issue_activity(
     )
     from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import (
-        artifact_path,
         required_path,
     )
     from sec_review_agents.workflows.issue.verification import verify_issue
 
     prepared_input = request.prepared_input
+    assert isinstance(prepared_input, PreparedIssueInput)
     run_artifacts_root = required_path(
-        prepared_input["artifact_root_path"],
+        prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
-    verifier_artifacts_path = artifact_path(
-        prepared_input["artifact_paths"],
-        "verifier",
-    )
+    verifier_artifacts_path = Path(prepared_input.verifier_artifacts_path)
     if not has_confirmed_repair_target(analysis_result):
         review_trajectory_path(
             review_trajectories_root(run_artifacts_root),
@@ -231,10 +219,9 @@ async def verify_issue_activity(
             retry_context=retry_context,
             reason="Verification was skipped because analysis produced no confirmed repair target.",
         )
-    bundle_paths = prepared_input["bundle_paths"]
     workspace_snapshot_tar_path = required_path(
-        bundle_paths["workspace_snapshot_tar_path"],
-        label="bundle_paths.workspace_snapshot_tar_path",
+        prepared_input.workspace_snapshot_tar_path,
+        label="workspace_snapshot_tar_path",
     )
     pass_index = retry_context.retry_index if retry_context is not None else 0
     with bind_trace_context(
@@ -246,11 +233,11 @@ async def verify_issue_activity(
         )
     ):
         return await verify_issue(
-            issue=prepared_input["issue"],
+            issue=prepared_input.issue,
             workspace_snapshot_tar_path=workspace_snapshot_tar_path,
             history_path=required_path(
-                bundle_paths["history_path"],
-                label="bundle_paths.history_path",
+                prepared_input.history_path,
+                label="history_path",
             ),
             verifier_artifacts_path=verifier_artifacts_path,
             published_trajectory_path=review_trajectory_path(
@@ -265,7 +252,7 @@ async def verify_issue_activity(
             mitigation_result=mitigation_result,
             retry_context=retry_context,
             setup_declaration_content=setup_declaration_content_for_backend(
-                prepared_input
+                prepared_input.setup_declaration
             ),
             runtime_context=request.runtime_context,
         )
@@ -273,17 +260,16 @@ async def verify_issue_activity(
 
 @activity.defn
 def archive_issue_feedback_attempt_activity(
-    prepared_input: dict[str, Any],
+    prepared_input: PreparedIssueInput,
     retry_context: FeedbackRetryContext,
 ) -> None:
     from sec_review_agents.review_stages.feedback_loop import (
         archive_initial_feedback_attempt,
     )
-    from sec_review_agents.utils.paths import artifact_path
 
     archive_initial_feedback_attempt(
-        mitigator_root=artifact_path(prepared_input["artifact_paths"], "mitigator"),
-        verifier_root=artifact_path(prepared_input["artifact_paths"], "verifier"),
+        mitigator_root=Path(prepared_input.mitigator_artifacts_path),
+        verifier_root=Path(prepared_input.verifier_artifacts_path),
         retry_context=retry_context,
     )
 
@@ -378,7 +364,7 @@ class IssueReviewWorkflow:
             retry_policy=activity_retry_policy(),
         )
         artifact_root = required_path(
-            request.prepared_input.get("artifact_root_path"),
+            request.prepared_input.artifact_root_path,
             label="artifact_root_path",
         )
         finalized = await workflow.execute_activity(

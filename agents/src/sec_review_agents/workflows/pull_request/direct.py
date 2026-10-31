@@ -6,6 +6,7 @@ from sec_review_agents.review_stages.feedback_loop import (
     feedback_retry_context,
     should_retry_from_verifier_result,
 )
+from sec_review_agents.workflows.prepared_input import PreparedPullRequestInput
 from sec_review_agents.workflows.pull_request.workflow import (
     analyze_pull_request_activity,
     archive_pull_request_feedback_attempt_activity,
@@ -20,6 +21,7 @@ async def run_pull_request_review_direct(
     request: ReviewWorkflowRequest,
 ) -> dict[str, Any]:
     prepared_input = request.prepared_input
+    assert isinstance(prepared_input, PreparedPullRequestInput)
     analysis_result = await analyze_pull_request_activity(request)
     mitigation_result = await mitigate_pull_request_activity(
         request,

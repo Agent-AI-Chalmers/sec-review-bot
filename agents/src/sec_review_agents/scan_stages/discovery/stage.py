@@ -1,8 +1,8 @@
 import hashlib
 import os
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Literal
+from typing import Literal
 
 from langchain_core.messages.utils import count_tokens_approximately
 
@@ -34,6 +34,7 @@ from sec_review_agents.scan_stages.discovery.result import (
     DiscoveryMetadata,
     DiscoveryResult,
 )
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 from sec_review_agents.utils.env import int_env
 from sec_review_agents.utils.files import persist_json_artifact, remove_json_artifacts
 from sec_review_agents.utils.paths_ignore import (
@@ -198,12 +199,12 @@ def _resolve_discovery_chunk_strategy() -> str:
 def _build_scan_manifest(
     *,
     workspace_root: Path,
-    scan_scope: dict[str, Any],
+    scan_scope: RepositoryScanScope,
     discovery_artifacts_path: Path,
 ) -> tuple[list[DiscoveryEntry], list[DiscoverySkippedFile]]:
     max_file_bytes, max_file_bytes_source = _resolve_discovery_max_file_bytes()
     paths_ignore = normalize_paths_ignore(
-        scan_scope.get("paths_ignore"), source="Repository discovery"
+        scan_scope.paths_ignore, source="Repository discovery"
     )
     entries: list[DiscoveryEntry] = []
     skipped: list[DiscoverySkippedFile] = []
@@ -291,66 +292,6 @@ def _build_scan_manifest(
     return entries, skipped
 
 
-# The scan scope's change vocabulary, mirroring `changedFileStatus` in the Execution API.
-# `deleted` is the only status that removes a file from discovery; the rest describe how a file
-# changed and all of them are scanned.
-INCREMENTAL_CHANGED_FILE_STATUSES = frozenset(
-    {"added", "modified", "deleted", "renamed", "copied", "type_changed"}
-)
-
-
-def _load_incremental_changed_files(
-    scan_scope: dict[str, Any],
-) -> list[dict[str, Any]]:
-    raw_files = scan_scope.get("incremental_changed_files")
-    if isinstance(raw_files, list):
-        normalized: list[dict[str, Any]] = []
-        for index, item in enumerate(raw_files):
-            if not isinstance(item, dict):
-                raise ValueError(
-                    "Repository incremental discovery requires "
-                    "scan_scope.incremental_changed_files"
-                    f"[{index}] to be an object."
-                )
-            file_path = str(item.get("path") or "").strip()
-            if not file_path:
-                raise ValueError(
-                    "Repository incremental discovery requires "
-                    "scan_scope.incremental_changed_files"
-                    f"[{index}].path to be non-empty."
-                )
-            status = str(item.get("status") or "").strip().lower()
-            if not status:
-                raise ValueError(
-                    "Repository incremental discovery requires "
-                    "scan_scope.incremental_changed_files"
-                    f"[{index}].status to be non-empty."
-                )
-            previous_path = item.get("previous_path")
-            if previous_path is not None and not isinstance(previous_path, str):
-                raise ValueError(
-                    "Repository incremental discovery requires "
-                    "scan_scope.incremental_changed_files"
-                    f"[{index}].previous_path to be a string or null."
-                )
-            normalized.append(
-                {
-                    "path": file_path.replace("\\", "/"),
-                    "status": status,
-                    "previous_path": (
-                        previous_path.strip()
-                        if isinstance(previous_path, str) and previous_path.strip()
-                        else None
-                    ),
-                }
-            )
-        return normalized
-
-    raise ValueError(
-        "Repository incremental discovery requires scan_scope.incremental_changed_files."
-    )
-
-
 def _entry_from_incremental_record(
     *,
     root: Path,
@@ -409,39 +350,25 @@ def _entry_from_incremental_record(
 def _build_incremental_scan_manifest(
     *,
     workspace_root: Path,
-    scan_scope: dict[str, Any],
-    changed_files: Sequence[Mapping[str, Any]],
+    scan_scope: RepositoryScanScope,
     discovery_artifacts_path: Path,
 ) -> tuple[list[DiscoveryEntry], list[DiscoverySkippedFile]]:
     max_file_bytes, max_file_bytes_source = _resolve_discovery_max_file_bytes()
     paths_ignore = normalize_paths_ignore(
-        scan_scope.get("paths_ignore"), source="Repository discovery"
+        scan_scope.paths_ignore, source="Repository discovery"
     )
 
     entries: list[DiscoveryEntry] = []
     skipped: list[DiscoverySkippedFile] = []
     seen_paths: set[str] = set()
 
-    for item in changed_files:
-        current_path = str(item.get("path") or "").strip()
-        if not current_path:
-            raise ValueError(
-                "Repository incremental discovery received an empty changed-file path."
-            )
-        normalized_path = Path(current_path.replace("\\", "/"))
+    for item in scan_scope.incremental_changed_files:
+        normalized_path = Path(item.path.strip().replace("\\", "/"))
         normalized_path_text = normalized_path.as_posix()
         if normalized_path_text in seen_paths:
             continue
         seen_paths.add(normalized_path_text)
-        status = str(item.get("status") or "").strip().lower()
-        if status not in INCREMENTAL_CHANGED_FILE_STATUSES:
-            # A status outside the contract means the producer and this consumer disagree about
-            # the vocabulary. Skipping it (or scanning it) would silently change which files are
-            # analyzed, so the disagreement has to stop the run.
-            raise ValueError(
-                "Repository incremental discovery received an unsupported changed-file status "
-                f"{status!r}; expected one of {sorted(INCREMENTAL_CHANGED_FILE_STATUSES)}."
-            )
+        status = item.status
         if status == "deleted":
             continue
 
@@ -906,7 +833,7 @@ def prepare_discovery_chunks(
     *,
     workspace_root: Path,
     scan_mode: str,
-    scan_scope: dict[str, Any],
+    scan_scope: RepositoryScanScope,
     discovery_artifacts_path: Path,
     chunk_target_ratio: tuple[int, int] = (1, 5),
     chunk_strategy: str | None = None,
@@ -920,7 +847,6 @@ def prepare_discovery_chunks(
         entries, skipped_files = _build_incremental_scan_manifest(
             workspace_root=workspace_root,
             scan_scope=scan_scope,
-            changed_files=_load_incremental_changed_files(scan_scope),
             discovery_artifacts_path=discovery_artifacts_path,
         )
     else:

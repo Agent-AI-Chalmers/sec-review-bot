@@ -15,6 +15,7 @@ from sec_review_agents.scan_stages.discovery.input import (
     DiscoveryManifest,
     DiscoverySkippedFile,
 )
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 from sec_review_agents.scan_stages.triage.result import TriageCase
 from sec_review_agents.workflows.repository.scan_result import RepositoryScanResult
 from sec_review_agents.workflows.repository.workflow import (
@@ -26,8 +27,10 @@ from sec_review_agents.workflows.repository.workflow import (
     triage_repository_activity,
     window_deletion_summary_activity,
 )
+from sec_review_agents.workflows.review_intent import ReviewIntent
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
+from tests.prepared_input_fixtures import prepared_repository_input
 from tests.repository_scan_fixtures import scan_result_fixture
 from tests.temporal_test_utils import temporal_time_skipping_environment
 
@@ -59,7 +62,9 @@ def prepare_manifest(tmp_path: Path) -> DiscoveryManifest:
         return prepare_discovery_chunks(
             workspace_root=workspace,
             scan_mode="full",
-            scan_scope={"paths_ignore": []},
+            scan_scope=RepositoryScanScope.model_validate(
+                {"incremental_changed_files": [], "paths_ignore": []}
+            ),
             discovery_artifacts_path=tmp_path / "discovery",
         )
 
@@ -119,17 +124,17 @@ async def test_discovery_production_activities_cross_temporal_boundary(
     request = ReviewWorkflowRequest(
         workflow="repository-review",
         run_id="discovery-boundary",
-        prepared_input={
-            "review_intent": {"objective": "audit", "test_changes": "allow"},
-            "artifact_root_path": str(tmp_path / "run"),
-            "artifact_paths": {
-                "discovery": str(tmp_path / "run" / "discovery"),
-                "triage": str(tmp_path / "run" / "triage"),
-            },
-            "bundle_paths": {"workspace_snapshot_tar_path": str(snapshot)},
-            "scan_target": {"scan_mode": "full"},
-            "scan_scope": {"paths_ignore": []},
-        },
+        prepared_input=prepared_repository_input(
+            review_intent=ReviewIntent(objective="audit", test_changes="allow"),
+            artifact_root_path=str(tmp_path / "run"),
+            discovery_artifacts_path=str(tmp_path / "run" / "discovery"),
+            triage_artifacts_path=str(tmp_path / "run" / "triage"),
+            workspace_snapshot_tar_path=str(snapshot),
+            scan_mode="full",
+            scan_scope=RepositoryScanScope.model_validate(
+                {"incremental_changed_files": [], "paths_ignore": []}
+            ),
+        ),
         timeout_seconds=30,
         runtime_context={},
     )

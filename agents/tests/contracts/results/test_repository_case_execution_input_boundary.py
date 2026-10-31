@@ -4,7 +4,9 @@ from typing import Any
 import pytest
 
 from sec_review_agents.agents.discovery.model import DiscoveryLocation
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 from sec_review_agents.scan_stages.triage.result import TriageCase
+from sec_review_agents.workflows.prepared_input import PreparedRepositoryInput
 from sec_review_agents.workflows.repository.case_execution_input import (
     prepare_case_execution_input,
 )
@@ -18,8 +20,9 @@ from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
     prepare_repository_case_activity,
 )
-from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
+from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW, ReviewIntent
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
+from tests.prepared_input_fixtures import prepared_repository_input
 
 
 def _prepare_case_execution_input(
@@ -190,19 +193,16 @@ def test_repository_case_trajectories_are_published_under_the_case_root(
     request = ReviewWorkflowRequest(
         workflow="repository-review",
         run_id="run-1",
-        prepared_input={
-            "artifact_root_path": str(tmp_path / "artifacts" / "run-1"),
-            "artifact_paths": {"cases": str(cases_root)},
-            "bundle_paths": {
-                "workspace_snapshot_tar_path": str(tmp_path / "workspace.tar"),
-                "history_path": str(tmp_path / "history"),
-            },
-            "scan_target": {"scan_mode": "full"},
-            "review_intent": {
-                "objective": "audit",
-                "test_changes": TEST_CHANGES_ALLOW,
-            },
-        },
+        prepared_input=prepared_repository_input(
+            artifact_root_path=str(tmp_path / "artifacts" / "run-1"),
+            cases_artifacts_path=str(cases_root),
+            workspace_snapshot_tar_path=str(tmp_path / "workspace.tar"),
+            history_path=str(tmp_path / "history"),
+            scan_mode="full",
+            review_intent=ReviewIntent(
+                objective="audit", test_changes=TEST_CHANGES_ALLOW
+            ),
+        ),
         timeout_seconds=30,
         runtime_context={},
     )
@@ -489,25 +489,28 @@ async def test_triage_cases_round_trip_into_repository_preparation(tmp_path) -> 
     request = ReviewWorkflowRequest(
         workflow="repository-review",
         run_id="run-1",
-        prepared_input={
-            "artifact_paths": {"cases": str(tmp_path / "cases")},
-            "bundle_paths": {
-                "workspace_snapshot_tar_path": str(tmp_path / "workspace.tar"),
-                "history_path": str(tmp_path / "history"),
-                "incremental_window_path": str(tmp_path / "window"),
-            },
-            "scan_target": {
-                "scan_mode": "incremental",
-                "base_sha": "base",
-                "head_sha": "head",
-            },
-            "scan_scope": {
-                "incremental_changed_files": [
-                    {"path": "src/guard.py", "status": "deleted"}
-                ]
-            },
-            "review_intent": {"objective": "audit", "test_changes": "allow"},
-        },
+        prepared_input=prepared_repository_input(
+            cases_artifacts_path=str(tmp_path / "cases"),
+            workspace_snapshot_tar_path=str(tmp_path / "workspace.tar"),
+            history_path=str(tmp_path / "history"),
+            incremental_window_path=str(tmp_path / "window"),
+            scan_mode="incremental",
+            base_sha="base",
+            head_sha="head",
+            scan_scope=RepositoryScanScope.model_validate(
+                {
+                    "paths_ignore": [],
+                    "incremental_changed_files": [
+                        {
+                            "path": "src/guard.py",
+                            "status": "deleted",
+                            "previous_path": None,
+                        }
+                    ],
+                }
+            ),
+            review_intent=ReviewIntent(objective="audit", test_changes="allow"),
+        ),
         timeout_seconds=30,
         runtime_context={},
     )
@@ -532,10 +535,11 @@ async def test_triage_cases_round_trip_into_repository_preparation(tmp_path) -> 
     assert "src/routes.py:7" in first.review_input
     assert "src/guard.py" in deleted.review_input
     assert "Candidate Anchors" not in deleted.review_input
+    assert isinstance(request.prepared_input, PreparedRepositoryInput)
     assert (
         deleted.case_id
         == deleted_repository_cases(
-            scan_scope=request.prepared_input["scan_scope"],
+            scan_scope=request.prepared_input.scan_scope,
             base_sha="base",
             head_sha="head",
         )[0].case_id

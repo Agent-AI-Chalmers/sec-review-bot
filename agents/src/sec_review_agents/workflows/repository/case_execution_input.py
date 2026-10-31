@@ -1,11 +1,11 @@
 import hashlib
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
 from sec_review_agents.agents.discovery.model import DiscoveryLocation
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 from sec_review_agents.scan_stages.triage.result import TriageCase
 from sec_review_agents.utils.markdown import (
     bullet_section,
@@ -47,7 +47,7 @@ def prepare_case_execution_input(
     workspace_snapshot_tar_path: Path,
     history_path: Path,
     incremental_window_path: Path | None,
-    scan_mode: str,
+    scan_mode: Literal["full", "incremental"],
     case: TriageCase | DeletedRepositoryCase,
     test_changes: TestChangesPolicy,
     setup_declaration_content: str | None = None,
@@ -61,27 +61,25 @@ def prepare_case_execution_input(
         case=case,
         scan_mode=scan_mode,
     )
-    return RepositoryCaseExecutionInput.model_validate(
-        {
-            "case_id": case_id,
-            "review_input": review_input,
-            "workspace_snapshot_tar_path": str(workspace_snapshot_tar_path),
-            "history_path": str(history_path),
-            "scan_mode": scan_mode,
-            "incremental_window_path": (
-                str(incremental_window_path)
-                if incremental_window_path is not None
-                else None
-            ),
-            "test_changes": test_changes,
-            "setup_declaration_content": setup_declaration_content,
-        }
+    return RepositoryCaseExecutionInput(
+        case_id=case_id,
+        review_input=review_input,
+        workspace_snapshot_tar_path=str(workspace_snapshot_tar_path),
+        history_path=str(history_path),
+        scan_mode=scan_mode,
+        incremental_window_path=(
+            str(incremental_window_path)
+            if incremental_window_path is not None
+            else None
+        ),
+        test_changes=test_changes,
+        setup_declaration_content=setup_declaration_content,
     )
 
 
 def window_deletion_summary(
     *,
-    scan_scope: Mapping[str, Any],
+    scan_scope: RepositoryScanScope,
     scan_mode: str,
 ) -> WindowDeletionSummary:
     """Summarize what this window deleted and whether review covers it.
@@ -99,25 +97,21 @@ def window_deletion_summary(
     )
 
 
-def _deleted_paths_for_review(scan_scope: Mapping[str, Any]) -> list[str]:
+def _deleted_paths_for_review(scan_scope: RepositoryScanScope) -> list[str]:
     """The window's deleted paths that review covers, in a stable order.
 
     The same ignore rules discovery applies to changed files, for the same reasons: a repository
     excludes vendored or generated trees from review.
     """
-    raw_paths_ignore = scan_scope.get("paths_ignore")
     paths_ignore = normalize_paths_ignore(
-        raw_paths_ignore if isinstance(raw_paths_ignore, list) else [],
-        source="Repository deletion cases",
+        scan_scope.paths_ignore, source="Repository deletion cases"
     )
     return sorted(
         {
             normalized_path
-            for item in scan_scope.get("incremental_changed_files") or []
-            if isinstance(item, Mapping)
-            and str(item.get("status") or "").strip().lower() == "deleted"
-            and str(item.get("path") or "").strip()
-            for normalized_path in [str(item.get("path") or "").strip()]
+            for item in scan_scope.incremental_changed_files
+            if item.status == "deleted"
+            for normalized_path in [item.path.strip()]
             if not matches_paths_ignore(Path(normalized_path), paths_ignore)
         }
     )
@@ -125,7 +119,7 @@ def _deleted_paths_for_review(scan_scope: Mapping[str, Any]) -> list[str]:
 
 def deleted_repository_cases(
     *,
-    scan_scope: Mapping[str, Any],
+    scan_scope: RepositoryScanScope,
     base_sha: str,
     head_sha: str,
 ) -> list[DeletedRepositoryCase]:

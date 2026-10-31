@@ -28,6 +28,7 @@ from sec_review_agents.workflows.repository.workflow import (
 )
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from sec_review_agents.workspace.patches import PatchArtifact
+from tests.prepared_input_fixtures import prepared_repository_input
 from tests.temporal_test_utils import temporal_time_skipping_environment
 
 
@@ -85,7 +86,7 @@ class DeliveryInputProbeWorkflow:
         request = ReviewWorkflowRequest(
             workflow="repository-review",
             run_id="delivery-input-probe",
-            prepared_input={},
+            prepared_input=prepared_repository_input(),
             timeout_seconds=30,
             runtime_context={},
         )

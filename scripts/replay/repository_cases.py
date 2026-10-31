@@ -20,6 +20,7 @@ from sec_review_agents.utils.env import (
     int_env,
 )
 from sec_review_agents.utils.files import persist_json_artifact
+from sec_review_agents.workflows.prepared_input import PreparedRepositoryInput
 from sec_review_agents.workflows.repository.case_execution_input import (
     prepare_case_execution_input,
     window_deletion_summary,
@@ -41,7 +42,6 @@ from sec_review_agents.workflows.repository_case.result import RepositoryCaseRes
 from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
 )
-from sec_review_agents.workflows.review_intent import require_review_intent
 
 from scripts.replay.input_bundle import (
     materialize_replay_input,
@@ -75,7 +75,7 @@ def _load_existing_result(run_artifacts: Path) -> dict[str, Any] | None:
 def _window_deletions(
     *,
     existing_result: dict[str, Any],
-    replay_input: dict[str, Any],
+    replay_input: PreparedRepositoryInput,
 ) -> WindowDeletionSummary:
     """Return the window's deletion reading for the rebuilt result.
 
@@ -87,8 +87,8 @@ def _window_deletions(
     the reading is recomputed from that same window.
     """
     recomputed = window_deletion_summary(
-        scan_scope=replay_input.get("scan_scope") or {},
-        scan_mode=str((replay_input.get("scan_target") or {}).get("scan_mode") or ""),
+        scan_scope=replay_input.scan_scope,
+        scan_mode=replay_input.scan_mode,
     )
     scan_summary = existing_result.get("scan_summary")
     deleted_file_count = (
@@ -271,22 +271,13 @@ async def main() -> None:
     )
 
     public_input = read_json(input_path)
-    replay_input = materialize_replay_input(
-        public_input, workflow="repository-review", artifact_root=run_artifacts
-    )
+    replay_input = materialize_replay_input(public_input, artifact_root=run_artifacts)
     discovery_result = read_json(discovery_path)
     triage_result = TriageResult.model_validate(read_json(triage_path))
 
-    # Stage replay starts after runner input preparation. Hydrate only
-    # prepared-input runtime roots, not caller materialization.
-    replay_input["artifact_paths"] = {
-        "discovery": str(run_artifacts / "discovery"),
-        "triage": str(run_artifacts / "triage"),
-        "cases": str(run_artifacts / "cases"),
-    }
-    local_root = Path(replay_input["input_bundle_root_path"])
+    local_root = Path(replay_input.input_bundle_root_path)
     bundle_paths = read_replay_bundle_paths(local_root)
-    test_changes = require_review_intent(replay_input.get("review_intent")).test_changes
+    test_changes = replay_input.review_intent.test_changes
 
     existing_result = _load_existing_result(run_artifacts) or {}
     window_deletions = _window_deletions(
@@ -330,8 +321,8 @@ async def main() -> None:
             _run_case_review(
                 semaphore=semaphore,
                 run_id=run_artifacts.name,
-                cases_artifacts_path=replay_input["artifact_paths"]["cases"],
-                scan_mode=replay_input["scan_target"]["scan_mode"],
+                cases_artifacts_path=replay_input.cases_artifacts_path,
+                scan_mode=replay_input.scan_mode,
                 test_changes=test_changes,
                 bundle_paths=bundle_paths,
                 case=case,

@@ -1,14 +1,10 @@
 from unittest.mock import AsyncMock
 
 import pytest
-from pydantic import BaseModel
 
 from sec_review_agents.temporal import client as temporal_client
-from sec_review_agents.workflows.review_intent import ReviewIntent
-
-
-class NestedRequest(BaseModel):
-    review_intent: ReviewIntent
+from sec_review_agents.workflows.prepared_input import PreparedRepositoryInput
+from tests.prepared_input_fixtures import prepared_repository_input
 
 
 @pytest.mark.asyncio
@@ -26,13 +22,11 @@ async def test_connection_restores_nested_workflow_models(monkeypatch) -> None:
     assert connect.call_args.args == ("temporal.example:7233",)
     assert connect.call_args.kwargs["namespace"] == "reviews"
     converter = connect.call_args.kwargs["data_converter"]
-    original = NestedRequest(
-        review_intent=ReviewIntent(objective="audit", test_changes="allow")
-    )
+    original = prepared_repository_input()
     payloads = await converter.encode([original])
-    (restored,) = await converter.decode(payloads, [NestedRequest])
-    assert isinstance(restored, NestedRequest)
-    assert type(restored.review_intent) is type(original.review_intent)
+    (restored,) = await converter.decode(payloads, [PreparedRepositoryInput])
+    assert isinstance(restored, PreparedRepositoryInput)
+    assert type(restored.scan_scope) is type(original.scan_scope)
     assert restored == original
 
 

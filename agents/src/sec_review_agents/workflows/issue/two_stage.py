@@ -23,11 +23,11 @@ from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.issue.workflow import (
     analyze_issue_activity,
 )
+from sec_review_agents.workflows.prepared_input import PreparedIssueInput
 from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_ALLOW,
     ReviewObjective,
     TestChangesPolicy,
-    require_review_intent,
 )
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
@@ -50,22 +50,19 @@ async def mitigate_issue_self_check_activity(
         setup_declaration_content_for_backend,
     )
     from sec_review_agents.temporal.support import activity_trace_labels
-    from sec_review_agents.utils.paths import artifact_path, required_path
+    from sec_review_agents.utils.paths import required_path
     from sec_review_agents.workflows.issue.mitigation_self_check import (
         mitigate_issue_with_self_check,
     )
 
     prepared_input = request.prepared_input
+    assert isinstance(prepared_input, PreparedIssueInput)
     run_artifacts_root = required_path(
-        prepared_input["artifact_root_path"],
+        prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
-    bundle_paths = prepared_input["bundle_paths"]
-    review_intent = require_review_intent(prepared_input.get("review_intent"))
-    mitigator_artifacts_path = artifact_path(
-        prepared_input["artifact_paths"],
-        "mitigator",
-    )
+    review_intent = prepared_input.review_intent
+    mitigator_artifacts_path = Path(prepared_input.mitigator_artifacts_path)
     if not has_confirmed_repair_target(analysis_result):
         review_trajectory_path(
             review_trajectories_root(run_artifacts_root),
@@ -80,8 +77,8 @@ async def mitigate_issue_self_check_activity(
         )
 
     workspace_snapshot_tar_path = required_path(
-        bundle_paths["workspace_snapshot_tar_path"],
-        label="bundle_paths.workspace_snapshot_tar_path",
+        prepared_input.workspace_snapshot_tar_path,
+        label="workspace_snapshot_tar_path",
     )
     with bind_trace_context(
         **activity_trace_labels(
@@ -92,11 +89,11 @@ async def mitigate_issue_self_check_activity(
         )
     ):
         return await mitigate_issue_with_self_check(
-            issue=prepared_input["issue"],
+            issue=prepared_input.issue,
             workspace_snapshot_tar_path=workspace_snapshot_tar_path,
             history_path=required_path(
-                bundle_paths["history_path"],
-                label="bundle_paths.history_path",
+                prepared_input.history_path,
+                label="history_path",
             ),
             mitigator_artifacts_path=mitigator_artifacts_path,
             published_trajectory_path=review_trajectory_path(
@@ -109,7 +106,7 @@ async def mitigate_issue_self_check_activity(
             test_changes=review_intent.test_changes,
             runtime_context=request.runtime_context,
             setup_declaration_content=setup_declaration_content_for_backend(
-                prepared_input
+                prepared_input.setup_declaration
             ),
         )
 
@@ -130,6 +127,7 @@ class IssueTwoStageWorkflow:
     @workflow.run
     async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
         prepared_input = request.prepared_input
+        assert isinstance(prepared_input, PreparedIssueInput)
         analysis_result = await workflow.execute_activity(
             analyze_issue_activity,
             request,
@@ -149,7 +147,7 @@ class IssueTwoStageWorkflow:
             retry_policy=activity_retry_policy(),
         )
         artifact_root = required_path(
-            prepared_input.get("artifact_root_path"),
+            prepared_input.artifact_root_path,
             label="artifact_root_path",
         )
         finalized = await workflow.execute_activity(

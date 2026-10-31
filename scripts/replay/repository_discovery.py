@@ -14,7 +14,7 @@ from sec_review_agents.scan_stages.discovery.stage import (
     scan_discovery_chunk,
 )
 from sec_review_agents.utils.env import bootstrap_agents_env
-from sec_review_agents.utils.paths import artifact_path
+from sec_review_agents.workflows.prepared_input import PreparedRepositoryInput
 
 from scripts.replay.input_bundle import (
     default_replay_artifact_root,
@@ -36,12 +36,8 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _run_id_from_replay_input(replay_input: dict[str, object]) -> str:
-    return (
-        Path(artifact_path(replay_input["artifact_paths"], "discovery"))
-        .resolve()
-        .parent.name
-    )
+def _run_id_from_replay_input(replay_input: PreparedRepositoryInput) -> str:
+    return Path(replay_input.discovery_artifacts_path).resolve().parent.name
 
 
 async def main() -> None:
@@ -54,13 +50,10 @@ async def main() -> None:
 
     public_input = read_json(input_path)
     run_artifacts = input_path.parent / "artifacts" / "replay-discovery"
-    replay_input = materialize_replay_input(
-        public_input, workflow="repository-review", artifact_root=run_artifacts
-    )
+    replay_input = materialize_replay_input(public_input, artifact_root=run_artifacts)
     run_id = _run_id_from_replay_input(replay_input)
 
-    scan_target = replay_input["scan_target"]
-    local_root = Path(replay_input["input_bundle_root_path"])
+    local_root = Path(replay_input.input_bundle_root_path)
     workspace_root = restore_replay_workspace(
         input_bundle_root=local_root,
         artifact_root=default_replay_artifact_root(
@@ -70,11 +63,9 @@ async def main() -> None:
     )
     manifest = prepare_discovery_chunks(
         workspace_root=workspace_root,
-        scan_mode=str(scan_target["scan_mode"]),
-        scan_scope=replay_input["scan_scope"],
-        discovery_artifacts_path=artifact_path(
-            replay_input["artifact_paths"], "discovery"
-        ),
+        scan_mode=replay_input.scan_mode,
+        scan_scope=replay_input.scan_scope,
+        discovery_artifacts_path=Path(replay_input.discovery_artifacts_path),
     )
     chunk_results = [
         await scan_discovery_chunk(chunk=chunk, root=workspace_root)
@@ -98,9 +89,7 @@ async def main() -> None:
         result=discovery_result,
     )
 
-    discovery_artifacts_path = Path(
-        artifact_path(replay_input["artifact_paths"], "discovery")
-    ).resolve()
+    discovery_artifacts_path = Path(replay_input.discovery_artifacts_path).resolve()
     discovery_result_path = discovery_artifacts_path / "discovery-result.json"
     discovery_counts = discovery_result.counts
 

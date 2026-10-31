@@ -6,6 +6,7 @@ import pytest
 
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.verification.result import VerificationStageResult
+from sec_review_agents.workflows.prepared_input import PreparedPullRequestInput
 from sec_review_agents.workflows.pull_request.direct import (
     run_pull_request_review_direct,
 )
@@ -15,20 +16,17 @@ from sec_review_agents.workflows.pull_request.workflow import (
 )
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from tests.analysis_fixtures import analysis_fixture, narrative_fixture
+from tests.prepared_input_fixtures import prepared_pull_request_input
 
 
-def _prepared_input(artifact_root: Path) -> dict[str, Any]:
-    return {
-        "artifact_root_path": str(artifact_root),
-        "artifact_paths": {"mitigator": str(artifact_root / "mitigator")},
-        "bundle_paths": {
-            "workspace_snapshot_tar_path": str(artifact_root / "workspace.tar"),
-            "history_path": str(artifact_root / "history"),
-            "incremental_window_path": str(artifact_root / "incremental.json"),
-        },
-        "pr": {},
-        "review_intent": {"objective": "audit"},
-    }
+def _prepared_input(artifact_root: Path) -> PreparedPullRequestInput:
+    return prepared_pull_request_input(
+        artifact_root_path=str(artifact_root),
+        mitigator_artifacts_path=str(artifact_root / "mitigator"),
+        workspace_snapshot_tar_path=str(artifact_root / "workspace.tar"),
+        history_path=str(artifact_root / "history"),
+        incremental_window_path=str(artifact_root / "incremental.json"),
+    )
 
 
 def _request(artifact_root: Path) -> ReviewWorkflowRequest:
@@ -116,7 +114,7 @@ async def test_direct_review_records_skipped_verification_without_confirmed_targ
     request = ReviewWorkflowRequest(
         workflow="pull-request-review",
         run_id="run-no-target",
-        prepared_input={},
+        prepared_input=prepared_pull_request_input(),
         timeout_seconds=30,
         runtime_context={},
     )
@@ -159,10 +157,10 @@ async def test_verification_activity_persists_skip_without_running_verifier(
     tmp_path: Path,
 ) -> None:
     artifact_root = tmp_path / "artifacts"
-    prepared_input = {
-        "artifact_root_path": str(artifact_root),
-        "artifact_paths": {"verifier": str(artifact_root / "verifier")},
-    }
+    prepared_input = prepared_pull_request_input(
+        artifact_root_path=str(artifact_root),
+        verifier_artifacts_path=str(artifact_root / "verifier"),
+    )
 
     with patch(
         "sec_review_agents.workflows.pull_request.verification.verify_pull_request"

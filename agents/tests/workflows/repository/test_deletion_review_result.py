@@ -1,3 +1,4 @@
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 from sec_review_agents.workflows.repository.result import (
     build_repository_workflow_result,
 )
@@ -47,14 +48,28 @@ def test_the_scan_counts_only_deletions_review_covers() -> None:
     )
 
     assert window_deletion_summary(
-        scan_scope={
-            "paths_ignore": ["vendor/**"],
-            "incremental_changed_files": [
-                {"path": "src/auth/gone.py", "status": "deleted"},
-                {"path": "vendor/lib/x.py", "status": "deleted"},
-                {"path": "src/kept.py", "status": "modified"},
-            ],
-        },
+        scan_scope=RepositoryScanScope.model_validate(
+            {
+                "paths_ignore": ["vendor/**"],
+                "incremental_changed_files": [
+                    {
+                        "path": "src/auth/gone.py",
+                        "status": "deleted",
+                        "previous_path": None,
+                    },
+                    {
+                        "path": "vendor/lib/x.py",
+                        "status": "deleted",
+                        "previous_path": None,
+                    },
+                    {
+                        "path": "src/kept.py",
+                        "status": "modified",
+                        "previous_path": None,
+                    },
+                ],
+            }
+        ),
         scan_mode="incremental",
     ).model_dump() == {"deleted_file_count": 1, "deletion_review_skipped": False}
 
@@ -66,12 +81,19 @@ def test_a_window_past_the_limit_reports_the_skip() -> None:
     )
 
     summary = window_deletion_summary(
-        scan_scope={
-            "incremental_changed_files": [
-                {"path": f"src/f{index}.py", "status": "deleted"}
-                for index in range(MAX_DELETED_FILES + 1)
-            ]
-        },
+        scan_scope=RepositoryScanScope.model_validate(
+            {
+                "paths_ignore": [],
+                "incremental_changed_files": [
+                    {
+                        "path": f"src/f{index}.py",
+                        "status": "deleted",
+                        "previous_path": None,
+                    }
+                    for index in range(MAX_DELETED_FILES + 1)
+                ],
+            }
+        ),
         scan_mode="incremental",
     )
 
@@ -87,5 +109,8 @@ def test_a_full_scan_counts_no_deletions() -> None:
     )
 
     assert window_deletion_summary(
-        scan_scope={"incremental_changed_files": []}, scan_mode="full"
+        scan_scope=RepositoryScanScope.model_validate(
+            {"paths_ignore": [], "incremental_changed_files": []}
+        ),
+        scan_mode="full",
     ).model_dump() == {"deleted_file_count": 0, "deletion_review_skipped": False}

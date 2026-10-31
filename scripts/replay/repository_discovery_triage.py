@@ -15,7 +15,6 @@ from sec_review_agents.scan_stages.discovery.stage import (
 )
 from sec_review_agents.scan_stages.triage.stage import run_repository_triage_stage
 from sec_review_agents.utils.env import bootstrap_agents_env
-from sec_review_agents.utils.paths import artifact_path
 
 from scripts.replay.input_bundle import (
     materialize_replay_input,
@@ -89,20 +88,10 @@ def _resolve_input_path(args: argparse.Namespace) -> tuple[Path, Path | None]:
     return input_path, run_artifacts_path
 
 
-def _run_artifacts_path(replay_input: dict, run_artifacts_path: Path | None) -> Path:
+def _run_artifacts_path(run_artifacts_path: Path | None) -> Path:
     if run_artifacts_path is not None:
         return run_artifacts_path
     return Path(".agent-artifacts") / "replay-discovery-triage"
-
-
-def _hydrate_artifact_paths(replay_input: dict, run_artifacts_path: Path) -> None:
-    # This script replays repository stages from an existing artifact directory.
-    # Hydrate only prepared-input runtime roots, not caller input.
-    replay_input["artifact_paths"] = {
-        "discovery": str(run_artifacts_path / "discovery"),
-        "triage": str(run_artifacts_path / "triage"),
-        "cases": str(run_artifacts_path / "cases"),
-    }
 
 
 async def main() -> None:
@@ -110,24 +99,21 @@ async def main() -> None:
     args = _parse_args()
     input_path, requested_run_artifacts_path = _resolve_input_path(args)
     public_input = read_json(input_path)
-    run_artifacts_path = _run_artifacts_path(public_input, requested_run_artifacts_path)
+    run_artifacts_path = _run_artifacts_path(requested_run_artifacts_path)
     replay_input = materialize_replay_input(
-        public_input, workflow="repository-review", artifact_root=run_artifacts_path
+        public_input, artifact_root=run_artifacts_path
     )
 
-    scan_target = replay_input["scan_target"]
-    local_root = Path(replay_input["input_bundle_root_path"])
+    local_root = Path(replay_input.input_bundle_root_path)
     workspace_root = restore_replay_workspace(
         input_bundle_root=local_root,
         artifact_root=run_artifacts_path,
     )
     manifest = prepare_discovery_chunks(
         workspace_root=workspace_root,
-        scan_mode=str(scan_target["scan_mode"]),
-        scan_scope=replay_input["scan_scope"],
-        discovery_artifacts_path=artifact_path(
-            replay_input["artifact_paths"], "discovery"
-        ),
+        scan_mode=replay_input.scan_mode,
+        scan_scope=replay_input.scan_scope,
+        discovery_artifacts_path=Path(replay_input.discovery_artifacts_path),
     )
     chunk_results = [
         await scan_discovery_chunk(chunk=chunk, root=workspace_root)
@@ -152,18 +138,14 @@ async def main() -> None:
     )
 
     triage_result = await run_repository_triage_stage(
-        triage_root=artifact_path(replay_input["artifact_paths"], "triage"),
+        triage_root=Path(replay_input.triage_artifacts_path),
         discovery_result=discovery_result,
         triage_mode=args.triage_mode,
         max_batch_size=args.batch_size,
     )
 
-    discovery_artifacts_path = Path(
-        artifact_path(replay_input["artifact_paths"], "discovery")
-    ).resolve()
-    triage_artifacts_path = Path(
-        artifact_path(replay_input["artifact_paths"], "triage")
-    ).resolve()
+    discovery_artifacts_path = Path(replay_input.discovery_artifacts_path).resolve()
+    triage_artifacts_path = Path(replay_input.triage_artifacts_path).resolve()
     discovery_counts = discovery_result.counts
     triage_counts = triage_result.counts
 

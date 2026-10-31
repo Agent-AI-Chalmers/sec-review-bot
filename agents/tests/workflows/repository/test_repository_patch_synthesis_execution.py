@@ -16,6 +16,7 @@ from sec_review_agents.agents.patch_synthesis.model import PatchSynthesisOutput
 from sec_review_agents.delivery_stages.execution.input import DeliveryPatchCase
 from sec_review_agents.delivery_stages.model import DeliveryEntry, DeliveryPlan
 from sec_review_agents.utils.files import persist_text_artifact
+from sec_review_agents.workflows.prepared_input import PreparedRepositoryInput
 from sec_review_agents.workflows.repository import direct as repository_direct
 from sec_review_agents.workflows.repository.workflow import (
     plan_repository_delivery_activity,
@@ -35,6 +36,7 @@ from sec_review_agents.workspace.patches import (
     observe_workspace_changed_files,
 )
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
+from tests.prepared_input_fixtures import prepared_repository_input
 
 
 def _build_file_changes_from_workspace_patch(
@@ -80,15 +82,15 @@ def _patch_paths(patch_artifact: dict[str, Any]) -> list[str]:
 
 async def _execute_delivery_direct_for_test(
     *,
-    input_data: dict,
+    input_data: PreparedRepositoryInput,
     keep_case_results: list[dict],
     delivery_plan: DeliveryPlan,
 ) -> dict[str, Any]:
-    workspace_path = Path(input_data["input_bundle_root_path"]) / "workspace"
+    workspace_path = Path(input_data.input_bundle_root_path) / "workspace"
     if workspace_path.is_dir():
         create_workspace_snapshot_tar(
             workspace_path=workspace_path,
-            tar_path=Path(input_data["bundle_paths"]["workspace_snapshot_tar_path"]),
+            tar_path=Path(input_data.workspace_snapshot_tar_path),
         )
     request = ReviewWorkflowRequest(
         workflow="repository-review",
@@ -111,12 +113,12 @@ async def _execute_delivery_direct_for_test(
 
 async def _run_repository_delivery_workflow_steps_for_test(
     *,
-    input_data: dict,
+    input_data: PreparedRepositoryInput,
     case_results: list[dict],
 ) -> dict[str, Any]:
     request = ReviewWorkflowRequest(
         workflow="repository-review",
-        run_id=input_data["run_id"],
+        run_id="delivery-execution-test",
         prepared_input=input_data,
         timeout_seconds=60,
         runtime_context={},
@@ -149,22 +151,12 @@ class TestRepositoryDeliveryExecution:
         self.workspace_root.mkdir(parents=True, exist_ok=True)
         self.case_artifacts.mkdir(parents=True, exist_ok=True)
 
-        self.input_data = {
-            "run_id": self.run_id,
-            "scan_target": {
-                "ref": "main",
-                "target_branch": "main",
-                "default_branch": "main",
-            },
-            "input_bundle_root_path": str(self.local_root),
-            "artifact_root_path": str(self.run_artifacts),
-            "artifact_paths": {"cases": str(self.case_artifacts)},
-            "bundle_paths": {
-                "workspace_snapshot_tar_path": str(
-                    self.local_root / "workspace.snapshot.tar"
-                )
-            },
-        }
+        self.input_data = prepared_repository_input(
+            input_bundle_root_path=str(self.local_root),
+            artifact_root_path=str(self.run_artifacts),
+            cases_artifacts_path=str(self.case_artifacts),
+            workspace_snapshot_tar_path=str(self.local_root / "workspace.snapshot.tar"),
+        )
 
     def teardown_method(self) -> None:
         self.tempdir.cleanup()

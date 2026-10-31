@@ -20,6 +20,11 @@ from sec_review_agents.workflows.review_request import (
     ReviewPostProcessingPolicy,
     ReviewWorkflowRequest,
 )
+from tests.prepared_input_fixtures import (
+    prepared_issue_input,
+    prepared_pull_request_input,
+    prepared_repository_input,
+)
 
 
 def _finalized(*unit_ids: str) -> dict[str, object]:
@@ -77,7 +82,9 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
         ReviewWorkflowRequest(
             workflow="issue-review",
             run_id="run-1",
-            prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+            prepared_input=prepared_issue_input(
+                artifact_root_path="/tmp/run-1/artifacts"
+            ),
             timeout_seconds=30,
             runtime_context={},
             post_processing=ReviewPostProcessingPolicy(diagnostic_scheme="file"),
@@ -149,7 +156,11 @@ async def test_single_review_publishes_before_scheduling_memory(
         ReviewWorkflowRequest(
             workflow=workflow_name,
             run_id="run-1",
-            prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+            prepared_input=(
+                prepared_issue_input
+                if workflow_name == "issue-review"
+                else prepared_pull_request_input
+            )(artifact_root_path="/tmp/run-1/artifacts"),
             timeout_seconds=30,
             runtime_context={},
         )
@@ -219,7 +230,9 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
         ReviewWorkflowRequest(
             workflow="repository-review",
             run_id="run-1",
-            prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+            prepared_input=prepared_repository_input(
+                artifact_root_path="/tmp/run-1/artifacts"
+            ),
             timeout_seconds=30,
             runtime_context={},
         )
@@ -271,7 +284,9 @@ async def test_repository_without_cases_still_publishes_run_diagnostic(
         ReviewWorkflowRequest(
             workflow="repository-review",
             run_id="run-1",
-            prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+            prepared_input=prepared_repository_input(
+                artifact_root_path="/tmp/run-1/artifacts"
+            ),
             timeout_seconds=30,
             runtime_context={},
         )
@@ -310,7 +325,9 @@ async def test_disabling_memory_does_not_skip_review_publication(monkeypatch) ->
         ReviewWorkflowRequest(
             workflow="issue-review",
             run_id="run-1",
-            prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+            prepared_input=prepared_issue_input(
+                artifact_root_path="/tmp/run-1/artifacts"
+            ),
             timeout_seconds=30,
             runtime_context={},
             post_processing=ReviewPostProcessingPolicy(memory_processing_enabled=False),
@@ -350,7 +367,9 @@ async def test_publication_failure_fails_review_before_memory_scheduling(
             ReviewWorkflowRequest(
                 workflow="issue-review",
                 run_id="run-1",
-                prepared_input={"artifact_root_path": "/tmp/run-1/artifacts"},
+                prepared_input=prepared_issue_input(
+                    artifact_root_path="/tmp/run-1/artifacts"
+                ),
                 timeout_seconds=30,
                 runtime_context={},
             )

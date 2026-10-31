@@ -24,10 +24,10 @@ from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
 from sec_review_agents.utils.paths import required_path
+from sec_review_agents.workflows.prepared_input import PreparedIssueInput
 from sec_review_agents.workflows.review_intent import (
     ReviewObjective,
     TestChangesPolicy,
-    require_review_intent,
 )
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from sec_review_agents.workspace.file_changes import file_change_paths
@@ -96,19 +96,19 @@ async def run_issue_single_agent_activity(
     from sec_review_agents.utils.paths import required_path
 
     prepared_input = request.prepared_input
+    assert isinstance(prepared_input, PreparedIssueInput)
     run_artifacts_root = required_path(
-        prepared_input["artifact_root_path"],
+        prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
-    review_intent = require_review_intent(prepared_input.get("review_intent"))
-    bundle_paths = prepared_input["bundle_paths"]
+    review_intent = prepared_input.review_intent
     workspace_snapshot_tar_path = required_path(
-        bundle_paths["workspace_snapshot_tar_path"],
-        label="bundle_paths.workspace_snapshot_tar_path",
+        prepared_input.workspace_snapshot_tar_path,
+        label="workspace_snapshot_tar_path",
     )
     history_path = required_path(
-        bundle_paths["history_path"],
-        label="bundle_paths.history_path",
+        prepared_input.history_path,
+        label="history_path",
     )
     with bind_trace_context(
         **activity_trace_labels(
@@ -119,7 +119,7 @@ async def run_issue_single_agent_activity(
         )
     ):
         return await run_issue_single_agent(
-            issue=prepared_input["issue"],
+            issue=prepared_input.issue,
             workspace_snapshot_tar_path=workspace_snapshot_tar_path,
             history_path=history_path,
             single_agent_artifacts_path=run_artifacts_root / "single-agent",
@@ -127,7 +127,7 @@ async def run_issue_single_agent_activity(
             test_changes=review_intent.test_changes,
             runtime_context=request.runtime_context,
             setup_declaration_content=setup_declaration_content_for_backend(
-                prepared_input
+                prepared_input.setup_declaration
             ),
         )
 
@@ -141,8 +141,9 @@ def build_issue_single_agent_result_activity(
     from sec_review_agents.utils.paths import required_path
 
     prepared_input = request.prepared_input
+    assert isinstance(prepared_input, PreparedIssueInput)
     run_artifacts_root = required_path(
-        prepared_input["artifact_root_path"],
+        prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
     result = build_issue_single_agent_result(single_agent_result=single_agent_result)
@@ -171,7 +172,7 @@ class IssueSingleAgentWorkflow:
             retry_policy=activity_retry_policy(),
         )
         artifact_root = required_path(
-            request.prepared_input.get("artifact_root_path"),
+            request.prepared_input.artifact_root_path,
             label="artifact_root_path",
         )
         finalized = await workflow.execute_activity(

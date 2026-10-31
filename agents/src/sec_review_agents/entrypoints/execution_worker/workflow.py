@@ -1,13 +1,15 @@
 """Worker-owned execution workflow and routing into review workflows."""
 
 from datetime import timedelta
-from typing import Any
+from typing import Any, Literal
 
+from pydantic import BaseModel, ConfigDict, Field
 from temporalio import activity, workflow
 
 from sec_review_agents.entrypoints.execution_protocol import (
     EXECUTION_REQUEST_INVALID,
     EXECUTION_WORKFLOW_UNSUPPORTED,
+    build_execution_error,
 )
 from sec_review_agents.entrypoints.execution_workflow import EXECUTION_WORKFLOW_TYPE
 from sec_review_agents.temporal.support import (
@@ -26,22 +28,30 @@ from sec_review_agents.workflows.review_request import (
 EXECUTION_INPUT_PREPARATION_TIMEOUT = timedelta(minutes=5)
 
 
-def _invalid_execution_request(error: ValueError) -> dict[str, Any]:
-    from sec_review_agents.entrypoints.execution_protocol import build_execution_error
+class PreparationFailure(BaseModel):
+    """Preparation failure facts, projected into the public error at workflow exit."""
 
-    return {
-        "ok": False,
-        "error": build_execution_error(
-            code=EXECUTION_REQUEST_INVALID,
-            category="input",
-            message=str(error),
-            details={"name": error.__class__.__name__},
-        ),
-    }
+    model_config = ConfigDict(frozen=True)
+
+    code: str
+    category: Literal["input", "workflow"]
+    message: str
+    details: dict[str, Any] = Field(default_factory=dict)
+
+
+def _invalid_execution_request(error: ValueError) -> PreparationFailure:
+    return PreparationFailure(
+        code=EXECUTION_REQUEST_INVALID,
+        category="input",
+        message=str(error),
+        details={"name": error.__class__.__name__},
+    )
 
 
 @activity.defn
-def prepare_execution_run_activity(request: dict[str, Any]) -> dict[str, Any]:
+def prepare_execution_run_activity(
+    request: dict[str, Any],
+) -> ReviewWorkflowRequest | PreparationFailure:
     from sec_review_agents.entrypoints.execution_workflow_validation import (
         parse_execution_workflow_input,
     )
@@ -64,34 +74,29 @@ def prepare_execution_run_activity(request: dict[str, Any]) -> dict[str, Any]:
                 input_type=type(parsed_request.input).__name__,
                 run_id=parsed_request.run_id,
             )
-            return {
-                "ok": True,
-                "workflow": parsed_request.workflow,
-                "run_id": parsed_request.run_id,
-                "prepared_input": prepare_run_input(
+            return ReviewWorkflowRequest(
+                workflow=parsed_request.workflow,
+                run_id=parsed_request.run_id,
+                prepared_input=prepare_run_input(
                     parsed_request.input,
                     run_id=parsed_request.run_id,
                     workflow=parsed_request.workflow,
                 ),
-                "runtime_context": runtime_context_from_config(parsed_request.runtime),
-                "timeout_seconds": parsed_request.timeout_seconds,
-                "memory_processing_enabled": memory_processing_enabled(),
-            }
+                runtime_context=runtime_context_from_config(parsed_request.runtime),
+                timeout_seconds=parsed_request.timeout_seconds,
+                post_processing=ReviewPostProcessingPolicy(
+                    memory_processing_enabled=memory_processing_enabled(),
+                    diagnostic_scheme="s3",
+                ),
+            )
     except ValueError as error:
         return _invalid_execution_request(error)
     except NotImplementedError as error:
-        from sec_review_agents.entrypoints.execution_protocol import (
-            build_execution_error,
+        return PreparationFailure(
+            code=EXECUTION_WORKFLOW_UNSUPPORTED,
+            category="workflow",
+            message=str(error),
         )
-
-        return {
-            "ok": False,
-            "error": build_execution_error(
-                code=EXECUTION_WORKFLOW_UNSUPPORTED,
-                category="workflow",
-                message=str(error),
-            ),
-        }
 
 
 @workflow.defn(name=EXECUTION_WORKFLOW_TYPE)
@@ -104,36 +109,33 @@ class ExecutionWorkflow:
             schedule_to_close_timeout=EXECUTION_INPUT_PREPARATION_TIMEOUT,
             retry_policy=activity_retry_policy(),
         )
-        if prepared.get("ok") is False:
-            return prepared
-        internal_request = ReviewWorkflowRequest(
-            workflow=prepared["workflow"],
-            run_id=prepared["run_id"],
-            prepared_input=prepared["prepared_input"],
-            timeout_seconds=prepared["timeout_seconds"],
-            runtime_context=prepared["runtime_context"],
-            post_processing=ReviewPostProcessingPolicy(
-                memory_processing_enabled=prepared["memory_processing_enabled"],
-                diagnostic_scheme="s3",
-            ),
-        )
-        if prepared["workflow"] == "issue-review":
+        if isinstance(prepared, PreparationFailure):
+            return {
+                "ok": False,
+                "error": build_execution_error(
+                    code=prepared.code,
+                    category=prepared.category,
+                    message=prepared.message,
+                    details=prepared.details,
+                ),
+            }
+        if prepared.workflow == "issue-review":
             result = await workflow.execute_child_workflow(
                 IssueReviewWorkflow.run,
-                internal_request,
-                id=_child_workflow_id(prepared["run_id"], prepared["workflow"]),
+                prepared,
+                id=_child_workflow_id(prepared.run_id, prepared.workflow),
             )
-        elif prepared["workflow"] == "pull-request-review":
+        elif prepared.workflow == "pull-request-review":
             result = await workflow.execute_child_workflow(
                 PullRequestReviewWorkflow.run,
-                internal_request,
-                id=_child_workflow_id(prepared["run_id"], prepared["workflow"]),
+                prepared,
+                id=_child_workflow_id(prepared.run_id, prepared.workflow),
             )
-        elif prepared["workflow"] == "repository-review":
+        elif prepared.workflow == "repository-review":
             result = await workflow.execute_child_workflow(
                 RepositoryReviewWorkflow.run,
-                internal_request,
-                id=_child_workflow_id(prepared["run_id"], prepared["workflow"]),
+                prepared,
+                id=_child_workflow_id(prepared.run_id, prepared.workflow),
             )
         else:
             return {
@@ -141,7 +143,7 @@ class ExecutionWorkflow:
                 "error": {
                     "category": "workflow",
                     "code": EXECUTION_WORKFLOW_UNSUPPORTED,
-                    "message": f"Unsupported workflow: {prepared['workflow']}",
+                    "message": f"Unsupported workflow: {prepared.workflow}",
                     "retryable": False,
                     "details": {},
                 },

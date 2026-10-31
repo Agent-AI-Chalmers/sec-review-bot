@@ -26,6 +26,7 @@ from sec_review_agents.scan_stages.discovery.stage import (
     prepare_discovery_chunks,
     scan_discovery_chunk,
 )
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 from sec_review_agents.utils.env import bootstrap_agents_env
 
 
@@ -99,7 +100,9 @@ async def _run_discovery(
     manifest = prepare_discovery_chunks(
         workspace_root=workspace,
         scan_mode="full",
-        scan_scope={"paths_ignore": paths_ignore},
+        scan_scope=RepositoryScanScope(
+            paths_ignore=paths_ignore, incremental_changed_files=[]
+        ),
         discovery_artifacts_path=artifacts,
         chunk_target_ratio=(
             chunk_target_ratio.numerator,

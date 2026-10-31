@@ -13,11 +13,13 @@ from sec_review_agents.workflows.issue.workflow import (
     mitigate_issue_activity,
     verify_issue_activity,
 )
+from sec_review_agents.workflows.prepared_input import PreparedIssueInput
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
 
 async def run_issue_review_direct(request: ReviewWorkflowRequest) -> dict[str, Any]:
     prepared_input = request.prepared_input
+    assert isinstance(prepared_input, PreparedIssueInput)
     analysis_result = await analyze_issue_activity(request)
     mitigation_result = await mitigate_issue_activity(
         request,

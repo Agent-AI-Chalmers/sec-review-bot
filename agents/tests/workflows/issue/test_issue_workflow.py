@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -11,8 +10,11 @@ from sec_review_agents.workflows.issue.workflow import (
     mitigate_issue_activity,
     verify_issue_activity,
 )
+from sec_review_agents.workflows.prepared_input import PreparedIssueInput
+from sec_review_agents.workflows.review_intent import ReviewIntent
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from tests.analysis_fixtures import analysis_fixture
+from tests.prepared_input_fixtures import prepared_issue_input
 
 
 @pytest.mark.asyncio
@@ -21,11 +23,11 @@ async def test_mitigation_activity_accepts_serialized_artifact_root(
 ) -> None:
     """Activity inputs cross a serialization boundary with string paths."""
     artifact_root = tmp_path / "artifacts"
-    prepared_input: dict[str, Any] = {
-        "artifact_root_path": str(artifact_root),
-        "artifact_paths": {"mitigator": str(artifact_root / "mitigator")},
-        "review_intent": {"objective": "audit"},
-    }
+    prepared_input: PreparedIssueInput = prepared_issue_input(
+        artifact_root_path=str(artifact_root),
+        mitigator_artifacts_path=str(artifact_root / "mitigator"),
+        review_intent=ReviewIntent(objective="audit", test_changes="allow"),
+    )
 
     request = ReviewWorkflowRequest(
         workflow="issue-review",
@@ -63,7 +65,7 @@ async def test_direct_review_records_skipped_verification_without_confirmed_targ
     request = ReviewWorkflowRequest(
         workflow="issue-review",
         run_id="run-no-target",
-        prepared_input={},
+        prepared_input=prepared_issue_input(),
         timeout_seconds=30,
         runtime_context={},
     )
@@ -106,10 +108,10 @@ async def test_verification_activity_persists_skip_without_running_verifier(
     tmp_path: Path,
 ) -> None:
     artifact_root = tmp_path / "artifacts"
-    prepared_input = {
-        "artifact_root_path": str(artifact_root),
-        "artifact_paths": {"verifier": str(artifact_root / "verifier")},
-    }
+    prepared_input = prepared_issue_input(
+        artifact_root_path=str(artifact_root),
+        verifier_artifacts_path=str(artifact_root / "verifier"),
+    )
 
     with patch(
         "sec_review_agents.workflows.issue.verification.verify_issue"

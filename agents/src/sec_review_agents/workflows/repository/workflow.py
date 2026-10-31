@@ -35,6 +35,7 @@ from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
 from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
+from sec_review_agents.workflows.prepared_input import PreparedRepositoryInput
 from sec_review_agents.workflows.repository.scan_result import (
     RepositoryScanResult,
     WindowDeletionSummary,
@@ -46,7 +47,6 @@ from sec_review_agents.workflows.repository_case.workflow import (
 )
 from sec_review_agents.workflows.review_intent import (
     REVIEW_OBJECTIVE_AUDIT,
-    require_review_intent,
 )
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 
@@ -114,37 +114,34 @@ def build_repository_discovery_manifest_activity(
     from sec_review_agents.scan_stages.discovery.stage import (
         prepare_discovery_chunks,
     )
-    from sec_review_agents.utils.paths import artifact_path, required_path
+    from sec_review_agents.utils.paths import required_path
     from sec_review_agents.workspace.snapshots import (
         ARTIFACT_WORKSPACE_DIR_NAME,
         restore_workspace_from_snapshot_tar,
     )
 
-    review_intent = require_review_intent(request.prepared_input.get("review_intent"))
+    review_intent = request.prepared_input.review_intent
     if review_intent.objective != REVIEW_OBJECTIVE_AUDIT:
         raise ValueError("review_intent.objective must be 'audit'.")
     prepared_input = request.prepared_input
+    assert isinstance(prepared_input, PreparedRepositoryInput)
     run_artifacts_root = required_path(
-        prepared_input["artifact_root_path"],
+        prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
-    bundle_paths = prepared_input["bundle_paths"]
     workspace_snapshot_tar_path = required_path(
-        bundle_paths["workspace_snapshot_tar_path"],
-        label="bundle_paths.workspace_snapshot_tar_path",
+        prepared_input.workspace_snapshot_tar_path,
+        label="workspace_snapshot_tar_path",
     )
     workspace_root = restore_workspace_from_snapshot_tar(
         tar_path=workspace_snapshot_tar_path,
         destination_path=run_artifacts_root / ARTIFACT_WORKSPACE_DIR_NAME,
     )
-    discovery_artifacts_path = artifact_path(
-        prepared_input["artifact_paths"],
-        "discovery",
-    )
+    discovery_artifacts_path = Path(prepared_input.discovery_artifacts_path)
     return prepare_discovery_chunks(
         workspace_root=workspace_root,
-        scan_mode=str(prepared_input["scan_target"]["scan_mode"]),
-        scan_scope=prepared_input["scan_scope"],
+        scan_mode=str(prepared_input.scan_mode),
+        scan_scope=prepared_input.scan_scope,
         discovery_artifacts_path=discovery_artifacts_path,
     )
 
@@ -210,10 +207,10 @@ async def triage_repository_activity(
     request: ReviewWorkflowRequest,
     discovery_result: DiscoveryResult,
 ) -> TriageResult:
+    assert isinstance(request.prepared_input, PreparedRepositoryInput)
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.scan_stages.triage.stage import run_repository_triage_stage
     from sec_review_agents.temporal.support import activity_trace_labels
-    from sec_review_agents.utils.paths import artifact_path
 
     with bind_trace_context(
         **activity_trace_labels(
@@ -222,9 +219,7 @@ async def triage_repository_activity(
         )
     ):
         return await run_repository_triage_stage(
-            triage_root=artifact_path(
-                request.prepared_input["artifact_paths"], "triage"
-            ),
+            triage_root=Path(request.prepared_input.triage_artifacts_path),
             discovery_result=discovery_result,
         )
 
@@ -241,7 +236,6 @@ def prepare_repository_case_review_inputs_activity(
         setup_declaration_content_for_backend,
     )
     from sec_review_agents.utils.paths import (
-        artifact_path,
         required_path,
     )
     from sec_review_agents.workflows.repository.case_execution_input import (
@@ -251,36 +245,35 @@ def prepare_repository_case_review_inputs_activity(
     )
 
     prepared_input = request.prepared_input
-    bundle_paths = prepared_input["bundle_paths"]
+    assert isinstance(prepared_input, PreparedRepositoryInput)
     workspace_snapshot_tar_path = required_path(
-        bundle_paths["workspace_snapshot_tar_path"],
-        label="bundle_paths.workspace_snapshot_tar_path",
+        prepared_input.workspace_snapshot_tar_path,
+        label="workspace_snapshot_tar_path",
     )
     history_path = required_path(
-        bundle_paths["history_path"],
-        label="bundle_paths.history_path",
+        prepared_input.history_path,
+        label="history_path",
     )
     incremental_window_path = (
         required_path(
-            bundle_paths.get("incremental_window_path"),
-            label="bundle_paths.incremental_window_path",
+            prepared_input.incremental_window_path,
+            label="incremental_window_path",
         )
-        if isinstance(bundle_paths.get("incremental_window_path"), str)
+        if isinstance(prepared_input.incremental_window_path, str)
         else None
     )
-    cases_artifacts_path = artifact_path(prepared_input["artifact_paths"], "cases")
-    scan_target = prepared_input["scan_target"]
-    scan_mode = str(scan_target["scan_mode"])
-    review_intent = require_review_intent(prepared_input.get("review_intent"))
+    cases_artifacts_path = Path(prepared_input.cases_artifacts_path)
+    scan_mode = prepared_input.scan_mode
+    review_intent = prepared_input.review_intent
     timeout_seconds = _repository_case_timeout_seconds(request)
     # A deleted file has no current content, so no single-file scan can produce a candidate for it.
     # Its case is built from the window itself and enters the same batch as triaged cases, which
     # keeps the analyzer as the single place that decides whether any case is a real finding.
     deletion_cases = (
         deleted_repository_cases(
-            scan_scope=prepared_input["scan_scope"],
-            base_sha=str(scan_target.get("base_sha") or ""),
-            head_sha=str(scan_target.get("head_sha") or ""),
+            scan_scope=prepared_input.scan_scope,
+            base_sha=prepared_input.base_sha or "",
+            head_sha=prepared_input.head_sha or "",
         )
         if scan_mode == "incremental"
         else []
@@ -306,7 +299,7 @@ def prepare_repository_case_review_inputs_activity(
                     case=case,
                     test_changes=review_intent.test_changes,
                     setup_declaration_content=setup_declaration_content_for_backend(
-                        prepared_input
+                        prepared_input.setup_declaration
                     ),
                 ),
                 cases_artifacts_path=str(cases_artifacts_path),
@@ -367,8 +360,9 @@ async def plan_repository_delivery_activity(
     from sec_review_agents.utils.paths import required_path
 
     prepared_input = request.prepared_input
+    assert isinstance(prepared_input, PreparedRepositoryInput)
     run_artifacts_root = required_path(
-        prepared_input["artifact_root_path"],
+        prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
     delivery_case_inputs = _delivery_case_inputs(case_results)
@@ -405,14 +399,14 @@ def prepare_repository_delivery_execution_activity(
     from sec_review_agents.utils.paths import required_path
 
     prepared_input = request.prepared_input
+    assert isinstance(prepared_input, PreparedRepositoryInput)
     run_artifacts_root = required_path(
-        prepared_input["artifact_root_path"],
+        prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
-    bundle_paths = prepared_input["bundle_paths"]
     workspace_snapshot_tar_path = required_path(
-        bundle_paths["workspace_snapshot_tar_path"],
-        label="bundle_paths.workspace_snapshot_tar_path",
+        prepared_input.workspace_snapshot_tar_path,
+        label="workspace_snapshot_tar_path",
     )
     keep_case_results = _delivery_case_inputs(case_results)
     deliveries = list(delivery_plan.deliveries)
@@ -440,7 +434,7 @@ def build_skipped_repository_delivery_result_activity(
     from sec_review_agents.utils.paths import required_path
 
     run_artifacts_root = required_path(
-        request.prepared_input["artifact_root_path"],
+        request.prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
     result = build_skipped_delivery_result()
@@ -548,7 +542,7 @@ def build_repository_review_result_activity(
     )
 
     run_artifacts_root = required_path(
-        request.prepared_input["artifact_root_path"],
+        request.prepared_input.artifact_root_path,
         label="artifact_root_path",
     )
     workflow_result = build_repository_workflow_result(
@@ -625,13 +619,14 @@ class RepositoryDiscoveryWorkflow:
 def window_deletion_summary_activity(
     request: ReviewWorkflowRequest,
 ) -> WindowDeletionSummary:
+    assert isinstance(request.prepared_input, PreparedRepositoryInput)
     from sec_review_agents.workflows.repository.case_execution_input import (
         window_deletion_summary,
     )
 
     return window_deletion_summary(
-        scan_scope=request.prepared_input["scan_scope"],
-        scan_mode=str(request.prepared_input["scan_target"]["scan_mode"]),
+        scan_scope=request.prepared_input.scan_scope,
+        scan_mode=str(request.prepared_input.scan_mode),
     )
 
 
@@ -843,7 +838,7 @@ class RepositoryReviewWorkflow:
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
-        artifact_root = Path(str(request.prepared_input["artifact_root_path"]))
+        artifact_root = Path(str(request.prepared_input.artifact_root_path))
         review_units = [
             {
                 "unit_id": case_result.case_id,

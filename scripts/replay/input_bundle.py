@@ -4,6 +4,7 @@ from typing import Any
 
 from sec_review_agents.entrypoints.input_preparation import prepare_workflow_input
 from sec_review_agents.utils.env import env_value
+from sec_review_agents.workflows.prepared_input import PreparedRepositoryInput
 from sec_review_agents.workspace.snapshots import (
     ARTIFACT_WORKSPACE_DIR_NAME,
     restore_workspace_from_snapshot_tar,
@@ -14,14 +15,17 @@ ARTIFACT_ROOT_ENV = "SEC_REVIEW_AGENT_ARTIFACT_ROOT"
 
 
 def materialize_replay_input(
-    public_input: dict[str, Any], *, workflow: str, artifact_root: Path
-) -> dict[str, Any]:
-    """Resolve a public archive reference before replaying internal stages."""
-    return prepare_workflow_input(
+    public_input: dict[str, Any], *, artifact_root: Path
+) -> PreparedRepositoryInput:
+    """Materialize repository input before replaying its internal stages."""
+    prepared = prepare_workflow_input(
         public_input,
-        workflow,
+        "repository-review",
         artifact_root_path=artifact_root,
     )
+    if not isinstance(prepared, PreparedRepositoryInput):
+        raise TypeError("Repository replay requires prepared repository input.")
+    return prepared
 
 
 def read_json(path: Path) -> Any:

@@ -33,7 +33,6 @@ Best effort stops at the *step* boundary, not the *declaration* boundary:
 """
 
 import shlex
-from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -89,7 +88,7 @@ class BootstrapResult:
 
 
 def setup_declaration_content_for_backend(
-    prepared_input: Mapping[str, Any],
+    setup_declaration: str | None,
 ) -> str | None:
     """Resolve the setup declaration text for the active backend.
 
@@ -105,8 +104,7 @@ def setup_declaration_content_for_backend(
     """
     if selected_sandbox_backend_kind() != "docker":
         return None
-    value = prepared_input.get("setup_declaration")
-    return value if isinstance(value, str) else None
+    return setup_declaration
 
 
 def flatten_step_command(step: SetupDeclarationStep) -> str:

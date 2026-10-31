@@ -21,6 +21,7 @@ from sec_review_agents.scan_stages.discovery.input import (
     DiscoveryEntry,
     DiscoverySkippedFile,
 )
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 
 
 def test_discovery_location_accepts_file_level_anchor() -> None:
@@ -282,7 +283,9 @@ def test_discovery_artifacts_record_target_and_hard_token_limits(
         manifest = discovery_stage.prepare_discovery_chunks(
             workspace_root=workspace,
             scan_mode="full",
-            scan_scope={"paths_ignore": []},
+            scan_scope=RepositoryScanScope.model_validate(
+                {"incremental_changed_files": [], "paths_ignore": []}
+            ),
             discovery_artifacts_path=artifacts,
         )
 

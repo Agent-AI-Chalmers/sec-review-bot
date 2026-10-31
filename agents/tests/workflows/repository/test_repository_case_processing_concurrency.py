@@ -26,6 +26,7 @@ from sec_review_agents.scan_stages.discovery.result import (
     DiscoveryChunkResult,
     DiscoveryResult,
 )
+from sec_review_agents.scan_stages.input import RepositoryScanScope
 from sec_review_agents.scan_stages.triage.result import TriageCase, TriageResult
 from sec_review_agents.workflows.repository import direct as repository_direct
 from sec_review_agents.workflows.repository.workflow import (
@@ -48,6 +49,7 @@ from sec_review_agents.workflows.repository_case.workflow import (
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from tests.analysis_fixtures import analysis_fixture, narrative_fixture
+from tests.prepared_input_fixtures import prepared_repository_input
 from tests.repository_scan_fixtures import scan_result_fixture
 from tests.temporal_test_utils import temporal_time_skipping_environment
 
@@ -77,11 +79,12 @@ def _review_workflow_request(run_id: str = "run-test") -> ReviewWorkflowRequest:
     return ReviewWorkflowRequest(
         workflow="repository-review",
         run_id=run_id,
-        prepared_input={
-            "run_id": run_id,
-            "scan_target": {"scan_mode": "full"},
-            "scan_scope": {"paths_ignore": [], "incremental_changed_files": []},
-        },
+        prepared_input=prepared_repository_input(
+            scan_mode="full",
+            scan_scope=RepositoryScanScope.model_validate(
+                {"paths_ignore": [], "incremental_changed_files": []}
+            ),
+        ),
         timeout_seconds=30,
         runtime_context={},
     )
@@ -541,7 +544,7 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
                             ReviewWorkflowRequest(
                                 workflow="repository-review",
                                 run_id="run-test",
-                                prepared_input={},
+                                prepared_input=prepared_repository_input(),
                                 timeout_seconds=30,
                                 runtime_context={},
                             ),
@@ -596,7 +599,7 @@ async def test_direct_repository_review_isolates_case_failure() -> None:
             ReviewWorkflowRequest(
                 workflow="repository-review",
                 run_id="run-test",
-                prepared_input={},
+                prepared_input=prepared_repository_input(),
                 timeout_seconds=30,
                 runtime_context={},
             ),
@@ -650,7 +653,7 @@ async def test_direct_repository_case_review_fanout_is_bounded() -> None:
             ReviewWorkflowRequest(
                 workflow="repository-review",
                 run_id="run-test",
-                prepared_input={},
+                prepared_input=prepared_repository_input(),
                 timeout_seconds=30,
                 runtime_context={},
             ),
@@ -769,7 +772,7 @@ async def test_repository_discovery_workflow_refills_chunk_window(
                             ReviewWorkflowRequest(
                                 workflow="repository-review",
                                 run_id="run-test",
-                                prepared_input={},
+                                prepared_input=prepared_repository_input(),
                                 timeout_seconds=30,
                                 runtime_context={},
                             ),
