@@ -31,7 +31,6 @@ Dependabot descriptions are exempt from the human-authored template but must be 
 - [Browser checks](../workflows/ci-browser.yml) own the desktop/mobile matrix and failure diagnostics.
 - [Package checks with PostgreSQL](../workflows/ci-postgres.yml) provide the shared test environment and commands for independent service jobs.
 - [Contract checks](../workflows/ci-contracts.yml) own the tool-family matrix and generated-artifact freshness checks. The changed-area validator reads this workflow to check tool-directory coverage.
-- [Agents checks](../workflows/ci-agents.yml) own Python checks and the mypy cache.
 
 The called workflows use workflow_call; they do not trigger independent PR runs. Their caller jobs remain direct dependencies of CI Status, so their failures contribute to the aggregate. Their file paths are included in the corresponding changed areas.
 
@@ -44,6 +43,8 @@ GitHub displays called jobs beneath their caller names. Branch protection should
 Package checks and service containers live in the workflows; change conditions stay in [the main CI workflow](../workflows/ci.yml). Changes to the shared action trigger its consuming areas through `changed-areas.yml`.
 
 ## Shared Python Setup
+
+The Agents job runs directly in the main CI workflow. After checkout, it calls [the Agents check action](../actions/check-agents/action.yml), which owns environment setup, the mypy cache, lint, type checks, and tests. This composite action keeps the steps in a separate file without introducing another job layer.
 
 [The Python setup action](../actions/setup-python/action.yml) installs the agents development environment for the Agents and Repository Scripts jobs. Its `python-version` output supplies the resolved version for the mypy cache key. Documentation checks install Python directly because they do not need agents dependencies.
 
