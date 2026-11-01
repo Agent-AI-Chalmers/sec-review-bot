@@ -369,7 +369,7 @@ test('issue draft PR publishes from review_record file_changes without workspace
   const review_record = reviewRecordWithMitigation({
     file_changes: [
       {
-        path: '/workspace/src/app.txt',
+        path: 'workspace/src/app.txt',
         status: 'upsert',
         content: 'fixed\n',
         content_encoding: 'utf-8',
@@ -400,7 +400,7 @@ test('issue draft PR publishes from review_record file_changes without workspace
   ])
   assert.deepStrictEqual(harness.trees[0], [
     {
-      path: 'src/app.txt',
+      path: 'workspace/src/app.txt',
       mode: '100755',
       type: 'blob',
       sha: 'blob-1'

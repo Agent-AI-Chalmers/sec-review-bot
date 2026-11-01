@@ -259,10 +259,6 @@ export function normalizePromotionFilePath(filePath: unknown): string {
     return validateRepoRelativePath(normalized.slice('/workspace/'.length))
   }
 
-  if (normalized.startsWith('workspace/')) {
-    return validateRepoRelativePath(normalized.slice('workspace/'.length))
-  }
-
   return validateRepoRelativePath(normalized)
 }
 

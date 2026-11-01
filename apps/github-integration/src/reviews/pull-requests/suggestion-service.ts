@@ -1,3 +1,4 @@
+import { TextDecoder } from 'node:util'
 import type { ReviewRecord } from '../review-record.js'
 
 import { publishPullRequestSuggestionReview } from './suggestion-comments.js'
@@ -25,6 +26,7 @@ interface WorkspaceHunk extends HunkHeader {
 interface WorkspacePatchFile {
   path: string
   hunks: WorkspaceHunk[]
+  path_error: string | null
 }
 
 interface PullRequestFile {
@@ -101,16 +103,13 @@ function parseWorkspacePatch(patch_content: string): WorkspacePatchFile[] {
 
   for (const line of lines) {
     if (line.startsWith('diff --git ') || line.startsWith('diff -ruN ')) {
-      const gitStyleMatch = /^diff --git a\/(.+) b\/(.+)$/.exec(line)
-      const runDiffStyleMatch = /^diff -ruN a\/(.+) b\/(.+)$/.exec(line)
-      const match = gitStyleMatch ?? runDiffStyleMatch
-
-      current_file = match
-        ? {
-            path: normalizeWorkspacePatchPath(match[2] ?? ''),
-            hunks: []
-          }
-        : null
+      // File headers below identify paths unambiguously even when names contain
+      // spaces or " b/". Keep the diff header as a diagnostic if parsing fails.
+      current_file = {
+        path: line,
+        hunks: [],
+        path_error: 'Patch entry has no readable destination path.'
+      }
 
       current_hunk = null
 
@@ -122,6 +121,20 @@ function parseWorkspacePatch(patch_content: string): WorkspacePatchFile[] {
     }
 
     if (!current_file) {
+      continue
+    }
+
+    if (!current_hunk && line.startsWith('+++ ')) {
+      try {
+        const path = decodeGitPatchPath(line.slice(4))
+        if (!path.startsWith('b/')) {
+          throw new Error('Patch destination is not a repository file.')
+        }
+        current_file.path = path.slice(2)
+        current_file.path_error = null
+      } catch (error) {
+        current_file.path_error = String(error)
+      }
       continue
     }
 
@@ -149,11 +162,49 @@ function parseWorkspacePatch(patch_content: string): WorkspacePatchFile[] {
   return files
 }
 
-function normalizeWorkspacePatchPath(rawPath: string): string {
-  const normalized = rawPath.replace(/\\/g, '/').replace(/^\/+/, '')
-  return normalized.startsWith('workspace/')
-    ? normalized.slice('workspace/'.length)
-    : normalized
+function decodeGitPatchPath(value: string): string {
+  // Git terminates unquoted headers containing spaces with a tab. Literal
+  // tabs in filenames are quoted and escaped instead.
+  if (!value.startsWith('"')) return value.split('\t', 1)[0]!
+  if (!value.endsWith('"')) throw new Error('Unterminated quoted Git path.')
+  const bytes: number[] = []
+  const escapes: Record<string, number> = {
+    a: 7,
+    b: 8,
+    t: 9,
+    n: 10,
+    v: 11,
+    f: 12,
+    r: 13,
+    '"': 34,
+    '\\': 92
+  }
+  for (let index = 1; index < value.length - 1; index++) {
+    const char = value[index]!
+    if (char === '\\') {
+      const octal = /^[0-3][0-7]{2}/.exec(value.slice(index + 1, -1))
+      if (octal) {
+        bytes.push(Number.parseInt(octal[0], 8))
+        index += 3
+      } else {
+        const escaped = value[++index]
+        if (
+          index >= value.length - 1 ||
+          escaped === undefined ||
+          !(escaped in escapes)
+        ) {
+          throw new Error('Invalid escape in quoted Git path.')
+        }
+        bytes.push(escapes[escaped]!)
+      }
+    } else {
+      if (char === '"') throw new Error('Unexpected quote in Git path.')
+      const codepoint = value.codePointAt(index)!
+      bytes.push(...Buffer.from(String.fromCodePoint(codepoint), 'utf8'))
+      if (codepoint > 0xffff) index++
+    }
+  }
+  return new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(bytes))
 }
 
 function parsePatchHunks(patch_content: string): HunkHeader[] {
@@ -366,6 +417,12 @@ function buildSuggestionManifest({
   }
 
   for (const workspacePatchFile of workspacePatchFiles) {
+    if (workspacePatchFile.path_error) {
+      const reason = workspacePatchFile.path_error
+      skipReasons.add(reason)
+      manifest.unmapped_changes.push({ path: workspacePatchFile.path, reason })
+      continue
+    }
     const prFile = files.find(
       (file) => file.filename === workspacePatchFile.path
     )
