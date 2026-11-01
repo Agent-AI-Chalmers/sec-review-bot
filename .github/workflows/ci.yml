@@ -263,7 +263,7 @@ jobs:
           pnpm run build
 
   control-plane-ui-browser:
-    name: Control Plane UI
+    name: Control Plane UI E2E
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||

@@ -1,4 +1,4 @@
-name: Control Plane UI Browser
+name: Control Plane UI E2E
 
 on:
   workflow_call:
@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   control-plane-ui-browser:
-    name: Browser (${{ matrix.project }})
+    name: ${{ matrix.project }}
     runs-on: ubuntu-latest
     defaults:
       run:
