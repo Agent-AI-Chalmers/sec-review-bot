@@ -25,7 +25,6 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
-      postgres-matrix: ${{ steps.postgres-matrix.outputs.matrix }}
       automation-config: ${{ steps.filter.outputs.automation-config }}
       ops: ${{ steps.filter.outputs.ops }}
       contract-tools: ${{ steps.filter.outputs.contract-tools }}
@@ -47,12 +46,6 @@ jobs:
         uses: dorny/paths-filter@v4
         with:
           filters: .github/ci/changed-areas.yml
-
-      - name: Select PostgreSQL packages
-        id: postgres-matrix
-        env:
-          CHANGED_AREAS: ${{ steps.filter.outputs.changes }}
-        run: python3 .github/ci/postgres-matrix.py
 
   automation-config:
     name: Automation Config
@@ -89,7 +82,7 @@ jobs:
       - name: Check changed-area model
         run: python3 .github/ci/check-changed-areas.py
 
-      - name: Test CI selection and aggregation
+      - name: Test CI aggregation
         run: python3 .github/ci/test_ci.py
 
   ops:
@@ -130,16 +123,29 @@ jobs:
       needs.changes.outputs.contract-tools == 'true'
     uses: ./.github/workflows/ci-contracts.yml
 
-  postgres-packages:
-    name: PostgreSQL Packages
+  review-runs:
+    name: Review Runs
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
-      needs.changes.outputs.review-runs == 'true' ||
+      needs.changes.outputs.review-runs == 'true'
+    uses: ./.github/workflows/ci-postgres.yml
+    with:
+      directory: services/review-runs
+      database: sec_review_bot_test
+      user: sec_review_bot
+
+  memory-catalog:
+    name: Memory Catalog
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
       needs.changes.outputs.memory-catalog == 'true'
     uses: ./.github/workflows/ci-postgres.yml
     with:
-      matrix: ${{ needs.changes.outputs.postgres-matrix }}
+      directory: services/memory-catalog
+      database: memory_catalog_test
+      user: memory_catalog
 
   execution-gateway:
     name: Execution Gateway
@@ -346,7 +352,8 @@ jobs:
       - automation-config
       - ops
       - contract-tools
-      - postgres-packages
+      - review-runs
+      - memory-catalog
       - execution-gateway
       - execution-submission-system
       - github-integration

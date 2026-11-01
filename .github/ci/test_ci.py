@@ -1,4 +1,4 @@
-"""Regression probes for CI selection, aggregation, and dependency coverage.
+"""Regression probes for CI aggregation and dependency coverage.
 
 Run with python3 .github/ci/test_ci.py. YAML is parsed through the same Ruby
 library used by the validators; these probes require no Python dependencies.
@@ -28,37 +28,6 @@ def read_workflow() -> dict:
         text=True,
     )
     return json.loads(result.stdout)
-
-
-def test_postgres_selection() -> None:
-    """Unrelated PRs must allocate no database job; merge candidates test both."""
-    packages = ["review-runs", "memory-catalog"]
-    for event in ("pull_request", "workflow_dispatch", "merge_group"):
-        for changed in ([], packages[:1], packages[1:], packages, ["documentation"]):
-            with tempfile.TemporaryDirectory() as directory:
-                output = Path(directory) / "output"
-                output.write_text("existing=value\n")
-                subprocess.run(
-                    ["python3", str(ROOT / ".github/ci/postgres-matrix.py")],
-                    env={
-                        **os.environ,
-                        "CHANGED_AREAS": json.dumps(changed),
-                        "GITHUB_EVENT_NAME": event,
-                        "GITHUB_OUTPUT": str(output),
-                    },
-                    check=True,
-                )
-                lines = output.read_text().splitlines()
-                assert lines[0] == "existing=value"
-                matrix = json.loads(lines[1].removeprefix("matrix="))
-                expected = (
-                    packages
-                    if event == "merge_group"
-                    else [package for package in packages if package in changed]
-                )
-                assert [
-                    Path(entry["directory"]).name for entry in matrix["include"]
-                ] == expected
 
 
 def test_aggregate_results() -> None:
@@ -116,7 +85,6 @@ def test_dependency_coverage() -> None:
 
 if __name__ == "__main__":
     for test in (
-        test_postgres_selection,
         test_aggregate_results,
         test_dependency_coverage,
     ):

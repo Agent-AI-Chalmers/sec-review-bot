@@ -1,10 +1,18 @@
-name: PostgreSQL Packages
+name: Package Checks with PostgreSQL
 
 on:
   workflow_call:
     inputs:
-      matrix:
-        description: JSON matrix of selected packages, including directory and database settings.
+      directory:
+        description: Package directory relative to the repository root.
+        required: true
+        type: string
+      database:
+        description: Disposable PostgreSQL database name.
+        required: true
+        type: string
+      user:
+        description: PostgreSQL role used by the package tests.
         required: true
         type: string
 
@@ -12,29 +20,26 @@ permissions:
   contents: read
 
 jobs:
-  postgres-packages:
-    name: ${{ matrix.name }}
+  checks:
+    name: Checks
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(inputs.matrix) }}
     services:
       postgres:
         image: postgres:18-bookworm
         env:
-          POSTGRES_DB: ${{ matrix.database }}
-          POSTGRES_USER: ${{ matrix.user }}
+          POSTGRES_DB: ${{ inputs.database }}
+          POSTGRES_USER: ${{ inputs.user }}
           POSTGRES_PASSWORD: ci-test-password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U ${{ matrix.user }} -d ${{ matrix.database }}"
+          --health-cmd "pg_isready -U ${{ inputs.user }} -d ${{ inputs.database }}"
           --health-interval 2s
           --health-timeout 5s
           --health-retries 30
     defaults:
       run:
-        working-directory: ${{ matrix.directory }}
+        working-directory: ${{ inputs.directory }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -42,7 +47,7 @@ jobs:
       - name: Set up Node package
         uses: ./.github/actions/setup-node
         with:
-          directory: ${{ matrix.directory }}
+          directory: ${{ inputs.directory }}
 
       - name: Check
         run: |
@@ -53,6 +58,5 @@ jobs:
 
       - name: Integration test
         env:
-          TEST_DATABASE_URL: postgresql://${{ matrix.user }}:ci-test-password@127.0.0.1:5432/${{ matrix.database }}
+          TEST_DATABASE_URL: postgresql://${{ inputs.user }}:ci-test-password@127.0.0.1:5432/${{ inputs.database }}
         run: pnpm run test:integration
-
