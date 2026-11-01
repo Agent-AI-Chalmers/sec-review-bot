@@ -67,6 +67,18 @@ jobs:
       - name: Parse Dependabot configuration
         run: ruby -e 'require "yaml"; YAML.parse_file(".github/dependabot.yml")'
 
+      # Every CI job must contribute to the required aggregate check.
+      - name: Check CI Status dependency coverage
+        run: |
+          ruby -ryaml -e '
+            jobs = YAML.load_file(".github/workflows/ci.yml").fetch("jobs")
+            expected = jobs.keys - ["ci-status"]
+            actual = jobs.fetch("ci-status").fetch("needs")
+            missing = expected - actual
+            extra = actual - expected
+            abort "CI Status dependencies differ: missing=#{missing.inspect}, extra=#{extra.inspect}" unless missing.empty? && extra.empty?
+          '
+
       - name: Check trusted review setup package coverage
         run: |
           ruby -ryaml -e '
@@ -658,9 +670,11 @@ jobs:
       - contract-tools
       - review-runs
       - execution-gateway
+      - execution-submission-system
       - memory-catalog
       - github-integration
       - control-plane-ui
+      - control-plane-ui-browser
       - agents
       - scripts
       - documentation
@@ -670,42 +684,21 @@ jobs:
       # Use this aggregate job as the required branch-protection check.
       - name: Check CI result
         env:
-          CHANGES_RESULT: ${{ needs.changes.result }}
-          AUTOMATION_CONFIG_RESULT: ${{ needs.automation-config.result }}
-          OPS_RESULT: ${{ needs.ops.result }}
-          CONTRACT_TOOLS_RESULT: ${{ needs.contract-tools.result }}
-          REVIEW_RUNS_RESULT: ${{ needs.review-runs.result }}
-          EXECUTION_GATEWAY_RESULT: ${{ needs.execution-gateway.result }}
-          MEMORY_CATALOG_RESULT: ${{ needs.memory-catalog.result }}
-          GITHUB_INTEGRATION_RESULT: ${{ needs.github-integration.result }}
-          CONTROL_PLANE_UI_RESULT: ${{ needs.control-plane-ui.result }}
-          AGENTS_RESULT: ${{ needs.agents.result }}
-          SCRIPTS_RESULT: ${{ needs.scripts.result }}
-          DOCUMENTATION_RESULT: ${{ needs.documentation.result }}
+          NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          set -euo pipefail
-          # CHANGES_RESULT is checked too: if change detection itself fails, every
-          # area job is skipped but the aggregate must still go red rather than
-          # pass with nothing executed.
-          for result in \
-            "$CHANGES_RESULT" \
-            "$AUTOMATION_CONFIG_RESULT" \
-            "$OPS_RESULT" \
-            "$CONTRACT_TOOLS_RESULT" \
-            "$REVIEW_RUNS_RESULT" \
-            "$EXECUTION_GATEWAY_RESULT" \
-            "$MEMORY_CATALOG_RESULT" \
-            "$GITHUB_INTEGRATION_RESULT" \
-            "$CONTROL_PLANE_UI_RESULT" \
-            "$AGENTS_RESULT" \
-            "$SCRIPTS_RESULT" \
-            "$DOCUMENTATION_RESULT"; do
-            case "$result" in
-              success|skipped)
-                ;;
-              *)
-                echo "A required CI job did not pass. Result: $result" >&2
-                exit 1
-                ;;
-            esac
-          done
+          python3 - <<'PYTHON'
+          import json
+          import os
+          import sys
+
+          # Include change detection: its failure can skip every area job.
+          needs = json.loads(os.environ["NEEDS_JSON"])
+          failed = {
+              job: details["result"]
+              for job, details in needs.items()
+              if details["result"] not in {"success", "skipped"}
+          }
+          for job, result in failed.items():
+              print(f"{job}: {result}", file=sys.stderr)
+          sys.exit(1 if failed else 0)
+          PYTHON
