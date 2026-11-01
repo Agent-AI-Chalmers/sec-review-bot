@@ -1,0 +1,22 @@
+name: Set up agents Python environment
+description: Install the agents Python version, uv, and locked development dependencies.
+outputs:
+  python-version:
+    description: Resolved Python version used by cache keys.
+    value: ${{ steps.python.outputs.python-version }}
+runs:
+  using: composite
+  steps:
+    - id: python
+      uses: actions/setup-python@v7
+      with:
+        python-version-file: agents/.python-version
+    # setup-uv publishes immutable releases rather than floating major tags.
+    - uses: astral-sh/setup-uv@v10.3.3
+      with:
+        enable-cache: true
+        cache-dependency-glob: agents/uv.lock
+    - name: Install dependencies
+      shell: bash
+      working-directory: agents
+      run: uv sync --group dev --frozen

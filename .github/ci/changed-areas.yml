@@ -12,6 +12,7 @@
 # Comments are free-form; the validator reads only the area keys and their globs.
 
 automation-config:
+  - ".github/actions/setup-python/**"
   - ".github/actions/setup-node/**"
   # Dependabot configuration and the workflow definitions themselves.
   - ".github/dependabot.yml"
@@ -90,6 +91,7 @@ system-tests:
   - ".github/workflows/ci.yml"
 
 memory-catalog:
+  - ".github/ci/**"
   - ".github/actions/setup-node/**"
   - "services/memory-catalog/**"
   - "contracts/memory-catalog-api/**"
@@ -114,6 +116,7 @@ control-plane-ui:
   - ".github/workflows/ci.yml"
 
 agents:
+  - ".github/actions/setup-python/**"
   - "agents/**"
   # The wheel packages the canonical contract schemas.
   - "contracts/**"
@@ -124,6 +127,7 @@ agents:
   - ".github/workflows/ci.yml"
 
 scripts:
+  - ".github/actions/setup-python/**"
   - "scripts/**"
   # CI tooling.
   - ".github/workflows/ci.yml"

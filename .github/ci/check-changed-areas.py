@@ -67,7 +67,13 @@ def declared_change_outputs(source: str) -> set[str]:
     block = re.search(r"^    outputs:\n((?:^      [\w-]+:.*\n)+)", source, re.MULTILINE)
     if block is None:
         raise AssertionError("could not find the `changes` job outputs block")
-    return set(re.findall(r"^      ([\w-]+):", block.group(1), re.MULTILINE))
+    return set(
+        re.findall(
+            r"^      ([\w-]+): \$\{\{ steps\.filter\.outputs\.",
+            block.group(1),
+            re.MULTILINE,
+        )
+    )
 
 
 def contract_tool_directories(tracked_files: list[str]) -> list[str]:

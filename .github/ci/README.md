@@ -30,6 +30,25 @@ Dependabot descriptions are exempt from the human-authored template but must be 
 
 Package checks, service containers, and change conditions stay in [the CI workflow](../workflows/ci.yml). Changes to the shared action trigger its consuming areas through `changed-areas.yml`.
 
+## Shared Python Setup
+
+[The Python setup action](../actions/setup-python/action.yml) installs the agents development environment for the Agents and Repository Scripts jobs. Its `python-version` output supplies the resolved version for the mypy cache key. Documentation checks install Python directly because they do not need agents dependencies.
+
+## PostgreSQL Package Checks
+
+[The matrix selector](postgres-matrix.py) selects PostgreSQL packages from the changed areas before GitHub allocates matrix runners and service containers. Merge queue candidates select all entries. The workflow skips the matrix job when neither package changed; each selected entry keeps its package check name and database configuration.
+
+## Automation Validators
+
+Run these checks from the repository root:
+
+```bash
+ruby .github/ci/check-ci-status-dependencies.rb
+ruby .github/ci/check-review-setup.rb
+```
+
+The first checks that every CI job contributes to `CI Status`. The second checks that trusted review setup installs every tracked pnpm package.
+
 ## Changed-Area Model
 
 CI does not run every job on every change. The `changes` job decides which areas changed, and each area job runs only when its area did.

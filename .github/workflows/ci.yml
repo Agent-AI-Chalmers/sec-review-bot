@@ -25,6 +25,7 @@ jobs:
     name: Detect changes
     runs-on: ubuntu-latest
     outputs:
+      postgres-matrix: ${{ steps.postgres-matrix.outputs.matrix }}
       automation-config: ${{ steps.filter.outputs.automation-config }}
       ops: ${{ steps.filter.outputs.ops }}
       contract-tools: ${{ steps.filter.outputs.contract-tools }}
@@ -46,6 +47,13 @@ jobs:
         uses: dorny/paths-filter@v4
         with:
           filters: .github/ci/changed-areas.yml
+
+      - name: Select PostgreSQL packages
+        id: postgres-matrix
+        env:
+          CHANGED_AREAS: ${{ steps.filter.outputs.changes }}
+        run: python3 .github/ci/postgres-matrix.py
+
   automation-config:
     name: Automation Config
     needs: changes
@@ -69,29 +77,10 @@ jobs:
 
       # Every CI job must contribute to the required aggregate check.
       - name: Check CI Status dependency coverage
-        run: |
-          ruby -ryaml -e '
-            jobs = YAML.load_file(".github/workflows/ci.yml").fetch("jobs")
-            expected = jobs.keys - ["ci-status"]
-            actual = jobs.fetch("ci-status").fetch("needs")
-            missing = expected - actual
-            extra = actual - expected
-            abort "CI Status dependencies differ: missing=#{missing.inspect}, extra=#{extra.inspect}" unless missing.empty? && extra.empty?
-          '
+        run: ruby .github/ci/check-ci-status-dependencies.rb
 
       - name: Check trusted review setup package coverage
-        run: |
-          ruby -ryaml -e '
-            setup = YAML.safe_load_file(".sec-review/setup.yml").fetch("setup")
-            actual = setup.filter_map do |step|
-              step["working-directory"] if step["run"] == "pnpm install --frozen-lockfile"
-            end.sort
-            expected = IO.popen(["git", "ls-files", "*/pnpm-lock.yaml"], &:read).lines.map {
-              File.dirname(_1.strip)
-            }.sort
-            message = "setup pnpm directories differ:\nexpected=" + expected.inspect + "\nactual=" + actual.inspect
-            abort message unless actual == expected
-          '
+        run: ruby .github/ci/check-review-setup.rb
 
       # The changed-area model (`.github/ci/changed-areas.yml`) is the single source of the
       # `changes` job's filters. This checks the couplings CI cannot see in an import graph: that
@@ -180,30 +169,34 @@ jobs:
           pnpm --if-present run typecheck
           pnpm test
 
-  review-runs:
-    name: Review Runs
+  postgres-packages:
+    name: ${{ matrix.name }}
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
-      needs.changes.outputs.review-runs == 'true'
+      needs.changes.outputs.review-runs == 'true' ||
+      needs.changes.outputs.memory-catalog == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.changes.outputs.postgres-matrix) }}
     services:
       postgres:
         image: postgres:18-bookworm
         env:
-          POSTGRES_DB: sec_review_bot_test
-          POSTGRES_USER: sec_review_bot
+          POSTGRES_DB: ${{ matrix.database }}
+          POSTGRES_USER: ${{ matrix.user }}
           POSTGRES_PASSWORD: ci-test-password
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U sec_review_bot -d sec_review_bot_test"
+          --health-cmd "pg_isready -U ${{ matrix.user }} -d ${{ matrix.database }}"
           --health-interval 2s
           --health-timeout 5s
           --health-retries 30
     defaults:
       run:
-        working-directory: services/review-runs
+        working-directory: ${{ matrix.directory }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -211,7 +204,7 @@ jobs:
       - name: Set up Node package
         uses: ./.github/actions/setup-node
         with:
-          directory: services/review-runs
+          directory: ${{ matrix.directory }}
 
       - name: Check
         run: |
@@ -222,7 +215,7 @@ jobs:
 
       - name: Integration test
         env:
-          TEST_DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
+          TEST_DATABASE_URL: postgresql://${{ matrix.user }}:ci-test-password@127.0.0.1:5432/${{ matrix.database }}
         run: pnpm run test:integration
 
   execution-gateway:
@@ -279,51 +272,6 @@ jobs:
 
       - name: Test execution submission boundary
         run: node --test scripts/system-tests/execution-submission.test.mjs
-
-  memory-catalog:
-    name: Memory Catalog
-    needs: changes
-    if: >-
-      github.event_name == 'merge_group' ||
-      needs.changes.outputs.memory-catalog == 'true'
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:18-bookworm
-        env:
-          POSTGRES_DB: memory_catalog_test
-          POSTGRES_USER: memory_catalog
-          POSTGRES_PASSWORD: ci-test-password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U memory_catalog -d memory_catalog_test"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 30
-    defaults:
-      run:
-        working-directory: services/memory-catalog
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Node package
-        uses: ./.github/actions/setup-node
-        with:
-          directory: services/memory-catalog
-
-      - name: Check
-        run: |
-          pnpm run format:check
-          pnpm run lint
-          pnpm run typecheck
-          pnpm test
-
-      - name: Integration test
-        env:
-          TEST_DATABASE_URL: postgresql://memory_catalog:ci-test-password@127.0.0.1:5432/memory_catalog_test
-        run: pnpm run test:integration
 
   github-integration:
     name: GitHub Integration
@@ -446,22 +394,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up Python
+      - name: Set up Python environment
         id: setup-python
-        uses: actions/setup-python@v7
-        with:
-          python-version-file: agents/.python-version
-
-      - name: Set up uv
-        # setup-uv intentionally uses immutable releases and does not publish
-        # floating major/minor tags; pin the action while the uv CLI tracks latest.
-        uses: astral-sh/setup-uv@v10.3.3
-        with:
-          enable-cache: true
-          cache-dependency-glob: agents/uv.lock
-
-      - name: Install dependencies
-        run: uv sync --group dev --frozen
+        uses: ./.github/actions/setup-python
 
       # mypy's cache is safe to restore across commits: mypy validates cached
       # metadata against the current source and dependencies before reusing it.
@@ -504,20 +439,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version-file: agents/.python-version
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.3
-        with:
-          enable-cache: true
-          cache-dependency-glob: agents/uv.lock
-
-      - name: Install dependencies
-        working-directory: agents
-        run: uv sync --group dev --frozen
+      - name: Set up Python environment
+        id: setup-python
+        uses: ./.github/actions/setup-python
 
       # Scripts are repository tools rather than part of the typed agents
       # package, but they still depend on the agents runtime and its deps.
@@ -572,10 +496,9 @@ jobs:
       - automation-config
       - ops
       - contract-tools
-      - review-runs
+      - postgres-packages
       - execution-gateway
       - execution-submission-system
-      - memory-catalog
       - github-integration
       - control-plane-ui
       - control-plane-ui-browser
