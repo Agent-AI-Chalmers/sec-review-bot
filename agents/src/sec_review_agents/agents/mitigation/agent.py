@@ -46,6 +46,7 @@ async def run_mitigation_agent(
     backend: BackendProtocol,
     system_prompt: str,
     filesystem_system_prompt: str,
+    workspace_root: str = "/workspace",
     baseline_snapshot_tar_path: Path,
     workspace_root_path: Path,
     user_prompt: str,
@@ -67,7 +68,9 @@ async def run_mitigation_agent(
             baseline_snapshot_tar_path=baseline_snapshot_tar_path,
         ),
     ]
-    agent_middleware.append(ProjectInstructionsMiddleware(backend=backend))
+    agent_middleware.append(
+        ProjectInstructionsMiddleware(backend=backend, workspace_root=workspace_root)
+    )
     if agent_skills_enabled():
         agent_middleware.append(SkillsMiddleware(backend=backend, sources=["/skills/"]))
     if memory_enabled:

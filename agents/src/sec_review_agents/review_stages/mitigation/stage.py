@@ -194,6 +194,7 @@ async def run_mitigation_stage(
             attempt_label=attempt_label,
         )
         config = build_backend_config(workspace_path)
+        workspace_root = config.get("working_directory", "/workspace")
         if memory_path_view is not None:
             config["path_views"].append(memory_path_view)
         backend = create_backend_with_path_views(**config)
@@ -203,7 +204,9 @@ async def run_mitigation_stage(
             record_bootstrap_result(
                 mitigator_artifacts_path,
                 await bootstrap_environment(
-                    backend, setup_declaration_content=setup_declaration_content
+                    backend,
+                    setup_declaration_content=setup_declaration_content,
+                    workspace_root=workspace_root,
                 ),
             )
             agent_output = await run_mitigation_agent(
@@ -211,6 +214,7 @@ async def run_mitigation_stage(
                 backend=backend,
                 system_prompt=system_prompt,
                 filesystem_system_prompt=filesystem_system_prompt,
+                workspace_root=workspace_root,
                 baseline_snapshot_tar_path=baseline_snapshot_tar_path,
                 workspace_root_path=workspace_path,
                 user_prompt=user_prompt,

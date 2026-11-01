@@ -1,6 +1,6 @@
 # Filesystem Scope
 
-- You may inspect and edit `/workspace`.
+- You may inspect and edit `{{workspace_root}}`.
 - Treat `/history` as read-only issue context.
 - `/tmp` is readable, writable, and executable, and may be used only as ephemeral per-run scratch space.
 

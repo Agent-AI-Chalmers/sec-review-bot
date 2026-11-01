@@ -84,11 +84,13 @@ class BootstrapResult:
     steps: tuple[BootstrapStepResult, ...] = ()
 
 
-def flatten_step_command(step: SetupDeclarationStep) -> str:
+def flatten_step_command(
+    step: SetupDeclarationStep, *, workspace_root: str = WORKSPACE_ROOT_IN_CONTAINER
+) -> str:
     """Turn one structured declaration step into the shell command to execute."""
-    cwd = WORKSPACE_ROOT_IN_CONTAINER
+    cwd = workspace_root
     if step.working_directory:
-        cwd = f"{WORKSPACE_ROOT_IN_CONTAINER}/{step.working_directory}"
+        cwd = f"{workspace_root}/{step.working_directory}"
     parts = [f"cd {shlex.quote(cwd)}"]
     if step.env:
         exports = " && ".join(
@@ -103,6 +105,7 @@ async def bootstrap_environment(
     backend: _SandboxLike,
     *,
     setup_declaration_content: str | None,
+    workspace_root: str = WORKSPACE_ROOT_IN_CONTAINER,
 ) -> BootstrapResult:
     """Run the setup declaration in `backend`'s container, if any."""
     if setup_declaration_content is None or is_blank_setup_declaration(
@@ -123,7 +126,7 @@ async def bootstrap_environment(
 
     results: list[BootstrapStepResult] = []
     for step in declaration.steps:
-        command = flatten_step_command(step)
+        command = flatten_step_command(step, workspace_root=workspace_root)
         # Bootstrap is best-effort: the review must still proceed, so a failure
         # *anywhere* in this loop -- including the sandbox itself raising (a
         # container that cannot start, a failed exec, a transport error) -- is

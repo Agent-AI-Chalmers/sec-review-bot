@@ -51,19 +51,18 @@ def workspace_view(
     *,
     host_path: Path,
     container_path: str | None = None,
+    agent_path: str = "/workspace",
     writable: bool = False,
 ) -> PathView:
-    """Expose a host path at `/workspace`.
+    """Expose repository material; execution stages use identical agent/container paths.
 
-    By default, the container path is also `/workspace`. Pass `container_path`
-    only when Docker should mount the workspace elsewhere inside the container
-    while preserving `/workspace` as the agent-facing path.
+    Explicit container_path remains available for existing nonidentity route users.
+    A workspace name alone maps identically so shell and file tools agree.
     """
-
     return PathView(
         host_path=host_path,
-        agent_path="/workspace",
-        container_path=container_path if container_path is not None else "/workspace",
+        agent_path=agent_path,
+        container_path=container_path if container_path is not None else agent_path,
         writable=writable,
     )
 

@@ -26,6 +26,7 @@ from sec_review_agents.review_stages.feedback_loop import (
 from sec_review_agents.runtime.runtime_config import (
     ExecutionRuntimeContext,
     runtime_workspace_image,
+    runtime_workspace_path,
 )
 from sec_review_agents.runtime.skills import materialize_agent_skills_view
 from sec_review_agents.utils.structured_renderer import (
@@ -69,8 +70,11 @@ def build_issue_mitigation_backend_config(
     runtime_context: ExecutionRuntimeContext | None = None,
 ) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
+    workspace_directory = runtime_workspace_path(runtime_context)
     path_views = [
-        workspace_view(host_path=workspace_root, writable=True),
+        workspace_view(
+            host_path=workspace_root, agent_path=workspace_directory, writable=True
+        ),
         read_only_path_view(agent_path="/history", host_path=history_path),
     ]
     if agent_skills_enabled():
@@ -82,6 +86,7 @@ def build_issue_mitigation_backend_config(
         container_name_prefix="issue-mitigator",
         path_views=path_views,
         image=workspace_image,
+        working_directory=workspace_directory,
     )
 
 
@@ -89,6 +94,7 @@ def build_issue_mitigation_system_prompt(
     *,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     is_retry: bool = False,
+    workspace_root: str = "/workspace",
 ) -> str:
     paths = [
         "mitigator/system-core.md",
@@ -106,16 +112,19 @@ def build_issue_mitigation_system_prompt(
             "shared/output-formatting.md",
         ]
     )
-    return join_prompt_sections(paths)
+    return join_prompt_sections(paths, workspace_root=workspace_root)
 
 
-def build_issue_mitigation_filesystem_system_prompt() -> str:
+def build_issue_mitigation_filesystem_system_prompt(
+    *, workspace_root: str = "/workspace"
+) -> str:
     return join_prompt_sections(
         [
             "mitigator/filesystem-system-core.md",
             *external_tool_prompt_paths_for(MITIGATION_AGENT_EXTERNAL_TOOLS),
             "scopes/issue/mitigator/filesystem-system-delta.md",
-        ]
+        ],
+        workspace_root=workspace_root,
     )
 
 
@@ -170,7 +179,9 @@ def build_issue_mitigation_user_prompt(
 
 
 def build_issue_self_check_mitigation_system_prompt(
-    *, test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW
+    *,
+    test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
+    workspace_root: str = "/workspace",
 ) -> str:
     return join_prompt_sections(
         [
@@ -183,17 +194,21 @@ def build_issue_self_check_mitigation_system_prompt(
             "scopes/issue/mitigator/system-delta.md",
             "shared/workspace-evidence-rule.md",
             "shared/output-formatting.md",
-        ]
+        ],
+        workspace_root=workspace_root,
     )
 
 
-def build_issue_self_check_mitigation_filesystem_system_prompt() -> str:
+def build_issue_self_check_mitigation_filesystem_system_prompt(
+    *, workspace_root: str = "/workspace"
+) -> str:
     return join_prompt_sections(
         [
             "mitigator/filesystem-system-core.md",
             *external_tool_prompt_paths_for(MITIGATION_AGENT_EXTERNAL_TOOLS),
             "scopes/issue/mitigator/filesystem-system-delta.md",
-        ]
+        ],
+        workspace_root=workspace_root,
     )
 
 

@@ -64,6 +64,7 @@ async def run_single_agent_stage(
         )
         trajectory = trajectory_path(single_agent_artifacts_path)
         config = build_backend_config(workspace_path)
+        workspace_root = config.get("working_directory", "/workspace")
         if memory_path_view is not None:
             config["path_views"].append(memory_path_view)
         backend = create_backend_with_path_views(**config)
@@ -73,7 +74,9 @@ async def run_single_agent_stage(
             record_bootstrap_result(
                 single_agent_artifacts_path,
                 await bootstrap_environment(
-                    backend, setup_declaration_content=setup_declaration_content
+                    backend,
+                    setup_declaration_content=setup_declaration_content,
+                    workspace_root=workspace_root,
                 ),
             )
             agent_output = await run_single_agent(
@@ -81,6 +84,7 @@ async def run_single_agent_stage(
                 backend=backend,
                 system_prompt=system_prompt,
                 filesystem_system_prompt=filesystem_system_prompt,
+                workspace_root=workspace_root,
                 todo_system_prompt=todo_system_prompt,
                 todo_tool_description=todo_tool_description,
                 baseline_snapshot_tar_path=baseline_snapshot_tar_path,

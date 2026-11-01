@@ -19,7 +19,10 @@ from sec_review_agents.run_diagnostics.publication import (
     RunDiagnosticPublicationRequest,
     publish_run_diagnostic_activity,
 )
-from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
+from sec_review_agents.runtime.runtime_config import (
+    ExecutionRuntimeContext,
+    runtime_workspace_path,
+)
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
@@ -74,13 +77,20 @@ async def run_issue_single_agent(
         system_prompt=build_issue_single_agent_system_prompt(
             review_objective=review_objective,
             test_changes=test_changes,
+            workspace_root=runtime_workspace_path(runtime_context),
         ),
-        filesystem_system_prompt=build_issue_single_agent_filesystem_system_prompt(),
+        filesystem_system_prompt=build_issue_single_agent_filesystem_system_prompt(
+            workspace_root=runtime_workspace_path(runtime_context)
+        ),
         user_prompt=build_issue_single_agent_user_prompt(
             issue=issue,
         ),
-        todo_system_prompt=build_issue_single_agent_todo_system_prompt(),
-        todo_tool_description=build_issue_single_agent_todo_tool_description(),
+        todo_system_prompt=build_issue_single_agent_todo_system_prompt(
+            workspace_root=runtime_workspace_path(runtime_context)
+        ),
+        todo_tool_description=build_issue_single_agent_todo_tool_description(
+            workspace_root=runtime_workspace_path(runtime_context)
+        ),
     )
 
 

@@ -30,6 +30,7 @@ from sec_review_agents.review_stages.mitigation.result import MitigationStageRes
 from sec_review_agents.runtime.runtime_config import (
     ExecutionRuntimeContext,
     runtime_workspace_image,
+    runtime_workspace_path,
 )
 from sec_review_agents.runtime.skills import materialize_agent_skills_view
 from sec_review_agents.utils.markdown import code_block
@@ -64,12 +65,17 @@ def build_repository_verification_backend_config(
     runtime_context: ExecutionRuntimeContext | None = None,
 ) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
+    workspace_directory = runtime_workspace_path(runtime_context)
     if not workspace_root_path.is_dir():
         raise FileNotFoundError(
             f"Verifier workspace does not exist: {workspace_root_path}"
         )
     path_views = [
-        workspace_view(host_path=workspace_root_path, writable=True),
+        workspace_view(
+            host_path=workspace_root_path,
+            agent_path=workspace_directory,
+            writable=True,
+        ),
     ]
     if agent_skills_enabled():
         path_views.append(
@@ -99,10 +105,13 @@ def build_repository_verification_backend_config(
         container_name_prefix="repository-verifier",
         path_views=path_views,
         image=workspace_image,
+        working_directory=workspace_directory,
     )
 
 
-def build_repository_verification_system_prompt(is_retry: bool = False) -> str:
+def build_repository_verification_system_prompt(
+    is_retry: bool = False, *, workspace_root: str = "/workspace"
+) -> str:
     if is_retry:
         return join_prompt_sections(
             [
@@ -116,7 +125,8 @@ def build_repository_verification_system_prompt(is_retry: bool = False) -> str:
                 "shared/workspace-evidence-rule.md",
                 "shared/advisory-evidence-rule.md",
                 "shared/output-formatting.md",
-            ]
+            ],
+            workspace_root=workspace_root,
         )
     return join_prompt_sections(
         [
@@ -130,12 +140,13 @@ def build_repository_verification_system_prompt(is_retry: bool = False) -> str:
             "shared/workspace-evidence-rule.md",
             "shared/advisory-evidence-rule.md",
             "shared/output-formatting.md",
-        ]
+        ],
+        workspace_root=workspace_root,
     )
 
 
 def build_repository_verification_filesystem_system_prompt(
-    scan_mode: str,
+    scan_mode: str, *, workspace_root: str = "/workspace"
 ) -> str:
     paths = [
         "verifier/filesystem-system-core.md",
@@ -144,7 +155,7 @@ def build_repository_verification_filesystem_system_prompt(
     ]
     if scan_mode == "incremental":
         paths.append("shared/incremental-evidence-rule.md")
-    return join_prompt_sections(paths)
+    return join_prompt_sections(paths, workspace_root=workspace_root)
 
 
 def build_repository_verification_user_prompt(
@@ -155,9 +166,12 @@ def build_repository_verification_user_prompt(
     analysis_result: AnalysisStageResult,
     mitigation_result: MitigationStageResult | None,
     workspace_patch: str | None,
+    workspace_root: str = "/workspace",
 ) -> str:
     incremental_scope_rule = (
-        load_prompt_resource("shared/incremental-window-scope-rule.md")
+        load_prompt_resource(
+            "shared/incremental-window-scope-rule.md", workspace_root=workspace_root
+        )
         if scan_mode == "incremental"
         else None
     )

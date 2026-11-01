@@ -242,6 +242,7 @@ async def run_verification_stage(
             workspace_patch=workspace_patch,
         )
         config = build_backend_config(workspace_path)
+        workspace_root = config.get("working_directory", "/workspace")
         if memory_path_view is not None:
             config["path_views"].append(memory_path_view)
         backend = create_backend_with_path_views(**config)
@@ -251,7 +252,9 @@ async def run_verification_stage(
             record_bootstrap_result(
                 verifier_artifacts_path,
                 await bootstrap_environment(
-                    backend, setup_declaration_content=setup_declaration_content
+                    backend,
+                    setup_declaration_content=setup_declaration_content,
+                    workspace_root=workspace_root,
                 ),
             )
             agent_output = await run_verification_agent(
@@ -259,6 +262,7 @@ async def run_verification_stage(
                 backend=backend,
                 system_prompt=system_prompt,
                 filesystem_system_prompt=filesystem_system_prompt,
+                workspace_root=workspace_root,
                 user_prompt=user_prompt,
                 trajectory_paths=trajectory_paths,
                 memory_enabled=memory_path_view is not None,

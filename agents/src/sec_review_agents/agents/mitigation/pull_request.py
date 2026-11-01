@@ -26,6 +26,7 @@ from sec_review_agents.review_stages.feedback_loop import (
 from sec_review_agents.runtime.runtime_config import (
     ExecutionRuntimeContext,
     runtime_workspace_image,
+    runtime_workspace_path,
 )
 from sec_review_agents.runtime.skills import materialize_agent_skills_view
 from sec_review_agents.utils.structured_renderer import (
@@ -61,8 +62,11 @@ def build_pr_mitigation_backend_config(
     runtime_context: ExecutionRuntimeContext | None = None,
 ) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
+    workspace_directory = runtime_workspace_path(runtime_context)
     path_views = [
-        workspace_view(host_path=workspace_root, writable=True),
+        workspace_view(
+            host_path=workspace_root, agent_path=workspace_directory, writable=True
+        ),
         read_only_path_view(
             agent_path="/incremental-window",
             host_path=incremental_window_path,
@@ -78,6 +82,7 @@ def build_pr_mitigation_backend_config(
         container_name_prefix="pr-mitigator",
         path_views=path_views,
         image=workspace_image,
+        working_directory=workspace_directory,
     )
 
 
@@ -85,6 +90,7 @@ def build_pr_mitigation_system_prompt(
     *,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     is_retry: bool = False,
+    workspace_root: str = "/workspace",
 ) -> str:
     paths = [
         "mitigator/system-core.md",
@@ -102,16 +108,19 @@ def build_pr_mitigation_system_prompt(
             "shared/output-formatting.md",
         ]
     )
-    return join_prompt_sections(paths)
+    return join_prompt_sections(paths, workspace_root=workspace_root)
 
 
-def build_pr_mitigation_filesystem_system_prompt() -> str:
+def build_pr_mitigation_filesystem_system_prompt(
+    *, workspace_root: str = "/workspace"
+) -> str:
     return join_prompt_sections(
         [
             "mitigator/filesystem-system-core.md",
             *external_tool_prompt_paths_for(MITIGATION_AGENT_EXTERNAL_TOOLS),
             "scopes/pr/mitigator/filesystem-system-delta.md",
-        ]
+        ],
+        workspace_root=workspace_root,
     )
 
 

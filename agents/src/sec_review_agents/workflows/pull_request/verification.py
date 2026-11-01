@@ -17,7 +17,10 @@ from sec_review_agents.review_stages.verification.stage import (
     run_verification_stage,
     verification_attempt_label,
 )
-from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
+from sec_review_agents.runtime.runtime_config import (
+    ExecutionRuntimeContext,
+    runtime_workspace_path,
+)
 
 
 async def verify_pull_request(
@@ -66,8 +69,11 @@ async def verify_pull_request(
             runtime_context=runtime_context,
         ),
         system_prompt=build_pr_verification_system_prompt(
-            is_retry=retry_context is not None
+            is_retry=retry_context is not None,
+            workspace_root=runtime_workspace_path(runtime_context),
         ),
-        filesystem_system_prompt=build_pr_verification_filesystem_system_prompt(),
+        filesystem_system_prompt=build_pr_verification_filesystem_system_prompt(
+            workspace_root=runtime_workspace_path(runtime_context)
+        ),
         user_prompt=user_prompt,
     )

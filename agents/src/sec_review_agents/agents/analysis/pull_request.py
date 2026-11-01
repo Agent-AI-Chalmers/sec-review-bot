@@ -20,6 +20,7 @@ from sec_review_agents.resources.loader import join_prompt_sections
 from sec_review_agents.runtime.runtime_config import (
     ExecutionRuntimeContext,
     runtime_workspace_image,
+    runtime_workspace_path,
 )
 from sec_review_agents.runtime.skills import materialize_agent_skills_view
 from sec_review_agents.utils.structured_renderer import (
@@ -43,8 +44,13 @@ def build_pr_analyzer_backend_config(
     runtime_context: ExecutionRuntimeContext | None = None,
 ) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
+    workspace_directory = runtime_workspace_path(runtime_context)
     path_views = [
-        workspace_view(host_path=workspace_root_path, writable=True),
+        workspace_view(
+            host_path=workspace_root_path,
+            agent_path=workspace_directory,
+            writable=True,
+        ),
         read_only_path_view(
             agent_path="/incremental-window",
             host_path=incremental_window_path,
@@ -60,10 +66,11 @@ def build_pr_analyzer_backend_config(
         container_name_prefix="pr-analyzer",
         path_views=path_views,
         image=workspace_image,
+        working_directory=workspace_directory,
     )
 
 
-def build_pr_analyzer_system_prompt() -> str:
+def build_pr_analyzer_system_prompt(*, workspace_root: str = "/workspace") -> str:
     return join_prompt_sections(
         [
             "analyzer/system-core.md",
@@ -76,17 +83,21 @@ def build_pr_analyzer_system_prompt() -> str:
             "shared/workspace-evidence-rule.md",
             "shared/advisory-evidence-rule.md",
             "shared/output-formatting.md",
-        ]
+        ],
+        workspace_root=workspace_root,
     )
 
 
-def build_pr_analyzer_filesystem_system_prompt() -> str:
+def build_pr_analyzer_filesystem_system_prompt(
+    *, workspace_root: str = "/workspace"
+) -> str:
     return join_prompt_sections(
         [
             "analyzer/filesystem-system-core.md",
             *external_tool_prompt_paths_for(ANALYSIS_AGENT_EXTERNAL_TOOLS),
             "scopes/pr/analyzer/filesystem-system-delta.md",
-        ]
+        ],
+        workspace_root=workspace_root,
     )
 
 

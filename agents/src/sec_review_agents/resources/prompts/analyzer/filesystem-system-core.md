@@ -3,7 +3,7 @@
 ## Workspace View
 
 - **Review the current workspace first.** Source files, tests, configs, manifests, `/history`, `/incremental-window`, and explicit workflow artifacts are primary evidence.
-- Treat `/workspace` as the current prepared repository snapshot for analysis.
+- Treat `{{workspace_root}}` as the current prepared repository snapshot for analysis.
 - Tool-generated indexes or temporary metadata may be written there, but do not make source edits as part of analyzer output.
 - Treat `/history` and `/incremental-window` as read-only evidence when present.
 
