@@ -133,7 +133,7 @@ def _string_value(value: Any) -> str | None:
 
 
 def _int_value(value: Any) -> int | None:
-    return value if isinstance(value, int) and not isinstance(value, bool) else None
+    return value if type(value) is int and value >= 0 else None
 
 
 def _usage_details(observation: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -187,9 +187,25 @@ def _empty_totals() -> dict[str, int]:
     return {field: 0 for field in TOKEN_FIELDS}
 
 
-def _add_usage(totals: dict[str, int], usage: Mapping[str, int]) -> None:
+def _add_usage(
+    totals: dict[str, int], reported: dict[str, int], usage: Mapping[str, int]
+) -> None:
     for field in TOKEN_FIELDS:
-        totals[field] += usage.get(field, 0)
+        if field in usage:
+            totals[field] += usage[field]
+            reported[field] += 1
+
+
+def _complete_totals(
+    totals: dict[str, int], reported: dict[str, int], call_count: int
+) -> dict[str, int | None]:
+    # Match Review Runs: a partial sum is not the total for the observed calls.
+    return {
+        field: (
+            totals[field] if call_count > 0 and reported[field] == call_count else None
+        )
+        for field in TOKEN_FIELDS
+    }
 
 
 def aggregate_run(
@@ -202,6 +218,7 @@ def aggregate_run(
     """Aggregate only observed generation calls without claiming upload completeness."""
     calls = list(generations)
     totals = _empty_totals()
+    reported = _empty_totals()
     usage_reported_call_count = 0
     groups: dict[tuple[str | None, str | None, str | None], dict[str, Any]] = {}
 
@@ -215,7 +232,7 @@ def aggregate_run(
         usage = _call_usage(call)
         if usage is not None:
             usage_reported_call_count += 1
-            _add_usage(totals, usage)
+            _add_usage(totals, reported, usage)
 
         key = (agent_name, provider, model)
         group = groups.setdefault(
@@ -227,12 +244,18 @@ def aggregate_run(
                 "model_call_count": 0,
                 "usage_reported_call_count": 0,
                 "token_usage": _empty_totals(),
+                "reported": _empty_totals(),
             },
         )
         group["model_call_count"] += 1
         if usage is not None:
             group["usage_reported_call_count"] += 1
-            _add_usage(group["token_usage"], usage)
+            _add_usage(group["token_usage"], group["reported"], usage)
+
+    for group in groups.values():
+        group["token_usage"] = _complete_totals(
+            group["token_usage"], group.pop("reported"), group["model_call_count"]
+        )
 
     observed_call_count = len(calls)
     if observed_call_count == 0:
@@ -258,6 +281,6 @@ def aggregate_run(
         "observed_call_count": observed_call_count,
         "usage_reported_call_count": usage_reported_call_count,
         "observed_usage_coverage": coverage,
-        "token_usage": totals,
+        "token_usage": _complete_totals(totals, reported, observed_call_count),
         "groups": sorted_groups,
     }
