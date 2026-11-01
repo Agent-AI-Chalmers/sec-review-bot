@@ -2,6 +2,9 @@ from pathlib import Path
 
 from scripts.replay.input_bundle import default_replay_artifact_root
 from scripts.replay.repository_discovery import _run_id_from_replay_input
+from sec_review_agents.scan_stages.input import RepositoryScanScope
+from sec_review_agents.workflows.prepared_input import PreparedRepositoryInput
+from sec_review_agents.workflows.review_intent import ReviewIntent
 
 
 def test_discovery_replay_uses_materialized_artifact_run_id(
@@ -9,7 +12,18 @@ def test_discovery_replay_uses_materialized_artifact_run_id(
 ) -> None:
     run_id = "replay-run-123"
     discovery_path = tmp_path / run_id / "discovery"
-    replay_input = {"artifact_paths": {"discovery": str(discovery_path)}}
+    replay_input = PreparedRepositoryInput(
+        input_bundle_root_path=str(tmp_path / "bundle"),
+        artifact_root_path=str(discovery_path.parent),
+        workspace_snapshot_tar_path=str(tmp_path / "workspace.tar"),
+        history_path=str(tmp_path / "history.json"),
+        review_intent=ReviewIntent(objective="repair", test_changes="allow"),
+        scan_mode="full",
+        scan_scope=RepositoryScanScope(paths_ignore=[], incremental_changed_files=[]),
+        discovery_artifacts_path=str(discovery_path),
+        triage_artifacts_path=str(discovery_path.parent / "triage"),
+        cases_artifacts_path=str(discovery_path.parent / "cases"),
+    )
     configured_root = tmp_path / "configured-artifacts"
     monkeypatch.setenv("SEC_REVIEW_AGENT_ARTIFACT_ROOT", str(configured_root))
 

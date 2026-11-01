@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.trajectories import (
     review_trajectories_root,
 )
@@ -99,15 +100,29 @@ def _max_tokens_failure(run_artifacts: Path, case_id: str) -> bool:
     return False
 
 
-def _analysis_status(
-    run_artifacts: Path, case_id: str
-) -> tuple[str | None, str | None]:
+def _analysis_diagnostics(run_artifacts: Path, case_id: str) -> dict[str, Any]:
     path = run_artifacts / "cases" / case_id / "analyzer" / "analysis-result.json"
-    if not path.is_file():
-        return None, None
-    data = read_json(path)
-    error = data.get("overview") if data.get("status") == "unavailable" else None
-    return data.get("status"), error
+    try:
+        analysis = AnalysisStageResult.model_validate_json(
+            path.read_text(encoding="utf-8")
+        )
+    except FileNotFoundError:
+        return {
+            "analysis_artifact_state": "missing",
+            "analysis_verdict": None,
+            "analysis_error": None,
+        }
+    except (ValueError, OSError) as error:
+        return {
+            "analysis_artifact_state": "invalid",
+            "analysis_verdict": None,
+            "analysis_error": str(error),
+        }
+    return {
+        "analysis_artifact_state": "valid",
+        "analysis_verdict": analysis.verdict,
+        "analysis_error": None,
+    }
 
 
 def _prepare_replay_input(
@@ -143,12 +158,18 @@ def _backup(
     backup_root = run_artifacts / "manual-rerun-backups" / f"manual-case-replay-{stamp}"
     backup_root.mkdir(parents=True, exist_ok=False)
 
-    for path in _result_paths(run_root, run_artifacts):
-        _copy_if_exists(path, backup_root / path.relative_to(run_root))
+    _copy_if_exists(
+        run_root / "repository-review-result.json",
+        backup_root / "run" / "repository-review-result.json",
+    )
+    _copy_if_exists(
+        run_artifacts / "repository-review-result.json",
+        backup_root / "artifacts" / "repository-review-result.json",
+    )
     for case_id in case_ids:
         _copy_if_exists(
             run_artifacts / "cases" / case_id,
-            backup_root / "artifacts" / run_artifacts.name / "cases" / case_id,
+            backup_root / "artifacts" / "cases" / case_id,
         )
     return backup_root
 
@@ -285,6 +306,7 @@ def _repository_result_from_replay(
     *,
     result: dict[str, Any],
     case_results: list[dict[str, Any]],
+    replayed_case_ids: set[str],
 ) -> dict[str, Any]:
     scan_summary = result.get("scan_summary")
     return {
@@ -295,7 +317,11 @@ def _repository_result_from_replay(
             else build_scan_summary(scan_result=None).model_dump(mode="json")
         ),
         "deliveries": [
-            item for item in (result.get("deliveries") or []) if isinstance(item, dict)
+            item
+            for item in (result.get("deliveries") or [])
+            if isinstance(item, dict)
+            # A combined patch cannot be split safely after one member changes.
+            and not replayed_case_ids.intersection(item["case_ids"])
         ],
         "case_results": case_results,
         # Rebuilt results satisfy the same contract as a live run, including this field. A missing
@@ -348,14 +374,12 @@ async def main() -> None:
         item = case_results[_case_index(case_results, case_id)]
         case_source = find_case_source(case_id)
         case = case_source[1] if case_source else None
-        analysis_status, analysis_error = _analysis_status(run_artifacts, case_id)
         dry_run_rows.append(
             {
                 "case_id": case_id,
                 "title": case.summary if case is not None else None,
                 "current_disposition": item.get("disposition"),
-                "analysis_status": analysis_status,
-                "analysis_error": analysis_error,
+                **_analysis_diagnostics(run_artifacts, case_id),
                 "has_max_tokens_stop": _max_tokens_failure(run_artifacts, case_id),
                 "case_artifacts_path": str(run_artifacts / "cases" / case_id),
             }
@@ -434,6 +458,7 @@ async def main() -> None:
     replayed_result = _repository_result_from_replay(
         result=result,
         case_results=case_results,
+        replayed_case_ids=set(replayed_by_case_id),
     )
 
     for path in result_paths:
