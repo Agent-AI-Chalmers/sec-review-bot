@@ -131,53 +131,15 @@ jobs:
     uses: ./.github/workflows/ci-contracts.yml
 
   postgres-packages:
-    name: ${{ matrix.name }}
+    name: PostgreSQL Packages
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
       needs.changes.outputs.review-runs == 'true' ||
       needs.changes.outputs.memory-catalog == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJSON(needs.changes.outputs.postgres-matrix) }}
-    services:
-      postgres:
-        image: postgres:18-bookworm
-        env:
-          POSTGRES_DB: ${{ matrix.database }}
-          POSTGRES_USER: ${{ matrix.user }}
-          POSTGRES_PASSWORD: ci-test-password
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U ${{ matrix.user }} -d ${{ matrix.database }}"
-          --health-interval 2s
-          --health-timeout 5s
-          --health-retries 30
-    defaults:
-      run:
-        working-directory: ${{ matrix.directory }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Node package
-        uses: ./.github/actions/setup-node
-        with:
-          directory: ${{ matrix.directory }}
-
-      - name: Check
-        run: |
-          pnpm run format:check
-          pnpm run lint
-          pnpm run typecheck
-          pnpm test
-
-      - name: Integration test
-        env:
-          TEST_DATABASE_URL: postgresql://${{ matrix.user }}:ci-test-password@127.0.0.1:5432/${{ matrix.database }}
-        run: pnpm run test:integration
+    uses: ./.github/workflows/ci-postgres.yml
+    with:
+      matrix: ${{ needs.changes.outputs.postgres-matrix }}
 
   execution-gateway:
     name: Execution Gateway

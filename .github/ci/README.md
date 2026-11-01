@@ -29,6 +29,7 @@ Dependabot descriptions are exempt from the human-authored template but must be 
 [The main CI workflow](../workflows/ci.yml) owns event triggers, change selection, job dependencies, and the required CI Status check. It calls these workflows at the same revision:
 
 - [Browser checks](../workflows/ci-browser.yml) own the desktop/mobile matrix and failure diagnostics.
+- [PostgreSQL checks](../workflows/ci-postgres.yml) receive the selected package matrix and own database services and package checks.
 - [Contract checks](../workflows/ci-contracts.yml) own the tool-family matrix and generated-artifact freshness checks. The changed-area validator reads this workflow to check tool-directory coverage.
 - [Agents checks](../workflows/ci-agents.yml) own Python checks and the mypy cache.
 
@@ -48,7 +49,7 @@ Package checks and service containers live in the workflows; change conditions s
 
 ## PostgreSQL Package Checks
 
-[The matrix selector](postgres-matrix.py) selects PostgreSQL packages from the changed areas before GitHub allocates matrix runners and service containers. Merge queue candidates select all entries. The workflow skips the matrix job when neither package changed; each selected entry keeps its package check name and database configuration.
+[The matrix selector](postgres-matrix.py) selects PostgreSQL packages from the changed areas before GitHub allocates matrix runners and service containers. Merge queue candidates select all entries. The workflow skips the matrix job when neither package changed; each selected entry keeps its database configuration and appears under the PostgreSQL Packages caller.
 
 ## Automation Validators
 
