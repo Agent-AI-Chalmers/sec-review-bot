@@ -29,11 +29,12 @@ Dependabot descriptions are exempt from the human-authored template but must be 
 [The main CI workflow](../workflows/ci.yml) owns event triggers, change selection, job dependencies, and the required CI Status check. It calls these workflows at the same revision:
 
 - [Browser checks](../workflows/ci-browser.yml) own the desktop/mobile matrix and failure diagnostics.
+- [Contract checks](../workflows/ci-contracts.yml) own the tool-family matrix and generated-artifact freshness checks. The changed-area validator reads this workflow to check tool-directory coverage.
 - [Agents checks](../workflows/ci-agents.yml) own Python checks and the mypy cache.
 
 The called workflows use workflow_call; they do not trigger independent PR runs. Their caller jobs remain direct dependencies of CI Status, so their failures contribute to the aggregate. Their file paths are included in the corresponding changed areas.
 
-GitHub displays called jobs beneath their caller names. Branch protection should require CI Status; installations that additionally require individual Agents or browser check names must update those names when adopting this layout.
+GitHub displays called jobs beneath their caller names. Branch protection should require CI Status; installations that additionally require individual called-job check names must update those names when adopting this layout.
 
 ## Shared Node Setup
 

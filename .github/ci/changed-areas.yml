@@ -34,6 +34,7 @@ ops:
   - ".github/workflows/ci.yml"
 
 contract-tools:
+  - ".github/workflows/ci-contracts.yml"
   - ".github/actions/setup-node/**"
   # The per-family tools and the contract trees they own.
   - "contracts/**"

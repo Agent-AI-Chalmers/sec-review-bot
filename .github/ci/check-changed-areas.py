@@ -8,6 +8,7 @@ HERE = Path(__file__).resolve().parent
 REPO_ROOT = HERE.parent.parent
 FILTERS_PATH = HERE / "changed-areas.yml"
 WORKFLOW_PATH = REPO_ROOT / ".github/workflows/ci.yml"
+CONTRACT_WORKFLOW_PATH = REPO_ROOT / ".github/workflows/ci-contracts.yml"
 
 UNCOVERED = (
     ("assets/**", "Screenshots and logo; no build consumes them."),
@@ -115,10 +116,10 @@ def check_change_outputs(areas: dict[str, list[str]], workflow: str) -> None:
 
 
 def check_generated_artifacts(
-    areas: dict[str, list[str]], workflow: str, tracked_files: list[str]
+    areas: dict[str, list[str]], contract_workflow: str, tracked_files: list[str]
 ) -> None:
     tool_directories = contract_tool_directories(tracked_files)
-    workflow_directories = contract_tool_directories_in_workflow(workflow)
+    workflow_directories = contract_tool_directories_in_workflow(contract_workflow)
     if workflow_directories != tool_directories:
         raise AssertionError(
             "the contract-tools matrix must run every tracked contract tool exactly once"
@@ -201,7 +202,11 @@ def main() -> int:
         ("change outputs", lambda: check_change_outputs(areas, workflow)),
         (
             "generated artifacts",
-            lambda: check_generated_artifacts(areas, workflow, tracked_files),
+            lambda: check_generated_artifacts(
+                areas,
+                CONTRACT_WORKFLOW_PATH.read_text(encoding="utf-8"),
+                tracked_files,
+            ),
         ),
         ("client/server seam", lambda: check_client_server_seam(areas)),
         ("Execution Workflow coverage", lambda: check_execution_workflow(areas)),
