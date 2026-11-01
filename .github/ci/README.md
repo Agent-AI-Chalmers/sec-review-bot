@@ -62,6 +62,15 @@ ruby .github/ci/check-review-setup.rb
 
 The first checks that every CI job contributes to `CI Status`. The second checks that trusted review setup installs every tracked pnpm package.
 
+## Cross-service Smoke Checks
+
+[The smoke inventory](../../scripts/system-tests/README.md#smoke-inventory) lists all scenarios, their boundaries, and CI policies. Execution submission is also a cross-service smoke test; its job is named `Smoke — Execution Submission`. The `Smoke — Memory and Artifacts` job groups the Catalog client, input bundle, and operator edit tests to share infrastructure.
+
+
+The `catalog-seam`, `input-bundle-seam`, and `memory-bff-seam` areas select the lightweight probes run by [the smoke action](../actions/check-seams/action.yml). The main workflow owns their single job and final status dependency; the action builds selected participants and runs them in one pytest process to share disposable services. See [the system-test guide](../../scripts/system-tests/README.md#model-free-cross-service-smoke-tests) for commands and coverage limits.
+
+[The execution lifecycle workflow](../workflows/execution-lifecycle.yml) is manual-only and separate from required PR checks. It uses a deterministic analysis activity and does not measure model quality.
+
 ## Regression Probes
 
 Run `python3 .github/ci/test_ci.py` from the repository root. The automation job runs the same probes for aggregate failure/cancellation handling and missing dependency rejection. They execute the real scripts and parsed workflow configuration using Python's standard library and Ruby's YAML parser.

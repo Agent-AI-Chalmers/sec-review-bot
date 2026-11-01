@@ -26,6 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       automation-config: ${{ steps.filter.outputs.automation-config }}
+      catalog-seam: ${{ steps.filter.outputs.catalog-seam }}
+      input-bundle-seam: ${{ steps.filter.outputs.input-bundle-seam }}
+      memory-bff-seam: ${{ steps.filter.outputs.memory-bff-seam }}
       ops: ${{ steps.filter.outputs.ops }}
       contract-tools: ${{ steps.filter.outputs.contract-tools }}
       review-runs: ${{ steps.filter.outputs.review-runs }}
@@ -242,8 +245,26 @@ jobs:
       - name: Integration test
         run: pnpm run test:integration
 
+  memory-artifact-smoke:
+    name: Smoke — Memory and Artifacts
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.catalog-seam == 'true' ||
+      needs.changes.outputs.input-bundle-seam == 'true' ||
+      needs.changes.outputs.memory-bff-seam == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/check-seams
+        with:
+          catalog: ${{ github.event_name == 'merge_group' || needs.changes.outputs.catalog-seam == 'true' }}
+          input-bundle: ${{ github.event_name == 'merge_group' || needs.changes.outputs.input-bundle-seam == 'true' }}
+          memory-bff: ${{ github.event_name == 'merge_group' || needs.changes.outputs.memory-bff-seam == 'true' }}
+
   execution-submission-system:
-    name: Execution Submission System Test
+    name: Smoke — Execution Submission
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
@@ -428,6 +449,7 @@ jobs:
       - memory-catalog
       - execution-gateway
       - execution-submission-system
+      - memory-artifact-smoke
       - github-integration
       - control-plane-ui
       - control-plane-ui-browser

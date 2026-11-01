@@ -1,0 +1,64 @@
+name: Memory and artifact smoke checks
+description: Build selected participants and run model-free cross-service probes.
+inputs:
+  catalog:
+    description: Run the Python Catalog client probe.
+    required: true
+  input-bundle:
+    description: Run the cross-language input bundle probe.
+    required: true
+  memory-bff:
+    description: Run the BFF memory edit and restore probe.
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: ./.github/actions/setup-python
+
+    - name: Prepare Catalog
+      if: inputs.catalog == 'true' || inputs.memory-bff == 'true'
+      uses: ./.github/actions/setup-node
+      with:
+        directory: services/memory-catalog
+    - name: Build Catalog
+      if: inputs.catalog == 'true' || inputs.memory-bff == 'true'
+      working-directory: services/memory-catalog
+      shell: bash
+      run: pnpm run build
+
+    - name: Prepare GitHub Integration
+      if: inputs.input-bundle == 'true'
+      uses: ./.github/actions/setup-node
+      with:
+        directory: apps/github-integration
+    - name: Build GitHub Integration
+      if: inputs.input-bundle == 'true'
+      working-directory: apps/github-integration
+      shell: bash
+      run: pnpm run build
+
+    - name: Prepare UI BFF
+      if: inputs.memory-bff == 'true'
+      uses: ./.github/actions/setup-node
+      with:
+        directory: apps/control-plane-ui
+    - name: Build UI BFF
+      if: inputs.memory-bff == 'true'
+      working-directory: apps/control-plane-ui
+      shell: bash
+      run: pnpm exec tsc -p tsconfig.server.build.json
+
+    # One pytest process shares disposable infrastructure across selected probes.
+    - name: Test selected boundaries
+      env:
+        CATALOG: ${{ inputs.catalog }}
+        INPUT_BUNDLE: ${{ inputs.input-bundle }}
+        MEMORY_BFF: ${{ inputs.memory-bff }}
+      shell: bash
+      run: |
+        tests=()
+        if [[ "$CATALOG" == true ]]; then tests+=(scripts/system-tests/test_memory_catalog.py); fi
+        if [[ "$INPUT_BUNDLE" == true ]]; then tests+=(scripts/system-tests/test_input_bundle.py); fi
+        if [[ "$MEMORY_BFF" == true ]]; then tests+=(scripts/system-tests/test_memory_bff.py); fi
+        if (( ${#tests[@]} == 0 )); then echo "No seam selected" >&2; exit 1; fi
+        uv --project agents run python -m pytest "${tests[@]}" -q --durations=10

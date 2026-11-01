@@ -38,13 +38,7 @@ python -m scripts.replay.repository_triage --help
 
 ## System Test
 
-The repository keeps one cross-service system test for the execution-submission boundary. It builds Review Runs and Execution Gateway, starts a disposable Temporal service, and verifies that the production Review Runs client can submit, replay, and read a run through the real Gateway HTTP surface:
-
-```bash
-node --test scripts/system-tests/execution-submission.test.mjs
-```
-
-Set `TEST_TEMPORAL_ADDRESS` to use an existing disposable Temporal service. Otherwise the test uses the Temporal image configured in `compose.yaml` and removes the temporary Docker container afterward. The test deliberately stops before worker execution, which requires the separately configured agents runtime, workspace, object storage, and model access.
+See [Cross-service System Tests](system-tests/README.md) for the submission test, model-free smoke probes, and manual execution lifecycle probe, including prerequisites, commands, coverage limits, isolation, and CI cost controls.
 
 ### Langfuse Run Statistics Probe
 
