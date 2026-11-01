@@ -162,22 +162,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
         with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: ${{ matrix.tools_directory }}/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: ${{ matrix.tools_directory }}/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          directory: ${{ matrix.tools_directory }}
 
       - name: Check generated artifacts are fresh
         # Re-renders this family's projections and compares them to the committed files. It
@@ -220,22 +208,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
         with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: services/review-runs/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: services/review-runs/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          directory: services/review-runs
 
       - name: Check
         run: |
@@ -263,22 +239,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
         with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: services/execution-gateway/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: services/execution-gateway/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          directory: services/execution-gateway
 
       - name: Check
         run: |
@@ -301,25 +265,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
         with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: services/execution-gateway/package.json
-          check-latest: true
-          cache: pnpm
+          directory: services/execution-gateway
           cache-dependency-path: |
             services/execution-gateway/pnpm-lock.yaml
             services/review-runs/pnpm-lock.yaml
-
-      - name: Install Execution Gateway dependencies
-        working-directory: services/execution-gateway
-        run: pnpm install --frozen-lockfile
 
       - name: Install Review Runs dependencies
         working-directory: services/review-runs
@@ -356,22 +308,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
         with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: services/memory-catalog/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: services/memory-catalog/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          directory: services/memory-catalog
 
       - name: Check
         run: |
@@ -399,22 +339,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
         with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: apps/github-integration/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: apps/github-integration/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          directory: apps/github-integration
 
       - name: Lint
         run: |
@@ -447,22 +375,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
         with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: apps/control-plane-ui/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: apps/control-plane-ui/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          directory: apps/control-plane-ui
 
       - name: Check
         run: |
@@ -495,22 +411,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
         with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: apps/control-plane-ui/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: apps/control-plane-ui/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          directory: apps/control-plane-ui
 
       - name: Browser project
         run: pnpm exec playwright test --project=${{ matrix.project }}

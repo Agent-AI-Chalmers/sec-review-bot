@@ -1,0 +1,26 @@
+name: Set up Node package
+description: Install pnpm, select the package's Node version, restore its cache, and install locked dependencies.
+inputs:
+  directory:
+    description: Package directory relative to the repository root.
+    required: true
+  cache-dependency-path:
+    description: Lockfiles to cache when a job installs more than one package.
+    required: false
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v6
+      with:
+        version: 12
+        run_install: false
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: ${{ inputs.directory }}/package.json
+        check-latest: true
+        cache: pnpm
+        cache-dependency-path: ${{ inputs.cache-dependency-path || format('{0}/pnpm-lock.yaml', inputs.directory) }}
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.directory }}
+      run: pnpm install --frozen-lockfile

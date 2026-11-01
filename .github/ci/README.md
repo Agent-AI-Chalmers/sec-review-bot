@@ -24,6 +24,12 @@ python3 .github/ci/validate-pr-description.py /path/to/pr-body.md
 
 Dependabot descriptions are exempt from the human-authored template but must be non-empty.
 
+## Shared Node Setup
+
+[The Node setup action](../actions/setup-node/action.yml) owns pnpm setup, package-specific Node selection, dependency caching, and frozen-lockfile installation. Call it after checkout with a repository-relative package directory. Jobs that install another package can supply its lockfile in `cache-dependency-path` and install that package in a separate step.
+
+Package checks, service containers, and change conditions stay in [the CI workflow](../workflows/ci.yml). Changes to the shared action trigger its consuming areas through `changed-areas.yml`.
+
 ## Changed-Area Model
 
 CI does not run every job on every change. The `changes` job decides which areas changed, and each area job runs only when its area did.
