@@ -75,4 +75,4 @@ The default table's `efficiency` is:
 effective_patch.total_tokens / total.total_tokens
 ```
 
-AI turn counts include assistant messages even when usage metadata is missing. `ai_messages_with_usage_count` separately reports coverage; a turn without usage is not evidence of zero token consumption. PatchEval summaries exclude partially observed token totals from their token averages and report missing/partial tasks in metadata.
+AI turn counts include assistant messages even when usage metadata is missing. `ai_messages_with_usage_count` separately reports coverage; a turn without usage is not evidence of zero token consumption.

@@ -15,8 +15,6 @@ sec_review_bot:
   paths_ignore:
     - '.sec-review'
     - '.github/dependabot.yml'
-    - 'evaluation'
-    - 'scripts/patcheval'
     - 'docs'
     - '**/*.zh.md'
     - '**/README.md'
