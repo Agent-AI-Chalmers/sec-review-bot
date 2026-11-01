@@ -15,7 +15,10 @@ from sec_review_agents.review_stages.verification.stage import (
     run_verification_stage,
     verification_attempt_label,
 )
-from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
+from sec_review_agents.runtime.runtime_config import (
+    ExecutionRuntimeContext,
+    runtime_workspace_path,
+)
 
 
 async def verify_repository_case(
@@ -49,6 +52,7 @@ async def verify_repository_case(
         analysis_result=analysis_result,
         mitigation_result=mitigation_result,
         workspace_patch=workspace_patch,
+        workspace_root=runtime_workspace_path(runtime_context),
     )
     return await run_verification_stage(
         agent_name="repository-verifier",
@@ -67,10 +71,11 @@ async def verify_repository_case(
             runtime_context=runtime_context,
         ),
         system_prompt=build_repository_verification_system_prompt(
-            is_retry=retry_context is not None
+            is_retry=retry_context is not None,
+            workspace_root=runtime_workspace_path(runtime_context),
         ),
         filesystem_system_prompt=build_repository_verification_filesystem_system_prompt(
-            scan_mode
+            scan_mode, workspace_root=runtime_workspace_path(runtime_context)
         ),
         user_prompt=user_prompt,
     )

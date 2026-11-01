@@ -42,8 +42,14 @@ class ProjectInstructionsMiddleware(AgentMiddleware[ProjectInstructionsState]):
 
     state_schema = ProjectInstructionsState
 
-    def __init__(self, *, backend: BackendProtocol) -> None:
+    def __init__(
+        self, *, backend: BackendProtocol, workspace_root: str = "/workspace"
+    ) -> None:
         self.backend = backend
+        self.instructions_prompt = load_prompt_resource(
+            "repository-instructions/system.md", workspace_root=workspace_root
+        )
+        self.instructions_path = f"{workspace_root}/AGENTS.md"
 
     def _format_read(self, result: ReadResult) -> str:
         # CompositeBackend may report a route-relative filename in read errors.
@@ -73,15 +79,14 @@ class ProjectInstructionsMiddleware(AgentMiddleware[ProjectInstructionsState]):
         if not content:
             return ""
         return (
-            f"{REPOSITORY_INSTRUCTIONS_SYSTEM_PROMPT}\n\n"
-            f'<repository_instructions source="{REPOSITORY_INSTRUCTIONS_PATH}">\n'
+            f"{self.instructions_prompt}\n\n"
+            f'<repository_instructions source="{self.instructions_path}">\n'
             f"{content}\n</repository_instructions>"
         )
 
-    @staticmethod
-    def _unavailable(reason: str) -> str:
+    def _unavailable(self, reason: str) -> str:
         return (
-            f"# Repository Guidance\n\n{REPOSITORY_INSTRUCTIONS_PATH} was not loaded: "
+            f"# Repository Guidance\n\n{self.instructions_path} was not loaded: "
             f"{reason}. Continue from the supplied task and repository evidence; "
             "consult relevant file sections if needed."
         )
@@ -91,7 +96,7 @@ class ProjectInstructionsMiddleware(AgentMiddleware[ProjectInstructionsState]):
     ) -> dict[str, Any]:
         # Refresh resumed threads too; only the current tool loop shares this snapshot.
         result = self.backend.read(
-            REPOSITORY_INSTRUCTIONS_PATH,
+            self.instructions_path,
             offset=0,
             limit=REPOSITORY_INSTRUCTIONS_MAX_LINES + 1,
         )
@@ -101,7 +106,7 @@ class ProjectInstructionsMiddleware(AgentMiddleware[ProjectInstructionsState]):
         self, state: ProjectInstructionsState, runtime: Runtime
     ) -> dict[str, Any]:
         result = await self.backend.aread(
-            REPOSITORY_INSTRUCTIONS_PATH,
+            self.instructions_path,
             offset=0,
             limit=REPOSITORY_INSTRUCTIONS_MAX_LINES + 1,
         )

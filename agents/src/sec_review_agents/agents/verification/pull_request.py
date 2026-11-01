@@ -28,6 +28,7 @@ from sec_review_agents.review_stages.mitigation.result import MitigationStageRes
 from sec_review_agents.runtime.runtime_config import (
     ExecutionRuntimeContext,
     runtime_workspace_image,
+    runtime_workspace_path,
 )
 from sec_review_agents.runtime.skills import materialize_agent_skills_view
 from sec_review_agents.utils.markdown import code_block
@@ -65,8 +66,13 @@ def build_pr_verification_backend_config(
             f"Verifier workspace does not exist: {workspace_root_path}"
         )
     workspace_image = runtime_workspace_image(runtime_context)
+    workspace_directory = runtime_workspace_path(runtime_context)
     path_views = [
-        workspace_view(host_path=workspace_root_path, writable=True),
+        workspace_view(
+            host_path=workspace_root_path,
+            agent_path=workspace_directory,
+            writable=True,
+        ),
         read_only_path_view(
             agent_path="/incremental-window",
             host_path=incremental_window_path,
@@ -84,10 +90,13 @@ def build_pr_verification_backend_config(
         container_name_prefix="pr-verifier",
         path_views=path_views,
         image=workspace_image,
+        working_directory=workspace_directory,
     )
 
 
-def build_pr_verification_system_prompt(is_retry: bool = False) -> str:
+def build_pr_verification_system_prompt(
+    is_retry: bool = False, *, workspace_root: str = "/workspace"
+) -> str:
     if is_retry:
         return join_prompt_sections(
             [
@@ -101,7 +110,8 @@ def build_pr_verification_system_prompt(is_retry: bool = False) -> str:
                 "shared/workspace-evidence-rule.md",
                 "shared/advisory-evidence-rule.md",
                 "shared/output-formatting.md",
-            ]
+            ],
+            workspace_root=workspace_root,
         )
     return join_prompt_sections(
         [
@@ -115,17 +125,21 @@ def build_pr_verification_system_prompt(is_retry: bool = False) -> str:
             "shared/workspace-evidence-rule.md",
             "shared/advisory-evidence-rule.md",
             "shared/output-formatting.md",
-        ]
+        ],
+        workspace_root=workspace_root,
     )
 
 
-def build_pr_verification_filesystem_system_prompt() -> str:
+def build_pr_verification_filesystem_system_prompt(
+    *, workspace_root: str = "/workspace"
+) -> str:
     return join_prompt_sections(
         [
             "verifier/filesystem-system-core.md",
             *external_tool_prompt_paths_for(VERIFICATION_AGENT_EXTERNAL_TOOLS),
             "scopes/pr/verifier/filesystem-system-delta.md",
-        ]
+        ],
+        workspace_root=workspace_root,
     )
 
 

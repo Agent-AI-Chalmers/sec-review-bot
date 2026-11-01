@@ -23,6 +23,7 @@ from sec_review_agents.resources.loader import (
 from sec_review_agents.runtime.runtime_config import (
     ExecutionRuntimeContext,
     runtime_workspace_image,
+    runtime_workspace_path,
 )
 from sec_review_agents.runtime.skills import materialize_agent_skills_view
 from sec_review_agents.utils.structured_renderer import (
@@ -51,8 +52,11 @@ def build_issue_single_agent_backend_config(
     runtime_context: ExecutionRuntimeContext | None = None,
 ) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
+    workspace_directory = runtime_workspace_path(runtime_context)
     path_views = [
-        workspace_view(host_path=workspace_root, writable=True),
+        workspace_view(
+            host_path=workspace_root, agent_path=workspace_directory, writable=True
+        ),
         read_only_path_view(agent_path="/history", host_path=history_path),
     ]
     if agent_skills_enabled():
@@ -64,6 +68,7 @@ def build_issue_single_agent_backend_config(
         container_name_prefix="issue-single-agent",
         path_views=path_views,
         image=workspace_image,
+        working_directory=workspace_directory,
     )
 
 
@@ -71,6 +76,7 @@ def build_issue_single_agent_system_prompt(
     *,
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
+    workspace_root: str = "/workspace",
 ) -> str:
     paths = [
         "single-agent/system-core.md",
@@ -89,25 +95,36 @@ def build_issue_single_agent_system_prompt(
             "shared/output-formatting.md",
         ]
     )
-    return join_prompt_sections(paths)
+    return join_prompt_sections(paths, workspace_root=workspace_root)
 
 
-def build_issue_single_agent_filesystem_system_prompt() -> str:
+def build_issue_single_agent_filesystem_system_prompt(
+    *, workspace_root: str = "/workspace"
+) -> str:
     return join_prompt_sections(
         [
             "single-agent/filesystem-system-core.md",
             *external_tool_prompt_paths_for(SINGLE_AGENT_EXTERNAL_TOOLS),
             "scopes/issue/single-agent/filesystem-system-delta.md",
-        ]
+        ],
+        workspace_root=workspace_root,
     )
 
 
-def build_issue_single_agent_todo_system_prompt() -> str:
-    return load_prompt_resource("single-agent/todo-system.md")
+def build_issue_single_agent_todo_system_prompt(
+    *, workspace_root: str = "/workspace"
+) -> str:
+    return load_prompt_resource(
+        "single-agent/todo-system.md", workspace_root=workspace_root
+    )
 
 
-def build_issue_single_agent_todo_tool_description() -> str:
-    return load_prompt_resource("single-agent/todo-tool-description.md")
+def build_issue_single_agent_todo_tool_description(
+    *, workspace_root: str = "/workspace"
+) -> str:
+    return load_prompt_resource(
+        "single-agent/todo-tool-description.md", workspace_root=workspace_root
+    )
 
 
 def build_issue_single_agent_user_prompt(*, issue: Mapping[str, Any]) -> str:

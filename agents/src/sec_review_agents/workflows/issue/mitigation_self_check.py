@@ -13,7 +13,10 @@ from sec_review_agents.review_stages.mitigation.result import MitigationStageRes
 from sec_review_agents.review_stages.mitigation.stage import (
     run_mitigation_stage,
 )
-from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
+from sec_review_agents.runtime.runtime_config import (
+    ExecutionRuntimeContext,
+    runtime_workspace_path,
+)
 from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_ALLOW,
     TestChangesPolicy,
@@ -45,9 +48,12 @@ async def mitigate_issue_with_self_check(
             runtime_context=runtime_context,
         ),
         system_prompt=build_issue_self_check_mitigation_system_prompt(
-            test_changes=test_changes
+            test_changes=test_changes,
+            workspace_root=runtime_workspace_path(runtime_context),
         ),
-        filesystem_system_prompt=build_issue_self_check_mitigation_filesystem_system_prompt(),
+        filesystem_system_prompt=build_issue_self_check_mitigation_filesystem_system_prompt(
+            workspace_root=runtime_workspace_path(runtime_context)
+        ),
         user_prompt=build_issue_self_check_mitigation_user_prompt(
             issue=issue,
             analysis_result=analysis_result,

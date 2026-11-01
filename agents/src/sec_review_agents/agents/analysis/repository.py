@@ -21,6 +21,7 @@ from sec_review_agents.resources.loader import (
 from sec_review_agents.runtime.runtime_config import (
     ExecutionRuntimeContext,
     runtime_workspace_image,
+    runtime_workspace_path,
 )
 from sec_review_agents.runtime.skills import materialize_agent_skills_view
 
@@ -42,8 +43,13 @@ def build_repository_analyzer_backend_config(
     runtime_context: ExecutionRuntimeContext | None = None,
 ) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
+    workspace_directory = runtime_workspace_path(runtime_context)
     path_views = [
-        workspace_view(host_path=workspace_root_path, writable=True),
+        workspace_view(
+            host_path=workspace_root_path,
+            agent_path=workspace_directory,
+            writable=True,
+        ),
     ]
     if agent_skills_enabled():
         path_views.append(
@@ -71,10 +77,13 @@ def build_repository_analyzer_backend_config(
         container_name_prefix="repository-analyzer",
         path_views=path_views,
         image=workspace_image,
+        working_directory=workspace_directory,
     )
 
 
-def build_repository_analyzer_system_prompt() -> str:
+def build_repository_analyzer_system_prompt(
+    *, workspace_root: str = "/workspace"
+) -> str:
     return join_prompt_sections(
         [
             "analyzer/system-core.md",
@@ -87,12 +96,13 @@ def build_repository_analyzer_system_prompt() -> str:
             "shared/workspace-evidence-rule.md",
             "shared/advisory-evidence-rule.md",
             "shared/output-formatting.md",
-        ]
+        ],
+        workspace_root=workspace_root,
     )
 
 
 def build_repository_analyzer_filesystem_system_prompt(
-    scan_mode: str,
+    scan_mode: str, *, workspace_root: str = "/workspace"
 ) -> str:
     paths = [
         "analyzer/filesystem-system-core.md",
@@ -101,12 +111,16 @@ def build_repository_analyzer_filesystem_system_prompt(
     ]
     if scan_mode == "incremental":
         paths.append("shared/incremental-evidence-rule.md")
-    return join_prompt_sections(paths)
+    return join_prompt_sections(paths, workspace_root=workspace_root)
 
 
-def build_repository_analyzer_user_prompt(*, review_input: str, scan_mode: str) -> str:
+def build_repository_analyzer_user_prompt(
+    *, review_input: str, scan_mode: str, workspace_root: str = "/workspace"
+) -> str:
     incremental_scope_rule = (
-        load_prompt_resource("shared/incremental-window-scope-rule.md")
+        load_prompt_resource(
+            "shared/incremental-window-scope-rule.md", workspace_root=workspace_root
+        )
         if scan_mode == "incremental"
         else None
     )

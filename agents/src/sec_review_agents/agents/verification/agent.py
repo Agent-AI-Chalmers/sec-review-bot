@@ -42,6 +42,7 @@ async def run_verification_agent(
     backend: BackendProtocol,
     system_prompt: str,
     filesystem_system_prompt: str,
+    workspace_root: str = "/workspace",
     user_prompt: str,
     memory_enabled: bool,
     trajectory_paths: tuple[Path, ...] = (),
@@ -57,7 +58,9 @@ async def run_verification_agent(
             max_retries=missing_structured_response_max_retries(),
         ),
     ]
-    agent_middleware.append(ProjectInstructionsMiddleware(backend=backend))
+    agent_middleware.append(
+        ProjectInstructionsMiddleware(backend=backend, workspace_root=workspace_root)
+    )
     if agent_skills_enabled():
         agent_middleware.append(SkillsMiddleware(backend=backend, sources=["/skills/"]))
     if memory_enabled:

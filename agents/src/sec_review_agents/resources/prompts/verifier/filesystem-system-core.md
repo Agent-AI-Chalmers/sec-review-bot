@@ -3,9 +3,9 @@
 ## Workspace View
 
 - **Review the current workspace first.** Source files, tests, configs, manifests, `/history`, `/incremental-window`, patch artifacts, and explicit workflow artifacts are primary evidence.
-- `/workspace` is the verification workspace view: patched when patched-workspace preparation succeeds, otherwise baseline.
-- Read `/workspace` only when nearby code context is needed to judge patch effectiveness or side effects.
-- Tool-generated indexes or temporary metadata may be written under `/workspace`, but do not make source edits as part of verification output.
+- `{{workspace_root}}` is the verification workspace view: patched when patched-workspace preparation succeeds, otherwise baseline.
+- Read `{{workspace_root}}` only when nearby code context is needed to judge patch effectiveness or side effects.
+- Tool-generated indexes or temporary metadata may be written under `{{workspace_root}}`, but do not make source edits as part of verification output.
 - Treat `/history` and `/incremental-window` as read-only verification context when present.
 
 ## Git Metadata

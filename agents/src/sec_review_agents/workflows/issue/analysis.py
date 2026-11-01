@@ -10,7 +10,10 @@ from sec_review_agents.agents.analysis.issue import (
 )
 from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.analysis.stage import run_analysis_stage
-from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
+from sec_review_agents.runtime.runtime_config import (
+    ExecutionRuntimeContext,
+    runtime_workspace_path,
+)
 from sec_review_agents.workflows.review_intent import ReviewObjective
 
 
@@ -36,8 +39,12 @@ async def analyze_issue(
             history_path=history_path,
             runtime_context=runtime_context,
         ),
-        system_prompt=build_issue_analyzer_system_prompt(review_objective),
-        filesystem_system_prompt=build_issue_analyzer_filesystem_system_prompt(),
+        system_prompt=build_issue_analyzer_system_prompt(
+            review_objective, workspace_root=runtime_workspace_path(runtime_context)
+        ),
+        filesystem_system_prompt=build_issue_analyzer_filesystem_system_prompt(
+            workspace_root=runtime_workspace_path(runtime_context)
+        ),
         user_prompt=build_issue_analyzer_user_prompt(
             issue=issue,
         ),

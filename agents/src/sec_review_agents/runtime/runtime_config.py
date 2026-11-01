@@ -1,4 +1,4 @@
-"""Per-run runtime overrides accepted by the execution request boundary.
+"""Internal per-run runtime configuration, including local-only workspace paths.
 
 The Execution Worker parses these values, then workflows and backends read them
 while building stage runtime resources.
@@ -9,6 +9,7 @@ closed allowlist, so a new override is an explicit change here rather than a new
 field the request can smuggle in.
 """
 
+import posixpath
 from typing import Any, TypedDict
 
 from sec_review_agents.utils.env import bool_env
@@ -16,10 +17,28 @@ from sec_review_agents.utils.env import bool_env
 
 class ExecutionRuntimeContext(TypedDict, total=False):
     workspace_image: str
+    workspace_path: str
 
 
-_ALLOWED_RUNTIME_CONFIG_KEYS = frozenset({"workspace_image"})
+_ALLOWED_RUNTIME_CONFIG_KEYS = frozenset({"workspace_image", "workspace_path"})
 ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV = "EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE"
+
+
+def runtime_workspace_path(runtime_context: ExecutionRuntimeContext | None) -> str:
+    """Resolve the shared file-tool and shell repository root."""
+    value = (runtime_context or {}).get("workspace_path", "/workspace")
+    if (
+        not isinstance(value, str)
+        or not value.startswith("/")
+        or value.startswith("//")
+        or posixpath.normpath(value) != value
+        or value == "/"
+        or any(char in value for char in ("\x00", "\n", "\r", ","))
+    ):
+        raise ValueError(
+            "runtime.workspace_path must be a normalized absolute directory"
+        )
+    return value
 
 
 def runtime_context_from_config(value: Any) -> ExecutionRuntimeContext:
@@ -48,6 +67,15 @@ def runtime_context_from_config(value: Any) -> ExecutionRuntimeContext:
         if not isinstance(workspace_image, str) or not workspace_image.strip():
             raise ValueError("runtime.workspace_image must be a non-empty string.")
         context["workspace_image"] = workspace_image.strip()
+    if "workspace_path" in value:
+        if not bool_env(ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV, False):
+            raise ValueError("runtime.workspace_path override is disabled")
+        workspace_path = value["workspace_path"]
+        if not isinstance(workspace_path, str):
+            raise ValueError("runtime.workspace_path must be a string")
+        context["workspace_path"] = runtime_workspace_path(
+            {"workspace_path": workspace_path}
+        )
     return context
 
 

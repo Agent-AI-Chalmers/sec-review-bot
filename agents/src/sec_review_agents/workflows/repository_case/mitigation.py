@@ -10,7 +10,10 @@ from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.feedback_loop import FeedbackRetryContext
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.mitigation.stage import run_mitigation_stage
-from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
+from sec_review_agents.runtime.runtime_config import (
+    ExecutionRuntimeContext,
+    runtime_workspace_path,
+)
 from sec_review_agents.workflows.review_intent import (
     TEST_CHANGES_ALLOW,
     TestChangesPolicy,
@@ -47,15 +50,18 @@ async def mitigate_repository_case(
             runtime_context=runtime_context,
         ),
         system_prompt=build_repository_mitigation_system_prompt(
-            test_changes=test_changes, is_retry=retry_context is not None
+            test_changes=test_changes,
+            is_retry=retry_context is not None,
+            workspace_root=runtime_workspace_path(runtime_context),
         ),
         filesystem_system_prompt=build_repository_mitigation_filesystem_system_prompt(
-            scan_mode
+            scan_mode, workspace_root=runtime_workspace_path(runtime_context)
         ),
         user_prompt=build_repository_mitigation_user_prompt(
             review_input=review_input,
             scan_mode=scan_mode,
             retry_context=retry_context,
             analysis_result=analysis_result,
+            workspace_root=runtime_workspace_path(runtime_context),
         ),
     )

@@ -62,6 +62,7 @@ async def run_analysis_stage(
             published_trajectory_path=published_trajectory_path,
         )
         config = build_backend_config(workspace_path)
+        workspace_root = config.get("working_directory", "/workspace")
         if memory_path_view is not None:
             config["path_views"].append(memory_path_view)
         backend = create_backend_with_path_views(**config)
@@ -69,7 +70,9 @@ async def run_analysis_stage(
             record_bootstrap_result(
                 analyzer_artifacts_path,
                 await bootstrap_environment(
-                    backend, setup_declaration_content=setup_declaration_content
+                    backend,
+                    setup_declaration_content=setup_declaration_content,
+                    workspace_root=workspace_root,
                 ),
             )
             agent_output = await run_analysis_agent(
@@ -77,6 +80,7 @@ async def run_analysis_stage(
                 backend=backend,
                 system_prompt=system_prompt,
                 filesystem_system_prompt=filesystem_system_prompt,
+                workspace_root=workspace_root,
                 user_prompt=user_prompt,
                 trajectory_paths=trajectory_paths,
                 memory_enabled=memory_path_view is not None,

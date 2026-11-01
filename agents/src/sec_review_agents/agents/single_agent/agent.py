@@ -46,6 +46,7 @@ async def run_single_agent(
     backend: BackendProtocol,
     system_prompt: str,
     filesystem_system_prompt: str,
+    workspace_root: str = "/workspace",
     todo_system_prompt: str,
     todo_tool_description: str,
     baseline_snapshot_tar_path: Path,
@@ -69,7 +70,9 @@ async def run_single_agent(
             baseline_snapshot_tar_path=baseline_snapshot_tar_path,
         ),
     ]
-    agent_middleware.append(ProjectInstructionsMiddleware(backend=backend))
+    agent_middleware.append(
+        ProjectInstructionsMiddleware(backend=backend, workspace_root=workspace_root)
+    )
     if agent_skills_enabled():
         agent_middleware.append(SkillsMiddleware(backend=backend, sources=["/skills/"]))
     if memory_enabled:
