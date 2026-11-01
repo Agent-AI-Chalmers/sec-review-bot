@@ -108,6 +108,7 @@ github-integration:
   - ".github/workflows/ci.yml"
 
 control-plane-ui:
+  - ".github/workflows/ci-browser.yml"
   - ".github/actions/setup-node/**"
   - "apps/control-plane-ui/**"
   # It pins its response type to the shared contract fixture.
@@ -116,6 +117,7 @@ control-plane-ui:
   - ".github/workflows/ci.yml"
 
 agents:
+  - ".github/workflows/ci-agents.yml"
   - ".github/actions/setup-python/**"
   - "agents/**"
   # The wheel packages the canonical contract schemas.

@@ -24,11 +24,22 @@ python3 .github/ci/validate-pr-description.py /path/to/pr-body.md
 
 Dependabot descriptions are exempt from the human-authored template but must be non-empty.
 
+## Workflow Boundaries
+
+[The main CI workflow](../workflows/ci.yml) owns event triggers, change selection, job dependencies, and the required CI Status check. It calls these workflows at the same revision:
+
+- [Browser checks](../workflows/ci-browser.yml) own the desktop/mobile matrix and failure diagnostics.
+- [Agents checks](../workflows/ci-agents.yml) own Python checks and the mypy cache.
+
+The called workflows use workflow_call; they do not trigger independent PR runs. Their caller jobs remain direct dependencies of CI Status, so their failures contribute to the aggregate. Their file paths are included in the corresponding changed areas.
+
+GitHub displays called jobs beneath their caller names. Branch protection should require CI Status; installations that additionally require individual Agents or browser check names must update those names when adopting this layout.
+
 ## Shared Node Setup
 
 [The Node setup action](../actions/setup-node/action.yml) owns pnpm setup, package-specific Node selection, dependency caching, and frozen-lockfile installation. Call it after checkout with a repository-relative package directory. Jobs that install another package can supply its lockfile in `cache-dependency-path` and install that package in a separate step.
 
-Package checks, service containers, and change conditions stay in [the CI workflow](../workflows/ci.yml). Changes to the shared action trigger its consuming areas through `changed-areas.yml`.
+Package checks and service containers live in the workflows; change conditions stay in [the main CI workflow](../workflows/ci.yml). Changes to the shared action trigger its consuming areas through `changed-areas.yml`.
 
 ## Shared Python Setup
 

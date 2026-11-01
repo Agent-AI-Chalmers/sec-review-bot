@@ -340,45 +340,12 @@ jobs:
           pnpm run build
 
   control-plane-ui-browser:
-    name: Control Plane UI browser (${{ matrix.project }})
+    name: Control Plane UI
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
       needs.changes.outputs.control-plane-ui == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/control-plane-ui
-    strategy:
-      fail-fast: false
-      matrix:
-        project:
-          - desktop
-          - mobile
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Node package
-        uses: ./.github/actions/setup-node
-        with:
-          directory: apps/control-plane-ui
-
-      - name: Browser project
-        run: pnpm exec playwright test --project=${{ matrix.project }}
-
-      # The runner workspace disappears after the job. Preserve Playwright's
-      # report, error context, traces, and screenshots only when diagnosis is needed.
-      - name: Upload browser diagnostics
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: control-plane-ui-${{ matrix.project }}-playwright
-          path: |
-            apps/control-plane-ui/playwright-report/
-            apps/control-plane-ui/test-results/
-          retention-days: 14
-          if-no-files-found: warn
+    uses: ./.github/workflows/ci-browser.yml
 
   agents:
     name: Agents
@@ -386,47 +353,7 @@ jobs:
     if: >-
       github.event_name == 'merge_group' ||
       needs.changes.outputs.agents == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: agents
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up Python environment
-        id: setup-python
-        uses: ./.github/actions/setup-python
-
-      # mypy's cache is safe to restore across commits: mypy validates cached
-      # metadata against the current source and dependencies before reusing it.
-      # Include the commit in the exact key so successful runs can publish a
-      # fresh cache; the restore prefix finds the newest compatible prior run.
-      - name: Restore mypy cache
-        uses: actions/cache@v6
-        with:
-          path: agents/.mypy_cache
-          key: >-
-            mypy-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('agents/uv.lock', 'agents/pyproject.toml') }}-${{ github.sha }}
-          restore-keys: |
-            mypy-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('agents/uv.lock', 'agents/pyproject.toml') }}-
-
-      - name: Lint with Ruff
-        run: uv run ruff check .
-
-      - name: Check formatting with Black
-        run: uv run black --check .
-
-      - name: Type-check with mypy
-        run: uv run mypy .
-
-      - name: Type-check with Pyright
-        run: uv run pyright .
-
-      - name: Test
-        # Report every setup/call/teardown phase taking at least 10 ms. This is
-        # diagnostic only: it does not select, skip, reorder, or relax tests.
-        run: uv run python -m pytest --durations=0 --durations-min=0.01
+    uses: ./.github/workflows/ci-agents.yml
 
   scripts:
     name: Repository Scripts
