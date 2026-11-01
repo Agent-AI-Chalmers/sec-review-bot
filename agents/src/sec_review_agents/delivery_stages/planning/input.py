@@ -3,23 +3,11 @@
 from collections.abc import Sequence
 from pathlib import Path
 
-from pydantic import BaseModel
-
-from sec_review_agents.delivery_stages.model import DeliveryCaseInput
+from sec_review_agents.delivery_stages.model import (
+    DeliveryCaseInput,
+    DeliveryPlanningCase,
+)
 from sec_review_agents.workspace.file_changes import file_change_paths
-
-
-class DeliveryPlanningCase(BaseModel):
-    """Compact case information used to batch and plan deliveries.
-
-    Planning needs the mitigation overview and changed paths, while patch bytes
-    stay in the prepared patch view. Serialize this projection only when writing
-    planning artifacts or populating the agent's workbench.
-    """
-
-    case_id: str
-    overview: str
-    changed_files: list[str]
 
 
 def prepare_delivery_planning_patch_view(
@@ -57,7 +45,6 @@ def build_delivery_planning_cases(
 
 
 __all__ = [
-    "DeliveryPlanningCase",
     "build_delivery_planning_cases",
     "prepare_delivery_planning_patch_view",
 ]

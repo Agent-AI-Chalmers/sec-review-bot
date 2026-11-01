@@ -23,11 +23,7 @@ def _build_single_delivery_outcome(
     case_results_by_case_id: Mapping[str, DeliveryPatchCase],
 ) -> DeliveryExecutionResult | None:
     delivery_id = delivery_entry.delivery_id
-    case_ids = [
-        case_id
-        for case_id in delivery_entry.case_ids
-        if case_id in case_results_by_case_id
-    ]
+    case_ids = delivery_entry.case_ids
     if not delivery_id or not case_ids:
         return None
     case_id = case_ids[0]
@@ -53,6 +49,20 @@ async def execute_delivery_entry(
     baseline_snapshot_tar_path: Path | None = None,
 ) -> DeliveryExecutionResult | None:
     case_results_by_case_id = {item.case_id: item for item in case_results}
+    missing_case_ids = [
+        case_id
+        for case_id in delivery_entry.case_ids
+        if case_id not in case_results_by_case_id
+    ]
+    if missing_case_ids:
+        # Never synthesize a subset under the original plan's identity/reason.
+        return DeliveryExecutionResult(
+            delivery_id=delivery_entry.delivery_id,
+            status="failed",
+            error=f"Delivery is missing case inputs: {', '.join(missing_case_ids)}",
+            file_changes=[],
+            patch_diff="",
+        )
     strategy = delivery_entry.strategy
     if strategy == "single":
         return _build_single_delivery_outcome(
@@ -61,11 +71,7 @@ async def execute_delivery_entry(
         )
 
     delivery_id = delivery_entry.delivery_id
-    case_ids = [
-        case_id
-        for case_id in delivery_entry.case_ids
-        if case_id in case_results_by_case_id
-    ]
+    case_ids = delivery_entry.case_ids
     if not delivery_id or not case_ids:
         return None
     if baseline_snapshot_tar_path is None:

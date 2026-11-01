@@ -10,6 +10,7 @@ from sec_review_agents.agents.triage.agent import (
 )
 from sec_review_agents.scan_stages.discovery.result import DiscoveryCandidateResult
 from sec_review_agents.scan_stages.triage.agent_passes import (
+    TriageMode,
     run_repository_triage_agent,
 )
 from sec_review_agents.scan_stages.triage.stage import REPOSITORY_TRIAGER_AGENT_NAME
@@ -207,3 +208,104 @@ async def test_repository_triage_batched_mode_uses_explicit_runtime_inputs(
     assert result.metadata.triage_pass_count == 0
     assert "agent_result" not in result.model_dump()
     assert "agent_results" not in result.model_dump()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("triage_mode", ["single", "batched"])
+@pytest.mark.parametrize("max_passes", [0, 1, 2, 10])
+async def test_triage_allows_at_most_one_refinement(
+    tmp_path: Path, triage_mode: TriageMode, max_passes: int
+) -> None:
+    """The pass budget controls refinement, not an arbitrary retry loop."""
+    pass_indices: list[int] = []
+
+    async def fake_agent_pass(*, workbench_state, pass_index, **_kwargs):
+        pass_indices.append(pass_index)
+        if pass_index == 0:
+            workbench_state.create_groups(
+                groups=[
+                    {
+                        "kind": "keep",
+                        "item_ids": ["a"],
+                        "summary": "A",
+                        "category": "test",
+                        "evidence": ["A"],
+                    }
+                ]
+            )
+
+    candidate = DiscoveryCandidateResult(
+        candidate_id="a",
+        candidate=DiscoveryCandidate(
+            category="xss", description="A", locations=[], evidence=[]
+        ),
+        grounding_status="grounded",
+    )
+    with patch(
+        "sec_review_agents.scan_stages.triage.agent_passes._run_repository_triage_agent_pass",
+        side_effect=fake_agent_pass,
+    ):
+        result = await run_repository_triage_agent(
+            triage_root=tmp_path,
+            triage_candidates=[candidate],
+            max_passes=max_passes,
+            triage_mode=triage_mode,
+        )
+    assert pass_indices == ([0, 1] if max_passes > 1 else [0])
+    assert result.metadata.triage_pass_count == len(pass_indices)
+
+
+@pytest.mark.asyncio
+async def test_batch_drafts_preserve_input_order_and_first_duplicate(
+    tmp_path: Path,
+) -> None:
+    """ID sorting for batching must not reorder or replace model-visible candidates."""
+    observed: dict[int, list[tuple[str, str]]] = {}
+
+    async def fake_agent_pass(*, workbench_state, pass_meta, **_kwargs):
+        observed[pass_meta["index"]] = [
+            (
+                item_id,
+                workbench_state.items_by_id[item_id].candidate.candidate.description,
+            )
+            for item_id in workbench_state.ordered_item_ids
+        ]
+        workbench_state.create_groups(
+            groups=[
+                {
+                    "kind": "keep",
+                    "item_ids": workbench_state.ordered_item_ids,
+                    "summary": "Batch",
+                    "category": "test",
+                    "evidence": ["Batch"],
+                }
+            ]
+        )
+
+    candidates = [
+        DiscoveryCandidateResult(
+            candidate_id=candidate_id,
+            candidate=DiscoveryCandidate(
+                category="xss", description=description, locations=[], evidence=[]
+            ),
+            grounding_status="grounded",
+        )
+        for candidate_id, description in [
+            ("c", "C"),
+            ("b", "first B"),
+            ("a", "A"),
+            (" b ", "second B"),
+        ]
+    ]
+    with patch(
+        "sec_review_agents.scan_stages.triage.agent_passes._run_repository_triage_agent_pass",
+        side_effect=fake_agent_pass,
+    ):
+        await run_repository_triage_agent(
+            triage_root=tmp_path,
+            triage_candidates=candidates,
+            triage_mode="batched",
+            max_batch_size=3,
+            max_passes=1,
+        )
+    assert observed == {1: [("b", "first B"), ("a", "A")], 2: [("c", "C")]}

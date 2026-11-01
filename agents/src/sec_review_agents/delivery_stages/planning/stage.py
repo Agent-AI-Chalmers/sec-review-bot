@@ -1,7 +1,12 @@
 from collections.abc import Sequence
 from pathlib import Path
 
-from sec_review_agents.delivery_stages.model import DeliveryCaseInput, DeliveryPlan
+from sec_review_agents.delivery_stages.model import (
+    DeliveryCaseInput,
+    DeliveryPlan,
+    DeliveryPlanningCounts,
+    DeliveryPlanningMetadata,
+)
 from sec_review_agents.delivery_stages.planning.agent_passes import (
     run_delivery_planning,
 )
@@ -64,16 +69,16 @@ def build_skipped_delivery_plan(*, total_case_count: int) -> DeliveryPlan:
     """Build a skipped plan; the workflow activity owns persistence."""
     return DeliveryPlan(
         status="skipped",
-        metadata={
-            "planning_mode": "skipped",
-            "planning_pass_count": 0,
-            "batch_size": None,
-        },
-        counts={
-            "input_case_count": 0,
-            "delivery_count": 0,
-            "total_case_count": total_case_count,
-        },
+        metadata=DeliveryPlanningMetadata(
+            planning_mode="skipped",
+            planning_pass_count=0,
+            batch_size=None,
+        ),
+        counts=DeliveryPlanningCounts(
+            input_case_count=0,
+            delivery_count=0,
+            total_case_count=total_case_count,
+        ),
         deliveries=[],
     )
 

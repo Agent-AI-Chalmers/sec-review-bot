@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 from pathlib import Path
 from typing import Literal
 
@@ -16,9 +17,13 @@ from sec_review_agents.agents.delivery_planning.prompts import (
 from sec_review_agents.agents.delivery_planning.workbench_state import (
     DeliveryWorkbenchState,
 )
-from sec_review_agents.delivery_stages.model import DeliveryPlan
+from sec_review_agents.delivery_stages.model import (
+    DeliveryPlan,
+    DeliveryPlanningCase,
+    DeliveryPlanningCounts,
+    DeliveryPlanningMetadata,
+)
 from sec_review_agents.delivery_stages.planning.batching import planning_case_id_batches
-from sec_review_agents.delivery_stages.planning.input import DeliveryPlanningCase
 from sec_review_agents.observability.trace_context import bind_trace_context
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.trajectories import remove_trajectories, trajectory_path
@@ -61,6 +66,12 @@ async def run_delivery_planning(
     planning_mode: DeliveryPlanningMode = "batched",
     max_batch_size: int = DEFAULT_DELIVERY_PLANNING_BATCH_SIZE,
 ) -> DeliveryPlan:
+    """Run a draft phase and at most one refinement phase.
+
+    ``max_passes <= 1`` disables refinement; larger values allow one refinement,
+    conditional on draft edits in single mode and unconditional in batched mode.
+    Batch drafts are separate invocations, not additional refinement phases.
+    """
     persist_delivery_planning_input(delivery_planning_root, planning_cases)
     if planning_mode == "batched":
         workbench_state, pass_count = await _run_batched_delivery_planning_passes(
@@ -84,15 +95,15 @@ async def run_delivery_planning(
     return DeliveryPlan(
         status="completed",
         deliveries=deliveries,
-        metadata={
-            "planning_mode": planning_mode,
-            "planning_pass_count": pass_count,
-            "batch_size": max_batch_size if planning_mode == "batched" else None,
-        },
-        counts={
-            "input_case_count": len(planning_cases),
-            "delivery_count": len(deliveries),
-        },
+        metadata=DeliveryPlanningMetadata(
+            planning_mode=planning_mode,
+            planning_pass_count=pass_count,
+            batch_size=max_batch_size if planning_mode == "batched" else None,
+        ),
+        counts=DeliveryPlanningCounts(
+            input_case_count=len(planning_cases),
+            delivery_count=len(deliveries),
+        ),
     )
 
 
@@ -103,25 +114,30 @@ async def _run_single_delivery_planning_passes(
     max_passes: int,
 ) -> tuple[DeliveryWorkbenchState, int]:
     workbench_state = DeliveryWorkbenchState.from_items(_planning_items(planning_cases))
-    pass_count = 0
-    for pass_index in range(max(1, max_passes)):
-        edit_event_start = len(workbench_state.edit_events)
-        await _run_delivery_planning_agent_pass(
-            delivery_planning_root=delivery_planning_root,
-            pass_meta={"kind": "refinement"} if pass_index > 0 else None,
-            workbench_state=workbench_state,
-            planning_cases=planning_cases,
-            pass_index=pass_index,
-        )
-        pass_count += 1
-        if not _should_run_another_delivery_planning_pass(
-            workbench_state=workbench_state,
-            pass_index=pass_index,
-            max_passes=max_passes,
-            pass_edit_events=workbench_state.edit_events[edit_event_start:],
-        ):
-            break
-    return workbench_state, pass_count
+    edit_event_start = len(workbench_state.edit_events)
+    await _run_delivery_planning_agent_pass(
+        delivery_planning_root=delivery_planning_root,
+        workbench_state=workbench_state,
+        planning_cases=planning_cases,
+        pass_index=0,
+    )
+    # Inspect only the draft invocation's edits when deciding on refinement.
+    if not _should_run_another_delivery_planning_pass(
+        workbench_state=workbench_state,
+        pass_index=0,
+        max_passes=max_passes,
+        pass_edit_events=workbench_state.edit_events[edit_event_start:],
+    ):
+        return workbench_state, 1
+
+    await _run_delivery_planning_agent_pass(
+        delivery_planning_root=delivery_planning_root,
+        pass_meta={"kind": "refinement"},
+        workbench_state=workbench_state,
+        planning_cases=planning_cases,
+        pass_index=1,
+    )
+    return workbench_state, 2
 
 
 async def _run_batched_delivery_planning_passes(
@@ -135,25 +151,29 @@ async def _run_batched_delivery_planning_passes(
     pass_count = 0
     draft_origins: list[dict] = []
     batches = planning_case_id_batches(planning_cases, max_batch_size=max_batch_size)
-    batch_concurrency = min(
-        max(1, len(batches)),
-        DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY,
-    )
+    # Route cases once, preserving their original order within each batch.
+    batch_cases: list[list[DeliveryPlanningCase]] = [[] for _ in batches]
+    batch_indices_by_case_id: dict[str, list[int]] = defaultdict(list)
+    for index, case_ids in enumerate(batches):
+        for case_id in set(case_ids):
+            batch_indices_by_case_id[case_id].append(index)
+    for case in planning_cases:
+        for index in batch_indices_by_case_id.get(case.case_id.strip(), []):
+            batch_cases[index].append(case)
 
     # Batch drafts run concurrently, but each batch owns its own workbench state.
     # The shared global state is updated only below, in batch index order, so
     # async interleaving cannot reorder or race delivery group creation.
-    semaphore = asyncio.Semaphore(batch_concurrency)
+    semaphore = asyncio.Semaphore(DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY)
 
     async def run_batch(
         index: int,
-        batch_case_ids: list[str],
+        cases: list[DeliveryPlanningCase],
     ) -> tuple[int, list[dict]]:
         async with semaphore:
             batch_group_drafts = await _run_delivery_planning_batch_draft(
                 delivery_planning_root=delivery_planning_root,
-                planning_cases=planning_cases,
-                batch_case_ids=batch_case_ids,
+                batch_cases=cases,
                 batch={
                     "kind": "batch",
                     "index": index,
@@ -164,10 +184,7 @@ async def _run_batched_delivery_planning_passes(
             return index, batch_group_drafts
 
     batch_results = await asyncio.gather(
-        *(
-            run_batch(index, batch_case_ids)
-            for index, batch_case_ids in enumerate(batches, start=1)
-        )
+        *(run_batch(index, cases) for index, cases in enumerate(batch_cases, start=1))
     )
     indexed_batch_results = dict(batch_results)
     pass_count += len(batch_results)
@@ -186,24 +203,16 @@ async def _run_batched_delivery_planning_passes(
                 }
             )
 
-    for pass_index in range(1, max(1, max_passes)):
-        edit_event_start = len(global_state.edit_events)
+    if max_passes > 1:
         await _run_delivery_planning_agent_pass(
             delivery_planning_root=delivery_planning_root,
             pass_meta={"kind": "refinement"},
             workbench_state=global_state,
             planning_cases=planning_cases,
-            pass_index=pass_index,
+            pass_index=1,
             draft_origins=draft_origins,
         )
         pass_count += 1
-        if not _should_run_another_delivery_planning_pass(
-            workbench_state=global_state,
-            pass_index=pass_index,
-            max_passes=max_passes,
-            pass_edit_events=global_state.edit_events[edit_event_start:],
-        ):
-            break
 
     return global_state, pass_count
 
@@ -211,11 +220,9 @@ async def _run_batched_delivery_planning_passes(
 async def _run_delivery_planning_batch_draft(
     *,
     delivery_planning_root: Path,
-    planning_cases: list[DeliveryPlanningCase],
-    batch_case_ids: list[str],
+    batch_cases: list[DeliveryPlanningCase],
     batch: dict,
 ) -> list[dict]:
-    batch_cases = _planning_cases_for_batch(planning_cases, batch_case_ids)
     batch_state = DeliveryWorkbenchState.from_items(_planning_items(batch_cases))
     await _run_delivery_planning_agent_pass(
         delivery_planning_root=delivery_planning_root,
@@ -267,7 +274,7 @@ async def _run_delivery_planning_agent_pass(
                 workbench_state=workbench_state,
                 system_prompt=system_prompt,
                 user_prompt=build_repository_delivery_planning_user_prompt(
-                    [case.model_dump(mode="json") for case in planning_cases],
+                    planning_cases,
                     pass_kind=pass_kind,
                     draft_origins=draft_origins,
                 ),
@@ -282,6 +289,7 @@ def _should_run_another_delivery_planning_pass(
     max_passes: int,
     pass_edit_events: list[dict] | None = None,
 ) -> bool:
+    """Allow one quality check for an incomplete or bulk-created single-mode draft."""
     if pass_index + 1 >= max(1, max_passes):
         return False
     if pass_index > 0:
@@ -294,6 +302,7 @@ def _should_run_another_delivery_planning_pass(
         for event in (pass_edit_events or [])
         if isinstance(event, dict)
     ]
+    # Bulk creation alone is a draft-only signal, not evidence of a quality audit.
     return operations in (["create_groups"], ["delete_groups", "create_groups"])
 
 
@@ -307,19 +316,6 @@ def _planning_items(planning_cases: list[DeliveryPlanningCase]) -> list[dict]:
             },
         }
         for case_entry in planning_cases
-    ]
-
-
-def _planning_cases_for_batch(
-    planning_cases: list[DeliveryPlanningCase], batch_case_ids: list[str]
-) -> list[DeliveryPlanningCase]:
-    requested_case_ids = {
-        case_id.strip() for case_id in batch_case_ids if case_id.strip()
-    }
-    return [
-        case_entry
-        for case_entry in planning_cases
-        if case_entry.case_id.strip() in requested_case_ids
     ]
 
 

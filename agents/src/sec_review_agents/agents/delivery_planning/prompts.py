@@ -1,6 +1,7 @@
 import json
 from typing import Any, Literal
 
+from sec_review_agents.delivery_stages.model import DeliveryPlanningCase
 from sec_review_agents.resources.loader import (
     join_prompt_sections,
 )
@@ -42,7 +43,7 @@ def build_repository_delivery_planning_filesystem_system_prompt() -> str:
 
 
 def build_repository_delivery_planning_user_prompt(
-    planning_cases: list[dict[str, Any]],
+    planning_cases: list[DeliveryPlanningCase],
     *,
     pass_kind: DeliveryPlanningPassKind | None = None,
     draft_origins: list[dict] | None = None,
@@ -119,42 +120,24 @@ def _planning_items_intro(pass_kind: DeliveryPlanningPassKind) -> str:
     return "Use these item payloads as the complete evidence inventory for this draft pass."
 
 
-def _planning_prompt_items(planning_cases: list[dict[str, Any]]) -> list[dict]:
+def _planning_prompt_items(planning_cases: list[DeliveryPlanningCase]) -> list[dict]:
     items: list[dict] = []
     for case_entry in planning_cases:
-        case_id = str(case_entry.get("case_id") or "").strip()
+        case_id = case_entry.case_id.strip()
         if not case_id:
             continue
-        items.append(
-            {
-                "item_id": case_id,
-                "payload": _planning_prompt_item_payload(case_entry),
-            }
-        )
+        payload: dict[str, Any] = {"overview": case_entry.overview.strip() or None}
+        changed_files = _planning_prompt_changed_files(case_entry)
+        if changed_files:
+            payload["changed_files"] = changed_files
+        items.append({"item_id": case_id, "payload": payload})
     return items
 
 
-def _planning_prompt_item_payload(case_entry: dict) -> dict:
-    payload: dict[str, Any] = {
-        "overview": _planning_prompt_overview(case_entry),
-    }
-    changed_files = _planning_prompt_changed_files(case_entry)
-    if changed_files:
-        payload["changed_files"] = changed_files
-    return payload
-
-
-def _planning_prompt_overview(case_entry: dict) -> str | None:
-    overview = str(case_entry.get("overview") or "").strip()
-    return overview or None
-
-
-def _planning_prompt_changed_files(case_entry: dict) -> list[str]:
+def _planning_prompt_changed_files(case_entry: DeliveryPlanningCase) -> list[str]:
     changed_files: list[str] = []
     seen: set[str] = set()
-    for value in case_entry.get("changed_files") or []:
-        if not isinstance(value, str):
-            continue
+    for value in case_entry.changed_files:
         path = value.strip().lstrip("/")
         if not path or path in seen:
             continue

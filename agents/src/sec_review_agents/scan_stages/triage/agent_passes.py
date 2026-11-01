@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 from pathlib import Path
 from typing import Literal
 
@@ -53,6 +54,12 @@ async def run_repository_triage_agent(
     triage_mode: TriageMode = "single",
     max_batch_size: int = DEFAULT_TRIAGE_BATCH_SIZE,
 ) -> TriageResult:
+    """Run a draft phase and at most one refinement phase.
+
+    ``max_passes <= 1`` disables refinement; larger values allow one refinement,
+    conditional on draft edits in single mode and unconditional in batched mode.
+    Batch drafts are separate invocations, not additional refinement phases.
+    """
     persist_json_artifact(
         triage_root,
         "triage-input",
@@ -111,24 +118,28 @@ async def _run_single_triage_passes(
     max_passes: int,
 ) -> tuple[TriageWorkbenchState, int]:
     workbench_state = TriageWorkbenchState.from_candidates(triage_candidates)
-    pass_count = 0
-    for pass_index in range(max(1, max_passes)):
-        edit_event_start = len(workbench_state.edit_events)
-        await _run_repository_triage_agent_pass(
-            triage_root=triage_root,
-            pass_meta={"kind": "refinement"} if pass_index > 0 else None,
-            workbench_state=workbench_state,
-            pass_index=pass_index,
-        )
-        pass_count += 1
-        if not _should_run_another_triage_pass(
-            workbench_state=workbench_state,
-            pass_index=pass_index,
-            max_passes=max_passes,
-            pass_edit_events=workbench_state.edit_events[edit_event_start:],
-        ):
-            break
-    return workbench_state, pass_count
+    edit_event_start = len(workbench_state.edit_events)
+    await _run_repository_triage_agent_pass(
+        triage_root=triage_root,
+        workbench_state=workbench_state,
+        pass_index=0,
+    )
+    # Inspect only the draft invocation's edits when deciding on refinement.
+    if not _should_run_another_triage_pass(
+        workbench_state=workbench_state,
+        pass_index=0,
+        max_passes=max_passes,
+        pass_edit_events=workbench_state.edit_events[edit_event_start:],
+    ):
+        return workbench_state, 1
+
+    await _run_repository_triage_agent_pass(
+        triage_root=triage_root,
+        pass_meta={"kind": "refinement"},
+        workbench_state=workbench_state,
+        pass_index=1,
+    )
+    return workbench_state, 2
 
 
 async def _run_batched_triage_passes(
@@ -142,25 +153,31 @@ async def _run_batched_triage_passes(
     pass_count = 0
     draft_origins: list[dict] = []
     batches = triage_candidate_batches(triage_candidates, max_batch_size=max_batch_size)
-    batch_concurrency = min(
-        max(1, len(batches)),
-        TRIAGE_MAX_BATCH_CONCURRENCY,
-    )
+    # Route candidates once, preserving their original order within each batch.
+    batch_candidates: list[list[DiscoveryCandidateResult]] = [[] for _ in batches]
+    batch_indices_by_candidate_id: dict[str, list[int]] = defaultdict(list)
+    for index, candidate_ids in enumerate(batches):
+        for candidate_id in set(candidate_ids):
+            batch_indices_by_candidate_id[candidate_id].append(index)
+    for candidate in triage_candidates:
+        for index in batch_indices_by_candidate_id.get(
+            candidate.candidate_id.strip(), []
+        ):
+            batch_candidates[index].append(candidate)
 
     # Batch drafts run concurrently, but each batch owns its own workbench state.
     # The shared global state is updated only below, in batch index order, so
     # async interleaving cannot reorder or race group creation.
-    semaphore = asyncio.Semaphore(batch_concurrency)
+    semaphore = asyncio.Semaphore(TRIAGE_MAX_BATCH_CONCURRENCY)
 
     async def run_batch(
         index: int,
-        batch_candidate_ids: list[str],
+        candidates: list[DiscoveryCandidateResult],
     ) -> tuple[int, list[dict]]:
         async with semaphore:
             batch_group_drafts = await _run_triage_batch_draft(
                 triage_root=triage_root,
-                triage_candidates=triage_candidates,
-                batch_candidate_ids=batch_candidate_ids,
+                batch_candidates=candidates,
                 batch={
                     "kind": "batch",
                     "index": index,
@@ -172,8 +189,8 @@ async def _run_batched_triage_passes(
 
     batch_results = await asyncio.gather(
         *(
-            run_batch(index, batch_candidate_ids)
-            for index, batch_candidate_ids in enumerate(batches, start=1)
+            run_batch(index, candidates)
+            for index, candidates in enumerate(batch_candidates, start=1)
         )
     )
     indexed_batch_results = dict(batch_results)
@@ -193,43 +210,24 @@ async def _run_batched_triage_passes(
                 }
             )
 
-    for pass_index in range(1, max(1, max_passes)):
-        edit_event_start = len(global_state.edit_events)
+    if max_passes > 1:
         await _run_repository_triage_agent_pass(
             triage_root=triage_root,
             pass_meta={"kind": "refinement"},
             workbench_state=global_state,
-            pass_index=pass_index,
+            pass_index=1,
             draft_origins=draft_origins,
         )
         pass_count += 1
-        if not _should_run_another_triage_pass(
-            workbench_state=global_state,
-            pass_index=pass_index,
-            max_passes=max_passes,
-            pass_edit_events=global_state.edit_events[edit_event_start:],
-        ):
-            break
     return global_state, pass_count
 
 
 async def _run_triage_batch_draft(
     *,
     triage_root: Path,
-    triage_candidates: list[DiscoveryCandidateResult],
-    batch_candidate_ids: list[str],
+    batch_candidates: list[DiscoveryCandidateResult],
     batch: dict,
 ) -> list[dict]:
-    requested_candidate_ids = {
-        str(candidate_id or "").strip()
-        for candidate_id in batch_candidate_ids
-        if str(candidate_id or "").strip()
-    }
-    batch_candidates = [
-        candidate
-        for candidate in triage_candidates
-        if candidate.candidate_id.strip() in requested_candidate_ids
-    ]
     batch_state = TriageWorkbenchState.from_candidates(batch_candidates)
     await _run_repository_triage_agent_pass(
         triage_root=triage_root,
@@ -285,6 +283,7 @@ def _should_run_another_triage_pass(
     max_passes: int,
     pass_edit_events: list[dict] | None = None,
 ) -> bool:
+    """Allow one quality check for an incomplete or bulk-created single-mode draft."""
     if pass_index + 1 >= max(1, max_passes):
         return False
     if pass_index > 0:
@@ -296,6 +295,7 @@ def _should_run_another_triage_pass(
         for event in (pass_edit_events or [])
         if isinstance(event, dict)
     ]
+    # Bulk creation alone is a draft-only signal, not evidence of a quality audit.
     return operations in (["create_groups"], ["delete_groups", "create_groups"])
 
 

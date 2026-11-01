@@ -10,17 +10,18 @@ from pydantic import BaseModel
 from sec_review_agents.agents.delivery_planning.workbench_state import (
     DeliveryWorkbenchState,
 )
-from sec_review_agents.delivery_stages.model import DeliveryCaseInput
+from sec_review_agents.delivery_stages.model import (
+    DeliveryCaseInput,
+    DeliveryPlanningCase,
+)
 from sec_review_agents.delivery_stages.planning.agent_passes import (
     _delivery_planning_pass_artifacts_path,
-    _planning_cases_for_batch,
     _planning_items,
     _run_delivery_planning_agent_pass,
     run_delivery_planning,
 )
 from sec_review_agents.delivery_stages.planning.batching import planning_case_id_batches
 from sec_review_agents.delivery_stages.planning.input import (
-    DeliveryPlanningCase,
     prepare_delivery_planning_patch_view,
 )
 from sec_review_agents.delivery_stages.planning.stage import (
@@ -298,26 +299,6 @@ class TestRepositoryScopeAndDeliveryPlanning:
             "not-scored"
         )
 
-    def test_delivery_planning_batch_cases_preserve_input_order(
-        self,
-    ) -> None:
-        planning_cases = [
-            DeliveryPlanningCase.model_validate(
-                {"overview": "", "changed_files": [], **item}
-            )
-            for item in [
-                {"case_id": "case-a", "changed_files": []},
-                {"case_id": "case-b", "changed_files": []},
-                {"case_id": "case-c", "changed_files": []},
-            ]
-        ]
-
-        subset = _planning_cases_for_batch(
-            planning_cases, ["case-c", "case-a", "missing"]
-        )
-
-        assert [item.case_id for item in subset] == ["case-a", "case-c"]
-
     def test_delivery_planning_items_use_generic_payload_shape(self) -> None:
         planning_cases = [
             DeliveryPlanningCase.model_validate(
@@ -444,12 +425,12 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 ).read_text(encoding="utf-8")
             )
 
-        assert result.metadata["planning_mode"] == "single"
+        assert result.metadata.planning_mode == "single"
         assert "agent_result" not in result.model_dump()
         assert "agent_results" not in result.model_dump()
-        assert result.metadata["planning_pass_count"] == 2
-        assert result.counts["input_case_count"] == 2
-        assert result.counts["delivery_count"] == 1
+        assert result.metadata.planning_pass_count == 2
+        assert result.counts.input_case_count == 2
+        assert result.counts.delivery_count == 1
         assert result.status == "completed"
         assert pass_metas == [None, {"kind": "refinement"}]
         assert archived_input == {
@@ -502,7 +483,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
             ):
                 result = await self._run_delivery_planning(input_data, planning_cases)
 
-        assert result.metadata["planning_mode"] == "batched"
+        assert result.metadata.planning_mode == "batched"
         assert "batch" in pass_kinds
         assert "refinement" in pass_kinds
         assert result.status == "completed"
@@ -658,8 +639,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
         assert pass_kinds.count("refinement") == 1
         assert len(refinement_seen_groups) == 2
         assert result.status == "completed"
-        assert result.metadata["planning_mode"] == "batched"
-        assert result.metadata["planning_pass_count"] == 3
+        assert result.metadata.planning_mode == "batched"
+        assert result.metadata.planning_pass_count == 3
         assert [item.case_ids for item in result.deliveries] == [
             ["case-a", "case-b"],
             ["case-c", "case-d"],

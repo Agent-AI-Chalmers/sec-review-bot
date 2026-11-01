@@ -2,10 +2,10 @@ from pathlib import Path
 
 import pytest
 
+from sec_review_agents.delivery_stages.model import DeliveryPlanningCase
 from sec_review_agents.delivery_stages.planning.agent_passes import (
     run_delivery_planning,
 )
-from sec_review_agents.delivery_stages.planning.input import DeliveryPlanningCase
 from tests.llm_probe import llm_probe
 
 pytestmark = [pytest.mark.integration, pytest.mark.llm]
