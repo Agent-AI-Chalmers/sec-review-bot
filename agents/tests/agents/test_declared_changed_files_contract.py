@@ -57,7 +57,6 @@ def test_declared_changed_files_preserve_repository_prefix() -> None:
         ({"path": "a.txt"}, "list_type"),
         (None, "list_type"),
         (["/workspace"], "value_error"),
-        (["workspace"], "value_error"),
         (["../escape.txt"], "value_error"),
         ([".git/config"], "value_error"),
     ],
@@ -84,3 +83,8 @@ def test_output_rejects_invalid_declared_files(
             }
         )
     assert any(item["type"] == error_type for item in error.value.errors())
+
+
+def test_declaration_preserves_file_named_workspace() -> None:
+    output = MitigationOutput(overview="repair", declared_changed_files=["workspace"])
+    assert output.declared_changed_files == ["workspace"]

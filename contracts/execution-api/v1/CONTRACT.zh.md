@@ -109,6 +109,8 @@ Issue / PR presentation 直接使用 `ReviewRecord`。Repository case presentati
 
 `ReviewRecord.mitigation.file_changes` 是补丁状态的权威来源。展示路径从 `file_changes[].path` 派生，不再存在独立的 `changed_files` 字段。`patch_diff` 是缓存的审查与定位产物，可以从基线文件树和 `file_changes` 重新生成；不能把它当成另一份最终文件内容来源。
 
+`file_changes` 的 upsert 使用 Git blob mode：`100644`（普通文件）、`100755`（可执行文件）或 `120000`（符号链接）。省略 mode 表示 `100644`。对于 `120000`，解码后的 `content` 保存链接目标的字节，而不是目标文件的内容；发布时不得解析目标。目标可以是相对路径、绝对路径或不存在的路径，条目自身的 path 仍须通过仓库路径校验。删除操作使用不带 mode 的 `status: "deleted"`，也适用于删除链接。切换 mode 会替换条目类型。在开始输出 `120000` 前，生产者和发布者必须一起升级；旧消费者可能拒绝新增的枚举值。 Worker 的文本 `patch_diff` 导出要求 diff 字节为 UTF-8，并明确拒绝非 UTF-8 diff；`file_changes` 支持 base64 并不意味着该导出限制已经消失。
+
 Execution Worker 根据内部 stage 输出生产这份投影。`ReviewRecord` builder 会有意只保留公开字段：未知内部字段会被丢弃，格式错误的可选 scalar 会变成 `null`，list 中格式错误的成员会被省略。这项降级策略只适用于生产可选报告细节；完整公开结果在跨越 Execution API 边界前仍必须通过完整 workflow result schema 校验。
 
 运行时异常不属于 `ReviewRecord`。Analyzer / mitigator / verifier / discovery / delivery synthesis 运行失败时，workflow run 应失败，并由 Execution API 返回结构化 execution error；不要在公开结果中发布 stage-level `status="error"`、`unavailable` 或其他兼容性错误投影。

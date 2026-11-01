@@ -562,25 +562,17 @@ class TestRepositoryDeliveryExecution:
             "alpha updated\n", encoding="utf-8"
         )
 
-        observed_git_diff_commands: list[list[str]] = []
-        original_run = subprocess.run
-
-        def record_git_diff(*args, **kwargs):
-            command = args[0] if args else kwargs.get("args")
-            if isinstance(command, list) and command[:2] == ["git", "diff"]:
-                observed_git_diff_commands.append(command)
-            return original_run(*args, **kwargs)
-
-        with patch(
-            "sec_review_agents.workspace.patches.subprocess.run", record_git_diff
-        ):
-            build_patch_artifact(
-                self.workspace_root,
-                include_paths=["src/app.txt"],
-            ).model_dump(mode="json")
-
-        assert observed_git_diff_commands
-        assert all("--no-color" in command for command in observed_git_diff_commands)
+        subprocess.run(
+            ["git", "config", "color.ui", "always"],
+            cwd=self.workspace_root,
+            check=True,
+            capture_output=True,
+        )
+        artifact = build_patch_artifact(
+            self.workspace_root, include_paths=["src/app.txt"]
+        )
+        assert "+alpha updated" in artifact.patch_diff
+        assert "\x1b[" not in artifact.patch_diff
 
     def test_build_patch_artifact_requires_git_workspace(self) -> None:
         self._write_workspace({"src/app.txt": "alpha\n"})

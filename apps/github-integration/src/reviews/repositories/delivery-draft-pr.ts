@@ -3,7 +3,7 @@ import crypto from 'node:crypto'
 import { buildDeliveryDraftPrTitle } from './delivery-title.js'
 import { buildDeliveryDraftPrBody } from './renderer.js'
 import type { Octokit } from 'octokit'
-import type { FileChange, FileMode, TextEncoding } from '../file-change.js'
+import type { FileChange, FileMode } from '../file-change.js'
 import { validateContractPublishableRepoRelativePath } from '../repo-path.js'
 import { sanitizeBranchSegment } from '../shared/branch-name.js'
 import type { RepositoryCaseResult, RepositoryDelivery } from './result.js'
@@ -85,25 +85,6 @@ function buildRepositorySecurityDeliveryCommitMessage(
   return `sec: ${normalizedTitle}`
 }
 
-function encodeGitFileContent(content_buffer: Buffer): {
-  content: string
-  encoding: TextEncoding
-} {
-  const isBinary = content_buffer.includes(0)
-
-  if (isBinary) {
-    return {
-      content: content_buffer.toString('base64'),
-      encoding: 'base64'
-    }
-  }
-
-  return {
-    content: content_buffer.toString('utf8'),
-    encoding: 'utf-8'
-  }
-}
-
 async function buildTreeElements(
   octokit: Octokit,
   delivery: RepositoryDelivery,
@@ -126,17 +107,12 @@ async function buildTreeElements(
       continue
     }
 
-    const content_buffer =
-      change.content_encoding === 'base64'
-        ? Buffer.from(change.content, 'base64')
-        : Buffer.from(change.content, 'utf8')
-    const blob = encodeGitFileContent(content_buffer)
     await assertPublicationClaim()
     const blobResponse = await octokit.rest.git.createBlob({
       owner: repo.owner_login,
       repo: repo.repo_name,
-      content: blob.content,
-      encoding: blob.encoding
+      content: change.content,
+      encoding: change.content_encoding
     })
     tree_elements.push({
       path: filePath,

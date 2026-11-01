@@ -13,7 +13,8 @@
     "review-record-deleted-file.json": "review-record.schema.json",
     "review-record-no-actionable.json": "review-record.schema.json",
     "review-record.json": "review-record.schema.json",
-    "issue-review-input-setup-declaration.json": "issue-review-input.schema.json"
+    "issue-review-input-setup-declaration.json": "issue-review-input.schema.json",
+    "review-record-symlink.json": "review-record.schema.json"
   },
   "invalid_schema_fixtures": {
     "invalid-input-bundle-manifest-extra-property.json": "input-bundle-manifest.schema.json",
@@ -33,7 +34,8 @@
     "invalid-repository-review-input-max-file-bytes.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-missing-previous-path.json": "repository-review-input.schema.json",
     "invalid-review-record-trailing-slash-path.json": "review-record.schema.json",
-    "invalid-issue-review-input-blank-setup-declaration.json": "issue-review-input.schema.json"
+    "invalid-issue-review-input-blank-setup-declaration.json": "issue-review-input.schema.json",
+    "invalid-review-record-file-mode.json": "review-record.schema.json"
   },
   "invalid_fixture_error_paths": {
     "invalid-input-bundle-manifest-extra-property.json": "<root>",
@@ -53,6 +55,7 @@
     "invalid-repository-review-input-extra-change-field.json": "scan_scope.incremental_changed_files.0",
     "invalid-repository-review-input-max-file-bytes.json": "scan_scope",
     "invalid-repository-review-input-missing-previous-path.json": "scan_scope.incremental_changed_files.0",
-    "invalid-review-record-trailing-slash-path.json": "mitigation.file_changes.0"
+    "invalid-review-record-trailing-slash-path.json": "mitigation.file_changes.0",
+    "invalid-review-record-file-mode.json": "mitigation.file_changes.0"
   }
 }

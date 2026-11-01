@@ -1,36 +1,29 @@
-def _normalize_repository_path(normalized: str, original: str | None) -> str:
-    """Shared tail: split, run escape checks, rejoin.
+import re
 
-    ``normalized`` is already slash-separated and prefix-stripped by the caller.
-    """
-    parts = [part for part in normalized.split("/") if part]
-    if any(part == ".." for part in parts):
-        raise ValueError(f"Workspace path must not escape the workspace: {original}")
-    if ".git" in parts:
-        raise ValueError(f"Workspace path must not target .git: {original}")
-    return "/".join(parts)
+
+def validate_repository_file_path(path: str) -> str:
+    """Validate an exact Git path without changing the file it identifies."""
+    parts = path.split("/")
+    if (
+        not path
+        or path != path.strip()
+        or path.startswith("/")
+        or re.match(r"^[A-Za-z]:", path)
+        or "\\" in path
+        or any(part in {"", ".", "..", ".git"} for part in parts)
+        or any(character in path for character in "\x00\r\n")
+    ):
+        raise ValueError(f"Unsupported repository file path: {path!r}")
+    return path
 
 
 def normalize_declared_file_path(file_path: str | None) -> str:
-    """Normalize an agent-declared repository-relative path.
+    """Accept the workspace mount prefix but never rewrite repository filenames.
 
-    Strips only the absolute ``/workspace`` mount prefix, because that spelling is
-    an unambiguous workspace-root reference (a repository-relative path never
-    starts with ``/``). The bare ``/workspace``/``workspace`` mount root is not a
-    repository file. A relative ``workspace/`` prefix is left intact: it may be a
-    real top-level ``workspace/`` directory, and guessing would silently retarget
-    the repair. Likewise ``a/``/``b/`` are real path segments, not git diff prefixes.
+    Public file paths exclude surrounding whitespace and backslashes. Reject
+    those spellings instead of silently selecting another file. Relative a/, b/,
+    and workspace/ prefixes can be real repository directories.
     """
-
-    raw_value = str(file_path or "").strip()
-    if not raw_value:
+    if not file_path or file_path == "/workspace":
         return ""
-
-    normalized = raw_value.replace("\\", "/")
-
-    if normalized in {"/workspace", "workspace"}:
-        return ""
-
-    normalized = normalized.removeprefix("/workspace/")
-
-    return _normalize_repository_path(normalized, file_path)
+    return validate_repository_file_path(file_path.removeprefix("/workspace/"))

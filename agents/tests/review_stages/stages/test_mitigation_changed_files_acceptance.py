@@ -1,6 +1,8 @@
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from sec_review_agents.agents.mitigation.model import MitigationOutput
 from sec_review_agents.runtime.changed_files_acceptance_middleware import (
     check_changed_files_acceptance,
@@ -255,3 +257,25 @@ def test_fresh_baseline_patch_check_rejects_unsafe_paths(tmp_path: Path) -> None
 
     assert isinstance(error, str)
     assert error != ""
+
+
+@pytest.mark.parametrize("target", ["../missing", "/absolute/missing"])
+def test_acceptance_allows_symbolic_link_patch(tmp_path: Path, target: str) -> None:
+    local_root = tmp_path / "local"
+    source = local_root / "workspace"
+    workspace = tmp_path / "writable"
+    _create_repo(source, {"file": "original"})
+    _copy_repo(source, workspace)
+    (workspace / "link").symlink_to(target)
+    result = check_changed_files_acceptance(
+        structured_response=MitigationOutput(
+            overview="add link", declared_changed_files=["link"]
+        ),
+        worktree_path=workspace,
+        baseline_snapshot_tar_path=_baseline_snapshot(
+            local_root, tmp_path / "artifacts"
+        ),
+        retry_attempts=0,
+        max_retries=1,
+    )
+    assert result.accepted, result.retry_prompt

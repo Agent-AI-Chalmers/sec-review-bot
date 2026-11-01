@@ -42,7 +42,7 @@ export type FileChange =
       status: 'upsert'
       content: string
       content_encoding: 'utf-8' | 'base64'
-      mode?: '100644' | '100755'
+      mode?: '100644' | '100755' | '120000'
     }
   | {
       path: string
