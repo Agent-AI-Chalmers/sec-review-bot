@@ -251,3 +251,30 @@ async def test_disabled_schedule_cleanup_propagates_other_rpc_errors(
         )
 
     assert captured.value is error
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure",
+    [
+        ValueError("invalid configuration"),
+        RPCError("unavailable", RPCStatusCode.UNAVAILABLE, b""),
+    ],
+)
+async def test_schedule_initialization_failure_propagates(monkeypatch, failure) -> None:
+    """Startup must not succeed with maintenance scheduling silently absent."""
+    monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "true")
+    monkeypatch.setattr(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        lambda: object(),
+    )
+    ensure = AsyncMock(side_effect=failure)
+    monkeypatch.setattr(
+        "sec_review_agents.entrypoints.memory_maintenance_worker.schedules.ensure_default_memory_maintenance_schedule",
+        ensure,
+    )
+    with pytest.raises(type(failure)) as captured:
+        await ensure_configured_memory_schedules(
+            _client(_FakeScheduleClient()), task_queue="memory-test"
+        )
+    assert captured.value is failure
