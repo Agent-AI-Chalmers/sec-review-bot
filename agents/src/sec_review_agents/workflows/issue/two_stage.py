@@ -46,9 +46,6 @@ async def mitigate_issue_self_check_activity(
         review_trajectories_root,
         review_trajectory_path,
     )
-    from sec_review_agents.runtime.setup_bootstrap import (
-        setup_declaration_content_for_backend,
-    )
     from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import required_path
     from sec_review_agents.workflows.issue.mitigation_self_check import (
@@ -105,9 +102,7 @@ async def mitigate_issue_self_check_activity(
             analysis_result=analysis_result,
             test_changes=review_intent.test_changes,
             runtime_context=request.runtime_context,
-            setup_declaration_content=setup_declaration_content_for_backend(
-                prepared_input.setup_declaration
-            ),
+            setup_declaration_content=prepared_input.setup_declaration,
         )
 
 

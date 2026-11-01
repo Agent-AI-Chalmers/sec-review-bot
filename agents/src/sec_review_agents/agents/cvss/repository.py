@@ -3,7 +3,7 @@ from typing import Any
 
 from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.filesystem.path_views import (
-    tmp_view_for_backend,
+    host_tmp_view,
     workspace_view,
 )
 from sec_review_agents.resources.loader import join_prompt_sections
@@ -49,7 +49,7 @@ def create_repository_cvss_backend(
         container_name_prefix="repository-cvss",
         path_views=[
             workspace_view(host_path=workspace_root_path, writable=True),
-            tmp_view_for_backend("local"),
+            host_tmp_view(),
         ],
         backend_kind="local",
     )

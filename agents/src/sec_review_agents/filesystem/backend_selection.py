@@ -12,8 +12,4 @@ def selected_sandbox_backend_kind() -> str:
     mode = (env_value("AGENT_SANDBOX_BACKEND") or "docker").strip().lower()
     if mode == "docker":
         return "docker"
-    if mode == "bwrap":
-        # Bubblewrap is Linux/WSL2-only, experimental, and host-policy-sensitive,
-        # so operators must opt into it explicitly.
-        return "bwrap"
-    raise ValueError("AGENT_SANDBOX_BACKEND must be one of: docker, bwrap")
+    raise ValueError("AGENT_SANDBOX_BACKEND must be docker")

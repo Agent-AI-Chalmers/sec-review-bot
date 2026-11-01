@@ -1,7 +1,6 @@
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, overload
 
 
 @dataclass(frozen=True)
@@ -86,7 +85,7 @@ def writable_memory_view(*, host_path: Path) -> PathView:
     )
 
 
-def _host_tmp_view() -> PathView:
+def host_tmp_view() -> PathView:
     """Expose the host temp directory as agent-visible `/tmp`."""
 
     return PathView(
@@ -94,42 +93,3 @@ def _host_tmp_view() -> PathView:
         agent_path="/tmp",
         writable=True,
     )
-
-
-def _container_tmp_view() -> PathView:
-    """Expose container-native `/tmp` without a host path source."""
-
-    return PathView(
-        host_path=None,
-        container_path="/tmp",
-        agent_path="/tmp",
-        writable=True,
-    )
-
-
-@overload
-def tmp_view_for_backend(backend_kind: Literal["docker", "local"]) -> PathView: ...
-
-
-@overload
-def tmp_view_for_backend(backend_kind: Literal["bwrap"]) -> None: ...
-
-
-@overload
-def tmp_view_for_backend(backend_kind: str) -> PathView | None: ...
-
-
-def tmp_view_for_backend(backend_kind: str) -> PathView | None:
-    """Return the `/tmp` path view appropriate for a backend kind."""
-
-    normalized_kind = backend_kind.strip().lower()
-    if normalized_kind == "docker":
-        return _container_tmp_view()
-    if normalized_kind == "local":
-        return _host_tmp_view()
-    if normalized_kind == "bwrap":
-        # bwrap commands already get a private tmpfs at /tmp. Do not expose host
-        # /tmp as a path view, and do not pretend the per-command tmpfs is a
-        # persistent filesystem backend route.
-        return None
-    raise ValueError("backend_kind must be one of: docker, local, bwrap")

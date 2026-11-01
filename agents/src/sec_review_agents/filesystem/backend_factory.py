@@ -5,10 +5,6 @@ from deepagents.backends import CompositeBackend, StateBackend
 from deepagents.backends.protocol import BackendProtocol
 
 from sec_review_agents.filesystem import backend_selection
-from sec_review_agents.filesystem.bwrap_backend import (
-    BwrapRoute,
-    BwrapSandboxBackend,
-)
 from sec_review_agents.filesystem.docker_backend import (
     DockerRoute,
     DockerSandboxBackend,
@@ -71,13 +67,8 @@ def create_backend_with_path_views(
             path_views=path_views,
             image=image,
         )
-    if backend_kind == "bwrap":
-        return _create_bwrap_backend(
-            working_directory=working_directory,
-            path_views=path_views,
-        )
     if backend_kind != "local":
-        raise ValueError("backend_kind must be one of: docker, local, bwrap")
+        raise ValueError("backend_kind must be one of: docker, local")
 
     routes: dict[str, BackendProtocol] = {}
     for view in path_views:
@@ -92,30 +83,6 @@ def create_backend_with_path_views(
     return CompositeBackend(
         default=StateBackend(),
         routes=routes,
-    )
-
-
-def _create_bwrap_backend(
-    *,
-    working_directory: str,
-    path_views: list[PathView],
-):
-    routes: list[BwrapRoute] = []
-    for view in path_views:
-        if view.host_path is None:
-            raise ValueError(
-                f"bwrap backend path view requires a host_path: {view.agent_path}"
-            )
-        routes.append(
-            BwrapRoute(
-                host_path=view.host_path,
-                agent_path=view.agent_path,
-                writable=view.writable,
-            )
-        )
-    return BwrapSandboxBackend(
-        routes=routes,
-        working_directory=working_directory,
     )
 
 
@@ -143,6 +110,8 @@ def _create_docker_backend(
     routes: list[DockerRoute] = []
 
     for view in path_views:
+        if posixpath.normpath(view.agent_path) == "/tmp" and view.host_path is not None:
+            raise ValueError("Docker /tmp must be container-native, not a host mount")
         if view.container_path is None:
             raise ValueError(
                 f"Docker backend path view requires a container_path: {view.agent_path}"

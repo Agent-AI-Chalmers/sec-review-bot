@@ -1,51 +1,27 @@
-"""Docker-backed sandbox implementation for agent-visible filesystem tools."""
-
-# Design notes for maintainers:
-#
-# This Docker backend intentionally implements DeepAgents' SandboxBackendProtocol
-# directly. The file operations below were derived from BaseSandbox's
-# container-side Python/shell approach and then made into this backend's own
-# contract: agent/container path mapping, readable/writable bounds, shared
-# filesystem resource budgets, and newline-tolerant edits.
-#
-# The important split is: Docker runtime owns container lifecycle and Docker CLI
-# primitives; this backend owns the agent-visible filesystem behavior inside
-# that container. Do not route `ls`, `read`, `grep`, `glob`, `write`, `edit`,
-# or their async counterparts through BaseSandbox unless you are also willing
-# to give up those local contracts.
-#
-# Maintenance risk: this file now carries a forked application-level copy of the
-# BaseSandbox file-operation idea, not a transparent upstream implementation.
-# When upgrading deepagents, compare their protocol result shapes and sandbox
-# transport assumptions, but keep our promises tested here: bounded traversal,
-# container paths mapped back to agent paths, explicit writable roots, and
-# newline-tolerant edits.
+"""Docker lifecycle and path policy around upstream file operations."""
 
 import asyncio
-import base64
-import json
 import logging
 import os
 import shlex
 import subprocess
-import uuid
 from dataclasses import dataclass
 from types import TracebackType
 from typing import Self
 
 from deepagents.backends.protocol import (
+    DeleteResult,
     EditResult,
     ExecuteResponse,
-    FileData,
     FileDownloadResponse,
     FileUploadResponse,
     GlobResult,
     GrepResult,
     LsResult,
     ReadResult,
-    SandboxBackendProtocol,
     WriteResult,
 )
+from deepagents.backends.sandbox import BaseSandbox
 
 from sec_review_agents.filesystem import docker_runtime
 from sec_review_agents.filesystem.command_output import text_output, truncate_output
@@ -57,27 +33,9 @@ from sec_review_agents.filesystem.docker_transfer_ops import (
     docker_transfer_error,
     docker_transfer_script,
 )
-from sec_review_agents.filesystem.limits import (
-    FilesystemLimits,
-    bounded_filesystem_error,
-    default_filesystem_limits,
-    effective_grep_max_matches,
-)
-from sec_review_agents.filesystem.result_parsing import (
-    file_infos_from_payload,
-    grep_matches_from_payload,
-    infer_file_operation_error,
-    int_value,
-    map_edit_error,
-    optional_int_value,
-)
-from sec_review_agents.filesystem.sandbox_file_ops import (
-    EDIT_INLINE_MAX_BYTES,
-    file_operation_script,
-)
+from sec_review_agents.filesystem.result_parsing import infer_file_operation_error
 from sec_review_agents.filesystem.unix_paths import (
     is_absolute_unix_path,
-    normalize_glob_pattern,
     normalize_unix_path,
     unix_path_has_prefix,
 )
@@ -105,13 +63,12 @@ def _is_root_docker_user(user: str | None) -> bool:
     return normalized in {"", "0", "0:0", "root", "root:root"}
 
 
-class DockerSandboxBackend(SandboxBackendProtocol):
+class DockerSandboxBackend(BaseSandbox):
     def __init__(
         self,
         *,
         container: DockerContainerResource,
         routes: list[DockerRoute],
-        limits: FilesystemLimits | None = None,
     ) -> None:
         self.container = container
         self._closed = False
@@ -130,25 +87,21 @@ class DockerSandboxBackend(SandboxBackendProtocol):
         self.mounts = container.mounts
         self.working_directory = container.working_directory
         self.environment = container.environment
-        self.limits = limits or default_filesystem_limits()
-        self.routes = routes
-        self.readable_prefixes = tuple(
-            sorted(
-                {normalize_unix_path(binding.container_path) for binding in self.routes}
+        # /tmp belongs to the container, not to repository material mounts.
+        # Upstream large edits upload temporary payloads here.
+        tmp_routes = [
+            route for route in routes if normalize_unix_path(route.agent_path) == "/tmp"
+        ]
+        if any(
+            normalize_unix_path(route.container_path) != "/tmp" or not route.writable
+            for route in tmp_routes
+        ):
+            raise ValueError("Docker /tmp must be a writable container-native path")
+        self.routes = list(routes)
+        if not tmp_routes:
+            self.routes.append(
+                DockerRoute(container_path="/tmp", agent_path="/tmp", writable=True)
             )
-        )
-        self.writable_prefixes = tuple(
-            sorted(
-                {
-                    normalize_unix_path(binding.container_path)
-                    for binding in self.routes
-                    if binding.writable
-                }
-            )
-        )
-        self.edit_temp_root = (
-            self.writable_prefixes[0] if self.writable_prefixes else None
-        )
 
     def _should_normalize_ownership(self) -> bool:
         """Return whether writable mount ownership should be normalized on close."""
@@ -316,7 +269,7 @@ class DockerSandboxBackend(SandboxBackendProtocol):
             )
             return self._timeout_response(error, timeout_desc)
         output, truncated = truncate_output(
-            combine_command_output(result.stdout, result.stderr),
+            combine_command_output(result.stdout, result.stderr) or "<no output>",
             self.max_output_bytes,
         )
         return ExecuteResponse(
@@ -354,7 +307,7 @@ class DockerSandboxBackend(SandboxBackendProtocol):
             )
             return self._timeout_response(error, timeout_desc)
         output, truncated = truncate_output(
-            combine_command_output(result.stdout, result.stderr),
+            combine_command_output(result.stdout, result.stderr) or "<no output>",
             self.max_output_bytes,
         )
         return ExecuteResponse(
@@ -386,10 +339,9 @@ class DockerSandboxBackend(SandboxBackendProtocol):
         if not is_absolute_unix_path(path):
             return False
 
-        normalized = self._to_container_path(path)
-
-        prefixes = self.writable_prefixes if writable else self.readable_prefixes
-        return any(unix_path_has_prefix(normalized, prefix) for prefix in prefixes)
+        # Authorize the most specific agent route before mapping it. A writable
+        # container parent (such as /tmp) must not override a read-only route.
+        return self._transfer_route(path, require_writable=writable) is not None
 
     def sandbox_path_for_agent_path(
         self,
@@ -465,80 +417,6 @@ class DockerSandboxBackend(SandboxBackendProtocol):
             )
         return normalized
 
-    def _limits_payload(
-        self, *, grep_max_count: int | None = None
-    ) -> dict[str, object]:
-        return {
-            "glob_max_results": self.limits.glob_max_results,
-            "glob_max_seconds": self.limits.glob_max_seconds,
-            "glob_max_visited": self.limits.glob_max_visited,
-            "grep_max_matches": effective_grep_max_matches(
-                self.limits,
-                grep_max_count,
-            ),
-            "grep_max_seconds": self.limits.grep_max_seconds,
-            "grep_max_files": self.limits.grep_max_files,
-            "ls_max_entries": self.limits.ls_max_entries,
-            "read_max_bytes": self.limits.read_max_bytes,
-            "read_max_scan_bytes": self.limits.read_max_scan_bytes,
-            "ignored_dirs": sorted(self.limits.ignored_dirs),
-        }
-
-    def _run_file_operation(self, payload: dict[str, object]) -> dict[str, object]:
-        script = file_operation_script(payload)
-        result = self.execute(f"python3 -c {shlex.quote(script)}")
-        return self._parse_file_operation_output(result.output)
-
-    async def _arun_file_operation(
-        self,
-        payload: dict[str, object],
-    ) -> dict[str, object]:
-        script = file_operation_script(payload)
-        result = await self.aexecute(f"python3 -c {shlex.quote(script)}")
-        return self._parse_file_operation_output(result.output)
-
-    def _parse_file_operation_output(self, output: str) -> dict[str, object]:
-        output = output.rstrip()
-        try:
-            data = json.loads(output)
-        except json.JSONDecodeError, ValueError:
-            detail = output[:200] if output else "(empty)"
-            return {"error": f"unexpected server response: {detail}"}
-        if not isinstance(data, dict):
-            detail = output[:200] if output else "(empty)"
-            return {"error": f"unexpected server response: {detail}"}
-        return data
-
-    def _bounded_stop_error(
-        self,
-        operation: str,
-        stop_reason: object,
-        *,
-        grep_max_count: int | None = None,
-    ) -> str | None:
-        if stop_reason is None:
-            return None
-        effective_grep_limit = effective_grep_max_matches(
-            self.limits,
-            grep_max_count,
-        )
-        reasons = {
-            "entry_limit": f"entry limit {self.limits.ls_max_entries} reached",
-            "result_limit": f"result limit {self.limits.glob_max_results} reached",
-            "visited_limit": f"visited file limit {self.limits.glob_max_visited} reached",
-            "time_limit": (
-                f"time limit {self.limits.glob_max_seconds:g}s reached"
-                if operation == "glob"
-                else f"time limit {self.limits.grep_max_seconds:g}s reached"
-            ),
-            "file_limit": f"file limit {self.limits.grep_max_files} reached",
-            "match_limit": f"match limit {effective_grep_limit} reached",
-        }
-        return bounded_filesystem_error(
-            operation,
-            reasons.get(str(stop_reason), str(stop_reason)),
-        )
-
     def _path_access_error(self, path: str, *, writable: bool = False) -> str:
         normalized = (
             self._to_container_path(path) if is_absolute_unix_path(path) else str(path)
@@ -549,139 +427,50 @@ class DockerSandboxBackend(SandboxBackendProtocol):
     def ls(self, path: str) -> LsResult:
         if not self._is_allowed_path(path):
             return LsResult(error=self._path_access_error(path))
-        data = self._run_file_operation(
-            {
-                "op": "ls",
-                "path": self._to_container_path(path),
-                "limits": self._limits_payload(),
-            }
-        )
-        entries = file_infos_from_payload(data.get("entries"))
-        for entry in entries:
-            entry["path"] = self._to_agent_path(entry["path"])
-        error = data.get("error")
-        return LsResult(
-            error=(
-                self._bounded_stop_error("ls", error)
-                if error == "entry_limit"
-                else str(error) if error else None
-            ),
-            entries=entries,
-        )
+        result = super().ls(self._to_container_path(path))
+        for item in result.entries or []:
+            item["path"] = self._to_agent_path(item["path"])
+        return result
 
     async def als(self, path: str) -> LsResult:
         if not self._is_allowed_path(path):
             return LsResult(error=self._path_access_error(path))
-        data = await self._arun_file_operation(
-            {
-                "op": "ls",
-                "path": self._to_container_path(path),
-                "limits": self._limits_payload(),
-            }
-        )
-        entries = file_infos_from_payload(data.get("entries"))
-        for entry in entries:
-            entry["path"] = self._to_agent_path(entry["path"])
-        error = data.get("error")
-        return LsResult(
-            error=(
-                self._bounded_stop_error("ls", error)
-                if error == "entry_limit"
-                else str(error) if error else None
-            ),
-            entries=entries,
-        )
+        result = await super().als(self._to_container_path(path))
+        for item in result.entries or []:
+            item["path"] = self._to_agent_path(item["path"])
+        return result
 
-    def read(
-        self,
-        file_path: str,
-        offset: int = 0,
-        limit: int = 2000,
-    ) -> ReadResult:
+    def read(self, file_path: str, offset: int = 0, limit: int = 2000) -> ReadResult:
         if not self._is_allowed_path(file_path):
             return ReadResult(error=self._path_access_error(file_path))
-        container_path = self._to_container_path(file_path)
-        data = self._run_file_operation(
-            {
-                "op": "read",
-                "path": container_path,
-                "offset": offset,
-                "limit": limit,
-                "limits": self._limits_payload(),
-            }
-        )
-        return self._read_result(file_path, offset, data)
-
-    def _read_result(
-        self,
-        file_path: str,
-        offset: int,
-        data: dict[str, object],
-    ) -> ReadResult:
-        error = data.get("error")
-        if error == "file_not_found":
-            return ReadResult(error=f"File '{file_path}' not found")
-        if error == "offset_exceeds_length":
-            return ReadResult(
-                error=(
-                    f"Line offset {offset} exceeds file length "
-                    f"({data.get('line_count', 0)} lines)"
-                )
-            )
-        if error == "read_max_bytes":
-            return ReadResult(
-                error=bounded_filesystem_error(
-                    "read_file",
-                    (
-                        f"file size {data.get('size')} bytes exceeds limit "
-                        f"{self.limits.read_max_bytes} bytes"
-                    ),
-                )
-            )
-        if error == "read_max_scan_bytes":
-            return ReadResult(
-                error=bounded_filesystem_error(
-                    "read_file",
-                    (
-                        f"scan limit {self.limits.read_max_scan_bytes} bytes "
-                        "reached before requested window"
-                    ),
-                )
-            )
-        if error:
-            return ReadResult(error=f"Error reading file '{file_path}': {error}")
-        file_data: FileData = {
-            "content": str(data.get("content", "")),
-            "encoding": str(data.get("encoding", "utf-8")),
-        }
-        return ReadResult(
-            file_data=file_data,
-            total_lines=optional_int_value(data.get("total_lines")),
-            start_line=optional_int_value(data.get("start_line")),
-            end_line=optional_int_value(data.get("end_line")),
-            next_offset=optional_int_value(data.get("next_offset")),
-            no_lines_requested=data.get("no_lines_requested") is True,
-        )
+        result = super().read(self._to_container_path(file_path), offset, limit)
+        return result
 
     async def aread(
-        self,
-        file_path: str,
-        offset: int = 0,
-        limit: int = 2000,
+        self, file_path: str, offset: int = 0, limit: int = 2000
     ) -> ReadResult:
         if not self._is_allowed_path(file_path):
             return ReadResult(error=self._path_access_error(file_path))
-        container_path = self._to_container_path(file_path)
-        data = await self._arun_file_operation(
-            {
-                "op": "read",
-                "path": container_path,
-                "offset": offset,
-                "limit": limit,
-                "limits": self._limits_payload(),
-            }
-        )
-        return self._read_result(file_path, offset, data)
+        result = await super().aread(self._to_container_path(file_path), offset, limit)
+        return result
+
+    def glob(self, pattern: str, path: str | None = None) -> GlobResult:
+        path = path or self.working_directory
+        if not self._is_allowed_path(path):
+            return GlobResult(error=self._path_access_error(path))
+        result = super().glob(pattern, self._to_container_path(path))
+        for item in result.matches or []:
+            item["path"] = self._to_agent_path(item["path"])
+        return result
+
+    async def aglob(self, pattern: str, path: str | None = None) -> GlobResult:
+        path = path or self.working_directory
+        if not self._is_allowed_path(path):
+            return GlobResult(error=self._path_access_error(path))
+        result = await super().aglob(pattern, self._to_container_path(path))
+        for item in result.matches or []:
+            item["path"] = self._to_agent_path(item["path"])
+        return result
 
     def grep(
         self,
@@ -691,47 +480,15 @@ class DockerSandboxBackend(SandboxBackendProtocol):
         *,
         max_count: int | None = None,
     ) -> GrepResult:
-        search_path = path or self.working_directory
-        if not self._is_allowed_path(search_path):
-            return GrepResult(error=self._path_access_error(search_path))
-        data = self._run_file_operation(
-            {
-                "op": "grep",
-                "path": self._to_container_path(search_path),
-                "pattern": pattern,
-                "glob": normalize_glob_pattern(glob or "**/*"),
-                "limits": self._limits_payload(grep_max_count=max_count),
-            }
+        path = path or self.working_directory
+        if not self._is_allowed_path(path):
+            return GrepResult(error=self._path_access_error(path))
+        result = super().grep(
+            pattern, self._to_container_path(path), glob, max_count=max_count
         )
-        return self._grep_result(pattern_path=path, data=data, max_count=max_count)
-
-    def _grep_result(
-        self,
-        *,
-        pattern_path: str | None,
-        data: dict[str, object],
-        max_count: int | None = None,
-    ) -> GrepResult:
-        error = data.get("error")
-        if error:
-            return GrepResult(
-                error=f"Error grepping path '{pattern_path}': {error}", matches=[]
-            )
-        return GrepResult(
-            error=self._bounded_stop_error(
-                "grep",
-                data.get("stop_reason"),
-                grep_max_count=max_count,
-            ),
-            matches=[
-                {
-                    **match,
-                    "path": self._to_agent_path(match["path"]),
-                }
-                for match in grep_matches_from_payload(data.get("matches"))
-            ],
-            truncated=data.get("stop_reason") is not None,
-        )
+        for item in result.matches or []:
+            item["path"] = self._to_agent_path(item["path"])
+        return result
 
     async def agrep(
         self,
@@ -741,143 +498,23 @@ class DockerSandboxBackend(SandboxBackendProtocol):
         *,
         max_count: int | None = None,
     ) -> GrepResult:
-        search_path = path or self.working_directory
-        if not self._is_allowed_path(search_path):
-            return GrepResult(error=self._path_access_error(search_path))
-        data = await self._arun_file_operation(
-            {
-                "op": "grep",
-                "path": self._to_container_path(search_path),
-                "pattern": pattern,
-                "glob": normalize_glob_pattern(glob or "**/*"),
-                "limits": self._limits_payload(grep_max_count=max_count),
-            }
+        path = path or self.working_directory
+        if not self._is_allowed_path(path):
+            return GrepResult(error=self._path_access_error(path))
+        result = await super().agrep(
+            pattern, self._to_container_path(path), glob, max_count=max_count
         )
-        return self._grep_result(pattern_path=path, data=data, max_count=max_count)
+        for item in result.matches or []:
+            item["path"] = self._to_agent_path(item["path"])
+        return result
 
-    def glob(self, pattern: str, path: str | None = "/") -> GlobResult:
-        search_path = path or "/"
-        if not self._is_allowed_path(search_path):
-            return GlobResult(error=self._path_access_error(search_path))
-        data = self._run_file_operation(
-            {
-                "op": "glob",
-                "path": self._to_container_path(search_path),
-                "pattern": normalize_glob_pattern(pattern),
-                "limits": self._limits_payload(),
-            }
-        )
-        return self._glob_result(search_path, data)
-
-    def _glob_result(
-        self,
-        search_path: str,
-        data: dict[str, object],
-    ) -> GlobResult:
-        error = data.get("error")
-        if error:
-            return GlobResult(
-                error=f"Error globbing path '{search_path}': {error}", matches=[]
-            )
-        return GlobResult(
-            matches=[
-                {
-                    **match,
-                    "path": self._to_agent_path(match["path"]),
-                }
-                for match in file_infos_from_payload(data.get("matches"))
-            ],
-            truncated=data.get("stop_reason") is not None,
-            truncation_reason=(
-                "budget" if data.get("stop_reason") is not None else None
-            ),
-        )
-
-    async def aglob(self, pattern: str, path: str | None = "/") -> GlobResult:
-        search_path = path or "/"
-        if not self._is_allowed_path(search_path):
-            return GlobResult(error=self._path_access_error(search_path))
-        data = await self._arun_file_operation(
-            {
-                "op": "glob",
-                "path": self._to_container_path(search_path),
-                "pattern": normalize_glob_pattern(pattern),
-                "limits": self._limits_payload(),
-            }
-        )
-        return self._glob_result(search_path, data)
-
-    def write(
-        self,
-        file_path: str,
-        content: str,
-    ) -> WriteResult:
+    def write(self, file_path: str, content: str) -> WriteResult:
         if not self._is_allowed_path(file_path, writable=True):
             return WriteResult(error=self._path_access_error(file_path, writable=True))
-        container_path = self._to_container_path(file_path)
-        data = self._run_file_operation(
-            {
-                "op": "write_check",
-                "path": container_path,
-                "limits": self._limits_payload(),
-            }
-        )
-        error = data.get("error")
-        if error == "file_exists":
-            return WriteResult(error=f"Error: File already exists: {container_path!r}")
-        if error:
-            return WriteResult(
-                error=f"Failed to write file '{container_path}': {error}"
-            )
-
-        responses = self.upload_files([(file_path, content.encode("utf-8"))])
-        if not responses:
-            raise AssertionError(
-                f"Responses was expected to return 1 result, but it returned {len(responses)}"
-            )
-        response = responses[0]
-        result = (
-            WriteResult(
-                error=f"Failed to write file '{container_path}': {response.error}"
-            )
-            if response.error
-            else WriteResult(path=file_path)
-        )
-        return result
+        return super().write(file_path, content)
 
     async def awrite(self, file_path: str, content: str) -> WriteResult:
-        if not self._is_allowed_path(file_path, writable=True):
-            return WriteResult(error=self._path_access_error(file_path, writable=True))
-        container_path = self._to_container_path(file_path)
-        data = await self._arun_file_operation(
-            {
-                "op": "write_check",
-                "path": container_path,
-                "limits": self._limits_payload(),
-            }
-        )
-        error = data.get("error")
-        if error == "file_exists":
-            return WriteResult(error=f"Error: File already exists: {container_path!r}")
-        if error:
-            return WriteResult(
-                error=f"Failed to write file '{container_path}': {error}"
-            )
-
-        responses = await self.aupload_files([(file_path, content.encode("utf-8"))])
-        if not responses:
-            raise AssertionError(
-                f"Responses was expected to return 1 result, but it returned {len(responses)}"
-            )
-        response = responses[0]
-        result = (
-            WriteResult(
-                error=f"Failed to write file '{container_path}': {response.error}"
-            )
-            if response.error
-            else WriteResult(path=file_path)
-        )
-        return result
+        return await asyncio.to_thread(self.write, file_path, content)
 
     def edit(
         self,
@@ -888,32 +525,7 @@ class DockerSandboxBackend(SandboxBackendProtocol):
     ) -> EditResult:
         if not self._is_allowed_path(file_path, writable=True):
             return EditResult(error=self._path_access_error(file_path, writable=True))
-        normalized_path = self._to_container_path(file_path)
-        payload_size = len(old_string.encode("utf-8")) + len(new_string.encode("utf-8"))
-
-        if payload_size <= EDIT_INLINE_MAX_BYTES:
-            result = self._edit_inline_newline_tolerant(
-                normalized_path,
-                old_string,
-                new_string,
-                replace_all,
-                result_path=file_path,
-            )
-            return result
-
-        if self.edit_temp_root is None:
-            return EditResult(
-                error=f"Error editing file '{normalized_path}': no writable mount available for temp files"
-            )
-
-        result = self._edit_via_allowed_upload(
-            normalized_path,
-            old_string,
-            new_string,
-            replace_all,
-            result_path=file_path,
-        )
-        return result
+        return super().edit(file_path, old_string, new_string, replace_all)
 
     async def aedit(
         self,
@@ -922,216 +534,40 @@ class DockerSandboxBackend(SandboxBackendProtocol):
         new_string: str,
         replace_all: bool = False,
     ) -> EditResult:
-        if not self._is_allowed_path(file_path, writable=True):
-            return EditResult(error=self._path_access_error(file_path, writable=True))
-        normalized_path = self._to_container_path(file_path)
-        payload_size = len(old_string.encode("utf-8")) + len(new_string.encode("utf-8"))
-
-        if payload_size <= EDIT_INLINE_MAX_BYTES:
-            result = await self._aedit_inline_newline_tolerant(
-                normalized_path,
-                old_string,
-                new_string,
-                replace_all,
-                result_path=file_path,
-            )
-            return result
-
-        if self.edit_temp_root is None:
-            return EditResult(
-                error=f"Error editing file '{normalized_path}': no writable mount available for temp files"
-            )
-
-        result = await self._aedit_via_allowed_upload(
-            normalized_path,
-            old_string,
-            new_string,
-            replace_all,
-            result_path=file_path,
+        return await asyncio.to_thread(
+            self.edit, file_path, old_string, new_string, replace_all
         )
+
+    def delete(self, file_path: str) -> DeleteResult:
+        if not self._is_allowed_path(file_path, writable=True):
+            return DeleteResult(error=self._path_access_error(file_path, writable=True))
+        result = super().delete(self._to_container_path(file_path))
+        if result.path is not None:
+            result.path = file_path
         return result
 
-    def _edit_inline_newline_tolerant(
-        self,
-        file_path: str,
-        old_string: str,
-        new_string: str,
-        replace_all: bool,
-        *,
-        result_path: str,
+    def _write_preflight(self, file_path: str) -> WriteResult | None:
+        return super()._write_preflight(self._to_container_path(file_path))
+
+    def _edit_inline(
+        self, file_path: str, old_string: str, new_string: str, replace_all: bool
     ) -> EditResult:
-        data = self._run_file_operation(
-            {
-                "op": "edit",
-                "path": file_path,
-                "old": old_string,
-                "new": new_string,
-                "replace_all": replace_all,
-                "limits": self._limits_payload(),
-            }
+        result = super()._edit_inline(
+            self._to_container_path(file_path), old_string, new_string, replace_all
         )
-        if "error" in data:
-            return map_edit_error(str(data["error"]), result_path, old_string)
-        return EditResult(
-            path=result_path,
-            occurrences=int_value(data.get("count"), 1),
-        )
+        if result.path is not None:
+            result.path = file_path
+        return result
 
-    async def _aedit_inline_newline_tolerant(
-        self,
-        file_path: str,
-        old_string: str,
-        new_string: str,
-        replace_all: bool,
-        *,
-        result_path: str,
+    def _edit_via_upload(
+        self, file_path: str, old_string: str, new_string: str, replace_all: bool
     ) -> EditResult:
-        data = await self._arun_file_operation(
-            {
-                "op": "edit",
-                "path": file_path,
-                "old": old_string,
-                "new": new_string,
-                "replace_all": replace_all,
-                "limits": self._limits_payload(),
-            }
+        result = super()._edit_via_upload(
+            self._to_container_path(file_path), old_string, new_string, replace_all
         )
-        if "error" in data:
-            return map_edit_error(str(data["error"]), result_path, old_string)
-        return EditResult(
-            path=result_path,
-            occurrences=int_value(data.get("count"), 1),
-        )
-
-    def _edit_via_allowed_upload(
-        self,
-        file_path: str,
-        old_string: str,
-        new_string: str,
-        replace_all: bool,
-        *,
-        result_path: str | None = None,
-    ) -> EditResult:
-        uid = base64.b32encode(uuid.uuid4().bytes).decode("ascii").lower().rstrip("=")
-        old_tmp = f"{self.edit_temp_root}/.deepagents_edit_{uid}_old"
-        new_tmp = f"{self.edit_temp_root}/.deepagents_edit_{uid}_new"
-
-        responses = self.upload_files(
-            [
-                (old_tmp, old_string.encode("utf-8")),
-                (new_tmp, new_string.encode("utf-8")),
-            ]
-        )
-        if len(responses) < 2:
-            self._cleanup_edit_temp_files(old_tmp, new_tmp)
-            return EditResult(
-                error=f"Error editing file '{file_path}': upload returned no response"
-            )
-        for response in responses:
-            if response.error:
-                self._cleanup_edit_temp_files(old_tmp, new_tmp)
-                return EditResult(
-                    error=f"Error editing file '{file_path}': {response.error}"
-                )
-
-        data = self._run_file_operation(
-            {
-                "op": "edit",
-                "path": file_path,
-                "old_path": old_tmp,
-                "new_path": new_tmp,
-                "replace_all": replace_all,
-                "limits": self._limits_payload(),
-            }
-        )
-        try:
-            if "error" in data:
-                return map_edit_error(
-                    str(data["error"]),
-                    result_path or file_path,
-                    old_string,
-                )
-            return EditResult(
-                path=result_path or file_path,
-                occurrences=int_value(data.get("count"), 1),
-            )
-        finally:
-            self._cleanup_edit_temp_files(old_tmp, new_tmp)
-
-    async def _aedit_via_allowed_upload(
-        self,
-        file_path: str,
-        old_string: str,
-        new_string: str,
-        replace_all: bool,
-        *,
-        result_path: str | None = None,
-    ) -> EditResult:
-        uid = base64.b32encode(uuid.uuid4().bytes).decode("ascii").lower().rstrip("=")
-        old_tmp = f"{self.edit_temp_root}/.deepagents_edit_{uid}_old"
-        new_tmp = f"{self.edit_temp_root}/.deepagents_edit_{uid}_new"
-
-        responses = await self.aupload_files(
-            [
-                (old_tmp, old_string.encode("utf-8")),
-                (new_tmp, new_string.encode("utf-8")),
-            ]
-        )
-        if len(responses) < 2:
-            await self._acleanup_edit_temp_files(old_tmp, new_tmp)
-            return EditResult(
-                error=f"Error editing file '{file_path}': upload returned no response"
-            )
-        for response in responses:
-            if response.error:
-                await self._acleanup_edit_temp_files(old_tmp, new_tmp)
-                return EditResult(
-                    error=f"Error editing file '{file_path}': {response.error}"
-                )
-
-        data = await self._arun_file_operation(
-            {
-                "op": "edit",
-                "path": file_path,
-                "old_path": old_tmp,
-                "new_path": new_tmp,
-                "replace_all": replace_all,
-                "limits": self._limits_payload(),
-            }
-        )
-        try:
-            if "error" in data:
-                return map_edit_error(
-                    str(data["error"]),
-                    result_path or file_path,
-                    old_string,
-                )
-            return EditResult(
-                path=result_path or file_path,
-                occurrences=int_value(data.get("count"), 1),
-            )
-        finally:
-            await self._acleanup_edit_temp_files(old_tmp, new_tmp)
-
-    def _cleanup_edit_temp_files(self, *paths: str) -> None:
-        """Remove staged large-edit payloads from the container best-effort."""
-        quoted_paths = " ".join(shlex.quote(path) for path in paths)
-        if not quoted_paths:
-            return
-        try:
-            self.execute(f"rm -f {quoted_paths}")
-        except Exception:
-            pass
-
-    async def _acleanup_edit_temp_files(self, *paths: str) -> None:
-        """Remove staged large-edit payloads from the container best-effort."""
-        quoted_paths = " ".join(shlex.quote(path) for path in paths)
-        if not quoted_paths:
-            return
-        try:
-            await self.aexecute(f"rm -f {quoted_paths}")
-        except Exception:
-            pass
+        if result.path is not None:
+            result.path = file_path
+        return result
 
     def upload_files(self, files: list[tuple[str, bytes]]) -> list[FileUploadResponse]:
         responses: list[FileUploadResponse] = []
@@ -1180,7 +616,7 @@ class DockerSandboxBackend(SandboxBackendProtocol):
                 responses.append(
                     FileUploadResponse(
                         path=target_path,
-                        error=infer_file_operation_error(str(error)),
+                        error=infer_file_operation_error(error),
                     )
                 )
 
@@ -1251,7 +687,7 @@ class DockerSandboxBackend(SandboxBackendProtocol):
                     FileDownloadResponse(
                         path=requested_path,
                         content=None,
-                        error=infer_file_operation_error(str(error)),
+                        error=infer_file_operation_error(error),
                     )
                 )
 

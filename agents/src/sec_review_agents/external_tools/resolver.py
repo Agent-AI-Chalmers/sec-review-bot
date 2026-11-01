@@ -25,17 +25,8 @@ def external_tool_prompt_paths_for(
     if unknown:
         raise ValueError("Unknown agent external tool(s): " + ", ".join(unknown))
     selected = set(configured_external_tools()).intersection(declared)
-    backend_kind = selected_sandbox_backend_kind() if selected else None
-    if selected and backend_kind == "local":
-        raise ValueError(
-            "External CLI tools require an execution-capable sandbox backend; "
-            "AGENT_SANDBOX_BACKEND resolved to local"
-        )
-    if "playwright" in selected and backend_kind == "bwrap":
-        raise ValueError(
-            "Playwright CLI requires the persistent Docker sandbox; "
-            "the bwrap backend creates a new namespace for each command"
-        )
+    if selected:
+        selected_sandbox_backend_kind()
     return tuple(
         path
         for name, (_, path) in EXTERNAL_TOOL_PROMPT_PATHS.items()

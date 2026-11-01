@@ -32,10 +32,6 @@ def playwright_mcp_connections_for_backend(
 ) -> dict[str, dict[str, Any]]:
     # Playwright is intentionally Docker-only. The browser and MCP server must
     # share the stage's long-lived sandbox with services started during setup.
-    # Bwrap creates a fresh, short-lived PID/network namespace for each command,
-    # so a setup service cannot survive into the later MCP invocation. This is
-    # different from CodeGraph, whose index persists through the mounted
-    # workspace and can be reopened by a separate bwrap invocation.
     if not isinstance(backend, DockerSandboxBackend):
         log_diagnostic("playwright_mcp_skipped", reason="unsupported_backend")
         return {}

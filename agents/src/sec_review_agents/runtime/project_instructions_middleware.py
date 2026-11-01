@@ -12,6 +12,7 @@ from collections.abc import Awaitable, Callable
 from typing import Annotated, Any, NotRequired
 
 from deepagents.backends.protocol import BackendProtocol, ReadResult
+from deepagents.backends.utils import EMPTY_CONTENT_WARNING
 from langchain.agents.middleware import AgentMiddleware, AgentState
 from langchain.agents.middleware.types import (
     ModelRequest,
@@ -57,6 +58,9 @@ class ProjectInstructionsMiddleware(AgentMiddleware[ProjectInstructionsState]):
         if result.file_data["encoding"] != "utf-8":
             return self._unavailable("the file is not UTF-8 text")
         content = result.file_data["content"]
+        # Upstream represents empty files as a tool-facing reminder, not guidance.
+        if content == EMPTY_CONTENT_WARNING:
+            return ""
         # A truncated file could omit qualifications that change earlier instructions.
         if (
             result.next_offset is not None

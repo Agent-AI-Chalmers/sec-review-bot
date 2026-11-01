@@ -44,9 +44,6 @@ from sec_review_agents.entrypoints.setup_declaration import (
     is_blank_setup_declaration,
     parse_setup_declaration,
 )
-from sec_review_agents.filesystem.backend_selection import (
-    selected_sandbox_backend_kind,
-)
 from sec_review_agents.observability.diagnostics import log_diagnostic
 from sec_review_agents.utils.files import persist_json_artifact
 
@@ -85,26 +82,6 @@ class BootstrapResult:
     status: BootstrapStatus
     reason: str | None = None
     steps: tuple[BootstrapStepResult, ...] = ()
-
-
-def setup_declaration_content_for_backend(
-    setup_declaration: str | None,
-) -> str | None:
-    """Resolve the setup declaration text for the active backend.
-
-    Only the docker backend surfaces a declaration. A docker container is built
-    from an image and persists for the lifetime of the run, so the runtime and
-    dependency tree it bootstraps stay self-consistent and the one bootstrap can
-    be reused afterward. bwrap and local reuse the host environment instead of
-    supplying their own: bwrap clears the worker environment, isolates the
-    network by default, and runs on host tooling, so an install there has no
-    self-contained dependency tree to land in. They are not unsupported; they
-    have no declaration to run. Filtering here rather than branching inside the
-    bootstrap keeps that decision at the backend-to-declaration boundary.
-    """
-    if selected_sandbox_backend_kind() != "docker":
-        return None
-    return setup_declaration
 
 
 def flatten_step_command(step: SetupDeclarationStep) -> str:
@@ -252,5 +229,4 @@ __all__ = [
     "bootstrap_environment",
     "flatten_step_command",
     "record_bootstrap_result",
-    "setup_declaration_content_for_backend",
 ]

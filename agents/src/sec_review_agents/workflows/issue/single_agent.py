@@ -89,9 +89,6 @@ async def run_issue_single_agent_activity(
     request: ReviewWorkflowRequest,
 ) -> SingleAgentFixOutcome:
     from sec_review_agents.observability.trace_context import bind_trace_context
-    from sec_review_agents.runtime.setup_bootstrap import (
-        setup_declaration_content_for_backend,
-    )
     from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import required_path
 
@@ -126,9 +123,7 @@ async def run_issue_single_agent_activity(
             review_objective=review_intent.objective,
             test_changes=review_intent.test_changes,
             runtime_context=request.runtime_context,
-            setup_declaration_content=setup_declaration_content_for_backend(
-                prepared_input.setup_declaration
-            ),
+            setup_declaration_content=prepared_input.setup_declaration,
         )
 
 

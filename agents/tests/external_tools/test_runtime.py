@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import pytest
 
 from sec_review_agents.external_tools import (
@@ -63,41 +61,8 @@ def test_external_tool_selection_rejects_unknown_agent_declaration(
         external_tool_prompt_paths_for(("unknown",))
 
 
-def test_external_tool_prompts_reject_a_shell_less_backend(monkeypatch) -> None:
-    """An external CLI needs a sandbox that can run it.
-
-    No operator setting resolves to `local` any more, so the check is exercised by
-    forcing the resolution directly: it guards the boundary rather than a
-    reachable configuration.
-    """
-    monkeypatch.setenv("AGENT_JOERN_ENABLED", "true")
-
-    with (
-        patch(
-            "sec_review_agents.external_tools.resolver.selected_sandbox_backend_kind",
-            return_value="local",
-        ),
-        pytest.raises(
-            ValueError,
-            match="External CLI tools require an execution-capable sandbox backend",
-        ),
-    ):
-        external_tool_prompt_paths_for(("joern",))
-
-
-def test_external_tool_prompts_reject_the_removed_auto_backend(monkeypatch) -> None:
-    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "auto")
+def test_external_tools_reject_filesystem_only_backend(monkeypatch):
+    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "local")
     monkeypatch.setenv("AGENT_PLAYWRIGHT_ENABLED", "true")
-
-    with pytest.raises(ValueError, match="must be one of: docker, bwrap"):
-        external_tool_prompt_paths_for(("playwright",))
-
-
-def test_bwrap_allows_joern_but_rejects_playwright(monkeypatch) -> None:
-    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", "bwrap")
-    monkeypatch.setenv("AGENT_JOERN_ENABLED", "true")
-    monkeypatch.setenv("AGENT_PLAYWRIGHT_ENABLED", "true")
-
-    assert external_tool_prompt_paths_for(("joern",)) == ("external-tools/joern.md",)
-    with pytest.raises(ValueError, match="Playwright CLI requires.*Docker sandbox"):
+    with pytest.raises(ValueError, match="must be docker"):
         external_tool_prompt_paths_for(("playwright",))

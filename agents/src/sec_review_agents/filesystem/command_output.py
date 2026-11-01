@@ -2,14 +2,17 @@
 
 
 def combine_command_output(stdout: str, stderr: str) -> str:
+    """Use DeepAgents LocalShellBackend's line formatting for command output.
+
+    Keep an empty result empty so error callers can supply their own diagnostic;
+    execution responses add the upstream ``<no output>`` display placeholder.
+    """
     parts: list[str] = []
     if stdout:
         parts.append(stdout)
     if stderr:
-        parts.append(
-            "".join(f"[stderr] {line}" for line in stderr.splitlines(keepends=True))
-        )
-    return "".join(parts)
+        parts.extend(f"[stderr] {line}" for line in stderr.strip().split("\n"))
+    return "\n".join(parts)
 
 
 def truncate_output(output: str, max_bytes: int) -> tuple[str, bool]:
