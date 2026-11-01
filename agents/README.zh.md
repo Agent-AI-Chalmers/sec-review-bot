@@ -342,7 +342,6 @@ launcher 会将不同的对象存储身份传给对应 worker，将 Memory Maint
 审查代码的 agent stage 必须运行在能够执行命令的 sandbox 里，否则它无法运行测试、读取历史或复现发现。具体用哪个 sandbox 属于部署配置：
 
 - `AGENT_SANDBOX_BACKEND` 不设置或设置为 `docker`：要求使用 Docker sandbox
-- `AGENT_SANDBOX_BACKEND=bwrap`：显式启用 bubblewrap（仅 Linux/WSL2）
 
 没有任何取值可以选择本地 filesystem backend。它没有 shell，把它交给审查代码的 stage，等于悄悄让那一步无法执行任何命令。不需要 shell 的 stage 会自行选择它，因此这不是部署配置。
 

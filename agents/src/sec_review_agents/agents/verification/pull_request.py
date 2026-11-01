@@ -10,12 +10,10 @@ from sec_review_agents.external_tools import (
     external_tool_prompt_paths_for,
 )
 from sec_review_agents.features import agent_skills_enabled
-from sec_review_agents.filesystem import backend_selection
 from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.filesystem.path_views import (
     read_only_path_view,
     skill_view,
-    tmp_view_for_backend,
     workspace_view,
 )
 from sec_review_agents.resources.loader import join_prompt_sections
@@ -67,8 +65,6 @@ def build_pr_verification_backend_config(
             f"Verifier workspace does not exist: {workspace_root_path}"
         )
     workspace_image = runtime_workspace_image(runtime_context)
-    backend_kind = backend_selection.selected_sandbox_backend_kind()
-    tmp_view = tmp_view_for_backend(backend_kind)
     path_views = [
         workspace_view(host_path=workspace_root_path, writable=True),
         read_only_path_view(
@@ -83,14 +79,11 @@ def build_pr_verification_backend_config(
                 host_path=materialize_agent_skills_view(VERIFICATION_AGENT_SKILLS)
             )
         )
-    if tmp_view is not None:
-        path_views.append(tmp_view)
 
     return BackendConfig(
         container_name_prefix="pr-verifier",
         path_views=path_views,
         image=workspace_image,
-        backend_kind=backend_kind,
     )
 
 
@@ -238,7 +231,7 @@ def _build_initial_pr_verification_user_prompt(
         render_structured_markdown_section(
             "Analysis Summary",
             {
-                "overview": str(analysis_result.overview or "").strip() or "(missing)",
+                "overview": analysis_result.overview.strip() or "(missing)",
                 "verdict": analysis_result.verdict,
             },
             profile="prompt",
@@ -250,7 +243,7 @@ def _build_initial_pr_verification_user_prompt(
             profile="prompt",
         ),
     ]
-    if isinstance(workspace_patch, str) and workspace_patch:
+    if workspace_patch:
         sections.extend(
             ["", "# Workspace Patch", "", code_block("diff", workspace_patch)]
         )
@@ -326,7 +319,7 @@ def _build_retry_pr_verification_user_prompt(
             profile="prompt",
         ),
     ]
-    if isinstance(workspace_patch, str) and workspace_patch:
+    if workspace_patch:
         sections.extend(
             ["", "# Workspace Patch", "", code_block("diff", workspace_patch)]
         )

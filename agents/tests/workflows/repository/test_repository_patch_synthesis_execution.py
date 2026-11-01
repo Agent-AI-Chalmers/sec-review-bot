@@ -14,7 +14,12 @@ from sec_review_agents.agents.delivery_planning.workbench_state import (
 )
 from sec_review_agents.agents.patch_synthesis.model import PatchSynthesisOutput
 from sec_review_agents.delivery_stages.execution.input import DeliveryPatchCase
-from sec_review_agents.delivery_stages.model import DeliveryEntry, DeliveryPlan
+from sec_review_agents.delivery_stages.model import (
+    DeliveryEntry,
+    DeliveryPlan,
+    DeliveryPlanningCounts,
+    DeliveryPlanningMetadata,
+)
 from sec_review_agents.utils.files import persist_text_artifact
 from sec_review_agents.workflows.prepared_input import PreparedRepositoryInput
 from sec_review_agents.workflows.repository import direct as repository_direct
@@ -25,8 +30,7 @@ from sec_review_agents.workflows.repository.workflow import (
 from sec_review_agents.workflows.repository_case.result import RepositoryCaseResult
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from sec_review_agents.workspace.file_changes import (
-    DeletedFileChange,
-    UpsertFileChange,
+    FileChange,
     collect_publishable_file_changes,
     file_change_paths,
 )
@@ -44,7 +48,7 @@ def _build_file_changes_from_workspace_patch(
     source_workspace_path: Path,
     patch_path: Path | str | None,
     include_paths: list[str] | None = None,
-) -> list[DeletedFileChange | UpsertFileChange]:
+) -> list[FileChange]:
     if patch_path is None:
         return []
     patch_path = Path(patch_path)
@@ -362,8 +366,10 @@ class TestRepositoryDeliveryExecution:
             )
         return DeliveryPlan(
             status="completed",
-            metadata={},
-            counts={},
+            metadata=DeliveryPlanningMetadata(
+                planning_mode="single", planning_pass_count=1, batch_size=None
+            ),
+            counts=DeliveryPlanningCounts(input_case_count=0, delivery_count=0),
             deliveries=workbench_state.export_deliveries(),
         )
 
@@ -404,8 +410,10 @@ class TestRepositoryDeliveryExecution:
         ]
         delivery_plan = DeliveryPlan(
             status="completed",
-            metadata={},
-            counts={},
+            metadata=DeliveryPlanningMetadata(
+                planning_mode="single", planning_pass_count=1, batch_size=None
+            ),
+            counts=DeliveryPlanningCounts(input_case_count=0, delivery_count=0),
             deliveries=[
                 DeliveryEntry(
                     delivery_id="delivery-single",
@@ -437,8 +445,10 @@ class TestRepositoryDeliveryExecution:
             ],
             DeliveryPlan(
                 status="completed",
-                metadata={},
-                counts={},
+                metadata=DeliveryPlanningMetadata(
+                    planning_mode="single", planning_pass_count=1, batch_size=None
+                ),
+                counts=DeliveryPlanningCounts(input_case_count=0, delivery_count=0),
                 deliveries=delivery_plan.deliveries,
             ),
         )
@@ -552,25 +562,17 @@ class TestRepositoryDeliveryExecution:
             "alpha updated\n", encoding="utf-8"
         )
 
-        observed_git_diff_commands: list[list[str]] = []
-        original_run = subprocess.run
-
-        def record_git_diff(*args, **kwargs):
-            command = args[0] if args else kwargs.get("args")
-            if isinstance(command, list) and command[:2] == ["git", "diff"]:
-                observed_git_diff_commands.append(command)
-            return original_run(*args, **kwargs)
-
-        with patch(
-            "sec_review_agents.workspace.patches.subprocess.run", record_git_diff
-        ):
-            build_patch_artifact(
-                self.workspace_root,
-                include_paths=["src/app.txt"],
-            ).model_dump(mode="json")
-
-        assert observed_git_diff_commands
-        assert all("--no-color" in command for command in observed_git_diff_commands)
+        subprocess.run(
+            ["git", "config", "color.ui", "always"],
+            cwd=self.workspace_root,
+            check=True,
+            capture_output=True,
+        )
+        artifact = build_patch_artifact(
+            self.workspace_root, include_paths=["src/app.txt"]
+        )
+        assert "+alpha updated" in artifact.patch_diff
+        assert "\x1b[" not in artifact.patch_diff
 
     def test_build_patch_artifact_requires_git_workspace(self) -> None:
         self._write_workspace({"src/app.txt": "alpha\n"})
@@ -1430,8 +1432,10 @@ class TestRepositoryDeliveryExecution:
                 keep_case_results=[case_result],
                 delivery_plan=DeliveryPlan(
                     status="completed",
-                    metadata={},
-                    counts={},
+                    metadata=DeliveryPlanningMetadata(
+                        planning_mode="single", planning_pass_count=1, batch_size=None
+                    ),
+                    counts=DeliveryPlanningCounts(input_case_count=0, delivery_count=0),
                     deliveries=[
                         DeliveryEntry(
                             delivery_id="delivery-invalid",

@@ -11,7 +11,9 @@ from sec_review_agents.delivery_stages.model import (
     DeliveryEntry,
 )
 from sec_review_agents.utils.files import persist_json_artifact
-from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
+from sec_review_agents.workspace.file_changes import (
+    FileChange,
+)
 
 
 class DeliveryArtifact(BaseModel):
@@ -20,9 +22,7 @@ class DeliveryArtifact(BaseModel):
     delivery_id: str
     case_ids: list[str]
     patch_diff: str
-    file_changes: list[DeletedFileChange | UpsertFileChange] = Field(
-        default_factory=list
-    )
+    file_changes: list[FileChange] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore")
 
@@ -43,13 +43,12 @@ class DeliveryResult(BaseModel):
 def _build_delivery_artifact(
     *,
     delivery_entry: DeliveryEntry,
-    keep_case_ids: Sequence[str],
+    keep_case_ids: set[str],
     patch_outcome: DeliveryExecutionResult,
 ) -> DeliveryArtifact | None:
     delivery_id = delivery_entry.delivery_id
-    keep_case_id_set = set(keep_case_ids)
     case_ids = [
-        case_id for case_id in delivery_entry.case_ids if case_id in keep_case_id_set
+        case_id for case_id in delivery_entry.case_ids if case_id in keep_case_ids
     ]
     if not delivery_id or not case_ids:
         return None
@@ -76,6 +75,7 @@ def _build_delivery_artifacts(
     outcomes_by_delivery_id = {
         outcome.delivery_id: outcome for outcome in patch_outcomes
     }
+    keep_case_id_set = set(keep_case_ids)
     delivery_artifacts: list[DeliveryArtifact] = []
     for delivery_entry in deliveries:
         delivery_id = delivery_entry.delivery_id
@@ -84,7 +84,7 @@ def _build_delivery_artifacts(
             continue
         artifact = _build_delivery_artifact(
             delivery_entry=delivery_entry,
-            keep_case_ids=keep_case_ids,
+            keep_case_ids=keep_case_id_set,
             patch_outcome=outcome,
         )
         if artifact is not None:

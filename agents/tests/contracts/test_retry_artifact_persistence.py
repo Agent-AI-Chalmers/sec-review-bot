@@ -238,10 +238,6 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
             "sec_review_agents.review_stages.mitigation.stage.build_patch_artifact",
             side_effect=fake_build_patch_artifact,
         ),
-        patch(
-            "sec_review_agents.review_stages.mitigation.result.build_mitigation_stage_result",
-            side_effect=lambda **kwargs: kwargs,
-        ),
     ):
         from sec_review_agents.review_stages.mitigation.stage import (
             run_mitigation_stage,

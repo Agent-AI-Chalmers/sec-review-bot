@@ -12,33 +12,25 @@ from sec_review_agents.filesystem.backend_factory import (
 from sec_review_agents.filesystem.backend_selection import (
     selected_sandbox_backend_kind,
 )
-from sec_review_agents.filesystem.bwrap_backend import (
-    BwrapRoute,
-    BwrapSandboxBackend,
+from sec_review_agents.filesystem.docker_backend import (
+    DockerRoute,
+    DockerSandboxBackend,
 )
-from sec_review_agents.filesystem.docker_backend import DockerRoute
 from sec_review_agents.filesystem.local_backend import LocalFilesystemBackend
 from sec_review_agents.filesystem.path_views import (
     PathView,
+    host_tmp_view,
     read_only_path_view,
-    tmp_view_for_backend,
     workspace_view,
 )
 
 
-def test_tmp_view_follows_backend_kind() -> None:
-    assert tmp_view_for_backend("docker") == PathView(
-        host_path=None,
-        container_path="/tmp",
-        agent_path="/tmp",
-        writable=True,
-    )
-    assert tmp_view_for_backend("local") == PathView(
+def test_host_tmp_view_maps_host_temporary_directory() -> None:
+    assert host_tmp_view() == PathView(
         host_path=Path(tempfile.gettempdir()),
         agent_path="/tmp",
         writable=True,
     )
-    assert tmp_view_for_backend("bwrap") is None
 
 
 @pytest.mark.parametrize("agent_path", ["", "   "])
@@ -90,7 +82,7 @@ def test_local_backend_routes_use_agent_path(tmp_path: Path) -> None:
 def test_environment_cannot_select_the_removed_auto_backend() -> None:
     with (
         patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "auto"}, clear=True),
-        pytest.raises(ValueError, match="must be one of: docker, bwrap"),
+        pytest.raises(ValueError, match="must be docker"),
     ):
         selected_sandbox_backend_kind()
 
@@ -99,45 +91,9 @@ def test_environment_cannot_select_the_local_backend() -> None:
     """No operator setting may downgrade an agent to a shell-less backend."""
     with (
         patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "local"}, clear=True),
-        pytest.raises(ValueError, match="must be one of: docker, bwrap"),
+        pytest.raises(ValueError, match="must be docker"),
     ):
         selected_sandbox_backend_kind()
-
-
-def test_backend_selection_can_be_forced_to_bwrap() -> None:
-    with patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "bwrap"}, clear=True):
-        assert selected_sandbox_backend_kind() == "bwrap"
-
-
-def test_environment_can_select_bwrap_backend_factory(tmp_path: Path) -> None:
-    with patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "bwrap"}, clear=True):
-        backend = create_backend_with_path_views(
-            container_name_prefix="test",
-            path_views=[workspace_view(host_path=tmp_path, writable=True)],
-        )
-
-    assert isinstance(backend, BwrapSandboxBackend)
-
-
-def test_bwrap_backend_uses_agent_paths_without_composite_routes(
-    tmp_path: Path,
-) -> None:
-    backend = create_backend_with_path_views(
-        container_name_prefix="test",
-        path_views=[workspace_view(host_path=tmp_path, writable=True)],
-        backend_kind="bwrap",
-    )
-
-    assert isinstance(backend, BwrapSandboxBackend)
-    assert (
-        BwrapRoute(
-            host_path=tmp_path,
-            agent_path="/workspace",
-            writable=True,
-        )
-        in backend.routes
-    )
-    assert backend._is_allowed_path("/workspace/app.py")
 
 
 def test_local_backend_routes_agent_workspace_to_host_backend(tmp_path: Path) -> None:
@@ -187,7 +143,12 @@ def test_docker_backend_mounts_use_container_path(tmp_path: Path) -> None:
                     host_path=tmp_path,
                     container_path="/mnt/material/workspace",
                 ),
-                tmp_view_for_backend("docker"),
+                PathView(
+                    host_path=None,
+                    container_path="/tmp",
+                    agent_path="/tmp",
+                    writable=True,
+                ),
             ],
             backend_kind="docker",
         )
@@ -227,7 +188,14 @@ def test_docker_backend_adds_deepagents_artifact_roots() -> None:
     ) as docker_backend_cls:
         create_backend_with_path_views(
             container_name_prefix="test",
-            path_views=[tmp_view_for_backend("docker")],
+            path_views=[
+                PathView(
+                    host_path=None,
+                    container_path="/tmp",
+                    agent_path="/tmp",
+                    writable=True,
+                )
+            ],
             backend_kind="docker",
         )
 
@@ -269,7 +237,12 @@ def test_docker_backend_allows_container_native_path_view() -> None:
                     agent_path="/tools",
                     writable=False,
                 ),
-                tmp_view_for_backend("docker"),
+                PathView(
+                    host_path=None,
+                    container_path="/tmp",
+                    agent_path="/tmp",
+                    writable=True,
+                ),
             ],
             backend_kind="docker",
         )
@@ -297,31 +270,18 @@ def test_docker_backend_allows_container_native_path_view() -> None:
     )
 
 
-def test_docker_backend_does_not_add_implicit_tmp_path_view(tmp_path: Path) -> None:
-    with patch(
-        "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
-        return_value=object(),
-    ) as docker_backend_cls:
-        create_backend_with_path_views(
-            container_name_prefix="test",
-            path_views=[
-                read_only_path_view(
-                    agent_path="/workspace",
-                    host_path=tmp_path,
-                )
-            ],
-            backend_kind="docker",
-        )
-
-    routes = docker_backend_cls.call_args.kwargs["routes"]
-    assert (
-        DockerRoute(
-            container_path="/tmp",
-            agent_path="/tmp",
-            writable=True,
-        )
-        not in routes
+def test_docker_backend_adds_native_tmp_without_host_mount(tmp_path: Path) -> None:
+    backend = create_backend_with_path_views(
+        container_name_prefix="test",
+        path_views=[read_only_path_view(agent_path="/workspace", host_path=tmp_path)],
+        backend_kind="docker",
     )
+    assert isinstance(backend, DockerSandboxBackend)
+    assert (
+        backend.sandbox_path_for_agent_path("/tmp/payload", require_writable=True)
+        == "/tmp/payload"
+    )
+    assert all(mount.container_path != "/tmp" for mount in backend.mounts)
 
 
 def test_docker_backend_rejects_host_tmp_view() -> None:
@@ -332,12 +292,12 @@ def test_docker_backend_rejects_host_tmp_view() -> None:
         ),
         pytest.raises(
             ValueError,
-            match="Docker backend path view requires a container_path: /tmp",
+            match="container-native",
         ),
     ):
         create_backend_with_path_views(
             container_name_prefix="test",
-            path_views=[tmp_view_for_backend("local")],
+            path_views=[host_tmp_view()],
             backend_kind="docker",
         )
 
@@ -422,10 +382,10 @@ def test_backend_config_uses_factory_defaults(monkeypatch, explicit_none: bool) 
         config.update({"image": None, "backend_kind": None})
     monkeypatch.setattr(
         "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
-        lambda: "bwrap",
+        lambda: "docker",
     )
     backend = create_backend_with_path_views(**config)
-    assert isinstance(backend, BwrapSandboxBackend)
+    assert isinstance(backend, DockerSandboxBackend)
     assert backend.working_directory == "/workspace"
     assert not backend._is_allowed_path("/workspace/app.py")
 
@@ -435,9 +395,23 @@ def test_backend_config_can_override_working_directory(tmp_path: Path) -> None:
         container_name_prefix="directory-probe",
         path_views=[read_only_path_view(agent_path="/source", host_path=tmp_path)],
         working_directory="/source",
-        backend_kind="bwrap",
+        backend_kind="docker",
     )
     backend = create_backend_with_path_views(**config)
-    assert isinstance(backend, BwrapSandboxBackend)
+    assert isinstance(backend, DockerSandboxBackend)
     assert backend.working_directory == "/source"
     assert backend._is_allowed_path("/source/app.py")
+
+
+@pytest.mark.parametrize("backend", ["local", "unknown"])
+def test_execution_backend_rejects_unsupported_selection(monkeypatch, backend):
+    monkeypatch.setenv("AGENT_SANDBOX_BACKEND", backend)
+    with pytest.raises(ValueError, match="must be docker"):
+        selected_sandbox_backend_kind()
+
+
+def test_factory_rejects_unknown_backend():
+    with pytest.raises(ValueError, match="docker, local"):
+        create_backend_with_path_views(
+            container_name_prefix="test", backend_kind="unknown"
+        )

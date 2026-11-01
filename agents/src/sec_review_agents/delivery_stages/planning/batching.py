@@ -1,6 +1,6 @@
 from math import ceil
 
-from sec_review_agents.delivery_stages.planning.input import DeliveryPlanningCase
+from sec_review_agents.delivery_stages.model import DeliveryPlanningCase
 
 
 def planning_case_id_batches(

@@ -2,13 +2,15 @@ import json
 from annotationlib import Format, get_annotations
 from typing import get_args, get_type_hints
 
+import pytest
+from pydantic import ValidationError
+
 import sec_review_agents.delivery_stages.result as delivery_result_module
 from sec_review_agents.delivery_stages.execution.patch_synthesis import (
     synthesize_combined_delivery_patch,
 )
 from sec_review_agents.delivery_stages.execution.result import (
     DeliveryExecutionResult,
-    build_delivery_execution_result,
 )
 from sec_review_agents.delivery_stages.model import (
     DeliveryEntry,
@@ -130,8 +132,8 @@ def test_delivery_result_contract_tracks_required_sections(tmp_path) -> None:
     }
 
 
-def test_delivery_execution_result_builder_tracks_public_fields() -> None:
-    result = build_delivery_execution_result(
+def test_delivery_execution_result_tracks_public_fields() -> None:
+    result = DeliveryExecutionResult(
         delivery_id="delivery-1",
         status="ready",
         error=None,
@@ -185,7 +187,7 @@ def test_file_change_types_match_shared_schema() -> None:
 
 
 def test_delivery_execution_result_serializes_at_json_boundary() -> None:
-    result = build_delivery_execution_result(
+    result = DeliveryExecutionResult(
         delivery_id="delivery-1",
         status="ready",
         error=None,
@@ -289,3 +291,30 @@ def test_skipped_delivery_result_persistence_writes_stage_result(tmp_path) -> No
         mode="json"
     )
     assert not (tmp_path / "delivery-execution" / "artifacts").exists()
+
+
+@pytest.mark.parametrize("case_ids", [[], ["a", "b"], ["a", "a"]])
+def test_single_delivery_rejects_invalid_case_count(case_ids: list[str]) -> None:
+    """Replay plans must not claim cases whose patches single execution ignores."""
+    with pytest.raises(ValidationError, match="exactly one case ID"):
+        DeliveryEntry.model_validate_json(
+            json.dumps(
+                {
+                    "delivery_id": "delivery",
+                    "strategy": "single",
+                    "case_ids": case_ids,
+                    "reason": "replay",
+                }
+            )
+        )
+
+
+@pytest.mark.parametrize("case_ids", [["a"], ["a", "b"]])
+def test_combined_delivery_preserves_case_ids(case_ids: list[str]) -> None:
+    entry = DeliveryEntry(
+        delivery_id="delivery",
+        strategy="combined",
+        case_ids=case_ids,
+        reason="synthesis",
+    )
+    assert entry.case_ids == case_ids

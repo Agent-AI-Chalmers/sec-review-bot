@@ -6,7 +6,6 @@ from unittest.mock import patch
 import pytest
 from deepagents.middleware.skills import SkillsMiddleware
 
-from sec_review_agents.agents.analysis.issue import build_issue_analyzer_backend_config
 from sec_review_agents.agents.analysis.repository import (
     build_repository_analyzer_backend_config,
 )
@@ -30,7 +29,6 @@ from sec_review_agents.agents.verification.repository import (
     build_repository_verification_backend_config,
 )
 from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
-from sec_review_agents.filesystem.bwrap_backend import BwrapSandboxBackend
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 
 pytestmark = pytest.mark.integration
@@ -287,29 +285,6 @@ def test_repository_review_backends_materialize_agent_skill_views(
     assert "/triage/" not in _routes_for(triage_backend)
 
 
-def test_bwrap_env_reaches_workflow_backend_factory(tmp_path: Path) -> None:
-    root = tmp_path
-    workspace = root / "workspace"
-    history = root / "history"
-    workspace.mkdir()
-    history.mkdir()
-
-    with patch.dict(
-        "os.environ",
-        {"AGENT_SANDBOX_BACKEND": "bwrap"},
-        clear=False,
-    ):
-        config = build_issue_analyzer_backend_config(
-            workspace_root_path=workspace,
-            history_path=history,
-        )
-
-    backend = create_backend_with_path_views(**config)
-    assert isinstance(backend, BwrapSandboxBackend)
-    assert backend._is_allowed_path("/workspace/app.py")
-    assert not backend._is_allowed_path("/tmp/app.py")
-
-
 def test_repository_analyzer_skills_middleware_loads_analysis_agent_skills(
     tmp_path: Path,
 ) -> None:
@@ -481,27 +456,8 @@ def test_repository_incremental_routes_are_mode_gated(tmp_path: Path) -> None:
     assert "/history/" in mitigation_incr_routes
 
 
-def test_repository_analyzer_local_tmp_write_is_host_tmp(tmp_path: Path) -> None:
-    root = tmp_path
-    local_root = root / "local"
-    workspace = local_root / "workspace"
-    run_artifacts = local_root / "artifacts" / "run-1"
-
-    workspace.mkdir(parents=True, exist_ok=True)
-    run_artifacts.mkdir(parents=True, exist_ok=True)
-
-    input_data = {
-        "run_id": "run-1",
-        "case": {"case_id": "case-1"},
-        "scan_target": {"scan_mode": "full"},
-        "input_bundle_root_path": str(local_root),
-    }
-
-    with patch(
-        "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
-        return_value="local",
-    ):
-        backend = _repository_analyzer_backend(input_data)
+def test_repository_cvss_local_tmp_write_is_host_tmp(tmp_path: Path) -> None:
+    backend = create_repository_cvss_backend(workspace_root_path=tmp_path)
 
     marker = uuid.uuid4().hex
     virtual_path = f"/tmp/ghsb-local-{marker}.txt"

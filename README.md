@@ -61,7 +61,7 @@ Each contract family under [`contracts/`](contracts/README.md) owns the tool tha
 - **Durable execution**: [Temporal](https://temporal.io/) owns workflow / activity scheduling, worker dispatch, retry, timeout, and failure state.
 - **State and storage**: [PostgreSQL](https://www.postgresql.org/) for coordination state; S3-compatible object storage ([RustFS](https://github.com/rustfs/rustfs) locally) for input bundles and diagnostic artifacts.
 - **Observability**: [Langfuse](https://langfuse.com/) is independently deployed and strongly recommended. Core review execution does not require it, but LLM-call tracing and Review Runs model-usage statistics do.
-- **Execution isolation**: [Docker](https://www.docker.com/) sandbox (default) or [bubblewrap](https://github.com/containers/bubblewrap) (bwrap, optional), used by the host execution worker.
+- **Execution isolation**: [Docker](https://www.docker.com/) sandbox, used by the host execution worker.
 - **Local deployment**: [Docker Compose](https://docs.docker.com/compose/) + [systemd](https://systemd.io/).
 
 ## Project Status

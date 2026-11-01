@@ -38,9 +38,6 @@ async def analyze_issue_activity(
         review_trajectories_root,
         review_trajectory_path,
     )
-    from sec_review_agents.runtime.setup_bootstrap import (
-        setup_declaration_content_for_backend,
-    )
     from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import (
         required_path,
@@ -80,9 +77,7 @@ async def analyze_issue_activity(
                 stage="analyzer",
             ),
             review_objective=review_intent.objective,
-            setup_declaration_content=setup_declaration_content_for_backend(
-                prepared_input.setup_declaration
-            ),
+            setup_declaration_content=prepared_input.setup_declaration,
             runtime_context=request.runtime_context,
         )
 
@@ -102,9 +97,6 @@ async def mitigate_issue_activity(
     from sec_review_agents.review_stages.trajectories import (
         review_trajectories_root,
         review_trajectory_path,
-    )
-    from sec_review_agents.runtime.setup_bootstrap import (
-        setup_declaration_content_for_backend,
     )
     from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import (
@@ -165,9 +157,7 @@ async def mitigate_issue_activity(
             test_changes=review_intent.test_changes,
             analysis_result=analysis_result,
             retry_context=retry_context,
-            setup_declaration_content=setup_declaration_content_for_backend(
-                prepared_input.setup_declaration
-            ),
+            setup_declaration_content=prepared_input.setup_declaration,
             runtime_context=request.runtime_context,
         )
 
@@ -188,9 +178,6 @@ async def verify_issue_activity(
     from sec_review_agents.review_stages.verification.stage import (
         create_skipped_verification_result,
         verification_attempt_label,
-    )
-    from sec_review_agents.runtime.setup_bootstrap import (
-        setup_declaration_content_for_backend,
     )
     from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.utils.paths import (
@@ -251,9 +238,7 @@ async def verify_issue_activity(
             analysis_result=analysis_result,
             mitigation_result=mitigation_result,
             retry_context=retry_context,
-            setup_declaration_content=setup_declaration_content_for_backend(
-                prepared_input.setup_declaration
-            ),
+            setup_declaration_content=prepared_input.setup_declaration,
             runtime_context=request.runtime_context,
         )
 

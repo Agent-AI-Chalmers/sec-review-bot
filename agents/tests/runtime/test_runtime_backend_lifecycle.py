@@ -1,10 +1,8 @@
-import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
-from deepagents.backends import CompositeBackend
 from deepagents.backends.protocol import BackendProtocol
 from langchain.agents.middleware import AgentMiddleware
 
@@ -18,9 +16,8 @@ from sec_review_agents.agents.patch_synthesis.backend import (
     create_patch_synthesis_backend,
 )
 from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
-from sec_review_agents.filesystem.docker_backend import DockerRoute
+from sec_review_agents.filesystem.docker_backend import DockerSandboxBackend
 from sec_review_agents.filesystem.docker_runtime import DockerContainerResource
-from sec_review_agents.filesystem.local_backend import LocalFilesystemBackend
 from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
 from sec_review_agents.runtime.backend_cleanup import (
     aclose_backend,
@@ -310,46 +307,7 @@ def test_repository_analyzer_backend_uses_container_tmp_under_docker(
     workspace = local_root / "workspace"
     workspace.mkdir(parents=True)
 
-    with (
-        patch(
-            "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
-            return_value="docker",
-        ),
-        patch(
-            "sec_review_agents.filesystem.backend_factory.DockerSandboxBackend",
-        ) as docker_backend_mock,
-    ):
-        create_backend_with_path_views(
-            **build_repository_analyzer_backend_config(
-                workspace_root_path=workspace,
-                history_path=None,
-                incremental_window_path=None,
-                scan_mode="full",
-            )
-        )
-
-    container = docker_backend_mock.call_args.kwargs["container"]
-    routes = docker_backend_mock.call_args.kwargs["routes"]
-    assert not any(mount.container_path == "/tmp" for mount in container.mounts)
-    assert (
-        DockerRoute(
-            container_path="/tmp",
-            agent_path="/tmp",
-            writable=True,
-        )
-        in routes
-    )
-
-
-def test_repository_analyzer_backend_uses_host_tmp_under_local(tmp_path: Path) -> None:
-    local_root = tmp_path / "local"
-    workspace = local_root / "workspace"
-    workspace.mkdir(parents=True)
-
-    with patch(
-        "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
-        return_value="local",
-    ):
+    with patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "docker"}):
         backend = create_backend_with_path_views(
             **build_repository_analyzer_backend_config(
                 workspace_root_path=workspace,
@@ -358,12 +316,12 @@ def test_repository_analyzer_backend_uses_host_tmp_under_local(tmp_path: Path) -
                 scan_mode="full",
             )
         )
-
-    assert isinstance(backend, CompositeBackend)
-    tmp_route = backend.routes["/tmp/"]
-    assert isinstance(tmp_route, LocalFilesystemBackend)
-    assert tmp_route.root_dir == Path(tempfile.gettempdir())
-    assert tmp_route.writable
+    assert isinstance(backend, DockerSandboxBackend)
+    assert not any(mount.container_path == "/tmp" for mount in backend.mounts)
+    assert (
+        backend.sandbox_path_for_agent_path("/tmp/payload", require_writable=True)
+        == "/tmp/payload"
+    )
 
 
 def test_repository_analyzer_backend_omits_skills_when_globally_disabled(

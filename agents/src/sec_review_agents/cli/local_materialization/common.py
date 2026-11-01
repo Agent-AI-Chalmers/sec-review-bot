@@ -1,7 +1,6 @@
 import secrets
 import shutil
 import subprocess
-import sys
 import tarfile
 import tempfile
 from dataclasses import dataclass
@@ -67,25 +66,10 @@ def read_setup_declaration_file(path: str | Path | None) -> str | None:
 
 
 def load_setup_declaration_content(path: str | Path | None) -> str | None:
-    """Resolve the setup declaration text for the selected sandbox backend.
-
-    Only the docker backend runs a setup declaration (its container is
-    long-lived). On any other backend the declaration cannot take effect, so
-    warn once and return None without reading the file -- a missing or
-    unreadable file must not fail a run whose declaration would be ignored
-    anyway. On docker, a path that cannot be read is a real error and raises.
-    """
+    """Read and validate setup instructions for the Docker execution environment."""
     if path is None:
         return None
-    backend = selected_sandbox_backend_kind()
-    if backend != "docker":
-        print(
-            f"SETUP_DECLARATION_WARNING=--setup-declaration was provided but the "
-            f"selected sandbox backend ({backend!r}) does not run setup "
-            f"declarations; the declaration is ignored.",
-            file=sys.stderr,
-        )
-        return None
+    selected_sandbox_backend_kind()
     return read_setup_declaration_file(path)
 
 

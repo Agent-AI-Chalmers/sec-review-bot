@@ -369,7 +369,7 @@ test('issue draft PR publishes from review_record file_changes without workspace
   const review_record = reviewRecordWithMitigation({
     file_changes: [
       {
-        path: '/workspace/src/app.txt',
+        path: 'workspace/src/app.txt',
         status: 'upsert',
         content: 'fixed\n',
         content_encoding: 'utf-8',
@@ -400,7 +400,7 @@ test('issue draft PR publishes from review_record file_changes without workspace
   ])
   assert.deepStrictEqual(harness.trees[0], [
     {
-      path: 'src/app.txt',
+      path: 'workspace/src/app.txt',
       mode: '100755',
       type: 'blob',
       sha: 'blob-1'
@@ -555,3 +555,78 @@ for (const [path, message] of [
     assert.strictEqual(harness.trees.length, 0)
   })
 }
+
+test('issue draft PR publishes symbolic link targets and deletions without workspace reads', async () => {
+  const { octokit, calls: harness } = createOctokitMock()
+  const issue: CreateDraftPrIssue = {
+    issue_number: 42,
+    issue_title: 'Fix unsafe path',
+    owner_login: 'octo-org',
+    repo_name: 'example-repo'
+  }
+  const review_record = reviewRecordWithMitigation({
+    file_changes: [
+      {
+        path: '/workspace/src/app.txt',
+        status: 'upsert',
+        content: 'dGFyZ2V0Lf8=',
+        content_encoding: 'base64',
+        mode: '120000'
+      },
+      {
+        path: 'src/remove.txt',
+        status: 'deleted'
+      }
+    ]
+  })
+  review_record.verification.patch_coverage = 'full'
+  review_record.verification.regression_status = 'not-run'
+  const result = await createDraftPullRequestFromIssueReviewRecord({
+    octokit,
+    issue,
+    run_id: 'run-12345678',
+    workspace_ref: 'base-sha',
+    review_record
+  })
+
+  assert.strictEqual(result?.html_url, 'https://example.test/pull/1')
+  assert.deepStrictEqual(harness.blobs, [
+    {
+      content: 'dGFyZ2V0Lf8=',
+      encoding: 'base64'
+    }
+  ])
+  assert.deepStrictEqual(harness.trees[0], [
+    {
+      path: 'src/app.txt',
+      mode: '120000',
+      type: 'blob',
+      sha: 'blob-1'
+    },
+    {
+      path: 'src/remove.txt',
+      mode: '100644',
+      type: 'blob',
+      sha: null
+    }
+  ])
+  assert.deepStrictEqual(harness.commits, [
+    {
+      message: 'Mitigate issue #42',
+      tree: 'tree-sha',
+      parents: ['base-sha']
+    }
+  ])
+  assert.strictEqual(harness.pulls[0]?.draft, true)
+  // The PR base is the API-resolved default branch, not the webhook payload's
+  // repository.default_branch (which the trusted flow refuses elsewhere too).
+  assert.strictEqual(harness.pulls[0]?.base, 'main')
+  // The opening status lines come from the shared vocabulary, so this body stays
+  // comparable with the PR review comment and the repository delivery bodies.
+  assert.match(harness.pulls[0]?.body ?? '', /- Analysis: `unknown`/)
+  assert.match(
+    harness.pulls[0]?.body ?? '',
+    /- Verification: `full coverage; not recorded; checks not run`/
+  )
+  assert.match(harness.pulls[0]?.body ?? '', /Verifier assessed patch=/)
+})

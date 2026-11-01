@@ -28,16 +28,14 @@ from dataclasses import dataclass
 import pytest
 
 from sec_review_agents.filesystem.docker_transfer_ops import docker_transfer_script
-from sec_review_agents.filesystem.sandbox_file_ops import file_operation_script
 
 
 @dataclass(frozen=True)
 class SandboxScript:
     """One script shipped to the sandbox, with the grammar it needs to keep supporting.
 
-    Each script declares its own floor because the requirement belongs to the script's syntax, not
-    to the test: the transfer helper uses assignment expressions (3.8), while the filesystem
-    helper annotates locals with builtin generics such as `list[str]` (3.9).
+    The transfer helper uses assignment expressions and requires Python 3.8.
+    Upstream owns the file-operation scripts; this check covers project-owned scripts.
     """
 
     name: str
@@ -46,13 +44,6 @@ class SandboxScript:
 
 
 SANDBOX_SCRIPTS = (
-    SandboxScript(
-        name="sandbox_file_script_program.py",
-        minimum_python=(3, 9),
-        build_source=lambda: file_operation_script(
-            {"op": "ls", "path": "/workspace", "limits": {"ls_max_entries": 1}}
-        ),
-    ),
     SandboxScript(
         name="docker_transfer_script_program.py",
         minimum_python=(3, 8),
@@ -79,9 +70,7 @@ def test_sandbox_script_parses_on_every_supported_python(
 ) -> None:
     """One case per version from the script's floor up to the host interpreter.
 
-    Black under `target-version = py314` once rewrote a tuple of exception types in
-    `sandbox_file_script_program.py` into the Python 2 `except A, B:` form, which is valid syntax
-    only from 3.14. Every host test kept passing while the sandbox could no longer list files, and
-    the declared floor is the version such a rewrite would break.
+    Formatting host code for Python 3.14 must not introduce syntax that older
+    sandbox interpreters cannot parse.
     """
     ast.parse(script.build_source(), feature_version=(3, minor))

@@ -11,7 +11,6 @@ from sec_review_agents.delivery_stages.execution.patch_synthesis import (
 )
 from sec_review_agents.delivery_stages.execution.result import (
     DeliveryExecutionResult,
-    build_delivery_execution_result,
 )
 from sec_review_agents.delivery_stages.model import (
     DeliveryEntry,
@@ -24,11 +23,7 @@ def _build_single_delivery_outcome(
     case_results_by_case_id: Mapping[str, DeliveryPatchCase],
 ) -> DeliveryExecutionResult | None:
     delivery_id = delivery_entry.delivery_id
-    case_ids = [
-        case_id
-        for case_id in delivery_entry.case_ids
-        if case_id in case_results_by_case_id
-    ]
+    case_ids = delivery_entry.case_ids
     if not delivery_id or not case_ids:
         return None
     case_id = case_ids[0]
@@ -37,7 +32,7 @@ def _build_single_delivery_outcome(
     patch_diff = case_result.mitigator_patch_diff or ""
     file_changes = case_result.mitigator_file_changes
     has_changes = bool(file_changes)
-    return build_delivery_execution_result(
+    return DeliveryExecutionResult(
         delivery_id=delivery_id,
         status="ready" if has_changes else "no-changes",
         error=None if has_changes else "Single delivery has no file changes.",
@@ -54,6 +49,20 @@ async def execute_delivery_entry(
     baseline_snapshot_tar_path: Path | None = None,
 ) -> DeliveryExecutionResult | None:
     case_results_by_case_id = {item.case_id: item for item in case_results}
+    missing_case_ids = [
+        case_id
+        for case_id in delivery_entry.case_ids
+        if case_id not in case_results_by_case_id
+    ]
+    if missing_case_ids:
+        # Never synthesize a subset under the original plan's identity/reason.
+        return DeliveryExecutionResult(
+            delivery_id=delivery_entry.delivery_id,
+            status="failed",
+            error=f"Delivery is missing case inputs: {', '.join(missing_case_ids)}",
+            file_changes=[],
+            patch_diff="",
+        )
     strategy = delivery_entry.strategy
     if strategy == "single":
         return _build_single_delivery_outcome(
@@ -62,11 +71,7 @@ async def execute_delivery_entry(
         )
 
     delivery_id = delivery_entry.delivery_id
-    case_ids = [
-        case_id
-        for case_id in delivery_entry.case_ids
-        if case_id in case_results_by_case_id
-    ]
+    case_ids = delivery_entry.case_ids
     if not delivery_id or not case_ids:
         return None
     if baseline_snapshot_tar_path is None:
@@ -82,7 +87,7 @@ async def execute_delivery_entry(
         )
         file_changes = patch_artifact.file_changes
         has_changes = bool(file_changes)
-        return build_delivery_execution_result(
+        return DeliveryExecutionResult(
             delivery_id=delivery_id,
             status="ready" if has_changes else "no-changes",
             error=(
@@ -94,7 +99,7 @@ async def execute_delivery_entry(
             patch_diff=patch_artifact.patch_diff,
         )
     except Exception as error:
-        return build_delivery_execution_result(
+        return DeliveryExecutionResult(
             delivery_id=delivery_id,
             status="failed",
             error=f"Patch synthesis failed: {error}",

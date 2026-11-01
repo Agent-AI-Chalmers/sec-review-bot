@@ -5,13 +5,13 @@ import pytest
 from sec_review_agents.delivery_stages.execution.input import DeliveryPatchCase
 from sec_review_agents.delivery_stages.execution.stage import execute_delivery_entry
 from sec_review_agents.delivery_stages.model import DeliveryEntry
-from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
+from sec_review_agents.workspace.file_changes import (
+    FileChange,
+)
 from sec_review_agents.workspace.patches import PatchArtifact
 
 
-def _case_result(
-    *, file_changes: list[DeletedFileChange | UpsertFileChange]
-) -> DeliveryPatchCase:
+def _case_result(*, file_changes: list[FileChange]) -> DeliveryPatchCase:
     return DeliveryPatchCase(
         case_id="case-1",
         mitigator_file_changes=file_changes,
@@ -46,7 +46,7 @@ async def test_single_execution_classifies_empty_file_changes(tmp_path) -> None:
 @pytest.mark.asyncio
 async def test_combined_execution_builds_status_from_patch_artifact(tmp_path) -> None:
     """Keep delivery status ownership in execution rather than patch synthesis."""
-    file_changes: list[DeletedFileChange | UpsertFileChange] = [
+    file_changes: list[FileChange] = [
         {
             "path": "src/app.py",
             "status": "upsert",

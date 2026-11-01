@@ -41,7 +41,7 @@ async def verify_issue(
     patch_diff = mitigation_result.patch_diff if mitigation_result is not None else None
     # you have to pass it originally without stripping, because the patch diff may have leading/trailing whitespace that is significant
     workspace_patch = (
-        patch_diff if isinstance(patch_diff, str) and patch_diff.strip() else None
+        patch_diff if patch_diff is not None and patch_diff.strip() else None
     )
     user_prompt = build_issue_verification_user_prompt(
         issue=issue,

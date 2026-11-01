@@ -190,9 +190,7 @@ def test_delivery_result_module_does_not_own_execution_results() -> None:
         for node in ast.walk(ast.parse(source))
         if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef))
     }
-    assert definitions.isdisjoint(
-        {"DeliveryExecutionResult", "build_delivery_execution_result"}
-    )
+    assert "DeliveryExecutionResult" not in definitions
 
 
 def test_delivery_planning_stage_does_not_own_input_projection() -> None:

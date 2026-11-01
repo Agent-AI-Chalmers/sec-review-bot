@@ -212,3 +212,23 @@ async def test_delivery_patch_input_crosses_real_temporal_activities(
         synthesis.call_args.kwargs["case_items"]
         == payload.combined_delivery_execution_items[0].case_items
     )
+
+
+@pytest.mark.asyncio
+async def test_temporal_converter_preserves_symbolic_link_mode() -> None:
+    case = DeliveryPatchCase(
+        case_id="link-case",
+        mitigator_file_changes=[
+            {
+                "path": "link",
+                "status": "upsert",
+                "mode": "120000",
+                "content": "../missing",
+                "content_encoding": "utf-8",
+            }
+        ],
+        mitigator_patch_diff=None,
+    )
+    payloads = await pydantic_data_converter.encode([case])
+    decoded = await pydantic_data_converter.decode(payloads, [DeliveryPatchCase])
+    assert decoded == [case]

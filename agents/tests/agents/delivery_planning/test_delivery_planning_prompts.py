@@ -7,6 +7,7 @@ from sec_review_agents.agents.delivery_planning.prompts import (
     build_repository_delivery_planning_user_prompt,
     build_repository_delivery_planning_workbench_system_prompt,
 )
+from sec_review_agents.delivery_stages.model import DeliveryPlanningCase
 from sec_review_agents.resources.loader import join_prompt_sections
 
 
@@ -39,11 +40,11 @@ def test_delivery_planning_user_prompt_serializes_case_items(
 ) -> None:
     user_prompt = build_repository_delivery_planning_user_prompt(
         [
-            {
-                "case_id": "case-a",
-                "overview": "Case A mitigation overview.",
-                "changed_files": ["src/a.ts"],
-            }
+            DeliveryPlanningCase(
+                case_id="case-a",
+                overview="Case A mitigation overview.",
+                changed_files=["src/a.ts"],
+            )
         ],
         pass_kind=pass_kind,
     )

@@ -59,7 +59,7 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
 - **持久执行**：[Temporal](https://temporal.io/) 负责 workflow/activity 调度、worker 分发、重试、超时和失败状态。
 - **状态与存储**：[PostgreSQL](https://www.postgresql.org/) 存协调状态；S3 兼容对象存储（本地为 [RustFS](https://github.com/rustfs/rustfs)）存输入材料包和诊断产物。
 - **可观测性**：[Langfuse](https://langfuse.com/) 独立部署，强烈建议配置。核心审查执行不依赖它，但 LLM 调用追踪和 Review Runs 模型用量统计依赖它。
-- **执行隔离**：[Docker](https://www.docker.com/) sandbox（默认）或 [bubblewrap](https://github.com/containers/bubblewrap)（bwrap，可选），由宿主机执行 worker 使用。
+- **执行隔离**：[Docker](https://www.docker.com/) sandbox，由宿主机执行 worker 使用。
 - **本地部署**：[Docker Compose](https://docs.docker.com/compose/) + [systemd](https://systemd.io/)。
 
 ## 项目状态

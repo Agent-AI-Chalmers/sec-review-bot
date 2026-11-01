@@ -14,10 +14,6 @@ import pytest
 from sec_review_agents.filesystem.backend_factory import (
     create_backend_with_path_views,
 )
-from sec_review_agents.filesystem.bwrap_backend import (
-    BwrapRoute,
-    BwrapSandboxBackend,
-)
 from sec_review_agents.filesystem.docker_backend import (
     DockerRoute,
     DockerSandboxBackend,
@@ -158,64 +154,6 @@ def test_prepares_index_and_returns_docker_exec_mcp_connection() -> None:
             ],
         }
     }
-
-
-def test_prepares_index_and_returns_bwrap_mcp_connection(tmp_path: Path) -> None:
-    backend = BwrapSandboxBackend(
-        routes=[
-            BwrapRoute(
-                host_path=tmp_path,
-                agent_path="/workspace",
-                writable=True,
-            )
-        ],
-        bwrap_bin="/usr/bin/bwrap",
-    )
-    execute_result = Mock(exit_code=0, output="")
-
-    with patch.object(backend, "execute", return_value=execute_result) as execute:
-        connections = codegraph_mcp_connections_for_backend(backend)
-
-    execute.assert_called_once()
-    prepare_command = execute.call_args.args[0]
-    assert "codegraph init -i /workspace" in prepare_command
-    connection = connections["codegraph"]
-    assert connection["transport"] == "stdio"
-    assert connection["command"] == "/usr/bin/bwrap"
-    args = connection["args"]
-    assert args[0] != "/usr/bin/bwrap"
-    assert "--bind" in args
-    assert str(tmp_path.resolve()) in args
-    assert "/workspace" in args
-    assert args[-3:] == [
-        "/bin/sh",
-        "-c",
-        "exec codegraph serve --mcp --no-watch --path /workspace",
-    ]
-
-
-def test_skips_read_only_bwrap_workspace(tmp_path: Path) -> None:
-    backend = BwrapSandboxBackend(
-        routes=[
-            BwrapRoute(
-                host_path=tmp_path,
-                agent_path="/workspace",
-                writable=False,
-            )
-        ],
-        bwrap_bin="/usr/bin/bwrap",
-    )
-
-    with patch(
-        "sec_review_agents.mcp.codegraph.log_diagnostic",
-    ) as log_diagnostic:
-        connections = codegraph_mcp_connections_for_backend(backend)
-
-    assert connections == {}
-    log_diagnostic.assert_called_with(
-        "codegraph_mcp_skipped",
-        reason="index_not_available",
-    )
 
 
 def test_does_not_close_borrowed_backend_when_codegraph_prepare_raises() -> None:

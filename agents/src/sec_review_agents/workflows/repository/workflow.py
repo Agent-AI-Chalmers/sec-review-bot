@@ -232,9 +232,6 @@ def prepare_repository_case_review_inputs_activity(
     from sec_review_agents.review_stages.trajectories import (
         review_trajectories_root,
     )
-    from sec_review_agents.runtime.setup_bootstrap import (
-        setup_declaration_content_for_backend,
-    )
     from sec_review_agents.utils.paths import (
         required_path,
     )
@@ -298,9 +295,7 @@ def prepare_repository_case_review_inputs_activity(
                     scan_mode=scan_mode,
                     case=case,
                     test_changes=review_intent.test_changes,
-                    setup_declaration_content=setup_declaration_content_for_backend(
-                        prepared_input.setup_declaration
-                    ),
+                    setup_declaration_content=prepared_input.setup_declaration,
                 ),
                 cases_artifacts_path=str(cases_artifacts_path),
                 published_trajectories_path=str(

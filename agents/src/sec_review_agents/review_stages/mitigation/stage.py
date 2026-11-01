@@ -18,8 +18,6 @@ from sec_review_agents.review_stages.feedback_loop import (
 )
 from sec_review_agents.review_stages.mitigation.result import (
     MitigationStageResult,
-    build_mitigation_stage_result,
-    build_skipped_mitigation_result,
 )
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.setup_bootstrap import (
@@ -151,7 +149,7 @@ def create_skipped_mitigation_result(
         "",
         attempt_label=attempt_label,
     )
-    result = build_skipped_mitigation_result(reason=reason)
+    result = MitigationStageResult(overview=reason)
     persist_mitigation_result(
         mitigator_artifacts_path, result, attempt_label=attempt_label
     )
@@ -229,7 +227,7 @@ async def run_mitigation_stage(
             patch_artifact.patch_diff,
             attempt_label=attempt_label,
         )
-        result = build_mitigation_stage_result(
+        result = MitigationStageResult(
             overview=agent_output.overview,
             file_changes=patch_artifact.file_changes,
             patch_diff=patch_artifact.patch_diff,

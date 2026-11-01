@@ -8,12 +8,10 @@ from sec_review_agents.external_tools import (
     external_tool_prompt_paths_for,
 )
 from sec_review_agents.features import agent_skills_enabled
-from sec_review_agents.filesystem import backend_selection
 from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.filesystem.path_views import (
     read_only_path_view,
     skill_view,
-    tmp_view_for_backend,
     workspace_view,
 )
 from sec_review_agents.resources.loader import (
@@ -44,8 +42,6 @@ def build_repository_analyzer_backend_config(
     runtime_context: ExecutionRuntimeContext | None = None,
 ) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
-    backend_kind = backend_selection.selected_sandbox_backend_kind()
-    tmp_view = tmp_view_for_backend(backend_kind)
     path_views = [
         workspace_view(host_path=workspace_root_path, writable=True),
     ]
@@ -53,8 +49,6 @@ def build_repository_analyzer_backend_config(
         path_views.append(
             skill_view(host_path=materialize_agent_skills_view(ANALYSIS_AGENT_SKILLS))
         )
-    if tmp_view is not None:
-        path_views.append(tmp_view)
     if scan_mode == "incremental":
         if incremental_window_path is None:
             raise KeyError("Missing bundle path: incremental_window_path")
@@ -77,7 +71,6 @@ def build_repository_analyzer_backend_config(
         container_name_prefix="repository-analyzer",
         path_views=path_views,
         image=workspace_image,
-        backend_kind=backend_kind,
     )
 
 

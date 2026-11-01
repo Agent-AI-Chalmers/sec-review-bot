@@ -86,6 +86,8 @@ class DeliveryWorkbenchState:
     ordered_item_ids: list[str]
     items_by_id: dict[str, _PlanningItem] = field(default_factory=dict)
     groups: dict[str, _PlanningGroup] = field(default_factory=dict)
+    # Successful edit operation names, in call order, for the refinement heuristic.
+    # No before/after values are stored; this is not a replayable change log.
     edit_events: list[dict[str, Any]] = field(default_factory=list)
     _next_group_number: int = 1
 
@@ -286,9 +288,12 @@ class DeliveryWorkbenchState:
             for group in self.groups.values()
             if group.kind == "delivery" and group.item_ids
         ]
+        item_positions = {
+            item_id: index for index, item_id in enumerate(self.ordered_item_ids)
+        }
         ordered_groups = sorted(
             groups,
-            key=lambda group: self.ordered_item_ids.index(group.item_ids[0]),
+            key=lambda group: item_positions[group.item_ids[0]],
         )
         return [
             DeliveryEntry(
@@ -309,9 +314,12 @@ class DeliveryWorkbenchState:
             for group in self.groups.values()
             if group.kind == "delivery" and group.item_ids
         ]
+        item_positions = {
+            item_id: index for index, item_id in enumerate(self.ordered_item_ids)
+        }
         ordered_groups = sorted(
             groups,
-            key=lambda group: self.ordered_item_ids.index(group.item_ids[0]),
+            key=lambda group: item_positions[group.item_ids[0]],
         )
         return [
             {

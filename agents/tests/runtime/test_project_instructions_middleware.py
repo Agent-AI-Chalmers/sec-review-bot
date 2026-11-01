@@ -134,7 +134,7 @@ async def test_snapshot_stays_fixed_during_tool_loop(
 
 @pytest.mark.parametrize(
     "content",
-    ["", "<!-- only a comment -->", None],
+    ["", "   \n", "<!-- only a comment -->", None],
 )
 @pytest.mark.asyncio
 async def test_missing_or_empty_guidance_does_not_change_prompt(

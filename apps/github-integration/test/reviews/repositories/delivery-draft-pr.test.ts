@@ -520,3 +520,64 @@ test('delivery-draft-pr does not force-update a createRef 422 that is not "alrea
 
   assert.deepStrictEqual(updatedRefs, [])
 })
+
+test('delivery-draft-pr publishes symbolic link targets and deletions without dereferencing', async () => {
+  const { octokit, calls } = createOctokitMock()
+  const repo: CreateRepositoryDeliveryDraftPrRepo = {
+    owner_login: 'octo-org',
+    repo_name: 'example-repo',
+    default_branch: 'main'
+  }
+  const input: CreateRepositoryDeliveryDraftPrInput = {
+    workspace_ref: 'base-sha'
+  }
+  const delivery: RepositoryDelivery = {
+    delivery_id: 'delivery-1',
+    case_ids: ['case-1'],
+    case_count: 1,
+    file_changes: [
+      {
+        path: 'src/app.txt',
+        status: 'upsert',
+        content: 'dGFyZ2V0Lf8=',
+        content_encoding: 'base64',
+        mode: '120000'
+      },
+      {
+        path: 'src/remove.txt',
+        status: 'deleted'
+      }
+    ]
+  }
+
+  const result = await createRepositoryDeliveryDraftPr({
+    octokit,
+    repo,
+    run_id: 'run-delete',
+    input,
+    delivery
+  })
+
+  assert.strictEqual(result.reused, false)
+  assert.deepStrictEqual(calls.blobs, [
+    { content: 'dGFyZ2V0Lf8=', encoding: 'base64' }
+  ])
+  assert.strictEqual(calls.trees.length, 1)
+  assert.deepStrictEqual(calls.trees[0], [
+    {
+      path: 'src/app.txt',
+      mode: '120000',
+      type: 'blob',
+      sha: 'blob-1'
+    },
+    {
+      path: 'src/remove.txt',
+      mode: '100644',
+      type: 'blob',
+      sha: null
+    }
+  ])
+  assert.strictEqual(calls.commits.length, 1)
+  assert.strictEqual(calls.refs.length, 1)
+  assert.strictEqual(calls.pulls.length, 1)
+})

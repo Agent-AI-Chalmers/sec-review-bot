@@ -5,7 +5,9 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
+from sec_review_agents.workspace.file_changes import (
+    FileChange,
+)
 from sec_review_agents.workspace.paths import normalize_declared_file_path
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -42,7 +44,7 @@ def _list_untracked_paths(workspace_path: Path) -> list[str]:
         return []
 
     return [
-        value.decode("utf-8", errors="ignore")
+        value.decode("utf-8")
         for value in (process.stdout or b"").split(b"\x00")
         if value
     ]
@@ -57,7 +59,7 @@ def _run_git_with_path_batches(
     for index in range(0, len(paths), batch_size):
         chunk = paths[index : index + batch_size]
         process = subprocess.run(
-            ["git", *base_args, "--", *chunk],
+            ["git", "--literal-pathspecs", *base_args, "--", *chunk],
             cwd=workspace_path,
             capture_output=True,
             text=True,
@@ -91,8 +93,8 @@ def _path_matches_any(path: str, include_paths: list[str]) -> bool:
 
 def _build_git_workspace_patch(
     workspace_path: Path, *, include_paths: Sequence[str] | None = None
-) -> tuple[str, list[str]]:
-    """Run Git diff and return its patch text and observed repository paths.
+) -> tuple[str, list[str], list[str]]:
+    """Run Git diff and return patch text, changed paths, and deleted paths.
 
     An empty scope observes the whole workspace. Untracked files are temporarily
     marked intent-to-add, then reset before this function returns.
@@ -117,6 +119,7 @@ def _build_git_workspace_patch(
         process = subprocess.run(
             [
                 "git",
+                "--literal-pathspecs",
                 "diff",
                 # Keep persisted patch artifacts free of ANSI color escapes.
                 "--no-color",
@@ -132,24 +135,35 @@ def _build_git_workspace_patch(
             ],
             cwd=workspace_path,
             capture_output=True,
-            text=True,
+            text=False,
             check=False,
         )
         if process.returncode != 0:
             raise RuntimeError(
-                process.stderr.strip()
+                process.stderr.decode("utf-8", errors="replace").strip()
                 or "git diff failed while building workspace.patch"
             )
+
+        # Do not use text=True: universal-newline conversion can change file
+        # contents inside a diff, including symbolic-link target bytes.
+        try:
+            patch_content = process.stdout.decode("utf-8")
+        except UnicodeDecodeError as error:
+            raise ValueError(
+                "Workspace diff contains non-UTF-8 bytes; textual patch_diff cannot represent it."
+            ) from error
 
         # Changed files come straight from git (NUL-separated, repository-relative)
         # rather than re-parsing the patch text. Text parsing is ambiguous for bare
         # paths containing spaces or a ` b/` substring and cannot see mode-only
-        # changes; `--name-only -z` reports the exact paths git acted on.
+        # changes. Keep deletion status so a file replaced by a directory is
+        # still exported as deletion of the original blob.
         names_process = subprocess.run(
             [
                 "git",
+                "--literal-pathspecs",
                 "diff",
-                "--name-only",
+                "--name-status",
                 "-z",
                 "--no-color",
                 "--no-ext-diff",
@@ -165,15 +179,21 @@ def _build_git_workspace_patch(
         if names_process.returncode != 0:
             raise RuntimeError(
                 names_process.stderr.decode("utf-8", errors="ignore").strip()
-                or "git diff --name-only failed while building workspace.patch"
+                or "git diff --name-status failed while building workspace.patch"
             )
-        changed_files = [
-            value.decode("utf-8", errors="ignore")
-            for value in (names_process.stdout or b"").split(b"\x00")
-            if value
-        ]
+        fields = names_process.stdout.split(b"\x00")
+        # --no-renames gives one status and one path per entry; paths themselves
+        # may contain tabs or newlines, so only NUL separates these fields.
+        changed_files = []
+        deleted_paths = []
+        for status, raw_path in zip(fields[0:-1:2], fields[1::2], strict=True):
+            path = raw_path.decode("utf-8")
+            changed_files.append(path)
+            if status == b"D":
+                deleted_paths.append(path)
 
-        return process.stdout or "", changed_files
+        return patch_content, changed_files, deleted_paths
+
     finally:
         if untracked_paths:
             _run_git_with_path_batches(
@@ -204,14 +224,15 @@ def build_workspace_patch(
 
     scoped_paths = _filter_paths(include_paths)
     if scoped_paths:
-        patch_content, changed_files = _build_git_workspace_patch(
+        patch_content, changed_files, deleted_paths = _build_git_workspace_patch(
             worktree_path, include_paths=scoped_paths
         )
     else:
-        patch_content, changed_files = "", []
+        patch_content, changed_files, deleted_paths = "", [], []
     return {
         "patch_content": patch_content,
         "changed_files": changed_files,
+        "deleted_paths": deleted_paths,
     }
 
 
@@ -254,7 +275,7 @@ class PatchArtifact(BaseModel):
     """
 
     patch_diff: str
-    file_changes: list[DeletedFileChange | UpsertFileChange]
+    file_changes: list[FileChange]
 
 
 def build_patch_artifact(
@@ -274,6 +295,7 @@ def build_patch_artifact(
     file_changes = collect_publishable_file_changes(
         workspace_path,
         workspace_patch["changed_files"],
+        deleted_paths=workspace_patch["deleted_paths"],
     )
 
     return PatchArtifact(
@@ -288,5 +310,5 @@ def observe_workspace_changed_files(worktree_path: Path) -> list[str]:
         )
 
     # Observation is diagnostic: publishable patch export still requires an explicit scope.
-    _, changed_files = _build_git_workspace_patch(worktree_path, include_paths=None)
+    _, changed_files, _ = _build_git_workspace_patch(worktree_path, include_paths=None)
     return changed_files

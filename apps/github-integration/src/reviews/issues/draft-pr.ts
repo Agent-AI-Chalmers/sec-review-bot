@@ -76,7 +76,9 @@ function normalizePublishableFileChanges(file_changes: unknown): FileChange[] {
           : null
     const rawMode = String(rawChange.mode ?? '').trim()
     const mode: FileMode | null =
-      rawMode === '100644' || rawMode === '100755' ? rawMode : null
+      rawMode === '100644' || rawMode === '100755' || rawMode === '120000'
+        ? rawMode
+        : null
 
     if (rawMode && mode === null) {
       throw new Error(

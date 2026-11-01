@@ -117,6 +117,8 @@ class TriageWorkbenchState:
     ordered_item_ids: list[str]
     items_by_id: dict[str, _TriageItem] = field(default_factory=dict)
     groups: dict[str, _TriageGroup] = field(default_factory=dict)
+    # Successful edit operation names, in call order, for the refinement heuristic.
+    # No before/after values are stored; this is not a replayable change log.
     edit_events: list[dict[str, Any]] = field(default_factory=list)
     _next_group_number: int = 1
 
@@ -337,11 +339,14 @@ class TriageWorkbenchState:
     ) -> tuple[list[TriageCase], list[SuppressedCandidate]]:
         cases: list[TriageCase] = []
         suppressed_candidates: list[SuppressedCandidate] = []
+        item_positions = {
+            item_id: index for index, item_id in enumerate(self.ordered_item_ids)
+        }
         ordered_groups = sorted(
             self.groups.values(),
             key=lambda group: (
-                self.ordered_item_ids.index(group.item_ids[0])
-                if group.item_ids and group.item_ids[0] in self.ordered_item_ids
+                item_positions.get(group.item_ids[0], len(self.ordered_item_ids))
+                if group.item_ids
                 else len(self.ordered_item_ids)
             ),
         )
@@ -494,6 +499,9 @@ class TriageWorkbenchState:
             raise ValueError(f"unknown item_id(s): {', '.join(unknown_item_ids)}")
 
     def _groups_view(self) -> list[dict[str, Any]]:
+        item_positions = {
+            item_id: index for index, item_id in enumerate(self.ordered_item_ids)
+        }
         return [
             {
                 "group_id": group.group_id,
@@ -506,7 +514,7 @@ class TriageWorkbenchState:
             }
             for group in sorted(
                 self.groups.values(),
-                key=lambda item: _group_sort_key(item, self.ordered_item_ids),
+                key=lambda group: _group_sort_key(group, item_positions),
             )
         ]
 
@@ -651,14 +659,14 @@ def _normalized_key_fragment(value: Any) -> str:
 
 
 def _group_sort_key(
-    group: _TriageGroup, ordered_item_ids: list[str]
+    group: _TriageGroup, item_positions: dict[str, int]
 ) -> tuple[int, str]:
     if not group.item_ids:
-        return (len(ordered_item_ids), group.group_id)
-    first_item_id = group.item_ids[0]
-    if first_item_id not in ordered_item_ids:
-        return (len(ordered_item_ids), group.group_id)
-    return (ordered_item_ids.index(first_item_id), group.group_id)
+        return (len(item_positions), group.group_id)
+    return (
+        item_positions.get(group.item_ids[0], len(item_positions)),
+        group.group_id,
+    )
 
 
 def _normalized_id(value: Any) -> str | None:

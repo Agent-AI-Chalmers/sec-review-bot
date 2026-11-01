@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 from sec_review_agents.filesystem import docker_runtime
-from sec_review_agents.filesystem.bwrap_backend import BwrapSandboxBackend
 from sec_review_agents.filesystem.docker_backend import DockerSandboxBackend
 from sec_review_agents.observability.diagnostics import log_diagnostic
 
@@ -13,7 +12,7 @@ CODEGRAPH_AGENT_WORKSPACE = "/workspace"
 
 
 def _prepare_sandbox_codegraph_index(
-    backend: BwrapSandboxBackend | DockerSandboxBackend,
+    backend: DockerSandboxBackend,
     workspace: str,
 ) -> str | None:
     quoted_workspace = shlex.quote(workspace)
@@ -130,29 +129,6 @@ def codegraph_mcp_connections_for_backend(
                     "--path",
                     workspace,
                 ],
-            }
-        }
-
-    if isinstance(backend, BwrapSandboxBackend):
-        workspace = backend.sandbox_path_for_agent_path(
-            CODEGRAPH_AGENT_WORKSPACE,
-            require_writable=True,
-        )
-        if workspace is None:
-            log_diagnostic("codegraph_mcp_skipped", reason="index_not_available")
-            return {}
-        workspace = _prepare_sandbox_codegraph_index(backend, workspace)
-        if workspace is None:
-            log_diagnostic("codegraph_mcp_skipped", reason="index_not_available")
-            return {}
-        command, args = backend.stdio_shell_command(
-            "exec codegraph serve --mcp --no-watch --path " f"{shlex.quote(workspace)}"
-        )
-        return {
-            "codegraph": {
-                "transport": "stdio",
-                "command": command,
-                "args": args,
             }
         }
 

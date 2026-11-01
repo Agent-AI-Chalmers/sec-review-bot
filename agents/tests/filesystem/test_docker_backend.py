@@ -1,19 +1,14 @@
 import asyncio
-import base64
 import json
 import subprocess
-import sys
-import tempfile
 import threading
 import time
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 from deepagents.backends.protocol import (
     ExecuteResponse,
-    FileUploadResponse,
     LsResult,
     SandboxBackendProtocol,
 )
@@ -34,35 +29,8 @@ from sec_review_agents.filesystem.docker_runtime import (
 )
 from sec_review_agents.filesystem.limits import (
     DEFAULT_COMMAND_TIMEOUT_MS,
-    FilesystemLimits,
-)
-from sec_review_agents.filesystem.sandbox_file_ops import (
-    limits_payload,
-    sandbox_file_script_source,
 )
 from sec_review_agents.runtime.backend_cleanup import aclose_backend
-
-
-def _run_file_script(payload: dict[str, object]) -> dict[str, object]:
-    encoded_payload = base64.b64encode(json.dumps(payload).encode("utf-8")).decode(
-        "ascii"
-    )
-    script = sandbox_file_script_source(payload_b64=encoded_payload)
-    result = subprocess.run(
-        [sys.executable, "-c", script],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stderr
-    payload_data = json.loads(result.stdout)
-    assert isinstance(payload_data, dict)
-    return payload_data
-
-
-def _result_list(payload: dict[str, object], key: str) -> list[object]:
-    value = payload.get(key)
-    return value if isinstance(value, list) else []
 
 
 class _AsyncProcess:
@@ -277,220 +245,10 @@ def test_sandbox_backend_rejects_unknown_mode() -> None:
         patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "host"}, clear=True),
         pytest.raises(
             ValueError,
-            match="AGENT_SANDBOX_BACKEND must be one of: docker, bwrap",
+            match="AGENT_SANDBOX_BACKEND must be docker",
         ),
     ):
         selected_sandbox_backend_kind()
-
-
-def test_container_file_script_edits_mixed_newline_content() -> None:
-    with tempfile.TemporaryDirectory() as tempdir:
-        target = Path(tempdir) / "mixed.txt"
-        target.write_bytes(b"alpha\r\nbeta\ngamma\r\n")
-
-        result = _run_file_script(
-            {
-                "op": "edit",
-                "path": str(target),
-                "old": "alpha\nbeta\n",
-                "new": "ALPHA\nBETA\n",
-                "replace_all": False,
-                "limits": limits_payload(FilesystemLimits()),
-            }
-        )
-
-        assert result == {"count": 1}
-        assert target.read_bytes() == b"ALPHA\r\nBETA\r\ngamma\r\n"
-
-
-def test_container_file_script_reports_read_pagination() -> None:
-    with tempfile.TemporaryDirectory() as tempdir:
-        target = Path(tempdir) / "lines.txt"
-        target.write_text("first\nsecond\nthird\n", encoding="utf-8")
-
-        result = _run_file_script(
-            {
-                "op": "read",
-                "path": str(target),
-                "offset": 1,
-                "limit": 1,
-                "limits": limits_payload(FilesystemLimits()),
-            }
-        )
-
-    assert result == {
-        "encoding": "utf-8",
-        "content": "second",
-        "total_lines": 3,
-        "start_line": 2,
-        "end_line": 2,
-        "next_offset": 2,
-    }
-
-
-def test_container_file_script_normalizes_degenerate_read_windows() -> None:
-    with tempfile.TemporaryDirectory() as tempdir:
-        target = Path(tempdir) / "lines.txt"
-        target.write_text("first\nsecond\n", encoding="utf-8")
-
-        negative_offset = _run_file_script(
-            {
-                "op": "read",
-                "path": str(target),
-                "offset": -1,
-                "limit": 1,
-                "limits": limits_payload(FilesystemLimits()),
-            }
-        )
-        no_lines = _run_file_script(
-            {
-                "op": "read",
-                "path": str(target),
-                "offset": 0,
-                "limit": 0,
-                "limits": limits_payload(FilesystemLimits()),
-            }
-        )
-
-    assert negative_offset["content"] == "first"
-    assert negative_offset["start_line"] == 1
-    assert no_lines == {
-        "encoding": "utf-8",
-        "content": "",
-        "no_lines_requested": True,
-    }
-
-
-def test_container_file_script_degenerate_window_still_validates_path() -> None:
-    with tempfile.TemporaryDirectory() as tempdir:
-        result = _run_file_script(
-            {
-                "op": "read",
-                "path": str(Path(tempdir) / "missing.txt"),
-                "offset": 0,
-                "limit": 0,
-                "limits": limits_payload(FilesystemLimits()),
-            }
-        )
-
-    assert result == {"error": "file_not_found"}
-
-
-def test_container_file_script_keeps_page_when_count_exceeds_scan_budget() -> None:
-    with tempfile.TemporaryDirectory() as tempdir:
-        target = Path(tempdir) / "lines.txt"
-        target.write_text("first\nsecond\nthird\n", encoding="utf-8")
-
-        result = _run_file_script(
-            {
-                "op": "read",
-                "path": str(target),
-                "offset": 0,
-                "limit": 1,
-                "limits": limits_payload(
-                    FilesystemLimits(read_max_scan_bytes=len("first\nsecond\n"))
-                ),
-            }
-        )
-
-    assert result == {
-        "encoding": "utf-8",
-        "content": "first",
-        "total_lines": None,
-        "start_line": 1,
-        "end_line": 1,
-        "next_offset": 1,
-    }
-
-
-def test_container_file_script_stops_glob_at_result_budget() -> None:
-    with tempfile.TemporaryDirectory() as tempdir:
-        root = Path(tempdir)
-        for index in range(5):
-            (root / f"file-{index}.py").write_text("x", encoding="utf-8")
-
-        result = _run_file_script(
-            {
-                "op": "glob",
-                "path": str(root),
-                "pattern": "*.py",
-                "limits": limits_payload(FilesystemLimits(glob_max_results=2)),
-            }
-        )
-
-        assert result["stop_reason"] == "result_limit"
-        assert len(_result_list(result, "matches")) == 2
-
-
-def test_container_file_script_stops_grep_at_match_budget() -> None:
-    with tempfile.TemporaryDirectory() as tempdir:
-        target = Path(tempdir) / "matches.txt"
-        target.write_text("needle\nneedle\nneedle\n", encoding="utf-8")
-
-        result = _run_file_script(
-            {
-                "op": "grep",
-                "path": str(target),
-                "pattern": "needle",
-                "glob": "**/*",
-                "limits": limits_payload(FilesystemLimits(grep_max_matches=2)),
-            }
-        )
-
-    assert result["stop_reason"] == "match_limit"
-    assert len(_result_list(result, "matches")) == 2
-
-
-def test_container_file_script_does_not_truncate_exact_grep_budget() -> None:
-    with tempfile.TemporaryDirectory() as tempdir:
-        target = Path(tempdir) / "matches.txt"
-        target.write_text("needle\nneedle\n", encoding="utf-8")
-
-        result = _run_file_script(
-            {
-                "op": "grep",
-                "path": str(target),
-                "pattern": "needle",
-                "glob": "**/*",
-                "limits": limits_payload(FilesystemLimits(grep_max_matches=2)),
-            }
-        )
-
-    assert result.get("stop_reason") is None
-    assert len(_result_list(result, "matches")) == 2
-
-
-def test_container_file_script_zero_grep_budget_only_truncates_when_matches_exist() -> (
-    None
-):
-    with tempfile.TemporaryDirectory() as tempdir:
-        target = Path(tempdir) / "matches.txt"
-        target.write_text("haystack\n", encoding="utf-8")
-
-        no_match_result = _run_file_script(
-            {
-                "op": "grep",
-                "path": str(target),
-                "pattern": "needle",
-                "glob": "**/*",
-                "limits": limits_payload(FilesystemLimits(), grep_max_count=0),
-            }
-        )
-        target.write_text("needle\n", encoding="utf-8")
-        match_result = _run_file_script(
-            {
-                "op": "grep",
-                "path": str(target),
-                "pattern": "needle",
-                "glob": "**/*",
-                "limits": limits_payload(FilesystemLimits(), grep_max_count=0),
-            }
-        )
-
-    assert no_match_result.get("stop_reason") is None
-    assert _result_list(no_match_result, "matches") == []
-    assert match_result["stop_reason"] == "match_limit"
-    assert _result_list(match_result, "matches") == []
 
 
 def test_start_container_marks_only_read_only_mounts_readonly() -> None:
@@ -707,7 +465,7 @@ async def test_async_filesystem_methods_use_local_async_semantics() -> None:
         commands.append(command)
         return ExecuteResponse(
             output=json.dumps(
-                {"entries": [{"path": "/mnt/material/workspace/app.py"}]}
+                {"path": "/mnt/material/workspace/app.py", "is_dir": False}
             ),
             exit_code=0,
         )
@@ -718,7 +476,7 @@ async def test_async_filesystem_methods_use_local_async_semantics() -> None:
     result = await backend.als("/workspace")
 
     assert commands
-    assert result == LsResult(entries=[{"path": "/workspace/app.py"}])
+    assert result == LsResult(entries=[{"path": "/workspace/app.py", "is_dir": False}])
 
 
 def test_routes_define_agent_visible_prefixes() -> None:
@@ -739,9 +497,6 @@ def test_routes_define_agent_visible_prefixes() -> None:
         ],
     )
 
-    assert "/mnt/material/workspace" in backend.readable_prefixes
-    assert "/mnt/material/workspace" in backend.writable_prefixes
-    assert "/workspace" not in backend.readable_prefixes
     assert backend._is_allowed_path("/workspace/app.py")
     assert backend._is_allowed_path("/workspace/app.py", writable=True)
     assert (
@@ -776,122 +531,6 @@ def test_routes_define_agent_visible_prefixes() -> None:
     )
 
 
-def test_ls_maps_container_paths_back_to_agent_paths() -> None:
-    backend = _backend(
-        routes=[
-            DockerRoute(
-                container_path="/mnt/material/workspace",
-                agent_path="/workspace",
-                writable=False,
-            )
-        ],
-    )
-
-    with patch.object(
-        backend,
-        "_run_file_operation",
-        return_value={
-            "entries": [
-                {
-                    "path": "/mnt/material/workspace/app.py",
-                    "is_dir": False,
-                }
-            ]
-        },
-    ):
-        result = backend.ls("/workspace")
-
-    assert result.error is None
-    assert result.entries is not None
-    assert result.entries[0]["path"] == "/workspace/app.py"
-
-
-def test_glob_budget_returns_structured_truncation() -> None:
-    backend = _backend(
-        routes=[
-            DockerRoute(
-                container_path="/workspace",
-                agent_path="/workspace",
-                writable=False,
-            )
-        ],
-    )
-
-    with patch.object(
-        backend,
-        "_run_file_operation",
-        return_value={"matches": [], "stop_reason": "result_limit"},
-    ):
-        result = backend.glob("**/*.py", "/workspace")
-
-    assert result.error is None
-    assert result.truncated
-    assert result.truncation_reason == "budget"
-
-
-def test_read_maps_pagination_metadata() -> None:
-    backend = _backend(
-        routes=[
-            DockerRoute(
-                container_path="/workspace",
-                agent_path="/workspace",
-                writable=False,
-            )
-        ],
-    )
-
-    with patch.object(
-        backend,
-        "_run_file_operation",
-        return_value={
-            "content": "second\nthird",
-            "encoding": "utf-8",
-            "total_lines": 4,
-            "start_line": 2,
-            "end_line": 3,
-            "next_offset": 3,
-        },
-    ):
-        result = backend.read("/workspace/app.py", offset=1, limit=2)
-
-    assert result.start_line == 2
-    assert result.end_line == 3
-    assert result.total_lines == 4
-    assert result.next_offset == 3
-
-
-def test_edit_uses_newline_tolerant_docker_file_operation() -> None:
-    backend = _backend(
-        routes=[
-            DockerRoute(
-                container_path="/mnt/material/workspace",
-                agent_path="/workspace",
-                writable=True,
-            )
-        ],
-    )
-
-    with (
-        patch.object(
-            backend,
-            "_run_file_operation",
-            return_value={"count": 1},
-        ) as operation,
-        patch.object(backend, "_normalize_mount_ownership"),
-    ):
-        result = backend.edit(
-            "/workspace/app.py",
-            "a\nb",
-            "a\nc",
-        )
-
-    assert result.error is None
-    assert result.path == "/workspace/app.py"
-    payload = operation.call_args.args[0]
-    assert payload["op"] == "edit"
-    assert payload["path"] == "/mnt/material/workspace/app.py"
-
-
 def test_finalize_normalizes_mount_ownership_once_at_backend_end() -> None:
     backend = _backend()
     with patch.object(backend, "_normalize_mount_ownership") as normalize:
@@ -900,28 +539,27 @@ def test_finalize_normalizes_mount_ownership_once_at_backend_end() -> None:
     normalize.assert_called_once_with()
 
 
-def test_tmp_is_available_only_when_path_binding_exposes_it() -> None:
+def test_tmp_is_container_native_even_without_material_routes() -> None:
     backend = _backend()
-
-    assert "/tmp" not in backend.readable_prefixes
-    assert "/tmp" not in backend.writable_prefixes
-    assert not backend._is_allowed_path("/tmp/app.py")
-    assert not backend._is_allowed_path("/tmp/app.py", writable=True)
-
-    backend_with_tmp = _backend(
-        routes=[
-            DockerRoute(
-                container_path="/tmp",
-                agent_path="/tmp",
-                writable=True,
-            )
-        ],
+    assert (
+        backend.sandbox_path_for_agent_path("/tmp/payload", require_writable=True)
+        == "/tmp/payload"
     )
+    assert not backend.mounts
 
-    assert "/tmp" in backend_with_tmp.readable_prefixes
-    assert "/tmp" in backend_with_tmp.writable_prefixes
-    assert backend_with_tmp._is_allowed_path("/tmp/app.py")
-    assert backend_with_tmp._is_allowed_path("/tmp/app.py", writable=True)
+
+@pytest.mark.parametrize(
+    "container_path,writable", [("/elsewhere", True), ("/tmp", False)]
+)
+def test_tmp_route_cannot_break_upstream_staging(container_path, writable):
+    with pytest.raises(ValueError, match="container-native"):
+        _backend(
+            routes=[
+                DockerRoute(
+                    container_path=container_path, agent_path="/tmp", writable=writable
+                )
+            ]
+        )
 
 
 def test_execute_does_not_normalize_mount_ownership_after_command() -> None:
@@ -1077,7 +715,19 @@ async def test_aexecute_timeout_includes_partial_output() -> None:
     assert result.exit_code == 124
 
 
-def test_execute_preserves_untruncated_output() -> None:
+@pytest.mark.parametrize(
+    ("stdout", "stderr", "expected"),
+    [
+        ("ok", "warn\n", "ok\n[stderr] warn"),
+        ("ok\n", "warn\nnext\n", "ok\n\n[stderr] warn\n[stderr] next"),
+        ("", "  warn\n", "[stderr] warn"),
+        ("", "", "<no output>"),
+    ],
+)
+def test_execute_formats_output_like_deepagents(
+    stdout: str, stderr: str, expected: str
+) -> None:
+    """Match upstream display formatting, including its extra separator after stdout."""
     with patch.dict(
         "os.environ",
         {"AGENT_DOCKER_MAX_OUTPUT_BYTES": "64"},
@@ -1085,21 +735,20 @@ def test_execute_preserves_untruncated_output() -> None:
     ):
         backend = _backend()
 
-    class Result:
-        returncode = 0
-        stdout = "ok"
-        stderr = "warn\n"
+    result_stub = subprocess.CompletedProcess(
+        args=["command"], returncode=0, stdout=stdout, stderr=stderr
+    )
 
     with (
         patch.object(backend.container, "ensure_started"),
         patch(
             "sec_review_agents.filesystem.docker_runtime.run_docker_command",
-            return_value=Result(),
+            return_value=result_stub,
         ),
     ):
         result = backend.execute("echo ok")
 
-    assert result.output == "ok[stderr] warn\n"
+    assert result.output == expected
     assert not result.truncated
     assert result.exit_code == 0
 
@@ -1215,50 +864,6 @@ def test_download_missing_returns_agent_path() -> None:
 
     assert responses[0].path == "/workspace/missing.py"
     assert responses[0].error == "file_not_found"
-
-
-def test_large_edit_cleans_uploaded_temp_files_after_success() -> None:
-    backend = _backend(
-        mounts=[
-            DockerMount(
-                host_path="/tmp/host-workspace",
-                container_path="/workspace",
-                writable=True,
-            )
-        ],
-    )
-    execute_commands: list[str] = []
-
-    class Result:
-        output = '{"count": 1}'
-        exit_code = 0
-        truncated = False
-
-    def fake_execute(command: str, *, timeout=None):
-        execute_commands.append(command)
-        return Result()
-
-    with (
-        patch.object(
-            backend,
-            "upload_files",
-            return_value=[
-                FileUploadResponse(path="/workspace/.old", error=None),
-                FileUploadResponse(path="/workspace/.new", error=None),
-            ],
-        ),
-        patch.object(backend, "execute", side_effect=fake_execute),
-    ):
-        result = backend._edit_via_allowed_upload(
-            "/workspace/app.py",
-            "old",
-            "new",
-            replace_all=False,
-        )
-
-    assert result.error is None
-    assert result.occurrences == 1
-    assert any(command.startswith("rm -f ") for command in execute_commands)
 
 
 def test_container_resource_has_empty_environment_and_unique_name() -> None:
@@ -1459,3 +1064,29 @@ async def test_docker_backend_aclose_records_a_completed_removal_when_afinalize_
 
     assert backend._closed is True
     assert backend.container.closed is True
+
+
+def test_readonly_nested_route_overrides_writable_parent() -> None:
+    backend = _backend(
+        routes=[
+            DockerRoute("/tmp/reference", "/tmp/reference", False),
+        ]
+    )
+    assert (
+        backend.sandbox_path_for_agent_path("/tmp/payload", require_writable=True)
+        == "/tmp/payload"
+    )
+    assert (
+        backend.sandbox_path_for_agent_path("/tmp/reference/file")
+        == "/tmp/reference/file"
+    )
+    assert (
+        backend.sandbox_path_for_agent_path(
+            "/tmp/reference/file", require_writable=True
+        )
+        is None
+    )
+    assert (
+        backend.upload_files([("/tmp/reference/file", b"change")])[0].error
+        == "permission_denied"
+    )

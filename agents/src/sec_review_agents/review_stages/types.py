@@ -1,4 +1,4 @@
-from typing import Literal, get_args
+from typing import Literal
 
 Verdict = Literal[
     "no-actionable-finding",
@@ -24,7 +24,3 @@ PatchCoverage = Literal[
 ]
 ResolutionNextStep = Literal["none", "retry-ai", "manual-review"]
 CvssOutcome = Literal["scored", "not-scored", "skipped"]
-
-
-def literal_values(literal: object) -> tuple[str, ...]:
-    return get_args(literal)

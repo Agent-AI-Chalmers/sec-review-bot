@@ -10,6 +10,11 @@ async def connect_temporal_client(*, address: str, namespace: str) -> Client:
     The converter is part of the workflow payload protocol: activities and child
     workflows must restore nested Pydantic models, not plain dictionaries. Keep
     it fixed here so CLI submissions and workers cannot silently diverge.
+
+    Its JSON decoder uses Pydantic TypeAdapter.validate_json with the declared
+    activity/workflow type, resolving supported PEP 695 aliases recursively.
+    The default converter instead uses Temporal's value_to_type. Successful JSON
+    encoding alone therefore does not establish that a type can cross this boundary.
     """
     return await Client.connect(
         address, namespace=namespace, data_converter=pydantic_data_converter

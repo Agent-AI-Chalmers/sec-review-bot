@@ -165,18 +165,10 @@ async def ensure_configured_memory_schedules(
                 "obsolete_memory_schedule_deleted",
                 schedule_id=schedule_id,
             )
-    try:
-        result = await ensure_default_memory_maintenance_schedule(
-            client,
-            task_queue=task_queue,
-        )
-    except Exception as error:
-        logger.warning(
-            "memory_schedule_ensure_failed",
-            schedule="maintenance",
-            error=str(error),
-        )
-        return
+    result = await ensure_default_memory_maintenance_schedule(
+        client,
+        task_queue=task_queue,
+    )
     logger.info(
         "memory_schedule_ensured",
         schedule="maintenance",

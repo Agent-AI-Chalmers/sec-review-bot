@@ -1,6 +1,8 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
+from sec_review_agents.workspace.file_changes import (
+    FileChange,
+)
 
 
 class MitigationStageResult(BaseModel):
@@ -13,26 +15,7 @@ class MitigationStageResult(BaseModel):
     """
 
     overview: str
-    file_changes: list[DeletedFileChange | UpsertFileChange] = Field(
-        default_factory=list
-    )
+    file_changes: list[FileChange] = Field(default_factory=list)
     patch_diff: str = ""
 
     model_config = ConfigDict(extra="ignore")
-
-
-def build_mitigation_stage_result(
-    *,
-    overview: str,
-    file_changes: list[DeletedFileChange | UpsertFileChange] | None = None,
-    patch_diff: str = "",
-) -> MitigationStageResult:
-    return MitigationStageResult(
-        overview=overview, file_changes=file_changes or [], patch_diff=patch_diff
-    )
-
-
-def build_skipped_mitigation_result(*, reason: str) -> MitigationStageResult:
-    return build_mitigation_stage_result(
-        overview=reason,
-    )
