@@ -89,6 +89,9 @@ jobs:
       - name: Check changed-area model
         run: python3 .github/ci/check-changed-areas.py
 
+      - name: Test CI selection and aggregation
+        run: python3 .github/ci/test_ci.py
+
   ops:
     name: Ops
     needs: changes

@@ -60,6 +60,10 @@ ruby .github/ci/check-review-setup.rb
 
 The first checks that every CI job contributes to `CI Status`. The second checks that trusted review setup installs every tracked pnpm package.
 
+## Regression Probes
+
+Run `python3 .github/ci/test_ci.py` from the repository root. The automation job runs the same probes for PostgreSQL selection, aggregate failure/cancellation handling, and missing dependency rejection. They execute the real scripts and parsed workflow configuration using Python's standard library and Ruby's YAML parser.
+
 ## Changed-Area Model
 
 CI does not run every job on every change. The `changes` job decides which areas changed, and each area job runs only when its area did.
