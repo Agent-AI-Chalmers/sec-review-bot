@@ -26,6 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       automation-config: ${{ steps.filter.outputs.automation-config }}
+      catalog-seam: ${{ steps.filter.outputs.catalog-seam }}
+      input-bundle-seam: ${{ steps.filter.outputs.input-bundle-seam }}
+      memory-bff-seam: ${{ steps.filter.outputs.memory-bff-seam }}
       ops: ${{ steps.filter.outputs.ops }}
       contract-tools: ${{ steps.filter.outputs.contract-tools }}
       review-runs: ${{ steps.filter.outputs.review-runs }}
@@ -46,6 +49,7 @@ jobs:
         uses: dorny/paths-filter@v4
         with:
           filters: .github/ci/changed-areas.yml
+
   automation-config:
     name: Automation Config
     needs: changes
@@ -67,19 +71,12 @@ jobs:
       - name: Parse Dependabot configuration
         run: ruby -e 'require "yaml"; YAML.parse_file(".github/dependabot.yml")'
 
+      # Every CI job must contribute to the required aggregate check.
+      - name: Check CI Status dependency coverage
+        run: ruby .github/ci/check-ci-status-dependencies.rb
+
       - name: Check trusted review setup package coverage
-        run: |
-          ruby -ryaml -e '
-            setup = YAML.safe_load_file(".sec-review/setup.yml").fetch("setup")
-            actual = setup.filter_map do |step|
-              step["working-directory"] if step["run"] == "pnpm install --frozen-lockfile"
-            end.sort
-            expected = IO.popen(["git", "ls-files", "*/pnpm-lock.yaml"], &:read).lines.map {
-              File.dirname(_1.strip)
-            }.sort
-            message = "setup pnpm directories differ:\nexpected=" + expected.inspect + "\nactual=" + actual.inspect
-            abort message unless actual == expected
-          '
+        run: ruby .github/ci/check-review-setup.rb
 
       # The changed-area model (`.github/ci/changed-areas.yml`) is the single source of the
       # `changes` job's filters. This checks the couplings CI cannot see in an import graph: that
@@ -87,6 +84,9 @@ jobs:
       # covered — the coupling that, when missing, lets a change run no job at all.
       - name: Check changed-area model
         run: python3 .github/ci/check-changed-areas.py
+
+      - name: Test CI aggregation
+        run: python3 .github/ci/test_ci.py
 
   ops:
     name: Ops
@@ -119,66 +119,12 @@ jobs:
         run: docker compose -f compose.yaml config -q --no-interpolate
 
   contract-tools:
-    name: Contract Tools (${{ matrix.name }})
+    name: Contract Tools
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
       needs.changes.outputs.contract-tools == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: review-runs-api
-            tools_directory: contracts/review-runs-api/tools
-          - name: execution-api
-            tools_directory: contracts/execution-api/tools
-          - name: memory-catalog-api
-            tools_directory: contracts/memory-catalog-api/tools
-          - name: tar-zstd-envelope
-            tools_directory: contracts/tar-zstd-artifact/envelope/tools
-          - name: memory-tree-profile
-            tools_directory: contracts/tar-zstd-artifact/profiles/memory-tree/tools
-          - name: input-bundle-profile
-            tools_directory: contracts/tar-zstd-artifact/profiles/input-bundle/tools
-          - name: run-diagnostic-profile
-            tools_directory: contracts/tar-zstd-artifact/profiles/run-diagnostic/tools
-    defaults:
-      run:
-        working-directory: ${{ matrix.tools_directory }}
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: ${{ matrix.tools_directory }}/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: ${{ matrix.tools_directory }}/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Check generated artifacts are fresh
-        # Re-renders this family's projections and compares them to the committed files. It
-        # also runs inside `pnpm test`, but as its own step so a failure reads as one check.
-        run: pnpm run check
-
-      - name: Check
-        run: |
-          pnpm --if-present run format:check
-          pnpm --if-present run lint
-          pnpm --if-present run lint:contract
-          pnpm --if-present run typecheck
-          pnpm test
+    uses: ./.github/workflows/ci-contracts.yml
 
   review-runs:
     name: Review Runs
@@ -208,22 +154,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
         with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: services/review-runs/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: services/review-runs/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          directory: services/review-runs
 
       - name: Check
         run: |
@@ -236,85 +170,6 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
         run: pnpm run test:integration
-
-  execution-gateway:
-    name: Execution Gateway
-    needs: changes
-    if: >-
-      github.event_name == 'merge_group' ||
-      needs.changes.outputs.execution-gateway == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/execution-gateway
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: services/execution-gateway/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: services/execution-gateway/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Check
-        run: |
-          pnpm run format:check
-          pnpm run lint
-          pnpm run typecheck
-          pnpm test
-
-      - name: Integration test
-        run: pnpm run test:integration
-
-  execution-submission-system:
-    name: Execution Submission System Test
-    needs: changes
-    if: >-
-      github.event_name == 'merge_group' ||
-      needs.changes.outputs.system-tests == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: services/execution-gateway/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: |
-            services/execution-gateway/pnpm-lock.yaml
-            services/review-runs/pnpm-lock.yaml
-
-      - name: Install Execution Gateway dependencies
-        working-directory: services/execution-gateway
-        run: pnpm install --frozen-lockfile
-
-      - name: Install Review Runs dependencies
-        working-directory: services/review-runs
-        run: pnpm install --frozen-lockfile
-
-      - name: Test execution submission boundary
-        run: node --test scripts/system-tests/execution-submission.test.mjs
 
   memory-catalog:
     name: Memory Catalog
@@ -344,22 +199,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
         with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: services/memory-catalog/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: services/memory-catalog/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          directory: services/memory-catalog
 
       - name: Check
         run: |
@@ -372,6 +215,79 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://memory_catalog:ci-test-password@127.0.0.1:5432/memory_catalog_test
         run: pnpm run test:integration
+
+  execution-gateway:
+    name: Execution Gateway
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.execution-gateway == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/execution-gateway
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
+        with:
+          directory: services/execution-gateway
+
+      - name: Check
+        run: |
+          pnpm run format:check
+          pnpm run lint
+          pnpm run typecheck
+          pnpm test
+
+      - name: Integration test
+        run: pnpm run test:integration
+
+  memory-artifact-smoke:
+    name: Smoke — Memory and Artifacts
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.catalog-seam == 'true' ||
+      needs.changes.outputs.input-bundle-seam == 'true' ||
+      needs.changes.outputs.memory-bff-seam == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/check-seams
+        with:
+          catalog: ${{ github.event_name == 'merge_group' || needs.changes.outputs.catalog-seam == 'true' }}
+          input-bundle: ${{ github.event_name == 'merge_group' || needs.changes.outputs.input-bundle-seam == 'true' }}
+          memory-bff: ${{ github.event_name == 'merge_group' || needs.changes.outputs.memory-bff-seam == 'true' }}
+
+  execution-submission-system:
+    name: Smoke — Execution Submission
+    needs: changes
+    if: >-
+      github.event_name == 'merge_group' ||
+      needs.changes.outputs.system-tests == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
+        with:
+          directory: services/execution-gateway
+          cache-dependency-path: |
+            services/execution-gateway/pnpm-lock.yaml
+            services/review-runs/pnpm-lock.yaml
+
+      - name: Install Review Runs dependencies
+        working-directory: services/review-runs
+        run: pnpm install --frozen-lockfile
+
+      - name: Test execution submission boundary
+        run: node --test scripts/system-tests/execution-submission.test.mjs
 
   github-integration:
     name: GitHub Integration
@@ -387,22 +303,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
         with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: apps/github-integration/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: apps/github-integration/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          directory: apps/github-integration
 
       - name: Lint
         run: |
@@ -435,22 +339,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
         with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: apps/control-plane-ui/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: apps/control-plane-ui/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          directory: apps/control-plane-ui
 
       - name: Check
         run: |
@@ -464,57 +356,12 @@ jobs:
           pnpm run build
 
   control-plane-ui-browser:
-    name: Control Plane UI browser (${{ matrix.project }})
+    name: Control Plane UI E2E
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
       needs.changes.outputs.control-plane-ui == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/control-plane-ui
-    strategy:
-      fail-fast: false
-      matrix:
-        project:
-          - desktop
-          - mobile
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v7
-
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: 12
-          run_install: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version-file: apps/control-plane-ui/package.json
-          check-latest: true
-          cache: pnpm
-          cache-dependency-path: apps/control-plane-ui/pnpm-lock.yaml
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Browser project
-        run: pnpm exec playwright test --project=${{ matrix.project }}
-
-      # The runner workspace disappears after the job. Preserve Playwright's
-      # report, error context, traces, and screenshots only when diagnosis is needed.
-      - name: Upload browser diagnostics
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: control-plane-ui-${{ matrix.project }}-playwright
-          path: |
-            apps/control-plane-ui/playwright-report/
-            apps/control-plane-ui/test-results/
-          retention-days: 14
-          if-no-files-found: warn
+    uses: ./.github/workflows/ci-browser.yml
 
   agents:
     name: Agents
@@ -523,59 +370,12 @@ jobs:
       github.event_name == 'merge_group' ||
       needs.changes.outputs.agents == 'true'
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: agents
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up Python
-        id: setup-python
-        uses: actions/setup-python@v7
-        with:
-          python-version-file: agents/.python-version
-
-      - name: Set up uv
-        # setup-uv intentionally uses immutable releases and does not publish
-        # floating major/minor tags; pin the action while the uv CLI tracks latest.
-        uses: astral-sh/setup-uv@v10.3.3
-        with:
-          enable-cache: true
-          cache-dependency-glob: agents/uv.lock
-
-      - name: Install dependencies
-        run: uv sync --group dev --frozen
-
-      # mypy's cache is safe to restore across commits: mypy validates cached
-      # metadata against the current source and dependencies before reusing it.
-      # Include the commit in the exact key so successful runs can publish a
-      # fresh cache; the restore prefix finds the newest compatible prior run.
-      - name: Restore mypy cache
-        uses: actions/cache@v6
-        with:
-          path: agents/.mypy_cache
-          key: >-
-            mypy-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('agents/uv.lock', 'agents/pyproject.toml') }}-${{ github.sha }}
-          restore-keys: |
-            mypy-${{ runner.os }}-py${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('agents/uv.lock', 'agents/pyproject.toml') }}-
-
-      - name: Lint with Ruff
-        run: uv run ruff check .
-
-      - name: Check formatting with Black
-        run: uv run black --check .
-
-      - name: Type-check with mypy
-        run: uv run mypy .
-
-      - name: Type-check with Pyright
-        run: uv run pyright .
-
-      - name: Test
-        # Report every setup/call/teardown phase taking at least 10 ms. This is
-        # diagnostic only: it does not select, skip, reorder, or relax tests.
-        run: uv run python -m pytest --durations=0 --durations-min=0.01
+      - name: Check agents
+        uses: ./.github/actions/check-agents
 
   scripts:
     name: Repository Scripts
@@ -588,20 +388,9 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v7
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
-        with:
-          python-version-file: agents/.python-version
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v10.3.3
-        with:
-          enable-cache: true
-          cache-dependency-glob: agents/uv.lock
-
-      - name: Install dependencies
-        working-directory: agents
-        run: uv sync --group dev --frozen
+      - name: Set up Python environment
+        id: setup-python
+        uses: ./.github/actions/setup-python
 
       # Scripts are repository tools rather than part of the typed agents
       # package, but they still depend on the agents runtime and its deps.
@@ -657,10 +446,13 @@ jobs:
       - ops
       - contract-tools
       - review-runs
-      - execution-gateway
       - memory-catalog
+      - execution-gateway
+      - execution-submission-system
+      - memory-artifact-smoke
       - github-integration
       - control-plane-ui
+      - control-plane-ui-browser
       - agents
       - scripts
       - documentation
@@ -670,42 +462,21 @@ jobs:
       # Use this aggregate job as the required branch-protection check.
       - name: Check CI result
         env:
-          CHANGES_RESULT: ${{ needs.changes.result }}
-          AUTOMATION_CONFIG_RESULT: ${{ needs.automation-config.result }}
-          OPS_RESULT: ${{ needs.ops.result }}
-          CONTRACT_TOOLS_RESULT: ${{ needs.contract-tools.result }}
-          REVIEW_RUNS_RESULT: ${{ needs.review-runs.result }}
-          EXECUTION_GATEWAY_RESULT: ${{ needs.execution-gateway.result }}
-          MEMORY_CATALOG_RESULT: ${{ needs.memory-catalog.result }}
-          GITHUB_INTEGRATION_RESULT: ${{ needs.github-integration.result }}
-          CONTROL_PLANE_UI_RESULT: ${{ needs.control-plane-ui.result }}
-          AGENTS_RESULT: ${{ needs.agents.result }}
-          SCRIPTS_RESULT: ${{ needs.scripts.result }}
-          DOCUMENTATION_RESULT: ${{ needs.documentation.result }}
+          NEEDS_JSON: ${{ toJSON(needs) }}
         run: |
-          set -euo pipefail
-          # CHANGES_RESULT is checked too: if change detection itself fails, every
-          # area job is skipped but the aggregate must still go red rather than
-          # pass with nothing executed.
-          for result in \
-            "$CHANGES_RESULT" \
-            "$AUTOMATION_CONFIG_RESULT" \
-            "$OPS_RESULT" \
-            "$CONTRACT_TOOLS_RESULT" \
-            "$REVIEW_RUNS_RESULT" \
-            "$EXECUTION_GATEWAY_RESULT" \
-            "$MEMORY_CATALOG_RESULT" \
-            "$GITHUB_INTEGRATION_RESULT" \
-            "$CONTROL_PLANE_UI_RESULT" \
-            "$AGENTS_RESULT" \
-            "$SCRIPTS_RESULT" \
-            "$DOCUMENTATION_RESULT"; do
-            case "$result" in
-              success|skipped)
-                ;;
-              *)
-                echo "A required CI job did not pass. Result: $result" >&2
-                exit 1
-                ;;
-            esac
-          done
+          python3 - <<'PYTHON'
+          import json
+          import os
+          import sys
+
+          # Include change detection: its failure can skip every area job.
+          needs = json.loads(os.environ["NEEDS_JSON"])
+          failed = {
+              job: details["result"]
+              for job, details in needs.items()
+              if details["result"] not in {"success", "skipped"}
+          }
+          for job, result in failed.items():
+              print(f"{job}: {result}", file=sys.stderr)
+          sys.exit(1 if failed else 0)
+          PYTHON

@@ -24,6 +24,57 @@ python3 .github/ci/validate-pr-description.py /path/to/pr-body.md
 
 Dependabot descriptions are exempt from the human-authored template but must be non-empty.
 
+## Workflow Boundaries
+
+[The main CI workflow](../workflows/ci.yml) owns event triggers, change selection, job dependencies, and the required CI Status check. It calls these workflows at the same revision:
+
+- [Browser checks](../workflows/ci-browser.yml) own the desktop/mobile matrix and failure diagnostics.
+- [Contract checks](../workflows/ci-contracts.yml) own the tool-family matrix and generated-artifact freshness checks. The changed-area validator reads this workflow to check tool-directory coverage.
+
+The called workflows use workflow_call; they do not trigger independent PR runs. Their caller jobs remain direct dependencies of CI Status, so their failures contribute to the aggregate. Their file paths are included in the corresponding changed areas.
+
+GitHub displays called jobs beneath their caller names. Branch protection should require CI Status; installations that additionally require individual called-job check names must update those names when adopting this layout.
+
+## Shared Node Setup
+
+[The Node setup action](../actions/setup-node/action.yml) owns pnpm setup, package-specific Node selection, dependency caching, and frozen-lockfile installation. Call it after checkout with a repository-relative package directory. Jobs that install another package can supply its lockfile in `cache-dependency-path` and install that package in a separate step.
+
+Package checks and service containers live in the workflows; change conditions stay in [the main CI workflow](../workflows/ci.yml). Changes to the shared action trigger its consuming areas through `changed-areas.yml`.
+
+## Shared Python Setup
+
+The Agents job runs directly in the main CI workflow. After checkout, it calls [the Agents check action](../actions/check-agents/action.yml), which owns environment setup, the mypy cache, lint, type checks, and tests. This composite action keeps the steps in a separate file without introducing another job layer.
+
+[The Python setup action](../actions/setup-python/action.yml) installs the agents development environment for the Agents and Repository Scripts jobs. Its `python-version` output supplies the resolved version for the mypy cache key. Documentation checks install Python directly because they do not need agents dependencies.
+
+## Service Checks
+
+Review Runs and Memory Catalog each own a complete job in the main workflow: change conditions, PostgreSQL service configuration, package checks, and integration tests. They reuse Node environment setup, while their check sequences remain explicit and independently editable.
+
+## Automation Validators
+
+Run these checks from the repository root:
+
+```bash
+ruby .github/ci/check-ci-status-dependencies.rb
+ruby .github/ci/check-review-setup.rb
+```
+
+The first checks that every CI job contributes to `CI Status`. The second checks that trusted review setup installs every tracked pnpm package.
+
+## Cross-service Smoke Checks
+
+[The smoke inventory](../../scripts/system-tests/README.md#smoke-inventory) lists all scenarios, their boundaries, and CI policies. Execution submission is also a cross-service smoke test; its job is named `Smoke — Execution Submission`. The `Smoke — Memory and Artifacts` job groups the Catalog client, input bundle, and operator edit tests to share infrastructure.
+
+
+The `catalog-seam`, `input-bundle-seam`, and `memory-bff-seam` areas select the lightweight probes run by [the smoke action](../actions/check-seams/action.yml). The main workflow owns their single job and final status dependency; the action builds selected participants and runs them in one pytest process to share disposable services. See [the system-test guide](../../scripts/system-tests/README.md#model-free-cross-service-smoke-tests) for commands and coverage limits.
+
+[The execution lifecycle workflow](../workflows/execution-lifecycle.yml) is manual-only and separate from required PR checks. It uses a deterministic analysis activity and does not measure model quality.
+
+## Regression Probes
+
+Run `python3 .github/ci/test_ci.py` from the repository root. The automation job runs the same probes for aggregate failure/cancellation handling and missing dependency rejection. They execute the real scripts and parsed workflow configuration using Python's standard library and Ruby's YAML parser.
+
 ## Changed-Area Model
 
 CI does not run every job on every change. The `changes` job decides which areas changed, and each area job runs only when its area did.

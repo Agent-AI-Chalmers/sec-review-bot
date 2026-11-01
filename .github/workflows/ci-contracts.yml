@@ -1,0 +1,55 @@
+name: Contract Tools
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-tools:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: review-runs-api
+            tools_directory: contracts/review-runs-api/tools
+          - name: execution-api
+            tools_directory: contracts/execution-api/tools
+          - name: memory-catalog-api
+            tools_directory: contracts/memory-catalog-api/tools
+          - name: tar-zstd-envelope
+            tools_directory: contracts/tar-zstd-artifact/envelope/tools
+          - name: memory-tree-profile
+            tools_directory: contracts/tar-zstd-artifact/profiles/memory-tree/tools
+          - name: input-bundle-profile
+            tools_directory: contracts/tar-zstd-artifact/profiles/input-bundle/tools
+          - name: run-diagnostic-profile
+            tools_directory: contracts/tar-zstd-artifact/profiles/run-diagnostic/tools
+    defaults:
+      run:
+        working-directory: ${{ matrix.tools_directory }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
+        with:
+          directory: ${{ matrix.tools_directory }}
+
+      - name: Check generated artifacts are fresh
+        # Re-renders this family's projections and compares them to the committed files. It
+        # also runs inside `pnpm test`, but as its own step so a failure reads as one check.
+        run: pnpm run check
+
+      - name: Check
+        run: |
+          pnpm --if-present run format:check
+          pnpm --if-present run lint
+          pnpm --if-present run lint:contract
+          pnpm --if-present run typecheck
+          pnpm test
+
