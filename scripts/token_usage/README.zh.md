@@ -79,4 +79,4 @@ OpenRouter 是转售平台的模型价格索引，其价格可能与模型服务
 effective_patch.total_tokens / total.total_tokens
 ```
 
-AI 轮次统计包含缺少用量元数据的 assistant 消息。`ai_messages_with_usage_count` 单独报告带用量信息的消息数；某一轮没有用量信息，不代表它没有消耗 token。PatchEval 汇总不会将仅观测到部分用量的 token 总数计入平均值，并会在元数据中列出用量缺失或不完整的任务。
+AI 轮次统计包含缺少用量元数据的 assistant 消息。`ai_messages_with_usage_count` 单独报告带用量信息的消息数；某一轮没有用量信息，不代表它没有消耗 token。

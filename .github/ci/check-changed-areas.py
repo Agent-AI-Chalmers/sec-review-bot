@@ -11,10 +11,6 @@ WORKFLOW_PATH = REPO_ROOT / ".github/workflows/ci.yml"
 
 UNCOVERED = (
     ("assets/**", "Screenshots and logo; no build consumes them."),
-    (
-        "evaluation/**",
-        "Committed evaluation data and reports; not executed by a suite.",
-    ),
     ("LICENSE", "License text."),
     ("AGENTS.md", "Repository guidance; Markdown is covered by documentation checks."),
     (".gitattributes", "Git attributes; no build reads them."),
