@@ -251,8 +251,9 @@ def test_sandbox_backend_rejects_unknown_mode() -> None:
         selected_sandbox_backend_kind()
 
 
-def test_start_container_marks_only_read_only_mounts_readonly() -> None:
+def test_start_container_marks_only_read_only_mounts_readonly(monkeypatch) -> None:
     """Container startup must enforce the repository-owned hardening baseline."""
+    monkeypatch.setenv("AGENT_DOCKER_RUN_LABEL", "attempt-test")
     with patch(
         "sec_review_agents.filesystem.docker_runtime.run_docker_command",
     ) as run_command:
@@ -282,6 +283,7 @@ def test_start_container_marks_only_read_only_mounts_readonly() -> None:
         )
 
     args = run_command.call_args.args[0]
+    assert args[args.index("--label") + 1] == "sec-review.run=attempt-test"
     read_only_mount = next(value for value in args if "dst=/readonly" in value)
     writable_mount = next(value for value in args if "dst=/workspace" in value)
     assert "readonly" in read_only_mount

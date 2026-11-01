@@ -90,7 +90,13 @@ def stage_cost(
     cost is unknown. Unknown is a first-class result: it means the price source
     did not know the model, not that the cost was zero.
     """
-    if index is None:
+    # OpenRouter's current schema has no cache-write rate. Do not silently
+    # price cache creation as free, or pretend the ordinary input rate is exact.
+    if (
+        index is None
+        or stage.cache_creation_tokens > 0
+        or stage.ai_messages_with_usage_count < stage.ai_message_count
+    ):
         return None, None
     price = index.lookup(stage.model_id)
     if price is None:

@@ -1,5 +1,6 @@
 import shutil
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 from sec_review_agents.cli.local_materialization.common import (
@@ -97,12 +98,23 @@ def build_patcheval_issue_bundle(
         cve_id=cve_id,
         dataset_path=dataset_path,
     )
-    return build_patcheval_issue_bundle_from_case(
-        case=case,
+    from scripts.patcheval.generation_image import prepare_generation_image
+
+    environment = prepare_generation_image(case)
+    bundle = build_patcheval_issue_bundle_from_case(
+        case=replace(case, image_name=environment["source_image"]),
         output_dir=output_dir,
         location_oracle=location_oracle,
         two_stage=two_stage,
         single_agent=single_agent,
+    )
+    write_json(bundle.local_root_path / "generation-environment.json", environment)
+    return replace(
+        bundle,
+        runtime_config={
+            "workspace_image": environment["generation_image"],
+            "workspace_path": case.work_dir,
+        },
     )
 
 

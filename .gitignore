@@ -31,6 +31,9 @@ compose.memory.env
 agents/config/model-providers.toml
 ops/systemd/deployment.env
 
+# Private experiment snapshots may contain model and environment credentials.
+.patcheval-batch-manifests/
+
 # workdir
 .agent-workspace
 .agent-workspace-patcheval

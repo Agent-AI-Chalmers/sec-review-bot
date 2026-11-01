@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 from collections import Counter
 from dataclasses import asdict, dataclass
@@ -11,6 +12,7 @@ from scripts.patcheval.experiments import (
 )
 from scripts.token_usage import (
     PriceIndex,
+    collect_used_prices,
     effective_patch_run,
     lightweight_two_stage_run,
     load_price_index,
@@ -41,8 +43,8 @@ class EvaluationRow:
     avg_price: float | None
     avg_ai_turns: float | None
     currency: str | None
-    # Runs contributing tokens/turns, priced or not. Kept under its original
-    # name so an existing consumer of this JSON does not silently change meaning.
+    # Complete-usage runs contributing tokens. Turn coverage can be larger;
+    # its denominator is recorded separately in evaluation metadata.
     cost_case_count: int
     # Denominator of avg_price: runs that could be priced. May be smaller than
     # cost_case_count when some run's model was not in the price source.
@@ -60,7 +62,7 @@ class CostSummary:
     currency: str | None
     # Number of runs that could be priced (the denominator of avg_price).
     priced_case_count: int
-    # Number of runs contributing tokens/turns, priced or not.
+    # Number of runs with complete usage contributing token averages.
     run_count: int
 
 
@@ -143,87 +145,99 @@ def iter_cost_run_dirs(
                 yield experiment_dir.resolve()
 
 
-def collect_costs(
-    workspace_root: Path,
-    tag: str,
-    *,
-    include_unlinked_runs: bool = False,
-    index: PriceIndex | None = None,
-) -> dict[str, CostSummary]:
-    """Aggregate tokens, turns, and cost per experiment variant.
-
-    ``index`` is the OpenRouter price source (see ``load_price_index``); when it
-    is ``None`` or does not know a run's model, that run contributes tokens and
-    turns but no cost, so ``avg_price`` averages only the priced runs and stays
-    ``None`` when none of a variant's runs could be priced.
-    """
-    tokens_by_variant: dict[str, list[int]] = {
-        variant: [] for variant in EVALUATION_EXPERIMENTS
-    }
-    costs_by_variant: dict[str, list[float]] = {
-        variant: [] for variant in EVALUATION_EXPERIMENTS
-    }
-    ai_turns_by_variant: dict[str, list[int]] = {
-        variant: [] for variant in EVALUATION_EXPERIMENTS
-    }
-    currencies_by_variant: dict[str, set[str]] = {
-        variant: set() for variant in EVALUATION_EXPERIMENTS
-    }
-
-    for run_dir in iter_cost_run_dirs(
-        workspace_root, tag, include_unlinked_runs=include_unlinked_runs
-    ):
-        run = load_run_usage(run_dir)
-        if not run.experiment:
-            continue
-        variant = experiment_variant(run.experiment)
-        if variant is None:
-            continue
-        effective = effective_patch_run(run)
-        tokens_by_variant[variant].append(effective.total_tokens)
-        ai_turns_by_variant[variant].append(effective.totals.ai_message_count)
-        cost = run_cost(effective, index)
-        if cost is not None:
-            costs_by_variant[variant].append(cost.amount)
-            currencies_by_variant[variant].add(cost.currency)
-
-        lightweight_variant = LIGHTWEIGHT_COST_VARIANTS.get(variant)
-        if lightweight_variant is not None:
-            lightweight_effective = lightweight_two_stage_run(run)
-            tokens_by_variant[lightweight_variant].append(
-                lightweight_effective.total_tokens
-            )
-            ai_turns_by_variant[lightweight_variant].append(
-                lightweight_effective.totals.ai_message_count
-            )
-            lightweight_cost = run_cost(lightweight_effective, index)
-            if lightweight_cost is not None:
-                costs_by_variant[lightweight_variant].append(lightweight_cost.amount)
-                currencies_by_variant[lightweight_variant].add(
-                    lightweight_cost.currency
+def load_submissions(directory: Path, tag: str, variants: list[str]) -> list[dict]:
+    """Join costs to exported attempts, not to whichever symlink exists today."""
+    manifest = json.loads((directory / f"patcheval-{tag}-manifest.json").read_text())
+    selected = []
+    for variant in variants:
+        records = [row for row in manifest if row["experiment"] == variant]
+        patches = json.loads(
+            (directory / f"patcheval-{tag}-{variant}.json").read_text()
+        )
+        by_cve = {row["cve"]: row for row in records}
+        if len(by_cve) != len(records) or len({row["cve"] for row in patches}) != len(
+            patches
+        ):
+            raise ValueError(f"Duplicate submission for {variant}")
+        if set(by_cve) != {row["cve"] for row in patches}:
+            raise ValueError(f"Submission/manifest task mismatch for {variant}")
+        for patch in patches:
+            row = by_cve[patch["cve"]]
+            if (
+                row.get("patch_sha256")
+                != hashlib.sha256(patch["fix_patch"].encode()).hexdigest()
+            ):
+                raise ValueError(
+                    f"Submission hash mismatch: {variant}/{patch['cve']}; re-export legacy inputs"
                 )
+        selected.extend(records)
+    return selected
 
-    summaries: dict[str, CostSummary] = {}
+
+def collect_costs(
+    records: list[dict], *, index: PriceIndex | None = None
+) -> tuple[dict[str, CostSummary], dict]:
+    summaries = {}
+    details = {}
     for variant in EVALUATION_EXPERIMENTS:
-        token_values = tokens_by_variant[variant]
-        cost_values = costs_by_variant[variant]
-        ai_turn_values = ai_turns_by_variant[variant]
-        currencies = currencies_by_variant[variant]
+        submitted = [record for record in records if record["experiment"] == variant]
+        runs = []
+        missing = []
+        partial = []
+        for record in submitted:
+            path = Path(record["run_dir"]) if record.get("run_dir") else None
+            if path is None or not path.is_dir():
+                missing.append(record["cve"])
+                continue
+            run = load_run_usage(path)
+            effective = (
+                lightweight_two_stage_run(run)
+                if variant in LIGHTWEIGHT_COST_VARIANTS.values()
+                else effective_patch_run(run)
+            )
+            if not effective.stages or effective.ai_message_count == 0:
+                missing.append(record["cve"])
+                continue
+            if effective.ai_messages_with_usage_count < effective.ai_message_count:
+                partial.append(record["cve"])
+            runs.append(effective)
+        # Unknown/partial usage never becomes a zero-cost task. Report the
+        # coverage explicitly; the denominator is observed tasks, not all 230.
+        complete = [
+            run
+            for run in runs
+            if run.ai_messages_with_usage_count == run.ai_message_count
+        ]
+        prices = [
+            cost.amount
+            for run in complete
+            if (cost := run_cost(run, index)) is not None
+        ]
         summaries[variant] = CostSummary(
             avg_token_k=(
-                (sum(token_values) / len(token_values) / 1000.0)
-                if token_values
+                sum(run.total_tokens for run in complete) / len(complete) / 1000
+                if complete
                 else None
             ),
-            avg_price=(sum(cost_values) / len(cost_values)) if cost_values else None,
+            avg_price=sum(prices) / len(prices) if prices else None,
             avg_ai_turns=(
-                (sum(ai_turn_values) / len(ai_turn_values)) if ai_turn_values else None
+                sum(run.ai_message_count for run in runs) / len(runs) if runs else None
             ),
-            currency=next(iter(currencies)) if len(currencies) == 1 else None,
-            priced_case_count=len(cost_values),
-            run_count=len(token_values),
+            currency="USD" if prices else None,
+            priced_case_count=len(prices),
+            run_count=len(complete),
         )
-    return summaries
+        details[variant] = {
+            "submitted_count": len(submitted),
+            "missing_usage_cves": missing,
+            "partial_usage_cves": partial,
+            "turn_case_count": len(runs),
+            "used_prices": {
+                name: asdict(price) if price else None
+                for name, price in collect_used_prices(runs, index).items()
+            },
+        }
+    return summaries, details
 
 
 def read_summary(
@@ -358,19 +372,44 @@ def main() -> int:
     parser.add_argument(
         "--include-unlinked-runs",
         action="store_true",
-        help="include every local-run-* directory in cost averages. By default only current experiment symlinks are used.",
+        help="write a separate all-attempts usage audit; never mix retries into submitted-task averages.",
+    )
+    parser.add_argument(
+        "--variant",
+        action="append",
+        choices=EVALUATION_EXPERIMENTS,
+        help="Workflow variant to report; repeatable. Defaults to all.",
     )
     args = parser.parse_args()
 
     base = Path(args.base)
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
-    costs = collect_costs(
-        Path(args.workspace_root),
-        args.tag,
-        include_unlinked_runs=args.include_unlinked_runs,
-        index=load_price_index(),
+    variants = list(dict.fromkeys(args.variant or EVALUATION_EXPERIMENTS))
+    submissions = load_submissions(Path(args.patch_input_dir), args.tag, variants)
+    index = load_price_index()
+    costs, cost_details = collect_costs(submissions, index=index)
+    metadata = {
+        "cost_scope": "effective_patch",
+        "pricing_source": "openrouter-reference",
+        "fetched_at": index.fetched_at if index else None,
+        "variants": cost_details,
+    }
+    (output_dir / f"patcheval-{args.tag}-evaluation-metadata.json").write_text(
+        json.dumps(metadata, indent=2)
     )
+    if args.include_unlinked_runs:
+        from scripts.token_usage.output import RenderConfig, render_json
+
+        all_runs = [
+            load_run_usage(path)
+            for path in iter_cost_run_dirs(
+                Path(args.workspace_root), args.tag, include_unlinked_runs=True
+            )
+        ]
+        (output_dir / f"patcheval-{args.tag}-all-attempts.json").write_text(
+            render_json(all_runs, RenderConfig(index=index))
+        )
     cve_languages = read_cve_languages(Path(args.input_file))
     language_totals = collect_language_totals(
         Path(args.patch_input_dir), args.tag, cve_languages
@@ -378,11 +417,32 @@ def main() -> int:
 
     rows: list[EvaluationRow] = []
     missing: list[Path] = []
-    for variant in EVALUATION_EXPERIMENTS:
+    for variant in variants:
         summary_path = base / f"{args.prefix}-{variant}" / "summary.json"
         if not summary_path.exists():
             missing.append(summary_path)
             continue
+        evaluator = json.loads(summary_path.read_text())
+        expected = {
+            record["cve"] for record in submissions if record["experiment"] == variant
+        }
+        observed = {
+            cve
+            for groups in (
+                evaluator["strict_evaluation"]["successful_cves"],
+                evaluator["failure_analysis"]["failed_cves"],
+            )
+            for cves in groups.values()
+            for cve in cves
+        }
+        if observed != expected:
+            raise ValueError(
+                f"Evaluator task identities differ from submission: {variant}"
+            )
+        if evaluator["strict_evaluation"]["total_cases"] != len(expected):
+            raise ValueError(
+                f"Evaluator denominator differs from submission: {variant}"
+            )
         rows.append(
             read_summary(
                 summary_path, variant, costs[variant], language_totals[variant]

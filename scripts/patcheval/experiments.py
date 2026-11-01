@@ -68,7 +68,7 @@ LIGHTWEIGHT_COST_VARIANTS: dict[str, str] = {
 
 
 def main() -> None:
-    """Print the executable experiment names, one per line, for the shell drivers."""
+    """Print the executable experiment names, one per line, for command-line inspection."""
     for name in EXECUTED_EXPERIMENTS:
         print(name)
 

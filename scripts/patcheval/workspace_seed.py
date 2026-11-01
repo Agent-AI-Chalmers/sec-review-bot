@@ -7,6 +7,7 @@ from pathlib import Path
 
 from sec_review_agents.filesystem.command_output import combine_command_output
 from sec_review_agents.filesystem.docker_runtime import default_docker_bin
+from sec_review_agents.utils.env import env_value
 from sec_review_agents.workspace.tar_filters import workspace_tar_filter
 
 
@@ -80,9 +81,10 @@ def extract_dir_from_image(
     container_created = False
     try:
         try:
-            _run_docker_command(
-                ["create", "--name", container_name, "--entrypoint", "true", image_name]
-            )
+            command = ["create", "--name", container_name, "--entrypoint", "true"]
+            if cleanup_label := env_value("AGENT_DOCKER_RUN_LABEL"):
+                command.extend(["--label", f"sec-review.run={cleanup_label}"])
+            _run_docker_command([*command, image_name])
             container_created = True
         except PatchevalWorkspaceSeedError as error:
             raise PatchevalWorkspaceSeedError(

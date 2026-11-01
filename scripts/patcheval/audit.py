@@ -104,6 +104,12 @@ def parse_args() -> argparse.Namespace:
             "artifact status."
         )
     )
+    parser.add_argument(
+        "--variant",
+        action="append",
+        choices=EXECUTED_EXPERIMENTS,
+        help="Workflow variant to audit; repeatable. Defaults to all.",
+    )
     parser.add_argument("--tag", default=DEFAULT_TAG, help="Workspace tag.")
     parser.add_argument(
         "--dataset",
@@ -144,12 +150,12 @@ def main() -> int:
 
     try:
         cves = (
-            dataset_cves(dataset)
-            if dataset.is_file()
-            else observed_cves(root=REPO_ROOT, tag=tag)
+            observed_cves(root=REPO_ROOT, tag=tag)
+            if args.existing_only
+            else dataset_cves(dataset)
         )
-    except ValueError:
-        print("No CVEs found to audit.", file=sys.stderr)
+    except (ValueError, OSError) as error:
+        print(str(error), file=sys.stderr)
         return 2
 
     rows: list[AuditRow] = []
@@ -160,7 +166,7 @@ def main() -> int:
                 continue
         rows.extend(
             _audit_row(root=REPO_ROOT, tag=tag, cve=cve, experiment=experiment)
-            for experiment in EXECUTED_EXPERIMENTS
+            for experiment in (args.variant or EXECUTED_EXPERIMENTS)
         )
 
     if not args.summary_only:
