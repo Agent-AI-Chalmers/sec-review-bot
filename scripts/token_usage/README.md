@@ -1,5 +1,7 @@
 # Token Usage Summary
 
+Language: English | [中文](README.zh.md)
+
 This directory contains a helper for summarizing token usage and effective patch cost from local run trajectories.
 
 Token fields follow OpenTelemetry GenAI semantics: `input_tokens` and `output_tokens` are inclusive totals. `cache_read_tokens` and `cache_creation_tokens` are subsets of `input_tokens`, while `reasoning_tokens` is a subset of `output_tokens`. The derived `uncached_input_tokens` subtracts both cache subsets from `input_tokens`.
@@ -51,7 +53,7 @@ Model-name mapping is the caller's responsibility, not this script's: the `model
 
 The source is a single live endpoint with no history, so a past price cannot be requested later; a report can only be priced at fetch time or left unknown.
 
-OpenRouter is a reseller index, so its prices may differ from the model provider's official prices; treat the cost here as a reference estimate, not the actual bill. When the source publishes no cache-read price for a model, cached input is billed at the model's uncached input rate rather than treated as free; a model whose input or output price is missing is reported as unknown cost.
+OpenRouter is a reseller index, so its prices may differ from the model provider's official prices; treat the cost here as a reference estimate, not the actual bill. When the source publishes no cache-read price for a model, cached input is billed at the model's uncached input rate rather than treated as free; a model whose input or output price is missing is reported as unknown cost. Cache creation has no write-rate field in the current price source, so a stage with cache-creation tokens is also reported as unknown cost instead of silently charging zero for them.
 
 ## Effective Patch Cost
 
@@ -72,3 +74,5 @@ The default table's `efficiency` is:
 ```text
 effective_patch.total_tokens / total.total_tokens
 ```
+
+AI turn counts include assistant messages even when usage metadata is missing. `ai_messages_with_usage_count` separately reports coverage; a turn without usage is not evidence of zero token consumption. PatchEval summaries exclude partially observed token totals from their token averages and report missing/partial tasks in metadata.

@@ -61,37 +61,40 @@ def observed_cves(*, root: Path, tag: str) -> list[str]:
     return sorted(cves)
 
 
-def dataset_cves(dataset_path: Path) -> list[str]:
-    try:
-        data = json.loads(dataset_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        data = None
-    if not isinstance(data, list):
-        raise TypeError(f"PatchEval dataset must be a JSON list: {dataset_path}")
-    cves = [
-        item["cve_id"]
-        for item in data
-        if isinstance(item, dict) and isinstance(item.get("cve_id"), str)
-    ]
-    if not cves:
+def read_dataset(dataset_path: Path) -> list[dict]:
+    """Reject ambiguous task identity before queueing or filling denominators."""
+    data = json.loads(dataset_path.read_text(encoding="utf-8"))
+    if not isinstance(data, list) or not data:
         raise ValueError(
-            f"PatchEval dataset did not contain any cve_id values: {dataset_path}"
+            f"PatchEval dataset must be a nonempty JSON list: {dataset_path}"
         )
-    return cves
+    seen: set[str] = set()
+    for row, item in enumerate(data, 1):
+        cve = item.get("cve_id") if isinstance(item, dict) else None
+        if not isinstance(cve, str) or not re.fullmatch(r"CVE-\d{4}-\d+", cve):
+            raise ValueError(f"Invalid cve_id at row {row} in {dataset_path}")
+        if cve in seen:
+            raise ValueError(f"Duplicate {cve} at row {row} in {dataset_path}")
+        seen.add(cve)
+    return data
+
+
+def dataset_cves(dataset_path: Path) -> list[str]:
+    return [item["cve_id"] for item in read_dataset(dataset_path)]
 
 
 def first_workspace_patch(experiment_dir: Path) -> Path | None:
-    """Return the patch the experiment produced, whichever stage wrote it.
-
-    PatchEval CVE experiments currently run issue/PR-style workflows. This is
-    intentionally not repository-delivery-aware; do not use it to infer publishable
-    repository review delivery artifacts.
-    """
-    artifacts = experiment_dir / "artifacts"
-    if not artifacts.is_dir():
-        return None
-    patches = sorted(artifacts.glob("*/**/workspace.patch"))
-    return patches[0] if patches else None
+    """Read only the stage-owned final patch, never an arbitrary recursive match."""
+    run = experiment_dir.resolve()
+    # Local materialization already scopes artifacts to this run directory.
+    root = run / "artifacts"
+    patches = [
+        root / stage / "workspace.patch" for stage in ("mitigator", "single-agent")
+    ]
+    present = [path for path in patches if path.is_file()]
+    if len(present) > 1:
+        raise ValueError(f"Ambiguous patch owners in {run}")
+    return present[0] if present else None
 
 
 def experiment_state(
@@ -108,7 +111,21 @@ def experiment_state(
         return ExperimentState("missing-workspace")
     if not workspace.is_dir():
         return ExperimentState("blocked-workspace")
-    if not experiment_dir.exists():
+    log_prefix = workspace / "_logs" / f"{cve}-{experiment}"
+    pending = log_prefix.with_name(log_prefix.name + ".pending")
+    # A retry owns the current result immediately, even before materialization.
+    # Its historical symlink must not make a running/failed retry look successful.
+    if pending.exists() or (
+        not experiment_dir.exists() and not experiment_dir.is_symlink()
+    ):
+        # A run can fail or be interrupted before the driver publishes its link.
+        # Such attempts must not be silently requeued as never-started work.
+        failure_path = log_prefix.with_name(log_prefix.name + ".exit-code")
+        if failure_path.is_file():
+            code = failure_path.read_text(encoding="utf-8").strip()
+            return ExperimentState(f"exit-{code or 'unknown'}", exit_code=code)
+        if any(log_prefix.parent.glob(log_prefix.name + ".*")):
+            return ExperimentState("missing-exit-code")
         return ExperimentState("missing-symlink")
     if not experiment_dir.is_symlink():
         return ExperimentState("blocked-non-symlink")

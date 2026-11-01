@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from scripts.patcheval.workspace_state import read_dataset
+
 type PatchevalIssueMode = Literal["end_to_end", "location_oracle"]
 
 
@@ -97,23 +99,8 @@ class PatchevalCase:
         return "\n".join(lines)
 
 
-def _load_json(path: Path) -> Any:
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError as error:
-        raise PatchevalDatasetError(
-            f"PatchEval dataset file not found: {path}"
-        ) from error
-    except json.JSONDecodeError as error:
-        raise PatchevalDatasetError(
-            f"Invalid JSON in PatchEval dataset file {path}: {error}"
-        ) from error
-
-
 def _find_case(dataset_path: Path, cve_id: str) -> dict[str, Any]:
-    data = _load_json(dataset_path)
-    if not isinstance(data, list):
-        raise PatchevalDatasetError(f"Expected a JSON array in {dataset_path}")
+    data = read_dataset(dataset_path)
 
     for item in data:
         if isinstance(item, dict) and item.get("cve_id") == cve_id:

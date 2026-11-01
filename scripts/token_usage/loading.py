@@ -198,6 +198,12 @@ def _read_trajectory_usage(path: Path, *, stage: str) -> StageUsage:
         message = event.get("message")
         if isinstance(message, dict):
             messages.append(message)
+    ai_messages = [
+        message
+        for message in messages
+        if message.get("type") in {"ai", "AIMessage", "AIMessageChunk"}
+        or message.get("role") == "assistant"
+    ]
     records = _usage_records_from_value(messages)
     totals = {field: 0 for field in NUMERIC_FIELDS}
     for record, _model_id in records:
@@ -227,7 +233,7 @@ def _read_trajectory_usage(path: Path, *, stage: str) -> StageUsage:
         cache_read_tokens=totals["cache_read_tokens"],
         cache_creation_tokens=totals["cache_creation_tokens"],
         reasoning_tokens=totals["reasoning_tokens"],
-        ai_message_count=len(records),
+        ai_message_count=max(len(ai_messages), len(records)),
         ai_messages_with_usage_count=len(records),
     )
 

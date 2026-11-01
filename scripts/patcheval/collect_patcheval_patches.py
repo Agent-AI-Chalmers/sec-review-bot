@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import hashlib
 import json
 import re
 from dataclasses import asdict, dataclass
@@ -37,12 +38,15 @@ class PatchRecord:
     retry_count_used: int | None = None
     synthetic: bool = False
     missing_reason: str | None = None
+    run_dir: str | None = None
+    execution_status: str | None = None
+    patch_sha256: str | None = None
 
 
 def _retry_count(run_dir: Path) -> int | None:
     # Retry inference is only a PatchEval issue-CVE reporting hint. Read both
     # the canonical stage trajectories and the current flat published view.
-    artifacts = run_dir / "artifacts" / run_dir.name
+    artifacts = run_dir / "artifacts"
     retry_indexes: list[int] = []
     for trajectory_path in artifacts.glob("**/trajectories/retry-*.jsonl"):
         label = trajectory_path.stem
@@ -64,7 +68,7 @@ def _retry_count(run_dir: Path) -> int | None:
 
 
 def _initial_mitigator_patch(run_dir: Path) -> tuple[Path, str] | None:
-    artifacts = run_dir / "artifacts" / run_dir.name / "mitigator"
+    artifacts = run_dir / "artifacts" / "mitigator"
     initial_patch = artifacts / "workspace.initial.patch"
     final_patch = artifacts / "workspace.patch"
     if initial_patch.is_file():
@@ -104,6 +108,9 @@ def _synthetic_empty_record(
         retry_count_used=None,
         synthetic=True,
         missing_reason=_COLLECT_STATUS.get(state.status, state.status),
+        run_dir=str(state.run_dir) if state.run_dir else None,
+        execution_status=state.status,
+        patch_sha256=hashlib.sha256(b"").hexdigest(),
     )
 
 
@@ -113,16 +120,18 @@ def _record_from_patch(
     tag: str,
     experiment: str,
     patch_path: Path,
+    run_dir: Path,
     source_experiment: str | None = None,
     patch_source: str = "workspace.patch",
     retry_count_used: int | None = None,
+    execution_status: str | None = None,
 ) -> PatchRecord:
     content = patch_path.read_text(encoding="utf-8", errors="replace")
     return PatchRecord(
         cve=cve,
         tag=tag,
         experiment=experiment,
-        run_id=patch_path.parts[-3],
+        run_id=run_dir.name,
         patch_path=str(patch_path),
         bytes=len(content.encode("utf-8")),
         lines=content.count("\n"),
@@ -130,10 +139,13 @@ def _record_from_patch(
         source_experiment=source_experiment,
         patch_source=patch_source,
         retry_count_used=retry_count_used,
+        run_dir=str(run_dir),
+        execution_status=execution_status,
+        patch_sha256=hashlib.sha256(content.encode()).hexdigest(),
     )
 
 
-def collect(root: Path, tag: str) -> list[PatchRecord]:
+def collect(root: Path, tag: str, *, include_ready: bool = False) -> list[PatchRecord]:
     records: list[PatchRecord] = []
     for workspace_dir in sorted(root.glob(f".agent-workspace-patcheval-CVE-*-{tag}")):
         match = WORKSPACE_DIR_RE.match(workspace_dir.name)
@@ -147,7 +159,26 @@ def collect(root: Path, tag: str) -> list[PatchRecord]:
             if not exp_match:
                 continue
             experiment = exp_match.group(2)
-            patch_path = first_workspace_patch(experiment_dir)
+            state = experiment_state(root=root, tag=tag, cve=cve, experiment=experiment)
+            # Pending retries have no selected run. Even --incomplete ready must
+            # not accept a matching receipt from their stale historical link.
+            if state.run_dir is None:
+                continue
+            run_dir = state.run_dir
+            patch_path = first_workspace_patch(run_dir)
+            if state.status not in {"complete", "empty-patch"}:
+                # Partial execution is only admissible with explicit policy and
+                # a matching patch-ready receipt from the selected attempt.
+                receipt = experiment_dir / "patch-execution.json"
+                ready = json.loads(receipt.read_text()) if receipt.is_file() else {}
+                if not (
+                    include_ready
+                    and patch_path
+                    and ready.get("phase") == "patch-ready"
+                    and ready.get("patch_sha256")
+                    == hashlib.sha256(patch_path.read_bytes()).hexdigest()
+                ):
+                    continue
             if patch_path is None:
                 continue
             records.append(
@@ -156,6 +187,8 @@ def collect(root: Path, tag: str) -> list[PatchRecord]:
                     tag=workspace_tag,
                     experiment=experiment,
                     patch_path=patch_path,
+                    run_dir=run_dir,
+                    execution_status=state.status,
                 )
             )
             if experiment in LIGHTWEIGHT_COST_VARIANTS:
@@ -170,9 +203,11 @@ def collect(root: Path, tag: str) -> list[PatchRecord]:
                         tag=workspace_tag,
                         experiment=LIGHTWEIGHT_COST_VARIANTS[experiment],
                         patch_path=lightweight_patch_path,
+                        run_dir=run_dir,
                         source_experiment=experiment,
                         patch_source=patch_source,
                         retry_count_used=_retry_count(run_dir),
+                        execution_status=state.status,
                     )
                 )
     return records
@@ -184,11 +219,12 @@ def fill_missing_empty_records(
     root: Path,
     tag: str,
     cves: list[str],
+    variants: tuple[str, ...] = EVALUATION_EXPERIMENTS,
 ) -> list[PatchRecord]:
     by_key = {(record.cve, record.experiment): record for record in records}
     filled: list[PatchRecord] = []
     for cve in cves:
-        for experiment in EVALUATION_EXPERIMENTS:
+        for experiment in variants:
             record = by_key.get((cve, experiment))
             if record is not None:
                 filled.append(record)
@@ -212,6 +248,8 @@ def write_patch_json(path: Path, records: list[PatchRecord]) -> None:
             if record.patch_path
             else ""
         )
+        if hashlib.sha256(patch.encode()).hexdigest() != record.patch_sha256:
+            raise ValueError(f"Patch changed while exporting {record.cve}")
         payload.append(
             {
                 "cve": record.cve,
@@ -263,7 +301,20 @@ def main() -> int:
         action="store_true",
         help="exclude empty workspace.patch files; do not use for leaderboard-style evaluation",
     )
+    parser.add_argument(
+        "--variant",
+        action="append",
+        choices=EVALUATION_EXPERIMENTS,
+        help="Workflow variant to collect; repeatable. Defaults to all.",
+    )
+    parser.add_argument(
+        "--incomplete",
+        choices=("error", "empty", "ready"),
+        default="error",
+        help="Unfinished tasks: reject (default), explicitly submit empty, or use a recorded patch-ready result and empty otherwise",
+    )
     args = parser.parse_args()
+    variants = tuple(dict.fromkeys(args.variant or EVALUATION_EXPERIMENTS))
 
     root = Path(args.root).resolve()
     output_dir = Path(args.output_dir)
@@ -275,7 +326,11 @@ def main() -> int:
     if not dataset_path.is_absolute():
         dataset_path = root / dataset_path
 
-    records = collect(root, args.tag)
+    records = [
+        record
+        for record in collect(root, args.tag, include_ready=args.incomplete == "ready")
+        if record.experiment in variants
+    ]
     if args.fill_missing_empty:
         cves = (
             dataset_cves(dataset_path)
@@ -287,6 +342,14 @@ def main() -> int:
             root=root,
             tag=args.tag,
             cves=cves,
+            variants=variants,
+        )
+    incomplete = [record for record in records if record.synthetic]
+    for record in incomplete:
+        print(f"INCOMPLETE {record.cve} {record.experiment}: {record.missing_reason}")
+    if incomplete and args.incomplete == "error":
+        parser.error(
+            "Unfinished submissions: classify them first, then select --incomplete empty|ready explicitly"
         )
     selected = (
         [record for record in records if not record.is_empty]
@@ -314,7 +377,12 @@ def main() -> int:
             output_dir / f"patcheval-{args.tag}-{experiment}.json", experiment_records
         )
 
-    write_patch_json(output_dir / f"patcheval-{args.tag}-{all_name}.json", selected)
+    combined = output_dir / f"patcheval-{args.tag}-{all_name}.json"
+    if len(experiments) == 1:
+        write_patch_json(combined, selected)
+    else:
+        # The evaluator has no variant key: repeated CVEs would mix conditions.
+        combined.unlink(missing_ok=True)
 
     print(f"manifest: {manifest_path}")
     print(f"records: {len(records)} total, {len(selected)} selected")

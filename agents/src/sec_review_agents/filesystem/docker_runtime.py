@@ -295,6 +295,11 @@ def start_container(
         args.append("--rm")
 
     args.extend(["--name", container_name, "--workdir", working_directory])
+    # Callers may group containers for inspection or cleanup with a run identifier.
+    # This is independent of any workflow or benchmark; unset means no added label.
+    # Select the group with: docker ps -a --filter label=sec-review.run=<identifier>
+    if run_label := env_value("AGENT_DOCKER_RUN_LABEL"):
+        args.extend(["--label", f"sec-review.run={run_label}"])
 
     # These are explicit project guarantees rather than daemon-dependent
     # defaults. Resource values remain configurable for heavyweight reviews.
