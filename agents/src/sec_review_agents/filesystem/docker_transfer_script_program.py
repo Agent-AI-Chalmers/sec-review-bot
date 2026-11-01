@@ -1,3 +1,4 @@
+# Requires Python 3.5+.
 import base64
 import errno
 import json
@@ -5,7 +6,7 @@ import os
 import stat
 import sys
 
-payload = json.loads(base64.b64decode("__PAYLOAD_B64__"))
+payload = json.loads(base64.b64decode("__PAYLOAD_B64__").decode("utf-8"))
 operation = payload["operation"]
 root = payload["root"]
 parts = payload["parts"]
@@ -45,7 +46,10 @@ try:
                 os.close(fd)
                 raise OSError(errno.EACCES, "non-regular transfer target", filename)
             with os.fdopen(fd, "wb") as handle:
-                while chunk := sys.stdin.buffer.read(1024 * 1024):
+                while True:
+                    chunk = sys.stdin.buffer.read(1024 * 1024)
+                    if not chunk:
+                        break
                     handle.write(chunk)
         elif operation == "download":
             flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
@@ -57,10 +61,13 @@ try:
                     raise IsADirectoryError(filename)
                 raise OSError(errno.EACCES, "non-regular transfer target", filename)
             with os.fdopen(fd, "rb") as handle:
-                while chunk := handle.read(1024 * 1024):
+                while True:
+                    chunk = handle.read(1024 * 1024)
+                    if not chunk:
+                        break
                     sys.stdout.buffer.write(chunk)
         else:
-            raise ValueError(f"unknown transfer operation: {operation}")
+            raise ValueError("unknown transfer operation: " + operation)
     finally:
         os.close(current_fd)
 except OSError as error:
@@ -79,5 +86,5 @@ except OSError as error:
         kind = "permission_denied"
     else:
         kind = "invalid_path"
-    sys.stderr.write(f"SEC_REVIEW_TRANSFER_ERROR:{kind}\n")
+    sys.stderr.write("FILE_TRANSFER_ERROR:" + kind + "\n")
     raise SystemExit(1)

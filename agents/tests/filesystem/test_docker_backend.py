@@ -467,7 +467,7 @@ async def test_async_filesystem_methods_use_local_async_semantics() -> None:
         commands.append(command)
         return ExecuteResponse(
             output=json.dumps(
-                {"path": "/mnt/material/workspace/app.py", "is_dir": False}
+                [{"path": "/mnt/material/workspace/app.py", "is_dir": False}]
             ),
             exit_code=0,
         )
@@ -858,7 +858,7 @@ def test_download_missing_returns_agent_path() -> None:
         patch(
             "sec_review_agents.filesystem.docker_runtime.transfer_with_container_helper",
             return_value=subprocess.CompletedProcess(
-                [], 1, b"", b"SEC_REVIEW_TRANSFER_ERROR:file_not_found\n"
+                [], 1, b"", b"FILE_TRANSFER_ERROR:file_not_found\n"
             ),
         ),
     ):
