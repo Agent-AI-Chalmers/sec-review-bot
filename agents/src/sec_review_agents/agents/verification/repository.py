@@ -219,8 +219,7 @@ def _build_initial_repository_verification_user_prompt(
             render_structured_markdown_section(
                 "Analysis Summary",
                 {
-                    "overview": str(analysis_result.overview or "").strip()
-                    or "(missing)",
+                    "overview": analysis_result.overview.strip() or "(missing)",
                     "verdict": analysis_result.verdict,
                 },
                 profile="prompt",
@@ -233,7 +232,7 @@ def _build_initial_repository_verification_user_prompt(
             ),
         ]
     )
-    if isinstance(workspace_patch, str) and workspace_patch:
+    if workspace_patch:
         sections.extend(
             ["", "# Workspace Patch", "", code_block("diff", workspace_patch)]
         )
@@ -266,7 +265,7 @@ def _build_retry_repository_verification_user_prompt(
             ),
         ]
     )
-    if isinstance(workspace_patch, str) and workspace_patch:
+    if workspace_patch:
         sections.extend(
             ["", "# Workspace Patch", "", code_block("diff", workspace_patch)]
         )

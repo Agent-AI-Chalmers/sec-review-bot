@@ -40,7 +40,7 @@ async def verify_repository_case(
     )
     patch_diff = mitigation_result.patch_diff if mitigation_result is not None else None
     workspace_patch = (
-        patch_diff if isinstance(patch_diff, str) and patch_diff.strip() else None
+        patch_diff if patch_diff is not None and patch_diff.strip() else None
     )
     user_prompt = build_repository_verification_user_prompt(
         review_input=review_input,

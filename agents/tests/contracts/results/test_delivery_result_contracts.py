@@ -8,7 +8,6 @@ from sec_review_agents.delivery_stages.execution.patch_synthesis import (
 )
 from sec_review_agents.delivery_stages.execution.result import (
     DeliveryExecutionResult,
-    build_delivery_execution_result,
 )
 from sec_review_agents.delivery_stages.model import (
     DeliveryEntry,
@@ -130,8 +129,8 @@ def test_delivery_result_contract_tracks_required_sections(tmp_path) -> None:
     }
 
 
-def test_delivery_execution_result_builder_tracks_public_fields() -> None:
-    result = build_delivery_execution_result(
+def test_delivery_execution_result_tracks_public_fields() -> None:
+    result = DeliveryExecutionResult(
         delivery_id="delivery-1",
         status="ready",
         error=None,
@@ -185,7 +184,7 @@ def test_file_change_types_match_shared_schema() -> None:
 
 
 def test_delivery_execution_result_serializes_at_json_boundary() -> None:
-    result = build_delivery_execution_result(
+    result = DeliveryExecutionResult(
         delivery_id="delivery-1",
         status="ready",
         error=None,

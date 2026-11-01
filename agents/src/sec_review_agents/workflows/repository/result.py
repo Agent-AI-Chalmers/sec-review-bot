@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
 from sec_review_agents.delivery_stages.result import DeliveryArtifact, DeliveryResult
@@ -20,12 +20,7 @@ class ScanSummary(BaseModel):
     # little: deletions never reach discovery, which has no current content to read for them.
     deleted_file_count: int = 0
 
-    model_config = ConfigDict(extra="ignore")
-
-    @field_validator("*", mode="before")
-    @classmethod
-    def count_value(cls, value: Any) -> int:
-        return value if isinstance(value, int) and not isinstance(value, bool) else 0
+    model_config = ConfigDict(extra="ignore", strict=True)
 
 
 class RepositoryWorkflowResult(BaseModel):

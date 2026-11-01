@@ -11,7 +11,6 @@ from sec_review_agents.delivery_stages.execution.patch_synthesis import (
 )
 from sec_review_agents.delivery_stages.execution.result import (
     DeliveryExecutionResult,
-    build_delivery_execution_result,
 )
 from sec_review_agents.delivery_stages.model import (
     DeliveryEntry,
@@ -37,7 +36,7 @@ def _build_single_delivery_outcome(
     patch_diff = case_result.mitigator_patch_diff or ""
     file_changes = case_result.mitigator_file_changes
     has_changes = bool(file_changes)
-    return build_delivery_execution_result(
+    return DeliveryExecutionResult(
         delivery_id=delivery_id,
         status="ready" if has_changes else "no-changes",
         error=None if has_changes else "Single delivery has no file changes.",
@@ -82,7 +81,7 @@ async def execute_delivery_entry(
         )
         file_changes = patch_artifact.file_changes
         has_changes = bool(file_changes)
-        return build_delivery_execution_result(
+        return DeliveryExecutionResult(
             delivery_id=delivery_id,
             status="ready" if has_changes else "no-changes",
             error=(
@@ -94,7 +93,7 @@ async def execute_delivery_entry(
             patch_diff=patch_artifact.patch_diff,
         )
     except Exception as error:
-        return build_delivery_execution_result(
+        return DeliveryExecutionResult(
             delivery_id=delivery_id,
             status="failed",
             error=f"Patch synthesis failed: {error}",

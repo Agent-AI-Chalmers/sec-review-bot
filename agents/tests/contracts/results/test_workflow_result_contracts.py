@@ -1,6 +1,6 @@
 import json
 from annotationlib import Format, get_annotations
-from typing import Any
+from typing import Any, get_args
 
 import pytest
 from pydantic import BaseModel, ValidationError
@@ -29,7 +29,6 @@ from sec_review_agents.review_stages.types import (
     ResolutionNextStep,
     ValidationLevel,
     Verdict,
-    literal_values,
 )
 from sec_review_agents.workflows.issue.single_agent import (
     execute_issue_single_agent,
@@ -68,24 +67,24 @@ def test_review_record_enum_allowlists_match_shared_schema() -> None:
     cvss = review_record["properties"]["cvss"]["anyOf"][1]["properties"]
 
     expected: dict[str, tuple[tuple[str, ...], list[Any]]] = {
-        "verdict": (literal_values(Verdict), analysis["verdict"]["enum"]),
+        "verdict": (get_args(Verdict), analysis["verdict"]["enum"]),
         "validation_level": (
-            literal_values(ValidationLevel),
+            get_args(ValidationLevel),
             verification["validation_level"]["enum"],
         ),
         "patch_coverage": (
-            literal_values(PatchCoverage),
+            get_args(PatchCoverage),
             verification["patch_coverage"]["enum"],
         ),
         "regression_status": (
-            literal_values(RegressionStatus),
+            get_args(RegressionStatus),
             verification["regression_status"]["enum"],
         ),
         "resolution_next_step": (
-            literal_values(ResolutionNextStep),
+            get_args(ResolutionNextStep),
             verification["resolution_next_step"]["enum"],
         ),
-        "cvss_outcome": (literal_values(CvssOutcome), cvss["outcome"]["enum"]),
+        "cvss_outcome": (get_args(CvssOutcome), cvss["outcome"]["enum"]),
     }
     for name, (runtime_values, schema_values) in expected.items():
         assert set(runtime_values) == {
@@ -251,3 +250,10 @@ def test_review_record_cvss_outcome_is_limited_to_the_schema_enum() -> None:
         {"cvss": {"outcome": "not-scored", "overview": "No score."}}
     ).model_dump(mode="json", by_alias=True)
     assert known["cvss"]["outcome"] == "not-scored"
+
+
+@pytest.mark.parametrize("invalid", ["10", True, 1.5, None])
+def test_scan_summary_rejects_invalid_count_instead_of_reporting_zero(invalid) -> None:
+    """Invalid internal statistics must not be published as a successful zero count."""
+    with pytest.raises(ValidationError, match="scanned_file_count"):
+        ScanSummary.model_validate({"scanned_file_count": invalid})

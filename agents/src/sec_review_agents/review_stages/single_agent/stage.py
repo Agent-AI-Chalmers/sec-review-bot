@@ -14,7 +14,6 @@ from sec_review_agents.filesystem.backend_factory import (
 from sec_review_agents.memory.runtime_view import materialized_memory_view
 from sec_review_agents.review_stages.single_agent.result import (
     SingleAgentFixOutcome,
-    build_single_agent_fix_outcome,
 )
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.setup_bootstrap import (
@@ -100,7 +99,7 @@ async def run_single_agent_stage(
             "workspace.patch",
             patch_artifact.patch_diff,
         )
-        return build_single_agent_fix_outcome(
+        return SingleAgentFixOutcome(
             overview=agent_output.overview,
             verdict=agent_output.verdict,
             validation_level=agent_output.validation_level,

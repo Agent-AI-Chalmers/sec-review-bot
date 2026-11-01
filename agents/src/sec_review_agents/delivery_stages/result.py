@@ -11,7 +11,9 @@ from sec_review_agents.delivery_stages.model import (
     DeliveryEntry,
 )
 from sec_review_agents.utils.files import persist_json_artifact
-from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
+from sec_review_agents.workspace.file_changes import (
+    FileChange,
+)
 
 
 class DeliveryArtifact(BaseModel):
@@ -20,9 +22,7 @@ class DeliveryArtifact(BaseModel):
     delivery_id: str
     case_ids: list[str]
     patch_diff: str
-    file_changes: list[DeletedFileChange | UpsertFileChange] = Field(
-        default_factory=list
-    )
+    file_changes: list[FileChange] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore")
 

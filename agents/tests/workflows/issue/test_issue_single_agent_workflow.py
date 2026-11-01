@@ -185,14 +185,13 @@ async def test_single_agent_activity_result_restores_model_before_public_project
 
     from sec_review_agents.review_stages.single_agent.result import (
         SingleAgentFixOutcome,
-        build_single_agent_fix_outcome,
     )
     from sec_review_agents.workflows.issue.single_agent import (
         build_issue_single_agent_review_record,
         run_issue_single_agent_activity,
     )
 
-    outcome = build_single_agent_fix_outcome(
+    outcome = SingleAgentFixOutcome(
         overview="Removed unsafe entrypoint",
         verdict="confirmed-defect",
         validation_level="static",

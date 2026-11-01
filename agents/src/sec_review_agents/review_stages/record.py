@@ -13,7 +13,9 @@ from sec_review_agents.review_stages.types import (
     Verdict,
 )
 from sec_review_agents.review_stages.verification.result import VerificationStageResult
-from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
+from sec_review_agents.workspace.file_changes import (
+    FileChange,
+)
 
 
 class ReviewRecordAnalysis(BaseModel):
@@ -28,9 +30,7 @@ class ReviewRecordMitigation(BaseModel):
     # `file_changes` is authoritative. `patch_diff` is a derived review and
     # location artifact; it must not be used to reconstruct final file contents.
     overview: str | None = None
-    file_changes: list[DeletedFileChange | UpsertFileChange] = Field(
-        default_factory=list
-    )
+    file_changes: list[FileChange] = Field(default_factory=list)
     patch_diff: str | None = None
 
     model_config = ConfigDict(extra="ignore", strict=True)

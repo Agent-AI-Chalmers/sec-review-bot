@@ -14,21 +14,22 @@ from typing import Any, Literal, NotRequired, TypedDict
 
 from sec_review_agents.workspace.paths import normalize_declared_file_path
 
-# These types cross Temporal activity boundaries. With Python 3.14 and
-# temporalio 1.34.0, the default converter rejected PEP 695 aliases with
-# "Unserializable type during conversion", including aliases nested inside
-# TypedDict fields (FileChange, ContentEncoding, and FileMode).
-# Keep the deleted/upsert variants, but spell unions and Literal values directly
-# instead of using aliases. We choose explicit transport annotations over shorter
-# names or a custom converter; JSON encoding alone does not test typed decoding.
-# Regression coverage: tests/delivery_stages/execution/test_temporal_input.py.
-FILE_MODE_REGULAR: Literal["100644", "100755"] = "100644"
-FILE_MODE_EXECUTABLE: Literal["100644", "100755"] = "100755"
+# These PEP 695 aliases are resolved during typed decoding by Pydantic's
+# TypeAdapter, which our shared Temporal client uses via pydantic_data_converter.
+# The default converter's value_to_type path cannot decode this nested alias
+# shape; expanding annotations was its workaround, not a JSON format requirement.
+# Alias names are not stored in JSON. Keep the configured converter and verify
+# typed decoding, not just encoding (tests/delivery_stages/execution/test_temporal_input.py).
+type ContentEncoding = Literal["utf-8", "base64"]
+type FileMode = Literal["100644", "100755"]
+
+FILE_MODE_REGULAR: FileMode = "100644"
+FILE_MODE_EXECUTABLE: FileMode = "100755"
 
 
 class EncodedFileContent(TypedDict):
     content: str
-    content_encoding: Literal["utf-8", "base64"]
+    content_encoding: ContentEncoding
 
 
 class DeletedFileChange(TypedDict):
@@ -40,8 +41,11 @@ class UpsertFileChange(TypedDict):
     path: str
     status: Literal["upsert"]
     content: str
-    content_encoding: Literal["utf-8", "base64"]
-    mode: NotRequired[Literal["100644", "100755"]]
+    content_encoding: ContentEncoding
+    mode: NotRequired[FileMode]
+
+
+type FileChange = DeletedFileChange | UpsertFileChange
 
 
 def file_change_paths(file_changes: Sequence[Mapping[str, Any]] | None) -> list[str]:
@@ -72,7 +76,7 @@ def encode_file_content(content_buffer: bytes) -> EncodedFileContent:
     }
 
 
-def git_blob_mode(path: Path) -> Literal["100644", "100755"]:
+def git_blob_mode(path: Path) -> FileMode:
     executable_bits = stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
     if path.stat().st_mode & executable_bits:
         return FILE_MODE_EXECUTABLE
@@ -81,9 +85,9 @@ def git_blob_mode(path: Path) -> Literal["100644", "100755"]:
 
 def collect_publishable_file_changes(
     workspace_path: Path, changed_files: Sequence[Any] | None
-) -> list[DeletedFileChange | UpsertFileChange]:
+) -> list[FileChange]:
     workspace_root_resolved = workspace_path.resolve()
-    file_changes: list[DeletedFileChange | UpsertFileChange] = []
+    file_changes: list[FileChange] = []
     seen: set[str] = set()
 
     for raw_path in changed_files or []:
@@ -114,7 +118,7 @@ def collect_publishable_file_changes(
             continue
 
         encoded_content = encode_file_content(absolute_path.read_bytes())
-        file_change: DeletedFileChange | UpsertFileChange = {
+        file_change: FileChange = {
             "path": normalized_path,
             "status": "upsert",
             "mode": git_blob_mode(absolute_path),

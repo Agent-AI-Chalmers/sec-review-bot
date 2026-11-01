@@ -5,7 +5,9 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
+from sec_review_agents.workspace.file_changes import (
+    FileChange,
+)
 from sec_review_agents.workspace.paths import normalize_declared_file_path
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -254,7 +256,7 @@ class PatchArtifact(BaseModel):
     """
 
     patch_diff: str
-    file_changes: list[DeletedFileChange | UpsertFileChange]
+    file_changes: list[FileChange]
 
 
 def build_patch_artifact(

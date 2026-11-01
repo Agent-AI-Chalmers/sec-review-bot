@@ -11,7 +11,9 @@ from sec_review_agents.delivery_stages.model import (
 )
 from sec_review_agents.utils.env import int_env
 from sec_review_agents.utils.files import persist_json_artifact
-from sec_review_agents.workspace.file_changes import DeletedFileChange, UpsertFileChange
+from sec_review_agents.workspace.file_changes import (
+    FileChange,
+)
 
 DELIVERY_PATCH_MAX_CONCURRENCY = 4
 
@@ -34,7 +36,7 @@ class DeliveryPatchCase(BaseModel):
     """
 
     case_id: str
-    mitigator_file_changes: list[DeletedFileChange | UpsertFileChange]
+    mitigator_file_changes: list[FileChange]
     mitigator_patch_diff: str | None
 
 

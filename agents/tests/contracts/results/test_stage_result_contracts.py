@@ -8,7 +8,6 @@ from sec_review_agents.review_stages.analysis.result import (
 )
 from sec_review_agents.review_stages.mitigation.result import (
     MitigationStageResult,
-    build_mitigation_stage_result,
 )
 from sec_review_agents.review_stages.verification.result import (
     VerificationStageResult,
@@ -25,10 +24,6 @@ from sec_review_agents.scan_stages.triage.stage import run_repository_triage_sta
 
 
 def test_stage_result_builder_return_annotations_are_public_payloads() -> None:
-    assert (
-        get_annotations(build_mitigation_stage_result, format=Format.VALUE)["return"]
-        == MitigationStageResult
-    )
     assert (
         get_annotations(build_verification_stage_result, format=Format.VALUE)["return"]
         == VerificationStageResult
@@ -59,8 +54,8 @@ def test_stage_result_compiler_models_track_public_fields() -> None:
     }
 
 
-def test_mitigation_stage_builder_emits_required_file_changes() -> None:
-    result = build_mitigation_stage_result(
+def test_mitigation_result_defaults_to_no_file_changes() -> None:
+    result = MitigationStageResult(
         overview="No mitigation target.",
     )
 
@@ -75,7 +70,7 @@ def test_stage_result_builders_emit_json_serializable_public_payloads() -> None:
             narratives=[],
             verdict="confirmed-defect",
         ).model_dump(mode="json", by_alias=True),
-        build_mitigation_stage_result(
+        MitigationStageResult(
             overview="Patched input validation.",
             file_changes=[{"path": "src/app.py", "status": "deleted"}],
         ).model_dump(mode="json"),

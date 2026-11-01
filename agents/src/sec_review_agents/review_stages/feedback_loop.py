@@ -229,7 +229,7 @@ def verification_feedback_retry_context(
 def render_history_projection_section(
     history: Sequence[VerifierHistoryEntry] | None,
 ) -> str | None:
-    if not isinstance(history, Sequence) or not history:
+    if not history:
         return None
 
     projection = _history_projection(history)
