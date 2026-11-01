@@ -29,7 +29,6 @@ Dependabot descriptions are exempt from the human-authored template but must be 
 [The main CI workflow](../workflows/ci.yml) owns event triggers, change selection, job dependencies, and the required CI Status check. It calls these workflows at the same revision:
 
 - [Browser checks](../workflows/ci-browser.yml) own the desktop/mobile matrix and failure diagnostics.
-- [Package checks with PostgreSQL](../workflows/ci-postgres.yml) provide the shared test environment and commands for independent service jobs.
 - [Contract checks](../workflows/ci-contracts.yml) own the tool-family matrix and generated-artifact freshness checks. The changed-area validator reads this workflow to check tool-directory coverage.
 
 The called workflows use workflow_call; they do not trigger independent PR runs. Their caller jobs remain direct dependencies of CI Status, so their failures contribute to the aggregate. Their file paths are included in the corresponding changed areas.
@@ -48,9 +47,9 @@ The Agents job runs directly in the main CI workflow. After checkout, it calls [
 
 [The Python setup action](../actions/setup-python/action.yml) installs the agents development environment for the Agents and Repository Scripts jobs. Its `python-version` output supplies the resolved version for the mypy cache key. Documentation checks install Python directly because they do not need agents dependencies.
 
-## PostgreSQL Package Checks
+## Service Checks
 
-Review Runs and Memory Catalog have independent jobs in the main workflow, each gated on its own changed area or a merge queue event. Each calls [the shared PostgreSQL check workflow](../workflows/ci-postgres.yml) with its package directory, database name, and database user. Calls run on separate runners with separate database containers; sharing the check implementation does not couple service selection or execution.
+Review Runs and Memory Catalog each own a complete job in the main workflow: change conditions, PostgreSQL service configuration, package checks, and integration tests. They reuse Node environment setup, while their check sequences remain explicit and independently editable.
 
 ## Automation Validators
 

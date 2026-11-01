@@ -129,11 +129,44 @@ jobs:
     if: >-
       github.event_name == 'merge_group' ||
       needs.changes.outputs.review-runs == 'true'
-    uses: ./.github/workflows/ci-postgres.yml
-    with:
-      directory: services/review-runs
-      database: sec_review_bot_test
-      user: sec_review_bot
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: sec_review_bot_test
+          POSTGRES_USER: sec_review_bot
+          POSTGRES_PASSWORD: ci-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U sec_review_bot -d sec_review_bot_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    defaults:
+      run:
+        working-directory: services/review-runs
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
+        with:
+          directory: services/review-runs
+
+      - name: Check
+        run: |
+          pnpm run format:check
+          pnpm run lint
+          pnpm run typecheck
+          pnpm test
+
+      - name: Integration test
+        env:
+          TEST_DATABASE_URL: postgresql://sec_review_bot:ci-test-password@127.0.0.1:5432/sec_review_bot_test
+        run: pnpm run test:integration
 
   memory-catalog:
     name: Memory Catalog
@@ -141,11 +174,44 @@ jobs:
     if: >-
       github.event_name == 'merge_group' ||
       needs.changes.outputs.memory-catalog == 'true'
-    uses: ./.github/workflows/ci-postgres.yml
-    with:
-      directory: services/memory-catalog
-      database: memory_catalog_test
-      user: memory_catalog
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_DB: memory_catalog_test
+          POSTGRES_USER: memory_catalog
+          POSTGRES_PASSWORD: ci-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U memory_catalog -d memory_catalog_test"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
+    defaults:
+      run:
+        working-directory: services/memory-catalog
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
+        with:
+          directory: services/memory-catalog
+
+      - name: Check
+        run: |
+          pnpm run format:check
+          pnpm run lint
+          pnpm run typecheck
+          pnpm test
+
+      - name: Integration test
+        env:
+          TEST_DATABASE_URL: postgresql://memory_catalog:ci-test-password@127.0.0.1:5432/memory_catalog_test
+        run: pnpm run test:integration
 
   execution-gateway:
     name: Execution Gateway

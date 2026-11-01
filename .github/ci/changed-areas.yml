@@ -61,7 +61,6 @@ contract-tools:
   - ".github/workflows/ci.yml"
 
 review-runs:
-  - ".github/workflows/ci-postgres.yml"
   - ".github/actions/setup-node/**"
   - "services/review-runs/**"
   # It validates requests against the shared contract schemas.
@@ -94,7 +93,6 @@ system-tests:
   - ".github/workflows/ci.yml"
 
 memory-catalog:
-  - ".github/workflows/ci-postgres.yml"
   - ".github/ci/**"
   - ".github/actions/setup-node/**"
   - "services/memory-catalog/**"
