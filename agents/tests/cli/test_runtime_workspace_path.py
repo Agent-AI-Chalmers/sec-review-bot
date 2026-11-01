@@ -3,6 +3,7 @@ from langgraph.runtime import Runtime
 
 from sec_review_agents.agents.analysis.issue import build_issue_analyzer_backend_config
 from sec_review_agents.runtime.runtime_config import (
+    ExecutionRuntimeContext,
     runtime_context_from_config,
     runtime_workspace_path,
 )
@@ -38,6 +39,38 @@ def test_workspace_path_requires_worker_opt_in(monkeypatch):
     monkeypatch.delenv("EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE", raising=False)
     with pytest.raises(ValueError, match="disabled"):
         runtime_context_from_config({"workspace_path": "/workspace/project"})
+
+
+@pytest.mark.parametrize(
+    "root",
+    [
+        "/tmp",
+        "/history",
+        "/incremental-window",
+        "/skills",
+        "/memory",
+        "/conversation_history",
+        "/large_tool_results",
+    ],
+)
+@pytest.mark.parametrize("suffix", ["", "/project"])
+def test_workspace_path_rejects_reserved_routes(root, suffix, monkeypatch):
+    """Nested mounts also overlap reserved views, regardless of enabled features."""
+    monkeypatch.setenv("EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE", "true")
+    context: ExecutionRuntimeContext = {"workspace_path": root + suffix}
+    with pytest.raises(ValueError, match="workspace_path.*reserved directory"):
+        runtime_context_from_config(context)
+    with pytest.raises(ValueError, match="workspace_path.*reserved directory"):
+        runtime_workspace_path(context)
+
+
+@pytest.mark.parametrize(
+    "value", ["/workspace", "/workspace/project", "/history-project", "/project/tmp"]
+)
+def test_workspace_path_allows_nonoverlapping_directories(value, monkeypatch):
+    monkeypatch.setenv("EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE", "true")
+    context = runtime_context_from_config({"workspace_path": value})
+    assert runtime_workspace_path(context) == value
 
 
 def test_project_instructions_use_configured_workspace(tmp_path):

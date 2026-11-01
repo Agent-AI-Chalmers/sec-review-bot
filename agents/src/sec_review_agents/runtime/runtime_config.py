@@ -22,6 +22,17 @@ class ExecutionRuntimeContext(TypedDict, total=False):
 
 _ALLOWED_RUNTIME_CONFIG_KEYS = frozenset({"workspace_image", "workspace_path"})
 ALLOW_WORKSPACE_IMAGE_OVERRIDE_ENV = "EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE"
+# Keep the workspace separate from stage context, optional skills/memory, and
+# backend scratch/artifact routes, even when a particular run omits those views.
+_RESERVED_WORKSPACE_ROOTS = (
+    "/tmp",
+    "/history",
+    "/incremental-window",
+    "/skills",
+    "/memory",
+    "/conversation_history",
+    "/large_tool_results",
+)
 
 
 def runtime_workspace_path(runtime_context: ExecutionRuntimeContext | None) -> str:
@@ -38,6 +49,11 @@ def runtime_workspace_path(runtime_context: ExecutionRuntimeContext | None) -> s
         raise ValueError(
             "runtime.workspace_path must be a normalized absolute directory"
         )
+    for root in _RESERVED_WORKSPACE_ROOTS:
+        if value == root or value.startswith(f"{root}/"):
+            raise ValueError(
+                f"runtime.workspace_path conflicts with reserved directory {root!r}"
+            )
     return value
 
 
