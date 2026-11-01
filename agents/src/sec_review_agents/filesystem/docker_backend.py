@@ -25,6 +25,10 @@ from deepagents.backends.sandbox import BaseSandbox
 
 from sec_review_agents.filesystem import docker_runtime
 from sec_review_agents.filesystem.command_output import text_output, truncate_output
+from sec_review_agents.filesystem.docker_listing import (
+    directory_listing_command,
+    parse_directory_listing,
+)
 from sec_review_agents.filesystem.docker_runtime import (
     DockerContainerResource,
     combine_command_output,
@@ -427,7 +431,9 @@ class DockerSandboxBackend(BaseSandbox):
     def ls(self, path: str) -> LsResult:
         if not self._is_allowed_path(path):
             return LsResult(error=self._path_access_error(path))
-        result = super().ls(self._to_container_path(path))
+        result = parse_directory_listing(
+            self.execute(directory_listing_command(self._to_container_path(path))), path
+        )
         for item in result.entries or []:
             item["path"] = self._to_agent_path(item["path"])
         return result
@@ -435,7 +441,12 @@ class DockerSandboxBackend(BaseSandbox):
     async def als(self, path: str) -> LsResult:
         if not self._is_allowed_path(path):
             return LsResult(error=self._path_access_error(path))
-        result = await super().als(self._to_container_path(path))
+        result = parse_directory_listing(
+            await self.aexecute(
+                directory_listing_command(self._to_container_path(path))
+            ),
+            path,
+        )
         for item in result.entries or []:
             item["path"] = self._to_agent_path(item["path"])
         return result

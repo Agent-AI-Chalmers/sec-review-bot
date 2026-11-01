@@ -29,7 +29,7 @@ def docker_transfer_script(
 
 
 def docker_transfer_error(stderr: bytes) -> str:
-    marker = b"SEC_REVIEW_TRANSFER_ERROR:"
+    marker = b"FILE_TRANSFER_ERROR:"
     for line in stderr.splitlines():
         if line.startswith(marker):
             return line.removeprefix(marker).decode("ascii", errors="replace")

@@ -27,6 +27,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from sec_review_agents.filesystem.docker_listing import directory_listing_script
 from sec_review_agents.filesystem.docker_transfer_ops import docker_transfer_script
 
 
@@ -34,8 +35,8 @@ from sec_review_agents.filesystem.docker_transfer_ops import docker_transfer_scr
 class SandboxScript:
     """One script shipped to the sandbox, with the grammar it needs to keep supporting.
 
-    The transfer helper uses assignment expressions and requires Python 3.8.
-    Upstream owns the file-operation scripts; this check covers project-owned scripts.
+    The transfer helper must remain runnable on Python 3.5 sandbox images.
+    Upstream owns most file-operation scripts; this covers project-owned scripts.
     """
 
     name: str
@@ -45,8 +46,13 @@ class SandboxScript:
 
 SANDBOX_SCRIPTS = (
     SandboxScript(
+        name="directory_listing_script",
+        minimum_python=(3, 5),
+        build_source=lambda: directory_listing_script("/workspace"),
+    ),
+    SandboxScript(
         name="docker_transfer_script_program.py",
-        minimum_python=(3, 8),
+        minimum_python=(3, 5),
         build_source=lambda: docker_transfer_script(
             operation="download", root="/workspace", relative_parts=("a.txt",)
         ),

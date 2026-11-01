@@ -3,6 +3,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from sec_review_agents.filesystem.docker_transfer_ops import docker_transfer_script
 
 
@@ -25,10 +27,14 @@ def _run_transfer(
     )
 
 
-def test_transfer_script_round_trips_binary_content(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "content", [b"", bytes(range(256)) * 8193], ids=["empty", "multi-chunk"]
+)
+def test_transfer_script_round_trips_binary_content(
+    tmp_path: Path, content: bytes
+) -> None:
     root = tmp_path / "root"
     root.mkdir()
-    content = bytes(range(256)) * 8
 
     upload = _run_transfer(
         operation="upload",
@@ -69,9 +75,9 @@ def test_transfer_script_rejects_symlink_parent(tmp_path: Path) -> None:
     )
 
     assert download.returncode == 1
-    assert b"SEC_REVIEW_TRANSFER_ERROR:permission_denied" in download.stderr
+    assert b"FILE_TRANSFER_ERROR:permission_denied" in download.stderr
     assert upload.returncode == 1
-    assert b"SEC_REVIEW_TRANSFER_ERROR:permission_denied" in upload.stderr
+    assert b"FILE_TRANSFER_ERROR:permission_denied" in upload.stderr
     assert (outside / "secret.txt").read_bytes() == b"secret"
 
 
@@ -92,5 +98,5 @@ def test_transfer_script_rejects_fifo_without_waiting(tmp_path: Path) -> None:
 
     assert download.returncode == 1
     assert upload.returncode == 1
-    assert b"SEC_REVIEW_TRANSFER_ERROR:permission_denied" in download.stderr
-    assert b"SEC_REVIEW_TRANSFER_ERROR:permission_denied" in upload.stderr
+    assert b"FILE_TRANSFER_ERROR:permission_denied" in download.stderr
+    assert b"FILE_TRANSFER_ERROR:permission_denied" in upload.stderr

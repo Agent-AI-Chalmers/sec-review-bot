@@ -33,6 +33,14 @@ uv run python -m pytest -m llm -q
 
 Real-model tests remain skipped unless their probe-specific environment variable is enabled. Selecting the `llm` marker alone does not opt into external model calls.
 
+For the legacy container runtime regression, point `LEGACY_PYTHON_TEST_IMAGE` at an existing local image whose `python3` is Python 3.5 or 3.6:
+
+```bash
+LEGACY_PYTHON_TEST_IMAGE=my-local-python35-image uv run python -m pytest tests/filesystem/test_legacy_python_skill_loading.py -q
+```
+
+This opt-in test exercises real skill discovery, binary transfers, file operations and symlink rejection. The image must select the intended interpreter through its own `PATH`; the test asserts the runtime version before checking behavior. Syntax compatibility guards run without Docker in the ordinary suite.
+
 ## Case Corpora
 
 Data-driven cases belong to the domain that interprets their inputs and oracle. Use this shape when a domain has enough cases to justify a corpus:

@@ -141,3 +141,22 @@ async def test_large_edit_uses_upstream_tmp_and_cleans_up(routed_backend, old_fo
         "c" * 30000 if old_found else original
     )
     assert not list(workspace.glob(".deepagents_edit_*"))
+
+
+@pytest.mark.asyncio
+async def test_listing_preserves_literal_paths_and_symlink_types(
+    routed_backend,
+) -> None:
+    backend, workspace, root, _ = routed_backend
+    directory = workspace / 'folder with "quotes"'
+    directory.mkdir()
+    (workspace / "directory-link").symlink_to(directory, target_is_directory=True)
+    (workspace / "missing-link").symlink_to(workspace / "missing")
+    result = await backend.als(root)
+    assert result.error is None
+    assert result.entries is not None
+    assert {Path(entry["path"]).name: entry["is_dir"] for entry in result.entries} == {
+        directory.name: True,
+        "directory-link": False,
+        "missing-link": False,
+    }
