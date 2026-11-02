@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-This directory contains a helper for summarizing token usage and effective patch cost from local run trajectories.
+This directory contains a helper for summarizing token usage and effective patch usage from local run trajectories.
 
 Token fields follow OpenTelemetry GenAI semantics: `input_tokens` and `output_tokens` are inclusive totals. `cache_read_tokens` and `cache_creation_tokens` are subsets of `input_tokens`, while `reasoning_tokens` is a subset of `output_tokens`. The derived `uncached_input_tokens` subtracts both cache subsets from `input_tokens`.
 
@@ -41,28 +41,28 @@ python -m scripts.token_usage.summarize --json /abs/path/to/local-run-xxx
 
 The input may be a run wrapper containing `artifacts/`, or an artifact root written directly by the integrated deployment, such as `.agent-artifacts/run-20260926T144116Z-348e955e`.
 
-## Pricing
+## No cost estimation
 
-Prices come from OpenRouter's public model list. Each stage's `model_id` is looked up as-is: a full `<provider>/<model>` id must match exactly, while a bare `<model>` is resolved by its leaf only when the source has exactly one entry with that leaf. A model the source does not know, or a bare name whose leaf is shared by two providers, is reported as **unknown cost**, never guessed.
+This report counts observed tokens only. Pricing them is deliberately left to a human: a price is meaningful only with the billing context of the account that paid — provider or reseller, contract discounts, batch or off-peak rates, cache read and write rules, context-tier thresholds, credits, currency, and the date of the price list. No automated figure can know those, so the report emits none. There is no opt-in flag: adding one would recreate the same false precision.
 
-- Prices are fetched live on every run; nothing is cached on disk. A report therefore never depends on what any machine happened to fetch earlier.
-- The report header shows `fetched_at`, the UTC instant of the live snapshot. That is the only timestamp; there is no per-run generation date, so the report contents depend only on the inputs and the fetched prices.
-- The JSON output records `pricing.used_prices`: the prices actually used for the handful of models in the report (`null` for a model the source did not know). This keeps the cost figures explainable from the report alone, without persisting the whole price table.
+Anyone who needs a money figure must do the conversion by hand against an explicit, pinned price table, and record at least:
 
-Model-name mapping is the caller's responsibility, not this script's: the `model_id` recorded in a trajectory must name a model the price source knows. An unmapped model is reported as unknown rather than silently mispriced.
+- the price source and its date;
+- how each `model_id` maps to a price entry;
+- the input, output, cache-read and cache-write rates used;
+- the tier, cache and discount assumptions;
+- what was excluded.
 
-The source is a single live endpoint with no history, so a past price cannot be requested later; a report can only be priced at fetch time or left unknown.
+Treat the result as an analysis with stated assumptions, not as a field of this report. Do not compare providers by token count alone.
 
-OpenRouter is a reseller index, so its prices may differ from the model provider's official prices; treat the cost here as a reference estimate, not the actual bill. When the source publishes no cache-read price for a model, cached input is billed at the model's uncached input rate rather than treated as free; a model whose input or output price is missing is reported as unknown cost. Cache creation has no write-rate field in the current price source, so a stage with cache-creation tokens is also reported as unknown cost instead of silently charging zero for them.
-
-## Effective Patch Cost
+## Effective Patch Usage
 
 The default table shows both:
 
 - `TOTAL / all`: total observed usage
 - `TOTAL / effective_patch`: usage counted toward the final patch path
 
-`effective_patch` is for comparing workflow shapes. It does not replace total cost accounting.
+`effective_patch` is for comparing workflow shapes. It does not replace total usage accounting.
 
 For 3-stage + feedback:
 
