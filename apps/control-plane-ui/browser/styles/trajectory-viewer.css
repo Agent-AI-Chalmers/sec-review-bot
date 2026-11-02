@@ -418,6 +418,34 @@
   background: var(--status-complete-soft);
 }
 
+.trajectory-patch {
+  max-height: 520px;
+  overflow: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--radius-panel);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: var(--mantine-font-size-sm);
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.trajectory-patch-line.add {
+  background: var(--status-complete-soft);
+}
+
+.trajectory-patch-line.remove {
+  background: var(--status-failed-soft);
+}
+
+.trajectory-patch-line.file {
+  font-weight: 700;
+}
+
+.trajectory-patch-line.hunk {
+  opacity: 0.75;
+}
+
 .trajectory-tool-output {
   max-height: 520px;
   overflow: auto;

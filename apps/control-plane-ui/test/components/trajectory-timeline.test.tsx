@@ -38,6 +38,79 @@ const events: TrajectoryEvent[] = [
   }
 ]
 
+test('assistant messages show model provenance before the agent name', () => {
+  const modelEvents: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-model',
+        name: 'issue-analyzer',
+        content: 'hello',
+        response_metadata: {
+          model_provider: 'deepseek',
+          model_name: 'deepseek-v4-pro'
+        }
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={modelEvents} />)
+
+  expect(screen.getByText('deepseek · deepseek-v4-pro')).toBeVisible()
+  // Agent names are not rendered on assistant turns: the name field is an
+  // overloaded label, so the header shows provenance instead.
+  expect(screen.queryByText(/issue-analyzer/)).not.toBeInTheDocument()
+})
+
+test('apply_patch arguments render as a line-oriented patch', async () => {
+  const user = userEvent.setup()
+  const patchEvents: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-patch',
+        content: '',
+        tool_calls: [
+          {
+            id: 'patch-1',
+            name: 'apply_patch',
+            args: {
+              patchText: [
+                '*** Begin Patch',
+                '*** Update File: src/main.js',
+                '@@',
+                '-const unsafe = true',
+                '+const safe = true',
+                '*** End Patch'
+              ].join('\n')
+            }
+          }
+        ]
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={patchEvents} />)
+
+  await user.click(screen.getByRole('button', { name: 'Expand all' }))
+
+  expect(document.querySelector('[data-trajectory-patch]')).not.toBeNull()
+  expect(document.querySelector('[data-patch-line="add"]')).toHaveTextContent(
+    '+const safe = true'
+  )
+  expect(
+    document.querySelector('[data-patch-line="remove"]')
+  ).toHaveTextContent('-const unsafe = true')
+  const fileLines = [
+    ...document.querySelectorAll('[data-patch-line="file"]')
+  ].map((element) => element.textContent)
+  expect(fileLines).toContain('*** Update File: src/main.js')
+  // The raw argument key must not also appear as a JSON field.
+  expect(screen.queryByText('patchText')).not.toBeInTheDocument()
+})
+
 test('tool results show result data without repeating call arguments', async () => {
   const user = userEvent.setup()
   renderComponent(<TrajectoryTimeline events={events} />)

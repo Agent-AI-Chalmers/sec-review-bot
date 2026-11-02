@@ -297,6 +297,51 @@ function JsonValueView({
   return <JsonPrimitive value={value} query={query} />
 }
 
+const PATCH_KEYS = ['patchText', 'patch'] as const
+
+function patchKeyFor(args: Record<string, unknown>): string | undefined {
+  return PATCH_KEYS.find(
+    (key) =>
+      typeof args[key] === 'string' &&
+      (args[key] as string).includes('*** Begin Patch')
+  )
+}
+
+function patchLineKind(line: string): string {
+  if (line.startsWith('*** ')) return 'file'
+  if (line.startsWith('@@')) return 'hunk'
+  if (line.startsWith('+')) return 'add'
+  if (line.startsWith('-')) return 'remove'
+  return 'context'
+}
+
+function PatchView({
+  text,
+  query
+}: {
+  text: string
+  query: string
+}): React.JSX.Element {
+  // Agent patch formats (apply_patch and friends) are line-oriented, not
+  // markdown: rendering them through the markdown path mangles the +/- markers.
+  return (
+    <div className="trajectory-patch" data-trajectory-patch="">
+      {text.split('\n').map((line, index) => {
+        const kind = patchLineKind(line)
+        return (
+          <div
+            key={index}
+            className={`trajectory-patch-line ${kind}`}
+            data-patch-line={kind}
+          >
+            <HighlightText value={line === '' ? ' ' : line} query={query} />
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 export function ToolArguments({
   args,
   query
@@ -317,8 +362,10 @@ export function ToolArguments({
       : 'replace_block' in args
         ? 'replace_block'
         : undefined
+  const patchKey = patchKeyFor(args)
   const ordinary = Object.entries(args).filter(
-    ([key]) => key !== oldKey && key !== newKey && key !== 'todos'
+    ([key]) =>
+      key !== oldKey && key !== newKey && key !== 'todos' && key !== patchKey
   )
   return (
     <Stack gap="sm">
@@ -354,6 +401,7 @@ export function ToolArguments({
           })}
         </Stack>
       )}
+      {patchKey && <PatchView text={String(args[patchKey])} query={query} />}
       {ordinary.length > 0 && (
         <div className="trajectory-args">
           {ordinary.map(([key, value]) => (

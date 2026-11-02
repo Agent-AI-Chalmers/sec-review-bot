@@ -226,6 +226,14 @@ export function TrajectoryMessage({
 }): React.JSX.Element {
   const t = useMessages()
   const presentation = rolePresentation(message.role)
+  const modelLabel = [message.modelProvider, message.modelName]
+    .filter(Boolean)
+    .join(' · ')
+  // Assistant turns show the model, never the agent name: the LangChain name
+  // field is an overloaded label, not a stable identity. Tool messages keep
+  // their tool name, which is what name unambiguously means there.
+  const primaryLabel =
+    message.role === 'assistant' ? modelLabel || undefined : message.name
   const jumpToCall = (): void => {
     if (!message.toolCallId) return
     scrollToTrajectoryElement(`trajectory-call-${message.toolCallId}`)
@@ -249,10 +257,16 @@ export function TrajectoryMessage({
           </Badge>
           <Text size="sm" c="dimmed">
             #{message.seq}
-            {message.name && (
+            {primaryLabel && (
               <>
                 {' · '}
-                <HighlightText value={message.name} query={query} />
+                <Text
+                  component="span"
+                  c="inherit"
+                  fw={message.role === 'assistant' ? 600 : undefined}
+                >
+                  <HighlightText value={primaryLabel} query={query} />
+                </Text>
               </>
             )}
           </Text>

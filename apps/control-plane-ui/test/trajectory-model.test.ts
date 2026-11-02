@@ -11,6 +11,7 @@ test('trajectory normalization separates content, reasoning, usage, and tool lin
       message: {
         type: 'ai',
         id: 'assistant-1',
+        name: 'issue-single-agent',
         content: [
           { type: 'text', text: 'Inspecting the boundary.' },
           { type: 'thinking', thinking: 'Need repository evidence.' },
@@ -27,6 +28,10 @@ test('trajectory normalization separates content, reasoning, usage, and tool lin
             args: { path: '/workspace/a' }
           }
         ],
+        response_metadata: {
+          model_provider: 'deepseek',
+          model_name: 'deepseek-v4-pro'
+        },
         usage_metadata: {
           input_tokens: 10,
           output_tokens: 5,
@@ -54,6 +59,16 @@ test('trajectory normalization separates content, reasoning, usage, and tool lin
   ])
 
   assert.strictEqual(document.messages[0]?.content, 'Inspecting the boundary.')
+  assert.strictEqual(document.messages[0]?.modelProvider, 'deepseek')
+  assert.strictEqual(document.messages[0]?.modelName, 'deepseek-v4-pro')
+  assert.match(document.messages[0]?.searchable ?? '', /deepseek-v4-pro/)
+  // Assistant names are hidden in the header, so they must not be searchable.
+  assert.doesNotMatch(
+    document.messages[0]?.searchable ?? '',
+    /issue-single-agent/
+  )
+  // Tool names stay searchable because the header still shows them.
+  assert.match(document.messages[1]?.searchable ?? '', /read_file/)
   assert.strictEqual(
     document.messages[0]?.reasoning,
     'Need repository evidence.'

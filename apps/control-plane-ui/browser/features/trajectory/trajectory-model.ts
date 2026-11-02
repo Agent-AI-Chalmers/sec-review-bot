@@ -28,6 +28,8 @@ export interface TrajectoryMessageView {
   seq: number
   role: TrajectoryRole
   name: string | undefined
+  modelProvider: string | undefined
+  modelName: string | undefined
   content: string
   reasoning: string
   toolCalls: ToolCallView[]
@@ -188,6 +190,7 @@ export function normalizeTrajectory(
         ? kwargs.reasoning_content
         : ''
     const messageRole = role(raw.type)
+    const responseMetadata = record(raw.response_metadata)
     const id =
       typeof raw.id === 'string' && raw.id ? raw.id : `message-${event.seq}`
     const view: TrajectoryMessageView = {
@@ -195,6 +198,16 @@ export function normalizeTrajectory(
       seq: event.seq,
       role: messageRole,
       name: typeof raw.name === 'string' && raw.name ? raw.name : undefined,
+      modelProvider:
+        typeof responseMetadata?.model_provider === 'string' &&
+        responseMetadata.model_provider
+          ? responseMetadata.model_provider
+          : undefined,
+      modelName:
+        typeof responseMetadata?.model_name === 'string' &&
+        responseMetadata.model_name
+          ? responseMetadata.model_name
+          : undefined,
       content: blocks.content,
       reasoning: [additionalReasoning, blocks.reasoning]
         .filter(Boolean)
@@ -209,7 +222,11 @@ export function normalizeTrajectory(
     }
     view.searchable = [
       view.role,
-      view.name,
+      // The header hides a name on assistant turns, so search must not surface
+      // them either; tool messages keep their tool name.
+      view.role === 'assistant' ? '' : view.name,
+      view.modelProvider ?? '',
+      view.modelName ?? '',
       view.content,
       view.reasoning,
       ...view.toolCalls.flatMap((call) => [
