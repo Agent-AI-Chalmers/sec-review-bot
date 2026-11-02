@@ -163,10 +163,9 @@ test('the total is derived from normalized tokens and a disagreeing source total
       reasoning_tokens: null
     })
     assert.strictEqual(warn.mock.callCount(), 1)
-    const message = JSON.parse(String(warn.mock.calls[0]?.arguments[0])) as Record<
-      string,
-      unknown
-    >
+    const message = JSON.parse(
+      String(warn.mock.calls[0]?.arguments[0])
+    ) as Record<string, unknown>
     assert.strictEqual(
       message.event,
       'execution_statistics_source_total_mismatch'
