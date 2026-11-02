@@ -1,0 +1,91 @@
+{
+  "run_id": "5c1f0a52-3d4b-4e6f-8a91-0b2c3d4e5f60",
+  "workflow": "repository-review",
+  "source_platform": "github",
+  "connector_id": "github-integration:default",
+  "preparation": {
+    "status": "failed",
+    "attempt_count": 1,
+    "started_at": "2026-10-10T05:00:10.000Z",
+    "finished_at": "2026-10-10T05:00:30.000Z",
+    "updated_at": "2026-10-10T05:00:30.000Z",
+    "failure_code": "PREPARATION_RETRY_EXHAUSTED",
+    "disconnect_reason": null
+  },
+  "execution": {
+    "status": "succeeded",
+    "started_at": "2026-10-10T05:00:30.000Z",
+    "finished_at": "2026-10-10T05:02:46.000Z",
+    "updated_at": "2026-10-10T05:02:46.000Z"
+  },
+  "execution_statistics": {
+    "reconciliation_status": "settled",
+    "ingestion_status": "settled",
+    "usage_coverage": "unavailable",
+    "root_trace_count": 2,
+    "excluded_non_review_root_count": 1,
+    "observed_call_count": 2,
+    "usage_reported_call_count": 0,
+    "token_usage": {
+      "input_tokens": null,
+      "output_tokens": null,
+      "total_tokens": null,
+      "cache_read_input_tokens": null,
+      "cache_creation_input_tokens": null,
+      "reasoning_tokens": null
+    },
+    "groups": [
+      {
+        "agent_name": "repository-discovery",
+        "case_id": null,
+        "delivery_id": null,
+        "pass_kind": null,
+        "pass_index": null,
+        "batch_index": null,
+        "chunk_id": null,
+        "provider": "anthropic",
+        "model": "deepseek-v4-pro",
+        "model_call_count": 2,
+        "usage_reported_call_count": 0,
+        "token_usage": {
+          "input_tokens": null,
+          "output_tokens": null,
+          "total_tokens": null,
+          "cache_read_input_tokens": null,
+          "cache_creation_input_tokens": null,
+          "reasoning_tokens": null
+        }
+      }
+    ],
+    "settled_at": "2026-10-10T05:03:46.000Z",
+    "updated_at": "2026-10-10T05:03:46.000Z"
+  },
+  "publication": {
+    "status": "published",
+    "started_at": "2026-10-10T05:05:00.000Z",
+    "finished_at": "2026-10-10T05:11:09.000Z",
+    "updated_at": "2026-10-10T05:11:09.000Z"
+  },
+  "created_at": "2026-10-10T05:00:00.000Z",
+  "artifact_storage": {
+    "status": "available",
+    "artifact": {
+      "kind": "diagnostic_bundle",
+      "uri": "s3://sec-review/runs/5c1f0a52-3d4b-4e6f-8a91-0b2c3d4e5f60/artifacts/diagnostic-tree.v1.tar.zst",
+      "media_type": "application/tar+zstd",
+      "digest": "sha256:a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4",
+      "size_bytes": 12345
+    }
+  },
+  "failure_code": "PREPARATION_RETRY_EXHAUSTED",
+  "notices": [
+    {
+      "notice_id": "notice-fixture",
+      "kind": "failure",
+      "status": "delivered",
+      "axis": "preparation",
+      "reason_code": "PREPARATION_RETRY_EXHAUSTED",
+      "comment_url": "https://github.com/example/example/issues/1#issuecomment-1"
+    }
+  ]
+}

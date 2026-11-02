@@ -127,6 +127,61 @@ function paths(value: unknown, prefix = ''): string[] {
   )
 }
 
+function tokenUsages(value: unknown): Array<Record<string, number | null>> {
+  const found: Array<Record<string, number | null>> = []
+  const walk = (node: unknown): void => {
+    if (Array.isArray(node)) {
+      node.forEach(walk)
+      return
+    }
+    if (typeof node !== 'object' || node === null) return
+    const record = node as Record<string, unknown>
+    const usage = record.token_usage
+    if (typeof usage === 'object' && usage !== null) {
+      found.push(usage as Record<string, number | null>)
+    }
+    Object.values(record).forEach(walk)
+  }
+  walk(value)
+  return found
+}
+
+test('token usage keeps the documented subset invariants', () => {
+  // The schema cannot express "cache is a subset of input", so the promise lives in the
+  // contract text and the fixtures pin it. A fixture that broke it would teach consumers to
+  // add fields that must not be added.
+  for (const [name, schemaName] of Object.entries(manifest.schema_fixtures)) {
+    if (schemaName !== 'observed-run.schema.json') continue
+    for (const usage of tokenUsages(fixture(name))) {
+      const input = usage.input_tokens
+      const cacheRead = usage.cache_read_input_tokens
+      const cacheCreation = usage.cache_creation_input_tokens
+      if (input != null && cacheRead != null && cacheCreation != null) {
+        assert.ok(
+          cacheRead + cacheCreation <= input,
+          `${name}: cache read + creation must not exceed input_tokens`
+        )
+      }
+      const output = usage.output_tokens
+      const reasoning = usage.reasoning_tokens
+      if (output != null && reasoning != null) {
+        assert.ok(
+          reasoning <= output,
+          `${name}: reasoning_tokens must not exceed output_tokens`
+        )
+      }
+      const total = usage.total_tokens
+      if (total != null && input != null && output != null) {
+        assert.strictEqual(
+          total,
+          input + output,
+          `${name}: total_tokens must equal input_tokens + output_tokens`
+        )
+      }
+    }
+  }
+})
+
 test('each invalid fixture differs from its valid counterpart only where it intends', () => {
   // A negative fixture proves nothing if it is rejected for the wrong reason. These were
   // hand-copied, so adding a required field to the contract kept them failing — but on the

@@ -13,13 +13,10 @@ import {
 import {
   IconArrowDown,
   IconArrowUp,
-  IconBraces,
-  IconBrain,
   IconCheck,
   IconChevronDown,
   IconChevronRight,
   IconCopy,
-  IconMessage,
   IconTool
 } from '@tabler/icons-react'
 
@@ -32,6 +29,7 @@ import {
   scrollToTrajectoryElement
 } from './trajectory-navigation.js'
 import { HighlightText, HighlightedMarkdown } from './TrajectoryText.js'
+import { DiffView } from './DiffView.js'
 import { ToolArguments } from './ToolArguments.js'
 import { TokenUsagePopover } from './TokenUsagePopover.js'
 
@@ -63,7 +61,6 @@ function Section({
   openedInitially = false,
   force,
   children,
-  icon,
   color = 'blue'
 }: {
   kind: 'message' | 'reasoning' | 'result' | 'artifact'
@@ -72,7 +69,6 @@ function Section({
   openedInitially?: boolean
   force: number
   children: React.ReactNode
-  icon?: React.ReactNode
   color?: string
 }): React.JSX.Element {
   const [opened, setOpened] = React.useState(openedInitially)
@@ -95,17 +91,14 @@ function Section({
           size="compact-sm"
           className="trajectory-section-toggle"
           aria-expanded={opened}
-          leftSection={
-            opened ? (
-              <IconChevronDown size={ICON_SIZE.sm} />
-            ) : (
-              <IconChevronRight size={ICON_SIZE.sm} />
-            )
-          }
           onClick={() => setOpened((current) => !current)}
         >
           <Group gap={6} wrap="nowrap">
-            {icon}
+            {opened ? (
+              <IconChevronDown size={ICON_SIZE.sm} />
+            ) : (
+              <IconChevronRight size={ICON_SIZE.sm} />
+            )}
             {title}
           </Group>
         </Button>
@@ -155,7 +148,17 @@ function ToolCall({
         )}
       </Group>
       <div className="trajectory-tool-call-body">
-        <ToolArguments args={call.args} query={query} />
+        {call.diff ? (
+          // The tool reported a real diff (context included); prefer it over
+          // reconstructing anything from the call arguments.
+          <DiffView
+            text={call.diff}
+            query={query}
+            truncated={call.diffTruncated === true}
+          />
+        ) : (
+          <ToolArguments args={call.args} query={query} />
+        )}
       </div>
     </div>
   )
@@ -226,6 +229,14 @@ export function TrajectoryMessage({
 }): React.JSX.Element {
   const t = useMessages()
   const presentation = rolePresentation(message.role)
+  const modelLabel = [message.modelProvider, message.modelName]
+    .filter(Boolean)
+    .join(' · ')
+  // Assistant turns show the model, never the agent name: the LangChain name
+  // field is an overloaded label, not a stable identity. Tool messages keep
+  // their tool name, which is what name unambiguously means there.
+  const primaryLabel =
+    message.role === 'assistant' ? modelLabel || undefined : message.name
   const jumpToCall = (): void => {
     if (!message.toolCallId) return
     scrollToTrajectoryElement(`trajectory-call-${message.toolCallId}`)
@@ -249,10 +260,16 @@ export function TrajectoryMessage({
           </Badge>
           <Text size="sm" c="dimmed">
             #{message.seq}
-            {message.name && (
+            {primaryLabel && (
               <>
                 {' · '}
-                <HighlightText value={message.name} query={query} />
+                <Text
+                  component="span"
+                  c="inherit"
+                  fw={message.role === 'assistant' ? 600 : undefined}
+                >
+                  <HighlightText value={primaryLabel} query={query} />
+                </Text>
               </>
             )}
           </Text>
@@ -290,7 +307,6 @@ export function TrajectoryMessage({
             title={t('trajectoryReasoning')}
             value={message.reasoning}
             force={force}
-            icon={<IconBrain size={ICON_SIZE.sm} />}
             color="violet"
           >
             <div className="memory-markdown memory-markdown-full">
@@ -313,7 +329,6 @@ export function TrajectoryMessage({
               message.content.length <= 600 && message.role !== 'system'
             }
             force={force}
-            icon={<IconMessage size={ICON_SIZE.sm} />}
             color={message.role === 'tool' ? 'green' : 'blue'}
           >
             {message.role === 'tool' ? (
@@ -338,7 +353,6 @@ export function TrajectoryMessage({
             title={t('trajectoryArtifact')}
             value={JSON.stringify(message.artifact, null, 2)}
             force={force}
-            icon={<IconBraces size={ICON_SIZE.sm} />}
             color="gray"
           >
             <Code block>

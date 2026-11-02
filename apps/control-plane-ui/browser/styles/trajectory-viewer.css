@@ -159,6 +159,7 @@
 }
 
 .trajectory-section {
+  --trajectory-section-gutter: 20px;
   min-width: 0;
   border: 0;
   border-radius: 0;
@@ -170,6 +171,7 @@
 }
 
 .trajectory-section-header {
+  position: relative;
   min-height: 38px;
   padding: var(--space-3) 0 0;
   background: transparent;
@@ -182,7 +184,7 @@
 }
 
 .trajectory-section-content {
-  padding: 0 var(--space-3) var(--space-4);
+  padding: var(--space-2) 0 var(--space-4) var(--trajectory-section-gutter);
   border-top: 0;
 }
 
@@ -235,7 +237,7 @@
 
 .trajectory-arg {
   display: grid;
-  gap: 4px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -285,6 +287,16 @@
 
 .json-value {
   min-width: 0;
+}
+
+.json-code.json-code-block {
+  display: block;
+  margin: 0;
+  padding: var(--space-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
 }
 
 .json-code {
@@ -416,6 +428,115 @@
   border: 1px solid
     light-dark(var(--mantine-color-green-2), var(--mantine-color-green-9));
   background: var(--status-complete-soft);
+}
+
+.trajectory-patch {
+  max-height: 520px;
+  overflow: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--radius-panel);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: var(--mantine-font-size-sm);
+  line-height: 1.5;
+  white-space: pre;
+}
+
+.trajectory-patch-line.add {
+  background: var(--status-complete-soft);
+}
+
+.trajectory-patch-line.remove {
+  background: var(--status-failed-soft);
+}
+
+.trajectory-patch-line.file {
+  font-weight: 700;
+}
+
+.trajectory-patch-line.hunk {
+  opacity: 0.75;
+}
+
+.trajectory-diff-fallback,
+.trajectory-diff-truncated {
+  margin: 0 0 var(--space-1);
+}
+
+.trajectory-diff-file + .trajectory-diff-file {
+  margin-top: var(--space-3);
+}
+
+.trajectory-diff-file-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  background: light-dark(
+    var(--mantine-color-gray-1),
+    var(--mantine-color-dark-6)
+  );
+  border: 1px solid var(--mantine-color-default-border);
+  border-bottom: none;
+  border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  font-family: var(--mantine-font-family-monospace);
+  min-width: 0;
+}
+
+.trajectory-diff-file-path {
+  flex: 1;
+  min-width: 0;
+}
+
+.trajectory-diff-file-stats {
+  flex: none;
+  font-family: var(--mantine-font-family-monospace);
+}
+
+.trajectory-diff-file-header + .trajectory-patch,
+.trajectory-diff-file-header + .trajectory-diff-split {
+  border-top: none;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.trajectory-diff-split {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--radius-panel);
+  font-family: var(--mantine-font-family-monospace);
+  font-size: var(--mantine-font-size-sm);
+  line-height: 1.5;
+  overflow: auto;
+  max-height: 520px;
+}
+
+.trajectory-diff-split-header {
+  padding: 2px var(--space-2);
+  opacity: 0.75;
+  border-bottom: 1px solid var(--mantine-color-default-border);
+}
+
+.trajectory-diff-split-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  border-bottom: 1px solid
+    light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
+}
+
+.trajectory-diff-cell {
+  padding: 0 var(--space-2);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 1.5em;
+}
+
+.trajectory-diff-cell.new.changed {
+  background: var(--status-complete-soft);
+}
+
+.trajectory-diff-cell.old.changed {
+  background: var(--status-failed-soft);
 }
 
 .trajectory-tool-output {

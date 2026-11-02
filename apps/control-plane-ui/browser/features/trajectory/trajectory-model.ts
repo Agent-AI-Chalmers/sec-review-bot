@@ -12,6 +12,9 @@ export interface ToolCallView {
   name: string
   args: Record<string, unknown>
   resultMessageId: string | undefined
+  /** Real unified diff reported by the tool, when it provides one. */
+  diff?: string
+  diffTruncated?: boolean
 }
 
 export interface UsageView {
@@ -28,12 +31,16 @@ export interface TrajectoryMessageView {
   seq: number
   role: TrajectoryRole
   name: string | undefined
+  modelProvider: string | undefined
+  modelName: string | undefined
   content: string
   reasoning: string
   toolCalls: ToolCallView[]
   toolCallId: string | undefined
   status: string | undefined
   artifact: unknown
+  diff: string | undefined
+  diffTruncated: boolean | undefined
   usage: UsageView | undefined
   searchable: string
 }
@@ -188,6 +195,7 @@ export function normalizeTrajectory(
         ? kwargs.reasoning_content
         : ''
     const messageRole = role(raw.type)
+    const responseMetadata = record(raw.response_metadata)
     const id =
       typeof raw.id === 'string' && raw.id ? raw.id : `message-${event.seq}`
     const view: TrajectoryMessageView = {
@@ -195,6 +203,16 @@ export function normalizeTrajectory(
       seq: event.seq,
       role: messageRole,
       name: typeof raw.name === 'string' && raw.name ? raw.name : undefined,
+      modelProvider:
+        typeof responseMetadata?.model_provider === 'string' &&
+        responseMetadata.model_provider
+          ? responseMetadata.model_provider
+          : undefined,
+      modelName:
+        typeof responseMetadata?.model_name === 'string' &&
+        responseMetadata.model_name
+          ? responseMetadata.model_name
+          : undefined,
       content: blocks.content,
       reasoning: [additionalReasoning, blocks.reasoning]
         .filter(Boolean)
@@ -204,12 +222,21 @@ export function normalizeTrajectory(
         typeof raw.tool_call_id === 'string' ? raw.tool_call_id : undefined,
       status: typeof raw.status === 'string' ? raw.status : undefined,
       artifact: raw.artifact,
+      diff:
+        typeof kwargs?.diff === 'string' && kwargs.diff
+          ? kwargs.diff
+          : undefined,
+      diffTruncated: kwargs?.diff_truncated === true ? true : undefined,
       usage: usage(raw),
       searchable: ''
     }
     view.searchable = [
       view.role,
-      view.name,
+      // The header hides a name on assistant turns, so search must not surface
+      // them either; tool messages keep their tool name.
+      view.role === 'assistant' ? '' : view.name,
+      view.modelProvider ?? '',
+      view.modelName ?? '',
       view.content,
       view.reasoning,
       ...view.toolCalls.flatMap((call) => [
@@ -254,7 +281,15 @@ export function normalizeTrajectory(
   )
   for (const message of messages) {
     for (const call of message.toolCalls) {
-      call.resultMessageId = results.get(call.id)?.id
+      const result = results.get(call.id)
+      call.resultMessageId = result?.id
+      // The tool reports the diff on its result message; the call renders it.
+      if (result?.diff) {
+        call.diff = result.diff
+        if (result.diffTruncated) call.diffTruncated = true
+        // The diff is displayed with this message, so it belongs in the index.
+        message.searchable += '\n' + result.diff.toLowerCase()
+      }
     }
   }
   const totalUsage: UsageView = {

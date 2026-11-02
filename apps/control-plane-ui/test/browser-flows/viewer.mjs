@@ -64,8 +64,8 @@ export async function runViewerFlow({ page }) {
     .waitFor()
   await page.getByRole('button', { name: 'Expand all' }).click()
   await page.getByText('Pasted reasoning detail', { exact: true }).waitFor()
-  await page.getByText('Before', { exact: true }).first().waitFor()
-  await page.getByText('After', { exact: true }).first().waitFor()
+  await page.getByText('old_string', { exact: true }).first().waitFor()
+  await page.getByText('new_string', { exact: true }).first().waitFor()
   await page.getByRole('button', { name: 'Jump to result' }).waitFor()
   // "Expand all" animates every section, and scrollIntoView picks its target from
   // the current layout. Navigating while a section is still growing lands on a

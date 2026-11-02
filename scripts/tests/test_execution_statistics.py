@@ -36,7 +36,8 @@ def test_totals_keep_explicit_zero_and_require_each_field_from_each_call():
     assert result["token_usage"]["input_tokens"] == 0
     assert result["token_usage"]["output_tokens"] == 5
     assert result["token_usage"]["reasoning_tokens"] == 0
-    assert result["token_usage"]["total_tokens"] is None
+    # The total is derived from the normalized components, not taken from the source.
+    assert result["token_usage"]["total_tokens"] == 5
     assert result["groups"][0]["token_usage"] == result["token_usage"]
 
 

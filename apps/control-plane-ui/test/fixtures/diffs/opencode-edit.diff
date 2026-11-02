@@ -1,0 +1,16 @@
+Index: /workspace/shescape/src/win.js
+===================================================================
+--- /workspace/shescape/src/win.js
++++ /workspace/shescape/src/win.js
+@@ -10,8 +10,10 @@
+  * @param {string} arg The argument to escape.
+  * @returns {string} The escaped argument.
+  */
+ function escapeShellArg(arg) {
+-  return arg.replace(/"/g, `""`);
++  return arg.replace(/["\0]/g, (match) =>
++    match === '"' ? `""` : `\\0`
++  );
+ }
+ 
+ module.exports.escapeShellArg = escapeShellArg;

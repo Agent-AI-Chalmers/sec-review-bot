@@ -462,6 +462,10 @@ export type ObservedPublicationStep = {
   failure_message: string | null
 }
 
+/**
+ * @description Token totals for the model calls this object covers, using OpenTelemetry GenAI semantics. Null means the value could not be established for every covered call, never that it is zero. input_tokens, output_tokens and their subsets are independently nullable; total_tokens is null whenever input_tokens or output_tokens is null. Cache and reasoning values are subsets of input_tokens and output_tokens and must never be added to them. Producers guarantee cache_read_input_tokens + cache_creation_input_tokens <= input_tokens and reasoning_tokens <= output_tokens whenever the relevant values are present.
+ * @type object
+ */
 export type ExecutionTokenUsage = {
   /**
    * @description Total input tokens using OpenTelemetry GenAI semantics. Includes tokens read from cache and tokens written to cache; the cache fields below are subsets, not additional tokens.
@@ -476,25 +480,25 @@ export type ExecutionTokenUsage = {
    */
   output_tokens: number | null
   /**
-   * @description Total input and output tokens reported for the model calls.
+   * @description Total tokens for the same calls, computed by the producer as input_tokens + output_tokens. It is null whenever either component is null; a total reported by the source is not passed through. Consumers must not derive it by adding cache or reasoning tokens on top.
    * @minLength 0
    * @type integer
    */
   total_tokens: number | null
   /**
-   * @description Input-token subset served from a prompt cache.
+   * @description Input-token subset served from a prompt cache. Never an additional count on top of input_tokens.
    * @minLength 0
    * @type integer
    */
   cache_read_input_tokens: number | null
   /**
-   * @description Input-token subset written to a prompt cache.
+   * @description Input-token subset written to a prompt cache. Never an additional count on top of input_tokens.
    * @minLength 0
    * @type integer
    */
   cache_creation_input_tokens: number | null
   /**
-   * @description Output-token subset used for model reasoning.
+   * @description Output-token subset used for model reasoning. Never an additional count on top of output_tokens.
    * @minLength 0
    * @type integer
    */
@@ -555,6 +559,10 @@ export type ExecutionStatisticsGroup = {
    * @type integer
    */
   usage_reported_call_count: number
+  /**
+   * @description Token totals for the model calls this object covers, using OpenTelemetry GenAI semantics. Null means the value could not be established for every covered call, never that it is zero. input_tokens, output_tokens and their subsets are independently nullable; total_tokens is null whenever input_tokens or output_tokens is null. Cache and reasoning values are subsets of input_tokens and output_tokens and must never be added to them. Producers guarantee cache_read_input_tokens + cache_creation_input_tokens <= input_tokens and reasoning_tokens <= output_tokens whenever the relevant values are present.
+   * @type object
+   */
   token_usage: ExecutionTokenUsage
 }
 
@@ -588,6 +596,10 @@ export type ExecutionStatisticsSummary = {
    * @type integer
    */
   usage_reported_call_count: number
+  /**
+   * @description Token totals for the model calls this object covers, using OpenTelemetry GenAI semantics. Null means the value could not be established for every covered call, never that it is zero. input_tokens, output_tokens and their subsets are independently nullable; total_tokens is null whenever input_tokens or output_tokens is null. Cache and reasoning values are subsets of input_tokens and output_tokens and must never be added to them. Producers guarantee cache_read_input_tokens + cache_creation_input_tokens <= input_tokens and reasoning_tokens <= output_tokens whenever the relevant values are present.
+   * @type object
+   */
   token_usage: ExecutionTokenUsage
   groups: ExecutionStatisticsGroup[]
   /**

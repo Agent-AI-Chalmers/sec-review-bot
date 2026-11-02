@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { mock } from 'node:test'
 
 import { aggregateExecutionStatistics } from '../src/statistics/execution-statistics.js'
 
@@ -113,6 +113,67 @@ test('execution statistics aggregate native provider/model usage by review agent
     }
   ])
   assert.match(snapshot.observationSetHash, /^[a-f0-9]{64}$/)
+})
+
+test('the total is derived from normalized tokens and a disagreeing source total is reported', () => {
+  const warn = mock.method(console, 'warn', () => undefined)
+  try {
+    const snapshot = aggregateExecutionStatistics({
+      roots: [],
+      generations: [
+        {
+          id: 'generation-1',
+          traceId: 'trace-1',
+          model: 'deepseek-v4-pro',
+          metadata: {
+            sec_review_agent: 'issue-analyzer',
+            ls_provider: 'anthropic'
+          },
+          usageDetails: {
+            input: 6,
+            cache_read_input_tokens: 2,
+            output: 2,
+            // The source total disagrees with its own components; the contract
+            // total must be ours, not the source's.
+            total: 999
+          }
+        },
+        {
+          id: 'generation-2',
+          traceId: 'trace-1',
+          model: 'deepseek-v4-pro',
+          metadata: {
+            sec_review_agent: 'issue-analyzer',
+            ls_provider: 'anthropic'
+          },
+          // No source total: the derived total still exists.
+          usageDetails: { input: 4, output: 1 }
+        }
+      ],
+      excludedNonReviewRootCount: 0
+    })
+
+    assert.deepStrictEqual(snapshot.tokenUsage, {
+      input_tokens: 12,
+      output_tokens: 3,
+      total_tokens: 15,
+      // Only one of the two calls reported cache detail, so the subset is null.
+      cache_read_input_tokens: null,
+      cache_creation_input_tokens: null,
+      reasoning_tokens: null
+    })
+    assert.strictEqual(warn.mock.callCount(), 1)
+    const message = JSON.parse(
+      String(warn.mock.calls[0]?.arguments[0])
+    ) as Record<string, unknown>
+    assert.strictEqual(
+      message.event,
+      'execution_statistics_source_total_mismatch'
+    )
+    assert.strictEqual(message.mismatched_calls, 1)
+  } finally {
+    warn.mock.restore()
+  }
 })
 
 test('an empty read reports no observed calls without deciding ingestion', () => {

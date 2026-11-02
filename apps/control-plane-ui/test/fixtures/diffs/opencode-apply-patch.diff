@@ -1,0 +1,65 @@
+Index: /workspace/shescape/src/main.js
+===================================================================
+--- /workspace/shescape/src/main.js
++++ /workspace/shescape/src/main.js
+@@ -42,8 +42,12 @@
+ 
+   argAsString = arg.toString();
+ }
+ 
++// Shell arguments cannot contain null characters. Remove them before escaping
++// so they cannot interfere with how the shell interprets the argument.
++argAsString = argAsString.replace(/\0/g, "");
++
+ switch (platform) {
+   case win32:
+     return win.escapeShellArg(argAsString);
+   default:
+
+Index: /workspace/shescape/test/index.test.js
+===================================================================
+--- /workspace/shescape/test/index.test.js
++++ /workspace/shescape/test/index.test.js
+@@ -5,8 +5,41 @@
+ const shescape = require("../index.js");
+ const main = require("../src/main.js");
+ 
+ describe("index.js", function () {
++  for (const platform of ["linux", "win32"]) {
++    describe(`null characters on '${platform}'`, function () {
++      beforeEach(function () {
++        sinon.stub(os, "platform").returns(platform);
++      });
++
++      afterEach(function () {
++        os.platform.restore();
++      });
++
++      for (const method of ["escape", "escapeAll", "quote", "quoteAll"]) {
++        it(`${method} removes all null characters before escaping`, function () {
++          for (const input of ["\0", "\0foo", "foo\0bar", "foo\0\0bar\0", "'\0\";&"]) {
++            const cleanInput = input.replace(/\0/g, "");
++            const expected = shescape[method](cleanInput);
++            assert.deepStrictEqual(shescape[method](input), expected);
++            assert.deepStrictEqual(
++              shescape[method]({ toString: () => input }),
++              expected
++            );
++
++            if (method.endsWith("All")) {
++              assert.deepStrictEqual(
++                shescape[method](["safe", input, input]),
++                shescape[method](["safe", cleanInput, cleanInput])
++              );
++            }
++          }
++        });
++      }
++    });
++  }
++
+   it("escape calls main for current OS", function () {
+     const osStubOutput = "MundOS";
+     sinon.stub(os, "platform").returns(osStubOutput);
+     const mainStubOutput = "foobar";
+

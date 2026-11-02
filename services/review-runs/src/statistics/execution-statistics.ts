@@ -110,7 +110,12 @@ function nonNegativeInteger(value: unknown): number | null {
   return Number.isSafeInteger(parsed) ? parsed : null
 }
 
-function tokenUsage(observation: LangfuseObservation): TokenUsage | null {
+interface ParsedTokenUsage {
+  usage: TokenUsage
+  sourceTotalMismatch: boolean
+}
+
+function tokenUsage(observation: LangfuseObservation): ParsedTokenUsage | null {
   const details = observation.usageDetails
   if (details === undefined) return null
   const ordinaryInput = tokenValue(details.input)
@@ -131,19 +136,31 @@ function tokenUsage(observation: LangfuseObservation): TokenUsage | null {
 
   // Langfuse usage details are mutually exclusive billing buckets. The Review Runs
   // boundary exposes OpenTelemetry-style inclusive input/output totals instead.
+  const inputTokens =
+    ordinaryInput === null
+      ? null
+      : ordinaryInput + (cacheRead ?? 0) + (cacheCreation ?? 0)
+  const outputTokens =
+    ordinaryOutput === null ? null : ordinaryOutput + (reasoning ?? 0)
+  // The total is ours, not the source's: forwarding a disagreeing source total
+  // would put a second token vocabulary inside one contract.
+  const derivedTotal =
+    inputTokens === null || outputTokens === null
+      ? null
+      : inputTokens + outputTokens
   const result: TokenUsage = {
-    input_tokens:
-      ordinaryInput === null
-        ? null
-        : ordinaryInput + (cacheRead ?? 0) + (cacheCreation ?? 0),
-    output_tokens:
-      ordinaryOutput === null ? null : ordinaryOutput + (reasoning ?? 0),
-    total_tokens: total,
+    input_tokens: inputTokens,
+    output_tokens: outputTokens,
+    total_tokens: derivedTotal,
     cache_read_input_tokens: cacheRead,
     cache_creation_input_tokens: cacheCreation,
     reasoning_tokens: reasoning
   }
-  return result
+  return {
+    usage: result,
+    sourceTotalMismatch:
+      total !== null && derivedTotal !== null && total !== derivedTotal
+  }
 }
 
 function tokenValue(value: unknown): number | null {
@@ -172,6 +189,7 @@ export function aggregateExecutionStatistics(
   const sums = emptyTokenSums()
   const reported = emptyTokenSums()
   let usageReportedCallCount = 0
+  let sourceTotalMismatchCount = 0
   const groups = new Map<string, GroupAccumulator>()
 
   for (const call of read.generations) {
@@ -216,10 +234,12 @@ export function aggregateExecutionStatistics(
       groups.set(key, group)
     }
     group.modelCallCount += 1
-    const usage = tokenUsage(call)
-    if (usage !== null) {
+    const parsed = tokenUsage(call)
+    if (parsed !== null) {
       usageReportedCallCount += 1
       group.usageReportedCallCount += 1
+      if (parsed.sourceTotalMismatch) sourceTotalMismatchCount += 1
+      const usage = parsed.usage
       for (const field of TOKEN_FIELDS) {
         const value = usage[field]
         if (value === null) continue
@@ -231,6 +251,18 @@ export function aggregateExecutionStatistics(
     }
   }
 
+  if (sourceTotalMismatchCount > 0) {
+    // The derived total replaced a source value that disagrees with its own
+    // components. That is a source-vocabulary change, not a per-run failure, so
+    // it is reported once per snapshot instead of once per call.
+    console.warn(
+      JSON.stringify({
+        event: 'execution_statistics_source_total_mismatch',
+        mismatched_calls: sourceTotalMismatchCount,
+        observed_call_count: read.generations.length
+      })
+    )
+  }
   const observedCallCount = read.generations.length
   // This only describes calls returned by Langfuse. The store separately refuses to interpret
   // an empty root set as proof of zero calls, because the producer may not be exporting.
