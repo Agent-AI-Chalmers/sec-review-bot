@@ -38,6 +38,542 @@ const events: TrajectoryEvent[] = [
   }
 ]
 
+test('argument rendering is decided by key, not by content heuristics', () => {
+  const policyEvents: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-policy',
+        content: '',
+        tool_calls: [
+          {
+            id: 'report-1',
+            name: 'report',
+            args: {
+              description: '**Important** notes',
+              payload: 'line one\nline two with **stars**'
+            }
+          }
+        ]
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={policyEvents} />)
+
+  // A known prose key is markdown.
+  const markdown = document.querySelector('.json-markdown')
+  expect(markdown?.querySelector('strong')).toHaveTextContent('Important')
+  // An unknown key is data: whitespace preserved, markdown not interpreted.
+  const block = document.querySelector('.json-code-block')
+  expect(block).toHaveTextContent('line two with **stars**')
+  expect(block?.querySelector('strong')).toBeNull()
+})
+
+test('hunk content starting with --- or +++ is data, not a file header', () => {
+  const trickyDiff: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-tricky',
+        content: '',
+        tool_calls: [
+          {
+            id: 'edit-tricky',
+            name: 'edit',
+            args: { filePath: '/workspace/src/sample.txt' }
+          }
+        ]
+      }
+    },
+    {
+      seq: 2,
+      event: 'message',
+      message: {
+        type: 'tool',
+        id: 'tool-tricky',
+        name: 'edit',
+        tool_call_id: 'edit-tricky',
+        content: 'Edit applied successfully.',
+        additional_kwargs: {
+          diff: [
+            'Index: /workspace/src/sample.txt',
+            '--- a/src/sample.txt',
+            '+++ b/src/sample.txt',
+            '@@ -1,2 +1,2 @@',
+            ' keep',
+            '--- old',
+            '+++ new'
+          ].join('\n')
+        }
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={trickyDiff} />)
+
+  const stats = document.querySelector('.trajectory-diff-file-stats')
+  expect(stats).toHaveTextContent('+1')
+  expect(stats).toHaveTextContent('−1')
+  expect(
+    document.querySelector('[data-patch-line="remove"]')
+  ).toHaveTextContent('--- old')
+  expect(document.querySelector('[data-patch-line="add"]')).toHaveTextContent(
+    '+++ new'
+  )
+})
+
+test('a deleted file keeps its own path and does not join the previous file', () => {
+  const deleteDiff: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-delete',
+        content: '',
+        tool_calls: [
+          {
+            id: 'edit-delete',
+            name: 'edit',
+            args: { filePath: '/workspace/gone.txt' }
+          }
+        ]
+      }
+    },
+    {
+      seq: 2,
+      event: 'message',
+      message: {
+        type: 'tool',
+        id: 'tool-delete',
+        name: 'edit',
+        tool_call_id: 'edit-delete',
+        content: 'Edit applied successfully.',
+        additional_kwargs: {
+          diff: [
+            'Index: /workspace/keep.txt',
+            '--- a/keep.txt',
+            '+++ b/keep.txt',
+            '@@ -1 +1 @@',
+            '-old',
+            '+new',
+            'Index: /workspace/gone.txt',
+            '--- a/gone.txt',
+            '+++ /dev/null',
+            '@@ -1,2 +0,0 @@',
+            '-line one',
+            '-line two'
+          ].join('\n')
+        }
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={deleteDiff} />)
+
+  const files = document.querySelectorAll('.trajectory-diff-file')
+  expect(files).toHaveLength(2)
+  expect(
+    files[1]?.querySelector('.trajectory-diff-file-path')
+  ).toHaveTextContent('gone.txt')
+  expect(files[1]?.querySelectorAll('[data-patch-line="remove"]')).toHaveLength(
+    2
+  )
+  expect(files[1]).toHaveTextContent('line two')
+  expect(within(files[1] as HTMLElement).getByText('Deleted')).toBeVisible()
+})
+
+test('Begin Patch delete and move keep their operation metadata', () => {
+  const opsDiff: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-ops',
+        content: '',
+        tool_calls: [
+          {
+            id: 'edit-ops',
+            name: 'apply_patch',
+            args: { patchText: '*** Begin Patch' }
+          }
+        ]
+      }
+    },
+    {
+      seq: 2,
+      event: 'message',
+      message: {
+        type: 'tool',
+        id: 'tool-ops',
+        name: 'apply_patch',
+        tool_call_id: 'edit-ops',
+        content: 'Success.',
+        additional_kwargs: {
+          diff: [
+            '*** Begin Patch',
+            '*** Update File: /workspace/old.py',
+            '*** Move to: /workspace/new.py',
+            '@@',
+            '-x = 1',
+            '+x = 2',
+            '*** Delete File: /workspace/gone.py',
+            '*** End Patch'
+          ].join('\n')
+        }
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={opsDiff} />)
+
+  const files = document.querySelectorAll('.trajectory-diff-file')
+  expect(files).toHaveLength(2)
+  const moved = files[0] as HTMLElement
+  expect(moved.querySelector('.trajectory-diff-file-path')).toHaveTextContent(
+    'old.py → new.py'
+  )
+  expect(within(moved).getByText('Moved')).toBeVisible()
+  expect(moved.querySelector('.trajectory-diff-file-stats')).toHaveTextContent(
+    '+1 −1'
+  )
+
+  const deleted = files[1] as HTMLElement
+  expect(deleted.querySelector('.trajectory-diff-file-path')).toHaveTextContent(
+    'gone.py'
+  )
+  expect(within(deleted).getByText('Deleted')).toBeVisible()
+  // An operation-only file has no line stats to show.
+  expect(deleted.querySelector('.trajectory-diff-file-stats')).toBeNull()
+})
+
+test('a damaged patch falls back to raw text instead of a wrong diff', () => {
+  const brokenDiff: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-broken',
+        content: '',
+        tool_calls: [
+          {
+            id: 'edit-broken',
+            name: 'edit',
+            args: { filePath: '/workspace/src/a.txt' }
+          }
+        ]
+      }
+    },
+    {
+      seq: 2,
+      event: 'message',
+      message: {
+        type: 'tool',
+        id: 'tool-broken',
+        name: 'edit',
+        tool_call_id: 'edit-broken',
+        content: 'Edit applied successfully.',
+        additional_kwargs: {
+          diff: [
+            'Index: /workspace/src/a.txt',
+            '--- a/src/a.txt',
+            '+++ b/src/a.txt',
+            '@@ -1,4 +1,4 @@',
+            ' keep'
+          ].join('\n')
+        }
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={brokenDiff} />)
+
+  // No structured diff view: the advertised counts never complete.
+  expect(document.querySelector('[data-diff-mode]')).toBeNull()
+  const raw = document.querySelector('[data-trajectory-patch]')
+  expect(raw).not.toBeNull()
+  expect(raw).toHaveTextContent('@@ -1,4 +1,4 @@')
+  expect(raw).toHaveTextContent('--- a/src/a.txt')
+  expect(screen.getByText(/Patch structure could not be parsed/)).toBeVisible()
+})
+
+test('a truncated diff is labelled as partial', () => {
+  const truncated: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-truncated',
+        content: '',
+        tool_calls: [
+          {
+            id: 'edit-truncated',
+            name: 'edit',
+            args: { filePath: '/workspace/src/a.txt' }
+          }
+        ]
+      }
+    },
+    {
+      seq: 2,
+      event: 'message',
+      message: {
+        type: 'tool',
+        id: 'tool-truncated',
+        name: 'edit',
+        tool_call_id: 'edit-truncated',
+        content: 'Edit applied successfully.',
+        additional_kwargs: {
+          diff: [
+            'Index: /workspace/src/a.txt',
+            '--- /workspace/src/a.txt',
+            '+++ /workspace/src/a.txt',
+            '@@ -1 +1 @@',
+            '-old',
+            '+new'
+          ].join('\n'),
+          diff_truncated: true
+        }
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={truncated} />)
+
+  expect(screen.getByText(/tool truncated this diff/i)).toBeVisible()
+  expect(document.querySelector('[data-diff-mode="unified"]')).not.toBeNull()
+})
+
+test('content left after a hunk ends also falls back to raw text', () => {
+  const earlyEnd: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-early',
+        content: '',
+        tool_calls: [
+          {
+            id: 'edit-early',
+            name: 'edit',
+            args: { filePath: '/workspace/src/a.txt' }
+          }
+        ]
+      }
+    },
+    {
+      seq: 2,
+      event: 'message',
+      message: {
+        type: 'tool',
+        id: 'tool-early',
+        name: 'edit',
+        tool_call_id: 'edit-early',
+        content: 'Edit applied successfully.',
+        additional_kwargs: {
+          diff: [
+            'Index: /workspace/src/a.txt',
+            '--- a/src/a.txt',
+            '+++ b/src/a.txt',
+            '@@ -1 +1 @@',
+            ' keep',
+            '+leftover'
+          ].join('\n')
+        }
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={earlyEnd} />)
+
+  expect(document.querySelector('[data-diff-mode]')).toBeNull()
+  const raw = document.querySelector('[data-trajectory-patch]')
+  expect(raw).toHaveTextContent('+leftover')
+})
+
+test('command arguments render as a terminal block, not markdown', () => {
+  const commandEvents: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-command',
+        content: '',
+        tool_calls: [
+          {
+            id: 'exec-1',
+            name: 'execute',
+            args: {
+              command: 'cd /tmp && python -c "print(1)"\necho done'
+            }
+          }
+        ]
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={commandEvents} />)
+
+  const block = document.querySelector('[data-trajectory-command]')
+  expect(block).not.toBeNull()
+  expect(block).toHaveTextContent('cd /tmp')
+  expect(block).toHaveTextContent('echo done')
+  // The markdown heuristic used to collapse commands into a paragraph.
+  expect(document.querySelector('.memory-markdown')).toBeNull()
+})
+
+test('camelCase edit arguments fall back to a before/after pair', () => {
+  const editEvents: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-edit',
+        content: '',
+        tool_calls: [
+          {
+            id: 'edit-1',
+            name: 'edit',
+            args: {
+              filePath: '/workspace/src/main.js',
+              oldString: 'const old = 1',
+              newString: 'const fresh = 2'
+            }
+          }
+        ]
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={editEvents} />)
+
+  // Labels are the actual argument names, not generic Before/After.
+  expect(screen.getByText('oldString')).toBeVisible()
+  expect(screen.getByText('newString')).toBeVisible()
+  expect(screen.getByText('const old = 1')).toBeVisible()
+  expect(screen.getByText('const fresh = 2')).toBeVisible()
+})
+
+test('a tool-provided diff wins over the call arguments', () => {
+  const diffEvents: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-diff',
+        content: '',
+        tool_calls: [
+          {
+            id: 'edit-1',
+            name: 'edit',
+            args: {
+              filePath: '/workspace/src/main.js',
+              oldString: 'const old = 1',
+              newString: 'const fresh = 2'
+            }
+          }
+        ]
+      }
+    },
+    {
+      seq: 2,
+      event: 'message',
+      message: {
+        type: 'tool',
+        id: 'tool-edit',
+        name: 'edit',
+        tool_call_id: 'edit-1',
+        content: 'Edit applied successfully.',
+        additional_kwargs: {
+          diff: [
+            'Index: /workspace/src/main.js',
+            '--- a/src/main.js',
+            '+++ b/src/main.js',
+            '@@ -1 +1 @@',
+            '-const old = 1',
+            '+const fresh = 2'
+          ].join('\n')
+        }
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={diffEvents} />)
+
+  expect(document.querySelector('[data-patch-line="add"]')).toHaveTextContent(
+    '+const fresh = 2'
+  )
+  expect(
+    document.querySelector('[data-patch-line="remove"]')
+  ).toHaveTextContent('-const old = 1')
+  // The real diff replaces the argument preview entirely.
+  expect(screen.queryByText('oldString')).not.toBeInTheDocument()
+  expect(screen.queryByText('newString')).not.toBeInTheDocument()
+})
+
+test('a real diff can switch to side-by-side', async () => {
+  const user = userEvent.setup()
+  const diffEvents: TrajectoryEvent[] = [
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        type: 'ai',
+        id: 'assistant-diff',
+        content: '',
+        tool_calls: [
+          {
+            id: 'edit-1',
+            name: 'edit',
+            args: { filePath: '/workspace/src/main.js' }
+          }
+        ]
+      }
+    },
+    {
+      seq: 2,
+      event: 'message',
+      message: {
+        type: 'tool',
+        id: 'tool-edit',
+        name: 'edit',
+        tool_call_id: 'edit-1',
+        content: 'Edit applied successfully.',
+        additional_kwargs: {
+          diff: [
+            'Index: /workspace/src/main.js',
+            '--- a/src/main.js',
+            '+++ b/src/main.js',
+            '@@ -1 +1 @@',
+            '-const old = 1',
+            '+const fresh = 2'
+          ].join('\n')
+        }
+      }
+    }
+  ]
+  renderComponent(<TrajectoryTimeline events={diffEvents} />)
+
+  expect(document.querySelector('[data-diff-mode="unified"]')).not.toBeNull()
+  await user.click(screen.getByText('Side by side'))
+  expect(
+    document.querySelector('[data-diff-mode="side-by-side"]')
+  ).not.toBeNull()
+  expect(document.querySelector('[data-diff-kind="add"]')).toHaveTextContent(
+    'const fresh = 2'
+  )
+  // Both sides of a paired row are marked as changed, not just the row kind.
+  const pairedRow = document.querySelector('[data-diff-kind="add"]')
+  expect(
+    pairedRow?.querySelector('.trajectory-diff-cell.old.changed')
+  ).not.toBeNull()
+  expect(
+    pairedRow?.querySelector('.trajectory-diff-cell.new.changed')
+  ).not.toBeNull()
+})
+
 test('assistant messages show model provenance before the agent name', () => {
   const modelEvents: TrajectoryEvent[] = [
     {
@@ -103,10 +639,8 @@ test('apply_patch arguments render as a line-oriented patch', async () => {
   expect(
     document.querySelector('[data-patch-line="remove"]')
   ).toHaveTextContent('-const unsafe = true')
-  const fileLines = [
-    ...document.querySelectorAll('[data-patch-line="file"]')
-  ].map((element) => element.textContent)
-  expect(fileLines).toContain('*** Update File: src/main.js')
+  // The parsed file header is shown as a path, not as a raw patch line.
+  expect(screen.getByText('src/main.js')).toBeVisible()
   // The raw argument key must not also appear as a JSON field.
   expect(screen.queryByText('patchText')).not.toBeInTheDocument()
 })

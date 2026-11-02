@@ -12,6 +12,9 @@ export interface ToolCallView {
   name: string
   args: Record<string, unknown>
   resultMessageId: string | undefined
+  /** Real unified diff reported by the tool, when it provides one. */
+  diff?: string
+  diffTruncated?: boolean
 }
 
 export interface UsageView {
@@ -36,6 +39,8 @@ export interface TrajectoryMessageView {
   toolCallId: string | undefined
   status: string | undefined
   artifact: unknown
+  diff: string | undefined
+  diffTruncated: boolean | undefined
   usage: UsageView | undefined
   searchable: string
 }
@@ -217,6 +222,11 @@ export function normalizeTrajectory(
         typeof raw.tool_call_id === 'string' ? raw.tool_call_id : undefined,
       status: typeof raw.status === 'string' ? raw.status : undefined,
       artifact: raw.artifact,
+      diff:
+        typeof kwargs?.diff === 'string' && kwargs.diff
+          ? kwargs.diff
+          : undefined,
+      diffTruncated: kwargs?.diff_truncated === true ? true : undefined,
       usage: usage(raw),
       searchable: ''
     }
@@ -271,7 +281,15 @@ export function normalizeTrajectory(
   )
   for (const message of messages) {
     for (const call of message.toolCalls) {
-      call.resultMessageId = results.get(call.id)?.id
+      const result = results.get(call.id)
+      call.resultMessageId = result?.id
+      // The tool reports the diff on its result message; the call renders it.
+      if (result?.diff) {
+        call.diff = result.diff
+        if (result.diffTruncated) call.diffTruncated = true
+        // The diff is displayed with this message, so it belongs in the index.
+        message.searchable += '\n' + result.diff.toLowerCase()
+      }
     }
   }
   const totalUsage: UsageView = {
