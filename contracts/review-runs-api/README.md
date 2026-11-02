@@ -27,6 +27,7 @@ Consumers can rely on:
 - `notices`: messages that an integration should show when part of the run fails or needs attention. They are ordered from oldest to newest, and separate events remain separate entries;
 - `execution_statistics`: a nullable Review Runs snapshot of reconciliation state, observed model-call/token totals, and workflow-coordinate/agent/provider/model groups. Case, delivery, pass, draft-batch, and discovery-chunk coordinates are nullable because most stages do not have them. `null` means no snapshot row exists; it does not mean zero usage;
 - execution-statistics token totals use OpenTelemetry GenAI semantics: `input_tokens` and `output_tokens` include their reported cache and reasoning subsets. Langfuse's mutually exclusive billing buckets are normalized before they enter this contract;
+- token fields are nullable: `null` means the value could not be established for every covered call, never zero. `input_tokens`, `output_tokens` and their subsets are independently nullable; `total_tokens` is computed as their sum and is null whenever either is missing. Cache and reasoning fields are subsets and must not be added to the totals;
 - the `artifact_storage` variants: absent; an error variant whose status is `unavailable` or `failed`, with optional `error_code` and `message`; or `available` with a stored bundle.
 
 The following are not part of this contract:

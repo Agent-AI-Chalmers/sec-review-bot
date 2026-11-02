@@ -1,3 +1,4 @@
+import warnings
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
@@ -141,7 +142,9 @@ def _usage_details(observation: Mapping[str, Any]) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
 
-def _call_usage(observation: Mapping[str, Any]) -> dict[str, int] | None:
+def _call_usage(
+    observation: Mapping[str, Any],
+) -> tuple[dict[str, int], bool] | None:
     raw = _usage_details(observation)
     ordinary_input = _int_value(raw.get("input"))
     ordinary_output = _int_value(raw.get("output"))
@@ -165,22 +168,38 @@ def _call_usage(observation: Mapping[str, Any]) -> dict[str, int] | None:
     # Langfuse reports ordinary, cache, and reasoning usage as mutually exclusive
     # billing buckets. Expose inclusive OpenTelemetry-style input/output totals while
     # retaining the cache and reasoning buckets as subsets for callers that need them.
+    input_tokens = (
+        None
+        if ordinary_input is None
+        else ordinary_input + (cache_read or 0) + (cache_creation or 0)
+    )
+    output_tokens = (
+        None if ordinary_output is None else ordinary_output + (reasoning or 0)
+    )
+    # Match Review Runs: the total is derived from the normalized components, so a
+    # source total never becomes a second token vocabulary downstream.
+    derived_total = (
+        input_tokens + output_tokens
+        if input_tokens is not None and output_tokens is not None
+        else None
+    )
     usage: dict[str, int] = {}
-    if ordinary_input is not None:
-        usage["input_tokens"] = (
-            ordinary_input + (cache_read or 0) + (cache_creation or 0)
-        )
-    if ordinary_output is not None:
-        usage["output_tokens"] = ordinary_output + (reasoning or 0)
-    if total is not None:
-        usage["total_tokens"] = total
+    if input_tokens is not None:
+        usage["input_tokens"] = input_tokens
+    if output_tokens is not None:
+        usage["output_tokens"] = output_tokens
+    if derived_total is not None:
+        usage["total_tokens"] = derived_total
     if cache_read is not None:
         usage["cache_read_input_tokens"] = cache_read
     if cache_creation is not None:
         usage["cache_creation_input_tokens"] = cache_creation
     if reasoning is not None:
         usage["reasoning_tokens"] = reasoning
-    return usage
+    source_total_mismatch = (
+        total is not None and derived_total is not None and total != derived_total
+    )
+    return usage, source_total_mismatch
 
 
 def _empty_totals() -> dict[str, int]:
@@ -220,6 +239,7 @@ def aggregate_run(
     totals = _empty_totals()
     reported = _empty_totals()
     usage_reported_call_count = 0
+    source_total_mismatch_count = 0
     groups: dict[tuple[str | None, str | None, str | None], dict[str, Any]] = {}
 
     for call in calls:
@@ -229,10 +249,14 @@ def aggregate_run(
         model = _string_value(call.get("model")) or _string_value(
             metadata.get("ls_model_name")
         )
-        usage = _call_usage(call)
-        if usage is not None:
+        parsed = _call_usage(call)
+        usage = None
+        if parsed is not None:
+            usage, source_total_mismatch = parsed
             usage_reported_call_count += 1
             _add_usage(totals, reported, usage)
+            if source_total_mismatch:
+                source_total_mismatch_count += 1
 
         key = (agent_name, provider, model)
         group = groups.setdefault(
@@ -255,6 +279,16 @@ def aggregate_run(
     for group in groups.values():
         group["token_usage"] = _complete_totals(
             group["token_usage"], group.pop("reported"), group["model_call_count"]
+        )
+
+    if source_total_mismatch_count:
+        # A source total that disagrees with its own components means the upstream
+        # vocabulary changed. Report once per run instead of once per call.
+        warnings.warn(
+            "execution_statistics_source_total_mismatch: "
+            f"{source_total_mismatch_count} of {len(calls)} calls",
+            RuntimeWarning,
+            stacklevel=2,
         )
 
     observed_call_count = len(calls)
