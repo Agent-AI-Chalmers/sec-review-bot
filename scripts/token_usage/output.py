@@ -1,31 +1,18 @@
 import csv
 import io
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 from pathlib import Path
 
 from . import (
     AttemptUsage,
-    CostEstimate,
     EffectivePatchUsage,
-    PricingSelection,
     RunUsage,
     UsageTotals,
     aggregate_stage_usages,
-    collect_used_prices,
     compute_effective_patch_usage,
     effective_patch_efficiency,
-    effective_patch_run,
-    resolve_pricing_selection,
 )
-from . import run_cost as compute_run_cost
-from . import stage_cost as compute_stage_cost
-from .openrouter_pricing import PriceIndex
-
-
-@dataclass(frozen=True)
-class RenderConfig:
-    index: PriceIndex | None = None
 
 
 def should_render_attempt_rows(run: RunUsage) -> bool:
@@ -54,15 +41,6 @@ def display_run_name(run: RunUsage) -> str:
     return run.experiment or Path(run.run_dir).name
 
 
-def render_pricing_header(pricing: PricingSelection) -> list[str]:
-    if pricing.fetched_at is None:
-        return ["pricing: unknown (no price source available)", ""]
-    return [
-        f"pricing: source=openrouter fetched_at={pricing.fetched_at}",
-        "",
-    ]
-
-
 def table_row(columns: list[str], widths: list[int]) -> str:
     return "  ".join(
         value.ljust(width) for value, width in zip(columns, widths, strict=False)
@@ -88,22 +66,12 @@ def render_rows(
     return "\n".join(lines).rstrip() + "\n"
 
 
-def format_cost(cost: CostEstimate | None) -> str:
-    return f"{cost.amount:.6f} {cost.currency}" if cost is not None else ""
-
-
-def render_raw_text(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
-    config = config or RenderConfig()
-    pricing = resolve_pricing_selection(
-        config.index, used_prices=collect_used_prices(runs, config.index)
-    )
-    lines: list[str] = render_pricing_header(pricing)
+def render_raw_text(runs: list[RunUsage]) -> str:
+    lines: list[str] = []
 
     for run in runs:
         effective = compute_effective_patch_usage(run)
         totals = effective.totals
-        run_cost = compute_run_cost(run, config.index)
-        effective_cost = compute_run_cost(effective_patch_run(run), config.index)
         visible_attempts = displayable_effective_attempts(run, effective)
 
         lines.append(run.run_dir)
@@ -118,9 +86,6 @@ def render_raw_text(runs: list[RunUsage], config: RenderConfig | None = None) ->
             f"cache_ratio={run.cache_ratio * 100:.2f}% "
             f"ai_msgs={run.ai_message_count}"
         )
-        if run_cost is not None:
-            lines.append(f"  estimated_cost={run_cost.amount:.6f} {run_cost.currency}")
-
         lines.append(
             "  effective_patch: "
             f"input={totals.input_tokens:,} "
@@ -132,10 +97,6 @@ def render_raw_text(runs: list[RunUsage], config: RenderConfig | None = None) ->
             f"cache_ratio={totals.cache_ratio * 100:.2f}% "
             f"ai_msgs={totals.ai_message_count}"
         )
-        if effective_cost is not None:
-            lines.append(
-                f"  effective_patch_cost={effective_cost.amount:.6f} {effective_cost.currency}"
-            )
         if visible_attempts:
             labels = ", ".join(
                 f"{item.stage}.{item.attempt_label}" for item in visible_attempts
@@ -143,12 +104,10 @@ def render_raw_text(runs: list[RunUsage], config: RenderConfig | None = None) ->
             lines.append(f"  effective_patch_attempts={labels}")
 
         for stage in run.stages:
-            stage_cost, price_model = compute_stage_cost(stage, config.index)
             line = (
                 "  - "
                 f"{stage.stage}: "
                 f"model_id={stage.model_id} "
-                f"price_model={price_model or 'unknown'} "
                 f"input={stage.input_tokens:,} "
                 f"output={stage.output_tokens:,} "
                 f"total={stage.total_tokens:,} "
@@ -158,25 +117,18 @@ def render_raw_text(runs: list[RunUsage], config: RenderConfig | None = None) ->
                 f"cache_ratio={stage.cache_ratio * 100:.2f}% "
                 f"ai_msgs={stage.ai_message_count}"
             )
-            if stage_cost is not None:
-                line += f" estimated_cost={stage_cost.amount:.6f} {stage_cost.currency}"
             lines.append(line)
         lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
-    config = config or RenderConfig()
-    pricing = resolve_pricing_selection(
-        config.index, used_prices=collect_used_prices(runs, config.index)
-    )
+def render_table(runs: list[RunUsage]) -> str:
     header = [
         "run",
         "stage",
         "scope",
         "model",
-        "price_model",
         "input",
         "output",
         "cache_read",
@@ -185,15 +137,12 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
         "cache_ratio",
         "efficiency",
         "ai_msgs",
-        "cost",
     ]
     rows: list[list[str]] = []
 
     for run in runs:
-        run_cost = compute_run_cost(run, config.index)
         effective = compute_effective_patch_usage(run)
         effective_totals = effective.totals
-        effective_cost = compute_run_cost(effective_patch_run(run), config.index)
         efficiency = effective_patch_efficiency(run)
 
         rows.append(
@@ -201,7 +150,6 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                 display_run_name(run),
                 "TOTAL",
                 "all",
-                "-",
                 "-",
                 f"{run.input_tokens:,}",
                 f"{run.output_tokens:,}",
@@ -211,7 +159,6 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                 f"{run.cache_ratio * 100:.2f}%",
                 f"{efficiency * 100:.2f}%",
                 str(run.ai_message_count),
-                format_cost(run_cost),
             ]
         )
         rows.append(
@@ -219,7 +166,6 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                 "",
                 "TOTAL",
                 "effective_patch",
-                "-",
                 "-",
                 f"{effective_totals.input_tokens:,}",
                 f"{effective_totals.output_tokens:,}",
@@ -229,19 +175,16 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                 f"{effective_totals.cache_ratio * 100:.2f}%",
                 f"{efficiency * 100:.2f}%",
                 str(effective_totals.ai_message_count),
-                format_cost(effective_cost),
             ]
         )
 
         for stage in run.stages:
-            stage_cost, price_model = compute_stage_cost(stage, config.index)
             rows.append(
                 [
                     "",
                     stage.stage,
                     "all",
                     stage.model_id,
-                    price_model or "unknown",
                     f"{stage.input_tokens:,}",
                     f"{stage.output_tokens:,}",
                     f"{stage.cache_read_tokens:,}",
@@ -250,7 +193,6 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                     f"{stage.cache_ratio * 100:.2f}%",
                     "",
                     str(stage.ai_message_count),
-                    format_cost(stage_cost),
                 ]
             )
 
@@ -258,16 +200,12 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
         if displayed_attempt_rows:
             visible_attempts = displayable_effective_attempts(run, effective)
             for attempt in displayed_attempt_rows:
-                stage_cost, price_model = compute_stage_cost(
-                    attempt.usage, config.index
-                )
                 rows.append(
                     [
                         "",
                         attempt.stage,
                         attempt.attempt_label,
                         attempt.usage.model_id,
-                        price_model or "unknown",
                         f"{attempt.usage.input_tokens:,}",
                         f"{attempt.usage.output_tokens:,}",
                         f"{attempt.usage.cache_read_tokens:,}",
@@ -276,15 +214,13 @@ def render_table(runs: list[RunUsage], config: RenderConfig | None = None) -> st
                         f"{attempt.usage.cache_ratio * 100:.2f}%",
                         "effective" if attempt in visible_attempts else "",
                         str(attempt.usage.ai_message_count),
-                        format_cost(stage_cost),
                     ]
                 )
 
-    return render_rows(header, rows, prefix_lines=render_pricing_header(pricing))
+    return render_rows(header, rows)
 
 
-def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
-    config = config or RenderConfig()
+def render_csv(runs: list[RunUsage]) -> str:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
     writer.writerow(
@@ -297,7 +233,6 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
             "scope",
             "attempt_label",
             "model_id",
-            "price_model",
             "input_tokens",
             "output_tokens",
             "total_tokens",
@@ -307,8 +242,6 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
             "cache_ratio",
             "ai_message_count",
             "ai_messages_with_usage_count",
-            "estimated_cost",
-            "currency",
         ]
     )
 
@@ -320,9 +253,7 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
         scope: str,
         attempt_label: str,
         model_id: str,
-        price_model: str,
         totals: UsageTotals,
-        cost: CostEstimate | None,
     ) -> None:
         writer.writerow(
             [
@@ -334,7 +265,6 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
                 scope,
                 attempt_label,
                 model_id,
-                price_model,
                 totals.input_tokens,
                 totals.output_tokens,
                 totals.total_tokens,
@@ -344,15 +274,11 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
                 f"{totals.cache_ratio:.6f}",
                 totals.ai_message_count,
                 totals.ai_messages_with_usage_count,
-                f"{cost.amount:.6f}" if cost is not None else "",
-                cost.currency if cost is not None else "",
             ]
         )
 
     for run in runs:
         effective = compute_effective_patch_usage(run)
-        run_cost = compute_run_cost(run, config.index)
-        effective_cost = compute_run_cost(effective_patch_run(run), config.index)
         write_usage_row(
             run=run,
             row_type="run",
@@ -360,9 +286,7 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
             scope="all",
             attempt_label="",
             model_id="",
-            price_model="-",
             totals=run.totals,
-            cost=run_cost,
         )
         write_usage_row(
             run=run,
@@ -371,13 +295,10 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
             scope="effective_patch",
             attempt_label="",
             model_id="",
-            price_model="-",
             totals=effective.totals,
-            cost=effective_cost,
         )
 
         for stage in run.stages:
-            stage_cost, price_model = compute_stage_cost(stage, config.index)
             write_usage_row(
                 run=run,
                 row_type="stage",
@@ -385,18 +306,13 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
                 scope="all",
                 attempt_label="",
                 model_id=stage.model_id,
-                price_model=price_model or "unknown",
                 totals=aggregate_stage_usages([stage]),
-                cost=stage_cost,
             )
 
         displayed_attempt_rows = displayable_attempt_rows(run)
         if displayed_attempt_rows:
             visible_attempts = displayable_effective_attempts(run, effective)
             for attempt in displayed_attempt_rows:
-                stage_cost, price_model = compute_stage_cost(
-                    attempt.usage, config.index
-                )
                 write_usage_row(
                     run=run,
                     row_type="attempt",
@@ -408,25 +324,17 @@ def render_csv(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
                     ),
                     attempt_label=attempt.attempt_label,
                     model_id=attempt.usage.model_id,
-                    price_model=price_model or "unknown",
                     totals=aggregate_stage_usages([attempt.usage]),
-                    cost=stage_cost,
                 )
 
     return buffer.getvalue()
 
 
-def render_json(runs: list[RunUsage], config: RenderConfig | None = None) -> str:
-    config = config or RenderConfig()
-    pricing = resolve_pricing_selection(
-        config.index, used_prices=collect_used_prices(runs, config.index)
-    )
+def render_json(runs: list[RunUsage]) -> str:
     payload: list[dict] = []
 
     for run in runs:
-        run_cost = compute_run_cost(run, config.index)
         effective = compute_effective_patch_usage(run)
-        effective_cost = compute_run_cost(effective_patch_run(run), config.index)
         totals = run.totals
         effective_totals = effective.totals
 
@@ -444,16 +352,6 @@ def render_json(runs: list[RunUsage], config: RenderConfig | None = None) -> str
             "cache_ratio": totals.cache_ratio,
             "ai_message_count": totals.ai_message_count,
             "ai_messages_with_usage_count": totals.ai_messages_with_usage_count,
-            "pricing": {
-                "source": "openrouter" if pricing.fetched_at else None,
-                "fetched_at": pricing.fetched_at,
-                "unit": "per_1m_tokens",
-                "used_prices": {
-                    model: (asdict(price) if price is not None else None)
-                    for model, price in pricing.used_prices.items()
-                },
-            },
-            "estimated_cost": asdict(run_cost) if run_cost is not None else None,
             "effective_patch": {
                 "input_tokens": effective_totals.input_tokens,
                 "output_tokens": effective_totals.output_tokens,
@@ -464,9 +362,6 @@ def render_json(runs: list[RunUsage], config: RenderConfig | None = None) -> str
                 "cache_ratio": effective_totals.cache_ratio,
                 "ai_message_count": effective_totals.ai_message_count,
                 "ai_messages_with_usage_count": effective_totals.ai_messages_with_usage_count,
-                "estimated_cost": (
-                    asdict(effective_cost) if effective_cost is not None else None
-                ),
                 "included_attempts": [
                     {"stage": item.stage, "attempt_label": item.attempt_label}
                     for item in effective.included_attempts
@@ -477,14 +372,9 @@ def render_json(runs: list[RunUsage], config: RenderConfig | None = None) -> str
         }
 
         for stage in run.stages:
-            stage_cost, price_model = compute_stage_cost(stage, config.index)
             stage_payload = asdict(stage)
             stage_payload["uncached_input_tokens"] = stage.uncached_input_tokens
             stage_payload["cache_ratio"] = stage.cache_ratio
-            stage_payload["estimated_cost"] = (
-                asdict(stage_cost) if stage_cost is not None else None
-            )
-            stage_payload["price_model"] = price_model
             run_payload["stages"].append(stage_payload)
 
         for attempt in run.attempts:

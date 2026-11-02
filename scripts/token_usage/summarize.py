@@ -4,9 +4,7 @@ from pathlib import Path
 from sec_review_agents.utils.env import bootstrap_agents_env
 
 from scripts.token_usage import load_run_usage
-from scripts.token_usage.openrouter_pricing import load_price_index
 from scripts.token_usage.output import (
-    RenderConfig,
     render_csv,
     render_json,
     render_raw_text,
@@ -50,17 +48,15 @@ def main() -> None:
         raise SystemExit("Choose at most one of --json, --csv, --raw.")
 
     runs = [load_run_usage(Path(item).resolve()) for item in args.run_dirs]
-    index = load_price_index()
-    render_config = RenderConfig(index=index)
 
     if args.json:
-        print(render_json(runs, render_config), end="")
+        print(render_json(runs), end="")
     elif args.csv:
-        print(render_csv(runs, render_config), end="")
+        print(render_csv(runs), end="")
     elif args.raw:
-        print(render_raw_text(runs, render_config), end="")
+        print(render_raw_text(runs), end="")
     else:
-        print(render_table(runs, render_config), end="")
+        print(render_table(runs), end="")
 
 
 if __name__ == "__main__":

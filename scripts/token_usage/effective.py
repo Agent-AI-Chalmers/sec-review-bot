@@ -27,7 +27,7 @@ def _initial_stage_attempt(run: RunUsage, stage_name: str) -> AttemptUsage | Non
 
 
 def compute_lightweight_two_stage_usage(run: RunUsage) -> EffectivePatchUsage:
-    """Compute the derived analyzer + first mitigator cost used by lightweight-two-stage."""
+    """Compute the derived analyzer + first mitigator usage used by lightweight-two-stage."""
     included = [
         item
         for item in (
@@ -104,7 +104,7 @@ def compute_effective_patch_usage(run: RunUsage) -> EffectivePatchUsage:
 
     # If there were N mitigator attempts, there were at most N-1 verifier feedback
     # checks that caused retry mitigation. Include only those verifier attempts in
-    # effective_patch, not the final verifier-only cost.
+    # effective_patch, not the final verifier-only usage.
     retry_mitigator_count = max(len(mitigator_attempts) - 1, 0)
     included.extend(verifier_attempts[:retry_mitigator_count])
     return EffectivePatchUsage(included_attempts=included)
