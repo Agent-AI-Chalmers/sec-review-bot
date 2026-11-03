@@ -36,11 +36,9 @@ test('trajectory normalization separates content, reasoning, usage, and tool lin
           input_tokens: 10,
           output_tokens: 5,
           total_tokens: 15,
-          input_token_details: {
-            cache_read: 7,
-            cache_creation: 2
-          },
-          output_token_details: { reasoning: 1 }
+          cache_read_input_tokens: 7,
+          cache_creation_input_tokens: 2,
+          reasoning_tokens: 1
         }
       }
     },
@@ -114,7 +112,9 @@ test('explicit zero cache counters remain known zero', () => {
           input_tokens: 10,
           output_tokens: 2,
           total_tokens: 12,
-          input_token_details: { cache_read: 0, cache_creation: 0 }
+          cache_read_input_tokens: 0,
+          cache_creation_input_tokens: 0,
+          reasoning_tokens: null
         }
       }
     }

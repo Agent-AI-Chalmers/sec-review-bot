@@ -1,1 +1,1 @@
-{"seq":1,"event":"message","message":{"id":"m1","role":"assistant","content":"Inspect the patch.","usage_metadata":{"input_tokens":-1}}}
+{"seq":1,"event":"message","message":{"id":"m1","role":"assistant","content":"Inspect the patch.","usage_metadata":{"input_tokens":-1,"output_tokens":null,"total_tokens":null,"cache_read_input_tokens":null,"cache_creation_input_tokens":null,"reasoning_tokens":null}}}

@@ -13,15 +13,14 @@ from sec_review_agents.llm.factory import (
     create_chat_model,
     create_chat_model_from_deployment,
 )
-
-from scripts.token_usage import usage_from_ai_message
+from sec_review_agents.runtime.token_usage import message_token_usage
 
 
 @dataclass(frozen=True)
 class RoundStats:
     round_index: int
     latency_ms: float
-    extracted_usage: dict[str, int] | None
+    extracted_usage: dict[str, int | None] | None
     usage_metadata: dict[str, Any] | None
     response_metadata: dict[str, Any] | None
     response_preview: str
@@ -31,7 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
             "Run a tiny multi-turn chat experiment and print raw token usage plus the "
-            "normalized cached-token fields parsed by diagnostics.py."
+            "canonical usage fields produced by the agents runtime."
         )
     )
     parser.add_argument(
@@ -158,7 +157,7 @@ def _message_to_round_stats(
     return RoundStats(
         round_index=round_index,
         latency_ms=latency_ms,
-        extracted_usage=usage_from_ai_message(message),
+        extracted_usage=message_token_usage(message),
         usage_metadata=usage_metadata if isinstance(usage_metadata, dict) else None,
         response_metadata=(
             response_metadata if isinstance(response_metadata, dict) else None
@@ -222,27 +221,23 @@ def _extract_raw_cache_fields(stats: RoundStats) -> dict[str, Any]:
 
 
 def _print_summary(results: list[RoundStats]) -> None:
-    total_input = 0
-    total_output = 0
-    total_cached = 0
-    rounds_with_cache = 0
-
-    for item in results:
-        usage = item.extracted_usage or {}
-        total_input += int(usage.get("input_tokens", 0))
-        total_output += int(usage.get("output_tokens", 0))
-        cached = int(usage.get("cache_read_tokens", 0))
-        total_cached += cached
-        if cached > 0:
-            rounds_with_cache += 1
-
     print()
     print("Summary")
     print(f"  rounds: {len(results)}")
-    print(f"  rounds_with_cache_read_tokens: {rounds_with_cache}")
-    print(f"  summed_input_tokens: {total_input}")
-    print(f"  summed_output_tokens: {total_output}")
-    print(f"  summed_cache_read_tokens: {total_cached}")
+    rounds_with_cache = sum(
+        (item.extracted_usage or {}).get("cache_read_input_tokens", 0) is not None
+        and ((item.extracted_usage or {}).get("cache_read_input_tokens") or 0) > 0
+        for item in results
+    )
+    print(f"  rounds_with_reported_cache_reads: {rounds_with_cache}")
+    for field in ("input_tokens", "output_tokens", "cache_read_input_tokens"):
+        values = [(item.extracted_usage or {}).get(field) for item in results]
+        total = (
+            sum(value for value in values if value is not None)
+            if values and all(value is not None for value in values)
+            else None
+        )
+        print(f"  summed_{field}: {total if total is not None else 'unknown'}")
 
 
 def main() -> None:

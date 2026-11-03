@@ -64,7 +64,14 @@ test('viewer projects execution events and retains model provenance', () => {
         id: 'answer',
         role: 'assistant',
         content: 'Evidence',
-        usage_metadata: { input_tokens: 10, output_tokens: 2, total_tokens: 12 }
+        usage_metadata: {
+          input_tokens: 10,
+          output_tokens: 2,
+          total_tokens: 12,
+          cache_read_input_tokens: null,
+          cache_creation_input_tokens: null,
+          reasoning_tokens: null
+        }
       }
     },
     { seq: 4, event: 'model_call_end', call_id: 'call', message_id: 'answer' },

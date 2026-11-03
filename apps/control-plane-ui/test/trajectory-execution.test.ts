@@ -54,7 +54,10 @@ test('parallel subagents with repeated tool IDs link to their own results', () =
           usage_metadata: {
             input_tokens: 10,
             output_tokens: 2,
-            total_tokens: 12
+            total_tokens: 12,
+            cache_read_input_tokens: null,
+            cache_creation_input_tokens: null,
+            reasoning_tokens: null
           }
         }
       },
@@ -81,7 +84,10 @@ test('parallel subagents with repeated tool IDs link to their own results', () =
       usage_metadata: {
         input_tokens: 100,
         output_tokens: 20,
-        total_tokens: 120
+        total_tokens: 120,
+        cache_read_input_tokens: null,
+        cache_creation_input_tokens: null,
+        reasoning_tokens: null
       }
     }
   })
@@ -260,7 +266,10 @@ for (const ended of [true, false]) {
           usage_metadata: {
             input_tokens: total - 1,
             output_tokens: 1,
-            total_tokens: total
+            total_tokens: total,
+            cache_read_input_tokens: null,
+            cache_creation_input_tokens: null,
+            reasoning_tokens: null
           }
         }
       })),
@@ -289,7 +298,14 @@ test('an interrupted call with one recorded response retains known usage', () =>
         id: 'response',
         role: 'assistant',
         content: 'Reply',
-        usage_metadata: { input_tokens: 10, output_tokens: 2, total_tokens: 12 }
+        usage_metadata: {
+          input_tokens: 10,
+          output_tokens: 2,
+          total_tokens: 12,
+          cache_read_input_tokens: null,
+          cache_creation_input_tokens: null,
+          reasoning_tokens: null
+        }
       }
     }
   ]
@@ -299,4 +315,46 @@ test('an interrupted call with one recorded response retains known usage', () =>
     buildTrajectoryDocument(parseViewerInput(input)).totalUsage.total,
     12
   )
+})
+
+test('a missing call usage keeps aggregate fields unknown independently', () => {
+  const usage = {
+    input_tokens: 10,
+    output_tokens: 2,
+    total_tokens: 12,
+    cache_read_input_tokens: null,
+    cache_creation_input_tokens: 0,
+    reasoning_tokens: 0
+  }
+  const records = [
+    { event: 'model_calls_start' },
+    { event: 'model_call_start', call_id: 'first' },
+    {
+      event: 'message',
+      call_id: 'first',
+      message: {
+        id: 'a',
+        role: 'assistant',
+        content: '',
+        usage_metadata: usage
+      }
+    },
+    { event: 'model_call_end', call_id: 'first', message_id: 'a' },
+    { event: 'model_call_start', call_id: 'missing' },
+    { event: 'model_calls_end', status: 'interrupted' }
+  ]
+  const events = parseViewerInput(
+    records
+      .map((record, index) => JSON.stringify({ seq: index + 1, ...record }))
+      .join('\n')
+  )
+  const document = buildTrajectoryDocument(events)
+  assert.equal(document.messages[0]?.usage?.total, 12)
+  assert.equal(document.totalUsage.total, undefined)
+  assert.equal(document.totalUsage.input, undefined)
+  assert.equal(document.totalUsage.cacheRead, undefined)
+  const oneCall = buildTrajectoryDocument(events.slice(0, 4))
+  assert.equal(oneCall.totalUsage.total, 12)
+  assert.equal(oneCall.totalUsage.cacheRead, undefined)
+  assert.equal(oneCall.totalUsage.cacheCreation, 0)
 })

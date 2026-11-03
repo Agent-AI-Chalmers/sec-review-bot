@@ -1,23 +1,13 @@
 import sys
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
+from sec_review_agents.runtime.token_usage import TOKEN_FIELDS
 from sec_review_agents.runtime.trajectories import read_trajectory_events
 
-from .models import AttemptUsage, RunUsage, StageUsage
-from .normalization import (
-    usage_from_langchain_metadata,
-    usage_from_provider_metadata,
-)
+from .models import AttemptUsage, RunUsage, StageUsage, aggregate_stage_usages
 
-NUMERIC_FIELDS = (
-    "input_tokens",
-    "output_tokens",
-    "total_tokens",
-    "cache_read_tokens",
-    "cache_creation_tokens",
-    "reasoning_tokens",
-)
 TRAJECTORIES_DIRNAME = "trajectories"
 # The artifact directory each stage writes its trajectories under, keyed by the directory
 # name the stage modules actually use and valued by pipeline order for report sorting.
@@ -60,7 +50,7 @@ def _artifact_root(run_dir: Path) -> Path:
     return run_dir
 
 
-def _detect_workflow_metadata(run_dir: Path) -> tuple[str | None, int | None]:
+def _detect_workflow_kind(run_dir: Path) -> str | None:
     artifact_root = _artifact_root(run_dir)
     candidates = (
         ("issue-review-result.json", "issue-review-workflow-result"),
@@ -81,8 +71,8 @@ def _detect_workflow_metadata(run_dir: Path) -> tuple[str | None, int | None]:
         paths = (run_dir / filename, artifact_root / filename)
         path = next((item for item in paths if item.exists()), None)
         if path is not None:
-            return workflow_kind, None
-    return None, None
+            return workflow_kind
+    return None
 
 
 def _infer_retry_count_used(
@@ -134,164 +124,59 @@ def _model_id_from_value(value: dict[str, Any]) -> str | None:
     return None
 
 
-def _usage_records_from_value(
-    value: Any,
-    inherited_model_id: str | None = None,
-) -> list[tuple[dict[str, int], str | None]]:
-    records: list[tuple[dict[str, int], str | None]] = []
-    if isinstance(value, dict):
-        model_id = _model_id_from_value(value) or inherited_model_id
-        usage_metadata = value.get("usage_metadata")
-        if isinstance(usage_metadata, dict):
-            direct_usage = usage_from_langchain_metadata(usage_metadata)
-            if direct_usage is not None:
-                return [(direct_usage, model_id)]
-
-        response_metadata = value.get("response_metadata")
-        if isinstance(response_metadata, dict):
-            provider_usage = response_metadata.get("token_usage")
-            if isinstance(provider_usage, dict):
-                direct_usage = usage_from_provider_metadata(provider_usage)
-                if direct_usage is not None:
-                    return [(direct_usage, model_id)]
-            response_usage = response_metadata.get("usage")
-            if isinstance(response_usage, dict):
-                direct_usage = usage_from_provider_metadata(
-                    response_usage
-                ) or usage_from_langchain_metadata(response_usage)
-                if direct_usage is not None:
-                    return [(direct_usage, model_id)]
-
-        direct_usage = usage_from_provider_metadata(
-            value
-        ) or usage_from_langchain_metadata(value)
-        if direct_usage is not None:
-            return [(direct_usage, model_id)]
-
-        for nested in value.values():
-            records.extend(_usage_records_from_value(nested, model_id))
-    elif isinstance(value, list):
-        for item in value:
-            records.extend(_usage_records_from_value(item, inherited_model_id))
-    return records
-
-
-def _fallback_model_id(messages: list[dict[str, Any]]) -> str | None:
-    """Recover a model id from trajectory metadata when usage lacks one."""
-    for message in messages:
-        model_id = _model_id_from_value(message)
-        if model_id is not None:
-            return model_id
-    return None
-
-
 def _transcript_usage_records(messages: list[dict[str, Any]]):
-    records: list[tuple[dict[str, int], str | None]] = []
+    records: list[tuple[dict[str, int | None], str | None]] = []
     for message in messages:
         metadata = message.get("usage_metadata")
-        if isinstance(metadata, dict):
-            usage = usage_from_langchain_metadata(metadata)
-            if usage is not None:
-                records.append((usage, _model_id_from_value(message)))
+        if isinstance(metadata, dict) and any(
+            value is not None for value in metadata.values()
+        ):
+            records.append((metadata, _model_id_from_value(message)))
     return records
 
 
 def _model_call_usage(events: list[dict[str, Any]], path: Path):
     """Count responses attributed to the recorded model calls."""
-    starts: set[str] = set()
-    ends: set[str] = set()
-    records: list[tuple[dict[str, int], str | None]] = []
-    messages: dict[str, dict[str, Any]] = {}
-    used_messages: set[str] = set()
-    opened = False
-    closed = False
-    completed = False
-    full_usage = True
+    starts = {
+        event["call_id"] for event in events if event["event"] == "model_call_start"
+    }
+    selected = {
+        event["call_id"]: event["message_id"]
+        for event in events
+        if event["event"] == "model_call_end"
+    }
+    responses: dict[str, list[dict[str, Any]]] = {call_id: [] for call_id in starts}
     for event in events:
-        kind = event.get("event")
-        if closed:
-            raise ValueError(f"Events after model accounting ended: {path}")
-        if kind == "message":
-            message = event.get("message")
-            if isinstance(message, dict):
-                message_id = message.get("id")
-                if (
-                    not isinstance(message_id, str)
-                    or not message_id
-                    or message_id in messages
-                ):
-                    raise ValueError(f"Invalid or duplicate message ID: {path}")
-                messages[message_id] = event
-            continue
-        if kind not in {
-            "model_calls_start",
-            "model_calls_end",
-            "model_call_start",
-            "model_call_end",
-        }:
-            continue
-        if kind == "model_calls_start":
-            if opened:
-                raise ValueError(f"Invalid model accounting header: {path}")
-            opened = True
-            continue
-        if not opened:
-            raise ValueError(f"Missing model accounting header: {path}")
-        if kind == "model_calls_end":
-            closed = True
-            completed = event.get("status") == "completed"
-            continue
-        call_id = event.get("call_id")
-        if not isinstance(call_id, str) or not call_id:
-            raise ValueError(f"Missing model call ID: {path}")
-        if kind == "model_call_start":
-            if call_id in starts:
-                raise ValueError(f"Duplicate model call start: {path}")
-            starts.add(call_id)
-        else:
-            if call_id not in starts or call_id in ends:
-                raise ValueError(f"Unmatched or duplicate model call end: {path}")
-            ends.add(call_id)
-            message_id = event.get("message_id")
-            record = messages.get(message_id) if isinstance(message_id, str) else None
-            if (
-                record is None
-                or record.get("call_id") != call_id
-                or message_id in used_messages
-            ):
-                raise ValueError(f"Missing or inconsistent model response: {path}")
-            used_messages.add(message_id)
-    response_calls: set[str] = set()
-    for record in messages.values():
-        call_id = record.get("call_id")
-        if call_id is None:
-            continue
-        if call_id not in starts or call_id in response_calls:
-            raise ValueError(f"Unmatched or duplicate model response: {path}")
-        response_calls.add(call_id)
-        response = record["message"]
-        metadata = response.get("usage_metadata")
-        # Full coverage requires explicit normalized input/output/total fields;
-        # partial provider metadata can still contribute known lower-bound totals.
-        full_usage = (
-            full_usage
-            and isinstance(metadata, dict)
-            and all(
-                isinstance(metadata.get(key), int)
-                and not isinstance(metadata.get(key), bool)
-                and metadata[key] >= 0
-                for key in ("input_tokens", "output_tokens", "total_tokens")
+        if event["event"] == "message" and event.get("call_id"):
+            call_id = event["call_id"]
+            if call_id not in responses:
+                raise ValueError(f"Unmatched model response: {path}")
+            responses[call_id].append(event["message"])
+    messages = []
+    for call_id, candidates in responses.items():
+        if call_id in selected:
+            messages.append(
+                next(
+                    message
+                    for message in candidates
+                    if message["id"] == selected[call_id]
+                )
             )
-        )
-        records.extend(_transcript_usage_records([response]))
+        elif len(candidates) == 1:
+            messages.append(candidates[0])
+    records = _transcript_usage_records(messages)
     complete = (
-        completed
-        and full_usage
-        and bool(starts)
-        and starts == ends
+        bool(starts)
+        and events[-1]["event"] == "model_calls_end"
+        and events[-1]["status"] == "completed"
+        and starts == selected.keys()
         and len(records) == len(starts)
+        and all(
+            all(usage[field] is not None for field in TOKEN_FIELDS)
+            for usage, _ in records
+        )
     )
-    return records, len(starts), complete
+    return records, len(starts), complete, messages
 
 
 def _read_trajectory_usage(path: Path, *, stage: str) -> StageUsage:
@@ -307,10 +192,15 @@ def _read_trajectory_usage(path: Path, *, stage: str) -> StageUsage:
     call_count = 0
     complete = False
     if has_calls:
-        records, call_count, complete = _model_call_usage(events, path)
+        records, call_count, complete, selected_messages = _model_call_usage(
+            events, path
+        )
     else:
         # A message-only transcript provides no evidence of complete call coverage.
-        records = _transcript_usage_records(messages)
+        selected_messages = [
+            message for message in messages if message["role"] == "assistant"
+        ]
+        records = _transcript_usage_records(selected_messages)
     generated_messages = (
         [
             event["message"]
@@ -326,15 +216,22 @@ def _read_trajectory_usage(path: Path, *, stage: str) -> StageUsage:
         message for message in generated_messages if message["role"] == "assistant"
     ]
     message_records = _transcript_usage_records(generated_messages)
-    totals = {field: 0 for field in NUMERIC_FIELDS}
-    for record, _model_id in records:
-        for field in NUMERIC_FIELDS:
-            totals[field] += int(record.get(field, 0) or 0)
+    coverage_count = call_count if has_calls else len(ai_messages)
+    totals = {
+        field: (
+            sum(record[field] for record, _ in records if record.get(field) is not None)
+            if coverage_count > 0
+            and sum(record.get(field) is not None for record, _ in records)
+            == coverage_count
+            else None
+        )
+        for field in TOKEN_FIELDS
+    }
 
     model_ids = sorted(
         {
             model_id.strip()
-            for _record, model_id in records
+            for model_id in map(_model_id_from_value, selected_messages)
             if isinstance(model_id, str) and model_id.strip()
         }
     )
@@ -343,7 +240,7 @@ def _read_trajectory_usage(path: Path, *, stage: str) -> StageUsage:
     elif len(model_ids) > 1:
         model_id = "mixed"
     else:
-        model_id = _fallback_model_id(messages) or "unknown"
+        model_id = "unknown"
 
     return StageUsage(
         stage=stage,
@@ -351,8 +248,8 @@ def _read_trajectory_usage(path: Path, *, stage: str) -> StageUsage:
         input_tokens=totals["input_tokens"],
         output_tokens=totals["output_tokens"],
         total_tokens=totals["total_tokens"],
-        cache_read_tokens=totals["cache_read_tokens"],
-        cache_creation_tokens=totals["cache_creation_tokens"],
+        cache_read_input_tokens=totals["cache_read_input_tokens"],
+        cache_creation_input_tokens=totals["cache_creation_input_tokens"],
         reasoning_tokens=totals["reasoning_tokens"],
         ai_message_count=max(len(ai_messages), len(message_records)),
         ai_messages_with_usage_count=len(message_records),
@@ -441,28 +338,7 @@ def _aggregate_stage_usage(
 ) -> StageUsage:
     payloads = [attempt.usage for attempt in attempts]
     return StageUsage(
-        stage=stage,
-        model_id=model_id,
-        model_call_count=sum(item.model_call_count for item in payloads),
-        model_calls_with_usage_count=sum(
-            item.model_calls_with_usage_count for item in payloads
-        ),
-        usage_source=(
-            payloads[0].usage_source
-            if len({item.usage_source for item in payloads}) == 1
-            else "mixed"
-        ),
-        usage_complete=all(item.usage_complete for item in payloads),
-        input_tokens=sum(item.input_tokens for item in payloads),
-        output_tokens=sum(item.output_tokens for item in payloads),
-        total_tokens=sum(item.total_tokens for item in payloads),
-        cache_read_tokens=sum(item.cache_read_tokens for item in payloads),
-        cache_creation_tokens=sum(item.cache_creation_tokens for item in payloads),
-        reasoning_tokens=sum(item.reasoning_tokens for item in payloads),
-        ai_message_count=sum(item.ai_message_count for item in payloads),
-        ai_messages_with_usage_count=sum(
-            item.ai_messages_with_usage_count for item in payloads
-        ),
+        stage=stage, model_id=model_id, **asdict(aggregate_stage_usages(payloads))
     )
 
 
@@ -503,7 +379,7 @@ def _load_stage_usages(attempts: list[AttemptUsage]) -> list[StageUsage]:
 
 def load_run_usage(run_dir: Path) -> RunUsage:
     artifact_root = _artifact_root(run_dir)
-    workflow_kind, retry_count_used = _detect_workflow_metadata(run_dir)
+    workflow_kind = _detect_workflow_kind(run_dir)
     attempts = _load_attempt_usages(artifact_root)
     stages = _load_stage_usages(attempts)
 
@@ -511,13 +387,8 @@ def load_run_usage(run_dir: Path) -> RunUsage:
         run_dir=str(run_dir),
         experiment=_read_experiment_name(run_dir),
         workflow_kind=workflow_kind,
-        retry_count_used=(
-            retry_count_used
-            if isinstance(retry_count_used, int)
-            else _infer_retry_count_used(
-                attempts,
-                has_workflow_result=workflow_kind is not None,
-            )
+        retry_count_used=_infer_retry_count_used(
+            attempts, has_workflow_result=workflow_kind is not None
         ),
         stages=stages,
         attempts=attempts,

@@ -35,8 +35,9 @@ export async function runViewerFlow({ page }) {
           input_tokens: 1200,
           output_tokens: 225,
           total_tokens: 1425,
-          input_token_details: { cache_read: 450, cache_creation: 24 },
-          output_token_details: { reasoning: 34 }
+          cache_read_input_tokens: 450,
+          cache_creation_input_tokens: 24,
+          reasoning_tokens: 34
         }
       }
     }),

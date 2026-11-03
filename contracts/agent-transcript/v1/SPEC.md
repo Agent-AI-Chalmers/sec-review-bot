@@ -60,7 +60,7 @@ The following abbreviated example shows a completed invocation:
 {"seq":2,"event":"message","agent":"reviewer","message":{"id":"s1","role":"system","content":"Review the change."}}
 {"seq":3,"event":"message","agent":"reviewer","message":{"id":"u1","role":"user","content":"Inspect the patch."}}
 {"seq":4,"event":"model_call_start","call_id":"c1","agent":"reviewer"}
-{"seq":5,"event":"message","call_id":"c1","agent":"reviewer","message":{"id":"a1","role":"assistant","content":"A check is needed.","usage_metadata":{"input_tokens":10,"output_tokens":2,"total_tokens":12}}}
+{"seq":5,"event":"message","call_id":"c1","agent":"reviewer","message":{"id":"a1","role":"assistant","content":"A check is needed.","usage_metadata":{"input_tokens":10,"output_tokens":2,"total_tokens":12,"cache_read_input_tokens":null,"cache_creation_input_tokens":null,"reasoning_tokens":null}}}
 {"seq":6,"event":"model_call_end","call_id":"c1","message_id":"a1"}
 {"seq":7,"event":"model_calls_end","status":"completed"}
 ```
@@ -69,7 +69,26 @@ The following abbreviated example shows a completed invocation:
 
 Message `usage_metadata` describes the model invocation that generated that response. Count each observed invocation at most once, using the response referenced by its call-end record when available. Without a call end, an unambiguous recorded response may contribute known usage without establishing successful completion. Historical messages supplied as context are not new invocations. Re-reading their content is already included in the new invocation's reported input usage.
 
-`input_tokens` includes cached input; `output_tokens` includes reasoning output when reported separately by the provider. Cache-read, cache-creation, and reasoning counts are subsets, not additional charges to add to those totals. Preserve unavailable values as unknown rather than zero.
+`message.usage_metadata` is the canonical per-call token record, distinct from envelope `metadata`. It is optional or `null` when unavailable. A non-null object contains exactly the following fields; each value is a nonnegative safe integer or `null`. A missing measurement is `null`, not zero. Explicitly reported zero stays `0`.
+
+This contract follows OpenTelemetry GenAI token-accounting semantics: inclusive input/output totals with cache and reasoning represented as subsets. Its JSON field names and record structure are project-owned, not a copy of OpenTelemetry attribute or metric names. OpenTelemetry GenAI conventions evolve independently; an upstream naming change does not change this contract. Producers map their source vocabulary to the fields defined below.
+
+| Field | Meaning |
+| --- | --- |
+| `input_tokens` | Inclusive input, including cache reads and cache creation |
+| `output_tokens` | Inclusive output, including reasoning |
+| `total_tokens` | `input_tokens + output_tokens` when both are known; otherwise `null` |
+| `cache_read_input_tokens` | Cache-read subset of input |
+| `cache_creation_input_tokens` | Cache-creation subset of input, disjoint from cache reads |
+| `reasoning_tokens` | Reasoning subset of output |
+
+Known cache subsets cannot sum to more than known input; known reasoning cannot exceed known output. Consumers reject impossible subsets, inconsistent totals, missing fields in a non-null usage object, and framework-specific detail keys inside canonical usage. Counts are bounded by `9007199254740991` for Python/JavaScript interoperability. Cache and reasoning counts are subsets and must not be added to inclusive totals.
+
+Producers normalize at their adapter boundary. LangChain totals and OpenAI prompt/completion totals are already inclusive. Anthropic ordinary input excludes its separately reported cache buckets; add those buckets once. Langfuse ordinary input/output buckets exclude cache/reasoning buckets; add those once. Absent optional buckets contribute nothing to this adapter-specific sum but do not establish reported subset values. An absent ordinary bucket leaves its inclusive total unknown. Derive `total_tokens` from normalized components; warn on a conflicting source total and retain original provider observations outside canonical usage. A source total alone cannot establish input/output or a canonical total.
+
+Consumers read canonical usage without interpreting provider metadata or LangChain detail maps. Aggregate each field only when every covered call has a known value for that field; otherwise that field's aggregate is unknown. No observed calls means unknown totals. A lower-bound partial sum may be exposed separately with an explicit label, never as the complete total. Derived uncached input and ratios remain unknown if any required operand is unknown. Complete usage accounting requires finished call recording and all six fields known for every covered invocation; known input/output totals alone do not establish cache or reasoning coverage.
+
+The agents runtime owns framework/provider conversion and transcript usage validation. Repository scripts own run discovery, workflow-specific effective-patch selection, and report rendering. Langfuse query code owns its external-source conversion; its normalized field meanings match this contract and the Review Runs token totals.
 
 Run-level aggregate usage belongs in a separate metrics artifact or an explicitly distinguished aggregate record. Do not attach it to an individual response. Where only aggregate usage is available, preserve it without inventing per-call allocation.
 

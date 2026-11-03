@@ -8,12 +8,12 @@ STAGE_NAMES = ("analyzer", "mitigator", "verifier", "single-agent")
 class StageUsage:
     stage: str
     model_id: str
-    input_tokens: int
-    output_tokens: int
-    total_tokens: int
-    cache_read_tokens: int
-    cache_creation_tokens: int
-    reasoning_tokens: int
+    input_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
+    cache_read_input_tokens: int | None
+    cache_creation_input_tokens: int | None
+    reasoning_tokens: int | None
     ai_message_count: int
     ai_messages_with_usage_count: int
     model_call_count: int = 0
@@ -22,16 +22,27 @@ class StageUsage:
     usage_complete: bool = False
 
     @property
-    def uncached_input_tokens(self) -> int:
-        return max(
-            self.input_tokens - self.cache_read_tokens - self.cache_creation_tokens,
-            0,
+    def uncached_input_tokens(self) -> int | None:
+        if (
+            self.input_tokens is None
+            or self.cache_read_input_tokens is None
+            or self.cache_creation_input_tokens is None
+        ):
+            return None
+        return (
+            self.input_tokens
+            - self.cache_read_input_tokens
+            - self.cache_creation_input_tokens
         )
 
     @property
-    def cache_ratio(self) -> float:
+    def cache_ratio(self) -> float | None:
+        if self.input_tokens is None or self.cache_read_input_tokens is None:
+            return None
         return (
-            self.cache_read_tokens / self.input_tokens if self.input_tokens > 0 else 0.0
+            self.cache_read_input_tokens / self.input_tokens
+            if self.input_tokens > 0
+            else 0.0
         )
 
 
@@ -44,12 +55,12 @@ class AttemptUsage:
 
 @dataclass(frozen=True)
 class UsageTotals:
-    input_tokens: int
-    output_tokens: int
-    total_tokens: int
-    cache_read_tokens: int
-    cache_creation_tokens: int
-    reasoning_tokens: int
+    input_tokens: int | None
+    output_tokens: int | None
+    total_tokens: int | None
+    cache_read_input_tokens: int | None
+    cache_creation_input_tokens: int | None
+    reasoning_tokens: int | None
     ai_message_count: int
     ai_messages_with_usage_count: int
     model_call_count: int = 0
@@ -58,28 +69,46 @@ class UsageTotals:
     usage_complete: bool = False
 
     @property
-    def uncached_input_tokens(self) -> int:
-        return max(
-            self.input_tokens - self.cache_read_tokens - self.cache_creation_tokens,
-            0,
+    def uncached_input_tokens(self) -> int | None:
+        if (
+            self.input_tokens is None
+            or self.cache_read_input_tokens is None
+            or self.cache_creation_input_tokens is None
+        ):
+            return None
+        return (
+            self.input_tokens
+            - self.cache_read_input_tokens
+            - self.cache_creation_input_tokens
         )
 
     @property
-    def cache_ratio(self) -> float:
+    def cache_ratio(self) -> float | None:
+        if self.input_tokens is None or self.cache_read_input_tokens is None:
+            return None
         return (
-            self.cache_read_tokens / self.input_tokens if self.input_tokens > 0 else 0.0
+            self.cache_read_input_tokens / self.input_tokens
+            if self.input_tokens > 0
+            else 0.0
         )
+
+
+def _sum_reported(items: list[StageUsage], field: str) -> int | None:
+    values = [getattr(item, field) for item in items]
+    return (
+        sum(values) if values and all(value is not None for value in values) else None
+    )
 
 
 def aggregate_stage_usages(stages: Iterable[StageUsage]) -> UsageTotals:
     items = list(stages)
     return UsageTotals(
-        input_tokens=sum(item.input_tokens for item in items),
-        output_tokens=sum(item.output_tokens for item in items),
-        total_tokens=sum(item.total_tokens for item in items),
-        cache_read_tokens=sum(item.cache_read_tokens for item in items),
-        cache_creation_tokens=sum(item.cache_creation_tokens for item in items),
-        reasoning_tokens=sum(item.reasoning_tokens for item in items),
+        input_tokens=_sum_reported(items, "input_tokens"),
+        output_tokens=_sum_reported(items, "output_tokens"),
+        total_tokens=_sum_reported(items, "total_tokens"),
+        cache_read_input_tokens=_sum_reported(items, "cache_read_input_tokens"),
+        cache_creation_input_tokens=_sum_reported(items, "cache_creation_input_tokens"),
+        reasoning_tokens=_sum_reported(items, "reasoning_tokens"),
         model_call_count=sum(item.model_call_count for item in items),
         model_calls_with_usage_count=sum(
             item.model_calls_with_usage_count for item in items
@@ -111,27 +140,27 @@ class RunUsage:
         return aggregate_stage_usages(self.stages)
 
     @property
-    def input_tokens(self) -> int:
+    def input_tokens(self) -> int | None:
         return self.totals.input_tokens
 
     @property
-    def output_tokens(self) -> int:
+    def output_tokens(self) -> int | None:
         return self.totals.output_tokens
 
     @property
-    def total_tokens(self) -> int:
+    def total_tokens(self) -> int | None:
         return self.totals.total_tokens
 
     @property
-    def cache_read_tokens(self) -> int:
-        return self.totals.cache_read_tokens
+    def cache_read_input_tokens(self) -> int | None:
+        return self.totals.cache_read_input_tokens
 
     @property
-    def uncached_input_tokens(self) -> int:
+    def uncached_input_tokens(self) -> int | None:
         return self.totals.uncached_input_tokens
 
     @property
-    def cache_ratio(self) -> float:
+    def cache_ratio(self) -> float | None:
         return self.totals.cache_ratio
 
     @property
@@ -153,4 +182,4 @@ class EffectivePatchUsage:
 
     @property
     def totals(self) -> UsageTotals:
-        return aggregate_stage_usages(self.stages)
+        return aggregate_stage_usages(item.usage for item in self.included_attempts)
