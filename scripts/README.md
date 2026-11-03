@@ -32,7 +32,6 @@ Then run module-style helpers from the repository root:
 ```bash
 # from the repository root, sec-review-bot
 source agents/.venv/bin/activate
-python -m scripts.token_usage.summarize /path/to/local-run
 python -m scripts.replay.repository_triage --help
 ```
 
@@ -60,3 +59,5 @@ The output describes calls observed by Langfuse. `complete_for_observed_calls` m
 `experimental_memory_extract_observations.py` runs the memory extractor against explicit trajectory files or review artifact directories and writes the observation preview and a uniquely named extractor trajectory to a requested directory. It is a model-development probe, not an operational ingestion path: it does not use Temporal, register state with the Memory Catalog, or publish artifacts.
 
 There is no repository script for directly maintaining persistent memory from observation files. Operational maintenance is started and scheduled through the agents Temporal CLI; persistent state remains owned by the Memory Catalog.
+
+Local transcript token reports live in [the paper evaluation tools](../sec-review-paper-evals/token_usage/README.md).
