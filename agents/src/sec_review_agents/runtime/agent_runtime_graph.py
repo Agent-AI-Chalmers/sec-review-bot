@@ -23,7 +23,10 @@ from sec_review_agents.observability.tracing import (
     tracing_configured,
 )
 from sec_review_agents.runtime.trajectories import TrajectoryWriter
-from sec_review_agents.utils.limit import compute_graph_recursion_limit
+from sec_review_agents.utils.limit import (
+    DEFAULT_GRAPH_RECURSION_LIMIT,
+    compute_graph_recursion_limit,
+)
 
 
 async def run_agent_runtime_graph[T: BaseModel](
@@ -114,7 +117,14 @@ async def invoke_agent_runtime_graph[T: BaseModel](
     that require dictionaries serialize the model at their own boundary.
     """
 
+    # Environment budgets override caller config; the project default is last.
     recursion_limit = compute_graph_recursion_limit(agent)
+    if recursion_limit is None:
+        # Core event streaming fills an omitted limit with 25 before LangGraph
+        # sees it. Pass the caller's limit or our own default explicitly.
+        recursion_limit = (config or {}).get(
+            "recursion_limit", DEFAULT_GRAPH_RECURSION_LIMIT
+        )
     tracing_config = build_tracing_config(
         agent_name=agent_name,
     )
@@ -128,8 +138,7 @@ async def invoke_agent_runtime_graph[T: BaseModel](
         config,
         tracing_config.to_langchain_config(),
     )
-    if recursion_limit is not None:
-        invoke_config["recursion_limit"] = recursion_limit
+    invoke_config["recursion_limit"] = recursion_limit
 
     started_at = log_agent_invocation_started(
         agent_name=agent_name,
