@@ -492,3 +492,70 @@ async def test_model_consumer_rejects_unvalidated_dictionary() -> None:
             agent_name="model-probe",
             user_prompt="probe",
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("target", [30, 101])
+@pytest.mark.parametrize(
+    ("explicit", "max_steps", "caller_limit", "expected"),
+    [
+        (None, None, None, None),
+        (None, None, 25, 25),
+        (None, "20", 25, 48),
+        ("40", "20", 25, 40),
+    ],
+)
+async def test_real_graph_event_stream_preserves_recursion_budget(
+    monkeypatch, explicit, max_steps, caller_limit, expected, target
+):
+    """Event streaming must not inject Core's 25-step default into LangGraph."""
+    from typing import TypedDict
+
+    from langgraph.errors import GraphRecursionError
+    from langgraph.graph import END, START, StateGraph
+
+    class State(TypedDict, total=False):
+        count: int
+        structured_response: ProbeOutput
+
+    def step(state: State) -> State:
+        count = state.get("count", 0) + 1
+        return {"count": count, "structured_response": ProbeOutput(status="ok")}
+
+    graph = StateGraph(State)
+    graph.add_node("step", step)
+    graph.add_edge(START, "step")
+    graph.add_conditional_edges(
+        "step", lambda state: END if state["count"] >= target else "step"
+    )
+    agent = graph.compile()
+    for key, value in {
+        "AGENT_GRAPH_RECURSION_LIMIT": explicit,
+        "AGENT_GRAPH_MAX_STEPS": max_steps,
+        "AGENT_GRAPH_RECURSION_BUFFER": "8",
+    }.items():
+        if value is None:
+            monkeypatch.delenv(key, raising=False)
+        else:
+            monkeypatch.setenv(key, value)
+    config = {} if caller_limit is None else {"recursion_limit": caller_limit}
+    with patch(
+        "sec_review_agents.runtime.agent_runtime_graph.log_agent_invocation_started"
+    ) as started:
+        kwargs: dict[str, Any] = {
+            "agent": agent,
+            "response_format": ProbeOutput,
+            "agent_name": "budget-probe",
+            "user_prompt": "probe",
+            "config": config,
+        }
+        if target > (100 if expected is None else expected):
+            with pytest.raises(GraphRecursionError):
+                await invoke_agent_runtime_graph(**kwargs)
+        else:
+            assert await invoke_agent_runtime_graph(**kwargs) == ProbeOutput(
+                status="ok"
+            )
+    assert started.call_args.kwargs["recursion_limit"] == (
+        100 if expected is None else expected
+    )
