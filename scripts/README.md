@@ -32,7 +32,6 @@ Then run module-style helpers from the repository root:
 ```bash
 # from the repository root, sec-review-bot
 source agents/.venv/bin/activate
-python -m scripts.token_usage.summarize /path/to/local-run
 python -m scripts.replay.repository_triage --help
 ```
 
