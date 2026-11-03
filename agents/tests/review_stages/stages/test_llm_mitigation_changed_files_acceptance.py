@@ -74,7 +74,6 @@ async def test_llm_corrects_rejected_changed_files_response_in_same_thread(
         response_format=PatchClaimProbeOutput,
         agent=agent,
         agent_name="structured-correction-probe",
-        system_prompt="Return only the configured structured response.",
         user_prompt=(
             "For this first response, intentionally return status='applied', "
             'declared_changed_files exactly ["b.txt"], and a short rationale. '

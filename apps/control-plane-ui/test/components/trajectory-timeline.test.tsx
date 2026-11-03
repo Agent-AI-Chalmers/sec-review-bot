@@ -1,7 +1,7 @@
 import React from 'react'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { expect, test } from 'vitest'
+import { expect, test, vi } from 'vitest'
 
 import { TrajectoryTimeline } from '../../browser/features/trajectory/TrajectoryTimeline.js'
 import type { TrajectoryEvent } from '../../browser/features/trajectory/trajectory-model.js'
@@ -12,7 +12,7 @@ const events: TrajectoryEvent[] = [
     seq: 1,
     event: 'message',
     message: {
-      type: 'ai',
+      role: 'assistant',
       id: 'assistant-1',
       content: 'I will update the file.',
       tool_calls: [
@@ -28,7 +28,7 @@ const events: TrajectoryEvent[] = [
     seq: 2,
     event: 'message',
     message: {
-      type: 'tool',
+      role: 'tool',
       id: 'result-1',
       name: 'replace_text',
       tool_call_id: 'replace-1',
@@ -44,7 +44,7 @@ test('argument rendering is decided by key, not by content heuristics', () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-policy',
         content: '',
         tool_calls: [
@@ -77,7 +77,7 @@ test('hunk content starting with --- or +++ is data, not a file header', () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-tricky',
         content: '',
         tool_calls: [
@@ -93,7 +93,7 @@ test('hunk content starting with --- or +++ is data, not a file header', () => {
       seq: 2,
       event: 'message',
       message: {
-        type: 'tool',
+        role: 'tool',
         id: 'tool-tricky',
         name: 'edit',
         tool_call_id: 'edit-tricky',
@@ -131,7 +131,7 @@ test('a deleted file keeps its own path and does not join the previous file', ()
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-delete',
         content: '',
         tool_calls: [
@@ -147,7 +147,7 @@ test('a deleted file keeps its own path and does not join the previous file', ()
       seq: 2,
       event: 'message',
       message: {
-        type: 'tool',
+        role: 'tool',
         id: 'tool-delete',
         name: 'edit',
         tool_call_id: 'edit-delete',
@@ -191,7 +191,7 @@ test('Begin Patch delete and move keep their operation metadata', () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-ops',
         content: '',
         tool_calls: [
@@ -207,7 +207,7 @@ test('Begin Patch delete and move keep their operation metadata', () => {
       seq: 2,
       event: 'message',
       message: {
-        type: 'tool',
+        role: 'tool',
         id: 'tool-ops',
         name: 'apply_patch',
         tool_call_id: 'edit-ops',
@@ -255,7 +255,7 @@ test('a damaged patch falls back to raw text instead of a wrong diff', () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-broken',
         content: '',
         tool_calls: [
@@ -271,7 +271,7 @@ test('a damaged patch falls back to raw text instead of a wrong diff', () => {
       seq: 2,
       event: 'message',
       message: {
-        type: 'tool',
+        role: 'tool',
         id: 'tool-broken',
         name: 'edit',
         tool_call_id: 'edit-broken',
@@ -305,7 +305,7 @@ test('a truncated diff is labelled as partial', () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-truncated',
         content: '',
         tool_calls: [
@@ -321,7 +321,7 @@ test('a truncated diff is labelled as partial', () => {
       seq: 2,
       event: 'message',
       message: {
-        type: 'tool',
+        role: 'tool',
         id: 'tool-truncated',
         name: 'edit',
         tool_call_id: 'edit-truncated',
@@ -352,7 +352,7 @@ test('content left after a hunk ends also falls back to raw text', () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-early',
         content: '',
         tool_calls: [
@@ -368,7 +368,7 @@ test('content left after a hunk ends also falls back to raw text', () => {
       seq: 2,
       event: 'message',
       message: {
-        type: 'tool',
+        role: 'tool',
         id: 'tool-early',
         name: 'edit',
         tool_call_id: 'edit-early',
@@ -399,7 +399,7 @@ test('command arguments render as a terminal block, not markdown', () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-command',
         content: '',
         tool_calls: [
@@ -430,7 +430,7 @@ test('camelCase edit arguments fall back to a before/after pair', () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-edit',
         content: '',
         tool_calls: [
@@ -462,7 +462,7 @@ test('a tool-provided diff wins over the call arguments', () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-diff',
         content: '',
         tool_calls: [
@@ -482,7 +482,7 @@ test('a tool-provided diff wins over the call arguments', () => {
       seq: 2,
       event: 'message',
       message: {
-        type: 'tool',
+        role: 'tool',
         id: 'tool-edit',
         name: 'edit',
         tool_call_id: 'edit-1',
@@ -520,7 +520,7 @@ test('a real diff can switch to side-by-side', async () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-diff',
         content: '',
         tool_calls: [
@@ -536,7 +536,7 @@ test('a real diff can switch to side-by-side', async () => {
       seq: 2,
       event: 'message',
       message: {
-        type: 'tool',
+        role: 'tool',
         id: 'tool-edit',
         name: 'edit',
         tool_call_id: 'edit-1',
@@ -580,7 +580,7 @@ test('assistant messages show model provenance before the agent name', () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-model',
         name: 'issue-analyzer',
         content: 'hello',
@@ -606,7 +606,7 @@ test('apply_patch arguments render as a line-oriented patch', async () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        role: 'assistant',
         id: 'assistant-patch',
         content: '',
         tool_calls: [
@@ -674,7 +674,8 @@ test('usage details expose totals and token subsets', async () => {
       seq: 1,
       event: 'message',
       message: {
-        type: 'ai',
+        id: 'fixture-1',
+        role: 'assistant',
         content: 'Usage-bearing response.',
         usage_metadata: {
           input_tokens: 1_200,
@@ -710,7 +711,7 @@ test('optional trajectory controls are absent without their source data', () => 
     {
       seq: 1,
       event: 'message',
-      message: { type: 'tool', content: 'Unlinked result' }
+      message: { id: 'fixture-2', role: 'tool', content: 'Unlinked result' }
     }
   ]
   renderComponent(<TrajectoryTimeline events={sparseEvents} />)
@@ -727,5 +728,71 @@ test('optional trajectory controls are absent without their source data', () => 
   ).not.toBeInTheDocument()
   expect(
     screen.queryByRole('button', { name: 'Usage details' })
+  ).not.toBeInTheDocument()
+})
+
+test('reverse navigation follows the resolved branch and hides unresolved links', async () => {
+  const parallel: TrajectoryEvent[] = ['left', 'right'].flatMap(
+    (branch, index) => [
+      {
+        seq: index * 2 + 1,
+        event: 'message',
+        agent: branch,
+        message: {
+          id: `${branch}-request`,
+          role: 'assistant',
+          content: '',
+          tool_calls: [{ id: 'same', name: 'inspect', args: {} }]
+        }
+      },
+      {
+        seq: index * 2 + 2,
+        event: 'message',
+        agent: branch,
+        message: {
+          id: `${branch}-result`,
+          role: 'tool',
+          content: 'Done',
+          tool_call_id: 'same'
+        }
+      }
+    ]
+  )
+  parallel.push({
+    seq: 5,
+    event: 'message',
+    message: {
+      id: 'unresolved',
+      role: 'tool',
+      content: 'Unknown',
+      tool_call_id: 'missing'
+    }
+  })
+  const { container } = renderComponent(
+    <TrajectoryTimeline events={parallel} />
+  )
+  const left = container.querySelector(
+    '#trajectory-left-request .trajectory-tool-calls-body > div'
+  )!
+  const right = container.querySelector(
+    '#trajectory-right-request .trajectory-tool-calls-body > div'
+  )!
+  expect(left.id).not.toBe(right.id)
+  const leftScroll = vi.fn()
+  const rightScroll = vi.fn()
+  Object.defineProperty(left, 'scrollIntoView', { value: leftScroll })
+  Object.defineProperty(right, 'scrollIntoView', { value: rightScroll })
+  const result = container.querySelector(
+    '#trajectory-right-result'
+  )! as HTMLElement
+  await userEvent
+    .setup()
+    .click(within(result).getByRole('button', { name: /back to call/i }))
+  expect(rightScroll).toHaveBeenCalledOnce()
+  expect(leftScroll).not.toHaveBeenCalled()
+  expect(
+    within(
+      container.querySelector('#trajectory-unresolved')! as HTMLElement
+    ).queryByRole('button', { name: /back to call/i })
   ).not.toBeInTheDocument()
 })

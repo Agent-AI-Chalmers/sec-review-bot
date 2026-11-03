@@ -1,5 +1,7 @@
 import React from 'react'
 import ReactMarkdown from 'react-markdown'
+import { Code } from '@mantine/core'
+import { markdownWithoutXmlTags } from './markdown-xml.js'
 import remarkGfm from 'remark-gfm'
 
 export function HighlightText({
@@ -69,5 +71,33 @@ export function HighlightedMarkdown({
     >
       {children}
     </ReactMarkdown>
+  )
+}
+
+export function TrajectoryText({
+  children,
+  query,
+  mode
+}: {
+  children: string
+  query: string
+  mode: string
+}): React.JSX.Element {
+  const rendered = React.useMemo(
+    () => markdownWithoutXmlTags(children),
+    [children]
+  )
+  return (
+    <div>
+      {mode === 'source' ? (
+        <Code block className="trajectory-source">
+          <HighlightText value={children} query={query} />
+        </Code>
+      ) : (
+        <div className="memory-markdown memory-markdown-full">
+          <HighlightedMarkdown query={query}>{rendered}</HighlightedMarkdown>
+        </div>
+      )}
+    </div>
   )
 }

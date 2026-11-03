@@ -16,12 +16,21 @@ test('BFF verifies and strictly parses memory trajectories for the viewer', asyn
         JSON.stringify({
           seq: 1,
           event: 'message',
-          message: { type: 'system', content: 'Maintain memory.' }
+          message: {
+            id: 'fixture-1',
+            role: 'system',
+            content: 'Maintain memory.'
+          }
         }),
         JSON.stringify({
           seq: 2,
           event: 'message',
-          message: { type: 'ai', content: 'Done.', tool_calls: [] }
+          message: {
+            id: 'fixture-2',
+            role: 'assistant',
+            content: 'Done.',
+            tool_calls: []
+          }
         })
       ].join('\n') + '\n'
     )
@@ -73,12 +82,21 @@ test('BFF verifies and strictly parses memory trajectories for the viewer', asyn
         {
           seq: 1,
           event: 'message',
-          message: { type: 'system', content: 'Maintain memory.' }
+          message: {
+            id: 'fixture-1',
+            role: 'system',
+            content: 'Maintain memory.'
+          }
         },
         {
           seq: 2,
           event: 'message',
-          message: { type: 'ai', content: 'Done.', tool_calls: [] }
+          message: {
+            id: 'fixture-2',
+            role: 'assistant',
+            content: 'Done.',
+            tool_calls: []
+          }
         }
       ]
     })
@@ -430,7 +448,12 @@ async function memoryArtifactFixture(t: TestContext): Promise<{
         JSON.stringify({
           seq: 1,
           event: 'message',
-          message: { type: 'ai', content, tool_calls: [] }
+          message: {
+            id: 'fixture-5',
+            role: 'assistant',
+            content,
+            tool_calls: []
+          }
         }) + '\n'
       )
     )
@@ -549,7 +572,12 @@ test('memory artifact routes select the declared source for downloads and conten
         {
           seq: 1,
           event: 'message',
-          message: { type: 'ai', content, tool_calls: [] }
+          message: {
+            id: 'fixture-5',
+            role: 'assistant',
+            content,
+            tool_calls: []
+          }
         }
       ]
     })

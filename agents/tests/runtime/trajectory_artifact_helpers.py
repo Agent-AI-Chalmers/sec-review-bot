@@ -1,7 +1,8 @@
-import json
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+from sec_review_agents.runtime.trajectories import read_trajectory_messages
 
 FILESYSTEM_TOOL_NAMES = {
     "read_file",
@@ -24,15 +25,7 @@ def trajectory_messages(trajectory_path: Path) -> list[dict[str, Any]]:
         else sorted(trajectory_path.glob("*.jsonl"))
     )
     for trajectory_file in trajectory_files:
-        for line in trajectory_file.read_text(encoding="utf-8").splitlines():
-            if not line.strip():
-                continue
-            event = json.loads(line)
-            if not isinstance(event, dict) or event.get("event") != "message":
-                continue
-            message = event.get("message")
-            if isinstance(message, dict):
-                messages.append(message)
+        messages.extend(read_trajectory_messages(trajectory_file))
     return messages
 
 
@@ -91,7 +84,7 @@ def message_execute_commands(message: dict[str, Any]) -> list[str]:
 
 
 def message_tool_errors(message: dict[str, Any]) -> list[dict[str, str]]:
-    if message.get("type") != "tool":
+    if message.get("role") != "tool":
         return []
     content = message.get("content")
     if not isinstance(content, str) or not content.startswith("Error:"):
@@ -124,7 +117,7 @@ def tool_interactions_from_trajectory(
             ):
                 pending[tool_call_id] = (name, arguments)
 
-        if message.get("type") != "tool":
+        if message.get("role") != "tool":
             continue
         tool_call_id = message.get("tool_call_id")
         if not isinstance(tool_call_id, str):

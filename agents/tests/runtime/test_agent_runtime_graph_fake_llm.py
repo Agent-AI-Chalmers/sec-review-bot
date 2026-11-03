@@ -93,9 +93,13 @@ async def test_structured_output_agent_continues_after_prose_only_model_turn() -
         trajectory_messages = read_trajectory_messages(trajectory_path)
 
     assert result.changed_files == ["a.txt"]
-    assert trajectory_messages[0]["type"] == "system"
+    assert [m["role"] for m in trajectory_messages[:2]] == ["system", "user"]
+    assert len([m for m in trajectory_messages if m["role"] == "system"]) == 1
     assert (
-        trajectory_messages[2]["content"] == "I found the answer but forgot the schema."
+        next(
+            message for message in trajectory_messages if message["role"] == "assistant"
+        )["content"]
+        == "I found the answer but forgot the schema."
     )
     assert trajectory_messages[-2]["tool_calls"] == [
         {
@@ -109,7 +113,7 @@ async def test_structured_output_agent_continues_after_prose_only_model_turn() -
             "type": "tool_call",
         }
     ]
-    assert trajectory_messages[-1]["type"] == "tool"
+    assert trajectory_messages[-1]["role"] == "tool"
     assert trajectory_messages[-1]["name"] == "PatchClaimProbeOutput"
 
 
@@ -159,7 +163,6 @@ async def test_trajectory_preserves_messages_replaced_by_summarization(
         response_format=PatchClaimProbeOutput,
         agent=agent,
         agent_name="summarized-trajectory-probe",
-        system_prompt="Review redirect behavior.",
         user_prompt="Inspect the redirect target.",
         trajectory_paths=(trajectory_path,),
     )
@@ -167,18 +170,17 @@ async def test_trajectory_preserves_messages_replaced_by_summarization(
     messages = read_trajectory_messages(trajectory_path)
     message_ids = [message["id"] for message in messages]
     assert len(message_ids) == len(set(message_ids))
-    assert [message["type"] for message in messages] == [
-        "system",
-        "human",
-        "ai",
+    assert [message["role"] for message in messages] == [
+        "user",
+        "assistant",
         "tool",
-        "human",
-        "ai",
+        "user",
+        "assistant",
         "tool",
     ]
-    assert messages[1]["content"] == "Inspect the redirect target."
-    assert messages[4]["additional_kwargs"]["lc_source"] == "summarization"
-    assert "Earlier context" in messages[4]["content"]
+    assert messages[0]["content"] == "Inspect the redirect target."
+    assert messages[3]["additional_kwargs"]["lc_source"] == "summarization"
+    assert "Earlier context" in messages[3]["content"]
 
 
 def test_missing_structured_response_middleware_keeps_tool_agent_in_one_invoke() -> (

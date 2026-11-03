@@ -75,4 +75,15 @@ The default table's `efficiency` is:
 effective_patch.total_tokens / total.total_tokens
 ```
 
-AI turn counts include assistant messages even when usage metadata is missing. `ai_messages_with_usage_count` separately reports coverage; a turn without usage is not evidence of zero token consumption.
+AI turn counts include captured model responses, including summarization and subagents, even when usage metadata is missing. `ai_messages_with_usage_count` separately reports message coverage; a turn without usage is not evidence of zero token consumption.
+
+See the [transcript contract](../../contracts/agent-transcript/v1/SPEC.md) for the transcript format.
+
+## Usage Sources and Completeness
+
+<!-- doc-default: model-call-accounting; source=loading.py -->
+`usage_source` identifies the accounting source: `model-calls` for model-call records, `trajectory` for canonical message-only transcripts, and `mixed` for an aggregate of both.
+
+`usage_complete` indicates whether the recording has usage for all observed calls and completed normally. When false, totals include known usage only. Message-only transcripts have limited coverage and are marked incomplete.
+
+`model_call_count` and `model_calls_with_usage_count` show observed calls and responses with usage. AI turns count the captured model responses.

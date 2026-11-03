@@ -1,0 +1,26 @@
+{
+  "valid": [
+    "subagents.jsonl",
+    "summarization.jsonl",
+    "message-only.jsonl",
+    "interrupted.jsonl",
+    "metadata-observations.jsonl"
+  ],
+  "invalid": [
+    "array.jsonl",
+    "wrapper.jsonl",
+    "message-type.jsonl",
+    "role-value.jsonl",
+    "missing-id.jsonl",
+    "duplicate-message-id.jsonl",
+    "sequence-order.jsonl",
+    "boolean-sequence.jsonl",
+    "call-without-recording.jsonl",
+    "unmatched-call-end.jsonl",
+    "negative-usage.jsonl",
+    "invalid-source.jsonl",
+    "invalid-ancestry.jsonl",
+    "unknown-event.jsonl",
+    "truncated.jsonl"
+  ]
+}

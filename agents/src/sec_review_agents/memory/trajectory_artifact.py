@@ -10,10 +10,11 @@ from sec_review_agents.artifacts.reference import (
     local_artifact_reference,
 )
 from sec_review_agents.artifacts.s3_adapter import publish_immutable_s3_artifact
+from sec_review_agents.contract_versions import AGENT_TRANSCRIPT_VERSION
 from sec_review_agents.runtime.trajectories import TRAJECTORY_SUFFIX
 from sec_review_agents.utils.files import slug_filename_component
 
-MEMORY_AGENT_TRAJECTORY_FILENAME = "trajectory.v1.jsonl.zst"
+MEMORY_AGENT_TRAJECTORY_FILENAME = f"trajectory.{AGENT_TRANSCRIPT_VERSION}.jsonl.zst"
 MEMORY_AGENT_TRAJECTORY_COMPRESSION_LEVEL = 10
 
 

@@ -8,13 +8,18 @@ export async function runViewerFlow({ page }) {
     JSON.stringify({
       seq: 1,
       event: 'message',
-      message: { type: 'system', content: 'Pasted system prompt' }
+      message: {
+        id: 'fixture-1',
+        role: 'system',
+        content: 'Pasted system prompt'
+      }
     }),
     JSON.stringify({
       seq: 2,
       event: 'message',
       message: {
-        type: 'ai',
+        id: 'fixture-2',
+        role: 'assistant',
         content: [
           { type: 'text', text: 'Pasted assistant response' },
           { type: 'thinking', thinking: 'Pasted reasoning detail' }
@@ -39,7 +44,8 @@ export async function runViewerFlow({ page }) {
       seq: 3,
       event: 'message',
       message: {
-        type: 'tool',
+        id: 'fixture-3',
+        role: 'tool',
         name: 'replace_text',
         tool_call_id: 'replace-1',
         content: Array.from(
@@ -50,14 +56,10 @@ export async function runViewerFlow({ page }) {
       }
     })
   ].join('\n')
-  await page
-    .getByLabel('Paste trajectory JSONL or JSON messages')
-    .fill(pastedTrajectory)
+  await page.getByLabel('Paste transcript JSONL').fill(pastedTrajectory)
   await page.getByRole('button', { name: 'Render' }).click()
   await page.getByRole('button', { name: 'Edit input' }).waitFor()
-  await page
-    .getByLabel('Paste trajectory JSONL or JSON messages')
-    .waitFor({ state: 'hidden' })
+  await page.getByLabel('Paste transcript JSONL').waitFor({ state: 'hidden' })
   await page
     .locator('.trajectory-timeline')
     .getByText('Pasted assistant response', { exact: true })
@@ -224,13 +226,15 @@ export async function runViewerFlow({ page }) {
       JSON.stringify({
         seq: index + 1,
         event: 'message',
-        message: { type: 'human', content: `Dense message ${index + 1}` }
+        message: {
+          id: `dense-${index + 1}`,
+          role: 'user',
+          content: `Dense message ${index + 1}`
+        }
       })
     ).join('\n')
     await page.getByRole('button', { name: 'Edit input' }).click()
-    await page
-      .getByLabel('Paste trajectory JSONL or JSON messages')
-      .fill(denseTrajectory)
+    await page.getByLabel('Paste transcript JSONL').fill(denseTrajectory)
     await page.getByRole('button', { name: 'Render' }).click()
     await page.getByText('Dense message 130', { exact: true }).waitFor()
     await page.waitForFunction(
@@ -261,12 +265,19 @@ export async function runViewerFlow({ page }) {
     )
   }
 
-  const uploadedTrajectory = JSON.stringify({
-    messages: [{ type: 'human', content: 'Uploaded trajectory message' }]
-  })
+  const uploadedTrajectory =
+    JSON.stringify({
+      seq: 1,
+      event: 'message',
+      message: {
+        id: 'uploaded-1',
+        role: 'user',
+        content: 'Uploaded trajectory message'
+      }
+    }) + '\n'
   await page.locator('input[type="file"]').setInputFiles({
-    name: 'sample-trajectory.json',
-    mimeType: 'application/json',
+    name: 'sample-trajectory.jsonl',
+    mimeType: 'application/x-ndjson',
     buffer: Buffer.from(uploadedTrajectory)
   })
   await page

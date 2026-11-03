@@ -1,4 +1,5 @@
 import React from 'react'
+import { readTrajectoryJsonl } from '../../../shared/trajectory-events.js'
 import {
   Alert,
   Button,
@@ -24,51 +25,11 @@ import { TrajectoryTimeline } from '../trajectory/TrajectoryTimeline.js'
 import type { TrajectoryEvent } from '../trajectory/trajectory-model.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
-function messageRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    return null
-  return value as Record<string, unknown>
-}
-
-/** Accept the concrete shapes people actually paste from this repository: trajectory JSONL,
- * an event array, `{ events }`, `{ messages }`, or a raw message array. Unlike agent-visual's
- * compatibility parser, this does not evaluate or guess Python repr syntax. */
+/** Read trajectory JSONL. */
 export function parseViewerInput(input: string): TrajectoryEvent[] {
-  const trimmed = input.trim()
-  if (!trimmed) throw new Error('empty_input')
-  let value: unknown
-  try {
-    value = JSON.parse(trimmed)
-  } catch {
-    value = trimmed
-      .split('\n')
-      .filter(Boolean)
-      .map((line) => JSON.parse(line))
-  }
-  const root = messageRecord(value)
-  const items = Array.isArray(value)
-    ? value
-    : Array.isArray(root?.events)
-      ? root.events
-      : Array.isArray(root?.messages)
-        ? root.messages
-        : []
-  if (items.length === 0) throw new Error('no_messages')
-  return items.map((item, index) => {
-    const record = messageRecord(item)
-    if (record === null) throw new Error('invalid_message')
-    if (record.event === 'message') {
-      const message = messageRecord(record.message)
-      if (!Number.isSafeInteger(record.seq) || message === null)
-        throw new Error('invalid_event')
-      return {
-        seq: record.seq as number,
-        event: 'message',
-        message
-      }
-    }
-    return { seq: index + 1, event: 'message', message: record }
-  })
+  const events = readTrajectoryJsonl(input)
+  if (!events.length) throw new Error('empty_input')
+  return events
 }
 
 export function Viewer(): React.JSX.Element {
@@ -91,10 +52,18 @@ export function Viewer(): React.JSX.Element {
   }
   const upload = async (file: File | null): Promise<void> => {
     if (!file) return
-    const content = await file.text()
-    setFilename(file.name)
-    setInput(content)
-    render(content)
+    try {
+      const content = new TextDecoder('utf-8', { fatal: true }).decode(
+        await file.arrayBuffer()
+      )
+      setFilename(file.name)
+      setInput(content)
+      render(content)
+    } catch {
+      setEvents([])
+      setError(t('viewerParseFailed'))
+      setInputOpened(true)
+    }
   }
   return (
     <Container size="lg" py="xl">
@@ -112,7 +81,9 @@ export function Viewer(): React.JSX.Element {
               <Text size="sm" fw={600}>
                 {t('trajectoryMessageCount').replace(
                   '{count}',
-                  String(events.length)
+                  String(
+                    events.filter((event) => event.event === 'message').length
+                  )
                 )}
               </Text>
               {filename && (
@@ -156,7 +127,7 @@ export function Viewer(): React.JSX.Element {
               <Group gap="sm">
                 <FileButton
                   onChange={(file) => void upload(file)}
-                  accept=".json,.jsonl,application/json,text/plain"
+                  accept=".jsonl,application/x-ndjson,text/plain"
                 >
                   {(props) => (
                     <Button

@@ -76,6 +76,9 @@ def render_raw_text(runs: list[RunUsage]) -> str:
 
         lines.append(run.run_dir)
         lines.append(
+            f"  usage_source={run.totals.usage_source} usage_complete={run.totals.usage_complete}"
+        )
+        lines.append(
             "  total: "
             f"input={run.input_tokens:,} "
             f"output={run.output_tokens:,} "
@@ -217,7 +220,11 @@ def render_table(runs: list[RunUsage]) -> str:
                     ]
                 )
 
-    return render_rows(header, rows)
+    coverage = "\n".join(
+        f"{display_run_name(run)}: usage_source={run.totals.usage_source}, usage_complete={run.totals.usage_complete}"
+        for run in runs
+    )
+    return render_rows(header, rows) + "\n" + coverage + "\n"
 
 
 def render_csv(runs: list[RunUsage]) -> str:
@@ -242,6 +249,10 @@ def render_csv(runs: list[RunUsage]) -> str:
             "cache_ratio",
             "ai_message_count",
             "ai_messages_with_usage_count",
+            "model_call_count",
+            "model_calls_with_usage_count",
+            "usage_source",
+            "usage_complete",
         ]
     )
 
@@ -274,6 +285,10 @@ def render_csv(runs: list[RunUsage]) -> str:
                 f"{totals.cache_ratio:.6f}",
                 totals.ai_message_count,
                 totals.ai_messages_with_usage_count,
+                totals.model_call_count,
+                totals.model_calls_with_usage_count,
+                totals.usage_source,
+                totals.usage_complete,
             ]
         )
 
@@ -339,6 +354,10 @@ def render_json(runs: list[RunUsage]) -> str:
         effective_totals = effective.totals
 
         run_payload = {
+            "usage_source": totals.usage_source,
+            "usage_complete": totals.usage_complete,
+            "model_call_count": totals.model_call_count,
+            "model_calls_with_usage_count": totals.model_calls_with_usage_count,
             "run_dir": run.run_dir,
             "experiment": run.experiment,
             "workflow_kind": run.workflow_kind,
@@ -353,6 +372,10 @@ def render_json(runs: list[RunUsage]) -> str:
             "ai_message_count": totals.ai_message_count,
             "ai_messages_with_usage_count": totals.ai_messages_with_usage_count,
             "effective_patch": {
+                "usage_source": effective_totals.usage_source,
+                "usage_complete": effective_totals.usage_complete,
+                "model_call_count": effective_totals.model_call_count,
+                "model_calls_with_usage_count": effective_totals.model_calls_with_usage_count,
                 "input_tokens": effective_totals.input_tokens,
                 "output_tokens": effective_totals.output_tokens,
                 "total_tokens": effective_totals.total_tokens,

@@ -70,7 +70,7 @@ def _trajectory_jsonl(*contents: str) -> str:
                 "seq": index,
                 "event": "message",
                 "message": {
-                    "type": "ai",
+                    "role": "assistant",
                     "id": f"message-{index}",
                     "name": None,
                     "content": content,
@@ -165,7 +165,7 @@ def test_trajectory_tools_list_and_read_messages(tmp_path: Path) -> None:
     assert message["message"]["content"] == "verified conclusion"
 
 
-def test_list_trajectory_messages_reports_partial_lines_without_losing_messages(
+def test_list_trajectory_messages_rejects_partial_jsonl(
     tmp_path: Path,
 ) -> None:
     trajectory = tmp_path / "0001-analyzer-initial.jsonl"
@@ -180,8 +180,8 @@ def test_list_trajectory_messages_reports_partial_lines_without_losing_messages(
         {"file_path": "/trajectories/0001-analyzer-initial.jsonl"}
     )
 
-    assert [message["seq"] for message in result["messages"]] == [1]
-    assert result["parse_errors"][0]["line"] == 2
+    assert result["ok"] is False
+    assert result["error"] == "Invalid transcript JSONL."
 
 
 def test_collect_review_memory_trajectories_uses_flat_published_files(

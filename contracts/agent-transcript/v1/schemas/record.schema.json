@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sec-review-bot/contracts/agent-transcript/v1/record.schema.json",
+  "title": "Agent transcript record",
+  "type": "object",
+  "required": [
+    "seq",
+    "event"
+  ],
+  "properties": {
+    "seq": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "event": {
+      "enum": [
+        "message",
+        "model_calls_start",
+        "model_calls_end",
+        "model_call_start",
+        "model_call_end"
+      ]
+    },
+    "message": {
+      "type": "object",
+      "required": [
+        "id",
+        "role",
+        "content"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "enum": [
+            "system",
+            "user",
+            "assistant",
+            "tool"
+          ]
+        },
+        "content": {
+          "type": [
+            "string",
+            "array"
+          ]
+        },
+        "usage_metadata": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "input_tokens": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "output_tokens": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            },
+            "total_tokens": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "additionalProperties": true
+        }
+      },
+      "not": {
+        "required": [
+          "type"
+        ]
+      },
+      "additionalProperties": true
+    },
+    "agent": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "source": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "parent_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "call_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "message_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "status": {
+      "enum": [
+        "completed",
+        "failed",
+        "interrupted"
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "message"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "message"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "model_call_start"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "call_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "model_call_end"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "call_id",
+          "message_id"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event": {
+            "const": "model_calls_end"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "status"
+        ]
+      }
+    }
+  ],
+  "additionalProperties": true
+}

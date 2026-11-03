@@ -539,7 +539,8 @@
   background: var(--status-failed-soft);
 }
 
-.trajectory-tool-output {
+.trajectory-tool-output,
+.trajectory-source {
   max-height: 520px;
   overflow: auto;
   white-space: pre-wrap;

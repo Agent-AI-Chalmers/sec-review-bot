@@ -7,6 +7,7 @@ import {
   Collapse,
   Group,
   Paper,
+  SegmentedControl,
   Text,
   Tooltip
 } from '@mantine/core'
@@ -28,7 +29,7 @@ import {
   messageKey,
   scrollToTrajectoryElement
 } from './trajectory-navigation.js'
-import { HighlightText, HighlightedMarkdown } from './TrajectoryText.js'
+import { HighlightText, TrajectoryText } from './TrajectoryText.js'
 import { DiffView } from './DiffView.js'
 import { ToolArguments } from './ToolArguments.js'
 import { TokenUsagePopover } from './TokenUsagePopover.js'
@@ -43,7 +44,12 @@ function CopyButton({ value }: { value: string }): React.JSX.Element {
   }
   return (
     <Tooltip label={copied ? t('copied') : t('copy')}>
-      <ActionIcon variant="subtle" color="gray" onClick={() => void copy()}>
+      <ActionIcon
+        variant="subtle"
+        color="gray"
+        aria-label={copied ? t('copied') : t('copy')}
+        onClick={() => void copy()}
+      >
         {copied ? (
           <IconCheck size={ICON_SIZE.sm} />
         ) : (
@@ -61,16 +67,21 @@ function Section({
   openedInitially = false,
   force,
   children,
-  color = 'blue'
+  color = 'blue',
+  query = ''
 }: {
   kind: 'message' | 'reasoning' | 'result' | 'artifact'
   title: string
   value: string
   openedInitially?: boolean
   force: number
-  children: React.ReactNode
+  children?: React.ReactNode
+  query?: string
   color?: string
 }): React.JSX.Element {
+  const t = useMessages()
+  const [mode, setMode] = React.useState('preview')
+  const hasPreview = kind === 'message' || kind === 'reasoning'
   const [opened, setOpened] = React.useState(openedInitially)
   const previousForce = React.useRef(force)
   React.useEffect(() => {
@@ -102,10 +113,31 @@ function Section({
             {title}
           </Group>
         </Button>
-        <CopyButton value={value} />
+        <Group gap="xs" wrap="nowrap">
+          {hasPreview && opened && (
+            <SegmentedControl
+              size="xs"
+              value={mode}
+              onChange={setMode}
+              data={[
+                { value: 'preview', label: t('preview') },
+                { value: 'source', label: t('source') }
+              ]}
+            />
+          )}
+          <CopyButton value={value} />
+        </Group>
       </Group>
       <Collapse expanded={opened}>
-        <div className="trajectory-section-content">{children}</div>
+        <div className="trajectory-section-content">
+          {hasPreview ? (
+            <TrajectoryText query={query} mode={mode}>
+              {value}
+            </TrajectoryText>
+          ) : (
+            children
+          )}
+        </div>
       </Collapse>
     </div>
   )
@@ -208,7 +240,7 @@ function ToolCalls({
       <Collapse expanded={opened}>
         <div className="trajectory-tool-calls-body">
           {calls.map((call) => (
-            <div id={`trajectory-call-${call.id}`} key={call.id}>
+            <div id={call.anchorId} key={call.anchorId}>
               <ToolCall call={call} query={query} />
             </div>
           ))}
@@ -232,20 +264,25 @@ export function TrajectoryMessage({
   const modelLabel = [message.modelProvider, message.modelName]
     .filter(Boolean)
     .join(' · ')
-  // Assistant turns show the model, never the agent name: the LangChain name
-  // field is an overloaded label, not a stable identity. Tool messages keep
-  // their tool name, which is what name unambiguously means there.
   const primaryLabel =
-    message.role === 'assistant' ? modelLabel || undefined : message.name
+    [
+      message.agent,
+      message.source,
+      message.role === 'assistant' ? modelLabel : message.name
+    ]
+      .filter(Boolean)
+      .join(' · ') || undefined
   const jumpToCall = (): void => {
-    if (!message.toolCallId) return
-    scrollToTrajectoryElement(`trajectory-call-${message.toolCallId}`)
+    if (!message.requestAnchorId) return
+    scrollToTrajectoryElement(message.requestAnchorId)
   }
   return (
     <Paper
       id={`trajectory-${message.id}`}
       data-trajectory-message-key={messageKey(message)}
       data-trajectory-role={message.role}
+      data-trajectory-agent={message.agent}
+      data-trajectory-source={message.source}
       withBorder
       className={`trajectory-message trajectory-${message.role}`}
     >
@@ -279,9 +316,9 @@ export function TrajectoryMessage({
             </Badge>
           )}
         </Group>
-        {(message.toolCallId || message.usage) && (
+        {(message.requestAnchorId || message.usage) && (
           <Group gap="xs" wrap="wrap">
-            {message.toolCallId && (
+            {message.requestAnchorId && (
               <Button
                 variant="subtle"
                 size="compact-xs"
@@ -308,13 +345,8 @@ export function TrajectoryMessage({
             value={message.reasoning}
             force={force}
             color="violet"
-          >
-            <div className="memory-markdown memory-markdown-full">
-              <HighlightedMarkdown query={query}>
-                {message.reasoning}
-              </HighlightedMarkdown>
-            </div>
-          </Section>
+            query={query}
+          />
         )}
         {message.content && (
           <Section
@@ -330,17 +362,12 @@ export function TrajectoryMessage({
             }
             force={force}
             color={message.role === 'tool' ? 'green' : 'blue'}
+            query={query}
           >
-            {message.role === 'tool' ? (
+            {message.role === 'tool' && (
               <Code block className="trajectory-tool-output">
                 <HighlightText value={message.content} query={query} />
               </Code>
-            ) : (
-              <div className="memory-markdown memory-markdown-full">
-                <HighlightedMarkdown query={query}>
-                  {message.content}
-                </HighlightedMarkdown>
-              </div>
             )}
           </Section>
         )}

@@ -34,7 +34,7 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
           seq: 1,
           event: 'message',
           message: {
-            type: 'human',
+            role: 'user',
             id: content.toLowerCase().replaceAll(' ', '-'),
             content,
             tool_calls: []
@@ -684,7 +684,7 @@ export async function runMemoryFlow({
       .waitFor()
     await maintenanceDialog
       .locator('.trajectory-message')
-      .getByText('AI message', { exact: true })
+      .getByText('Assistant', { exact: true })
       .waitFor()
     const trajectoryLayout = await maintenanceDialog.evaluate((dialog) => {
       const layout = dialog.querySelector('.trajectory-layout')
