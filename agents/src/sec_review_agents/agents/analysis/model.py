@@ -190,8 +190,7 @@ class ScopeReview(BaseModel):
     scope_analysis: NonEmptyText = Field(
         description=(
             "Explain, in this order: how the control point decides the outcome, why the repair-relevant scope "
-            "is local or shared, and, when the scope is still unresolved, what evidence would settle it. List the "
-            "entries that reach the control point in `related_paths` rather than repeating them here."
+            "is local or shared, and, when the scope is still unresolved, what evidence would settle it."
         ),
     )
     # Whether a control point must be named is validated on Narrative: it depends on
