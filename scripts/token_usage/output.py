@@ -4,15 +4,22 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from . import (
+from .effective import compute_effective_patch_usage, effective_patch_efficiency
+from .models import (
     AttemptUsage,
     EffectivePatchUsage,
     RunUsage,
     UsageTotals,
     aggregate_stage_usages,
-    compute_effective_patch_usage,
-    effective_patch_efficiency,
 )
+
+
+def format_count(value: int | None) -> str:
+    return "unknown" if value is None else f"{value:,}"
+
+
+def format_ratio(value: float | None) -> str:
+    return "unknown" if value is None else f"{value * 100:.2f}%"
 
 
 def should_render_attempt_rows(run: RunUsage) -> bool:
@@ -80,24 +87,26 @@ def render_raw_text(runs: list[RunUsage]) -> str:
         )
         lines.append(
             "  total: "
-            f"input={run.input_tokens:,} "
-            f"output={run.output_tokens:,} "
-            f"total={run.total_tokens:,} "
-            f"cache_read={run.cache_read_tokens:,} "
-            f"cache_creation={run.totals.cache_creation_tokens:,} "
-            f"uncached_input={run.uncached_input_tokens:,} "
-            f"cache_ratio={run.cache_ratio * 100:.2f}% "
+            f"input={format_count(run.input_tokens)} "
+            f"output={format_count(run.output_tokens)} "
+            f"total={format_count(run.total_tokens)} "
+            f"cache_read={format_count(run.cache_read_input_tokens)} "
+            f"cache_creation={format_count(run.totals.cache_creation_input_tokens)} "
+            f"reasoning={format_count(run.totals.reasoning_tokens)} "
+            f"uncached_input={format_count(run.uncached_input_tokens)} "
+            f"cache_ratio={format_ratio(run.cache_ratio)} "
             f"ai_msgs={run.ai_message_count}"
         )
         lines.append(
             "  effective_patch: "
-            f"input={totals.input_tokens:,} "
-            f"output={totals.output_tokens:,} "
-            f"total={totals.total_tokens:,} "
-            f"cache_read={totals.cache_read_tokens:,} "
-            f"cache_creation={totals.cache_creation_tokens:,} "
-            f"uncached_input={totals.uncached_input_tokens:,} "
-            f"cache_ratio={totals.cache_ratio * 100:.2f}% "
+            f"input={format_count(totals.input_tokens)} "
+            f"output={format_count(totals.output_tokens)} "
+            f"total={format_count(totals.total_tokens)} "
+            f"cache_read={format_count(totals.cache_read_input_tokens)} "
+            f"cache_creation={format_count(totals.cache_creation_input_tokens)} "
+            f"reasoning={format_count(totals.reasoning_tokens)} "
+            f"uncached_input={format_count(totals.uncached_input_tokens)} "
+            f"cache_ratio={format_ratio(totals.cache_ratio)} "
             f"ai_msgs={totals.ai_message_count}"
         )
         if visible_attempts:
@@ -111,13 +120,14 @@ def render_raw_text(runs: list[RunUsage]) -> str:
                 "  - "
                 f"{stage.stage}: "
                 f"model_id={stage.model_id} "
-                f"input={stage.input_tokens:,} "
-                f"output={stage.output_tokens:,} "
-                f"total={stage.total_tokens:,} "
-                f"cache_read={stage.cache_read_tokens:,} "
-                f"cache_creation={stage.cache_creation_tokens:,} "
-                f"uncached_input={stage.uncached_input_tokens:,} "
-                f"cache_ratio={stage.cache_ratio * 100:.2f}% "
+                f"input={format_count(stage.input_tokens)} "
+                f"output={format_count(stage.output_tokens)} "
+                f"total={format_count(stage.total_tokens)} "
+                f"cache_read={format_count(stage.cache_read_input_tokens)} "
+                f"cache_creation={format_count(stage.cache_creation_input_tokens)} "
+                f"reasoning={format_count(stage.reasoning_tokens)} "
+                f"uncached_input={format_count(stage.uncached_input_tokens)} "
+                f"cache_ratio={format_ratio(stage.cache_ratio)} "
                 f"ai_msgs={stage.ai_message_count}"
             )
             lines.append(line)
@@ -134,6 +144,8 @@ def render_table(runs: list[RunUsage]) -> str:
         "model",
         "input",
         "output",
+        "total",
+        "reasoning",
         "cache_read",
         "cache_creation",
         "uncached",
@@ -154,13 +166,15 @@ def render_table(runs: list[RunUsage]) -> str:
                 "TOTAL",
                 "all",
                 "-",
-                f"{run.input_tokens:,}",
-                f"{run.output_tokens:,}",
-                f"{run.cache_read_tokens:,}",
-                f"{run.totals.cache_creation_tokens:,}",
-                f"{run.uncached_input_tokens:,}",
-                f"{run.cache_ratio * 100:.2f}%",
-                f"{efficiency * 100:.2f}%",
+                format_count(run.input_tokens),
+                format_count(run.output_tokens),
+                format_count(run.total_tokens),
+                format_count(run.totals.reasoning_tokens),
+                format_count(run.cache_read_input_tokens),
+                format_count(run.totals.cache_creation_input_tokens),
+                format_count(run.uncached_input_tokens),
+                format_ratio(run.cache_ratio),
+                format_ratio(efficiency),
                 str(run.ai_message_count),
             ]
         )
@@ -170,13 +184,15 @@ def render_table(runs: list[RunUsage]) -> str:
                 "TOTAL",
                 "effective_patch",
                 "-",
-                f"{effective_totals.input_tokens:,}",
-                f"{effective_totals.output_tokens:,}",
-                f"{effective_totals.cache_read_tokens:,}",
-                f"{effective_totals.cache_creation_tokens:,}",
-                f"{effective_totals.uncached_input_tokens:,}",
-                f"{effective_totals.cache_ratio * 100:.2f}%",
-                f"{efficiency * 100:.2f}%",
+                format_count(effective_totals.input_tokens),
+                format_count(effective_totals.output_tokens),
+                format_count(effective_totals.total_tokens),
+                format_count(effective_totals.reasoning_tokens),
+                format_count(effective_totals.cache_read_input_tokens),
+                format_count(effective_totals.cache_creation_input_tokens),
+                format_count(effective_totals.uncached_input_tokens),
+                format_ratio(effective_totals.cache_ratio),
+                format_ratio(efficiency),
                 str(effective_totals.ai_message_count),
             ]
         )
@@ -188,12 +204,14 @@ def render_table(runs: list[RunUsage]) -> str:
                     stage.stage,
                     "all",
                     stage.model_id,
-                    f"{stage.input_tokens:,}",
-                    f"{stage.output_tokens:,}",
-                    f"{stage.cache_read_tokens:,}",
-                    f"{stage.cache_creation_tokens:,}",
-                    f"{stage.uncached_input_tokens:,}",
-                    f"{stage.cache_ratio * 100:.2f}%",
+                    format_count(stage.input_tokens),
+                    format_count(stage.output_tokens),
+                    format_count(stage.total_tokens),
+                    format_count(stage.reasoning_tokens),
+                    format_count(stage.cache_read_input_tokens),
+                    format_count(stage.cache_creation_input_tokens),
+                    format_count(stage.uncached_input_tokens),
+                    format_ratio(stage.cache_ratio),
                     "",
                     str(stage.ai_message_count),
                 ]
@@ -209,12 +227,14 @@ def render_table(runs: list[RunUsage]) -> str:
                         attempt.stage,
                         attempt.attempt_label,
                         attempt.usage.model_id,
-                        f"{attempt.usage.input_tokens:,}",
-                        f"{attempt.usage.output_tokens:,}",
-                        f"{attempt.usage.cache_read_tokens:,}",
-                        f"{attempt.usage.cache_creation_tokens:,}",
-                        f"{attempt.usage.uncached_input_tokens:,}",
-                        f"{attempt.usage.cache_ratio * 100:.2f}%",
+                        format_count(attempt.usage.input_tokens),
+                        format_count(attempt.usage.output_tokens),
+                        format_count(attempt.usage.total_tokens),
+                        format_count(attempt.usage.reasoning_tokens),
+                        format_count(attempt.usage.cache_read_input_tokens),
+                        format_count(attempt.usage.cache_creation_input_tokens),
+                        format_count(attempt.usage.uncached_input_tokens),
+                        format_ratio(attempt.usage.cache_ratio),
                         "effective" if attempt in visible_attempts else "",
                         str(attempt.usage.ai_message_count),
                     ]
@@ -243,8 +263,9 @@ def render_csv(runs: list[RunUsage]) -> str:
             "input_tokens",
             "output_tokens",
             "total_tokens",
-            "cache_read_tokens",
-            "cache_creation_tokens",
+            "cache_read_input_tokens",
+            "cache_creation_input_tokens",
+            "reasoning_tokens",
             "uncached_input_tokens",
             "cache_ratio",
             "ai_message_count",
@@ -279,10 +300,11 @@ def render_csv(runs: list[RunUsage]) -> str:
                 totals.input_tokens,
                 totals.output_tokens,
                 totals.total_tokens,
-                totals.cache_read_tokens,
-                totals.cache_creation_tokens,
+                totals.cache_read_input_tokens,
+                totals.cache_creation_input_tokens,
+                totals.reasoning_tokens,
                 totals.uncached_input_tokens,
-                f"{totals.cache_ratio:.6f}",
+                ("" if totals.cache_ratio is None else f"{totals.cache_ratio:.6f}"),
                 totals.ai_message_count,
                 totals.ai_messages_with_usage_count,
                 totals.model_call_count,
@@ -365,8 +387,9 @@ def render_json(runs: list[RunUsage]) -> str:
             "input_tokens": totals.input_tokens,
             "output_tokens": totals.output_tokens,
             "total_tokens": totals.total_tokens,
-            "cache_read_tokens": totals.cache_read_tokens,
-            "cache_creation_tokens": totals.cache_creation_tokens,
+            "cache_read_input_tokens": totals.cache_read_input_tokens,
+            "cache_creation_input_tokens": totals.cache_creation_input_tokens,
+            "reasoning_tokens": totals.reasoning_tokens,
             "uncached_input_tokens": totals.uncached_input_tokens,
             "cache_ratio": totals.cache_ratio,
             "ai_message_count": totals.ai_message_count,
@@ -379,8 +402,9 @@ def render_json(runs: list[RunUsage]) -> str:
                 "input_tokens": effective_totals.input_tokens,
                 "output_tokens": effective_totals.output_tokens,
                 "total_tokens": effective_totals.total_tokens,
-                "cache_read_tokens": effective_totals.cache_read_tokens,
-                "cache_creation_tokens": effective_totals.cache_creation_tokens,
+                "cache_read_input_tokens": effective_totals.cache_read_input_tokens,
+                "cache_creation_input_tokens": effective_totals.cache_creation_input_tokens,
+                "reasoning_tokens": effective_totals.reasoning_tokens,
                 "uncached_input_tokens": effective_totals.uncached_input_tokens,
                 "cache_ratio": effective_totals.cache_ratio,
                 "ai_message_count": effective_totals.ai_message_count,

@@ -51,3 +51,28 @@ def test_malformed_token_counts_are_not_reported(value):
 def test_no_calls_has_no_measured_totals():
     result = snapshot([])
     assert all(value is None for value in result["token_usage"].values())
+
+
+def test_normalized_langfuse_and_transcript_usage_use_the_same_vocabulary():
+    from sec_review_agents.runtime.token_usage import normalize_langchain_usage
+
+    call = {
+        "usageDetails": {
+            "input": 6,
+            "output": 3,
+            "total": 15,
+            "cache_read_input_tokens": 3,
+            "cache_creation_input_tokens": 1,
+            "reasoning": 2,
+        }
+    }
+    normalized = normalize_langchain_usage(
+        {
+            "input_tokens": 10,
+            "output_tokens": 5,
+            "total_tokens": 15,
+            "input_token_details": {"cache_read": 3, "cache_creation": 1},
+            "output_token_details": {"reasoning": 2},
+        }
+    )
+    assert snapshot([call])["token_usage"] == normalized

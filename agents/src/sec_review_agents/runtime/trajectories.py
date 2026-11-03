@@ -9,6 +9,10 @@ from uuid import uuid4
 
 from langchain_core.messages import RemoveMessage
 
+from sec_review_agents.runtime.token_usage import (
+    message_token_usage,
+    validate_token_usage,
+)
 from sec_review_agents.utils.serialization import json_safe
 
 TRAJECTORY_BASENAME = "trajectory"
@@ -65,7 +69,7 @@ def serialize_agent_message(message: Any, *, message_id: str) -> dict:
             "tool_calls": json_safe(message.get("tool_calls", [])),
             "invalid_tool_calls": json_safe(message.get("invalid_tool_calls", [])),
             "tool_call_chunks": json_safe(message.get("tool_call_chunks", [])),
-            "usage_metadata": json_safe(message.get("usage_metadata")),
+            "usage_metadata": message_token_usage(message),
         }
         if serialized["role"] == "tool":
             serialized.update(
@@ -89,7 +93,7 @@ def serialize_agent_message(message: Any, *, message_id: str) -> dict:
         "tool_calls": json_safe(getattr(message, "tool_calls", [])),
         "invalid_tool_calls": json_safe(getattr(message, "invalid_tool_calls", [])),
         "tool_call_chunks": json_safe(getattr(message, "tool_call_chunks", [])),
-        "usage_metadata": json_safe(getattr(message, "usage_metadata", None)),
+        "usage_metadata": message_token_usage(message),
     }
     if serialized["role"] == "tool":
         serialized.update(
@@ -130,18 +134,7 @@ def validate_trajectory_event(event: Any) -> dict[str, Any]:
             raise ValueError("Transcript message requires an ID")
         if not isinstance(message.get("content"), (str, list)):
             raise ValueError("Transcript content must be text or content blocks")
-        usage = message.get("usage_metadata")
-        if usage is not None:
-            if not isinstance(usage, dict):
-                raise ValueError("Invalid transcript usage")
-            for key in ("input_tokens", "output_tokens", "total_tokens"):
-                if key in usage and (
-                    not isinstance(usage[key], int)
-                    or isinstance(usage[key], bool)
-                    or usage[key] < 0
-                    or usage[key] > 9007199254740991
-                ):
-                    raise ValueError("Invalid transcript token count")
+        validate_token_usage(message.get("usage_metadata"))
     elif kind == "model_calls_start":
         pass
     elif kind == "model_calls_end":

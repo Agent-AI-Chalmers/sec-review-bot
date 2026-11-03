@@ -111,10 +111,8 @@ function contentParts(value: unknown): { content: string; reasoning: string } {
 function usage(message: Record<string, unknown>): UsageView | undefined {
   const source = record(message.usage_metadata)
   if (!source) return undefined
-  const inputDetails = record(source.input_token_details)
-  const outputDetails = record(source.output_token_details)
-  const cacheRead = number(inputDetails?.cache_read)
-  const cacheCreation = number(inputDetails?.cache_creation)
+  const cacheRead = number(source.cache_read_input_tokens)
+  const cacheCreation = number(source.cache_creation_input_tokens)
   const input = number(source.input_tokens)
   const result: UsageView = {
     input,
@@ -122,14 +120,8 @@ function usage(message: Record<string, unknown>): UsageView | undefined {
     cacheRead,
     cacheCreation,
     total: number(source.total_tokens),
-    reasoning: number(outputDetails?.reasoning)
+    reasoning: number(source.reasoning_tokens)
   }
-  if (
-    result.total === undefined &&
-    result.input !== undefined &&
-    result.output !== undefined
-  )
-    result.total = result.input + result.output
   return Object.values(result).some((item) => item !== undefined)
     ? result
     : undefined
@@ -322,21 +314,26 @@ function totalRecordedUsage(
   for (const [callId, ids] of responses) {
     if (!selected.has(callId) && ids.length === 1) selected.set(callId, ids[0]!)
   }
-  const responseIds = new Set(selected.values())
   // Viewer totals project recorded usage; accounting reports own coverage assessment.
-  for (const message of messages) {
-    if (hasCallRecords && !responseIds.has(message.id)) continue
-    for (const key of [
-      'input',
-      'output',
-      'cacheRead',
-      'cacheCreation',
-      'reasoning',
-      'total'
-    ] as const) {
-      const value = message.usage?.[key]
-      if (value !== undefined) totalUsage[key] = (totalUsage[key] ?? 0) + value
-    }
+  const covered = hasCallRecords
+    ? [...responses.keys()].map((callId) =>
+        messages.find((message) => message.id === selected.get(callId))
+      )
+    : messages.filter((message) => message.role === 'assistant')
+  for (const key of [
+    'input',
+    'output',
+    'cacheRead',
+    'cacheCreation',
+    'reasoning',
+    'total'
+  ] as const) {
+    const values = covered.map((message) => message?.usage?.[key])
+    if (
+      values.length &&
+      values.every((value): value is number => value !== undefined)
+    )
+      totalUsage[key] = values.reduce((sum, value) => sum + value, 0)
   }
   return totalUsage
 }

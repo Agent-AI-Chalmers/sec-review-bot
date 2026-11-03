@@ -69,13 +69,46 @@ export function validateTrajectoryEvent(value: unknown): TrajectoryEvent {
     const usage = message.usage_metadata
     if (usage !== undefined && usage !== null) {
       if (!object(usage)) return invalid()
-      for (const key of ['input_tokens', 'output_tokens', 'total_tokens']) {
+      const fields = [
+        'input_tokens',
+        'output_tokens',
+        'total_tokens',
+        'cache_read_input_tokens',
+        'cache_creation_input_tokens',
+        'reasoning_tokens'
+      ] as const
+      if (
+        Object.keys(usage).length !== fields.length ||
+        !fields.every((key) => key in usage)
+      )
+        return invalid()
+      for (const key of fields) {
         if (
-          usage[key] !== undefined &&
+          usage[key] !== null &&
           (!Number.isSafeInteger(usage[key]) || (usage[key] as number) < 0)
         )
           return invalid()
       }
+      const input = usage.input_tokens as number | null
+      const output = usage.output_tokens as number | null
+      if (
+        usage.total_tokens !==
+        (input === null || output === null ? null : input + output)
+      )
+        return invalid()
+      if (
+        input !== null &&
+        ((usage.cache_read_input_tokens as number | null) ?? 0) +
+          ((usage.cache_creation_input_tokens as number | null) ?? 0) >
+          input
+      )
+        return invalid()
+      if (
+        output !== null &&
+        usage.reasoning_tokens !== null &&
+        (usage.reasoning_tokens as number) > output
+      )
+        return invalid()
     }
   } else if (value.event === 'model_calls_start') {
     // No additional fields to validate.

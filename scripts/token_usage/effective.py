@@ -1,3 +1,5 @@
+from dataclasses import replace
+
 from .models import AttemptUsage, EffectivePatchUsage, RunUsage, StageUsage
 
 
@@ -40,103 +42,48 @@ def compute_lightweight_two_stage_usage(run: RunUsage) -> EffectivePatchUsage:
 
 
 def compute_effective_patch_usage(run: RunUsage) -> EffectivePatchUsage:
-    """Compute patch-generation usage.
-
-    Semantics:
-    - single-agent: all single-agent attempts/stage usage.
-    - two-stage: final analyzer + final mitigator.
-    - default/3-stage:
-      * analyzer initial/final first pass;
-      * all mitigator attempts;
-      * verifier attempts only when they are part of retry feedback path.
-    """
-
+    """Select recorded attempts; stage totals are derived views, not executions."""
     if run.workflow_kind == "repository-review-workflow-result":
-        return EffectivePatchUsage(
-            included_attempts=[
-                AttemptUsage(stage=stage.stage, attempt_label="final", usage=stage)
-                for stage in run.stages
-            ]
-        )
+        return EffectivePatchUsage(included_attempts=list(run.attempts))
 
     if run.workflow_kind == "issue-review-single-agent-workflow-result":
-        single_attempts = _attempts_for_stage(run, "single-agent")
-        if single_attempts:
-            return EffectivePatchUsage(included_attempts=list(single_attempts))
-        fallback = _final_stage_attempt(run, "single-agent")
         return EffectivePatchUsage(
-            included_attempts=[fallback] if fallback is not None else []
+            included_attempts=_attempts_for_stage(run, "single-agent")
         )
 
     if run.workflow_kind == "issue-review-two-stage-workflow-result":
-        included = [
-            item
-            for item in (
-                _final_stage_attempt(run, "analyzer"),
-                _final_stage_attempt(run, "mitigator"),
-            )
-            if item is not None
-        ]
-        return EffectivePatchUsage(included_attempts=included)
+        return EffectivePatchUsage(
+            included_attempts=[
+                attempt
+                for attempt in run.attempts
+                if attempt.stage in {"analyzer", "mitigator"}
+            ]
+        )
 
-    included: list[AttemptUsage] = []
-
-    analyzer_attempts = _attempts_for_stage(run, "analyzer")
-    if analyzer_attempts:
-        included.append(analyzer_attempts[0])
-    else:
-        analyzer_fallback = _final_stage_attempt(run, "analyzer")
-        if analyzer_fallback is not None:
-            included.append(analyzer_fallback)
-
-    mitigator_attempts = _attempts_for_stage(run, "mitigator")
-    verifier_attempts = _attempts_for_stage(run, "verifier")
-
-    if not mitigator_attempts:
-        mitigator_fallback = _final_stage_attempt(run, "mitigator")
-        if mitigator_fallback is not None and (
-            run.retry_count_used == 0 or run.retry_count_used is None
-        ):
-            included.append(mitigator_fallback)
-        return EffectivePatchUsage(included_attempts=included)
-
-    included.extend(mitigator_attempts)
-
-    # If there were N mitigator attempts, there were at most N-1 verifier feedback
-    # checks that caused retry mitigation. Include only those verifier attempts in
-    # effective_patch, not the final verifier-only usage.
-    retry_mitigator_count = max(len(mitigator_attempts) - 1, 0)
-    included.extend(verifier_attempts[:retry_mitigator_count])
-    return EffectivePatchUsage(included_attempts=included)
-
-
-def effective_patch_efficiency(run: RunUsage) -> float:
-    return (
-        compute_effective_patch_usage(run).totals.total_tokens / run.total_tokens
-        if run.total_tokens > 0
-        else 0.0
+    analyzer = _attempts_for_stage(run, "analyzer")
+    mitigator = _attempts_for_stage(run, "mitigator")
+    verifier = _attempts_for_stage(run, "verifier")
+    # Verification that caused mitigation feedback is part of the patch path;
+    # the final verification is inspection, not patch generation.
+    feedback_count = max(len(mitigator) - 1, 0)
+    return EffectivePatchUsage(
+        included_attempts=analyzer[:1] + mitigator + verifier[:feedback_count]
     )
+
+
+def effective_patch_efficiency(run: RunUsage) -> float | None:
+    effective_total = compute_effective_patch_usage(run).totals.total_tokens
+    total = run.total_tokens
+    if total is None or effective_total is None:
+        return None
+    return effective_total / total if total > 0 else 0.0
 
 
 def effective_patch_run(run: RunUsage) -> RunUsage:
     effective = compute_effective_patch_usage(run)
-    return RunUsage(
-        run_dir=run.run_dir,
-        experiment=run.experiment,
-        workflow_kind=run.workflow_kind,
-        retry_count_used=run.retry_count_used,
-        stages=effective.stages,
-        attempts=[],
-    )
+    return replace(run, stages=effective.stages, attempts=effective.included_attempts)
 
 
 def lightweight_two_stage_run(run: RunUsage) -> RunUsage:
     effective = compute_lightweight_two_stage_usage(run)
-    return RunUsage(
-        run_dir=run.run_dir,
-        experiment=run.experiment,
-        workflow_kind=run.workflow_kind,
-        retry_count_used=run.retry_count_used,
-        stages=effective.stages,
-        attempts=[],
-    )
+    return replace(run, stages=effective.stages, attempts=effective.included_attempts)

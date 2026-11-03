@@ -15,3 +15,5 @@ Producers emit canonical records. Consumers validate JSONL, record shapes, seque
 Python and TypeScript run the same corpus through their own readers. Producer tests also check emitted records against the schema. No package reads another package's test directory.
 
 There are no generated projections or family-specific generation tools. Changes to the schema, corpus, specification, and participating readers are reviewed together.
+
+Usage is a closed six-field nullable record normalized by producers. Consumers validate the canonical usage fields before using them.

@@ -1,0 +1,1 @@
+{"seq":1,"event":"message","message":{"id":"reply","role":"assistant","content":"reply","usage_metadata":{"input_tokens":0,"output_tokens":null,"total_tokens":null,"cache_read_input_tokens":null,"cache_creation_input_tokens":null,"reasoning_tokens":null}}}

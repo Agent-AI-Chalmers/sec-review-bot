@@ -4,7 +4,9 @@
     "summarization.jsonl",
     "message-only.jsonl",
     "interrupted.jsonl",
-    "metadata-observations.jsonl"
+    "metadata-observations.jsonl",
+    "usage-normalized.jsonl",
+    "usage-partial.jsonl"
   ],
   "invalid": [
     "array.jsonl",
@@ -21,6 +23,14 @@
     "invalid-source.jsonl",
     "invalid-ancestry.jsonl",
     "unknown-event.jsonl",
-    "truncated.jsonl"
+    "truncated.jsonl",
+    "usage-missing-field.jsonl",
+    "usage-legacy-details.jsonl",
+    "usage-negative-subset.jsonl",
+    "usage-boolean-subset.jsonl",
+    "usage-cache-overflow.jsonl",
+    "usage-reasoning-overflow.jsonl",
+    "usage-total-mismatch.jsonl",
+    "usage-total-without-components.jsonl"
   ]
 }

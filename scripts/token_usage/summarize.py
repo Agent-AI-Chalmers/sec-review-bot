@@ -3,7 +3,7 @@ from pathlib import Path
 
 from sec_review_agents.utils.env import bootstrap_agents_env
 
-from scripts.token_usage import load_run_usage
+from scripts.token_usage.loading import load_run_usage
 from scripts.token_usage.output import (
     render_csv,
     render_json,

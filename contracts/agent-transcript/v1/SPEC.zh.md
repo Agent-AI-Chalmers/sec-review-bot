@@ -60,7 +60,7 @@ Transcript 是执行历史，不是每次模型调用的完整请求快照。只
 {"seq":2,"event":"message","agent":"reviewer","message":{"id":"s1","role":"system","content":"Review the change."}}
 {"seq":3,"event":"message","agent":"reviewer","message":{"id":"u1","role":"user","content":"Inspect the patch."}}
 {"seq":4,"event":"model_call_start","call_id":"c1","agent":"reviewer"}
-{"seq":5,"event":"message","call_id":"c1","agent":"reviewer","message":{"id":"a1","role":"assistant","content":"A check is needed.","usage_metadata":{"input_tokens":10,"output_tokens":2,"total_tokens":12}}}
+{"seq":5,"event":"message","call_id":"c1","agent":"reviewer","message":{"id":"a1","role":"assistant","content":"A check is needed.","usage_metadata":{"input_tokens":10,"output_tokens":2,"total_tokens":12,"cache_read_input_tokens":null,"cache_creation_input_tokens":null,"reasoning_tokens":null}}}
 {"seq":6,"event":"model_call_end","call_id":"c1","message_id":"a1"}
 {"seq":7,"event":"model_calls_end","status":"completed"}
 ```
@@ -69,7 +69,26 @@ Transcript 是执行历史，不是每次模型调用的完整请求快照。只
 
 消息的 `usage_metadata` 描述生成该响应的模型调用。对每次已观察到的调用最多统计一次；存在调用结束记录时，使用其引用的响应。缺少调用结束记录时，可以计入无歧义的已记录响应用量，但这不证明调用成功完成。作为上下文传入的历史消息不构成新调用。重新读取其内容的消耗，已包含在新调用报告的输入用量中。
 
-`input_tokens` 包含缓存输入；供应商单独报告推理输出时，`output_tokens` 包含该部分。缓存读取、缓存写入和推理计数是子集，不额外加到这些总量上。无法获得的数值保持未知，不当作零。
+`message.usage_metadata` 是标准化的逐调用 token 记录，与信封层 `metadata` 不同。无法获得时可以省略或设为 `null`。非 null 对象必须恰好包含以下字段；每个值为非负安全整数或 `null`。缺失的测量值使用 `null`，不当作零；明确报告的零保留为 `0`。
+
+本契约遵循 OpenTelemetry GenAI 的 token 统计语义：输入/输出采用包含式总量，缓存和推理作为子集。JSON 字段名及记录结构由本项目定义，不照搬 OpenTelemetry 的属性名或指标名。OpenTelemetry GenAI 规范独立演进；上游命名变化不会自动改变本契约。生产端负责将来源词汇映射为下表定义的字段。
+
+| 字段 | 含义 |
+| --- | --- |
+| `input_tokens` | 包含缓存读取和缓存写入的输入总量 |
+| `output_tokens` | 包含推理的输出总量 |
+| `total_tokens` | input 与 output 均已知时为两者之和，否则为 `null` |
+| `cache_read_input_tokens` | 输入中的缓存读取子集 |
+| `cache_creation_input_tokens` | 输入中的缓存写入子集，与缓存读取不重叠 |
+| `reasoning_tokens` | 输出中的推理子集 |
+
+已知缓存子集之和不能超过已知输入；已知推理量不能超过已知输出。消费端拒绝不可能的子集、不一致的总量、非 null 用量对象缺少字段，以及标准用量内的框架专用详情字段。计数上限为 `9007199254740991`，保证 Python/JavaScript 互操作。缓存和推理是子集，不得额外加到包含式总量上。
+
+生产端在适配边界完成归一化。LangChain 总量和 OpenAI prompt/completion 总量已经采用包含式口径。Anthropic 普通输入不含单独报告的缓存桶，需加一次。Langfuse 普通输入/输出桶不含缓存/推理桶，需加一次。缺失的可选桶不增加该适配口径下的总量，但不能据此将对应子集记为已上报零值。普通桶缺失时，其包含式总量保持未知。`total_tokens` 从归一化后的分量计算；源总量冲突时发出警告，原始供应商观测数据保留在标准用量之外。只有源 total 不足以确定 input/output 或标准 total。
+
+消费端读取标准用量，不解释供应商 metadata 或 LangChain 详情映射。只有覆盖范围内每次调用都具有某字段的已知值时，才能汇总该字段；否则该字段的汇总保持未知。没有观测到调用时，总量未知。部分和作为下界时可以单独展示并明确标注，不能当作完整总量。未缓存输入和比率所需的任意操作数未知时，派生值保持未知。完整用量核算要求调用记录已结束，且每次覆盖调用的六个字段均已知；仅 input/output 已知不足以证明缓存或推理覆盖完整。
+
+agents runtime 负责框架/供应商转换及轨迹用量校验。仓库脚本负责运行目录发现、工作流相关的有效补丁路径选择和报告渲染。Langfuse 查询代码负责其外部数据源转换，归一化后的字段含义与本契约及 Review Runs token 总量一致。
 
 运行级汇总用量放在独立 metrics 产物或明确区分的汇总记录中，不附到某条响应上。只能获得汇总用量时，保留该汇总，不虚构逐调用分配。
 

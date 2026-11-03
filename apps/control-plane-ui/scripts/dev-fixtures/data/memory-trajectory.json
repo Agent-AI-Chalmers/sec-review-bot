@@ -45,7 +45,10 @@
         "usage_metadata": {
           "input_tokens": 384,
           "output_tokens": 72,
-          "total_tokens": 456
+          "total_tokens": 456,
+          "cache_read_input_tokens": null,
+          "cache_creation_input_tokens": null,
+          "reasoning_tokens": null
         },
         "role": "assistant"
       }
