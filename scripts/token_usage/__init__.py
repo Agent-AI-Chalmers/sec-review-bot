@@ -6,7 +6,7 @@ from .effective import (
     lightweight_two_stage_run,
     stage_by_name,
 )
-from .loading import load_run_usage
+from .loading import discover_trajectories, load_run_usage
 from .models import (
     STAGE_NAMES,
     AttemptUsage,
@@ -27,6 +27,7 @@ __all__ = [
     "aggregate_stage_usages",
     "compute_effective_patch_usage",
     "compute_lightweight_two_stage_usage",
+    "discover_trajectories",
     "effective_patch_efficiency",
     "effective_patch_run",
     "lightweight_two_stage_run",

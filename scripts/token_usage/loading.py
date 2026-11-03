@@ -297,13 +297,14 @@ def _classify_trajectory(artifact_root: Path, path: Path) -> tuple[str, str] | N
     return None
 
 
-def _discover_trajectories(artifact_root: Path) -> list[tuple[Path, str, str]]:
+def discover_trajectories(run_dir: Path) -> list[tuple[Path, str, str]]:
     """Return every stage-local trajectory with the stage and attempt it belongs to.
 
     A trajectory under no known stage directory is not counted; if any such trajectory is
     stage-local rather than a published copy, its tokens would otherwise disappear
     silently, so report the count once.
     """
+    artifact_root = _artifact_root(run_dir)
     published_root = artifact_root / TRAJECTORIES_DIRNAME
     trajectories: set[tuple[Path, str, str]] = set()
     unclassified: list[Path] = []
@@ -350,7 +351,7 @@ def _stage_sort_key(stage: StageUsage) -> tuple[int, str, str]:
 
 def _load_attempt_usages(artifact_root: Path) -> list[AttemptUsage]:
     attempts: list[AttemptUsage] = []
-    for trajectory_path, stage_name, attempt_label in _discover_trajectories(
+    for trajectory_path, stage_name, attempt_label in discover_trajectories(
         artifact_root
     ):
         usage = _read_trajectory_usage(trajectory_path, stage=stage_name)
