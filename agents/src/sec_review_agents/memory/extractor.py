@@ -198,9 +198,7 @@ async def _generate_memory_observation(
     with tempfile.TemporaryDirectory(prefix="sec-review-memory-extractor-") as tempdir:
         staged_trajectory_root = Path(tempdir) / "trajectories"
         staged_trajectories = stage_trajectories(trajectories, staged_trajectory_root)
-        backend = create_memory_extractor_backend(
-            trajectory_root=staged_trajectory_root
-        )
+        backend = create_memory_extractor_backend()
         model = create_chat_model(
             agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
             deployment_override=deployment,
@@ -210,7 +208,8 @@ async def _generate_memory_observation(
                 model=model,
                 backend=backend,
                 user_prompt=build_extractor_prompt(staged_trajectories),
-                trajectory_paths=(extractor_trajectory_path,),
+                source_trajectory_root=staged_trajectory_root,
+                extractor_trajectory_path=extractor_trajectory_path,
             )
 
         observation_body = structured_result.observation_markdown.strip()

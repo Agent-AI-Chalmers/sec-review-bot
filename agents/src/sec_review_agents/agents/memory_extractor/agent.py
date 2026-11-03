@@ -31,9 +31,14 @@ async def run_memory_extractor_agent(
     model: BaseChatModel,
     backend: BackendProtocol,
     user_prompt: str,
-    trajectory_paths: tuple[Path, ...] = (),
+    source_trajectory_root: Path,
+    extractor_trajectory_path: Path | None = None,
 ) -> MemoryObservationOutput:
-    """Run the structured-output extractor with filesystem and skill access."""
+    """Read staged review trajectories and optionally record the extractor itself.
+
+    source_trajectory_root supplies evidence to the trajectory tools;
+    extractor_trajectory_path receives this invocation's own execution record.
+    """
     agent_middleware: list[AgentMiddleware[Any, Any, Any]] = [
         MissingStructuredResponseMiddleware(
             max_retries=missing_structured_response_max_retries(),
@@ -46,12 +51,16 @@ async def run_memory_extractor_agent(
     agent_middleware.append(create_filesystem_middleware(backend=backend))
     return await run_agent_runtime_graph(
         user_prompt=user_prompt,
-        trajectory_paths=trajectory_paths,
+        trajectory_paths=(
+            (extractor_trajectory_path,)
+            if extractor_trajectory_path is not None
+            else ()
+        ),
         model=model,
         agent_name=MEMORY_EXTRACTOR_AGENT_NAME,
         backend=backend,
         system_prompt=MEMORY_EXTRACTOR_SYSTEM_PROMPT,
-        tools=build_trajectory_tools(backend),
+        tools=build_trajectory_tools(source_trajectory_root),
         response_format=MemoryObservationOutput,
         middleware=agent_middleware,
     )

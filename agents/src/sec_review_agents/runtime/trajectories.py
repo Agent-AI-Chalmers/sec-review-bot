@@ -247,6 +247,7 @@ class TrajectoryWriter:
         self.path = self.paths[0]
         self._seq = 0
         self._seen_message_ids: set[str] = set()
+        self._system_contents: dict[str, str] = {}
         self._pending_messages: dict[str, tuple[Any, dict[str, Any]]] = {}
         self._object_message_ids: dict[int, tuple[Any, str]] = {}
         self._lock = Lock()
@@ -394,6 +395,23 @@ class TrajectoryWriter:
             for message in messages:
                 if isinstance(message, RemoveMessage):
                     continue
+                # Middleware rebuilds effective SystemMessage objects per call.
+                # Ignore unchanged instructions only within a known conversation;
+                # changed prompts and independent branches remain distinct evidence.
+                parents = context.get("parent_ids", [])
+                if _message_type(message) == "system" and len(parents) >= 2:
+                    branch = json.dumps(
+                        [
+                            context.get("agent", self.agent),
+                            context.get("source"),
+                            parents[:-1],
+                        ]
+                    )
+                    serialized = serialize_agent_message(message, message_id="system")
+                    content = json.dumps(serialized, sort_keys=True, ensure_ascii=False)
+                    if self._system_contents.get(branch) == content:
+                        continue
+                    self._system_contents[branch] = content
                 message_id = self._ensure_message_id(message)
                 if message_id in self._seen_message_ids:
                     continue

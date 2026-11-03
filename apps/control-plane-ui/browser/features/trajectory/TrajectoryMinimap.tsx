@@ -182,7 +182,7 @@ export function TrajectoryMinimap({
     hoveredIndex === null ? undefined : segments[hoveredIndex]?.message
   const currentMessage = segments[active]?.message
   const currentLabel = currentMessage
-    ? `${t(rolePresentation(currentMessage.role).key)} #${currentMessage.seq}: ${messagePreview(currentMessage)}`
+    ? `${t(rolePresentation(currentMessage.role).key)}: ${messagePreview(currentMessage)}`
     : undefined
 
   const indexAt = (clientY: number, rect: DOMRect): number => {
@@ -307,8 +307,7 @@ export function TrajectoryMinimap({
           style={{ top: `${ticks.start + hoveredIndex * ticks.gap}px` }}
         >
           <Text size="xs" fw={700}>
-            {t(rolePresentation(hoveredMessage.role).key)} · #
-            {hoveredMessage.seq}
+            {t(rolePresentation(hoveredMessage.role).key)}
           </Text>
           <Text size="xs" lineClamp={3} c="dimmed">
             {messagePreview(hoveredMessage)}

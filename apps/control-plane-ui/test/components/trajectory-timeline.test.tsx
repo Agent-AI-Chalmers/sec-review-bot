@@ -1,4 +1,6 @@
 import React from 'react'
+import { readFileSync } from 'node:fs'
+import { readTrajectoryJsonl } from '../../shared/trajectory-events.js'
 import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, test, vi } from 'vitest'
@@ -796,4 +798,23 @@ test('reverse navigation follows the resolved branch and hides unresolved links'
       container.querySelector('#trajectory-unresolved')! as HTMLElement
     ).queryByRole('button', { name: /back to call/i })
   ).not.toBeInTheDocument()
+})
+
+test('failed analysis displays tool errors and prompt references without raw function JSON', async () => {
+  const failed = readTrajectoryJsonl(
+    readFileSync('test/fixtures/trajectory-failed-analysis.jsonl', 'utf8')
+  )
+  const { container } = renderComponent(<TrajectoryTimeline events={failed} />)
+  expect(container.textContent).not.toContain('"type": "function_call"')
+  expect(screen.queryByText(/^#\d+$/)).not.toBeInTheDocument()
+  expect(
+    screen.getAllByRole('button', {
+      name: 'Unchanged system instructions — view earlier message'
+    })
+  ).toHaveLength(4)
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: 'Expand all' }))
+  expect(screen.getAllByText('Recorded arguments: {}')).toHaveLength(5)
+  expect(screen.getAllByText('error').length).toBeGreaterThanOrEqual(5)
+  expect(screen.getByText('/workspace/project/src')).toBeInTheDocument()
 })

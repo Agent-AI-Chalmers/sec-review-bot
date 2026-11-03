@@ -7,11 +7,9 @@ import pytest
 from deepagents.backends import CompositeBackend
 from langchain.agents.middleware.types import ModelRequest
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
+from langchain_core.messages import AIMessage
 
 from sec_review_agents.agents.analysis.agent import run_analysis_agent
-from sec_review_agents.agents.memory_extractor.backend import (
-    create_memory_extractor_backend,
-)
 from sec_review_agents.agents.memory_extractor.prompts import build_extractor_prompt
 from sec_review_agents.agents.memory_extractor.tools import (
     build_trajectory_tools,
@@ -146,8 +144,7 @@ def test_trajectory_tools_list_and_read_messages(tmp_path: Path) -> None:
         _trajectory_jsonl("initial claim", "verified conclusion"),
         encoding="utf-8",
     )
-    backend = create_memory_extractor_backend(trajectory_root=tmp_path)
-    list_messages, read_message = build_trajectory_tools(backend)
+    list_messages, read_message = build_trajectory_tools(tmp_path)
 
     listed = list_messages.invoke(
         {"file_path": "/trajectories/0001-analyzer-initial.jsonl"}
@@ -162,7 +159,7 @@ def test_trajectory_tools_list_and_read_messages(tmp_path: Path) -> None:
     assert listed["ok"] is True
     assert [item["seq"] for item in listed["messages"]] == [1, 2]
     assert listed["messages"][1]["preview"] == "verified conclusion"
-    assert message["message"]["content"] == "verified conclusion"
+    assert message["value"] == "verified conclusion"
 
 
 def test_list_trajectory_messages_rejects_partial_jsonl(
@@ -173,15 +170,14 @@ def test_list_trajectory_messages_rejects_partial_jsonl(
         _trajectory_jsonl("readable") + '{"seq":2,"event":"message"',
         encoding="utf-8",
     )
-    backend = create_memory_extractor_backend(trajectory_root=tmp_path)
-    list_messages, _ = build_trajectory_tools(backend)
+    list_messages, _ = build_trajectory_tools(tmp_path)
 
     result = list_messages.invoke(
         {"file_path": "/trajectories/0001-analyzer-initial.jsonl"}
     )
 
     assert result["ok"] is False
-    assert result["error"] == "Invalid transcript JSONL."
+    assert "transcript JSONL" in result["error"]
 
 
 def test_collect_review_memory_trajectories_uses_flat_published_files(
@@ -686,3 +682,297 @@ async def test_analysis_agent_leaves_memory_disabled_when_runtime_memory_is_miss
         )
 
     assert not any(isinstance(item, MemoryMiddleware) for item in captured_middleware)
+
+
+def test_trajectory_tools_page_large_messages_and_reuse_private_snapshot(
+    tmp_path, monkeypatch
+):
+    from sec_review_agents.agents.memory_extractor import tools
+
+    (tmp_path / "large.jsonl").write_text(
+        _trajectory_jsonl(*["x" * 40000 for _ in range(23)])
+    )
+    parse = Mock(wraps=tools.parse_trajectory_jsonl)
+    monkeypatch.setattr(tools, "parse_trajectory_jsonl", parse)
+    listing, reading = tools.build_trajectory_tools(tmp_path)
+    first = listing.invoke({"file_path": "/trajectories/large.jsonl"})
+    assert len(first["messages"]) == 20
+    assert first["next_offset"] == 20
+    second = listing.invoke(
+        {"file_path": "/trajectories/large.jsonl", "offset": first["next_offset"]}
+    )
+    assert [item["seq"] for item in second["messages"]] == [21, 22, 23]
+    assert second["next_offset"] is None
+    chunks = []
+    offset = 0
+    while True:
+        page = reading.invoke(
+            {
+                "file_path": "/trajectories/large.jsonl",
+                "seq": 1,
+                "offset": offset,
+                "limit": 8000,
+            }
+        )
+        assert len(page["value"]) <= 8000
+        assert page["complete"] is False
+        chunks.append(page["value"])
+        if page["next_offset"] is None:
+            break
+        offset = page["next_offset"]
+    assert "".join(chunks) == "x" * 40000
+    assert parse.call_count == 1
+    with pytest.raises(ValueError):
+        reading.invoke(
+            {"file_path": "/trajectories/large.jsonl", "seq": 1, "limit": 24001}
+        )
+
+
+def test_trajectory_tools_reject_symlink_escape_and_raw_filesystem_has_no_trajectory(
+    tmp_path, monkeypatch
+):
+    from sec_review_agents.agents.memory_extractor.backend import (
+        create_memory_extractor_backend,
+    )
+
+    private = tmp_path / "private"
+    private.mkdir()
+    external = tmp_path / "outside.jsonl"
+    external.write_text(_trajectory_jsonl("private evidence"))
+    (private / "escape.jsonl").symlink_to(external)
+    listing, _ = build_trajectory_tools(private)
+    assert listing.invoke({"file_path": "/trajectories/escape.jsonl"})["ok"] is False
+    monkeypatch.setenv("AGENT_SKILLS_ENABLED", "false")
+    backend = create_memory_extractor_backend()
+    from typing import TypedDict
+
+    from langgraph.graph import END, START, StateGraph
+
+    class State(TypedDict):
+        files: dict
+        result: str | None
+
+    graph = StateGraph(State)
+    graph.add_node(
+        "read",
+        lambda state: {"result": backend.read("/trajectories/outside.jsonl").error},
+    )
+    graph.add_edge(START, "read")
+    graph.add_edge("read", END)
+    raw = graph.compile().invoke({"files": {}, "result": ""})["result"]
+    assert raw is not None
+    assert "private evidence" not in raw
+    assert "Error" in raw or "not found" in raw.lower()
+
+
+def test_memory_reading_view_excludes_accounting_but_retains_review_evidence(tmp_path):
+    record = json.loads(_trajectory_jsonl("evidence"))
+    record["message"].update(
+        {
+            "response_metadata": {"model_name": "provider-private"},
+            "additional_kwargs": {
+                "reasoning_content": "reason",
+                "diff": "-old\n+new",
+                "provider_private": "omit",
+            },
+            "tool_calls": [
+                {"id": "call", "name": "inspect", "args": {"path": "/workspace/a"}}
+            ],
+        }
+    )
+    (tmp_path / "probe.jsonl").write_text(json.dumps(record) + "\n")
+    _, reading = build_trajectory_tools(tmp_path)
+    page = reading.invoke({"file_path": "/trajectories/probe.jsonl", "seq": 1})
+    assert page["value"] == "evidence"
+    assert "usage_metadata" not in page
+    assert "response_metadata" not in page
+    assert "provider_private" not in str(page)
+    reasoning = reading.invoke(
+        {"file_path": "/trajectories/probe.jsonl", "seq": 1, "part": "reasoning"}
+    )
+    assert reasoning["value"] == "reason"
+    diff = reading.invoke(
+        {"file_path": "/trajectories/probe.jsonl", "seq": 1, "part": "diff"}
+    )
+    assert diff["value"] == "-old\n+new"
+    call = reading.invoke(
+        {
+            "file_path": "/trajectories/probe.jsonl",
+            "seq": 1,
+            "part": "tool_calls",
+            "tool_call_id": "call",
+        }
+    )
+    assert call["value"]["args"] == {"path": "/workspace/a"}
+
+
+def test_memory_scratch_files_use_graph_state_without_writing_to_host(
+    tmp_path, monkeypatch
+):
+    from typing import TypedDict
+
+    from langgraph.graph import END, START, StateGraph
+
+    from sec_review_agents.agents.memory_extractor.backend import (
+        create_memory_extractor_backend,
+    )
+
+    monkeypatch.setenv("AGENT_SKILLS_ENABLED", "false")
+    backend = create_memory_extractor_backend()
+
+    class State(TypedDict):
+        files: dict
+        result: str
+
+    def write(state):
+        result = backend.write("/tmp/notes.md", "temporary notes")
+        assert result.error is None
+        return {}
+
+    def read(state):
+        result = backend.read("/tmp/notes.md")
+        assert result.error is None
+        return {"result": str(result)}
+
+    graph = StateGraph(State)
+    graph.add_node("write", write)
+    graph.add_node("read", read)
+    graph.add_edge(START, "write")
+    graph.add_edge("write", "read")
+    graph.add_edge("read", END)
+    result = graph.compile().invoke({"files": {}, "result": ""})
+    assert "/tmp/notes.md" in result["files"]
+    assert "temporary notes" in result["result"]
+
+
+@pytest.mark.parametrize("status", ["failed", "completed", None])
+def test_memory_index_exposes_execution_outcome_without_protocol_events(
+    tmp_path, status
+):
+    message = json.loads(_trajectory_jsonl("evidence"))
+    message["seq"] = 2
+    events = [{"seq": 1, "event": "model_calls_start"}, message]
+    if status is not None:
+        events.append({"seq": 3, "event": "model_calls_end", "status": status})
+    (tmp_path / "status.jsonl").write_text(
+        "\n".join(json.dumps(event) for event in events) + "\n"
+    )
+    listing, _ = build_trajectory_tools(tmp_path)
+    page = listing.invoke({"file_path": "/trajectories/status.jsonl"})
+    assert page["execution_status"] == (status or "unknown")
+    assert [message["seq"] for message in page["messages"]] == [2]
+
+
+def test_semantic_tool_read_keeps_arguments_whole_and_pages_selected_text(tmp_path):
+    record = json.loads(_trajectory_jsonl("Inspecting the file."))
+    record["message"]["tool_calls"] = [
+        {
+            "id": "edit",
+            "name": "write_file",
+            "args": {"path": "/workspace/a", "content": "abc" * 15000},
+        }
+    ]
+    (tmp_path / "semantic.jsonl").write_text(json.dumps(record) + "\n")
+    _, read = build_trajectory_tools(tmp_path)
+    request = {
+        "file_path": "/trajectories/semantic.jsonl",
+        "seq": 1,
+        "part": "tool_calls",
+        "tool_call_id": "edit",
+    }
+    oversized = read.invoke(request)
+    assert oversized["ok"] is False
+    assert "value" not in oversized
+    path = read.invoke({**request, "argument": "path"})
+    assert path["value"] == "/workspace/a"
+    assert path["complete"] is True
+    first = read.invoke({**request, "argument": "content", "limit": 1000})
+    second = read.invoke(
+        {
+            **request,
+            "argument": "content",
+            "offset": first["next_offset"],
+            "limit": 1000,
+        }
+    )
+    assert first["value"] == ("abc" * 15000)[:1000]
+    assert second["value"] == ("abc" * 15000)[1000:2000]
+    assert first["complete"] is False
+    assert read.invoke({**request, "tool_call_id": "missing"})["ok"] is False
+    assert read.invoke({**request, "part": "content"})["ok"] is False
+    assert (
+        read.invoke(
+            {
+                "file_path": "/trajectories/semantic.jsonl",
+                "seq": 1,
+                "part": "tool_result",
+            }
+        )["ok"]
+        is False
+    )
+
+
+def test_semantic_tool_result_read_preserves_failure_without_unrelated_fields(tmp_path):
+    record = json.loads(_trajectory_jsonl("Missing required file_path."))
+    record["message"].update(role="tool", tool_call_id="read", status="error")
+    (tmp_path / "result.jsonl").write_text(json.dumps(record) + "\n")
+    _, read = build_trajectory_tools(tmp_path)
+    page = read.invoke(
+        {"file_path": "/trajectories/result.jsonl", "seq": 1, "part": "tool_result"}
+    )
+    assert page["value"] == "Missing required file_path."
+    assert page["tool_call_id"] == "read"
+    assert page["status"] == "error"
+    assert "usage_metadata" not in page
+
+
+@pytest.mark.parametrize("block_format", ["standard", "summary", "thinking"])
+@pytest.mark.parametrize(
+    "reasoning", ["Check the caller after validation.", "推理 evidence. " * 3000]
+)
+def test_trajectory_reasoning_blocks_survive_persistence_and_pagination(
+    tmp_path: Path, block_format: str, reasoning: str
+) -> None:
+    """Evidence stored by the writer must remain reachable through semantic reads."""
+    from sec_review_agents.runtime.trajectories import TrajectoryWriter
+
+    block: dict[str, object]
+    if block_format == "standard":
+        block = {"type": "reasoning", "reasoning": reasoning}
+    elif block_format == "summary":
+        block = {
+            "type": "reasoning",
+            "summary": [{"type": "summary_text", "text": reasoning}],
+        }
+    else:
+        block = {"type": "thinking", "thinking": reasoning}
+    path = tmp_path / "reasoning.jsonl"
+    TrajectoryWriter((path,)).write_messages(
+        [AIMessage(content=[block, {"type": "text", "text": "Visible answer."}])]
+    )
+    _, read = build_trajectory_tools(tmp_path)
+    chunks = []
+    offset = 0
+    while True:
+        page = read.invoke(
+            {
+                "file_path": "/trajectories/reasoning.jsonl",
+                "seq": 1,
+                "part": "reasoning",
+                "offset": offset,
+            }
+        )
+        assert page["ok"] is True
+        assert page["total_chars"] == len(reasoning)
+        assert page["value"] == reasoning[offset : offset + 12000]
+        assert page["complete"] is (offset == 0 and len(reasoning) <= 12000)
+        chunks.append(page["value"])
+        if page["next_offset"] is None:
+            break
+        assert page["next_offset"] == offset + len(page["value"])
+        offset = page["next_offset"]
+    assert "".join(chunks) == reasoning
+    body = read.invoke(
+        {"file_path": "/trajectories/reasoning.jsonl", "seq": 1, "part": "content"}
+    )
+    assert body["value"] == "Visible answer."

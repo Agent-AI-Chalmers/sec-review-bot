@@ -27,10 +27,9 @@ from sec_review_agents.utils.files import (
 )
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
+# Stage execution
 
-#########################################################################
-# ====================== Stage Execution =================================
-#########################################################################
+
 async def run_analysis_stage(
     *,
     analyzer_artifacts_path: Path,
@@ -97,6 +96,9 @@ async def run_analysis_stage(
         return result
 
 
+# Preparation and cleanup
+
+
 def reset_analysis_artifacts(*, analyzer_artifacts_path: Path) -> None:
     remove_json_artifacts(analyzer_artifacts_path, ("analysis-result",))
     remove_trajectories((trajectory_path(analyzer_artifacts_path),))
@@ -107,12 +109,19 @@ def prepare_analysis_trajectory(
     analyzer_artifacts_path: Path,
     published_trajectory_path: Path | None,
 ) -> tuple[Path, ...]:
+    """Return local and optional published outputs for this analysis.
+
+    Remove any old published copy; the runtime writer initializes the returned files.
+    """
     local_trajectory_path = trajectory_path(analyzer_artifacts_path)
     if published_trajectory_path is None:
         return (local_trajectory_path,)
 
     published_trajectory_path.unlink(missing_ok=True)
     return (local_trajectory_path, published_trajectory_path)
+
+
+# Result persistence
 
 
 def persist_analysis_stage_result(
