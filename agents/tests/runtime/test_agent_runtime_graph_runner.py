@@ -20,7 +20,11 @@ def _stream(*updates: dict[str, Any], error: Exception | None = None):
     async def astream(*args: Any, **kwargs: Any):
         _ = args, kwargs
         for update in updates:
-            yield update
+            yield {
+                "event": "on_chain_stream",
+                "parent_ids": [],
+                "data": {"chunk": update},
+            }
         if error is not None:
             raise error
 
@@ -29,7 +33,7 @@ def _stream(*updates: dict[str, Any], error: Exception | None = None):
 
 def _successful_agent(*, messages: list[Any] | None = None) -> Mock:
     agent = Mock()
-    agent.astream = Mock(
+    agent.astream_events = Mock(
         side_effect=_stream(
             {
                 "model": {
@@ -68,7 +72,6 @@ async def test_invoke_returns_structured_response_after_success(
             response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
-            system_prompt="",
             user_prompt="prompt",
             config={"metadata": {"scope": "unit"}},
             trajectory_paths=(trajectory_path,),
@@ -76,14 +79,14 @@ async def test_invoke_returns_structured_response_after_success(
         trajectory_messages = read_trajectory_messages(trajectory_path)
 
     assert result == ProbeOutput(status="ok")
-    invoke_config = agent.astream.call_args.kwargs["config"]
+    invoke_config = agent.astream_events.call_args.kwargs["config"]
     assert invoke_config["metadata"] == {
         "scope": "unit",
         "sec_review_agent": "test-agent",
     }
     assert invoke_config["recursion_limit"] == 3
-    assert [item["type"] for item in trajectory_messages] == ["system", "human"]
-    assert trajectory_messages[0]["type"] == "system"
+    assert [item["role"] for item in trajectory_messages] == ["user"]
+    assert trajectory_messages[0]["role"] == "user"
 
 
 @pytest.mark.asyncio
@@ -125,7 +128,6 @@ async def test_trajectory_callback_does_not_mark_langfuse_tracing_enabled(
             response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
-            system_prompt="",
             user_prompt="prompt",
             trajectory_paths=(trajectory_path,),
         )
@@ -133,8 +135,8 @@ async def test_trajectory_callback_does_not_mark_langfuse_tracing_enabled(
 
     started_mock.assert_called_once()
     assert not started_mock.call_args.kwargs["tracing_enabled"]
-    assert "callbacks" not in agent.astream.call_args.kwargs["config"]
-    assert trajectory_messages[0]["type"] == "system"
+    assert "callbacks" not in agent.astream_events.call_args.kwargs["config"]
+    assert trajectory_messages[0]["role"] == "user"
     flush.assert_called_once_with()
 
 
@@ -178,13 +180,12 @@ async def test_trajectory_export_preserves_callback_manager(
             response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
-            system_prompt="",
             user_prompt="prompt",
             config={"callbacks": callback_manager},
             trajectory_paths=(tmp_path / "trajectory.jsonl",),
         )
 
-    invoke_callbacks = agent.astream.call_args.kwargs["config"]["callbacks"]
+    invoke_callbacks = agent.astream_events.call_args.kwargs["config"]["callbacks"]
     assert isinstance(invoke_callbacks, CallbackManager)
     assert caller_handler in invoke_callbacks.handlers
     assert invoke_callbacks.handlers == [caller_handler]
@@ -194,7 +195,7 @@ async def test_trajectory_export_preserves_callback_manager(
 async def test_invoke_uses_async_agent_stream() -> None:
     astream_calls: list[dict] = []
 
-    async def astream(payload, *, config=None, stream_mode=None):
+    async def astream(payload, *, config=None, stream_mode=None, version=None):
         astream_calls.append(
             {
                 "payload": payload,
@@ -202,10 +203,16 @@ async def test_invoke_uses_async_agent_stream() -> None:
                 "stream_mode": stream_mode,
             }
         )
-        yield {"model": {"structured_response": ProbeOutput(status="ok")}}
+        yield {
+            "event": "on_chain_stream",
+            "parent_ids": [],
+            "data": {
+                "chunk": {"model": {"structured_response": ProbeOutput(status="ok")}}
+            },
+        }
 
     agent = Mock()
-    agent.astream = astream
+    agent.astream_events = astream
 
     with (
         patch(
@@ -227,7 +234,6 @@ async def test_invoke_uses_async_agent_stream() -> None:
             response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
-            system_prompt="",
             user_prompt="prompt",
         )
 
@@ -261,18 +267,17 @@ async def test_invoke_uses_async_agent_without_sync_wrapper() -> None:
             response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
-            system_prompt="",
             user_prompt="prompt",
         )
 
     assert result == ProbeOutput(status="ok")
-    agent.astream.assert_called_once()
+    agent.astream_events.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_invoke_logs_failure_and_reraises() -> None:
     agent = Mock()
-    agent.astream = Mock(side_effect=_stream(error=RuntimeError("boom")))
+    agent.astream_events = Mock(side_effect=_stream(error=RuntimeError("boom")))
 
     with (
         patch(
@@ -295,7 +300,6 @@ async def test_invoke_logs_failure_and_reraises() -> None:
             response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
-            system_prompt="",
             user_prompt="prompt",
         )
 
@@ -307,7 +311,7 @@ async def test_stream_failure_preserves_completed_message_updates(
     tmp_path: Path,
 ) -> None:
     agent = Mock()
-    agent.astream = Mock(
+    agent.astream_events = Mock(
         side_effect=_stream(
             {
                 "model": {
@@ -330,14 +334,12 @@ async def test_stream_failure_preserves_completed_message_updates(
             response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
-            system_prompt="system",
             user_prompt="prompt",
             trajectory_paths=(trajectory_path,),
         )
 
     messages = read_trajectory_messages(trajectory_path)
     assert [message["content"] for message in messages] == [
-        "system",
         "prompt",
         "Evidence collected before failure.",
     ]
@@ -346,7 +348,7 @@ async def test_stream_failure_preserves_completed_message_updates(
 @pytest.mark.asyncio
 async def test_missing_structured_response_raises() -> None:
     agent = Mock()
-    agent.astream = Mock(
+    agent.astream_events = Mock(
         side_effect=_stream(
             {"model": {"messages": [{"role": "assistant", "content": "prose"}]}}
         )
@@ -373,11 +375,10 @@ async def test_missing_structured_response_raises() -> None:
             response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
-            system_prompt="",
             user_prompt="prompt",
         )
 
-    assert agent.astream.call_count == 1
+    assert agent.astream_events.call_count == 1
     failed_mock.assert_called_once()
 
 
@@ -422,17 +423,16 @@ async def test_trajectory_messages_cover_message_dump_fields(
             response_format=ProbeOutput,
             agent=agent,
             agent_name="test-agent",
-            system_prompt="",
             user_prompt="prompt",
             trajectory_paths=(trajectory_path,),
         )
         messages = read_trajectory_messages(trajectory_path)
 
-    ai_messages = [item for item in messages if item["type"] == "ai"]
+    ai_messages = [item for item in messages if item["role"] == "assistant"]
     assert len(ai_messages) == 1
     message = ai_messages[0]
     assert set(message) == {
-        "type",
+        "role",
         "id",
         "name",
         "content",
@@ -464,14 +464,13 @@ async def test_model_response_is_preserved_without_serialization() -> None:
         }
     )
     agent = _successful_agent()
-    agent.astream = Mock(
+    agent.astream_events = Mock(
         side_effect=_stream({"model": {"structured_response": output}})
     )
     result = await invoke_agent_runtime_graph(
         agent=agent,
         response_format=DiscoveryOutput,
         agent_name="model-probe",
-        system_prompt="",
         user_prompt="probe",
     )
     assert result is output
@@ -483,7 +482,7 @@ async def test_model_consumer_rejects_unvalidated_dictionary() -> None:
     from sec_review_agents.agents.discovery.model import DiscoveryOutput
 
     agent = _successful_agent()
-    agent.astream = Mock(
+    agent.astream_events = Mock(
         side_effect=_stream({"model": {"structured_response": {"candidates": []}}})
     )
     with pytest.raises(TypeError, match="Expected DiscoveryOutput"):
@@ -491,6 +490,5 @@ async def test_model_consumer_rejects_unvalidated_dictionary() -> None:
             agent=agent,
             response_format=DiscoveryOutput,
             agent_name="model-probe",
-            system_prompt="",
             user_prompt="probe",
         )

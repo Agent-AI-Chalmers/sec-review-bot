@@ -16,6 +16,10 @@ class StageUsage:
     reasoning_tokens: int
     ai_message_count: int
     ai_messages_with_usage_count: int
+    model_call_count: int = 0
+    model_calls_with_usage_count: int = 0
+    usage_source: str = "trajectory"
+    usage_complete: bool = False
 
     @property
     def uncached_input_tokens(self) -> int:
@@ -48,6 +52,10 @@ class UsageTotals:
     reasoning_tokens: int
     ai_message_count: int
     ai_messages_with_usage_count: int
+    model_call_count: int = 0
+    model_calls_with_usage_count: int = 0
+    usage_source: str = "trajectory"
+    usage_complete: bool = False
 
     @property
     def uncached_input_tokens(self) -> int:
@@ -72,6 +80,16 @@ def aggregate_stage_usages(stages: Iterable[StageUsage]) -> UsageTotals:
         cache_read_tokens=sum(item.cache_read_tokens for item in items),
         cache_creation_tokens=sum(item.cache_creation_tokens for item in items),
         reasoning_tokens=sum(item.reasoning_tokens for item in items),
+        model_call_count=sum(item.model_call_count for item in items),
+        model_calls_with_usage_count=sum(
+            item.model_calls_with_usage_count for item in items
+        ),
+        usage_source=(
+            items[0].usage_source
+            if items and len({item.usage_source for item in items}) == 1
+            else "mixed"
+        ),
+        usage_complete=bool(items) and all(item.usage_complete for item in items),
         ai_message_count=sum(item.ai_message_count for item in items),
         ai_messages_with_usage_count=sum(
             item.ai_messages_with_usage_count for item in items

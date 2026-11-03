@@ -1,0 +1,2 @@
+{"seq":1,"event":"model_calls_start"}
+{"seq":2,"event":"model_call_end","call_id":"c1","message_id":"m1"}

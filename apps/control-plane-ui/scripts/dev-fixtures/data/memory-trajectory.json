@@ -4,25 +4,24 @@
       "seq": 1,
       "event": "message",
       "message": {
-        "type": "system",
         "id": "fixture-system",
-        "content": "Maintain concise, evidence-backed review memory."
+        "content": "Maintain concise, evidence-backed review memory.",
+        "role": "system"
       }
     },
     {
       "seq": 2,
       "event": "message",
       "message": {
-        "type": "human",
         "id": "fixture-human",
-        "content": "Update the memory from the supplied review evidence."
+        "content": "Update the memory from the supplied review evidence.",
+        "role": "user"
       }
     },
     {
       "seq": 3,
       "event": "message",
       "message": {
-        "type": "ai",
         "id": "fixture-assistant",
         "content": [
           {
@@ -47,18 +46,19 @@
           "input_tokens": 384,
           "output_tokens": 72,
           "total_tokens": 456
-        }
+        },
+        "role": "assistant"
       }
     },
     {
       "seq": 4,
       "event": "message",
       "message": {
-        "type": "tool",
         "id": "fixture-tool-result",
         "tool_call_id": "fixture-read-memory",
         "name": "read_memory_file",
-        "content": "# Review memory\n\nGround conclusions in current repository evidence."
+        "content": "# Review memory\n\nGround conclusions in current repository evidence.",
+        "role": "tool"
       }
     }
   ]

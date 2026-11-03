@@ -1,10 +1,11 @@
-import json
 import posixpath
 from typing import Any
 
 from deepagents.backends.protocol import BackendProtocol
 from langchain_core.tools import StructuredTool
 from pydantic import BaseModel, Field
+
+from sec_review_agents.runtime.trajectories import parse_trajectory_jsonl
 
 
 class ListTrajectoryMessagesArgs(BaseModel):
@@ -58,25 +59,11 @@ def _read_events(
     if downloaded.error is not None or downloaded.content is None:
         return [], [], downloaded.error or "Trajectory has no readable content."
 
-    events: list[dict[str, Any]] = []
-    parse_errors: list[dict[str, Any]] = []
-    for line_number, line in enumerate(
-        downloaded.content.decode("utf-8").splitlines(), start=1
-    ):
-        if not line.strip():
-            continue
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError as error:
-            parse_errors.append({"line": line_number, "error": error.msg})
-            continue
-        if not isinstance(event, dict):
-            parse_errors.append(
-                {"line": line_number, "error": "event is not an object"}
-            )
-            continue
-        events.append(event)
-    return events, parse_errors, None
+    try:
+        events = parse_trajectory_jsonl(downloaded.content.decode("utf-8"))
+    except ValueError:
+        return [], [], "Invalid transcript JSONL."
+    return events, [], None
 
 
 def build_trajectory_tools(backend: BackendProtocol) -> list[StructuredTool]:
@@ -107,7 +94,13 @@ def build_trajectory_tools(backend: BackendProtocol) -> list[StructuredTool]:
             messages.append(
                 {
                     "seq": event.get("seq"),
-                    "type": message.get("type"),
+                    "id": message.get("id"),
+                    "call_id": event.get("call_id"),
+                    "run_id": event.get("run_id"),
+                    "parent_ids": event.get("parent_ids", []),
+                    "agent": event.get("agent"),
+                    "source": event.get("source"),
+                    "role": message["role"],
                     "name": message.get("name"),
                     "preview": _content_preview(message.get("content")),
                     "tool_calls": [
@@ -117,9 +110,6 @@ def build_trajectory_tools(backend: BackendProtocol) -> list[StructuredTool]:
                     ],
                     "tool_call_id": message.get("tool_call_id"),
                     "tool_status": message.get("status"),
-                    "lc_source": (message.get("additional_kwargs") or {}).get(
-                        "lc_source"
-                    ),
                 }
             )
         return {"ok": True, "messages": messages, "parse_errors": parse_errors}
@@ -140,6 +130,11 @@ def build_trajectory_tools(backend: BackendProtocol) -> list[StructuredTool]:
                     "ok": True,
                     "seq": seq,
                     "message": event["message"],
+                    "call_id": event.get("call_id"),
+                    "run_id": event.get("run_id"),
+                    "parent_ids": event.get("parent_ids", []),
+                    "agent": event.get("agent"),
+                    "source": event.get("source"),
                     "parse_errors": parse_errors,
                 }
         return {

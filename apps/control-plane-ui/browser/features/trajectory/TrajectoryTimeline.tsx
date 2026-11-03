@@ -14,7 +14,7 @@ import { IconSearch } from '@tabler/icons-react'
 import { useMessages } from '../../shared/i18n.js'
 import { BREAKPOINTS, ICON_SIZE } from '../../shared/design.js'
 import {
-  normalizeTrajectory,
+  buildTrajectoryDocument,
   type TrajectoryEvent,
   type TrajectoryRole
 } from './trajectory-model.js'
@@ -43,7 +43,10 @@ export function TrajectoryTimeline({
       getInitialValueInEffect: false
     }
   )
-  const document = React.useMemo(() => normalizeTrajectory(events), [events])
+  const document = React.useMemo(
+    () => buildTrajectoryDocument(events),
+    [events]
+  )
   const [query, setQuery] = React.useState('')
   const [roles, setRoles] = React.useState<TrajectoryRole[]>(TRAJECTORY_ROLES)
   const [force, setForce] = React.useState(0)

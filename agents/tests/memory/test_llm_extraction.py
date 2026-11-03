@@ -41,8 +41,8 @@ class ExtractorSafetyCase(BaseModel):
 class TrajectoryMessage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["system", "human", "ai", "tool"]
-    id: str | None
+    role: Literal["system", "user", "assistant", "tool"]
+    id: str
     name: str | None
     content: str | list[dict[str, Any]]
     additional_kwargs: dict[str, Any]
@@ -120,7 +120,7 @@ def test_extractor_safety_fixtures_are_valid() -> None:
             assert [event.seq for event in events] == list(range(1, len(events) + 1))
             messages = [event.message for event in events]
             assert messages, f"empty trajectory fixture: {trajectory}"
-            assert messages[0].type == "system"
+            assert messages[0].role == "system"
             if case.id in CURRENT_WRITER_FIXTURE_CASES:
                 tool_call_ids = {
                     call["id"]
@@ -133,7 +133,7 @@ def test_extractor_safety_fixtures_are_valid() -> None:
                         message,
                         message_id=message["id"],
                     )
-                    if message["type"] == "tool":
+                    if message["role"] == "tool":
                         assert message["tool_call_id"] in tool_call_ids
         if case.expect_observation:
             assert case.required_terms

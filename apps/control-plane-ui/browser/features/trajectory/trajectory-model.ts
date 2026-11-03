@@ -1,13 +1,15 @@
+import type {
+  TrajectoryEvent,
+  TrajectoryMessageEvent
+} from '../../../shared/trajectory-events.js'
+
 export type TrajectoryRole =
   'system' | 'human' | 'assistant' | 'tool' | 'unknown'
 
-export interface TrajectoryEvent {
-  seq: number
-  event: 'message'
-  message: Record<string, unknown>
-}
+export type { TrajectoryEvent } from '../../../shared/trajectory-events.js'
 
 export interface ToolCallView {
+  anchorId: string
   id: string
   name: string
   args: Record<string, unknown>
@@ -31,11 +33,15 @@ export interface TrajectoryMessageView {
   seq: number
   role: TrajectoryRole
   name: string | undefined
+  agent?: string | undefined
+  source?: string | undefined
+  parentIds?: string[] | undefined
   modelProvider: string | undefined
   modelName: string | undefined
   content: string
   reasoning: string
   toolCalls: ToolCallView[]
+  requestAnchorId?: string
   toolCallId: string | undefined
   status: string | undefined
   artifact: unknown
@@ -60,16 +66,11 @@ function number(value: unknown): number | undefined {
   return typeof value === 'number' && Number.isFinite(value) ? value : undefined
 }
 
-function positiveNumber(value: unknown): number | undefined {
-  const parsed = number(value)
-  return parsed !== undefined && parsed > 0 ? parsed : undefined
-}
-
 function role(value: unknown): TrajectoryRole {
   const kind = typeof value === 'string' ? value.toLowerCase() : ''
   if (kind === 'system') return 'system'
-  if (kind === 'human' || kind === 'user') return 'human'
-  if (kind === 'ai' || kind === 'assistant') return 'assistant'
+  if (kind === 'user') return 'human'
+  if (kind === 'assistant') return 'assistant'
   if (kind === 'tool') return 'tool'
   return 'unknown'
 }
@@ -108,44 +109,20 @@ function contentParts(value: unknown): { content: string; reasoning: string } {
 }
 
 function usage(message: Record<string, unknown>): UsageView | undefined {
-  const direct = record(message.usage_metadata)
-  const responseMetadata = record(message.response_metadata)
-  const fallback =
-    record(responseMetadata?.usage) ?? record(responseMetadata?.token_usage)
-  const source = direct ?? fallback
+  const source = record(message.usage_metadata)
   if (!source) return undefined
-  const inputDetails =
-    record(source.input_token_details) ?? record(source.prompt_tokens_details)
-  const outputDetails =
-    record(source.output_token_details) ??
-    record(source.completion_tokens_details)
-  const cacheRead =
-    positiveNumber(inputDetails?.cache_read) ??
-    positiveNumber(inputDetails?.cached_tokens) ??
-    positiveNumber(source.cache_read_input_tokens)
-  const cacheCreation =
-    positiveNumber(inputDetails?.cache_creation) ??
-    positiveNumber(source.cache_creation_input_tokens)
-  const promptTokens = number(source.prompt_tokens)
-  const ordinaryInput = number(source.input_tokens)
-  // LangChain usage metadata and OpenAI prompt totals are already inclusive.
-  // Raw Anthropic response metadata reports ordinary and cache input separately.
-  const input =
-    promptTokens ??
-    (direct === undefined && inputDetails === undefined
-      ? ordinaryInput === undefined
-        ? undefined
-        : ordinaryInput + (cacheRead ?? 0) + (cacheCreation ?? 0)
-      : ordinaryInput)
+  const inputDetails = record(source.input_token_details)
+  const outputDetails = record(source.output_token_details)
+  const cacheRead = number(inputDetails?.cache_read)
+  const cacheCreation = number(inputDetails?.cache_creation)
+  const input = number(source.input_tokens)
   const result: UsageView = {
     input,
-    output: number(source.output_tokens) ?? number(source.completion_tokens),
+    output: number(source.output_tokens),
     cacheRead,
     cacheCreation,
     total: number(source.total_tokens),
-    reasoning:
-      number(outputDetails?.reasoning) ??
-      number(outputDetails?.reasoning_tokens)
+    reasoning: number(outputDetails?.reasoning)
   }
   if (
     result.total === undefined &&
@@ -158,7 +135,10 @@ function usage(message: Record<string, unknown>): UsageView | undefined {
     : undefined
 }
 
-function toolCalls(message: Record<string, unknown>): ToolCallView[] {
+function toolCalls(
+  message: Record<string, unknown>,
+  seq: number
+): ToolCallView[] {
   if (!Array.isArray(message.tool_calls)) return []
   return message.tool_calls.flatMap((value, index) => {
     const call = record(value)
@@ -166,6 +146,7 @@ function toolCalls(message: Record<string, unknown>): ToolCallView[] {
     const args = record(call.args) ?? record(call.input) ?? {}
     return [
       {
+        anchorId: `trajectory-call-${seq}-${index}`,
         id:
           typeof call.id === 'string' && call.id
             ? call.id
@@ -183,106 +164,125 @@ function toolCalls(message: Record<string, unknown>): ToolCallView[] {
   })
 }
 
-export function normalizeTrajectory(
-  events: TrajectoryEvent[]
-): TrajectoryDocument {
-  const messages = events.map((event) => {
-    const raw = event.message
-    const blocks = contentParts(raw.content)
-    const kwargs = record(raw.additional_kwargs)
-    const additionalReasoning =
-      typeof kwargs?.reasoning_content === 'string'
-        ? kwargs.reasoning_content
-        : ''
-    const messageRole = role(raw.type)
-    const responseMetadata = record(raw.response_metadata)
-    const id =
-      typeof raw.id === 'string' && raw.id ? raw.id : `message-${event.seq}`
-    const view: TrajectoryMessageView = {
-      id,
-      seq: event.seq,
-      role: messageRole,
-      name: typeof raw.name === 'string' && raw.name ? raw.name : undefined,
-      modelProvider:
-        typeof responseMetadata?.model_provider === 'string' &&
-        responseMetadata.model_provider
-          ? responseMetadata.model_provider
-          : undefined,
-      modelName:
-        typeof responseMetadata?.model_name === 'string' &&
-        responseMetadata.model_name
-          ? responseMetadata.model_name
-          : undefined,
-      content: blocks.content,
-      reasoning: [additionalReasoning, blocks.reasoning]
-        .filter(Boolean)
-        .join('\n\n'),
-      toolCalls: toolCalls(raw),
-      toolCallId:
-        typeof raw.tool_call_id === 'string' ? raw.tool_call_id : undefined,
-      status: typeof raw.status === 'string' ? raw.status : undefined,
-      artifact: raw.artifact,
-      diff:
-        typeof kwargs?.diff === 'string' && kwargs.diff
-          ? kwargs.diff
-          : undefined,
-      diffTruncated: kwargs?.diff_truncated === true ? true : undefined,
-      usage: usage(raw),
-      searchable: ''
-    }
-    view.searchable = [
-      view.role,
-      // The header hides a name on assistant turns, so search must not surface
-      // them either; tool messages keep their tool name.
-      view.role === 'assistant' ? '' : view.name,
-      view.modelProvider ?? '',
-      view.modelName ?? '',
-      view.content,
-      view.reasoning,
-      ...view.toolCalls.flatMap((call) => [
-        call.name,
-        JSON.stringify(call.args)
-      ]),
-      view.artifact === undefined ? '' : JSON.stringify(view.artifact)
-    ]
+function projectMessage(event: TrajectoryMessageEvent): TrajectoryMessageView {
+  const raw = event.message
+  const blocks = contentParts(raw.content)
+  const kwargs = record(raw.additional_kwargs)
+  const additionalReasoning =
+    typeof kwargs?.reasoning_content === 'string'
+      ? kwargs.reasoning_content
+      : ''
+  const messageRole = role(raw.role)
+  const responseMetadata = record(raw.response_metadata)
+  const id =
+    typeof raw.id === 'string' && raw.id ? raw.id : `message-${event.seq}`
+  const view: TrajectoryMessageView = {
+    id,
+    seq: event.seq,
+    role: messageRole,
+    agent: event.agent ?? undefined,
+    source: event.source ?? undefined,
+    parentIds: event.parent_ids,
+    name: typeof raw.name === 'string' && raw.name ? raw.name : undefined,
+    modelProvider:
+      typeof responseMetadata?.model_provider === 'string' &&
+      responseMetadata.model_provider
+        ? responseMetadata.model_provider
+        : undefined,
+    modelName:
+      typeof responseMetadata?.model_name === 'string' &&
+      responseMetadata.model_name
+        ? responseMetadata.model_name
+        : undefined,
+    content: blocks.content,
+    reasoning: [additionalReasoning, blocks.reasoning]
       .filter(Boolean)
-      .join('\n')
-      .toLowerCase()
-    return view
-  })
-
-  // A direct LangGraph message-array export may omit `tool_call_id` from tool results
-  // while retaining the canonical ordering: one assistant message with N calls followed
-  // immediately by N results. Recover only that exact, unambiguous shape; partial or
-  // interleaved result runs remain deliberately unlinked.
-  for (let index = 0; index < messages.length; index += 1) {
-    const calls = messages[index]?.toolCalls ?? []
-    if (calls.length === 0) continue
-    const results = messages.slice(index + 1, index + 1 + calls.length)
-    if (
-      results.length !== calls.length ||
-      results.some(
-        (message) => message.role !== 'tool' || message.toolCallId !== undefined
-      )
-    )
-      continue
-    const following = messages[index + 1 + calls.length]
-    if (following?.role === 'tool' && following.toolCallId === undefined)
-      continue
-    results.forEach((message, resultIndex) => {
-      message.toolCallId = calls[resultIndex]?.id
-    })
+      .join('\n\n'),
+    toolCalls: toolCalls(raw, event.seq),
+    toolCallId:
+      typeof raw.tool_call_id === 'string' ? raw.tool_call_id : undefined,
+    status: typeof raw.status === 'string' ? raw.status : undefined,
+    artifact: raw.artifact,
+    diff:
+      typeof kwargs?.diff === 'string' && kwargs.diff ? kwargs.diff : undefined,
+    diffTruncated: kwargs?.diff_truncated === true ? true : undefined,
+    usage: usage(raw),
+    searchable: ''
   }
+  view.searchable = [
+    view.role,
+    view.agent ?? '',
+    view.source ?? '',
+    // The header hides a name on assistant turns, so search must not surface
+    // them either; tool messages keep their tool name.
+    view.role === 'assistant' ? '' : view.name,
+    view.modelProvider ?? '',
+    view.modelName ?? '',
+    view.content,
+    view.reasoning,
+    ...view.toolCalls.flatMap((call) => [call.name, JSON.stringify(call.args)]),
+    view.artifact === undefined ? '' : JSON.stringify(view.artifact)
+  ]
+    .filter(Boolean)
+    .join('\n')
+    .toLowerCase()
+  return view
+}
 
-  const results = new Map(
-    messages.flatMap((message) =>
-      message.toolCallId ? [[message.toolCallId, message] as const] : []
-    )
-  )
+function linkToolResults(messages: TrajectoryMessageView[]): void {
+  const results = messages.filter((message) => message.toolCallId)
+  const proposed = new Map<ToolCallView, TrajectoryMessageView>()
+  const resultRequests = new Map<string, number>()
   for (const message of messages) {
     for (const call of message.toolCalls) {
-      const result = results.get(call.id)
+      // Tool IDs may repeat in parallel subagents; select the closest execution branch.
+      const candidates = results.filter((result) => {
+        if (result.toolCallId !== call.id || result.seq <= message.seq)
+          return false
+        if (message.agent && result.agent && message.agent !== result.agent)
+          return false
+        // The last parent is the model/tools node, which differs within one
+        // conversation. Earlier parents identify the owning execution branch.
+        const left = message.parentIds?.slice(0, -1)
+        const right = result.parentIds?.slice(0, -1)
+        if (left?.length && right?.length)
+          return (
+            left.length === right.length &&
+            left.every((parent, index) => parent === right[index])
+          )
+        return true
+      })
+      const scored = candidates
+        .map((result) => {
+          const left = message.parentIds ?? []
+          const right = result.parentIds ?? []
+          let common = 0
+          while (common < left.length && left[common] === right[common])
+            common += 1
+          return { result, common }
+        })
+        .sort((a, b) => b.common - a.common)
+      const result =
+        scored.length === 1 ||
+        (scored.length > 1 && scored[0]!.common > scored[1]!.common)
+          ? scored[0]?.result
+          : undefined
+      if (result) {
+        proposed.set(call, result)
+        resultRequests.set(result.id, (resultRequests.get(result.id) ?? 0) + 1)
+      }
+    }
+  }
+  for (const message of messages) {
+    for (const call of message.toolCalls) {
+      const candidate = proposed.get(call)
+      // A unique result candidate can still be ambiguous on the request side.
+      const result =
+        candidate && resultRequests.get(candidate.id) === 1
+          ? candidate
+          : undefined
       call.resultMessageId = result?.id
+      if (result) result.requestAnchorId = call.anchorId
       // The tool reports the diff on its result message; the call renders it.
       if (result?.diff) {
         call.diff = result.diff
@@ -292,6 +292,12 @@ export function normalizeTrajectory(
       }
     }
   }
+}
+
+function totalRecordedUsage(
+  events: TrajectoryEvent[],
+  messages: TrajectoryMessageView[]
+): UsageView {
   const totalUsage: UsageView = {
     input: undefined,
     output: undefined,
@@ -300,7 +306,26 @@ export function normalizeTrajectory(
     reasoning: undefined,
     total: undefined
   }
+  const hasCallRecords = events.some(
+    (event) => event.event === 'model_calls_start'
+  )
+  const responses = new Map<string, string[]>()
+  const selected = new Map<string, string>()
+  for (const event of events) {
+    if (event.event === 'model_call_start') responses.set(event.call_id!, [])
+    else if (event.event === 'message' && event.call_id)
+      responses.get(event.call_id)?.push(event.message.id as string)
+    else if (event.event === 'model_call_end')
+      selected.set(event.call_id!, event.message_id!)
+  }
+  // Keep known usage for interrupted calls only when their response is unambiguous.
+  for (const [callId, ids] of responses) {
+    if (!selected.has(callId) && ids.length === 1) selected.set(callId, ids[0]!)
+  }
+  const responseIds = new Set(selected.values())
+  // Viewer totals project recorded usage; accounting reports own coverage assessment.
   for (const message of messages) {
+    if (hasCallRecords && !responseIds.has(message.id)) continue
     for (const key of [
       'input',
       'output',
@@ -313,5 +338,17 @@ export function normalizeTrajectory(
       if (value !== undefined) totalUsage[key] = (totalUsage[key] ?? 0) + value
     }
   }
-  return { messages, totalUsage }
+  return totalUsage
+}
+
+export function buildTrajectoryDocument(
+  events: TrajectoryEvent[]
+): TrajectoryDocument {
+  const messages = events
+    .filter(
+      (event): event is TrajectoryMessageEvent => event.event === 'message'
+    )
+    .map(projectMessage)
+  linkToolResults(messages)
+  return { messages, totalUsage: totalRecordedUsage(events, messages) }
 }

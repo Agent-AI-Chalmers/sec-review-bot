@@ -1,7 +1,8 @@
-import json
 import sys
 from pathlib import Path
 from typing import Any
+
+from sec_review_agents.runtime.trajectories import read_trajectory_events
 
 from .models import AttemptUsage, RunUsage, StageUsage
 from .normalization import (
@@ -184,27 +185,147 @@ def _fallback_model_id(messages: list[dict[str, Any]]) -> str | None:
     return None
 
 
+def _transcript_usage_records(messages: list[dict[str, Any]]):
+    records: list[tuple[dict[str, int], str | None]] = []
+    for message in messages:
+        metadata = message.get("usage_metadata")
+        if isinstance(metadata, dict):
+            usage = usage_from_langchain_metadata(metadata)
+            if usage is not None:
+                records.append((usage, _model_id_from_value(message)))
+    return records
+
+
+def _model_call_usage(events: list[dict[str, Any]], path: Path):
+    """Count responses attributed to the recorded model calls."""
+    starts: set[str] = set()
+    ends: set[str] = set()
+    records: list[tuple[dict[str, int], str | None]] = []
+    messages: dict[str, dict[str, Any]] = {}
+    used_messages: set[str] = set()
+    opened = False
+    closed = False
+    completed = False
+    full_usage = True
+    for event in events:
+        kind = event.get("event")
+        if closed:
+            raise ValueError(f"Events after model accounting ended: {path}")
+        if kind == "message":
+            message = event.get("message")
+            if isinstance(message, dict):
+                message_id = message.get("id")
+                if (
+                    not isinstance(message_id, str)
+                    or not message_id
+                    or message_id in messages
+                ):
+                    raise ValueError(f"Invalid or duplicate message ID: {path}")
+                messages[message_id] = event
+            continue
+        if kind not in {
+            "model_calls_start",
+            "model_calls_end",
+            "model_call_start",
+            "model_call_end",
+        }:
+            continue
+        if kind == "model_calls_start":
+            if opened:
+                raise ValueError(f"Invalid model accounting header: {path}")
+            opened = True
+            continue
+        if not opened:
+            raise ValueError(f"Missing model accounting header: {path}")
+        if kind == "model_calls_end":
+            closed = True
+            completed = event.get("status") == "completed"
+            continue
+        call_id = event.get("call_id")
+        if not isinstance(call_id, str) or not call_id:
+            raise ValueError(f"Missing model call ID: {path}")
+        if kind == "model_call_start":
+            if call_id in starts:
+                raise ValueError(f"Duplicate model call start: {path}")
+            starts.add(call_id)
+        else:
+            if call_id not in starts or call_id in ends:
+                raise ValueError(f"Unmatched or duplicate model call end: {path}")
+            ends.add(call_id)
+            message_id = event.get("message_id")
+            record = messages.get(message_id) if isinstance(message_id, str) else None
+            if (
+                record is None
+                or record.get("call_id") != call_id
+                or message_id in used_messages
+            ):
+                raise ValueError(f"Missing or inconsistent model response: {path}")
+            used_messages.add(message_id)
+    response_calls: set[str] = set()
+    for record in messages.values():
+        call_id = record.get("call_id")
+        if call_id is None:
+            continue
+        if call_id not in starts or call_id in response_calls:
+            raise ValueError(f"Unmatched or duplicate model response: {path}")
+        response_calls.add(call_id)
+        response = record["message"]
+        metadata = response.get("usage_metadata")
+        # Full coverage requires explicit normalized input/output/total fields;
+        # partial provider metadata can still contribute known lower-bound totals.
+        full_usage = (
+            full_usage
+            and isinstance(metadata, dict)
+            and all(
+                isinstance(metadata.get(key), int)
+                and not isinstance(metadata.get(key), bool)
+                and metadata[key] >= 0
+                for key in ("input_tokens", "output_tokens", "total_tokens")
+            )
+        )
+        records.extend(_transcript_usage_records([response]))
+    complete = (
+        completed
+        and full_usage
+        and bool(starts)
+        and starts == ends
+        and len(records) == len(starts)
+    )
+    return records, len(starts), complete
+
+
 def _read_trajectory_usage(path: Path, *, stage: str) -> StageUsage:
-    messages: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        try:
-            event = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not isinstance(event, dict) or event.get("event") != "message":
-            continue
-        message = event.get("message")
-        if isinstance(message, dict):
-            messages.append(message)
-    ai_messages = [
-        message
-        for message in messages
-        if message.get("type") in {"ai", "AIMessage", "AIMessageChunk"}
-        or message.get("role") == "assistant"
+    events = read_trajectory_events(path)
+    messages = [
+        event["message"]
+        for event in events
+        if event.get("event") == "message" and isinstance(event.get("message"), dict)
     ]
-    records = _usage_records_from_value(messages)
+    has_calls = any(
+        str(event.get("event", "")).startswith("model_call") for event in events
+    )
+    call_count = 0
+    complete = False
+    if has_calls:
+        records, call_count, complete = _model_call_usage(events, path)
+    else:
+        # A message-only transcript provides no evidence of complete call coverage.
+        records = _transcript_usage_records(messages)
+    generated_messages = (
+        [
+            event["message"]
+            for event in events
+            if event.get("event") == "message"
+            and event.get("call_id")
+            and isinstance(event.get("message"), dict)
+        ]
+        if has_calls
+        else messages
+    )
+    ai_messages = [
+        message for message in generated_messages if message["role"] == "assistant"
+    ]
+    message_records = _transcript_usage_records(generated_messages)
     totals = {field: 0 for field in NUMERIC_FIELDS}
     for record, _model_id in records:
         for field in NUMERIC_FIELDS:
@@ -233,8 +354,12 @@ def _read_trajectory_usage(path: Path, *, stage: str) -> StageUsage:
         cache_read_tokens=totals["cache_read_tokens"],
         cache_creation_tokens=totals["cache_creation_tokens"],
         reasoning_tokens=totals["reasoning_tokens"],
-        ai_message_count=max(len(ai_messages), len(records)),
-        ai_messages_with_usage_count=len(records),
+        ai_message_count=max(len(ai_messages), len(message_records)),
+        ai_messages_with_usage_count=len(message_records),
+        model_call_count=call_count,
+        model_calls_with_usage_count=len(records) if has_calls else 0,
+        usage_source="model-calls" if has_calls else "trajectory",
+        usage_complete=complete,
     )
 
 
@@ -318,6 +443,16 @@ def _aggregate_stage_usage(
     return StageUsage(
         stage=stage,
         model_id=model_id,
+        model_call_count=sum(item.model_call_count for item in payloads),
+        model_calls_with_usage_count=sum(
+            item.model_calls_with_usage_count for item in payloads
+        ),
+        usage_source=(
+            payloads[0].usage_source
+            if len({item.usage_source for item in payloads}) == 1
+            else "mixed"
+        ),
+        usage_complete=all(item.usage_complete for item in payloads),
         input_tokens=sum(item.input_tokens for item in payloads),
         output_tokens=sum(item.output_tokens for item in payloads),
         total_tokens=sum(item.total_tokens for item in payloads),

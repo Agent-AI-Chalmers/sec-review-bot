@@ -35,6 +35,7 @@ Package READMEs own local setup, commands, configuration, and implementation lay
 Use these docs when you need agent boundaries, capabilities, or framework decisions.
 
 - [CAPABILITY_BOUNDARIES.md](agent/CAPABILITY_BOUNDARIES.md): Agent capability boundaries, including git-history and external-state limits.
+- [Agent transcript contract](../contracts/agent-transcript/README.md): JSONL messages, execution relationships, and usage accounting.
 - [CONTEXT_LOADING.md](agent/CONTEXT_LOADING.md): Which context an agent receives in its prompt and which it reads on demand, and how each agent here chooses.
 - [SKILLS.md](agent/SKILLS.md): Agent skills selection, preparation, and mounting.
 - [FRAMEWORK_SELECTION.md](agent/FRAMEWORK_SELECTION.md): Agent framework selection.

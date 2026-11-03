@@ -18,7 +18,13 @@ function deferredResponse(): {
 
 function trajectoryResponse(content: string): Response {
   return Response.json({
-    events: [{ seq: 1, event: 'message', message: { type: 'ai', content } }]
+    events: [
+      {
+        seq: 1,
+        event: 'message',
+        message: { id: 'fixture-1', role: 'assistant', content }
+      }
+    ]
   })
 }
 

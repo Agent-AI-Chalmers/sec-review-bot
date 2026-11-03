@@ -79,4 +79,15 @@ python -m scripts.token_usage.summarize --json /abs/path/to/local-run-xxx
 effective_patch.total_tokens / total.total_tokens
 ```
 
-AI 轮次统计包含缺少用量元数据的 assistant 消息。`ai_messages_with_usage_count` 单独报告带用量信息的消息数；某一轮没有用量信息，不代表它没有消耗 token。
+AI 轮次统计捕获到的模型响应，包含 summarization middleware 和 subagent 的响应，即使用量元数据缺失也计入。`ai_messages_with_usage_count` 单独报告带用量信息的模型响应数；某一轮没有用量信息，不代表它没有消耗 token。
+
+轨迹格式见[transcript 契约](../../contracts/agent-transcript/v1/SPEC.zh.md)。
+
+## 用量来源与完整性
+
+<!-- doc-default: model-call-accounting; source=loading.py -->
+`usage_source` 表示统计来源：`model-calls` 为模型调用记录，`trajectory` 为规范的纯消息轨迹，`mixed` 为两者的混合汇总。
+
+`usage_complete` 表示记录正常完成，且已观察到的调用都有用量。为 false 时，总量只包含已知用量。规范的纯消息轨迹覆盖有限，标记为不完整。
+
+`model_call_count` 和 `model_calls_with_usage_count` 分别表示已观察到的调用数和带用量的响应数。AI 轮次统计捕获到的模型响应。

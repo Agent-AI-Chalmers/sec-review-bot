@@ -6,7 +6,7 @@ from deepagents.backends.protocol import BackendProtocol
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware
 from langchain_core.language_models import BaseChatModel
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_core.runnables.config import merge_configs
 from langgraph.graph.state import CompiledStateGraph
@@ -57,7 +57,6 @@ async def run_agent_runtime_graph[T: BaseModel](
         agent=agent,
         response_format=response_format,
         agent_name=agent_name,
-        system_prompt=system_prompt,
         user_prompt=user_prompt,
         trajectory_paths=trajectory_paths,
         config=config,
@@ -104,7 +103,6 @@ async def invoke_agent_runtime_graph[T: BaseModel](
     agent: CompiledStateGraph,
     response_format: type[T],
     agent_name: str,
-    system_prompt: str,
     user_prompt: str,
     trajectory_paths: tuple[Path, ...] = (),
     config: RunnableConfig | None = None,
@@ -120,7 +118,11 @@ async def invoke_agent_runtime_graph[T: BaseModel](
     tracing_config = build_tracing_config(
         agent_name=agent_name,
     )
-    trajectory_writer = TrajectoryWriter(trajectory_paths) if trajectory_paths else None
+    trajectory_writer = (
+        TrajectoryWriter(trajectory_paths, agent=agent_name)
+        if trajectory_paths
+        else None
+    )
 
     invoke_config = merge_configs(
         config,
@@ -136,17 +138,23 @@ async def invoke_agent_runtime_graph[T: BaseModel](
     )
     user_message = HumanMessage(content=user_prompt)
     if trajectory_writer is not None:
-        trajectory_writer.write_messages(
-            [SystemMessage(content=system_prompt), user_message]
-        )
+        trajectory_writer.defer_messages([user_message], agent=agent_name)
 
     async def invoke_agent() -> Any:
         structured_result: Any | None = None
-        async for update in agent.astream(
+        # Execution events include model calls absent from parent state updates.
+        async for event in agent.astream_events(
             {"messages": [user_message]},
             config=invoke_config,
+            version="v2",
             stream_mode="updates",
         ):
+            if trajectory_writer is not None:
+                trajectory_writer.write_execution_event(event)
+            # Child outputs must not replace the root conversation or structured result.
+            if event["event"] != "on_chain_stream" or event.get("parent_ids"):
+                continue
+            update = event["data"].get("chunk")
             if not isinstance(update, Mapping):
                 continue
             for node_update in update.values():
@@ -155,12 +163,20 @@ async def invoke_agent_runtime_graph[T: BaseModel](
                 if trajectory_writer is not None:
                     update_messages = node_update.get("messages")
                     if isinstance(update_messages, list):
-                        trajectory_writer.write_messages(update_messages)
+                        trajectory_writer.defer_messages(
+                            update_messages,
+                            run_id=event.get("run_id"),
+                            parent_ids=event.get("parent_ids", []),
+                            agent=agent_name,
+                        )
                 candidate = node_update.get("structured_response")
                 if candidate is not None:
                     structured_result = candidate
         return structured_result
 
+    status = "interrupted"
+    if trajectory_writer is not None:
+        trajectory_writer.write_event("model_calls_start")
     try:
         structured_result = await invoke_agent()
         if structured_result is None:
@@ -176,8 +192,10 @@ async def invoke_agent_runtime_graph[T: BaseModel](
             started_at=started_at,
             structured_response=structured_result,
         )
+        status = "completed"
         return structured_result
     except Exception as error:
+        status = "failed"
         log_agent_invocation_failed(
             agent_name=agent_name,
             started_at=started_at,
@@ -185,4 +203,8 @@ async def invoke_agent_runtime_graph[T: BaseModel](
         )
         raise
     finally:
+        # A missing terminal marker after SIGKILL/crash is deliberately incomplete.
+        if trajectory_writer is not None:
+            trajectory_writer.flush_pending_messages()
+            trajectory_writer.write_event("model_calls_end", status=status)
         tracing_config.flush()

@@ -7,6 +7,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 from sec_review_agents.contract_versions import (
+    AGENT_TRANSCRIPT_VERSION,
     EXECUTION_API_VERSION,
     EXECUTION_WORKFLOW_VERSION,
 )
@@ -100,4 +101,17 @@ def format_schema_errors(errors: Iterable) -> str:
     return "\n".join(
         f"{'/'.join(str(part) for part in error.path) or '<root>'}: {error.message}"
         for error in errors
+    )
+
+
+AGENT_TRANSCRIPT_ROOT = CONTRACTS_ROOT / "agent-transcript" / AGENT_TRANSCRIPT_VERSION
+
+
+def transcript_corpus_file(name: str) -> Path:
+    return AGENT_TRANSCRIPT_ROOT / "corpus" / name
+
+
+def transcript_corpus_manifest() -> dict[str, Any]:
+    return json.loads(
+        transcript_corpus_file("manifest.json").read_text(encoding="utf-8")
     )

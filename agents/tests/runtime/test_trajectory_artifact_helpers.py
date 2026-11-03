@@ -6,6 +6,9 @@ from tests.runtime.trajectory_artifact_helpers import (
 
 
 def _write_messages(trajectory, messages: list[dict]) -> None:
+    for index, message in enumerate(messages, 1):
+        message["id"] = f"message-{index}"
+        message.setdefault("content", "")
     trajectory.write_text(
         "\n".join(
             json.dumps({"seq": index, "event": "message", "message": message})
@@ -22,7 +25,7 @@ def test_tool_interactions_pair_same_named_calls_with_their_results(tmp_path) ->
         trajectory,
         [
             {
-                "type": "ai",
+                "role": "assistant",
                 "tool_calls": [
                     {
                         "id": "call-first",
@@ -37,13 +40,13 @@ def test_tool_interactions_pair_same_named_calls_with_their_results(tmp_path) ->
                 ],
             },
             {
-                "type": "tool",
+                "role": "tool",
                 "tool_call_id": "call-second",
                 "name": "playwright_browser_navigate",
                 "content": "second result",
             },
             {
-                "type": "tool",
+                "role": "tool",
                 "tool_call_id": "call-first",
                 "name": "playwright_browser_navigate",
                 "content": "first result",
@@ -71,7 +74,7 @@ def test_tool_interactions_ignore_calls_without_stable_ids(tmp_path) -> None:
         trajectory,
         [
             {
-                "type": "ai",
+                "role": "assistant",
                 "tool_calls": [
                     {
                         "name": "playwright_browser_navigate",
@@ -80,7 +83,7 @@ def test_tool_interactions_ignore_calls_without_stable_ids(tmp_path) -> None:
                 ],
             },
             {
-                "type": "tool",
+                "role": "tool",
                 "name": "playwright_browser_navigate",
                 "content": "unattributed result",
             },
