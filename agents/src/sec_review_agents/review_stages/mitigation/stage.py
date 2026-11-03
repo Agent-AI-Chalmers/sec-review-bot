@@ -41,124 +41,9 @@ from sec_review_agents.workspace.snapshots import (
     restore_workspace_from_snapshot_tar,
 )
 
-
-def persist_mitigation_result(
-    mitigator_artifacts_path: Path,
-    result: MitigationStageResult,
-    *,
-    attempt_label: str,
-) -> None:
-    """Persist the latest mitigation result and its retry-specific copy."""
-    persist_json_artifact(
-        mitigator_artifacts_path,
-        "mitigation-result",
-        result.model_dump(mode="json"),
-    )
-    if attempt_label != "initial":
-        persist_json_artifact(
-            mitigator_artifacts_path,
-            f"mitigation-result.{attempt_label}",
-            result.model_dump(mode="json"),
-        )
+# Stage execution
 
 
-def persist_mitigation_patch(
-    mitigator_artifacts_path: Path,
-    patch_diff: str,
-    *,
-    attempt_label: str,
-) -> None:
-    """Persist the latest workspace patch and its retry-specific copy."""
-    persist_text_artifact(
-        mitigator_artifacts_path,
-        "workspace.patch",
-        patch_diff,
-    )
-    if attempt_label != "initial":
-        persist_text_artifact(
-            mitigator_artifacts_path,
-            f"workspace.{attempt_label}.patch",
-            patch_diff,
-        )
-
-
-def mitigation_attempt_label(retry_context: FeedbackRetryContext | None) -> str:
-    return (
-        f"retry-{retry_context.retry_index}" if retry_context is not None else "initial"
-    )
-
-
-def reset_mitigation_attempt_artifacts(
-    *,
-    mitigator_artifacts_path: Path,
-    attempt_label: str,
-) -> None:
-    json_stems = ["mitigation-result"]
-    filenames = ["workspace.patch"]
-    if attempt_label != "initial":
-        json_stems.append(f"mitigation-result.{attempt_label}")
-        filenames.append(f"workspace.{attempt_label}.patch")
-    else:
-        json_stems.append("mitigation-result.initial")
-        filenames.append("workspace.initial.patch")
-        for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1):
-            retry_label = f"retry-{retry_index}"
-            json_stems.append(f"mitigation-result.{retry_label}")
-            filenames.append(f"workspace.{retry_label}.patch")
-    remove_json_artifacts(mitigator_artifacts_path, json_stems)
-    reset_stage_attempt_artifacts(
-        mitigator_artifacts_path,
-        filenames=filenames,
-    )
-    trajectory_attempts = (
-        ["initial"]
-        + [
-            f"retry-{retry_index}"
-            for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1)
-        ]
-        if attempt_label == "initial"
-        else [attempt_label]
-    )
-    remove_trajectories(
-        trajectory_path(
-            mitigator_artifacts_path / "trajectories",
-            name=trajectory_attempt,
-        )
-        for trajectory_attempt in trajectory_attempts
-    )
-
-
-#########################################################################
-# ====================== Skip Path =======================================
-#########################################################################
-def create_skipped_mitigation_result(
-    *,
-    mitigator_artifacts_path: Path,
-    retry_context: FeedbackRetryContext | None,
-    reason: str,
-) -> MitigationStageResult:
-    attempt_label = mitigation_attempt_label(retry_context)
-    reset_mitigation_attempt_artifacts(
-        mitigator_artifacts_path=mitigator_artifacts_path,
-        attempt_label=attempt_label,
-    )
-    # Skipped mitigation still emits the patch files expected by downstream
-    # verifier/delivery contracts, but with empty content.
-    persist_mitigation_patch(
-        mitigator_artifacts_path,
-        "",
-        attempt_label=attempt_label,
-    )
-    result = MitigationStageResult(overview=reason)
-    persist_mitigation_result(
-        mitigator_artifacts_path, result, attempt_label=attempt_label
-    )
-    return result
-
-
-#########################################################################
-# ====================== Stage Execution =================================
-#########################################################################
 async def run_mitigation_stage(
     *,
     agent_name: str,
@@ -244,12 +129,93 @@ async def run_mitigation_stage(
         return result
 
 
+# Skip path
+
+
+def create_skipped_mitigation_result(
+    *,
+    mitigator_artifacts_path: Path,
+    retry_context: FeedbackRetryContext | None,
+    reason: str,
+) -> MitigationStageResult:
+    attempt_label = mitigation_attempt_label(retry_context)
+    reset_mitigation_attempt_artifacts(
+        mitigator_artifacts_path=mitigator_artifacts_path,
+        attempt_label=attempt_label,
+    )
+    # Skipped mitigation still emits the patch files expected by downstream
+    # verifier/delivery contracts, but with empty content.
+    persist_mitigation_patch(
+        mitigator_artifacts_path,
+        "",
+        attempt_label=attempt_label,
+    )
+    result = MitigationStageResult(overview=reason)
+    persist_mitigation_result(
+        mitigator_artifacts_path, result, attempt_label=attempt_label
+    )
+    return result
+
+
+# Preparation and cleanup
+
+
+def mitigation_attempt_label(retry_context: FeedbackRetryContext | None) -> str:
+    return (
+        f"retry-{retry_context.retry_index}" if retry_context is not None else "initial"
+    )
+
+
+def reset_mitigation_attempt_artifacts(
+    *,
+    mitigator_artifacts_path: Path,
+    attempt_label: str,
+) -> None:
+    json_stems = ["mitigation-result"]
+    filenames = ["workspace.patch"]
+    if attempt_label != "initial":
+        json_stems.append(f"mitigation-result.{attempt_label}")
+        filenames.append(f"workspace.{attempt_label}.patch")
+    else:
+        json_stems.append("mitigation-result.initial")
+        filenames.append("workspace.initial.patch")
+        for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1):
+            retry_label = f"retry-{retry_index}"
+            json_stems.append(f"mitigation-result.{retry_label}")
+            filenames.append(f"workspace.{retry_label}.patch")
+    remove_json_artifacts(mitigator_artifacts_path, json_stems)
+    reset_stage_attempt_artifacts(
+        mitigator_artifacts_path,
+        filenames=filenames,
+    )
+    trajectory_attempts = (
+        ["initial"]
+        + [
+            f"retry-{retry_index}"
+            for retry_index in range(1, MAX_FEEDBACK_RETRY_ATTEMPTS + 1)
+        ]
+        if attempt_label == "initial"
+        else [attempt_label]
+    )
+    remove_trajectories(
+        trajectory_path(
+            mitigator_artifacts_path / "trajectories",
+            name=trajectory_attempt,
+        )
+        for trajectory_attempt in trajectory_attempts
+    )
+
+
 def prepare_mitigation_trajectory(
     *,
     mitigator_artifacts_path: Path,
     published_trajectory_path: Path | None,
     attempt_label: str,
 ) -> tuple[Path, ...]:
+    """Return local and optional published outputs for this mitigation attempt.
+
+    Remove any old published copy; the runtime writer initializes the returned files.
+    """
     local_trajectory_path = trajectory_path(
         mitigator_artifacts_path / "trajectories",
         name=attempt_label,
@@ -259,6 +225,49 @@ def prepare_mitigation_trajectory(
 
     published_trajectory_path.unlink(missing_ok=True)
     return (local_trajectory_path, published_trajectory_path)
+
+
+# Result persistence
+
+
+def persist_mitigation_result(
+    mitigator_artifacts_path: Path,
+    result: MitigationStageResult,
+    *,
+    attempt_label: str,
+) -> None:
+    """Persist the latest mitigation result and its retry-specific copy."""
+    persist_json_artifact(
+        mitigator_artifacts_path,
+        "mitigation-result",
+        result.model_dump(mode="json"),
+    )
+    if attempt_label != "initial":
+        persist_json_artifact(
+            mitigator_artifacts_path,
+            f"mitigation-result.{attempt_label}",
+            result.model_dump(mode="json"),
+        )
+
+
+def persist_mitigation_patch(
+    mitigator_artifacts_path: Path,
+    patch_diff: str,
+    *,
+    attempt_label: str,
+) -> None:
+    """Persist the latest workspace patch and its retry-specific copy."""
+    persist_text_artifact(
+        mitigator_artifacts_path,
+        "workspace.patch",
+        patch_diff,
+    )
+    if attempt_label != "initial":
+        persist_text_artifact(
+            mitigator_artifacts_path,
+            f"workspace.{attempt_label}.patch",
+            patch_diff,
+        )
 
 
 __all__ = [

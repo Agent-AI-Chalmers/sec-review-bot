@@ -66,7 +66,7 @@ async def test_extractor_returns_preview_and_records_to_explicit_trajectory(
         deployment_override=None,
     )
     assert invoke.await_args is not None
-    assert invoke.await_args.kwargs["trajectory_paths"] == (agent_trajectory,)
+    assert invoke.await_args.kwargs["extractor_trajectory_path"] == agent_trajectory
 
 
 @pytest.mark.asyncio

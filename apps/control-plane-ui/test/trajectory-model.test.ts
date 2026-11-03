@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
+import { readTrajectoryJsonl } from '../shared/trajectory-events.js'
 
 import { buildTrajectoryDocument } from '../browser/features/trajectory/trajectory-model.js'
 
@@ -152,4 +154,110 @@ test('message-array tool results are not guessed when the ordered run is incompl
     undefined
   )
   assert.strictEqual(document.messages[1]?.toolCallId, undefined)
+})
+
+test('Responses function calls render once, while unmatched blocks remain inspectable', () => {
+  const document = buildTrajectoryDocument([
+    {
+      seq: 1,
+      event: 'message',
+      message: {
+        id: 'response',
+        role: 'assistant',
+        content: [
+          { type: 'text', text: 'Inspecting.' },
+          {
+            type: 'function_call',
+            call_id: 'ls-1',
+            name: 'ls',
+            arguments: '{"path":"/workspace"}'
+          },
+          {
+            type: 'function_call',
+            call_id: 'unmatched',
+            name: 'inspect',
+            arguments: '{}'
+          }
+        ],
+        tool_calls: [{ id: 'ls-1', name: 'ls', args: { path: '/workspace' } }]
+      }
+    }
+  ])
+  assert.doesNotMatch(document.messages[0]!.content, /ls-1/)
+  assert.match(document.messages[0]!.content, /unmatched/)
+  assert.deepEqual(document.messages[0]!.toolCalls[0]!.args, {
+    path: '/workspace'
+  })
+})
+
+test('failed analysis fixture preserves empty arguments, errors and repeated prompt provenance', () => {
+  const events = readTrajectoryJsonl(
+    readFileSync(
+      new URL('./fixtures/trajectory-failed-analysis.jsonl', import.meta.url),
+      'utf8'
+    )
+  )
+  const document = buildTrajectoryDocument(events)
+  const systems = document.messages.filter(
+    (message) => message.role === 'system'
+  )
+  assert.equal(systems.length, 5)
+  assert.equal(systems[0]!.repeatedSystemId, undefined)
+  assert.ok(
+    systems
+      .slice(1)
+      .every((message) => message.repeatedSystemId === systems[0]!.id)
+  )
+  const response = document.messages.find((message) => message.seq === 10)!
+  assert.equal(response.content, '')
+  assert.equal(response.toolCalls.length, 5)
+  for (const call of response.toolCalls) {
+    assert.deepEqual(call.args, {})
+    assert.equal(call.resultStatus, 'error')
+    assert.ok(call.resultMessageId)
+  }
+  const final = document.messages.find((message) => message.seq === 29)!
+  assert.deepEqual(final.toolCalls[0]!.args, { path: '/workspace/project/src' })
+  assert.equal(final.toolCalls[0]!.resultMessageId, undefined)
+})
+
+test('system prompt references never cross branches or skip changed instructions', () => {
+  const document = buildTrajectoryDocument([
+    {
+      seq: 1,
+      event: 'message',
+      agent: 'agent',
+      parent_ids: ['root', 'left', 'model1'],
+      message: { id: 'a', role: 'system', content: 'A' }
+    },
+    {
+      seq: 2,
+      event: 'message',
+      agent: 'agent',
+      parent_ids: ['root', 'right', 'model2'],
+      message: { id: 'b', role: 'system', content: 'A' }
+    },
+    {
+      seq: 3,
+      event: 'message',
+      agent: 'agent',
+      parent_ids: ['root', 'left', 'model3'],
+      message: { id: 'c', role: 'system', content: 'B' }
+    },
+    {
+      seq: 4,
+      event: 'message',
+      agent: 'agent',
+      parent_ids: ['root', 'left', 'model4'],
+      message: { id: 'd', role: 'system', content: 'A' }
+    },
+    {
+      seq: 5,
+      event: 'message',
+      message: { id: 'unknown', role: 'system', content: 'A' }
+    }
+  ])
+  assert.ok(
+    document.messages.every((message) => message.repeatedSystemId === undefined)
+  )
 })

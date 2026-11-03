@@ -211,6 +211,10 @@
 }
 
 .trajectory-tool-call {
+  --trajectory-tool-color: light-dark(
+    var(--mantine-color-green-7),
+    var(--mantine-color-green-4)
+  );
   padding: var(--space-3);
   border: 1px solid
     light-dark(var(--mantine-color-green-2), var(--mantine-color-green-9));
@@ -220,6 +224,28 @@
     var(--mantine-color-white),
     var(--mantine-color-dark-7)
   );
+}
+
+.trajectory-tool-call[data-result-status='error'] {
+  --trajectory-tool-color: light-dark(
+    var(--mantine-color-red-7),
+    var(--mantine-color-red-4)
+  );
+  border-color: light-dark(
+    var(--mantine-color-red-2),
+    var(--mantine-color-red-9)
+  );
+  border-left-color: var(--mantine-color-red-6);
+}
+
+.trajectory-tool-call-identity {
+  min-width: 0;
+  flex: 1;
+}
+
+.trajectory-tool-call-identity > svg,
+.trajectory-tool-call-identity > .mantine-Badge-root {
+  flex-shrink: 0;
 }
 
 .trajectory-tool-call-header {

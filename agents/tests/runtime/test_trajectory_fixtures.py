@@ -1,9 +1,9 @@
 """Keep inspectable runtime recordings usable by trajectory and Memory consumers."""
 
+import json
 from shutil import copyfile
 
 import pytest
-from deepagents.backends import FilesystemBackend
 
 from sec_review_agents.agents.memory_extractor.tools import build_trajectory_tools
 from sec_review_agents.runtime.trajectories import (
@@ -66,13 +66,10 @@ def test_recorded_trajectory_is_complete_and_readable_by_memory(
     directory.mkdir()
     copyfile(path, directory / filename)
     tools = {
-        tool.name: tool
-        for tool in build_trajectory_tools(
-            FilesystemBackend(root_dir=tmp_path, virtual_mode=True)
-        )
+        tool.name: tool for tool in build_trajectory_tools(tmp_path / "trajectories")
     }
     listing = tools["list_trajectory_messages"].invoke(
-        {"file_path": f"/trajectories/{filename}"}
+        {"file_path": f"/trajectories/{filename}", "limit": 50}
     )
     assert listing["ok"] and not listing["parse_errors"]
     assert len(listing["messages"]) == message_count
@@ -83,10 +80,16 @@ def test_recorded_trajectory_is_complete_and_readable_by_memory(
         ] == ["user", "assistant", "user"]
     for record in generated.values():
         result = tools["read_trajectory_message"].invoke(
-            {"file_path": f"/trajectories/{filename}", "seq": record["seq"]}
+            {
+                "file_path": f"/trajectories/{filename}",
+                "seq": record["seq"],
+                "part": "tool_calls",
+            }
         )
         assert result["ok"]
-        assert result["message"] == record["message"]
+        assert result["value"] == record["message"].get("tool_calls", [])
+        assert "usage_metadata" not in result
+        assert "response_metadata" not in result
         assert result["call_id"] == record["call_id"]
         assert result["parent_ids"] == record["parent_ids"]
 
@@ -198,7 +201,6 @@ def test_transcript_contract_corpus():
 
 
 def test_transcript_records_match_contract_schema():
-    import json
 
     from jsonschema import Draft202012Validator
 

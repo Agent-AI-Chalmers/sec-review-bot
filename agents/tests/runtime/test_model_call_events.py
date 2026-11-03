@@ -275,14 +275,9 @@ async def test_nested_tools_and_memory_reader_share_single_response_records(
     assert len(results) == 2
     assert results[0]["parent_ids"] != results[1]["parent_ids"]
     assert len([e for e in messages if e["message"]["role"] == "tool"]) == 4
-    tools = {
-        t.name: t
-        for t in build_trajectory_tools(
-            FilesystemBackend(root_dir=tmp_path, virtual_mode=True)
-        )
-    }
+    tools = {t.name: t for t in build_trajectory_tools(tmp_path / "trajectories")}
     listing = tools["list_trajectory_messages"].invoke(
-        {"file_path": "/trajectories/probe.jsonl"}
+        {"file_path": "/trajectories/probe.jsonl", "limit": 50}
     )
     assert len(listing["messages"]) == len(messages)
     child = next(e for e in generated if e["metadata"].get("lc_agent_name") == "child")
@@ -290,7 +285,7 @@ async def test_nested_tools_and_memory_reader_share_single_response_records(
         {"file_path": "/trajectories/probe.jsonl", "seq": child["seq"]}
     )
     assert detail["call_id"] == child["call_id"]
-    assert detail["message"]["usage_metadata"]["total_tokens"] == 12
+    assert "usage_metadata" not in detail
     assert detail["agent"] == "child"
 
 

@@ -1,28 +1,23 @@
 """Filesystem backend construction for memory observation extraction."""
 
-from pathlib import Path
-
 from deepagents.backends.protocol import BackendProtocol
 
 from sec_review_agents.features import agent_skills_enabled
 from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
-from sec_review_agents.filesystem.path_views import read_only_path_view, skill_view
+from sec_review_agents.filesystem.path_views import skill_view
 from sec_review_agents.runtime.skills import materialize_all_agent_skills_view
 
 
-def create_memory_extractor_backend(*, trajectory_root: Path) -> BackendProtocol:
-    """Mount staged trajectories and all bundled skills for the extractor.
+def create_memory_extractor_backend() -> BackendProtocol:
+    """Mount skills only; staged trajectories are accessible through structured tools.
 
     Skills are existing agent knowledge for the extraction decision, not source
     evidence. Mounting every packaged skill lets the extractor reject trajectory
     lessons that merely restate guidance already available to review agents.
     """
-    path_views = [
-        read_only_path_view(
-            agent_path="/trajectories",
-            host_path=trajectory_root,
-        )
-    ]
+    # Unmatched paths use the factory's StateBackend: /tmp scratch files live
+    # in this invocation's graph state, never in the host temporary directory.
+    path_views = []
     if agent_skills_enabled():
         # SkillsMiddleware reads from /skills, so the backend mount and middleware
         # gate must follow the same feature flag.

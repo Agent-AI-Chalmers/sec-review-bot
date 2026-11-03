@@ -155,7 +155,7 @@ export async function runViewerFlow({ page }) {
     await preview.waitFor()
     assert.match(
       (await preview.textContent()) ?? '',
-      /#2/,
+      /Pasted assistant response/,
       'hovering the track must preview the message under the pointer'
     )
     await slider.focus()

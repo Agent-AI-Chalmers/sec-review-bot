@@ -156,17 +156,25 @@ function ToolCall({
     scrollToTrajectoryElement(`trajectory-${call.resultMessageId}`)
   }
   return (
-    <div className="trajectory-tool-call">
+    <div
+      className="trajectory-tool-call"
+      data-result-status={call.resultStatus}
+    >
       <Group
         justify="space-between"
         wrap="nowrap"
         className="trajectory-tool-call-header"
       >
-        <Group gap="xs" wrap="nowrap">
-          <IconTool size={ICON_SIZE.md} color="var(--mantine-color-green-6)" />
-          <Text fw={600} size="sm" c="green.7" truncate>
+        <Group gap="xs" wrap="nowrap" className="trajectory-tool-call-identity">
+          <IconTool size={ICON_SIZE.md} color="var(--trajectory-tool-color)" />
+          <Text fw={600} size="sm" c="var(--trajectory-tool-color)" truncate>
             <HighlightText value={call.name} query={query} />
           </Text>
+          {call.resultStatus === 'error' && (
+            <Badge color="red" size="xs" variant="light">
+              error
+            </Badge>
+          )}
         </Group>
         {call.resultMessageId && (
           <Button
@@ -188,6 +196,8 @@ function ToolCall({
             query={query}
             truncated={call.diffTruncated === true}
           />
+        ) : Object.keys(call.args).length === 0 ? (
+          <Code>{t('trajectoryEmptyArguments')}</Code>
         ) : (
           <ToolArguments args={call.args} query={query} />
         )}
@@ -295,23 +305,21 @@ export function TrajectoryMessage({
           >
             {t(presentation.key)}
           </Badge>
-          <Text size="sm" c="dimmed">
-            #{message.seq}
-            {primaryLabel && (
-              <>
-                {' · '}
-                <Text
-                  component="span"
-                  c="inherit"
-                  fw={message.role === 'assistant' ? 600 : undefined}
-                >
-                  <HighlightText value={primaryLabel} query={query} />
-                </Text>
-              </>
-            )}
-          </Text>
+          {primaryLabel && (
+            <Text
+              size="sm"
+              c="dimmed"
+              fw={message.role === 'assistant' ? 600 : undefined}
+            >
+              <HighlightText value={primaryLabel} query={query} />
+            </Text>
+          )}
           {message.status && (
-            <Badge size="xs" variant="outline">
+            <Badge
+              size="xs"
+              {...(message.status === 'error' ? { color: 'red' } : {})}
+              variant={message.status === 'error' ? 'light' : 'outline'}
+            >
               {message.status}
             </Badge>
           )}
@@ -348,7 +356,20 @@ export function TrajectoryMessage({
             query={query}
           />
         )}
-        {message.content && (
+        {message.repeatedSystemId && (
+          <Button
+            variant="subtle"
+            size="compact-xs"
+            onClick={() =>
+              scrollToTrajectoryElement(
+                `trajectory-${message.repeatedSystemId}`
+              )
+            }
+          >
+            {t('trajectoryRepeatedSystem')}
+          </Button>
+        )}
+        {message.content && !message.repeatedSystemId && (
           <Section
             kind={message.role === 'tool' ? 'result' : 'message'}
             title={

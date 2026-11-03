@@ -126,6 +126,9 @@ export const messages = {
     trajectoryArtifact: 'Attached data',
     trajectoryArguments: 'Arguments',
     trajectoryJumpResult: 'Jump to result',
+    trajectoryRepeatedSystem:
+      'Unchanged system instructions — view earlier message',
+    trajectoryEmptyArguments: 'Recorded arguments: {}',
     trajectoryJumpCall: 'Back to call',
     trajectoryTokensIn: 'Input',
     trajectoryTokensOut: 'Output',
@@ -709,6 +712,8 @@ export const messages = {
     trajectoryArtifact: '附加数据',
     trajectoryArguments: '参数',
     trajectoryJumpResult: '跳到结果',
+    trajectoryRepeatedSystem: 'System 指令未变化，查看前一份指令',
+    trajectoryEmptyArguments: '记录的参数：{}',
     trajectoryJumpCall: '返回调用',
     trajectoryTokensIn: '输入',
     trajectoryTokensOut: '输出',

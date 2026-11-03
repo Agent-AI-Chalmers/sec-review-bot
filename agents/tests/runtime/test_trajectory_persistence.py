@@ -351,3 +351,23 @@ def test_transcript_producer_writes_canonical_roles_and_provenance(tmp_path):
     assert response["message"]["role"] == "assistant"
     assert "type" not in response["message"]
     assert response["metadata"]["sec_review_agent"] == "parent"
+
+
+def test_system_deduplication_preserves_changes_and_independent_branches(tmp_path):
+    from langchain_core.messages import SystemMessage
+
+    writer = TrajectoryWriter((tmp_path / "systems.jsonl",))
+    for branch, content in [
+        ("left", "A"),
+        ("left", "A"),
+        ("right", "A"),
+        ("left", "B"),
+        ("left", "A"),
+    ]:
+        writer.write_messages(
+            [SystemMessage(content=content)],
+            agent="reviewer",
+            parent_ids=["root", branch, "model"],
+        )
+    messages = read_trajectory_messages(writer.path)
+    assert [message["content"] for message in messages] == ["A", "A", "B", "A"]

@@ -14,6 +14,7 @@ export interface ToolCallView {
   name: string
   args: Record<string, unknown>
   resultMessageId: string | undefined
+  resultStatus?: string | undefined
   /** Real unified diff reported by the tool, when it provides one. */
   diff?: string
   diffTruncated?: boolean
@@ -41,6 +42,7 @@ export interface TrajectoryMessageView {
   content: string
   reasoning: string
   toolCalls: ToolCallView[]
+  repeatedSystemId?: string
   requestAnchorId?: string
   toolCallId: string | undefined
   status: string | undefined
@@ -75,7 +77,10 @@ function role(value: unknown): TrajectoryRole {
   return 'unknown'
 }
 
-function contentParts(value: unknown): { content: string; reasoning: string } {
+function contentParts(
+  value: unknown,
+  calls: ToolCallView[]
+): { content: string; reasoning: string } {
   if (typeof value === 'string') return { content: value, reasoning: '' }
   if (!Array.isArray(value)) {
     return {
@@ -102,6 +107,11 @@ function contentParts(value: unknown): { content: string; reasoning: string } {
       content.push(item.text)
     else if (item.type === 'thinking' && typeof item.thinking === 'string')
       reasoning.push(item.thinking)
+    else if (
+      item.type === 'function_call' &&
+      calls.some((call) => call.id === item.call_id && call.name === item.name)
+    )
+      continue // The canonical tool call is rendered separately; retain unmatched blocks.
     else if (item.type !== 'tool_use')
       content.push(JSON.stringify(item, null, 2))
   }
@@ -158,7 +168,8 @@ function toolCalls(
 
 function projectMessage(event: TrajectoryMessageEvent): TrajectoryMessageView {
   const raw = event.message
-  const blocks = contentParts(raw.content)
+  const calls = toolCalls(raw, event.seq)
+  const blocks = contentParts(raw.content, calls)
   const kwargs = record(raw.additional_kwargs)
   const additionalReasoning =
     typeof kwargs?.reasoning_content === 'string'
@@ -190,7 +201,7 @@ function projectMessage(event: TrajectoryMessageEvent): TrajectoryMessageView {
     reasoning: [additionalReasoning, blocks.reasoning]
       .filter(Boolean)
       .join('\n\n'),
-    toolCalls: toolCalls(raw, event.seq),
+    toolCalls: calls,
     toolCallId:
       typeof raw.tool_call_id === 'string' ? raw.tool_call_id : undefined,
     status: typeof raw.status === 'string' ? raw.status : undefined,
@@ -274,6 +285,7 @@ function linkToolResults(messages: TrajectoryMessageView[]): void {
           ? candidate
           : undefined
       call.resultMessageId = result?.id
+      call.resultStatus = result?.status
       if (result) result.requestAnchorId = call.anchorId
       // The tool reports the diff on its result message; the call renders it.
       if (result?.diff) {
@@ -341,11 +353,28 @@ function totalRecordedUsage(
 export function buildTrajectoryDocument(
   events: TrajectoryEvent[]
 ): TrajectoryDocument {
-  const messages = events
-    .filter(
-      (event): event is TrajectoryMessageEvent => event.event === 'message'
-    )
-    .map(projectMessage)
+  const messageEvents = events.filter(
+    (event): event is TrajectoryMessageEvent => event.event === 'message'
+  )
+
+  const messages = messageEvents.map(projectMessage)
+  // Repeated effective instructions are observations, not new instructions.
+  // Keep every record, and link only within a known execution branch. Compare
+  // raw content so distinct non-text blocks are never merged by text projection.
+  const systems = new Map<string, { content: string; id: string }>()
+  for (const [index, message] of messages.entries()) {
+    if (message.role !== 'system' || (message.parentIds?.length ?? 0) < 2)
+      continue
+    const branch = JSON.stringify([
+      message.agent,
+      message.source,
+      message.parentIds!.slice(0, -1)
+    ])
+    const content = JSON.stringify(messageEvents[index]!.message.content)
+    const previous = systems.get(branch)
+    if (previous?.content === content) message.repeatedSystemId = previous.id
+    else systems.set(branch, { content, id: message.id })
+  }
   linkToolResults(messages)
   return { messages, totalUsage: totalRecordedUsage(events, messages) }
 }
