@@ -319,3 +319,149 @@ def test_patch_tool_calls_middleware_repairs_dangling_tool_call_history() -> Non
     assert patched_tool_messages[0].tool_call_id == "call_missing"
     assert patched_tool_messages[0].status == "error"
     assert patched_tool_messages[0].content
+
+
+@pytest.mark.parametrize("tools", [[], [lookup_evidence]])
+def test_invalid_structured_tool_arguments_are_retried(tools: list[Any]) -> None:
+    """Malformed JSON must reach recovery before the agent silently terminates."""
+    model = RecordingToolCallingFakeMessagesListChatModel(
+        responses=[
+            AIMessage(
+                content="",
+                invalid_tool_calls=[
+                    {
+                        "name": "PatchClaimProbeOutput",
+                        "args": '{"rationale": "bad \\d escape"}',
+                        "id": "invalid-output",
+                        "error": "Invalid JSON escape",
+                    }
+                ],
+            ),
+            structured_tool_call_message(
+                PatchClaimProbeOutput,
+                {"status": "applied", "changed_files": [], "rationale": "fixed"},
+            ),
+        ]
+    )
+    agent = create_agent(
+        model=model,
+        tools=tools,
+        response_format=PatchClaimProbeOutput,
+        middleware=[MissingStructuredResponseMiddleware()],
+    )
+    result = agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
+    assert result["structured_response"].rationale == "fixed"
+    assert len(model.message_batches) == 2
+    assert isinstance(model.message_batches[1][-1], HumanMessage)
+    assert any(
+        isinstance(message, AIMessage) and message.invalid_tool_calls
+        for message in model.message_batches[1]
+    )
+
+
+def test_invalid_tool_arguments_recovery_is_bounded() -> None:
+    model = RecordingToolCallingFakeMessagesListChatModel(
+        responses=[
+            AIMessage(
+                content="",
+                invalid_tool_calls=[
+                    {
+                        "name": "PatchClaimProbeOutput",
+                        "args": "{",
+                        "id": "invalid-output",
+                        "error": "Invalid JSON",
+                    }
+                ],
+            )
+        ]
+    )
+    agent = create_agent(
+        model=model,
+        tools=[],
+        response_format=PatchClaimProbeOutput,
+        middleware=[MissingStructuredResponseMiddleware(max_retries=1)],
+    )
+    with pytest.raises(RuntimeError, match="Retried 1 time"):
+        agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
+    assert len(model.message_batches) == 2
+
+
+@pytest.mark.asyncio
+async def test_invalid_structured_arguments_recover_through_runtime(
+    tmp_path: Path,
+) -> None:
+    """The streaming path must retain the failed turn and recover its result."""
+    model = ToolCallingFakeMessagesListChatModel(
+        responses=[
+            AIMessage(
+                content="",
+                invalid_tool_calls=[
+                    {
+                        "name": "PatchClaimProbeOutput",
+                        "args": "{",
+                        "id": "invalid-output",
+                        "error": "Invalid JSON",
+                    }
+                ],
+            ),
+            structured_tool_call_message(
+                PatchClaimProbeOutput,
+                {"status": "applied", "changed_files": [], "rationale": "fixed"},
+            ),
+        ]
+    )
+    trajectory_path = tmp_path / "trajectory.jsonl"
+    result = await run_agent_runtime_graph(
+        response_format=PatchClaimProbeOutput,
+        model=model,
+        backend=None,
+        agent_name="fake-invalid-structured-response",
+        system_prompt="Return the configured structured response.",
+        user_prompt="Return a patch claim.",
+        trajectory_paths=(trajectory_path,),
+    )
+    assert result.rationale == "fixed"
+    messages = read_trajectory_messages(trajectory_path)
+    assert any(message.get("invalid_tool_calls") for message in messages)
+
+
+def test_invalid_arguments_do_not_skip_valid_tool_calls() -> None:
+    model = RecordingToolCallingFakeMessagesListChatModel(
+        responses=[
+            AIMessage(
+                content="",
+                tool_calls=[
+                    {
+                        "name": "lookup_evidence",
+                        "args": {"query": "session"},
+                        "id": "valid-lookup",
+                    }
+                ],
+                invalid_tool_calls=[
+                    {
+                        "name": "PatchClaimProbeOutput",
+                        "args": "{",
+                        "id": "invalid-output",
+                        "error": "Invalid JSON",
+                    }
+                ],
+            ),
+            structured_tool_call_message(
+                PatchClaimProbeOutput,
+                {"status": "applied", "changed_files": [], "rationale": "fixed"},
+            ),
+        ]
+    )
+    agent = create_agent(
+        model=model,
+        tools=[lookup_evidence],
+        response_format=PatchClaimProbeOutput,
+        middleware=[MissingStructuredResponseMiddleware()],
+    )
+    result = agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
+    assert result["structured_response"].rationale == "fixed"
+    assert len(model.message_batches) == 2
+    tool_result = model.message_batches[1][-1]
+    assert isinstance(tool_result, ToolMessage)
+    assert tool_result.tool_call_id == "valid-lookup"
+    assert tool_result.content == "evidence for session"

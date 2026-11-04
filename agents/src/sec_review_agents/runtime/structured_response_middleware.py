@@ -1,9 +1,11 @@
-"""Middleware for repairing structured-output agents that stop with prose."""
+"""Recover structured-output turns with prose or unparseable tool arguments."""
 
 # Design notes for maintainers:
 #
-# LangChain's structured-output retry can repair invalid structured payloads, but
-# an agent with tools may also terminate with a normal prose AI message before it
+# LangChain retries parsed tool arguments that fail schema validation. Malformed
+# JSON instead becomes `invalid_tool_calls` and can bypass that retry path.
+# This middleware also handles those turns when no valid tool call can proceed.
+# An agent with tools may also terminate with a normal prose AI message before it
 # ever calls the structured-output tool. For this project, that is a protocol
 # failure: stages with a response schema must return `structured_response`.
 #
@@ -56,19 +58,27 @@ class MissingStructuredResponseState(AgentState[ResponseT]):
 class MissingStructuredResponseMiddleware(
     AgentMiddleware[MissingStructuredResponseState[ResponseT], ContextT, ResponseT]
 ):
-    """Keep structured-output agents in the agent loop after prose-only turns."""
+    """Retry missing results, including tool arguments rejected before schema validation."""
 
     state_schema: type[MissingStructuredResponseState[ResponseT]] = (
         MissingStructuredResponseState
     )
 
-    _MISSING_STRUCTURED_RESPONSE_RETRY_PROMPT: ClassVar[str] = """\
-Your previous response did not include the required structured response.
+    _MISSING_STRUCTURED_RESPONSE_RETRY_PROMPT: ClassVar[str] = (
+        "Your previous response did not include the required structured response.\n\n"
+        "This stage cannot accept a prose-only answer. "
+        "Return the required structured response using the configured "
+        "structured-output mechanism and populate every required field "
+        "according to the schema.\n\n"
+        "If this stage uses a structured output tool, call that tool exactly once. "
+        "Do not finish with only text content.\n"
+    )
 
-This stage cannot accept a prose-only answer. Return the required structured response using the configured structured-output mechanism and populate every required field according to the schema.
-
-If this stage uses a structured output tool, call that tool exactly once. Do not finish with only text content.
-"""
+    _INVALID_TOOL_ARGUMENTS_RETRY_PROMPT: ClassVar[str] = (
+        "The previous tool arguments could not be parsed as JSON. "
+        "Return valid JSON arguments: escape quotes and backslashes "
+        "inside strings and close all objects and arrays."
+    )
 
     def __init__(
         self,
@@ -105,10 +115,21 @@ If this stage uses a structured output tool, call that tool exactly once. Do not
                 f"Retried {retry_count} time(s) after missing structured output."
             )
 
+        invalid_calls = False
+        if isinstance(last_message, AIMessage):
+            invalid_calls = bool(last_message.invalid_tool_calls)
+        elif isinstance(last_message, dict):
+            invalid_calls = bool(last_message.get("invalid_tool_calls"))
+        retry_prompt = self.retry_prompt
+        if invalid_calls:
+            retry_prompt = (
+                f"{self._INVALID_TOOL_ARGUMENTS_RETRY_PROMPT}\n\n{retry_prompt}"
+            )
+
         return {
             "jump_to": "model",
             "missing_structured_response_retry_count": retry_count + 1,
-            "messages": [HumanMessage(content=self.retry_prompt)],
+            "messages": [HumanMessage(content=retry_prompt)],
         }
 
     async def aafter_model(
@@ -121,10 +142,10 @@ If this stage uses a structured output tool, call that tool exactly once. Do not
 
 def _is_terminal_ai_message(message: Any) -> bool:
     if isinstance(message, AIMessage):
-        return not message.tool_calls and not message.invalid_tool_calls
+        return not message.tool_calls
     if isinstance(message, dict):
         message_type = message.get("role") or message.get("type")
         if message_type not in {"assistant", "ai"}:
             return False
-        return not message.get("tool_calls") and not message.get("invalid_tool_calls")
+        return not message.get("tool_calls")
     return False
