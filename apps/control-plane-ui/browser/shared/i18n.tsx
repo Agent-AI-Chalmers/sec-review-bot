@@ -341,16 +341,13 @@ export const messages = {
       'The system stopped here and needs you to decide. It cannot go on, because the conclusion it would draw contradicts something this run has already recorded. The code below says what.',
     blockedNoResumeReason:
       'Resuming is not offered: execution has already moved past the point where preparation could be picked up again, so a resumed preparation could never be claimed.',
-    // These describe what the decision does, and each is rendered only for the data it is true
-    // of: the stop clause depends on execution actually still moving, and the promise that a
-    // resumed run "returns here" is dropped - that is a prediction about a future failure,
-    // and the banner already leaves the judgement to the operator.
+    // Abandon closes coordination state; it does not request remote cancellation.
     blockedOutcomeResume:
       'Resume tries again: preparation goes back to Uncertain with a fresh budget, and the result already recorded is kept.',
     blockedOutcomeAbandon:
       'Abandon gives up on it: preparation is recorded as failed and the result is no longer published. Its recorded result is kept as evidence.',
-    blockedOutcomeAbandonStopsExecution:
-      'The task is still in flight, so it is stopped too.',
+    blockedOutcomeAbandonRemoteExecution:
+      'This ends tracking of the execution; remote work may continue.',
     abandonRun: 'Abandon',
     abandonTitle: 'Abandon this run',
     abandonExplainer:
@@ -912,7 +909,8 @@ export const messages = {
       '「恢复」是再试一次：准备阶段回到「待确认」并获得新的尝试预算，已记录的结果不会丢失。',
     blockedOutcomeAbandon:
       '「放弃」是不再尝试：准备记为失败，结果不再发布，已记录的结果作为证据保留。',
-    blockedOutcomeAbandonStopsExecution: '该任务仍在执行中，会一并停止。',
+    blockedOutcomeAbandonRemoteExecution:
+      '这会结束对该任务的执行跟踪；远端工作可能仍在继续。',
     abandonRun: '放弃',
     abandonTitle: '放弃这个运行',
     abandonExplainer: '这会结束这个运行，而不是继续重试，操作不可撤销。',

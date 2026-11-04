@@ -27,11 +27,11 @@ export class OperatorDecisionStore {
    *
    * This is not a repair and does not try to make the run publishable: it concludes the axes
    * that are still open, so the run stops holding work no coordinator can conclude. The
-   * execution axis is deliberately left exactly as it is - a `succeeded` result and its
-   * `workflow_result` stay on the row - because abandoning says "this result will not be
-   * delivered", not "this result never happened". Nothing is deleted: the run, its events, and
-   * its ingress identity all remain, so a replay of the same webhook still resolves to this run
-   * instead of starting a new one.
+   * execution axis is concluded in Review Runs when still active; an existing terminal result and
+   * its `workflow_result` remain as evidence. No remote cancellation is requested, so model
+   * calls and other remote work may continue after coordination stops. Nothing is deleted:
+   * the run, its events, and its ingress identity all remain, so a replay of the same webhook
+   * still resolves to this run instead of starting a new one.
    *
    * Only a preparation parked by a contradiction (`disconnected`) is eligible. A run parked on
    * execution or publication is ended with `giveUpDisconnectedRun` instead. That restriction is
@@ -113,6 +113,7 @@ export class OperatorDecisionStore {
         axis: 'preparation',
         reasonCode: abandonCode
       })
+      // This ends execution tracking in Review Runs. No cancellation is sent to the execution system.
       // The execution axis must not outlive the run's decision. A blocked run is blocked
       // precisely because execution already advanced, so it may still be `queued` or `running`
       // and would otherwise be driven to `succeeded` later with nowhere for that result to go -

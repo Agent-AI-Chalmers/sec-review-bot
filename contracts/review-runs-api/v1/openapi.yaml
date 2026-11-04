@@ -2656,8 +2656,9 @@ paths:
       operationId: abandonBlockedPreparation
       description: >-
         An operator decision, not a repair: conclude a blocked run's open axes so it stops
-        holding unwinnable work. Execution is left untouched (a recorded result and its
-        `workflow_result` stay), nothing is deleted, and the run keeps its ingress identity so a
+        holding unwinnable work. Active execution tracking is recorded as failed; an existing
+        terminal result and its `workflow_result` are preserved. No remote cancellation is
+        requested, so remote work may continue. Nothing is deleted, and the run keeps its ingress identity so a
         replay still resolves to it. Only a run whose preparation is parked by a contradiction
         is eligible - the case this decision exists for; a run parked on execution or publication
         is ended with `giveUp` instead. That single-eligibility restriction is what keeps this
@@ -2716,8 +2717,10 @@ paths:
         accepted by the Execution API provider, and a disconnected publication may already have delivered some of
         its steps. The decision is therefore recorded as "this outcome will not be waited for":
         the disconnected axis ends as failed with a reason naming the operator, and whatever the
-        run would still have produced is not published. A disconnected preparation concludes as a
-        failure, an execution in flight is stopped, and a publication is skipped.
+        run would still have produced is not published. The preparation and execution branches
+        skip pending or in-flight publication; the publication branch records publication as failed.
+        The preparation branch leaves execution tracking unchanged. No remote cancellation or
+        rollback of existing remote effects is requested; remote work may continue.
         Only a run with a disconnected axis is eligible, and a reason is required so the decision
         is never anonymous. Requires the admin token; the route does not exist when none is
         configured.
