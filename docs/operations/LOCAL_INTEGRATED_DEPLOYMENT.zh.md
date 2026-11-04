@@ -441,7 +441,8 @@ GitHub integration 的镜像构建和 Git workspace 拉取使用不同的网络�
 
 ### pnpm 与 npm registry
 
-Node 服务镜像从 `ghcr.io/pnpm/pnpm:12-alpine` 复制 pnpm 12，构建过程中不再下载 package manager。因此 Docker 必须能直接访问 GHCR，或通过 daemon 配置的 registry mirror 或代理访问。
+<!-- doc-default: node-workspace.package-manager; source=package.json -->
+Node 服务构建从官方 `ghcr.io/pnpm/pnpm:12-alpine` 镜像复制 pnpm。pnpm 根据根 `package.json#packageManager` 选择项目版本。Docker 需要能访问 GHCR；pnpm 使用 `NPM_CONFIG_REGISTRY` 选择的 npm registry。
 
 pnpm 默认从 `https://registry.npmjs.org` 下载项目依赖。该地址不可用或速度不稳定时，可以改用可达的 npm registry：
 

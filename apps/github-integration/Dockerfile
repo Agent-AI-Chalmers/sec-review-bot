@@ -1,6 +1,6 @@
 FROM ghcr.io/pnpm/pnpm:12-alpine AS pnpm
 
-FROM node:24-alpine AS builder
+FROM node:26-alpine AS builder
 
 COPY --from=pnpm /opt/pnpm /opt/pnpm
 ENV PATH="/opt/pnpm:${PATH}"
@@ -22,7 +22,7 @@ RUN pnpm run build
 # Deploy only this service and its production dependencies.
 RUN pnpm --filter @sec-review-bot/github-integration deploy --prod /prod
 
-FROM node:24-alpine
+FROM node:26-alpine
 
 # The GitHub integration service materializes review refs over HTTPS and creates
 # deterministic input bundles with GNU tar options unsupported by BusyBox tar.

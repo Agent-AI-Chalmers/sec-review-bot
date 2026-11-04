@@ -2,9 +2,9 @@
   "name": "@sec-review-bot/workspace",
   "private": true,
   "version": "0.0.1",
-  "packageManager": "pnpm@12.10.1",
+  "packageManager": "pnpm@12.16.1",
   "engines": {
-    "node": ">=24.22.1 <25"
+    "node": ">=26.13.0 <27"
   },
   "scripts": {
     "check:boundaries": "node .github/ci/check-package-boundaries.mjs",
