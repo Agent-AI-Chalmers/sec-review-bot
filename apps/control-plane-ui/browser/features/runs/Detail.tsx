@@ -730,7 +730,7 @@ export function Detail(): React.JSX.Element {
                         {/* Only when there is something to stop. */}
                         {parkedAxis === 'preparation' &&
                           executionStillMovable &&
-                          ` ${t('blockedOutcomeAbandonStopsExecution')}`}
+                          ` ${t('blockedOutcomeAbandonRemoteExecution')}`}
                       </Text>
                     </Stack>
                     {/* Resuming is offered first: it keeps the run alive, while the other

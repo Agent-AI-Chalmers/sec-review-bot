@@ -62,6 +62,11 @@ test('selection fill remains distinct from keyboard navigation and hover', async
   })
   await filter.click()
   await page.getByRole('option', { name: 'Succeeded', exact: true }).click()
+  // Reopen only after the URL-backed value has committed; the next click checks selection styling.
+  await expect(page).toHaveURL(
+    (url) => url.searchParams.get('execution_status') === 'succeeded'
+  )
+  await expect(filter).toHaveValue('Succeeded')
   await filter.click()
   const selected = page.getByRole('option', {
     name: 'Succeeded',
