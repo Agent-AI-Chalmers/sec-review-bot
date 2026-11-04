@@ -115,11 +115,14 @@ export async function startReviewRunsServer(): Promise<{
   const connectorId =
     process.env.CONNECTOR_ID?.trim() || 'github-integration:default'
   const connectionString = requiredEnv('DATABASE_URL')
+  const langfuseConfig = langfuseConfiguration()
+  await using resources = new AsyncDisposableStack()
   const store = new ReviewRunStore({
     connectionString,
     connectorId,
     onDroppedRunRow: (dropped) => logDroppedRunRow(connectorId, dropped)
   })
+  resources.defer(() => store.close())
   await store.initialize()
 
   const coordinator = startReviewRunCoordinatorLoop({
@@ -196,7 +199,8 @@ export async function startReviewRunsServer(): Promise<{
     }
   })
 
-  const langfuseConfig = langfuseConfiguration()
+  resources.defer(() => coordinator.stop())
+
   const statisticsStore =
     langfuseConfig === null
       ? null
@@ -217,6 +221,7 @@ export async function startReviewRunsServer(): Promise<{
             10 * 60_000
           )
         })
+  if (statisticsStore !== null) resources.defer(() => statisticsStore.close())
   const statisticsCoordinator =
     statisticsStore === null || langfuseConfig === null
       ? null
@@ -268,7 +273,11 @@ export async function startReviewRunsServer(): Promise<{
           }
         })
 
+  if (statisticsCoordinator !== null)
+    resources.defer(() => statisticsCoordinator.stop())
+
   const app = Fastify(REVIEW_RUNS_FASTIFY_OPTIONS)
+  resources.defer(() => app.close())
   await registerReviewRunsRoutes(app, {
     store,
     serviceToken: token,
@@ -277,13 +286,6 @@ export async function startReviewRunsServer(): Promise<{
   })
   await app.listen({ port, host: '0.0.0.0' })
 
-  return {
-    close: async () => {
-      await app.close()
-      await coordinator.stop()
-      if (statisticsCoordinator !== null) await statisticsCoordinator.stop()
-      if (statisticsStore !== null) await statisticsStore.close()
-      await store.close()
-    }
-  }
+  const running = resources.move()
+  return { close: () => running.disposeAsync() }
 }

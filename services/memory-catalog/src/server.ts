@@ -345,23 +345,23 @@ export async function startMemoryCatalogServer(): Promise<{
   close: () => Promise<void>
 }> {
   const port = integerEnv('MEMORY_CATALOG_PORT', 8092, 1, 65_535)
-  const store = new PostgresMemoryCatalogStore(
-    requiredEnv('MEMORY_CATALOG_DATABASE_URL'),
-  )
+  const connectionString = requiredEnv('MEMORY_CATALOG_DATABASE_URL')
+  const workerToken = requiredEnv('MEMORY_CATALOG_WORKER_TOKEN')
+  const operatorToken = requiredEnv('MEMORY_CATALOG_OPERATOR_TOKEN')
+  const host = process.env.MEMORY_CATALOG_HOST?.trim() || '127.0.0.1'
+  await using resources = new AsyncDisposableStack()
+  const store = new PostgresMemoryCatalogStore(connectionString)
+  resources.defer(() => store.close())
   await store.initialize()
   const app = await createApp({
     store,
-    workerToken: requiredEnv('MEMORY_CATALOG_WORKER_TOKEN'),
-    operatorToken: requiredEnv('MEMORY_CATALOG_OPERATOR_TOKEN'),
+    workerToken,
+    operatorToken,
   })
-  const host = process.env.MEMORY_CATALOG_HOST?.trim() || '127.0.0.1'
+  resources.defer(() => app.close())
   await app.listen({ port, host })
-  return {
-    close: async () => {
-      await app.close()
-      await store.close()
-    },
-  }
+  const running = resources.move()
+  return { close: () => running.disposeAsync() }
 }
 
 if (process.env.NODE_ENV !== 'test') {

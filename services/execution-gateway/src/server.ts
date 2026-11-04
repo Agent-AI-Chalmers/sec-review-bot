@@ -206,7 +206,6 @@ export async function startExecutionGateway(): Promise<{
   close(): Promise<void>
 }> {
   const port = integerEnv('EXECUTION_GATEWAY_PORT', 8000, 1, 65_535)
-  const store = await TemporalExecutionStore.connect()
   const token = process.env.EXECUTION_GATEWAY_TOKEN?.trim()
   const host = process.env.EXECUTION_GATEWAY_HOST?.trim() || '127.0.0.1'
   if (
@@ -219,17 +218,17 @@ export async function startExecutionGateway(): Promise<{
       'EXECUTION_GATEWAY_TOKEN is required for a non-loopback host.',
     )
   }
+  await using resources = new AsyncDisposableStack()
+  const store = await TemporalExecutionStore.connect()
+  resources.defer(() => store.close())
   const app = await createApp({ store, ...(token ? { token } : {}) })
+  resources.defer(() => app.close())
   await app.listen({
     host,
     port,
   })
-  return {
-    close: async () => {
-      await app.close()
-      await store.close()
-    },
-  }
+  const running = resources.move()
+  return { close: () => running.disposeAsync() }
 }
 
 if (process.env.NODE_ENV !== 'test') {
