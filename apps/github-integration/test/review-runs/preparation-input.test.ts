@@ -17,6 +17,7 @@ const repository = {
   owner: { login: 'octo' },
   default_branch: 'main'
 }
+
 function issueInput(): IssuePreparationInput {
   return {
     kind: 'github_issue_review',
@@ -32,6 +33,7 @@ function issueInput(): IssuePreparationInput {
     open_pr: true
   }
 }
+
 function prInput(): PullRequestPreparationInput {
   return {
     kind: 'github_pull_request_review',

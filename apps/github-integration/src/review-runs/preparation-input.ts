@@ -299,6 +299,7 @@ function requirePersistedPullRequest(
     from_fork: requireBooleanField(record, 'from_fork', label)
   }
 }
+
 function optionalStringOrNull(
   record: Record<string, unknown>,
   field: string,

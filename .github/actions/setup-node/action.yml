@@ -1,26 +1,28 @@
 name: Set up Node package
-description: Install pnpm, select the package's Node version, restore its cache, and install locked dependencies.
+description: Install pnpm, select the package's Node version, and install the locked repository workspace.
 inputs:
   directory:
     description: Package directory relative to the repository root.
     required: true
-  cache-dependency-path:
-    description: Lockfiles to cache when a job installs more than one package.
-    required: false
 runs:
   using: composite
   steps:
     - uses: pnpm/action-setup@v6
       with:
-        version: 12
         run_install: false
     - uses: actions/setup-node@v7
       with:
         node-version-file: ${{ inputs.directory }}/package.json
         check-latest: true
         cache: pnpm
-        cache-dependency-path: ${{ inputs.cache-dependency-path || format('{0}/pnpm-lock.yaml', inputs.directory) }}
+        cache-dependency-path: pnpm-lock.yaml
     - name: Install dependencies
       shell: bash
-      working-directory: ${{ inputs.directory }}
+      working-directory: ${{ github.workspace }}
       run: pnpm install --frozen-lockfile
+    - name: Check Node.js package boundaries
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      run: |
+        node --test .github/ci/check-package-boundaries.test.mjs
+        node .github/ci/check-package-boundaries.mjs

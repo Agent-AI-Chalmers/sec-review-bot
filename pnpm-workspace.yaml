@@ -1,0 +1,12 @@
+packages:
+  - "apps/*"
+  - "services/*"
+  - "contracts/codegen"
+  - "contracts/*/tools"
+  - "contracts/tar-zstd-artifact/envelope/tools"
+  - "contracts/tar-zstd-artifact/profiles/*/tools"
+
+allowBuilds:
+  esbuild: true
+  "@scarf/scarf": false
+  protobufjs: false

@@ -8,7 +8,9 @@
       "code_inputs": [
         "contracts/execution-api/tools/src/generate-api-types.ts",
         "services/review-runs/.prettierrc.json",
-        "services/execution-gateway/.prettierrc.json"
+        "services/execution-gateway/.prettierrc.json",
+        "contracts/codegen/src/index.js",
+        "contracts/codegen/package.json"
       ],
       "command": "pnpm --dir contracts/execution-api/tools run generate",
       "inputs": [

@@ -18,8 +18,10 @@ interface ObservationStore {
     storage?: ExecutionArtifactStorage
   ): Promise<boolean>
 }
+
 export type ExecutionObservationResult =
   'active' | 'succeeded' | 'failed' | 'poll_retry'
+
 export interface ExecutionObservationEvent {
   kind:
     | 'execution_poll_retry'

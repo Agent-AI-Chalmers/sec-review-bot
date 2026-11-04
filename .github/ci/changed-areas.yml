@@ -12,6 +12,10 @@
 # Comments are free-form; the validator reads only the area keys and their globs.
 
 automation-config:
+  - "package.json"
+  - "pnpm-workspace.yaml"
+  - ".dockerignore"
+  - "pnpm-lock.yaml"
   - ".github/actions/check-seams/**"
   - ".github/actions/check-agents/**"
   - ".github/actions/setup-python/**"
@@ -36,6 +40,10 @@ ops:
   - ".github/workflows/ci.yml"
 
 contract-tools:
+  - "package.json"
+  - "pnpm-workspace.yaml"
+  - ".dockerignore"
+  - "pnpm-lock.yaml"
   - ".github/workflows/ci-contracts.yml"
   - ".github/actions/setup-node/**"
   # The per-family tools and the contract trees they own.
@@ -62,45 +70,67 @@ contract-tools:
   - ".github/workflows/ci.yml"
 
 review-runs:
+  - "package.json"
+  - "pnpm-workspace.yaml"
+  - ".dockerignore"
+  - "pnpm-lock.yaml"
   - ".github/actions/setup-node/**"
   - "services/review-runs/**"
   # It validates requests against the shared contract schemas.
   - "contracts/**"
-  # Its integration suite's client<->server seam test drives the GitHub integration client
-  # against the real server, so a client change must re-run this job.
-  - "apps/github-integration/src/review-runs/client.ts"
-  - "apps/github-integration/src/review-runs/review-runs-api.ts"
   # CI tooling.
   - ".github/ci/**"
   - ".github/workflows/ci.yml"
 
 execution-gateway:
+  - "package.json"
+  - "pnpm-workspace.yaml"
+  - ".dockerignore"
+  - "pnpm-lock.yaml"
   - ".github/actions/setup-node/**"
   - "services/execution-gateway/**"
   - "contracts/execution-api/**"
+  - "contracts/codegen/**"
   - "contracts/execution-workflow/**"
   - ".github/workflows/ci.yml"
 
 system-tests:
+  - "package.json"
+  - "pnpm-workspace.yaml"
+  - ".dockerignore"
+  - "pnpm-lock.yaml"
   - ".github/actions/setup-node/**"
-  # The single cross-service path joins these production boundaries and their shared contracts.
+  # Repository-level HTTP and submission tests combine these participants.
   - "scripts/system-tests/execution-submission.test.mjs"
+  - "scripts/system-tests/review-runs-http.test.mjs"
+  - "apps/github-integration/**"
   - "services/review-runs/**"
   - "services/execution-gateway/**"
+  - "contracts/review-runs-api/**"
   - "contracts/execution-api/**"
+  - "contracts/codegen/**"
   - "contracts/execution-workflow/**"
   - "compose.yaml"
   - ".github/ci/**"
   - ".github/workflows/ci.yml"
 
 memory-catalog:
+  - "package.json"
+  - "pnpm-workspace.yaml"
+  - ".dockerignore"
+  - "pnpm-lock.yaml"
   - ".github/ci/**"
   - ".github/actions/setup-node/**"
   - "services/memory-catalog/**"
   - "contracts/memory-catalog-api/**"
+  - "contracts/codegen/**"
   - ".github/workflows/ci.yml"
 
 github-integration:
+  - "package.json"
+  - "pnpm-workspace.yaml"
+  - ".dockerignore"
+  - "pnpm-lock.yaml"
   - ".github/actions/setup-node/**"
   # The repo-level trigger configuration the service reads.
   - ".sec-review/**"
@@ -111,6 +141,10 @@ github-integration:
   - ".github/workflows/ci.yml"
 
 control-plane-ui:
+  - "package.json"
+  - "pnpm-workspace.yaml"
+  - ".dockerignore"
+  - "pnpm-lock.yaml"
   - ".github/workflows/ci-browser.yml"
   - ".github/actions/setup-node/**"
   - "apps/control-plane-ui/**"
@@ -149,6 +183,10 @@ documentation:
   - ".github/workflows/ci.yml"
 
 catalog-seam:
+  - "package.json"
+  - "pnpm-workspace.yaml"
+  - ".dockerignore"
+  - "pnpm-lock.yaml"
   - ".github/workflows/ci.yml"
   - ".github/actions/check-seams/**"
   - ".github/actions/setup-node/**"
@@ -164,10 +202,15 @@ catalog-seam:
   - "agents/uv.lock"
   - "agents/.python-version"
   - "contracts/memory-catalog-api/**"
+  - "contracts/codegen/**"
   - "scripts/system-tests/catalog-server.mjs"
   - "scripts/system-tests/test_memory_catalog.py"
 
 input-bundle-seam:
+  - "package.json"
+  - "pnpm-workspace.yaml"
+  - ".dockerignore"
+  - "pnpm-lock.yaml"
   - ".github/workflows/ci.yml"
   - ".github/actions/check-seams/**"
   - ".github/actions/setup-node/**"
@@ -184,11 +227,16 @@ input-bundle-seam:
   - "agents/uv.lock"
   - "agents/.python-version"
   - "contracts/execution-api/**"
+  - "contracts/codegen/**"
   - "contracts/tar-zstd-artifact/**"
   - "scripts/system-tests/publish-input.mjs"
   - "scripts/system-tests/test_input_bundle.py"
 
 memory-bff-seam:
+  - "package.json"
+  - "pnpm-workspace.yaml"
+  - ".dockerignore"
+  - "pnpm-lock.yaml"
   - ".github/workflows/ci.yml"
   - ".github/actions/check-seams/**"
   - ".github/actions/setup-node/**"
@@ -200,7 +248,6 @@ memory-bff-seam:
   - "apps/control-plane-ui/server/**"
   - "apps/control-plane-ui/shared/**"
   - "apps/control-plane-ui/package.json"
-  - "apps/control-plane-ui/pnpm-lock.yaml"
   - "apps/control-plane-ui/tsconfig*.json"
   - "services/memory-catalog/**"
   - "agents/src/sec_review_agents/memory/**"
@@ -209,6 +256,7 @@ memory-bff-seam:
   - "agents/uv.lock"
   - "agents/.python-version"
   - "contracts/memory-catalog-api/**"
+  - "contracts/codegen/**"
   - "contracts/tar-zstd-artifact/**"
   - "scripts/system-tests/catalog-server.mjs"
   - "scripts/system-tests/bff-server.mjs"

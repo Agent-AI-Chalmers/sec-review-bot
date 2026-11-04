@@ -144,10 +144,12 @@ export const RUN_SELECT = `
 function iso(value: string): string {
   return new Date(value).toISOString()
 }
+
 /** `iso` for an axis timestamp that is meaningful only once the phase reaches it. */
 function isoOrNull(value: string | null): string | null {
   return value === null ? null : iso(value)
 }
+
 export function rowToRecord(row: ReviewRunRow): ReviewRunRecord {
   const { trunk, execution, publication, preparation } = row
   if (execution.missing) {

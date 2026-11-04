@@ -87,6 +87,7 @@ function coerceQueryStrings(request: FastifyRequest): void {
     }
   }
 }
+
 // Statuses whose handling needs the run record itself, because the terminal writes
 // persist the result, the error, and the artifact reference. Every other status is
 // answered from the pass's batch, so a poll where nothing changed costs one request
@@ -100,6 +101,7 @@ function coerceQueryStrings(request: FastifyRequest): void {
 // ErrorResponse.code enum so the surface cannot advertise a code the contract omits. Typed as
 // string[] because the membership check guards an arbitrary thrown error's `code`.
 const errorCodeEnum: readonly string[] = [...ERROR_RESPONSE_CODES_FROM_CONTRACT]
+
 function logEvent(event: string, fields: Record<string, unknown> = {}): void {
   // Keep operational logs structured, but never serialize request arguments:
   // they may contain execution input, publish context, or claim credentials.

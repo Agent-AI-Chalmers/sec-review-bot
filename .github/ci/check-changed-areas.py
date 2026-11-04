@@ -16,7 +16,6 @@ UNCOVERED = (
     ("AGENTS.md", "Repository guidance; Markdown is covered by documentation checks."),
     (".gitattributes", "Git attributes; no build reads them."),
     (".gitignore", "Git ignore rules; no build reads them."),
-    (".dockerignore", "Docker ignore rules for the unused root context."),
 )
 
 
@@ -81,14 +80,16 @@ def contract_tool_directories(tracked_files: list[str]) -> list[str]:
     return sorted(
         str(PurePosixPath(file).parent)
         for file in tracked_files
-        if re.fullmatch(r"contracts/.+/tools/package\.json", file)
+        if re.fullmatch(r"contracts/(?:.+/tools|codegen)/package\.json", file)
     )
 
 
 def contract_tool_directories_in_workflow(source: str) -> list[str]:
     return sorted(
         re.findall(
-            r"^\s+tools_directory:\s+(contracts/\S+/tools)$", source, re.MULTILINE
+            r"^\s+tools_directory:\s+(contracts/(?:\S+/tools|codegen))$",
+            source,
+            re.MULTILINE,
         )
     )
 
@@ -127,6 +128,9 @@ def check_generated_artifacts(
 
     outputs: list[str] = []
     for tool_directory in tool_directories:
+        # The shared renderer is checked in this matrix but owns no contract artifacts.
+        if tool_directory == "contracts/codegen":
+            continue
         manifest_path = f"{tool_directory}/generated-artifacts.json"
         if manifest_path not in tracked_files:
             raise AssertionError(
@@ -153,14 +157,13 @@ def check_client_server_seam(areas: dict[str, list[str]]) -> None:
     seam_paths = (
         "apps/github-integration/src/review-runs/client.ts",
         "apps/github-integration/src/review-runs/review-runs-api.ts",
+        "services/review-runs/src/http/server-surface.ts",
+        "scripts/system-tests/review-runs-http.test.mjs",
+        "contracts/review-runs-api/v1/openapi.yaml",
     )
     for candidate in seam_paths:
-        if not covers(areas["review-runs"], candidate):
-            raise AssertionError(f"the review-runs area must trigger on {candidate}")
-        if not covers(areas["github-integration"], candidate):
-            raise AssertionError(
-                f"the github-integration area must trigger on {candidate}"
-            )
+        if not covers(areas["system-tests"], candidate):
+            raise AssertionError(f"the system-tests area must trigger on {candidate}")
 
 
 def check_execution_workflow(areas: dict[str, list[str]]) -> None:

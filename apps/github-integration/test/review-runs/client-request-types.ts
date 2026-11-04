@@ -10,7 +10,7 @@
 // These assertions are type-level only; `client.test.ts` covers the transport behaviour.
 import { operationRoutes } from '../../src/review-runs/review-runs-api.js'
 import type {
-  GetInternalRunResponse,
+  GetInternalRunResponseBody,
   OperationOptionsById,
   SubmitPreparedRunOptions
 } from '../../src/review-runs/review-runs-api.js'
@@ -45,7 +45,7 @@ export type PublicationStepsAcceptsStepKeys = Expect<
 export type GetRunMayReportAbsence = Expect<
   Equals<
     Awaited<ReturnType<ReviewRunsClient['getRun']>>,
-    GetInternalRunResponse | null
+    GetInternalRunResponseBody | null
   >
 >
 

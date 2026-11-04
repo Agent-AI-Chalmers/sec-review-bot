@@ -43,6 +43,7 @@ type RevisionPage = MemoryTreeRevisionList
 type ObservationPage = ObservationList
 type MaintenanceControlRequest = Omit<MaintenanceControlOperation, 'actor'>
 type RestoreRequest = Omit<MemoryTreeRestoreOperation, 'actor'>
+
 function operationId(): string {
   return crypto.randomUUID()
 }

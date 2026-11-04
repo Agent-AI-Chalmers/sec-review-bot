@@ -29,7 +29,6 @@ tools/
     generated-artifact.ts    the { output, render } shape
     repo-root.ts             the repository root, for absolute output paths
     generate-types.ts        the API projections (types, error codes, console params)
-    render-kubb-types.ts     the shared in-memory Kubb TypeScript projection
     generate-schemas.ts      the committed v1 JSON Schemas
   spectral-functions/
     operationRequiresSecurity.js     the every-operation-declares-security rule (../.spectral.yaml)

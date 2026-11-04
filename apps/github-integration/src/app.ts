@@ -100,6 +100,7 @@ server.listen(port, () => {
 
 let shutdownStarted = false
 const shutdownSignals = ['SIGINT', 'SIGTERM'] as const
+
 type ShutdownSignal = (typeof shutdownSignals)[number]
 
 function closeServer(): Promise<void> {

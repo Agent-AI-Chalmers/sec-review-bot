@@ -14,6 +14,8 @@ The Execution API owns the reference object and workflow-specific manifest schem
 ```bash
 pnpm run generate
 pnpm run check
+pnpm run format:check
+pnpm run lint
 pnpm run test
 ```
 

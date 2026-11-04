@@ -639,6 +639,7 @@ test('dispatchRepositoryReview preserves an uncertain Execution submission for r
   assert.strictEqual((transitions[0] as unknown[])[0], 'prepared')
   assert.strictEqual(transitions.length, 1)
 })
+
 function withoutPreparationInput<
   T extends { preparation_input?: unknown; preparation_input_version?: unknown }
 >(run: T): Omit<T, 'preparation_input' | 'preparation_input_version'> {

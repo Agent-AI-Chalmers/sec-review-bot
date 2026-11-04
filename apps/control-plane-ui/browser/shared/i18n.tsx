@@ -1116,6 +1116,7 @@ export const messages = {
     attentionNoticeSuperseded: '恢复已重新启动，此通知已不再适用'
   }
 } as const
+
 export type Message = keyof typeof messages.en
 
 const LanguageContext = React.createContext<{

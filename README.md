@@ -113,6 +113,16 @@ sudo systemctl enable --now sec-review-bot.target
 
 `sec-review-bot.target` is the systemd entry point for the complete service. See the [local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) for configuration, status inspection, updates, and component-level development.
 
+### Local Development
+
+To develop the UI or Node.js services, first install dependencies from the repository root:
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+Then follow the target package's README for development commands. For Python development setup, see [agents/README.md](agents/README.md).
+
 ## Where To Start
 
 Package-specific setup and commands live in the package READMEs.

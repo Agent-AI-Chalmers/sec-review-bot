@@ -19,15 +19,14 @@
     "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
-    "@kubb/core": "5.13.1",
-    "@kubb/plugin-ts": "5.1.0",
     "@stoplight/spectral-cli": "^6.17.0",
-    "kubb": "5.13.1",
     "prettier": "^3.9.10",
-    "yaml": "^2.9.1"
+    "yaml": "^2.9.1",
+    "@sec-review-bot/contract-codegen": "workspace:*"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^24.19.2",
     "eslint": "^10.13.0",
     "eslint-config-prettier": "^10.1.8",

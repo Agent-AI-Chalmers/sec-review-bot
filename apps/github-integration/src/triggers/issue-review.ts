@@ -22,6 +22,7 @@ import type {
   IssueReviewEventType,
   IssuePreparationInput
 } from '../review-runs/preparation-input.js'
+
 interface StartIssueReviewCommandDeps {
   prepare_review: typeof prepareIssueReview
   store: PreparationCommandStore

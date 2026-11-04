@@ -37,9 +37,22 @@ GitHub displays called jobs beneath their caller names. Branch protection should
 
 ## Shared Node Setup
 
-[The Node setup action](../actions/setup-node/action.yml) owns pnpm setup, package-specific Node selection, dependency caching, and frozen-lockfile installation. Call it after checkout with a repository-relative package directory. Jobs that install another package can supply its lockfile in `cache-dependency-path` and install that package in a separate step.
+<!-- doc-default: shared-node-setup; source=.github/actions/setup-node/action.yml -->
+[The Node setup action](../actions/setup-node/action.yml) owns pnpm setup, package-specific Node selection, dependency caching, and frozen-lockfile installation. Call it after checkout with a repository-relative package directory to select the Node version. The action uses the root lockfile for caching and installs the repository workspace once from the root, making dependencies available to all workspace packages.
 
 Package checks and service containers live in the workflows; change conditions stay in [the main CI workflow](../workflows/ci.yml). Changes to the shared action trigger its consuming areas through `changed-areas.yml`.
+
+## Node.js Package Boundaries
+
+After installing dependencies, the shared Node setup action runs the package-boundary checker and its regression tests. To run the check locally after `pnpm install --frozen-lockfile`:
+
+```bash
+pnpm run check:boundaries
+node --test .github/ci/check-package-boundaries.test.mjs
+```
+
+<!-- doc-default: node-package-boundaries; source=.github/ci/check-package-boundaries.mjs -->
+Applications and services must not depend on or import other repository packages. Contract tools may use `contracts/codegen`. The checker validates dependency declarations and uses the TypeScript AST to inspect literal references, including type imports, re-exports, dynamic imports, `require`, and file URLs; it also resolves TypeScript path aliases. Contract schemas and fixtures remain available as data. Package tests follow the same boundaries as production code. Tests that combine packages belong under `scripts/system-tests/`. Computed paths assembled at runtime are outside this static check's coverage.
 
 ## Shared Python Setup
 
@@ -64,7 +77,7 @@ The first checks that every CI job contributes to `CI Status`. The second checks
 
 ## Cross-service Smoke Checks
 
-[The smoke inventory](../../scripts/system-tests/README.md#smoke-inventory) lists all scenarios, their boundaries, and CI policies. Execution submission is also a cross-service smoke test; its job is named `Smoke — Execution Submission`. The `Smoke — Memory and Artifacts` job groups the Catalog client, input bundle, and operator edit tests to share infrastructure.
+[The smoke inventory](../../scripts/system-tests/README.md#smoke-inventory) lists all scenarios, their boundaries, and CI policies. Execution submission and Integration-to-Review-Runs HTTP checks run in `Smoke — Service Boundaries`. The `Smoke — Memory and Artifacts` job groups the Catalog client, input bundle, and operator edit tests to share infrastructure.
 
 
 The `catalog-seam`, `input-bundle-seam`, and `memory-bff-seam` areas select the lightweight probes run by [the smoke action](../actions/check-seams/action.yml). The main workflow owns their single job and final status dependency; the action builds selected participants and runs them in one pytest process to share disposable services. See [the system-test guide](../../scripts/system-tests/README.md#model-free-cross-service-smoke-tests) for commands and coverage limits.
@@ -94,7 +107,7 @@ CI cannot see a cross-package dependency in an import graph, so the couplings ar
 
 - **Shared contract.** `contracts/**` is read by every consumer of a contract family, so it is listed under `contract-tools`, `review-runs`, `github-integration`, `control-plane-ui`, and `agents`.
 - **Generated artifacts.** A contract tool renders a projection into another package, so `contract-tools` lists each one. The checker derives that set from the tools' `generated-artifacts.json` manifests, so a new projection cannot be added without wiring it up.
-- **Cross-package tests.** `review-runs`'s integration suite includes the client↔server seam test, which loads the GitHub-integration client, so a client change must re-run it; both the `review-runs` and `github-integration` areas list the client.
+- **Cross-package tests.** The repository-level `review-runs-http.test.mjs` combines the Integration client and Review Runs server. The `system-tests` area covers both participants and the test entrypoint.
 
 A missed path means a change runs **no job at all** — silent, green CI. That is the class of defect that let an empty-200 response break the client: the job that would have caught it was not wired to the file that changed.
 

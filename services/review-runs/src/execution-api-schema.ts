@@ -152,17 +152,6 @@ export type RunStatusResponse = {
   runs: RunStatusToken[]
 }
 
-export type HealthStatus200 = HealthResponse
-
-/**
- * @description An error body.
- *
- * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
- * concerned, so a caller can attribute a failure without echoing its own request back.
- * @type object
- */
-export type HealthStatus500 = ExecutionErrorResponse
-
 export type HealthOptions = {
   body?: never
   path?: never
@@ -170,39 +159,20 @@ export type HealthOptions = {
   headers?: never
 }
 
-export type HealthResponses = {
-  '200': HealthStatus200
-  '500': HealthStatus500
+export type HealthResponseBodyByStatus = {
+  '200': HealthResponse
+  /**
+   * @description An error body.
+   *
+   * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
+   * concerned, so a caller can attribute a failure without echoing its own request back.
+   * @type object
+   */
+  '500': ExecutionErrorResponse
 }
 
-export type GetRunStatusesStatus200 = RunStatusResponse
-
-/**
- * @description An error body.
- *
- * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
- * concerned, so a caller can attribute a failure without echoing its own request back.
- * @type object
- */
-export type GetRunStatusesStatus400 = ExecutionErrorResponse
-
-/**
- * @description An error body.
- *
- * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
- * concerned, so a caller can attribute a failure without echoing its own request back.
- * @type object
- */
-export type GetRunStatusesStatus413 = ExecutionErrorResponse
-
-/**
- * @description An error body.
- *
- * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
- * concerned, so a caller can attribute a failure without echoing its own request back.
- * @type object
- */
-export type GetRunStatusesStatus500 = ExecutionErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type HealthResponseBody = HealthResponseBodyByStatus['200']
 
 /**
  * @description Which runs a status query wants status tokens for.
@@ -217,17 +187,37 @@ export type GetRunStatusesOptions = {
   headers?: never
 }
 
-export type GetRunStatusesResponses = {
-  '200': GetRunStatusesStatus200
-  '400': GetRunStatusesStatus400
-  '413': GetRunStatusesStatus413
-  '500': GetRunStatusesStatus500
+export type GetRunStatusesResponseBodyByStatus = {
+  '200': RunStatusResponse
+  /**
+   * @description An error body.
+   *
+   * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
+   * concerned, so a caller can attribute a failure without echoing its own request back.
+   * @type object
+   */
+  '400': ExecutionErrorResponse
+  /**
+   * @description An error body.
+   *
+   * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
+   * concerned, so a caller can attribute a failure without echoing its own request back.
+   * @type object
+   */
+  '413': ExecutionErrorResponse
+  /**
+   * @description An error body.
+   *
+   * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
+   * concerned, so a caller can attribute a failure without echoing its own request back.
+   * @type object
+   */
+  '500': ExecutionErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type GetRunStatusesResponse = GetRunStatusesStatus200
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type GetRunStatusesResponseBody =
+  GetRunStatusesResponseBodyByStatus['200']
 
 export type GetRunPath = {
   /**
@@ -237,34 +227,6 @@ export type GetRunPath = {
   run_id: string
 }
 
-/**
- * @description One run as the Execution API provider reports it.
- *
- * Optional result, diagnostic, and post-processing fields are omitted rather
- * than null until they exist, which is why the route serializes with
- * `exclude_none`.
- * @type object
- */
-export type GetRunStatus200 = RunResponse
-
-/**
- * @description An error body.
- *
- * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
- * concerned, so a caller can attribute a failure without echoing its own request back.
- * @type object
- */
-export type GetRunStatus404 = ExecutionErrorResponse
-
-/**
- * @description An error body.
- *
- * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
- * concerned, so a caller can attribute a failure without echoing its own request back.
- * @type object
- */
-export type GetRunStatus500 = ExecutionErrorResponse
-
 export type GetRunOptions = {
   body?: never
   path: GetRunPath
@@ -272,66 +234,40 @@ export type GetRunOptions = {
   headers?: never
 }
 
-export type GetRunResponses = {
-  '200': GetRunStatus200
-  '404': GetRunStatus404
-  '500': GetRunStatus500
+export type GetRunResponseBodyByStatus = {
+  /**
+   * @description One run as the Execution API provider reports it.
+   *
+   * Optional result, diagnostic, and post-processing fields are omitted rather
+   * than null until they exist, which is why the route serializes with
+   * `exclude_none`.
+   * @type object
+   */
+  '200': RunResponse
+  /**
+   * @description An error body.
+   *
+   * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
+   * concerned, so a caller can attribute a failure without echoing its own request back.
+   * @type object
+   */
+  '404': ExecutionErrorResponse
+  /**
+   * @description An error body.
+   *
+   * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
+   * concerned, so a caller can attribute a failure without echoing its own request back.
+   * @type object
+   */
+  '500': ExecutionErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type GetRunResponse = GetRunStatus200
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type GetRunResponseBody = GetRunResponseBodyByStatus['200']
 
 export type CreateRunPath = {
   workflow: 'issue-review' | 'pull-request-review' | 'repository-review'
 }
-
-/**
- * @description One run as the Execution API provider reports it.
- *
- * Optional result, diagnostic, and post-processing fields are omitted rather
- * than null until they exist, which is why the route serializes with
- * `exclude_none`.
- * @type object
- */
-export type CreateRunStatus202 = RunResponse
-
-/**
- * @description An error body.
- *
- * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
- * concerned, so a caller can attribute a failure without echoing its own request back.
- * @type object
- */
-export type CreateRunStatus400 = ExecutionErrorResponse
-
-/**
- * @description An error body.
- *
- * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
- * concerned, so a caller can attribute a failure without echoing its own request back.
- * @type object
- */
-export type CreateRunStatus409 = ExecutionErrorResponse
-
-/**
- * @description An error body.
- *
- * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
- * concerned, so a caller can attribute a failure without echoing its own request back.
- * @type object
- */
-export type CreateRunStatus413 = ExecutionErrorResponse
-
-/**
- * @description An error body.
- *
- * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
- * concerned, so a caller can attribute a failure without echoing its own request back.
- * @type object
- */
-export type CreateRunStatus500 = ExecutionErrorResponse
 
 /**
  * @description A request to start one workflow run.
@@ -346,18 +282,53 @@ export type CreateRunOptions = {
   headers?: never
 }
 
-export type CreateRunResponses = {
-  '202': CreateRunStatus202
-  '400': CreateRunStatus400
-  '409': CreateRunStatus409
-  '413': CreateRunStatus413
-  '500': CreateRunStatus500
+export type CreateRunResponseBodyByStatus = {
+  /**
+   * @description One run as the Execution API provider reports it.
+   *
+   * Optional result, diagnostic, and post-processing fields are omitted rather
+   * than null until they exist, which is why the route serializes with
+   * `exclude_none`.
+   * @type object
+   */
+  '202': RunResponse
+  /**
+   * @description An error body.
+   *
+   * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
+   * concerned, so a caller can attribute a failure without echoing its own request back.
+   * @type object
+   */
+  '400': ExecutionErrorResponse
+  /**
+   * @description An error body.
+   *
+   * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
+   * concerned, so a caller can attribute a failure without echoing its own request back.
+   * @type object
+   */
+  '409': ExecutionErrorResponse
+  /**
+   * @description An error body.
+   *
+   * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
+   * concerned, so a caller can attribute a failure without echoing its own request back.
+   * @type object
+   */
+  '413': ExecutionErrorResponse
+  /**
+   * @description An error body.
+   *
+   * `run_id` and `workflow` are present when the Execution API provider already knows which run the request
+   * concerned, so a caller can attribute a failure without echoing its own request back.
+   * @type object
+   */
+  '500': ExecutionErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type CreateRunResponse = CreateRunStatus202
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type CreateRunResponseBody = CreateRunResponseBodyByStatus['202']
+
 export interface InputBundleArtifactRef {
   uri: string
   digest: string

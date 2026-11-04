@@ -1,19 +1,20 @@
 # Cross-service Smoke Tests
 
 <!-- doc-default: system-tests.inventory; source=scripts/system-tests/ -->
-There are **5 cross-service smoke scenarios** here: **4 run on relevant PR changes and in the merge queue; 1 runs manually in CI**. All use production code across package or language boundaries. None calls a real model. All commands below run from the repository root.
+These smoke tests use production code across package or language boundaries without calling a real model. The inventory lists their CI execution policies. All commands below run from the repository root.
 
 ## Smoke Inventory
 
 | Smoke scenario / entrypoint | Real boundary exercised | Main assertions | CI execution |
 | --- | --- | --- | --- |
+| [Review Runs HTTP](review-runs-http.test.mjs) | Integration client → Review Runs HTTP | Empty successful responses resolve without JSON parsing errors; JSON responses still parse. | PR by path + merge queue |
 | [Execution submission](execution-submission.test.mjs) | Review Runs client → Gateway HTTP → Temporal | Submit, replay the same submission, and read running status. Stops before Worker execution. | PR by path + merge queue |
 | [Memory Catalog client](test_memory_catalog.py) | Python client → Catalog HTTP → PostgreSQL | Confirmation required; duplicate registration is idempotent; conflicting intent and bad credentials are rejected. | PR by path + merge queue |
 | [Input bundle](test_input_bundle.py) | TypeScript archive/upload → RustFS → Python input preparation | Repeated publication preserves identity; workspace bytes survive transport; wrong digest is rejected. | PR by path + merge queue |
 | [Memory operator edit](test_memory_bff.py) | UI BFF → Catalog/PostgreSQL + RustFS | Edit replay creates no extra revision; stale edits conflict; restore returns the prior pointer and readable artifact. | PR by path + merge queue |
 | [Execution lifecycle](test_execution_lifecycle.py) | Review Runs coordination → Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | Activity retry, completed execution, readable diagnostics, and a durable publication result after reopening the store. Analysis is deterministic; no real model or GitHub publication. | Manual only |
 
-**Scenarios and CI jobs are different counts.** Execution submission has its own job, `Smoke — Execution Submission`. Catalog client, input bundle, and operator edit share `Smoke — Memory and Artifacts` so selected tests can reuse disposable services; they remain separate tests with separate path filters. The manual workflow is `Smoke — Execution Lifecycle`. The shared job is an execution-cost choice, not a separate category of smoke tests.
+Review Runs HTTP and execution submission share the `Smoke — Service Boundaries` job. Catalog client, input bundle, and operator edit share `Smoke — Memory and Artifacts` so selected tests can reuse disposable services; they remain separate tests with separate path filters. The manual workflow is `Smoke — Execution Lifecycle`. The shared job is an execution-cost choice, not a separate category of smoke tests.
 
 ## Prerequisites
 
@@ -21,12 +22,20 @@ Use the Python version from `agents/.python-version`, Node and pnpm versions sup
 
 ```bash
 uv --project agents sync --group test --frozen
-for package in services/memory-catalog apps/github-integration apps/control-plane-ui services/execution-gateway services/review-runs; do
-  pnpm --dir "$package" install --frozen-lockfile
-done
+pnpm install --frozen-lockfile
 ```
 
 Install and build only the participants needed for the selected test. The original submission test builds its own packages; the Python probes consume compiled Node modules and require the build commands shown below.
+
+## Review Runs HTTP
+
+This test combines the compiled Integration client and Review Runs HTTP routes on an ephemeral loopback port. It protects against parsing an empty HTTP 200 response as JSON while also checking a JSON-returning operation. Storage is stubbed; this test needs no database or Docker daemon.
+
+```bash
+pnpm --dir apps/github-integration run build
+pnpm --dir services/review-runs run build
+node --test scripts/system-tests/review-runs-http.test.mjs
+```
 
 ## Execution Submission
 

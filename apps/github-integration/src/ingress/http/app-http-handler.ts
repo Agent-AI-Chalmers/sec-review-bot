@@ -104,6 +104,7 @@ async function handleAppHttpRequest(
     request.off('end', cleanup)
     request.off('error', cleanup)
   }
+
   function enforceWebhookBodyLimit(chunk: Buffer | string): void {
     if (rejected) return
     receivedBytes += Buffer.isBuffer(chunk)
@@ -119,6 +120,7 @@ async function handleAppHttpRequest(
     }
     request.destroy()
   }
+
   request.on('data', enforceWebhookBodyLimit)
   request.once('end', cleanup)
   request.once('error', cleanup)

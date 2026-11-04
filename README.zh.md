@@ -111,6 +111,16 @@ sudo systemctl enable --now sec-review-bot.target
 
 `sec-review-bot.target` 是整套服务的 systemd 入口。配置、状态查看、更新和组件级调试见[本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
 
+### 本地开发
+
+开发 UI 或 Node.js 服务时，先在仓库根目录安装依赖：
+
+```bash
+pnpm install --frozen-lockfile
+```
+
+随后按目标包 README 中的命令进行开发。Python 开发环境安装见 [agents/README.zh.md](agents/README.zh.md)。
+
 ## 从哪里开始
 
 各 package 的安装和开发命令放在对应 package README 里。

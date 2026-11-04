@@ -90,6 +90,7 @@ export interface ExecutionRunStatus extends Omit<
   /** Present only once `parseArtifactStorage` has accepted it. */
   artifact_storage?: ExecutionArtifactStorage
 }
+
 export interface ExecutionServiceError extends Error {
   name: 'ExecutionServiceError'
   code: string

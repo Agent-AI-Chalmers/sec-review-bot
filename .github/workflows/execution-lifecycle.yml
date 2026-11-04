@@ -17,15 +17,10 @@ jobs:
       - uses: ./.github/actions/setup-node
         with:
           directory: services/execution-gateway
-          cache-dependency-path: |
-            services/execution-gateway/pnpm-lock.yaml
-            services/review-runs/pnpm-lock.yaml
-            apps/github-integration/pnpm-lock.yaml
       - name: Build participants
         shell: bash
         run: |
           for package in services/execution-gateway services/review-runs apps/github-integration; do
-            pnpm --dir "$package" install --frozen-lockfile
             pnpm --dir "$package" run build
           done
       - name: Test execution, retry, diagnostics and durable terminal state

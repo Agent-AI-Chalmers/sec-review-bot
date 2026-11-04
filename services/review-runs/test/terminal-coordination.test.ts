@@ -37,6 +37,7 @@ const run: ReviewRunRecord = {
   artifact_storage: null,
   notices: []
 }
+
 type ObservationStore = Parameters<typeof observeExecutionRun>[0]
 
 /** The transitions this test records, kept flat; observation reads them per axis. */

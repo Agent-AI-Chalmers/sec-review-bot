@@ -23,6 +23,7 @@ import { installationOctokitForRepo } from '../github/installation-client.js'
 export interface PublicationCoordinator {
   stop: () => Promise<void>
 }
+
 interface Options {
   app: App
   store?: PublicationCoordinatorStore

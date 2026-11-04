@@ -25,7 +25,7 @@ Internal web console for inspecting and operating review runs, execution diagnos
 From `apps/control-plane-ui`, install dependencies and start the fixture-backed preview:
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm run dev:fixtures
 ```
 

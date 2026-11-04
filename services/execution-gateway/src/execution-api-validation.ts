@@ -62,6 +62,7 @@ function createValidators(): Map<string, ValidateFunction> {
 
 let validators: Map<string, ValidateFunction> | undefined
 let resultValidators: Map<string, ValidateFunction> | undefined
+
 export function supportedWorkflows(): ExecutionWorkflow[] {
   return Object.keys(schemaByWorkflow) as ExecutionWorkflow[]
 }

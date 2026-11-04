@@ -7,6 +7,7 @@ import type { Octokit } from 'octokit'
 import { asErrorWithResponse, isRecord } from '../utils/error-utils.js'
 import { ensureSummaryIssueNumber } from '../reviews/repositories/publish.js'
 import { repositoryFullName } from '../github/repository-service.js'
+
 function replyTarget(input: Record<string, unknown>): {
   owner_login: string
   repo_name: string
