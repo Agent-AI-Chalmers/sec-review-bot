@@ -1,314 +1,163 @@
+import os
+import shutil
 import subprocess
 import tempfile
-from collections.abc import Sequence
 from pathlib import Path
 
 from pydantic import BaseModel
 
-from sec_review_agents.workspace.file_changes import (
-    FileChange,
-)
-from sec_review_agents.workspace.paths import normalize_declared_file_path
+from sec_review_agents.workspace.file_changes import FileChange
+from sec_review_agents.workspace.paths import validate_repository_file_path
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
 
-def normalize_declared_changed_files(
-    declared_changed_files: list[str],
-) -> list[str]:
-    normalized_paths: list[str] = []
-    seen: set[str] = set()
+def apply_workspace_patch(workspace_path: Path, patch_content: str | None) -> None:
+    """Reconstruct delivery paths in a disposable stage workspace using Git.
 
-    for raw_path in declared_changed_files:
-        normalized = normalize_declared_file_path(str(raw_path or ""))
-        if not normalized:
-            raise ValueError(
-                "declared_changed_files entries must name repository files."
-            )
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        normalized_paths.append(normalized)
-
-    return normalized_paths
-
-
-def _list_untracked_paths(workspace_path: Path) -> list[str]:
-    process = subprocess.run(
-        ["git", "ls-files", "--others", "--exclude-standard", "-z"],
-        cwd=workspace_path,
-        capture_output=True,
-        text=False,
-        check=False,
-    )
-    if process.returncode != 0:
-        return []
-
-    return [
-        value.decode("utf-8")
-        for value in (process.stdout or b"").split(b"\x00")
-        if value
-    ]
-
-
-def _run_git_with_path_batches(
-    workspace_path: Path, base_args: list[str], paths: list[str], batch_size: int = 200
-) -> None:
-    if not paths:
+    The committed code wins over snapshot drift, including untracked files and
+    directories blocking delivery paths. Reconstruction may remove those blockers
+    recursively; unrelated environment files remain. The immutable source snapshot
+    is never modified. An independent index preserves the workspace's real index
+    and HEAD, and applies the patch against committed code rather than disk state.
+    """
+    if not patch_content or not patch_content.strip():
         return
+    if not (workspace_path / ".git").exists():
+        raise RuntimeError("Patch reconstruction requires a workspace repository root.")
 
-    for index in range(0, len(paths), batch_size):
-        chunk = paths[index : index + batch_size]
-        process = subprocess.run(
-            ["git", "--literal-pathspecs", *base_args, "--", *chunk],
-            cwd=workspace_path,
-            capture_output=True,
-            text=True,
-            check=False,
+    with tempfile.TemporaryDirectory(prefix="sec-review-patch-index-") as tempdir:
+        env = dict(os.environ, GIT_INDEX_FILE=str(Path(tempdir) / "index"))
+
+        def git(*args: str, data: bytes | None = None) -> bytes:
+            process = subprocess.run(
+                ["git", *args],
+                cwd=workspace_path,
+                env=env,
+                input=data,
+                capture_output=True,
+                check=False,
+            )
+            if process.returncode:
+                raise RuntimeError(
+                    process.stderr.decode("utf-8", errors="replace").strip()
+                    or "Git patch reconstruction failed."
+                )
+            return process.stdout
+
+        git("read-tree", "HEAD")
+        # Repository apply.whitespace=fix must not rewrite committed repair bytes.
+        git(
+            "apply",
+            "--cached",
+            "--whitespace=nowarn",
+            "-p1",
+            data=patch_content.encode("utf-8"),
         )
-        if process.returncode != 0:
-            raise RuntimeError(
-                process.stderr.strip()
-                or "git command failed while preparing workspace patch"
-            )
-
-
-def _filter_paths(paths: Sequence[str] | None) -> list[str]:
-    filtered: list[str] = []
-    seen: set[str] = set()
-    for path in paths or []:
-        normalized = normalize_declared_file_path(path)
-        if not normalized or normalized in seen:
-            continue
-        seen.add(normalized)
-        filtered.append(normalized)
-    return filtered
-
-
-def _path_matches_any(path: str, include_paths: list[str]) -> bool:
-    return any(
-        path == include_path or path.startswith(f"{include_path}/")
-        for include_path in include_paths
-    )
-
-
-def _build_git_workspace_patch(
-    workspace_path: Path, *, include_paths: Sequence[str] | None = None
-) -> tuple[str, list[str], list[str]]:
-    """Run Git diff and return patch text, changed paths, and deleted paths.
-
-    An empty scope observes the whole workspace. Untracked files are temporarily
-    marked intent-to-add, then reset before this function returns.
-    """
-    scoped_paths = _filter_paths(include_paths)
-    untracked_paths = _list_untracked_paths(workspace_path)
-    if scoped_paths:
-        untracked_paths = [
-            path for path in untracked_paths if _path_matches_any(path, scoped_paths)
-        ]
-
-    scope_args = ["--", *scoped_paths] if scoped_paths else []
-
-    try:
-        if untracked_paths:
-            _run_git_with_path_batches(
-                workspace_path,
-                ["add", "--intent-to-add"],
-                untracked_paths,
-            )
-
-        process = subprocess.run(
-            [
-                "git",
-                "--literal-pathspecs",
-                "diff",
-                # Keep persisted patch artifacts free of ANSI color escapes.
-                "--no-color",
-                "--binary",
-                "--no-ext-diff",
-                # Do not let git collapse delete+add into a rename.
-                # file_changes publishes final path actions: delete old, upsert new.
-                "--no-renames",
-                "--src-prefix=a/",
-                "--dst-prefix=b/",
-                "HEAD",
-                *scope_args,
-            ],
-            cwd=workspace_path,
-            capture_output=True,
-            text=False,
-            check=False,
-        )
-        if process.returncode != 0:
-            raise RuntimeError(
-                process.stderr.decode("utf-8", errors="replace").strip()
-                or "git diff failed while building workspace.patch"
-            )
-
-        # Do not use text=True: universal-newline conversion can change file
-        # contents inside a diff, including symbolic-link target bytes.
-        try:
-            patch_content = process.stdout.decode("utf-8")
-        except UnicodeDecodeError as error:
-            raise ValueError(
-                "Workspace diff contains non-UTF-8 bytes; textual patch_diff cannot represent it."
-            ) from error
-
-        # Changed files come straight from git (NUL-separated, repository-relative)
-        # rather than re-parsing the patch text. Text parsing is ambiguous for bare
-        # paths containing spaces or a ` b/` substring and cannot see mode-only
-        # changes. Keep deletion status so a file replaced by a directory is
-        # still exported as deletion of the original blob.
-        names_process = subprocess.run(
-            [
-                "git",
-                "--literal-pathspecs",
-                "diff",
-                "--name-status",
-                "-z",
-                "--no-color",
-                "--no-ext-diff",
-                "--no-renames",
-                "HEAD",
-                *scope_args,
-            ],
-            cwd=workspace_path,
-            capture_output=True,
-            text=False,
-            check=False,
-        )
-        if names_process.returncode != 0:
-            raise RuntimeError(
-                names_process.stderr.decode("utf-8", errors="ignore").strip()
-                or "git diff --name-status failed while building workspace.patch"
-            )
-        fields = names_process.stdout.split(b"\x00")
-        # --no-renames gives one status and one path per entry; paths themselves
-        # may contain tabs or newlines, so only NUL separates these fields.
-        changed_files = []
-        deleted_paths = []
-        for status, raw_path in zip(fields[0:-1:2], fields[1::2], strict=True):
-            path = raw_path.decode("utf-8")
-            changed_files.append(path)
+        fields = git(
+            "diff",
+            "--cached",
+            "--raw",
+            "--no-abbrev",
+            "--no-renames",
+            "--ignore-submodules=none",
+            "-z",
+            "HEAD",
+        ).split(b"\x00")
+        deletes: list[str] = []
+        upserts: list[tuple[str, bytes, bytes]] = []
+        for metadata, raw_path in zip(fields[0:-1:2], fields[1::2], strict=True):
+            _, mode, _, oid, status = metadata.split()
+            path = validate_repository_file_path(raw_path.decode("utf-8"))
             if status == b"D":
-                deleted_paths.append(path)
+                deletes.append(path)
+            elif mode in {b"100644", b"100755", b"120000"}:
+                upserts.append((path, mode, oid))
+            else:
+                raise ValueError(f"Unsupported patch entry: {path}")
 
-        return patch_content, changed_files, deleted_paths
+        # Delete deepest paths first. If snapshot drift puts a symlink in a
+        # deleted path's parents, remove that blocker instead of traversing it.
+        for path in sorted(deletes, key=lambda value: value.count("/"), reverse=True):
+            relative = Path(path)
+            blocked = False
+            for parent in reversed(relative.parents):
+                if parent == Path("."):
+                    continue
+                ancestor = workspace_path / parent
+                if ancestor.is_symlink():
+                    ancestor.unlink()
+                    blocked = True
+                    break
+            if blocked:
+                continue
+            target = workspace_path / relative
+            if target.is_symlink() or target.is_file():
+                target.unlink()
+            elif target.is_dir():
+                shutil.rmtree(target)
 
-    finally:
-        if untracked_paths:
-            _run_git_with_path_batches(
-                workspace_path,
-                ["reset", "-q"],
-                untracked_paths,
-            )
+        # Checkout would run smudge filters and newline/encoding conversions.
+        # Materialize raw blobs so reconstructed bytes match published contents,
+        # without executing repository-configured checkout filters on the host.
+        for path, mode, oid in upserts:
+            content = git("cat-file", "blob", oid.decode("ascii"))
+            _restore_file(workspace_path, path, mode, content)
 
 
-def build_workspace_patch(
-    worktree_path: Path,
-    *,
-    include_paths: Sequence[str],
-) -> dict:
-    """Build, but do not persist, the patch for explicitly declared paths.
-
-    Runtime acceptance and artifact construction share this export policy. The
-    returned paths are Git-observed changes within ``include_paths``. An empty
-    declared scope returns an empty patch instead of exporting the whole workspace.
-    """
-    # `include_paths=[]` means "the agent declared no publishable changed paths".
-    # Keep the emitted patch empty so undeclared workspace edits never become
-    # publishable patch content.
-    if not (worktree_path / ".git").exists():
-        raise RuntimeError(
-            "Workspace patch export requires a git-initialized workspace."
-        )
-
-    scoped_paths = _filter_paths(include_paths)
-    if scoped_paths:
-        patch_content, changed_files, deleted_paths = _build_git_workspace_patch(
-            worktree_path, include_paths=scoped_paths
-        )
+def _restore_file(workspace_path: Path, path: str, mode: bytes, content: bytes) -> None:
+    """Restore a validated delivery entry, replacing snapshot blockers in its path."""
+    relative = Path(path)
+    # Never follow snapshot symlinks, even in parent directories. Force
+    # replacement is limited to blockers along validated delivery paths.
+    for parent in reversed(relative.parents):
+        if parent == Path("."):
+            continue
+        ancestor = workspace_path / parent
+        if ancestor.is_symlink() or (ancestor.exists() and not ancestor.is_dir()):
+            ancestor.unlink()
+        ancestor.mkdir(exist_ok=True)
+    target = workspace_path / relative
+    if target.is_symlink() or (target.exists() and not target.is_dir()):
+        target.unlink()
+    elif target.is_dir():
+        shutil.rmtree(target)
+    if mode == b"120000":
+        os.symlink(content, os.fsencode(target))
     else:
-        patch_content, changed_files, deleted_paths = "", [], []
-    return {
-        "patch_content": patch_content,
-        "changed_files": changed_files,
-        "deleted_paths": deleted_paths,
-    }
+        # Exclusive creation also prevents following a link installed at
+        # the destination after blocker removal; chmod restores Git mode
+        # independently of the process umask or the old snapshot mode.
+        with target.open("xb") as output:
+            output.write(content)
+            os.fchmod(output.fileno(), 0o755 if mode == b"100755" else 0o644)
 
 
 def check_workspace_patch_applies_to_fresh_baseline(
-    baseline_snapshot_tar_path: Path,
+    workspace_snapshot_tar_path: Path,
     patch_content: str,
 ) -> str | None:
-    if not str(patch_content or "").strip():
+    """Probe the same reconstruction used by verification on a disposable seed."""
+    if not patch_content or not patch_content.strip():
         return None
-
     with tempfile.TemporaryDirectory(prefix="sec-review-patch-apply-") as tempdir:
         fresh_workspace = Path(tempdir) / "workspace"
         restore_workspace_from_snapshot_tar(
-            tar_path=baseline_snapshot_tar_path,
+            tar_path=workspace_snapshot_tar_path,
             destination_path=fresh_workspace,
         )
-        process = subprocess.run(
-            ["git", "apply", "--check", "-p1"],
-            cwd=fresh_workspace,
-            input=patch_content,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if process.returncode == 0:
-            return None
-        return (
-            process.stderr.strip()
-            or process.stdout.strip()
-            or "git apply --check failed for the generated workspace patch"
-        )
+        try:
+            apply_workspace_patch(fresh_workspace, patch_content)
+        except (RuntimeError, ValueError) as error:
+            return str(error)
+    return None
 
 
 class PatchArtifact(BaseModel):
-    """Review diff and publishable final contents exported from one workspace scope.
+    """Diff and final file contents exported from one committed tree.
 
-    File changes are authoritative for applying the patch; the diff is for review.
-    Keeping both together ensures synthesis and repair stages consume the same
-    export rather than reconstructing file contents from diff text.
+    The diff describes the change from the baseline; file changes carry the
+    resulting blobs and modes. Both representations must describe the same change.
     """
 
     patch_diff: str
     file_changes: list[FileChange]
-
-
-def build_patch_artifact(
-    workspace_path: Path,
-    *,
-    include_paths: Sequence[str],
-) -> PatchArtifact:
-    """Build review diff and final-file changes from the same workspace paths."""
-    from sec_review_agents.workspace.file_changes import (
-        collect_publishable_file_changes,
-    )
-
-    workspace_patch = build_workspace_patch(
-        workspace_path,
-        include_paths=include_paths,
-    )
-    file_changes = collect_publishable_file_changes(
-        workspace_path,
-        workspace_patch["changed_files"],
-        deleted_paths=workspace_patch["deleted_paths"],
-    )
-
-    return PatchArtifact(
-        patch_diff=workspace_patch["patch_content"], file_changes=file_changes
-    )
-
-
-def observe_workspace_changed_files(worktree_path: Path) -> list[str]:
-    if not (worktree_path / ".git").exists():
-        raise RuntimeError(
-            "Workspace change observation requires a git-initialized workspace."
-        )
-
-    # Observation is diagnostic: publishable patch export still requires an explicit scope.
-    _, changed_files, _ = _build_git_workspace_patch(worktree_path, include_paths=None)
-    return changed_files

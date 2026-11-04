@@ -13,18 +13,13 @@ from sec_review_agents.runtime.agent_runtime_graph import (
     invoke_agent_runtime_graph,
     run_agent_runtime_graph,
 )
-from sec_review_agents.runtime.changed_files_acceptance_middleware import (
-    ChangedFilesAcceptanceMiddleware,
+from sec_review_agents.runtime.committed_patch_middleware import (
+    CommittedPatchMiddleware,
 )
 from sec_review_agents.runtime.structured_response_middleware import (
     MissingStructuredResponseMiddleware,
 )
 from sec_review_agents.runtime.trajectories import read_trajectory_messages
-from tests.review_stages.stages.test_mitigation_changed_files_acceptance import (
-    _baseline_snapshot,
-    _copy_repo,
-    _create_repo,
-)
 from tests.runtime.fake_chat_models import (
     ToolCallingFakeMessagesListChatModel,
     structured_tool_call_message,
@@ -34,12 +29,6 @@ from tests.runtime.fake_chat_models import (
 class PatchClaimProbeOutput(BaseModel):
     status: str
     changed_files: list[str] = Field()
-    rationale: str
-
-
-class DeclaredPatchProbeOutput(BaseModel):
-    status: str
-    declared_changed_files: list[str] = Field()
     rationale: str
 
 
@@ -218,64 +207,57 @@ def test_missing_structured_response_middleware_keeps_tool_agent_in_one_invoke()
     )
 
 
-def test_changed_files_acceptance_middleware_retries_in_one_invoke() -> None:
-    with tempfile.TemporaryDirectory() as tempdir:
-        local_root = Path(tempdir) / "local"
-        source_workspace = local_root / "workspace"
-        workspace = Path(tempdir) / "writable-workspace"
-        _create_repo(
-            source_workspace,
-            {
-                "a.txt": "old\n",
-                "b.txt": "old\n",
-            },
-        )
-        _copy_repo(source_workspace, workspace)
-        (workspace / "a.txt").write_text("new\n", encoding="utf-8")
-        model = RecordingToolCallingFakeMessagesListChatModel(
-            responses=[
-                structured_tool_call_message(
-                    DeclaredPatchProbeOutput,
-                    {
-                        "status": "applied",
-                        "declared_changed_files": ["b.txt"],
-                        "rationale": "first response mismatches workspace",
-                    },
-                    call_id="call_1",
-                ),
-                structured_tool_call_message(
-                    DeclaredPatchProbeOutput,
-                    {
-                        "status": "applied",
-                        "declared_changed_files": ["a.txt"],
-                        "rationale": "corrected response matches workspace",
-                    },
-                    call_id="call_2",
-                ),
-            ]
-        )
-        agent = create_agent(
-            model=model,
-            tools=[lookup_evidence],
-            response_format=DeclaredPatchProbeOutput,
-            system_prompt="Return the configured structured response.",
-            middleware=[
-                ChangedFilesAcceptanceMiddleware(
-                    worktree_path=workspace,
-                    baseline_snapshot_tar_path=_baseline_snapshot(
-                        local_root,
-                        Path(tempdir) / "artifacts" / "run-1",
-                    ),
-                )
-            ],
-        )
+def test_committed_patch_acceptance_retries_in_one_invoke(
+    tmp_path, monkeypatch
+) -> None:
+    from unittest.mock import Mock
 
-        result = agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
+    from sec_review_agents.workspace.patches import PatchArtifact
 
-    structured = result["structured_response"]
-    assert structured.declared_changed_files == ["a.txt"]
+    build = Mock(
+        side_effect=[
+            ValueError("invalid commit"),
+            PatchArtifact(patch_diff="", file_changes=[]),
+        ]
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.runtime.committed_patch_middleware.build_committed_patch",
+        build,
+    )
+    model = RecordingToolCallingFakeMessagesListChatModel(
+        responses=[
+            structured_tool_call_message(
+                PatchClaimProbeOutput,
+                {"status": "applied", "changed_files": [], "rationale": "candidate"},
+                call_id="first",
+            ),
+            structured_tool_call_message(
+                PatchClaimProbeOutput,
+                {"status": "applied", "changed_files": [], "rationale": "corrected"},
+                call_id="second",
+            ),
+        ]
+    )
+    agent = create_agent(
+        model=model,
+        tools=[],
+        response_format=PatchClaimProbeOutput,
+        middleware=[
+            CommittedPatchMiddleware(tmp_path, "baseline", tmp_path / "baseline.tar")
+        ],
+    )
+    result = agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
+    assert result["structured_response"].rationale == "corrected"
     assert len(model.message_batches) == 2
-    assert "Patch reconciliation failed" in model.message_batches[1][-1].content
+    assert build.call_count == 2
+    # Reusing the compiled graph starts a fresh correction budget.
+    build.side_effect = [
+        ValueError("invalid commit"),
+        PatchArtifact(patch_diff="", file_changes=[]),
+    ]
+    again = agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
+    assert again["structured_response"].rationale == "corrected"
+    assert build.call_count == 4
 
 
 def test_patch_tool_calls_middleware_repairs_dangling_tool_call_history() -> None:

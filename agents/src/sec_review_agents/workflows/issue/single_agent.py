@@ -66,7 +66,7 @@ async def run_issue_single_agent(
 
     return await run_single_agent_stage(
         agent_name="issue-single-agent",
-        baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
         single_agent_artifacts_path=single_agent_artifacts_path,
         setup_declaration_content=setup_declaration_content,
         build_backend_config=lambda workspace_root: build_issue_single_agent_backend_config(

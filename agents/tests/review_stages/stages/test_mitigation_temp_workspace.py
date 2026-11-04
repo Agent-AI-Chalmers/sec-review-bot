@@ -42,7 +42,7 @@ def _add_snapshot_seed(materialization: dict) -> None:
 async def _run_mitigation_stage_for_workspace_capture(
     *,
     tmp_path: Path,
-    baseline_snapshot_tar_path: Path,
+    workspace_snapshot_tar_path: Path,
 ) -> list[Path]:
     captured_workspace_paths: list[Path] = []
 
@@ -60,24 +60,27 @@ async def _run_mitigation_stage_for_workspace_capture(
         return MitigationOutput.model_validate(
             {
                 "overview": "No changes needed.",
-                "declared_changed_files": [],
             }
         )
 
     with (
         patch(
+            "sec_review_agents.review_stages.mitigation.stage.resolve_workspace_commit",
+            return_value="baseline",
+        ),
+        patch(
             "sec_review_agents.review_stages.mitigation.stage.run_mitigation_agent",
             side_effect=run_agent,
         ),
         patch(
-            "sec_review_agents.review_stages.mitigation.stage.build_patch_artifact",
+            "sec_review_agents.review_stages.mitigation.stage.build_committed_patch",
             return_value=PatchArtifact(file_changes=[], patch_diff=""),
         ),
     ):
         await run_mitigation_stage(
             agent_name="mitigator",
             mitigator_artifacts_path=tmp_path / "artifacts" / "mitigator",
-            baseline_snapshot_tar_path=baseline_snapshot_tar_path,
+            workspace_snapshot_tar_path=workspace_snapshot_tar_path,
             retry_context=None,
             build_backend_config=build_backend,
             system_prompt="system",
@@ -99,7 +102,7 @@ async def test_run_mitigation_stage_uses_system_temp_workspace(
 
     captured_workspace_paths = await _run_mitigation_stage_for_workspace_capture(
         tmp_path=tmp_path,
-        baseline_snapshot_tar_path=local_root / WORKSPACE_SNAPSHOT_TAR_NAME,
+        workspace_snapshot_tar_path=local_root / WORKSPACE_SNAPSHOT_TAR_NAME,
     )
     assert len(captured_workspace_paths) == 1
     workspace_path = captured_workspace_paths[0]
@@ -116,7 +119,7 @@ async def test_run_mitigation_stage_requires_snapshot_seed(tmp_path: Path) -> No
     with pytest.raises(FileNotFoundError):
         await _run_mitigation_stage_for_workspace_capture(
             tmp_path=tmp_path,
-            baseline_snapshot_tar_path=Path(materialization["local_root_path"])
+            workspace_snapshot_tar_path=Path(materialization["local_root_path"])
             / WORKSPACE_SNAPSHOT_TAR_NAME,
         )
 
@@ -144,3 +147,70 @@ def test_create_skipped_mitigation_result_persists_empty_patch_without_temp_work
     assert not tmp_root.exists()
 
     assert "change_status" not in result.model_dump()
+
+
+@pytest.mark.asyncio
+async def test_stage_exports_commits_from_pinned_baseline(tmp_path: Path) -> None:
+    """Exercise stage baseline capture and real export, rather than mocking the artifact."""
+    import subprocess
+
+    from sec_review_agents.workspace.commits import resolve_workspace_commit
+    from sec_review_agents.workspace.patches import (
+        check_workspace_patch_applies_to_fresh_baseline,
+    )
+
+    materialization = _build_base_materialization(tmp_path)
+    local_root = Path(materialization["local_root_path"])
+    seed = local_root / "workspace"
+
+    def git(workspace: Path, *args: str) -> None:
+        subprocess.run(["git", *args], cwd=workspace, check=True, capture_output=True)
+
+    git(seed, "init")
+    git(seed, "config", "user.name", "Test")
+    git(seed, "config", "user.email", "test@localhost")
+    git(seed, "add", ".")
+    git(seed, "commit", "-qm", "baseline")
+    baseline = resolve_workspace_commit(seed)
+    _add_snapshot_seed(materialization)
+    snapshot = local_root / WORKSPACE_SNAPSHOT_TAR_NAME
+
+    async def run_agent(**kwargs: Any) -> MitigationOutput:
+        workspace = kwargs["workspace_root_path"]
+        assert kwargs["baseline_commit"] == baseline
+        (workspace / "src/app.js").write_text("fixed\n")
+        git(workspace, "commit", "-qam", "repair")
+        (workspace / "regression.txt").write_text("test evidence\n")
+        git(workspace, "add", "regression.txt")
+        git(workspace, "commit", "-qm", "regression")
+        (workspace / "src/app.js").write_text("uncommitted experiment\n")
+        return MitigationOutput(overview="Committed repair and regression coverage.")
+
+    with patch(
+        "sec_review_agents.review_stages.mitigation.stage.run_mitigation_agent",
+        side_effect=run_agent,
+    ):
+        result = await run_mitigation_stage(
+            agent_name="mitigator",
+            mitigator_artifacts_path=tmp_path / "artifacts",
+            workspace_snapshot_tar_path=snapshot,
+            retry_context=None,
+            build_backend_config=lambda _: BackendConfig(
+                container_name_prefix="test",
+                path_views=[],
+                image=None,
+                backend_kind="local",
+            ),
+            system_prompt="system",
+            filesystem_system_prompt="filesystem",
+            user_prompt="repair",
+        )
+    assert {c["path"]: c.get("content") for c in result.file_changes} == {
+        "src/app.js": "fixed\n",
+        "regression.txt": "test evidence\n",
+    }
+    assert (
+        check_workspace_patch_applies_to_fresh_baseline(snapshot, result.patch_diff)
+        is None
+    )
+    assert (tmp_path / "artifacts/workspace.patch").read_text() == result.patch_diff

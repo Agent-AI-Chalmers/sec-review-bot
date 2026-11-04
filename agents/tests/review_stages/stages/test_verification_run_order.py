@@ -35,9 +35,9 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
         assert kwargs["tar_path"] == Path("/tmp/workspace.snapshot.tar")
         return kwargs["destination_path"]
 
-    def _apply_workspace_patch(**kwargs: Any) -> None:
+    def _apply_workspace_patch(*args: Any, **kwargs: Any) -> None:
         call_order.append("apply")
-        assert kwargs["workspace_patch"] == "diff --git a/a b/a\n"
+        assert args[1] == "diff --git a/a b/a\n"
 
     def _build_backend(workspace_root: Path) -> BackendConfig:
         call_order.append("backend")
@@ -59,7 +59,7 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
             side_effect=_restore_workspace,
         ),
         patch(
-            "sec_review_agents.review_stages.verification.stage._apply_workspace_patch",
+            "sec_review_agents.review_stages.verification.stage.apply_workspace_patch",
             side_effect=_apply_workspace_patch,
         ),
         patch(
@@ -74,7 +74,7 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
             agent_name="verification-agent",
             verifier_artifacts_path=Path("/tmp/verifier"),
             attempt_label="initial",
-            baseline_snapshot_tar_path=Path("/tmp/workspace.snapshot.tar"),
+            workspace_snapshot_tar_path=Path("/tmp/workspace.snapshot.tar"),
             workspace_patch="diff --git a/a b/a\n",
             mitigation_result=MitigationStageResult(overview="Test mitigation"),
             build_backend_config=_build_backend,
@@ -106,7 +106,7 @@ async def test_run_verification_stage_uses_unpatched_workspace_when_no_patch() -
             side_effect=lambda **kwargs: kwargs["destination_path"],
         ),
         patch(
-            "sec_review_agents.review_stages.verification.stage._apply_workspace_patch",
+            "sec_review_agents.review_stages.verification.stage.apply_workspace_patch",
         ) as apply_workspace_patch_mock,
         patch(
             "sec_review_agents.review_stages.verification.stage.run_verification_agent",
@@ -120,7 +120,7 @@ async def test_run_verification_stage_uses_unpatched_workspace_when_no_patch() -
             agent_name="verification-agent",
             verifier_artifacts_path=Path("/tmp/verifier"),
             attempt_label="initial",
-            baseline_snapshot_tar_path=Path("/tmp/workspace.snapshot.tar"),
+            workspace_snapshot_tar_path=Path("/tmp/workspace.snapshot.tar"),
             workspace_patch=None,
             mitigation_result=MitigationStageResult(overview="Test mitigation"),
             build_backend_config=_build_backend,
@@ -130,7 +130,7 @@ async def test_run_verification_stage_uses_unpatched_workspace_when_no_patch() -
         )
 
     apply_workspace_patch_mock.assert_called_once()
-    assert apply_workspace_patch_mock.call_args.kwargs["workspace_patch"] is None
+    assert apply_workspace_patch_mock.call_args.args[1] is None
     agent_mock.assert_called_once()
     assert len(captured_workspace_roots) == 1
     assert captured_workspace_roots[0].name.startswith("sec-review-verifier-")

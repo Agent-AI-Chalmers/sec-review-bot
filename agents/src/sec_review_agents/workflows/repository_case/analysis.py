@@ -30,7 +30,7 @@ async def analyze_repository_case(
         analyzer_artifacts_path=analyzer_artifacts_path,
         published_trajectory_path=published_trajectory_path,
         agent_name="repository-analyzer",
-        baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
         setup_declaration_content=setup_declaration_content,
         build_backend_config=lambda stage_workspace_path: build_repository_analyzer_backend_config(
             workspace_root_path=stage_workspace_path,

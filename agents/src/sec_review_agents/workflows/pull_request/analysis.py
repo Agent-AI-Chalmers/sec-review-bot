@@ -31,7 +31,7 @@ async def analyze_pull_request(
         analyzer_artifacts_path=analyzer_artifacts_path,
         published_trajectory_path=published_trajectory_path,
         agent_name="pull-request-analyzer",
-        baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
         setup_declaration_content=setup_declaration_content,
         build_backend_config=lambda stage_workspace_path: build_pr_analyzer_backend_config(
             workspace_root_path=stage_workspace_path,

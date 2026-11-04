@@ -88,6 +88,10 @@ async def _mitigation_error_stage_result(tmp_path: Path) -> MitigationStageResul
 
     with (
         patch(
+            "sec_review_agents.review_stages.mitigation.stage.resolve_workspace_commit",
+            return_value="baseline",
+        ),
+        patch(
             "sec_review_agents.workflows.repository_case.mitigation.build_repository_mitigation_backend_config",
             return_value=BackendConfig(
                 container_name_prefix="test",

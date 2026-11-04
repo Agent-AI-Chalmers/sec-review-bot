@@ -207,7 +207,6 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
     )
     structured_payload = {
         "overview": "retry patch",
-        "declared_changed_files": ["demo.txt"],
         "residual_risks": [],
     }
 
@@ -217,13 +216,13 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
         )
         return MitigationOutput.model_validate(structured_payload)
 
-    def fake_build_patch_artifact(
+    def fake_build_committed_patch(
         workspace_path,
         *,
-        include_paths,
+        baseline_commit,
     ):
         _ = workspace_path
-        assert include_paths == ["demo.txt"]
+        assert baseline_commit == "baseline"
         return PatchArtifact(
             patch_diff="diff --git a/demo.txt b/demo.txt\n",
             file_changes=[{"path": "demo.txt", "status": "deleted"}],
@@ -231,12 +230,16 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
 
     with (
         patch(
+            "sec_review_agents.review_stages.mitigation.stage.resolve_workspace_commit",
+            return_value="baseline",
+        ),
+        patch(
             "sec_review_agents.review_stages.mitigation.stage.run_mitigation_agent",
             side_effect=fake_run_agent,
         ),
         patch(
-            "sec_review_agents.review_stages.mitigation.stage.build_patch_artifact",
-            side_effect=fake_build_patch_artifact,
+            "sec_review_agents.review_stages.mitigation.stage.build_committed_patch",
+            side_effect=fake_build_committed_patch,
         ),
     ):
         from sec_review_agents.review_stages.mitigation.stage import (
@@ -246,7 +249,7 @@ async def test_run_mitigation_persists_retry_artifacts_with_retry_label(
         await run_mitigation_stage(
             agent_name="mitigation-agent",
             mitigator_artifacts_path=mitigator_root,
-            baseline_snapshot_tar_path=root / WORKSPACE_SNAPSHOT_TAR_NAME,
+            workspace_snapshot_tar_path=root / WORKSPACE_SNAPSHOT_TAR_NAME,
             retry_context=retry_context,
             build_backend_config=lambda _workspace_path: BackendConfig(
                 container_name_prefix="test",

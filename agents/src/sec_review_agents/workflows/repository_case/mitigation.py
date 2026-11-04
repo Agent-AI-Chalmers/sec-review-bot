@@ -39,7 +39,7 @@ async def mitigate_repository_case(
         agent_name="repository-mitigator",
         mitigator_artifacts_path=mitigator_artifacts_path,
         published_trajectory_path=published_trajectory_path,
-        baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=retry_context,
         setup_declaration_content=setup_declaration_content,
         build_backend_config=lambda workspace_root: build_repository_mitigation_backend_config(

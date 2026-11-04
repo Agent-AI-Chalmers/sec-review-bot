@@ -493,7 +493,7 @@ async def execute_repository_combined_delivery_activity(
     ):
         return await execute_delivery_entry(
             run_artifacts_root=run_artifacts_root,
-            baseline_snapshot_tar_path=Path(
+            workspace_snapshot_tar_path=Path(
                 delivery_execution.workspace_snapshot_tar_path
             ),
             delivery_entry=delivery_entry,

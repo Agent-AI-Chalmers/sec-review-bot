@@ -25,8 +25,9 @@ from sec_review_agents.utils.files import (
     persist_text_artifact,
     reset_stage_attempt_artifacts,
 )
-from sec_review_agents.workspace.patches import (
-    build_patch_artifact,
+from sec_review_agents.workspace.commits import (
+    build_committed_patch,
+    resolve_workspace_commit,
 )
 from sec_review_agents.workspace.snapshots import (
     restore_workspace_from_snapshot_tar,
@@ -36,7 +37,7 @@ from sec_review_agents.workspace.snapshots import (
 async def run_single_agent_stage(
     *,
     agent_name: str,
-    baseline_snapshot_tar_path: Path,
+    workspace_snapshot_tar_path: Path,
     single_agent_artifacts_path: Path,
     build_backend_config: Callable[[Path], BackendConfig],
     system_prompt: str,
@@ -59,10 +60,12 @@ async def run_single_agent_stage(
         remove_trajectories((trajectory_path(single_agent_artifacts_path),))
         workspace_path = Path(tempdir)
         restore_workspace_from_snapshot_tar(
-            tar_path=baseline_snapshot_tar_path,
+            tar_path=workspace_snapshot_tar_path,
             destination_path=workspace_path,
         )
         trajectory = trajectory_path(single_agent_artifacts_path)
+        # Setup and the agent may move HEAD; delivery stays anchored to this seed.
+        baseline_commit = resolve_workspace_commit(workspace_path)
         config = build_backend_config(workspace_path)
         workspace_root = config.get("working_directory", "/workspace")
         if memory_path_view is not None:
@@ -87,16 +90,15 @@ async def run_single_agent_stage(
                 workspace_root=workspace_root,
                 todo_system_prompt=todo_system_prompt,
                 todo_tool_description=todo_tool_description,
-                baseline_snapshot_tar_path=baseline_snapshot_tar_path,
+                baseline_commit=baseline_commit,
+                workspace_snapshot_tar_path=workspace_snapshot_tar_path,
                 workspace_root_path=workspace_path,
                 user_prompt=user_prompt,
                 trajectory_paths=(trajectory,),
                 memory_enabled=memory_path_view is not None,
             )
-        declared_patch_paths = agent_output.declared_changed_files
-        patch_artifact = build_patch_artifact(
-            workspace_path,
-            include_paths=declared_patch_paths,
+        patch_artifact = build_committed_patch(
+            workspace_path, baseline_commit=baseline_commit
         )
         persist_text_artifact(
             single_agent_artifacts_path,

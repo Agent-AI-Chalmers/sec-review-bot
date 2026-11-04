@@ -26,11 +26,12 @@ from sec_review_agents.utils.files import (
     reset_stage_attempt_artifacts,
 )
 from sec_review_agents.utils.markdown import inline_code, md
-from sec_review_agents.workspace.file_changes import file_change_paths
-from sec_review_agents.workspace.patches import (
-    PatchArtifact,
-    build_patch_artifact,
+from sec_review_agents.workspace.commits import (
+    build_committed_patch,
+    resolve_workspace_commit,
 )
+from sec_review_agents.workspace.file_changes import file_change_paths
+from sec_review_agents.workspace.patches import PatchArtifact
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
 
@@ -144,7 +145,7 @@ def build_delivery_patch_synthesis_user_prompt(
 
 async def synthesize_combined_delivery_patch(
     *,
-    baseline_snapshot_tar_path: Path,
+    workspace_snapshot_tar_path: Path,
     patch_synthesis_root: Path,
     delivery_entry: DeliveryEntry,
     case_items: Sequence[DeliveryPatchCase],
@@ -152,16 +153,16 @@ async def synthesize_combined_delivery_patch(
     """Build and persist the patch artifact for one combined delivery.
 
     Delivery execution owns status and error reporting. This function returns only
-    patch data, using an empty artifact when the agent declares no changed files.
+    patch data from the committed combined repair.
     """
     delivery_id = delivery_entry.delivery_id
     if not delivery_id:
         raise ValueError("Missing delivery_id for combined patch synthesis.")
 
-    if not baseline_snapshot_tar_path.exists():
+    if not workspace_snapshot_tar_path.exists():
         raise FileNotFoundError(
             "Missing patch-synthesis baseline snapshot at "
-            f"{baseline_snapshot_tar_path}."
+            f"{workspace_snapshot_tar_path}."
         )
 
     case_ids = [item.case_id for item in case_items]
@@ -183,29 +184,30 @@ async def synthesize_combined_delivery_patch(
         remove_trajectories((trajectory_path(delivery_artifacts_root),))
         workspace_path = Path(tempdir)
         restore_workspace_from_snapshot_tar(
-            tar_path=baseline_snapshot_tar_path,
+            tar_path=workspace_snapshot_tar_path,
             destination_path=workspace_path,
         )
+        baseline_commit = resolve_workspace_commit(workspace_path)
         backend = create_patch_synthesis_backend(
             workspace_root_path=workspace_path,
             workspace_writable=True,
         )
         async with amanaged_backend(backend):
-            structured_payload = await run_patch_synthesis_agent(
+            await run_patch_synthesis_agent(
                 backend=backend,
                 workspace_root_path=workspace_path,
-                baseline_snapshot_tar_path=baseline_snapshot_tar_path,
+                baseline_commit=baseline_commit,
+                workspace_snapshot_tar_path=workspace_snapshot_tar_path,
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 trajectory_paths=(trajectory_path(delivery_artifacts_root),),
             )
 
-        declared_changed_files = structured_payload.declared_changed_files
-
-        patch_artifact = build_patch_artifact(
-            workspace_path,
-            include_paths=declared_changed_files,
+        patch_artifact = build_committed_patch(
+            workspace_path, baseline_commit=baseline_commit
         )
+        if not patch_artifact.file_changes:
+            raise ValueError("Patch synthesis requires a non-empty committed repair.")
         persist_text_artifact(
             delivery_artifacts_root,
             "workspace.patch",

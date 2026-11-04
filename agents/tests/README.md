@@ -79,7 +79,6 @@ Probe-agent tests also require `LLM_TEST_DEPLOYMENT=<deployment name>`. Product 
 
 | Probe | Enable with | Extra requirements | Purpose |
 | --- | --- | --- | --- |
-| Changed-files response correction | `RUN_LLM_STRUCTURED_CORRECTION_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Checks that the model corrects a rejected changed-files declaration in the same thread. |
 | Context summarization | `RUN_LLM_CONTEXT_SUMMARIZATION_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Checks real summarization middleware behavior. |
 | Project instructions | `RUN_LLM_PROJECT_INSTRUCTIONS_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Uses a local workspace to check that the agent uses a preloaded project validation command, inspects source, and leaves guidance unchanged. |
 | Memory probes | `RUN_LLM_MEMORY_MIDDLEWARE_INTEGRATION=1`, `RUN_LLM_MEMORY_EXTRACTION_INTEGRATION=1`, `RUN_LLM_MEMORY_MAINTENANCE_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Checks memory topic use, trajectory extraction, and candidate memory-tree maintenance. |

@@ -3,20 +3,28 @@ from pathlib import Path
 
 import pytest
 
-from sec_review_agents.review_stages.verification.stage import (
-    _apply_workspace_patch,
-)
+from sec_review_agents.workspace.patches import apply_workspace_patch
 
 
 def _init_workspace_git_repo(workspace: Path) -> None:
-    """Make the workspace its own repository root, as a restored snapshot is.
-
-    `git apply` resolves patch paths against the repository root it finds, so a
-    workspace that is a subdirectory of some other repository silently skips every
-    path. Production restores a snapshot that already contains `.git`, and these
-    tests must not depend on where the test runner put its temporary directory.
-    """
+    """Restored stage workspaces are independent Git repository roots."""
     subprocess.run(["git", "init"], cwd=workspace, check=True, capture_output=True)
+
+
+def _commit_workspace(workspace: Path) -> None:
+    for args in [
+        ("add", "."),
+        (
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@localhost",
+            "commit",
+            "-qm",
+            "baseline",
+        ),
+    ]:
+        subprocess.run(["git", *args], cwd=workspace, check=True, capture_output=True)
 
 
 def test_apply_workspace_patch_applies_patch(tmp_path: Path) -> None:
@@ -37,9 +45,10 @@ def test_apply_workspace_patch_applies_patch(tmp_path: Path) -> None:
         '+if (header.alg === "none") return null;\n'
     )
 
-    _apply_workspace_patch(
+    _commit_workspace(workspace)
+    apply_workspace_patch(
         workspace_path=workspace,
-        workspace_patch=patch_content,
+        patch_content=patch_content,
     )
     patched_file = workspace / "src" / "lib" / "jwt.ts"
     assert "return null" in patched_file.read_text(encoding="utf-8")
@@ -65,10 +74,11 @@ def test_apply_workspace_patch_fails_when_patch_cannot_apply(
         "+new baseline\n"
     )
 
+    _commit_workspace(workspace)
     with pytest.raises(RuntimeError):
-        _apply_workspace_patch(
+        apply_workspace_patch(
             workspace_path=workspace,
-            workspace_patch=patch_content,
+            patch_content=patch_content,
         )
 
 
@@ -87,9 +97,9 @@ def test_apply_workspace_patch_rejects_unsafe_patch_paths(
     )
 
     with pytest.raises(RuntimeError):
-        _apply_workspace_patch(
+        apply_workspace_patch(
             workspace_path=workspace,
-            workspace_patch=patch_content,
+            patch_content=patch_content,
         )
 
 
@@ -99,9 +109,9 @@ def test_apply_workspace_patch_ignores_empty_patch(
     workspace = tmp_path
     (workspace / "app.py").write_text("print('baseline')\n", encoding="utf-8")
 
-    _apply_workspace_patch(
+    apply_workspace_patch(
         workspace_path=workspace,
-        workspace_patch=None,
+        patch_content=None,
     )
 
     assert (workspace / "app.py").read_text(encoding="utf-8") == ("print('baseline')\n")
@@ -110,10 +120,7 @@ def test_apply_workspace_patch_ignores_empty_patch(
 def test_apply_workspace_patch_rejects_a_workspace_inside_another_repository(
     tmp_path: Path,
 ) -> None:
-    """`git apply` exits 0 while skipping every path when the workspace is a
-    subdirectory of another repository. Without the guard the verifier would run on the
-    unpatched baseline and report success, so the skip must fail loudly instead.
-    """
+    """Reconstruction must not discover and modify an enclosing repository's index."""
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
 
     workspace = tmp_path / "workspace"
@@ -132,9 +139,9 @@ def test_apply_workspace_patch_rejects_a_workspace_inside_another_repository(
     )
 
     with pytest.raises(RuntimeError):
-        _apply_workspace_patch(
+        apply_workspace_patch(
             workspace_path=workspace,
-            workspace_patch=patch_content,
+            patch_content=patch_content,
         )
 
     assert "return payload" in target.read_text(encoding="utf-8")

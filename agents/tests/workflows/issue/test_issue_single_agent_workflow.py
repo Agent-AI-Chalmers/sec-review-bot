@@ -45,7 +45,6 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
         "validation_level": "static",
         "regression_status": "not-run",
         "target_claim": "The issue allowed attacker-controlled path traversal.",
-        "declared_changed_files": ["app.py"],
         "residual_risks": [],
         "self_check_notes": [
             "Reviewed sibling file access path and verified the guard is shared."
@@ -53,6 +52,10 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
     }
 
     with (
+        patch(
+            "sec_review_agents.review_stages.single_agent.stage.resolve_workspace_commit",
+            return_value="baseline",
+        ),
         patch(
             "sec_review_agents.review_stages.single_agent.stage.restore_workspace_from_snapshot_tar",
             side_effect=lambda **kwargs: kwargs["destination_path"],
@@ -71,7 +74,7 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
             return_value=SingleAgentFixOutput.model_validate(structured_payload),
         ),
         patch(
-            "sec_review_agents.review_stages.single_agent.stage.build_patch_artifact",
+            "sec_review_agents.review_stages.single_agent.stage.build_committed_patch",
             return_value=PatchArtifact.model_validate(
                 {
                     "patch_diff": "diff --git a/app.py b/app.py\n",
@@ -100,7 +103,7 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
 
 
 @pytest.mark.asyncio
-async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_declares_changed_files(
+async def test_single_agent_workflow_preserves_confirmed_verdict_with_committed_patch(
     tmp_path: Path,
 ) -> None:
     root = tmp_path
@@ -120,7 +123,6 @@ async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_dec
         "validation_level": "static",
         "regression_status": "not-run",
         "target_claim": "The issue allowed attacker-controlled path traversal.",
-        "declared_changed_files": ["app.py"],
         "residual_risks": [],
         "self_check_notes": [
             "Reviewed sibling file access path and verified the guard is shared."
@@ -128,6 +130,10 @@ async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_dec
     }
 
     with (
+        patch(
+            "sec_review_agents.review_stages.single_agent.stage.resolve_workspace_commit",
+            return_value="baseline",
+        ),
         patch(
             "sec_review_agents.review_stages.single_agent.stage.restore_workspace_from_snapshot_tar",
             side_effect=lambda **kwargs: kwargs["destination_path"],
@@ -146,7 +152,7 @@ async def test_single_agent_workflow_does_not_fall_back_to_failed_when_agent_dec
             return_value=SingleAgentFixOutput.model_validate(structured_payload),
         ),
         patch(
-            "sec_review_agents.review_stages.single_agent.stage.build_patch_artifact",
+            "sec_review_agents.review_stages.single_agent.stage.build_committed_patch",
             return_value=PatchArtifact.model_validate(
                 {
                     "patch_diff": "diff --git a/app.py b/app.py\n",

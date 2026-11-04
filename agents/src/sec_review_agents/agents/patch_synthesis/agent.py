@@ -11,8 +11,8 @@ from sec_review_agents.agents.patch_synthesis.prompts import (
 )
 from sec_review_agents.llm.factory import create_chat_model
 from sec_review_agents.runtime.agent_runtime_graph import run_agent_runtime_graph
-from sec_review_agents.runtime.changed_files_acceptance_middleware import (
-    ChangedFilesAcceptanceMiddleware,
+from sec_review_agents.runtime.committed_patch_middleware import (
+    CommittedPatchMiddleware,
 )
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
 from sec_review_agents.runtime.model_turn_diagnostics import (
@@ -34,7 +34,8 @@ async def run_patch_synthesis_agent(
     *,
     backend,
     workspace_root_path: Path,
-    baseline_snapshot_tar_path: Path | None = None,
+    baseline_commit: str,
+    workspace_snapshot_tar_path: Path,
     system_prompt: str | None = None,
     user_prompt: str,
     trajectory_paths: tuple[Path, ...] = (),
@@ -48,13 +49,14 @@ async def run_patch_synthesis_agent(
             max_retries=missing_structured_response_max_retries(),
         ),
     ]
-    if baseline_snapshot_tar_path is not None:
-        agent_middleware.append(
-            ChangedFilesAcceptanceMiddleware(
-                worktree_path=workspace_root_path,
-                baseline_snapshot_tar_path=baseline_snapshot_tar_path,
-            )
+    agent_middleware.append(
+        CommittedPatchMiddleware(
+            worktree_path=workspace_root_path,
+            baseline_commit=baseline_commit,
+            workspace_snapshot_tar_path=workspace_snapshot_tar_path,
+            require_changes=True,
         )
+    )
     agent_middleware.append(
         create_filesystem_middleware(
             backend=backend,

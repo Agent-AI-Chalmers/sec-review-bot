@@ -4,11 +4,27 @@ import subprocess
 
 import pytest
 
-from sec_review_agents.workspace.patches import (
-    build_patch_artifact,
-    normalize_declared_changed_files,
-    observe_workspace_changed_files,
+from sec_review_agents.workspace.commits import (
+    build_committed_patch,
+    resolve_workspace_commit,
 )
+
+
+def _commit_patch(workspace, *, include_paths):
+    baseline = resolve_workspace_commit(workspace)
+    subprocess.run(
+        ["git", "--literal-pathspecs", "add", "-A", "--", *include_paths],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "commit", "--allow-empty", "-qm", "repair"],
+        cwd=workspace,
+        check=True,
+        capture_output=True,
+    )
+    return build_committed_patch(workspace, baseline_commit=baseline)
 
 
 def _init_git_repo(workspace, files: dict[str, str]) -> None:
@@ -39,63 +55,9 @@ def _init_git_repo(workspace, files: dict[str, str]) -> None:
     )
 
 
-def test_normalize_declared_changed_files_preserves_declared_prefix() -> None:
-    # A declared path may legitimately start with a top-level a/ or b/ directory;
-    # the git diff prefixes must not be stripped from declared paths, or an agent
-    # that edits a/x.py and declares a/x.py would silently target x.py instead.
-    assert normalize_declared_changed_files(["a/src/app.py", "src/app.py"]) == [
-        "a/src/app.py",
-        "src/app.py",
-    ]
-
-
-def test_normalize_declared_changed_files_rejects_empty_path() -> None:
-    with pytest.raises(ValueError, match="must name repository files"):
-        normalize_declared_changed_files(["/workspace"])
-
-
-def test_normalize_declared_changed_files_strips_only_absolute_workspace_prefix() -> (
-    None
-):
-    # `/workspace/...` is the unambiguous workspace-root spelling and is stripped;
-    # a relative `workspace/...` may be a real top-level `workspace/` directory and
-    # must not be retargeted.
-    assert normalize_declared_changed_files(["/workspace/src/app.py"]) == ["src/app.py"]
-    assert normalize_declared_changed_files(["workspace/src/app.py"]) == [
-        "workspace/src/app.py"
-    ]
-
-
-def test_observe_workspace_changed_files_reports_spaced_and_mode_only_paths(
-    tmp_path,
-) -> None:
-    """Observation reads NUL-separated paths from Git, so it reports spaced
-    names, ` b/` substrings, and mode-only changes that patch-text parsing could
-    not recover reliably.
-    """
-    workspace = tmp_path / "workspace"
-    _init_git_repo(workspace, {"a b.txt": "x\n", "foo b/bar.txt": "x\n"})
-
-    # Mode-only change on the spaced path + content change on the ` b/` path.
-    (workspace / "a b.txt").chmod(0o755)
-    (workspace / "foo b" / "bar.txt").write_text("y\n", encoding="utf-8")
-
-    assert sorted(observe_workspace_changed_files(workspace)) == [
-        "a b.txt",
-        "foo b/bar.txt",
-    ]
-
-
-def test_build_patch_artifact_requires_explicit_include_paths(tmp_path) -> None:
-    with pytest.raises(TypeError, match="include_paths"):
-        # Intentionally omit include_paths to verify the public helper fails
-        # loudly when callers do not choose an explicit patch scope.
-        build_patch_artifact(tmp_path)  # type: ignore[call-arg]
-
-
 @pytest.mark.parametrize("name", ["a*.txt", "a[1].txt", ":(glob)*.txt", "workspace"])
 @pytest.mark.parametrize("tracked", [True, False])
-def test_patch_scope_uses_literal_git_paths(tmp_path, name, tracked) -> None:
+def test_committed_paths_preserve_literal_git_names(tmp_path, name, tracked) -> None:
     workspace = tmp_path / "workspace"
     files = {"abc.txt": "old"}
     if tracked:
@@ -103,19 +65,11 @@ def test_patch_scope_uses_literal_git_paths(tmp_path, name, tracked) -> None:
     _init_git_repo(workspace, files)
     (workspace / name).write_text("selected")
     (workspace / "abc.txt").write_text("unselected")
-    artifact = build_patch_artifact(workspace, include_paths=[name])
+    artifact = _commit_patch(workspace, include_paths=[name])
     assert [change["path"] for change in artifact.file_changes] == [name]
     change = artifact.file_changes[0]
     assert change["status"] == "upsert"
     assert change["content"] == "selected"
-    staged = subprocess.run(
-        ["git", "diff", "--cached", "--name-only"],
-        cwd=workspace,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    assert staged.stdout == ""
 
 
 @pytest.mark.parametrize("name", [" spaced.txt", "spaced.txt ", r"a\b.txt"])
@@ -124,7 +78,7 @@ def test_patch_rejects_unpublishable_names_without_retargeting(tmp_path, name) -
     _init_git_repo(workspace, {name: "old", "spaced.txt": "old"})
     (workspace / name).write_text("updated")
     with pytest.raises(ValueError, match="Unsupported repository file path"):
-        build_patch_artifact(workspace, include_paths=[name])
+        _commit_patch(workspace, include_paths=[name])
 
 
 @pytest.mark.parametrize(
@@ -134,7 +88,7 @@ def test_patch_exports_link_target_not_target_contents(tmp_path, target) -> None
     workspace = tmp_path / "workspace"
     _init_git_repo(workspace, {"target": "do not dereference"})
     (workspace / "link").symlink_to(target)
-    artifact = build_patch_artifact(workspace, include_paths=["link"])
+    artifact = _commit_patch(workspace, include_paths=["link"])
     assert artifact.file_changes == [
         {
             "path": "link",
@@ -169,13 +123,13 @@ def test_patch_preserves_link_edits_and_type_transitions(
         (workspace / "entry").symlink_to("new-target")
     else:
         (workspace / "entry").write_text("regular content")
-    artifact = build_patch_artifact(workspace, include_paths=["entry"])
+    artifact = _commit_patch(workspace, include_paths=["entry"])
     change = artifact.file_changes[0]
     assert change["status"] == "upsert"
     assert change.get("mode") == ("120000" if final_link else "100644")
     assert change["content"] == ("new-target" if final_link else "regular content")
     (workspace / "entry").unlink()
-    assert build_patch_artifact(workspace, include_paths=["entry"]).file_changes == [
+    assert _commit_patch(workspace, include_paths=["entry"]).file_changes == [
         {"path": "entry", "status": "deleted"}
     ]
 
@@ -189,7 +143,7 @@ def test_file_changes_reproduce_git_tree_with_symlinks(tmp_path) -> None:
     (workspace / "to-link").unlink()
     (workspace / "to-link").symlink_to("../missing")
     os.symlink("目标", workspace / "binary-link")
-    artifact = build_patch_artifact(
+    artifact = _commit_patch(
         workspace, include_paths=["regular", "removed", "to-link", "binary-link"]
     )
     env = dict(os.environ, GIT_INDEX_FILE=str(tmp_path / "publication-index"))
@@ -233,7 +187,7 @@ def test_patch_rejects_non_utf8_diff_without_corrupting_target(tmp_path) -> None
     _init_git_repo(workspace, {"file": "original"})
     os.symlink(b"target-\xff", os.fsencode(workspace / "link"))
     with pytest.raises(ValueError, match="non-UTF-8"):
-        build_patch_artifact(workspace, include_paths=["link"])
+        _commit_patch(workspace, include_paths=["link"])
     assert os.fsencode(os.readlink(workspace / "link")) == b"target-\xff"
 
 
@@ -254,7 +208,7 @@ def test_patch_exports_file_replaced_by_directory(tmp_path, initial_link) -> Non
     (workspace / "foo").mkdir()
     (workspace / "foo" / "bar").write_text("new")
 
-    artifact = build_patch_artifact(workspace, include_paths=["foo", "foo/bar"])
+    artifact = _commit_patch(workspace, include_paths=["foo"])
     assert artifact.file_changes == [
         {"path": "foo", "status": "deleted"},
         {
@@ -286,7 +240,7 @@ def test_patch_exports_directory_replaced_by_file(tmp_path, final_link) -> None:
     else:
         (workspace / "foo").write_text("new")
 
-    artifact = build_patch_artifact(workspace, include_paths=["foo", "foo/bar"])
+    artifact = _commit_patch(workspace, include_paths=["foo"])
     assert artifact.file_changes == [
         {
             "path": "foo",

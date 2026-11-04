@@ -6,6 +6,9 @@ from sec_review_agents.agents.patch_synthesis.agent import (
     run_patch_synthesis_agent,
 )
 from sec_review_agents.agents.patch_synthesis.model import PatchSynthesisOutput
+from sec_review_agents.runtime.committed_patch_middleware import (
+    CommittedPatchMiddleware,
+)
 
 
 @pytest.mark.asyncio
@@ -59,7 +62,19 @@ async def test_run_patch_synthesis_agent_uses_fixed_response_format(
             user_prompt="task",
             backend=backend,
             workspace_root_path=tmp_path,
+            baseline_commit="baseline",
+            workspace_snapshot_tar_path=tmp_path / "baseline.tar",
         )
 
     assert created_agent is agent
     assert created_kwargs["response_format"] is PatchSynthesisOutput
+
+    acceptance = [
+        item
+        for item in created_kwargs["middleware"]
+        if isinstance(item, CommittedPatchMiddleware)
+    ]
+    assert len(acceptance) == 1
+    assert acceptance[0].baseline_commit == "baseline"
+    assert acceptance[0].workspace_snapshot_tar_path == tmp_path / "baseline.tar"
+    assert acceptance[0].require_changes

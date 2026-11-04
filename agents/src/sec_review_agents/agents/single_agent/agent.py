@@ -16,8 +16,8 @@ from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
 from sec_review_agents.runtime.agent_runtime_graph import (
     run_agent_runtime_graph,
 )
-from sec_review_agents.runtime.changed_files_acceptance_middleware import (
-    ChangedFilesAcceptanceMiddleware,
+from sec_review_agents.runtime.committed_patch_middleware import (
+    CommittedPatchMiddleware,
 )
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
 from sec_review_agents.runtime.memory_middleware import (
@@ -49,7 +49,8 @@ async def run_single_agent(
     workspace_root: str = "/workspace",
     todo_system_prompt: str,
     todo_tool_description: str,
-    baseline_snapshot_tar_path: Path,
+    baseline_commit: str,
+    workspace_snapshot_tar_path: Path,
     workspace_root_path: Path,
     user_prompt: str,
     memory_enabled: bool,
@@ -62,12 +63,13 @@ async def run_single_agent(
     """
     model = create_chat_model(agent_name=agent_name)
     agent_middleware: list[AgentMiddleware[Any, Any, Any]] = [
+        CommittedPatchMiddleware(
+            worktree_path=workspace_root_path,
+            baseline_commit=baseline_commit,
+            workspace_snapshot_tar_path=workspace_snapshot_tar_path,
+        ),
         MissingStructuredResponseMiddleware(
             max_retries=missing_structured_response_max_retries(),
-        ),
-        ChangedFilesAcceptanceMiddleware(
-            worktree_path=workspace_root_path,
-            baseline_snapshot_tar_path=baseline_snapshot_tar_path,
         ),
     ]
     agent_middleware.append(

@@ -1,6 +1,5 @@
 """Reusable verification stage runtime; workflows own review-specific prompts."""
 
-import subprocess
 import tempfile
 from collections.abc import Callable
 from pathlib import Path
@@ -38,6 +37,7 @@ from sec_review_agents.utils.files import (
     remove_json_artifacts,
 )
 from sec_review_agents.workspace.file_changes import file_change_paths
+from sec_review_agents.workspace.patches import apply_workspace_patch
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
 # Stage execution
@@ -49,7 +49,7 @@ async def run_verification_stage(
     verifier_artifacts_path: Path,
     attempt_label: str,
     published_trajectory_path: Path | None = None,
-    baseline_snapshot_tar_path: Path,
+    workspace_snapshot_tar_path: Path,
     workspace_patch: str | None,
     mitigation_result: MitigationStageResult | None,
     build_backend_config: Callable[[Path], BackendConfig],
@@ -72,13 +72,10 @@ async def run_verification_stage(
 
         workspace_path = Path(tempdir)
         restore_workspace_from_snapshot_tar(
-            tar_path=baseline_snapshot_tar_path,
+            tar_path=workspace_snapshot_tar_path,
             destination_path=workspace_path,
         )
-        _apply_workspace_patch(
-            workspace_path=workspace_path,
-            workspace_patch=workspace_patch,
-        )
+        apply_workspace_patch(workspace_path, workspace_patch)
         config = build_backend_config(workspace_path)
         workspace_root = config.get("working_directory", "/workspace")
         if memory_path_view is not None:
@@ -207,69 +204,6 @@ def prepare_verification_trajectory(
 
     published_trajectory_path.unlink(missing_ok=True)
     return (local_trajectory_path, published_trajectory_path)
-
-
-def _apply_workspace_patch(
-    *,
-    workspace_path: Path,
-    workspace_patch: str | None,
-) -> None:
-    patch_content = (
-        workspace_patch if workspace_patch and workspace_patch.strip() else None
-    )
-    if not patch_content:
-        return
-
-    patch_copy_path = workspace_path.parent / f"{workspace_path.name}.workspace.patch"
-    try:
-        patch_copy_path.write_text(patch_content, encoding="utf-8")
-
-        # `git apply` exits 0 while skipping every path when the workspace sits inside
-        # another repository, which would leave the verifier on the unpatched baseline
-        # and report success. `--numstat` prints one line per file the patch resolves to,
-        # so empty output with a zero exit code is exactly that silent skip; a malformed
-        # patch exits non-zero and falls through to `--check` for its real message.
-        stat_process = subprocess.run(
-            ["git", "apply", "--numstat", "-p1", str(patch_copy_path)],
-            cwd=workspace_path,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if stat_process.returncode == 0 and not stat_process.stdout.strip():
-            raise RuntimeError(
-                "workspace.patch resolves to no file in the verifier workspace."
-            )
-
-        check_process = subprocess.run(
-            ["git", "apply", "--check", "-p1", str(patch_copy_path)],
-            cwd=workspace_path,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if check_process.returncode != 0:
-            raise RuntimeError(
-                check_process.stderr.strip()
-                or check_process.stdout.strip()
-                or "Failed to validate workspace.patch against verifier workspace."
-            )
-
-        apply_process = subprocess.run(
-            ["git", "apply", "-p1", str(patch_copy_path)],
-            cwd=workspace_path,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if apply_process.returncode != 0:
-            raise RuntimeError(
-                apply_process.stderr.strip()
-                or apply_process.stdout.strip()
-                or "Failed to apply workspace.patch to verifier workspace."
-            )
-    finally:
-        patch_copy_path.unlink(missing_ok=True)
 
 
 # Result validation and persistence
