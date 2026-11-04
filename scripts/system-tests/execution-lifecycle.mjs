@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import { setTimeout } from 'node:timers/promises'
 import { createApp } from '../../services/execution-gateway/dist/server.js'
-import { TemporalExecutionStore } from '../../services/execution-gateway/dist/temporal-execution-store.js'
+import { TemporalExecutionClient } from '../../services/execution-gateway/dist/temporal-execution-client.js'
 import { ReviewRunStore } from '../../services/review-runs/dist/persistence/review-run-store.js'
 import {
   submitExecutionRun,
@@ -19,8 +19,8 @@ const store = new ReviewRunStore({
   connectionString: process.env.TEST_DATABASE_URL,
   connectorId,
 })
-const executionStore = await TemporalExecutionStore.connect()
-const app = await createApp({ store: executionStore, token: 'seam-execution' })
+const executionClient = await TemporalExecutionClient.connect()
+const app = await createApp({ client: executionClient, token: 'seam-execution' })
 let storeClosed = false
 try {
   await store.initialize()
@@ -102,6 +102,6 @@ try {
   }
 } finally {
   await app.close()
-  await executionStore.close()
+  await executionClient.close()
   if (!storeClosed) await store.close()
 }
