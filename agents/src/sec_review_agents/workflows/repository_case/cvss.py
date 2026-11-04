@@ -38,7 +38,7 @@ async def score_repository_cvss_v4(
     return await run_cvss_v4_scoring_stage(
         cvss_artifacts_path=cvss_artifacts_path,
         agent_name=REPOSITORY_CVSS_V4_SCORER_NAME,
-        baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
         build_backend=lambda stage_workspace_path: create_repository_cvss_backend(
             workspace_root_path=stage_workspace_path,
         ),

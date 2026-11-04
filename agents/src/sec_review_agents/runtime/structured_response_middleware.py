@@ -19,9 +19,8 @@
 # the agent finished" shape.
 #
 # It only handles the missing-structured-response protocol failure. Runtime
-# acceptance checks for already-produced structured responses, such as whether
-# declared changed files match an observed workspace patch, belong to their own
-# middleware.
+# acceptance checks for already-produced structured responses, such as committed
+# patch delivery, belong to their own middleware.
 
 from typing import Annotated, Any, ClassVar, NotRequired, override
 

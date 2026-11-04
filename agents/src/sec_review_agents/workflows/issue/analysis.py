@@ -32,7 +32,7 @@ async def analyze_issue(
         analyzer_artifacts_path=analyzer_artifacts_path,
         published_trajectory_path=published_trajectory_path,
         agent_name="issue-analyzer",
-        baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
         setup_declaration_content=setup_declaration_content,
         build_backend_config=lambda stage_workspace_path: build_issue_analyzer_backend_config(
             workspace_root_path=stage_workspace_path,

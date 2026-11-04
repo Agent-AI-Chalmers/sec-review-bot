@@ -117,7 +117,7 @@ async def run_cvss_v4_scoring_stage(
     *,
     cvss_artifacts_path: Path,
     agent_name: str,
-    baseline_snapshot_tar_path: Path,
+    workspace_snapshot_tar_path: Path,
     build_backend: Callable[[Path], Any],
     system_prompt: str,
     filesystem_system_prompt: str,
@@ -127,7 +127,7 @@ async def run_cvss_v4_scoring_stage(
         reset_cvss_artifacts(cvss_artifacts_path=cvss_artifacts_path)
         workspace_path = Path(tempdir)
         restore_workspace_from_snapshot_tar(
-            tar_path=baseline_snapshot_tar_path,
+            tar_path=workspace_snapshot_tar_path,
             destination_path=workspace_path,
         )
         trajectory = trajectory_path(cvss_artifacts_path)

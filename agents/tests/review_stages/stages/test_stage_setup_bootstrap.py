@@ -73,7 +73,7 @@ async def _run(
         await run_analysis_stage(
             analyzer_artifacts_path=artifacts,
             agent_name="analyzer",
-            baseline_snapshot_tar_path=_seed(tmp_path),
+            workspace_snapshot_tar_path=_seed(tmp_path),
             build_backend_config=lambda _ws: BackendConfig(
                 container_name_prefix="test",
                 path_views=[],
@@ -214,7 +214,7 @@ async def test_stage_assembles_invocation_mounts(
         await run_analysis_stage(
             analyzer_artifacts_path=tmp_path / "artifacts",
             agent_name="probe",
-            baseline_snapshot_tar_path=_seed(tmp_path),
+            workspace_snapshot_tar_path=_seed(tmp_path),
             build_backend_config=configure,
             system_prompt="system",
             filesystem_system_prompt="filesystem",

@@ -192,7 +192,7 @@ async def main() -> None:
     ):
         outcome = await execute_delivery_entry(
             run_artifacts_root=run_artifacts,
-            baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+            workspace_snapshot_tar_path=workspace_snapshot_tar_path,
             delivery_entry=delivery_request.delivery,
             case_results=delivery_request.case_items,
         )

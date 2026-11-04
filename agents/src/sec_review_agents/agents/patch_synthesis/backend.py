@@ -13,6 +13,7 @@ def create_patch_synthesis_backend(
     workspace_root_path: Path,
     workspace_writable: bool = True,
 ):
+    # Commit delivery requires shell execution, as do the other repair agents.
     return create_backend_with_path_views(
         container_name_prefix="patch-synthesizer",
         path_views=[
@@ -21,5 +22,4 @@ def create_patch_synthesis_backend(
                 writable=workspace_writable,
             ),
         ],
-        backend_kind="local",
     )

@@ -67,7 +67,7 @@ async def test_combined_execution_builds_status_from_patch_artifact(tmp_path) ->
     ):
         result = await execute_delivery_entry(
             run_artifacts_root=tmp_path,
-            baseline_snapshot_tar_path=tmp_path / "baseline.tar",
+            workspace_snapshot_tar_path=tmp_path / "baseline.tar",
             delivery_entry=DeliveryEntry(
                 delivery_id="delivery-1",
                 strategy="combined",
@@ -102,7 +102,7 @@ async def test_combined_execution_classifies_empty_patch_artifact(tmp_path) -> N
     ):
         result = await execute_delivery_entry(
             run_artifacts_root=tmp_path,
-            baseline_snapshot_tar_path=tmp_path / "baseline.tar",
+            workspace_snapshot_tar_path=tmp_path / "baseline.tar",
             delivery_entry=DeliveryEntry(
                 delivery_id="delivery-1",
                 strategy="combined",
@@ -128,7 +128,7 @@ async def test_combined_execution_converts_synthesis_failure(tmp_path) -> None:
     ):
         result = await execute_delivery_entry(
             run_artifacts_root=tmp_path,
-            baseline_snapshot_tar_path=tmp_path / "baseline.tar",
+            workspace_snapshot_tar_path=tmp_path / "baseline.tar",
             delivery_entry=DeliveryEntry(
                 delivery_id="delivery-1",
                 strategy="combined",

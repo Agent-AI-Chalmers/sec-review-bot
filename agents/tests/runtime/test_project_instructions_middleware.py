@@ -226,7 +226,8 @@ async def test_review_agents_load_guidance_independently_of_experience_memory(
     }
     if role in {"mitigation", "single_agent"}:
         kwargs.update(
-            baseline_snapshot_tar_path=tmp_path / "baseline.tar",
+            baseline_commit="baseline",
+            workspace_snapshot_tar_path=tmp_path / "baseline.tar",
             workspace_root_path=tmp_path,
         )
     if role == "single_agent":

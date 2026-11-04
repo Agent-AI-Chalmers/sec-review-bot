@@ -35,7 +35,7 @@ async def run_analysis_stage(
     analyzer_artifacts_path: Path,
     published_trajectory_path: Path | None = None,
     agent_name: str,
-    baseline_snapshot_tar_path: Path,
+    workspace_snapshot_tar_path: Path,
     build_backend_config: Callable[[Path], BackendConfig],
     system_prompt: str,
     filesystem_system_prompt: str,
@@ -53,7 +53,7 @@ async def run_analysis_stage(
         )
         workspace_path = Path(tempdir)
         restore_workspace_from_snapshot_tar(
-            tar_path=baseline_snapshot_tar_path,
+            tar_path=workspace_snapshot_tar_path,
             destination_path=workspace_path,
         )
         trajectory_paths = prepare_analysis_trajectory(

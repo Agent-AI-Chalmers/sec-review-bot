@@ -188,7 +188,7 @@ async def run_repository_delivery_direct(
         delivery_index = delivery_request.index
         patch_outcomes[delivery_index] = await execute_delivery_entry(
             run_artifacts_root=run_artifacts_root,
-            baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+            workspace_snapshot_tar_path=workspace_snapshot_tar_path,
             delivery_entry=delivery_request.delivery,
             case_results=delivery_request.case_items,
         )

@@ -58,7 +58,8 @@ def agent_call(request, monkeypatch, tmp_path: Path):
     }
     if role in {"mitigation", "single_agent"}:
         kwargs.update(
-            baseline_snapshot_tar_path=tmp_path / "baseline.tar",
+            baseline_commit="baseline",
+            workspace_snapshot_tar_path=tmp_path / "baseline.tar",
             workspace_root_path=tmp_path,
         )
     if role == "single_agent":

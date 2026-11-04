@@ -58,7 +58,7 @@ async def verify_pull_request(
         verifier_artifacts_path=verifier_artifacts_path,
         attempt_label=attempt_label,
         published_trajectory_path=published_trajectory_path,
-        baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
         workspace_patch=workspace_patch,
         mitigation_result=mitigation_result,
         setup_declaration_content=setup_declaration_content,

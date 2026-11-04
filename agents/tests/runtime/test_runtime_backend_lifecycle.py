@@ -428,7 +428,7 @@ def test_runtime_workspace_image_reaches_pr_and_repository_docker_backends(
     )
 
 
-def test_patch_synthesis_backend_stays_local_when_docker_is_enabled(
+def test_patch_synthesis_backend_uses_docker_for_commit_delivery(
     tmp_path: Path,
 ) -> None:
     local_root = tmp_path / "local"
@@ -449,5 +449,9 @@ def test_patch_synthesis_backend_stays_local_when_docker_is_enabled(
             workspace_writable=True,
         )
 
-    docker_backend_mock.assert_not_called()
-    assert "/workspace/" in getattr(backend, "routes", {})
+    docker_backend_mock.assert_called_once()
+    assert backend is docker_backend_mock.return_value
+    assert (
+        docker_backend_mock.call_args.kwargs["container"].working_directory
+        == "/workspace"
+    )

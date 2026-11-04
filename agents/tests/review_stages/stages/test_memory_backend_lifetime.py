@@ -22,6 +22,8 @@ async def test_stage_releases_backend_before_memory_on_failure(
     tmp_path: Path, monkeypatch, role: str, failure: str
 ) -> None:
     stage = import_module(f"sec_review_agents.review_stages.{role}.stage")
+    if role in {"mitigation", "single_agent"}:
+        monkeypatch.setattr(stage, "resolve_workspace_commit", lambda _: "baseline")
     source = tmp_path / "source"
     source.mkdir()
     snapshot = tmp_path / "workspace.tar"
@@ -77,7 +79,7 @@ async def test_stage_releases_backend_before_memory_on_failure(
     monkeypatch.setattr(stage, "record_bootstrap_result", lambda *args, **kwargs: None)
     kwargs = {
         "agent_name": "probe",
-        "baseline_snapshot_tar_path": snapshot,
+        "workspace_snapshot_tar_path": snapshot,
         "build_backend_config": configure,
         "system_prompt": "system",
         "filesystem_system_prompt": "filesystem",

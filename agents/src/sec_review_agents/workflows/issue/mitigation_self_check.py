@@ -40,7 +40,7 @@ async def mitigate_issue_with_self_check(
         mitigator_artifacts_path=mitigator_artifacts_path,
         setup_declaration_content=setup_declaration_content,
         published_trajectory_path=published_trajectory_path,
-        baseline_snapshot_tar_path=workspace_snapshot_tar_path,
+        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
         retry_context=None,
         build_backend_config=lambda workspace_root: build_issue_mitigation_backend_config(
             workspace_root=workspace_root,

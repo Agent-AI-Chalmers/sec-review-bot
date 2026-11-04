@@ -46,7 +46,7 @@ async def execute_delivery_entry(
     run_artifacts_root: Path,
     delivery_entry: DeliveryEntry,
     case_results: Sequence[DeliveryPatchCase],
-    baseline_snapshot_tar_path: Path | None = None,
+    workspace_snapshot_tar_path: Path | None = None,
 ) -> DeliveryExecutionResult | None:
     case_results_by_case_id = {item.case_id: item for item in case_results}
     missing_case_ids = [
@@ -74,13 +74,13 @@ async def execute_delivery_entry(
     case_ids = delivery_entry.case_ids
     if not delivery_id or not case_ids:
         return None
-    if baseline_snapshot_tar_path is None:
+    if workspace_snapshot_tar_path is None:
         raise ValueError(
-            "baseline_snapshot_tar_path is required for combined deliveries."
+            "workspace_snapshot_tar_path is required for combined deliveries."
         )
     try:
         patch_artifact = await synthesize_combined_delivery_patch(
-            baseline_snapshot_tar_path=baseline_snapshot_tar_path,
+            workspace_snapshot_tar_path=workspace_snapshot_tar_path,
             patch_synthesis_root=run_artifacts_root / "patch-synthesis",
             delivery_entry=delivery_entry,
             case_items=[case_results_by_case_id[case_id] for case_id in case_ids],

@@ -6,14 +6,13 @@ from sec_review_agents.review_stages.types import (
     Verdict,
 )
 from sec_review_agents.utils.pydantic_types import NonEmptyText
-from sec_review_agents.workspace.patches import normalize_declared_changed_files
 
 # Agent structured output
 
 
 class SingleAgentFixOutput(BaseModel):
     """
-    Keep `overview`, `verdict`, `validation_level`, `regression_status`, `target_claim`, and `declared_changed_files`
+    Keep `overview`, `verdict`, `validation_level`, `regression_status`, and `target_claim`
     aligned to one final repository-grounded outcome after repair and self-check.
     Use `target_claim` for the strongest concrete claim the agent actually audited;
     leave it empty only when no actionable target was confirmed.
@@ -48,15 +47,6 @@ class SingleAgentFixOutput(BaseModel):
     target_claim: str = Field(
         description="The strongest concrete claim the agent treated as the review target; use empty string when no actionable issue was confirmed.",
     )
-    declared_changed_files: list[str] = Field(
-        default_factory=list,
-        description=(
-            "Repository-relative files intentionally changed by the repair and intended for patch export. "
-            "Use paths like `src/app.py`; do not use the absolute `/workspace` mount prefix, and do not copy "
-            "the git diff `a/`/`b/` header prefixes. A real top-level `a/`, `b/`, or `workspace/` directory is a valid "
-            "path and should be declared as-is."
-        ),
-    )
     residual_risks: list[str] = Field(
         default_factory=list,
         max_length=5,
@@ -70,9 +60,6 @@ class SingleAgentFixOutput(BaseModel):
 
     @model_validator(mode="after")
     def validate_result(self) -> SingleAgentFixOutput:
-        self.declared_changed_files = normalize_declared_changed_files(
-            self.declared_changed_files
-        )
         if not self.self_check_notes:
             raise ValueError("at least one self_check_note is required.")
         return self
