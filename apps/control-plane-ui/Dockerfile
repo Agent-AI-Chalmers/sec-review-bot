@@ -1,6 +1,6 @@
 FROM ghcr.io/pnpm/pnpm:12-alpine AS pnpm
 
-FROM node:24-alpine AS builder
+FROM node:26-alpine AS builder
 
 COPY --from=pnpm /opt/pnpm /opt/pnpm
 ENV PATH="/opt/pnpm:${PATH}"
@@ -19,7 +19,7 @@ COPY . ./
 RUN pnpm run build
 RUN pnpm --filter @sec-review-bot/control-plane-ui deploy --prod /prod
 
-FROM node:24-alpine
+FROM node:26-alpine
 WORKDIR /app
 COPY --from=builder /repo/apps/control-plane-ui/dist ./dist
 COPY --from=builder /repo/apps/control-plane-ui/dist-server ./dist-server

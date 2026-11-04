@@ -6,7 +6,7 @@
 
 An experimental security review bot for GitHub issues, pull requests, and repository scans.
 
-[![CI](https://github.com/Agent-AI-Chalmers/sec-review-bot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Agent-AI-Chalmers/sec-review-bot/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/Python-%E2%89%A53.14-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A524-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![CI](https://github.com/Agent-AI-Chalmers/sec-review-bot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Agent-AI-Chalmers/sec-review-bot/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/Python-%E2%89%A53.14-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![Node.js](https://img.shields.io/badge/Node.js-26_LTS-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
 English · [中文](README.zh.md)
 
@@ -115,9 +115,11 @@ sudo systemctl enable --now sec-review-bot.target
 
 ### Local Development
 
-To develop the UI or Node.js services, first install dependencies from the repository root:
+<!-- doc-default: node-workspace.toolchain; source=package.json -->
+Use Node.js 26 LTS and pnpm 12 to develop the UI or Node.js services. The root `package.json` declares the supported Node.js range and the exact pnpm version; pnpm automatically selects that project version. Run from the repository root:
 
 ```bash
+npm install --global pnpm@12
 pnpm install --frozen-lockfile
 ```
 

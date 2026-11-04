@@ -439,7 +439,8 @@ The GitHub integration image build and Git workspace fetches use separate networ
 
 ### pnpm And npm Registries
 
-The Node service images copy pnpm 12 from `ghcr.io/pnpm/pnpm:12-alpine`; this avoids downloading the package manager during the build. Docker must therefore be able to pull from GHCR, directly or through the daemon's configured registry mirror or proxy.
+<!-- doc-default: node-workspace.package-manager; source=package.json -->
+Node service builds copy pnpm from the official `ghcr.io/pnpm/pnpm:12-alpine` image. pnpm selects the project version declared in the root `package.json#packageManager`. Docker needs access to GHCR; pnpm uses the npm registry selected by `NPM_CONFIG_REGISTRY`.
 
 pnpm uses `https://registry.npmjs.org` by default for project dependencies. If that endpoint is unavailable or unreliable, select a reachable npm registry:
 

@@ -1,6 +1,6 @@
 FROM ghcr.io/pnpm/pnpm:12-alpine AS pnpm
 
-FROM node:24-alpine AS builder
+FROM node:26-alpine AS builder
 
 COPY --from=pnpm /opt/pnpm /opt/pnpm
 ENV PATH="/opt/pnpm:${PATH}"
@@ -23,7 +23,7 @@ COPY --from=contracts memory-catalog-api/v1/openapi.yaml /repo/contracts/memory-
 RUN pnpm run build \
     && pnpm --filter @sec-review-bot/memory-catalog deploy --prod /prod
 
-FROM node:24-alpine
+FROM node:26-alpine
 
 WORKDIR /app
 

@@ -226,7 +226,7 @@ Langfuse 返回 HTTP 429 时，已领取的 run 按 `Retry-After` 延期；缺�
 
 服务作为独立 Node.js 进程运行，默认监听 `8090`。PostgreSQL 凭据只提供给 Review Runs。
 
-使用 Node.js 24 和 pnpm 12。在本目录安装依赖并启动服务：
+在本目录安装依赖并启动服务：
 
 ```bash
 pnpm install --frozen-lockfile

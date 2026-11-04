@@ -226,7 +226,7 @@ Langfuse HTTP 429 responses defer the claimed run according to `Retry-After` (fa
 
 The service runs as an independent Node.js process on port `8090` by default. PostgreSQL credentials are provided only to Review Runs.
 
-Use Node.js 24 and pnpm 12. Install dependencies and start the service from this directory:
+Install dependencies and start the service from this directory:
 
 ```bash
 pnpm install --frozen-lockfile

@@ -6,7 +6,7 @@
 
 一个面向 GitHub issues、pull requests 和仓库级扫描的实验性安全审查 bot。
 
-[![CI](https://github.com/Agent-AI-Chalmers/sec-review-bot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Agent-AI-Chalmers/sec-review-bot/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/Python-%E2%89%A53.14-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![Node.js](https://img.shields.io/badge/Node.js-%E2%89%A524-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![CI](https://github.com/Agent-AI-Chalmers/sec-review-bot/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Agent-AI-Chalmers/sec-review-bot/actions/workflows/ci.yml) [![License](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](LICENSE) [![Python](https://img.shields.io/badge/Python-%E2%89%A53.14-3776AB?logo=python&logoColor=white)](https://www.python.org/) [![Node.js](https://img.shields.io/badge/Node.js-26_LTS-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
 
 [English](README.md) · 中文
 
@@ -113,9 +113,11 @@ sudo systemctl enable --now sec-review-bot.target
 
 ### 本地开发
 
-开发 UI 或 Node.js 服务时，先在仓库根目录安装依赖：
+<!-- doc-default: node-workspace.toolchain; source=package.json -->
+开发 UI 或 Node.js 服务时，使用 Node.js 26 LTS 和 pnpm 12。根 `package.json` 声明支持的 Node.js 范围和 pnpm 精确版本；pnpm 会自动选择该项目版本。在仓库根目录执行：
 
 ```bash
+npm install --global pnpm@12
 pnpm install --frozen-lockfile
 ```
 

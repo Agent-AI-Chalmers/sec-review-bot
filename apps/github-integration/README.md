@@ -11,17 +11,8 @@ It does not execute agent workflows directly. It prepares inputs, submits and ob
 For local development, install Review Runs service and integration dependencies from the repository root:
 
 ```bash
-corepack install --global pnpm@12
 pnpm install --frozen-lockfile
 ```
-
-<!-- doc-default: github-integration.node-runtime; source=apps/github-integration/package.json -->
-
-Use Node 24.x.
-
-<!-- doc-time-sensitive: node-active-lts-schedule; checked=2026-10-28; source=https://github.com/nodejs/Release#release-schedule -->
-
-> _Node 24 is the current LTS baseline for this package. The [Node.js release schedule](https://github.com/nodejs/Release#release-schedule) currently lists Node 26's Active LTS start as 2026-10-28; after that, this package can evaluate moving the default runtime to Node 26._
 
 ## Commands
 
