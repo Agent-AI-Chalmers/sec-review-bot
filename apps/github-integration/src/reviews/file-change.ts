@@ -3,6 +3,7 @@ import type { FileChange } from '../execution/execution-api-types-generated.js'
 type UpsertFileChange = Extract<FileChange, { status: 'upsert' }>
 
 export type { FileChange }
+
 export type TextEncoding = UpsertFileChange['content_encoding']
 export type FileMode = NonNullable<UpsertFileChange['mode']>
 

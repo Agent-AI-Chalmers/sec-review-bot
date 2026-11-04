@@ -12,6 +12,7 @@ interface RepoGetCall {
   owner: string
   repo: string
 }
+
 interface BranchGetCall extends RepoGetCall {
   branch: string
 }

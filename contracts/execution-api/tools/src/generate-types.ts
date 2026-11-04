@@ -13,7 +13,7 @@ import { parse } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
 import { renderWorkflowInputDeclarations } from './generate-api-types.js'
-import { renderKubbTypes } from './render-kubb-types.js'
+import { renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
@@ -84,7 +84,8 @@ export type CreateRunRequestFor<Workflow extends ExecutionWorkflow> =
     input: WorkflowInputByName[Workflow]
   }
 `
-  const rendered = HEADER + (await renderKubbTypes(SPEC_PATH)) + composedTypes
+  const rendered =
+    HEADER + (await renderOpenApiTypes(SPEC_PATH)) + '\n' + composedTypes
   // `format` does not read the project's Prettier config from `filepath`; it has to be
   // resolved and passed, or the output keeps the generator's own quoting and fails
   // `format:check`.

@@ -30,6 +30,7 @@ export async function requirePreparationClaim(
 }
 
 const projection = 'run_id,digest,reference,input,publish_context,status'
+
 type InputPublicationIntent = Pick<
   InputBundleCandidate,
   'reference' | 'input' | 'publish_context'

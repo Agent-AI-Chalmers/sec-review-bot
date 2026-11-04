@@ -91,8 +91,11 @@ export interface MemoryCatalogStore {
 }
 
 export class ExtractionConflictError extends Error {}
+
 export class MemoryTreeRevisionConflictError extends Error {}
+
 export class MaintenanceControlConflictError extends Error {}
+
 export class MaintenancePausedError extends Error {}
 
 /** Owns the pool lifecycle, publication ledgers, and atomic catalog transitions.

@@ -537,10 +537,6 @@ export type ErrorResponse = {
     | 'INTERNAL_ERROR'
 }
 
-export type HealthStatus200 = Health
-
-export type HealthStatus500 = ErrorResponse
-
 export type HealthOptions = {
   body?: never
   path?: never
@@ -548,15 +544,13 @@ export type HealthOptions = {
   headers?: never
 }
 
-export type HealthResponses = {
-  '200': HealthStatus200
-  '500': HealthStatus500
+export type HealthResponseBodyByStatus = {
+  '200': Health
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type HealthResponse = HealthStatus200
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type HealthResponseBody = HealthResponseBodyByStatus['200']
 
 export type ListExtractionsQuery = {
   /**
@@ -582,14 +576,6 @@ export type ListExtractionsQuery = {
   has_observation?: 'true' | 'false'
 }
 
-export type ListExtractionsStatus200 = ExtractionList
-
-export type ListExtractionsStatus400 = ErrorResponse
-
-export type ListExtractionsStatus401 = ErrorResponse
-
-export type ListExtractionsStatus500 = ErrorResponse
-
 export type ListExtractionsOptions = {
   body?: never
   path?: never
@@ -597,29 +583,16 @@ export type ListExtractionsOptions = {
   headers?: never
 }
 
-export type ListExtractionsResponses = {
-  '200': ListExtractionsStatus200
-  '400': ListExtractionsStatus400
-  '401': ListExtractionsStatus401
-  '500': ListExtractionsStatus500
+export type ListExtractionsResponseBodyByStatus = {
+  '200': ExtractionList
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type ListExtractionsResponse = ListExtractionsStatus200
-
-export type RegisterExtractionStatus200 = ExtractionRegistrationResult
-
-export type RegisterExtractionStatus400 = ErrorResponse
-
-export type RegisterExtractionStatus401 = ErrorResponse
-
-export type RegisterExtractionStatus409 = ErrorResponse
-
-export type RegisterExtractionStatus413 = ErrorResponse
-
-export type RegisterExtractionStatus500 = ErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type ListExtractionsResponseBody =
+  ListExtractionsResponseBodyByStatus['200']
 
 export type RegisterExtractionBody = ExtractionRegistration
 
@@ -630,19 +603,18 @@ export type RegisterExtractionOptions = {
   headers?: never
 }
 
-export type RegisterExtractionResponses = {
-  '200': RegisterExtractionStatus200
-  '400': RegisterExtractionStatus400
-  '401': RegisterExtractionStatus401
-  '409': RegisterExtractionStatus409
-  '413': RegisterExtractionStatus413
-  '500': RegisterExtractionStatus500
+export type RegisterExtractionResponseBodyByStatus = {
+  '200': ExtractionRegistrationResult
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '409': ErrorResponse
+  '413': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type RegisterExtractionResponse = RegisterExtractionStatus200
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type RegisterExtractionResponseBody =
+  RegisterExtractionResponseBodyByStatus['200']
 
 export type GetExtractionPath = {
   /**
@@ -653,16 +625,6 @@ export type GetExtractionPath = {
   extraction_id: ExtractionId
 }
 
-export type GetExtractionStatus200 = ExtractionRecord
-
-export type GetExtractionStatus400 = ErrorResponse
-
-export type GetExtractionStatus401 = ErrorResponse
-
-export type GetExtractionStatus404 = ErrorResponse
-
-export type GetExtractionStatus500 = ErrorResponse
-
 export type GetExtractionOptions = {
   body?: never
   path: GetExtractionPath
@@ -670,24 +632,16 @@ export type GetExtractionOptions = {
   headers?: never
 }
 
-export type GetExtractionResponses = {
-  '200': GetExtractionStatus200
-  '400': GetExtractionStatus400
-  '401': GetExtractionStatus401
-  '404': GetExtractionStatus404
-  '500': GetExtractionStatus500
+export type GetExtractionResponseBodyByStatus = {
+  '200': ExtractionRecord
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '404': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type GetExtractionResponse = GetExtractionStatus200
-
-export type GetObservationBacklogStatus200 = ObservationBacklog
-
-export type GetObservationBacklogStatus401 = ErrorResponse
-
-export type GetObservationBacklogStatus500 = ErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type GetExtractionResponseBody = GetExtractionResponseBodyByStatus['200']
 
 export type GetObservationBacklogOptions = {
   body?: never
@@ -696,16 +650,15 @@ export type GetObservationBacklogOptions = {
   headers?: never
 }
 
-export type GetObservationBacklogResponses = {
-  '200': GetObservationBacklogStatus200
-  '401': GetObservationBacklogStatus401
-  '500': GetObservationBacklogStatus500
+export type GetObservationBacklogResponseBodyByStatus = {
+  '200': ObservationBacklog
+  '401': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type GetObservationBacklogResponse = GetObservationBacklogStatus200
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type GetObservationBacklogResponseBody =
+  GetObservationBacklogResponseBodyByStatus['200']
 
 export type ListObservationsQuery = {
   /**
@@ -726,14 +679,6 @@ export type ListObservationsQuery = {
   consumed_revision?: string
 }
 
-export type ListObservationsStatus200 = ObservationList
-
-export type ListObservationsStatus400 = ErrorResponse
-
-export type ListObservationsStatus401 = ErrorResponse
-
-export type ListObservationsStatus500 = ErrorResponse
-
 export type ListObservationsOptions = {
   body?: never
   path?: never
@@ -741,17 +686,16 @@ export type ListObservationsOptions = {
   headers?: never
 }
 
-export type ListObservationsResponses = {
-  '200': ListObservationsStatus200
-  '400': ListObservationsStatus400
-  '401': ListObservationsStatus401
-  '500': ListObservationsStatus500
+export type ListObservationsResponseBodyByStatus = {
+  '200': ObservationList
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type ListObservationsResponse = ListObservationsStatus200
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type ListObservationsResponseBody =
+  ListObservationsResponseBodyByStatus['200']
 
 export type GetCatalogOverviewQuery = {
   /**
@@ -761,12 +705,6 @@ export type GetCatalogOverviewQuery = {
   range?: '30d' | '90d' | 'all'
 }
 
-export type GetCatalogOverviewStatus200 = CatalogOverview
-
-export type GetCatalogOverviewStatus401 = ErrorResponse
-
-export type GetCatalogOverviewStatus500 = ErrorResponse
-
 export type GetCatalogOverviewOptions = {
   body?: never
   path?: never
@@ -774,16 +712,15 @@ export type GetCatalogOverviewOptions = {
   headers?: never
 }
 
-export type GetCatalogOverviewResponses = {
-  '200': GetCatalogOverviewStatus200
-  '401': GetCatalogOverviewStatus401
-  '500': GetCatalogOverviewStatus500
+export type GetCatalogOverviewResponseBodyByStatus = {
+  '200': CatalogOverview
+  '401': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type GetCatalogOverviewResponse = GetCatalogOverviewStatus200
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type GetCatalogOverviewResponseBody =
+  GetCatalogOverviewResponseBodyByStatus['200']
 
 export type GetMaintenanceInputQuery = {
   /**
@@ -793,14 +730,6 @@ export type GetMaintenanceInputQuery = {
   limit: string
 }
 
-export type GetMaintenanceInputStatus200 = MaintenanceInputResult
-
-export type GetMaintenanceInputStatus400 = ErrorResponse
-
-export type GetMaintenanceInputStatus401 = ErrorResponse
-
-export type GetMaintenanceInputStatus500 = ErrorResponse
-
 export type GetMaintenanceInputOptions = {
   body?: never
   path?: never
@@ -808,31 +737,16 @@ export type GetMaintenanceInputOptions = {
   headers?: never
 }
 
-export type GetMaintenanceInputResponses = {
-  '200': GetMaintenanceInputStatus200
-  '400': GetMaintenanceInputStatus400
-  '401': GetMaintenanceInputStatus401
-  '500': GetMaintenanceInputStatus500
+export type GetMaintenanceInputResponseBodyByStatus = {
+  '200': MaintenanceInputResult
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type GetMaintenanceInputResponse = GetMaintenanceInputStatus200
-
-export type CreateMemoryTreeRevisionStatus200 = MemoryTreeRevisionCreationResult
-
-export type CreateMemoryTreeRevisionStatus201 = MemoryTreeRevisionCreationResult
-
-export type CreateMemoryTreeRevisionStatus400 = ErrorResponse
-
-export type CreateMemoryTreeRevisionStatus401 = ErrorResponse
-
-export type CreateMemoryTreeRevisionStatus409 = ErrorResponse
-
-export type CreateMemoryTreeRevisionStatus413 = ErrorResponse
-
-export type CreateMemoryTreeRevisionStatus500 = ErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type GetMaintenanceInputResponseBody =
+  GetMaintenanceInputResponseBodyByStatus['200']
 
 export type CreateMemoryTreeRevisionBody = MemoryTreeRevisionCreation
 
@@ -843,21 +757,19 @@ export type CreateMemoryTreeRevisionOptions = {
   headers?: never
 }
 
-export type CreateMemoryTreeRevisionResponses = {
-  '200': CreateMemoryTreeRevisionStatus200
-  '201': CreateMemoryTreeRevisionStatus201
-  '400': CreateMemoryTreeRevisionStatus400
-  '401': CreateMemoryTreeRevisionStatus401
-  '409': CreateMemoryTreeRevisionStatus409
-  '413': CreateMemoryTreeRevisionStatus413
-  '500': CreateMemoryTreeRevisionStatus500
+export type CreateMemoryTreeRevisionResponseBodyByStatus = {
+  '200': MemoryTreeRevisionCreationResult
+  '201': MemoryTreeRevisionCreationResult
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '409': ErrorResponse
+  '413': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type CreateMemoryTreeRevisionResponse =
-  CreateMemoryTreeRevisionStatus200 | CreateMemoryTreeRevisionStatus201
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type CreateMemoryTreeRevisionResponseBody =
+  CreateMemoryTreeRevisionResponseBodyByStatus['200' | '201']
 
 export type ListMemoryTreeRevisionsQuery = {
   /**
@@ -872,14 +784,6 @@ export type ListMemoryTreeRevisionsQuery = {
   limit?: string
 }
 
-export type ListMemoryTreeRevisionsStatus200 = MemoryTreeRevisionList
-
-export type ListMemoryTreeRevisionsStatus400 = ErrorResponse
-
-export type ListMemoryTreeRevisionsStatus401 = ErrorResponse
-
-export type ListMemoryTreeRevisionsStatus500 = ErrorResponse
-
 export type ListMemoryTreeRevisionsOptions = {
   body?: never
   path?: never
@@ -887,23 +791,16 @@ export type ListMemoryTreeRevisionsOptions = {
   headers?: never
 }
 
-export type ListMemoryTreeRevisionsResponses = {
-  '200': ListMemoryTreeRevisionsStatus200
-  '400': ListMemoryTreeRevisionsStatus400
-  '401': ListMemoryTreeRevisionsStatus401
-  '500': ListMemoryTreeRevisionsStatus500
+export type ListMemoryTreeRevisionsResponseBodyByStatus = {
+  '200': MemoryTreeRevisionList
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type ListMemoryTreeRevisionsResponse = ListMemoryTreeRevisionsStatus200
-
-export type GetMemoryTreeStatus200 = MemoryTree
-
-export type GetMemoryTreeStatus401 = ErrorResponse
-
-export type GetMemoryTreeStatus500 = ErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type ListMemoryTreeRevisionsResponseBody =
+  ListMemoryTreeRevisionsResponseBodyByStatus['200']
 
 export type GetMemoryTreeOptions = {
   body?: never
@@ -912,30 +809,14 @@ export type GetMemoryTreeOptions = {
   headers?: never
 }
 
-export type GetMemoryTreeResponses = {
-  '200': GetMemoryTreeStatus200
-  '401': GetMemoryTreeStatus401
-  '500': GetMemoryTreeStatus500
+export type GetMemoryTreeResponseBodyByStatus = {
+  '200': MemoryTree
+  '401': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type GetMemoryTreeResponse = GetMemoryTreeStatus200
-
-export type RestoreMemoryTreeStatus200 = MemoryTreeRestoreOperationResult
-
-export type RestoreMemoryTreeStatus201 = MemoryTreeRestoreOperationResult
-
-export type RestoreMemoryTreeStatus400 = ErrorResponse
-
-export type RestoreMemoryTreeStatus401 = ErrorResponse
-
-export type RestoreMemoryTreeStatus409 = ErrorResponse
-
-export type RestoreMemoryTreeStatus413 = ErrorResponse
-
-export type RestoreMemoryTreeStatus500 = ErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type GetMemoryTreeResponseBody = GetMemoryTreeResponseBodyByStatus['200']
 
 export type RestoreMemoryTreeBody = MemoryTreeRestoreOperation
 
@@ -946,27 +827,19 @@ export type RestoreMemoryTreeOptions = {
   headers?: never
 }
 
-export type RestoreMemoryTreeResponses = {
-  '200': RestoreMemoryTreeStatus200
-  '201': RestoreMemoryTreeStatus201
-  '400': RestoreMemoryTreeStatus400
-  '401': RestoreMemoryTreeStatus401
-  '409': RestoreMemoryTreeStatus409
-  '413': RestoreMemoryTreeStatus413
-  '500': RestoreMemoryTreeStatus500
+export type RestoreMemoryTreeResponseBodyByStatus = {
+  '200': MemoryTreeRestoreOperationResult
+  '201': MemoryTreeRestoreOperationResult
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '409': ErrorResponse
+  '413': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type RestoreMemoryTreeResponse =
-  RestoreMemoryTreeStatus200 | RestoreMemoryTreeStatus201
-
-export type GetMaintenanceControlStatus200 = MaintenanceControl
-
-export type GetMaintenanceControlStatus401 = ErrorResponse
-
-export type GetMaintenanceControlStatus500 = ErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type RestoreMemoryTreeResponseBody =
+  RestoreMemoryTreeResponseBodyByStatus['200' | '201']
 
 export type GetMaintenanceControlOptions = {
   body?: never
@@ -975,30 +848,15 @@ export type GetMaintenanceControlOptions = {
   headers?: never
 }
 
-export type GetMaintenanceControlResponses = {
-  '200': GetMaintenanceControlStatus200
-  '401': GetMaintenanceControlStatus401
-  '500': GetMaintenanceControlStatus500
+export type GetMaintenanceControlResponseBodyByStatus = {
+  '200': MaintenanceControl
+  '401': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type GetMaintenanceControlResponse = GetMaintenanceControlStatus200
-
-export type PauseMaintenanceStatus200 = MaintenanceControlOperationResult
-
-export type PauseMaintenanceStatus201 = MaintenanceControlOperationResult
-
-export type PauseMaintenanceStatus400 = ErrorResponse
-
-export type PauseMaintenanceStatus401 = ErrorResponse
-
-export type PauseMaintenanceStatus409 = ErrorResponse
-
-export type PauseMaintenanceStatus413 = ErrorResponse
-
-export type PauseMaintenanceStatus500 = ErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type GetMaintenanceControlResponseBody =
+  GetMaintenanceControlResponseBodyByStatus['200']
 
 export type PauseMaintenanceBody = MaintenanceControlOperation
 
@@ -1009,35 +867,19 @@ export type PauseMaintenanceOptions = {
   headers?: never
 }
 
-export type PauseMaintenanceResponses = {
-  '200': PauseMaintenanceStatus200
-  '201': PauseMaintenanceStatus201
-  '400': PauseMaintenanceStatus400
-  '401': PauseMaintenanceStatus401
-  '409': PauseMaintenanceStatus409
-  '413': PauseMaintenanceStatus413
-  '500': PauseMaintenanceStatus500
+export type PauseMaintenanceResponseBodyByStatus = {
+  '200': MaintenanceControlOperationResult
+  '201': MaintenanceControlOperationResult
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '409': ErrorResponse
+  '413': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type PauseMaintenanceResponse =
-  PauseMaintenanceStatus200 | PauseMaintenanceStatus201
-
-export type ResumeMaintenanceStatus200 = MaintenanceControlOperationResult
-
-export type ResumeMaintenanceStatus201 = MaintenanceControlOperationResult
-
-export type ResumeMaintenanceStatus400 = ErrorResponse
-
-export type ResumeMaintenanceStatus401 = ErrorResponse
-
-export type ResumeMaintenanceStatus409 = ErrorResponse
-
-export type ResumeMaintenanceStatus413 = ErrorResponse
-
-export type ResumeMaintenanceStatus500 = ErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type PauseMaintenanceResponseBody = PauseMaintenanceResponseBodyByStatus[
+  '200' | '201']
 
 export type ResumeMaintenanceBody = MaintenanceControlOperation
 
@@ -1048,21 +890,19 @@ export type ResumeMaintenanceOptions = {
   headers?: never
 }
 
-export type ResumeMaintenanceResponses = {
-  '200': ResumeMaintenanceStatus200
-  '201': ResumeMaintenanceStatus201
-  '400': ResumeMaintenanceStatus400
-  '401': ResumeMaintenanceStatus401
-  '409': ResumeMaintenanceStatus409
-  '413': ResumeMaintenanceStatus413
-  '500': ResumeMaintenanceStatus500
+export type ResumeMaintenanceResponseBodyByStatus = {
+  '200': MaintenanceControlOperationResult
+  '201': MaintenanceControlOperationResult
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '409': ErrorResponse
+  '413': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type ResumeMaintenanceResponse =
-  ResumeMaintenanceStatus200 | ResumeMaintenanceStatus201
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type ResumeMaintenanceResponseBody =
+  ResumeMaintenanceResponseBodyByStatus['200' | '201']
 
 export type GetMemoryTreeRevisionPath = {
   /**
@@ -1072,16 +912,6 @@ export type GetMemoryTreeRevisionPath = {
   revision: string
 }
 
-export type GetMemoryTreeRevisionStatus200 = MemoryTreeRevision
-
-export type GetMemoryTreeRevisionStatus400 = ErrorResponse
-
-export type GetMemoryTreeRevisionStatus401 = ErrorResponse
-
-export type GetMemoryTreeRevisionStatus404 = ErrorResponse
-
-export type GetMemoryTreeRevisionStatus500 = ErrorResponse
-
 export type GetMemoryTreeRevisionOptions = {
   body?: never
   path: GetMemoryTreeRevisionPath
@@ -1089,30 +919,17 @@ export type GetMemoryTreeRevisionOptions = {
   headers?: never
 }
 
-export type GetMemoryTreeRevisionResponses = {
-  '200': GetMemoryTreeRevisionStatus200
-  '400': GetMemoryTreeRevisionStatus400
-  '401': GetMemoryTreeRevisionStatus401
-  '404': GetMemoryTreeRevisionStatus404
-  '500': GetMemoryTreeRevisionStatus500
+export type GetMemoryTreeRevisionResponseBodyByStatus = {
+  '200': MemoryTreeRevision
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '404': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type GetMemoryTreeRevisionResponse = GetMemoryTreeRevisionStatus200
-
-export type ReserveExtractionPublicationStatus200 = ExtractionPublication
-
-export type ReserveExtractionPublicationStatus400 = ErrorResponse
-
-export type ReserveExtractionPublicationStatus401 = ErrorResponse
-
-export type ReserveExtractionPublicationStatus409 = ErrorResponse
-
-export type ReserveExtractionPublicationStatus413 = ErrorResponse
-
-export type ReserveExtractionPublicationStatus500 = ErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type GetMemoryTreeRevisionResponseBody =
+  GetMemoryTreeRevisionResponseBodyByStatus['200']
 
 export type ReserveExtractionPublicationBody = ExtractionPublicationIntent
 
@@ -1123,32 +940,18 @@ export type ReserveExtractionPublicationOptions = {
   headers?: never
 }
 
-export type ReserveExtractionPublicationResponses = {
-  '200': ReserveExtractionPublicationStatus200
-  '400': ReserveExtractionPublicationStatus400
-  '401': ReserveExtractionPublicationStatus401
-  '409': ReserveExtractionPublicationStatus409
-  '413': ReserveExtractionPublicationStatus413
-  '500': ReserveExtractionPublicationStatus500
+export type ReserveExtractionPublicationResponseBodyByStatus = {
+  '200': ExtractionPublication
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '409': ErrorResponse
+  '413': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type ReserveExtractionPublicationResponse =
-  ReserveExtractionPublicationStatus200
-
-export type ConfirmExtractionPublicationStatus200 = ExtractionPublication
-
-export type ConfirmExtractionPublicationStatus400 = ErrorResponse
-
-export type ConfirmExtractionPublicationStatus401 = ErrorResponse
-
-export type ConfirmExtractionPublicationStatus409 = ErrorResponse
-
-export type ConfirmExtractionPublicationStatus413 = ErrorResponse
-
-export type ConfirmExtractionPublicationStatus500 = ErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type ReserveExtractionPublicationResponseBody =
+  ReserveExtractionPublicationResponseBodyByStatus['200']
 
 export type ConfirmExtractionPublicationBody = ExtractionPublicationIntent
 
@@ -1159,20 +962,18 @@ export type ConfirmExtractionPublicationOptions = {
   headers?: never
 }
 
-export type ConfirmExtractionPublicationResponses = {
-  '200': ConfirmExtractionPublicationStatus200
-  '400': ConfirmExtractionPublicationStatus400
-  '401': ConfirmExtractionPublicationStatus401
-  '409': ConfirmExtractionPublicationStatus409
-  '413': ConfirmExtractionPublicationStatus413
-  '500': ConfirmExtractionPublicationStatus500
+export type ConfirmExtractionPublicationResponseBodyByStatus = {
+  '200': ExtractionPublication
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '409': ErrorResponse
+  '413': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type ConfirmExtractionPublicationResponse =
-  ConfirmExtractionPublicationStatus200
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type ConfirmExtractionPublicationResponseBody =
+  ConfirmExtractionPublicationResponseBodyByStatus['200']
 
 export type ListExtractionPublicationsPath = {
   /**
@@ -1183,14 +984,6 @@ export type ListExtractionPublicationsPath = {
   extraction_id: string
 }
 
-export type ListExtractionPublicationsStatus200 = ExtractionPublicationList
-
-export type ListExtractionPublicationsStatus400 = ErrorResponse
-
-export type ListExtractionPublicationsStatus401 = ErrorResponse
-
-export type ListExtractionPublicationsStatus500 = ErrorResponse
-
 export type ListExtractionPublicationsOptions = {
   body?: never
   path: ListExtractionPublicationsPath
@@ -1198,30 +991,16 @@ export type ListExtractionPublicationsOptions = {
   headers?: never
 }
 
-export type ListExtractionPublicationsResponses = {
-  '200': ListExtractionPublicationsStatus200
-  '400': ListExtractionPublicationsStatus400
-  '401': ListExtractionPublicationsStatus401
-  '500': ListExtractionPublicationsStatus500
+export type ListExtractionPublicationsResponseBodyByStatus = {
+  '200': ExtractionPublicationList
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type ListExtractionPublicationsResponse =
-  ListExtractionPublicationsStatus200
-
-export type ReserveRevisionPublicationStatus200 = RevisionPublication
-
-export type ReserveRevisionPublicationStatus400 = ErrorResponse
-
-export type ReserveRevisionPublicationStatus401 = ErrorResponse
-
-export type ReserveRevisionPublicationStatus409 = ErrorResponse
-
-export type ReserveRevisionPublicationStatus413 = ErrorResponse
-
-export type ReserveRevisionPublicationStatus500 = ErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type ListExtractionPublicationsResponseBody =
+  ListExtractionPublicationsResponseBodyByStatus['200']
 
 export type ReserveRevisionPublicationBody = MemoryTreeRevisionCreation
 
@@ -1232,32 +1011,18 @@ export type ReserveRevisionPublicationOptions = {
   headers?: never
 }
 
-export type ReserveRevisionPublicationResponses = {
-  '200': ReserveRevisionPublicationStatus200
-  '400': ReserveRevisionPublicationStatus400
-  '401': ReserveRevisionPublicationStatus401
-  '409': ReserveRevisionPublicationStatus409
-  '413': ReserveRevisionPublicationStatus413
-  '500': ReserveRevisionPublicationStatus500
+export type ReserveRevisionPublicationResponseBodyByStatus = {
+  '200': RevisionPublication
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '409': ErrorResponse
+  '413': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type ReserveRevisionPublicationResponse =
-  ReserveRevisionPublicationStatus200
-
-export type ConfirmRevisionPublicationStatus200 = RevisionPublication
-
-export type ConfirmRevisionPublicationStatus400 = ErrorResponse
-
-export type ConfirmRevisionPublicationStatus401 = ErrorResponse
-
-export type ConfirmRevisionPublicationStatus409 = ErrorResponse
-
-export type ConfirmRevisionPublicationStatus413 = ErrorResponse
-
-export type ConfirmRevisionPublicationStatus500 = ErrorResponse
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type ReserveRevisionPublicationResponseBody =
+  ReserveRevisionPublicationResponseBodyByStatus['200']
 
 export type ConfirmRevisionPublicationBody = MemoryTreeRevisionCreation
 
@@ -1268,20 +1033,18 @@ export type ConfirmRevisionPublicationOptions = {
   headers?: never
 }
 
-export type ConfirmRevisionPublicationResponses = {
-  '200': ConfirmRevisionPublicationStatus200
-  '400': ConfirmRevisionPublicationStatus400
-  '401': ConfirmRevisionPublicationStatus401
-  '409': ConfirmRevisionPublicationStatus409
-  '413': ConfirmRevisionPublicationStatus413
-  '500': ConfirmRevisionPublicationStatus500
+export type ConfirmRevisionPublicationResponseBodyByStatus = {
+  '200': RevisionPublication
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '409': ErrorResponse
+  '413': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type ConfirmRevisionPublicationResponse =
-  ConfirmRevisionPublicationStatus200
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type ConfirmRevisionPublicationResponseBody =
+  ConfirmRevisionPublicationResponseBodyByStatus['200']
 
 export type ListRevisionPublicationsPath = {
   kind: 'maintenance' | 'operator'
@@ -1293,14 +1056,6 @@ export type ListRevisionPublicationsPath = {
   owner_id: string
 }
 
-export type ListRevisionPublicationsStatus200 = RevisionPublicationList
-
-export type ListRevisionPublicationsStatus400 = ErrorResponse
-
-export type ListRevisionPublicationsStatus401 = ErrorResponse
-
-export type ListRevisionPublicationsStatus500 = ErrorResponse
-
 export type ListRevisionPublicationsOptions = {
   body?: never
   path: ListRevisionPublicationsPath
@@ -1308,17 +1063,17 @@ export type ListRevisionPublicationsOptions = {
   headers?: never
 }
 
-export type ListRevisionPublicationsResponses = {
-  '200': ListRevisionPublicationsStatus200
-  '400': ListRevisionPublicationsStatus400
-  '401': ListRevisionPublicationsStatus401
-  '500': ListRevisionPublicationsStatus500
+export type ListRevisionPublicationsResponseBodyByStatus = {
+  '200': RevisionPublicationList
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '500': ErrorResponse
 }
 
-/**
- * @description Union of all possible responses
- */
-export type ListRevisionPublicationsResponse = ListRevisionPublicationsStatus200
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type ListRevisionPublicationsResponseBody =
+  ListRevisionPublicationsResponseBodyByStatus['200']
+
 export interface OperationOptionsById {
   health: HealthOptions
   listExtractions: ListExtractionsOptions

@@ -1,0 +1,21 @@
+{
+  "name": "@sec-review-bot/workspace",
+  "private": true,
+  "version": "0.0.1",
+  "packageManager": "pnpm@12.10.1",
+  "engines": {
+    "node": ">=24.22.1 <25"
+  },
+  "scripts": {
+    "check:boundaries": "node .github/ci/check-package-boundaries.mjs",
+    "build": "pnpm -r --if-present run build",
+    "format:check": "pnpm -r --if-present run format:check",
+    "lint": "pnpm -r --if-present run lint",
+    "lint:fix": "pnpm -r --if-present run lint:fix",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --workspace-concurrency=1 --if-present run test",
+    "contracts:check": "pnpm --filter \"./contracts/**\" --if-present run check",
+    "contracts:generate": "pnpm --filter \"./contracts/**\" --if-present run generate",
+    "format": "pnpm -r --if-present run format"
+  }
+}

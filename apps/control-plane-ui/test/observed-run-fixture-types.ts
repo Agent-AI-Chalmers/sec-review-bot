@@ -52,6 +52,7 @@ type AvailableArtifactStorage = Extract<
   NonNullable<ArtifactStorage>,
   { status: 'available' }
 >
+
 export type ArtifactKeysMatchTheContract = Expect<
   SameKeys<
     NonNullable<(typeof fixture)['artifact_storage']>['artifact'],

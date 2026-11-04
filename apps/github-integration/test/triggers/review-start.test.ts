@@ -856,6 +856,7 @@ test('startIssueReviewCommand reports an invalid setup declaration distinctly', 
     ]
   ])
 })
+
 function withoutPreparationInput<
   T extends { preparation_input?: unknown; preparation_input_version?: unknown }
 >(run: T): Omit<T, 'preparation_input' | 'preparation_input_version'> {

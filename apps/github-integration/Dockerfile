@@ -8,17 +8,19 @@ ENV PATH="/opt/pnpm:${PATH}"
 ARG NPM_CONFIG_REGISTRY=https://registry.npmjs.org
 ENV npm_config_registry=${NPM_CONFIG_REGISTRY}
 
-WORKDIR /app
+WORKDIR /repo
 
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY --from=workspace package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json apps/github-integration/package.json
 RUN pnpm config set registry "${NPM_CONFIG_REGISTRY}" \
-    && pnpm install --frozen-lockfile
+    && pnpm --filter ./apps/github-integration... install --frozen-lockfile
+
+WORKDIR /repo/apps/github-integration
 
 COPY . ./
 RUN pnpm run build
-# Deploy a self-contained production tree: this package is its own workspace
-# root, so the default implementation needs no injected workspace packages.
-RUN pnpm deploy --filter . --prod /prod
+# Deploy only this service and its production dependencies.
+RUN pnpm --filter @sec-review-bot/github-integration deploy --prod /prod
 
 FROM node:24-alpine
 
@@ -28,7 +30,7 @@ RUN apk add --no-cache ca-certificates git tar
 
 WORKDIR /app
 
-COPY --from=builder /app/dist ./dist
+COPY --from=builder /repo/apps/github-integration/dist ./dist
 COPY --from=builder /prod ./
 # The service validates execution results against the canonical contract schemas, which it
 # must carry itself (compose supplies `contracts/` only as a build context, not a runtime

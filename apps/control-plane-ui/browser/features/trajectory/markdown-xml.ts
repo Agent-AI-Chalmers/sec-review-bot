@@ -18,6 +18,7 @@ export function markdownWithoutXmlTags(source: string): string {
   )
   if (masked === source) return source
   const code: [number, number][] = []
+
   function visit(node: Nodes): void {
     if (node.type === 'code' || node.type === 'inlineCode') {
       const start = node.position?.start.offset
@@ -26,6 +27,7 @@ export function markdownWithoutXmlTags(source: string): string {
     }
     if ('children' in node) node.children.forEach(visit)
   }
+
   visit(fromMarkdown(masked))
   return source.replace(XML_TAG, (tag: string, offset: number) =>
     escaped(source, offset) ||

@@ -15,7 +15,7 @@ import prettier from 'prettier'
 import { parse as parseYaml } from 'yaml'
 
 import type { GeneratedArtifact } from './generated-artifact.js'
-import { renderKubbTypes } from './render-kubb-types.js'
+import { renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 import { REPO_ROOT } from './repo-root.js'
 
 export { REPO_ROOT }
@@ -124,7 +124,7 @@ function renderOperationTypeMaps(spec: OpenApiDocument): string {
   const responses = routes
     .map(({ operationId }) => {
       const name = operationTypeName(operationId)
-      return `  ${operationId}: ${name}Response`
+      return `  ${operationId}: ${name}ResponseBody`
     })
     .join('\n')
   return `export interface OperationOptionsById {
@@ -142,8 +142,8 @@ export async function renderReviewRunsApiTypes(): Promise<string> {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as OpenApiDocument
   const rendered =
     HEADER +
-    (await renderKubbTypes(SPEC_PATH)) +
-    '\n' +
+    (await renderOpenApiTypes(SPEC_PATH)) +
+    '\n\n' +
     renderOperationRoutes(spec) +
     '\n' +
     renderOperationTypeMaps(spec)
@@ -232,7 +232,7 @@ export async function renderContractTypes(): Promise<string> {
 // types are its server-side projection, so the server's types follow the contract
 // instead of a parallel schema.
 
-${await renderKubbTypes(SPEC_PATH)}
+${await renderOpenApiTypes(SPEC_PATH)}
 
 ${renderOperationTypeMaps(spec)}
 
@@ -362,7 +362,7 @@ export async function renderUiContractTypes(): Promise<string> {
 // and a flattened copy of a discriminated union (ArtifactStorage) cannot express which fields a
 // given status requires.
 
-${await renderKubbTypes(SPEC_PATH)}
+${await renderOpenApiTypes(SPEC_PATH)}
 
 export type Run = ObservedRun
 export type RunEvent = ReviewRunEvent

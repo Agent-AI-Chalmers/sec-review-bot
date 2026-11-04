@@ -16,6 +16,8 @@ Execution API 拥有 reference object 与 workflow-specific manifest schema。�
 ```bash
 pnpm run generate
 pnpm run check
+pnpm run format:check
+pnpm run lint
 pnpm run test
 ```
 

@@ -14,8 +14,7 @@
 
 ```bash
 corepack install --global pnpm@12
-pnpm --dir services/review-runs install
-pnpm --dir apps/github-integration install
+pnpm install --frozen-lockfile
 ```
 
 <!-- doc-default: github-integration.node-runtime; source=apps/github-integration/package.json -->

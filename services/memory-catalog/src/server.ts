@@ -45,6 +45,7 @@ function bearerTokenMatches(
 }
 
 type CatalogRole = 'worker' | 'operator'
+
 const operatorActor = {
   kind: 'service' as const,
   id: 'memory-catalog-operator',

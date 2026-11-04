@@ -97,6 +97,7 @@ type ContractShapedFixtureRun = Omit<FixtureRun, 'source_platform'> & {
 }
 type FixtureMatchesRun = ContractShapedFixtureRun extends Run ? true : false
 type RunMatchesFixture = Run extends ContractShapedFixtureRun ? true : false
+
 const _fixtureMatchesRun: FixtureMatchesRun = true
 const _runMatchesFixture: RunMatchesFixture = true
 void _fixtureMatchesRun
@@ -449,6 +450,7 @@ function remoteUrlFor(stepKey: string, index: number): string {
 export const SCENARIOS = scenarioData as readonly Scenario[]
 const iso = (milliseconds: number): string =>
   new Date(milliseconds).toISOString()
+
 /**
  * Deterministic pseudo-random ids in the shape Review Runs actually assigns
  * (`crypto.randomUUID()`, a v4 UUID). A time-ordered id would misrepresent what the

@@ -90,6 +90,7 @@ services:
       context: services/execution-gateway
       dockerfile: Dockerfile
       additional_contexts:
+        workspace: .
         contracts: contracts
       args:
         NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
@@ -129,6 +130,7 @@ services:
       context: services/memory-catalog
       dockerfile: Dockerfile
       additional_contexts:
+        workspace: .
         contracts: contracts
       args:
         NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
@@ -164,6 +166,7 @@ services:
       context: services/review-runs
       dockerfile: Dockerfile
       additional_contexts:
+        workspace: .
         contracts: contracts
       args:
         NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
@@ -216,6 +219,8 @@ services:
     build:
       context: apps/control-plane-ui
       dockerfile: Dockerfile
+      additional_contexts:
+        workspace: .
       args:
         NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
     environment:
@@ -262,6 +267,7 @@ services:
       context: apps/github-integration
       dockerfile: Dockerfile
       additional_contexts:
+        workspace: .
         contracts: contracts
       args:
         # Override for networks where the public npm registry is unreliable.

@@ -489,12 +489,14 @@ test('memory fixtures form one coherent provenance graph', async () => {
         response.json()
       )
     ])
+
     type FixtureExtraction = {
       extraction_id: string
       source_run_id: string
       source_unit_id: string
       observation: { body_markdown: string } | null
     }
+
     const extractionById = new Map<string, FixtureExtraction>(
       extractions.extractions.map(
         (record: FixtureExtraction) => [record.extraction_id, record] as const

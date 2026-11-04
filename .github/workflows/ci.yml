@@ -264,7 +264,7 @@ jobs:
           memory-bff: ${{ github.event_name == 'merge_group' || needs.changes.outputs.memory-bff-seam == 'true' }}
 
   execution-submission-system:
-    name: Smoke — Execution Submission
+    name: Smoke — Service Boundaries
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
@@ -278,13 +278,12 @@ jobs:
         uses: ./.github/actions/setup-node
         with:
           directory: services/execution-gateway
-          cache-dependency-path: |
-            services/execution-gateway/pnpm-lock.yaml
-            services/review-runs/pnpm-lock.yaml
 
-      - name: Install Review Runs dependencies
-        working-directory: services/review-runs
-        run: pnpm install --frozen-lockfile
+      - name: Test Integration client against Review Runs HTTP
+        run: |
+          pnpm --dir apps/github-integration run build
+          pnpm --dir services/review-runs run build
+          node --test scripts/system-tests/review-runs-http.test.mjs
 
       - name: Test execution submission boundary
         run: node --test scripts/system-tests/execution-submission.test.mjs
@@ -320,10 +319,8 @@ jobs:
         run: pnpm test
       # Deliberately no `test:integration` step. The only integration test here is the opt-in S3
       # upload check, which self-skips without `SEC_REVIEW_TEST_S3_ENDPOINT`, so a CI step would
-      # pass vacuously. The integration↔review-runs boundary is covered by Review Runs's own
-      # integration suite (real PostgreSQL store) and by
-      # `services/review-runs/test/integration/client-server-seam.test.ts`, which drives this package's
-      # real client against the real server; both jobs provision what they need.
+      # pass vacuously. The Integration-to-Review-Runs HTTP boundary is covered by the
+      # repository-level review-runs-http test in Smoke — Service Boundaries.
 
   control-plane-ui:
     name: Control Plane UI

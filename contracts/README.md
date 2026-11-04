@@ -4,6 +4,23 @@ Language: English | [中文](README.zh.md)
 
 This directory is the workspace-level home for project-owned contracts. It holds both the human-readable specification of a contract and the executable assets that enforce it.
 
+## Package Workspace
+
+<!-- doc-default: node-workspace; source=pnpm-workspace.yaml -->
+The contract tools and `contracts/codegen` belong to the repository-root pnpm workspace, sharing its lockfile with applications and services. Contracts retains ownership of codegen; consumers explicitly declare `workspace:*` dependencies.
+
+Run from the repository root:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm run contracts:check
+pnpm --filter "./contracts/**" run lint
+pnpm --filter "./contracts/**" test
+pnpm --filter @sec-review-bot/execution-api-tools run generate
+```
+
+Package-local commands remain available after installation. CI installs from the repository root and runs checks in each matrix package. Dependency changes should update the root `pnpm-lock.yaml`.
+
 ## Layout
 
 Each contract family owns one directory, and each supported version owns a subdirectory holding its specification, schemas, and fixtures:
@@ -76,6 +93,8 @@ Some artifacts are generated from a hand-written contract rather than maintained
 Name a stable package entry point for the responsibility callers consume, even when a generator maintains it (`execution-api-version.ts`, for example). Raw mechanical projections may carry `generated` in the filename when that helps distinguish files that should not accumulate hand-written behavior (`contract-types-generated.ts`, for example). The filename is not the enforcement boundary: every committed generated artifact must identify itself in its header, appear in the family manifest, and be covered by the freshness and CI checks below.
 
 Each tool provides a local `generate` command to render every artifact and `check` to prove the committed copies match. A family's test asserts the manifest matches the generators' own declared outputs and that the CI change filter triggers on every listed artifact, so a new projection is covered by being listed, not by remembering to wire up a check.
+
+The API-family tools share the development-only [TypeScript renderer](codegen/README.md). Each family installs it as an explicit local package dependency and retains ownership of its contract-specific projections and checks.
 
 ## Change Checklist
 

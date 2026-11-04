@@ -18,6 +18,10 @@
         "apps/github-integration/src/review-runs/review-runs-api.ts",
         "apps/control-plane-ui/browser/features/runs/api-types.generated.ts",
         "apps/control-plane-ui/shared/list-run-query-params.ts"
+      ],
+      "code_inputs": [
+        "contracts/codegen/src/index.js",
+        "contracts/codegen/package.json"
       ]
     },
     {

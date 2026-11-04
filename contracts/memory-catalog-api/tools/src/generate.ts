@@ -4,7 +4,7 @@ import path from 'node:path'
 import prettier from 'prettier'
 import { parse } from 'yaml'
 
-import { renderKubbTypes } from './render-kubb-types.js'
+import { renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 
 const toolsRoot = path.resolve(import.meta.dirname, '..')
 const contractPath = path.resolve(toolsRoot, '../v1/openapi.yaml')
@@ -48,9 +48,9 @@ function renderOperationOptionsById(spec: unknown): string {
 export async function renderGeneratedTypes(
   outputPath: string
 ): Promise<string> {
-  const generated = await renderKubbTypes(contractPath)
+  const generated = await renderOpenApiTypes(contractPath)
   const spec = parse(await readFile(contractPath, 'utf8')) as unknown
-  const source = `// Generated from contracts/memory-catalog-api/v1/openapi.yaml. Do not edit.\n${generated}\n${renderOperationOptionsById(spec)}\n`
+  const source = `// Generated from contracts/memory-catalog-api/v1/openapi.yaml. Do not edit.\n${generated}\n\n${renderOperationOptionsById(spec)}\n`
   const options = await prettier.resolveConfig(outputPath)
   return prettier.format(source, { ...options, filepath: outputPath })
 }

@@ -9,6 +9,7 @@ import type {
 } from '../../../browser/features/memory/api-types.generated.js'
 
 const LOAD_ERROR_REVISION = 404
+
 type SourceRunIds = Record<
   'repository-review' | 'pull-request-review' | 'issue-review',
   string

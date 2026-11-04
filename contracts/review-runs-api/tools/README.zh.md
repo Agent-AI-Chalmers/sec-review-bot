@@ -31,7 +31,6 @@ tools/
     generated-artifact.ts    { output, render } 形状
     repo-root.ts             仓库根，用于构造产物绝对路径
     generate-types.ts        API 投影（类型、错误码、控制台参数）
-    render-kubb-types.ts     共享的内存 Kubb TypeScript 投影
     generate-schemas.ts      提交的 v1 JSON Schema
   spectral-functions/
     operationRequiresSecurity.js     每个操作必须声明 security 的规则（../.spectral.yaml）

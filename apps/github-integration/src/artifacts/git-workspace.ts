@@ -19,6 +19,7 @@ const GIT_FETCH_INITIAL_RETRY_DELAY_MS = 1_000
 // repositories exceed it can raise it through the environment.
 const GIT_COMMAND_TIMEOUT_ENV = 'GITHUB_INTEGRATION_GIT_TIMEOUT_MS'
 const DEFAULT_GIT_COMMAND_TIMEOUT_MS = 600_000
+
 type Sleep = (delay_ms: number) => Promise<void>
 
 /** Resolve the per-command timeout, validating the environment override. */

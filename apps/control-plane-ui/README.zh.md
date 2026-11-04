@@ -27,7 +27,7 @@
 在 `apps/control-plane-ui` 中安装依赖，并启动使用 fixture 的预览：
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm run dev:fixtures
 ```
 
