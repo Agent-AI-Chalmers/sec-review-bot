@@ -29,6 +29,7 @@ import {
 } from './MemoryOverview.js'
 import { MemoryRevisionDiffViewer } from './MemoryRevisionDiff.js'
 import { MemoryRevisionHistory } from './MemoryRevisionHistory.js'
+import { useMemoryEditor } from './useMemoryEditor.js'
 import { useRefresh } from '../../shared/refresh.js'
 import { LoadingState } from '../../shared/StateMessage.js'
 import {
@@ -44,13 +45,6 @@ type MaintenanceControlRequest = Omit<MaintenanceControlOperation, 'actor'>
 type RestoreRequest = Omit<MemoryTreeRestoreOperation, 'actor'>
 function operationId(): string {
   return crypto.randomUUID()
-}
-
-interface MemoryEditSession {
-  baseRevision: number
-  initialFiles: Record<string, string>
-  files: Record<string, string>
-  attempt?: { content: string; operationId: string }
 }
 
 export function Memory(): React.JSX.Element {
@@ -77,7 +71,7 @@ export function Memory(): React.JSX.Element {
     })
   )
   const activeRevision = tree.data?.revision
-  const [editSession, setEditSession] = React.useState<MemoryEditSession>()
+  const editor = useMemoryEditor()
   const [restoreRevision, setRestoreRevision] = React.useState<number>()
   const [viewRevision, setViewRevision] = React.useState<number>()
   const [diffRevision, setDiffRevision] = React.useState<Revision>()
@@ -154,42 +148,19 @@ export function Memory(): React.JSX.Element {
   }
   const beginEdit = async (): Promise<void> => {
     if (activeRevision === undefined) return
-    // Capture before loading: catalog refreshes cannot change this edit's base.
-    const baseRevision = activeRevision
     try {
-      const files =
-        baseRevision === 0
-          ? { 'MEMORY.md': '# Security Review Experience Memory\n' }
-          : (
-              await api<{ files: Record<string, string> }>(
-                `/memory/revisions/${baseRevision}/content`
-              )
-            ).files
-      setEditSession({ baseRevision, files, initialFiles: files })
+      await editor.begin(activeRevision)
     } catch (failure) {
       if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
       else setError(t('memoryLoadFailed'))
     }
   }
   const commitEdit = async (): Promise<void> => {
-    if (editSession === undefined) return
+    if (editor.session === undefined) return
     setBusy(true)
     setError('')
     try {
-      const content = JSON.stringify(
-        Object.entries(editSession.files).sort(([a], [b]) => a.localeCompare(b))
-      )
-      const attempt =
-        editSession.attempt?.content === content
-          ? editSession.attempt
-          : { content, operationId: operationId() }
-      setEditSession({ ...editSession, attempt })
-      await apiPost('/memory/edit', {
-        operation_id: attempt.operationId,
-        expected_active_revision: editSession.baseRevision,
-        files: editSession.files
-      })
-      setEditSession(undefined)
+      await editor.commit()
       await refresh()
     } catch (failure) {
       if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
@@ -358,17 +329,13 @@ export function Memory(): React.JSX.Element {
         onClose={() => setRestoreRevision(undefined)}
         onConfirm={() => void restore()}
       />
-      {editSession !== undefined && (
+      {editor.session !== undefined && (
         <MemoryEditorDialog
-          files={editSession.files}
-          initialFiles={editSession.initialFiles}
+          files={editor.session.files}
+          initialFiles={editor.session.initialFiles}
           busy={busy}
-          onFilesChange={(files) =>
-            setEditSession((session) =>
-              session === undefined ? undefined : { ...session, files }
-            )
-          }
-          onClose={() => setEditSession(undefined)}
+          onFilesChange={editor.changeFiles}
+          onClose={editor.close}
           onCommit={() => void commitEdit()}
         />
       )}
