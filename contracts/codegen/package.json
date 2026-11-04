@@ -17,16 +17,16 @@
     "test": "node --import tsx --test test/*.test.ts"
   },
   "dependencies": {
-    "@kubb/core": "5.13.1",
-    "@kubb/plugin-ts": "5.1.0",
-    "kubb": "5.13.1",
+    "@kubb/core": "5.15.3",
+    "@kubb/plugin-ts": "5.4.0",
+    "kubb": "5.15.3",
     "typescript": "^6.0.3"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^24.19.2",
-    "eslint": "^10.13.0",
+    "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.0.0",
     "prettier": "^3.9.10",

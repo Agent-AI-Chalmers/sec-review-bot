@@ -21,7 +21,7 @@ export type ArtifactReference = {
    */
   media_type: string
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   size_bytes: number
@@ -135,7 +135,7 @@ export type OperatorRevisionCreationSource = {
 export type MemoryTreeRevisionCreation = {
   /**
    * @description Active revision that must still be current for this compare-and-swap commit.
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   expected_active_revision: number
@@ -222,7 +222,7 @@ export type ObservationRecord = {
    */
   body_markdown: string
   /**
-   * @minLength 1
+   * @minimum 1
    * @type integer
    */
   consumed_revision: number | null
@@ -241,7 +241,7 @@ export type ObservationList = {
 
 export type ObservationBacklog = {
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   pending_count: number
@@ -255,38 +255,38 @@ export type ObservationBacklog = {
 
 export type CatalogOverviewTotals = {
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   completed_extraction_count: number
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   extracted_unit_count: number
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   units_with_observation_count: number
   /**
    * @description Distinct source run/unit pairs whose completed extractions have never produced an observation.
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   units_without_observation_count: number
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   observation_count: number
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   pending_observation_count: number
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   consumed_observation_count: number
@@ -301,12 +301,12 @@ export type CatalogOverviewPoint = {
    */
   period_start: string
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   extracted_unit_count: number
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   units_with_observation_count: number
@@ -319,17 +319,17 @@ export type CatalogOverviewWorkflow = {
    */
   source_workflow: string
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   extracted_unit_count: number
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   units_with_observation_count: number
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   units_without_observation_count: number
@@ -359,7 +359,7 @@ export type MaintenanceObservation = {
 export type MaintenanceInput = {
   /**
    * @description Active revision that must still be current when this maintenance input is committed.
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   expected_active_revision: number
@@ -388,7 +388,7 @@ export type MemoryTreeRevisionSource =
 export type MemoryTreeRevisionCreationResult = {
   created: boolean
   /**
-   * @minLength 1
+   * @minimum 1
    * @type integer
    */
   revision: number
@@ -415,7 +415,7 @@ export type MemoryTreeRevisionCreationResult = {
 
 export type MemoryTree = {
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   revision: number
@@ -424,13 +424,13 @@ export type MemoryTree = {
 
 export type MemoryTreeRevision = {
   /**
-   * @minLength 1
+   * @minimum 1
    * @type integer
    */
   revision: number
   /**
    * @description Revision that was active when this revision was created; null for the first revision.
-   * @minLength 1
+   * @minimum 1
    * @type integer
    */
   predecessor_revision: number | null
@@ -452,12 +452,12 @@ export type MemoryTreeRestoreOperation = {
    */
   operation_id: OperationId
   /**
-   * @minLength 1
+   * @minimum 1
    * @type integer
    */
   expected_active_revision: number
   /**
-   * @minLength 1
+   * @minimum 1
    * @type integer
    */
   restored_revision: number
@@ -466,7 +466,7 @@ export type MemoryTreeRestoreOperation = {
 export type MemoryTreeRestoreOperationResult = {
   created: boolean
   /**
-   * @minLength 1
+   * @minimum 1
    * @type integer
    */
   active_revision: number
@@ -481,7 +481,7 @@ export type MemoryTreeRestoreOperationResult = {
 export type MemoryTreeRevisionList = {
   revisions: MemoryTreeRevision[]
   /**
-   * @minLength 1
+   * @minimum 1
    * @type integer
    */
   next_before_revision: number | null
@@ -490,7 +490,7 @@ export type MemoryTreeRevisionList = {
 export type MaintenanceControl = {
   state: 'enabled' | 'paused'
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   generation: number
@@ -511,7 +511,7 @@ export type MaintenanceControlOperation = {
    */
   operation_id: OperationId
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   expected_generation: number

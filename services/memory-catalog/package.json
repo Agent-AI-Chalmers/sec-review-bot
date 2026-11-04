@@ -31,7 +31,7 @@
     "@stylistic/eslint-plugin": "^5.10.0",
     "@types/node": "^24.19.2",
     "@types/pg": "^8.23.1",
-    "eslint": "^10.13.0",
+    "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
