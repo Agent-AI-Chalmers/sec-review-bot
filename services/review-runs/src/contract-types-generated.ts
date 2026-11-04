@@ -48,7 +48,7 @@ export type PreparationSummary = {
     | 'submitted'
     | 'failed'
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   attempt_count: number
@@ -172,7 +172,7 @@ export type ArtifactStorage =
          */
         digest: string
         /**
-         * @minLength 0
+         * @minimum 0
          * @type integer
          */
         size_bytes: number
@@ -265,7 +265,7 @@ export type InputBundleReference = {
   digest: string
   media_type: 'application/tar+zstd'
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   size_bytes: number
@@ -309,7 +309,7 @@ export type PreparationWork = {
    */
   claim_token: string
   /**
-   * @minLength 1
+   * @minimum 1
    * @type integer
    */
   attempt_count: number
@@ -415,7 +415,7 @@ export type PublicationStepRecord = {
     | 'terminal_failed'
   /**
    * @description How many times this step has been claimed and started. More than one means an earlier owner began the side effect, so a reclaiming publisher must reconcile against the remote object (`remote_object_id`/`remote_object_url`) instead of assuming nothing happened.
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   attempt_count: number
@@ -453,7 +453,7 @@ export type ObservedPublicationStep = {
     | 'terminal_failed'
   /**
    * @description How many attempts this step has started against its budget. A count above one on a successful step means the side effect was reached after a retry or a recovery, not on the first try.
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   attempt_count: number
@@ -474,37 +474,37 @@ export type ObservedPublicationStep = {
 export type ExecutionTokenUsage = {
   /**
    * @description Total input tokens using OpenTelemetry GenAI semantics. Includes tokens read from cache and tokens written to cache; the cache fields below are subsets, not additional tokens.
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   input_tokens: number | null
   /**
    * @description Total output tokens using OpenTelemetry GenAI semantics. Includes reasoning tokens when the provider reports them; reasoning_tokens is a subset.
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   output_tokens: number | null
   /**
    * @description Total tokens for the same calls, computed by the producer as input_tokens + output_tokens. It is null whenever either component is null; a total reported by the source is not passed through. Consumers must not derive it by adding cache or reasoning tokens on top.
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   total_tokens: number | null
   /**
    * @description Input-token subset served from a prompt cache. Never an additional count on top of input_tokens.
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   cache_read_input_tokens: number | null
   /**
    * @description Input-token subset written to a prompt cache. Never an additional count on top of input_tokens.
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   cache_creation_input_tokens: number | null
   /**
    * @description Output-token subset used for model reasoning. Never an additional count on top of output_tokens.
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   reasoning_tokens: number | null
@@ -533,13 +533,13 @@ export type ExecutionStatisticsGroup = {
   pass_kind: string | null
   /**
    * @description Zero-based pass number within the review or case when supplied by the agent.
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   pass_index: number | null
   /**
    * @description One-based draft batch number for batched triage or delivery planning; null for non-batched work.
-   * @minLength 1
+   * @minimum 1
    * @type integer
    */
   batch_index: number | null
@@ -555,12 +555,12 @@ export type ExecutionStatisticsGroup = {
   provider: string
   model: string | null
   /**
-   * @minLength 1
+   * @minimum 1
    * @type integer
    */
   model_call_count: number
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   usage_reported_call_count: number
@@ -582,22 +582,22 @@ export type ExecutionStatisticsSummary = {
   usage_coverage:
     ('complete_for_observed_calls' | 'partial' | 'unavailable') | null
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   root_trace_count: number
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   excluded_non_review_root_count: number
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   observed_call_count: number
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer
    */
   usage_reported_call_count: number
@@ -763,8 +763,8 @@ export type ListRunsQuery = {
    */
   filter?: {
     /**
-     * @minLength 1
-     * @maxLength 100
+     * @minimum 1
+     * @maximum 100
      * @type integer | undefined
      */
     limit?: number
@@ -1117,7 +1117,7 @@ export type FailPreparationBody = {
   retry?: boolean
   /**
    * @description Delay before the durable preparation is claimable again.
-   * @minLength 0
+   * @minimum 0
    * @type integer | undefined
    */
   retry_after_ms?: number
@@ -1254,7 +1254,7 @@ export type CompleteRunNoticeResponseBody =
 
 export type ClaimNextPublicationBody = {
   /**
-   * @minLength 0
+   * @minimum 0
    * @type integer | undefined
    */
   wait_ms?: number
