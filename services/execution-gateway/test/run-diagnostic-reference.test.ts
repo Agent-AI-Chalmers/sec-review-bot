@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { parseRunDiagnosticArtifact } from '../src/temporal-execution-store.js'
+import { parseRunDiagnosticArtifact } from '../src/temporal-execution-client.js'
 
 const artifact = {
   status: 'available',

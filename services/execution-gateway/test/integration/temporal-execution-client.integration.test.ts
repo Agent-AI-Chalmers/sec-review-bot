@@ -9,7 +9,7 @@ import {
   type ExecutionWorkflowInput,
 } from '../../src/execution.js'
 import type { IssueReviewInput } from '../../src/execution-api-types-generated.js'
-import { TemporalExecutionStore } from '../../src/temporal-execution-store.js'
+import { TemporalExecutionClient } from '../../src/temporal-execution-client.js'
 
 const temporalAddress = process.env.TEST_TEMPORAL_ADDRESS
 if (temporalAddress === undefined)
@@ -33,9 +33,9 @@ async function issueReviewInput(): Promise<IssueReviewInput> {
   ) as IssueReviewInput
 }
 
-await test('Temporal store submits and identifies execution requests', async () => {
+await test('Temporal client submits and identifies execution requests', async () => {
   process.env.TEMPORAL_ADDRESS = temporalAddress
-  const store = await TemporalExecutionStore.connect()
+  const client = await TemporalExecutionClient.connect()
   const runId = `gateway-integration-${crypto.randomUUID()}`
   const request: ExecutionWorkflowInput = {
     workflow: 'issue-review',
@@ -45,29 +45,29 @@ await test('Temporal store submits and identifies execution requests', async () 
   }
 
   try {
-    const created = await store.start(request)
+    const created = await client.start(request)
     assert.equal(created.run_id, runId)
     assert.equal(created.workflow, request.workflow)
     assert.equal(created.status, 'running')
 
-    assert.deepEqual(await store.start(request), created)
-    assert.deepEqual(await store.get(runId), created)
-    assert.equal(await store.get(`missing-${crypto.randomUUID()}`), undefined)
+    assert.deepEqual(await client.start(request), created)
+    assert.deepEqual(await client.get(runId), created)
+    assert.equal(await client.get(`missing-${crypto.randomUUID()}`), undefined)
 
     assert.deepEqual(
-      await store.start({ ...request, timeout_seconds: 120 }),
+      await client.start({ ...request, timeout_seconds: 120 }),
       created,
       'Gateway timeout policy is not part of the caller request identity',
     )
 
     await assert.rejects(
-      store.start({
+      client.start({
         ...request,
         runtime: { workspace_image: 'example.invalid/changed:latest' },
       }),
       ExecutionRunConflictError,
     )
   } finally {
-    await store.close()
+    await client.close()
   }
 })

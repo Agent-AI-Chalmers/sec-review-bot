@@ -18,8 +18,8 @@ import type { PathParameters, RequestBody } from './route-types.js'
 import { integerEnv } from './env.js'
 import {
   executionError,
-  TemporalExecutionStore,
-} from './temporal-execution-store.js'
+  TemporalExecutionClient,
+} from './temporal-execution-client.js'
 
 function specPath(): string {
   const moduleDirectory = import.meta.dirname
@@ -56,11 +56,11 @@ function semanticError(
 export async function registerExecutionGatewayRoutes(
   app: FastifyInstance,
   options: {
-    store: Pick<TemporalExecutionStore, 'start' | 'get'>
+    client: Pick<TemporalExecutionClient, 'start' | 'get'>
     token?: string
   },
 ): Promise<void> {
-  const { store, token } = options
+  const { client, token } = options
   const workflowTimeoutSeconds = integerEnv(
     'TEMPORAL_WORKFLOW_TIMEOUT_SECONDS',
     10_800,
@@ -99,7 +99,7 @@ export async function registerExecutionGatewayRoutes(
         try {
           return await reply.status(202).send(
             response(
-              await store.start({
+              await client.start({
                 workflow,
                 run_id: body.run_id,
                 input: body.input,
@@ -126,7 +126,7 @@ export async function registerExecutionGatewayRoutes(
       },
       getRun: async (request: FastifyRequest, reply: FastifyReply) => {
         const { run_id: runId } = request.params as PathParameters<'getRun'>
-        const record = await store.get(runId)
+        const record = await client.get(runId)
         if (record) return response(record)
         return await reply.status(404).send({
           run_id: runId,
@@ -141,7 +141,7 @@ export async function registerExecutionGatewayRoutes(
         const body = request.body as RequestBody<'getRunStatuses'>
         const records = await Promise.all(
           [...new Set(body.run_ids)].map(
-            async (runId) => [runId, await store.get(runId)] as const,
+            async (runId) => [runId, await client.get(runId)] as const,
           ),
         )
         return {
@@ -176,7 +176,7 @@ export async function registerExecutionGatewayRoutes(
 }
 
 export async function createApp(options: {
-  store: Pick<TemporalExecutionStore, 'start' | 'get'>
+  client: Pick<TemporalExecutionClient, 'start' | 'get'>
   token?: string
 }): Promise<FastifyInstance> {
   const app = Fastify({
@@ -219,9 +219,9 @@ export async function startExecutionGateway(): Promise<{
     )
   }
   await using resources = new AsyncDisposableStack()
-  const store = await TemporalExecutionStore.connect()
-  resources.defer(() => store.close())
-  const app = await createApp({ store, ...(token ? { token } : {}) })
+  const client = await TemporalExecutionClient.connect()
+  resources.defer(() => client.close())
+  const app = await createApp({ client, ...(token ? { token } : {}) })
   resources.defer(() => app.close())
   await app.listen({
     host,

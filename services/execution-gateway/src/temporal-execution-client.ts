@@ -55,14 +55,14 @@ function statusName(status: { name?: string } | string | undefined): string {
   return status?.name ?? 'UNKNOWN'
 }
 
-export class TemporalExecutionStore {
+export class TemporalExecutionClient {
   private constructor(
     private readonly connection: Connection,
     private readonly client: Client,
     private readonly taskQueue: string,
   ) {}
 
-  static async connect(): Promise<TemporalExecutionStore> {
+  static async connect(): Promise<TemporalExecutionClient> {
     const connection = await Connection.connect({
       address: process.env.TEMPORAL_ADDRESS?.trim() || '127.0.0.1:7233',
     })
@@ -70,7 +70,7 @@ export class TemporalExecutionStore {
       connection,
       namespace: process.env.TEMPORAL_NAMESPACE?.trim() || 'default',
     })
-    return new TemporalExecutionStore(
+    return new TemporalExecutionClient(
       connection,
       client,
       process.env.TEMPORAL_EXECUTION_TASK_QUEUE?.trim() ||

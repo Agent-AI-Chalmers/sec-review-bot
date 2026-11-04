@@ -5,7 +5,7 @@ import type { FastifyInstance } from 'fastify'
 import { once } from 'node:events'
 import test, { type TestContext } from 'node:test'
 
-import { TemporalExecutionStore } from '../src/temporal-execution-store.js'
+import { TemporalExecutionClient } from '../src/temporal-execution-client.js'
 process.env.NODE_ENV = 'test'
 const { startExecutionGateway } = await import('../src/server.js')
 
@@ -40,7 +40,7 @@ async function setup(t: TestContext) {
   let opens = 0
   let closes = 0
   let closeFailure: Error | undefined
-  t.mock.method(TemporalExecutionStore, 'connect', () => {
+  t.mock.method(TemporalExecutionClient, 'connect', () => {
     opens += 1
     return Promise.resolve({
       close: () => {

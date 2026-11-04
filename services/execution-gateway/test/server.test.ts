@@ -56,7 +56,7 @@ function fixture(name: string): Record<string, unknown> {
 
 await test('health endpoint remains public when API authentication is configured', async () => {
   const app = await createApp({
-    store: new FakeExecutionRunClient(),
+    client: new FakeExecutionRunClient(),
     token: 'secret',
   })
   const response = await app.inject({ method: 'GET', url: '/healthz' })
@@ -70,14 +70,14 @@ await test('invalid workflow timeout fails while creating the app', async (t) =>
   t.after(() => delete process.env.TEMPORAL_WORKFLOW_TIMEOUT_SECONDS)
 
   await assert.rejects(
-    createApp({ store: new FakeExecutionRunClient() }),
+    createApp({ client: new FakeExecutionRunClient() }),
     /TEMPORAL_WORKFLOW_TIMEOUT_SECONDS must be a decimal integer/,
   )
 })
 
 await test('creates and reads an execution run', async () => {
-  const store = new FakeExecutionRunClient()
-  const app = await createApp({ store, token: 'secret' })
+  const client = new FakeExecutionRunClient()
+  const app = await createApp({ client, token: 'secret' })
   const create = await app.inject({
     method: 'POST',
     url: '/v1/workflows/issue-review/runs',
@@ -101,7 +101,7 @@ await test('creates and reads an execution run', async () => {
 })
 
 await test('rejects requests that violate the workflow input contract', async () => {
-  const app = await createApp({ store: new FakeExecutionRunClient() })
+  const app = await createApp({ client: new FakeExecutionRunClient() })
   const response = await app.inject({
     method: 'POST',
     url: '/v1/workflows/issue-review/runs',
@@ -133,7 +133,7 @@ await test('rejects requests that violate the workflow input contract', async ()
 
 await test('requires the configured bearer token', async () => {
   const app = await createApp({
-    store: new FakeExecutionRunClient(),
+    client: new FakeExecutionRunClient(),
     token: 'secret',
   })
   const response = await app.inject({
@@ -155,7 +155,7 @@ await test('requires the configured bearer token', async () => {
 })
 
 await test('returns missing runs in the public error envelope', async () => {
-  const app = await createApp({ store: new FakeExecutionRunClient() })
+  const app = await createApp({ client: new FakeExecutionRunClient() })
   const response = await app.inject({
     method: 'GET',
     url: '/v1/runs/run-missing',
@@ -175,9 +175,9 @@ await test('returns missing runs in the public error envelope', async () => {
 })
 
 await test('reports Temporal submission failures as internal errors', async () => {
-  const store = new FakeExecutionRunClient()
-  store.startError = new Error('Temporal unavailable')
-  const app = await createApp({ store })
+  const client = new FakeExecutionRunClient()
+  client.startError = new Error('Temporal unavailable')
+  const app = await createApp({ client })
   const response = await app.inject({
     method: 'POST',
     url: '/v1/workflows/issue-review/runs',

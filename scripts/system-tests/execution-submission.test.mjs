@@ -167,14 +167,14 @@ async function exerciseSubmissionBoundary(temporalAddress) {
   process.env.EXECUTION_API_TOKEN = token
   process.env.EXECUTION_API_REQUEST_RETRIES = '0'
 
-  const [{ createApp }, { TemporalExecutionStore }, executionClient] =
+  const [{ createApp }, { TemporalExecutionClient }, executionClient] =
     await Promise.all([
       import('../../services/execution-gateway/dist/server.js'),
-      import('../../services/execution-gateway/dist/temporal-execution-store.js'),
+      import('../../services/execution-gateway/dist/temporal-execution-client.js'),
       import('../../services/review-runs/dist/execution-client.js'),
     ])
-  const store = await TemporalExecutionStore.connect()
-  const app = await createApp({ store, token })
+  const client = await TemporalExecutionClient.connect()
+  const app = await createApp({ client, token })
 
   try {
     const address = await app.listen({ host: '127.0.0.1', port: 0 })
@@ -216,7 +216,7 @@ async function exerciseSubmissionBoundary(temporalAddress) {
     )
   } finally {
     await app.close()
-    await store.close()
+    await client.close()
   }
 }
 
