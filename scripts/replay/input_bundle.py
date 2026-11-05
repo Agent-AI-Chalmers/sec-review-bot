@@ -15,12 +15,13 @@ ARTIFACT_ROOT_ENV = "SEC_REVIEW_AGENT_ARTIFACT_ROOT"
 
 
 def materialize_replay_input(
-    public_input: dict[str, Any], *, artifact_root: Path
+    public_input: dict[str, Any], *, input_root: Path, artifact_root: Path
 ) -> PreparedRepositoryInput:
     """Materialize repository input before replaying its internal stages."""
     prepared = prepare_workflow_input(
         public_input,
         "repository-review",
+        input_root_path=input_root,
         artifact_root_path=artifact_root,
     )
     if not isinstance(prepared, PreparedRepositoryInput):
@@ -42,7 +43,7 @@ def default_replay_artifact_root(
                 f"{ARTIFACT_ROOT_ENV} requires run_id to derive replay artifact root."
             )
         return Path(configured_root) / run_id
-    return input_bundle_root / "artifacts"
+    return input_bundle_root.parent / "artifacts"
 
 
 def _manifest_path(input_bundle_root: Path, key: str) -> Path:

@@ -131,7 +131,7 @@ def _prepare_replay_input(
     prepared = dict(caller_input)
     # Manual case replay resumes inside the repository workflow. These artifact
     # roots are internal runtime context, not public runner input fields.
-    prepared["input_bundle_root_path"] = str(run_root)
+    prepared["input_bundle_root_path"] = str(run_root / "input")
     prepared["artifact_paths"] = {
         "discovery": str(run_artifacts / "discovery"),
         "triage": str(run_artifacts / "triage"),
@@ -354,7 +354,7 @@ async def main() -> None:
 
     replay_input = _prepare_replay_input(read_json(input_path), run_root, run_artifacts)
     test_changes = require_review_intent(replay_input.get("review_intent")).test_changes
-    bundle_paths = read_replay_bundle_paths(run_root)
+    bundle_paths = read_replay_bundle_paths(run_root / "input")
     result = read_json(result_paths[0])
     triage_result = TriageResult.model_validate(read_json(triage_path))
     case_results = result.get("case_results") or []

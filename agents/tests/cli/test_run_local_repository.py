@@ -10,6 +10,8 @@ def test_parse_args_collects_repeated_paths_ignore_patterns() -> None:
             "sec-review-agents-run-local-repository",
             "--repo",
             "/repo",
+            "--output-dir",
+            "/runs",
             "--test-changes",
             "deny",
             "--paths-ignore",

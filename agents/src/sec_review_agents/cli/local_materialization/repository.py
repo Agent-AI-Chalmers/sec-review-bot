@@ -1,18 +1,15 @@
 import shutil
 import subprocess
+from dataclasses import replace
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from sec_review_agents.cli.local_git import repo_default_branch, resolve_git_ref
 from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
-    archive_input_bundle,
-    build_run_paths,
     create_local_run_id,
-    ensure_run_directories,
-    history_path,
-    incremental_window_path,
     materialize_workspace_with_limited_commit_history,
-    workspace_path,
+    pack_input_bundle,
     write_input_bundle_manifest,
 )
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
@@ -98,14 +95,14 @@ _GIT_STATUS_TO_CHANGE = {
 def _materialize_incremental_artifacts(
     *,
     repo_path: Path,
-    paths,
+    input_root: Path,
     run_id: str,
     event_type: str,
     base_ref: str,
     head_ref: str,
 ) -> tuple[list[dict], list[str]]:
-    incremental_window_root = incremental_window_path(paths)
-    history_root = history_path(paths)
+    incremental_window_root = input_root / "incremental-window"
+    history_root = input_root / "history"
     patch_text = subprocess.run(
         ["git", "diff", "--binary", f"{base_ref}..{head_ref}"],
         cwd=repo_path,
@@ -181,101 +178,109 @@ def build_local_repository_security_bundle(
     run_id = create_local_run_id()
     resolved_ref = resolve_git_ref(repo_path, ref)
     resolved_default_branch = default_branch or repo_default_branch(repo_path)
-    paths = build_run_paths(output_dir, run_id)
-
-    if paths.local_root_path.exists():
-        shutil.rmtree(paths.local_root_path)
-
-    ensure_run_directories(
-        paths,
-        include_repository_artifacts=True,
+    bundle = ReviewBundle(
+        workflow="repository-review",
+        run_id=run_id,
+        input={},
+        local_root_path=output_dir / run_id,
     )
 
-    resolved_scan_mode = _normalize_scan_mode(scan_mode)
-    base_ref: str | None = None
-    changed_files_for_manifest: list[dict] = []
-    commit_shas_for_scan_target: list[str] = []
-    if resolved_scan_mode == "incremental":
-        baseline_candidate = (baseline_ref or "").strip()
-        if not baseline_candidate:
-            raise ValueError(
-                "Incremental scan requested but no baseline_ref was provided. "
-                "Refusing to silently downgrade to full scan."
-            )
-        else:
-            base_ref = resolve_git_ref(repo_path, baseline_candidate)
-            if base_ref == resolved_ref:
+    if bundle.local_root_path.exists():
+        shutil.rmtree(bundle.local_root_path)
+
+    bundle.local_root_path.mkdir(parents=True)
+    with TemporaryDirectory(prefix="sec-review-preparation-") as temporary_directory:
+        preparation_root = Path(temporary_directory)
+        input_root = preparation_root / "input"
+        (input_root / "history").mkdir(parents=True, exist_ok=True)
+
+        resolved_scan_mode = _normalize_scan_mode(scan_mode)
+        base_ref: str | None = None
+        changed_files_for_manifest: list[dict] = []
+        commit_shas_for_scan_target: list[str] = []
+        if resolved_scan_mode == "incremental":
+            baseline_candidate = (baseline_ref or "").strip()
+            if not baseline_candidate:
                 raise ValueError(
-                    "Incremental scan requested but baseline resolves to the same commit as head. "
+                    "Incremental scan requested but no baseline_ref was provided. "
                     "Refusing to silently downgrade to full scan."
                 )
-            if not _is_ancestor_commit(repo_path, base_ref, resolved_ref):
-                raise ValueError(
-                    "Incremental scan requested but baseline is not an ancestor of head. "
-                    "Refusing to silently downgrade to full scan."
-                )
-            try:
-                changed_files_for_manifest, commit_shas_for_scan_target = (
-                    _materialize_incremental_artifacts(
-                        repo_path=repo_path,
-                        paths=paths,
-                        run_id=run_id,
-                        event_type=event_type,
-                        base_ref=base_ref,
-                        head_ref=resolved_ref,
+            else:
+                base_ref = resolve_git_ref(repo_path, baseline_candidate)
+                if base_ref == resolved_ref:
+                    raise ValueError(
+                        "Incremental scan requested but baseline resolves to the same commit as head. "
+                        "Refusing to silently downgrade to full scan."
                     )
-                )
-            except Exception as error:
-                raise RuntimeError(
-                    "Incremental scan requested but incremental artifacts could not be generated. "
-                    "Refusing to silently downgrade to full scan."
-                ) from error
+                if not _is_ancestor_commit(repo_path, base_ref, resolved_ref):
+                    raise ValueError(
+                        "Incremental scan requested but baseline is not an ancestor of head. "
+                        "Refusing to silently downgrade to full scan."
+                    )
+                try:
+                    changed_files_for_manifest, commit_shas_for_scan_target = (
+                        _materialize_incremental_artifacts(
+                            repo_path=repo_path,
+                            input_root=input_root,
+                            run_id=run_id,
+                            event_type=event_type,
+                            base_ref=base_ref,
+                            head_ref=resolved_ref,
+                        )
+                    )
+                except Exception as error:
+                    raise RuntimeError(
+                        "Incremental scan requested but incremental artifacts could not be generated. "
+                        "Refusing to silently downgrade to full scan."
+                    ) from error
 
-    limited_refs = [base_ref] if base_ref else []
-    limited_refs.append(resolved_ref)
-    materialize_workspace_with_limited_commit_history(
-        source_repo_path=repo_path,
-        workspace_path=workspace_path(paths),
-        refs=limited_refs,
-    )
-
-    create_workspace_snapshot_tar(
-        workspace_path=workspace_path(paths),
-        tar_path=paths.local_root_path / WORKSPACE_SNAPSHOT_TAR_NAME,
-    )
-    write_input_bundle_manifest(
-        paths,
-        include_incremental_window=(resolved_scan_mode == "incremental"),
-    )
-
-    if resolved_scan_mode == "full":
-        write_json(
-            history_path(paths) / "scan-window.json",
-            {
-                "run_id": run_id,
-                "event_type": event_type,
-                "scan_mode": "full",
-                "base_sha": base_ref,
-                "head_sha": resolved_ref,
-            },
+        limited_refs = [base_ref] if base_ref else []
+        limited_refs.append(resolved_ref)
+        preparation_workspace = preparation_root / "workspace"
+        materialize_workspace_with_limited_commit_history(
+            source_repo_path=repo_path,
+            workspace_path=preparation_workspace,
+            refs=limited_refs,
         )
 
-    scan_scope = {
-        "paths_ignore": resolved_paths_ignore,
-        "incremental_changed_files": [
-            {
-                "path": item.get("path"),
-                "status": item.get("status"),
-                "previous_path": item.get("previous_path"),
-            }
-            for item in changed_files_for_manifest
-        ],
-    }
+        create_workspace_snapshot_tar(
+            workspace_path=preparation_workspace,
+            tar_path=input_root / WORKSPACE_SNAPSHOT_TAR_NAME,
+        )
+        write_input_bundle_manifest(
+            input_root,
+            include_incremental_window=(resolved_scan_mode == "incremental"),
+        )
 
-    input_bundle = archive_input_bundle(
-        paths,
-        include_incremental_window=resolved_scan_mode == "incremental",
-    )
+        if resolved_scan_mode == "full":
+            write_json(
+                input_root / "history" / "scan-window.json",
+                {
+                    "run_id": run_id,
+                    "event_type": event_type,
+                    "scan_mode": "full",
+                    "base_sha": base_ref,
+                    "head_sha": resolved_ref,
+                },
+            )
+
+        scan_scope = {
+            "paths_ignore": resolved_paths_ignore,
+            "incremental_changed_files": [
+                {
+                    "path": item.get("path"),
+                    "status": item.get("status"),
+                    "previous_path": item.get("previous_path"),
+                }
+                for item in changed_files_for_manifest
+            ],
+        }
+
+        input_bundle = pack_input_bundle(
+            bundle,
+            input_root=input_root,
+            include_incremental_window=resolved_scan_mode == "incremental",
+        )
     input_data = {
         "api_version": EXECUTION_API_VERSION,
         "input_bundle": input_bundle,
@@ -299,13 +304,7 @@ def build_local_repository_security_bundle(
             else {}
         ),
     }
-    input_path = paths.local_root_path / "repository-review-input.json"
+    input_path = bundle.local_root_path / "repository-review-input.json"
     write_json(input_path, input_data)
 
-    return ReviewBundle(
-        workflow="repository-review",
-        run_id=run_id,
-        input=input_data,
-        local_root_path=paths.local_root_path,
-        artifact_root_path=paths.artifact_root_path,
-    )
+    return replace(bundle, input=input_data)

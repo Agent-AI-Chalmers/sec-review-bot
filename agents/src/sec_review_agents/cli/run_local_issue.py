@@ -7,7 +7,6 @@ from sec_review_agents.cli.local_git import git_ref_exists, repo_default_branch
 from sec_review_agents.cli.local_materialization.common import (
     IssueReviewStrategy,
     ReviewBundle,
-    default_local_output_dir,
     load_setup_declaration_content,
     result_path_for_bundle,
 )
@@ -96,10 +95,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-dir",
-        help=(
-            "Directory where materialized local run roots should be created. "
-            "Defaults to a temp root."
-        ),
+        required=True,
+        help="Parent directory in which a new local-run-* directory is created.",
     )
     parser.add_argument(
         "--materialize-only",
@@ -143,11 +140,7 @@ def main() -> None:
         raise SystemExit("Provide --issue-md or at least --title/--body.")
 
     title, body = _resolve_issue_text(args)
-    output_dir = (
-        Path(args.output_dir).resolve()
-        if args.output_dir
-        else default_local_output_dir()
-    )
+    output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     bundle = build_local_issue_bundle(
@@ -167,7 +160,6 @@ def main() -> None:
         run_id=bundle.run_id,
         input=bundle.input,
         local_root_path=bundle.local_root_path,
-        artifact_root_path=bundle.artifact_root_path,
         runtime_config=bundle.runtime_config,
         issue_strategy=issue_strategy,
     )

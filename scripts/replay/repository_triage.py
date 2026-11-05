@@ -116,7 +116,9 @@ async def main() -> None:
     discovery_result = DiscoveryResult.model_validate(read_json(discovery_path))
     run_artifacts_path = _run_artifacts_path(requested_run_artifacts_path)
     replay_input = materialize_replay_input(
-        public_input, artifact_root=run_artifacts_path
+        public_input,
+        input_root=input_path.parent / "input",
+        artifact_root=run_artifacts_path,
     )
 
     triage_result = await run_repository_triage_stage(

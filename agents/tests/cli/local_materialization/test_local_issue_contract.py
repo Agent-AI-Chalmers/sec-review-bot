@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from sec_review_agents.cli.local_execution import build_local_workflow_request
 from sec_review_agents.cli.local_materialization.issue import build_local_issue_bundle
 from sec_review_agents.entrypoints.execution_api_schema import (
     validate_execution_api_input,
@@ -77,9 +78,10 @@ def test_local_issue_metadata_matches_the_execution_input(
         output_dir=tmp_path / "out",
     )
 
+    build_local_workflow_request(bundle, timeout_seconds=60)
     metadata = json.loads(
-        (bundle.local_root_path / "history" / "issue-metadata.json").read_text(
-            encoding="utf-8"
-        )
+        (
+            bundle.local_root_path / "input" / "history" / "issue-metadata.json"
+        ).read_text(encoding="utf-8")
     )
     assert metadata == bundle.input["issue"]

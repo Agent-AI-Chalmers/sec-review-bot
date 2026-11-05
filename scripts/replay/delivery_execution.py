@@ -145,7 +145,11 @@ async def main() -> None:
     )
 
     public_input = read_json(input_path)
-    replay_input = materialize_replay_input(public_input, artifact_root=run_artifacts)
+    replay_input = materialize_replay_input(
+        public_input,
+        input_root=input_path.parent / "input",
+        artifact_root=run_artifacts,
+    )
     previous_result = _load_result(run_artifacts)
 
     if not plan_path.exists():

@@ -37,3 +37,13 @@ def test_discovery_replay_uses_materialized_artifact_run_id(
         )
         == configured_root / run_id
     )
+
+
+def test_discovery_replay_keeps_default_artifacts_beside_local_input(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.delenv("SEC_REVIEW_AGENT_ARTIFACT_ROOT", raising=False)
+    assert (
+        default_replay_artifact_root(input_bundle_root=tmp_path / "input")
+        == tmp_path / "artifacts"
+    )

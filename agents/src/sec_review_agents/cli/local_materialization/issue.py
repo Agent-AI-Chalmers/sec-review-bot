@@ -1,6 +1,8 @@
 import shutil
 import subprocess
+from dataclasses import replace
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from sec_review_agents.cli.local_git import (
     repo_default_branch,
@@ -9,13 +11,9 @@ from sec_review_agents.cli.local_git import (
 )
 from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
-    archive_input_bundle,
-    build_run_paths,
     create_local_run_id,
-    ensure_run_directories,
-    history_path,
     materialize_workspace_with_limited_commit_history,
-    workspace_path,
+    pack_input_bundle,
     write_input_bundle_manifest,
 )
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
@@ -75,48 +73,60 @@ def build_local_issue_bundle(
         resolved_workspace_ref = repo_head_sha(repo_path).strip()
 
     repo_name = repo_full_name(repo_path, repo_full_name_value)
-    paths = build_run_paths(output_dir, run_id)
-
-    if paths.local_root_path.exists():
-        shutil.rmtree(paths.local_root_path)
-
-    ensure_run_directories(paths)
-    workspace_root = workspace_path(paths)
-    history_root = history_path(paths)
-
-    materialize_workspace_with_limited_commit_history(
-        source_repo_path=repo_path,
-        workspace_path=workspace_root,
-        refs=[resolved_workspace_ref],
+    bundle = ReviewBundle(
+        workflow="issue-review",
+        run_id=run_id,
+        input={},
+        issue_strategy="default",
+        local_root_path=output_dir / run_id,
     )
-    create_workspace_snapshot_tar(
-        workspace_path=workspace_root,
-        tar_path=paths.local_root_path / WORKSPACE_SNAPSHOT_TAR_NAME,
-    )
-    write_input_bundle_manifest(paths, include_incremental_window=False)
 
-    # Input preparation validates this against the v1 issue schema, which forbids additional
-    # properties, so it carries identity plus what the prompts render and nothing else.
-    issue_metadata = {
-        "owner": repo_name.split("/", 1)[0],
-        "repo": repo_name.split("/", 1)[-1],
-        "repo_full_name": repo_name,
-        "number": issue_number_value,
-        "title": title,
-        "body": body,
-    }
-    write_json(history_root / "issue-metadata.json", issue_metadata)
-    write_json(
-        history_root / "linked-context.json",
-        {
-            "relation_type": "cross-referenced",
-            "source": "timeline",
-            "sources_checked": ["timeline"],
-            "issues": [],
-            "prs": [],
-        },
-    )
-    input_bundle = archive_input_bundle(paths, include_incremental_window=False)
+    if bundle.local_root_path.exists():
+        shutil.rmtree(bundle.local_root_path)
+
+    bundle.local_root_path.mkdir(parents=True)
+    with TemporaryDirectory(prefix="sec-review-preparation-") as temporary_directory:
+        preparation_root = Path(temporary_directory)
+        input_root = preparation_root / "input"
+        (input_root / "history").mkdir(parents=True, exist_ok=True)
+        preparation_workspace = preparation_root / "workspace"
+        history_root = input_root / "history"
+
+        materialize_workspace_with_limited_commit_history(
+            source_repo_path=repo_path,
+            workspace_path=preparation_workspace,
+            refs=[resolved_workspace_ref],
+        )
+        create_workspace_snapshot_tar(
+            workspace_path=preparation_workspace,
+            tar_path=input_root / WORKSPACE_SNAPSHOT_TAR_NAME,
+        )
+        write_input_bundle_manifest(input_root, include_incremental_window=False)
+
+        # Input preparation validates this against the v1 issue schema, which forbids additional
+        # properties, so it carries identity plus what the prompts render and nothing else.
+        issue_metadata = {
+            "owner": repo_name.split("/", 1)[0],
+            "repo": repo_name.split("/", 1)[-1],
+            "repo_full_name": repo_name,
+            "number": issue_number_value,
+            "title": title,
+            "body": body,
+        }
+        write_json(history_root / "issue-metadata.json", issue_metadata)
+        write_json(
+            history_root / "linked-context.json",
+            {
+                "relation_type": "cross-referenced",
+                "source": "timeline",
+                "sources_checked": ["timeline"],
+                "issues": [],
+                "prs": [],
+            },
+        )
+        input_bundle = pack_input_bundle(
+            bundle, input_root=input_root, include_incremental_window=False
+        )
     input_data = {
         "api_version": EXECUTION_API_VERSION,
         "review_intent": {
@@ -131,13 +141,6 @@ def build_local_issue_bundle(
             else {}
         ),
     }
-    input_path = paths.local_root_path / "issue-review-input.json"
+    input_path = bundle.local_root_path / "issue-review-input.json"
     write_json(input_path, input_data)
-    return ReviewBundle(
-        workflow="issue-review",
-        run_id=run_id,
-        input=input_data,
-        local_root_path=paths.local_root_path,
-        artifact_root_path=paths.artifact_root_path,
-        issue_strategy="default",
-    )
+    return replace(bundle, input=input_data)

@@ -1,19 +1,16 @@
 import shutil
 import subprocess
+from dataclasses import replace
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from sec_review_agents.cli.local_git import repo_full_name, resolve_git_ref
 from sec_review_agents.cli.local_materialization.common import (
     ReviewBundle,
-    archive_input_bundle,
-    build_run_paths,
     create_local_run_id,
-    ensure_run_directories,
-    history_path,
-    incremental_window_path,
     materialize_workspace_with_limited_commit_history,
-    workspace_path,
+    pack_input_bundle,
     write_input_bundle_manifest,
 )
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
@@ -237,87 +234,98 @@ def build_local_pull_request_bundle(
     head_sha = resolve_git_ref(repo_path, head_ref)
     diff_range = f"{base_ref}...{head_ref}"
     files = _build_local_pr_files(repo_path, diff_range)
-    manifest_paths = build_run_paths(output_dir, run_id)
-
-    if manifest_paths.local_root_path.exists():
-        shutil.rmtree(manifest_paths.local_root_path)
-
-    workspace_root = workspace_path(manifest_paths)
-    incremental_window_root = incremental_window_path(manifest_paths)
-    history_root = history_path(manifest_paths)
-
-    ensure_run_directories(manifest_paths)
-    incremental_window_root.mkdir(parents=True, exist_ok=True)
-    materialize_workspace_with_limited_commit_history(
-        source_repo_path=repo_path,
-        workspace_path=workspace_root,
-        refs=[base_sha, head_sha],
+    bundle = ReviewBundle(
+        workflow="pull-request-review",
+        run_id=run_id,
+        input={},
+        local_root_path=output_dir / run_id,
     )
-    create_workspace_snapshot_tar(
-        workspace_path=workspace_root,
-        tar_path=manifest_paths.local_root_path / WORKSPACE_SNAPSHOT_TAR_NAME,
-    )
-    write_input_bundle_manifest(manifest_paths, include_incremental_window=True)
 
-    _materialize_incremental_window_artifacts(files, incremental_window_root)
-    linked_issues = {
-        "relation_type": "cross-referenced",
-        "source": "timeline",
-        "sources_checked": ["timeline"],
-        "issues": [],
-        "prs": [],
-    }
+    if bundle.local_root_path.exists():
+        shutil.rmtree(bundle.local_root_path)
 
-    commit_shas_output = subprocess.run(
-        ["git", "rev-list", f"{base_sha}..{head_sha}"],
-        cwd=repo_path,
-        check=False,
-        capture_output=True,
-        text=True,
-    ).stdout
-    commit_shas = [
-        line.strip() for line in commit_shas_output.splitlines() if line.strip()
-    ]
-    # Input preparation validates this object against the v1 pull request schema, so it carries exactly
-    # the subject the GitHub producer builds and nothing else: the contract forbids additional
-    # properties, and the local path has no webhook payload to explain extra fields.
-    #
-    # A local run always covers the whole pull request, so the review window is the pull request
-    # range itself. Reporting it keeps this file shaped like the GitHub producer's, which is what
-    # the scope prompts read.
-    review_window = {
-        "kind": "full",
-        "base_sha": base_sha,
-        "head_sha": head_sha,
-        "reason": "pull-request-scope",
-    }
-    pr_subject = {
-        "owner": owner_login,
-        "repo": repo_short_name,
-        "repo_full_name": repo_name,
-        "number": pr_number_value,
-        "title": title,
-        "body": body,
-        "base_ref": base_ref,
-        "base_sha": base_sha,
-        "head_ref": head_ref,
-        "head_sha": head_sha,
-        "commit_shas": commit_shas,
-        "review_window": review_window,
-    }
+    bundle.local_root_path.mkdir(parents=True)
+    with TemporaryDirectory(prefix="sec-review-preparation-") as temporary_directory:
+        preparation_root = Path(temporary_directory)
+        input_root = preparation_root / "input"
+        preparation_workspace = preparation_root / "workspace"
+        incremental_window_root = input_root / "incremental-window"
+        history_root = input_root / "history"
 
-    # The agent reads the window and the commit list only; identity fields stay in the execution
-    # input, matching what the GitHub producer writes here.
-    write_json(
-        history_root / "pr-metadata.json",
-        {
-            "review_window": review_window,
+        (input_root / "history").mkdir(parents=True, exist_ok=True)
+        incremental_window_root.mkdir(parents=True, exist_ok=True)
+        materialize_workspace_with_limited_commit_history(
+            source_repo_path=repo_path,
+            workspace_path=preparation_workspace,
+            refs=[base_sha, head_sha],
+        )
+        create_workspace_snapshot_tar(
+            workspace_path=preparation_workspace,
+            tar_path=input_root / WORKSPACE_SNAPSHOT_TAR_NAME,
+        )
+        write_input_bundle_manifest(input_root, include_incremental_window=True)
+
+        _materialize_incremental_window_artifacts(files, incremental_window_root)
+        linked_issues = {
+            "relation_type": "cross-referenced",
+            "source": "timeline",
+            "sources_checked": ["timeline"],
+            "issues": [],
+            "prs": [],
+        }
+
+        commit_shas_output = subprocess.run(
+            ["git", "rev-list", f"{base_sha}..{head_sha}"],
+            cwd=repo_path,
+            check=False,
+            capture_output=True,
+            text=True,
+        ).stdout
+        commit_shas = [
+            line.strip() for line in commit_shas_output.splitlines() if line.strip()
+        ]
+        # Input preparation validates this object against the v1 pull request schema, so it carries exactly
+        # the subject the GitHub producer builds and nothing else: the contract forbids additional
+        # properties, and the local path has no webhook payload to explain extra fields.
+        #
+        # A local run always covers the whole pull request, so the review window is the pull request
+        # range itself. Reporting it keeps this file shaped like the GitHub producer's, which is what
+        # the scope prompts read.
+        review_window = {
+            "kind": "full",
+            "base_sha": base_sha,
+            "head_sha": head_sha,
+            "reason": "pull-request-scope",
+        }
+        pr_subject = {
+            "owner": owner_login,
+            "repo": repo_short_name,
+            "repo_full_name": repo_name,
+            "number": pr_number_value,
+            "title": title,
+            "body": body,
+            "base_ref": base_ref,
+            "base_sha": base_sha,
+            "head_ref": head_ref,
+            "head_sha": head_sha,
             "commit_shas": commit_shas,
-        },
-    )
-    write_json(history_root / "linked-context.json", linked_issues)
+            "review_window": review_window,
+        }
 
-    input_bundle = archive_input_bundle(manifest_paths, include_incremental_window=True)
+        # The agent reads the window and the commit list only; identity fields stay in the execution
+        # input, matching what the GitHub producer writes here.
+        write_json(
+            history_root / "pr-metadata.json",
+            {
+                "review_window": review_window,
+                "commit_shas": commit_shas,
+            },
+        )
+        write_json(history_root / "linked-context.json", linked_issues)
+
+        input_bundle = pack_input_bundle(
+            bundle, input_root=input_root, include_incremental_window=True
+        )
     input_data = {
         "api_version": EXECUTION_API_VERSION,
         "review_intent": {
@@ -333,12 +341,6 @@ def build_local_pull_request_bundle(
         ),
     }
 
-    input_path = manifest_paths.local_root_path / "pull-request-review-input.json"
+    input_path = bundle.local_root_path / "pull-request-review-input.json"
     write_json(input_path, input_data)
-    return ReviewBundle(
-        workflow="pull-request-review",
-        run_id=run_id,
-        input=input_data,
-        local_root_path=manifest_paths.local_root_path,
-        artifact_root_path=manifest_paths.artifact_root_path,
-    )
+    return replace(bundle, input=input_data)

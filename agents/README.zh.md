@@ -154,7 +154,7 @@ flowchart LR
 - `sec-review-agents-run-local-pr`：本地 PR run 入口
 - `sec-review-agents-run-local-repository`：本地 repo 扫描 run 入口；可用 `--scan-mode full|incremental` 选择全量或增量扫描，并可重复传入 `--paths-ignore PATTERN`，忽略指定路径或 glob
 
-本地运行默认使用临时目录保存 workflow result、workspace snapshot、history 和其他 artifacts。命令结束时会打印 `WORKFLOW_RESULT=...`，可根据该路径查看结果；也可以通过 `--output-dir` 指定固定的输出目录。
+本地命令必须通过 `--output-dir` 指定保存位置；程序在该父目录下创建新的 `local-run-*` 目录。
 
 示例：
 
@@ -169,12 +169,13 @@ sec-review-agents-run-local-issue \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
-  --output-dir /abs/path/to/local-run \
+  --output-dir /abs/path/to/local-runs \
   --review-objective repair
 
 # 1b) issue two-stage ablation
 # --test-changes deny 表示最终 mitigation patch 不得包含测试改动。
 sec-review-agents-run-local-issue \
+  --output-dir /abs/path/to/local-runs \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
@@ -184,6 +185,7 @@ sec-review-agents-run-local-issue \
 
 # 1c) issue single-agent baseline
 sec-review-agents-run-local-issue \
+  --output-dir /abs/path/to/local-runs \
   --repo /abs/path/to/repo \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
@@ -193,6 +195,7 @@ sec-review-agents-run-local-issue \
 # 2) pr
 # PR 的 objective 固定为 audit；--test-changes 可选。
 sec-review-agents-run-local-pr \
+  --output-dir /abs/path/to/local-runs \
   --repo /abs/path/to/repo \
   --pr-md /abs/path/to/pr.md \
   --base-sha <base-commit-sha> \
@@ -202,6 +205,7 @@ sec-review-agents-run-local-pr \
 # 3) repo 全量扫描
 # Repository 的 objective 固定为 audit；test_changes 默认为 allow。
 sec-review-agents-run-local-repository \
+  --output-dir /abs/path/to/local-runs \
   --repo /abs/path/to/repo \
   --target-branch main \
   --paths-ignore docs \
@@ -209,6 +213,7 @@ sec-review-agents-run-local-repository \
 
 # 4) repo 增量扫描
 sec-review-agents-run-local-repository \
+  --output-dir /abs/path/to/local-runs \
   --repo /abs/path/to/repo \
   --target-branch main \
   --scan-mode incremental \

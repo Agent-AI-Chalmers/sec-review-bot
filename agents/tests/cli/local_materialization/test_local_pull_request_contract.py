@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from sec_review_agents.cli.local_execution import build_local_workflow_request
 from sec_review_agents.cli.local_materialization.pull_request import (
     build_local_pull_request_bundle,
 )
@@ -81,8 +82,9 @@ def test_local_pull_request_metadata_is_the_agent_facing_subset(
         base_ref="HEAD~1",
     )
 
+    build_local_workflow_request(bundle, timeout_seconds=60)
     metadata = json.loads(
-        (bundle.local_root_path / "history" / "pr-metadata.json").read_text(
+        (bundle.local_root_path / "input" / "history" / "pr-metadata.json").read_text(
             encoding="utf-8"
         )
     )

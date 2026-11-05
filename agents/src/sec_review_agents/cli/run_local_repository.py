@@ -11,7 +11,6 @@ from sec_review_agents.cli.local_git import (
     repo_default_branch,
 )
 from sec_review_agents.cli.local_materialization.common import (
-    default_local_output_dir,
     load_setup_declaration_content,
     result_path_for_bundle,
 )
@@ -82,10 +81,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-dir",
-        help=(
-            "Directory where materialized local run roots should be created. "
-            "Defaults to a temp root."
-        ),
+        required=True,
+        help="Parent directory in which a new local-run-* directory is created.",
     )
     parser.add_argument(
         "--materialize-only",
@@ -173,11 +170,7 @@ def main() -> None:
         base_sha = None
         review_ref = target_branch
 
-    output_dir = (
-        Path(args.output_dir).resolve()
-        if args.output_dir
-        else default_local_output_dir()
-    )
+    output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     bundle = build_local_repository_security_bundle(
