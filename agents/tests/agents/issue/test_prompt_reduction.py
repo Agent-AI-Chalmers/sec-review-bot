@@ -114,27 +114,27 @@ def test_retry_verifier_feedback_keeps_only_lightweight_fields() -> None:
             mitigation_result=None,
             verifier_result=VerificationStageResult(
                 overview="Previous verifier found a gap.",
-                review_target_claim="claim",
-                patch_coverage="partial",
-                resolution_next_step="retry-ai",
-                patch_findings=["concern"],
+                target_claim="claim",
+                coverage="partial",
+                next_step="retry-ai",
+                findings=["concern"],
                 validation_level="static",
-                verification_findings=["verbose note"],
-                regression_status=None,
+                evidence=["verbose note"],
+                regression=None,
             ),
             history=[
                 *feedback_retry_context(
                     retry_index=1,
                     mitigation_result=None,
                     verifier_result=VerificationStageResult(
-                        patch_coverage="partial",
-                        resolution_next_step="retry-ai",
-                        patch_findings=["gap"],
-                        verification_findings=["verbose note"],
+                        coverage="partial",
+                        next_step="retry-ai",
+                        findings=["gap"],
+                        evidence=["verbose note"],
                         overview="Test verification",
-                        review_target_claim=None,
+                        target_claim=None,
                         validation_level=None,
-                        regression_status=None,
+                        regression=None,
                     ),
                 ).history
             ],
@@ -146,10 +146,10 @@ def test_retry_verifier_feedback_keeps_only_lightweight_fields() -> None:
     latest = payload.latest_verifier
     assert latest is not None
 
-    assert latest.review_target_claim == "claim"
-    assert latest.resolution_next_step == "retry-ai"
-    assert latest.patch_findings == ["concern"]
-    assert latest.verification_findings == ["verbose note"]
+    assert latest.target_claim == "claim"
+    assert latest.next_step == "retry-ai"
+    assert latest.findings == ["concern"]
+    assert latest.evidence == ["verbose note"]
 
 
 def test_retry_issue_verification_prompt_inlines_original_issue_text() -> None:
@@ -163,13 +163,13 @@ def test_retry_issue_verification_prompt_inlines_original_issue_text() -> None:
             retry_index=1,
             mitigation_result=None,
             verifier_result=VerificationStageResult(
-                review_target_claim="claim",
-                patch_coverage="partial",
-                resolution_next_step="retry-ai",
-                patch_findings=["gap"],
+                target_claim="claim",
+                coverage="partial",
+                next_step="retry-ai",
+                findings=["gap"],
                 overview="Test verification",
                 validation_level=None,
-                regression_status=None,
+                regression=None,
             ),
         ),
         analysis_result=analysis_fixture(
@@ -190,14 +190,14 @@ def test_retry_issue_verification_prompt_inlines_original_issue_text() -> None:
     assert "Previous Verifier Result" in prompt
     previous_verifier_section = prompt.split("# Previous Verifier Result", 1)[1]
     assert "```json" not in previous_verifier_section
-    assert previous_verifier_section.index("- Review target claim: claim") < (
-        previous_verifier_section.index("- Patch coverage: `partial`")
+    assert previous_verifier_section.index("- Target claim: claim") < (
+        previous_verifier_section.index("- Coverage: `partial`")
     )
-    assert previous_verifier_section.index("- Patch coverage: `partial`") < (
-        previous_verifier_section.index("- Resolution next step: `retry-ai`")
+    assert previous_verifier_section.index("- Coverage: `partial`") < (
+        previous_verifier_section.index("- Next step: `retry-ai`")
     )
-    assert "- Patch coverage: `partial`" in prompt
-    assert "Patch findings:" in prompt
+    assert "- Coverage: `partial`" in prompt
+    assert "Findings:" in prompt
     assert "- gap" in prompt
 
 
@@ -217,13 +217,13 @@ def test_retry_issue_verification_prompt_renders_history_without_json_block() ->
                     retry_index=1,
                     mitigation_result=None,
                     verifier_result=VerificationStageResult(
-                        patch_coverage="partial",
-                        patch_findings=["still misses retry path"],
+                        coverage="partial",
+                        findings=["still misses retry path"],
                         overview="Test verification",
-                        review_target_claim=None,
-                        resolution_next_step="none",
+                        target_claim=None,
+                        next_step="none",
                         validation_level=None,
-                        regression_status=None,
+                        regression=None,
                     ),
                 ).history
             ],
@@ -239,7 +239,7 @@ def test_retry_issue_verification_prompt_renders_history_without_json_block() ->
     assert "```json" not in history_section
     assert "- Retry 1" in history_section
     assert "- Retry index: `1`" in history_section
-    assert "- Patch coverage: `partial`" in history_section
+    assert "- Coverage: `partial`" in history_section
     assert "- still misses retry path" in history_section
 
 
@@ -259,13 +259,13 @@ def test_retry_pr_verification_prompt_inlines_original_pr_text() -> None:
             retry_index=1,
             mitigation_result=None,
             verifier_result=VerificationStageResult(
-                review_target_claim="claim",
-                patch_coverage="partial",
-                resolution_next_step="retry-ai",
-                patch_findings=["gap"],
+                target_claim="claim",
+                coverage="partial",
+                next_step="retry-ai",
+                findings=["gap"],
                 overview="Test verification",
                 validation_level=None,
-                regression_status=None,
+                regression=None,
             ),
         ),
         analysis_result=analysis_fixture(
@@ -333,26 +333,26 @@ def test_retry_mitigation_prompt_keeps_verifier_as_primary_corrective_signal() -
         ),
         verifier_result=VerificationStageResult(
             overview="Old verifier",
-            review_target_claim="claim",
-            patch_coverage="partial",
-            resolution_next_step="retry-ai",
+            target_claim="claim",
+            coverage="partial",
+            next_step="retry-ai",
             validation_level="static",
-            patch_findings=["gap"],
-            verification_findings=["note"],
-            regression_status=None,
+            findings=["gap"],
+            evidence=["note"],
+            regression=None,
         ),
         history=[
             *feedback_retry_context(
                 retry_index=1,
                 mitigation_result=None,
                 verifier_result=VerificationStageResult(
-                    patch_coverage="partial",
-                    resolution_next_step="retry-ai",
-                    patch_findings=["old gap"],
+                    coverage="partial",
+                    next_step="retry-ai",
+                    findings=["old gap"],
                     overview="Test verification",
-                    review_target_claim=None,
+                    target_claim=None,
                     validation_level=None,
-                    regression_status=None,
+                    regression=None,
                 ),
             ).history
         ],
@@ -370,14 +370,14 @@ def test_retry_mitigation_prompt_keeps_verifier_as_primary_corrective_signal() -
     )[0]
     assert "```json" not in retry_section
     assert "Latest verifier:" in retry_section
-    assert retry_section.index("- Review target claim: claim") < (
-        retry_section.index("- Patch coverage: `partial`")
+    assert retry_section.index("- Target claim: claim") < (
+        retry_section.index("- Coverage: `partial`")
     )
-    assert retry_section.index("- Patch coverage: `partial`") < (
-        retry_section.index("- Resolution next step: `retry-ai`")
+    assert retry_section.index("- Coverage: `partial`") < (
+        retry_section.index("- Next step: `retry-ai`")
     )
     assert "- Validation level: `static`" in retry_section
-    assert "- Patch findings:" in retry_section
+    assert "- Findings:" in retry_section
     assert "- gap" in prompt
     assert "Previous mitigation:" in retry_section
     assert "- a.py" in retry_section

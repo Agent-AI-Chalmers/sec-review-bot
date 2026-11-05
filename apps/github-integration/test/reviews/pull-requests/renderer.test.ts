@@ -26,13 +26,13 @@ test('pull request renderer preserves inline code in review prose', () => {
     },
     verification: {
       overview: null,
-      review_target_claim: 'The loader still calls `load_prompt_resource`.',
+      target_claim: 'The loader still calls `load_prompt_resource`.',
       validation_level: 'static',
-      patch_coverage: 'not-applicable',
-      regression_status: 'not-run',
-      resolution_next_step: 'none',
-      patch_findings: [],
-      verification_findings: [
+      coverage: 'full',
+      regression: 'not-run',
+      next_step: 'none',
+      findings: [],
+      evidence: [
         '`agents/tests/memory/test_memory.py` covers the prompt contract.'
       ],
       residual_risks: []
@@ -64,13 +64,13 @@ test('pull request renderer summarizes each review stage without implying PR fil
     },
     verification: {
       overview: 'The result was reviewed statically.',
-      review_target_claim: null,
+      target_claim: null,
       validation_level: 'static',
-      patch_coverage: 'full',
-      regression_status: 'not-run',
-      resolution_next_step: 'none',
-      patch_findings: [],
-      verification_findings: [],
+      coverage: 'full',
+      regression: 'not-run',
+      next_step: 'none',
+      findings: [],
+      evidence: [],
       residual_risks: []
     },
     cvss: null
@@ -84,7 +84,7 @@ test('pull request renderer summarizes each review stage without implying PR fil
   )
   assert.doesNotMatch(body, /- Tests:/)
   assert.doesNotMatch(body, /Changed files: `0`/)
-  assert.doesNotMatch(body, /Resolution next step: `none`/)
+  assert.doesNotMatch(body, /Next step: `none`/)
 })
 
 test('pull request renderer reports mitigation file count only when a patch exists', () => {
@@ -104,13 +104,13 @@ test('pull request renderer reports mitigation file count only when a patch exis
     },
     verification: {
       overview: null,
-      review_target_claim: null,
+      target_claim: null,
       validation_level: 'runtime-partial',
-      patch_coverage: 'partial',
-      regression_status: 'failed',
-      resolution_next_step: 'manual-review',
-      patch_findings: [],
-      verification_findings: [],
+      coverage: 'partial',
+      regression: 'failed',
+      next_step: 'manual-review',
+      findings: [],
+      evidence: [],
       residual_risks: []
     },
     cvss: null
@@ -123,5 +123,5 @@ test('pull request renderer reports mitigation file count only when a patch exis
     /- Verification: `partial coverage; partial runtime validation; checks failed`/
   )
   assert.doesNotMatch(body, /- Tests:/)
-  assert.match(body, /- Resolution next step: `manual-review`/)
+  assert.match(body, /- Next step: `manual-review`/)
 })

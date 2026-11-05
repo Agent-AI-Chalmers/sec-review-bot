@@ -68,27 +68,20 @@ export interface ReviewRecord {
   }
   verification: {
     overview: string | null
-    review_target_claim: string | null
+    target_claim: string | null
     validation_level:
       | 'static'
       | 'logic-simulated'
       | 'runtime-partial'
       | 'runtime-endpoint'
       | null
-    patch_coverage:
-      | 'full'
-      | 'partial'
-      | 'local-only'
-      | 'unresolved'
-      | 'misaligned'
-      | 'no-patch'
-      | 'not-applicable'
-      | null
-    regression_status:
+    coverage:
+      'full' | 'partial' | 'local-only' | 'unresolved' | 'misaligned' | null
+    regression:
       'passed' | 'failed' | 'not-run' | 'not-applicable' | 'unresolved' | null
-    resolution_next_step: 'none' | 'retry-ai' | 'manual-review' | null
-    patch_findings: string[]
-    verification_findings: string[]
+    next_step: 'none' | 'retry-ai' | 'manual-review' | null
+    findings: string[]
+    evidence: string[]
     residual_risks: string[]
   }
   cvss: null | {

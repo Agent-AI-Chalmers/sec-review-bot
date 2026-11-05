@@ -109,7 +109,7 @@ async def run_single_agent_stage(
             overview=agent_output.overview,
             verdict=agent_output.verdict,
             validation_level=agent_output.validation_level,
-            regression_status=agent_output.regression_status,
+            regression=agent_output.regression,
             target_claim=agent_output.target_claim,
             file_changes=patch_artifact.file_changes,
             patch_diff=patch_artifact.patch_diff,

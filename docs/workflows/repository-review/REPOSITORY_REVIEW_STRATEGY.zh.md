@@ -73,7 +73,7 @@ analyzer 会先把候选线索提升为有证据支撑的结论，然后 mitigat
 - `/workspace`：baseline 只读视角（未打补丁）；
 - `/workspace-patched`：在 verifier 阶段临时构建的只读视角（将 `workspace.patch` 应用到 clean workspace snapshot 后得到）。
 
-当 `workspace.patch` 存在且可应用时，`patch_coverage` 主要基于 `/workspace-patched` 判断，`/workspace` 仅作为基线对照。若 patched 视角构建失败，verification 会失败，而不是基于 baseline 代码判断补丁覆盖。
+当 `workspace.patch` 存在且可应用时，`coverage` 主要基于 `/workspace-patched` 判断，`/workspace` 仅作为基线对照。若 patched 视角构建失败，verification 会失败，而不是基于 baseline 代码判断补丁覆盖。
 
 ### `delivery-planning`
 

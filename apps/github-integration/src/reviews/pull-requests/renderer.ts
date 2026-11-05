@@ -75,22 +75,20 @@ function renderAnalysisSection(
 function renderVerificationSection(
   verification: ReviewRecord['verification']
 ): string | null {
-  if (!verification.patch_coverage) {
+  if (!verification.coverage) {
     return null
   }
 
   return renderVerificationSummaryLines(
     {
       ...verification,
-      resolution_next_step:
-        verification.resolution_next_step === 'none'
-          ? null
-          : verification.resolution_next_step
+      next_step:
+        verification.next_step === 'none' ? null : verification.next_step
     },
     {
       includeOverview: false,
-      reviewTargetClaimFallback: '(none)',
-      includeUnknownResolutionNextStep: false
+      targetClaimFallback: '(none)',
+      includeUnknownNextStep: false
     }
   ).join('\n')
 }
@@ -110,13 +108,13 @@ export function renderAnalysisSummaryCommentFromReviewRecord(
   }
   const verification = review_record?.verification ?? {
     overview: null,
-    review_target_claim: null,
+    target_claim: null,
     validation_level: null,
-    patch_coverage: null,
-    regression_status: null,
-    resolution_next_step: null,
-    patch_findings: [],
-    verification_findings: [],
+    coverage: null,
+    regression: null,
+    next_step: null,
+    findings: [],
+    evidence: [],
     residual_risks: []
   }
   const overview = displayText(analysis.overview, 'No overview provided.')
@@ -126,7 +124,7 @@ export function renderAnalysisSummaryCommentFromReviewRecord(
     '',
     ...renderReviewStatusLines(
       { analysis, mitigation, verification },
-      { includeResolutionNextStep: true }
+      { includeNextStep: true }
     ),
     '',
     overview

@@ -18,13 +18,13 @@ function reviewRecord(): ReviewRecord {
     },
     verification: {
       overview: 'Verifier overview text.',
-      review_target_claim: 'reviewed claim',
+      target_claim: 'reviewed claim',
       validation_level: 'logic-simulated',
-      patch_coverage: 'full',
-      regression_status: 'not-run',
-      resolution_next_step: 'none',
-      patch_findings: [],
-      verification_findings: [],
+      coverage: 'full',
+      regression: 'not-run',
+      next_step: 'none',
+      findings: [],
+      evidence: [],
       residual_risks: []
     },
     cvss: null
@@ -72,5 +72,5 @@ test('unpromoted issue comment shares the same status vocabulary and reports the
   )
   assert.match(body, /- Patch ready: `yes`/)
   assert.match(body, /- `src\/app\.ts`/)
-  assert.doesNotMatch(body, /Next step/)
+  assert.match(body, /Next step: `none`/)
 })

@@ -7,7 +7,6 @@ from pathlib import Path
 from sec_review_agents.agents.verification.agent import (
     run_verification_agent,
 )
-from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.filesystem.backend_factory import (
     BackendConfig,
     create_backend_with_path_views,
@@ -17,7 +16,6 @@ from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
     FeedbackRetryContext,
 )
-from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.verification.result import (
     VerificationStageResult,
     build_verification_stage_result,
@@ -35,7 +33,6 @@ from sec_review_agents.utils.files import (
     persist_json_artifact,
     remove_json_artifacts,
 )
-from sec_review_agents.workspace.file_changes import file_change_paths
 from sec_review_agents.workspace.patches import apply_workspace_patch
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
@@ -50,7 +47,6 @@ async def run_verification_stage(
     published_trajectory_path: Path | None = None,
     workspace_snapshot_tar_path: Path,
     workspace_patch: str | None,
-    mitigation_result: MitigationStageResult | None,
     build_backend_config: Callable[[Path], BackendConfig],
     system_prompt: str,
     filesystem_system_prompt: str,
@@ -102,16 +98,15 @@ async def run_verification_stage(
                 memory_enabled=memory_path_view is not None,
             )
 
-        validate_verification_coverages(agent_output, mitigation_result)
         result = build_verification_stage_result(
             overview=agent_output.overview,
-            review_target_claim=agent_output.review_target_claim,
-            patch_coverage=agent_output.patch_coverage,
-            resolution_next_step=agent_output.resolution_next_step,
-            patch_findings=agent_output.patch_findings,
-            verification_findings=agent_output.verification_findings,
+            target_claim=agent_output.target_claim,
+            coverage=agent_output.coverage,
+            next_step=agent_output.next_step,
+            findings=agent_output.findings,
+            evidence=agent_output.evidence,
             validation_level=agent_output.validation_level,
-            regression_status=agent_output.regression_status,
+            regression=agent_output.regression,
             residual_risks=agent_output.residual_risks,
         )
         persist_verification_result(
@@ -183,23 +178,6 @@ def prepare_verification_trajectory(
 
 
 # Result validation and persistence
-
-
-def validate_verification_coverages(
-    structured_result: VerificationOutput,
-    mitigation_result: MitigationStageResult | None,
-) -> None:
-    patch_coverage = structured_result.patch_coverage
-    changed_files = file_change_paths(
-        mitigation_result.file_changes if mitigation_result is not None else None
-    )
-    if changed_files and patch_coverage in {
-        "no-patch",
-        "not-applicable",
-    }:
-        raise RuntimeError(
-            "Verifier must evaluate the patch when mitigation exported changed files."
-        )
 
 
 def persist_verification_result(

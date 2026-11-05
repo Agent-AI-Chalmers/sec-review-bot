@@ -101,8 +101,8 @@ class TestRepositoryScopeAndDeliveryPlanning:
         anchor_line: int,
         verdict: str = "confirmed-vulnerability",
         changed_files: list[str] | None = None,
-        patch_coverage: str = "full",
-        verification_findings: list[str] | None = None,
+        coverage: str = "full",
+        evidence: list[str] | None = None,
     ) -> dict:
         changed_files = changed_files if changed_files is not None else [affected_path]
         return {
@@ -133,9 +133,9 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 },
                 "verification": {
                     "overview": f"{title} verification overview.",
-                    "patch_coverage": patch_coverage,
-                    "patch_findings": verification_findings or [],
-                    "verification_findings": [],
+                    "coverage": coverage,
+                    "findings": evidence or [],
+                    "evidence": [],
                     "residual_risks": [],
                 },
                 "cvss": None,
@@ -749,10 +749,10 @@ class TestRepositoryScopeAndDeliveryPlanning:
         )
         verifier_result = VerificationStageResult(
             overview="Patch fully covers the target claim.",
-            review_target_claim="target claim",
-            patch_coverage="full",
-            regression_status="not-run",
-            resolution_next_step="none",
+            target_claim="target claim",
+            coverage="full",
+            regression="not-run",
+            next_step="none",
             validation_level=None,
         )
         case_disposition = derive_case_disposition(
@@ -763,9 +763,9 @@ class TestRepositoryScopeAndDeliveryPlanning:
         assert "approved by verifier" in case_disposition["reason"]
         assert set(case_disposition) == {"disposition", "reason"}
 
-    @pytest.mark.parametrize("regression_status", ["failed", "unresolved", None])
+    @pytest.mark.parametrize("regression", ["failed", "unresolved", None])
     def test_case_disposition_blocks_uncleared_regression(
-        self, regression_status: RegressionStatus | None
+        self, regression: RegressionStatus | None
     ) -> None:
         """Fail closed when regression evidence is failed, unresolved, or absent."""
         case_disposition = derive_case_disposition(
@@ -774,11 +774,11 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 file_changes=[{"path": "src/server.js", "status": "deleted"}],
             ),
             verifier_result=VerificationStageResult(
-                patch_coverage="full",
-                regression_status=regression_status,
-                resolution_next_step="manual-review",
+                coverage="full",
+                regression=regression,
+                next_step="manual-review",
                 overview="Test verification",
-                review_target_claim=None,
+                target_claim=None,
                 validation_level=None,
             ),
         )
@@ -794,11 +794,11 @@ class TestRepositoryScopeAndDeliveryPlanning:
                 file_changes=[{"path": "src/server.js", "status": "deleted"}],
             ),
             verifier_result=VerificationStageResult(
-                patch_coverage="full",
-                regression_status="passed",
-                resolution_next_step="manual-review",
+                coverage="full",
+                regression="passed",
+                next_step="manual-review",
                 overview="Test verification",
-                review_target_claim=None,
+                target_claim=None,
                 validation_level=None,
             ),
         )
@@ -813,11 +813,11 @@ class TestRepositoryScopeAndDeliveryPlanning:
         )
         verifier_result = VerificationStageResult(
             overview="Patch partially covers the target claim.",
-            review_target_claim="target claim",
-            patch_coverage="partial",
-            resolution_next_step="none",
+            target_claim="target claim",
+            coverage="partial",
+            next_step="none",
             validation_level=None,
-            regression_status=None,
+            regression=None,
         )
         case_disposition = derive_case_disposition(
             mitigator_result=mitigator_result,
@@ -844,7 +844,7 @@ class TestRepositoryScopeAndDeliveryPlanning:
                                 "overview": "User input reaches a raw SQL query.",
                             },
                             "verification": {
-                                "patch_coverage": "partial",
+                                "coverage": "partial",
                             },
                             "cvss": {"severity": "high", "base_score": 8.1},
                         },

@@ -95,9 +95,7 @@ async def test_stage_releases_backend_before_memory_on_failure(
     if role == "mitigation":
         kwargs["retry_context"] = None
     elif role == "verification":
-        kwargs.update(
-            attempt_label="initial", workspace_patch=None, mitigation_result=None
-        )
+        kwargs.update(attempt_label="initial", workspace_patch=None)
     elif role == "single_agent":
         kwargs.update(todo_system_prompt="todo", todo_tool_description="plan")
     with pytest.raises(asyncio.CancelledError if failure == "cancel" else RuntimeError):

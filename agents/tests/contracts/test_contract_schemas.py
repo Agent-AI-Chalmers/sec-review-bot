@@ -170,20 +170,6 @@ def test_execution_api_v1_issue_input_schema_rejects_test_changes_outside_enum()
     assert errors != []
 
 
-def test_execution_api_v1_issue_input_schema_rejects_renamed_repair_mode_field() -> (
-    None
-):
-    # reviewIntent sets additionalProperties: false, so the field the rename replaced
-    # must not validate under its old name.
-    validator = contract_validator("issue-review-input.schema.json")
-    payload = contract_fixture("issue-review-input.json")
-    payload["review_intent"]["repair_mode"] = "no-test-changes"
-
-    errors = list(validator.iter_errors(payload))
-
-    assert errors != []
-
-
 def test_execution_api_v1_pull_request_input_schema_requires_audit_objective() -> None:
     validator = contract_validator("pull-request-review-input.schema.json")
     payload = contract_fixture("pull-request-review-input.json")

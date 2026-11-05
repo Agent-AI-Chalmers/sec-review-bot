@@ -45,11 +45,11 @@ MITIGATION = {"overview": "Narrowed the trust boundary."}
 
 VERIFICATION = {
     "overview": "Patch matches the claim.",
-    "review_target_claim": "The endpoint trusts a request-controlled path.",
-    "patch_coverage": "no-patch",
-    "resolution_next_step": "none",
+    "target_claim": "The endpoint trusts a request-controlled path.",
+    "coverage": "full",
+    "next_step": "none",
     "validation_level": "static",
-    "regression_status": "not-run",
+    "regression": "not-run",
 }
 
 CVSS = {
@@ -64,7 +64,7 @@ SINGLE_AGENT = {
     "overview": "No actionable target was confirmed.",
     "verdict": "no-actionable-finding",
     "validation_level": "static",
-    "regression_status": "not-run",
+    "regression": "not-run",
     "self_check_notes": ["Ran the focused test."],
     "target_claim": "",
 }
@@ -89,7 +89,7 @@ DISCOVERY_LOCATION = {"file": "src/run.ts", "label": "sink"}
         (
             VerificationOutput,
             VERIFICATION,
-            {**VERIFICATION, "review_target_claim": BLANK},
+            {**VERIFICATION, "target_claim": BLANK},
         ),
         (CvssV4ScoringOutput, CVSS, {**CVSS, "overview": BLANK}),
         (CvssMetricRationale, CVSS_METRIC, {**CVSS_METRIC, "rationale": BLANK}),

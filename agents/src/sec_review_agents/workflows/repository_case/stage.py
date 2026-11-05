@@ -48,14 +48,14 @@ def derive_case_disposition(
     ):
         return _blocked_case_disposition("The case did not produce an applied patch.")
 
-    if verifier_result is None or verifier_result.patch_coverage != "full":
+    if verifier_result is None or verifier_result.coverage != "full":
         return _blocked_case_disposition(
             "The verifier did not fully approve the patch for delivery execution."
         )
 
     # Full coverage answers only the security-target question. Known or unresolved
     # regressions still make the overall patch unsafe to send to delivery.
-    if verifier_result.regression_status not in {
+    if verifier_result.regression not in {
         "passed",
         "not-run",
         "not-applicable",
@@ -64,7 +64,7 @@ def derive_case_disposition(
             "The verifier did not clear regression risk for delivery execution."
         )
 
-    if verifier_result.resolution_next_step != "none":
+    if verifier_result.next_step != "none":
         return _blocked_case_disposition(
             "The verifier requires follow-up before delivery execution."
         )
@@ -278,7 +278,7 @@ async def run_repository_case_verification_stage(
             stage="verifier",
             started_at=started_at,
             case_id=case_id,
-            patch_coverage=result.patch_coverage,
+            coverage=result.coverage,
         )
         return result
     except Exception as error:

@@ -52,7 +52,7 @@ def _render_pr_review_body(review_record: dict[str, Any]) -> list[str]:
             analysis,
             mitigation,
             verification,
-            include_resolution_next_step=True,
+            include_next_step=True,
         ),
         "",
         plain_text(analysis.get("overview"), "No overview provided."),
@@ -71,13 +71,13 @@ def _render_pr_review_body(review_record: dict[str, Any]) -> list[str]:
             )
         )
         lines.append("")
-    if verification.get("patch_coverage"):
+    if verification.get("coverage"):
         verification_details = {
             **verification,
-            "resolution_next_step": (
+            "next_step": (
                 None
-                if verification.get("resolution_next_step") == "none"
-                else verification.get("resolution_next_step")
+                if verification.get("next_step") == "none"
+                else verification.get("next_step")
             ),
         }
         lines.extend(

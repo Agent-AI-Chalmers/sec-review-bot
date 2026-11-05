@@ -54,12 +54,12 @@ async def test_analysis_verdict_does_not_prevent_stage_execution(
     mitigation = MitigationStageResult(overview="No safe repair identified.")
     verification = VerificationStageResult(
         overview="Found an in-scope repair target despite the earlier assessment.",
-        review_target_claim="Caller input reaches an unchecked parser.",
-        patch_coverage="no-patch",
-        resolution_next_step="retry-ai",
-        patch_findings=["Validate caller input at the parser boundary."],
+        target_claim="Caller input reaches an unchecked parser.",
+        coverage="unresolved",
+        next_step="retry-ai",
+        findings=["Validate caller input at the parser boundary."],
         validation_level="static",
-        regression_status="not-applicable",
+        regression="not-applicable",
     )
     feedback = (
         feedback_retry_context(
@@ -194,20 +194,20 @@ async def test_verifier_feedback_repairs_rejected_analysis_without_rewriting_it(
     )
     blocker = VerificationStageResult(
         overview="The unmodified parser has a concrete unchecked input path.",
-        review_target_claim="Caller input reaches an unchecked parser.",
-        patch_coverage="no-patch",
-        resolution_next_step="retry-ai",
-        patch_findings=["Validate caller input at the parser boundary."],
+        target_claim="Caller input reaches an unchecked parser.",
+        coverage="unresolved",
+        next_step="retry-ai",
+        findings=["Validate caller input at the parser boundary."],
         validation_level="static",
-        regression_status="not-applicable",
+        regression="not-applicable",
     )
     approved = blocker.model_copy(
         update={
             "overview": "The repair covers the target.",
-            "patch_coverage": "full",
-            "resolution_next_step": "none",
-            "patch_findings": [],
-            "regression_status": "passed",
+            "coverage": "full",
+            "next_step": "none",
+            "findings": [],
+            "regression": "passed",
         }
     )
     request = ReviewWorkflowRequest(
@@ -241,13 +241,40 @@ async def test_verifier_feedback_repairs_rejected_analysis_without_rewriting_it(
     assert mitigate.call_args_list[0].kwargs["retry_context"] is None
     retry = mitigate.call_args_list[1].kwargs["retry_context"]
     assert retry.retry_index == 1
-    assert (
-        retry.previous_verifier_summary.review_target_claim
-        == blocker.review_target_claim
-    )
-    assert retry.previous_verifier_summary.patch_findings == blocker.patch_findings
+    assert retry.previous_verifier_summary.target_claim == blocker.target_claim
+    assert retry.previous_verifier_summary.findings == blocker.findings
     assert mitigate.call_args_list[1].kwargs["analysis_result"] is analysis
     assert verify.call_args_list[1].kwargs["retry_context"] is retry
     assert result["review_record"]["analysis"]["verdict"] == "no-actionable-finding"
-    assert result["review_record"]["verification"]["patch_coverage"] == "full"
+    assert result["review_record"]["verification"]["coverage"] == "full"
     assert derive_case_disposition(repaired, approved)["disposition"] == "keep"
+
+
+@pytest.mark.parametrize(
+    "has_changes,next_step",
+    [(False, "none"), (True, "retry-ai"), (True, "manual-review")],
+)
+def test_full_current_code_coverage_alone_does_not_approve_delivery(
+    has_changes, next_step
+):
+    """A safe baseline or a patch needing correction must not create a delivery."""
+    from sec_review_agents.workflows.repository_case.stage import (
+        derive_case_disposition,
+    )
+
+    mitigation = MitigationStageResult(
+        overview="Metadata-only change" if has_changes else "No changes needed",
+        file_changes=(
+            [{"path": "package.json", "status": "deleted"}] if has_changes else []
+        ),
+    )
+    verification = VerificationStageResult(
+        overview="The baseline already meets the target.",
+        target_claim="Block unsafe input.",
+        coverage="full",
+        next_step=next_step,
+        findings=["Remove the unrelated metadata change."] if has_changes else [],
+        validation_level="static",
+        regression="not-run" if has_changes else "not-applicable",
+    )
+    assert derive_case_disposition(mitigation, verification)["disposition"] == "blocked"

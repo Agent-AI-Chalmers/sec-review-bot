@@ -14,14 +14,14 @@
     "review-record-no-actionable.json": "review-record.schema.json",
     "review-record.json": "review-record.schema.json",
     "issue-review-input-setup-declaration.json": "issue-review-input.schema.json",
-    "review-record-symlink.json": "review-record.schema.json"
+    "review-record-symlink.json": "review-record.schema.json",
+    "review-record-no-changes-retry.json": "review-record.schema.json"
   },
   "invalid_schema_fixtures": {
     "invalid-input-bundle-manifest-extra-property.json": "input-bundle-manifest.schema.json",
     "invalid-issue-review-input-file-single-slash.json": "issue-review-input.schema.json",
     "invalid-issue-review-input-relative-file-uri.json": "issue-review-input.schema.json",
     "invalid-issue-review-input-remote-file-uri.json": "issue-review-input.schema.json",
-    "invalid-issue-review-input-repair-mode-field.json": "issue-review-input.schema.json",
     "invalid-issue-review-input-s3-missing-key.json": "issue-review-input.schema.json",
     "invalid-issue-review-input-s3-port.json": "issue-review-input.schema.json",
     "invalid-issue-review-input-s3-query.json": "issue-review-input.schema.json",
@@ -31,7 +31,6 @@
     "invalid-repository-review-input-blank-target-branch.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-empty-ignore.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-extra-change-field.json": "repository-review-input.schema.json",
-    "invalid-repository-review-input-max-file-bytes.json": "repository-review-input.schema.json",
     "invalid-repository-review-input-missing-previous-path.json": "repository-review-input.schema.json",
     "invalid-review-record-trailing-slash-path.json": "review-record.schema.json",
     "invalid-issue-review-input-blank-setup-declaration.json": "issue-review-input.schema.json",
@@ -42,7 +41,6 @@
     "invalid-issue-review-input-file-single-slash.json": "input_bundle.uri",
     "invalid-issue-review-input-relative-file-uri.json": "input_bundle.uri",
     "invalid-issue-review-input-remote-file-uri.json": "input_bundle.uri",
-    "invalid-issue-review-input-repair-mode-field.json": "review_intent",
     "invalid-issue-review-input-s3-missing-key.json": "input_bundle.uri",
     "invalid-issue-review-input-s3-port.json": "input_bundle.uri",
     "invalid-issue-review-input-s3-query.json": "input_bundle.uri",
@@ -53,7 +51,6 @@
     "invalid-repository-review-input-blank-target-branch.json": "scan_target.target_branch",
     "invalid-repository-review-input-empty-ignore.json": "scan_scope.paths_ignore.0",
     "invalid-repository-review-input-extra-change-field.json": "scan_scope.incremental_changed_files.0",
-    "invalid-repository-review-input-max-file-bytes.json": "scan_scope",
     "invalid-repository-review-input-missing-previous-path.json": "scan_scope.incremental_changed_files.0",
     "invalid-review-record-trailing-slash-path.json": "mitigation.file_changes.0",
     "invalid-review-record-file-mode.json": "mitigation.file_changes.0"

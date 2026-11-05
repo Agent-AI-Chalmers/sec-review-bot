@@ -43,13 +43,13 @@ def test_stage_result_compiler_models_track_public_fields() -> None:
     }
     assert set(VerificationStageResult.model_fields) == {
         "overview",
-        "review_target_claim",
-        "patch_coverage",
-        "resolution_next_step",
-        "patch_findings",
-        "verification_findings",
+        "target_claim",
+        "coverage",
+        "next_step",
+        "findings",
+        "evidence",
         "validation_level",
-        "regression_status",
+        "regression",
         "residual_risks",
     }
 
@@ -76,13 +76,13 @@ def test_stage_result_builders_emit_json_serializable_public_payloads() -> None:
         ).model_dump(mode="json"),
         build_verification_stage_result(
             overview="Patch covers the target claim.",
-            review_target_claim="Input is validated before use.",
-            patch_coverage="full",
-            resolution_next_step="none",
-            patch_findings=[],
-            verification_findings=["Reviewed patched branch."],
+            target_claim="Input is validated before use.",
+            coverage="full",
+            next_step="none",
+            findings=[],
+            evidence=["Reviewed patched branch."],
             validation_level="static",
-            regression_status="not-run",
+            regression="not-run",
             residual_risks=[],
         ).model_dump(mode="json"),
     ]
@@ -95,17 +95,17 @@ def test_stage_result_builders_emit_json_serializable_public_payloads() -> None:
 def test_verification_stage_builder_keeps_nullable_public_fields() -> None:
     result = build_verification_stage_result(
         overview="No patch was available.",
-        review_target_claim=None,
-        patch_coverage="no-patch",
-        resolution_next_step="manual-review",
-        patch_findings=[],
-        verification_findings=[],
+        target_claim=None,
+        coverage="full",
+        next_step="manual-review",
+        findings=[],
+        evidence=[],
         validation_level="static",
-        regression_status="not-applicable",
+        regression="not-applicable",
         residual_risks=[],
     )
 
-    assert result.review_target_claim is None
+    assert result.target_claim is None
 
 
 def test_scan_stage_entrypoint_return_annotation_is_named_contract() -> None:

@@ -14,7 +14,6 @@ from sec_review_agents.review_stages.record import (
     ReviewRecordVerification,
 )
 from sec_review_agents.review_stages.single_agent.result import SingleAgentFixOutcome
-from sec_review_agents.review_stages.types import PatchCoverage
 from sec_review_agents.run_diagnostics.publication import (
     RunDiagnosticPublicationRequest,
     publish_run_diagnostic_activity,
@@ -33,7 +32,6 @@ from sec_review_agents.workflows.review_intent import (
     TestChangesPolicy,
 )
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
-from sec_review_agents.workspace.file_changes import file_change_paths
 
 
 async def run_issue_single_agent(
@@ -210,11 +208,8 @@ def build_issue_single_agent_review_record(
     *,
     single_agent_result: SingleAgentFixOutcome,
 ) -> dict[str, Any]:
-    patch_coverage: PatchCoverage = (
-        "full"
-        if file_change_paths(single_agent_result.file_changes)
-        else "not-applicable"
-    )
+    # The single-agent ablation exposes self-check notes, not an independent
+    # verifier assessment. File presence cannot establish current-code coverage.
     return ReviewRecord(
         analysis=ReviewRecordAnalysis(
             overview=single_agent_result.overview,
@@ -227,13 +222,12 @@ def build_issue_single_agent_review_record(
         ),
         verification=ReviewRecordVerification(
             overview=single_agent_result.overview,
+            target_claim=single_agent_result.target_claim,
             validation_level=single_agent_result.validation_level,
-            patch_coverage=patch_coverage,
-            regression_status=single_agent_result.regression_status,
-            resolution_next_step=(
-                "none" if patch_coverage == "full" else "manual-review"
-            ),
-            verification_findings=single_agent_result.self_check_notes,
+            coverage=None,
+            regression=single_agent_result.regression,
+            next_step="manual-review",
+            evidence=single_agent_result.self_check_notes,
             residual_risks=single_agent_result.residual_risks,
         ),
     ).model_dump(mode="json", by_alias=True)

@@ -98,9 +98,9 @@ export interface VerificationSummaryLineOptions {
   fallback?: string
   includeHeadline?: boolean
   includeOverview?: boolean
-  includeReviewTargetClaim?: boolean
-  reviewTargetClaimFallback?: string
-  includeUnknownResolutionNextStep?: boolean
+  includeTargetClaim?: boolean
+  targetClaimFallback?: string
+  includeUnknownNextStep?: boolean
   listItemFormatter?: (item: unknown) => string
 }
 
@@ -114,7 +114,7 @@ export function renderVerificationSummaryLines(
 
   if (options.includeHeadline) {
     lines.push(
-      `Verifier assessed patch=${nonEmptyText(verification.patch_coverage) || 'unknown'}.`,
+      `Verifier assessed coverage=${nonEmptyText(verification.coverage) || 'unknown'}.`,
       ''
     )
   }
@@ -124,42 +124,40 @@ export function renderVerificationSummaryLines(
   }
 
   lines.push(
-    `- Patch coverage: ${inlineCode(verification.patch_coverage ?? 'unknown')}`,
-    `- Regression status: ${inlineCode(verification.regression_status ?? 'unknown')}`
+    `- Coverage: ${inlineCode(verification.coverage ?? 'unknown')}`,
+    `- Regression: ${inlineCode(verification.regression ?? 'unknown')}`
   )
 
-  const resolutionNextStep = nonEmptyText(verification.resolution_next_step)
-  if (resolutionNextStep || options.includeUnknownResolutionNextStep) {
-    lines.push(
-      `- Resolution next step: ${inlineCode(resolutionNextStep || 'unknown')}`
-    )
+  const nextStep = nonEmptyText(verification.next_step)
+  if (nextStep || options.includeUnknownNextStep) {
+    lines.push(`- Next step: ${inlineCode(nextStep || 'unknown')}`)
   }
 
   lines.push(
     `- Validation level: ${inlineCode(verification.validation_level ?? 'unknown')}`
   )
 
-  if (options.includeReviewTargetClaim !== false) {
-    const reviewTargetClaim = nonEmptyText(verification.review_target_claim)
-    if (reviewTargetClaim || options.reviewTargetClaimFallback !== undefined) {
+  if (options.includeTargetClaim !== false) {
+    const targetClaim = nonEmptyText(verification.target_claim)
+    if (targetClaim || options.targetClaimFallback !== undefined) {
       lines.push(
         '',
-        'Review target claim:',
+        'Target claim:',
         '',
-        reviewTargetClaim || options.reviewTargetClaimFallback || ''
+        targetClaim || options.targetClaimFallback || ''
       )
     }
   }
 
   lines.push(
     ...renderLabeledListLines(
-      'Patch findings',
-      verification.patch_findings,
+      'Findings',
+      verification.findings,
       listItemFormatter
     ),
     ...renderLabeledListLines(
-      'Verification findings',
-      verification.verification_findings,
+      'Evidence',
+      verification.evidence,
       listItemFormatter
     ),
     ...renderLabeledListLines(
@@ -367,8 +365,8 @@ export function mitigationHeadline(
     : 'no patch proposed'
 }
 
-export function coverageHeadline(patchCoverage: unknown): string {
-  switch (patchCoverage) {
+export function coverageHeadline(coverage: unknown): string {
+  switch (coverage) {
     case 'full':
       return 'full coverage'
     case 'partial':
@@ -376,13 +374,9 @@ export function coverageHeadline(patchCoverage: unknown): string {
     case 'local-only':
       return 'local fix only'
     case 'misaligned':
-      return 'misaligned patch'
+      return 'mitigation misaligned'
     case 'unresolved':
       return 'coverage unresolved'
-    case 'no-patch':
-      return 'no patch'
-    case 'not-applicable':
-      return 'patch review n/a'
     default:
       return 'coverage not recorded'
   }
@@ -422,22 +416,19 @@ export function checksHeadline(regressionStatus: unknown): string {
 
 export function renderReviewStatusLines(
   review: { analysis?: unknown; mitigation?: unknown; verification?: unknown },
-  options: { includeResolutionNextStep?: boolean } = {}
+  options: { includeNextStep?: boolean } = {}
 ): string[] {
   const analysis = isRecord(review.analysis) ? review.analysis : {}
   const mitigation = isRecord(review.mitigation) ? review.mitigation : {}
   const verification = isRecord(review.verification) ? review.verification : {}
-  const resolution_next_step = displayText(
-    verification.resolution_next_step,
-    'unknown'
-  )
+  const next_step = displayText(verification.next_step, 'unknown')
 
   return [
     `- Analysis: ${inlineCode(analysisHeadline(analysis.verdict))}`,
     `- Mitigation: ${inlineCode(mitigationHeadline(analysis.verdict, fileChangePaths(mitigation.file_changes)))}`,
-    `- Verification: ${inlineCode(`${coverageHeadline(verification.patch_coverage)}; ${verificationHeadline(verification.validation_level)}; ${checksHeadline(verification.regression_status)}`)}`,
-    ...(options.includeResolutionNextStep && resolution_next_step !== 'none'
-      ? [`- Resolution next step: ${inlineCode(resolution_next_step)}`]
+    `- Verification: ${inlineCode(`${coverageHeadline(verification.coverage)}; ${verificationHeadline(verification.validation_level)}; ${checksHeadline(verification.regression)}`)}`,
+    ...(options.includeNextStep && next_step !== 'none'
+      ? [`- Next step: ${inlineCode(next_step)}`]
       : [])
   ]
 }

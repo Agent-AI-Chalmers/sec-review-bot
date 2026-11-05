@@ -56,7 +56,7 @@ from tests.temporal_test_utils import temporal_time_skipping_environment
 def assert_not_run_review_record(review_record: dict) -> None:
     assert review_record["analysis"]["verdict"] is None
     assert review_record["mitigation"]["file_changes"] == []
-    assert review_record["verification"]["patch_coverage"] is None
+    assert review_record["verification"]["coverage"] is None
     assert review_record["cvss"] is None
 
 
@@ -123,11 +123,11 @@ async def test_direct_case_passes_no_patch_assessment_to_result() -> None:
     )
     verifier_result = VerificationStageResult(
         overview="No repair justified after independent review.",
-        resolution_next_step="none",
-        review_target_claim="Whether the reported issue requires repair.",
-        patch_coverage="no-patch",
+        next_step="none",
+        target_claim="Whether the reported issue requires repair.",
+        coverage="full",
         validation_level="static",
-        regression_status="not-applicable",
+        regression="not-applicable",
     )
 
     with (
@@ -430,14 +430,14 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
     ) -> VerificationStageResult:
         return VerificationStageResult(
             overview="Verified.",
-            review_target_claim="target claim",
-            patch_coverage="full",
-            resolution_next_step="none",
-            patch_findings=[],
-            verification_findings=[],
+            target_claim="target claim",
+            coverage="full",
+            next_step="none",
+            findings=[],
+            evidence=[],
             residual_risks=[],
             validation_level=None,
-            regression_status=None,
+            regression=None,
         )
 
     @activity.defn(name="archive_repository_case_feedback_attempt_activity")
@@ -828,15 +828,15 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
         _retry_context: FeedbackRetryContext | None,
     ) -> VerificationStageResult:
         return VerificationStageResult(
-            overview="No patch was available to verify.",
-            review_target_claim="target claim",
-            patch_coverage="no-patch",
-            resolution_next_step="manual-review",
-            patch_findings=[],
-            verification_findings=[],
+            overview="No patch was available and coverage remains uncertain.",
+            target_claim="target claim",
+            coverage="unresolved",
+            next_step="manual-review",
+            findings=[],
+            evidence=[],
             residual_risks=[],
             validation_level=None,
-            regression_status=None,
+            regression=None,
         )
 
     @activity.defn(name="archive_repository_case_feedback_attempt_activity")
@@ -904,7 +904,7 @@ async def test_run_case_processing_starts_cvss_and_mitigation_in_parallel() -> N
     assert result.case_id == "case-1"
     assert result.review_record.cvss is not None
     assert result.review_record.cvss.outcome == "scored"
-    assert result.review_record.verification.patch_coverage == "no-patch"
+    assert result.review_record.verification.coverage == "unresolved"
     assert "diagnostics" not in result.model_dump()
 
 
@@ -964,14 +964,14 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
     ) -> VerificationStageResult:
         return VerificationStageResult(
             overview="Verified.",
-            review_target_claim="target claim",
-            patch_coverage="full",
-            resolution_next_step="none",
-            patch_findings=[],
-            verification_findings=[],
+            target_claim="target claim",
+            coverage="full",
+            next_step="none",
+            findings=[],
+            evidence=[],
             residual_risks=[],
             validation_level=None,
-            regression_status=None,
+            regression=None,
         )
 
     @activity.defn(name="archive_repository_case_feedback_attempt_activity")
@@ -1038,7 +1038,7 @@ async def test_run_case_processing_cvss_failure_does_not_block_case() -> None:
 
     assert result.disposition == "keep"
     assert result.review_record.cvss is None
-    assert result.review_record.verification.patch_coverage == "full"
+    assert result.review_record.verification.coverage == "full"
 
 
 @pytest.mark.asyncio
@@ -1109,12 +1109,12 @@ async def test_direct_case_processing_starts_cvss_and_mitigation_in_parallel() -
         _retry_context: FeedbackRetryContext | None,
     ) -> VerificationStageResult:
         return VerificationStageResult(
-            patch_coverage="no-patch",
+            coverage="full",
             overview="Test verification",
-            review_target_claim=None,
-            resolution_next_step="none",
+            target_claim=None,
+            next_step="none",
             validation_level=None,
-            regression_status=None,
+            regression=None,
         )
 
     def fake_build_result(
@@ -1243,12 +1243,12 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
         _retry_context: FeedbackRetryContext | None,
     ) -> VerificationStageResult:
         return VerificationStageResult(
-            patch_coverage="full",
+            coverage="full",
             overview="Test verification",
-            review_target_claim=None,
-            resolution_next_step="none",
+            target_claim=None,
+            next_step="none",
             validation_level=None,
-            regression_status=None,
+            regression=None,
         )
 
     def fake_build_result(

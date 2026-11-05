@@ -117,11 +117,15 @@ Execution Worker 根据内部 stage 输出生产这份投影。`ReviewRecord` bu
 
 > *CVSS 是报告里展示的可选评分，不是判断本次审查成功或失败的信号。如果 repository CVSS scoring 失败，但 case review 本身已经成功，公开结果中的 `ReviewRecord.cvss` 应为 `null`，失败细节保留在诊断信息和 artifacts 中。*
 
-`verification.patch_coverage="full"` 要求 verifier 对 patch target 给出完整覆盖；partial coverage 仍应视为 unresolved，不进入 repository delivery/draft PR 交付。
+`verification.coverage` 表达当前代码对 `target_claim` 的解决程度，与是否有补丁无关。`full` 表示仓库证据证明问题已经解决、基线已经修好，或该问题在当前代码中不成立；`partial`、`local-only` 和 `misaligned` 表达仍有缺口，`unresolved` 表示证据不足。没有修改时检查基线，是否有补丁由 `mitigation.file_changes` 表达。Coverage 本身不代表批准交付：还必须有补丁、没有阻断交付的回归证据，且 `next_step=none`。即使当前代码为 `full`，不必要或无关修改的交付问题仍须写入发现及下一步动作。
 
-`verification.regression_status` 表达聚焦的 regression、行为保持、build 或 test 证据是否支持 patched workspace。它和安全目标覆盖度分离：一个 patch 可以完整覆盖被审查的安全 claim，同时测试没有运行或回归就绪状态仍未确定。
+`target_claim` 是核查目标，`coverage` 是当前代码对该目标的解决程度，`regression` 是回归检查结果，`next_step` 是后续动作。`findings` 记录需要处理的问题，`evidence` 记录核查依据。结果结构变化时，生产者和消费者必须一起升级；已有 artifacts 保留为历史记录，不能仅靠改字段名推断新的评估结论。
 
-`verification.resolution_next_step` 表达 verifier 判断后的后续动作：`none` 表示无需后续；`retry-ai` 表示存在明确、可由 bounded AI mitigation 继续修补的 patch gap；`manual-review` 表示剩余工作需要人审、管理员动作、凭据轮换、历史清理、部署配置或其他非普通 workspace patch 能力。
+`verification.regression` 表达聚焦的 regression、行为保持、build 或 test 证据是否支持 patched workspace。它和安全目标覆盖度分离：一个 patch 可以完整覆盖被审查的安全 claim，同时测试没有运行或回归就绪状态仍未确定。
+
+`verification.next_step` 表达 verifier 判断后的后续动作：`none` 表示无需后续；`retry-ai` 表示存在明确、可由 bounded AI mitigation 继续修补的 patch gap；`manual-review` 表示剩余工作需要人审、管理员动作、凭据轮换、历史清理、部署配置或其他非普通 workspace patch 能力。
+
+`single-agent` 本地消融路径没有独立的 Verifier 评估，因此 `verification.coverage` 为 `null`；保留自检记录，不从是否有文件修改推断安全覆盖度。
 
 ### Issue review 结果
 

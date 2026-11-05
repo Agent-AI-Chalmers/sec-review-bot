@@ -40,13 +40,13 @@ function reviewRecord(
     },
     verification: {
       overview: null,
-      review_target_claim: null,
+      target_claim: null,
       validation_level: null,
-      patch_coverage: null,
-      regression_status: null,
-      resolution_next_step: null,
-      patch_findings: [],
-      verification_findings: [],
+      coverage: null,
+      regression: null,
+      next_step: null,
+      findings: [],
+      evidence: [],
       residual_risks: [],
       ...overrides.verification
     },
@@ -128,10 +128,10 @@ test('repository renderer derives blocked confirmed case cards from case results
         'diff --git a/src/webhook.ts b/src/webhook.ts\n+verifyRetrySignature()'
     },
     verification: {
-      patch_coverage: 'partial',
-      regression_status: 'not-run',
+      coverage: 'partial',
+      regression: 'not-run',
       validation_level: 'static',
-      resolution_next_step: 'manual-review',
+      next_step: 'manual-review',
       overview: 'Queued retry payloads remain unverified.'
     }
   })
@@ -197,9 +197,7 @@ test('repository renderer derives blocked confirmed case cards from case results
     .find((line) => line.startsWith('<summary>[medium] case-1'))
   assert.ok(titleLine)
   assert.ok(
-    !titleLine.includes(
-      coverageHeadline(review_record.verification.patch_coverage)
-    )
+    !titleLine.includes(coverageHeadline(review_record.verification.coverage))
   )
 })
 
@@ -216,8 +214,8 @@ test('repository blocked confirmed case uses disposition reason as mitigation an
             overview: 'Signed webhook retries can be replayed.'
           },
           verification: {
-            patch_coverage: 'partial',
-            regression_status: 'not-run',
+            coverage: 'partial',
+            regression: 'not-run',
             validation_level: 'static'
           }
         })
@@ -321,8 +319,8 @@ test('repository renderer preserves CVSS not-scored state', () => {
   assert.doesNotMatch(body, /Verdict: `confirmed-defect`/)
   assert.doesNotMatch(body, /Affected paths:/)
   assert.doesNotMatch(body, /##### Evidence anchors/)
-  assert.doesNotMatch(body, /Patch coverage: `full`/)
-  assert.doesNotMatch(body, /Resolution next step: `none`/)
+  assert.doesNotMatch(body, /Coverage: `full`/)
+  assert.doesNotMatch(body, /Next step: `none`/)
   assert.doesNotMatch(body, /Case disposition: `keep`/)
   assert.doesNotMatch(body, /- Analysis: `confirmed security defect`/)
   assert.doesNotMatch(body, /## Delivery CVSS/)
@@ -341,7 +339,7 @@ test('repository renderer preserves CVSS not-scored state', () => {
     /This is hardening, not an independent vulnerability\./
   )
   assert.doesNotMatch(body, /CVSS v4 base score: `n\/a` \(`unknown`\)/)
-  assert.doesNotMatch(body, /Review target claim: \(none\)/)
+  assert.doesNotMatch(body, /Target claim: \(none\)/)
 })
 
 test('repository summary workflow view projects a validated repository result without reparsing', () => {
@@ -431,12 +429,12 @@ test('repository draft PR body renders case details from case results', () => {
             overview: 'Restrict preview root.'
           },
           verification: {
-            patch_coverage: 'full',
-            regression_status: 'not-run',
-            resolution_next_step: 'none',
+            coverage: 'full',
+            regression: 'not-run',
+            next_step: 'none',
             validation_level: 'static',
-            patch_findings: ['Reviewer-visible concern.'],
-            verification_findings: []
+            findings: ['Reviewer-visible concern.'],
+            evidence: []
           }
         })
       }
@@ -475,8 +473,8 @@ test('repository draft PR case details use delivery fallback text', () => {
             overview: 'Preview endpoint exposed repository files.'
           },
           verification: {
-            patch_coverage: 'full',
-            regression_status: 'not-run',
+            coverage: 'full',
+            regression: 'not-run',
             validation_level: 'static'
           }
         })

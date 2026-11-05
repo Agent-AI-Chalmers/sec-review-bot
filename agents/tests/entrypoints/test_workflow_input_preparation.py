@@ -699,14 +699,9 @@ def test_workflow_artifact_root_rejects_configured_root_escape(monkeypatch) -> N
     ("payload", "workflow", "message"),
     [
         (
-            _issue_input() | {"materialization": {"local_root_path": "/tmp/legacy"}},
+            _issue_input() | {"unexpected_option": True},
             "issue-review",
-            "materialization",
-        ),
-        (
-            _issue_input() | {"artifact_paths": {"analyzer": "/tmp/a"}},
-            "issue-review",
-            "artifact_paths",
+            "unexpected_option",
         ),
         (
             {

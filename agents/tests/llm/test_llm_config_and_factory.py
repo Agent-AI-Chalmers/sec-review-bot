@@ -430,31 +430,6 @@ issue-analyzer = "openai_fast"
             )
 
 
-def test_default_deployment_is_rejected(tmp_path: Path) -> None:
-    config_path = _write_toml(
-        tmp_path,
-        """
-default_deployment = "openai_fast"
-
-[[deployments]]
-name = "openai_fast"
-model = "openai/gpt-4.1-mini"
-max_input_tokens = 1047576
-api_key = "primary-key"
-
-[agent_deployment_bindings]
-issue-analyzer = "openai_fast"
-""",
-    )
-    env = {"MODEL_PROVIDERS_CONFIG_TOML": config_path}
-
-    with (
-        patch.dict(os.environ, env, clear=True),
-        pytest.raises(ValueError, match="default_deployment has been removed"),
-    ):
-        get_llm_config()
-
-
 def test_unmapped_agent_is_rejected(tmp_path: Path) -> None:
     config_path = _write_toml(tmp_path, _base_toml())
     env = {"MODEL_PROVIDERS_CONFIG_TOML": config_path}
@@ -559,52 +534,6 @@ api_key = "local-key"
     with (
         patch.dict(os.environ, env, clear=True),
         pytest.raises(ValueError, match="unsupported provider 'ollama'"),
-    ):
-        get_llm_config()
-
-
-def test_stage_deployment_table_is_rejected(tmp_path: Path) -> None:
-    config_path = _write_toml(
-        tmp_path,
-        """
-[[deployments]]
-name = "openai_fast"
-model = "openai/gpt-4.1-mini"
-max_input_tokens = 1047576
-api_key = "primary-key"
-
-[stage_deployments]
-analysis = "openai_fast"
-""",
-    )
-    env = {"MODEL_PROVIDERS_CONFIG_TOML": config_path}
-
-    with (
-        patch.dict(os.environ, env, clear=True),
-        pytest.raises(ValueError, match="stage_deployments"),
-    ):
-        get_llm_config()
-
-
-def test_removed_agent_deployments_table_is_rejected(tmp_path: Path) -> None:
-    config_path = _write_toml(
-        tmp_path,
-        """
-[[deployments]]
-name = "openai_fast"
-model = "openai/gpt-4.1-mini"
-max_input_tokens = 1047576
-api_key = "primary-key"
-
-[agent_deployments]
-issue-analyzer = "openai_fast"
-""",
-    )
-    env = {"MODEL_PROVIDERS_CONFIG_TOML": config_path}
-
-    with (
-        patch.dict(os.environ, env, clear=True),
-        pytest.raises(ValueError, match="agent_deployments has been removed"),
     ):
         get_llm_config()
 

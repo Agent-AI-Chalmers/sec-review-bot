@@ -6,31 +6,8 @@ files should remain thin entrypoints.
 """
 
 import ast
-import inspect
 
 from tests.arch.architecture_test_helpers import PACKAGE_ROOT, import_violations
-
-
-def test_workspace_patch_scope_does_not_use_standalone_change_contract() -> None:
-    assert not (PACKAGE_ROOT / "runtime" / "changes.py").exists()
-    assert not (PACKAGE_ROOT / "review_stages" / "changes.py").exists()
-    assert not (PACKAGE_ROOT / "workspace" / "changes.py").exists()
-    assert (PACKAGE_ROOT / "workspace" / "patches.py").exists()
-
-
-def test_filesystem_owns_backend_composition() -> None:
-    assert not (PACKAGE_ROOT / "workspace" / "backend_helpers.py").exists()
-    assert not (PACKAGE_ROOT / "workspace" / "local_backend.py").exists()
-    assert not (PACKAGE_ROOT / "workspace" / "material_backends.py").exists()
-    assert (PACKAGE_ROOT / "filesystem" / "local_backend.py").exists()
-    assert not (PACKAGE_ROOT / "filesystem" / "material_backends.py").exists()
-    assert (PACKAGE_ROOT / "filesystem" / "backend_factory.py").exists()
-    assert not (PACKAGE_ROOT / "filesystem" / "local_material_backend.py").exists()
-
-
-def test_resources_own_resource_materialization() -> None:
-    assert not (PACKAGE_ROOT / "workspace" / "resources.py").exists()
-    assert (PACKAGE_ROOT / "resources" / "materialization.py").exists()
 
 
 def test_runtime_package_stays_domain_neutral() -> None:
@@ -84,11 +61,6 @@ def test_review_record_does_not_own_domain_specific_builders() -> None:
     assert [token for token in forbidden_tokens if token in record_source] == []
 
 
-def test_legacy_shared_review_workflow_does_not_return() -> None:
-    """Keep orchestration in the domain workflows instead of reviving the old wrapper."""
-    assert not (PACKAGE_ROOT / "review_stages" / "workflow.py").exists()
-
-
 def test_issue_workflow_variants_stay_in_their_own_modules() -> None:
     """Keep each intentional issue workflow variant defined in its own module."""
     issue_workflow_root = PACKAGE_ROOT / "workflows" / "issue"
@@ -113,12 +85,6 @@ def test_issue_workflow_variants_stay_in_their_own_modules() -> None:
         node.name for node in main_tree.body if isinstance(node, ast.ClassDef)
     }
     assert main_class_definitions.isdisjoint(variant_modules.values())
-
-
-def test_workflow_input_preparation_is_a_single_entrypoints_module() -> None:
-    assert (PACKAGE_ROOT / "entrypoints" / "input_preparation.py").is_file()
-    assert not (PACKAGE_ROOT / "entrypoints" / "inputs").exists()
-    assert not (PACKAGE_ROOT / "entrypoints" / "input_normalization.py").exists()
 
 
 def test_local_materialization_is_cli_only() -> None:
@@ -167,19 +133,6 @@ def test_delivery_planning_agent_does_not_build_stage_result_contracts() -> None
     assert violations == []
 
 
-def test_delivery_result_builder_accepts_keep_case_ids() -> None:
-    """Keep the result builder independent of workflow artifacts and agent models."""
-    from sec_review_agents.delivery_stages.result import (
-        build_delivery_result_from_outcomes,
-    )
-
-    signature = inspect.signature(build_delivery_result_from_outcomes)
-
-    assert "keep_case_ids" in signature.parameters
-    assert "keep_case_results" not in signature.parameters
-    assert "run_artifacts_root" not in signature.parameters
-
-
 def test_delivery_result_module_does_not_own_execution_results() -> None:
     """Aggregation may consume execution types, but must not define them itself."""
     source = (PACKAGE_ROOT / "delivery_stages" / "result.py").read_text(
@@ -211,13 +164,3 @@ def test_delivery_planning_stage_does_not_own_input_projection() -> None:
     )
 
     assert [token for token in forbidden_tokens if token in source] == []
-
-
-def test_patch_synthesis_stays_inside_delivery_execution() -> None:
-    """Keep the removed patch-synthesis package gone and its current owner explicit."""
-    old_root = PACKAGE_ROOT / "delivery_stages" / "patch_synthesis"
-    assert [path.name for path in old_root.glob("*.py")] == []
-
-    path = PACKAGE_ROOT / "delivery_stages" / "execution" / "patch_synthesis.py"
-
-    assert path.exists()

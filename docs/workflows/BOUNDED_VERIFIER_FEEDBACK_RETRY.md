@@ -20,7 +20,7 @@ This is intentionally **not** an open-ended loop. The architecture supports a re
 
 `verifier` is not only a terminal audit stage. It is also the stage to identify:
 
-- incomplete patch coverage
+- incomplete security coverage
 - ineffective remediation
 - unsafe fixes
 - overstated analyzer claims that should no longer drive patch scope
@@ -69,40 +69,42 @@ where:
 
 The important property is the budget, not the exact number. The design leaves room for modest future experiments without turning the workflow into an unbounded conversational loop.
 
-## Resolution Next Step
+## Next Step
 
-Verifier output separates patch coverage from the next workflow action:
+Verifier output separates current-code coverage from the next workflow action:
 
-- `patch_coverage`: how well the patch covers the reviewed target claim
-- `regression_status`: whether regression, build, test, or behavior-preservation evidence clears the patched workspace
-- `resolution_next_step`: what should happen after the verification judgment
+- `coverage`: how fully current code resolves the reviewed target claim, with or without a patch
+- `regression`: whether regression, build, test, or behavior-preservation evidence clears the patched workspace
+- `next_step`: what should happen after the verification judgment
 
-`resolution_next_step` has three values:
+`next_step` has three values:
 
-- `none`: no further action is needed for this verifier outcome. With `patch_coverage=full`, this requires `regression_status` to be `passed`, `not-run`, or `not-applicable`.
+- `none`: no further action is needed for this verifier outcome. With `coverage=full`, this requires `regression` to be `passed`, `not-run`, or `not-applicable`.
 - `retry-ai`: a concrete, in-scope security gap or confirmed regression is likely fixable by one bounded AI mitigation retry pass.
 - `manual-review`: unresolved regression evidence is the remaining factor that determines the next action, or the remaining work needs human judgment, repository administrator action, credential rotation, deployment/configuration changes, history cleanup, cache/fork cleanup, or some other action outside a normal workspace patch.
 
-Patch coverage and regression status are independent judgments. A patch may fully cover the security target while failing a supported behavior contract. That outcome is `patch_coverage=full` with `regression_status=failed`, but it is not delivery-ready and must use `retry-ai` or `manual-review` rather than `none`.
+Coverage and regression status are independent judgments. A patch may fully cover the security target while failing a supported behavior contract. That outcome is `coverage=full` with `regression=failed`, but it is not delivery-ready and must use `retry-ai` or `manual-review` rather than `none`.
 
-When a separate, concrete security gap is still suitable for bounded repair, `retry-ai` may be used even if `regression_status=unresolved`. The unresolved regression must remain in `patch_findings` and be reassessed after the retry. If the unresolved regression itself determines the next action, including when security coverage is already `full`, use `manual-review`.
+When a separate, concrete security gap is still suitable for bounded repair, `retry-ai` may be used even if `regression=unresolved`. The unresolved regression must remain in `findings` and be reassessed after the retry. If the unresolved regression itself determines the next action, including when security coverage is already `full`, use `manual-review`.
 
 `partial` does not automatically mean retry. A partial patch can either expose an actionable code gap that should be retried, or it can represent useful current-snapshot hardening with residual work that only a human or repository administrator can complete.
 
 Examples:
 
-- SSRF bypass remains in the patched URL/IP validation logic -> `patch_coverage=partial`, `resolution_next_step=retry-ai`
-- a bounded security gap remains and regression evidence is also unresolved -> `patch_coverage=partial`, `regression_status=unresolved`, `resolution_next_step=retry-ai`, with both concerns retained in `patch_findings`
-- security coverage is full but the patch breaks a supported API contract -> `patch_coverage=full`, `regression_status=failed`, `resolution_next_step=retry-ai` or `manual-review`
-- committed secret removed from the current tree but still present in git history -> `patch_coverage=partial`, `resolution_next_step=manual-review`
+- SSRF bypass remains in the patched URL/IP validation logic -> `coverage=partial`, `next_step=retry-ai`
+- a bounded security gap remains and regression evidence is also unresolved -> `coverage=partial`, `regression=unresolved`, `next_step=retry-ai`, with both concerns retained in `findings`
+- security coverage is full but the patch breaks a supported API contract -> `coverage=full`, `regression=failed`, `next_step=retry-ai` or `manual-review`
+- committed secret removed from the current tree but still present in git history -> `coverage=partial`, `next_step=manual-review`
+
+A safe current codebase does not approve every supplied change. With no patch, sufficient evidence can support `coverage=full`. With unnecessary, unrelated, or unsafe changes, record concrete concerns in `findings` and require follow-up instead of approving delivery.
 
 ## Retry Trigger Policy
 
-Retry is driven by `resolution_next_step=retry-ai`, not by `patch_coverage` alone.
+Retry is driven by `next_step=retry-ai`, not by `coverage` alone.
 
-A first mitigation attempt does not need to produce changed files to be retry-eligible. If verifier identifies a concrete in-scope repair that the first attempt missed, `patch_coverage=no-patch` with actionable `patch_findings` may use `resolution_next_step=retry-ai`. The workflow bounds that recovery in the same way as a retry after a partial patch.
+A first mitigation attempt does not need to produce changed files to be retry-eligible. If verifier identifies a concrete in-scope repair that the first attempt missed, a remaining or unresolved gap with actionable `findings` may use `next_step=retry-ai`. The workflow bounds that recovery in the same way as a retry after a partial patch.
 
-Retry-eligible patch judgments are usually `partial` / `local-only` / `unresolved` / `misaligned`. Full security coverage can also be retry-eligible when `regression_status=failed`. Every retry-eligible outcome must carry `resolution_next_step=retry-ai`.
+Retry-eligible patch judgments are usually `partial` / `local-only` / `unresolved` / `misaligned`. Full security coverage can also be retry-eligible when `regression=failed`. Every retry-eligible outcome must carry `next_step=retry-ai`.
 
 The more common retry pattern is:
 
@@ -112,7 +114,7 @@ The more common retry pattern is:
 
 That is the case where retry is useful. In that situation, verifier is not only rejecting the patch. It is also taking over the effective framing for the retry pass.
 
-When verifier chooses `resolution_next_step=retry-ai`, it should include concrete `patch_findings[]` text so the retrying mitigator has actionable patch-correction feedback instead of a vague negative verdict.
+When verifier chooses `next_step=retry-ai`, it should include concrete `findings[]` text so the retrying mitigator has actionable patch-correction feedback instead of a vague negative verdict.
 
 The design intent is simple: retry only when verifier has produced actionable patch-correction feedback. The mechanism is not meant to reopen every unsuccessful review.
 

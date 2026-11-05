@@ -95,13 +95,13 @@ function review_record(
     },
     verification: {
       overview: null,
-      review_target_claim: null,
+      target_claim: null,
       validation_level: null,
-      patch_coverage: null,
-      regression_status: null,
-      resolution_next_step: null,
-      patch_findings: [],
-      verification_findings: [],
+      coverage: null,
+      regression: null,
+      next_step: null,
+      findings: [],
+      evidence: [],
       residual_risks: []
     },
     cvss: null,
@@ -243,13 +243,13 @@ test('pull request publish leaves plausible risks as non-blocking comments', asy
         },
         verification: {
           overview: 'Exploitability is not confirmed.',
-          review_target_claim: null,
+          target_claim: null,
           validation_level: 'static',
-          patch_coverage: 'no-patch',
-          regression_status: 'not-applicable',
-          resolution_next_step: 'manual-review',
-          patch_findings: [],
-          verification_findings: [],
+          coverage: 'full',
+          regression: 'not-applicable',
+          next_step: 'manual-review',
+          findings: [],
+          evidence: [],
           residual_risks: ['Review the deployment trust boundary.']
         }
       })
@@ -310,13 +310,13 @@ test('pull request publish approves when analysis is not confirmed', async () =>
         },
         verification: {
           overview: null,
-          review_target_claim: null,
+          target_claim: null,
           validation_level: null,
-          patch_coverage: 'not-applicable',
-          regression_status: 'not-applicable',
-          resolution_next_step: null,
-          patch_findings: [],
-          verification_findings: [],
+          coverage: 'full',
+          regression: 'not-applicable',
+          next_step: null,
+          findings: [],
+          evidence: [],
           residual_risks: []
         }
       })
@@ -550,13 +550,13 @@ test('pull request publish leaves confirmed risks as non-blocking comments with 
         },
         verification: {
           overview: 'The reviewed PR is safe.',
-          review_target_claim: null,
+          target_claim: null,
           validation_level: 'static',
-          patch_coverage: 'full',
-          regression_status: 'not-run',
-          resolution_next_step: 'none',
-          patch_findings: [],
-          verification_findings: [],
+          coverage: 'full',
+          regression: 'not-run',
+          next_step: 'none',
+          findings: [],
+          evidence: [],
           residual_risks: []
         }
       })

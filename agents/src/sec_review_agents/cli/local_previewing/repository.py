@@ -164,7 +164,7 @@ def _delivery_case_details(
         analysis,
         mitigation,
         verification,
-        include_resolution_next_step=True,
+        include_next_step=True,
     )
     case_details = [
         f"### Case {inline_code(case_id)}",

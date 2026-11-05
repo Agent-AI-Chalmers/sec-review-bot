@@ -46,13 +46,13 @@ const EMPTY_MITIGATION: ReviewRecord['mitigation'] = {
 
 const EMPTY_VERIFICATION: ReviewRecord['verification'] = {
   overview: null,
-  review_target_claim: null,
+  target_claim: null,
   validation_level: null,
-  patch_coverage: null,
-  regression_status: null,
-  resolution_next_step: null,
-  patch_findings: [],
-  verification_findings: [],
+  coverage: null,
+  regression: null,
+  next_step: null,
+  findings: [],
+  evidence: [],
   residual_risks: []
 }
 
@@ -63,10 +63,9 @@ function asNonEmptyString(value: unknown): string {
 function buildVerifierHeadline(
   verification: ReviewRecord['verification']
 ): string {
-  const patch_coverage =
-    asNonEmptyString(verification.patch_coverage) || 'unknown'
+  const coverage = asNonEmptyString(verification.coverage) || 'unknown'
 
-  return `Verifier assessed patch=${patch_coverage}.`
+  return `Verifier assessed coverage=${coverage}.`
 }
 
 function renderIssueAnalysisSection(
@@ -103,8 +102,8 @@ function renderIssueVerificationSection(
   const lines = renderVerificationSummaryLines(verification, {
     includeHeadline: true,
     includeOverview: false,
-    includeUnknownResolutionNextStep: true,
-    reviewTargetClaimFallback: '(none)'
+    includeUnknownNextStep: true,
+    targetClaimFallback: '(none)'
   })
 
   return lines.join('\n')
@@ -239,7 +238,16 @@ function renderSuggestedDraftPrSection(
 export function hasReviewRecordPatchReadyForPromotion(
   review_record: ReviewRecord | null | undefined
 ): boolean {
-  return (review_record?.mitigation.file_changes.length ?? 0) > 0
+  const verification = review_record?.verification
+  // Security coverage alone does not approve supplied changes for publication.
+  return (
+    (review_record?.mitigation.file_changes.length ?? 0) > 0 &&
+    verification?.coverage === 'full' &&
+    ['passed', 'not-run', 'not-applicable'].includes(
+      verification.regression ?? ''
+    ) &&
+    verification.next_step === 'none'
+  )
 }
 
 export function normalizePromotionFilePath(filePath: unknown): string {
@@ -369,8 +377,8 @@ export function buildDraftPullRequestBodyFromReviewRecord({
   const verificationLines = renderVerificationSummaryLines(verification, {
     includeHeadline: true,
     includeOverview: false,
-    includeUnknownResolutionNextStep: true,
-    reviewTargetClaimFallback: '(none)'
+    includeUnknownNextStep: true,
+    targetClaimFallback: '(none)'
   })
   const reviewerNotesLines = [
     '- This PR is intentionally narrow.',
@@ -384,7 +392,7 @@ export function buildDraftPullRequestBodyFromReviewRecord({
     '',
     ...renderReviewStatusLines(
       { analysis, mitigation, verification },
-      { includeResolutionNextStep: true }
+      { includeNextStep: true }
     ),
     '',
     String(
@@ -434,8 +442,8 @@ export async function buildSuggestedDraftPrPlanFromReviewRecord({
       code_changes: changed_files.map((item) => `\`${item}\``),
       verification: [
         buildVerifierHeadline(verification),
-        `Patch coverage: ${inlineCode(verification.patch_coverage ?? 'unknown')}`,
-        `Regression status: ${inlineCode(verification.regression_status ?? 'unknown')}`,
+        `Coverage: ${inlineCode(verification.coverage ?? 'unknown')}`,
+        `Regression: ${inlineCode(verification.regression ?? 'unknown')}`,
         `Validation level: ${inlineCode(verification.validation_level ?? 'unknown')}`
       ].filter((item): item is string => Boolean(item)),
       residual_risks: verification.residual_risks.slice(0, 5)
@@ -480,7 +488,7 @@ export function renderIssueReviewCommentFromReviewRecord({
     `- Patch ready: ${inlineCode(draftPrPlan?.patch_ready ? 'yes' : 'no')}`,
     '',
     String(
-      verification.patch_coverage
+      verification.coverage
         ? buildVerifierHeadline(verification)
         : (analysis.overview ??
             `Security review completed for issue #${issue.issue_number}.`)

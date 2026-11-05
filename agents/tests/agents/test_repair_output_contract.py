@@ -21,7 +21,7 @@ def test_single_agent_output_requires_no_file_declaration() -> None:
             "overview": "No safe patch was produced.",
             "verdict": "no-actionable-finding",
             "validation_level": "static",
-            "regression_status": "not-applicable",
+            "regression": "not-applicable",
             "target_claim": "",
             "residual_risks": [],
             "self_check_notes": ["No patch target."],

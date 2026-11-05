@@ -1,9 +1,9 @@
 from pydantic import BaseModel, ConfigDict, Field
 
 from sec_review_agents.review_stages.types import (
-    PatchCoverage,
+    CoverageStatus,
+    NextStep,
     RegressionStatus,
-    ResolutionNextStep,
     ValidationLevel,
 )
 
@@ -18,13 +18,13 @@ class VerificationStageResult(BaseModel):
     """
 
     overview: str
-    review_target_claim: str | None
-    patch_coverage: PatchCoverage | None
-    resolution_next_step: ResolutionNextStep
-    patch_findings: list[str] = Field(default_factory=list)
-    verification_findings: list[str] = Field(default_factory=list)
+    target_claim: str | None
+    coverage: CoverageStatus | None
+    next_step: NextStep
+    findings: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
     validation_level: ValidationLevel | None
-    regression_status: RegressionStatus | None
+    regression: RegressionStatus | None
     residual_risks: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore")
@@ -33,13 +33,13 @@ class VerificationStageResult(BaseModel):
 def build_verification_stage_result(
     *,
     overview: str,
-    review_target_claim: str | None,
-    patch_coverage: PatchCoverage,
-    resolution_next_step: ResolutionNextStep,
-    patch_findings: list[str],
-    verification_findings: list[str],
+    target_claim: str | None,
+    coverage: CoverageStatus,
+    next_step: NextStep,
+    findings: list[str],
+    evidence: list[str],
     validation_level: ValidationLevel,
-    regression_status: RegressionStatus,
+    regression: RegressionStatus,
     residual_risks: list[str],
 ) -> VerificationStageResult:
     """Build a completed assessment with required coverage and validation fields.
@@ -49,13 +49,13 @@ def build_verification_stage_result(
     """
     return VerificationStageResult(
         overview=overview,
-        review_target_claim=review_target_claim,
-        patch_coverage=patch_coverage,
-        resolution_next_step=resolution_next_step,
-        patch_findings=patch_findings,
-        verification_findings=verification_findings,
+        target_claim=target_claim,
+        coverage=coverage,
+        next_step=next_step,
+        findings=findings,
+        evidence=evidence,
         validation_level=validation_level,
-        regression_status=regression_status,
+        regression=regression,
         residual_risks=residual_risks,
     )
 
@@ -63,12 +63,12 @@ def build_verification_stage_result(
 def build_skipped_verification_result(*, reason: str) -> VerificationStageResult:
     return VerificationStageResult(
         overview=reason,
-        review_target_claim=None,
-        patch_coverage=None,
-        resolution_next_step="none",
-        patch_findings=[],
-        verification_findings=[],
+        target_claim=None,
+        coverage=None,
+        next_step="none",
+        findings=[],
+        evidence=[],
         validation_level=None,
-        regression_status=None,
+        regression=None,
         residual_risks=[],
     )

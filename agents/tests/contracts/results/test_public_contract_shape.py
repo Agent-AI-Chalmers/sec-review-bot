@@ -98,10 +98,10 @@ def test_pull_request_result_public_shape() -> None:
                 },
                 "verification": {
                     "status": "completed",
-                    "patch_coverage": "not-applicable",
-                    "resolution_next_step": "manual-review",
-                    "verification_findings": [],
-                    "patch_findings": [],
+                    "coverage": "full",
+                    "next_step": "manual-review",
+                    "evidence": [],
+                    "findings": [],
                     "residual_risks": [],
                 },
                 "cvss": None,
@@ -136,13 +136,13 @@ def test_review_record_builder_output_matches_shared_contract_schema() -> None:
             },
             "verification": {
                 "overview": "The patch covers the retry enqueue path.",
-                "review_target_claim": "Retry payloads must be signed with current metadata.",
+                "target_claim": "Retry payloads must be signed with current metadata.",
                 "validation_level": "static",
-                "patch_coverage": "full",
-                "regression_status": "not-run",
-                "resolution_next_step": "none",
-                "patch_findings": [],
-                "verification_findings": [],
+                "coverage": "full",
+                "regression": "not-run",
+                "next_step": "none",
+                "findings": [],
+                "evidence": [],
                 "residual_risks": [],
             },
             "cvss": {
@@ -178,9 +178,9 @@ def test_repository_result_public_shape() -> None:
             "verification": {
                 "overview": None,
                 "validation_level": None,
-                "patch_coverage": None,
-                "patch_findings": [],
-                "verification_findings": [],
+                "coverage": None,
+                "findings": [],
+                "evidence": [],
                 "residual_risks": [],
             },
             "cvss": None,
@@ -275,13 +275,13 @@ def test_repository_workflow_result_builder_output_matches_shared_contract_schem
                             },
                             "verification": {
                                 "overview": "The patch covers the retry enqueue path.",
-                                "review_target_claim": "Retry payloads must be signed with current metadata.",
+                                "target_claim": "Retry payloads must be signed with current metadata.",
                                 "validation_level": "static",
-                                "patch_coverage": "full",
-                                "regression_status": "not-run",
-                                "resolution_next_step": "none",
-                                "patch_findings": [],
-                                "verification_findings": [],
+                                "coverage": "full",
+                                "regression": "not-run",
+                                "next_step": "none",
+                                "findings": [],
+                                "evidence": [],
                                 "residual_risks": [],
                             },
                             "cvss": {
@@ -366,7 +366,7 @@ def test_repository_case_results_normalize_partial_review_record_shape() -> None
     assert review_record["analysis"]["verdict"] == "confirmed-defect"
     assert review_record["analysis"]["overview"] is None
     assert review_record["mitigation"]["file_changes"] == []
-    assert review_record["verification"]["patch_coverage"] is None
+    assert review_record["verification"]["coverage"] is None
     assert review_record["cvss"] is None
     assert "unexpected" not in review_record["analysis"]
 
@@ -423,7 +423,7 @@ def test_repository_blocked_case_result_keeps_required_review_record() -> None:
     review_record = result["case_results"][0]["review_record"]
     assert review_record["analysis"]["verdict"] is None
     assert review_record["mitigation"]["file_changes"] == []
-    assert review_record["verification"]["patch_coverage"] is None
+    assert review_record["verification"]["coverage"] is None
     assert review_record["cvss"] is None
 
 

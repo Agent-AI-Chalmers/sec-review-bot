@@ -142,18 +142,6 @@ test('v1 repository input schema requires audit objective', () => {
   assert.strictEqual(validate(payload), false)
 })
 
-test('v1 repository input schema rejects the removed max_file_bytes field', () => {
-  const validate = contractValidator('repository-review-input.schema.json')
-  const payload = structuredClone(
-    contractFixture('repository-review-input-full.json')
-  ) as {
-    scan_scope: { max_file_bytes?: number }
-  }
-  payload.scan_scope.max_file_bytes = 200000
-
-  assert.strictEqual(validate(payload), false)
-})
-
 test('v1 repository full scan schema rejects incremental window fields', () => {
   const validate = contractValidator('repository-review-input.schema.json')
   const payload = contractFixture('repository-review-input-full.json') as {

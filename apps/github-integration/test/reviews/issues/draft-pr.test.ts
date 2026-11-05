@@ -5,6 +5,7 @@ import {
   buildDraftBranchName,
   createDraftPullRequestFromIssueReviewRecord as createDraftPullRequestWithClaim
 } from '../../../src/reviews/issues/draft-pr.js'
+import { buildSuggestedDraftPrPlanFromReviewRecord } from '../../../src/reviews/issues/renderer.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
 import type { FileMode } from '../../../src/reviews/file-change.js'
 import { PublicationClaimLostError } from '../../../src/review-runs/publication-claim.js'
@@ -43,13 +44,13 @@ function reviewRecordWithMitigation(mitigation: TestMitigation): ReviewRecord {
     },
     verification: {
       overview: null,
-      review_target_claim: null,
+      target_claim: null,
       validation_level: null,
-      patch_coverage: null,
-      regression_status: null,
-      resolution_next_step: null,
-      patch_findings: [],
-      verification_findings: [],
+      coverage: 'full',
+      regression: 'not-run',
+      next_step: 'none',
+      findings: [],
+      evidence: [],
       residual_risks: []
     },
     cvss: null
@@ -237,7 +238,7 @@ test('issue draft PR retry reuses a branch left by a partial prior attempt witho
       }
     ]
   })
-  review_record.verification.patch_coverage = 'full'
+  review_record.verification.coverage = 'full'
 
   const result = await createDraftPullRequestFromIssueReviewRecord({
     octokit,
@@ -381,8 +382,8 @@ test('issue draft PR publishes from review_record file_changes without workspace
       }
     ]
   })
-  review_record.verification.patch_coverage = 'full'
-  review_record.verification.regression_status = 'not-run'
+  review_record.verification.coverage = 'full'
+  review_record.verification.regression = 'not-run'
   const result = await createDraftPullRequestFromIssueReviewRecord({
     octokit,
     issue,
@@ -430,7 +431,7 @@ test('issue draft PR publishes from review_record file_changes without workspace
     harness.pulls[0]?.body ?? '',
     /- Verification: `full coverage; not recorded; checks not run`/
   )
-  assert.match(harness.pulls[0]?.body ?? '', /Verifier assessed patch=/)
+  assert.match(harness.pulls[0]?.body ?? '', /Verifier assessed coverage=/)
 })
 
 test('issue draft PR is not promoted when file_changes are absent', async () => {
@@ -465,7 +466,7 @@ test('issue draft PR rejects unsupported file modes', async () => {
       }
     ]
   })
-  review_record.verification.patch_coverage = 'full'
+  review_record.verification.coverage = 'full'
 
   await assert.rejects(
     async () =>
@@ -497,7 +498,7 @@ test('issue draft PR rejects deleted file changes with mode', async () => {
       }
     ]
   })
-  review_record.verification.patch_coverage = 'full'
+  review_record.verification.coverage = 'full'
 
   await assert.rejects(
     async () =>
@@ -534,7 +535,7 @@ for (const [path, message] of [
         }
       ]
     })
-    review_record.verification.patch_coverage = 'full'
+    review_record.verification.coverage = 'full'
 
     await assert.rejects(
       async () =>
@@ -579,8 +580,8 @@ test('issue draft PR publishes symbolic link targets and deletions without works
       }
     ]
   })
-  review_record.verification.patch_coverage = 'full'
-  review_record.verification.regression_status = 'not-run'
+  review_record.verification.coverage = 'full'
+  review_record.verification.regression = 'not-run'
   const result = await createDraftPullRequestFromIssueReviewRecord({
     octokit,
     issue,
@@ -628,5 +629,89 @@ test('issue draft PR publishes symbolic link targets and deletions without works
     harness.pulls[0]?.body ?? '',
     /- Verification: `full coverage; not recorded; checks not run`/
   )
-  assert.match(harness.pulls[0]?.body ?? '', /Verifier assessed patch=/)
+  assert.match(harness.pulls[0]?.body ?? '', /Verifier assessed coverage=/)
 })
+
+const blockedVerificationCases: Array<{
+  name: string
+  verification: Partial<ReviewRecord['verification']>
+}> = [
+  {
+    name: 'withdraw unrelated changes on a safe baseline',
+    verification: {
+      next_step: 'retry-ai',
+      findings: ['Revert the unrelated package.json deletion.']
+    }
+  },
+  { name: 'manual review', verification: { next_step: 'manual-review' } },
+  ...(['partial', 'local-only', 'misaligned', 'unresolved', null] as const).map(
+    (coverage) => ({ name: `coverage ${coverage}`, verification: { coverage } })
+  ),
+  ...(['failed', 'unresolved', null] as const).map((regression) => ({
+    name: `regression ${regression}`,
+    verification: { regression }
+  })),
+  { name: 'missing next step', verification: { next_step: null } },
+  {
+    name: 'single-agent self-check',
+    verification: { coverage: null, next_step: 'manual-review' }
+  }
+]
+for (const { name, verification } of blockedVerificationCases) {
+  test(`issue draft PR refuses unapproved changes: ${name}`, async () => {
+    const review_record = reviewRecordWithMitigation({
+      file_changes: [{ path: 'package.json', status: 'deleted' }]
+    })
+    Object.assign(review_record.verification, verification)
+    const issue = {
+      issue_number: 42,
+      owner_login: 'octo-org',
+      repo_name: 'example-repo'
+    }
+    const plan = await buildSuggestedDraftPrPlanFromReviewRecord({
+      issue,
+      review_record
+    })
+    assert.equal(plan.patch_ready, false)
+    const { octokit, requests } = fakeGitHub(() => {
+      throw new Error('Unapproved changes must not reach GitHub.')
+    })
+    const result = await createDraftPullRequestFromIssueReviewRecord({
+      octokit,
+      issue,
+      run_id: 'blocked-run',
+      workspace_ref: 'base-sha',
+      review_record
+    })
+    assert.equal(result, null)
+    assert.deepEqual(requests, [])
+  })
+}
+for (const regression of ['passed', 'not-run', 'not-applicable'] as const) {
+  test(`issue draft PR plan accepts full coverage with cleared regression ${regression}`, async () => {
+    const review_record = reviewRecordWithMitigation({
+      file_changes: [{ path: 'src/unsafe.js', status: 'deleted' }]
+    })
+    review_record.verification.regression = regression
+    const issue = { issue_number: 42 }
+    assert.equal(
+      (
+        await buildSuggestedDraftPrPlanFromReviewRecord({
+          issue,
+          review_record
+        })
+      ).patch_ready,
+      true
+    )
+    review_record.mitigation.file_changes = []
+    assert.equal(
+      (
+        await buildSuggestedDraftPrPlanFromReviewRecord({
+          issue,
+          review_record
+        })
+      ).patch_ready,
+      false
+    )
+  })
+}

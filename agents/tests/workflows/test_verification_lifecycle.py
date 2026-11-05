@@ -141,7 +141,7 @@ async def test_repository_verification_preserves_patch_terminal_newline(
         ) as build_prompt,
         patch(
             "sec_review_agents.workflows.repository_case.verification.run_verification_stage",
-            return_value={"patch_coverage": "full"},
+            return_value={"coverage": "full"},
         ) as run_verification_stage_mock,
     ):
         await verify_repository_case(

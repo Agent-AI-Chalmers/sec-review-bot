@@ -22,7 +22,7 @@
 - Maintain and refresh a compact working state in your reasoning before every new read, search, diff inspection, or runtime command:
   - carried-forward claim: the previous verifier's reviewed claim, corrected only when current repository evidence forces a correction
   - blocking concern: the previous blocking concern or the superseding current patch problem you are judging
-  - unresolved retry decision: the concrete decision still open, such as whether the blocking concern is resolved, target-claim scope, patch coverage, missed in-scope sibling path, control coverage, regression risk, validation need, validation level, or final retry outcome
+  - unresolved retry decision: the concrete decision still open, such as whether the blocking concern is resolved, target-claim scope, coverage, missed in-scope sibling path, control coverage, regression risk, validation need, validation level, or final retry outcome
   - reason to inspect more: why the next read, search, diff inspection, or command can materially change that retry decision
   - checked retry surface: the smallest set of revised patch hunks, files, entry points, sibling paths, or behavior cases already checked or next to check
 

@@ -23,10 +23,10 @@ from sec_review_agents.review_stages.record import (
 )
 from sec_review_agents.review_stages.single_agent import SingleAgentFixOutcome
 from sec_review_agents.review_stages.types import (
+    CoverageStatus,
     CvssOutcome,
-    PatchCoverage,
+    NextStep,
     RegressionStatus,
-    ResolutionNextStep,
     ValidationLevel,
     Verdict,
 )
@@ -72,17 +72,17 @@ def test_review_record_enum_allowlists_match_shared_schema() -> None:
             get_args(ValidationLevel),
             verification["validation_level"]["enum"],
         ),
-        "patch_coverage": (
-            get_args(PatchCoverage),
-            verification["patch_coverage"]["enum"],
+        "coverage": (
+            get_args(CoverageStatus),
+            verification["coverage"]["enum"],
         ),
-        "regression_status": (
+        "regression": (
             get_args(RegressionStatus),
-            verification["regression_status"]["enum"],
+            verification["regression"]["enum"],
         ),
-        "resolution_next_step": (
-            get_args(ResolutionNextStep),
-            verification["resolution_next_step"]["enum"],
+        "next_step": (
+            get_args(NextStep),
+            verification["next_step"]["enum"],
         ),
         "cvss_outcome": (get_args(CvssOutcome), cvss["outcome"]["enum"]),
     }
@@ -104,7 +104,7 @@ def test_issue_single_agent_contract_tracks_required_sections() -> None:
         "overview",
         "verdict",
         "validation_level",
-        "regression_status",
+        "regression",
         "target_claim",
         "file_changes",
         "patch_diff",

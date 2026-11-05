@@ -19,29 +19,29 @@ PREVIEW_STAGE_SUMMARY_SCHEMA = StructuredRenderSchema(
             "description",
             "reason",
             "note",
-            "review_target_claim",
+            "target_claim",
         }
     ),
     key_labels={
         "changed_files": "Changed files",
-        "patch_coverage": "Patch coverage",
-        "patch_findings": "Patch findings",
-        "regression_status": "Regression status",
-        "resolution_next_step": "Resolution next step",
+        "coverage": "Coverage",
+        "findings": "Findings",
+        "regression": "Regression",
+        "next_step": "Next step",
         "residual_risks": "Residual risks",
-        "review_target_claim": "Review target claim",
+        "target_claim": "Target claim",
         "validation_level": "Validation level",
-        "verification_findings": "Verification findings",
+        "evidence": "Evidence",
     },
     field_order={
-        "patch_coverage": 10,
-        "regression_status": 20,
-        "resolution_next_step": 30,
+        "coverage": 10,
+        "regression": 20,
+        "next_step": 30,
         "validation_level": 40,
-        "review_target_claim": 50,
+        "target_claim": 50,
         "changed_files": 60,
-        "patch_findings": 70,
-        "verification_findings": 80,
+        "findings": 70,
+        "evidence": 80,
         "residual_risks": 90,
     },
 )
@@ -78,13 +78,13 @@ def render_verification_preview_lines(
     lines = render_structured_markdown(
         {
             "overview": compact_plain_text(verification.get("overview")) or fallback,
-            "patch_coverage": verification.get("patch_coverage"),
-            "regression_status": verification.get("regression_status"),
-            "resolution_next_step": verification.get("resolution_next_step"),
+            "coverage": verification.get("coverage"),
+            "regression": verification.get("regression"),
+            "next_step": verification.get("next_step"),
             "validation_level": verification.get("validation_level"),
-            "review_target_claim": verification.get("review_target_claim"),
-            "patch_findings": as_list(verification.get("patch_findings")),
-            "verification_findings": as_list(verification.get("verification_findings")),
+            "target_claim": verification.get("target_claim"),
+            "findings": as_list(verification.get("findings")),
+            "evidence": as_list(verification.get("evidence")),
             "residual_risks": as_list(verification.get("residual_risks")),
         },
         schema=PREVIEW_STAGE_SUMMARY_SCHEMA,
@@ -314,16 +314,14 @@ def mitigation_headline(verdict: Any, changed_files: list[Any]) -> str:
     return "not needed" if verdict == "no-actionable-finding" else "no patch proposed"
 
 
-def coverage_headline(patch_coverage: Any) -> str:
+def coverage_headline(coverage: Any) -> str:
     return {
         "full": "full coverage",
         "partial": "partial coverage",
         "local-only": "local fix only",
-        "misaligned": "misaligned patch",
+        "misaligned": "mitigation misaligned",
         "unresolved": "coverage unresolved",
-        "no-patch": "no patch",
-        "not-applicable": "patch review n/a",
-    }.get(patch_coverage, "coverage not recorded")
+    }.get(coverage, "coverage not recorded")
 
 
 def verification_headline(validation_level: Any) -> str:
@@ -335,14 +333,14 @@ def verification_headline(validation_level: Any) -> str:
     }.get(validation_level, "not recorded")
 
 
-def checks_headline(regression_status: Any) -> str:
+def checks_headline(regression: Any) -> str:
     return {
         "passed": "checks passed",
         "failed": "checks failed",
         "not-run": "checks not run",
         "not-applicable": "checks not applicable",
         "unresolved": "checks unresolved",
-    }.get(regression_status, "checks not recorded")
+    }.get(regression, "checks not recorded")
 
 
 def render_review_status_lines(
@@ -350,7 +348,7 @@ def render_review_status_lines(
     mitigation: dict[str, Any],
     verification: dict[str, Any],
     *,
-    include_resolution_next_step: bool = False,
+    include_next_step: bool = False,
 ) -> list[str]:
     """The opening status lines shared by every review-record preview surface."""
     lines = [
@@ -364,16 +362,13 @@ def render_review_status_lines(
         ),
         "- Verification: "
         + inline_code(
-            f"{coverage_headline(verification.get('patch_coverage'))}; "
+            f"{coverage_headline(verification.get('coverage'))}; "
             f"{verification_headline(verification.get('validation_level'))}; "
-            f"{checks_headline(verification.get('regression_status'))}"
+            f"{checks_headline(verification.get('regression'))}"
         ),
     ]
-    if (
-        include_resolution_next_step
-        and verification.get("resolution_next_step") != "none"
-    ):
+    if include_next_step and verification.get("next_step") != "none":
         lines.append(
-            f"- Resolution next step: {inline_code(verification.get('resolution_next_step'), 'unknown')}"
+            f"- Next step: {inline_code(verification.get('next_step'), 'unknown')}"
         )
     return lines

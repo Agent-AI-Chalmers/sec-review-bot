@@ -34,13 +34,13 @@ function reviewRecord(): ReviewRecord {
     },
     verification: {
       overview: null,
-      review_target_claim: null,
+      target_claim: null,
       validation_level: null,
-      patch_coverage: null,
-      regression_status: null,
-      resolution_next_step: null,
-      patch_findings: [],
-      verification_findings: [],
+      coverage: 'full',
+      regression: 'not-run',
+      next_step: 'none',
+      findings: [],
+      evidence: [],
       residual_risks: []
     },
     cvss: null

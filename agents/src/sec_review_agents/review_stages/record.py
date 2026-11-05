@@ -5,10 +5,10 @@ from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.cvss.result import CvssStageResult
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.types import (
+    CoverageStatus,
     CvssOutcome,
-    PatchCoverage,
+    NextStep,
     RegressionStatus,
-    ResolutionNextStep,
     ValidationLevel,
     Verdict,
 )
@@ -38,13 +38,13 @@ class ReviewRecordMitigation(BaseModel):
 
 class ReviewRecordVerification(BaseModel):
     overview: str | None = None
-    review_target_claim: str | None = None
+    target_claim: str | None = None
     validation_level: ValidationLevel | None = None
-    patch_coverage: PatchCoverage | None = None
-    regression_status: RegressionStatus | None = None
-    resolution_next_step: ResolutionNextStep | None = None
-    patch_findings: list[str] = Field(default_factory=list)
-    verification_findings: list[str] = Field(default_factory=list)
+    coverage: CoverageStatus | None = None
+    regression: RegressionStatus | None = None
+    next_step: NextStep | None = None
+    findings: list[str] = Field(default_factory=list)
+    evidence: list[str] = Field(default_factory=list)
     residual_risks: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="ignore", strict=True)

@@ -68,11 +68,11 @@ def _workflow_result() -> dict:
                 "residual_risks": [],
             },
             "verification": {
-                "review_target_claim": ("`MemoryObservationOutput` remains unchanged."),
-                "patch_coverage": "full",
-                "resolution_next_step": "none",
-                "patch_findings": [],
-                "verification_findings": [],
+                "target_claim": ("`MemoryObservationOutput` remains unchanged."),
+                "coverage": "full",
+                "next_step": "none",
+                "findings": [],
+                "evidence": [],
                 "residual_risks": [],
             },
         }
@@ -158,9 +158,9 @@ def test_pull_request_preview_summarizes_review_stages(tmp_path: Path) -> None:
     review_record["verification"].update(
         {
             "validation_level": "static",
-            "patch_coverage": "not-applicable",
-            "regression_status": "not-run",
-            "resolution_next_step": "none",
+            "coverage": "full",
+            "regression": "not-run",
+            "next_step": "none",
         }
     )
 
@@ -175,12 +175,10 @@ def test_pull_request_preview_summarizes_review_stages(tmp_path: Path) -> None:
     )
     assert "- Analysis: `no actionable security finding`" in content
     assert "- Mitigation: `not needed`" in content
-    assert (
-        "- Verification: `patch review n/a; static review; checks not run`" in content
-    )
+    assert "- Verification: `full coverage; static review; checks not run`" in content
     assert "- Tests:" not in content
     assert "Changed files: `0`" not in content
-    assert "Resolution next step: `none`" not in content
+    assert "Next step: `none`" not in content
 
 
 def test_pull_request_preview_reports_patch_and_manual_review(tmp_path: Path) -> None:
@@ -195,8 +193,8 @@ def test_pull_request_preview_reports_patch_and_manual_review(tmp_path: Path) ->
     review_record["verification"].update(
         {
             "validation_level": "runtime-partial",
-            "regression_status": "failed",
-            "resolution_next_step": "manual-review",
+            "regression": "failed",
+            "next_step": "manual-review",
         }
     )
 
@@ -216,7 +214,7 @@ def test_pull_request_preview_reports_patch_and_manual_review(tmp_path: Path) ->
         in content
     )
     assert "- Tests:" not in content
-    assert "- Resolution next step: `manual-review`" in content
+    assert "- Next step: `manual-review`" in content
 
 
 def test_analysis_narrative_rendering_keeps_scope_decisions_visible() -> None:

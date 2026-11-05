@@ -133,13 +133,13 @@ async def test_issue_verifier_docker_workspace_is_writable_stage_copy(
         return VerificationOutput.model_validate(
             {
                 "overview": "No patch was available.",
-                "review_target_claim": "demo claim",
-                "patch_coverage": "no-patch",
-                "resolution_next_step": "manual-review",
-                "patch_findings": [],
-                "verification_findings": ["No patch was available."],
+                "target_claim": "demo claim",
+                "coverage": "unresolved",
+                "next_step": "manual-review",
+                "findings": [],
+                "evidence": ["No patch was available."],
                 "validation_level": "static",
-                "regression_status": "not-applicable",
+                "regression": "not-applicable",
                 "residual_risks": [],
             }
         )
@@ -166,7 +166,7 @@ async def test_issue_verifier_docker_workspace_is_writable_stage_copy(
             retry_context=None,
         )
 
-    assert result.patch_coverage == "no-patch"
+    assert result.coverage == "unresolved"
     assert len(stage_workspaces) == 1
     assert not (source_workspace / ".agent-index").exists()
     assert not stage_workspaces[0].exists()
