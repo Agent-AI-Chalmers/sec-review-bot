@@ -1,5 +1,9 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
+import type {
+  MemoryTreeContentResponse,
+  TrajectoryContentResponse
+} from '../../shared/artifact-content.js'
 import type { ArtifactStore } from '../artifacts/store.js'
 import type { PublishedArtifact } from '../artifacts/published-artifact.js'
 import {
@@ -156,7 +160,7 @@ export function createMemoryArtifactRoutes({
         { idleTimeoutMs: artifactDownloadIdleTimeoutMs }
       )
       if (artifactRequest.view === 'content') {
-        let content: object
+        let content: MemoryTreeContentResponse | TrajectoryContentResponse
         if (artifactRequest.kind === 'tree') {
           const files = await readMemoryTreeArtifact(complete)
           content = {

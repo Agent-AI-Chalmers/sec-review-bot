@@ -9,8 +9,8 @@ import {
   Text
 } from '@mantine/core'
 
-import type { Run } from './api.js'
-import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
+import type { Run } from '../api.js'
+import { formatDate, useLanguage, useMessages } from '../../../shared/i18n.js'
 
 type Statistics = NonNullable<Run['execution_statistics']>
 type StatisticsGroup = Statistics['groups'][number]

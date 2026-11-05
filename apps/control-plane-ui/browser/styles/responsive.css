@@ -190,9 +190,15 @@
   .operations-bar [aria-label='Run list controls'] {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: var(--space-5);
     width: 100%;
   }
 
+  .operations-bar .operations-filter-group {
+    display: contents;
+  }
+
+  .operations-filter-group > *,
   .operations-bar [aria-label='Run list controls'] > *,
   .operations-per-page,
   .operations-more {
@@ -200,8 +206,13 @@
     width: 100% !important;
   }
 
-  .runs-heading {
-    align-items: flex-start;
+  .runs-heading > .runs-heading-actions {
+    display: contents;
+  }
+
+  .runs-heading .refresh-controls {
+    flex-basis: 100%;
+    justify-content: flex-end;
   }
 
   .platform-mark-compact .platform-mark-label {

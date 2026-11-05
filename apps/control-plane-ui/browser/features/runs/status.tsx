@@ -6,18 +6,11 @@ import {
   IconMinus,
   IconPlayerPlay
 } from '@tabler/icons-react'
-import { type ArtifactStorage, type Run } from './api.js'
+import { type ArtifactStorage, type PublicationStep, type Run } from './api.js'
 import { useMessages } from '../../shared/i18n.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
-export type PublicationStepStatus =
-  | 'pending'
-  | 'running'
-  | 'uncertain'
-  | 'disconnected'
-  | 'succeeded'
-  | 'failed'
-  | 'terminal_failed'
+export type PublicationStepStatus = PublicationStep['status']
 
 type StatusTone = 'waiting' | 'active' | 'complete' | 'failed' | 'neutral'
 

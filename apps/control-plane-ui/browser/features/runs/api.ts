@@ -1,5 +1,6 @@
 import { api, request } from '../../shared/api-client.js'
 import type {
+  ListParkedRunsResponseBody,
   ArtifactStorage,
   ParkedRun,
   PublicationStep,
@@ -40,6 +41,6 @@ export async function adminRunAction(
 
 /** Read runs whose automatic coordination has stopped retrying. */
 export async function parkedRuns(): Promise<ParkedRun[]> {
-  const body = await api<{ blocks: ParkedRun[] }>('/runs/parked')
+  const body = await api<ListParkedRunsResponseBody>('/runs/parked')
   return body.blocks
 }

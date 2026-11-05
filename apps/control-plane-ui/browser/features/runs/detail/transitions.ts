@@ -1,10 +1,10 @@
-import type { Run, RunEvent } from './api.js'
+import type { Run, RunEvent } from '../api.js'
 import {
   STATE_MACHINES,
   type StateAxis,
   type StateMachine as StateMachineDefinition
-} from './state-machines.generated.js'
-import type { Message } from '../../shared/i18n.js'
+} from '../state-machines.generated.js'
+import type { Message } from '../../../shared/i18n.js'
 import { DIAGRAMMED_AXES } from './state-machine-layout.js'
 
 export const TRANSITIONS_PAGE_SIZE = 12

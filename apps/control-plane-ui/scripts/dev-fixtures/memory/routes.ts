@@ -1,12 +1,21 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
+import type {
+  MemoryTreeContentResponse,
+  TrajectoryContentResponse
+} from '../../../shared/artifact-content.js'
 import memoryTrajectory from '../data/memory-trajectory.json' with { type: 'json' }
+import { validateTrajectoryEvent } from '../../../shared/trajectory-events.js'
 import { BASE_TIME } from '../runs/generate.js'
 import type {
   CatalogOverviewWorkflow,
   ExtractionRecord,
   ObservationRecord
 } from '../../../browser/features/memory/api-types.generated.js'
+
+const trajectoryContent: TrajectoryContentResponse = {
+  events: memoryTrajectory.events.map(validateTrajectoryEvent)
+}
 
 const LOAD_ERROR_REVISION = 404
 
@@ -344,7 +353,7 @@ export function createMemoryHandler(
         response.end(JSON.stringify({ error: 'memory_catalog_unavailable' }))
         return
       }
-      response.end(JSON.stringify(memoryTrajectory))
+      response.end(JSON.stringify(trajectoryContent))
       return
     }
     const memoryDownloadMatch =
@@ -397,7 +406,11 @@ export function createMemoryHandler(
       const files = memoryFilesByRevision.get(revision)
       if (files === undefined) response.statusCode = 404
       response.end(
-        JSON.stringify(files === undefined ? { error: 'not_found' } : { files })
+        JSON.stringify(
+          files === undefined
+            ? { error: 'not_found' }
+            : ({ files } satisfies MemoryTreeContentResponse)
+        )
       )
       return
     }

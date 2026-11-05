@@ -9,9 +9,9 @@ import {
   TextInput
 } from '@mantine/core'
 
-import { useMessages, type Message } from '../../shared/i18n.js'
-import { adminRunAction, type AdminRunAction } from './api.js'
-import { abandonFailureMessageKey } from './format.js'
+import { useMessages, type Message } from '../../../shared/i18n.js'
+import { adminRunAction, type AdminRunAction } from '../api.js'
+import { abandonFailureMessageKey } from '../format.js'
 
 /** What one operator decision says about itself; everything else is shared. */
 export interface AdminRunActionConfig {

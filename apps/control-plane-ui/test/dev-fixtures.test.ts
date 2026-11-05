@@ -601,3 +601,28 @@ test('memory fixtures form one coherent provenance graph', async () => {
     await fixture.close()
   }
 })
+
+test('fixture event responses preserve the contract reason for a failed transition', async () => {
+  const { runs } = await import('../scripts/dev-fixtures/runs/generate.js')
+  const run = runs.find(
+    (value) =>
+      value.preparation.status === 'failed' &&
+      value.preparation.failure_code !== null
+  )!
+  const fixture = await startFixtureServer()
+  try {
+    const response = await fetch(
+      `${fixture.base}/api/runs/${run.run_id}/events`
+    )
+    assert.equal(response.status, 200)
+    const body = await response.json()
+    const transition = body.events.find(
+      (event: { axis: string; to_status: string }) =>
+        event.axis === 'preparation' && event.to_status === 'failed'
+    )
+    assert.ok(transition)
+    assert.equal(transition.reason_code, run.preparation.failure_code)
+  } finally {
+    await fixture.close()
+  }
+})

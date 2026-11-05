@@ -19,7 +19,7 @@ test('runtime recordings show natural flat order with subagent and summary label
     const edit = page.getByRole('button', { name: 'Edit input' })
     if (await edit.isVisible()) await edit.click()
     const raw = transcriptCorpus(`${name}.jsonl`)
-    await page.getByLabel('Paste transcript JSONL').fill(raw)
+    await page.getByLabel('Paste trajectory JSONL').fill(raw)
     await page.getByRole('button', { name: 'Render', exact: true }).click()
     const messages = page.locator('[data-trajectory-message-key]')
     await expect(messages.first()).toHaveAttribute(
@@ -100,7 +100,7 @@ test('failed analysis retains readable tool errors and repeated prompt navigatio
     new URL('../fixtures/trajectory-failed-analysis.jsonl', import.meta.url),
     'utf8'
   )
-  await page.getByLabel('Paste transcript JSONL').fill(raw)
+  await page.getByLabel('Paste trajectory JSONL').fill(raw)
   await page.getByRole('button', { name: 'Render', exact: true }).click()
   const references = page.getByRole('button', {
     name: 'Unchanged system instructions — view earlier message'
@@ -203,7 +203,7 @@ test('truncated transcript shows a parse alert outside message cards', async ({
     ),
     'utf8'
   )
-  await page.getByLabel('Paste transcript JSONL').fill(raw)
+  await page.getByLabel('Paste trajectory JSONL').fill(raw)
   await page.getByRole('button', { name: 'Render', exact: true }).click()
   await expect(page.getByRole('alert')).toBeVisible()
   await expect(page.locator('.trajectory-message')).toHaveCount(0)

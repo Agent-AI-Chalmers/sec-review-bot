@@ -9,7 +9,7 @@ import {
   latestTransitionAxis,
   transitionDuration,
   transitionExplanation
-} from '../browser/features/runs/transitions.js'
+} from '../browser/features/runs/detail/transitions.js'
 
 function event(overrides: Partial<RunEvent>): RunEvent {
   return {

@@ -2,29 +2,18 @@ import React from 'react'
 import {
   ActionIcon,
   Alert,
-  Badge,
   Button,
-  Collapse,
   Group,
   Modal,
-  ScrollArea,
   SegmentedControl,
   Text,
   TextInput,
-  Tooltip,
-  UnstyledButton
+  Tooltip
 } from '@mantine/core'
-import {
-  IconChevronDown,
-  IconChevronRight,
-  IconFile,
-  IconFileText,
-  IconFolder,
-  IconPencil,
-  IconPlus,
-  IconTrash
-} from '@tabler/icons-react'
+import { IconPencil, IconPlus, IconTrash } from '@tabler/icons-react'
 
+import { useWorkspaceSidebar } from './useWorkspaceSidebar.js'
+import { WorkspaceFileTree } from './WorkspaceFileTree.js'
 import { formatBytes } from '../../shared/format.js'
 import { useMessages } from '../../shared/i18n.js'
 import { ICON_SIZE } from '../../shared/design.js'
@@ -38,42 +27,6 @@ const JsonFilePreview = React.lazy(async () => ({
 const MarkdownPreview = React.lazy(async () => ({
   default: (await import('./MarkdownPreview.js')).MarkdownPreview
 }))
-
-interface FileTreeNode {
-  name: string
-  path?: string
-  children: FileTreeNode[]
-}
-
-const SIDEBAR_WIDTH_KEY = 'file-workspace-sidebar-width'
-const DEFAULT_SIDEBAR_WIDTH = 240
-const MIN_SIDEBAR_WIDTH = 180
-const MAX_SIDEBAR_WIDTH = 480
-
-function storedSidebarWidth(): number {
-  const value = Number(localStorage.getItem(SIDEBAR_WIDTH_KEY))
-  return Number.isFinite(value)
-    ? Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, value))
-    : DEFAULT_SIDEBAR_WIDTH
-}
-
-function buildFileTree(paths: string[]): FileTreeNode[] {
-  const root: FileTreeNode = { name: '', children: [] }
-  for (const path of paths.sort()) {
-    const parts = path.split('/')
-    let parent = root
-    parts.forEach((part, index) => {
-      let child = parent.children.find((item) => item.name === part)
-      if (!child) {
-        child = { name: part, children: [] }
-        parent.children.push(child)
-      }
-      if (index === parts.length - 1) child.path = path
-      parent = child
-    })
-  }
-  return root.children
-}
 
 function validFilePath(path: string): boolean {
   if (!path || path.startsWith('/') || path.endsWith('/')) return false
@@ -104,82 +57,6 @@ function linkedFile(
   }
   const target = normalized.join('/')
   return Object.hasOwn(files, target) ? target : undefined
-}
-
-function FileTreeItem({
-  node,
-  depth,
-  selectedFile,
-  onSelect,
-  modifiedFiles,
-  fileMarkers
-}: {
-  node: FileTreeNode
-  depth: number
-  selectedFile: string
-  onSelect: (path: string) => void
-  modifiedFiles: ReadonlySet<string>
-  fileMarkers: Readonly<Record<string, { label: string; color: string }>>
-}): React.JSX.Element {
-  const [opened, setOpened] = React.useState(true)
-  if (node.path === undefined) {
-    return (
-      <div>
-        <UnstyledButton
-          className="file-workspace-node file-workspace-directory"
-          style={{ paddingLeft: 8 + depth * 16 }}
-          onClick={() => setOpened((current) => !current)}
-        >
-          {opened ? (
-            <IconChevronDown size={ICON_SIZE.sm} />
-          ) : (
-            <IconChevronRight size={ICON_SIZE.sm} />
-          )}
-          <IconFolder size={ICON_SIZE.md} />
-          <span>{node.name}</span>
-        </UnstyledButton>
-        <Collapse expanded={opened}>
-          {node.children.map((child) => (
-            <FileTreeItem
-              key={`${node.name}/${child.name}`}
-              node={child}
-              depth={depth + 1}
-              selectedFile={selectedFile}
-              onSelect={onSelect}
-              modifiedFiles={modifiedFiles}
-              fileMarkers={fileMarkers}
-            />
-          ))}
-        </Collapse>
-      </div>
-    )
-  }
-  return (
-    <UnstyledButton
-      className="file-workspace-node file-workspace-file"
-      data-active={node.path === selectedFile || undefined}
-      data-modified={modifiedFiles.has(node.path) || undefined}
-      style={{ paddingLeft: 24 + depth * 16 }}
-      onClick={() => onSelect(node.path!)}
-    >
-      {node.name.endsWith('.md') ? (
-        <IconFileText size={ICON_SIZE.md} />
-      ) : (
-        <IconFile size={ICON_SIZE.md} />
-      )}
-      <span>{node.name}</span>
-      {fileMarkers[node.path] && (
-        <Badge
-          size="xs"
-          variant="light"
-          color={fileMarkers[node.path]?.color}
-          className="file-workspace-marker"
-        >
-          {fileMarkers[node.path]?.label}
-        </Badge>
-      )}
-    </UnstyledButton>
-  )
 }
 
 export function FileWorkspace({
@@ -213,17 +90,11 @@ export function FileWorkspace({
   const [pathInput, setPathInput] = React.useState('')
   const [pathError, setPathError] = React.useState('')
   const [deleteOpen, setDeleteOpen] = React.useState(false)
-  const [sidebarWidth, setSidebarWidth] = React.useState(storedSidebarWidth)
-  const workspaceRef = React.useRef<HTMLDivElement>(null)
-  const currentSidebarWidth = React.useRef(sidebarWidth)
-  const dragStart = React.useRef<{ pointerX: number; width: number } | null>(
-    null
-  )
-  const tree = React.useMemo(
-    () =>
-      buildFileTree([
-        ...new Set([...Object.keys(files), ...Object.keys(unpreviewableFiles)])
-      ]),
+  const { workspaceRef, sidebarWidth, splitterProps } = useWorkspaceSidebar()
+  const paths = React.useMemo(
+    () => [
+      ...new Set([...Object.keys(files), ...Object.keys(unpreviewableFiles)])
+    ],
     [files, unpreviewableFiles]
   )
   const isMarkdown = selectedFile.endsWith('.md')
@@ -246,23 +117,6 @@ export function FileWorkspace({
     unpreviewable
   ])
 
-  const updateSidebarWidth = (width: number, persist = false): void => {
-    const workspaceWidth =
-      workspaceRef.current?.getBoundingClientRect().width ?? 0
-    const responsiveMaximum = workspaceWidth
-      ? Math.max(MIN_SIDEBAR_WIDTH, workspaceWidth * 0.45)
-      : MAX_SIDEBAR_WIDTH
-    const next = Math.round(
-      Math.min(
-        MAX_SIDEBAR_WIDTH,
-        responsiveMaximum,
-        Math.max(MIN_SIDEBAR_WIDTH, width)
-      )
-    )
-    currentSidebarWidth.current = next
-    setSidebarWidth(next)
-    if (persist) localStorage.setItem(SIDEBAR_WIDTH_KEY, String(next))
-  }
   const openOperation = (next: 'new' | 'rename'): void => {
     setOperation(next)
     setPathInput(next === 'rename' ? selectedFile : '')
@@ -363,59 +217,20 @@ export function FileWorkspace({
               </Group>
             </Group>
           )}
-          <ScrollArea className="file-workspace-files">
-            {tree.map((node) => (
-              <FileTreeItem
-                key={node.name}
-                node={node}
-                depth={0}
-                selectedFile={selectedFile}
-                onSelect={onSelectFile}
-                modifiedFiles={modifiedFiles}
-                fileMarkers={fileMarkers}
-              />
-            ))}
-          </ScrollArea>
+          <WorkspaceFileTree
+            paths={paths}
+            selectedFile={selectedFile}
+            onSelect={onSelectFile}
+            modifiedFiles={modifiedFiles}
+            fileMarkers={fileMarkers}
+          />
         </div>
         <div
           className="file-workspace-splitter"
           role="separator"
           aria-label={t('resizeFileTree')}
           aria-orientation="vertical"
-          aria-valuemin={MIN_SIDEBAR_WIDTH}
-          aria-valuemax={MAX_SIDEBAR_WIDTH}
-          aria-valuenow={sidebarWidth}
-          tabIndex={0}
-          onDoubleClick={() => updateSidebarWidth(DEFAULT_SIDEBAR_WIDTH, true)}
-          onKeyDown={(event) => {
-            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-            event.preventDefault()
-            updateSidebarWidth(
-              sidebarWidth + (event.key === 'ArrowLeft' ? -16 : 16),
-              true
-            )
-          }}
-          onPointerDown={(event) => {
-            dragStart.current = { pointerX: event.clientX, width: sidebarWidth }
-            event.currentTarget.setPointerCapture(event.pointerId)
-          }}
-          onPointerMove={(event) => {
-            if (dragStart.current)
-              updateSidebarWidth(
-                dragStart.current.width +
-                  event.clientX -
-                  dragStart.current.pointerX
-              )
-          }}
-          onPointerUp={(event) => {
-            if (!dragStart.current) return
-            dragStart.current = null
-            event.currentTarget.releasePointerCapture(event.pointerId)
-            localStorage.setItem(
-              SIDEBAR_WIDTH_KEY,
-              String(currentSidebarWidth.current)
-            )
-          }}
+          {...splitterProps}
         />
         <div className="file-workspace-content">
           <Group justify="space-between" mb="md" wrap="nowrap">

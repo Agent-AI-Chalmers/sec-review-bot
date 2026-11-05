@@ -12,13 +12,13 @@ import {
 } from '@mantine/core'
 import { IconChevronDown, IconSitemap } from '@tabler/icons-react'
 
-import { ICON_SIZE } from '../../shared/design.js'
-import type { Run, RunEvent } from './api.js'
-import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
-import { axisLabel } from './status.js'
-import { useNow } from '../../shared/useNow.js'
-import { type StateAxis } from './state-machines.generated.js'
-import { failureCodeLabel, formatDuration } from './format.js'
+import { ICON_SIZE } from '../../../shared/design.js'
+import type { Run, RunEvent } from '../api.js'
+import { formatDate, useLanguage, useMessages } from '../../../shared/i18n.js'
+import { axisLabel } from '../status.js'
+import { useNow } from '../../../shared/useNow.js'
+import { type StateAxis } from '../state-machines.generated.js'
+import { failureCodeLabel, formatDuration } from '../format.js'
 import {
   TRANSITIONS_PAGE_SIZE,
   actualTransitions,

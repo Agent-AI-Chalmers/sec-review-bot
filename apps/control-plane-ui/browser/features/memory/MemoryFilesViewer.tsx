@@ -1,6 +1,7 @@
 import React from 'react'
 import { Modal } from '@mantine/core'
 
+import type { MemoryTreeContentResponse } from '../../../shared/artifact-content.js'
 import { api } from '../../shared/api-client.js'
 import { useMessages } from '../../shared/i18n.js'
 import { ArtifactWorkspace } from '../workspace/ArtifactWorkspace.js'
@@ -18,7 +19,7 @@ export function MemoryFilesContent({
       fullPage={fullPage}
       source={{
         load: async (signal) => {
-          const body = await api<{ files: Record<string, string> }>(
+          const body = await api<MemoryTreeContentResponse>(
             `/memory/revisions/${revision}/content`,
             { signal }
           )

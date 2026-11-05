@@ -22,13 +22,14 @@ import { failureReason } from '../shared/format.js'
 import { ICON_SIZE } from '../shared/design.js'
 
 const Runs = React.lazy(async () => ({
-  default: (await import('../features/runs/Runs.js')).Runs
+  default: (await import('../features/runs/overview/Runs.js')).Runs
 }))
 const Detail = React.lazy(async () => ({
-  default: (await import('../features/runs/Detail.js')).Detail
+  default: (await import('../features/runs/detail/Detail.js')).Detail
 }))
 const RunFilesPage = React.lazy(async () => ({
-  default: (await import('../features/runs/RunFilesViewer.js')).RunFilesPage
+  default: (await import('../features/runs/detail/RunFilesViewer.js'))
+    .RunFilesPage
 }))
 const Memory = React.lazy(async () => ({
   default: (await import('../features/memory/Memory.js')).Memory
