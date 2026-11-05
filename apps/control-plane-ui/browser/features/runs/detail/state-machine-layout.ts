@@ -7,7 +7,7 @@
 //
 // Anything not listed falls back to the component's computed grid (forward-flow layering with
 // side branches on the row below).
-import type { StateAxis } from './state-machines.generated.js'
+import type { StateAxis } from '../state-machines.generated.js'
 
 /** Which lifecycle axes the console draws, in lifecycle order. */
 export const DIAGRAMMED_AXES = [

@@ -1,5 +1,6 @@
 import React from 'react'
 
+import type { TrajectoryContentResponse } from '../../../shared/artifact-content.js'
 import {
   api,
   isAbortError,
@@ -30,7 +31,7 @@ export function TrajectoryContent({
     setEvents([])
     setLoading(true)
     setError(undefined)
-    void api<{ events: TrajectoryEvent[] }>(contentHref, {
+    void api<TrajectoryContentResponse>(contentHref, {
       signal: request.signal
     })
       .then((body) => {

@@ -10,6 +10,7 @@ import {
 } from '@mantine/core'
 import { IconExternalLink } from '@tabler/icons-react'
 
+import type { MemoryTreeContentResponse } from '../../../shared/artifact-content.js'
 import {
   api,
   isAbortError,
@@ -125,17 +126,16 @@ export function MemoryRevisionDiffContent({
     // on the revision so a branch created after a restore compares against its actual parent.
     const previous =
       predecessorRevision === null
-        ? Promise.resolve({ files: {} as Record<string, string> })
-        : api<{ files: Record<string, string> }>(
+        ? Promise.resolve<MemoryTreeContentResponse>({ files: {} })
+        : api<MemoryTreeContentResponse>(
             `/memory/revisions/${predecessorRevision}/content`,
             { signal: controller.signal }
           )
     void Promise.all([
       previous,
-      api<{ files: Record<string, string> }>(
-        `/memory/revisions/${revision}/content`,
-        { signal: controller.signal }
-      )
+      api<MemoryTreeContentResponse>(`/memory/revisions/${revision}/content`, {
+        signal: controller.signal
+      })
     ])
       .then(([previousBody, currentBody]) => {
         if (controller.signal.aborted) return

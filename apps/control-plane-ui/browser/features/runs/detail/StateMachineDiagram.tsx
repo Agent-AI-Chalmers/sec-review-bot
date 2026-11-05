@@ -2,12 +2,12 @@ import React from 'react'
 
 import { Tooltip } from '@mantine/core'
 
-import type { Run, RunEvent } from './api.js'
-import { useMessages } from '../../shared/i18n.js'
+import type { Run, RunEvent } from '../api.js'
+import { useMessages } from '../../../shared/i18n.js'
 import type {
   StateAxis,
   StateMachine as StateMachineDefinition
-} from './state-machines.generated.js'
+} from '../state-machines.generated.js'
 import {
   STATE_LAYOUT,
   revertSide,

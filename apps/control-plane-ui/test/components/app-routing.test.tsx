@@ -12,7 +12,7 @@ vi.mock('../../browser/app/preferences.js', () => ({
   PreferenceControls: (): null => null
 }))
 
-vi.mock('../../browser/features/runs/Runs.js', () => ({
+vi.mock('../../browser/features/runs/overview/Runs.js', () => ({
   Runs: (): React.JSX.Element => <div>Runs route</div>
 }))
 

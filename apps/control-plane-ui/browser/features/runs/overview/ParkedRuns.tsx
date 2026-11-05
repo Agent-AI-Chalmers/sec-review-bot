@@ -11,12 +11,12 @@ import {
 } from '@mantine/core'
 import { IconAlertTriangle, IconChevronRight } from '@tabler/icons-react'
 
-import type { ParkedRun } from './api.js'
-import { useMessages } from '../../shared/i18n.js'
-import { axisLabel } from './status.js'
-import { formatDuration } from './format.js'
-import { ICON_SIZE } from '../../shared/design.js'
-import { useNow } from '../../shared/useNow.js'
+import type { ParkedRun } from '../api.js'
+import { useMessages } from '../../../shared/i18n.js'
+import { axisLabel } from '../status.js'
+import { formatDuration } from '../format.js'
+import { ICON_SIZE } from '../../../shared/design.js'
+import { useNow } from '../../../shared/useNow.js'
 
 /** The operator queue for runs whose coordination stopped without concluding. */
 export function ParkedRuns({

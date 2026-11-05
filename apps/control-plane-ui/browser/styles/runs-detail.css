@@ -153,6 +153,10 @@
   box-shadow: var(--shadow-sm);
 }
 
+.operations-bar .operations-filter-groups {
+  column-gap: var(--space-7);
+}
+
 .operations-row {
   display: block;
 }

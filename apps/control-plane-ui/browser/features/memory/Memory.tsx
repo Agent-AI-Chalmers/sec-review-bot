@@ -1,46 +1,33 @@
 import React from 'react'
 import { Alert, Container, Tabs, Title } from '@mantine/core'
 import {
-  api,
   apiPost,
   ApiError,
   isUnauthorizedApiError,
   throwIfUnauthorized
 } from '../../shared/api-client.js'
 import { useMessages, type Message } from '../../shared/i18n.js'
-import { useResource } from '../../shared/resource.js'
 import type {
-  MaintenanceControl,
   MaintenanceControlOperation,
-  MemoryTree,
   MemoryTreeRestoreOperation,
-  MemoryTreeRevision,
-  MemoryTreeRevisionList,
-  ObservationList
+  MemoryTreeRevision
 } from './api-types.generated.js'
 import { MemoryEditorDialog, MemoryRestoreDialog } from './MemoryDialogs.js'
 import { MemoryFilesViewer } from './MemoryFilesViewer.js'
 import { MemoryHeader } from './MemoryHeader.js'
 import { MemoryObservationList } from './MemoryObservationList.js'
-import {
-  MemoryOverview,
-  type CatalogOverview,
-  type OverviewRange
-} from './MemoryOverview.js'
+import { MemoryOverview } from './MemoryOverview.js'
 import { MemoryRevisionDiffViewer } from './MemoryRevisionDiff.js'
 import { MemoryRevisionHistory } from './MemoryRevisionHistory.js'
 import { useMemoryEditor } from './useMemoryEditor.js'
-import { useRefresh } from '../../shared/refresh.js'
+import { useMemoryResources } from './useMemoryResources.js'
 import { LoadingState } from '../../shared/StateMessage.js'
 import {
   TrajectoryViewer,
   type TrajectoryTarget
 } from '../trajectory/TrajectoryViewer.js'
 
-type Control = MaintenanceControl
 type Revision = MemoryTreeRevision
-type RevisionPage = MemoryTreeRevisionList
-type ObservationPage = ObservationList
 type MaintenanceControlRequest = Omit<MaintenanceControlOperation, 'actor'>
 type RestoreRequest = Omit<MemoryTreeRestoreOperation, 'actor'>
 
@@ -50,27 +37,18 @@ function operationId(): string {
 
 export function Memory(): React.JSX.Element {
   const t = useMessages()
-  // The selected range lives in a ref as well as in state: a reload has to read the range
-  // the reader picked, not the one this render closed over.
-  const overviewRangeRef = React.useRef<OverviewRange>('30d')
-  const [overviewRange, setOverviewRange] = React.useState<OverviewRange>('30d')
-  const control = useResource((signal) =>
-    api<Control>('/memory/maintenance-control', { signal })
-  )
-  const tree = useResource((signal) =>
-    api<MemoryTree>('/memory/tree', { signal })
-  )
-  const revisions = useResource((signal) =>
-    api<RevisionPage>('/memory/revisions?limit=50', { signal })
-  )
-  const observations = useResource((signal) =>
-    api<ObservationPage>('/memory/observations?limit=50', { signal })
-  )
-  const overview = useResource((signal) =>
-    api<CatalogOverview>(`/memory/overview?range=${overviewRangeRef.current}`, {
-      signal
-    })
-  )
+  const {
+    control,
+    tree,
+    revisions,
+    observations,
+    overview,
+    overviewRange,
+    changeOverviewRange,
+    refresh,
+    refreshing,
+    lastChecked
+  } = useMemoryResources()
   const activeRevision = tree.data?.revision
   const editor = useMemoryEditor()
   const [restoreRevision, setRestoreRevision] = React.useState<number>()
@@ -84,29 +62,6 @@ export function Memory(): React.JSX.Element {
   const [error, setError] = React.useState('')
   const [queryFailure, setQueryFailure] = React.useState<unknown>()
   const [busy, setBusy] = React.useState(false)
-
-  const load = React.useCallback(async (): Promise<void> => {
-    await Promise.all([
-      control.reload(),
-      tree.reload(),
-      revisions.reload(),
-      observations.reload(),
-      overview.reload()
-    ])
-  }, [
-    control.reload,
-    observations.reload,
-    overview.reload,
-    revisions.reload,
-    tree.reload
-  ])
-  const { refresh, refreshing, lastChecked } = useRefresh(load)
-
-  const changeOverviewRange = async (range: OverviewRange): Promise<void> => {
-    setOverviewRange(range)
-    overviewRangeRef.current = range
-    await overview.reload()
-  }
 
   const revealRevision = (revision: number): void => {
     setActiveTab('revisions')

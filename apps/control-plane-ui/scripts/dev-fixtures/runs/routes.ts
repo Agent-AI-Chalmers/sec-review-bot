@@ -1,5 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 
+import type {
+  ListParkedRunsResponseBody,
+  ListRunPublicationStepsResponseBody,
+  ListRunEventsResponseBody
+} from '../../../browser/features/runs/api-types.generated.js'
+import type { RunArtifactContentResponse } from '../../../shared/artifact-content.js'
+import type { ParkedRun } from '../../../browser/features/runs/api.js'
 import artifactContent from '../data/artifact-content.json' with { type: 'json' }
 import {
   DECLARED_QUERY_PARAMS,
@@ -45,15 +52,7 @@ export function createRunsHandler(): (
         : run.publication.status === 'disconnected'
           ? 'publication'
           : null
-  const blockedRuns = (): Array<{
-    run_id: string
-    axis: 'preparation' | 'execution' | 'publication'
-    reason:
-      | 'EXECUTION_ALREADY_ADVANCED'
-      | 'SUBMISSION_RECOVERY_EXHAUSTED'
-      | 'PUBLICATION_RECONCILIATION_EXHAUSTED'
-    parked_at: string
-  }> =>
+  const blockedRuns = (): ParkedRun[] =>
     runs.flatMap((run, index) => {
       // Only the runs this fixture deliberately parked are queued. A run whose state
       // merely happens to be `disconnected` (the lifecycle scenarios, repeated across the
@@ -199,7 +198,7 @@ export function createRunsHandler(): (
               runId
             )
           }
-        })
+        } satisfies RunArtifactContentResponse)
       )
       return
     }
@@ -389,7 +388,11 @@ export function createRunsHandler(): (
       // the contradictory shape coordination refuses to resolve), so it is invented here
       // rather than mutating a real run. The ids are real, so following one opens a detail
       // page that loads.
-      response.end(JSON.stringify({ blocks: blockedRuns() }))
+      response.end(
+        JSON.stringify({
+          blocks: blockedRuns()
+        } satisfies ListParkedRunsResponseBody)
+      )
       return
     }
     const stepsMatch = /^\/api\/runs\/([^/?]+)\/publication-steps$/.exec(
@@ -401,7 +404,7 @@ export function createRunsHandler(): (
         JSON.stringify({
           run_id: runId,
           publication_steps: stepsByRun.get(runId) ?? []
-        })
+        } satisfies ListRunPublicationStepsResponseBody)
       )
       return
     }
@@ -415,7 +418,10 @@ export function createRunsHandler(): (
         return
       }
       response.end(
-        JSON.stringify({ run_id: run.run_id, events: eventsFor(run) })
+        JSON.stringify({
+          run_id: run.run_id,
+          events: eventsFor(run)
+        } satisfies ListRunEventsResponseBody)
       )
       return
     }

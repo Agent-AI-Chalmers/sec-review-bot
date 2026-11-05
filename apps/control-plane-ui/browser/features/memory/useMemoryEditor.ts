@@ -1,5 +1,6 @@
 import React from 'react'
 
+import type { MemoryTreeContentResponse } from '../../../shared/artifact-content.js'
 import { api, apiPost } from '../../shared/api-client.js'
 
 interface EditorFiles {
@@ -30,7 +31,7 @@ export function useMemoryEditor(): MemoryEditor {
       baseRevision === 0
         ? { 'MEMORY.md': '# Security Review Experience Memory\n' }
         : (
-            await api<{ files: Record<string, string> }>(
+            await api<MemoryTreeContentResponse>(
               `/memory/revisions/${baseRevision}/content`
             )
           ).files

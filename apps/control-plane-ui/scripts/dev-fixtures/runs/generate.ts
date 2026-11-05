@@ -1,116 +1,33 @@
 import type {
   ArtifactStorage,
-  Run
+  PublicationStep,
+  Run,
+  RunEvent
 } from '../../../browser/features/runs/api.js'
 
 import { LIST_RUN_QUERY_PARAMS } from '../../../shared/list-run-query-params.js'
 import scenarioData from '../data/run-scenarios.json' with { type: 'json' }
 import { validateRun } from './validate.js'
 
-type Workflow = 'issue-review' | 'pull-request-review' | 'repository-review'
-type ExecutionStatus =
-  | 'pending'
-  | 'uncertain'
-  | 'disconnected'
-  | 'queued'
-  | 'running'
-  | 'succeeded'
-  | 'skipped'
-  | 'failed'
-type PublicationStatus =
-  | 'pending'
-  | 'publishing'
-  | 'uncertain'
-  | 'disconnected'
-  | 'published'
-  | 'failed'
-  | 'skipped'
-type PreparationStatus =
-  | 'pending'
-  | 'preparing'
-  | 'uncertain'
-  | 'disconnected'
-  | 'submitted'
-  | 'failed'
-type NoticeStage = 'pending' | 'delivering' | 'delivered' | 'failed'
-type ArtifactStatus = 'available' | 'unavailable' | 'failed'
-type StepStatus =
-  | 'pending'
-  | 'running'
-  | 'uncertain'
-  | 'disconnected'
-  | 'succeeded'
-  | 'failed'
-  | 'terminal_failed'
+type Workflow = Run['workflow']
+type ExecutionStatus = Run['execution']['status']
+type PublicationStatus = Run['publication']['status']
+type PreparationStatus = Run['preparation']['status']
+type NoticeStage = Run['notices'][number]['status']
+type ArtifactStatus = NonNullable<ArtifactStorage>['status']
+type StepStatus = PublicationStep['status']
 type FixtureSourcePlatform = 'github' | 'gitlab' | 'unknown'
 
 // The contract's own artifact union, not a look-alike: `available` is the only status that may
 // carry `artifact`, and the fixtures must satisfy the same shape the console renders.
 type FixtureArtifact = NonNullable<ArtifactStorage>
 
-export interface FixtureRun {
-  run_id: string
-  workflow: Workflow
-  connector_id: string
+// Preview multiple platforms even though the current admission contract accepts only GitHub.
+export type FixtureRun = Omit<Run, 'source_platform'> & {
   source_platform: FixtureSourcePlatform
-  preparation: {
-    status: PreparationStatus
-    attempt_count: number
-    started_at: string | null
-    finished_at: string | null
-    updated_at: string
-    failure_code: string | null
-    disconnect_reason: string | null
-  }
-  notices: Run['notices']
-  execution: {
-    status: ExecutionStatus
-    started_at: string | null
-    finished_at: string | null
-    updated_at: string
-  }
-  execution_statistics: Run['execution_statistics']
-  publication: {
-    status: PublicationStatus
-    started_at: string | null
-    finished_at: string | null
-    updated_at: string
-  }
-  created_at: string
-  failure_code: string | null
-  artifact_storage: FixtureArtifact | null
 }
 
-/**
- * The fixtures are served as the console's own read responses, so their shape must be the
- * console's `Run` type exactly — not a hand-maintained look-alike that drifts from it.
- *
- * `validateRun` below checks that a fixture is internally *consistent* (a phase may not end
- * before it starts, a skipped run never started, and so on). That is a different question from
- * whether it is the *right shape*, and consistency alone silently tolerated a fixture that had
- * not been migrated to the nested axis objects: every field was still reachable, so nothing
- * failed, but the console rendered `undefined`. This alias makes the shape a compile-time fact:
- * widening, narrowing, or renaming a field on either side stops compiling here.
- */
-type ContractShapedFixtureRun = Omit<FixtureRun, 'source_platform'> & {
-  source_platform: Run['source_platform']
-}
-type FixtureMatchesRun = ContractShapedFixtureRun extends Run ? true : false
-type RunMatchesFixture = Run extends ContractShapedFixtureRun ? true : false
-
-const _fixtureMatchesRun: FixtureMatchesRun = true
-const _runMatchesFixture: RunMatchesFixture = true
-void _fixtureMatchesRun
-void _runMatchesFixture
-
-export interface FixtureStep {
-  step_key: string
-  status: StepStatus
-  attempt_count: number
-  remote_object_url: string | null
-  failure_code: string | null
-  failure_message: string | null
-}
+export type FixtureStep = PublicationStep
 
 /**
  * One reachable slice of a run's lifecycle. Every field here is implied by the
@@ -523,17 +440,10 @@ function artifactFor(
  * axes mirror what Review Runs writes: execution and preparation start at admission,
  * publication starts once execution succeeds.
  */
-export function eventsFor(run: FixtureRun): Array<{
-  event_id: number
-  axis: 'execution' | 'preparation' | 'publication'
-  from_status: string | null
-  to_status: string
-  failure_code: string | null
-  occurred_at: string
-}> {
+export function eventsFor(run: FixtureRun): RunEvent[] {
   let eventId = 0
   const push = (
-    axis: 'execution' | 'preparation' | 'publication',
+    axis: RunEvent['axis'],
     from: string | null,
     to: string,
     at: string,
@@ -543,7 +453,7 @@ export function eventsFor(run: FixtureRun): Array<{
     axis,
     from_status: from,
     to_status: to,
-    failure_code: reason,
+    reason_code: reason,
     occurred_at: at
   })
   const events = [

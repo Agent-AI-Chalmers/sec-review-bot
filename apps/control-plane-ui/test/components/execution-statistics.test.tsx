@@ -3,7 +3,7 @@ import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { expect, test } from 'vitest'
 
-import { ExecutionStatistics } from '../../browser/features/runs/ExecutionStatistics.js'
+import { ExecutionStatistics } from '../../browser/features/runs/detail/ExecutionStatistics.js'
 import type { Run } from '../../browser/features/runs/api.js'
 import { renderComponent } from './render.js'
 

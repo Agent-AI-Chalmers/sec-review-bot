@@ -1,264 +1,18 @@
-import React from 'react'
-import {
-  ActionIcon,
-  Badge,
-  Button,
-  Code,
-  Collapse,
-  Group,
-  Paper,
-  SegmentedControl,
-  Text,
-  Tooltip
-} from '@mantine/core'
-import {
-  IconArrowDown,
-  IconArrowUp,
-  IconCheck,
-  IconChevronDown,
-  IconChevronRight,
-  IconCopy,
-  IconTool
-} from '@tabler/icons-react'
-
+import type React from 'react'
+import { Badge, Button, Code, Group, Paper, Text } from '@mantine/core'
+import { IconArrowUp } from '@tabler/icons-react'
 import { useMessages } from '../../shared/i18n.js'
 import { ICON_SIZE } from '../../shared/design.js'
-import type { ToolCallView, TrajectoryMessageView } from './trajectory-model.js'
+import type { TrajectoryMessageView } from './trajectory-model.js'
 import { rolePresentation } from './trajectory-roles.js'
 import {
   messageKey,
   scrollToTrajectoryElement
 } from './trajectory-navigation.js'
-import { HighlightText, TrajectoryText } from './TrajectoryText.js'
-import { DiffView } from './DiffView.js'
-import { ToolArguments } from './ToolArguments.js'
+import { HighlightText } from './TrajectoryText.js'
 import { TokenUsagePopover } from './TokenUsagePopover.js'
-
-function CopyButton({ value }: { value: string }): React.JSX.Element {
-  const t = useMessages()
-  const [copied, setCopied] = React.useState(false)
-  const copy = async (): Promise<void> => {
-    await navigator.clipboard.writeText(value)
-    setCopied(true)
-    window.setTimeout(() => setCopied(false), 2000)
-  }
-  return (
-    <Tooltip label={copied ? t('copied') : t('copy')}>
-      <ActionIcon
-        variant="subtle"
-        color="gray"
-        aria-label={copied ? t('copied') : t('copy')}
-        onClick={() => void copy()}
-      >
-        {copied ? (
-          <IconCheck size={ICON_SIZE.sm} />
-        ) : (
-          <IconCopy size={ICON_SIZE.sm} />
-        )}
-      </ActionIcon>
-    </Tooltip>
-  )
-}
-
-function Section({
-  kind,
-  title,
-  value,
-  openedInitially = false,
-  force,
-  children,
-  color = 'blue',
-  query = ''
-}: {
-  kind: 'message' | 'reasoning' | 'result' | 'artifact'
-  title: string
-  value: string
-  openedInitially?: boolean
-  force: number
-  children?: React.ReactNode
-  query?: string
-  color?: string
-}): React.JSX.Element {
-  const t = useMessages()
-  const [mode, setMode] = React.useState('preview')
-  const hasPreview = kind === 'message' || kind === 'reasoning'
-  const [opened, setOpened] = React.useState(openedInitially)
-  const previousForce = React.useRef(force)
-  React.useEffect(() => {
-    if (force === previousForce.current) return
-    previousForce.current = force
-    setOpened(force > 0)
-  }, [force])
-  return (
-    <div className="trajectory-section" data-trajectory-section={kind}>
-      <Group
-        justify="space-between"
-        wrap="nowrap"
-        className="trajectory-section-header"
-      >
-        <Button
-          variant="subtle"
-          color={color}
-          size="compact-sm"
-          className="trajectory-section-toggle"
-          aria-expanded={opened}
-          onClick={() => setOpened((current) => !current)}
-        >
-          <Group gap={6} wrap="nowrap">
-            {opened ? (
-              <IconChevronDown size={ICON_SIZE.sm} />
-            ) : (
-              <IconChevronRight size={ICON_SIZE.sm} />
-            )}
-            {title}
-          </Group>
-        </Button>
-        <Group gap="xs" wrap="nowrap">
-          {hasPreview && opened && (
-            <SegmentedControl
-              size="xs"
-              value={mode}
-              onChange={setMode}
-              data={[
-                { value: 'preview', label: t('preview') },
-                { value: 'source', label: t('source') }
-              ]}
-            />
-          )}
-          <CopyButton value={value} />
-        </Group>
-      </Group>
-      <Collapse expanded={opened}>
-        <div className="trajectory-section-content">
-          {hasPreview ? (
-            <TrajectoryText query={query} mode={mode}>
-              {value}
-            </TrajectoryText>
-          ) : (
-            children
-          )}
-        </div>
-      </Collapse>
-    </div>
-  )
-}
-
-function ToolCall({
-  call,
-  query
-}: {
-  call: ToolCallView
-  query: string
-}): React.JSX.Element {
-  const t = useMessages()
-  const jump = (): void => {
-    if (!call.resultMessageId) return
-    scrollToTrajectoryElement(`trajectory-${call.resultMessageId}`)
-  }
-  return (
-    <div
-      className="trajectory-tool-call"
-      data-result-status={call.resultStatus}
-    >
-      <Group
-        justify="space-between"
-        wrap="nowrap"
-        className="trajectory-tool-call-header"
-      >
-        <Group gap="xs" wrap="nowrap" className="trajectory-tool-call-identity">
-          <IconTool size={ICON_SIZE.md} color="var(--trajectory-tool-color)" />
-          <Text fw={600} size="sm" c="var(--trajectory-tool-color)" truncate>
-            <HighlightText value={call.name} query={query} />
-          </Text>
-          {call.resultStatus === 'error' && (
-            <Badge color="red" size="xs" variant="light">
-              error
-            </Badge>
-          )}
-        </Group>
-        {call.resultMessageId && (
-          <Button
-            variant="subtle"
-            size="compact-xs"
-            leftSection={<IconArrowDown size={ICON_SIZE.sm} />}
-            onClick={jump}
-          >
-            {t('trajectoryJumpResult')}
-          </Button>
-        )}
-      </Group>
-      <div className="trajectory-tool-call-body">
-        {call.diff ? (
-          // The tool reported a real diff (context included); prefer it over
-          // reconstructing anything from the call arguments.
-          <DiffView
-            text={call.diff}
-            query={query}
-            truncated={call.diffTruncated === true}
-          />
-        ) : Object.keys(call.args).length === 0 ? (
-          <Code>{t('trajectoryEmptyArguments')}</Code>
-        ) : (
-          <ToolArguments args={call.args} query={query} />
-        )}
-      </div>
-    </div>
-  )
-}
-
-function ToolCalls({
-  calls,
-  force,
-  query
-}: {
-  calls: ToolCallView[]
-  force: number
-  query: string
-}): React.JSX.Element {
-  const t = useMessages()
-  const [opened, setOpened] = React.useState(true)
-  const previousForce = React.useRef(force)
-  React.useEffect(() => {
-    if (force === previousForce.current) return
-    previousForce.current = force
-    setOpened(force > 0)
-  }, [force])
-  return (
-    <div className="trajectory-tool-calls">
-      <Button
-        variant="subtle"
-        color="green"
-        size="compact-sm"
-        className="trajectory-tool-calls-toggle"
-        aria-expanded={opened}
-        leftSection={
-          opened ? (
-            <IconChevronDown size={ICON_SIZE.sm} />
-          ) : (
-            <IconChevronRight size={ICON_SIZE.sm} />
-          )
-        }
-        onClick={() => setOpened((current) => !current)}
-      >
-        <Group gap={6} wrap="nowrap">
-          <IconTool size={ICON_SIZE.sm} />
-          <Text fw={600} size="sm">
-            {t('trajectoryToolCalls')} · {calls.length}
-          </Text>
-        </Group>
-      </Button>
-      <Collapse expanded={opened}>
-        <div className="trajectory-tool-calls-body">
-          {calls.map((call) => (
-            <div id={call.anchorId} key={call.anchorId}>
-              <ToolCall call={call} query={query} />
-            </div>
-          ))}
-        </div>
-      </Collapse>
-    </div>
-  )
-}
+import { TrajectorySection } from './TrajectorySection.js'
+import { TrajectoryToolCalls } from './TrajectoryToolCalls.js'
 
 export function TrajectoryMessage({
   message,
@@ -347,7 +101,7 @@ export function TrajectoryMessage({
       </Group>
       <div className="trajectory-message-body">
         {message.reasoning && (
-          <Section
+          <TrajectorySection
             kind="reasoning"
             title={t('trajectoryReasoning')}
             value={message.reasoning}
@@ -370,7 +124,7 @@ export function TrajectoryMessage({
           </Button>
         )}
         {message.content && !message.repeatedSystemId && (
-          <Section
+          <TrajectorySection
             kind={message.role === 'tool' ? 'result' : 'message'}
             title={
               message.role === 'tool'
@@ -390,13 +144,17 @@ export function TrajectoryMessage({
                 <HighlightText value={message.content} query={query} />
               </Code>
             )}
-          </Section>
+          </TrajectorySection>
         )}
         {message.toolCalls.length > 0 && (
-          <ToolCalls calls={message.toolCalls} force={force} query={query} />
+          <TrajectoryToolCalls
+            calls={message.toolCalls}
+            force={force}
+            query={query}
+          />
         )}
         {message.artifact !== undefined && message.artifact !== null && (
-          <Section
+          <TrajectorySection
             kind="artifact"
             title={t('trajectoryArtifact')}
             value={JSON.stringify(message.artifact, null, 2)}
@@ -409,7 +167,7 @@ export function TrajectoryMessage({
                 query={query}
               />
             </Code>
-          </Section>
+          </TrajectorySection>
         )}
       </div>
     </Paper>

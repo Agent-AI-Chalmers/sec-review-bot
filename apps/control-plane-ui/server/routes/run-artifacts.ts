@@ -2,6 +2,7 @@ import { createReadStream } from 'node:fs'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { pipeline } from 'node:stream/promises'
 
+import type { RunArtifactContentResponse } from '../../shared/artifact-content.js'
 import {
   ARTIFACT_BUCKET,
   type ArtifactStore,
@@ -89,7 +90,7 @@ export function createRunArtifactRoutes({
         JSON.stringify({
           files: view.files,
           unpreviewable_files: view.unpreviewableFiles
-        })
+        } satisfies RunArtifactContentResponse)
       )
     } catch (error) {
       if (response.headersSent || response.destroyed) return

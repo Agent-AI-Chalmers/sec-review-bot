@@ -57,10 +57,10 @@ export async function runViewerFlow({ page }) {
       }
     })
   ].join('\n')
-  await page.getByLabel('Paste transcript JSONL').fill(pastedTrajectory)
+  await page.getByLabel('Paste trajectory JSONL').fill(pastedTrajectory)
   await page.getByRole('button', { name: 'Render' }).click()
   await page.getByRole('button', { name: 'Edit input' }).waitFor()
-  await page.getByLabel('Paste transcript JSONL').waitFor({ state: 'hidden' })
+  await page.getByLabel('Paste trajectory JSONL').waitFor({ state: 'hidden' })
   await page
     .locator('.trajectory-timeline')
     .getByText('Pasted assistant response', { exact: true })
@@ -235,7 +235,7 @@ export async function runViewerFlow({ page }) {
       })
     ).join('\n')
     await page.getByRole('button', { name: 'Edit input' }).click()
-    await page.getByLabel('Paste transcript JSONL').fill(denseTrajectory)
+    await page.getByLabel('Paste trajectory JSONL').fill(denseTrajectory)
     await page.getByRole('button', { name: 'Render' }).click()
     await page.getByText('Dense message 130', { exact: true }).waitFor()
     await page.waitForFunction(

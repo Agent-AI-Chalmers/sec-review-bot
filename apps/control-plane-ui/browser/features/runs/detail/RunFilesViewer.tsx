@@ -2,14 +2,10 @@ import React from 'react'
 import { Container, Modal, Text } from '@mantine/core'
 import { useParams } from 'react-router-dom'
 
-import { api } from '../../shared/api-client.js'
-import { useMessages } from '../../shared/i18n.js'
-import { ArtifactWorkspace } from '../workspace/ArtifactWorkspace.js'
-
-interface RunFilesResponse {
-  files: Record<string, string>
-  unpreviewable_files: Record<string, { sizeBytes: number }>
-}
+import type { RunArtifactContentResponse } from '../../../../shared/artifact-content.js'
+import { api } from '../../../shared/api-client.js'
+import { useMessages } from '../../../shared/i18n.js'
+import { ArtifactWorkspace } from '../../workspace/ArtifactWorkspace.js'
 
 export function RunFilesContent({
   runId,
@@ -24,7 +20,7 @@ export function RunFilesContent({
       fullPage={fullPage}
       source={{
         load: async (signal) => {
-          const body = await api<RunFilesResponse>(
+          const body = await api<RunArtifactContentResponse>(
             `/runs/${encodeURIComponent(runId)}/artifact/content`,
             { signal }
           )
