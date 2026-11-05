@@ -24,6 +24,7 @@ def build_local_workflow_request(
         prepared_input=prepare_workflow_input(
             bundle.input,
             workflow=bundle.workflow,
+            input_root_path=bundle.input_root_path,
             artifact_root_path=bundle.artifact_root_path,
         ),
         timeout_seconds=timeout_seconds,

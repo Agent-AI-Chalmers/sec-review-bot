@@ -25,7 +25,6 @@ def _issue_bundle(strategy: IssueReviewStrategy | None) -> ReviewBundle:
         run_id="run-1",
         input={},
         local_root_path=Path("/tmp/run-1"),
-        artifact_root_path=Path("/tmp/run-1/artifacts"),
         issue_strategy=strategy,
     )
 
@@ -53,7 +52,6 @@ def _prepared_issue_bundle(tmp_path: Path) -> ReviewBundle:
             "input_bundle": write_test_input_bundle(local_root),
         },
         local_root_path=local_root,
-        artifact_root_path=local_root / "artifacts",
     )
 
 

@@ -2,7 +2,6 @@ import secrets
 import shutil
 import subprocess
 import tarfile
-import tempfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -19,7 +18,6 @@ from sec_review_agents.entrypoints.setup_declaration import (
 from sec_review_agents.filesystem.backend_selection import (
     selected_sandbox_backend_kind,
 )
-from sec_review_agents.utils.env import env_value
 
 IssueReviewStrategy = Literal["default", "two-stage", "single-agent"]
 ReviewWorkflow = Literal[
@@ -28,7 +26,6 @@ ReviewWorkflow = Literal[
     "repository-review",
 ]
 BUNDLE_MANIFEST_NAME = "manifest.json"
-LOCAL_INPUT_BUNDLE_ROOT_ENV = "SEC_REVIEW_INPUT_BUNDLE_ROOT"
 
 
 def create_local_run_id() -> str:
@@ -74,68 +71,44 @@ def load_setup_declaration_content(path: str | Path | None) -> str | None:
 
 
 @dataclass(frozen=True)
-class MaterializedRunPaths:
-    local_root_path: Path
-    artifact_root_path: Path
-
-
-@dataclass(frozen=True)
 class ReviewBundle:
+    """Local run materials and execution choices, not a worker request.
+
+    Paths relative to ``local_root_path``:
+
+    - ``input/``: extracted execution inputs (manifest, workspace snapshot, history,
+      and incremental-window context when applicable).
+    - ``input.tar.zst``: transport archive.
+    - ``artifacts/``: stage results and trajectories.
+
+    Workflow input and result JSON files live at the run root. Constructing this
+    object does not create files.
+    """
+
     workflow: ReviewWorkflow
     run_id: str
     input: dict[str, Any]
-    # Root directory for the local input bundle and replayable run materials.
+    # One local run owns both its input materials and execution artifacts.
     local_root_path: Path
-    # Root directory where this local run writes workflow/stage artifacts.
-    artifact_root_path: Path
     # Local-only runtime options such as workspace image.
     runtime_config: dict[str, Any] | None = None
     issue_strategy: IssueReviewStrategy | None = None
 
+    @property
+    def artifact_root_path(self) -> Path:
+        return self.local_root_path / "artifacts"
 
-def build_run_paths(base_dir: Path, run_id: str) -> MaterializedRunPaths:
-    local_root_path = base_dir / run_id
-    artifact_root_path = local_root_path / "artifacts"
-    return MaterializedRunPaths(
-        local_root_path=local_root_path,
-        artifact_root_path=artifact_root_path,
-    )
+    @property
+    def input_root_path(self) -> Path:
+        return self.local_root_path / "input"
 
-
-def workspace_path(paths: MaterializedRunPaths) -> Path:
-    return paths.local_root_path / "workspace"
-
-
-def history_path(paths: MaterializedRunPaths) -> Path:
-    return paths.local_root_path / "history"
-
-
-def incremental_window_path(paths: MaterializedRunPaths) -> Path:
-    return paths.local_root_path / "incremental-window"
-
-
-def ensure_run_directories(
-    paths: MaterializedRunPaths,
-    *,
-    include_repository_artifacts: bool = False,
-) -> None:
-    directory_paths = [
-        history_path(paths),
-    ]
-    if include_repository_artifacts:
-        directory_paths.extend(
-            [
-                paths.artifact_root_path / "discovery",
-                paths.artifact_root_path / "triage",
-                paths.artifact_root_path / "cases",
-            ]
-        )
-    for path in directory_paths:
-        path.mkdir(parents=True, exist_ok=True)
+    @property
+    def archive_path(self) -> Path:
+        return self.local_root_path / "input.tar.zst"
 
 
 def write_input_bundle_manifest(
-    paths: MaterializedRunPaths,
+    input_root: Path,
     *,
     include_incremental_window: bool,
 ) -> None:
@@ -154,16 +127,23 @@ def write_input_bundle_manifest(
         }
     from sec_review_agents.utils.files import write_json
 
-    write_json(paths.local_root_path / BUNDLE_MANIFEST_NAME, manifest)
+    write_json(input_root / BUNDLE_MANIFEST_NAME, manifest)
 
 
-def archive_input_bundle(
-    paths: MaterializedRunPaths,
+def pack_input_bundle(
+    bundle: ReviewBundle,
     *,
+    input_root: Path,
     include_incremental_window: bool,
 ) -> dict[str, object]:
-    """Create the immutable public input artifact from prepared local material."""
-    archive_path = Path(f"{paths.local_root_path}.tar.zst")
+    """Pack prepared execution inputs into the transport archive.
+
+    Read the manifest, workspace snapshot, history, and optional incremental
+    context from ``input_root``; write ``bundle.archive_path`` and
+    return its artifact reference (URI, size, and checksum). Preparation workspace
+    cleanup belongs to the caller.
+    """
+    archive_path = bundle.archive_path
     entries = [
         BUNDLE_MANIFEST_NAME,
         "history",
@@ -178,14 +158,11 @@ def archive_input_bundle(
     with tarfile.open(archive_path, mode="w:zst", format=tarfile.PAX_FORMAT) as archive:
         for entry in entries:
             archive.add(
-                paths.local_root_path / entry,
+                input_root / entry,
                 arcname=entry,
                 filter=canonical_tar_info,
             )
     reference = local_artifact_reference(archive_path).as_dict()
-    # Local execution consumes the snapshot, not the preparation checkout.
-    # Remove the redundant repository copy only after the archive is complete.
-    shutil.rmtree(workspace_path(paths), ignore_errors=True)
     return reference
 
 
@@ -280,13 +257,6 @@ def materialize_workspace_with_limited_commit_history(
         capture_output=True,
         text=True,
     )
-
-
-def default_local_output_dir() -> Path:
-    configured_root = env_value(LOCAL_INPUT_BUNDLE_ROOT_ENV)
-    if configured_root:
-        return Path(configured_root)
-    return Path(tempfile.gettempdir()) / "sec-review-agents-local-runs"
 
 
 def effective_issue_strategy(bundle: ReviewBundle) -> IssueReviewStrategy:

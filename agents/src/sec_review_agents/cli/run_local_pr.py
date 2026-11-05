@@ -5,7 +5,6 @@ from pathlib import Path
 from sec_review_agents.cli.local_direct import run_local_direct_workflow
 from sec_review_agents.cli.local_git import git_commit_exists, is_likely_git_sha
 from sec_review_agents.cli.local_materialization.common import (
-    default_local_output_dir,
     load_setup_declaration_content,
     result_path_for_bundle,
 )
@@ -90,10 +89,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--output-dir",
-        help=(
-            "Directory where materialized local run roots should be created. "
-            "Defaults to a temp root."
-        ),
+        required=True,
+        help="Parent directory in which a new local-run-* directory is created.",
     )
     parser.add_argument(
         "--materialize-only",
@@ -139,11 +136,7 @@ def main() -> None:
         raise SystemExit("Provide --pr-md or at least --title/--body.")
 
     title, body = _resolve_pull_request_text(args)
-    output_dir = (
-        Path(args.output_dir).resolve()
-        if args.output_dir
-        else default_local_output_dir()
-    )
+    output_dir = Path(args.output_dir).resolve()
     output_dir.mkdir(parents=True, exist_ok=True)
 
     bundle = build_local_pull_request_bundle(

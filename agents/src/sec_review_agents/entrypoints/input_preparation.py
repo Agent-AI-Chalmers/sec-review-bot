@@ -50,10 +50,10 @@ def prepare_run_input(
     return prepare_workflow_input(
         caller_input,
         workflow,
+        input_root_path=_resolve_run_input_root(run_id=validated_run_id),
         artifact_root_path=workflow_artifact_root(
             run_id=validated_run_id,
         ),
-        input_root_path=_resolve_run_input_root(run_id=validated_run_id),
         expected_run_id=validated_run_id,
     )
 
@@ -62,8 +62,8 @@ def prepare_workflow_input(
     input_data: dict[str, Any],
     workflow: str,
     *,
-    artifact_root_path: str | Path,
     input_root_path: str | Path | None = None,
+    artifact_root_path: str | Path,
     expected_run_id: str | None = None,
 ) -> PreparedWorkflowInput:
     """Validate public JSON, materialize its bundle, then construct runtime input."""

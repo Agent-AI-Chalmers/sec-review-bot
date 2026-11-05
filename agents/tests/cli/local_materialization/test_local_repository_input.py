@@ -6,6 +6,7 @@ from urllib.parse import unquote, urlsplit
 import pytest
 
 from sec_review_agents.artifacts.reference import ArtifactReference
+from sec_review_agents.cli.local_execution import build_local_workflow_request
 from sec_review_agents.cli.local_materialization.repository import (
     _build_changed_files,
     build_local_repository_security_bundle,
@@ -103,6 +104,12 @@ def test_full_repository_bundle_creates_limited_history_workspace(
     assert parsed_uri.scheme == "file"
     assert Path(unquote(parsed_uri.path)).is_file()
     assert head_sha
+    assert not bundle.input_root_path.exists()
+    request = build_local_workflow_request(bundle, timeout_seconds=60)
+    prepared = request.prepared_input
+    assert Path(prepared.input_bundle_root_path) == bundle.local_root_path / "input"
+    assert Path(prepared.workspace_snapshot_tar_path).is_file()
+    assert Path(prepared.history_path).is_dir()
 
 
 def test_incremental_bundle_rejects_non_ancestor_baseline(tmp_path: Path) -> None:

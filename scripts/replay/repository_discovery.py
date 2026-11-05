@@ -50,7 +50,11 @@ async def main() -> None:
 
     public_input = read_json(input_path)
     run_artifacts = input_path.parent / "artifacts" / "replay-discovery"
-    replay_input = materialize_replay_input(public_input, artifact_root=run_artifacts)
+    replay_input = materialize_replay_input(
+        public_input,
+        input_root=input_path.parent / "input",
+        artifact_root=run_artifacts,
+    )
     run_id = _run_id_from_replay_input(replay_input)
 
     local_root = Path(replay_input.input_bundle_root_path)
