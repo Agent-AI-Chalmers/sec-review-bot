@@ -2,7 +2,7 @@ from typing import Any
 
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 from langchain_core.messages import AIMessage
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ToolCallingFakeMessagesListChatModel(FakeMessagesListChatModel):
@@ -30,3 +30,18 @@ def structured_tool_call_message(
             }
         ],
     )
+
+
+class RecordingToolCallingFakeMessagesListChatModel(
+    ToolCallingFakeMessagesListChatModel
+):
+    message_batches: list[list[Any]] = Field(default_factory=list)
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        self.message_batches.append(list(messages))
+        return super()._generate(
+            messages,
+            stop=stop,
+            run_manager=run_manager,
+            **kwargs,
+        )
