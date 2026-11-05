@@ -22,6 +22,7 @@
 # acceptance checks for already-produced structured responses, such as committed
 # patch delivery, belong to their own middleware.
 
+import json
 from typing import Annotated, Any, ClassVar, NotRequired, override
 
 from langchain.agents.middleware.types import (
@@ -74,7 +75,7 @@ class MissingStructuredResponseMiddleware(
     )
 
     _INVALID_TOOL_ARGUMENTS_RETRY_PROMPT: ClassVar[str] = (
-        "The previous tool arguments could not be parsed as JSON. "
+        "The previous tool call arguments were rejected. "
         "Return valid JSON arguments: escape quotes and backslashes "
         "inside strings and close all objects and arrays."
     )
@@ -114,21 +115,10 @@ class MissingStructuredResponseMiddleware(
                 f"Retried {retry_count} time(s) after missing structured output."
             )
 
-        invalid_calls = False
-        if isinstance(last_message, AIMessage):
-            invalid_calls = bool(last_message.invalid_tool_calls)
-        elif isinstance(last_message, dict):
-            invalid_calls = bool(last_message.get("invalid_tool_calls"))
-        retry_prompt = self.retry_prompt
-        if invalid_calls:
-            retry_prompt = (
-                f"{self._INVALID_TOOL_ARGUMENTS_RETRY_PROMPT}\n\n{retry_prompt}"
-            )
-
         return {
             "jump_to": "model",
             "missing_structured_response_retry_count": retry_count + 1,
-            "messages": [HumanMessage(content=retry_prompt)],
+            "messages": [HumanMessage(content=self._build_retry_prompt(last_message))],
         }
 
     async def aafter_model(
@@ -137,6 +127,21 @@ class MissingStructuredResponseMiddleware(
         runtime: Runtime[ContextT],
     ) -> dict[str, Any] | None:
         return self.after_model(state, runtime)
+
+    def _build_retry_prompt(self, message: Any) -> str:
+        invalid_calls = []
+        if isinstance(message, AIMessage):
+            invalid_calls = message.invalid_tool_calls
+        elif isinstance(message, dict):
+            invalid_calls = message.get("invalid_tool_calls") or []
+        if not invalid_calls:
+            return self.retry_prompt
+        return (
+            f"{self._INVALID_TOOL_ARGUMENTS_RETRY_PROMPT}\n"
+            f"{_invalid_arguments_feedback(invalid_calls)}\n\n"
+            "Return the required structured response using the configured "
+            "structured-output mechanism."
+        )
 
 
 def _is_terminal_ai_message(message: Any) -> bool:
@@ -148,3 +153,49 @@ def _is_terminal_ai_message(message: Any) -> bool:
             return False
         return not message.get("tool_calls")
     return False
+
+
+def _invalid_arguments_feedback(calls: list[Any]) -> str:
+    """Diagnose retained arguments without repairing them or echoing whole payloads."""
+    diagnostics = []
+    # Bound feedback even if a model emits many invalid calls or very long text.
+    for call in calls[:3]:
+        detail: dict[str, Any] = {"tool": str(call.get("name") or "unknown")[:100]}
+        detail.update(_diagnose_arguments(call.get("args")))
+        diagnostics.append(json.dumps(detail, ensure_ascii=True))
+    if len(calls) > 3:
+        diagnostics.append(f"{len(calls) - 3} further invalid calls omitted.")
+    return "Argument diagnostics (JSON data; offsets are zero-based):\n" + "\n".join(
+        diagnostics
+    )
+
+
+def _diagnose_arguments(arguments: Any) -> dict[str, Any]:
+    """Describe a rejected payload without changing its arguments."""
+    if not isinstance(arguments, str):
+        return {"error": "No raw JSON arguments were retained."}
+    try:
+        parsed = json.loads(arguments)
+    except json.JSONDecodeError as error:
+        context_start = max(0, error.pos - 80)
+        return {
+            "error": error.msg,
+            "line": error.lineno,
+            "column": error.colno,
+            "offset": error.pos,
+            "context_start": context_start,
+            "context": arguments[context_start : error.pos + 80],
+        }
+    except RecursionError:
+        return {"error": "JSON nesting is too deep to parse."}
+    except ValueError as error:
+        # Conversion limits (for example oversized integers) are not syntax errors.
+        return {"error": f"JSON value could not be parsed: {str(error)[:300]}"}
+    if not isinstance(parsed, dict):
+        return {
+            "error": f"Arguments must be a JSON object, not {type(parsed).__name__}."
+        }
+    return {
+        "error": "Arguments are a JSON object locally, but the tool parser "
+        "rejected the call; resend it using the configured schema."
+    }

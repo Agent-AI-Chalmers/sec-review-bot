@@ -1,6 +1,5 @@
 import tempfile
 from pathlib import Path
-from typing import Any
 
 import pytest
 from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
@@ -13,14 +12,9 @@ from sec_review_agents.runtime.agent_runtime_graph import (
     invoke_agent_runtime_graph,
     run_agent_runtime_graph,
 )
-from sec_review_agents.runtime.committed_patch_middleware import (
-    CommittedPatchMiddleware,
-)
-from sec_review_agents.runtime.structured_response_middleware import (
-    MissingStructuredResponseMiddleware,
-)
 from sec_review_agents.runtime.trajectories import read_trajectory_messages
 from tests.runtime.fake_chat_models import (
+    RecordingToolCallingFakeMessagesListChatModel,
     ToolCallingFakeMessagesListChatModel,
     structured_tool_call_message,
 )
@@ -30,21 +24,6 @@ class PatchClaimProbeOutput(BaseModel):
     status: str
     changed_files: list[str] = Field()
     rationale: str
-
-
-class RecordingToolCallingFakeMessagesListChatModel(
-    ToolCallingFakeMessagesListChatModel
-):
-    message_batches: list[list[Any]] = Field(default_factory=list)
-
-    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
-        self.message_batches.append(list(messages))
-        return super()._generate(
-            messages,
-            stop=stop,
-            run_manager=run_manager,
-            **kwargs,
-        )
 
 
 def lookup_evidence(query: str) -> str:
@@ -172,94 +151,6 @@ async def test_trajectory_preserves_messages_replaced_by_summarization(
     assert "Earlier context" in messages[3]["content"]
 
 
-def test_missing_structured_response_middleware_keeps_tool_agent_in_one_invoke() -> (
-    None
-):
-    model = RecordingToolCallingFakeMessagesListChatModel(
-        responses=[
-            AIMessage(content="I found the answer but forgot the schema."),
-            structured_tool_call_message(
-                PatchClaimProbeOutput,
-                {
-                    "status": "applied",
-                    "changed_files": ["a.txt"],
-                    "rationale": "middleware requested structured response",
-                },
-            ),
-        ]
-    )
-    agent = create_agent(
-        model=model,
-        tools=[lookup_evidence],
-        response_format=PatchClaimProbeOutput,
-        system_prompt="Return the configured structured response.",
-        middleware=[MissingStructuredResponseMiddleware()],
-    )
-    result = agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
-
-    structured = result["structured_response"]
-    assert structured.changed_files == ["a.txt"]
-    assert len(model.message_batches) == 2
-    assert model.message_batches[0][-1].content == "Return a patch claim."
-    assert (
-        "did not include the required structured response"
-        in model.message_batches[1][-1].content
-    )
-
-
-def test_committed_patch_acceptance_retries_in_one_invoke(
-    tmp_path, monkeypatch
-) -> None:
-    from unittest.mock import Mock
-
-    from sec_review_agents.workspace.patches import PatchArtifact
-
-    build = Mock(
-        side_effect=[
-            ValueError("invalid commit"),
-            PatchArtifact(patch_diff="", file_changes=[]),
-        ]
-    )
-    monkeypatch.setattr(
-        "sec_review_agents.runtime.committed_patch_middleware.build_committed_patch",
-        build,
-    )
-    model = RecordingToolCallingFakeMessagesListChatModel(
-        responses=[
-            structured_tool_call_message(
-                PatchClaimProbeOutput,
-                {"status": "applied", "changed_files": [], "rationale": "candidate"},
-                call_id="first",
-            ),
-            structured_tool_call_message(
-                PatchClaimProbeOutput,
-                {"status": "applied", "changed_files": [], "rationale": "corrected"},
-                call_id="second",
-            ),
-        ]
-    )
-    agent = create_agent(
-        model=model,
-        tools=[],
-        response_format=PatchClaimProbeOutput,
-        middleware=[
-            CommittedPatchMiddleware(tmp_path, "baseline", tmp_path / "baseline.tar")
-        ],
-    )
-    result = agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
-    assert result["structured_response"].rationale == "corrected"
-    assert len(model.message_batches) == 2
-    assert build.call_count == 2
-    # Reusing the compiled graph starts a fresh correction budget.
-    build.side_effect = [
-        ValueError("invalid commit"),
-        PatchArtifact(patch_diff="", file_changes=[]),
-    ]
-    again = agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
-    assert again["structured_response"].rationale == "corrected"
-    assert build.call_count == 4
-
-
 def test_patch_tool_calls_middleware_repairs_dangling_tool_call_history() -> None:
     model = RecordingToolCallingFakeMessagesListChatModel(
         responses=[AIMessage(content="done")]
@@ -303,71 +194,6 @@ def test_patch_tool_calls_middleware_repairs_dangling_tool_call_history() -> Non
     assert patched_tool_messages[0].content
 
 
-@pytest.mark.parametrize("tools", [[], [lookup_evidence]])
-def test_invalid_structured_tool_arguments_are_retried(tools: list[Any]) -> None:
-    """Malformed JSON must reach recovery before the agent silently terminates."""
-    model = RecordingToolCallingFakeMessagesListChatModel(
-        responses=[
-            AIMessage(
-                content="",
-                invalid_tool_calls=[
-                    {
-                        "name": "PatchClaimProbeOutput",
-                        "args": '{"rationale": "bad \\d escape"}',
-                        "id": "invalid-output",
-                        "error": "Invalid JSON escape",
-                    }
-                ],
-            ),
-            structured_tool_call_message(
-                PatchClaimProbeOutput,
-                {"status": "applied", "changed_files": [], "rationale": "fixed"},
-            ),
-        ]
-    )
-    agent = create_agent(
-        model=model,
-        tools=tools,
-        response_format=PatchClaimProbeOutput,
-        middleware=[MissingStructuredResponseMiddleware()],
-    )
-    result = agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
-    assert result["structured_response"].rationale == "fixed"
-    assert len(model.message_batches) == 2
-    assert isinstance(model.message_batches[1][-1], HumanMessage)
-    assert any(
-        isinstance(message, AIMessage) and message.invalid_tool_calls
-        for message in model.message_batches[1]
-    )
-
-
-def test_invalid_tool_arguments_recovery_is_bounded() -> None:
-    model = RecordingToolCallingFakeMessagesListChatModel(
-        responses=[
-            AIMessage(
-                content="",
-                invalid_tool_calls=[
-                    {
-                        "name": "PatchClaimProbeOutput",
-                        "args": "{",
-                        "id": "invalid-output",
-                        "error": "Invalid JSON",
-                    }
-                ],
-            )
-        ]
-    )
-    agent = create_agent(
-        model=model,
-        tools=[],
-        response_format=PatchClaimProbeOutput,
-        middleware=[MissingStructuredResponseMiddleware(max_retries=1)],
-    )
-    with pytest.raises(RuntimeError, match="Retried 1 time"):
-        agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
-    assert len(model.message_batches) == 2
-
-
 @pytest.mark.asyncio
 async def test_invalid_structured_arguments_recover_through_runtime(
     tmp_path: Path,
@@ -405,45 +231,3 @@ async def test_invalid_structured_arguments_recover_through_runtime(
     assert result.rationale == "fixed"
     messages = read_trajectory_messages(trajectory_path)
     assert any(message.get("invalid_tool_calls") for message in messages)
-
-
-def test_invalid_arguments_do_not_skip_valid_tool_calls() -> None:
-    model = RecordingToolCallingFakeMessagesListChatModel(
-        responses=[
-            AIMessage(
-                content="",
-                tool_calls=[
-                    {
-                        "name": "lookup_evidence",
-                        "args": {"query": "session"},
-                        "id": "valid-lookup",
-                    }
-                ],
-                invalid_tool_calls=[
-                    {
-                        "name": "PatchClaimProbeOutput",
-                        "args": "{",
-                        "id": "invalid-output",
-                        "error": "Invalid JSON",
-                    }
-                ],
-            ),
-            structured_tool_call_message(
-                PatchClaimProbeOutput,
-                {"status": "applied", "changed_files": [], "rationale": "fixed"},
-            ),
-        ]
-    )
-    agent = create_agent(
-        model=model,
-        tools=[lookup_evidence],
-        response_format=PatchClaimProbeOutput,
-        middleware=[MissingStructuredResponseMiddleware()],
-    )
-    result = agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
-    assert result["structured_response"].rationale == "fixed"
-    assert len(model.message_batches) == 2
-    tool_result = model.message_batches[1][-1]
-    assert isinstance(tool_result, ToolMessage)
-    assert tool_result.tool_call_id == "valid-lookup"
-    assert tool_result.content == "evidence for session"

@@ -3,13 +3,20 @@ from typing import Any, cast
 from unittest.mock import Mock
 
 import pytest
+from langchain.agents import create_agent
+from langchain_core.messages import HumanMessage
 from langgraph.runtime import Runtime
+from pydantic import BaseModel, Field
 
 from sec_review_agents.runtime.committed_patch_middleware import (
     CommittedPatchMiddleware,
     CommittedPatchState,
 )
 from sec_review_agents.workspace.patches import PatchArtifact
+from tests.runtime.fake_chat_models import (
+    RecordingToolCallingFakeMessagesListChatModel,
+    structured_tool_call_message,
+)
 
 
 def test_retries_invalid_commits_once_then_fails(tmp_path: Path, monkeypatch) -> None:
@@ -84,3 +91,58 @@ def test_empty_commit_result_depends_on_stage_policy(
     else:
         assert correction is None
         check.assert_called_once()
+
+
+class PatchClaimProbeOutput(BaseModel):
+    status: str
+    changed_files: list[str] = Field()
+    rationale: str
+
+
+def test_committed_patch_acceptance_retries_in_one_invoke(
+    tmp_path, monkeypatch
+) -> None:
+    build = Mock(
+        side_effect=[
+            ValueError("invalid commit"),
+            PatchArtifact(patch_diff="", file_changes=[]),
+        ]
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.runtime.committed_patch_middleware.build_committed_patch",
+        build,
+    )
+    model = RecordingToolCallingFakeMessagesListChatModel(
+        responses=[
+            structured_tool_call_message(
+                PatchClaimProbeOutput,
+                {"status": "applied", "changed_files": [], "rationale": "candidate"},
+                call_id="first",
+            ),
+            structured_tool_call_message(
+                PatchClaimProbeOutput,
+                {"status": "applied", "changed_files": [], "rationale": "corrected"},
+                call_id="second",
+            ),
+        ]
+    )
+    agent = create_agent(
+        model=model,
+        tools=[],
+        response_format=PatchClaimProbeOutput,
+        middleware=[
+            CommittedPatchMiddleware(tmp_path, "baseline", tmp_path / "baseline.tar")
+        ],
+    )
+    result = agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
+    assert result["structured_response"].rationale == "corrected"
+    assert len(model.message_batches) == 2
+    assert build.call_count == 2
+    # Reusing the compiled graph starts a fresh correction budget.
+    build.side_effect = [
+        ValueError("invalid commit"),
+        PatchArtifact(patch_diff="", file_changes=[]),
+    ]
+    again = agent.invoke({"messages": [HumanMessage("Return a patch claim.")]})
+    assert again["structured_response"].rationale == "corrected"
+    assert build.call_count == 4
