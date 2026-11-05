@@ -10,7 +10,6 @@ from temporalio import activity, workflow
 from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.record import build_review_record
-from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
 from sec_review_agents.run_diagnostics.publication import (
     RunDiagnosticPublicationRequest,
     publish_run_diagnostic_activity,
@@ -39,7 +38,6 @@ async def mitigate_issue_self_check_activity(
 ) -> MitigationStageResult:
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.mitigation.stage import (
-        create_skipped_mitigation_result,
         mitigation_attempt_label,
     )
     from sec_review_agents.review_stages.trajectories import (
@@ -60,18 +58,6 @@ async def mitigate_issue_self_check_activity(
     )
     review_intent = prepared_input.review_intent
     mitigator_artifacts_path = Path(prepared_input.mitigator_artifacts_path)
-    if not has_confirmed_repair_target(analysis_result):
-        review_trajectory_path(
-            review_trajectories_root(run_artifacts_root),
-            order=2,
-            stage="mitigator",
-            attempt=mitigation_attempt_label(None),
-        ).unlink(missing_ok=True)
-        return create_skipped_mitigation_result(
-            mitigator_artifacts_path=mitigator_artifacts_path,
-            retry_context=None,
-            reason="No confirmed, reparable mitigation target was available from the issue analyzer output.",
-        )
 
     workspace_snapshot_tar_path = required_path(
         prepared_input.workspace_snapshot_tar_path,
@@ -184,9 +170,6 @@ async def execute_issue_two_stage(
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     """Run analyzer and self-checking mitigation, then publish their review record."""
-    from sec_review_agents.review_stages.mitigation.stage import (
-        create_skipped_mitigation_result,
-    )
     from sec_review_agents.workflows.issue.analysis import analyze_issue
     from sec_review_agents.workflows.issue.mitigation_self_check import (
         mitigate_issue_with_self_check,
@@ -202,23 +185,16 @@ async def execute_issue_two_stage(
         setup_declaration_content=setup_declaration_content,
     )
 
-    if not has_confirmed_repair_target(analysis_result):
-        mitigation_result: MitigationStageResult = create_skipped_mitigation_result(
-            mitigator_artifacts_path=mitigator_artifacts_path,
-            retry_context=None,
-            reason="No confirmed, reparable mitigation target was available from the issue analyzer output.",
-        )
-    else:
-        mitigation_result = await mitigate_issue_with_self_check(
-            issue=issue,
-            workspace_snapshot_tar_path=workspace_snapshot_tar_path,
-            history_path=history_path,
-            mitigator_artifacts_path=mitigator_artifacts_path,
-            analysis_result=analysis_result,
-            test_changes=test_changes,
-            runtime_context=runtime_context,
-            setup_declaration_content=setup_declaration_content,
-        )
+    mitigation_result = await mitigate_issue_with_self_check(
+        issue=issue,
+        workspace_snapshot_tar_path=workspace_snapshot_tar_path,
+        history_path=history_path,
+        mitigator_artifacts_path=mitigator_artifacts_path,
+        analysis_result=analysis_result,
+        test_changes=test_changes,
+        runtime_context=runtime_context,
+        setup_declaration_content=setup_declaration_content,
+    )
 
     return build_issue_two_stage_result(
         analysis_result=analysis_result,

@@ -20,7 +20,6 @@ from sec_review_agents.review_stages.feedback_loop import (
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.verification.result import (
     VerificationStageResult,
-    build_skipped_verification_result,
     build_verification_stage_result,
 )
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
@@ -123,29 +122,6 @@ async def run_verification_stage(
         return result
 
 
-# Skip path
-
-
-def create_skipped_verification_result(
-    *,
-    verifier_artifacts_path: Path,
-    retry_context: FeedbackRetryContext | None,
-    reason: str,
-) -> VerificationStageResult:
-    attempt_label = verification_attempt_label(retry_context)
-    reset_verification_attempt_artifacts(
-        verifier_artifacts_path,
-        attempt_label=attempt_label,
-    )
-    result = build_skipped_verification_result(reason=reason)
-    persist_verification_result(
-        verifier_artifacts_path,
-        result,
-        attempt_label=attempt_label,
-    )
-    return result
-
-
 # Preparation and cleanup
 
 
@@ -246,7 +222,6 @@ def persist_verification_result(
 
 
 __all__ = [
-    "create_skipped_verification_result",
     "reset_verification_attempt_artifacts",
     "run_verification_stage",
     "verification_attempt_label",

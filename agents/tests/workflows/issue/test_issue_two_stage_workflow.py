@@ -145,14 +145,10 @@ async def test_two_stage_threads_setup_declaration_to_both_stages(
 
 
 @pytest.mark.asyncio
-async def test_two_stage_repair_objective_skips_mitigation_without_confirmed_narrative(
+async def test_two_stage_repair_objective_runs_mitigation_without_confirmed_narrative(
     tmp_path: Path,
 ) -> None:
-    """A trusted `repair` input does not force mitigation past the analyzer's verdict.
-
-    PatchEval sends `repair` for a known CVE. When the analyzer still cannot confirm a
-    narrative, forcing a repair would invent a patch; the stage must stay skipped.
-    """
+    """The self-checking mitigator may abstain, but must receive the analysis."""
     analysis_result = analysis_fixture(verdict="no-actionable-finding", narratives=[])
 
     with (
@@ -162,6 +158,7 @@ async def test_two_stage_repair_objective_skips_mitigation_without_confirmed_nar
         ) as analyze_mock,
         patch(
             "sec_review_agents.workflows.issue.mitigation_self_check.mitigate_issue_with_self_check",
+            return_value=MitigationStageResult(overview="No justified repair."),
         ) as mitigate_mock,
     ):
         result = await execute_issue_two_stage(
@@ -174,5 +171,6 @@ async def test_two_stage_repair_objective_skips_mitigation_without_confirmed_nar
         )
 
     assert analyze_mock.call_args.kwargs["review_objective"] == "repair"
-    mitigate_mock.assert_not_called()
+    mitigate_mock.assert_awaited_once()
+    assert mitigate_mock.call_args.kwargs["analysis_result"] is analysis_result
     assert result["review_record"]["mitigation"]["file_changes"] == []

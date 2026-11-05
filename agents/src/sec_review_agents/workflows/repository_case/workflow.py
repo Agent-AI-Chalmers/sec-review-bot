@@ -18,7 +18,6 @@ from sec_review_agents.review_stages.feedback_loop import (
 )
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.record import build_review_record
-from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
 from sec_review_agents.review_stages.verification.result import VerificationStageResult
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
@@ -171,30 +170,14 @@ async def mitigate_repository_case_activity(
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.mitigation.stage import (
-        create_skipped_mitigation_result,
         mitigation_attempt_label,
     )
     from sec_review_agents.temporal.support import activity_trace_labels
     from sec_review_agents.workflows.repository_case.stage import (
-        MITIGATION_NO_TARGET_REASON,
         run_repository_case_mitigation_stage,
     )
 
     mitigator_artifacts_path = Path(prepared_case.artifact_paths.mitigator)
-    if not has_confirmed_repair_target(analysis_result):
-        _repository_case_trajectory_path(
-            prepared_case,
-            order=review_stage_attempt_order(
-                stage="mitigator", retry_context=retry_context
-            ),
-            stage="mitigator",
-            attempt=mitigation_attempt_label(retry_context),
-        ).unlink(missing_ok=True)
-        return create_skipped_mitigation_result(
-            mitigator_artifacts_path=mitigator_artifacts_path,
-            retry_context=retry_context,
-            reason=MITIGATION_NO_TARGET_REASON,
-        )
     pass_index = retry_context.retry_index if retry_context is not None else 0
     with bind_trace_context(
         **activity_trace_labels(
@@ -233,7 +216,6 @@ async def verify_repository_case_activity(
     from sec_review_agents.observability.trace_context import bind_trace_context
     from sec_review_agents.review_stages.feedback_loop import review_stage_attempt_order
     from sec_review_agents.review_stages.verification.stage import (
-        create_skipped_verification_result,
         verification_attempt_label,
     )
     from sec_review_agents.temporal.support import activity_trace_labels
@@ -242,20 +224,6 @@ async def verify_repository_case_activity(
     )
 
     verifier_artifacts_path = Path(prepared_case.artifact_paths.verifier)
-    if not has_confirmed_repair_target(analysis_result):
-        _repository_case_trajectory_path(
-            prepared_case,
-            order=review_stage_attempt_order(
-                stage="verifier", retry_context=retry_context
-            ),
-            stage="verifier",
-            attempt=verification_attempt_label(retry_context),
-        ).unlink(missing_ok=True)
-        return create_skipped_verification_result(
-            verifier_artifacts_path=verifier_artifacts_path,
-            retry_context=retry_context,
-            reason="Verification was skipped because analysis produced no confirmed repair target.",
-        )
     pass_index = retry_context.retry_index if retry_context is not None else 0
     with bind_trace_context(
         **activity_trace_labels(
@@ -315,7 +283,6 @@ def build_repository_case_result_activity(
     case_execution_input = prepared_case.case_execution_input
     case_id = case_execution_input.case_id.strip()
     case_disposition = derive_case_disposition(
-        analysis_result,
         mitigation_result,
         verifier_result,
     )

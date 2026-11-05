@@ -44,7 +44,6 @@ from sec_review_agents.workflows.repository_case.result import RepositoryCaseRes
 from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
     RepositoryCaseReviewWorkflow,
-    verify_repository_case_activity,
 )
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
@@ -104,9 +103,7 @@ def repository_case_review_request(case_id: str) -> RepositoryCaseReviewRequest:
 
 
 @pytest.mark.asyncio
-async def test_direct_case_records_skipped_verification_without_confirmed_target() -> (
-    None
-):
+async def test_direct_case_passes_no_patch_assessment_to_result() -> None:
     prepared_case: PreparedRepositoryCase = PreparedRepositoryCase.model_validate(
         {
             "published_trajectories_path": "/tmp/cases/case-1/trajectories",
@@ -125,12 +122,12 @@ async def test_direct_case_records_skipped_verification_without_confirmed_target
         file_changes=[],
     )
     verifier_result = VerificationStageResult(
-        overview="Verification skipped.",
+        overview="No repair justified after independent review.",
         resolution_next_step="none",
-        review_target_claim=None,
-        patch_coverage=None,
-        validation_level=None,
-        regression_status=None,
+        review_target_claim="Whether the reported issue requires repair.",
+        patch_coverage="no-patch",
+        validation_level="static",
+        regression_status="not-applicable",
     )
 
     with (
@@ -178,39 +175,6 @@ async def test_direct_case_records_skipped_verification_without_confirmed_target
         None,
     )
     assert build_result_mock.call_args.args[-1] == verifier_result
-
-
-@pytest.mark.asyncio
-async def test_case_verification_activity_persists_skip_without_running_verifier(
-    tmp_path: Path,
-) -> None:
-    prepared_case: PreparedRepositoryCase = PreparedRepositoryCase.model_validate(
-        {
-            "case_execution_input": repository_case_execution_input("case-1"),
-            "artifact_paths": {
-                "verifier": str(tmp_path / "verifier"),
-                "analyzer": str(tmp_path / "analyzer"),
-                "mitigator": str(tmp_path / "mitigator"),
-                "cvss": str(tmp_path / "cvss"),
-            },
-            "published_trajectories_path": str(tmp_path / "trajectories"),
-        }
-    )
-
-    with patch(
-        "sec_review_agents.workflows.repository_case.stage.run_repository_case_verification_stage"
-    ) as verify_mock:
-        result = await verify_repository_case_activity(
-            repository_case_review_request("case-1"),
-            prepared_case,
-            analysis_fixture(verdict="no-actionable-finding", narratives=[]),
-            MitigationStageResult(overview="Test mitigation"),
-            None,
-        )
-
-    verify_mock.assert_not_called()
-    assert result.patch_coverage is None
-    assert (tmp_path / "verifier" / "verification-result.json").is_file()
 
 
 @pytest.mark.asyncio
