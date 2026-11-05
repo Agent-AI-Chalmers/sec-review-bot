@@ -12,7 +12,6 @@ from sec_review_agents.workflows.pull_request.direct import (
 )
 from sec_review_agents.workflows.pull_request.workflow import (
     mitigate_pull_request_activity,
-    verify_pull_request_activity,
 )
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from tests.analysis_fixtures import analysis_fixture, narrative_fixture
@@ -37,23 +36,6 @@ def _request(artifact_root: Path) -> ReviewWorkflowRequest:
         timeout_seconds=30,
         runtime_context={},
     )
-
-
-@pytest.mark.asyncio
-async def test_mitigation_activity_skip_accepts_serialized_artifact_root(
-    tmp_path: Path,
-) -> None:
-    """Activity inputs cross a serialization boundary with string paths."""
-    artifact_root = tmp_path / "artifacts"
-
-    result = await mitigate_pull_request_activity(
-        request=_request(artifact_root),
-        analysis_result=analysis_fixture(verdict=None, narratives=[]),
-        retry_context=None,
-    )
-
-    assert result.file_changes == []
-    assert (artifact_root / "mitigator" / "mitigation-result.json").is_file()
 
 
 @pytest.mark.asyncio
@@ -96,20 +78,18 @@ async def test_mitigation_activity_run_accepts_serialized_artifact_root(
 
 
 @pytest.mark.asyncio
-async def test_direct_review_records_skipped_verification_without_confirmed_target() -> (
-    None
-):
+async def test_direct_review_passes_no_patch_assessment_to_result() -> None:
     analysis_result = analysis_fixture(verdict="no-actionable-finding", narratives=[])
     mitigation_result = MitigationStageResult(
         overview="No confirmed repair target.", file_changes=[], patch_diff=""
     )
     verifier_result = VerificationStageResult(
-        overview="Verification skipped.",
+        overview="No repair justified after independent review.",
         resolution_next_step="none",
-        review_target_claim=None,
-        patch_coverage=None,
-        validation_level=None,
-        regression_status=None,
+        review_target_claim="Whether the reported issue requires repair.",
+        patch_coverage="no-patch",
+        validation_level="static",
+        regression_status="not-applicable",
     )
     request = ReviewWorkflowRequest(
         workflow="pull-request-review",
@@ -150,34 +130,3 @@ async def test_direct_review_records_skipped_verification_without_confirmed_targ
         mitigation_result,
         verifier_result,
     )
-
-
-@pytest.mark.asyncio
-async def test_verification_activity_persists_skip_without_running_verifier(
-    tmp_path: Path,
-) -> None:
-    artifact_root = tmp_path / "artifacts"
-    prepared_input = prepared_pull_request_input(
-        artifact_root_path=str(artifact_root),
-        verifier_artifacts_path=str(artifact_root / "verifier"),
-    )
-
-    with patch(
-        "sec_review_agents.workflows.pull_request.verification.verify_pull_request"
-    ) as verify_mock:
-        result = await verify_pull_request_activity(
-            ReviewWorkflowRequest(
-                workflow="pull-request-review",
-                run_id="run-test",
-                prepared_input=prepared_input,
-                timeout_seconds=30,
-                runtime_context={},
-            ),
-            analysis_fixture(verdict="no-actionable-finding", narratives=[]),
-            MitigationStageResult(overview="Test mitigation"),
-            None,
-        )
-
-    verify_mock.assert_not_called()
-    assert result.patch_coverage is None
-    assert (artifact_root / "verifier" / "verification-result.json").is_file()

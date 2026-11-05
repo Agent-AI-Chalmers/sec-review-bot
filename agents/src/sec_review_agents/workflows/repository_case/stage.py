@@ -31,11 +31,6 @@ from sec_review_agents.workflows.repository_case.verification import (
 )
 from sec_review_agents.workspace.file_changes import file_change_paths
 
-MITIGATION_NO_TARGET_REASON = (
-    "No confirmed, reparable mitigation target was available from the repository "
-    "analyzer output."
-)
-
 
 def _blocked_case_disposition(reason: str) -> dict[str, Any]:
     return {
@@ -45,11 +40,9 @@ def _blocked_case_disposition(reason: str) -> dict[str, Any]:
 
 
 def derive_case_disposition(
-    analyzer_result: AnalysisStageResult,
     mitigator_result: MitigationStageResult | None,
     verifier_result: VerificationStageResult | None,
 ) -> dict[str, Any]:
-    verdict = analyzer_result.verdict
     if not file_change_paths(
         mitigator_result.file_changes if mitigator_result is not None else None
     ):
@@ -76,14 +69,9 @@ def derive_case_disposition(
             "The verifier requires follow-up before delivery execution."
         )
 
-    if verdict not in {"confirmed-defect", "confirmed-vulnerability", "plausible-risk"}:
-        return _blocked_case_disposition(
-            "The analyzer did not confirm the case strongly enough for delivery execution."
-        )
-
     return {
         "disposition": "keep",
-        "reason": "Case passed analyzer, mitigator, and verifier delivery gates.",
+        "reason": "Case produced a patch approved by verifier for delivery execution.",
     }
 
 

@@ -131,34 +131,6 @@ async def run_mitigation_stage(
         return result
 
 
-# Skip path
-
-
-def create_skipped_mitigation_result(
-    *,
-    mitigator_artifacts_path: Path,
-    retry_context: FeedbackRetryContext | None,
-    reason: str,
-) -> MitigationStageResult:
-    attempt_label = mitigation_attempt_label(retry_context)
-    reset_mitigation_attempt_artifacts(
-        mitigator_artifacts_path=mitigator_artifacts_path,
-        attempt_label=attempt_label,
-    )
-    # Skipped mitigation still emits the patch files expected by downstream
-    # verifier/delivery contracts, but with empty content.
-    persist_mitigation_patch(
-        mitigator_artifacts_path,
-        "",
-        attempt_label=attempt_label,
-    )
-    result = MitigationStageResult(overview=reason)
-    persist_mitigation_result(
-        mitigator_artifacts_path, result, attempt_label=attempt_label
-    )
-    return result
-
-
 # Preparation and cleanup
 
 
@@ -273,7 +245,6 @@ def persist_mitigation_patch(
 
 
 __all__ = [
-    "create_skipped_mitigation_result",
     "mitigation_attempt_label",
     "run_mitigation_stage",
 ]

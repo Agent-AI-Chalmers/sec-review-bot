@@ -9,14 +9,13 @@ from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.review_stages.feedback_loop import feedback_retry_context
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.mitigation.stage import (
-    create_skipped_mitigation_result,
     persist_mitigation_result,
+    reset_mitigation_attempt_artifacts,
 )
 from sec_review_agents.review_stages.verification.result import (
     build_skipped_verification_result,
 )
 from sec_review_agents.review_stages.verification.stage import (
-    create_skipped_verification_result,
     persist_verification_result,
     reset_verification_attempt_artifacts,
     verification_attempt_label,
@@ -68,14 +67,11 @@ def test_initial_mitigation_attempt_clears_stale_attempt_archives(
     ):
         (root / filename).write_text("stale", encoding="utf-8")
 
-    create_skipped_mitigation_result(
+    reset_mitigation_attempt_artifacts(
         mitigator_artifacts_path=root,
-        retry_context=None,
-        reason="no target",
+        attempt_label="initial",
     )
 
-    assert (root / "mitigation-result.json").exists()
-    assert (root / "workspace.patch").exists()
     assert not (root / "mitigation-result.initial.json").exists()
     assert not (root / "workspace.initial.patch").exists()
     assert not (root / "mitigation-result.retry-1.json").exists()
@@ -96,18 +92,13 @@ def test_retry_mitigation_attempt_preserves_initial_archive(tmp_path: Path) -> N
     for filename in initial_files:
         (root / filename).write_text("initial", encoding="utf-8")
 
-    create_skipped_mitigation_result(
+    reset_mitigation_attempt_artifacts(
         mitigator_artifacts_path=root,
-        retry_context=feedback_retry_context(
-            retry_index=1, mitigation_result=None, verifier_result=None
-        ),
-        reason="no target",
+        attempt_label="retry-1",
     )
 
     for filename in initial_files:
         assert (root / filename).read_text(encoding="utf-8") == "initial"
-    assert (root / "mitigation-result.retry-1.json").exists()
-    assert (root / "workspace.retry-1.patch").exists()
     assert (root / "trajectories" / "initial.jsonl").read_text(
         encoding="utf-8"
     ) == "initial"
@@ -140,20 +131,6 @@ def test_verification_persists_latest_and_attempt_specific_files(
     retry_copy = json.loads((root / "verification-result.retry-1.json").read_text())
     assert latest["overview"] == "verified"
     assert retry_copy["overview"] == "verified"
-
-
-def test_skipped_verification_persists_explicit_stage_result(tmp_path: Path) -> None:
-    result = create_skipped_verification_result(
-        verifier_artifacts_path=tmp_path,
-        retry_context=None,
-        reason="No confirmed repair target.",
-    )
-
-    persisted = json.loads((tmp_path / "verification-result.json").read_text())
-    assert result.model_dump(mode="json") == persisted
-    assert result.overview == "No confirmed repair target."
-    assert result.patch_coverage is None
-    assert result.resolution_next_step == "none"
 
 
 def test_verification_attempt_reset_uses_retry_context_for_attempt_label(

@@ -58,7 +58,7 @@ Default behavior:
 
 `repair` does not allow hallucinated findings and is not blind obedience to reports. It still requires repository evidence. The difference is the default direction: advance toward the correct repair instead of re-arguing whether a repair was warranted.
 
-The objective changes analyzer investigation policy, not the meaning of its structured result. Mitigation runs only when analysis produces a confirmed vulnerability or confirmed defect narrative; the same analysis result has the same downstream behavior under either objective.
+The objective sets the goal of Analyzer’s investigation without predetermining its conclusion or changing the meaning of result fields. For example, investigating with a repair objective does not require Analyzer to conclude that a vulnerability exists or Mitigator to produce a patch.
 
 ## Test Changes Policy
 

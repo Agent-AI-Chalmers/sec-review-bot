@@ -41,7 +41,10 @@ Verifier-led retry 弱于 failed PoC、failed test 或另一个可直接复现�
 
 ## Core Workflow
 
-confirmed repair target 的准入条件同时也是 verifier 准入边界。如果 analysis 没有产生 `confirmed-vulnerability` 或 `confirmed-defect` 的 repair target，mitigation 和 verification 的阶段 wrapper 都会生成确定性的 skipped result，但不会启动对应 agent。Skipped verification result 会以空判断字段和 `resolution_next_step=none` 持久化，因此不会触发 feedback retry。这样既能避免 verification 在没有已接受 repair target 的 case 上退化成第二次 analyzer pass，也能保留明确的阶段审计记录。
+- Analyzer 的结论不会阻止后续修复和验证阶段运行。
+- Mitigator 根据证据决定是否修改代码。没有安全、合理的修复方案时，可以不做修改。
+- Verifier 会独立核查问题是否成立，以及 Mitigator 的处理是否合理；没有补丁也会进行核查。
+- 如果 Verifier 找到具体且可修复的问题，可以要求 Mitigator 再尝试一次。此次修复以 Verifier 指出的问题为主，原分析作为参考，不重新运行 Analyzer。
 
 ### Normal Path
 

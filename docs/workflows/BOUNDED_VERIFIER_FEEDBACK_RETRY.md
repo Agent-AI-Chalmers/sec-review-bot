@@ -39,7 +39,10 @@ In practice, though, many security repair tasks do not come with runnable PoCs, 
 
 ## Core Workflow
 
-The confirmed repair target gate is also the verifier eligibility boundary. If analysis does not produce a confirmed vulnerability or confirmed defect repair target, the mitigation and verification stage wrappers emit deterministic skipped results without starting either agent. The skipped verification result is persisted with empty judgment fields and `resolution_next_step=none`, so no feedback retry is scheduled. This prevents verification from becoming a second analyzer pass over a case with no accepted repair target while preserving an explicit stage audit record.
+- Analyzer conclusions do not prevent the subsequent mitigation and verification stages from running.
+- Mitigator decides whether to change code based on evidence. It may leave code unchanged when no safe, justified repair is available.
+- Verifier independently checks whether the problem exists within the review scope and whether Mitigator handled it appropriately, even when there is no patch.
+- If Verifier finds a concrete, repairable problem, it can ask Mitigator to try once more. This retry prioritizes the problems identified by Verifier, uses the original analysis as context, and does not rerun Analyzer.
 
 ### Normal Path
 

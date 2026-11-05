@@ -36,7 +36,6 @@ from sec_review_agents.review_stages.cvss.stage import (
     is_cvss_v4_scoring_target,
 )
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
-from sec_review_agents.review_stages.repair_target import has_confirmed_repair_target
 from sec_review_agents.review_stages.types import RegressionStatus
 from sec_review_agents.review_stages.verification.result import VerificationStageResult
 from sec_review_agents.workflows.repository.result import (
@@ -145,22 +144,14 @@ class TestRepositoryScopeAndDeliveryPlanning:
             "reason": "unit-test",
         }
 
-    def test_t1_no_actionable_does_not_enter_mitigation(self) -> None:
-        analysis = self._no_actionable_analysis()
-
-        assert analysis.verdict == "no-actionable-finding"
-        assert analysis.narratives == []
-        assert not has_confirmed_repair_target(analysis)
-
-    def test_t2_confirmed_case_enters_mitigation(self) -> None:
+    def test_confirmed_vulnerability_is_cvss_scored(self) -> None:
         analysis = self._confirmed_analysis()
 
         assert analysis.verdict == "confirmed-vulnerability"
         assert len(analysis.narratives) == 1
-        assert has_confirmed_repair_target(analysis)
         assert is_cvss_v4_scoring_target(analysis)
 
-    def test_t3_no_confirmed_narrative_is_not_promoted_to_mitigation_target(
+    def test_no_actionable_finding_is_not_cvss_scored(
         self,
     ) -> None:
         analysis = self._no_actionable_analysis()
@@ -752,9 +743,6 @@ class TestRepositoryScopeAndDeliveryPlanning:
         self,
     ) -> None:
         """Keep `not-run` delivery-neutral unless project policy changes."""
-        analyzer_result = analysis_fixture(
-            verdict="confirmed-vulnerability", narratives=[]
-        )
         mitigator_result = MitigationStageResult(
             overview="Test mitigation",
             file_changes=[{"path": "src/server.js", "status": "deleted"}],
@@ -768,12 +756,11 @@ class TestRepositoryScopeAndDeliveryPlanning:
             validation_level=None,
         )
         case_disposition = derive_case_disposition(
-            analyzer_result,
             mitigator_result=mitigator_result,
             verifier_result=verifier_result,
         )
         assert case_disposition["disposition"] == "keep"
-        assert "passed analyzer" in case_disposition["reason"]
+        assert "approved by verifier" in case_disposition["reason"]
         assert set(case_disposition) == {"disposition", "reason"}
 
     @pytest.mark.parametrize("regression_status", ["failed", "unresolved", None])
@@ -782,7 +769,6 @@ class TestRepositoryScopeAndDeliveryPlanning:
     ) -> None:
         """Fail closed when regression evidence is failed, unresolved, or absent."""
         case_disposition = derive_case_disposition(
-            analysis_fixture(verdict="confirmed-vulnerability", narratives=[]),
             mitigator_result=MitigationStageResult(
                 overview="Test mitigation",
                 file_changes=[{"path": "src/server.js", "status": "deleted"}],
@@ -803,7 +789,6 @@ class TestRepositoryScopeAndDeliveryPlanning:
     def test_case_disposition_blocks_pending_follow_up(self) -> None:
         """Block delivery whenever the verifier still requests follow-up."""
         case_disposition = derive_case_disposition(
-            analysis_fixture(verdict="confirmed-vulnerability", narratives=[]),
             mitigator_result=MitigationStageResult(
                 overview="Test mitigation",
                 file_changes=[{"path": "src/server.js", "status": "deleted"}],
@@ -822,9 +807,6 @@ class TestRepositoryScopeAndDeliveryPlanning:
         assert "requires follow-up" in case_disposition["reason"]
 
     def test_partial_verifier_coverage_is_confirmed_unresolved(self) -> None:
-        analyzer_result = analysis_fixture(
-            verdict="confirmed-vulnerability", narratives=[]
-        )
         mitigator_result = MitigationStageResult(
             overview="Test mitigation",
             file_changes=[{"path": "src/server.js", "status": "deleted"}],
@@ -838,7 +820,6 @@ class TestRepositoryScopeAndDeliveryPlanning:
             regression_status=None,
         )
         case_disposition = derive_case_disposition(
-            analyzer_result,
             mitigator_result=mitigator_result,
             verifier_result=verifier_result,
         )

@@ -8,7 +8,6 @@ import pytest
 from sec_review_agents.agents.mitigation.model import MitigationOutput
 from sec_review_agents.filesystem.backend_factory import BackendConfig
 from sec_review_agents.review_stages.mitigation.stage import (
-    create_skipped_mitigation_result,
     run_mitigation_stage,
 )
 from sec_review_agents.workspace.patches import PatchArtifact
@@ -122,31 +121,6 @@ async def test_run_mitigation_stage_requires_snapshot_seed(tmp_path: Path) -> No
             workspace_snapshot_tar_path=Path(materialization["local_root_path"])
             / WORKSPACE_SNAPSHOT_TAR_NAME,
         )
-
-
-def test_create_skipped_mitigation_result_persists_empty_patch_without_temp_workspace(
-    tmp_path: Path,
-) -> None:
-    materialization = _build_base_materialization(tmp_path)
-    local_root = Path(materialization["local_root_path"])
-    run_artifacts = local_root / "artifacts"
-    mitigator_artifacts = run_artifacts / "mitigator"
-    _add_snapshot_seed(materialization)
-
-    result = create_skipped_mitigation_result(
-        mitigator_artifacts_path=mitigator_artifacts,
-        retry_context=None,
-        reason="No mitigation target",
-    )
-
-    patch_path = mitigator_artifacts / "workspace.patch"
-    assert patch_path.exists()
-    assert patch_path.read_text(encoding="utf-8") == ""
-
-    tmp_root = run_artifacts / "tmp-workspaces" / "mitigation"
-    assert not tmp_root.exists()
-
-    assert "change_status" not in result.model_dump()
 
 
 @pytest.mark.asyncio
