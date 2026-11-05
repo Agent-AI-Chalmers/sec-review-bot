@@ -642,7 +642,7 @@ export function buildDeliveryDraftPrBody({
       '',
       ...renderReviewStatusLines(
         { analysis, mitigation, verification },
-        { includeResolutionNextStep: true }
+        { includeNextStep: true }
       ),
       '',
       ...renderFoldedBlock('Analysis', [

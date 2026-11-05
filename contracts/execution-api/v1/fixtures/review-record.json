@@ -34,15 +34,15 @@
   },
   "verification": {
     "overview": "The patch covers the retry enqueue path.",
-    "review_target_claim": "Retry payloads must be signed with current metadata.",
+    "target_claim": "Retry payloads must be signed with current metadata.",
     "validation_level": "static",
-    "patch_coverage": "full",
-    "regression_status": "not-run",
-    "resolution_next_step": "none",
-    "patch_findings": [
+    "coverage": "full",
+    "regression": "not-run",
+    "next_step": "none",
+    "findings": [
       "Retry signature metadata is rebuilt before enqueue."
     ],
-    "verification_findings": [
+    "evidence": [
       "No alternate retry enqueue path was found."
     ],
     "residual_risks": []

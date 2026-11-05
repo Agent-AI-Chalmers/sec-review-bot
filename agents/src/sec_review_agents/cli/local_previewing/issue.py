@@ -38,8 +38,8 @@ def _render_issue_comment(
 ) -> list[str]:
     analysis, mitigation, verification = _fix_sections(review_record)
     headline = (
-        f"Verifier assessed patch={inline_code(verification.get('patch_coverage'), 'unknown')}."
-        if verification.get("patch_coverage")
+        f"Verifier assessed coverage={inline_code(verification.get('coverage'), 'unknown')}."
+        if verification.get("coverage")
         else compact_plain_text(
             analysis.get("overview"),
             f"Security review completed for issue #{issue_number}.",
@@ -97,7 +97,7 @@ def _render_issue_draft_pr(
             analysis,
             mitigation,
             verification,
-            include_resolution_next_step=True,
+            include_next_step=True,
         ),
         "",
         plain_text(

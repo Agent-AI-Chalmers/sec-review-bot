@@ -22,7 +22,7 @@
 
 `verifier` 不只是 terminal audit stage。它也负责识别：
 
-- incomplete patch coverage
+- incomplete security coverage
 - ineffective remediation
 - unsafe fixes
 - 不应继续驱动 patch scope 的 overstated analyzer claims
@@ -71,40 +71,42 @@ retry 是对同一 scoped task 的 bounded revision pass。retrying mitigator �
 
 重要性质是 budget，而不是具体数字。这个设计为适度的未来实验留出空间，同时避免把 workflow 变成 unbounded conversational loop。
 
-## Resolution Next Step
+## Next Step
 
-Verifier output 将 patch coverage 与下一个 workflow action 分开：
+Verifier 将当前代码对安全目标的解决程度与下一步动作分开：
 
-- `patch_coverage`: patch 对 reviewed target claim 的覆盖程度
-- `regression_status`: regression、build、test 或 behavior-preservation 证据是否支持 patched workspace
-- `resolution_next_step`: verification judgment 之后应该发生什么
+- `coverage`: 当前代码对所核查问题的解决程度，无论是否有补丁
+- `regression`: regression、build、test 或 behavior-preservation 证据是否支持 patched workspace
+- `next_step`: verification judgment 之后应该发生什么
 
-`resolution_next_step` 有三个值：
+`next_step` 有三个值：
 
-- `none`: 当前 verifier outcome 不需要后续动作。当 `patch_coverage=full` 时，`regression_status` 必须是 `passed`、`not-run` 或 `not-applicable`。
+- `none`: 当前 verifier outcome 不需要后续动作。当 `coverage=full` 时，`regression` 必须是 `passed`、`not-run` 或 `not-applicable`。
 - `retry-ai`: 具体且 in-scope 的安全缺口或已确认 regression 可能由一次 bounded AI mitigation retry pass 修复。
 - `manual-review`: 未解决的 regression 证据是决定下一步动作的剩余因素，或者剩余工作需要 human judgment、repository administrator action、credential rotation、deployment/configuration changes、history cleanup、cache/fork cleanup，或其他普通 workspace patch 之外的动作。
 
-Patch coverage 与 regression status 是相互独立的判断。Patch 可能完整覆盖安全目标，同时破坏受支持的行为契约。这时可以是 `patch_coverage=full`、`regression_status=failed`，但尚不可交付，必须使用 `retry-ai` 或 `manual-review`，不能使用 `none`。
+Coverage 与 regression status 是相互独立的判断。Patch 可能完整覆盖安全目标，同时破坏受支持的行为契约。这时可以是 `coverage=full`、`regression=failed`，但尚不可交付，必须使用 `retry-ai` 或 `manual-review`，不能使用 `none`。
 
-如果仍有另一个具体且适合 bounded repair 的安全缺口，即使 `regression_status=unresolved`，也可以使用 `retry-ai`。未解决的 regression 必须保留在 `patch_findings` 中，并在 retry 后重新评估。如果未解决的 regression 本身决定下一步动作，包括安全覆盖已经是 `full` 的情况，则使用 `manual-review`。
+如果仍有另一个具体且适合 bounded repair 的安全缺口，即使 `regression=unresolved`，也可以使用 `retry-ai`。未解决的 regression 必须保留在 `findings` 中，并在 retry 后重新评估。如果未解决的 regression 本身决定下一步动作，包括安全覆盖已经是 `full` 的情况，则使用 `manual-review`。
 
 `partial` 不自动表示 retry。partial patch 可以暴露一个应当 retry 的 actionable code gap，也可以表示有用的 current-snapshot hardening，但剩余工作只能由人或 repository administrator 完成。
 
 Examples:
 
-- SSRF bypass 仍然存在于已 patch 的 URL/IP validation logic 中 -> `patch_coverage=partial`, `resolution_next_step=retry-ai`
-- 仍有适合 bounded repair 的安全缺口，同时 regression 证据未解决 -> `patch_coverage=partial`, `regression_status=unresolved`, `resolution_next_step=retry-ai`，并在 `patch_findings` 中保留两个问题
-- 安全覆盖完整，但 patch 破坏受支持的 API 契约 -> `patch_coverage=full`, `regression_status=failed`, `resolution_next_step=retry-ai` 或 `manual-review`
-- committed secret 已从当前 tree 移除，但仍存在于 git history 中 -> `patch_coverage=partial`, `resolution_next_step=manual-review`
+- SSRF bypass 仍然存在于已 patch 的 URL/IP validation logic 中 -> `coverage=partial`, `next_step=retry-ai`
+- 仍有适合 bounded repair 的安全缺口，同时 regression 证据未解决 -> `coverage=partial`, `regression=unresolved`, `next_step=retry-ai`，并在 `findings` 中保留两个问题
+- 安全覆盖完整，但 patch 破坏受支持的 API 契约 -> `coverage=full`, `regression=failed`, `next_step=retry-ai` 或 `manual-review`
+- committed secret 已从当前 tree 移除，但仍存在于 git history 中 -> `coverage=partial`, `next_step=manual-review`
+
+当前代码已满足安全目标，不代表任何附带修改都值得交付。没有补丁时可在证据充分的情况下报告 `coverage=full`；若有不必要、无关或不安全的修改，仍需在 `findings` 中说明，并通过下一步动作阻止交付。
 
 ## Retry Trigger Policy
 
-Retry 由 `resolution_next_step=retry-ai` 驱动，而不是只由 `patch_coverage` 驱动。
+Retry 由 `next_step=retry-ai` 驱动，而不是只由 `coverage` 驱动。
 
-第一次 mitigation attempt 不需要产生 changed files 才有资格 retry。如果 verifier 找到了第一次尝试遗漏的、具体且在 scope 内的修复，`patch_coverage=no-patch` 可以在提供 actionable `patch_findings` 时使用 `resolution_next_step=retry-ai`。Workflow 对这种 recovery 使用与 partial patch retry 相同的次数上限。
+第一次 mitigation attempt 不需要产生 changed files 才有资格 retry。如果 verifier 找到了第一次尝试遗漏的、具体且在 scope 内的修复，仍存在或尚未查清的问题，可以在提供具体 `findings` 时使用 `next_step=retry-ai`。Workflow 对这种 recovery 使用与 partial patch retry 相同的次数上限。
 
-Retry-eligible patch judgments 通常是 `partial` / `local-only` / `unresolved` / `misaligned`。当 `regression_status=failed` 时，完整安全覆盖也可以进入 retry。所有 retry-eligible outcome 都必须携带 `resolution_next_step=retry-ai`。
+Retry-eligible patch judgments 通常是 `partial` / `local-only` / `unresolved` / `misaligned`。当 `regression=failed` 时，完整安全覆盖也可以进入 retry。所有 retry-eligible outcome 都必须携带 `next_step=retry-ai`。
 
 更常见的 retry 模式是：
 
@@ -114,7 +116,7 @@ Retry-eligible patch judgments 通常是 `partial` / `local-only` / `unresolved`
 
 这就是 retry 有用的情况。在这种情况下，verifier 不只是拒绝 patch。它也接管 retry pass 的 effective framing。
 
-当 verifier 选择 `resolution_next_step=retry-ai` 时，它应该包含具体的 `patch_findings[]` 文本，让 retrying mitigator 获得 actionable patch-correction feedback，而不是模糊的 negative verdict。
+当 verifier 选择 `next_step=retry-ai` 时，它应该包含具体的 `findings[]` 文本，让 retrying mitigator 获得 actionable patch-correction feedback，而不是模糊的 negative verdict。
 
 设计意图很简单：只有当 verifier 产生了 actionable patch-correction feedback 时才 retry。这个机制不是为了重新打开每一个 unsuccessful review。
 

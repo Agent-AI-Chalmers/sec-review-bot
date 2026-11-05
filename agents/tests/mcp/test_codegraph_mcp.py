@@ -51,7 +51,7 @@ def _docker_backend(*, writable: bool = True) -> DockerSandboxBackend:
     )
 
 
-def test_skips_non_docker_backend_without_legacy_gate() -> None:
+def test_skips_non_docker_backend() -> None:
     with patch(
         "sec_review_agents.mcp.codegraph.log_diagnostic",
     ) as log_diagnostic:
@@ -64,7 +64,7 @@ def test_skips_non_docker_backend_without_legacy_gate() -> None:
     )
 
 
-def test_docker_backend_attempts_prepare_without_legacy_gate() -> None:
+def test_docker_backend_attempts_prepare() -> None:
     backend = _docker_backend()
 
     with (

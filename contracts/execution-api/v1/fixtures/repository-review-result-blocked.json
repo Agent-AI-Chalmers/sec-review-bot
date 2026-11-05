@@ -27,13 +27,13 @@
         },
         "verification": {
           "overview": "The required remediation is an external secret rotation and history cleanup.",
-          "review_target_claim": "Committed production tokens must be revoked and removed from history.",
+          "target_claim": "Committed production tokens must be revoked and removed from history.",
           "validation_level": "static",
-          "patch_coverage": "unresolved",
-          "regression_status": "not-applicable",
-          "resolution_next_step": "manual-review",
-          "patch_findings": [],
-          "verification_findings": [
+          "coverage": "unresolved",
+          "regression": "not-applicable",
+          "next_step": "manual-review",
+          "findings": [],
+          "evidence": [
             "No workspace-only patch can revoke the credential."
           ],
           "residual_risks": [

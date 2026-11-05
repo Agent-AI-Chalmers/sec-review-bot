@@ -34,13 +34,13 @@ class VerifierSummary(BaseModel):
     """
 
     overview: str | None
-    review_target_claim: str | None
-    patch_coverage: str | None
-    resolution_next_step: str | None
-    patch_findings: list[str]
+    target_claim: str | None
+    coverage: str | None
+    next_step: str | None
+    findings: list[str]
     validation_level: str | None
-    regression_status: str | None
-    verification_findings: list[str]
+    regression: str | None
+    evidence: list[str]
     residual_risks: list[str]
 
 
@@ -138,10 +138,7 @@ def should_retry_from_verifier_result(
     verifier_result: VerificationStageResult | None,
 ) -> bool:
     """Use the verifier's requested next step as the sole bounded-retry signal."""
-    return (
-        verifier_result is not None
-        and verifier_result.resolution_next_step == "retry-ai"
-    )
+    return verifier_result is not None and verifier_result.next_step == "retry-ai"
 
 
 def feedback_retry_context(
@@ -191,13 +188,13 @@ def verifier_result_summary(
         return None
     return VerifierSummary(
         overview=verifier_result.overview,
-        review_target_claim=verifier_result.review_target_claim,
-        patch_coverage=verifier_result.patch_coverage,
-        resolution_next_step=verifier_result.resolution_next_step,
-        patch_findings=verifier_result.patch_findings or [],
+        target_claim=verifier_result.target_claim,
+        coverage=verifier_result.coverage,
+        next_step=verifier_result.next_step,
+        findings=verifier_result.findings or [],
         validation_level=verifier_result.validation_level,
-        regression_status=verifier_result.regression_status,
-        verification_findings=verifier_result.verification_findings or [],
+        regression=verifier_result.regression,
+        evidence=verifier_result.evidence or [],
         residual_risks=verifier_result.residual_risks or [],
     )
 
@@ -278,10 +275,10 @@ def _history_projection(
         entry = {
             "title": f"Retry {retry_index}",
             "retry_index": retry_index,
-            "patch_coverage": item.patch_coverage,
-            "regression_status": item.regression_status,
-            "resolution_next_step": item.resolution_next_step,
-            "patch_findings": item.patch_findings or [],
+            "coverage": item.coverage,
+            "regression": item.regression,
+            "next_step": item.next_step,
+            "findings": item.findings or [],
         }
         projection.append(entry)
     return projection

@@ -34,13 +34,13 @@
         },
         "verification": {
           "overview": "The patch covers the retry enqueue path.",
-          "review_target_claim": "Retry payloads must be signed with current metadata.",
+          "target_claim": "Retry payloads must be signed with current metadata.",
           "validation_level": "static",
-          "patch_coverage": "full",
-          "regression_status": "not-run",
-          "resolution_next_step": "none",
-          "patch_findings": [],
-          "verification_findings": [],
+          "coverage": "full",
+          "regression": "not-run",
+          "next_step": "none",
+          "findings": [],
+          "evidence": [],
           "residual_risks": []
         },
         "cvss": {

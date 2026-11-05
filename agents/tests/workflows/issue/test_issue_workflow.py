@@ -18,11 +18,11 @@ async def test_direct_review_passes_no_patch_assessment_to_result() -> None:
     )
     verifier_result = VerificationStageResult(
         overview="No repair justified after independent review.",
-        resolution_next_step="none",
-        review_target_claim="Whether the reported issue requires repair.",
-        patch_coverage="no-patch",
+        next_step="none",
+        target_claim="Whether the reported issue requires repair.",
+        coverage="full",
         validation_level="static",
-        regression_status="not-applicable",
+        regression="not-applicable",
     )
     request = ReviewWorkflowRequest(
         workflow="issue-review",

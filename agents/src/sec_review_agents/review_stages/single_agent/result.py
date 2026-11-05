@@ -24,7 +24,7 @@ class SingleAgentFixOutcome(BaseModel):
     overview: str
     verdict: Verdict
     validation_level: ValidationLevel
-    regression_status: RegressionStatus
+    regression: RegressionStatus
     target_claim: str
     file_changes: list[FileChange] = Field(default_factory=list)
     patch_diff: str = ""

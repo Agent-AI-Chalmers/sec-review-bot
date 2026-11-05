@@ -199,13 +199,13 @@
           "additionalProperties": false,
           "required": [
             "overview",
-            "review_target_claim",
+            "target_claim",
             "validation_level",
-            "patch_coverage",
-            "regression_status",
-            "resolution_next_step",
-            "patch_findings",
-            "verification_findings",
+            "coverage",
+            "regression",
+            "next_step",
+            "findings",
+            "evidence",
             "residual_risks"
           ],
           "properties": {
@@ -215,7 +215,7 @@
                 "null"
               ]
             },
-            "review_target_claim": {
+            "target_claim": {
               "type": [
                 "string",
                 "null"
@@ -230,19 +230,17 @@
                 null
               ]
             },
-            "patch_coverage": {
+            "coverage": {
               "enum": [
                 "full",
                 "partial",
                 "local-only",
                 "unresolved",
                 "misaligned",
-                "no-patch",
-                "not-applicable",
                 null
               ]
             },
-            "regression_status": {
+            "regression": {
               "enum": [
                 "passed",
                 "failed",
@@ -252,7 +250,7 @@
                 null
               ]
             },
-            "resolution_next_step": {
+            "next_step": {
               "enum": [
                 "none",
                 "retry-ai",
@@ -260,13 +258,13 @@
                 null
               ]
             },
-            "patch_findings": {
+            "findings": {
               "type": "array",
               "items": {
                 "type": "string"
               }
             },
-            "verification_findings": {
+            "evidence": {
               "type": "array",
               "items": {
                 "type": "string"

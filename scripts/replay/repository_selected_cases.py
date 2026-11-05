@@ -287,7 +287,7 @@ def _summary_from_replayed(case_id: str, replayed: dict[str, Any]) -> dict[str, 
         "analysis_status": analysis.get("status"),
         "analysis_verdict": analysis.get("verdict"),
         "mitigation_status": mitigation.get("status"),
-        "verification_coverage": verification.get("patch_coverage"),
+        "verification_coverage": verification.get("coverage"),
         "changed_files": file_change_paths(mitigation.get("file_changes")),
     }
 

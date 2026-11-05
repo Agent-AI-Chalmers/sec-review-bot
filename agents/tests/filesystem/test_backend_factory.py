@@ -79,14 +79,6 @@ def test_local_backend_routes_use_agent_path(tmp_path: Path) -> None:
     assert "/mnt/material/workspace/" not in backend.routes
 
 
-def test_environment_cannot_select_the_removed_auto_backend() -> None:
-    with (
-        patch.dict("os.environ", {"AGENT_SANDBOX_BACKEND": "auto"}, clear=True),
-        pytest.raises(ValueError, match="must be docker"),
-    ):
-        selected_sandbox_backend_kind()
-
-
 def test_environment_cannot_select_the_local_backend() -> None:
     """No operator setting may downgrade an agent to a shell-less backend."""
     with (

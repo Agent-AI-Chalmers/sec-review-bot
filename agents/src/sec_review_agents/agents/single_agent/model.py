@@ -12,7 +12,7 @@ from sec_review_agents.utils.pydantic_types import NonEmptyText
 
 class SingleAgentFixOutput(BaseModel):
     """
-    Keep `overview`, `verdict`, `validation_level`, `regression_status`, and `target_claim`
+    Keep `overview`, `verdict`, `validation_level`, `regression`, and `target_claim`
     aligned to one final repository-grounded outcome after repair and self-check.
     Use `target_claim` for the strongest concrete claim the agent actually audited;
     leave it empty only when no actionable target was confirmed.
@@ -35,7 +35,7 @@ class SingleAgentFixOutput(BaseModel):
             "`runtime-endpoint` only when the actual service or endpoint behavior was exercised end-to-end."
         ),
     )
-    regression_status: RegressionStatus = Field(
+    regression: RegressionStatus = Field(
         description=(
             "Whether focused regression, behavior-preservation, build, or test evidence supports the repaired workspace. "
             "Use `passed` when relevant checks were run and passed; `failed` when a relevant check failed or repository "

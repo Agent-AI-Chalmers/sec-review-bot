@@ -115,17 +115,21 @@ Runtime exceptions are not part of `ReviewRecord`. If analyzer / mitigator / ver
 
 > *CVSS is an optional score shown in the report, not the pass/fail signal for the review. If repository CVSS scoring fails after the case review itself succeeds, publish `ReviewRecord.cvss` as `null` and keep the scoring failure details in diagnostics and artifacts.*
 
-`verification.patch_coverage="full"` requires the verifier to report full coverage for the patch target. Partial coverage remains unresolved and must not enter repository delivery / draft PR publication.
+`verification.coverage` describes current-code safety for `target_claim`, independently of patch presence. `full` means repository evidence establishes that the target is resolved, already fixed, or not applicable to this code; `partial`, `local-only`, and `misaligned` describe remaining gaps, and `unresolved` means evidence is insufficient. With no changes, assess the baseline. Use `mitigation.file_changes` to determine whether a patch exists. Coverage alone does not approve delivery: a patch must exist, regression evidence must not block it, and `next_step` must be `none`. Report concerns about unnecessary or unrelated changes in findings and the next action even when current-code coverage is `full`.
 
-`verification.regression_status` reports whether focused regression, behavior-preservation, build, or test evidence supports the patched workspace. It is separate from security-target coverage: a patch can fully cover the reviewed security claim while tests were not run or while regression readiness remains unresolved.
+`target_claim` identifies the scoped claim, `coverage` assesses current-code safety for that claim, `regression` reports regression checks, and `next_step` requests further action. `findings` records problems requiring follow-up; `evidence` records the checks and observations supporting the judgment. Producers and consumers must be upgraded together when this result shape changes. Existing artifacts remain historical records; renaming fields alone cannot establish a new assessment.
 
-`verification.resolution_next_step` describes the next action after verifier judgment: `none` means no further action is needed; `retry-ai` means there is a concrete patch gap that bounded AI mitigation can continue fixing; `manual-review` means remaining work requires human review, administrator action, credential rotation, history cleanup, deployment/configuration changes, or another capability outside normal workspace patching.
+`verification.regression` reports whether focused regression, behavior-preservation, build, or test evidence supports the patched workspace. It is separate from security-target coverage: a patch can fully cover the reviewed security claim while tests were not run or while regression readiness remains unresolved.
+
+`verification.next_step` describes the next action after verifier judgment: `none` means no further action is needed; `retry-ai` means there is a concrete patch gap that bounded AI mitigation can continue fixing; `manual-review` means remaining work requires human review, administrator action, credential rotation, history cleanup, deployment/configuration changes, or another capability outside normal workspace patching.
+
+The local `single-agent` ablation has no independent Verifier assessment, so its `verification.coverage` is `null`. It retains self-check notes rather than inferring safety coverage from file presence.
 
 ### Issue Review Result
 
 Workflow: `issue-review`
 
-Input keeps the existing issue input contract and expresses review intent through `review_intent`. This is the workflow where `review_intent.objective = "repair"` changes analyzer stance. Downstream mitigation still depends only on the analyzer's structured result.
+Input keeps the existing issue input contract and expresses review intent through `review_intent`. This is the workflow where `review_intent.objective = "repair"` changes analyzer stance. Analyzer conclusions do not determine admission to mitigation or verification.
 
 The result shape is defined by [`issue-review-result.schema.json`](schemas/issue-review-result.schema.json).
 

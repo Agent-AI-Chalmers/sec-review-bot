@@ -167,14 +167,14 @@ async def test_repository_case_without_patch_does_not_retry_verification() -> No
         ],
         verification_results=[
             VerificationStageResult(
-                patch_coverage="no-patch",
-                resolution_next_step="manual-review",
-                patch_findings=[],
-                verification_findings=[],
+                coverage="unresolved",
+                next_step="manual-review",
+                findings=[],
+                evidence=[],
                 overview="Test verification",
-                review_target_claim=None,
+                target_claim=None,
                 validation_level=None,
-                regression_status=None,
+                regression=None,
             )
         ],
     )
@@ -184,7 +184,7 @@ async def test_repository_case_without_patch_does_not_retry_verification() -> No
     assert state.mitigation_retry_contexts == [None]
     assert state.verification_retry_contexts == [None]
     assert state.archive_retry_contexts == []
-    assert result.review_record.verification.patch_coverage == "no-patch"
+    assert result.review_record.verification.coverage == "unresolved"
     assert "diagnostics" not in result.model_dump()
 
 
@@ -206,25 +206,25 @@ async def test_repository_case_workflow_retries_and_passes_verifier_history() ->
         verification_results=[
             VerificationStageResult(
                 overview="Patch still needs revision.",
-                review_target_claim="target claim",
-                patch_coverage="partial",
-                resolution_next_step="retry-ai",
+                target_claim="target claim",
+                coverage="partial",
+                next_step="retry-ai",
                 validation_level="static",
-                patch_findings=["needs revision"],
-                verification_findings=["first verifier"],
+                findings=["needs revision"],
+                evidence=["first verifier"],
                 residual_risks=[],
-                regression_status=None,
+                regression=None,
             ),
             VerificationStageResult(
                 overview="Patch fully covers the target claim.",
-                review_target_claim="target claim",
-                patch_coverage="full",
-                resolution_next_step="none",
+                target_claim="target claim",
+                coverage="full",
+                next_step="none",
                 validation_level="static",
-                patch_findings=[],
-                verification_findings=["second verifier"],
+                findings=[],
+                evidence=["second verifier"],
                 residual_risks=[],
-                regression_status=None,
+                regression=None,
             ),
         ],
     )
@@ -240,7 +240,7 @@ async def test_repository_case_workflow_retries_and_passes_verifier_history() ->
     assert state.verification_retry_contexts[1] is not None
     assert state.verification_retry_contexts[1].retry_index == 1
     assert len(state.archive_retry_contexts) == 1
-    assert result.review_record.verification.patch_coverage == "full"
+    assert result.review_record.verification.coverage == "full"
     assert result.disposition == "keep"
     assert "diagnostics" not in result.model_dump()
 
@@ -320,8 +320,8 @@ async def _run_case_workflow(state: _CaseWorkflowState) -> RepositoryCaseResult:
         if retry_context is not None:
             history = retry_context.history
             assert len(history) == 1
-            assert history[0].patch_coverage == "partial"
-            assert history[0].resolution_next_step == "retry-ai"
+            assert history[0].coverage == "partial"
+            assert history[0].next_step == "retry-ai"
         return state.verification_results.pop(0)
 
     @activity.defn(name="archive_repository_case_feedback_attempt_activity")
@@ -345,7 +345,7 @@ async def _run_case_workflow(state: _CaseWorkflowState) -> RepositoryCaseResult:
                 "disposition": (
                     "keep"
                     if verifier_result is not None
-                    and verifier_result.patch_coverage == "full"
+                    and verifier_result.coverage == "full"
                     else "blocked"
                 ),
                 "review_record": {

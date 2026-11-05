@@ -1,0 +1,28 @@
+{
+  "analysis": {
+    "verdict": "no-actionable-finding",
+    "overview": "The reported redirect path already validates same-origin targets.",
+    "narratives": []
+  },
+  "mitigation": {
+    "overview": null,
+    "file_changes": [],
+    "patch_diff": null
+  },
+  "verification": {
+    "overview": "The unchanged baseline leaves a concrete input-validation gap.",
+    "target_claim": "The scoped input cannot cross the protected boundary.",
+    "validation_level": "static",
+    "coverage": "partial",
+    "regression": "not-applicable",
+    "next_step": "retry-ai",
+    "findings": [
+      "Validate input before it reaches the sink."
+    ],
+    "evidence": [
+      "The baseline has no guard on the scoped input path."
+    ],
+    "residual_risks": []
+  },
+  "cvss": null
+}

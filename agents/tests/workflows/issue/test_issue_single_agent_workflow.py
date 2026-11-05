@@ -43,7 +43,7 @@ async def test_single_agent_workflow_with_model_access_returns_compact_shape(
         "overview": "Applied a fix after validating the issue.",
         "verdict": "confirmed-vulnerability",
         "validation_level": "static",
-        "regression_status": "not-run",
+        "regression": "not-run",
         "target_claim": "The issue allowed attacker-controlled path traversal.",
         "residual_risks": [],
         "self_check_notes": [
@@ -121,7 +121,7 @@ async def test_single_agent_workflow_preserves_confirmed_verdict_with_committed_
         "overview": "Applied a fix after validating the issue.",
         "verdict": "confirmed-defect",
         "validation_level": "static",
-        "regression_status": "not-run",
+        "regression": "not-run",
         "target_claim": "The issue allowed attacker-controlled path traversal.",
         "residual_risks": [],
         "self_check_notes": [
@@ -201,7 +201,7 @@ async def test_single_agent_activity_result_restores_model_before_public_project
         overview="Removed unsafe entrypoint",
         verdict="confirmed-defect",
         validation_level="static",
-        regression_status="not-run",
+        regression="not-run",
         target_claim="Unsafe entrypoint",
         file_changes=[{"path": "unsafe.py", "status": "deleted"}],
         patch_diff="reference patch",
@@ -220,4 +220,6 @@ async def test_single_agent_activity_result_restores_model_before_public_project
     assert restored == outcome
     public = build_issue_single_agent_review_record(single_agent_result=restored)
     assert public["mitigation"]["file_changes"] == outcome.file_changes
-    assert public["verification"]["verification_findings"] == ["Checked callers"]
+    assert public["verification"]["evidence"] == ["Checked callers"]
+    assert public["verification"]["coverage"] is None
+    assert public["verification"]["next_step"] == "manual-review"

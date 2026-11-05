@@ -8,17 +8,17 @@ def test_patch_full_with_claim_is_valid() -> None:
     result = VerificationOutput.model_validate(
         {
             "overview": "Patch fully covers the reviewed claim.",
-            "review_target_claim": "reviewed claim",
-            "patch_coverage": "full",
-            "resolution_next_step": "none",
-            "patch_findings": [],
+            "target_claim": "reviewed claim",
+            "coverage": "full",
+            "next_step": "none",
+            "findings": [],
             "validation_level": "static",
-            "regression_status": "not-run",
-            "verification_findings": ["patch fully covers the reviewed claim"],
+            "regression": "not-run",
+            "evidence": ["patch fully covers the reviewed claim"],
         }
     )
 
-    assert result.patch_coverage == "full"
+    assert result.coverage == "full"
 
 
 def test_patch_full_with_unresolved_regression_requires_manual_review() -> None:
@@ -26,37 +26,37 @@ def test_patch_full_with_unresolved_regression_requires_manual_review() -> None:
     result = VerificationOutput.model_validate(
         {
             "overview": "Patch fully covers the reviewed claim.",
-            "review_target_claim": "reviewed claim",
-            "patch_coverage": "full",
-            "resolution_next_step": "manual-review",
-            "patch_findings": ["compatibility note"],
+            "target_claim": "reviewed claim",
+            "coverage": "full",
+            "next_step": "manual-review",
+            "findings": ["compatibility note"],
             "validation_level": "static",
-            "regression_status": "unresolved",
-            "verification_findings": ["note"],
+            "regression": "unresolved",
+            "evidence": ["note"],
         }
     )
 
-    assert result.patch_findings == ["compatibility note"]
-    assert result.regression_status == "unresolved"
-    assert result.resolution_next_step == "manual-review"
+    assert result.findings == ["compatibility note"]
+    assert result.regression == "unresolved"
+    assert result.next_step == "manual-review"
 
 
-@pytest.mark.parametrize("regression_status", ["failed", "unresolved"])
+@pytest.mark.parametrize("regression", ["failed", "unresolved"])
 def test_patch_full_rejects_none_for_blocking_regression(
-    regression_status: str,
+    regression: str,
 ) -> None:
     """Prevent a delivery-blocking regression from being reported as complete."""
     with pytest.raises(ValueError, match="requires retry-ai or manual-review"):
         VerificationOutput.model_validate(
             {
                 "overview": "Security coverage is full but delivery is blocked.",
-                "review_target_claim": "reviewed claim",
-                "patch_coverage": "full",
-                "resolution_next_step": "none",
-                "patch_findings": ["regression blocks delivery"],
+                "target_claim": "reviewed claim",
+                "coverage": "full",
+                "next_step": "none",
+                "findings": ["regression blocks delivery"],
                 "validation_level": "static",
-                "regression_status": regression_status,
-                "verification_findings": ["note"],
+                "regression": regression,
+                "evidence": ["note"],
             }
         )
 
@@ -66,33 +66,33 @@ def test_patch_full_can_retry_confirmed_regression() -> None:
     result = VerificationOutput.model_validate(
         {
             "overview": "Security coverage is full but a regression needs repair.",
-            "review_target_claim": "reviewed claim",
-            "patch_coverage": "full",
-            "resolution_next_step": "retry-ai",
-            "patch_findings": ["restore the supported API behavior"],
+            "target_claim": "reviewed claim",
+            "coverage": "full",
+            "next_step": "retry-ai",
+            "findings": ["restore the supported API behavior"],
             "validation_level": "static",
-            "regression_status": "failed",
-            "verification_findings": ["security target is covered"],
+            "regression": "failed",
+            "evidence": ["security target is covered"],
         }
     )
 
-    assert result.patch_coverage == "full"
-    assert result.resolution_next_step == "retry-ai"
+    assert result.coverage == "full"
+    assert result.next_step == "retry-ai"
 
 
 def test_patch_full_cannot_retry_unresolved_regression() -> None:
     """Route an unproven regression outcome to human review instead of patch retry."""
-    with pytest.raises(ValueError, match="requires resolution_next_step=manual-review"):
+    with pytest.raises(ValueError, match="requires next_step=manual-review"):
         VerificationOutput.model_validate(
             {
                 "overview": "Security coverage is full but regression evidence is unclear.",
-                "review_target_claim": "reviewed claim",
-                "patch_coverage": "full",
-                "resolution_next_step": "retry-ai",
-                "patch_findings": ["regression outcome is unresolved"],
+                "target_claim": "reviewed claim",
+                "coverage": "full",
+                "next_step": "retry-ai",
+                "findings": ["regression outcome is unresolved"],
                 "validation_level": "static",
-                "regression_status": "unresolved",
-                "verification_findings": ["security target is covered"],
+                "regression": "unresolved",
+                "evidence": ["security target is covered"],
             }
         )
 
@@ -102,114 +102,116 @@ def test_partial_patch_can_retry_with_unresolved_regression() -> None:
     result = VerificationOutput.model_validate(
         {
             "overview": "A security gap remains and regression evidence is unclear.",
-            "review_target_claim": "reviewed claim",
-            "patch_coverage": "partial",
-            "resolution_next_step": "retry-ai",
-            "patch_findings": [
+            "target_claim": "reviewed claim",
+            "coverage": "partial",
+            "next_step": "retry-ai",
+            "findings": [
                 "close the remaining security gap",
                 "reassess the unresolved regression concern after retry",
             ],
             "validation_level": "static",
-            "regression_status": "unresolved",
-            "verification_findings": ["the current patch is incomplete"],
+            "regression": "unresolved",
+            "evidence": ["the current patch is incomplete"],
         }
     )
 
-    assert result.patch_coverage == "partial"
-    assert result.regression_status == "unresolved"
-    assert result.resolution_next_step == "retry-ai"
+    assert result.coverage == "partial"
+    assert result.regression == "unresolved"
+    assert result.next_step == "retry-ai"
 
 
-@pytest.mark.parametrize("patch_findings", [[], [""], ["   "]])
+@pytest.mark.parametrize("findings", [[], [""], ["   "]])
 def test_patch_full_with_blocking_regression_requires_patch_finding(
-    patch_findings: list[str],
+    findings: list[str],
 ) -> None:
     """Require actionable context whenever regression evidence blocks delivery."""
-    with pytest.raises(ValueError, match="requires a concrete patch finding"):
+    with pytest.raises(ValueError, match="requires a concrete finding"):
         VerificationOutput.model_validate(
             {
                 "overview": "Security coverage is full but delivery is blocked.",
-                "review_target_claim": "reviewed claim",
-                "patch_coverage": "full",
-                "resolution_next_step": "manual-review",
-                "patch_findings": patch_findings,
+                "target_claim": "reviewed claim",
+                "coverage": "full",
+                "next_step": "manual-review",
+                "findings": findings,
                 "validation_level": "static",
-                "regression_status": "failed",
-                "verification_findings": ["security target is covered"],
+                "regression": "failed",
+                "evidence": ["security target is covered"],
             }
         )
 
 
-def test_patch_full_without_blocking_regression_rejects_follow_up() -> None:
-    """Reject needless follow-up when both security and regression gates are clear."""
-    with pytest.raises(ValueError, match="requires resolution_next_step=none"):
+def test_full_without_a_concrete_concern_rejects_follow_up() -> None:
+    """Require a concrete concern before requesting follow-up on safe code."""
+    with pytest.raises(ValueError, match="requires a concrete finding"):
         VerificationOutput.model_validate(
             {
                 "overview": "Patch fully covers the reviewed claim.",
-                "review_target_claim": "reviewed claim",
-                "patch_coverage": "full",
-                "resolution_next_step": "manual-review",
-                "patch_findings": [],
+                "target_claim": "reviewed claim",
+                "coverage": "full",
+                "next_step": "manual-review",
+                "findings": [],
                 "validation_level": "static",
-                "regression_status": "passed",
-                "verification_findings": ["note"],
+                "regression": "passed",
+                "evidence": ["note"],
             }
         )
 
 
-def test_retry_ai_requires_patch_findings() -> None:
+def test_retry_ai_requires_findings() -> None:
     result = VerificationOutput.model_validate(
         {
             "overview": "Patch partially covers the reviewed claim.",
-            "review_target_claim": "reviewed claim",
-            "patch_coverage": "partial",
-            "resolution_next_step": "retry-ai",
-            "patch_findings": ["fix the remaining bypass"],
+            "target_claim": "reviewed claim",
+            "coverage": "partial",
+            "next_step": "retry-ai",
+            "findings": ["fix the remaining bypass"],
             "validation_level": "static",
-            "regression_status": "not-run",
-            "verification_findings": ["note"],
+            "regression": "not-run",
+            "evidence": ["note"],
         }
     )
 
-    assert result.resolution_next_step == "retry-ai"
+    assert result.next_step == "retry-ai"
 
 
-@pytest.mark.parametrize("patch_findings", [[], [""], ["   "]])
-def test_retry_ai_rejects_blank_patch_findings(
-    patch_findings: list[str],
+@pytest.mark.parametrize("findings", [[], [""], ["   "]])
+def test_retry_ai_rejects_blank_findings(
+    findings: list[str],
 ) -> None:
     """Reject retry feedback that contains no actionable finding text."""
-    with pytest.raises(ValueError, match="requires at least one patch finding"):
+    with pytest.raises(ValueError, match="requires at least one concrete finding"):
         VerificationOutput.model_validate(
             {
                 "overview": "Patch partially covers the reviewed claim.",
-                "review_target_claim": "reviewed claim",
-                "patch_coverage": "partial",
-                "resolution_next_step": "retry-ai",
-                "patch_findings": patch_findings,
+                "target_claim": "reviewed claim",
+                "coverage": "partial",
+                "next_step": "retry-ai",
+                "findings": findings,
                 "validation_level": "static",
-                "regression_status": "not-run",
-                "verification_findings": ["note"],
+                "regression": "not-run",
+                "evidence": ["note"],
             }
         )
 
 
-def test_no_patch_can_have_no_next_step() -> None:
+def test_already_safe_baseline_can_have_no_next_step() -> None:
     result = VerificationOutput.model_validate(
         {
-            "overview": "No patch was available to verify.",
-            "review_target_claim": "reviewed claim",
-            "patch_coverage": "no-patch",
-            "resolution_next_step": "none",
-            "patch_findings": [],
+            "overview": "Repository evidence shows the baseline already blocks the reported path.",
+            "target_claim": "reviewed claim",
+            "coverage": "full",
+            "next_step": "none",
+            "findings": [],
             "validation_level": "static",
-            "regression_status": "not-applicable",
-            "verification_findings": ["No patch was available to verify."],
+            "regression": "not-applicable",
+            "evidence": [
+                "Repository evidence shows the baseline already blocks the reported path."
+            ],
         }
     )
 
-    assert result.patch_coverage == "no-patch"
-    assert result.resolution_next_step == "none"
+    assert result.coverage == "full"
+    assert result.next_step == "none"
 
 
 def test_partial_patch_cannot_have_no_next_step() -> None:
@@ -217,29 +219,59 @@ def test_partial_patch_cannot_have_no_next_step() -> None:
         VerificationOutput.model_validate(
             {
                 "overview": "Patch partially covers the reviewed claim.",
-                "review_target_claim": "reviewed claim",
-                "patch_coverage": "partial",
-                "resolution_next_step": "none",
-                "patch_findings": ["fix the remaining bypass"],
+                "target_claim": "reviewed claim",
+                "coverage": "partial",
+                "next_step": "none",
+                "findings": ["fix the remaining bypass"],
                 "validation_level": "static",
-                "regression_status": "not-run",
-                "verification_findings": ["note"],
+                "regression": "not-run",
+                "evidence": ["note"],
             }
         )
 
 
-def test_manual_review_partial_does_not_require_patch_findings() -> None:
+def test_manual_review_partial_does_not_require_findings() -> None:
     result = VerificationOutput.model_validate(
         {
             "overview": "Patch partially covers the reviewed claim.",
-            "review_target_claim": "reviewed claim",
-            "patch_coverage": "partial",
-            "resolution_next_step": "manual-review",
-            "patch_findings": ["history cleanup"],
+            "target_claim": "reviewed claim",
+            "coverage": "partial",
+            "next_step": "manual-review",
+            "findings": ["history cleanup"],
             "validation_level": "static",
-            "regression_status": "not-run",
-            "verification_findings": ["note"],
+            "regression": "not-run",
+            "evidence": ["note"],
         }
     )
 
-    assert result.resolution_next_step == "manual-review"
+    assert result.next_step == "manual-review"
+
+
+def test_safe_baseline_does_not_approve_unnecessary_changes() -> None:
+    """Security closure is separate from accepting a supplied patch for delivery."""
+    result = VerificationOutput(
+        overview="Baseline is safe but the supplied metadata change is unrelated.",
+        target_claim="The baseline must block unsafe extraction.",
+        coverage="full",
+        next_step="retry-ai",
+        findings=["Remove the unrelated version bump."],
+        evidence=["The baseline already rejects the reported input."],
+        validation_level="static",
+        regression="not-run",
+    )
+    assert result.coverage == "full"
+    assert result.next_step == "retry-ai"
+
+
+def test_unmodified_code_with_concrete_gap_can_request_repair() -> None:
+    result = VerificationOutput(
+        overview="The unchanged baseline still has a concrete gap.",
+        target_claim="Reject unsafe extraction paths.",
+        coverage="partial",
+        next_step="retry-ai",
+        findings=["Validate the path before extraction."],
+        evidence=["The baseline does not guard this path."],
+        validation_level="static",
+        regression="not-applicable",
+    )
+    assert result.next_step == "retry-ai"

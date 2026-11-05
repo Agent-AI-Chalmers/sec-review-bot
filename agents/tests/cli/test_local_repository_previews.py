@@ -78,11 +78,11 @@ def test_writes_publishable_preview_outside_patch_synthesis(tmp_path: Path) -> N
                 "changed_files": ["src/server.js"],
             },
             "verification": {
-                "patch_coverage": "full",
-                "resolution_next_step": "none",
+                "coverage": "full",
+                "next_step": "none",
                 "validation_level": "static",
-                "patch_findings": ["Reviewer-visible concern."],
-                "verification_findings": [],
+                "findings": ["Reviewer-visible concern."],
+                "evidence": [],
                 "residual_risks": [],
             },
             "cvss": {
@@ -130,8 +130,8 @@ def test_writes_publishable_preview_outside_patch_synthesis(tmp_path: Path) -> N
     assert "- Validation level: `static`" in content
     assert "Affected paths:" not in content
     assert "##### Evidence anchors" not in content
-    assert "- Patch coverage: `full`" in content
-    assert "- Resolution next step: `none`" in content
+    assert "- Coverage: `full`" in content
+    assert "- Next step: `none`" in content
     assert "- Case disposition: `keep`" not in content
     assert "- Analysis: `confirmed security vulnerability`" in content
     assert "<summary>CVSS</summary>" in content
@@ -271,8 +271,8 @@ def test_writes_blocked_confirmed_cases_preview(tmp_path: Path) -> None:
             "patch_diff": "diff --git a/src/webhook.ts b/src/webhook.ts\n+verifyRetrySignature()\n",
         },
         "verification": {
-            "patch_coverage": "partial",
-            "resolution_next_step": "Manual review needed.",
+            "coverage": "partial",
+            "next_step": "Manual review needed.",
             "overview": "Queued retry payloads remain unverified.",
         },
     }
@@ -315,8 +315,7 @@ def test_writes_blocked_confirmed_cases_preview(tmp_path: Path) -> None:
         if line.startswith("<summary>[medium] case-1")
     )
     assert (
-        coverage_headline(review_record["verification"]["patch_coverage"])
-        not in title_line
+        coverage_headline(review_record["verification"]["coverage"]) not in title_line
     )
     assert "<summary>Analysis</summary>" in content
     assert "<summary>CVSS</summary>" in content

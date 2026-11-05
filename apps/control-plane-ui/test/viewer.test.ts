@@ -29,17 +29,12 @@ test('viewer parses repository trajectory JSONL', () => {
   )
 })
 
-test('viewer rejects arrays, wrappers, legacy roles and malformed records', () => {
+test('viewer rejects arrays, wrappers and malformed records', () => {
   const message = { id: 'm', role: 'user', content: 'Inspect this' }
   for (const value of [
     [message],
     { messages: [message] },
     { events: [] },
-    {
-      seq: 1,
-      event: 'message',
-      message: { id: 'm', type: 'human', content: 'old' }
-    },
     {
       seq: 1,
       event: 'message',

@@ -10,15 +10,15 @@
     "patch_diff": null
   },
   "verification": {
-    "overview": "No patch is required because the reviewed path rejects external targets.",
-    "review_target_claim": "Callback redirects must not leave the trusted origin.",
+    "overview": "The unchanged baseline already enforces the reviewed boundary.",
+    "target_claim": "The scoped input cannot cross the protected boundary.",
     "validation_level": "static",
-    "patch_coverage": "not-applicable",
-    "regression_status": "not-applicable",
-    "resolution_next_step": "none",
-    "patch_findings": [],
-    "verification_findings": [
-      "The existing allowlist check runs before redirect response creation."
+    "coverage": "full",
+    "regression": "not-applicable",
+    "next_step": "none",
+    "findings": [],
+    "evidence": [
+      "The baseline guard rejects the reported unsafe input before the sink."
     ],
     "residual_risks": []
   },

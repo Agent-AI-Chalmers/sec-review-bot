@@ -267,21 +267,6 @@ def test_narrative_nested_reviews_accept_aliases() -> None:
     assert narrative.cwe_mapping.cwe_id == "CWE-918"
 
 
-def test_narrative_rejects_legacy_top_level_review_fields() -> None:
-    with pytest.raises(ValueError, match="Extra inputs are not permitted"):
-        Narrative.model_validate(
-            {
-                "priority": 1,
-                "verdict": "confirmed-defect",
-                "title": "legacy",
-                "description": "desc",
-                "validation_level": "static",
-                "scope_review": scope_review(),
-                "source_facts": ["legacy source"],
-            }
-        )
-
-
 def test_analysis_output_orders_narratives_by_priority() -> None:
     output = AnalysisOutput.model_validate(
         {

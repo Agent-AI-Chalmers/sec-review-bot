@@ -71,7 +71,7 @@ To reduce the risk that a mitigation report claims a patch was applied while ver
 - `/workspace`: read-only baseline view without the patch
 - `/workspace-patched`: read-only view built temporarily during verifier stage by applying `workspace.patch` to a clean workspace snapshot
 
-When `workspace.patch` exists and applies cleanly, `patch_coverage` is judged primarily from `/workspace-patched`; `/workspace` is used only for baseline comparison. If the patched view cannot be built, verification fails instead of judging patch coverage from baseline code.
+When `workspace.patch` exists and applies cleanly, `coverage` is judged primarily from `/workspace-patched`; `/workspace` is used only for baseline comparison. If the patched view cannot be built, verification fails instead of judging patch coverage from baseline code.
 
 ### `delivery-planning`
 

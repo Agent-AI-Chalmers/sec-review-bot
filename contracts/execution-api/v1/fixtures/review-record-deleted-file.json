@@ -16,15 +16,15 @@
   },
   "verification": {
     "overview": "The route registration no longer imports the deleted debug endpoint.",
-    "review_target_claim": "Debug-only environment disclosure must not be reachable in production.",
+    "target_claim": "Debug-only environment disclosure must not be reachable in production.",
     "validation_level": "static",
-    "patch_coverage": "full",
-    "regression_status": "not-run",
-    "resolution_next_step": "none",
-    "patch_findings": [
+    "coverage": "full",
+    "regression": "not-run",
+    "next_step": "none",
+    "findings": [
       "The debug endpoint file is deleted."
     ],
-    "verification_findings": [],
+    "evidence": [],
     "residual_risks": []
   },
   "cvss": {

@@ -296,7 +296,7 @@ class TestRepositoryDeliveryExecution:
         self,
         case_id: str,
         *,
-        patch_coverage: str = "full",
+        coverage: str = "full",
     ) -> dict:
         analysis = {
             "verdict": "confirmed-defect",
@@ -323,9 +323,9 @@ class TestRepositoryDeliveryExecution:
         }
         verification = {
             "overview": f"Verifier overview for {case_id}.",
-            "patch_coverage": patch_coverage,
-            "patch_findings": [] if patch_coverage == "full" else ["needs revision"],
-            "verification_findings": [],
+            "coverage": coverage,
+            "findings": [] if coverage == "full" else ["needs revision"],
+            "evidence": [],
             "residual_risks": [],
         }
         return {
@@ -1302,7 +1302,7 @@ class TestRepositoryDeliveryExecution:
                     deliveries=[
                         DeliveryEntry(
                             delivery_id="delivery-invalid",
-                            strategy="legacy",  # type: ignore[arg-type]
+                            strategy="unknown-strategy",  # type: ignore[arg-type]
                             case_ids=["case-1"],
                             reason="bad strategy",
                         )

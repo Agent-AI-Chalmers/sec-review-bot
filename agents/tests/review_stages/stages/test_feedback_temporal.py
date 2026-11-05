@@ -57,12 +57,12 @@ async def test_retry_summary_survives_temporal_and_preserves_changed_paths() -> 
         ),
         verifier_result=VerificationStageResult(
             overview="Missing check",
-            patch_findings=["gap"],
-            review_target_claim=None,
-            patch_coverage=None,
-            resolution_next_step="none",
+            findings=["gap"],
+            target_claim=None,
+            coverage=None,
+            next_step="none",
             validation_level=None,
-            regression_status=None,
+            regression=None,
         ),
     )
     async with (

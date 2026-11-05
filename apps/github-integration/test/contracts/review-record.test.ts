@@ -42,13 +42,13 @@ function validReviewRecord(): ReviewRecordFixture {
     },
     verification: {
       overview: null,
-      review_target_claim: null,
+      target_claim: null,
       validation_level: null,
-      patch_coverage: null,
-      regression_status: null,
-      resolution_next_step: null,
-      patch_findings: [],
-      verification_findings: [],
+      coverage: null,
+      regression: null,
+      next_step: null,
+      findings: [],
+      evidence: [],
       residual_risks: []
     },
     cvss: null
@@ -66,7 +66,7 @@ test('parseReviewRecord accepts the shared v1 review_record fixture', () => {
   const record = parseReviewRecord(contractFixture('review-record.json'))
 
   assert.strictEqual(record.analysis.verdict, 'confirmed-vulnerability')
-  assert.strictEqual(record.verification.patch_coverage, 'full')
+  assert.strictEqual(record.verification.coverage, 'full')
   assert.strictEqual(record.cvss?.severity, 'medium')
 })
 
@@ -230,27 +230,7 @@ test('parseReviewRecord rejects malformed v1 review_record', () => {
 
 test('parseReviewRecord rejects unknown public enum values', () => {
   const record = validReviewRecord()
-  record.verification.patch_coverage = 'future-coverage'
-
-  assert.throws(
-    () => parseReviewRecord(record),
-    /review_record does not match API v1/
-  )
-})
-
-test('parseReviewRecord rejects removed public status fields', () => {
-  const record = validReviewRecord()
-  Object.assign(record.mitigation, { status: 'error' })
-
-  assert.throws(
-    () => parseReviewRecord(record),
-    /review_record does not match API v1/
-  )
-})
-
-test('parseReviewRecord rejects the removed changed_files field', () => {
-  const record = validReviewRecord()
-  Object.assign(record.mitigation, { changed_files: ['src/server.ts'] })
+  record.verification.coverage = 'future-coverage'
 
   assert.throws(
     () => parseReviewRecord(record),

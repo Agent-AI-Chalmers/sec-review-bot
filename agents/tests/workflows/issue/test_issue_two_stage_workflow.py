@@ -62,7 +62,7 @@ async def test_two_stage_workflow_runs_internal_self_check_mitigation_without_ve
         {"path": "demo.py", "status": "deleted"}
     ]
     assert review_record["analysis"]["verdict"] == "confirmed-vulnerability"
-    assert review_record["verification"]["patch_coverage"] is None
+    assert review_record["verification"]["coverage"] is None
 
 
 @pytest.mark.asyncio

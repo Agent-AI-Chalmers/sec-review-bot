@@ -6,21 +6,20 @@ import pytest
 
 from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.filesystem.backend_factory import BackendConfig
-from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.verification.stage import run_verification_stage
 
 
-def _verification_payload(*, patch_coverage: str = "full") -> VerificationOutput:
+def _verification_payload(*, coverage: str = "full") -> VerificationOutput:
     return VerificationOutput.model_validate(
         {
             "overview": "Patch fully covers the target claim.",
-            "review_target_claim": "target claim",
-            "patch_coverage": patch_coverage,
-            "resolution_next_step": "none",
+            "target_claim": "target claim",
+            "coverage": coverage,
+            "next_step": "none",
             "validation_level": "static",
-            "regression_status": "not-run",
-            "patch_findings": [],
-            "verification_findings": ["ok"],
+            "regression": "not-run",
+            "findings": [],
+            "evidence": ["ok"],
             "residual_risks": [],
         }
     )
@@ -76,7 +75,6 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
             attempt_label="initial",
             workspace_snapshot_tar_path=Path("/tmp/workspace.snapshot.tar"),
             workspace_patch="diff --git a/a b/a\n",
-            mitigation_result=MitigationStageResult(overview="Test mitigation"),
             build_backend_config=_build_backend,
             system_prompt="base prompt",
             filesystem_system_prompt="filesystem prompt",
@@ -84,7 +82,7 @@ async def test_run_verification_stage_prepares_workspace_before_backend() -> Non
         )
 
     assert call_order == ["restore", "apply", "backend", "invoke"]
-    assert result.patch_coverage == "full"
+    assert result.coverage == "full"
 
 
 @pytest.mark.asyncio
@@ -110,7 +108,7 @@ async def test_run_verification_stage_uses_unpatched_workspace_when_no_patch() -
         ) as apply_workspace_patch_mock,
         patch(
             "sec_review_agents.review_stages.verification.stage.run_verification_agent",
-            return_value=_verification_payload(patch_coverage="no-patch"),
+            return_value=_verification_payload(coverage="full"),
         ) as agent_mock,
         patch(
             "sec_review_agents.review_stages.verification.stage.persist_verification_result"
@@ -122,7 +120,6 @@ async def test_run_verification_stage_uses_unpatched_workspace_when_no_patch() -
             attempt_label="initial",
             workspace_snapshot_tar_path=Path("/tmp/workspace.snapshot.tar"),
             workspace_patch=None,
-            mitigation_result=MitigationStageResult(overview="Test mitigation"),
             build_backend_config=_build_backend,
             system_prompt="base prompt",
             filesystem_system_prompt="filesystem prompt",
@@ -134,4 +131,4 @@ async def test_run_verification_stage_uses_unpatched_workspace_when_no_patch() -
     agent_mock.assert_called_once()
     assert len(captured_workspace_roots) == 1
     assert captured_workspace_roots[0].name.startswith("sec-review-verifier-")
-    assert result.patch_coverage == "no-patch"
+    assert result.coverage == "full"

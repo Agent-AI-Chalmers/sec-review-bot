@@ -13,15 +13,15 @@
     },
     "verification": {
       "overview": "Queued retry payloads remain unverified.",
-      "review_target_claim": "The patch should cover every webhook execution path.",
+      "target_claim": "The patch should cover every webhook execution path.",
       "validation_level": "static",
-      "patch_coverage": "partial",
-      "regression_status": "not-run",
-      "resolution_next_step": "manual-review",
-      "patch_findings": [
+      "coverage": "partial",
+      "regression": "not-run",
+      "next_step": "manual-review",
+      "findings": [
         "Direct webhook requests are covered."
       ],
-      "verification_findings": [
+      "evidence": [
         "Retry payload validation is still missing."
       ],
       "residual_risks": [

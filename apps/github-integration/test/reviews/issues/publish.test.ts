@@ -31,13 +31,13 @@ function issueReviewRecordWithPatch(): ReviewRecord {
     },
     verification: {
       overview: null,
-      review_target_claim: null,
+      target_claim: null,
       validation_level: null,
-      patch_coverage: null,
-      regression_status: null,
-      resolution_next_step: null,
-      patch_findings: [],
-      verification_findings: [],
+      coverage: 'full',
+      regression: 'not-run',
+      next_step: 'none',
+      findings: [],
+      evidence: [],
       residual_risks: []
     },
     cvss: null
@@ -118,7 +118,10 @@ function buildHarness() {
   }
 }
 
-async function runPublish(open_pr: boolean) {
+async function runPublish(
+  open_pr: boolean,
+  review_record = issueReviewRecordWithPatch()
+) {
   const harness = buildHarness()
   await handleIssueReviewRun({
     run: {
@@ -139,7 +142,7 @@ async function runPublish(open_pr: boolean) {
     },
     result: {
       api_version: EXECUTION_API_VERSION,
-      review_record: issueReviewRecordWithPatch()
+      review_record
     },
     store: harness.store,
     claim_token: 'claim',
@@ -165,3 +168,15 @@ test('issue publish keeps the patch in the summary comment when not opted in', a
   assert.strictEqual(harness.createdComments.length, 1)
   assert.deepStrictEqual(harness.initializedSteps[0], ['issue:summary-comment'])
 })
+
+for (const next_step of ['retry-ai', 'manual-review'] as const) {
+  test(`issue publish only posts the summary when verifier requests ${next_step}`, async () => {
+    const review_record = issueReviewRecordWithPatch()
+    review_record.verification.next_step = next_step
+    review_record.verification.findings = ['Revert the unrelated change.']
+    const harness = await runPublish(true, review_record)
+    assert.equal(harness.createdPullRequests.length, 0)
+    assert.equal(harness.createdComments.length, 1)
+    assert.deepEqual(harness.initializedSteps[0], ['issue:summary-comment'])
+  })
+}

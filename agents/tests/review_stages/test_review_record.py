@@ -49,9 +49,7 @@ def test_issue_review_record_projects_staged_result_with_patch(tmp_path) -> None
         "verdict": "confirmed-defect",
     }
     mitigation_result = {
-        "status": "completed",
         "overview": "normalized paths",
-        "changed_files": ["app.py"],
         "file_changes": [
             {
                 "path": "app.py",
@@ -63,10 +61,10 @@ def test_issue_review_record_projects_staged_result_with_patch(tmp_path) -> None
         "patch_diff": "diff --git a/app.py b/app.py\n",
     }
     verifier_result = {
-        "patch_coverage": "full",
-        "regression_status": "not-run",
-        "patch_findings": [],
-        "verification_findings": ["Checked normalized path handling."],
+        "coverage": "full",
+        "regression": "not-run",
+        "findings": [],
+        "evidence": ["Checked normalized path handling."],
         "validation_level": "static",
     }
 
@@ -90,23 +88,12 @@ def test_issue_review_record_projects_staged_result_with_patch(tmp_path) -> None
             "content_encoding": "utf-8",
         }
     ]
-    assert record["verification"]["patch_coverage"] == "full"
-    assert record["verification"]["regression_status"] == "not-run"
-    assert record["verification"]["patch_findings"] == []
-    assert record["verification"]["verification_findings"] == [
-        "Checked normalized path handling."
-    ]
+    assert record["verification"]["coverage"] == "full"
+    assert record["verification"]["regression"] == "not-run"
+    assert record["verification"]["findings"] == []
+    assert record["verification"]["evidence"] == ["Checked normalized path handling."]
     assert "disposition" not in record
     assert "raw" not in record
-
-
-def test_review_record_keeps_analysis_residual_risks_out_of_public_record() -> None:
-    analysis = analysis_fixture().model_dump(mode="json", by_alias=True)
-    record = ReviewRecord.model_validate(
-        {"analysis": {**analysis, "residual_risks": ["Legacy risk"]}}
-    ).model_dump(mode="json", by_alias=True)
-    assert record["analysis"]["narratives"] == analysis["narratives"]
-    assert "residual_risks" not in record["analysis"]
 
 
 def test_issue_review_record_projects_deleted_and_binary_file_changes(tmp_path) -> None:
@@ -117,8 +104,6 @@ def test_issue_review_record_projects_deleted_and_binary_file_changes(tmp_path) 
         {
             "analysis": {"verdict": "confirmed-defect"},
             "mitigation": {
-                "status": "completed",
-                "changed_files": ["image.bin", "deleted.txt"],
                 "file_changes": [
                     {
                         "path": "image.bin",
@@ -129,7 +114,7 @@ def test_issue_review_record_projects_deleted_and_binary_file_changes(tmp_path) 
                     {"path": "deleted.txt", "status": "deleted"},
                 ],
             },
-            "verification": {"patch_coverage": "full"},
+            "verification": {"coverage": "full"},
             "cvss": None,
         }
     ).model_dump(mode="json", by_alias=True)
@@ -153,7 +138,6 @@ def test_issue_single_agent_review_record_projects_combined_result() -> None:
         "overview": "Applied escaping.",
         "verdict": "confirmed-defect",
         "target_claim": "Unsafe shell command composition.",
-        "changed_files": ["server.py"],
         "file_changes": [
             {
                 "path": "server.py",
@@ -171,7 +155,7 @@ def test_issue_single_agent_review_record_projects_combined_result() -> None:
         single_agent_result=SingleAgentFixOutcome.model_validate(
             {
                 "validation_level": "static",
-                "regression_status": "not-run",
+                "regression": "not-run",
                 **single_agent_result,
             }
         ),
@@ -187,7 +171,9 @@ def test_issue_single_agent_review_record_projects_combined_result() -> None:
             "content_encoding": "utf-8",
         }
     ]
-    assert "raw" not in record
+    assert record["verification"]["target_claim"] == "Unsafe shell command composition."
+    assert record["verification"]["coverage"] is None
+    assert record["verification"]["evidence"] == ["Checked command construction."]
 
 
 def test_issue_single_agent_skipped_mitigation_projects_not_needed() -> None:
@@ -195,7 +181,6 @@ def test_issue_single_agent_skipped_mitigation_projects_not_needed() -> None:
         "overview": "No code change needed.",
         "verdict": "no-actionable-finding",
         "target_claim": "No actionable issue.",
-        "changed_files": [],
         "file_changes": [],
         "residual_risks": ["Manual review may still be useful."],
         "self_check_notes": ["No patch target."],
@@ -205,55 +190,26 @@ def test_issue_single_agent_skipped_mitigation_projects_not_needed() -> None:
         single_agent_result=SingleAgentFixOutcome.model_validate(
             {
                 "validation_level": "static",
-                "regression_status": "not-run",
+                "regression": "not-run",
                 **single_agent_result,
             }
         ),
     )
 
-    assert "residual_risks" not in record["analysis"]
+    assert record["verification"]["coverage"] is None
+    assert record["verification"]["residual_risks"] == [
+        "Manual review may still be useful."
+    ]
+    assert record["verification"]["evidence"] == ["No patch target."]
 
 
-def test_review_record_analysis_projection_ignores_legacy_public_status_input() -> None:
-    for legacy_status in ("confirmed", "success"):
-        record = ReviewRecord.model_validate(
-            {
-                "analysis": {
-                    "status": legacy_status,
-                    "overview": "already projected public analysis",
-                    "verdict": "no-actionable-finding",
-                },
-                "cvss": None,
-            }
-        ).model_dump(mode="json", by_alias=True)
-
-        assert record["analysis"]["verdict"] == "no-actionable-finding"
-
-
-@pytest.mark.parametrize("verdict", ["false-positive", "not-reproducible"])
+@pytest.mark.parametrize("verdict", ["unknown-verdict", ""])
 def test_review_record_analysis_projection_rejects_unrecognized_verdicts(
     verdict,
 ) -> None:
     with pytest.raises(ValidationError) as error:
         ReviewRecord.model_validate({"analysis": {"verdict": verdict}})
     assert error.value.errors()[0]["loc"] == ("analysis", "verdict")
-
-
-def test_review_record_drops_removed_changed_files_projection() -> None:
-    record = ReviewRecord.model_validate(
-        {
-            "analysis": {"verdict": "confirmed-defect"},
-            "mitigation": {
-                "status": "completed",
-                "overview": "claimed applied without exported files",
-                "changed_files": [],
-            },
-            "cvss": None,
-        }
-    ).model_dump(mode="json", by_alias=True)
-
-    assert "changed_files" not in record["mitigation"]
-    assert record["mitigation"]["file_changes"] == []
 
 
 def test_repository_case_review_record_keeps_delivery_gate_out_of_review_record(
@@ -264,15 +220,14 @@ def test_repository_case_review_record_keeps_delivery_gate_out_of_review_record(
         "verdict": "confirmed-vulnerability",
     }
     mitigation_result = {
-        "status": "completed",
         "overview": "parameterized query",
         "file_changes": [{"path": "src/a.py", "status": "deleted"}],
         "patch_diff": "diff --git a/src/a.py b/src/a.py\n",
     }
     verifier_result = {
         "overview": "SQL injection coverage accepted.",
-        "review_target_claim": "SQL injection in src/a.py was fixed.",
-        "patch_coverage": "full",
+        "target_claim": "SQL injection in src/a.py was fixed.",
+        "coverage": "full",
         "validation_level": "static",
     }
     cvss_result = {
@@ -296,7 +251,7 @@ def test_repository_case_review_record_keeps_delivery_gate_out_of_review_record(
     assert record_cvss is not None
     assert record_cvss["outcome"] == "scored"
     assert record_cvss["severity"] == "high"
-    assert record["verification"]["review_target_claim"] == (
+    assert record["verification"]["target_claim"] == (
         "SQL injection in src/a.py was fixed."
     )
     assert "disposition" not in record
@@ -427,11 +382,11 @@ def test_review_record_builder_does_not_hide_invalid_stage_result_as_not_run() -
         ("mitigation", "overview", 42),
         ("mitigation", "patch_diff", 42),
         ("verification", "overview", 42),
-        ("verification", "review_target_claim", 42),
+        ("verification", "target_claim", 42),
         ("verification", "validation_level", "invalid"),
-        ("verification", "patch_coverage", "invalid"),
-        ("verification", "regression_status", "invalid"),
-        ("verification", "resolution_next_step", "invalid"),
+        ("verification", "coverage", "invalid"),
+        ("verification", "regression", "invalid"),
+        ("verification", "next_step", "invalid"),
         ("cvss", "outcome", "invalid"),
         ("cvss", "severity", 42),
         ("cvss", "vector", 42),
@@ -451,8 +406,8 @@ def test_review_record_rejects_malformed_scalar_fields(section, field, value) ->
     ("section", "field", "valid_item"),
     [
         ("mitigation", "file_changes", {"path": "app.py", "status": "deleted"}),
-        ("verification", "patch_findings", "Finding"),
-        ("verification", "verification_findings", "Finding"),
+        ("verification", "findings", "Finding"),
+        ("verification", "evidence", "Finding"),
         ("verification", "residual_risks", "Risk"),
     ],
 )

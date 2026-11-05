@@ -7,10 +7,10 @@ from sec_review_agents.utils.structured_renderer import (
 def test_render_structured_markdown_formats_nested_stage_like_payload() -> None:
     payload = {
         "overview": "Patch covers the SQL injection claim.",
-        "patch_coverage": "full",
+        "coverage": "full",
         "base_score": 8.1,
         "changed_files": ["src/app.py", "tests/test_app.py"],
-        "verification_findings": [
+        "evidence": [
             "Parameterized query reaches the sink.",
             {"summary": "Regression suite passed.", "path": "tests/test_app.py"},
         ],
@@ -32,17 +32,17 @@ def test_render_structured_markdown_formats_nested_stage_like_payload() -> None:
         "",
         "- `src/app.py`",
         "- `tests/test_app.py`",
+        "- Coverage: `full`",
+        "",
+        "Evidence:",
+        "",
+        "- Parameterized query reaches the sink.",
+        "- `tests/test_app.py`: Regression suite passed.",
         "",
         "Metrics:",
         "",
         "  - Attack vector: `network`",
         "  - User interaction: `none`",
-        "- Patch coverage: `full`",
-        "",
-        "Verification findings:",
-        "",
-        "- Parameterized query reaches the sink.",
-        "- `tests/test_app.py`: Regression suite passed.",
     ]
 
 
@@ -100,28 +100,28 @@ def test_render_structured_markdown_formats_tuples_as_ordered_lists() -> None:
 def test_render_structured_markdown_accepts_lightweight_display_schema() -> None:
     schema = StructuredRenderSchema(
         key_labels={
-            "patch_coverage": "Patch coverage",
-            "regression_status": "Regression status",
+            "coverage": "Coverage",
+            "regression": "Regression",
         },
         field_order={
-            "patch_coverage": 10,
-            "regression_status": 20,
-            "verification_findings": 30,
+            "coverage": 10,
+            "regression": 20,
+            "evidence": 30,
         },
     )
 
     assert render_structured_markdown(
         {
-            "verification_findings": ["Checked SQL injection path."],
-            "regression_status": "not-run",
-            "patch_coverage": "full",
+            "evidence": ["Checked SQL injection path."],
+            "regression": "not-run",
+            "coverage": "full",
         },
         schema=schema,
     ) == [
-        "- Patch coverage: `full`",
-        "- Regression status: `not-run`",
+        "- Coverage: `full`",
+        "- Regression: `not-run`",
         "",
-        "Verification findings:",
+        "Evidence:",
         "",
         "- Checked SQL injection path.",
     ]
@@ -131,7 +131,7 @@ def test_render_structured_markdown_preserves_inline_code_in_review_prose() -> N
     """Review prose keeps model-supplied inline code in local previews."""
     payload = {
         "overview": "The patch updates `agents/src/example.py`.",
-        "verification_findings": [
+        "evidence": [
             "`MemoryObservationOutput` remains unchanged.",
         ],
     }
@@ -139,13 +139,13 @@ def test_render_structured_markdown_preserves_inline_code_in_review_prose() -> N
     assert render_structured_markdown(payload) == [
         "The patch updates `agents/src/example.py`.",
         "",
-        "Verification findings:",
+        "Evidence:",
         "",
         "- `MemoryObservationOutput` remains unchanged.",
     ]
 
 
-def test_prompt_profile_preserves_inline_code_in_review_target_claim() -> None:
+def test_prompt_profile_preserves_inline_code_in_target_claim() -> None:
     """Prompt rendering treats review claims as prose regardless of their length."""
     short_claim = "`MemoryObservationOutput` remains unchanged."
     long_claim = (
@@ -154,11 +154,11 @@ def test_prompt_profile_preserves_inline_code_in_review_target_claim() -> None:
     )
 
     assert render_structured_markdown(
-        {"review_target_claim": short_claim}, profile="prompt"
-    ) == [f"- Review target claim: {short_claim}"]
+        {"target_claim": short_claim}, profile="prompt"
+    ) == [f"- Target claim: {short_claim}"]
     assert render_structured_markdown(
-        {"review_target_claim": long_claim}, profile="prompt"
-    ) == [f"- Review target claim: {long_claim}"]
+        {"target_claim": long_claim}, profile="prompt"
+    ) == [f"- Target claim: {long_claim}"]
 
 
 def test_render_structured_markdown_profiles_keep_prompt_trajectories_visible() -> None:

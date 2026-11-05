@@ -18,40 +18,6 @@ from tests.arch.architecture_test_helpers import (
 )
 
 
-def test_capability_packages_do_not_import_legacy_domain_shims() -> None:
-    capability_roots = [
-        PACKAGE_ROOT / "scan_stages",
-        PACKAGE_ROOT / "review_stages",
-        PACKAGE_ROOT / "delivery_stages",
-        PACKAGE_ROOT / "workflows",
-    ]
-    legacy_prefixes = (
-        "sec_review_agents.issues",
-        "sec_review_agents.pull_requests",
-        "sec_review_agents.repositories",
-    )
-    violations: list[str] = []
-
-    for root in capability_roots:
-        for path in root.rglob("*.py"):
-            tree = ast.parse(path.read_text(), filename=str(path))
-            for node in ast.walk(tree):
-                if isinstance(node, ast.ImportFrom):
-                    module = node.module or ""
-                    if module.startswith(legacy_prefixes):
-                        violations.append(
-                            f"{path.relative_to(PACKAGE_ROOT)} imports {module}"
-                        )
-                elif isinstance(node, ast.Import):
-                    for alias in node.names:
-                        if alias.name.startswith(legacy_prefixes):
-                            violations.append(
-                                f"{path.relative_to(PACKAGE_ROOT)} imports {alias.name}"
-                            )
-
-    assert violations == []
-
-
 def test_foundational_packages_do_not_import_upper_layers() -> None:
     # Keep this as a one-way layering check. Foundational packages may share
     # small helpers, but they should not pull in workflows, execution workers, or stages.

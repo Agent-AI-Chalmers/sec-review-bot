@@ -67,7 +67,7 @@ def test_external_tool_oracle_binds_command_and_evidence_to_one_execution() -> N
         ],
         "result": {
             "validation_level": "runtime-endpoint",
-            "verification_findings": ["Reflected XSS execution confirmed"],
+            "evidence": ["Reflected XSS execution confirmed"],
         },
     }
 

@@ -31,34 +31,34 @@ test('view utils render verification summary with stable order and finding summa
   assert.deepStrictEqual(
     renderVerificationSummaryLines(
       {
-        patch_coverage: 'full',
-        regression_status: 'not-run',
-        resolution_next_step: 'none',
+        coverage: 'full',
+        regression: 'not-run',
+        next_step: 'none',
         validation_level: 'static',
-        review_target_claim: 'The patch covers retry payloads.',
-        patch_findings: [{ summary: 'Patch updates retry validation.' }],
-        verification_findings: ['No regression suite was run.'],
+        target_claim: 'The patch covers retry payloads.',
+        findings: [{ summary: 'Patch updates retry validation.' }],
+        evidence: ['No regression suite was run.'],
         residual_risks: []
       },
       {
         includeOverview: false,
-        includeUnknownResolutionNextStep: true
+        includeUnknownNextStep: true
       }
     ),
     [
-      '- Patch coverage: `full`',
-      '- Regression status: `not-run`',
-      '- Resolution next step: `none`',
+      '- Coverage: `full`',
+      '- Regression: `not-run`',
+      '- Next step: `none`',
       '- Validation level: `static`',
       '',
-      'Review target claim:',
+      'Target claim:',
       '',
       'The patch covers retry payloads.',
       '',
-      'Patch findings:',
+      'Findings:',
       '- Patch updates retry validation.',
       '',
-      'Verification findings:',
+      'Evidence:',
       '- No regression suite was run.'
     ]
   )
@@ -68,14 +68,14 @@ test('view utils preserve inline code in review prose', () => {
   assert.deepStrictEqual(
     renderVerificationSummaryLines(
       {
-        patch_coverage: 'full',
-        regression_status: 'passed',
-        resolution_next_step: 'none',
+        coverage: 'full',
+        regression: 'passed',
+        next_step: 'none',
         validation_level: 'static',
-        review_target_claim:
+        target_claim:
           'The patch updates `agents/src/sec_review_agents/resources/prompts/memory/extract-system.md`.',
-        patch_findings: [],
-        verification_findings: ['`MemoryObservationOutput` remains unchanged.'],
+        findings: [],
+        evidence: ['`MemoryObservationOutput` remains unchanged.'],
         residual_risks: []
       },
       {
@@ -83,16 +83,16 @@ test('view utils preserve inline code in review prose', () => {
       }
     ),
     [
-      '- Patch coverage: `full`',
-      '- Regression status: `passed`',
-      '- Resolution next step: `none`',
+      '- Coverage: `full`',
+      '- Regression: `passed`',
+      '- Next step: `none`',
       '- Validation level: `static`',
       '',
-      'Review target claim:',
+      'Target claim:',
       '',
       'The patch updates `agents/src/sec_review_agents/resources/prompts/memory/extract-system.md`.',
       '',
-      'Verification findings:',
+      'Evidence:',
       '- `MemoryObservationOutput` remains unchanged.'
     ]
   )

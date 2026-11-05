@@ -34,7 +34,7 @@ def test_mcp_oracle_requires_arguments_and_result_from_one_interaction() -> None
         "toolErrors": [],
         "result": {
             "validation_level": "runtime-endpoint",
-            "verification_findings": ["DOM XSS execution confirmed"],
+            "evidence": ["DOM XSS execution confirmed"],
         },
     }
 
