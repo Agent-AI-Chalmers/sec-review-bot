@@ -289,8 +289,7 @@ class Narrative(BaseModel):
     )
     locations: list[Location] = Field(
         default_factory=list,
-        max_length=3,
-        description="Up to three code locations that best anchor this narrative in the repository.",
+        description="Code locations that best anchor this narrative in the repository.",
     )
     flow_review: FlowReview = Field(
         default_factory=FlowReview,

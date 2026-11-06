@@ -25,6 +25,7 @@ from sec_review_agents.workflows.repository_case.workflow import (
     mitigate_repository_case_activity,
     verify_repository_case_activity,
 )
+from sec_review_agents.workflows.review_intent import ReviewIntent
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from tests.analysis_fixtures import analysis_fixture
 from tests.prepared_input_fixtures import (
@@ -128,6 +129,7 @@ async def test_analysis_verdict_does_not_prevent_stage_execution(
         assert ver_mock.call_args.args[3] is feedback
     else:
         fields = {
+            "review_intent": ReviewIntent(objective="audit", test_changes="deny"),
             "artifact_root_path": str(tmp_path),
             "workspace_snapshot_tar_path": str(tmp_path / "snapshot.tar"),
             "history_path": str(tmp_path / "history"),
@@ -171,6 +173,7 @@ async def test_analysis_verdict_does_not_prevent_stage_execution(
         assert mit_mock.call_args.kwargs["retry_context"] is feedback
         assert ver_mock.call_args.kwargs["analysis_result"] is analysis
         assert ver_mock.call_args.kwargs["retry_context"] is feedback
+        assert ver_mock.call_args.kwargs["test_changes"] == "deny"
     mit_mock.assert_awaited_once()
     ver_mock.assert_awaited_once()
 

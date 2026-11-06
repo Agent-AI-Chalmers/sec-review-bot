@@ -59,6 +59,24 @@ def test_confirmed_defect_decision_accepts_without_vulnerability_proof_fields() 
     assert narrative.verdict == "confirmed-defect"
 
 
+def test_narrative_preserves_all_relevant_locations() -> None:
+    """Distinct entry points and fallback paths must not be dropped to fit a display limit."""
+    locations = [{"file": "index.js", "line": line} for line in (4, 6, 8, 10)]
+    narrative = Narrative.model_validate(
+        {
+            "priority": 1,
+            "verdict": "confirmed-defect",
+            "title": "Unsafe command execution across entry points",
+            "description": "The main and fallback paths pass input to the shell.",
+            "locations": locations,
+            "scope_review": scope_review(),
+        }
+    )
+
+    assert narrative.model_dump(exclude_none=True)["locations"] == locations
+    assert Narrative.model_validate_json(narrative.model_dump_json()) == narrative
+
+
 def test_scope_analysis_is_required_for_every_narrative() -> None:
     """Every narrative explains its scope; leaving the field out was the cheapest way
     to pass the local-versus-shared decision, which is how a shared control point

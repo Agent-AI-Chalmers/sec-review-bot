@@ -1,3 +1,5 @@
+import pytest
+
 from sec_review_agents.agents.analysis.issue import (
     build_issue_analyzer_filesystem_system_prompt,
     build_issue_analyzer_system_prompt,
@@ -265,3 +267,23 @@ def test_repository_incremental_evidence_prompt_is_incremental_only() -> None:
     for build_prompt, full_input, incremental_input in prompt_cases:
         assert "Incremental Evidence Rule" not in build_prompt(full_input)
         assert "Incremental Evidence Rule" in build_prompt(incremental_input)
+
+
+@pytest.mark.parametrize("is_retry", [False, True])
+@pytest.mark.parametrize("test_changes", ["allow", "deny"])
+def test_verifier_profiles_select_run_test_policy(is_retry, test_changes) -> None:
+    """Both verification passes must share the repairer's permitted test edits."""
+    other_policy = "deny" if test_changes == "allow" else "allow"
+    selected = load_prompt_resource(f"test-changes-policy/{test_changes}-boundary.md")
+    omitted = load_prompt_resource(f"test-changes-policy/{other_policy}-boundary.md")
+    for builder in (
+        build_issue_verification_system_prompt,
+        build_pr_verification_system_prompt,
+        build_repository_verification_system_prompt,
+    ):
+        prompt = builder(is_retry=is_retry, test_changes=test_changes)
+        assert prompt.count(selected) == 1
+        assert omitted not in prompt
+        assert prompt.index(selected) < prompt.index(
+            load_prompt_resource("shared/output-formatting.md")
+        )

@@ -19,6 +19,10 @@ from sec_review_agents.runtime.runtime_config import (
     ExecutionRuntimeContext,
     runtime_workspace_path,
 )
+from sec_review_agents.workflows.review_intent import (
+    TEST_CHANGES_ALLOW,
+    TestChangesPolicy,
+)
 
 
 async def verify_repository_case(
@@ -33,6 +37,7 @@ async def verify_repository_case(
     analysis_result: AnalysisStageResult,
     mitigation_result: MitigationStageResult | None,
     retry_context: FeedbackRetryContext | None = None,
+    test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
     runtime_context: ExecutionRuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> VerificationStageResult:
@@ -71,6 +76,7 @@ async def verify_repository_case(
         ),
         system_prompt=build_repository_verification_system_prompt(
             is_retry=retry_context is not None,
+            test_changes=test_changes,
             workspace_root=runtime_workspace_path(runtime_context),
         ),
         filesystem_system_prompt=build_repository_verification_filesystem_system_prompt(

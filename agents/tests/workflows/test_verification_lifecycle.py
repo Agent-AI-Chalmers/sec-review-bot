@@ -1,8 +1,11 @@
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.resources.loader import load_prompt_resource
+from sec_review_agents.review_stages.feedback_loop import feedback_retry_context
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.workflows.issue.verification import verify_issue
 from sec_review_agents.workflows.pull_request.verification import verify_pull_request
@@ -161,3 +164,51 @@ async def test_repository_verification_preserves_patch_terminal_newline(
 
     assert build_prompt.call_args.kwargs["workspace_patch"] == patch_diff
     assert run_verification_stage_mock.call_args.kwargs["workspace_patch"] == patch_diff
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("scope", ["issue", "pull_request", "repository_case"])
+@pytest.mark.parametrize("test_changes", ["allow", "deny"])
+@pytest.mark.parametrize("is_retry", [False, True])
+async def test_verification_passes_test_policy_to_stage(
+    tmp_path: Path, scope: str, test_changes, is_retry: bool
+) -> None:
+    """Exercise real prompt composition so wrapper defaults cannot hide a deny policy."""
+    analysis = analysis_fixture(verdict=None, narratives=[])
+    retry = (
+        feedback_retry_context(
+            retry_index=1, mitigation_result=None, verifier_result=None
+        )
+        if is_retry
+        else None
+    )
+    kwargs: dict[str, Any] = {
+        "workspace_snapshot_tar_path": tmp_path / "snapshot.tar",
+        "history_path": tmp_path / "history",
+        "verifier_artifacts_path": tmp_path / "verifier",
+        "analysis_result": analysis,
+        "mitigation_result": None,
+        "retry_context": retry,
+        "test_changes": test_changes,
+    }
+    with patch(
+        f"sec_review_agents.workflows.{scope}.verification.run_verification_stage"
+    ) as stage:
+        if scope == "issue":
+            await verify_issue(issue={}, **kwargs)
+        elif scope == "pull_request":
+            await verify_pull_request(
+                pr={}, incremental_window_path=tmp_path / "window", **kwargs
+            )
+        else:
+            await verify_repository_case(
+                review_input="Review the scoped claim.",
+                scan_mode="full",
+                incremental_window_path=None,
+                **kwargs,
+            )
+    prompt = stage.call_args.kwargs["system_prompt"]
+    assert (
+        load_prompt_resource(f"test-changes-policy/{test_changes}-boundary.md")
+        in prompt
+    )

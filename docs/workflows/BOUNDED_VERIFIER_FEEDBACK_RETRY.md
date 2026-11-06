@@ -54,7 +54,7 @@ If the first verifier result is acceptable, the workflow ends.
 
 - `analyzer -> mitigator(pass1) -> verifier(pass1) -> mitigator(retry) -> verifier(retry)`
 
-The retry is a bounded revision pass over the same scoped task. The retrying mitigator uses the previous attempt and verifier feedback as context, but starts from the prepared baseline workspace again rather than stacking edits on top of the previous patch. In particular, the retry path stays on the mitigation-verification path rather than reopening analyzer. Analyzer remains the baseline scope artifact, while verifier objections constrain the retrying mitigation pass.
+During retry, the mitigator uses the previous repair result and verifier feedback to generate a new patch from the original prepared workspace. It checks the problems raised by the verifier first, then uses code and execution evidence to decide whether and how to revise the patch. The retry addresses the original review task and reruns mitigation and verification without rerunning the analyzer; the existing analysis continues to define the review scope.
 
 ### Generalized Bounded Model
 
@@ -112,7 +112,7 @@ The more common retry pattern is:
 - mitigator follows that framing
 - verifier concludes that the analyzer framing was incomplete and that the resulting patch is also `partial`, `local-only`, or `misaligned`
 
-That is the case where retry is useful. In that situation, verifier is not only rejecting the patch. It is also taking over the effective framing for the retry pass.
+In this situation, verifier identifies the concerns to investigate first during retry. Its judgment still needs to be checked against current repository evidence.
 
 When verifier chooses `next_step=retry-ai`, it should include concrete `findings[]` text so the retrying mitigator has actionable patch-correction feedback instead of a vague negative verdict.
 
@@ -131,9 +131,11 @@ The retrying mitigator should be framed as a bounded revision pass that receives
 Its operating rules are:
 
 - treat the verifier report as the primary corrective signal
-- once retry begins, treat verifier as the effective framing authority for the retry pass
-- preserve valid analyzer findings unless verifier explicitly challenges them
-- when analyzer claims conflict with verifier concerns, prefer the verifier's safer interpretation
+- investigate the verifier's blocking concerns first; current code and execution evidence determine whether and how to revise the patch
+- preserve valid analyzer findings unless verifier-identified blockers or current code evidence require a correction
+- fix confirmed problems; when rejecting a verifier concern, cite code or execution evidence that directly addresses it
+- do not change the patch merely because analyzer and verifier disagree; a suggested patch shape is not mandatory, and supported concerns should be addressed without weakening the security fix to satisfy an unsafe legacy expectation
+- leave unresolved concerns visible for the retrying verifier to assess; when unresolved evidence or required human judgment determines the next action, the verifier should use `manual-review`
 - use the previous attempt and verifier feedback as revision context, but generate the retry patch from the prepared baseline workspace rather than stacking edits on top of the previous patch
 - use the previous mitigation summary only to understand what the last attempt did, not as the source of truth for the retry patch
 - stay within the original issue, pull request, or repository-case scope

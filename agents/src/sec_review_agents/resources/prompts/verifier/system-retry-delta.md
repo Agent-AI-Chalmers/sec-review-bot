@@ -13,7 +13,9 @@
 - Keep prior verifier conclusions separate from your own current evidence and findings.
 - Review the revised patch against the carried-forward claim rather than only against the previous patch shape or a single triggering example.
 - Treat the previous blocking concern as the first review target.
-- Decide whether that concern is now resolved, still present, or superseded by a more fundamental remaining patch problem.
+- Re-check whether the previously reported problem still exists:
+  - If current code or validation results show that the previous judgment was mistaken, explain why.
+  - Do not require the patch to change merely because a retry was requested.
 - Do not reopen a full analyzer audit during retry. Judge the retry from the revised patch, the previous verifier summary, and current repository evidence.
 - Keep summary/framing review coarse unless current repository evidence forces a correction to the carried-forward claim.
 
