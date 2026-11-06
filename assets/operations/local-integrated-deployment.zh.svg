@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1500 820" role="img" aria-labelledby="title description">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1700 820" role="img" aria-labelledby="title description">
   <title id="title">本地集成部署结构</title>
-  <desc id="description">GitHub、运维人员浏览器和独立部署的 Langfuse 连接 Docker Compose 服务以及宿主机上的三个 worker pool。</desc>
+  <desc id="description">GitHub、运维人员浏览器和独立部署的 Langfuse 连接 Compose 服务及宿主机 workers。Catalog 协调 Memory revision，workers 直接向对象存储传输 artifacts。</desc>
   <defs>
     <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
       <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#0f172a" flood-opacity="0.1" />
@@ -25,7 +25,6 @@
       .memory-node .node-accent { stroke: #2f806a; }
       .storage-node .node-accent { stroke: #9a6a22; }
       .sandbox-node .node-accent { stroke: #7c5c9e; }
-      .observability-node .node-accent { stroke: #8a5a9e; }
       .node-label { font-size: 16px; font-weight: 550; }
       .edge { fill: none; stroke: #94a3b8; stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; opacity: 0.76; }
       .edge.dashed { stroke-dasharray: 6 5; }
@@ -36,44 +35,54 @@
   <text x="130" y="56" class="zone-label" text-anchor="middle">
     <tspan x="130" dy="0">外部</tspan>
   </text>
-  <rect x="270" y="24" width="930" height="760" rx="7" class="zone compose-zone" />
-  <text x="735" y="56" class="zone-label" text-anchor="middle">
-    <tspan x="735" dy="0">Docker Compose</tspan>
+  <rect x="270" y="24" width="1400" height="760" rx="7" class="zone host-zone" />
+  <text x="970" y="56" class="zone-label" text-anchor="middle">
+    <tspan x="970" dy="0">宿主机</tspan>
   </text>
-  <rect x="1230" y="24" width="240" height="760" rx="7" class="zone host-zone" />
-  <text x="1350" y="56" class="zone-label" text-anchor="middle">
-    <tspan x="1350" dy="0">宿主机</tspan>
+  <rect x="470" y="85" width="930" height="650" rx="7" class="zone compose-zone" />
+  <text x="935" y="108" class="zone-label" text-anchor="middle">
+    <tspan x="935" dy="0">Docker Compose</tspan>
   </text>
-  <path d="M 210 151 L 300 151" class="edge" marker-end="url(#arrow)" />
-  <path d="M 470 151 L 510 151" class="edge" marker-end="url(#arrow)" />
-  <path d="M 680 151 L 720 151" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 900 151 L 940 151" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 1025 187 L 1025 315" class="edge" marker-end="url(#arrow)" />
-  <path d="M 1110 333 L 1170 333 Q 1180 333 1180 343 L 1180 291 Q 1180 301 1190 301 L 1260 301" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 1110 351 L 1180 351 Q 1190 351 1190 361 L 1190 416 Q 1190 426 1200 426 L 1260 426" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 1110 369 L 1190 369 Q 1200 369 1200 379 L 1200 541 Q 1200 551 1210 551 L 1260 551" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 1260 283 L 1238 283 Q 1245 283 1245 293 L 1245 681 Q 1245 691 1252 691 L 1260 691" class="edge" marker-end="url(#arrow)" />
-  <path d="M 210 351 L 300 351" class="edge" marker-end="url(#arrow)" />
-  <path d="M 470 351 L 480 351 Q 490 351 490 361 L 490 195 Q 490 205 500 205 L 710 205 Q 720 205 720 215 L 720 169" class="edge" marker-end="url(#arrow)" />
-  <path d="M 680 169 L 690 169 Q 700 169 700 179 L 700 550 Q 700 560 710 560 L 965 560 Q 975 560 975 570 L 975 590" class="edge" marker-end="url(#arrow)" />
-  <path d="M 810 187 L 810 590" class="edge" marker-end="url(#arrow)" />
-  <path d="M 600 387 L 600 550 Q 600 560 610 560 L 730 560 Q 740 560 740 570 L 740 590" class="edge" marker-end="url(#arrow)" />
-  <path d="M 1110 169 L 1130 169 Q 1140 169 1140 179 L 1140 550 Q 1140 560 1150 560 L 1060 560 Q 1070 560 1070 570 L 1070 590" class="edge" marker-end="url(#arrow)" />
-  <path d="M 1025 387 L 1025 590" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 1260 319 L 1160 319 Q 1170 319 1170 329 L 1170 621 Q 1170 631 1180 631 L 1130 631" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 1260 444 L 1150 444 Q 1160 444 1160 454 L 1160 603 Q 1160 613 1170 613 L 1130 613" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 1260 569 L 1140 569 Q 1150 569 1150 579 L 1150 639 Q 1150 649 1160 649 L 1130 649" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 1260 426 L 1170 426 Q 1180 426 1180 429 L 1180 417 Q 1180 420 1190 420 L 700 420 Q 710 420 710 430 L 710 359 Q 710 369 720 369 L 690 369" class="edge dashed" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 1260 551 L 1160 551 Q 1170 551 1170 561 L 1170 430 Q 1170 440 1180 440 L 720 440 Q 730 440 730 450 L 730 359 Q 730 369 740 369 L 690 369" class="edge dashed" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 720 169 L 250 169 Q 230 169 230 189 L 230 551 Q 230 561 210 561" class="edge dashed" marker-end="url(#arrow)" marker-start="url(#arrow)" />
-  <path d="M 1250 301 L 1215 301 L 1215 755 L 245 755 Q 230 755 230 740 L 230 579 Q 230 561 210 561" class="edge dashed" marker-end="url(#arrow)" />
-  <path d="M 1250 426 L 1215 426" class="edge dashed" />
-  <path d="M 1250 551 L 1215 551" class="edge dashed" />
+  <path d="M 210 151 H 290" class="edge" marker-end="url(#arrow)" />
+  <path d="M 450 151 H 710" class="edge" marker-end="url(#arrow)" />
+  <path d="M 880 151 L 920 151" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1100 151 L 1140 151" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1225 187 L 1225 315" class="edge" marker-end="url(#arrow)" />
+  <path d="M 1310 333 L 1370 333 Q 1380 333 1380 323 L 1380 311 Q 1380 301 1390 301 L 1460 301" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1310 351 L 1380 351 Q 1390 351 1390 361 L 1390 416 Q 1390 426 1400 426 L 1460 426" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1310 369 L 1390 369 Q 1400 369 1400 379 L 1400 541 Q 1400 551 1410 551 L 1460 551" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1460 283 L 1452 283 Q 1445 283 1445 293 L 1445 681 Q 1445 691 1452 691 L 1460 691" class="edge" marker-end="url(#arrow)" />
+  <path d="M 210 351 L 500 351" class="edge" marker-end="url(#arrow)" />
+  <path d="M 670 351 L 680 351 Q 690 351 690 341 L 690 215 Q 690 205 700 205 L 910 205 Q 920 205 920 195 L 920 169" class="edge" marker-end="url(#arrow)" />
+  <path d="M 880 169 L 890 169 Q 900 169 900 179 L 900 550 Q 900 560 910 560 L 1165 560 Q 1175 560 1175 570 L 1175 590" class="edge" marker-end="url(#arrow)" />
+  <path d="M 1010 187 L 1010 590" class="edge" marker-end="url(#arrow)" />
+  <path d="M 800 387 L 800 550 Q 800 560 810 560 L 930 560 Q 940 560 940 570 L 940 590" class="edge" marker-end="url(#arrow)" />
+  <path d="M 1460 319 L 1380 319 Q 1370 319 1370 329 L 1370 621 Q 1370 631 1360 631 L 1330 631" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1460 444 L 1370 444 Q 1360 444 1360 454 L 1360 603 Q 1360 613 1350 613 L 1330 613" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1460 569 L 1360 569 Q 1350 569 1350 579 L 1350 639 Q 1350 649 1340 649 L 1330 649" class="edge" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1460 426 L 1390 426 Q 1380 426 1380 423 L 1380 423 Q 1380 420 1370 420 L 920 420 Q 910 420 910 410 L 910 379 Q 910 369 900 369 L 890 369" class="edge dashed" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1460 551 L 1380 551 Q 1370 551 1370 541 L 1370 450 Q 1370 440 1360 440 L 940 440 Q 930 440 930 430 L 930 379 Q 930 369 920 369 L 890 369" class="edge dashed" marker-end="url(#arrow)" marker-start="url(#arrow)" />
+  <path d="M 1450 265 L 1430 265 Q 1420 265 1420 255 L 1420 240 Q 1420 230 1410 230 L 810 230 Q 800 230 800 240 L 800 315" class="edge dashed" marker-end="url(#arrow)" />
+  <path d="M 670 351 L 710 351" class="edge" marker-end="url(#arrow)" />
+  <path d="M 670 375 L 675 375 Q 680 375 680 385 L 680 700 Q 680 710 690 710 L 1225 710 Q 1235 710 1235 700 L 1235 672" class="edge" marker-end="url(#arrow)" />
+  <path d="M 1010 187 L 1020 205 Q 1030 215 1040 215 L 1320 215 Q 1330 215 1330 225 L 1330 570 Q 1330 580 1320 580 L 1300 580 Q 1290 580 1290 585 L 1290 590" class="edge" marker-end="url(#arrow)" />
+  <path d="M 1010 115 L 1010 100 Q 1010 90 1000 90 L 260 90 Q 250 90 250 100 L 250 551 Q 250 561 240 561 L 210 561" class="edge dashed" marker-end="url(#arrow)" />
+  <path d="M 1650 301 L 1655 301 Q 1660 301 1660 311 L 1660 745 Q 1660 755 1650 755 L 140 755 Q 130 755 130 745 L 130 607" class="edge dashed" marker-end="url(#arrow)" />
+  <path d="M 1650 426 L 1655 426 Q 1660 426 1660 436 L 1660 745 Q 1660 755 1650 755 L 140 755 Q 130 755 130 745 L 130 607" class="edge dashed" marker-end="url(#arrow)" />
+  <path d="M 1650 551 L 1655 551 Q 1660 551 1660 561 L 1660 745 Q 1660 755 1650 755 L 140 755 Q 130 755 130 745 L 130 607" class="edge dashed" marker-end="url(#arrow)" />
   <g id="github" class="node external-node">
     <rect x="50" y="115" width="160" height="72" rx="8" class="node-surface" />
     <path d="M 58 116 H 202" class="node-accent" />
     <text x="130" y="156" class="node-label" text-anchor="middle">
       <tspan x="130" dy="0">GitHub</tspan>
+    </text>
+  </g>
+  <g id="langfuse" class="node external-node">
+    <rect x="50" y="515" width="160" height="92" rx="8" class="node-surface" />
+    <path d="M 58 516 H 202" class="node-accent" />
+    <text x="130" y="557" class="node-label" text-anchor="middle">
+      <tspan x="130" dy="0">Langfuse</tspan>
+      <tspan x="130" dy="18">可观测性</tspan>
     </text>
   </g>
   <g id="browser" class="node external-node">
@@ -84,110 +93,102 @@
       <tspan x="130" dy="18">浏览器</tspan>
     </text>
   </g>
-  <g id="langfuse" class="node observability-node">
-    <rect x="50" y="515" width="160" height="92" rx="8" class="node-surface" />
-    <path d="M 58 516 H 202" class="node-accent" />
-    <text x="130" y="552" class="node-label" text-anchor="middle">
-      <tspan x="130" dy="0">Langfuse</tspan>
-      <tspan x="130" dy="18">可观测性</tspan>
-    </text>
-  </g>
   <g id="tunnel" class="node control-node">
-    <rect x="300" y="115" width="170" height="72" rx="8" class="node-surface" />
-    <path d="M 308 116 H 462" class="node-accent" />
-    <text x="385" y="147" class="node-label" text-anchor="middle">
-      <tspan x="385" dy="0">Cloudflare</tspan>
-      <tspan x="385" dy="18">Tunnel</tspan>
+    <rect x="290" y="115" width="160" height="72" rx="8" class="node-surface" />
+    <path d="M 298 116 H 442" class="node-accent" />
+    <text x="370" y="147" class="node-label" text-anchor="middle">
+      <tspan x="370" dy="0">cloudflared</tspan>
+      <tspan x="370" dy="18">Cloudflare Tunnel</tspan>
     </text>
   </g>
   <g id="integration" class="node control-node">
-    <rect x="510" y="115" width="170" height="72" rx="8" class="node-surface" />
-    <path d="M 518 116 H 672" class="node-accent" />
-    <text x="595" y="147" class="node-label" text-anchor="middle">
-      <tspan x="595" dy="0">GitHub</tspan>
-      <tspan x="595" dy="18">Integration</tspan>
+    <rect x="710" y="115" width="170" height="72" rx="8" class="node-surface" />
+    <path d="M 718 116 H 872" class="node-accent" />
+    <text x="795" y="147" class="node-label" text-anchor="middle">
+      <tspan x="795" dy="0">GitHub</tspan>
+      <tspan x="795" dy="18">Integration</tspan>
     </text>
   </g>
-  <g id="control" class="node control-node">
-    <rect x="720" y="115" width="180" height="72" rx="8" class="node-surface" />
-    <path d="M 728 116 H 892" class="node-accent" />
-    <text x="810" y="147" class="node-label" text-anchor="middle">
-      <tspan x="810" dy="0">Review Control</tspan>
-      <tspan x="810" dy="18">Plane</tspan>
+  <g id="review-runs" class="node control-node">
+    <rect x="920" y="115" width="180" height="72" rx="8" class="node-surface" />
+    <path d="M 928 116 H 1092" class="node-accent" />
+    <text x="1010" y="156" class="node-label" text-anchor="middle">
+      <tspan x="1010" dy="0">Review Runs</tspan>
     </text>
   </g>
   <g id="gateway" class="node execution-node">
-    <rect x="940" y="115" width="170" height="72" rx="8" class="node-surface" />
-    <path d="M 948 116 H 1102" class="node-accent" />
-    <text x="1025" y="147" class="node-label" text-anchor="middle">
-      <tspan x="1025" dy="0">Execution</tspan>
-      <tspan x="1025" dy="18">Gateway</tspan>
+    <rect x="1140" y="115" width="170" height="72" rx="8" class="node-surface" />
+    <path d="M 1148 116 H 1302" class="node-accent" />
+    <text x="1225" y="147" class="node-label" text-anchor="middle">
+      <tspan x="1225" dy="0">Execution</tspan>
+      <tspan x="1225" dy="18">Gateway</tspan>
     </text>
   </g>
   <g id="ui" class="node control-node">
-    <rect x="300" y="315" width="170" height="72" rx="8" class="node-surface" />
-    <path d="M 308 316 H 462" class="node-accent" />
-    <text x="385" y="356" class="node-label" text-anchor="middle">
-      <tspan x="385" dy="0">Control Plane UI</tspan>
+    <rect x="500" y="315" width="170" height="72" rx="8" class="node-surface" />
+    <path d="M 508 316 H 662" class="node-accent" />
+    <text x="585" y="356" class="node-label" text-anchor="middle">
+      <tspan x="585" dy="0">Control Plane UI</tspan>
     </text>
   </g>
   <g id="temporal" class="node execution-node">
-    <rect x="940" y="315" width="170" height="72" rx="8" class="node-surface" />
-    <path d="M 948 316 H 1102" class="node-accent" />
-    <text x="1025" y="356" class="node-label" text-anchor="middle">
-      <tspan x="1025" dy="0">Temporal Server</tspan>
+    <rect x="1140" y="315" width="170" height="72" rx="8" class="node-surface" />
+    <path d="M 1148 316 H 1302" class="node-accent" />
+    <text x="1225" y="356" class="node-label" text-anchor="middle">
+      <tspan x="1225" dy="0">Temporal Server</tspan>
     </text>
   </g>
   <g id="catalog" class="node memory-node">
-    <rect x="510" y="315" width="180" height="72" rx="8" class="node-surface" />
-    <path d="M 518 316 H 682" class="node-accent" />
-    <text x="600" y="347" class="node-label" text-anchor="middle">
-      <tspan x="600" dy="0">Memory Catalog</tspan>
-      <tspan x="600" dy="18">Server</tspan>
+    <rect x="710" y="315" width="180" height="72" rx="8" class="node-surface" />
+    <path d="M 718 316 H 882" class="node-accent" />
+    <text x="800" y="347" class="node-label" text-anchor="middle">
+      <tspan x="800" dy="0">Memory Catalog</tspan>
+      <tspan x="800" dy="18">Server</tspan>
     </text>
   </g>
   <g id="postgres" class="node storage-node">
-    <rect x="700" y="590" width="190" height="82" rx="8" class="node-surface" />
-    <path d="M 708 591 H 882" class="node-accent" />
-    <text x="795" y="636" class="node-label" text-anchor="middle">
-      <tspan x="795" dy="0">PostgreSQL</tspan>
+    <rect x="900" y="590" width="190" height="82" rx="8" class="node-surface" />
+    <path d="M 908 591 H 1082" class="node-accent" />
+    <text x="995" y="636" class="node-label" text-anchor="middle">
+      <tspan x="995" dy="0">PostgreSQL</tspan>
     </text>
   </g>
   <g id="storage" class="node storage-node">
-    <rect x="940" y="590" width="190" height="82" rx="8" class="node-surface" />
-    <path d="M 948 591 H 1122" class="node-accent" />
-    <text x="1035" y="636" class="node-label" text-anchor="middle">
-      <tspan x="1035" dy="0">对象存储</tspan>
+    <rect x="1140" y="590" width="190" height="82" rx="8" class="node-surface" />
+    <path d="M 1148 591 H 1322" class="node-accent" />
+    <text x="1235" y="627" class="node-label" text-anchor="middle">
+      <tspan x="1235" dy="0">RustFS</tspan>
+      <tspan x="1235" dy="18">对象存储</tspan>
     </text>
   </g>
   <g id="execution-worker" class="node execution-node">
-    <rect x="1250" y="265" width="200" height="72" rx="8" class="node-surface" />
-    <path d="M 1258 266 H 1442" class="node-accent" />
-    <text x="1350" y="306" class="node-label" text-anchor="middle">
-      <tspan x="1350" dy="0">Execution Worker</tspan>
+    <rect x="1450" y="265" width="200" height="72" rx="8" class="node-surface" />
+    <path d="M 1458 266 H 1642" class="node-accent" />
+    <text x="1550" y="306" class="node-label" text-anchor="middle">
+      <tspan x="1550" dy="0">Execution Worker</tspan>
     </text>
   </g>
   <g id="memory-extraction-worker" class="node memory-node">
-    <rect x="1250" y="390" width="200" height="72" rx="8" class="node-surface" />
-    <path d="M 1258 391 H 1442" class="node-accent" />
-    <text x="1350" y="422" class="node-label" text-anchor="middle">
-      <tspan x="1350" dy="0">Memory Extraction</tspan>
-      <tspan x="1350" dy="18">Worker</tspan>
+    <rect x="1450" y="390" width="200" height="72" rx="8" class="node-surface" />
+    <path d="M 1458 391 H 1642" class="node-accent" />
+    <text x="1550" y="422" class="node-label" text-anchor="middle">
+      <tspan x="1550" dy="0">Memory Extraction</tspan>
+      <tspan x="1550" dy="18">Worker</tspan>
     </text>
   </g>
   <g id="memory-maintenance-worker" class="node memory-node">
-    <rect x="1250" y="515" width="200" height="72" rx="8" class="node-surface" />
-    <path d="M 1258 516 H 1442" class="node-accent" />
-    <text x="1350" y="547" class="node-label" text-anchor="middle">
-      <tspan x="1350" dy="0">Memory Maintenance</tspan>
-      <tspan x="1350" dy="18">Worker</tspan>
+    <rect x="1450" y="515" width="200" height="72" rx="8" class="node-surface" />
+    <path d="M 1458 516 H 1642" class="node-accent" />
+    <text x="1550" y="547" class="node-label" text-anchor="middle">
+      <tspan x="1550" dy="0">Memory Maintenance</tspan>
+      <tspan x="1550" dy="18">Worker</tspan>
     </text>
   </g>
   <g id="sandbox" class="node sandbox-node">
-    <rect x="1250" y="650" width="200" height="82" rx="8" class="node-surface" />
-    <path d="M 1258 651 H 1442" class="node-accent" />
-    <text x="1350" y="696" class="node-label" text-anchor="middle">
-      <tspan x="1350" dy="0">Docker sandbox</tspan>
+    <rect x="1450" y="650" width="200" height="82" rx="8" class="node-surface" />
+    <path d="M 1458 651 H 1642" class="node-accent" />
+    <text x="1550" y="696" class="node-label" text-anchor="middle">
+      <tspan x="1550" dy="0">Docker sandbox</tspan>
     </text>
   </g>
 </svg>

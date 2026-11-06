@@ -15,7 +15,7 @@ services:
       RUSTFS_SECRET_KEY: "${RUSTFS_ROOT_PASSWORD:?RUSTFS_ROOT_PASSWORD is required}"
       RUSTFS_OBS_LOG_DIRECTORY: "/data/logs"
     volumes:
-      - "${PWD}/.agent-rustfs-state:/data"
+      - "${SEC_REVIEW_RUSTFS_STATE_DIR:-${PWD}/.agent-rustfs-state}:/data"
     ports:
       - "127.0.0.1:${RUSTFS_API_PORT:-9100}:9000"
       - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-9101}:9001"
@@ -48,7 +48,7 @@ services:
       REVIEW_RUNS_POSTGRES_PASSWORD: "${REVIEW_RUNS_POSTGRES_PASSWORD:?REVIEW_RUNS_POSTGRES_PASSWORD is required}"
       MEMORY_CATALOG_POSTGRES_PASSWORD: "${MEMORY_CATALOG_POSTGRES_PASSWORD:?MEMORY_CATALOG_POSTGRES_PASSWORD is required}"
     volumes:
-      - "${PWD}/.agent-postgres-state:/var/lib/postgresql"
+      - "${SEC_REVIEW_POSTGRES_STATE_DIR:-${PWD}/.agent-postgres-state}:/var/lib/postgresql"
       - "./ops/postgres-init:/docker-entrypoint-initdb.d:ro"
     ports:
       - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
@@ -77,7 +77,7 @@ services:
       - /var/lib/temporal/temporal.db
     volumes:
       # Keep workflow state across the process restarts performed by systemd.
-      - "${PWD}/.agent-temporal-state:/var/lib/temporal"
+      - "${SEC_REVIEW_TEMPORAL_STATE_DIR:-${PWD}/.agent-temporal-state}:/var/lib/temporal"
     ports:
       - "127.0.0.1:${TEMPORAL_PORT:-7233}:7233"
       - "127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8233"

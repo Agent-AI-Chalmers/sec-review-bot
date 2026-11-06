@@ -8,9 +8,14 @@
 
 如果你要在本地跑完整集成链路，读本文。不经过 HTTP 运行服务、直接在本地运行 agent，或使用 `run-local-* --temporal` 调试时，见 [agents 本地运行说明](../../agents/README.zh.md)。
 
+
+本地 Memory 开发环境见[本地 Memory 开发](LOCAL_MEMORY_DEVELOPMENT.zh.md)。
+
 ## 部署结构
 
 ![本地集成部署结构](../../assets/operations/local-integrated-deployment.zh.svg)
+
+`cloudflared` 作为单独管理的宿主机服务运行，不由 Docker Compose 管理。
 
 Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Review Runs 协调每个 review run；Temporal 把 review、memory extraction 和 memory maintenance 工作分发给三个独立的 worker pool。PostgreSQL 保存控制和 catalog 状态，RustFS 保存运行输入、trajectory、memory revision 和 artifact。
 
@@ -106,7 +111,7 @@ ops/init-local-deployment-config.sh
 
 Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个文件只管 Compose 怎么启动容器、挂载哪些本地目录、暴露哪些端口。
 
-初始化命令会用彼此独立的随机值填充服务 token 与 PostgreSQL/RustFS 凭据，并把宿主 worker 所需的 Memory Catalog token 和各角色存储凭据同步写入 `ops/systemd/deployment.env`，无需手工复制。安装脚本会把该源文件投影为独立的 worker 环境文件，因此 execution 与 memory 进程只会收到各自的凭据。Compose 自己管理的状态固定使用仓库下的 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`，不再分别提供配置项。
+初始化命令会用彼此独立的随机值填充服务 token 与 PostgreSQL/RustFS 凭据，并把宿主 worker 所需的 Memory Catalog token 和各角色存储凭据同步写入 `ops/systemd/deployment.env`，无需手工复制。安装脚本会把该源文件投影为独立的 worker 环境文件，因此 execution 与 memory 进程只会收到各自的凭据。集成部署默认使用 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`。Compose 支持通过 `SEC_REVIEW_TEMPORAL_STATE_DIR`、`SEC_REVIEW_RUSTFS_STATE_DIR` 和 `SEC_REVIEW_POSTGRES_STATE_DIR` 为独立的 Memory 开发环境指定其他路径。
 
 RustFS 按存储职责分配身份：integration 写入 input object；Execution Worker 读取 input、写入 run diagnostic bundle 并读取 active memory revision；Memory Extraction Worker 和 Memory Maintenance Worker 共用一套 memory storage identity，用于访问 run diagnostic、memory revision 和压缩后的 memory-agent trajectory；UI BFF 为经过认证的下载读取已存储 diagnostic。Extraction 与 maintenance 仍然是独立的 Temporal worker identity、进程和 task queue。这里保留共享 S3 credential，是因为当前对象存储 policy 覆盖同一个 memory artifact namespace；在本次部署拆分中进一步拆 IAM contract 不会单独改善进程隔离。
 

@@ -84,6 +84,7 @@ Use these docs when running the system locally or wiring GitHub webhooks:
 
 - [DEPENDENCY_MAINTENANCE.md](operations/DEPENDENCY_MAINTENANCE.md): Dependency update policy, local inspection commands, and verification.
 - [LOCAL_INTEGRATED_DEPLOYMENT.md](operations/LOCAL_INTEGRATED_DEPLOYMENT.md): Local control plane, host execution worker, systemd operation, and scaling.
+- [LOCAL_MEMORY_DEVELOPMENT.md](operations/LOCAL_MEMORY_DEVELOPMENT.md): Standalone local Memory infrastructure, worker startup, and maintenance operations.
 - [LOCAL_GITHUB_INBOUND_SETUP.md](operations/LOCAL_GITHUB_INBOUND_SETUP.md): Route GitHub App webhooks and Actions repository review requests to a local service.
 
 ### roadmap/

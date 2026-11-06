@@ -142,19 +142,19 @@ Before editing maintained documentation, follow `docs/DOCUMENTATION_GUIDE.md`, i
 After documentation moves or local Markdown link edits, run:
 
 ```bash
-python scripts/check_markdown_links.py
+python -m scripts.checks.markdown_links
 ```
 
 For translated Markdown updates, run the repository-wide heading structure check:
 
 ```bash
-python scripts/check_translated_doc_headings.py
+python -m scripts.checks.translated_doc_headings
 ```
 
 For agent-facing Markdown such as skills and memory notes, prefer semantic paragraphs over fixed-column hard wrapping. To check likely hard-wrapped prose, run:
 
 ```bash
-python scripts/check_markdown_wrapping.py
+python -m scripts.checks.markdown_wrapping
 ```
 
 For translated contract documents, preserve code identifiers such as field names, interface names, workflow names, enum values, file paths, and directory names. Localize descriptive prose and section titles; project asset terms such as `schemas` and `fixtures` may remain in English when they refer to repository directories or test assets.

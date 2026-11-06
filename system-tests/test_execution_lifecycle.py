@@ -2,7 +2,8 @@
 
 The production execution/issue workflows, input preparation, result projection,
 diagnostic publication, Gateway and Review Runs persistence all run. Only the
-analysis activity is replaced, so this tests orchestration rather than LLM quality.
+analysis activity and later model invocations are replaced, so this tests
+orchestration rather than LLM quality.
 """
 
 import asyncio
@@ -14,6 +15,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
+from sec_review_agents.agents.mitigation.model import MitigationOutput
+from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.artifacts.materialize import materialize_verified_artifact_file
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.entrypoints.execution_worker.workflow import (
@@ -35,7 +38,7 @@ from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from temporalio import activity
 from temporalio.worker import Worker
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 
 
 @activity.defn(name="analyze_issue_activity")
@@ -56,6 +59,32 @@ async def deterministic_analysis(request: ReviewWorkflowRequest) -> AnalysisStag
 async def test_execution_completes_and_persists(
     postgres, temporal, object_store, monkeypatch, tmp_path
 ):
+    async def no_changes(**_kwargs):
+        return MitigationOutput(overview="No changes needed.")
+
+    async def verify_no_changes(**_kwargs):
+        return VerificationOutput(
+            overview="No changes needed.",
+            target_claim="Deterministic lifecycle probe",
+            coverage="full",
+            next_step="none",
+            validation_level="static",
+            regression="not-run",
+            findings=[],
+            evidence=["No actionable finding or patch."],
+            residual_risks=[],
+        )
+
+    # Keep real stage setup, snapshot restoration, and result persistence while
+    # replacing model invocations, which always run even without repair targets.
+    monkeypatch.setattr(
+        "sec_review_agents.review_stages.mitigation.stage.run_mitigation_agent",
+        no_changes,
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.review_stages.verification.stage.run_verification_agent",
+        verify_no_changes,
+    )
     for key, value in {
         **object_store,
         "AGENT_MEMORY_PROCESSING_ENABLED": "false",
@@ -69,7 +98,7 @@ async def test_execution_completes_and_persists(
         subprocess.run,
         [
             "node",
-            str(ROOT / "scripts/system-tests/publish-input.mjs"),
+            str(ROOT / "system-tests/publish-input.mjs"),
             str(tmp_path / "producer"),
             run_id,
             str(reference),
@@ -108,7 +137,7 @@ async def test_execution_completes_and_persists(
         ):
             process = await asyncio.create_subprocess_exec(
                 "node",
-                str(ROOT / "scripts/system-tests/execution-lifecycle.mjs"),
+                str(ROOT / "system-tests/execution-lifecycle.mjs"),
                 cwd=ROOT,
                 env={
                     **os.environ,

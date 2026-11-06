@@ -13,7 +13,7 @@ import yaml
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def run(*args, timeout=120, **kwargs):
@@ -162,7 +162,7 @@ def node_service(tmp_path):
         ready = tmp_path / f"ready-{len(processes)}.json"
         log = (tmp_path / f"node-{len(processes)}.log").open("w+")
         process = subprocess.Popen(
-            ["node", str(ROOT / "scripts/system-tests" / script)],
+            ["node", str(ROOT / "system-tests" / script)],
             cwd=ROOT,
             env={**os.environ, **env, "NODE_ENV": "test", "READY_FILE": str(ready)},
             stdout=log,

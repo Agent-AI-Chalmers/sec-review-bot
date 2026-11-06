@@ -35,7 +35,7 @@ Run checks from every affected package, not only from the package where the firs
 | Control Plane UI | [`apps/control-plane-ui/README.md`](apps/control-plane-ui/README.md) | format, lint, typecheck, tests, build, browser smoke test for user-visible flows |
 | Execution Gateway | [`services/execution-gateway/README.md`](services/execution-gateway/README.md) | format, lint, typecheck, tests, Temporal integration tests |
 | Memory Catalog Server | [`services/memory-catalog/README.md`](services/memory-catalog/README.md) | format, lint, typecheck, tests, PostgreSQL integration tests |
-| Execution submission system path | [`scripts/README.md`](scripts/README.md#system-test) | Review Runs client, Execution Gateway HTTP, and Temporal system test |
+| Execution submission system path | [`system-tests/README.md`](system-tests/README.md) | Review Runs client, Execution Gateway HTTP, and Temporal system test |
 | Repository scripts | [`scripts/README.md`](scripts/README.md) | Ruff, Black, compile checks, and focused entrypoint probes |
 | Documentation | [`docs/DOCUMENTATION_GUIDE.md`](docs/DOCUMENTATION_GUIDE.md) and [`docs/README.md`](docs/README.md) | link, wrapping, and translated-heading checks as applicable |
 

@@ -3,14 +3,14 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import test from 'node:test'
-import { reviewRunsClient } from '../../apps/github-integration/dist/review-runs/client.js'
+import { reviewRunsClient } from '../apps/github-integration/dist/review-runs/client.js'
 import {
   REVIEW_RUNS_FASTIFY_OPTIONS,
-  registerReviewRunsRoutes,
-} from '../../services/review-runs/dist/http/server-surface.js'
+  registerReviewRunsRoutes
+} from '../services/review-runs/dist/http/server-surface.js'
 
 const require = createRequire(
-  new URL('../../services/review-runs/package.json', import.meta.url),
+  new URL('../services/review-runs/package.json', import.meta.url)
 )
 const Fastify = require('fastify')
 
@@ -30,7 +30,7 @@ function stubStore() {
       },
       requirePublicationStepClaim: async (...args) => {
         calls.push({ method: 'requirePublicationStepClaim', args })
-      },
+      }
     },
     preparations: {
       fail: async (...args) => {
@@ -39,8 +39,8 @@ function stubStore() {
       renewClaim: async (...args) => {
         calls.push({ method: 'renewPreparationClaim', args })
         return true
-      },
-    },
+      }
+    }
   }
 }
 
@@ -50,13 +50,13 @@ async function startSeam() {
   await registerReviewRunsRoutes(app, {
     store,
     serviceToken: SERVICE_TOKEN,
-    readToken: 'seam-read-token',
+    readToken: 'seam-read-token'
   })
   await app.listen({ port: 0, host: '127.0.0.1' })
   const address = app.server.address()
   assert.ok(
     address !== null && typeof address === 'object',
-    'server did not bind a TCP port',
+    'server did not bind a TCP port'
   )
   const previousUrl = process.env.REVIEW_RUNS_SERVICE_URL
   const previousToken = process.env.REVIEW_RUNS_SERVICE_TOKEN
@@ -71,9 +71,10 @@ async function startSeam() {
       if (previousToken === undefined)
         delete process.env.REVIEW_RUNS_SERVICE_TOKEN
       else process.env.REVIEW_RUNS_SERVICE_TOKEN = previousToken
-    },
+    }
   }
 }
+
 test('a void operation (empty 200) resolves for the real client against the real server', async () => {
   const seam = await startSeam()
   try {
@@ -81,32 +82,32 @@ test('a void operation (empty 200) resolves for the real client against the real
     // publication made, so under the empty-200 bug it looped execution forever.
     assert.strictEqual(
       await reviewRunsClient.initializePublicationSteps(RUN_ID, 'claim-1', [
-        'pull-request:review',
+        'pull-request:review'
       ]),
-      undefined,
+      undefined
     )
     assert.strictEqual(
       await reviewRunsClient.requirePublicationStepClaim(
         RUN_ID,
         'claim-1',
-        'pull-request:review',
+        'pull-request:review'
       ),
-      undefined,
+      undefined
     )
     assert.strictEqual(
       await reviewRunsClient.failPreparation(RUN_ID, 'prep-1', {
         code: 'PREPARATION_FAILED',
-        message: 'seam test',
+        message: 'seam test'
       }),
-      undefined,
+      undefined
     )
     assert.deepStrictEqual(
       seam.store.calls.map((call) => call.method),
       [
         'initializePublicationSteps',
         'requirePublicationStepClaim',
-        'failPreparation',
-      ],
+        'failPreparation'
+      ]
     )
   } finally {
     await seam.close()
@@ -119,7 +120,7 @@ test('a JSON-returning operation still parses against the real server', async ()
     // broken the ordinary path.
     assert.strictEqual(
       await reviewRunsClient.renewPreparationClaim(RUN_ID, 'prep-1'),
-      true,
+      true
     )
   } finally {
     await seam.close()

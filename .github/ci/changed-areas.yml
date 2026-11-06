@@ -101,8 +101,8 @@ system-tests:
   - "pnpm-lock.yaml"
   - ".github/actions/setup-node/**"
   # Repository-level HTTP and submission tests combine these participants.
-  - "scripts/system-tests/execution-submission.test.mjs"
-  - "scripts/system-tests/review-runs-http.test.mjs"
+  - "system-tests/execution-submission.test.mjs"
+  - "system-tests/review-runs-http.test.mjs"
   - "apps/github-integration/**"
   - "services/review-runs/**"
   - "services/execution-gateway/**"
@@ -168,6 +168,7 @@ agents:
 scripts:
   - ".github/actions/setup-python/**"
   - "scripts/**"
+  - "system-tests/**"
   # CI tooling.
   - ".github/workflows/ci.yml"
 
@@ -175,10 +176,7 @@ documentation:
   # Documentation.
   - "**/*.md"
   # The documentation checkers.
-  - "scripts/check_markdown_links.py"
-  - "scripts/check_markdown_wrapping.py"
-  - "scripts/check_translated_doc_headings.py"
-  - "scripts/markdown_check_utils.py"
+  - "scripts/checks/**"
   # CI tooling.
   - ".github/workflows/ci.yml"
 
@@ -192,8 +190,8 @@ catalog-seam:
   - ".github/actions/setup-node/**"
   - ".github/actions/setup-python/**"
   - ".github/ci/**"
-  - "scripts/system-tests/conftest.py"
-  - "scripts/system-tests/pytest.ini"
+  - "system-tests/conftest.py"
+  - "system-tests/pytest.ini"
   - "compose.yaml"
   - "services/memory-catalog/**"
   - "agents/src/sec_review_agents/memory/**"
@@ -203,8 +201,8 @@ catalog-seam:
   - "agents/.python-version"
   - "contracts/memory-catalog-api/**"
   - "contracts/codegen/**"
-  - "scripts/system-tests/catalog-server.mjs"
-  - "scripts/system-tests/test_memory_catalog.py"
+  - "system-tests/catalog-server.mjs"
+  - "system-tests/test_memory_catalog.py"
 
 input-bundle-seam:
   - "package.json"
@@ -216,8 +214,8 @@ input-bundle-seam:
   - ".github/actions/setup-node/**"
   - ".github/actions/setup-python/**"
   - ".github/ci/**"
-  - "scripts/system-tests/conftest.py"
-  - "scripts/system-tests/pytest.ini"
+  - "system-tests/conftest.py"
+  - "system-tests/pytest.ini"
   - "compose.yaml"
   - "apps/github-integration/**"
   - "agents/src/sec_review_agents/entrypoints/**"
@@ -229,8 +227,8 @@ input-bundle-seam:
   - "contracts/execution-api/**"
   - "contracts/codegen/**"
   - "contracts/tar-zstd-artifact/**"
-  - "scripts/system-tests/publish-input.mjs"
-  - "scripts/system-tests/test_input_bundle.py"
+  - "system-tests/publish-input.mjs"
+  - "system-tests/test_input_bundle.py"
 
 memory-bff-seam:
   - "package.json"
@@ -242,8 +240,8 @@ memory-bff-seam:
   - ".github/actions/setup-node/**"
   - ".github/actions/setup-python/**"
   - ".github/ci/**"
-  - "scripts/system-tests/conftest.py"
-  - "scripts/system-tests/pytest.ini"
+  - "system-tests/conftest.py"
+  - "system-tests/pytest.ini"
   - "compose.yaml"
   - "apps/control-plane-ui/server/**"
   - "apps/control-plane-ui/shared/**"
@@ -258,6 +256,6 @@ memory-bff-seam:
   - "contracts/memory-catalog-api/**"
   - "contracts/codegen/**"
   - "contracts/tar-zstd-artifact/**"
-  - "scripts/system-tests/catalog-server.mjs"
-  - "scripts/system-tests/bff-server.mjs"
-  - "scripts/system-tests/test_memory_bff.py"
+  - "system-tests/catalog-server.mjs"
+  - "system-tests/bff-server.mjs"
+  - "system-tests/test_memory_bff.py"

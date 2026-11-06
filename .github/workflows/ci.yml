@@ -283,10 +283,10 @@ jobs:
         run: |
           pnpm --dir apps/github-integration run build
           pnpm --dir services/review-runs run build
-          node --test scripts/system-tests/review-runs-http.test.mjs
+          node --test system-tests/review-runs-http.test.mjs
 
       - name: Test execution submission boundary
-        run: node --test scripts/system-tests/execution-submission.test.mjs
+        run: node --test system-tests/execution-submission.test.mjs
 
   github-integration:
     name: GitHub Integration
@@ -375,7 +375,7 @@ jobs:
         uses: ./.github/actions/check-agents
 
   scripts:
-    name: Repository Scripts
+    name: Scripts and System Test Tooling
     needs: changes
     if: >-
       github.event_name == 'merge_group' ||
@@ -389,26 +389,22 @@ jobs:
         id: setup-python
         uses: ./.github/actions/setup-python
 
-      # Scripts are repository tools rather than part of the typed agents
-      # package, but they still depend on the agents runtime and its deps.
-      - name: Lint repository scripts with Ruff
+      # Repository scripts and system tests share the agents runtime dependencies
+      # for static checks; system test execution stays in the boundary jobs.
+      - name: Lint scripts and system tests with Ruff
         working-directory: scripts
-        run: uv --project ../agents run ruff check .
+        run: uv --project ../agents run ruff check . ../system-tests
 
-      - name: Check repository script formatting with Black
+      - name: Check script and system test formatting with Black
         working-directory: scripts
-        run: uv --project ../agents run black --check .
+        run: uv --project ../agents run black --check . ../system-tests
 
-      - name: Compile repository scripts
+      - name: Compile scripts and system tests
         working-directory: scripts
-        run: python -m compileall -q .
+        run: python -m compileall -q . ../system-tests
 
-      - name: Smoke-test repository script entrypoints
-        working-directory: scripts
-        env:
-          PYTHONPATH: ../agents/src
-        run: |
-          uv --project ../agents run python experimental_memory_extract_observations.py --help
+      - name: Test repository scripts
+        run: uv --project agents run python -m pytest scripts/tests
 
   documentation:
     name: Documentation
@@ -427,13 +423,13 @@ jobs:
           python-version-file: agents/.python-version
 
       - name: Check Markdown links
-        run: python scripts/check_markdown_links.py
+        run: python -m scripts.checks.markdown_links
 
       - name: Check Markdown wrapping
-        run: python scripts/check_markdown_wrapping.py
+        run: python -m scripts.checks.markdown_wrapping
 
       - name: Check translated document headings
-        run: python scripts/check_translated_doc_headings.py
+        run: python -m scripts.checks.translated_doc_headings
 
   ci-status:
     name: CI Status

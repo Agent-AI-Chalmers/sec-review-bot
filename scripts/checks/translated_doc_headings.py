@@ -140,7 +140,7 @@ def main() -> int:
     parser.add_argument(
         "root",
         nargs="?",
-        default=Path(__file__).resolve().parents[1],
+        default=Path(__file__).resolve().parents[2],
         type=Path,
         help="repository root to scan",
     )

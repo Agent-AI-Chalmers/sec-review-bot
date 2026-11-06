@@ -286,57 +286,14 @@ Agent 可以声明自己需要的 skills。worker 启动 agent 时会自动准�
 
 ### Memory
 
-Memory 依赖 Temporal、使用 PostgreSQL 的 Memory Catalog，以及 S3 兼容对象存储。
-
-首次使用建议先阅读 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)，了解 memory 的基本概念和工作流程。
+本包实现 memory extractor、maintainer 及对应 workers；review agent 通过 invocation-scoped 文件系统视图读取维护后的 Memory。整体设计见 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)，基础设施搭建与运维见[本地 Memory 开发](../docs/operations/LOCAL_MEMORY_DEVELOPMENT.zh.md)。
 
 | 变量 | 用途 |
 | --- | --- |
 | `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 的基础 URL。未配置时，review agent 不加载 memory，memory processing 也无法运行。 |
 | `AGENT_MEMORY_CATALOG_TOKEN` | Memory Catalog extraction 和自动 maintenance 使用的 worker bearer token。配置 `AGENT_MEMORY_CATALOG_URL` 时必须同时配置。 |
-| `AGENT_MEMORY_CONSUMPTION_ENABLED` | 是否让 review agent 加载 active memory tree。默认为 `true`。 |
-| `AGENT_MEMORY_PROCESSING_ENABLED` | 是否运行 extraction 和 maintenance activities。默认为 `true`。 |
-
-本地 Memory 开发由 Compose 运行基础设施，各个 worker 则作为宿主机进程运行。
-
-> [!WARNING]
-> 仓库提供的是只供 loopback 开发使用的固定凭据。它们不是 secret，不得用于共享机器或可被其他主机访问的部署。
-
-在 **仓库根目录** 中创建被忽略的本地 env 文件，并启动基础设施：
-
-```bash
-cp compose.memory.env.sample compose.memory.env
-# Compose 使用当前宿主机 UID/GID 运行 RustFS 和 Temporal；预先创建
-# bind-mount 根目录，确保容器可以写入。
-install -d .agent-rustfs-state .agent-temporal-state
-docker compose \
-  --env-file compose.memory.env \
-  --profile memory \
-  up -d --build --wait \
-  rustfs postgres temporal memory-catalog-server
-docker compose \
-  --env-file compose.memory.env \
-  --profile memory \
-  run --rm rustfs-init
-curl --fail http://127.0.0.1:8092/healthz
-```
-
-填好 `agents/.env` 和 `agents/config/model-providers.toml` 中的模型配置，然后一起启动 Execution、Memory Extraction 和 Memory Maintenance workers：
-
-```bash
-cd agents
-uv run sec-review-agents-memory dev-workers \
-  --env-file ../compose.memory.env
-```
-
-launcher 会将不同的对象存储身份传给对应 worker，将 Memory Maintenance Worker 的 activity concurrency 保持为 `1`，并在任一 worker 退出或收到 `SIGINT`/`SIGTERM` 时停止整个 worker 组。它不负责启动或停止 Compose services。
-
-本地 Temporal 模式启用 memory processing 时，Memory Extraction Worker 会从本地文件系统读取 Execution Worker 生成的 diagnostic bundle，因此两个 worker 必须能访问同一个文件路径。提取结果仍通过 Memory Catalog 保存 observations 和产物引用，通过 S3 兼容存储保存 extractor 的执行轨迹。
-
-每次 review invocation 都会在临时目录中物化 active memory tree，并在结束后删除。
-
-- `sec-review-agents-memory maintain`：请求 Temporal Server 启动一次 memory maintenance workflow。
-- `sec-review-agents-memory schedules maintenance ensure`：在 Temporal Server 中创建或更新周期性 maintenance schedule。
+| `AGENT_MEMORY_CONSUMPTION_ENABLED` | 是否让 review agent 加载 active memory tree。 |
+| `AGENT_MEMORY_PROCESSING_ENABLED` | 是否运行 extraction 和 maintenance activities。 |
 
 ### 结构化输出
 

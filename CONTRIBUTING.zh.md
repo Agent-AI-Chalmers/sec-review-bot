@@ -37,7 +37,7 @@
 | Control Plane UI | [`apps/control-plane-ui/README.zh.md`](apps/control-plane-ui/README.zh.md) | format、lint、typecheck、测试、build；用户可见流程运行浏览器 smoke test |
 | Execution Gateway | [`services/execution-gateway/README.zh.md`](services/execution-gateway/README.zh.md) | format、lint、typecheck、测试、Temporal integration tests |
 | Memory Catalog Server | [`services/memory-catalog/README.zh.md`](services/memory-catalog/README.zh.md) | format、lint、typecheck、测试、PostgreSQL integration tests |
-| Execution submission 系统路径 | [`scripts/README.md`](scripts/README.md#system-test) | Review Runs client、Execution Gateway HTTP 与 Temporal 系统测试 |
+| Execution submission 系统路径 | [`system-tests/README.md`](system-tests/README.md) | Review Runs client、Execution Gateway HTTP 与 Temporal 系统测试 |
 | 仓库脚本 | [`scripts/README.md`](scripts/README.md) | Ruff、Black、compile 检查和聚焦的入口探针 |
 | 文档 | [`docs/DOCUMENTATION_GUIDE.zh.md`](docs/DOCUMENTATION_GUIDE.zh.md) 和 [`docs/README.zh.md`](docs/README.zh.md) | 根据变更运行链接、wrapping 和译文标题检查 |
 

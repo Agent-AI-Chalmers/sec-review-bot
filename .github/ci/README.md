@@ -52,7 +52,7 @@ node --test .github/ci/check-package-boundaries.test.mjs
 ```
 
 <!-- doc-default: node-package-boundaries; source=.github/ci/check-package-boundaries.mjs -->
-Applications and services must not depend on or import other repository packages. Contract tools may use `contracts/codegen`. The checker validates dependency declarations and uses the TypeScript AST to inspect literal references, including type imports, re-exports, dynamic imports, `require`, and file URLs; it also resolves TypeScript path aliases. Contract schemas and fixtures remain available as data. Package tests follow the same boundaries as production code. Tests that combine packages belong under `scripts/system-tests/`. Computed paths assembled at runtime are outside this static check's coverage.
+Applications and services must not depend on or import other repository packages. Contract tools may use `contracts/codegen`. The checker validates dependency declarations and uses the TypeScript AST to inspect literal references, including type imports, re-exports, dynamic imports, `require`, and file URLs; it also resolves TypeScript path aliases. Contract schemas and fixtures remain available as data. Package tests follow the same boundaries as production code. Tests that combine packages belong under `system-tests/`. Computed paths assembled at runtime are outside this static check's coverage.
 
 ## Shared Python Setup
 
@@ -77,10 +77,10 @@ The first checks that every CI job contributes to `CI Status`. The second checks
 
 ## Cross-service Smoke Checks
 
-[The smoke inventory](../../scripts/system-tests/README.md#smoke-inventory) lists all scenarios, their boundaries, and CI policies. Execution submission and Integration-to-Review-Runs HTTP checks run in `Smoke — Service Boundaries`. The `Smoke — Memory and Artifacts` job groups the Catalog client, input bundle, and operator edit tests to share infrastructure.
+[The smoke inventory](../../system-tests/README.md#smoke-inventory) lists all scenarios, their boundaries, and CI policies. Execution submission and Integration-to-Review-Runs HTTP checks run in `Smoke — Service Boundaries`. The `Smoke — Memory and Artifacts` job groups the Catalog client, input bundle, and operator edit tests to share infrastructure.
 
 
-The `catalog-seam`, `input-bundle-seam`, and `memory-bff-seam` areas select the lightweight probes run by [the smoke action](../actions/check-seams/action.yml). The main workflow owns their single job and final status dependency; the action builds selected participants and runs them in one pytest process to share disposable services. See [the system-test guide](../../scripts/system-tests/README.md#model-free-cross-service-smoke-tests) for commands and coverage limits.
+The `catalog-seam`, `input-bundle-seam`, and `memory-bff-seam` areas select the lightweight probes run by [the smoke action](../actions/check-seams/action.yml). The main workflow owns their single job and final status dependency; the action builds selected participants and runs them in one pytest process to share disposable services. See [the system-test guide](../../system-tests/README.md#model-free-cross-service-smoke-tests) for commands and coverage limits.
 
 [The execution lifecycle workflow](../workflows/execution-lifecycle.yml) is manual-only and separate from required PR checks. It uses a deterministic analysis activity and does not measure model quality.
 

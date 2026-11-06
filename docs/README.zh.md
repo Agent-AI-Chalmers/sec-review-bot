@@ -86,6 +86,7 @@ Package README 负责本地 setup、命令、配置与实现布局。运行角�
 
 - [DEPENDENCY_MAINTENANCE.md](operations/DEPENDENCY_MAINTENANCE.md) / [中文](operations/DEPENDENCY_MAINTENANCE.zh.md)：依赖更新策略、本地检查命令和验证方式。
 - [LOCAL_INTEGRATED_DEPLOYMENT.md](operations/LOCAL_INTEGRATED_DEPLOYMENT.md) / [中文](operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)：本地控制平面、宿主机执行 worker、systemd 运维和扩展方式。
+- [LOCAL_MEMORY_DEVELOPMENT.md](operations/LOCAL_MEMORY_DEVELOPMENT.md) / [中文](operations/LOCAL_MEMORY_DEVELOPMENT.zh.md)：独立的本地 Memory 基础设施、worker 启动与维护操作。
 - [LOCAL_GITHUB_INBOUND_SETUP.md](operations/LOCAL_GITHUB_INBOUND_SETUP.md) / [中文](operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md)：将 GitHub App webhook 和 Actions 仓库级 review 请求转发到本地服务。
 
 ### roadmap/
