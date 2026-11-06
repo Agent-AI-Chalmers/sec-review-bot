@@ -6,7 +6,8 @@
     "interrupted.jsonl",
     "metadata-observations.jsonl",
     "usage-normalized.jsonl",
-    "usage-partial.jsonl"
+    "usage-partial.jsonl",
+    "unicode-line-separators.jsonl"
   ],
   "invalid": [
     "array.jsonl",

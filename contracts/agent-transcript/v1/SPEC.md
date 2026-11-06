@@ -10,6 +10,8 @@ The [record schema](schemas/record.schema.json) defines structural requirements.
 
 A transcript uses UTF-8 JSONL: one JSON object per line. Newlines inside message content are escaped within that object. Each record has a positive integer `seq` and an `event` name. Sequence numbers increase within one file and need not be contiguous.
 
+Records are separated by LF (`U+000A`); CRLF is also accepted. Unicode separators such as `U+0085`, `U+2028`, and `U+2029` inside JSON strings are content, not record boundaries.
+
 Messages use `event: "message"`. Their envelope carries provenance and execution relationships; `message` carries the message itself. Producers write one canonical representation. Readers validate this format before using the records.
 
 ## Messages and Sources

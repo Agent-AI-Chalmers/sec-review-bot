@@ -10,6 +10,7 @@ from pydantic import BaseModel
 from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
 from sec_review_agents.runtime.trajectories import (
     TrajectoryWriter,
+    parse_trajectory_jsonl,
     read_trajectory_events,
     read_trajectory_messages,
 )
@@ -371,3 +372,43 @@ def test_system_deduplication_preserves_changes_and_independent_branches(tmp_pat
         )
     messages = read_trajectory_messages(writer.path)
     assert [message["content"] for message in messages] == ["A", "A", "B", "A"]
+
+
+@pytest.mark.parametrize("separator", ["\u0085", "\u2028", "\u2029"])
+def test_trajectory_round_trip_preserves_unicode_separators(
+    tmp_path: Path, separator: str
+) -> None:
+    """Tool output may contain Unicode separators without starting a JSONL record."""
+    path = tmp_path / "trajectory.jsonl"
+    writer = TrajectoryWriter((path,))
+    content = f"before{separator}after"
+    writer.write_messages([_FakeMessage(content)])
+    writer.write_messages([_FakeMessage("next", message_id="msg-2")])
+
+    assert [message["content"] for message in read_trajectory_messages(path)] == [
+        content,
+        "next",
+    ]
+
+
+@pytest.mark.parametrize("newline", ["\n", "\r\n"])
+@pytest.mark.parametrize("trailing_newline", [False, True])
+def test_trajectory_record_delimiters(newline: str, trailing_newline: bool) -> None:
+    import json
+
+    records = [
+        {
+            "seq": index,
+            "event": "message",
+            "message": {
+                "id": f"m{index}",
+                "role": "user",
+                "content": "a\u0085b\u2028c\u2029d",
+            },
+        }
+        for index in (1, 2)
+    ]
+    content = newline.join(json.dumps(record, ensure_ascii=False) for record in records)
+    if trailing_newline:
+        content += newline
+    assert parse_trajectory_jsonl(content) == records
