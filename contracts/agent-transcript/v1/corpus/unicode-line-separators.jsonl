@@ -1,0 +1,2 @@
+{"seq": 1, "event": "message", "message": {"id": "unicode-tool", "role": "tool", "content": "beforebetween and after"}}
+{"seq": 2, "event": "message", "message": {"id": "following", "role": "user", "content": "Continue."}}

@@ -84,7 +84,7 @@ def _max_tokens_failure(run_artifacts: Path, case_id: str) -> bool:
     messages_path = run_artifacts / "cases" / case_id / "analyzer" / "trajectory.jsonl"
     if not messages_path.is_file():
         return False
-    for line in messages_path.read_text(encoding="utf-8").splitlines():
+    for line in messages_path.read_text(encoding="utf-8").split("\n"):
         if not line.strip():
             continue
         try:

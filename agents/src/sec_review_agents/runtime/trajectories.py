@@ -175,7 +175,8 @@ def parse_trajectory_jsonl(content: str) -> list[dict[str, Any]]:
     ends: set[str] = set()
     opened = False
     closed = False
-    for line in content.splitlines():
+    # JSONL records are delimited by LF; Unicode line separators belong to JSON strings.
+    for line in content.split("\n"):
         if not line.strip():
             continue
         event = validate_trajectory_event(json.loads(line))
@@ -300,19 +301,7 @@ class TrajectoryWriter:
         if kind == "on_chat_model_start":
             inputs = event["data"].get("input", {})
             batches = inputs.get("messages", []) if isinstance(inputs, Mapping) else []
-            # Graph inputs arrive before the effective system prompt is known.
-            # Publish that prompt first, then the branch's observed conversation.
-            for messages in batches:
-                leading_systems = []
-                for message in messages:
-                    if _message_type(message) != "system":
-                        break
-                    leading_systems.append(message)
-                self.write_messages(leading_systems, **context)
-            if context["metadata"].get("lc_source") != "summarization":
-                self.flush_pending_messages(parent_ids=context["parent_ids"])
-            for messages in batches:
-                self.write_messages(messages, **context)
+            self._write_model_input_messages(batches, context)
             self.write_event("model_call_start", call_id=event["run_id"], **context)
         elif kind == "on_chat_model_end":
             response = event["data"]["output"]
@@ -338,6 +327,27 @@ class TrajectoryWriter:
             )
             if isinstance(output, Mapping):
                 self.defer_messages(output.get("messages"), **context)
+
+    def _write_model_input_messages(
+        self, batches: list[list[Any]], context: Mapping[str, Any]
+    ) -> None:
+        """Write effective systems before deferred branch inputs and request history.
+
+        Summarization requests do not flush the continuing conversation's inputs.
+        """
+        # Graph inputs arrive before the effective system prompt is known.
+        # Publish that prompt first, then the branch's observed conversation.
+        for messages in batches:
+            leading_systems = []
+            for message in messages:
+                if _message_type(message) != "system":
+                    break
+                leading_systems.append(message)
+            self.write_messages(leading_systems, **context)
+        if context["metadata"].get("lc_source") != "summarization":
+            self.flush_pending_messages(parent_ids=context["parent_ids"])
+        for messages in batches:
+            self.write_messages(messages, **context)
 
     def defer_messages(self, messages: list | None, **context: Any) -> None:
         """Hold graph messages until their branch's effective system is available."""
@@ -388,6 +398,26 @@ class TrajectoryWriter:
                 self._object_message_ids[object_id] = (message, message_id)
         return message_id
 
+    def _is_unchanged_system_message(
+        self, message: Any, context: Mapping[str, Any]
+    ) -> bool:
+        """Compare and remember effective system content; caller must hold ``_lock``."""
+        # Middleware rebuilds effective SystemMessage objects per call.
+        # Ignore unchanged instructions only within a known conversation;
+        # changed prompts and independent branches remain distinct evidence.
+        parents = context.get("parent_ids", [])
+        if _message_type(message) != "system" or len(parents) < 2:
+            return False
+        branch = json.dumps(
+            [context.get("agent", self.agent), context.get("source"), parents[:-1]]
+        )
+        serialized = serialize_agent_message(message, message_id="system")
+        content = json.dumps(serialized, sort_keys=True, ensure_ascii=False)
+        if self._system_contents.get(branch) == content:
+            return True
+        self._system_contents[branch] = content
+        return False
+
     def write_messages(self, messages: list | None, **context: Any) -> None:
         if messages is None:
             return
@@ -395,47 +425,34 @@ class TrajectoryWriter:
             for message in messages:
                 if isinstance(message, RemoveMessage):
                     continue
-                # Middleware rebuilds effective SystemMessage objects per call.
-                # Ignore unchanged instructions only within a known conversation;
-                # changed prompts and independent branches remain distinct evidence.
-                parents = context.get("parent_ids", [])
-                if _message_type(message) == "system" and len(parents) >= 2:
-                    branch = json.dumps(
-                        [
-                            context.get("agent", self.agent),
-                            context.get("source"),
-                            parents[:-1],
-                        ]
-                    )
-                    serialized = serialize_agent_message(message, message_id="system")
-                    content = json.dumps(serialized, sort_keys=True, ensure_ascii=False)
-                    if self._system_contents.get(branch) == content:
-                        continue
-                    self._system_contents[branch] = content
+                if self._is_unchanged_system_message(message, context):
+                    continue
                 message_id = self._ensure_message_id(message)
                 if message_id in self._seen_message_ids:
                     continue
                 self._pending_messages.pop(message_id, None)
                 self._seen_message_ids.add(message_id)
+                source = context.get("source")
+                if not source:
+                    additional_kwargs = (
+                        message.get("additional_kwargs", {})
+                        if isinstance(message, dict)
+                        else getattr(message, "additional_kwargs", {})
+                    )
+                    source = additional_kwargs.get("lc_source")
                 self._seq += 1
-                self._append(
-                    {
-                        "seq": self._seq,
-                        "event": "message",
-                        **{key: json_safe(value) for key, value in context.items()},
-                        "agent": context.get("agent", self.agent),
-                        "source": context.get("source")
-                        or (
-                            getattr(message, "additional_kwargs", {})
-                            if not isinstance(message, dict)
-                            else message.get("additional_kwargs", {})
-                        ).get("lc_source"),
-                        "message": serialize_agent_message(
-                            message,
-                            message_id=message_id,
-                        ),
-                    }
-                )
+                record = {
+                    "seq": self._seq,
+                    "event": "message",
+                    **{key: json_safe(value) for key, value in context.items()},
+                    "agent": context.get("agent", self.agent),
+                    "source": source,
+                    "message": serialize_agent_message(
+                        message,
+                        message_id=message_id,
+                    ),
+                }
+                self._append(record)
 
 
 __all__ = [
