@@ -4,9 +4,9 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { promisify } from 'node:util'
 import { execFile } from 'node:child_process'
 import path from 'node:path'
-import { writeInputBundleManifest } from '../apps/github-integration/dist/execution/input-bundle-manifest.js'
-import { archiveInputBundle } from '../apps/github-integration/dist/reviews/shared/input-bundle.js'
-import { publishInputBundle } from '../apps/github-integration/dist/artifacts/input-storage.js'
+import { writeInputBundleManifest } from '../../apps/github-integration/dist/execution/input-bundle-manifest.js'
+import { archiveInputBundle } from '../../apps/github-integration/dist/reviews/shared/input-bundle.js'
+import { publishInputBundle } from '../../apps/github-integration/dist/artifacts/input-storage.js'
 
 const [root, runId, output] = process.argv.slice(2)
 await mkdir(path.join(root, 'workspace'), { recursive: true })

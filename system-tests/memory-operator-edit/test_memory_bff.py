@@ -19,7 +19,8 @@ def test_memory_edit_replay_and_restore(
     for key, value in object_store.items():
         monkeypatch.setenv(key, value)
     bff = node_service(
-        "bff-server.mjs", {**object_store, "TEST_CATALOG_URL": catalog["url"]}
+        "memory-operator-edit/bff-server.mjs",
+        {**object_store, "TEST_CATALOG_URL": catalog["url"]},
     )["url"]
     cookie = ""
 

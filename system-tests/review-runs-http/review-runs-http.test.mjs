@@ -3,14 +3,14 @@
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import test from 'node:test'
-import { reviewRunsClient } from '../apps/github-integration/dist/review-runs/client.js'
+import { reviewRunsClient } from '../../apps/github-integration/dist/review-runs/client.js'
 import {
   REVIEW_RUNS_FASTIFY_OPTIONS,
   registerReviewRunsRoutes
-} from '../services/review-runs/dist/http/server-surface.js'
+} from '../../services/review-runs/dist/http/server-surface.js'
 
 const require = createRequire(
-  new URL('../services/review-runs/package.json', import.meta.url)
+  new URL('../../services/review-runs/package.json', import.meta.url)
 )
 const Fastify = require('fastify')
 

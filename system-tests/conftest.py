@@ -5,15 +5,13 @@ import os
 import subprocess
 import time
 import uuid
-from pathlib import Path
 
 import boto3
 import pytest
 import yaml
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
-
-ROOT = Path(__file__).resolve().parents[1]
+from project_paths import REPOSITORY_ROOT, SYSTEM_TESTS_ROOT
 
 
 def run(*args, timeout=120, **kwargs):
@@ -43,7 +41,7 @@ def wait_for(probe, *, process=None):
 
 @pytest.fixture(scope="session")
 def compose_images():
-    return yaml.safe_load((ROOT / "compose.yaml").read_text())["services"]
+    return yaml.safe_load((REPOSITORY_ROOT / "compose.yaml").read_text())["services"]
 
 
 @pytest.fixture(scope="session")
@@ -162,8 +160,8 @@ def node_service(tmp_path):
         ready = tmp_path / f"ready-{len(processes)}.json"
         log = (tmp_path / f"node-{len(processes)}.log").open("w+")
         process = subprocess.Popen(
-            ["node", str(ROOT / "system-tests" / script)],
-            cwd=ROOT,
+            ["node", str(SYSTEM_TESTS_ROOT / script)],
+            cwd=REPOSITORY_ROOT,
             env={**os.environ, **env, "NODE_ENV": "test", "READY_FILE": str(ready)},
             stdout=log,
             stderr=log,
@@ -190,7 +188,7 @@ def node_service(tmp_path):
 @pytest.fixture
 def catalog(postgres, node_service):
     return node_service(
-        "catalog-server.mjs", {"TEST_DATABASE_URL": postgres["catalog"]}
+        "memory-catalog/catalog-server.mjs", {"TEST_DATABASE_URL": postgres["catalog"]}
     )
 
 

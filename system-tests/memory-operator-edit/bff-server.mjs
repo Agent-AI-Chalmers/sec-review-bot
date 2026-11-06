@@ -1,7 +1,7 @@
 // Start the real BFF with its production S3 adapter and the disposable Catalog.
 import { writeFile } from 'node:fs/promises'
-import { createControlPlaneUiBffServer } from '../apps/control-plane-ui/dist-server/server/create-bff.js'
-import { artifactStoreFromEnvironment } from '../apps/control-plane-ui/dist-server/server/artifacts/store.js'
+import { createControlPlaneUiBffServer } from '../../apps/control-plane-ui/dist-server/server/create-bff.js'
+import { artifactStoreFromEnvironment } from '../../apps/control-plane-ui/dist-server/server/artifacts/store.js'
 const app = createControlPlaneUiBffServer({
   reviewRunsUrl: 'http://127.0.0.1:1',
   reviewRunsToken: 'unused',

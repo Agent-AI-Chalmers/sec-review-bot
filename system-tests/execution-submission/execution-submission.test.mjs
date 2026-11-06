@@ -9,7 +9,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import test from 'node:test'
 
-const repositoryDirectory = path.resolve(import.meta.dirname, '..')
+const repositoryDirectory = path.resolve(import.meta.dirname, '../..')
 const gatewayDirectory = path.join(
   repositoryDirectory,
   'services',
@@ -169,9 +169,9 @@ async function exerciseSubmissionBoundary(temporalAddress) {
 
   const [{ createApp }, { TemporalExecutionClient }, executionClient] =
     await Promise.all([
-      import('../services/execution-gateway/dist/server.js'),
-      import('../services/execution-gateway/dist/temporal-execution-client.js'),
-      import('../services/review-runs/dist/execution-client.js')
+      import('../../services/execution-gateway/dist/server.js'),
+      import('../../services/execution-gateway/dist/temporal-execution-client.js'),
+      import('../../services/review-runs/dist/execution-client.js')
     ])
   const client = await TemporalExecutionClient.connect()
   const app = await createApp({ client, token })

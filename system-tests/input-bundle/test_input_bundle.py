@@ -7,11 +7,10 @@ import uuid
 from pathlib import Path
 
 import pytest
+from project_paths import CONTRACTS_ROOT, REPOSITORY_ROOT, SYSTEM_TESTS_ROOT
 from sec_review_agents.entrypoints.input_preparation import prepare_workflow_input
 from sec_review_agents.workspace.commits import resolve_workspace_commit
 from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
-
-ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_typescript_bundle_materializes_in_python(object_store, monkeypatch, tmp_path):
@@ -23,12 +22,12 @@ def test_typescript_bundle_materializes_in_python(object_store, monkeypatch, tmp
     subprocess.run(
         [
             "node",
-            str(ROOT / "system-tests/publish-input.mjs"),
+            str(SYSTEM_TESTS_ROOT / "input-bundle/publish-input.mjs"),
             str(tmp_path / "producer"),
             run_id,
             str(output),
         ],
-        cwd=ROOT,
+        cwd=REPOSITORY_ROOT,
         env={**os.environ, **object_store},
         check=True,
         timeout=30,
@@ -37,7 +36,7 @@ def test_typescript_bundle_materializes_in_python(object_store, monkeypatch, tmp
     reference = json.loads(output.read_text())
     input_data = json.loads(
         (
-            ROOT / "contracts/execution-api/v1/fixtures/issue-review-input.json"
+            CONTRACTS_ROOT / "execution-api/v1/fixtures/issue-review-input.json"
         ).read_text()
     )
     input_data["input_bundle"] = reference
