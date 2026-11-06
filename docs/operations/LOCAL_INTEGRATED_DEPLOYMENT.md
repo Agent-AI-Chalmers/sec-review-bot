@@ -6,9 +6,14 @@ This guide covers local deployment of the GitHub integration, Review Runs, Execu
 
 Use it to run the complete integrated path locally. For running agents directly without the HTTP Execution Gateway, or for debugging with `run-local-* --temporal`, see the [agents local running guide](../../agents/README.md).
 
+
+For a standalone Memory development environment, see [Local Memory Development](LOCAL_MEMORY_DEVELOPMENT.md).
+
 ## Deployment Shape
 
 ![Local integrated deployment shape](../../assets/operations/local-integrated-deployment.svg)
+
+`cloudflared` runs as a separately managed host service, outside Docker Compose.
 
 Cloudflare Tunnel sends GitHub traffic to the integration service. Review Runs coordinates each review run, while Temporal dispatches review, memory extraction, and memory maintenance work to three independent worker pools. PostgreSQL stores control and catalog state, while RustFS stores run inputs, trajectories, memory revisions, and artifacts.
 
@@ -104,7 +109,7 @@ The initialization command copies the maintained samples, generates independent 
 
 Compose-level defaults are documented in [compose.env.sample](../../compose.env.sample). This file controls how Compose starts containers, mounts local directories, and exposes ports.
 
-The initialization command fills the service tokens and PostgreSQL/RustFS credentials with independently generated values. It also copies the Memory Catalog and role-specific storage credentials needed by host workers into `ops/systemd/deployment.env`; no manual token synchronization is required. The installer projects that source into separate worker environment files, so execution and memory processes receive only their own credentials. Compose-owned state uses the fixed repository directories `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state`; they are intentionally not separate configuration values.
+The initialization command fills the service tokens and PostgreSQL/RustFS credentials with independently generated values. It also copies the Memory Catalog and role-specific storage credentials needed by host workers into `ops/systemd/deployment.env`; no manual token synchronization is required. The installer projects that source into separate worker environment files, so execution and memory processes receive only their own credentials. The integrated deployment uses `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state` by default. Compose supports `SEC_REVIEW_TEMPORAL_STATE_DIR`, `SEC_REVIEW_RUSTFS_STATE_DIR`, and `SEC_REVIEW_POSTGRES_STATE_DIR` overrides for the separate Memory development environment.
 
 RustFS uses a separate workload identity for each storage responsibility: the integration writes input objects; Execution Worker reads inputs, writes run diagnostic bundles, and reads active memory revisions; the Memory Extraction and Memory Maintenance Workers share one memory-storage identity for run diagnostics, memory revisions, and compressed memory-agent trajectories; and the UI BFF reads stored diagnostics for authenticated downloads. Extraction and maintenance remain separate Temporal worker identities, processes, and task queues. Their shared S3 credential is retained because the current object-store policy covers one common memory artifact namespace; splitting that policy is outside this deployment change and would not improve process isolation by itself.
 

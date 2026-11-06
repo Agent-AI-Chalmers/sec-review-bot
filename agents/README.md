@@ -284,57 +284,14 @@ Agents can declare the skills they need. The worker prepares and mounts the decl
 
 ### Memory
 
-Memory requires Temporal, a Memory Catalog backed by PostgreSQL, and S3-compatible object storage.
-
-If you are new to Memory, start with [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the basic concepts and workflow.
+This package implements the memory extractor, maintainer, and their workers. Review agents read maintained memory through an invocation-scoped filesystem view. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the overall design and [local Memory development](../docs/operations/LOCAL_MEMORY_DEVELOPMENT.md) for infrastructure setup and operation.
 
 | Variable | Purpose |
 | --- | --- |
 | `AGENT_MEMORY_CATALOG_URL` | Memory Catalog base URL. Without it, review agents have no memory view and memory processing cannot run. |
 | `AGENT_MEMORY_CATALOG_TOKEN` | Worker bearer token for Memory Catalog extraction and automatic maintenance. Required when `AGENT_MEMORY_CATALOG_URL` is set. |
-| `AGENT_MEMORY_CONSUMPTION_ENABLED` | Whether review agents load the active memory tree. Defaults to `true`. |
-| `AGENT_MEMORY_PROCESSING_ENABLED` | Whether extraction and maintenance activities run. Defaults to `true`. |
-
-For local Memory development, Compose runs the infrastructure and the workers run as host processes.
-
-> [!WARNING]
-> The checked-in development credentials are fixed loopback-only values. They are not secrets and must not be used on a shared machine or any deployment reachable from another host.
-
-From the **repository root**, create the ignored local env file and start the infrastructure:
-
-```bash
-cp compose.memory.env.sample compose.memory.env
-# Compose runs RustFS and Temporal with the current host UID/GID. Creating
-# their bind-mount roots first keeps those directories writable.
-install -d .agent-rustfs-state .agent-temporal-state
-docker compose \
-  --env-file compose.memory.env \
-  --profile memory \
-  up -d --build --wait \
-  rustfs postgres temporal memory-catalog-server
-docker compose \
-  --env-file compose.memory.env \
-  --profile memory \
-  run --rm rustfs-init
-curl --fail http://127.0.0.1:8092/healthz
-```
-
-Configure `agents/.env` and `agents/config/model-providers.toml` for model access, then start the Execution, Memory Extraction, and Memory Maintenance workers together:
-
-```bash
-cd agents
-uv run sec-review-agents-memory dev-workers \
-  --env-file ../compose.memory.env
-```
-
-The launcher maps the separate object-storage identities to their workers, keeps Memory Maintenance Worker activity concurrency at `1`, and stops the worker group when one worker exits or the launcher receives `SIGINT`/`SIGTERM`. It does not start or stop Compose services.
-
-When memory processing is enabled in local Temporal mode, Memory Extraction Worker reads the diagnostic bundle produced by Execution Worker from the local filesystem. Both workers must be able to access the same file path. Extraction results still use Memory Catalog to store observations and artifact references, and S3-compatible storage to store the extractor trajectory.
-
-Each review invocation materializes the active memory tree in a temporary directory and removes it afterward.
-
-- `sec-review-agents-memory maintain` asks Temporal Server to start one memory maintenance workflow.
-- `sec-review-agents-memory schedules maintenance ensure` creates or updates the periodic maintenance schedule in Temporal Server.
+| `AGENT_MEMORY_CONSUMPTION_ENABLED` | Whether review agents load the active memory tree.  |
+| `AGENT_MEMORY_PROCESSING_ENABLED` | Whether extraction and maintenance activities run.  |
 
 ### Structured Output
 

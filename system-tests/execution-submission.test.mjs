@@ -9,19 +9,19 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import test from 'node:test'
 
-const repositoryDirectory = path.resolve(import.meta.dirname, '../..')
+const repositoryDirectory = path.resolve(import.meta.dirname, '..')
 const gatewayDirectory = path.join(
   repositoryDirectory,
   'services',
-  'execution-gateway',
+  'execution-gateway'
 )
 const reviewRunsDirectory = path.join(
   repositoryDirectory,
   'services',
-  'review-runs',
+  'review-runs'
 )
 const requireFromGateway = createRequire(
-  path.join(gatewayDirectory, 'package.json'),
+  path.join(gatewayDirectory, 'package.json')
 )
 const { parse } = requireFromGateway('yaml')
 
@@ -32,7 +32,7 @@ function run(command, args, options = {}) {
     const child = spawn(command, args, {
       cwd: options.cwd ?? repositoryDirectory,
       env: options.env ?? process.env,
-      stdio: options.stdio ?? 'inherit',
+      stdio: options.stdio ?? 'inherit'
     })
     child.once('error', reject)
     child.once('exit', (code, signal) => {
@@ -41,8 +41,8 @@ function run(command, args, options = {}) {
         new Error(
           `${command} ${args.join(' ')} exited with ${
             signal === null ? `code ${code}` : `signal ${signal}`
-          }.`,
-        ),
+          }.`
+        )
       )
     })
   })
@@ -55,7 +55,7 @@ function capture(command, args, { stderr = 'inherit' } = {}) {
     let output = ''
     const child = spawn(command, args, {
       cwd: repositoryDirectory,
-      stdio: ['ignore', 'pipe', stderr],
+      stdio: ['ignore', 'pipe', stderr]
     })
     child.stdout.setEncoding('utf8')
     child.stdout.on('data', (chunk) => {
@@ -65,7 +65,7 @@ function capture(command, args, { stderr = 'inherit' } = {}) {
     child.once('exit', (code) => {
       if (code === 0) return resolve(output.trim())
       reject(
-        new Error(`${command} ${args.join(' ')} exited with code ${code}.`),
+        new Error(`${command} ${args.join(' ')} exited with code ${code}.`)
       )
     })
   })
@@ -80,7 +80,7 @@ async function temporalImage() {
   // Compose owns the deployed image choice. Reusing it here prevents the system test from
   // validating against a Temporal version different from the repository's local deployment.
   const compose = parse(
-    await readFile(path.join(repositoryDirectory, 'compose.yaml'), 'utf8'),
+    await readFile(path.join(repositoryDirectory, 'compose.yaml'), 'utf8')
   )
   const image = compose?.services?.temporal?.image
   if (typeof image !== 'string' || image.trim() === '')
@@ -104,9 +104,9 @@ async function waitForTemporal(containerName) {
           'cluster',
           'health',
           '--address',
-          '127.0.0.1:7233',
+          '127.0.0.1:7233'
         ],
-        { stderr: 'ignore' },
+        { stderr: 'ignore' }
       )
       return
     } catch {
@@ -121,7 +121,7 @@ async function waitForTemporal(containerName) {
 async function buildPackages() {
   await Promise.all([
     run('pnpm', ['run', 'build'], { cwd: gatewayDirectory }),
-    run('pnpm', ['run', 'build'], { cwd: reviewRunsDirectory }),
+    run('pnpm', ['run', 'build'], { cwd: reviewRunsDirectory })
   ])
 }
 
@@ -141,7 +141,7 @@ async function startTemporaryTemporal() {
     'server',
     'start-dev',
     '--ip',
-    '0.0.0.0',
+    '0.0.0.0'
   ])
   try {
     await waitForTemporal(containerName)
@@ -169,9 +169,9 @@ async function exerciseSubmissionBoundary(temporalAddress) {
 
   const [{ createApp }, { TemporalExecutionClient }, executionClient] =
     await Promise.all([
-      import('../../services/execution-gateway/dist/server.js'),
-      import('../../services/execution-gateway/dist/temporal-execution-client.js'),
-      import('../../services/review-runs/dist/execution-client.js'),
+      import('../services/execution-gateway/dist/server.js'),
+      import('../services/execution-gateway/dist/temporal-execution-client.js'),
+      import('../services/review-runs/dist/execution-client.js')
     ])
   const client = await TemporalExecutionClient.connect()
   const app = await createApp({ client, token })
@@ -187,23 +187,23 @@ async function exerciseSubmissionBoundary(temporalAddress) {
           'execution-api',
           'v1',
           'fixtures',
-          'issue-review-input.json',
+          'issue-review-input.json'
         ),
-        'utf8',
-      ),
+        'utf8'
+      )
     )
 
     await executionClient.submitExecutionRun({
       workflow: 'issue-review',
       run_id: runId,
-      input,
+      input
     })
     // Review Runs may replay an uncertain submission. The second request must resolve to the same
     // Temporal workflow through the Gateway's fingerprint check instead of creating a conflict.
     await executionClient.submitExecutionRun({
       workflow: 'issue-review',
       run_id: runId,
-      input,
+      input
     })
 
     assert.deepEqual(
@@ -211,8 +211,8 @@ async function exerciseSubmissionBoundary(temporalAddress) {
       {
         run_id: runId,
         workflow: 'issue-review',
-        status: 'running',
-      },
+        status: 'running'
+      }
     )
   } finally {
     await app.close()
@@ -236,7 +236,7 @@ test('Review Runs submits and reads a run through Execution Gateway', async () =
     await exerciseSubmissionBoundary(temporary.address)
   } finally {
     await run('docker', ['rm', '--force', temporary.containerName]).catch(
-      () => undefined,
+      () => undefined
     )
   }
 })

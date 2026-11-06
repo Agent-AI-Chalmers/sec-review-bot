@@ -1,6 +1,6 @@
 # Cross-service Smoke Tests
 
-<!-- doc-default: system-tests.inventory; source=scripts/system-tests/ -->
+<!-- doc-default: system-tests.inventory; source=system-tests/ -->
 These smoke tests use production code across package or language boundaries without calling a real model. The inventory lists their CI execution policies. All commands below run from the repository root.
 
 ## Smoke Inventory
@@ -34,7 +34,7 @@ This test combines the compiled Integration client and Review Runs HTTP routes o
 ```bash
 pnpm --dir apps/github-integration run build
 pnpm --dir services/review-runs run build
-node --test scripts/system-tests/review-runs-http.test.mjs
+node --test system-tests/review-runs-http.test.mjs
 ```
 
 ## Execution Submission
@@ -42,7 +42,7 @@ node --test scripts/system-tests/review-runs-http.test.mjs
 The execution-submission system test covers the submission boundary. It builds Review Runs and Execution Gateway, starts a disposable Temporal service, and verifies that the production Review Runs client can submit, replay, and read a run through the real Gateway HTTP surface:
 
 ```bash
-node --test scripts/system-tests/execution-submission.test.mjs
+node --test system-tests/execution-submission.test.mjs
 ```
 
 Set `TEST_TEMPORAL_ADDRESS` to use an existing disposable Temporal service. Otherwise the test uses the Temporal image configured in `compose.yaml` and removes the temporary Docker container afterward. The test deliberately stops before worker execution, which requires the separately configured agents runtime, workspace, object storage, and model access.
@@ -57,7 +57,7 @@ Install the agents test dependencies and the participating Node packages with th
 pnpm --dir services/memory-catalog run build
 pnpm --dir apps/github-integration run build
 pnpm --dir apps/control-plane-ui exec tsc -p tsconfig.server.build.json
-uv --project agents run python -m pytest scripts/system-tests/test_memory_catalog.py scripts/system-tests/test_input_bundle.py scripts/system-tests/test_memory_bff.py -q --durations=10
+uv --project agents run python -m pytest system-tests/test_memory_catalog.py system-tests/test_input_bundle.py system-tests/test_memory_bff.py -q --durations=10
 ```
 
 Docker must be available. Fixtures create private containers with random host ports using images from `compose.yaml`, and remove owned containers afterward. These probes do not use deployment database URLs or object-store credentials. A single pytest invocation shares PostgreSQL and RustFS across the selected probes; unused fixtures do not start services. Node services bind ephemeral loopback ports and stop after each test.
@@ -68,7 +68,7 @@ The main CI selects probes by their consuming paths through `.github/ci/changed-
 
 The separate `Smoke — Execution Lifecycle` GitHub workflow uses only `workflow_dispatch`; it does not add a required PR check. It exercises the production Review Runs client and durable stores, Gateway HTTP, Temporal execution and issue workflows, Worker input preparation, diagnostic publication to RustFS, and terminal observation back into PostgreSQL. It then reopens the store and claims the persisted publication result.
 
-Only the analysis activity is replaced with a deterministic no-finding result. Its first attempt fails deliberately to exercise retry. Mitigation and verification take their production no-repair-target paths. This validates orchestration and artifact transport, not model quality, actual repairs, GitHub publication, or memory extraction.
+The analysis activity returns a deterministic no-finding result; its first attempt fails deliberately to exercise retry. Mitigation and verification use their production stages with deterministic model outputs that make no changes. Snapshot restoration, baseline commit resolution, and result persistence still run. This validates orchestration and artifact transport, not model quality, actual repairs, GitHub publication, or memory extraction.
 
 After installing dependencies and building the participants:
 
@@ -76,7 +76,7 @@ After installing dependencies and building the participants:
 pnpm --dir apps/github-integration run build
 pnpm --dir services/execution-gateway run build
 pnpm --dir services/review-runs run build
-uv --project agents run python -m pytest scripts/system-tests/test_execution_lifecycle.py -q --durations=10
+uv --project agents run python -m pytest system-tests/test_execution_lifecycle.py -q --durations=10
 ```
 
 The driver invokes Review Runs coordination functions directly rather than running its HTTP admission surface and background polling scheduler. PostgreSQL, Temporal and RustFS are real private containers. Service readiness, subprocesses, tests, and CI jobs have time limits; stdout/stderr and pytest durations identify failures and slow boundaries.
@@ -99,6 +99,6 @@ On failure, inspect pytest's captured Node stderr and the `node-*.log` files in 
 
 ## Maintaining These Tests
 
-Keep assertions on observable transport, artifact, and persistence outcomes. Prefer a small fixture and one concrete failure/retry scenario over broad model-driven cases. When adding a producer or consumer dependency, update [the changed-area model](../../.github/ci/changed-areas.yml) and [the smoke action](../../.github/actions/check-seams/action.yml) so the relevant test and build run together.
+Keep assertions on observable transport, artifact, and persistence outcomes. Prefer a small fixture and one concrete failure/retry scenario over broad model-driven cases. When adding a producer or consumer dependency, update [the changed-area model](../.github/ci/changed-areas.yml) and [the smoke action](../.github/actions/check-seams/action.yml) so the relevant test and build run together.
 
 Run script formatting/lint checks from `scripts/` as described in [the scripts guide](../README.md), plus the affected system tests. Node helpers can be checked with `node --check`; Python tests use pytest-style functions and plain assertions.

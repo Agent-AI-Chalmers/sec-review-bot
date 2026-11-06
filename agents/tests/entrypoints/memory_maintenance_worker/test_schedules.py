@@ -9,7 +9,6 @@ from temporalio.client import (
 )
 from temporalio.service import RPCError, RPCStatusCode
 
-from sec_review_agents.cli.memory import parse_args
 from sec_review_agents.entrypoints.memory_maintenance_worker.schedules import (
     MEMORY_MAINTENANCE_SCHEDULE_ID,
     MemoryMaintenanceScheduleRequest,
@@ -126,21 +125,6 @@ async def test_ensure_schedule_creates_and_updates() -> None:
     assert result["action"] == "updated"
     assert updated.handle.updated is True
     assert updated.handle.triggered is True
-
-
-def test_cli_only_exposes_maintenance_schedule() -> None:
-    args = parse_args(
-        [
-            "schedules",
-            "maintenance",
-            "ensure",
-            "--interval-seconds",
-            "120",
-        ]
-    )
-    assert args.schedule_kind == "maintenance"
-    with pytest.raises(SystemExit):
-        parse_args(["schedules", "extraction", "ensure"])
 
 
 @pytest.mark.asyncio

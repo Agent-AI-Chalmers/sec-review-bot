@@ -3,14 +3,15 @@
 import json
 import os
 import subprocess
-import tarfile
 import uuid
 from pathlib import Path
 
 import pytest
 from sec_review_agents.entrypoints.input_preparation import prepare_workflow_input
+from sec_review_agents.workspace.commits import resolve_workspace_commit
+from sec_review_agents.workspace.snapshots import restore_workspace_from_snapshot_tar
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_typescript_bundle_materializes_in_python(object_store, monkeypatch, tmp_path):
@@ -22,7 +23,7 @@ def test_typescript_bundle_materializes_in_python(object_store, monkeypatch, tmp
     subprocess.run(
         [
             "node",
-            str(ROOT / "scripts/system-tests/publish-input.mjs"),
+            str(ROOT / "system-tests/publish-input.mjs"),
             str(tmp_path / "producer"),
             run_id,
             str(output),
@@ -46,10 +47,12 @@ def test_typescript_bundle_materializes_in_python(object_store, monkeypatch, tmp
         artifact_root_path=tmp_path / "artifacts",
         expected_run_id=run_id,
     )
-    with tarfile.open(prepared.workspace_snapshot_tar_path) as archive:
-        content = archive.extractfile("probe.txt")
-        assert content is not None
-        assert content.read().decode() == "跨语言 bundle\n"
+    workspace = restore_workspace_from_snapshot_tar(
+        tar_path=Path(prepared.workspace_snapshot_tar_path),
+        destination_path=tmp_path / "restored-workspace",
+    )
+    assert (workspace / "probe.txt").read_text() == "跨语言 bundle\n"
+    assert resolve_workspace_commit(workspace)
     assert json.loads((Path(prepared.history_path) / "issue.json").read_text()) == {
         "number": 1
     }

@@ -24,4 +24,4 @@ jobs:
             pnpm --dir "$package" run build
           done
       - name: Test execution, retry, diagnostics and durable terminal state
-        run: uv --project agents run python -m pytest scripts/system-tests/test_execution_lifecycle.py -q --durations=10
+        run: uv --project agents run python -m pytest system-tests/test_execution_lifecycle.py -q --durations=10

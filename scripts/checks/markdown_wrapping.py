@@ -21,7 +21,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from markdown_check_utils import iter_markdown_files
+from scripts.checks.markdown_utils import iter_markdown_files
 
 SKIPPED_FILES = {
     "LICENSE.md",
@@ -330,7 +330,7 @@ def main() -> int:
     parser.add_argument(
         "root",
         nargs="?",
-        default=Path(__file__).resolve().parents[1],
+        default=Path(__file__).resolve().parents[2],
         type=Path,
         help="repository root to scan",
     )

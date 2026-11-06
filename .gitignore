@@ -39,6 +39,7 @@ ops/systemd/deployment.env
 .agent-workspace-patcheval
 .agent-workspace-patcheval-*
 .agent-input-bundles/
+.agent-memory-dev/
 .agent-rustfs-state/
 .agent-artifacts/
 .agent-run-inputs/

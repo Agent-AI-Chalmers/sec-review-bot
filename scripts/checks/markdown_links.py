@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from markdown_check_utils import iter_markdown_files
+from scripts.checks.markdown_utils import iter_markdown_files
 
 INLINE_LINK_RE = re.compile(r"!?\[[^\]]*]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
 REFERENCE_DEF_RE = re.compile(r"^\s*\[[^\]]+]:\s+(\S+)", re.MULTILINE)
@@ -64,7 +64,7 @@ def main() -> int:
     parser.add_argument(
         "root",
         nargs="?",
-        default=Path(__file__).resolve().parents[1],
+        default=Path(__file__).resolve().parents[2],
         type=Path,
         help="repository root to scan",
     )

@@ -56,7 +56,6 @@ sec-review-agents-check-llm-deployments = "sec_review_agents.cli.check_llm_deplo
 sec-review-agents-run-local-issue = "sec_review_agents.cli.run_local_issue:main"
 sec-review-agents-run-local-pr = "sec_review_agents.cli.run_local_pr:main"
 sec-review-agents-run-local-repository = "sec_review_agents.cli.run_local_repository:main"
-sec-review-agents-memory = "sec_review_agents.cli.memory:main"
 
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]

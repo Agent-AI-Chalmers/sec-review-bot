@@ -92,12 +92,32 @@ def rounded_path(points: list[tuple[int, int]], radius: int = 10) -> str:
             abs(following[0] - current[0]) // 2 + abs(following[1] - current[1]) // 2,
         )
         before = (
-            current[0] - (incoming if current[0] != previous[0] else 0),
-            current[1] - (incoming if current[1] != previous[1] else 0),
+            current[0]
+            - (
+                incoming
+                if current[0] > previous[0]
+                else -incoming if current[0] < previous[0] else 0
+            ),
+            current[1]
+            - (
+                incoming
+                if current[1] > previous[1]
+                else -incoming if current[1] < previous[1] else 0
+            ),
         )
         after = (
-            current[0] + (outgoing if following[0] != current[0] else 0),
-            current[1] + (outgoing if following[1] != current[1] else 0),
+            current[0]
+            + (
+                outgoing
+                if following[0] > current[0]
+                else -outgoing if following[0] < current[0] else 0
+            ),
+            current[1]
+            + (
+                outgoing
+                if following[1] > current[1]
+                else -outgoing if following[1] < current[1] else 0
+            ),
         )
         commands.extend(
             (
@@ -113,7 +133,7 @@ def render(filename: str, labels: dict[str, str]) -> None:
     root = ET.Element(
         f"{{{SVG}}}svg",
         {
-            "viewBox": "0 0 1500 820",
+            "viewBox": "0 0 1700 820",
             "role": "img",
             "aria-labelledby": "title description",
         },
@@ -183,87 +203,120 @@ def render(filename: str, labels: dict[str, str]) -> None:
         class_="zone external-zone",
     )
     add_text(root, 130, 56, labels["external"], css_class="zone-label")
+    # Compose and native processes share one host, but separate lifecycles.
+    element(
+        root, "rect", x=270, y=24, width=1400, height=760, rx=7, class_="zone host-zone"
+    )
+    add_text(root, 970, 56, labels["host"], css_class="zone-label")
     element(
         root,
         "rect",
-        x=270,
-        y=24,
+        x=470,
+        y=85,
         width=930,
-        height=760,
+        height=650,
         rx=7,
         class_="zone compose-zone",
     )
-    add_text(root, 735, 56, "Docker Compose", css_class="zone-label")
-    element(
-        root, "rect", x=1230, y=24, width=240, height=760, rx=7, class_="zone host-zone"
-    )
-    add_text(root, 1350, 56, labels["host"], css_class="zone-label")
+    add_text(root, 935, 108, "Docker Compose", css_class="zone-label")
 
-    add_path(root, [(210, 151), (300, 151)])
-    add_path(root, [(470, 151), (510, 151)])
-    add_path(root, [(680, 151), (720, 151)], bidirectional=True)
-    add_path(root, [(900, 151), (940, 151)], bidirectional=True)
-    add_path(root, [(1025, 187), (1025, 315)])
+    element(root, "path", d="M 210 151 H 290", class_="edge", marker_end="url(#arrow)")
+    element(root, "path", d="M 450 151 H 710", class_="edge", marker_end="url(#arrow)")
+    add_path(root, [(880, 151), (920, 151)], bidirectional=True)
+    add_path(root, [(1100, 151), (1140, 151)], bidirectional=True)
+    add_path(root, [(1225, 187), (1225, 315)])
     add_path(
-        root, [(1110, 333), (1180, 333), (1180, 301), (1260, 301)], bidirectional=True
+        root, [(1310, 333), (1380, 333), (1380, 301), (1460, 301)], bidirectional=True
     )
     add_path(
-        root, [(1110, 351), (1190, 351), (1190, 426), (1260, 426)], bidirectional=True
+        root, [(1310, 351), (1390, 351), (1390, 426), (1460, 426)], bidirectional=True
     )
     add_path(
-        root, [(1110, 369), (1200, 369), (1200, 551), (1260, 551)], bidirectional=True
+        root, [(1310, 369), (1400, 369), (1400, 551), (1460, 551)], bidirectional=True
     )
-    add_path(root, [(1260, 283), (1245, 283), (1245, 691), (1260, 691)])
-    add_path(root, [(210, 351), (300, 351)])
-    add_path(root, [(470, 351), (490, 351), (490, 205), (720, 205), (720, 169)])
-    add_path(root, [(680, 169), (700, 169), (700, 560), (975, 560), (975, 590)])
-    add_path(root, [(810, 187), (810, 590)])
-    add_path(root, [(600, 387), (600, 560), (740, 560), (740, 590)])
-    add_path(root, [(1110, 169), (1140, 169), (1140, 560), (1070, 560), (1070, 590)])
-    add_path(root, [(1025, 387), (1025, 590)], bidirectional=True)
+    add_path(root, [(1460, 283), (1445, 283), (1445, 691), (1460, 691)])
+    add_path(root, [(210, 351), (500, 351)])
+    add_path(root, [(670, 351), (690, 351), (690, 205), (920, 205), (920, 169)])
+    add_path(root, [(880, 169), (900, 169), (900, 560), (1175, 560), (1175, 590)])
+    add_path(root, [(1010, 187), (1010, 590)])
+    add_path(root, [(800, 387), (800, 560), (940, 560), (940, 590)])
     add_path(
-        root, [(1260, 319), (1170, 319), (1170, 631), (1130, 631)], bidirectional=True
+        root, [(1460, 319), (1370, 319), (1370, 631), (1330, 631)], bidirectional=True
     )
     add_path(
-        root, [(1260, 444), (1160, 444), (1160, 613), (1130, 613)], bidirectional=True
+        root, [(1460, 444), (1360, 444), (1360, 613), (1330, 613)], bidirectional=True
     )
     add_path(
-        root, [(1260, 569), (1150, 569), (1150, 649), (1130, 649)], bidirectional=True
+        root, [(1460, 569), (1350, 569), (1350, 649), (1330, 649)], bidirectional=True
     )
     add_path(
         root,
-        [(1260, 426), (1180, 426), (1180, 420), (710, 420), (710, 369), (690, 369)],
+        [(1460, 426), (1380, 426), (1380, 420), (910, 420), (910, 369), (890, 369)],
         bidirectional=True,
         dashed=True,
     )
     add_path(
         root,
-        [(1260, 551), (1170, 551), (1170, 440), (730, 440), (730, 369), (690, 369)],
+        [(1460, 551), (1370, 551), (1370, 440), (930, 440), (930, 369), (890, 369)],
         bidirectional=True,
         dashed=True,
     )
+
+    # Catalog coordinates revisions; workers transfer artifact bytes directly.
+    add_path(
+        root,
+        [(1450, 265), (1420, 265), (1420, 230), (800, 230), (800, 315)],
+        dashed=True,
+    )
+    add_path(root, [(670, 351), (710, 351)])
+    add_path(root, [(670, 375), (680, 375), (680, 710), (1235, 710), (1235, 672)])
+    add_path(
+        root,
+        [(1010, 187), (1030, 215), (1330, 215), (1330, 580), (1290, 580), (1290, 590)],
+    )
+
+    # Optional telemetry goes to independently deployed Langfuse.
+    add_path(
+        root, [(1010, 115), (1010, 90), (250, 90), (250, 561), (210, 561)], dashed=True
+    )
+    for y in (301, 426, 551):
+        add_path(
+            root,
+            [(1650, y), (1660, y), (1660, 755), (130, 755), (130, 607)],
+            dashed=True,
+        )
 
     add_node(root, "github", 50, 115, 160, 72, "GitHub", "external-node")
+    add_node(root, "langfuse", 50, 515, 160, 92, labels["langfuse"], "external-node")
     add_node(root, "browser", 50, 315, 160, 72, labels["browser"], "external-node")
-    add_node(root, "tunnel", 300, 115, 170, 72, "Cloudflare\nTunnel", "control-node")
     add_node(
-        root, "integration", 510, 115, 170, 72, "GitHub\nIntegration", "control-node"
+        root,
+        "tunnel",
+        290,
+        115,
+        160,
+        72,
+        "cloudflared\nCloudflare Tunnel",
+        "control-node",
     )
     add_node(
-        root, "control", 720, 115, 180, 72, "Review Control\nPlane", "control-node"
+        root, "integration", 710, 115, 170, 72, "GitHub\nIntegration", "control-node"
     )
-    add_node(root, "gateway", 940, 115, 170, 72, "Execution\nGateway", "execution-node")
-    add_node(root, "ui", 300, 315, 170, 72, "Control Plane UI", "control-node")
-    add_node(root, "temporal", 940, 315, 170, 72, "Temporal Server", "execution-node")
+    add_node(root, "review-runs", 920, 115, 180, 72, "Review Runs", "control-node")
     add_node(
-        root, "catalog", 510, 315, 180, 72, "Memory Catalog\nServer", "memory-node"
+        root, "gateway", 1140, 115, 170, 72, "Execution\nGateway", "execution-node"
     )
-    add_node(root, "postgres", 700, 590, 190, 82, "PostgreSQL", "storage-node")
-    add_node(root, "storage", 940, 590, 190, 82, labels["storage"], "storage-node")
+    add_node(root, "ui", 500, 315, 170, 72, "Control Plane UI", "control-node")
+    add_node(root, "temporal", 1140, 315, 170, 72, "Temporal Server", "execution-node")
+    add_node(
+        root, "catalog", 710, 315, 180, 72, "Memory Catalog\nServer", "memory-node"
+    )
+    add_node(root, "postgres", 900, 590, 190, 82, "PostgreSQL", "storage-node")
+    add_node(root, "storage", 1140, 590, 190, 82, labels["storage"], "storage-node")
     add_node(
         root,
         "execution-worker",
-        1250,
+        1450,
         265,
         200,
         72,
@@ -273,7 +326,7 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_node(
         root,
         "memory-extraction-worker",
-        1250,
+        1450,
         390,
         200,
         72,
@@ -283,14 +336,14 @@ def render(filename: str, labels: dict[str, str]) -> None:
     add_node(
         root,
         "memory-maintenance-worker",
-        1250,
+        1450,
         515,
         200,
         72,
         "Memory Maintenance\nWorker",
         "memory-node",
     )
-    add_node(root, "sandbox", 1250, 650, 200, 82, "Docker sandbox", "sandbox-node")
+    add_node(root, "sandbox", 1450, 650, 200, 82, "Docker sandbox", "sandbox-node")
 
     tree = ET.ElementTree(root)
     ET.indent(tree, space="  ")
@@ -302,11 +355,12 @@ render(
     "local-integrated-deployment.svg",
     {
         "title": "Local integrated deployment shape",
-        "description": "GitHub and an operator browser connect to Docker Compose services, while three host worker pools execute reviews, memory extraction, and memory maintenance.",
+        "description": "GitHub, an operator browser, and independently deployed Langfuse connect to Docker Compose services and host workers. Catalog coordinates memory revisions; workers transfer artifacts directly to object storage.",
         "external": "External",
         "host": "Host",
         "browser": "Operator\nbrowser",
-        "storage": "Object Storage",
+        "storage": "RustFS\nObject Storage",
+        "langfuse": "Langfuse\nObservability",
     },
 )
 
@@ -314,10 +368,11 @@ render(
     "local-integrated-deployment.zh.svg",
     {
         "title": "本地集成部署结构",
-        "description": "GitHub 和运维人员浏览器连接 Docker Compose 服务，宿主机上的三个 worker pool 分别执行 review、memory extraction 和 memory maintenance。",
+        "description": "GitHub、运维人员浏览器和独立部署的 Langfuse 连接 Compose 服务及宿主机 workers。Catalog 协调 Memory revision，workers 直接向对象存储传输 artifacts。",
         "external": "外部",
         "host": "宿主机",
         "browser": "运维人员\n浏览器",
-        "storage": "对象存储",
+        "storage": "RustFS\n对象存储",
+        "langfuse": "Langfuse\n可观测性",
     },
 )

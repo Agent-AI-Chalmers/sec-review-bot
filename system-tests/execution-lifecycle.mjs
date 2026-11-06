@@ -2,45 +2,48 @@
 import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import { setTimeout } from 'node:timers/promises'
-import { createApp } from '../../services/execution-gateway/dist/server.js'
-import { TemporalExecutionClient } from '../../services/execution-gateway/dist/temporal-execution-client.js'
-import { ReviewRunStore } from '../../services/review-runs/dist/persistence/review-run-store.js'
+import { createApp } from '../services/execution-gateway/dist/server.js'
+import { TemporalExecutionClient } from '../services/execution-gateway/dist/temporal-execution-client.js'
+import { ReviewRunStore } from '../services/review-runs/dist/persistence/review-run-store.js'
 import {
   submitExecutionRun,
-  getExecutionRunStatus,
-} from '../../services/review-runs/dist/execution-client.js'
-import { observeExecutionRun } from '../../services/review-runs/dist/runtime/terminal-coordination.js'
+  getExecutionRunStatus
+} from '../services/review-runs/dist/execution-client.js'
+import { observeExecutionRun } from '../services/review-runs/dist/runtime/terminal-coordination.js'
 
 const request = JSON.parse(
-  await readFile(process.env.TEST_REQUEST_FILE, 'utf8'),
+  await readFile(process.env.TEST_REQUEST_FILE, 'utf8')
 )
 const connectorId = 'lifecycle'
 const store = new ReviewRunStore({
   connectionString: process.env.TEST_DATABASE_URL,
-  connectorId,
+  connectorId
 })
 const executionClient = await TemporalExecutionClient.connect()
-const app = await createApp({ client: executionClient, token: 'seam-execution' })
+const app = await createApp({
+  client: executionClient,
+  token: 'seam-execution'
+})
 let storeClosed = false
 try {
   await store.initialize()
   process.env.EXECUTION_API_URL = await app.listen({
     host: '127.0.0.1',
-    port: 0,
+    port: 0
   })
   const admitted = await store.admissions.create({
     workflow: 'issue-review',
     run_id: request.run_id,
     publish_context: {},
     preparation_input_version: 'v1',
-    preparation_input: { kind: 'seam' },
+    preparation_input: { kind: 'seam' }
   })
   const token = admitted.preparation_token
   assert(token)
   const intent = {
     reference: request.input.input_bundle,
     input: request.input,
-    publish_context: {},
+    publish_context: {}
   }
   await store.inputBundleCandidates.reserve(request.run_id, token, intent)
   // publish-input.mjs already uploaded these bytes before this driver started.
@@ -48,13 +51,13 @@ try {
     request.run_id,
     token,
     intent.reference.digest,
-    'present',
+    'present'
   )
   await store.submissionTransitions.savePreparedSubmission(
     request.run_id,
     token,
     {},
-    request.input,
+    request.input
   )
   await submitExecutionRun(request)
   // An uncertain acknowledgement must resolve to the same Temporal execution.
@@ -68,7 +71,7 @@ try {
       store,
       record,
       getExecutionRunStatus,
-      () => false,
+      () => false
     )
     if (status === 'succeeded' || status === 'failed') break
     await setTimeout(100)
@@ -79,7 +82,7 @@ try {
   storeClosed = true
   const reopened = new ReviewRunStore({
     connectionString: process.env.TEST_DATABASE_URL,
-    connectorId,
+    connectorId
   })
   try {
     await reopened.initialize()
@@ -87,7 +90,7 @@ try {
     assert.equal(
       record.execution.status,
       'succeeded',
-      JSON.stringify(record.execution),
+      JSON.stringify(record.execution)
     )
     // The ordinary run projection omits workflow_result. Claiming publication
     // checks the actual consumer boundary and proves the result is publishable.
