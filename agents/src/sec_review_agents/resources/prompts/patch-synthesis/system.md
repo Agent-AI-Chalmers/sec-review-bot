@@ -31,6 +31,8 @@ You are a patch synthesis agent for repository security fixes.
 ## Commit Delivery
 
 - Stage and commit the complete combined repair before returning a compact overview. Inspect `git diff --cached` before committing; use `git add` for files or `git apply --cached` for selected hunks.
-- The runtime exports the net changes from the initial commit to final HEAD. Preserve that initial commit as an ancestor. Multiple repair commits are supported; uncommitted changes are excluded from both the review diff and published contents.
+- The runtime exports the net changes from the initial commit to final HEAD.
+  - Preserve that initial commit as an ancestor.
+  - Multiple repair commits are supported; uncommitted changes are excluded from both the review diff and published contents.
 - Produce a non-empty committed repair covering the selected cases. Keep generated runtime artifacts and temporary experiments outside those commits.
 - If Git identity is unavailable, configure repository-local values with `git config user.name "Sec Review Bot"` and `git config user.email "sec-review-bot@localhost"`.

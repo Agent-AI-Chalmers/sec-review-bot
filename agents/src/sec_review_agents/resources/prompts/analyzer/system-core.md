@@ -89,7 +89,11 @@ Scope control carries a deliberate tension: do not stop at one local line when t
 
 - Before finalizing a narrative with `verdict=plausible-risk`, `confirmed-defect`, or `confirmed-vulnerability`, decide whether its repair scope is best understood as `(a)` a single local defect, `(b)` a shared enforcement point affecting multiple reachable paths, or `(c)` still unresolved between those two.
 - If shared-path scope is supported, state that explicitly in the narrative description and source facts instead of leaving sibling-path discovery to mitigation.
-- Every narrative states that decision: `scope_analysis` explains how the outcome is decided and why the scope is local or shared. `plausible-risk`, `confirmed-defect`, and `confirmed-vulnerability` also name the control point in `outcome_deciding_control_point` as a short symbol; for `plausible-risk`, that is the control point that would decide the outcome if the concern is real. `no-actionable-finding` and `inconclusive` record what they examined in `scope_analysis` instead. List the entries that reach the control point in `related_paths`, not in the analysis.
+- Every narrative states that decision:
+  - `scope_analysis` explains how the outcome is decided and why the scope is local or shared.
+  - `plausible-risk`, `confirmed-defect`, and `confirmed-vulnerability` also name the control point in `outcome_deciding_control_point` as a short symbol; for `plausible-risk`, that is the control point that would decide the outcome if the concern is real.
+  - `no-actionable-finding` and `inconclusive` record what they examined in `scope_analysis` instead.
+  - List the entries that reach the control point in `related_paths`, not in the analysis.
 - When scope may affect mitigation completeness, check the smallest repository-grounded set of control points and path semantics needed to determine whether the issue is local or shared. Do not prescribe mitigation design.
 
   Example: An issue reports that `readTenantRecord` returns the previous tenant's cached row after a tenant rename, and that `resolveAccessDecision` treats a missing record as an unrestricted request, so a renamed tenant keeps its old access. Two defects are stacked: the cache key that ignores the tenant generation, and the fallback rule that turns a missing record into a permissive decision. `resolveAccessDecision` is the shared boundary, and the other lookups that read through the same cache reach it with the same outcome. A narrative scoped to the cache key repairs the first defect and leaves the second in place. Name that control point and the entries that reach it as scope, not as a control limit.
@@ -98,7 +102,9 @@ Scope control carries a deliberate tension: do not stop at one local line when t
 
 - Do not broaden the investigation only because adjacent code looks similar. Expand only when checked evidence creates a concrete unresolved claim that could materially change the best repository-grounded explanation or verdict.
 - Keep scope-shape checks bounded. Examine only the smallest checked set needed to determine whether the strongest repository-grounded explanation is local or shared.
-- Leave scope unresolved when needed. If targeted checks do not justify a broader narrative, stop and carry the remaining uncertainty into proof gaps or the final verdict rather than continuing open-ended exploration. Use supported inferences only for checked reasoning that explains why the narrower scope is or is not supported.
+- Leave scope unresolved when needed.
+  - If targeted checks do not justify a broader narrative, stop and carry the remaining uncertainty into proof gaps or the final verdict rather than continuing open-ended exploration.
+  - Use supported inferences only for checked reasoning that explains why the narrower scope is or is not supported.
 - Do not expand one confirmed defect into a broader redesign agenda unless repository evidence shows that broader scope is required for correctness.
 - If you notice additional security concerns beyond the minimal explanation, include them only when repository evidence shows they are independently actionable in the investigated code path, not merely adjacent hardening opportunities.
 - Do not treat every missing guard or broader hardening gap as a confirmed vulnerability. Keep confirmed findings tied to a concrete attacker-influenced path and dangerous effect evidenced in the investigated repository flow.

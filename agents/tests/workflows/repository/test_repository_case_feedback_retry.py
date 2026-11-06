@@ -8,6 +8,7 @@ from temporalio import activity
 from temporalio.worker import Worker
 
 from sec_review_agents.filesystem.backend_factory import BackendConfig
+from sec_review_agents.resources.loader import load_prompt_resource
 from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.cvss.result import (
     CvssStageResult,
@@ -130,6 +131,8 @@ async def test_repository_case_verifier_exception_is_raised_for_activity_retry(
     case_input.workspace_snapshot_tar_path = str(snapshot_tar)
     case_input.history_path = str(tmp_path / "history")
 
+    case_input.test_changes = "deny"
+
     with (
         patch(
             "sec_review_agents.workflows.repository_case.verification.build_repository_verification_backend_config",
@@ -143,7 +146,7 @@ async def test_repository_case_verifier_exception_is_raised_for_activity_retry(
         patch(
             "sec_review_agents.review_stages.verification.stage.run_verification_agent",
             side_effect=RuntimeError("verifier exploded"),
-        ),
+        ) as verifier,
         pytest.raises(RuntimeError, match="verifier exploded"),
     ):
         await case_workflow.run_repository_case_verification_stage(
@@ -154,6 +157,10 @@ async def test_repository_case_verifier_exception_is_raised_for_activity_retry(
             None,
             verifier_artifacts_path=tmp_path / "verifier",
         )
+
+    assert load_prompt_resource("test-changes-policy/deny-boundary.md") in (
+        verifier.call_args.kwargs["system_prompt"]
+    )
 
 
 @pytest.mark.asyncio

@@ -207,6 +207,7 @@ async def verify_issue_activity(
             analysis_result=analysis_result,
             mitigation_result=mitigation_result,
             retry_context=retry_context,
+            test_changes=prepared_input.review_intent.test_changes,
             setup_declaration_content=prepared_input.setup_declaration,
             runtime_context=request.runtime_context,
         )

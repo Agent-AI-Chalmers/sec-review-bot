@@ -37,6 +37,11 @@ from sec_review_agents.utils.markdown import code_block
 from sec_review_agents.utils.structured_renderer import (
     render_structured_markdown_section,
 )
+from sec_review_agents.workflows.review_intent import (
+    TEST_CHANGES_ALLOW,
+    TestChangesPolicy,
+    test_changes_boundary_prompt_path,
+)
 from sec_review_agents.workspace.file_changes import file_change_paths
 
 REPOSITORY_VERIFICATION_INITIAL_INTRO = "\n".join(
@@ -110,13 +115,17 @@ def build_repository_verification_backend_config(
 
 
 def build_repository_verification_system_prompt(
-    is_retry: bool = False, *, workspace_root: str = "/workspace"
+    *,
+    test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
+    is_retry: bool = False,
+    workspace_root: str = "/workspace",
 ) -> str:
     if is_retry:
         return join_prompt_sections(
             [
                 "verifier/system-core.md",
                 "verifier/system-retry-delta.md",
+                test_changes_boundary_prompt_path(test_changes),
                 "shared/no-git-history-remediation-boundary.md",
                 "shared/runtime-evidence-discipline.md",
                 "shared/validation-level-discipline.md",
@@ -132,6 +141,7 @@ def build_repository_verification_system_prompt(
         [
             "verifier/system-core.md",
             "verifier/system-initial-delta.md",
+            test_changes_boundary_prompt_path(test_changes),
             "shared/no-git-history-remediation-boundary.md",
             "shared/runtime-evidence-discipline.md",
             "shared/validation-level-discipline.md",

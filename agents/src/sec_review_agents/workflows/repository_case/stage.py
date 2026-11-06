@@ -270,6 +270,7 @@ async def run_repository_case_verification_stage(
             analysis_result=analyzer_result,
             mitigation_result=mitigator_result,
             retry_context=retry_context,
+            test_changes=case_execution_input.test_changes,
             setup_declaration_content=case_execution_input.setup_declaration_content,
             runtime_context=runtime_context,
         )

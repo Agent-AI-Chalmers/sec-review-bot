@@ -56,7 +56,7 @@ Verifier-led retry 弱于 failed PoC、failed test 或另一个可直接复现�
 
 - `analyzer -> mitigator(pass1) -> verifier(pass1) -> mitigator(retry) -> verifier(retry)`
 
-retry 是对同一 scoped task 的 bounded revision pass。retrying mitigator 使用 previous attempt 和 verifier feedback 作为上下文，但从 prepared baseline workspace 重新开始，而不是把编辑叠在 previous patch 上。尤其是，retry path 留在 mitigation-verification path 上，不重新打开 analyzer。Analyzer 仍然是 baseline scope artifact，而 verifier objections 约束 retrying mitigation pass。
+重试时，mitigator 会参考上一次的修复结果和验证反馈，从原始工作区重新生成补丁。它先核查verifier 指出的问题，再根据代码和执行证据决定是否修改、如何修改。重试仍围绕原来的审查任务，只重新执行修复和验证，不重新运行analyzer；原有分析结果继续作为审查范围的依据。
 
 ### Generalized Bounded Model
 
@@ -114,7 +114,7 @@ Retry-eligible patch judgments 通常是 `partial` / `local-only` / `unresolved`
 - mitigator 遵循该 framing
 - verifier 判断 analyzer framing 不完整，并且 resulting patch 也是 `partial`、`local-only` 或 `misaligned`
 
-这就是 retry 有用的情况。在这种情况下，verifier 不只是拒绝 patch。它也接管 retry pass 的 effective framing。
+在这种情况下，verifier 指出 retry 时应优先核查的问题。它的判断仍需根据当前仓库证据复核。
 
 当 verifier 选择 `next_step=retry-ai` 时，它应该包含具体的 `findings[]` 文本，让 retrying mitigator 获得 actionable patch-correction feedback，而不是模糊的 negative verdict。
 
@@ -133,9 +133,11 @@ retrying mitigator 应被 framing 为 bounded revision pass，并接收：
 它的运行规则是：
 
 - 把 verifier 报告作为主要修正信号
-- retry 一旦开始，就把 verifier 视为本次 retry pass 的有效问题框定者
-- 保留 analyzer 中仍然成立的发现，除非 verifier 明确提出质疑
-- 当 analyzer claim 与 verifier concern 冲突时，优先采用 verifier 更安全的解释
+- 优先核查 verifier 指出的阻塞问题；当前代码和执行证据决定是否修改 patch，以及如何修改
+- 保留 analyzer 中仍然成立的发现，除非 verifier 指出的阻塞问题或当前代码证据要求修正
+- 修复已确认的问题；否定 verifier 的意见时，应引用直接回应其质疑的代码或执行证据
+- 不因 analyzer 和 verifier 存在分歧而修改 patch；verifier 建议的补丁形式并非强制要求，处理有证据支持的问题时，不应为满足不安全的旧行为预期而削弱安全修复
+- 保留尚未解决的问题，供 retrying verifier 评估；当未解决的证据问题或所需的人工判断决定下一步行动时，verifier 应使用 `manual-review`
 - 把上一次尝试和 verifier feedback 作为修订上下文，但 retry patch 应从 prepared baseline workspace 重新生成，而不是叠加在上一次 patch 之上
 - 上一次 mitigation summary 只用于理解上一次尝试做了什么，不作为 retry patch 的事实源
 - 保持在原 issue、pull request 或 repository case scope 内
