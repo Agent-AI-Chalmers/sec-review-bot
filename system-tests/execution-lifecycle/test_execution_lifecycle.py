@@ -15,6 +15,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
+from project_paths import CONTRACTS_ROOT, REPOSITORY_ROOT, SYSTEM_TESTS_ROOT
 from sec_review_agents.agents.mitigation.model import MitigationOutput
 from sec_review_agents.agents.verification.model import VerificationOutput
 from sec_review_agents.artifacts.materialize import materialize_verified_artifact_file
@@ -37,8 +38,6 @@ from sec_review_agents.workflows.issue.workflow import (
 from sec_review_agents.workflows.review_request import ReviewWorkflowRequest
 from temporalio import activity
 from temporalio.worker import Worker
-
-ROOT = Path(__file__).resolve().parents[1]
 
 
 @activity.defn(name="analyze_issue_activity")
@@ -98,18 +97,18 @@ async def test_execution_completes_and_persists(
         subprocess.run,
         [
             "node",
-            str(ROOT / "system-tests/publish-input.mjs"),
+            str(SYSTEM_TESTS_ROOT / "input-bundle/publish-input.mjs"),
             str(tmp_path / "producer"),
             run_id,
             str(reference),
         ],
-        cwd=ROOT,
+        cwd=REPOSITORY_ROOT,
         check=True,
         timeout=30,
     )
     input_data = json.loads(
         (
-            ROOT / "contracts/execution-api/v1/fixtures/issue-review-input.json"
+            CONTRACTS_ROOT / "execution-api/v1/fixtures/issue-review-input.json"
         ).read_text()
     )
     input_data["input_bundle"] = json.loads(reference.read_text())
@@ -137,8 +136,8 @@ async def test_execution_completes_and_persists(
         ):
             process = await asyncio.create_subprocess_exec(
                 "node",
-                str(ROOT / "system-tests/execution-lifecycle.mjs"),
-                cwd=ROOT,
+                str(SYSTEM_TESTS_ROOT / "execution-lifecycle/execution-lifecycle.mjs"),
+                cwd=REPOSITORY_ROOT,
                 env={
                     **os.environ,
                     "NODE_ENV": "test",

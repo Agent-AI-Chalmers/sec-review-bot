@@ -2,14 +2,14 @@
 import assert from 'node:assert/strict'
 import { readFile, writeFile } from 'node:fs/promises'
 import { setTimeout } from 'node:timers/promises'
-import { createApp } from '../services/execution-gateway/dist/server.js'
-import { TemporalExecutionClient } from '../services/execution-gateway/dist/temporal-execution-client.js'
-import { ReviewRunStore } from '../services/review-runs/dist/persistence/review-run-store.js'
+import { createApp } from '../../services/execution-gateway/dist/server.js'
+import { TemporalExecutionClient } from '../../services/execution-gateway/dist/temporal-execution-client.js'
+import { ReviewRunStore } from '../../services/review-runs/dist/persistence/review-run-store.js'
 import {
   submitExecutionRun,
   getExecutionRunStatus
-} from '../services/review-runs/dist/execution-client.js'
-import { observeExecutionRun } from '../services/review-runs/dist/runtime/terminal-coordination.js'
+} from '../../services/review-runs/dist/execution-client.js'
+import { observeExecutionRun } from '../../services/review-runs/dist/runtime/terminal-coordination.js'
 
 const request = JSON.parse(
   await readFile(process.env.TEST_REQUEST_FILE, 'utf8')

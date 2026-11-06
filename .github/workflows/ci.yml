@@ -283,10 +283,10 @@ jobs:
         run: |
           pnpm --dir apps/github-integration run build
           pnpm --dir services/review-runs run build
-          node --test system-tests/review-runs-http.test.mjs
+          node --test system-tests/review-runs-http/review-runs-http.test.mjs
 
       - name: Test execution submission boundary
-        run: node --test system-tests/execution-submission.test.mjs
+        run: node --test system-tests/execution-submission/execution-submission.test.mjs
 
   github-integration:
     name: GitHub Integration

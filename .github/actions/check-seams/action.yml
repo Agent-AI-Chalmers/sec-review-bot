@@ -57,8 +57,8 @@ runs:
       shell: bash
       run: |
         tests=()
-        if [[ "$CATALOG" == true ]]; then tests+=(system-tests/test_memory_catalog.py); fi
-        if [[ "$INPUT_BUNDLE" == true ]]; then tests+=(system-tests/test_input_bundle.py); fi
-        if [[ "$MEMORY_BFF" == true ]]; then tests+=(system-tests/test_memory_bff.py); fi
+        if [[ "$CATALOG" == true ]]; then tests+=(system-tests/memory-catalog/test_memory_catalog.py); fi
+        if [[ "$INPUT_BUNDLE" == true ]]; then tests+=(system-tests/input-bundle/test_input_bundle.py); fi
+        if [[ "$MEMORY_BFF" == true ]]; then tests+=(system-tests/memory-operator-edit/test_memory_bff.py); fi
         if (( ${#tests[@]} == 0 )); then echo "No seam selected" >&2; exit 1; fi
         uv --project agents run python -m pytest "${tests[@]}" -q --durations=10

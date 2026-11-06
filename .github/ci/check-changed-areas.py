@@ -158,7 +158,7 @@ def check_client_server_seam(areas: dict[str, list[str]]) -> None:
         "apps/github-integration/src/review-runs/client.ts",
         "apps/github-integration/src/review-runs/review-runs-api.ts",
         "services/review-runs/src/http/server-surface.ts",
-        "system-tests/review-runs-http.test.mjs",
+        "system-tests/review-runs-http/review-runs-http.test.mjs",
         "contracts/review-runs-api/v1/openapi.yaml",
     )
     for candidate in seam_paths:
