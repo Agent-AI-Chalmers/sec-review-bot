@@ -53,7 +53,11 @@ Use this format:
 <type>(<optional-scope>): <concise summary>
 ```
 
-Allowed types are `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`, and `ci`. Use a scope only when it identifies the primary owner clearly, and add `!` before the colon for a breaking change.
+Allowed `type` values are `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`, and `ci`.
+
+Use the optional `scope` to name the component being changed: `agents` in `fix(agents): ...`, for example. If no component needs naming, omit it and write `fix: ...`.
+
+Add `!` before the colon for a breaking change.
 
 Examples:
 

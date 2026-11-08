@@ -55,7 +55,11 @@
 <type>(<optional-scope>): <concise summary>
 ```
 
-允许的 type 包括 `feat`、`fix`、`refactor`、`docs`、`test`、`chore`、`build` 和 `ci`。只有 scope 能清楚标识主要所有者时才使用；破坏性变更在冒号前添加 `!`。
+允许的 `type` 包括 `feat`、`fix`、`refactor`、`docs`、`test`、`chore`、`build` 和 `ci`。
+
+如果需要在标题中注明修改的组件，可以填写 `scope`，例如 `fix(agents): ...` 中的 `agents`。不需要注明时就省略，写成 `fix: ...`。
+
+破坏性变更在冒号前添加 `!`。
 
 示例：
 
