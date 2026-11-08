@@ -104,9 +104,32 @@ Additional UI consistency checks:
 - `pnpm run icons:check`: requires browser icons to come from Tabler and use the shared `ICON_SIZE` scale.
 - `pnpm run styles:report`: lists spacing, border-radius, and font-size values written directly in maintained CSS. This is an informational report and does not fail CI.
 
-`pnpm test` runs the Node tests and Vitest React component tests. Component tests use React Testing Library with jsdom for local rendering and interaction behavior. `pnpm run test:e2e` runs desktop and mobile Chrome projects through Playwright Test. Each local worker starts an isolated fixture server on a random port, so stateful flows cannot leak between workers; set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed local port when debugging. Set `CONTROL_PLANE_UI_BASE_URL` to test an already-running external deployment and `CONTROL_PLANE_UI_ACCESS_TOKEN` when that deployment requires sign-in. External-deployment tests are read-only and use one worker to avoid multiplying load and observations against shared data; the single-worker setting is a stability policy, not the write-safety boundary. Browser-only layout, scrolling, minimap, download, and request-race behavior remains in reusable browser flows invoked by Playwright tests, while component behavior is covered by Vitest rather than duplicated in E2E.
+### Test Coverage
 
-The local-fixture browser suite also checks WCAG A/AA violations with axe, including rendered text contrast, and verifies keyboard focus plus disabled/loading control states. Visual tests cover desktop and mobile viewports, light and dark themes, and a stable error state. They compare current screenshots with the baseline images committed to the repository and allow at most 0.1% of pixels to differ. The 0.1% tolerance is a project choice, not a Playwright standard. For an intentional UI change, inspect the new images first; only after confirming the change should you run `pnpm run test:e2e:update-visuals` and commit the updated baselines.
+- `pnpm test`: runs Node tests and React component tests for component rendering and interaction.
+- `pnpm run test:e2e`: runs desktop and mobile Chrome browser tests for layout, scrolling, downloads, and other browser behavior, as well as accessibility and visual checks.
+
+Local browser tests start an isolated fixture server for each Playwright worker on a random port. Set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed port when debugging.
+
+### Test An External Deployment
+
+Set `CONTROL_PLANE_UI_BASE_URL` to an already-running deployment. If sign-in is required, also set `CONTROL_PLANE_UI_ACCESS_TOKEN`.
+
+External-deployment tests are read-only and use a single Playwright worker to reduce load on shared services.
+
+### Accessibility And Visual Checks
+
+Local browser tests use axe to check WCAG A/AA violations and check text contrast, keyboard focus, and disabled and loading control states.
+
+Visual tests cover desktop and mobile viewports, light and dark themes, and error pages. Screenshots are compared with the committed baselines, allowing at most 0.1% of pixels to differ.
+
+For an intentional UI change:
+
+1. Inspect the new screenshots and confirm the changes are expected.
+2. Run `pnpm run test:e2e:update-visuals`.
+3. Commit the updated baseline images with the change.
+
+## Server Configuration And Access Control
 
 The production server requires `REVIEW_RUNS_READ_TOKEN` and `CONTROL_PLANE_UI_ACCESS_TOKEN`, and they answer different questions. The access token decides who may open the console: the browser exchanges it for an HTTP-only session cookie, and the token itself never reaches browser code or Vite variables. The read token is what the backend then uses to call Review Runs query routes on the signed-in user's behalf; it never leaves the server either. Keeping them separate means a console account and a read key can be issued, rotated, and revoked independently — a read-only consumer such as a dashboard holds only the read token and has no console access.
 
@@ -116,12 +139,14 @@ The production server binds to `127.0.0.1` by default. Set `CONTROL_PLANE_UI_HOS
 
 When an HTTPS reverse proxy terminates TLS, set `CONTROL_PLANE_UI_SECURE_COOKIES=true` so session and sign-out cookies carry the `Secure` attribute. Keep the plain HTTP listener unreachable from untrusted networks; the access token is submitted only to `/api/session`, but TLS remains the transport protection for that request.
 
-The BFF also proxies terminal artifact downloads from private RustFS storage. It receives a dedicated `s3:GetObject` credential restricted to `sec-review/runs/*/artifacts/*`; the browser supplies only a run ID and never receives storage credentials or an object URI. Before responding to the browser, the BFF writes the object to a temporary file and verifies its size and SHA-256 digest against Review Runs metadata. Downloads are attachment-only, subject to a storage idle timeout, and protected by the same HTTP-only session.
+The BFF also proxies diagnostic artifact downloads from private RustFS storage. It receives a dedicated `s3:GetObject` credential restricted to `sec-review/runs/*/artifacts/*`; the browser supplies only a run ID and never receives storage credentials or an object URI. Before responding to the browser, the BFF writes the object to a temporary file and verifies its size and SHA-256 digest against Review Runs metadata. Downloads are attachment-only, subject to a storage idle timeout, and protected by the same HTTP-only session.
+
+## Memory Management
 
 The server-side memory tree reader and builder implement the versioned [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.md). They remain outside the browser bundle; the BFF is responsible for validation, digest calculation, and canonical object keys.
 
-Set `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_OPERATOR_TOKEN` to enable memory management. The BFF strips storage URIs from Catalog JSON, fetches artifacts itself, and verifies their size and SHA-256 digest before returning content or downloads.
+Set `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_OPERATOR_TOKEN` to manage memory in the console: pause or resume automatic maintenance, edit the active memory tree, and restore an existing revision.
 
-The authenticated control plane can pause or resume maintenance, edit the active memory tree, and restore an existing revision. The BFF derives actor identity server-side and uses expected-active-revision and control-generation compare-and-swap. Its S3 identity can create immutable objects only under `memory/trees/*`; run artifacts and memory trajectories remain read-only. A failed edit or restore does not resume maintenance automatically.
+The BFF accesses Catalog and object storage and verifies artifact size and SHA-256 digest before returning artifacts. The browser receives no storage URIs or credentials.
 
-Memory edits reserve the complete revision intent in Catalog before the BFF uploads the tree, confirm it after the immutable upload, and then commit it. Retrying unchanged content within an open editor reuses the operation ID and original expected revision, including after a lost response. Closing or reloading the editor starts a new edit operation. Concurrent identical S3 uploads reuse the verified winning object.
+After an edit fails, keeping the editor open with unchanged content allows retries of the same operation using the original operation ID. Closing or reloading the editor starts a new operation. Failed edits or restores do not automatically resume memory maintenance.
