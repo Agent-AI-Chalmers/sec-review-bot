@@ -155,7 +155,7 @@ sudo cloudflared service uninstall
 - You changed App permissions, but the installation has not been re-approved.
 - The webhook secret does not match local configuration.
 - The webhook URL is correct, but the local forwarding tool is not running.
-- Cloudflare Tunnel only routes `/api/webhook`, so repository review dispatch requests return `404`.
+- Cloudflare Tunnel only routes `/api/webhook`, so repository review requests from GitHub Actions return `404`.
 - You think you are listening on a public address, but the local service is not listening on the expected port.
 - The App lacks enough `Pull requests`, `Issues`, or `Contents` permissions, so later write-back fails.
 

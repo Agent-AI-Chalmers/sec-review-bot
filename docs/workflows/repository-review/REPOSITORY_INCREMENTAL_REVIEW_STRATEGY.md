@@ -55,7 +55,7 @@ Scan mode has two values:
 - `full`: repository-level full scan, the existing behavior.
 - `incremental`: incremental scan based on `base..head`.
 
-Dispatch payload introduces:
+Repository review requests include:
 
 - `scan_mode`: `"full" | "incremental"`
 - `base_sha`: string, incremental window start commit boundary
@@ -140,9 +140,9 @@ Reasons:
 ### Scheduled vs Manual Window Semantics
 
 - `schedule` (scheduled incremental):
-  - the caller sends `target_branch` and the cron `schedule` to the GitHub integration HTTP dispatch endpoint;
-  - the App dispatch resolver resolves `head_sha` from `target_branch`;
-  - the App dispatch resolver computes `base_sha` by looking back roughly one schedule interval and selecting the latest commit before that cutoff;
+  - GitHub Actions submits `target_branch` and the cron `schedule` to the GitHub Integration repository review HTTP endpoint;
+  - GitHub Integration resolves `head_sha` from `target_branch`;
+  - GitHub Integration computes `base_sha` by looking back roughly one schedule interval and selecting the latest commit before that cutoff;
   - actual scan window is `base_sha..head_sha`.
 - `manual` (manual incremental):
   - caller must explicitly specify `base_sha`; `head_sha` may be omitted;

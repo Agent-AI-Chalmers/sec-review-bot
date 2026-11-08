@@ -4,13 +4,13 @@
 
 本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-这个 package 是项目里的 GitHub integration service。
+本包实现 GitHub Integration。
 
-它不直接执行 agent workflow；它负责准备输入，通过 Review Runs 提交和观察 review run，并把终态结果发布回 GitHub。
+它负责准备输入，通过 Review Runs 提交和观察审查任务，并把终态结果发布回 GitHub。
 
 ## 安装
 
-本地开发时，在仓库根目录安装 Review Runs 服务和 integration 的依赖：
+本地开发时，在仓库根目录安装 Review Runs 服务和集成服务的依赖：
 
 ```bash
 pnpm install --frozen-lockfile
@@ -27,7 +27,7 @@ pnpm run build
 pnpm test
 ```
 
-`pnpm test` 运行不依赖外部服务的测试。集成测试使用 Review Runs 测试数据库验证 publisher 边界：
+`pnpm test` 运行不依赖外部服务的测试。集成测试使用 Review Runs 测试数据库验证发布组件边界：
 
 ```bash
 TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
@@ -36,14 +36,14 @@ pnpm run test:integration
 
 ## 本地接收端
 
-完整 review 还需要 execution gateway 和 worker。要在本地跑完整链路，请使用仓库级 Docker Compose 部署。下面的命令只启动 GitHub integration service。
+完整审查还需要 Execution Gateway 和 Execution Worker。要在本地跑完整链路，请使用仓库级 Docker Compose 部署。下面的命令只启动 GitHub Integration。
 
 非 Compose 启动时，先按 `apps/github-integration/.env.sample` 填好 `apps/github-integration/.env`；至少需要设置 `APP_ID`、`PRIVATE_KEY_PATH`、`WEBHOOK_SECRET`、`REVIEW_RUNS_SERVICE_URL` 和 `REVIEW_RUNS_SERVICE_TOKEN`。
 
-使用 `SEC_REVIEW_ARTIFACT_STORE=s3` 时，需要配置 bucket 和 AWS credentials。AWS 可以省略 `SEC_REVIEW_ARTIFACT_S3_ENDPOINT`，自定义 S3-compatible endpoint 则需要设置它。`SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` 接受 `auto`（默认）、`path` 或 `virtual`；本地 RustFS 部署使用 `path`。该传输配置不会改变提交的 `s3://bucket/key` artifact reference。
+使用 `SEC_REVIEW_ARTIFACT_STORE=s3` 时，需要配置存储桶和 AWS 凭据。AWS 可以省略 `SEC_REVIEW_ARTIFACT_S3_ENDPOINT`，自定义 S3-compatible 接口地址则需要设置它。`SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` 接受 `auto`（默认）、`path` 或 `virtual`；本地 RustFS 部署使用 `path`。该传输配置不会改变提交的 `s3://bucket/key` 产物引用。
 
 <!-- doc-default: REVIEW_RUNS_REQUEST_TIMEOUT_MS; source=apps/github-integration/src/review-runs/client.ts -->
-`REVIEW_RUNS_REQUEST_TIMEOUT_MS` 限制每次 Review Runs 请求的最长等待时间，默认 30 秒。publication lease 续租失败或超时会被视为 ownership 已丢失：publisher 不再启动新的 GitHub mutation，而是等待 lease takeover 恢复。
+`REVIEW_RUNS_REQUEST_TIMEOUT_MS` 限制每次 Review Runs 请求的最长等待时间，默认 30 秒。发布租约续租失败或超时会被视为持有任务的资格已丢失：发布组件不再启动新的 GitHub 写操作，而是等待租约接管恢复。
 
 ```bash
 pnpm run server
@@ -72,22 +72,21 @@ GitHub 参考：
 
 - GitHub App quickstart:
   - <https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/quickstart>
-- GitHub webhook app guide:
+- GitHub Webhook app guide:
   - <https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/building-a-github-app-that-responds-to-webhook-events>
 
 如果你已经有域名，也可以用 Cloudflare Tunnel 把公网地址转到本地服务。
 
-GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 入站设置](../../docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
+GitHub App Webhook 和 GitHub Actions 仓库审查请求的本地转发说明见 [本地 GitHub 入站设置](../../docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
 ## 职责
 
 - 读取 GitHub App 元信息与 installation 身份
 
-- 接收 GitHub webhook
-- 接收 GitHub Actions 发起、通过 OIDC 鉴权的 HTTP dispatch
+- 接收 GitHub Webhook
+- 接收 GitHub Actions 发起的仓库审查 HTTP 请求，并通过 OIDC 验证身份
 
-- 准备 issue / pull request review input
-- 准备 repository review input
+- 准备 Issue、PR 和仓库审查输入
 
 - 向 Review Runs 提交已准备的输入并领取发布任务
 - 把结构化结果发布回 GitHub
@@ -136,27 +135,27 @@ sec_review_bot:
 
 配置含义如下：
 
-- `trigger_mode: manual_only`：自动对象事件会被接收后跳过，只有仓库 `write`、`maintain` 或 `admin` 用户在 comment 中显式写出对应手动命令才会触发 workflow。
-- `trigger_mode: automatic`：危险模式。`pull_request.opened`、`pull_request.ready_for_review`、`issues.opened` 等事件会为任意作者触发 workflow，包括没有仓库写权限的用户。它无需维护者确认就可能消耗 Execution Worker / LLM 资源。
+- `trigger_mode: manual_only`：自动对象事件会被接收后跳过，只有仓库 `write`、`maintain` 或 `admin` 用户在评论中显式写出对应手动命令才会触发工作流。
+- `trigger_mode: automatic`：危险模式。`pull_request.opened`、`pull_request.ready_for_review`、`issues.opened` 等事件会为任意作者触发工作流，包括没有仓库写权限的用户。它无需维护者确认就可能消耗 Execution Worker / LLM 资源。
 
 说明：
 
-- [`.github/workflows/sec-review-bot.yml`](../../.github/workflows/sec-review-bot.yml) 只包含 GitHub Actions 调度；bot 运行配置属于 `.sec-review/config.yml`。
+- [`.github/workflows/sec-review-bot.yml`](../../.github/workflows/sec-review-bot.yml) 定义 GitHub Actions 如何发起仓库审查请求；bot 运行配置属于 `.sec-review/config.yml`。
 - 如果 [`.sec-review/config.yml`](../../.sec-review/config.yml) 文件不存在，默认行为是 `trigger_mode: manual_only`。
-- 如果配置文件存在但 YAML 非法、缺少 `sec_review_bot.trigger_mode` 或值不在允许集合内，自动 webhook 会严格报错并失败（不会静默降级）。
-- `paths_ignore` 仅影响 repository-review 的 discovery 文件扫描；不影响 PR/Issue webhook 触发判定本身。
+- 如果配置文件存在但 YAML 非法、缺少 `sec_review_bot.trigger_mode` 或值不在允许集合内，自动 Webhook 会严格报错并失败（不会静默降级）。
+- `paths_ignore` 仅影响 repository-review 的 Discovery 文件扫描；不影响 PR/Issue Webhook 触发判定本身。
 - 配置始终从**默认分支**读取（经 GitHub API 解析），绝不来自 PR base ref 或 repository-review 的 `target_branch`。因此扫描非默认分支时，使用的是默认分支的 `trigger_mode` / `paths_ignore`。
-- 仓库配置不支持选择 workspace image。GitHub App 不会从 `.sec-review/config.yml` 解析 image 配置字段。
+- 仓库配置不支持选择工作区镜像。GitHub App 不会从 `.sec-review/config.yml` 解析 image 配置字段。
 
-仓库还可以用 [`.sec-review/setup.yml`](../../.sec-review/setup.yml) 声明如何为 agent 准备依赖齐全的环境。GitHub integration 会在提交运行前从默认分支读取并校验该声明；其格式由 [setup declaration 契约](../../contracts/setup-declaration/README.zh.md) 定义，设计缘由见 [Trusted Setup](../../docs/workflows/TRUSTED_SETUP.zh.md)。
+仓库还可以用 [`.sec-review/setup.yml`](../../.sec-review/setup.yml) 声明如何为 Agent 准备依赖齐全的环境。GitHub Integration 会在提交运行前从默认分支读取并校验该声明；其格式由 [setup declaration 契约](../../contracts/setup-declaration/README.zh.md) 定义，设计缘由见 [Trusted Setup](../../docs/workflows/TRUSTED_SETUP.zh.md)。
 
 ### 手动命令
 
-这里的 `<app-slug>` 不是字面量占位符，而是这只 GitHub App 在 GitHub 上注册的实际 slug。假设 app slug 是 `web-sec-bot`，那么 comment 里的实际写法就是 `@web-sec-bot review`。
+这里的 `<app-slug>` 不是字面量占位符，而是这只 GitHub App 在 GitHub 上注册的实际 slug。假设 app slug 是 `web-sec-bot`，那么评论里的实际写法就是 `@web-sec-bot review`。
 
 本 app 只回应自己名字的两种拼写：裸 slug，以及 GitHub 分配的 bot login `@<app-slug>[bot]`。它刻意不去猜测 `@<app-slug>-bot` 这类近似写法，因为那样的名字可能属于另一个账号。其他写法都视为普通对话，不做处理。
 
-issue 与 PR conversation comment 共用同一套命令语法；下面的参数在两种场景下解析方式一致，对当前目标没有意义的参数会被忽略（每个参数下已注明）：
+Issue 和 PR 页面的评论共用同一套命令语法；下面的参数在两种场景下解析方式一致，对当前目标没有意义的参数会被忽略（每个参数下已注明）：
 
 ```text
 @<app-slug> review
@@ -164,23 +163,23 @@ issue 与 PR conversation comment 共用同一套命令语法；下面的参数�
 @<app-slug> review --open-pr
 ```
 
-- `review`：触发一次 review；若产生最终 patch，默认允许其中包含合理的测试改动。
-- `--test-changes allow|deny`：最终 mitigation patch 是否允许包含测试改动。`deny` 表示不得包含测试改动；测试只能作为临时验证手段。不带该参数时 Execution Worker 使用 `allow`。
+- `review`：触发一次 review；若产生最终补丁，默认允许其中包含合理的测试改动。
+- `--test-changes allow|deny`：最终修复补丁是否允许包含测试改动。`deny` 表示不得包含测试改动；测试只能作为临时验证手段。不带该参数时 Execution Worker 使用 `allow`。
 - `--open-pr`：仅适用于 Issue 审查。指定此参数且补丁符合发布条件时，允许创建 draft PR；不指定时，补丁只展示在原 Issue 的审查结果评论中。`issues.opened` 自动触发的审查不会创建 draft PR。
 
 各参数与顺序无关，可组合使用。没有 objective 参数：GitHub 侧一律以 `audit` 模式审查。
 
 ### 仓库级 Actions 触发
 
-仓库级 review 通过 [`.github/workflows/sec-review-bot.yml`](../../.github/workflows/sec-review-bot.yml) 的 `workflow_dispatch` 或 `schedule` 触发，不使用 comment 命令。
+仓库级 review 通过 [`.github/workflows/sec-review-bot.yml`](../../.github/workflows/sec-review-bot.yml) 的 `workflow_dispatch` 或 `schedule` 触发，不使用评论命令。
 
 ![GitHub Actions repository review workflow dispatch form](../../assets/screenshots/github-actions-repository-review-dispatch.png)
 
 目标仓库必须配置这些 Actions secrets：
 
-- `SEC_BOT_DISPATCH_URL`：App dispatch endpoint 的完整公网 HTTPS URL，例如 `https://your-bot-dev.example.com/api/repository-review/dispatch`
+- `SEC_BOT_DISPATCH_URL`：GitHub Actions 提交仓库审查请求的公网 HTTPS 地址，例如 `https://your-bot-dev.example.com/api/repository-review/dispatch`
 
-Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id-token: write`，token audience 固定为 `sec-review-bot`。
+GitHub Actions 提交仓库审查请求时使用 OIDC 验证身份。工作流必须授予 `id-token: write`，token audience 固定为 `sec-review-bot`。
 
 手动 `workflow_dispatch` 支持：
 
@@ -189,7 +188,7 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 - `head_sha`：手动增量扫描可选，默认当前分支 HEAD
 - `test_changes`：`allow` 或 `deny`
 
-`test_changes=deny` 表示仓库级扫描生成的最终 mitigation patch 不得包含测试改动；测试仍可作为临时验证手段。`schedule` 触发不带手动 input 时使用默认值（`allow`）。
+`test_changes=deny` 表示仓库级扫描生成的最终修复补丁不得包含测试改动；测试仍可作为临时验证手段。`schedule` 触发不带手动输入时使用默认值（`allow`）。
 
 `schedule` 触发默认按 incremental scan 处理，并由 App 侧根据 cron 推导扫描窗口；手动 incremental 必须显式提供 `base_sha`。
 
@@ -197,7 +196,7 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 
 补充说明：
 
-- 手动命令接受普通 issue comment 和 pull request 页面 Conversation 标签下的 comment。
+- 手动命令接受普通 issue 评论和 pull request 页面 Conversation 标签下的评论。
 - Files changed 页面里的评论和通过 Submit review 提交的 review 评论不属于受支持的命令入口。
 
 ## GitHub REST API 版本
@@ -208,8 +207,8 @@ Repository-level dispatch 使用 GitHub Actions OIDC。workflow 必须授予 `id
 
 ## Bot 自身事件与发布边界
 
-Bot 自己创建的 comment、PR 或 push 可能会再次触发 webhook，形成自循环。系统在 webhook 入口检查 sender 是否为 Bot，命中后直接跳过，只跳过本 App 自己发出的回流事件。当 App 自身的 login 未知时，该守卫会跳过所有 Bot 事件（无法区分自己与别人）；服务在该状态下拒绝启动，因此这只会影响绕过启动流程的调用方。
+Bot 自己创建的评论、PR 或 push 可能会再次触发 Webhook，形成自循环。系统在 Webhook 入口检查 sender 是否为 Bot，命中后直接跳过，只跳过本 App 自己发出的回流事件。当 App 自身的 login 未知时，该守卫会跳过所有 Bot 事件（无法区分自己与别人）；服务在该状态下拒绝启动，因此这只会影响绕过启动流程的调用方。
 
-手动 comment 命令解析也会忽略 Markdown blockquote 行，所以在回复里引用旧 bot 命令不会再次触发；新的命令必须写在引用文本之外。
+手动评论命令解析也会忽略 Markdown blockquote 行，所以在回复里引用旧 bot 命令不会再次触发；新的命令必须写在引用文本之外。
 
-发布阶段也有一个相关边界：如果 PR 作者是当前 App bot，App 会发布普通 review comment，而不是给自己的 PR 创建 `APPROVE` 或 `REQUEST_CHANGES` reviewer state。该判断复用与自循环守卫相同的归属函数，因此 App 自身 login 未知时发布会 fail closed，而不是猜测。如果 GitHub 仍然以 own-PR review 拒绝 approval，publisher 会降级为普通 review comment。
+发布阶段也有一个相关边界：如果 PR 作者是当前 App bot，App 会发布普通 review 评论，而不是给自己的 PR 创建 `APPROVE` 或 `REQUEST_CHANGES` reviewer state。该判断复用与自循环守卫相同的归属函数，因此 App 自身 login 未知时发布会 fail closed，而不是猜测。如果 GitHub 仍然以 own-PR review 拒绝 approval，发布组件会降级为普通 review 评论。

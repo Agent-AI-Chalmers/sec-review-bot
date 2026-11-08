@@ -57,7 +57,7 @@ case 的边界并不完美：`src/`、`config/`、根目录这类宽目录可能
 - `full`：仓库级全量扫描（现有行为）。
 - `incremental`：基于 `base..head` 的增量扫描。
 
-在 dispatch payload 中引入：
+仓库审查请求包含以下字段：
 
 - `scan_mode`: `"full" | "incremental"`
 - `base_sha`: string，增量窗口起点 commit（边界）
@@ -142,9 +142,9 @@ discovery 不做任何窗口判断。它拿到的是整文件，报的是文件�
 ### 定时与手动的窗口语义
 
 - `schedule`（定时增量）：
-  - 调用方把 `target_branch` 和 cron `schedule` 发给 GitHub integration HTTP dispatch endpoint；
-  - App dispatch resolver 从 `target_branch` 解析 `head_sha`；
-  - App dispatch resolver 按 schedule 周期大致回推一个窗口，并选择 cutoff 之前最近的 commit 作为 `base_sha`；
+  - GitHub Actions 将 `target_branch` 和 cron `schedule` 提交给 GitHub Integration 的仓库审查 HTTP 接口；
+  - GitHub Integration 从 `target_branch` 解析 `head_sha`；
+  - GitHub Integration 按 `schedule` 周期大致回推一个窗口，并选择截止时间之前最近的提交作为 `base_sha`；
   - 实际扫描窗口为 `base_sha..head_sha`。
 - `manual`（手动增量）：
   - 调用方必须显式指定 `base_sha`（`head_sha` 可省略）；

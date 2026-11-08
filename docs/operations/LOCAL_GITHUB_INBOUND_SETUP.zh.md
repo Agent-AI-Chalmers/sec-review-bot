@@ -154,7 +154,7 @@ sudo cloudflared service uninstall
 - 你改了 App 权限，但 installation 还没重新批准
 - webhook secret 和本地配置不一致
 - webhook URL 填对了，但本地转发工具没在跑
-- Cloudflare Tunnel 只配置了 `/api/webhook`，导致 repository review dispatch 返回 `404`
+- Cloudflare Tunnel 只配置了 `/api/webhook`，导致 GitHub Actions 发起的仓库审查请求返回 `404`
 - 你以为自己在监听公网地址，其实本地服务没有监听对应端口
 - App 没有 `Pull requests`、`Issues` 或 `Contents` 的足够权限，导致后续回写失败
 

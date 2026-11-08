@@ -4,7 +4,7 @@ Language: English | [中文](README.zh.md)
 
 This package contains the GitHub integration service for the project.
 
-It does not execute agent workflows directly. It prepares inputs, submits and observes review runs through Review Runs, and publishes terminal results back to GitHub.
+It prepares inputs, submits and observes review runs through Review Runs, and publishes terminal results back to GitHub.
 
 ## Setup
 
@@ -75,17 +75,16 @@ GitHub references:
 
 If you already have a domain, you can also use Cloudflare Tunnel to route a public address to the local service.
 
-For local GitHub App webhook and Actions dispatch routing, see the [local GitHub inbound setup guide](../../docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md).
+For local GitHub App webhook routing and repository review requests from GitHub Actions, see the [local GitHub inbound setup guide](../../docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md).
 
 ## Role
 
 - Read GitHub App metadata and installation identity
 
 - Receive GitHub webhooks
-- Receive OIDC-authenticated HTTP dispatches initiated by GitHub Actions
+- Receive repository review HTTP requests from GitHub Actions and authenticate them with OIDC
 
-- Prepare issue / pull request review input
-- Prepare repository review input
+- Prepare issue, pull request, and repository review inputs
 
 - Submit prepared inputs to Review Runs and claim publication work
 - Publish structured results back to GitHub
@@ -176,9 +175,9 @@ Repository-level review is triggered through [`.github/workflows/sec-review-bot.
 
 The target repository must configure these Actions secrets:
 
-- `SEC_BOT_DISPATCH_URL`: the full public HTTPS URL for the App dispatch endpoint, for example `https://your-bot-dev.example.com/api/repository-review/dispatch`
+- `SEC_BOT_DISPATCH_URL`: the public HTTPS URL where GitHub Actions submits repository review requests, for example `https://your-bot-dev.example.com/api/repository-review/dispatch`
 
-Repository-level dispatch uses GitHub Actions OIDC. The workflow must grant `id-token: write`, and the token audience is fixed to `sec-review-bot`.
+GitHub Actions authenticates repository review requests with OIDC. The workflow must grant `id-token: write`, and the token audience is fixed to `sec-review-bot`.
 
 Manual `workflow_dispatch` supports:
 
