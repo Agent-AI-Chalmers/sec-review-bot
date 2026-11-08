@@ -16,4 +16,6 @@ Execution Gateway produces this value when it starts `execution-workflow`. Execu
 
 ## Enforcement
 
-Execution Gateway validates with Ajv. Execution Worker preserves the raw Temporal mapping through workflow deserialization, then validates it with `jsonschema` at the start of its input-preparation activity before projecting it into `ExecutionWorkflowInput`. The activity uses a worker-owned preparation timeout rather than the unvalidated request timeout. Both test suites execute every case listed in the fixture manifest. The manifest must cover every JSON fixture in the directory, so adding a boundary case requires both implementations to agree on it.
+Execution Gateway validates with Ajv. Execution Worker keeps the raw Temporal mapping during workflow deserialization, validates it with `jsonschema` at the start of input preparation, then converts it to `ExecutionWorkflowInput`. Preparation uses the worker's configured timeout rather than an unvalidated request timeout.
+
+Both implementations test every fixture listed in the manifest, which must cover every JSON fixture in the directory. New cases must be accepted or rejected consistently by both implementations.
