@@ -67,6 +67,6 @@ When reviewing maintained documentation:
 1. Remove unnecessary counts and check that examples are not presented as a complete list.
 2. Keep defaults, limits, dates, and measurement results that readers need to configure, operate, or understand the system.
 3. Add or update source markers for information that may change, and check the cited sources.
-4. Check that absolute language is backed by an enforceable boundary.
+4. Check statements about system behavior against the implementation and relevant contracts.
 5. Keep English and Chinese documents consistent in meaning, heading structure, and source markers.
 6. Run the documentation checks listed in `AGENTS.md`.
