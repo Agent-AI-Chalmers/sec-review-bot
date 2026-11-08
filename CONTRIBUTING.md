@@ -39,7 +39,7 @@ Run checks from every affected package, not only from the package where the firs
 | Control Plane UI | [`apps/control-plane-ui/README.md`](apps/control-plane-ui/README.md) | format, lint, typecheck, tests, build, browser smoke test for user-visible flows |
 | Execution Gateway | [`services/execution-gateway/README.md`](services/execution-gateway/README.md) | format, lint, typecheck, tests, Temporal integration tests |
 | Memory Catalog Server | [`services/memory-catalog/README.md`](services/memory-catalog/README.md) | format, lint, typecheck, tests, PostgreSQL integration tests |
-| Execution submission system path | [`system-tests/README.md`](system-tests/README.md) | Review Runs client, Execution Gateway HTTP, and Temporal system test |
+| Cross-service system tests | [`system-tests/README.md`](system-tests/README.md) | Run the system tests relevant to the affected services and data flows |
 | Repository scripts | [`scripts/README.md`](scripts/README.md) | Ruff, Black, Python syntax checks; check the changed scripts as appropriate, for example with `--help` or test inputs |
 | Documentation | [`docs/DOCUMENTATION_GUIDE.md`](docs/DOCUMENTATION_GUIDE.md) and [`docs/README.md`](docs/README.md) | As applicable, check that local links work, prose paragraphs remain unwrapped as required, and English/Chinese heading structures match |
 
