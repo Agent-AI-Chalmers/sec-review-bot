@@ -91,12 +91,14 @@ For local GitHub App webhook and Actions dispatch routing, see the [local GitHub
 
 ## Layout
 
+The paths below are relative to `src/`.
+
 - `reviews/` - input preparation, submission, publishing, and rendering for review workflows
   - `reviews/issues/` - issue review
   - `reviews/pull-requests/` - pull request review and suggestion comments
   - `reviews/repositories/` - repository review, summary issue, and repair draft PR
 - `github/` - thin GitHub API wrappers and webhook helpers
-- `services/review-runs/` - Review Runs client, claim handling, and publication coordination
+- `review-runs/` - Client-side code through which GitHub Integration communicates and works with the Review Runs service
 - `execution/` - Execution input, result, and error contracts consumed by this connector
 - `artifacts/` - input bundle storage and Git workspace preparation
 - `ingress/` - inbound HTTP, GitHub Actions, and GitHub webhook handling

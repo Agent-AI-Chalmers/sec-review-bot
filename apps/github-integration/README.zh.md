@@ -93,12 +93,14 @@ GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 
 
 ## 目录
 
+以下路径均相对于 `src/`。
+
 - `reviews/` - 各类 review workflow 的输入准备、提交、发布与渲染
   - `reviews/issues/` - issue review
   - `reviews/pull-requests/` - PR review、建议评论
   - `reviews/repositories/` - repository review、摘要 issue 与修复 draft PR
 - `github/` - GitHub API 薄封装和 webhook 辅助函数
-- `services/review-runs/` - Review Runs client、claim 处理与发布协调
+- `review-runs/` - GitHub Integration 与 Review Runs 服务通信、协作所用的客户端代码
 - `execution/` - 此 connector 消费的 Execution input、result 与错误契约
 - `artifacts/` - input bundle 存储与 Git workspace 准备
 - `ingress/` - HTTP、GitHub Actions 和 GitHub webhook 的入站处理
