@@ -65,30 +65,30 @@ The main public workflow IDs are `issue-review`, `pull-request-review`, and `rep
 
 #### Shared Review Rules
 
-- [CONCURRENCY_MODEL](workflows/CONCURRENCY_MODEL.md): Workflow concurrency model.
-- [NARRATIVE_FIRST_REVIEW](workflows/NARRATIVE_FIRST_REVIEW.md): Narrative-first analyzer output discipline.
-- [REVIEW_INTENT](workflows/REVIEW_INTENT.md): Review intent and repair-stage constraints.
-- [BOUNDED_VERIFIER_FEEDBACK_RETRY](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.md): Bounded verifier feedback retry.
-- [TRUSTED_SETUP](workflows/TRUSTED_SETUP.md): Why setup declarations are shaped this way — the trust question, the constraints it yields, the decisions beyond trust, and the invariants.
+- [CONCURRENCY_MODEL](workflows/CONCURRENCY_MODEL.md): How workflows control concurrency.
+- [NARRATIVE_FIRST_REVIEW](workflows/NARRATIVE_FIRST_REVIEW.md): Why reviews start from evidence-backed narratives rather than vulnerability labels, and how Analyzer, Mitigator, and Verifier use them.
+- [REVIEW_INTENT](workflows/REVIEW_INTENT.md): How `review_intent` specifies the review objective and constrains test changes in the final patch.
+- [BOUNDED_VERIFIER_FEEDBACK_RETRY](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.md): When Verifier feedback calls for another mitigation-and-verification round, what context is passed, and how retries are bounded.
+- [TRUSTED_SETUP](workflows/TRUSTED_SETUP.md): Why setup steps come from the default branch, when fork reviews need approval, and how those steps run in sandboxes.
 
 #### Issue Review
 
-- [INPUT_PREANALYSIS](workflows/issue-review/INPUT_PREANALYSIS.md): Issue input pre-analysis.
+- [INPUT_PREANALYSIS](workflows/issue-review/INPUT_PREANALYSIS.md): How to investigate issue reports without accepting claims too early or expanding the investigation without a question.
 
 #### Pull Request Review
 
-- [REVIEW_WINDOW_CONTRACT](workflows/pull-request-review/REVIEW_WINDOW_CONTRACT.md): Review window semantics for `synchronize`, measured GitHub API behavior, and the contract that keeps changed files, patch, and suggestion anchoring on one window.
-- [SUGGESTION_COMMENT_DESIGN](workflows/pull-request-review/SUGGESTION_COMMENT_DESIGN.md): PR suggestion comment mapping rules.
+- [REVIEW_WINDOW_CONTRACT](workflows/pull-request-review/REVIEW_WINDOW_CONTRACT.md): How changed files, patches, and inline suggestions use the same PR review window.
+- [SUGGESTION_COMMENT_DESIGN](workflows/pull-request-review/SUGGESTION_COMMENT_DESIGN.md): How mitigation patches are mapped to GitHub PR review comments containing suggestion blocks.
 
 #### Repository Review
 
-- [REPOSITORY_REVIEW_STRATEGY](workflows/repository-review/REPOSITORY_REVIEW_STRATEGY.md): Repository review strategy and delivery boundaries.
-- [DISCOVERY_AGENT_DESIGN](workflows/repository-review/DISCOVERY_AGENT_DESIGN.md): Discovery agent responsibilities, file selection, chunking, and resource boundaries.
-- [REPOSITORY_INCREMENTAL_REVIEW_STRATEGY](workflows/repository-review/REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.md): Incremental review strategy.
-- [TRIAGE_BOUNDARIES](workflows/repository-review/TRIAGE_BOUNDARIES.md): Triage boundaries.
+- [REPOSITORY_REVIEW_STRATEGY](workflows/repository-review/REPOSITORY_REVIEW_STRATEGY.md): Repository review stages and how repairs are organized for delivery.
+- [DISCOVERY_AGENT_DESIGN](workflows/repository-review/DISCOVERY_AGENT_DESIGN.md): Discovery agent responsibilities, file selection, chunking, and resource limits.
+- [REPOSITORY_INCREMENTAL_REVIEW_STRATEGY](workflows/repository-review/REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.md): How incremental reviews select files, handle deletions, and define the review window.
+- [TRIAGE_BOUNDARIES](workflows/repository-review/TRIAGE_BOUNDARIES.md): When triage retains, merges, or excludes candidate findings.
 - [AGENT_PARTITION_WORKBENCH](workflows/repository-review/AGENT_PARTITION_WORKBENCH.md): Agent-edited partition workbench.
 - [CVSSV4](workflows/repository-review/CVSSV4.md): CVSS v4 scoring.
-- [CONCURRENCY_AND_FAILURES](workflows/repository-review/CONCURRENCY_AND_FAILURES.md): Repository review concurrency and failure boundaries.
+- [CONCURRENCY_AND_FAILURES](workflows/repository-review/CONCURRENCY_AND_FAILURES.md): How repository reviews run concurrently and which tasks are affected by local failures.
 
 ### Operations
 

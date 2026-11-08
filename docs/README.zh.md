@@ -67,30 +67,30 @@
 
 #### 通用审查规则
 
-- [CONCURRENCY_MODEL](workflows/CONCURRENCY_MODEL.zh.md)：Workflow 并发模型。
-- [NARRATIVE_FIRST_REVIEW](workflows/NARRATIVE_FIRST_REVIEW.zh.md)：Narrative-first analyzer 输出纪律。
-- [REVIEW_INTENT](workflows/REVIEW_INTENT.zh.md)：Review intent 和修复阶段约束。
-- [BOUNDED_VERIFIER_FEEDBACK_RETRY](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.zh.md)：Verifier 反馈的有界重试。
-- [TRUSTED_SETUP](workflows/TRUSTED_SETUP.zh.md)：设置声明为何是这样——信任问题、它推出的约束、与信任无关的决定，以及不变量。
+- [CONCURRENCY_MODEL](workflows/CONCURRENCY_MODEL.zh.md)：工作流如何控制并发。
+- [NARRATIVE_FIRST_REVIEW](workflows/NARRATIVE_FIRST_REVIEW.zh.md)：为什么以叙事（narrative）为先，围绕叙事组织证据和结论，再判断漏洞类型，以及 Analyzer、Mitigator 和 Verifier 如何使用这些叙事。
+- [REVIEW_INTENT](workflows/REVIEW_INTENT.zh.md)：`review_intent` 如何指定审查目标，并约束最终补丁中的测试改动。
+- [BOUNDED_VERIFIER_FEEDBACK_RETRY](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.zh.md)：何时根据 Verifier 的反馈重新执行修复和验证、重试时传递哪些上下文，以及如何限制重试次数。
+- [TRUSTED_SETUP](workflows/TRUSTED_SETUP.zh.md)：为什么从默认分支读取环境准备步骤、审查 fork PR 时为何需要授权，以及这些步骤如何在沙箱中执行。
 
 #### Issue 审查
 
-- [INPUT_PREANALYSIS](workflows/issue-review/INPUT_PREANALYSIS.zh.md)：Issue input 的预分析。
+- [INPUT_PREANALYSIS](workflows/issue-review/INPUT_PREANALYSIS.zh.md)：如何根据 Issue 中的线索开始调查，避免过早相信报告或无目的地扩大调查范围。
 
 #### PR 审查
 
-- [REVIEW_WINDOW_CONTRACT](workflows/pull-request-review/REVIEW_WINDOW_CONTRACT.zh.md)：`synchronize` 的审查窗口语义、实测的 GitHub API 行为，以及让 changed files、patch 与 suggestion 锚定共用同一窗口的契约。
-- [SUGGESTION_COMMENT_DESIGN](workflows/pull-request-review/SUGGESTION_COMMENT_DESIGN.zh.md)：PR suggestion comment 映射规则。
+- [REVIEW_WINDOW_CONTRACT](workflows/pull-request-review/REVIEW_WINDOW_CONTRACT.zh.md)：变更文件列表、补丁和行内修改建议如何使用同一 PR 审查窗口。
+- [SUGGESTION_COMMENT_DESIGN](workflows/pull-request-review/SUGGESTION_COMMENT_DESIGN.zh.md)：如何将修复补丁映射为 GitHub PR review comment 中的 suggestion 代码块。
 
 #### 仓库审查
 
-- [REPOSITORY_REVIEW_STRATEGY](workflows/repository-review/REPOSITORY_REVIEW_STRATEGY.zh.md)：Repository review 策略和 delivery 边界。
-- [DISCOVERY_AGENT_DESIGN](workflows/repository-review/DISCOVERY_AGENT_DESIGN.zh.md)：Discovery agent 的职责、文件选择、chunking 和资源边界。
-- [REPOSITORY_INCREMENTAL_REVIEW_STRATEGY](workflows/repository-review/REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.zh.md)：Incremental review 策略。
-- [TRIAGE_BOUNDARIES](workflows/repository-review/TRIAGE_BOUNDARIES.zh.md)：Triage 的边界。
+- [REPOSITORY_REVIEW_STRATEGY](workflows/repository-review/REPOSITORY_REVIEW_STRATEGY.zh.md)：仓库审查各阶段的职责，以及如何组织可交付的修复。
+- [DISCOVERY_AGENT_DESIGN](workflows/repository-review/DISCOVERY_AGENT_DESIGN.zh.md)：Discovery Agent 的职责、文件选择、分块方式和资源限制。
+- [REPOSITORY_INCREMENTAL_REVIEW_STRATEGY](workflows/repository-review/REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.zh.md)：增量审查如何选择扫描文件、处理删除和限定审查窗口。
+- [TRIAGE_BOUNDARIES](workflows/repository-review/TRIAGE_BOUNDARIES.zh.md)：Triage 阶段何时保留、合并或排除候选线索。
 - [AGENT_PARTITION_WORKBENCH](workflows/repository-review/AGENT_PARTITION_WORKBENCH.zh.md)：Agent 直接编辑的分组工作台。
 - [CVSSV4](workflows/repository-review/CVSSV4.zh.md)：CVSS v4 评分。
-- [CONCURRENCY_AND_FAILURES](workflows/repository-review/CONCURRENCY_AND_FAILURES.zh.md)：Repository review 并发与失败边界。
+- [CONCURRENCY_AND_FAILURES](workflows/repository-review/CONCURRENCY_AND_FAILURES.zh.md)：仓库审查如何并发执行，以及局部失败会影响哪些任务。
 
 ### 运维
 
