@@ -19,7 +19,7 @@ Use the documented responsibilities and actual callers to determine who owns a c
 
 - Before deciding that code or a path is obsolete, look for its callers, related tests, repository scripts, and comments. If generated files are involved, also check where they are used.
 - Keep the patch close to the owning boundary. Remove misleading compatibility and false indirection instead of wrapping them again.
-- Decide compatibility explicitly. A breaking change must identify affected callers, artifacts, persisted data, configuration, or operational behavior and provide a migration path.
+- State whether the change preserves compatibility. If it breaks compatibility, list the affected callers, artifacts, persisted data, configuration, or operational procedures and explain how to migrate.
 - Update documentation when responsibilities, setup, configuration, public behavior, or operational procedures change. Follow the [documentation guide](docs/DOCUMENTATION_GUIDE.md) for durable wording and mutable-fact markers.
 - If you need to change a generated file, edit its source and run the corresponding generator. Do not edit the generated output directly.
 
