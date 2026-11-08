@@ -8,7 +8,7 @@ This guide defines repository-wide rules for maintained documentation. It applie
 
 Describe how the system works now rather than recounting each edit or refactor. Include historical context when readers need it to operate or maintain the system or interpret existing data.
 
-Remove details that merely recount nearby content and can become false independently of it. Common examples include a number before a list, a count of roles already named in the same sentence, and a claim that an open set is complete. Prefer:
+Avoid unnecessary counts: when a list or the named services already show what is included, there is usually no need to state the total again. If you are giving examples, do not present them as a complete list. Prefer:
 
 - `The supported execution paths are:` over `There are three execution paths:`;
 - named owners over `the two services`;
