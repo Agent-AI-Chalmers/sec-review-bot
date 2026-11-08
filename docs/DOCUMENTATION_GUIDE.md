@@ -14,7 +14,7 @@ Avoid unnecessary counts: when a list or the named services already show what is
 - specific service names over `the two services`;
 - `for example` or `includes` when listing examples, rather than presenting them as `all` or `the only` possibilities.
 
-Do not remove a number merely because it may change. Keep it when readers need the value to configure, operate, or reason about the system, or when it expresses an enforced invariant. Examples include a retry limit, timeout, concurrency default, protocol cardinality, and the single-maintainer guarantee.
+Do not delete a number just because it may change later. Keep values readers need to configure, operate, or understand the system, along with quantity limits enforced by the implementation or contract. For example, if a configuration table says “the timeout defaults to 60 seconds,” do not replace the value with “a timeout is configured.” Readers need the duration to judge whether to change it. The 60 seconds here is an example, not a project default.
 
 Use `always`, `never`, `only`, `exactly`, and exhaustive lists only for behavior enforced by code, a schema, an operational boundary, or tests. Otherwise narrow the statement to the context actually established.
 
