@@ -56,6 +56,10 @@ When documenting how to use a feature, first state what the reader can do and wh
 
 Use natural Chinese for explanations and descriptive headings, while keeping code identifiers, commands, paths, protocol values, and component names unchanged. Briefly explain terms readers may not know when they first appear.
 
+## Preserve Meaning When Rewriting
+
+Rewriting should make explanations clearer without changing their meaning. For example, “may fail” does not mean “will fail,” and shortening “validate the file before extraction” to “check the file” loses the required order of operations. For contract documentation, check field names, allowed values, specific numbers, and inputs that must be rejected against the contract definitions.
+
 ## Documentation Review
 
 When reviewing maintained documentation:
