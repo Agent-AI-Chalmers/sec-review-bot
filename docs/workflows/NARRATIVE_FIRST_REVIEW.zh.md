@@ -4,7 +4,7 @@
 
 本文为 [NARRATIVE_FIRST_REVIEW.md](NARRATIVE_FIRST_REVIEW.md) 的中文译文；如有差异，以英文版为准。
 
-analyzer 的输出不是“随手列几个发现”，而是围绕 narrative 来组织。这里的 narrative 不是空泛猜测，而是一个带有独立证据和 verdict 的可审查分析方向。它可以解释 confirmed issue、plausible risk、inconclusive path，也可以表示某个方向已经审过且结论是 no-actionable-finding。
+Analyzer 围绕 narrative 组织结果。每条 narrative 包含针对某个问题的解释、支持它的证据和判断结论，也可以记录证据不足，或未发现需要处理的问题的情况。
 
 这样做的目的，是避免 agent 一边读代码一边不断堆零散 observation，最后只留下一个模糊印象。相反，系统希望 agent 先收敛出一组可比较的解释，并给出清晰优先级。也就是说，输出的基本形状是：
 
@@ -17,7 +17,7 @@ analyzer 的输出不是“随手列几个发现”，而是围绕 narrative 来
 - 如果返回 narratives，每条都必须带唯一的 `priority`
 - `confirmed-vulnerability` 和 `confirmed-defect` 要和 overall verdict 保持一致
 - 当某条 narrative 的 `verdict=confirmed-vulnerability` 时，必须落到具体 location、`flow_review.source_facts`、`flow_review.sink_facts`，而不是只给抽象判断
-- no-actionable narrative 应该说明被审查的方向、用来排除 actionable concern 的仓库证据，以及仍然重要的 proof gaps
+- 结论为 `no-actionable-finding`（未发现需要处理的问题）的 narrative 应该说明被审查的方向、用来排除 actionable concern 的仓库证据，以及仍然重要的 proof gaps
 - `support_review.proof_gaps` 用来记录某个 narrative 还缺什么证据
 
 对读者来说，最重要的区别是：这个系统不是先问“有没有 checklist 上的漏洞类型”，而是先问“哪些审查方向值得保留下来，以及每个方向的证据支持什么 verdict”。漏洞类型、CWE 和 verdict 都是围绕这个 narrative-first 结构往外展开的，而不是反过来先定一个标签，再去拼证据。
@@ -43,4 +43,4 @@ overall verdict: no-actionable-finding
 
 拆成两条是有价值的，因为它们依赖不同的证据，也可能独立改变 verdict。参数化 SQL 不能证明并发发布安全；claim token 也不能证明文件路径安全。把它们塞进一条 narrative，会让 source、sink、control 和 proof gap 混在一起。
 
-> 这个例子也说明，多条 no-actionable narrative 仍需准确描述控制边界。数据库 fencing 能阻止 stale owner 提交本地状态，但不能撤销已经发出的 GitHub 请求。Heartbeat、marker reconciliation 和稳定远端身份可以降低并协调重复副作用风险，却不等于远端原子 exactly-once。因而第二条 narrative 的合适命题是“本地提交受到 fencing，远端重试依赖可恢复身份”，而不是“完全防止重复 GitHub 副作用”。
+> 这个例子也说明，多条结论为 `no-actionable-finding` 的 narrative 仍需准确描述控制边界。数据库 fencing 能阻止 stale owner 提交本地状态，但不能撤销已经发出的 GitHub 请求。Heartbeat、marker reconciliation 和稳定远端身份可以降低并协调重复副作用风险，却不等于远端原子 exactly-once。因而第二条 narrative 的合适命题是“本地提交受到 fencing，远端重试依赖可恢复身份”，而不是“完全防止重复 GitHub 副作用”。

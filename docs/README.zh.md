@@ -68,7 +68,7 @@
 #### 通用审查规则
 
 - [CONCURRENCY_MODEL](workflows/CONCURRENCY_MODEL.zh.md)：工作流如何控制并发。
-- [NARRATIVE_FIRST_REVIEW](workflows/NARRATIVE_FIRST_REVIEW.zh.md)：为什么以叙事（narrative）为先，围绕叙事组织证据和结论，再判断漏洞类型，以及 Analyzer、Mitigator 和 Verifier 如何使用这些叙事。
+- [NARRATIVE_FIRST_REVIEW](workflows/NARRATIVE_FIRST_REVIEW.zh.md)：为什么采用 narrative-first（叙事为先），以及 Analyzer、Mitigator 和 Verifier 如何围绕 narrative 组织和使用证据与结论。
 - [REVIEW_INTENT](workflows/REVIEW_INTENT.zh.md)：`review_intent` 如何指定审查目标，并约束最终补丁中的测试改动。
 - [BOUNDED_VERIFIER_FEEDBACK_RETRY](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.zh.md)：何时根据 Verifier 的反馈重新执行修复和验证、重试时传递哪些上下文，以及如何限制重试次数。
 - [TRUSTED_SETUP](workflows/TRUSTED_SETUP.zh.md)：为什么从默认分支读取环境准备步骤、审查 fork PR 时为何需要授权，以及这些步骤如何在沙箱中执行。
