@@ -42,6 +42,7 @@ pnpm run test:integration
 
 使用 `SEC_REVIEW_ARTIFACT_STORE=s3` 时，需要配置 bucket 和 AWS credentials。AWS 可以省略 `SEC_REVIEW_ARTIFACT_S3_ENDPOINT`，自定义 S3-compatible endpoint 则需要设置它。`SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` 接受 `auto`（默认）、`path` 或 `virtual`；本地 RustFS 部署使用 `path`。该传输配置不会改变提交的 `s3://bucket/key` artifact reference。
 
+<!-- doc-default: REVIEW_RUNS_REQUEST_TIMEOUT_MS; source=apps/github-integration/src/review-runs/client.ts -->
 `REVIEW_RUNS_REQUEST_TIMEOUT_MS` 限制每次 Review Runs 请求的最长等待时间，默认 30 秒。publication lease 续租失败或超时会被视为 ownership 已丢失：publisher 不再启动新的 GitHub mutation，而是等待 lease takeover 恢复。
 
 ```bash
