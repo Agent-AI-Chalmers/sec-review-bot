@@ -18,7 +18,12 @@ Use the documented responsibilities and actual callers to determine who owns a c
 ## Guidelines For Making Changes
 
 - Before deciding that code or a path is obsolete, look for its callers, related tests, repository scripts, and comments. If generated files are involved, also check where they are used.
-- Keep the patch close to the owning boundary. Remove misleading compatibility and false indirection instead of wrapping them again.
+- Prefer changing the code that implements the behavior.
+
+  For example, suppose an HTTP endpoint and a CLI command use the same input-validation function. If that function accepts invalid input, fix the shared function so both entry points benefit, rather than adding a check only to the HTTP endpoint.
+- Prefer removing an unnecessary intermediate layer over adding another wrapper.
+
+  For example, consider `caller -> A() -> B()`. If `A()` only forwards arguments to `B()` and returns its result unchanged, with no other role such as validation, logging, or compatibility with an old interface, consider letting callers use `B()` directly. Check the callers first; if the old interface is still needed, do not simply delete `A()`. Handle any compatibility break as described below.
 - State whether the change preserves compatibility. If it breaks compatibility, list the affected callers, artifacts, persisted data, configuration, or operational procedures and explain how to migrate.
 - Update documentation when responsibilities, setup, configuration, public behavior, or operational procedures change. Follow the [documentation guide](docs/DOCUMENTATION_GUIDE.md) for durable wording and mutable-fact markers.
 - If you need to change a generated file, edit its source and run the corresponding generator. Do not edit the generated output directly.
