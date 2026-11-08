@@ -4,15 +4,24 @@ Language: English | [中文](SYSTEM_ARCHITECTURE.zh.md)
 
 Sec Review Bot's repository-owned runtime roles are GitHub Integration, Review Runs, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server. Langfuse is a trusted observability dependency with an independent deployment and lifecycle, not a repository-owned runtime role.
 
+Distinguish the review task, its execution, and its delivery:
+
+| Term | Meaning |
+| --- | --- |
+| run | An admitted review task in Review Runs, including preparation, execution, and publication state. |
+| execution | Work submitted through Execution Gateway to Temporal. |
+| case | A repository-scan problem unit requiring independent analysis and verification. |
+| delivery | A publishable repair result for one or more cases. |
+
 ## Runtime topology
 
 ![Sec Review Bot runtime topology](../../assets/architecture/runtime-topology.svg)
 
 Temporal Server is infrastructure, but it directly dispatches work to the worker processes, so the topology presents it with the runtime services. PostgreSQL and Object Storage remain separate persistence facilities. Langfuse appears outside the repository deployment boundary: workers optionally export LLM observations to it, and Review Runs reads those observations asynchronously to persist model-usage snapshots. Review execution, memory extraction, and memory maintenance use independent worker processes and task queues.
 
-The memory path has one deployment-independent state model. Memory Catalog owns coordination state in PostgreSQL, Object Storage owns immutable memory-tree and trajectory artifacts, and Temporal owns workflow execution. Each review invocation materializes the current memory tree into a temporary directory for its agent backend and removes that directory afterward.
+Memory Catalog owns coordination state in PostgreSQL, Object Storage owns immutable memory-tree and trajectory artifacts, and Temporal owns workflow execution. When memory consumption is enabled and an active revision exists, a review invocation materializes that memory tree into a temporary directory for the agent and removes it afterward.
 
-Control Plane UI manages Memory Catalog through its BFF and never exposes Catalog tokens, storage credentials, or `s3://` references to the browser. The BFF fetches and identity-checks artifact downloads. Authenticated operators can pause or resume automatic maintenance, create operator edit revisions, and restore the active pointer to an existing revision. New revisions retain that active revision as their predecessor while revision identities remain globally increasing. The BFF can create immutable memory-tree objects, while run artifacts and memory trajectories remain read-only.
+Control Plane UI accesses Memory Catalog through its same-origin backend (BFF). The browser receives no Catalog tokens, storage credentials, or `s3://` references. The BFF checks artifact references, size, and digest before returning downloaded content. Authenticated operators can pause or resume automatic maintenance, commit manual edits, and restore an existing revision. New revisions record the revision active at creation as their predecessor, while revision numbers remain globally increasing. The BFF can create immutable memory-tree objects but has read-only access to review artifacts and memory trajectories.
 
 ## Runtime ownership map
 
