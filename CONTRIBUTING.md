@@ -83,6 +83,6 @@ Follow [the pull request template](.github/pull_request_template.md):
 - `Validation` describes the checks and tests you ran, their results, and any relevant checks you did not run.
 - `Review Notes` is optional. Use it for details that help reviewers, such as where to start reading, why you chose the approach, or what remains for later.
 
-The repository checks that the three required sections are present and non-empty, that `Compatibility` contains exactly one supported classification, and that a breaking change includes migration guidance. Additional headings and sections are welcome and are not interpreted by the check. Delete `Review Notes` when it adds no value.
+The PR description must include non-empty `Summary`, `Compatibility`, and `Validation` sections. In `Compatibility`, keep the template options and select exactly one. You may add other sections to help reviewers. Delete `Review Notes` if there is nothing useful to add.
 
 Dependabot pull requests keep their generated dependency summary, release notes, and command block instead of using the human-authored template. They remain subject to the title rule, package checks, review, and compatibility assessment.

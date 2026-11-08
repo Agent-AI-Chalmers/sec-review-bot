@@ -85,6 +85,6 @@ feat(contracts)!: remove legacy execution fields
 - `Validation` 说明运行了哪些检查和测试、结果如何，以及哪些相关检查没有运行。
 - `Review Notes` 可选，用来补充有助于审查本次修改的信息，例如建议先看哪些文件、为什么采用当前方案，或哪些工作留待以后处理。
 
-仓库会检查三个必填 section 是否存在且非空、`Compatibility` 是否恰好包含一种受支持分类，以及破坏性变更是否包含迁移指导。可以添加其他有助于审核的标题和 section，检查器不会解释它们。`Review Notes` 没有提供价值时应删除。
+PR 描述中的 `Summary`、`Compatibility` 和 `Validation` 不能为空；`Compatibility` 按模板保留选项，只勾选一项。可以添加其他有助于审查的章节。没有需要补充的内容时，删除 `Review Notes`。
 
 Dependabot pull request 保留其生成的依赖更新摘要、release note 和命令块，不使用人工编写的模板。它们仍需遵守标题规则、package 检查、审核和兼容性评估要求。
