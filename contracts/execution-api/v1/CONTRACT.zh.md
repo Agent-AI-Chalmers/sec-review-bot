@@ -60,7 +60,7 @@ Repository scan scope（同一 schema 中的 `scan_scope`）声明 `paths_ignore
 Pull request input 携带 `pr` subject，描述本次 run 所看到的 pull request。其中两个字段的关系无法由 schema 表达，因此需要单独说明：
 
 - `base_sha` 与 `head_sha` 标识 pull request 本身，在一次 run 内保持不变。
-- `review_window` 说明本次 run 覆盖的范围。`synchronize` 下它窄于 `base_sha..head_sha`，因为该 run 只覆盖上次审查后推送的提交。`review_window.reason` 记录 run 为何回退到完整范围。
+- `review_window` 说明本次任务覆盖的范围。`synchronize` 通常只覆盖新推送的提交，因此范围较窄；触发回退条件时，也可能覆盖完整 PR。`review_window.reason` 记录任务为何回退到完整范围。
 
 Execution API provider 和 Execution Worker 都会在各自的进程边界校验 input。所有 workflow 都需要这些共同字段：
 

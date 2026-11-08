@@ -77,9 +77,10 @@ Building the patch from that field therefore drops changes silently. The patch i
 | Identical commits, empty diff | `200`, `files: []`, `status: identical` |
 | Unreachable base commit | `404 Not Found` |
 
-`synchronize` uses `previous_head_sha...current_head_sha`, which needs the historical head to still be reachable. The current code does not guard this call, so a 404 propagates and fails the whole preparation instead of falling back to the full pull request. The fallback that was intended (`incrementalFiles.length > 0`, otherwise re-read all files) only covers the empty-diff case.
+<!-- doc-default: github-integration.resolveReviewWindowFiles; source=apps/github-integration/src/reviews/pull-requests/review-window.ts -->
+A `synchronize` event normally reviews only the changes in the latest push. If GitHub cannot provide the comparison from the previous commit to the current commit and returns `404`, the run reviews the entire PR instead, with reason `synchronize-previous-head-unreachable`. Other request errors follow the preparation retry and failure rules.
 
-This is a latent defect independent of force-push: it triggers whenever the historical head is no longer resolvable. It is not established that force-push reliably produces that state, because GitHub does not document how long a force-pushed commit stays resolvable.
+A force-push does not necessarily make the old commit immediately inaccessible. Whether to fall back because of `404` therefore depends on the API response, not on whether a force-push occurred.
 
 ## What Other Review Tools Do
 
@@ -135,9 +136,9 @@ The decisive requirement is not which window is better; it is that **whatever wi
 
 The window is resolved **once** and threaded through, rather than being decided independently by each artifact. A single function decides the window and produces the file list, the patch range, and the suggestion file set together.
 
-Two guards accompany the contract:
+The implementation also provides these guards:
 
-1. **Fall back to the full window** when the push window cannot be established: `previous_head_sha` missing, the compare call returning an empty change set, or the compare call failing with `404`. This is the guard that does not exist today and that the measured 404 behavior requires.
+1. **Fall back to the full window** when the push window cannot be established: `previous_head_sha` missing, the compare call returning an empty change set, or the compare call failing with `404`. Only compare `404` triggers this error fallback; other errors still fail preparation.
 2. **Never mix windows.** A run whose file list comes from one window and whose patch comes from another is rejected rather than published, because the resulting analyzer instructions contradict each other and the suggestion anchoring silently drops changes.
 
 3. **Fall back to the full window when the push window is not a fast-forward.** The compare response reports commits on both sides (`behind_by`) when the previous head is not an ancestor of the current head, which is what a force-push leaves behind. Such a window no longer describes an incremental change, and the workspace cannot even contain the discarded head, so the run covers the whole pull request instead.

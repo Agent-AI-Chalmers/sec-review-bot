@@ -58,7 +58,7 @@ Each workflow input has its own schema:
 Pull request inputs carry a `pr` subject describing the pull request as this run sees it. Two of its fields deserve a note because the schema cannot express their relationship:
 
 - `base_sha` and `head_sha` identify the pull request itself and stay constant for the run.
-- `review_window` states the range the run covers. On `synchronize` it is narrower than `base_sha..head_sha`, because the run covers only the commits pushed since the previous review. `review_window.reason` records why a run fell back to the full range.
+- `review_window` states the range the run covers. On `synchronize` it normally covers newly pushed commits and is narrower than `base_sha..head_sha`; fallback conditions may instead select the full PR range. `review_window.reason` records why a run fell back to the full range.
 
 The Execution API provider and Execution Worker both validate input at their process boundaries. All workflows require these common fields:
 

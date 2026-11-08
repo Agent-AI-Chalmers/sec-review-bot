@@ -79,9 +79,10 @@ GitHub 把 `pull_request.base.sha` 报告为**目标分支当前 tip**，而不�
 | 两个相同提交，空 diff | `200`、`files: []`、`status: identical` |
 | base 提交不可达 | `404 Not Found` |
 
-`synchronize` 使用 `previous_head_sha...current_head_sha`，这要求历史 head 仍然可达。当前代码没有为这个调用做保护，因此 404 会向上传播并让整个 preparation 失败，而不是回退到完整 pull request。原本设想的回退（`incrementalFiles.length > 0`，否则重读全部文件）只覆盖空 diff 这一种情形。
+<!-- doc-default: github-integration.resolveReviewWindowFiles; source=apps/github-integration/src/reviews/pull-requests/review-window.ts -->
+`synchronize` 事件通常只审查本次推送的变更。如果 GitHub 无法提供上次提交到当前提交的比较结果，并返回 `404`，则改为审查整个 PR，回退原因为 `synchronize-previous-head-unreachable`。其他请求错误仍按准备阶段的重试和失败规则处理。
 
-这是一个独立于 force-push 的潜在缺陷：只要历史 head 不再可解析就会触发。目前**不能**断定 force-push 一定产生该状态，因为 GitHub 未文档化被 force-push 的提交能保持可解析多久。
+强制推送后，旧提交不一定立即无法访问。因此，是否因 `404` 回退取决于接口响应，而不是是否发生过强制推送。
 
 ## 其他审查工具怎么做
 
@@ -137,9 +138,9 @@ GitHub 把 `pull_request.base.sha` 报告为**目标分支当前 tip**，而不�
 
 窗口只解析**一次**并贯穿传递，而不是由每个产物各自决定。由一个函数决定窗口，并同时产出文件列表、patch 范围和 suggestion 文件集合。
 
-契约附带两道保护：
+实现还提供以下保护：
 
-1. **在无法建立 push 窗口时回退到完整窗口**：`previous_head_sha` 缺失、compare 返回空变更集合，或 compare 以 `404` 失败。这正是当前缺失、且实测 404 行为所要求的那道保护。
+1. **在无法建立 push 窗口时回退到完整窗口**：`previous_head_sha` 缺失、compare 返回空变更集合，或 compare 以 `404` 失败。只有 compare 的 `404` 触发这一错误回退，其他错误仍然失败。
 2. **绝不混用窗口**。一个 run 如果文件列表来自一个窗口、patch 来自另一个窗口，应被拒绝而不是发布，因为它产生的 analyzer 指令自相矛盾，且 suggestion 锚定会静默丢弃变更。
 
 3. **当 push 窗口不是快进时回退到完整窗口。** 前一个 head 不是当前 head 的祖先时，compare 响应会在两侧都报告提交（`behind_by`），这正是 force-push 留下的状态。这样的窗口已不再描述增量变更，workspace 也无从包含被丢弃的 head，因此 run 改为覆盖整个 pull request。
