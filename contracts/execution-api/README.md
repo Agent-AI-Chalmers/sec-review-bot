@@ -44,7 +44,7 @@ Agents are responsible for:
 
 - executing structured orchestration for issue, pull request, and repository workflows;
 - producing structured workflow results centered on `review_record` and repository `deliveries[]`;
-- saving stage artifacts.
+- saving artifacts.
 
 The GitHub integration is one implementation of the caller side: it turns GitHub events and publishing rules into execution inputs and result publication.
 
@@ -54,7 +54,7 @@ This split is also a security boundary. GitHub identity, permissions, API calls,
 
 [v1/openapi.yaml](v1/openapi.yaml) defines the HTTP operations and envelopes. The JSON Schemas in the same version directory define the workflow-specific objects carried by those envelopes. They are maintained and released as one API version, and are not generated from service code. Execution Gateway mounts routes and validation from these files, while the contract tools generate provider and consumer types from them.
 
-The contract tools use Kubb to generate named TypeScript types from the HTTP contract, then compose the HTTP envelope with the v1 workflow input schemas. This gives the provider a compile-time `workflow`-to-`input` relationship without introducing a shared runtime package.
+The contract tools generate TypeScript types from the HTTP contract with Kubb, then combine them with the v1 workflow input schemas. This lets the compiler check that `workflow` and `input` correspond without adding a shared runtime package.
 
 ## Tooling
 
@@ -108,6 +108,4 @@ Runtime parsers may also enforce canonical forms that schemas intentionally leav
 
 ## Artifact Boundary
 
-Stage artifacts are runtime diagnostics unless a field is explicitly promoted into the public workflow result. Public results are `review_record`, repository `case_results[]`, repository `deliveries[]`, and the other fields documented in [v1/CONTRACT.md](v1/CONTRACT.md).
-
-Callers should publish from the workflow result, not by reading whole stage artifact packages. If a stage artifact becomes necessary for caller behavior, either promote the required field into this contract or keep the dependency private to a local debugging tool.
+Public results are `review_record`, repository `case_results[]`, repository `deliveries[]`, and the other fields documented in [v1/CONTRACT.md](v1/CONTRACT.md).
