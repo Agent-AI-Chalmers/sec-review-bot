@@ -2,7 +2,7 @@
 
 Language: English | [中文](CONTRIBUTING.zh.md)
 
-Keep changes focused, preserve explicit ownership boundaries, and validate the packages and contracts that actually consume the change. This guide provides the repository-wide workflow; package and contract READMEs remain the source of truth for local details.
+Keep changes focused, preserve explicit ownership boundaries, and validate the packages and contracts that actually consume the change. This guide explains the common contribution process. For installation, configuration, check commands, and contract-specific change requirements, read the README in the relevant directory.
 
 ## Find The Owning Boundary
 

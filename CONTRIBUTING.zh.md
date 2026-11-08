@@ -4,7 +4,7 @@
 
 本文是 [CONTRIBUTING.md](CONTRIBUTING.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
 
-保持变更聚焦，维护明确的所有权边界，并验证实际消费该变更的 package 和 contract。本指南说明仓库级工作流程；各 package 和 contract 的 README 仍是本地细节的权威来源。
+保持变更聚焦，维护明确的所有权边界，并验证实际消费该变更的 package 和 contract。本指南介绍通用的贡献流程。各包的安装、配置和检查命令，以及契约的修改要求，见对应目录的 README。
 
 ## 找到所有权边界
 
