@@ -21,7 +21,7 @@ Use the documented responsibilities and actual callers to determine who owns a c
 - Keep the patch close to the owning boundary. Remove misleading compatibility and false indirection instead of wrapping them again.
 - Decide compatibility explicitly. A breaking change must identify affected callers, artifacts, persisted data, configuration, or operational behavior and provide a migration path.
 - Update documentation when responsibilities, setup, configuration, public behavior, or operational procedures change. Follow the [documentation guide](docs/DOCUMENTATION_GUIDE.md) for durable wording and mutable-fact markers.
-- Do not hand-edit generated artifacts without changing their source and running the owning generator.
+- If you need to change a generated file, edit its source and run the corresponding generator. Do not edit the generated output directly.
 
 ## Validate The Affected Areas
 
