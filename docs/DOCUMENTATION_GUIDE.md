@@ -44,8 +44,6 @@ Find marked facts with:
 rg 'doc-(default|time-sensitive):' --glob '*.md' --glob '!docs/DOCUMENTATION_GUIDE*.md'
 ```
 
-The exclusion keeps the marker templates in this guide out of the review-obligation set.
-
 ## Defaults And Examples
 
 Keep a default in prose when it changes how a reader should operate or understand the system. Prefer one canonical configuration table when the value is merely reference data. A narrative may repeat the value when the consequence is the point, such as explaining how long recovery can pause or how a concurrency limit affects scheduling; mark that repetition with `doc-default`.
