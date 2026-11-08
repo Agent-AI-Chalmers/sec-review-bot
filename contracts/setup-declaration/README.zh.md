@@ -4,33 +4,33 @@
 
 本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-本 family 持有仓库用来告诉审查沙箱在 agent 启动前如何准备自己的格式：`.sec-review/setup.yml` 声明。
+仓库通过 `.sec-review/setup.yml` 说明如何在 Agent 启动前准备审查环境。本目录定义这份声明的格式。
 
-使用这些文档：
+相关文件：
 
-- [v1/SPEC.md](v1/SPEC.zh.md)：格式、其合法性规则，以及相互独立的执行者。
-- [v1/corpus](v1/corpus)：Python 与 TypeScript 测试套件共享的输入文件，以及记录必须接受和必须拒绝哪些用例的 manifest。
+- [SPEC](v1/SPEC.zh.md)：格式、有效性规则，以及两端分别如何校验。
+- [v1/corpus](v1/corpus)：Python 和 TypeScript 测试共用的输入文件；清单记录每个用例必须被接受还是拒绝。
 
-## 边界
+## 双方分别负责什么
 
-声明跨越 **GitHub Integration**（生产者）与 **Execution Worker**（消费者）之间的边界：
+声明由 **GitHub Integration** 读取并提交，由 **Execution Worker** 接收和执行：
 
-- GitHub Integration 从 base 仓库的默认分支读取 `.sec-review/setup.yml`，按本格式校验它，并在提交运行前拒绝非法声明。
-- Execution Worker 作为纵深防御对同一段文本再次校验，然后在沙箱内执行它。
+- GitHub Integration 从目标仓库的默认分支读取 `.sec-review/setup.yml`，按本规范校验；声明无效时，在提交任务前报错。
+- Execution Worker 再次校验同一段文本，作为额外防护，通过后在沙箱内执行。
 
-本契约只涉及 *格式*。声明来自哪里——对其来源的信任——不在其中：那由 integration 读取默认分支来决定，绝不使用 fork 或载荷提供的 ref。
+本契约只规定格式，不决定来源是否可信。GitHub Integration 通过只读取默认分支、而不读取 Fork 或请求中指定的引用来限制来源。
 
-## 强制方式
+## 如何校验
 
-本 family 没有 JSON Schema。真正要紧的规则是决策逻辑（`working-directory` 不能逃出仓库根、`env` 名不能夹带 shell 语法、timeout 为正整数），而不是结构形状，因此它们留在 Execution Worker 与 GitHub Integration 的解析器里，而不是留在可能与之不一致的 schema 里：
+本契约没有 JSON Schema。`working-directory` 不得越出仓库根目录、`env` 名不得夹带 shell 语法、超时必须为正整数等规则，由两端解析器直接校验，避免与另一份 schema 定义发生分歧：
 
 - Python（Execution Worker）：`agents/src/sec_review_agents/entrypoints/setup_declaration.py`
 - TypeScript（GitHub Integration）：`apps/github-integration/src/github/setup-declaration.ts`
 
-Execution Worker 与 GitHub Integration 都会在测试中执行共享语料。新增一条规则，就意味着向 [v1/corpus](v1/corpus) 新增一个用例，并让各自的执行者通过它，因此这些实现不会悄悄漂移。
+两端测试使用同一套输入。新增规则时，必须在 [v1/corpus](v1/corpus) 添加用例，并确认两端得到相同结果。
 
-空白内容也是边界的一部分：空或只含空白的声明是合法的，并且在各个实现中都表示"无声明"。
+空文件或只含空白的内容是有效输入，两端都将其视为“没有声明”。
 
-## 谁拥有本 family
+## 由谁维护
 
-Execution Worker 与 GitHub Integration 共同拥有声明格式，因为两者都强制它，且都必须就“什么是合法的声明”达成一致。规范与语料一起变更。
+Execution Worker 和 GitHub Integration 共同维护这份格式，因为两端都要校验并对有效性作出相同判断。修改时同步更新规范和测试输入。
