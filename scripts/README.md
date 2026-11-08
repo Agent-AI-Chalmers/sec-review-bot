@@ -74,9 +74,10 @@ The output describes calls observed by Langfuse. `complete_for_observed_calls` m
 
 ## Experimental Memory Probe
 
-`experiments/memory_extract_observations.py` runs the memory extractor against explicit trajectory files or review artifact directories and writes the observation preview and a uniquely named extractor trajectory to a requested directory. It is a model-development probe, not an operational ingestion path: it does not use Temporal, register state with the Memory Catalog, or publish artifacts.
+- `experiments/memory_extract_observations.py` runs the memory extractor against specified trajectory files or review artifact directories, producing observations and an extractor trajectory.
+- `experiments/memory_maintain.py` calls the package memory maintainer directly to build or update a local memory tree from observations.
 
-For local file-based maintenance, use `experiments/memory_maintain.py`. It calls the package maintainer directly without Temporal, Memory Catalog, PostgreSQL, Docker, or object storage; model API access is still required.
+Both scripts read and write local files without Temporal, Memory Catalog, PostgreSQL, or object storage.
 
 ```bash
 # Build a new Memory tree from observation Markdown files.
@@ -91,10 +92,6 @@ uv --project agents run python -m scripts.experiments.memory_maintain \
 
 Inputs are processed in argument order; filename stems identify observations and must be unique. `--deployment` optionally overrides the maintainer model deployment. The output directory must not exist. It contains `memory/`, a maintainer trajectory, and `manifest.json` with input hashes, base-tree fingerprints, the deployment override, timestamps, execution status, and successful output fingerprints. Input files and the base tree are not modified. Staged observations are removed from a successful Memory output; a failed attempt keeps its partial files and records failure. Retry into a new directory. Empty observation batches are rejected; no automatic batching or retry is performed.
 
-This local tool does not register results with Catalog or publish artifacts. Operational maintenance uses `scripts.ops.memory_ops` separately.
-
-Validation on 2026-11-06: `uv --project agents run python -m pytest scripts/tests/experiments/test_memory_maintain.py -q` passed six cases covering empty/existing base trees, invalid inputs, overwrite prevention, and failure preservation. A single synthetic-observation model smoke invoked `memory_maintain.main([...])` in a temporary directory without starting services; it completed in about 20 seconds and produced `memory/MEMORY.md`, `maintainer.jsonl`, and a completed manifest with no staged observations left in the Memory tree. This synthetic input and output are not experiment corpus material.
-
 ## Local Development Workers
 
 From the repository root, start the Execution, Memory Extraction, and Memory Maintenance workers together:
@@ -105,7 +102,7 @@ uv --project agents run python -m scripts.dev.dev_workers --env-file compose.mem
 
 The former `sec-review-agents-memory dev-workers` subcommand is removed; use the command above instead.
 
-This development launcher maps role-specific storage credentials and stops the worker group when a worker exits or it receives SIGINT/SIGTERM. It requires the infrastructure described in [local Memory setup](../docs/operations/LOCAL_MEMORY_DEVELOPMENT.md); it does not start Compose services. Maintenance workflows and schedules are managed separately by `scripts.ops.memory_ops`.
+This development launcher maps role-specific storage credentials and stops the worker group when a worker exits or it receives SIGINT/SIGTERM. It requires the infrastructure described in [local Memory setup](../docs/operations/LOCAL_MEMORY_DEVELOPMENT.md); it does not start Compose services.
 
 ## Memory Operations
 
@@ -117,5 +114,3 @@ uv --project agents run python -m scripts.ops.memory_ops --env-file compose.memo
 ```
 
 `maintain` starts a maintenance workflow in Temporal; `schedules maintenance ensure` creates or updates its periodic trigger. Both require the configured Temporal service; actual maintenance also requires the worker, Memory Catalog, and object storage. Use each subcommand's `--help` to inspect connection, timeout, batch, and schedule options.
-
-The installed `sec-review-agents-memory` command is removed. Replace it with `uv --project agents run python -m scripts.ops.memory_ops` for maintenance and scheduling; worker startup uses `scripts.dev.dev_workers` as shown above. These scripts are repository operations tools, not installed agent-package entrypoints.

@@ -34,9 +34,9 @@ Control Plane UI 通过同源服务端（BFF）访问 Memory Catalog，浏览器
 | Control Plane UI | `apps/control-plane-ui/` | 经身份验证的运维控制台，用于查看 run 和管理记忆 | [README](../../apps/control-plane-ui/README.zh.md) |
 | Execution Gateway | `services/execution-gateway/` | 经过鉴权的 Execution API 与 HTTP-to-Temporal 转换 | [README](../../services/execution-gateway/README.zh.md) |
 | Execution Worker | `agents/` | 执行审查工作流、activity 和 Agent，保存阶段产物并发布诊断包 | [README](../../agents/README.zh.md) |
-| Memory Extraction Worker | `agents/` | 读取审查诊断包、提取经验、发布轨迹并登记提取结果 | [README](../../agents/README.zh.md) |
+| Memory Extraction Worker | `agents/` | 读取审查诊断包、提取经验、发布轨迹并登记 extraction | [README](../../agents/README.zh.md) |
 | Memory Maintenance Worker | `agents/` | 分批整理待处理经验、发布记忆文件树并提交修订 | [README](../../agents/README.zh.md) |
-| Memory Catalog Server | `services/memory-catalog/` | 保存经验提取记录、不可变修订历史和当前生效版本 | [README](../../services/memory-catalog/README.zh.md) |
+| Memory Catalog Server | `services/memory-catalog/` | 保存 extraction、不可变修订历史和当前生效版本 | [README](../../services/memory-catalog/README.zh.md) |
 
 这些运行角色通过 [`contracts/`](../../contracts/README.zh.md) 下由项目维护的边界通信。`services/` 归集内部 HTTP 服务包；各包保留独立的配置、构建和部署。源码包的位置不决定运行进程的组织方式：`agents/` 实现彼此独立部署的 Temporal Worker。`apps/` 下的应用也分别独立部署。
 
@@ -161,8 +161,8 @@ sequenceDiagram
 | 产物 | 持久化恢复依据 | 恢复边界 |
 | --- | --- | --- |
 | 审查输入材料包 | Review Runs 发布意图：产物引用、已准备的输入和发布上下文 | 接管输入准备的调用方可在对象存在时复用原发布意图；只有确认对象不存在时，才能放弃未选中的候选记录并重新准备。 |
-| 经验提取轨迹 | Memory Catalog 发布意图：轨迹引用、经验条目和摘要 | 重试先检查已有候选记录，再决定是否重新调用模型；选定记录和登记提取结果在同一事务中完成。 |
-| 自动维护修订 | Memory Catalog 发布意图：记忆树、轨迹、经验条目 ID 和预期生效修订 | 不同模型输出可以对应不同候选记录；选定记录、创建修订、标记经验条目已处理和更新生效版本在同一事务中完成。 |
+| 经验提取轨迹 | Memory Catalog 发布意图：轨迹引用、observation 和摘要 | 重试先检查已有候选记录，再决定是否重新调用模型；选定记录和登记 extraction 在同一事务中完成。 |
+| 自动维护修订 | Memory Catalog 发布意图：记忆树、轨迹、observation ID 和预期生效修订 | 不同模型输出可以对应不同候选记录；选定记录、创建修订、标记 observation 已处理和更新生效版本在同一事务中完成。 |
 | 人工编辑修订 | Memory Catalog 发布意图：记忆树引用、operation ID 和预期生效修订；UI BFF 上传记忆树 | 编辑器保持打开且内容未变时，重试复用 operation ID 和最初预期的修订。BFF 重新执行预留、条件上传、确认和幂等修订创建。 |
 | S3 中的 run 诊断包 | Temporal 发布请求和固定的 run 对象键 | 恢复时先按请求校验已上传的诊断包，再考虑本地文件。如果完整上传的诊断包和本地产物都已丢失，仅凭请求无法重建诊断内容。 |
 
