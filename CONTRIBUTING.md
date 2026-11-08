@@ -25,7 +25,7 @@ Use the documented responsibilities and actual callers to determine who owns a c
 
   For example, consider `caller -> A() -> B()`. If `A()` only forwards arguments to `B()` and returns its result unchanged, with no other role such as validation, logging, or compatibility with an old interface, consider letting callers use `B()` directly. Check the callers first; if the old interface is still needed, do not simply delete `A()`. Handle any compatibility break as described below.
 - State whether the change preserves compatibility. If it breaks compatibility, list the affected callers, artifacts, persisted data, configuration, or operational procedures and explain how to migrate.
-- Update documentation when responsibilities, setup, configuration, public behavior, or operational procedures change. Follow the [documentation guide](docs/DOCUMENTATION_GUIDE.md) for durable wording and mutable-fact markers.
+- If a change affects component responsibilities, environment setup, configuration, public behavior, or operational steps, update the relevant documentation too.
 - If you need to change a generated file, edit its source and run the corresponding generator. Do not edit the generated output directly.
 
 ## Validate The Affected Areas
