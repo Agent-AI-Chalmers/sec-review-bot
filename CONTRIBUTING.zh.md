@@ -42,7 +42,7 @@
 | Execution Gateway | [`services/execution-gateway/README.zh.md`](services/execution-gateway/README.zh.md) | format、lint、typecheck、测试、Temporal 集成测试 |
 | Memory Catalog Server | [`services/memory-catalog/README.zh.md`](services/memory-catalog/README.zh.md) | format、lint、typecheck、测试、PostgreSQL 集成测试 |
 | Execution submission 系统路径 | [`system-tests/README.md`](system-tests/README.md) | Review Runs client、Execution Gateway HTTP 与 Temporal 系统测试 |
-| 仓库脚本 | [`scripts/README.md`](scripts/README.md) | Ruff、Black、compile 检查和聚焦的入口探针 |
+| 仓库脚本 | [`scripts/README.md`](scripts/README.md) | Ruff、Black、Python 语法检查；根据修改内容，运行脚本的 `--help` 或用测试数据检查相关功能 |
 | 文档 | [`docs/DOCUMENTATION_GUIDE.zh.md`](docs/DOCUMENTATION_GUIDE.zh.md) 和 [`docs/README.zh.md`](docs/README.zh.md) | 根据变更运行链接、wrapping 和译文标题检查 |
 
 修改 contract 时，在 `contracts/<family>/tools/` 中运行受影响 family 的工具：重新生成投影，检查已提交 artifact 是否为最新，并运行格式化、lint、存在时的 contract lint、typecheck 和测试。随后运行消费方 package 的检查。参见 [contracts 变更检查清单](contracts/README.zh.md#变更检查清单)。
