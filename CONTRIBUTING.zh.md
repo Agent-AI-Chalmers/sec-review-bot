@@ -86,5 +86,3 @@ feat(contracts)!: remove legacy execution fields
 - `Review Notes` 可选，用来补充有助于审查本次修改的信息，例如建议先看哪些文件、为什么采用当前方案，或哪些工作留待以后处理。
 
 PR 描述中的 `Summary`、`Compatibility` 和 `Validation` 不能为空；`Compatibility` 按模板保留选项，只勾选一项。可以添加其他有助于审查的章节。没有需要补充的内容时，删除 `Review Notes`。
-
-Dependabot pull request 保留其生成的依赖更新摘要、release note 和命令块，不使用人工编写的模板。它们仍需遵守标题规则、package 检查、审核和兼容性评估要求。

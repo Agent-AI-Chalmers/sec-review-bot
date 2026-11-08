@@ -84,5 +84,3 @@ Follow [the pull request template](.github/pull_request_template.md):
 - `Review Notes` is optional. Use it for details that help reviewers, such as where to start reading, why you chose the approach, or what remains for later.
 
 The PR description must include non-empty `Summary`, `Compatibility`, and `Validation` sections. In `Compatibility`, keep the template options and select exactly one. You may add other sections to help reviewers. Delete `Review Notes` if there is nothing useful to add.
-
-Dependabot pull requests keep their generated dependency summary, release notes, and command block instead of using the human-authored template. They remain subject to the title rule, package checks, review, and compatibility assessment.
