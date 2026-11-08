@@ -6,11 +6,11 @@ Keep changes focused, preserve explicit ownership boundaries, and validate the p
 
 ## Find The Code Responsible For The Behavior
 
-Before editing code, use the maintained documentation in this order:
+Before editing code, consult the documentation relevant to the change:
 
-1. Read the [system architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) when the change crosses services, workers, storage, or deployment boundaries.
-2. Read the `README.md` in the directory containing the code you plan to change, or the nearest parent directory that has one. It explains what that code is responsible for, how to set it up and configure it, and which checks to run.
-3. If you need to change data exchanged between packages, first read the [contracts guide](contracts/README.md) and the README for the relevant contract. Identify which packages depend on these agreements and how the change would affect them.
+- Read the [system architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) when the change crosses services, workers, storage, or deployment boundaries.
+- Read the `README.md` in the directory containing the code you plan to change, or the nearest parent directory that has one. It explains what that code is responsible for, how to set it up and configure it, and which checks to run.
+- If you need to change data exchanged between packages, first read the [contracts guide](contracts/README.md) and the README for the relevant contract. Identify which packages depend on these agreements and how the change would affect them.
 
 Use the documented responsibilities and actual callers to determine who owns a change, rather than directory size or document length. Components in the same source package may still be responsible for different tasks.
 
