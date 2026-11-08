@@ -20,7 +20,7 @@ The catalog below is a reference, not a required reading sequence.
 
 ## Documentation Index
 
-- [DOCUMENTATION_GUIDE](DOCUMENTATION_GUIDE.md): Repository-wide rules for durable wording, mutable facts, translations, and documentation review.
+- [DOCUMENTATION_GUIDE](DOCUMENTATION_GUIDE.md): How to write, update, translate, and review project documentation.
 
 ### Architecture
 
@@ -44,7 +44,7 @@ Package READMEs explain installation, commands, configuration, and code layout. 
 
 ### Agents
 
-Use these docs when you need agent boundaries, capabilities, or framework decisions.
+These documents explain agent capabilities, context loading, and framework choices.
 
 - [CAPABILITY_BOUNDARIES](agent/CAPABILITY_BOUNDARIES.md): Agent capabilities and limits when working with Git history and state outside the repository.
 - [agent-transcript](../contracts/agent-transcript/README.md): JSONL messages, execution relationships, and usage accounting.

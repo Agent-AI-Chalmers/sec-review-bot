@@ -22,7 +22,7 @@
 
 ## 文档目录
 
-- [DOCUMENTATION_GUIDE](DOCUMENTATION_GUIDE.zh.md)：关于耐久表述、易变事实、翻译和文档审核的仓库级规则。
+- [DOCUMENTATION_GUIDE](DOCUMENTATION_GUIDE.zh.md)：项目文档的编写、更新、翻译和审查要求。
 
 ### 架构
 
@@ -46,7 +46,7 @@
 
 ### Agent
 
-需要理解 agent 边界、能力或 framework 取舍时，看这里。
+以下文档介绍 Agent 的能力、上下文加载方式和框架选择。
 
 - [CAPABILITY_BOUNDARIES](agent/CAPABILITY_BOUNDARIES.zh.md)：Agent 能力边界，包括 Git 历史和仓库外状态的处理限制。
 - [agent-transcript](../contracts/agent-transcript/README.zh.md)：JSONL 消息、执行关系与用量核算。
@@ -103,4 +103,4 @@
 
 ### 后续工作
 
-- [FUTURE_WORK](roadmap/FUTURE_WORK.zh.md)：将来工作。
+- [FUTURE_WORK](roadmap/FUTURE_WORK.zh.md)：后续可探索的工作。
