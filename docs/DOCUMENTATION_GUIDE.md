@@ -68,5 +68,5 @@ When reviewing maintained documentation:
 2. Keep defaults, limits, dates, and measurement results that readers need to configure, operate, or understand the system.
 3. Add or update source markers for information that may change, and check the cited sources.
 4. Check that absolute language is backed by an enforceable boundary.
-5. Keep English and translated documents aligned in meaning, headings, and markers.
+5. Keep English and Chinese documents consistent in meaning, heading structure, and source markers.
 6. Run the documentation checks listed in `AGENTS.md`.
