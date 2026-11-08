@@ -29,7 +29,7 @@ The catalog below is a reference, not a required reading sequence.
 
 ### Packages and services
 
-Package READMEs own local setup, commands, configuration, and implementation layout. Runtime roles and source packages are not one-to-one: `agents/` implements the Execution Worker, Memory Extraction Worker, and Memory Maintenance Worker.
+Package READMEs explain installation, commands, configuration, and code layout. One source package can implement several independently running components: `agents/` implements the Execution Worker, Memory Extraction Worker, and Memory Maintenance Worker.
 
 | Runtime role | Package guide |
 | --- | --- |
@@ -57,7 +57,7 @@ Use these docs when you need agent boundaries, capabilities, or framework decisi
 
 ### Contracts
 
-Read the [Contracts README](../contracts/README.md) for the canonical catalog of cross-package boundaries, their owners, versions, executable assets, and change procedure. Each family README then defines what consumers may rely on and what the contract deliberately leaves to domain code.
+The [Contracts README](../contracts/README.md) lists the data exchanged between packages, who maintains it, its versions, and how to validate and change it. Each family README explains the interface guarantees and the rules callers must handle themselves.
 
 ### Workflows
 

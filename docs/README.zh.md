@@ -4,7 +4,7 @@
 
 本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-这里是 `sec-review-bot` 的项目文档入口，包含 agent 设计说明、public contracts、workflow 设计说明和本地运行指南。
+这里汇总 `sec-review-bot` 的 Agent 设计、对外接口与数据格式、工作流和本地运行说明。
 
 如果想先看项目概览，从仓库根目录的 [README](../README.zh.md) 开始。
 
@@ -31,7 +31,7 @@
 
 ### 包与服务
 
-Package README 负责本地 setup、命令、配置与实现布局。运行角色和源码 package 并非一一对应：`agents/` 实现 Execution Worker、Memory Extraction Worker 与 Memory Maintenance Worker。
+各包的 README 说明安装、命令、配置和代码结构。一个源码包可以实现多个独立运行的组件，例如 `agents/` 实现 Execution Worker、Memory Extraction Worker 与 Memory Maintenance Worker。
 
 | 运行角色 | 包说明 |
 | --- | --- |
@@ -59,7 +59,7 @@ Package README 负责本地 setup、命令、配置与实现布局。运行角�
 
 ### 契约
 
-完整的跨 package 边界目录、所有者、版本、可执行资产与变更流程统一维护在 [Contracts README](../contracts/README.zh.md) 中。各契约族 README 再分别定义消费者可以依赖什么，以及哪些规则刻意留给领域代码。
+包与包之间交换哪些数据、由谁维护、使用哪个版本，以及如何校验和修改，见[契约目录说明](../contracts/README.zh.md)。每类契约的 README 进一步说明接口保证什么、调用方还需自行处理哪些规则。
 
 ### 工作流
 
