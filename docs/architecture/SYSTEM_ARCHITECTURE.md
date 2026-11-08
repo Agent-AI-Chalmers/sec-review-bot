@@ -130,11 +130,13 @@ sequenceDiagram
   Runs-->>UI: Return snapshot, pending state, or no observation record
 ```
 
-Langfuse stores the individual model-call observations. Review Runs reads and aggregates them into its own database for display in the Control Plane UI.
+Langfuse stores model-call records. Review Runs reads and aggregates them into its own database for display in the Control Plane UI.
 
 ## Artifact publication and recovery
 
-PostgreSQL and object storage commit separately. Input and memory publishers first persist a publication intent: the intended artifact references and the business payload needed to finish attachment after a crash.
+Review input publication, extraction registration, automatic maintenance revisions, and manual edit revisions all upload files to object storage and register results in PostgreSQL separately. These writes cannot be completed in one local transaction, creating a [dual-write consistency problem](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html): an upload may succeed before the process stops without registering it in the database, leaving an unreferenced object. Registering the database reference first creates the opposite risk: a failed upload can leave a reference to a missing file.
+
+To support retries after an interruption, input and memory publishers first persist a publication intent containing the intended artifact references and complete registration payload, then upload the objects and register the result. Retries can inspect existing objects and continue from that record instead of blindly repeating uploads or model calls.
 
 ```mermaid
 sequenceDiagram

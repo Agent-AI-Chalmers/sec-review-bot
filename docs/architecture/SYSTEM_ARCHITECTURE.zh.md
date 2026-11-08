@@ -132,11 +132,13 @@ sequenceDiagram
   Runs-->>UI: 返回 snapshot、等待状态或无 observation 记录
 ```
 
-Langfuse 保存每次模型调用的 observation。Review Runs 读取并汇总这些数据，写入自己的数据库，供 Control Plane UI 展示。
+Langfuse 保存模型调用记录。Review Runs 读取并汇总这些数据，写入自己的数据库，供 Control Plane UI 展示。
 
 ## Artifact 发布与恢复
 
-PostgreSQL 与对象存储分别提交。Input 与 memory 的发布方先持久化发布意图记录（publication intent），记录预期的产物引用，以及崩溃后完成挂接所需的业务数据。
+本系统中的审查输入发布、经验提取登记、自动维护修订和人工编辑修订，都需要分别向对象存储上传文件、向 PostgreSQL 登记结果。两者无法在一个本地事务中同时完成，因此会遇到[双写一致性问题（dual-write problem）](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html)：文件上传成功后，进程可能在登记数据库前中断，留下没有数据库引用的对象；如果先登记数据库，上传失败又可能留下指向不存在文件的引用。
+
+为支持中断后重试，输入材料和记忆产物的发布方先持久保存发布意图（publication intent），记录预期的产物引用和登记所需的完整业务数据，再上传对象，最后登记结果。重试可以据此检查已有对象并继续处理，而不是盲目重复上传或重新调用模型。
 
 ```mermaid
 sequenceDiagram
@@ -158,18 +160,18 @@ sequenceDiagram
 
 | 产物 | 持久化恢复依据 | 恢复边界 |
 | --- | --- | --- |
-| Review input bundle | Review Runs 发布意图：reference、prepared input 与 publish context | 新 preparation claim 可在对象存在时复用原 发布意图；只有明确不存在时，才允许放弃未选中的 candidate 并重建。 |
-| Extraction trajectory | Memory Catalog 发布意图：trajectory reference、observation 与 summary | 重试先检查已记录的 candidate，再决定是否重新运行模型；选择与 extraction 注册在同一事务中提交。 |
-| Maintenance revision | Memory Catalog 发布意图：tree、trajectory、observation IDs 与 expected active revision 作为一组 | 不同模型输出可以形成不同 candidate；选择、revision 创建、observation 消费与 active pointer 更新在同一事务中提交。 |
-| Operator edit revision | Memory Catalog 发布意图：tree reference、operation ID 与 expected active revision；UI BFF 上传 tree | 编辑器保持打开且内容未变时，重试保留 operation ID 与原 expected revision。BFF 重复执行预留、条件上传、确认与幂等 revision 创建。 |
-| S3 中的 run diagnostic bundle | Temporal publication request 与固定 run key | 恢复先按 request 校验已有 bundle，再考虑本地文件。如果完整上传的 bundle 与本地产物均已丢失，request 无法重建诊断字节。 |
+| 审查输入材料包 | Review Runs 发布意图：产物引用、已准备的输入和发布上下文 | 接管输入准备的调用方可在对象存在时复用原发布意图；只有确认对象不存在时，才能放弃未选中的候选记录并重新准备。 |
+| 经验提取轨迹 | Memory Catalog 发布意图：轨迹引用、经验条目和摘要 | 重试先检查已有候选记录，再决定是否重新调用模型；选定记录和登记提取结果在同一事务中完成。 |
+| 自动维护修订 | Memory Catalog 发布意图：记忆树、轨迹、经验条目 ID 和预期生效修订 | 不同模型输出可以对应不同候选记录；选定记录、创建修订、标记经验条目已处理和更新生效版本在同一事务中完成。 |
+| 人工编辑修订 | Memory Catalog 发布意图：记忆树引用、operation ID 和预期生效修订；UI BFF 上传记忆树 | 编辑器保持打开且内容未变时，重试复用 operation ID 和最初预期的修订。BFF 重新执行预留、条件上传、确认和幂等修订创建。 |
+| S3 中的 run 诊断包 | Temporal 发布请求和固定的 run 对象键 | 恢复时先按请求校验已上传的诊断包，再考虑本地文件。如果完整上传的诊断包和本地产物都已丢失，仅凭请求无法重建诊断内容。 |
 
-UI restore 在 Catalog 事务中将 active pointer 移到已有 revision，不创建 revision 或对象，也不会修复丢失的字节。
+UI 恢复版本在 Catalog 事务中将生效版本指针移到已有修订，不创建修订或对象，也不会修复丢失的字节。
 
-Input 与 memory 的具体协议见 [Review Runs](../../services/review-runs/README.zh.md) 和 [Memory Catalog](../../services/memory-catalog/README.md)。存储错误仍是不确定状态，会使本次尝试失败，不能当作对象不存在。已记录的 发布意图 支持重试，但不提供重试耗尽后的自动后台完成机制。
+输入材料和记忆产物的具体协议见 [Review Runs](../../services/review-runs/README.zh.md) 和 [Memory Catalog](../../services/memory-catalog/README.md)。存储错误仍是不确定状态，会使本次尝试失败，不能当作对象不存在。已记录的发布意图支持重试，但不提供重试耗尽后的自动后台完成机制。
 
 <!-- doc-time-sensitive: artifact-conditional-write-semantics; checked=2026-10-31; source=https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html -->
 
-[条件 PUT](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html) 阻止遵守协议的发布方覆盖已有 key，但不保证对象能抵抗其他具有覆盖或删除权限的身份。Consumer 在使用前校验大小与 SHA-256：这能拒绝替换内容，却不能找回丢失的字节。S3 兼容部署必须针对实际部署的存储版本验证所依赖的 API 与策略条件。
+[条件 PUT](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html) 阻止遵守协议的发布方覆盖已有对象键，但不保证对象能抵抗其他具有覆盖或删除权限的身份。读取方在使用前校验大小与 SHA-256：这能拒绝替换内容，却不能找回丢失的字节。S3 兼容部署必须针对实际部署的存储版本验证所依赖的 API 与策略条件。
 
-放弃 candidate 不会删除对象，目前也没有自动对象垃圾回收。旧上传进程仍可能完成上传，不同 candidate 也可能共享内容 key。未来清理必须考虑历史 revision、extraction reference，以及 Temporal history 中保留的尚未挂接引用，不能把当前没有数据库挂接的对象直接视为可删除。
+放弃候选发布记录不会删除对象，目前也没有自动对象垃圾回收。旧上传进程仍可能完成上传，不同候选发布记录也可能共享内容对象键。未来清理必须考虑历史修订、经验提取引用，以及 Temporal 历史记录中保留的尚未挂接引用，不能把当前未被数据库引用的对象直接视为可删除。
