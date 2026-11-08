@@ -27,7 +27,7 @@
 
 ## 验证受影响区域
 
-在每个受影响的 package 中运行检查，不要只检查最先修改的 package。package README、`package.json` 或 `pyproject.toml` 定义准确的本地命令。
+在每个受影响的包中运行检查，不要只检查直接改了代码的包。具体命令见各包的 README、`package.json` 或 `pyproject.toml`。
 
 | 区域 | 开发指南 | 基线验证 |
 | --- | --- | --- |
