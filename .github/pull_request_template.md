@@ -15,7 +15,7 @@ operators should migrate.
 
 ## Validation
 
-<!-- List the checks, tests, and focused probes actually run. State anything relevant that was not tested. -->
+<!-- Describe the checks and tests you ran, their results, and any relevant checks you did not run. -->
 
 ## Review Notes
 

@@ -82,7 +82,7 @@ feat(contracts)!: remove legacy execution fields
 
 - `Summary` 说明修改内容和原因。
 - `Compatibility` 必须且只能选择 `No compatibility impact`、`Backward-compatible behavior change` 或 `Breaking change` 之一。破坏性变更必须说明受影响内容，以及调用方或运维人员应如何迁移。
-- `Validation` 列出实际运行的检查、测试和聚焦探针，包括相关缺口。
+- `Validation` 说明运行了哪些检查和测试、结果如何，以及哪些相关检查没有运行。
 - `Review Notes` 可选，只应包含有助于审核的信息，例如建议的审核顺序、不明显的权衡、有意保留的行为、排除范围、异常 artifact、不确定性或后续工作。
 
 仓库会检查三个必填 section 是否存在且非空、`Compatibility` 是否恰好包含一种受支持分类，以及破坏性变更是否包含迁移指导。可以添加其他有助于审核的标题和 section，检查器不会解释它们。`Review Notes` 没有提供价值时应删除。
