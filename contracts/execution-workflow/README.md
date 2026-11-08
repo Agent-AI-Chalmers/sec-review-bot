@@ -12,7 +12,7 @@ Use these files:
 
 ## Boundary
 
-Execution Gateway produces this value when it starts `execution-workflow`. Execution Worker validates the same value before preparing and dispatching the selected review workflow. The nested `input` remains governed by the selected Execution API workflow schema; this family owns only the Temporal handoff envelope.
+Execution Gateway produces this value when it starts `execution-workflow`. Execution Worker validates the same value before preparing and dispatching the selected review workflow. The nested `input` remains governed by the selected Execution API workflow schema; this contract owns only the Temporal handoff envelope.
 
 ## Enforcement
 

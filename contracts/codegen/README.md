@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-This development-only package provides the OpenAPI-to-TypeScript generation rules shared by the Execution API, Review Runs API, and Memory Catalog API tools. Each family maintains its own contract, generation command, output manifest, formatting, and generated-output consistency checks.
+This development-only package provides the OpenAPI-to-TypeScript generation rules shared by the Execution API, Review Runs API, and Memory Catalog API tools. The tools for each contract maintain its specification, generation command, output manifest, formatting, and generated-output consistency checks.
 
 Consumers declare a `workspace:*` dependency. Run `pnpm install --frozen-lockfile` from the repository root to use the shared workspace lockfile. After installing dependencies, the tool is ready to run; no separate build is needed.
 
@@ -19,4 +19,4 @@ pnpm run typecheck
 pnpm test
 ```
 
-Behavioral probes belong here; each family separately tests its actual generated contract and freshness. After renderer changes, regenerate all three families and run checks in their consumer packages.
+Behavioral probes belong here; each contract tool separately tests its generated outputs and freshness. After renderer changes, regenerate all three API contracts and run checks in their consumer packages.

@@ -24,7 +24,7 @@ pnpm test
 
 ```text
 tools/
-  generated-artifacts.json   本族派生什么、落到哪里
+  generated-artifacts.json   本契约派生什么、落到哪里
   src/
     generate.ts              pnpm run generate
     check.ts                 pnpm run check

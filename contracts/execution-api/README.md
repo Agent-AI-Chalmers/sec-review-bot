@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-This family defines the complete public Execution API: HTTP operations, execution inputs, workflow results, errors, `ReviewRecord`, and repository `deliveries[]`. A version applies to that complete surface; transport and payload schemas do not carry independent versions.
+This contract defines the complete public Execution API: HTTP operations, execution inputs, workflow results, errors, `ReviewRecord`, and repository `deliveries[]`. A version applies to that complete surface; transport and payload schemas do not carry independent versions.
 
 Use these documents:
 

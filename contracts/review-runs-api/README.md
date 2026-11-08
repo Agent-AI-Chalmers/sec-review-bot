@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-This family holds the shapes Review Runs exchanges with its callers. The single source of truth is the hand-written [v1/openapi.yaml](v1/openapi.yaml); routes, request/response schemas, and security all derive from it. Two surfaces answer to different credentials: the redacted read surface the console consumes, and the full read/write surface the GitHub integration calls.
+This contract holds the shapes Review Runs exchanges with its callers. The single source of truth is the hand-written [v1/openapi.yaml](v1/openapi.yaml); routes, request/response schemas, and security all derive from it. Two surfaces answer to different credentials: the redacted read surface the console consumes, and the full read/write surface the GitHub integration calls.
 
 Use these documents:
 

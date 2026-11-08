@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-This package generates and checks every artifact derived from the [family OpenAPI contract](../v1/openapi.yaml): TypeScript types, operation-route mappings, and committed v1 JSON Schemas. The tools live beside the contract and remain responsible for checking outputs written into other packages.
+This package generates and checks every artifact derived from the [contract OpenAPI contract](../v1/openapi.yaml): TypeScript types, operation-route mappings, and committed v1 JSON Schemas. The tools live beside the contract and remain responsible for checking outputs written into other packages.
 
 ## Commands
 
@@ -22,7 +22,7 @@ pnpm test
 
 ```text
 tools/
-  generated-artifacts.json   what this family derives and where
+  generated-artifacts.json   what this contract derives and where
   src/
     generate.ts              pnpm run generate
     check.ts                 pnpm run check

@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-This family defines the portable, content-addressed archive used to store one rendered memory tree. It is shared by the producer that publishes a tree and every service that validates or extracts one.
+This contract defines the portable, content-addressed archive used to store one rendered memory tree. It is shared by the producer that publishes a tree and every service that validates or extracts one.
 
 Its compression and tar representation follow the shared [envelope v1](../../envelope/v1/SPEC.md); this directory defines the memory-tree profile inside that envelope.
 
