@@ -135,8 +135,6 @@ Workflow：`issue-review`
 
 结果结构由 [`issue-review-result.schema.json`](schemas/issue-review-result.schema.json) 定义。
 
-`two-stage` 和 `single-agent` 两种 issue 策略（本地 issue CLI 的 `--strategy`）是本地评测 / ablation 专用路径：它们在 `issue-review` workflow 上作为 local-only Temporal workflow 启动，但不属于 Execution API v1。
-
 调用方必须从 `review_record` 渲染 issue 评论、判断是否有 patch、创建 draft PR。发布 draft PR 时，最终文件内容以 `review_record.mitigation.file_changes` 为准。
 
 ### Pull request review 结果

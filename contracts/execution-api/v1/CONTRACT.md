@@ -133,8 +133,6 @@ Input keeps the existing issue input contract and expresses review intent throug
 
 The result shape is defined by [`issue-review-result.schema.json`](schemas/issue-review-result.schema.json).
 
-The `two-stage` and `single-agent` issue strategies (`--strategy` on the local issue CLI) are local evaluation / ablation paths. They start as local-only Temporal workflows on the `issue-review` workflow, but they are not part of Execution API v1.
-
 Callers must render issue comments, decide whether a patch exists, and create draft PRs from `review_record`. When publishing a draft PR, `review_record.mitigation.file_changes` is the authoritative source for final file contents.
 
 ### Pull Request Review Result
