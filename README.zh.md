@@ -20,7 +20,7 @@ Sec Review Bot 支持使用 AI Agent 执行代码库安全审计，覆盖 issue�
 
 | 能力                | 行为                                                                 |
 | ------------------- | -------------------------------------------------------------------- |
-| Issue review        | 审计 issue 报告，并在需要修复时产出经过复核的补丁或 draft PR。       |
+| Issue review        | 核查 Issue 报告、分析问题及其影响，再根据证据决定是否尝试修复，并独立验证分析结论和修复结果；有可交付补丁且指定 `--open-pr` 时，可创建 draft PR。       |
 | Pull request review | 审查 PR 变更，并可发布 review suggestions。                          |
 | Repository review   | 对仓库执行全仓或增量扫描，并进行问题发现、筛选、逐项处理和交付规划。 |
 

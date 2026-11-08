@@ -20,7 +20,7 @@ Sec Review Bot uses AI agents to audit codebases and handle security-review task
 
 | Capability          | What happens                                                                                              |
 | ------------------- | --------------------------------------------------------------------------------------------------------- |
-| Issue review        | Audits reported issues and can produce reviewed fixes or draft PRs when repair is requested.              |
+| Issue review        | Investigates issue reports, analyzes the problem and its impact, decides from evidence whether to attempt a repair, and independently verifies the analysis and repair outcome; a ready patch can be published as a draft PR when `--open-pr` is specified.              |
 | Pull request review | Reviews PR changes and can publish review suggestions.                                                    |
 | Repository review   | Runs full-repository or incremental scans with discovery, triage, case processing, and delivery planning. |
 
