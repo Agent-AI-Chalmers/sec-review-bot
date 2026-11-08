@@ -6,12 +6,12 @@
 
 保持变更聚焦，维护明确的所有权边界，并验证实际消费该变更的 package 和 contract。本指南介绍通用的贡献流程。各包的安装、配置和检查命令，以及契约的修改要求，见对应目录的 README。
 
-## 找到所有权边界
+## 找到负责该功能的代码
 
 修改代码前，按以下顺序阅读维护文档：
 
 1. 变更跨越服务、worker、存储或部署边界时，阅读[系统架构](docs/architecture/SYSTEM_ARCHITECTURE.zh.md)。
-2. 阅读最近的 package 或目录 `README.md`，了解本地职责、设置、配置和命令；有中文版本时可以同时参考。
+2. 阅读准备修改的代码所在目录的 `README.md`；该目录没有时，向上查找最近一级目录的 README。通过它了解这部分代码负责什么、如何准备环境和配置，以及需要运行哪些检查。
 3. 阅读[文档地图](docs/README.zh.md)，查找 workflow、agent 和运维设计说明。
 4. 对于跨 package 数据，在修改 schema、fixture、生成投影、artifact 或 API 形状之前，先阅读 [contracts 指南](contracts/README.zh.md)和受影响 contract family 的 README。
 

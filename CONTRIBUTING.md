@@ -4,12 +4,12 @@ Language: English | [中文](CONTRIBUTING.zh.md)
 
 Keep changes focused, preserve explicit ownership boundaries, and validate the packages and contracts that actually consume the change. This guide explains the common contribution process. For installation, configuration, check commands, and contract-specific change requirements, read the README in the relevant directory.
 
-## Find The Owning Boundary
+## Find The Code Responsible For The Behavior
 
 Before editing code, use the maintained documentation in this order:
 
 1. Read the [system architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) when the change crosses services, workers, storage, or deployment boundaries.
-2. Read the nearest package or directory `README.md` for local responsibilities, setup, configuration, and commands.
+2. Read the `README.md` in the directory containing the code you plan to change, or the nearest parent directory that has one. It explains what that code is responsible for, how to set it up and configure it, and which checks to run.
 3. Read the [documentation map](docs/README.md) for workflow, agent, and operations design notes.
 4. For cross-package data, read the [contracts guide](contracts/README.md) and the affected contract-family README before changing a schema, fixture, generated projection, artifact, or API shape.
 
