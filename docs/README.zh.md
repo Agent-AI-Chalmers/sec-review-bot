@@ -97,9 +97,9 @@
 本地运行系统或配置 GitHub webhook 时，看这里：
 
 - [DEPENDENCY_MAINTENANCE](operations/DEPENDENCY_MAINTENANCE.zh.md)：依赖更新策略、本地检查命令和验证方式。
-- [LOCAL_INTEGRATED_DEPLOYMENT](operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)：本地控制平面、宿主机执行 worker、systemd 运维和扩展方式。
-- [LOCAL_MEMORY_DEVELOPMENT](operations/LOCAL_MEMORY_DEVELOPMENT.zh.md)：独立的本地 Memory 基础设施、worker 启动与维护操作。
-- [LOCAL_GITHUB_INBOUND_SETUP](operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md)：将 GitHub App webhook 和 Actions 仓库级 review 请求转发到本地服务。
+- [LOCAL_INTEGRATED_DEPLOYMENT](operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)：本地控制平面、宿主机执行 Worker、systemd 运维和扩展方式。
+- [LOCAL_MEMORY_DEVELOPMENT](operations/LOCAL_MEMORY_DEVELOPMENT.zh.md)：如何搭建本地 Memory 开发环境、启动 Worker 和执行维护操作。
+- [LOCAL_GITHUB_INBOUND_SETUP](operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md)：将 GitHub App webhook 和 GitHub Actions 发起的仓库审查请求转发到本地服务。
 
 ### 后续工作
 
