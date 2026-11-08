@@ -8,6 +8,18 @@
 
 如果想先看项目概览，从仓库根目录的 [README](../README.zh.md) 开始。
 
+## 按任务选择阅读路线
+
+| 你想做什么 | 建议顺序 |
+| --- | --- |
+| 在本地运行一次审查 | [Agents 安装与模型配置](../agents/README.zh.md) → [本地运行示例](../agents/README.zh.md#本地运行)；无需先部署 GitHub 集成。 |
+| 部署 GitHub 审查服务 | [本地集成部署](operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md) → [GitHub 入站设置](operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) → [触发命令](../apps/github-integration/README.zh.md#触发)。 |
+| 修改 Agent 或工作流 | [阶段与 Agent 分工](architecture/STAGE_AGENT_OWNERSHIP.zh.md) → [Agents 包说明](../agents/README.zh.md) → 对应工作流文档。 |
+| 修改服务间接口或产物格式 | [系统架构](architecture/SYSTEM_ARCHITECTURE.zh.md) → [契约目录](../contracts/README.zh.md) → 对应契约目录和使用方的说明。 |
+| 开发控制台界面 | [Control Plane UI](../apps/control-plane-ui/README.zh.md)，先用测试数据预览，无需启动完整后端。 |
+
+下面的目录用于按主题查阅，不要求从头读到尾。
+
 ## 文档地图
 
 - [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md) / [中文](DOCUMENTATION_GUIDE.zh.md)：关于耐久表述、易变事实、翻译和文档审核的仓库级规则。

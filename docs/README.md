@@ -6,6 +6,18 @@ This directory collects the project docs for `sec-review-bot`: agent design note
 
 For a project overview, start with the repository [README](../README.md).
 
+## Reading Paths By Task
+
+| Task | Suggested order |
+| --- | --- |
+| Run one local review | [Agents installation and model setup](../agents/README.md) → [local run examples](../agents/README.md#local-runs); GitHub integration is not required. |
+| Deploy GitHub reviews | [Integrated deployment](operations/LOCAL_INTEGRATED_DEPLOYMENT.md) → [GitHub inbound setup](operations/LOCAL_GITHUB_INBOUND_SETUP.md) → [trigger commands](../apps/github-integration/README.md#triggers). |
+| Change an agent or workflow | [Stage and agent responsibilities](architecture/STAGE_AGENT_OWNERSHIP.md) → [Agents package guide](../agents/README.md) → the relevant workflow document. |
+| Change a service interface or artifact format | [System architecture](architecture/SYSTEM_ARCHITECTURE.md) → [contracts catalog](../contracts/README.md) → the family and consumer guides. |
+| Develop the console | [Control Plane UI](../apps/control-plane-ui/README.md); start with fixtures without deploying the full backend. |
+
+The catalog below is a reference, not a required reading sequence.
+
 ## Documentation Map
 
 - [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md): Repository-wide rules for durable wording, mutable facts, translations, and documentation review.
