@@ -48,6 +48,10 @@ Find marked facts with:
 rg 'doc-(default|time-sensitive):' --glob '*.md' --glob '!docs/DOCUMENTATION_GUIDE*.md'
 ```
 
+## Explain How To Use It First
+
+When documenting how to use a feature, first state what the reader can do and what they need to prepare, then give a minimal working example. Put implementation details after these instructions. For example, a service startup guide can cover preparing dependencies, setting configuration, running the startup command, and confirming that the service is available before explaining module layout and internal call flow.
+
 ## Documentation Review
 
 When reviewing maintained documentation:
