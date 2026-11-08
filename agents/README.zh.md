@@ -4,9 +4,15 @@
 
 本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-`agents/` 是项目里的 Python 侧。它把 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker 实现为三个独立的 Temporal runtime，并提供 workflow 执行、filesystem / workspace runtime、delivery 产物生成和 observability。
+`agents/` 包含安全审查 Agent、审查工作流，以及审查经验的提取和维护代码，支持本地运行和通过 Temporal 执行任务。
 
-## 安装
+## 能力
+
+- **Execution Worker** 执行 `issue-review`、`pull-request-review` 和 `repository-review`。仓库审查包括 Discovery、Triage、逐项分析、CVSS 评分、修复、验证和交付；没有交付结果的 case 仍会展示在 case 结果中。
+- **Memory Extraction Worker** 从执行轨迹中提取可复用的审查经验。
+- **Memory Maintenance Worker** 审阅提取出的经验，并更新共享记忆。
+
+## 安装、激活环境
 
 在 `agents/` 目录运行：
 
@@ -19,149 +25,55 @@ source .venv/bin/activate
 
 > *Python 3.14 是当前 package 的默认开发、CI、package 和容器 runtime 基线。*
 
-开发检查：
-
-```bash
-uv run ruff check .
-uv run black --check .
-uv run mypy .
-uv run pyright .
-uv run python -m pytest
-```
-
-本地清理时，可以让 ruff 应用安全的机械修复：
-
-```bash
-uv run ruff check . --fix
-```
-
 ## LLM 配置
 
-LLM 配置按 deployment 选择 provider。
+先在仓库根目录复制配置文件，再编辑 TOML 中的模型地址、凭据引用和 Agent 绑定。可用字段和绑定名称见示例文件；运行任务涉及的每个 Agent 都需要绑定可用模型。
 
-这一层负责：
+```bash
+cp agents/.env.sample agents/.env
+cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
+```
 
-- 由 [`llm/config.py`](./src/sec_review_agents/llm/config.py) 读取 chat / embedding deployment 配置
-- 由 [`llm/factory.py`](./src/sec_review_agents/llm/factory.py) 按 agent 选择 deployment
-- 再按 provider 前缀构造原生 LangChain chat model
-  - `openai/...` -> `ChatOpenAI`
-  - `anthropic/...` -> `ChatAnthropic`
-  - `google/...` -> `ChatGoogleGenerativeAI`
-
-在本仓库里运行本地命令时，默认读取 `agents/.env` 和 `agents/config/model-providers.toml`。
+本地审查命令默认读取 `agents/.env` 和 `agents/config/model-providers.toml`。如需使用其他位置的模型配置文件，可设置 `MODEL_PROVIDERS_CONFIG_TOML`。
 
 本地 `run-local-*` CLI 和 `sec-review-agents-check-llm-deployments` 会加载 `agents/.env`，但不会覆盖进程里已有的环境变量。
 
-`sec-review-execution-worker`、`sec-review-memory-extraction-worker` 和 `sec-review-memory-maintenance-worker` 不会自己加载 `.env`，需要由 shell、process supervisor 或 CI 注入环境变量。Execution Gateway 是 [`services/execution-gateway/`](../services/execution-gateway/README.zh.md) 下独立的 TypeScript 服务。
+本地命令会加载 `agents/.env`，Worker 启动命令不会。启动 Worker 时，需要通过 shell、进程管理器或 CI 设置环境变量。
 
-没有 `.env` 文件路径 override。`MODEL_PROVIDERS_CONFIG_TOML` 是模型配置路径的最高优先级入口；只有想把 TOML 放到其他位置，或运行方式不保留当前项目相对目录结构时，才需要显式设置它。
+`[agent_deployment_bindings]` 用来把具体 Agent 显式绑定到某个模型部署。所有运行到的 Agent 都必须显式声明；未声明的 Agent 会 fail fast，不会继承默认模型。
 
-`[agent_deployment_bindings]` 用来把具体 agent 显式绑定到某个 deployment。所有运行到的 agent 都必须显式声明；未声明的 agent 会 fail fast，不会继承默认模型。
-
-每个 `[[deployments]]` 都必须显式声明 `max_input_tokens`。Execution Worker 不会从 LangChain model profile 或 provider 名字推断上下文窗口；这个 deployment contract 才是上下文上限行为的事实来源。
-
-## 能力
-
-Execution Worker 支持：
-
-- `issue-review` workflow
-- issue analyzer / mitigator / verifier
-- `pull-request-review` workflow
-- PR analyzer / mitigator / verifier
-- `repository-review` workflow
-  - discovery / triage / analyzer / cvss-v4-scoring / mitigator / verifier / delivery
-  - delivery 会把 repository cases 组织成可发布的交付结果；未交付 case 仍通过 case result 展示
-- 本地评测 / ablation 路径：
-  - `issue-review` 配 `--strategy two-stage`
-  - `issue-review` 配 `--strategy single-agent`（local baseline）
-
-resources 位于 package 内部：
-
-- [`./src/sec_review_agents/resources/`](./src/sec_review_agents/resources/)
-- worker 从这里读取 prompts，并把 agent 声明允许的 skills 准备好、挂给对应 agent 使用
-
-## 目录
-
-Python package 按职责读最清楚：
-
-1. Agent implementations。
-   - `agents/`：各类 agent 的提示词、运行配置、工具和输出结构。
-
-2. Stage pipeline：共享执行、stage 产物和公开结果契约。
-   - `scan_stages/`：repository discovery / triage stage execution，把仓库扫描信号整理成 cases。
-   - `review_stages/`：analysis / mitigation / verification / CVSS stage execution、stage result payloads、review record projection 和 verifier feedback 逻辑。
-   - `delivery_stages/`：repository delivery planning、delivery execution、patch synthesis execution 和 delivery result 生成。
-
-3. Workflows：把 stage 组合成产品路径。
-   - `workflows/`：`issue/`、`pull_request/`、`repository/` 是三个 public workflow；`repository_case/` 是 repository workflow 内部的单 case review。
-
-4. 本地与运维命令。
-   - `cli/`：用于开发和运维、完成一次指定任务后退出的命令，以及只服务于本地命令的支持代码。
-
-5. 生产 entrypoints。
-   - `entrypoints/`：Temporal execution worker，以及它的 execution contract、run protocol 和 workflow input preparation 边界。
-
-6. Artifact 持久化与 run diagnostics。
-   - `artifacts/`：不可变 artifact reference、本地与 S3 传输、物化和安全 archive 解包。Reference 将 `file://` 或 `s3://` 位置与 media type、大小和 digest 绑定；consumer 持有传输配置，并在使用前校验和物化 reference。
-   - `run_diagnostics/`：per-run diagnostic bundle 的格式、构建与物化逻辑，以及对应的 Temporal publication activity。
-
-7. Runtime support：agent 运行所需基础设施。
-   - `runtime/`、`filesystem/`、`workspace/`、`llm/`、`resources/`、`observability/`：agent runtime、filesystem sandbox、workspace 产物、模型配置、prompt / skill 资源和诊断支持。
-
-## 执行架构
-
-```mermaid
-flowchart LR
-    gateway["services/execution-gateway/<br/>TypeScript + Fastify"] <-->|"启动 / 查询 workflow"| temporal["Temporal Server"]
-
-    local["run-local-*"] --> materialize["本地准备输入"]
-    materialize --> direct["Direct execution"]
-    materialize -->|"--temporal"| temporal
-
-    temporal <-->|"任务 / 结果"| worker["Temporal Worker"]
-    worker --> execution["Review workflows / activities / agents"]
-    direct --> execution
-```
-
-外部 TypeScript Gateway 接收 HTTP run 请求，并通过 Temporal client 启动和查询 workflow。Temporal Server 持久化 workflow 状态，并通过 task queue 将 review 工作分发给 Execution Worker。
-
-- Direct local execution 绕过 HTTP service 和 Temporal，但会复用 activity functions。
-- `run-local-* --temporal` 绕过 HTTP service，但会经过 Temporal Server 和 Execution Worker。
+每个 `[[deployments]]` 都必须显式声明 `max_input_tokens`。Execution Worker 不会从 LangChain 模型能力描述或模型服务商名字推断上下文窗口；这个模型部署 contract 才是上下文上限行为的事实来源。
 
 ## 本地运行
 
 本地运行用于开发和调试，不是生产集成路径。
 
-本地有三种执行路径：
+本地支持以下执行路径：
 
-- Direct local run：日常开发默认使用，也是最快的路径。
-- Local `--temporal` run：用于验证 workflow / activity 编排。
-- 手动启动 Service 和 Worker：用于在不启动完整 Compose 栈时验证完整 service path。
+- 直接本地执行：日常开发使用，省去 HTTP 和 Temporal 调度。
+- Local `--temporal` 任务：用于验证 workflow / activity 编排。
+- 手动启动 Service 和 Worker：联调 HTTP 服务、Temporal 和 Worker，无需启动完整 Compose 栈。
 
-| 执行路径 | Diagnostic publication | Memory processing |
+| 执行路径 | 诊断包发布 | 记忆处理 |
 | --- | --- | --- |
-| Direct `run-local-*`，标准 workflow | 本地 diagnostic bundle | 禁用 |
-| Direct `run-local-*`，`single-agent` 或 `two-stage` ablation | 本地 diagnostic bundle | 禁用 |
-| 本地 `--temporal`，标准 workflow | 本地 diagnostic bundle | 由 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
-| 本地 `--temporal`，`single-agent` 或 `two-stage` ablation | 本地 diagnostic bundle | 禁用 |
-| 手动启动 Service 和 Worker | S3 兼容存储中的 diagnostic bundle | 使用生产 workflow 行为 |
+| Direct `run-local-*`，标准工作流 | 本地诊断包 | 禁用 |
+| 本地 `--temporal`，标准工作流 | 本地诊断包 | 由 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
+| 手动启动 Service 和 Worker | S3 兼容存储中的诊断包 | 由 Execution Worker 环境中的 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
 
 ### `run-local-*` 命令
 
 安装依赖后，可以使用以下命令：
 
-- `sec-review-agents-run-local-issue`：本地 issue run 入口；可用 `--strategy default|two-stage|single-agent` 选择默认 multi-stage 路径、two-stage ablation 或 single-agent baseline
-- `sec-review-agents-run-local-pr`：本地 PR run 入口
-- `sec-review-agents-run-local-repository`：本地 repo 扫描 run 入口；可用 `--scan-mode full|incremental` 选择全量或增量扫描，并可重复传入 `--paths-ignore PATTERN`，忽略指定路径或 glob
+- `sec-review-agents-run-local-issue`：本地 issue 任务入口；其他策略见[消融实验](#消融实验)
+- `sec-review-agents-run-local-pr`：本地 PR 任务入口
+- `sec-review-agents-run-local-repository`：本地 repo 扫描任务入口；可用 `--scan-mode full|incremental` 选择全量或增量扫描，并可重复传入 `--paths-ignore PATTERN`，忽略指定路径或 glob
 
 本地命令必须通过 `--output-dir` 指定保存位置；程序在该父目录下创建新的 `local-run-*` 目录。
 
 示例：
 
 ```bash
-cd /path/to/monorepo
-cp agents/.env.sample agents/.env
-cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
+cd /path/to/sec-review-bot
 
 # 1) issue
 # 选择 review objective；test_changes 默认为 allow。
@@ -170,26 +82,6 @@ sec-review-agents-run-local-issue \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
   --output-dir /abs/path/to/local-runs \
-  --review-objective repair
-
-# 1b) issue two-stage ablation
-# --test-changes deny 表示最终 mitigation patch 不得包含测试改动。
-sec-review-agents-run-local-issue \
-  --output-dir /abs/path/to/local-runs \
-  --repo /abs/path/to/repo \
-  --issue-md /abs/path/to/issue.md \
-  --target-branch main \
-  --strategy two-stage \
-  --review-objective audit \
-  --test-changes deny
-
-# 1c) issue single-agent baseline
-sec-review-agents-run-local-issue \
-  --output-dir /abs/path/to/local-runs \
-  --repo /abs/path/to/repo \
-  --issue-md /abs/path/to/issue.md \
-  --target-branch main \
-  --strategy single-agent \
   --review-objective repair
 
 # 2) pr
@@ -225,15 +117,15 @@ sec-review-agents-run-local-repository \
 
 只有需要调试内部 Temporal workflow / activity 编排时，才使用 `--temporal`。
 
-显式传 `--temporal` 时，同一个本地命令仍然在开发机上准备输入，但后续 workflow stages 会通过 Temporal workflow / activity 调度执行。这个模式适合调试 workflow 编排、retry、activity 边界或 Temporal 中可见的状态。
+显式传 `--temporal` 时，同一个本地命令仍然在开发机上准备输入，但后续工作流阶段会通过 Temporal workflow / activity 调度执行。这个模式适合调试工作流编排、retry、activity 边界或 Temporal 中可见的状态。
 
 按[手动启动 Workers](#手动启动-workers)中的步骤启动 Temporal Server 和 Execution Worker，再为 `run-local-*` 命令添加 `--temporal`。
 
 ### 手动启动 Workers
 
-运行 review 需要 Temporal Server 和 Execution Worker。启用 memory processing 时，先按 [Memory](#memory) 小节配置依赖，再启动 Memory Extraction 和 Memory Maintenance workers。
+运行 review 需要 Temporal Server 和 Execution Worker。启用记忆处理时，先按 [Memory](#memory) 小节配置依赖，再启动 Memory Extraction 和 Memory Maintenance Worker。
 
-先按[模型配置](#llm-配置)准备 `agents/.env` 和 `agents/config/model-providers.toml`。在每个 worker 终端中，先加载环境变量，再执行对应的启动命令：
+先按[模型配置](#llm-配置)准备 `agents/.env` 和 `agents/config/model-providers.toml`。在每个 Worker 终端中，先加载环境变量，再执行对应的启动命令：
 
 ```bash
 cd agents
@@ -242,7 +134,7 @@ source .env
 set +a
 ```
 
-在不同终端中分别启动 Temporal 和 workers：
+在不同终端中分别启动 Temporal 和 Worker：
 
 终端 1，Temporal Server：
 
@@ -274,9 +166,9 @@ TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES=1 \
 sec-review-memory-maintenance-worker
 ```
 
-Execution Worker 负责 review workflow、sandbox activity 和 run diagnostic 发布；Memory Extraction Worker 读取已发布的诊断包并产出 observations，可以增加轮询同一 extraction task queue 的进程；Memory Maintenance Worker 串行更新共享 memory tree，并负责维护 maintenance schedule，它拒绝 `1` 以外的 activity concurrency，且必须保持单进程。三个 worker 分别使用独立的 task queue 和并发限制。
+Memory Maintenance Worker 必须保持单进程，activity 并发数固定为 `1`；不要同时启动多个实例。
 
-Docker Compose 控制平面和宿主机 worker 的运行方式见[本地集成部署](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
+Docker Compose 控制平面和宿主机 Worker 的运行方式见[本地集成部署](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
 
 ## Agent 运行时配置
 
@@ -330,3 +222,101 @@ export AGENT_MCP_ENABLED=true
 ```
 
 工具及接入方式的选择见 [Agent 外部工具](../docs/agent/EXTERNAL_TOOLS.zh.md)。
+
+## 开发者导航
+
+### 目录
+
+Python package 按职责读最清楚：
+
+1. Agent implementations。
+   - `agents/`：各类 agent 的提示词、运行配置、工具和输出结构。
+
+2. Stage pipeline：共享执行、stage 产物和公开结果契约。
+   - `scan_stages/`：repository discovery / triage stage execution，把仓库扫描信号整理成 cases。
+   - `review_stages/`：analysis / mitigation / verification / CVSS stage execution、stage result payloads、review record projection 和 verifier feedback 逻辑。
+   - `delivery_stages/`：repository delivery planning、delivery execution、patch synthesis execution 和 delivery result 生成。
+
+3. Workflows：把 stage 组合成产品路径。
+   - `workflows/`：`issue/`、`pull_request/`、`repository/` 是三个 public workflow；`repository_case/` 是 repository workflow 内部的单 case review。
+
+4. 本地与运维命令。
+   - `cli/`：用于开发和运维、完成一次指定任务后退出的命令，以及只服务于本地命令的支持代码。
+
+5. 生产 entrypoints。
+   - `entrypoints/`：Temporal execution worker，以及它的 execution contract、run protocol 和 workflow input preparation 边界。
+
+6. Artifact 持久化与 run diagnostics。
+   - `artifacts/`：不可变 artifact reference、本地与 S3 传输、物化和安全 archive 解包。Reference 将 `file://` 或 `s3://` 位置与 media type、大小和 digest 绑定；consumer 持有传输配置，并在使用前校验和物化 reference。
+   - `run_diagnostics/`：per-run diagnostic bundle 的格式、构建与物化逻辑，以及对应的 Temporal publication activity。
+
+7. Runtime support：agent 运行所需基础设施。
+   - `runtime/`、`filesystem/`、`workspace/`、`llm/`、`resources/`、`observability/`：agent runtime、filesystem sandbox、workspace 产物、模型配置、prompt / skill 资源和诊断支持。
+
+### 执行架构
+
+```mermaid
+flowchart LR
+    gateway["services/execution-gateway/<br/>TypeScript + Fastify"] <-->|"启动 / 查询 workflow"| temporal["Temporal Server"]
+
+    local["run-local-*"] --> materialize["本地准备输入"]
+    materialize --> direct["Direct execution"]
+    materialize -->|"--temporal"| temporal
+
+    temporal <-->|"任务 / 结果"| worker["Temporal Worker"]
+    worker --> execution["Review workflows / activities / agents"]
+    direct --> execution
+```
+
+外部 TypeScript Gateway 接收 HTTP run 请求，并通过 Temporal client 启动和查询 workflow。Temporal Server 持久化 workflow 状态，并通过 task queue 将 review 工作分发给 Execution Worker。
+
+- Direct 本地执行不经过 HTTP 服务和 Temporal 调度，但复用 Temporal activity 函数。
+- `run-local-* --temporal` 绕过 HTTP service，但会经过 Temporal Server 和 Execution Worker。
+
+### 开发检查
+
+在 `agents/` 目录运行：
+
+```bash
+uv run ruff check .
+uv run black --check .
+uv run mypy .
+uv run pyright .
+uv run python -m pytest
+```
+
+本地清理时，可以让 ruff 应用安全的机械修复：
+
+```bash
+uv run ruff check . --fix
+```
+
+### 消融实验
+
+本地 Issue 审查默认使用多阶段工作流。做消融实验时，添加 `--strategy two-stage` 运行双阶段版本，或添加 `--strategy single-agent` 运行 single-agent。
+
+消融实验路径生成本地诊断包，且禁用记忆处理；直接运行和添加 `--temporal` 时均如此。
+
+```bash
+cd /path/to/sec-review-bot
+
+# two-stage 消融实验
+# --test-changes deny 表示最终 mitigation patch 不得包含测试改动。
+sec-review-agents-run-local-issue \
+  --output-dir /abs/path/to/local-runs \
+  --repo /abs/path/to/repo \
+  --issue-md /abs/path/to/issue.md \
+  --target-branch main \
+  --strategy two-stage \
+  --review-objective audit \
+  --test-changes deny
+
+# single-agent
+sec-review-agents-run-local-issue \
+  --output-dir /abs/path/to/local-runs \
+  --repo /abs/path/to/repo \
+  --issue-md /abs/path/to/issue.md \
+  --target-branch main \
+  --strategy single-agent \
+  --review-objective repair
+```

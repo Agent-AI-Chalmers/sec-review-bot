@@ -2,9 +2,15 @@
 
 Language: English | [中文](README.zh.md)
 
-`agents/` is the Python side of the project. It implements the Execution Worker, Memory Extraction Worker, and Memory Maintenance Worker as separate Temporal runtimes, together with workflow execution, filesystem and workspace runtime, delivery result generation, and observability.
+`agents/` contains security-review agents, review workflows, and code for extracting and maintaining review experience. It supports local runs and task execution through Temporal.
 
-## Setup
+## Capabilities
+
+- **Execution Worker** runs `issue-review`, `pull-request-review`, and `repository-review`. Repository reviews include discovery, triage, per-case analysis, CVSS scoring, mitigation, verification, and delivery. Cases without a delivery remain visible in case results.
+- **Memory Extraction Worker** extracts reusable review experience from execution trajectories.
+- **Memory Maintenance Worker** reviews extracted experience and updates shared memory.
+
+## Install And Activate The Environment
 
 From `agents/`:
 
@@ -17,114 +23,24 @@ This directory carries its own `.python-version`; `pyproject.toml` requires Pyth
 
 > *Python 3.14 is the default development, CI, package, and container runtime baseline for this package.*
 
-Development checks:
-
-```bash
-uv run ruff check .
-uv run black --check .
-uv run mypy .
-uv run pyright .
-uv run python -m pytest
-```
-
-For local cleanup, ruff can apply safe mechanical fixes:
-
-```bash
-uv run ruff check . --fix
-```
-
 ## LLM Setup
 
-LLM configuration is deployment-based.
+Copy the configuration files from the repository root, then edit the TOML model endpoints, credential references, and agent bindings. The sample lists the available fields and binding names; every agent used by the task needs an available model binding.
 
-This layer is responsible for:
+```bash
+cp agents/.env.sample agents/.env
+cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
+```
 
-- reading chat / embedding deployment config through [`llm/config.py`](./src/sec_review_agents/llm/config.py)
-- selecting deployments per agent through [`llm/factory.py`](./src/sec_review_agents/llm/factory.py)
-- constructing native LangChain chat models by provider prefix:
-  - `openai/...` -> `ChatOpenAI`
-  - `anthropic/...` -> `ChatAnthropic`
-  - `google/...` -> `ChatGoogleGenerativeAI`
-
-When running from this repository, local commands read `agents/.env` and `agents/config/model-providers.toml` by default.
+Local review commands read `agents/.env` and `agents/config/model-providers.toml` by default. Set `MODEL_PROVIDERS_CONFIG_TOML` to use a model configuration file at another location.
 
 The local `run-local-*` CLIs and `sec-review-agents-check-llm-deployments` load `agents/.env`, but never overwrite environment variables already set in the process.
 
-`sec-review-execution-worker`, `sec-review-memory-extraction-worker`, and `sec-review-memory-maintenance-worker` do not load `.env` themselves. Pass their environment through the shell, process supervisor, or CI. Execution Gateway is a separate TypeScript service under [`services/execution-gateway/`](../services/execution-gateway/README.md).
-
-There is no `.env` path override. `MODEL_PROVIDERS_CONFIG_TOML` has the highest priority for model config; set it only when using another TOML location or when the run layout does not preserve the project-relative path.
+Local commands load `agents/.env`; Worker startup commands do not. Set environment variables through the shell, a process manager, or CI when starting Workers.
 
 `[agent_deployment_bindings]` explicitly binds agents to deployments. Every agent that can run must be declared; undeclared agents fail fast and do not inherit a default model.
 
 Each `[[deployments]]` entry must explicitly declare `max_input_tokens`. The Execution Worker does not infer context-window size from LangChain model profiles or provider names; this deployment contract is the source of truth for context-limit behavior.
-
-## Capabilities
-
-The Execution Worker supports:
-
-- `issue-review` workflow
-- issue analyzer / mitigator / verifier
-- `pull-request-review` workflow
-- PR analyzer / mitigator / verifier
-- `repository-review` workflow
-  - discovery / triage / analyzer / cvss-v4-scoring / mitigator / verifier / delivery
-  - delivery organizes repository cases into publishable delivery results; non-delivered cases are still shown through case results
-- local evaluation / ablation paths:
-  - `issue-review` with `--strategy two-stage`
-  - `issue-review` with `--strategy single-agent` (local baseline)
-
-Resources live inside the package:
-
-- [`./src/sec_review_agents/resources/`](./src/sec_review_agents/resources/)
-- The worker reads prompts from there, prepares the skills declared for an agent, and mounts them for that agent.
-
-## Layout
-
-The Python package is easiest to read by responsibility:
-
-1. Agent implementations.
-   - `agents/`: prompts, runtime setup, tools, and output schemas for each agent.
-
-2. Stage pipeline: shared execution, stage artifacts, and public result contracts.
-   - `scan_stages/`: repository discovery / triage stage execution; turns repository scan signals into cases.
-   - `review_stages/`: analysis / mitigation / verification / CVSS stage execution, stage result payloads, review record projection, and verifier feedback logic.
-   - `delivery_stages/`: repository delivery planning, delivery execution, patch synthesis execution, and delivery result generation.
-
-3. Workflows: combines stages into product paths.
-   - `workflows/`: `issue/`, `pull_request/`, and `repository/` are the public workflows; `repository_case/` is the per-case review used inside repository workflow.
-
-4. Local and operator commands.
-   - `cli/`: commands for development and operations that perform one requested task and exit, plus their local-only support code.
-
-5. Production entrypoints.
-   - `entrypoints/`: the Temporal execution worker plus its execution contract, run protocol, and workflow input preparation boundaries.
-
-6. Artifact persistence and run diagnostics.
-   - `artifacts/`: immutable artifact references, local and S3 transport, materialization, and safe archive extraction. References bind a `file://` or `s3://` location to its media type, size, and digest; consumers own transport configuration and materialize verified references before use.
-   - `run_diagnostics/`: the per-run diagnostic bundle format, build and materialize logic, and its Temporal publication activity.
-
-7. Runtime support: infrastructure needed to run agents.
-   - `runtime/`, `filesystem/`, `workspace/`, `llm/`, `resources/`, `observability/`: agent runtime, filesystem sandbox, workspace artifacts, model config, prompt / skill resources, and diagnostics.
-
-## Execution Architecture
-
-```mermaid
-flowchart LR
-    gateway["services/execution-gateway/<br/>TypeScript + Fastify"] <-->|"start / query workflow"| temporal["Temporal Server"]
-
-    local["run-local-*"] --> materialize["Local input materialization"]
-    materialize --> direct["Direct execution"]
-    materialize -->|"--temporal"| temporal
-
-    temporal <-->|"tasks / results"| worker["Temporal Worker"]
-    worker --> execution["Review workflows / activities / agents"]
-    direct --> execution
-```
-
-The external TypeScript Gateway receives HTTP run requests and uses the Temporal client to start and query workflows. Temporal Server persists workflow state and dispatches review work to Execution Worker through its task queue.
-
-- Direct local execution bypasses the HTTP service and Temporal while reusing activity functions.
-- `run-local-* --temporal` bypasses the HTTP service but uses Temporal Server and Execution Worker.
 
 ## Local Runs
 
@@ -134,21 +50,19 @@ The supported local execution paths are:
 
 - Direct local run: the default and fastest path for ordinary development.
 - Local `--temporal` run: for exercising workflow / activity orchestration.
-- Manually started service and worker: for exercising the complete service path without the full Compose stack.
+- Manually started service and worker: for testing the HTTP service, Temporal, and Worker together without starting the full Compose stack.
 
 | Execution path | Diagnostic publication | Memory processing |
 | --- | --- | --- |
 | Direct `run-local-*`, standard workflow | Local diagnostic bundle | Disabled |
-| Direct `run-local-*`, `single-agent` or `two-stage` ablation | Local diagnostic bundle | Disabled |
 | Local `--temporal`, standard workflow | Local diagnostic bundle | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED` |
-| Local `--temporal`, `single-agent` or `two-stage` ablation | Local diagnostic bundle | Disabled |
-| Manually started service and workers | Diagnostic bundle in S3-compatible storage | Production workflow behavior |
+| Manually started service and workers | Diagnostic bundle in S3-compatible storage | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED` in the Execution Worker environment |
 
 ### `run-local-*` Commands
 
 After installing dependencies, these commands are available:
 
-- `sec-review-agents-run-local-issue`: local issue run entrypoint. Use `--strategy default|two-stage|single-agent` to choose the default multi-stage path, two-stage ablation, or single-agent baseline.
+- `sec-review-agents-run-local-issue`: local issue run entrypoint. See [Ablation Experiments](#ablation-experiments) for alternative strategies.
 - `sec-review-agents-run-local-pr`: local PR run entrypoint.
 - `sec-review-agents-run-local-repository`: local repository scan run entrypoint. Use `--scan-mode full|incremental` to choose full or incremental scan, and repeat `--paths-ignore PATTERN` to ignore paths or globs.
 
@@ -157,9 +71,7 @@ Local commands require `--output-dir` to select the parent directory for a new `
 Examples:
 
 ```bash
-cd /path/to/monorepo
-cp agents/.env.sample agents/.env
-cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
+cd /path/to/sec-review-bot
 
 # 1) issue
 # Choose the review objective; test_changes defaults to allow.
@@ -168,26 +80,6 @@ sec-review-agents-run-local-issue \
   --issue-md /abs/path/to/issue.md \
   --target-branch main \
   --output-dir /abs/path/to/local-runs \
-  --review-objective repair
-
-# 1b) issue two-stage ablation
-# --test-changes deny forbids test changes in the final mitigation patch.
-sec-review-agents-run-local-issue \
-  --output-dir /abs/path/to/local-runs \
-  --repo /abs/path/to/repo \
-  --issue-md /abs/path/to/issue.md \
-  --target-branch main \
-  --strategy two-stage \
-  --review-objective audit \
-  --test-changes deny
-
-# 1c) issue single-agent baseline
-sec-review-agents-run-local-issue \
-  --output-dir /abs/path/to/local-runs \
-  --repo /abs/path/to/repo \
-  --issue-md /abs/path/to/issue.md \
-  --target-branch main \
-  --strategy single-agent \
   --review-objective repair
 
 # 2) pr
@@ -272,7 +164,7 @@ TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES=1 \
 sec-review-memory-maintenance-worker
 ```
 
-Execution Worker handles review workflows, sandboxed activities, and run diagnostic publication. Memory Extraction Worker reads published diagnostics and produces observations; additional processes can poll the same extraction task queue. Memory Maintenance Worker serially updates the shared memory tree and owns maintenance schedule repair; it rejects any activity concurrency other than `1` and must run as a single process. Each worker has its own task queue and concurrency limit.
+Memory Maintenance Worker must run as a single process with activity concurrency fixed at `1`; do not start multiple instances.
 
 Docker Compose review-runs startup and host worker operation are documented in the [local integrated deployment guide](../docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md).
 
@@ -328,3 +220,101 @@ export AGENT_MCP_ENABLED=true
 ```
 
 See [Agent External Tools](../docs/agent/EXTERNAL_TOOLS.md) for the tool and interface choices.
+
+## Developer Navigation
+
+### Layout
+
+The Python package is easiest to read by responsibility:
+
+1. Agent implementations.
+   - `agents/`: prompts, runtime setup, tools, and output schemas for each agent.
+
+2. Stage pipeline: shared execution, stage artifacts, and public result contracts.
+   - `scan_stages/`: repository discovery / triage stage execution; turns repository scan signals into cases.
+   - `review_stages/`: analysis / mitigation / verification / CVSS stage execution, stage result payloads, review record projection, and verifier feedback logic.
+   - `delivery_stages/`: repository delivery planning, delivery execution, patch synthesis execution, and delivery result generation.
+
+3. Workflows: combines stages into product paths.
+   - `workflows/`: `issue/`, `pull_request/`, and `repository/` are the public workflows; `repository_case/` is the per-case review used inside repository workflow.
+
+4. Local and operator commands.
+   - `cli/`: commands for development and operations that perform one requested task and exit, plus their local-only support code.
+
+5. Production entrypoints.
+   - `entrypoints/`: the Temporal execution worker plus its execution contract, run protocol, and workflow input preparation boundaries.
+
+6. Artifact persistence and run diagnostics.
+   - `artifacts/`: immutable artifact references, local and S3 transport, materialization, and safe archive extraction. References bind a `file://` or `s3://` location to its media type, size, and digest; consumers own transport configuration and materialize verified references before use.
+   - `run_diagnostics/`: the per-run diagnostic bundle format, build and materialize logic, and its Temporal publication activity.
+
+7. Runtime support: infrastructure needed to run agents.
+   - `runtime/`, `filesystem/`, `workspace/`, `llm/`, `resources/`, `observability/`: agent runtime, filesystem sandbox, workspace artifacts, model config, prompt / skill resources, and diagnostics.
+
+### Execution Architecture
+
+```mermaid
+flowchart LR
+    gateway["services/execution-gateway/<br/>TypeScript + Fastify"] <-->|"start / query workflow"| temporal["Temporal Server"]
+
+    local["run-local-*"] --> materialize["Local input materialization"]
+    materialize --> direct["Direct execution"]
+    materialize -->|"--temporal"| temporal
+
+    temporal <-->|"tasks / results"| worker["Temporal Worker"]
+    worker --> execution["Review workflows / activities / agents"]
+    direct --> execution
+```
+
+The external TypeScript Gateway receives HTTP run requests and uses the Temporal client to start and query workflows. Temporal Server persists workflow state and dispatches review work to Execution Worker through its task queue.
+
+- Direct local execution bypasses the HTTP service and Temporal while reusing activity functions.
+- `run-local-* --temporal` bypasses the HTTP service but uses Temporal Server and Execution Worker.
+
+### Development Checks
+
+Run from `agents/`:
+
+```bash
+uv run ruff check .
+uv run black --check .
+uv run mypy .
+uv run pyright .
+uv run python -m pytest
+```
+
+For local cleanup, ruff can apply safe mechanical fixes:
+
+```bash
+uv run ruff check . --fix
+```
+
+### Ablation Experiments
+
+Local issue reviews use the multi-stage workflow by default. For ablation experiments, add `--strategy two-stage` to run the two-stage variant, or `--strategy single-agent` to run single-agent.
+
+The ablation paths publish local diagnostic bundles and disable memory processing, both in direct runs and with `--temporal`.
+
+```bash
+cd /path/to/sec-review-bot
+
+# two-stage ablation
+# --test-changes deny forbids test changes in the final mitigation patch.
+sec-review-agents-run-local-issue \
+  --output-dir /abs/path/to/local-runs \
+  --repo /abs/path/to/repo \
+  --issue-md /abs/path/to/issue.md \
+  --target-branch main \
+  --strategy two-stage \
+  --review-objective audit \
+  --test-changes deny
+
+# single-agent
+sec-review-agents-run-local-issue \
+  --output-dir /abs/path/to/local-runs \
+  --repo /abs/path/to/repo \
+  --issue-md /abs/path/to/issue.md \
+  --target-branch main \
+  --strategy single-agent \
+  --review-objective repair
+```
