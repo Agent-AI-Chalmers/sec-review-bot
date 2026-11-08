@@ -24,8 +24,8 @@ The catalog below is a reference, not a required reading sequence.
 
 ### Architecture
 
-- [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.md): Logical runtime roles, current deployment boundaries, ownership, and the main review and asynchronous memory paths.
-- [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.md): Stage and agent responsibilities, resource lifetimes, and MCP session ownership.
+- [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.md): Runtime component responsibilities, deployment, and data flow through reviews and background memory processing.
+- [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.md): What stages and agents are responsible for, and who creates and closes workspaces, connections, and MCP sessions.
 
 ### Packages and services
 
@@ -46,12 +46,12 @@ Package READMEs explain installation, commands, configuration, and code layout. 
 
 Use these docs when you need agent boundaries, capabilities, or framework decisions.
 
-- [CAPABILITY_BOUNDARIES](agent/CAPABILITY_BOUNDARIES.md): Agent capability boundaries, including git-history and external-state limits.
+- [CAPABILITY_BOUNDARIES](agent/CAPABILITY_BOUNDARIES.md): Agent capabilities and limits when working with Git history and state outside the repository.
 - [agent-transcript](../contracts/agent-transcript/README.md): JSONL messages, execution relationships, and usage accounting.
-- [CONTEXT_LOADING](agent/CONTEXT_LOADING.md): Which context an agent receives in its prompt and which it reads on demand, and how each agent here chooses.
-- [SKILLS](agent/SKILLS.md): Agent skills selection, preparation, and mounting.
-- [FRAMEWORK_SELECTION](agent/FRAMEWORK_SELECTION.md): Agent framework selection.
-- [MEMORY_SYSTEM](agent/MEMORY_SYSTEM.md): Agent experience memory extraction and maintenance.
+- [CONTEXT_LOADING](agent/CONTEXT_LOADING.md): What goes directly into prompts, what agents read on demand, and how each agent uses these approaches.
+- [SKILLS](agent/SKILLS.md): How agent skills are selected, prepared, and mounted.
+- [FRAMEWORK_SELECTION](agent/FRAMEWORK_SELECTION.md): Agent framework choices and their rationale.
+- [MEMORY_SYSTEM](agent/MEMORY_SYSTEM.md): How agents read memory and how review experience is extracted and maintained.
 - [EXTERNAL_TOOLS](agent/EXTERNAL_TOOLS.md): Agent external tools, CLI defaults, and optional MCP integrations.
 - [RELATED_ISSUES](agent/RELATED_ISSUES.md): Agent-related design issues.
 

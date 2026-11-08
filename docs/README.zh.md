@@ -26,8 +26,8 @@
 
 ### 架构
 
-- [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.zh.md)：逻辑运行角色、当前部署边界、职责所有权，以及主 review 与异步 memory 链路。
-- [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.zh.md)：stage 与 agent 的职责、资源生命周期和 MCP 会话归属。
+- [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.zh.md)：各运行组件的职责、部署方式，以及审查执行和异步记忆处理的数据流。
+- [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.zh.md)：阶段与 Agent 分别负责什么，以及临时工作区、连接和 MCP 会话由谁创建、何时关闭。
 
 ### 包与服务
 
@@ -48,12 +48,12 @@
 
 需要理解 agent 边界、能力或 framework 取舍时，看这里。
 
-- [CAPABILITY_BOUNDARIES](agent/CAPABILITY_BOUNDARIES.zh.md)：Agent 能力边界，包括 git history 和外部状态限制。
+- [CAPABILITY_BOUNDARIES](agent/CAPABILITY_BOUNDARIES.zh.md)：Agent 能力边界，包括 Git 历史和仓库外状态的处理限制。
 - [agent-transcript](../contracts/agent-transcript/README.zh.md)：JSONL 消息、执行关系与用量核算。
-- [CONTEXT_LOADING](agent/CONTEXT_LOADING.zh.md)：哪些上下文进 prompt、哪些由 agent 按需读取，以及本项目各 agent 如何选择。
-- [SKILLS](agent/SKILLS.zh.md)：Agent skills 的选择、准备和挂载。
-- [FRAMEWORK_SELECTION](agent/FRAMEWORK_SELECTION.zh.md)：Agent framework 的选型。
-- [MEMORY_SYSTEM](agent/MEMORY_SYSTEM.zh.md)：Agent memory system、经验提取和整理。
+- [CONTEXT_LOADING](agent/CONTEXT_LOADING.zh.md)：哪些内容直接放进提示词，哪些由 Agent 按需读取，以及各类 Agent 采用哪种方式。
+- [SKILLS](agent/SKILLS.zh.md)：Agent 技能的选择、准备和挂载。
+- [FRAMEWORK_SELECTION](agent/FRAMEWORK_SELECTION.zh.md)：Agent 框架的选择及理由。
+- [MEMORY_SYSTEM](agent/MEMORY_SYSTEM.zh.md)：Agent 如何读取记忆，以及如何提取和整理审查经验。
 - [EXTERNAL_TOOLS](agent/EXTERNAL_TOOLS.zh.md)：Agent 外部工具、默认 CLI 接入方式与可选 MCP 集成。
 - [RELATED_ISSUES](agent/RELATED_ISSUES.zh.md)：Agent 相关设计问题。
 
