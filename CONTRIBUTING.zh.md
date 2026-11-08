@@ -15,7 +15,7 @@
 3. 阅读[文档地图](docs/README.zh.md)，查找 workflow、agent 和运维设计说明。
 4. 对于跨 package 数据，在修改 schema、fixture、生成投影、artifact 或 API 形状之前，先阅读 [contracts 指南](contracts/README.zh.md)和受影响 contract family 的 README。
 
-不要根据目录大小或文档长度推断所有权。即使多个运行角色共享同一个源码 package，它们也有明确的所有权边界。
+判断由谁负责时，应看文档说明和实际调用关系，不能只看目录大小或文档篇幅。即使多个运行组件的代码放在同一个包中，它们也可能分别负责不同的任务。
 
 ## 准备变更
 

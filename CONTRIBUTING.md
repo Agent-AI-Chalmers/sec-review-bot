@@ -13,7 +13,7 @@ Before editing code, use the maintained documentation in this order:
 3. Read the [documentation map](docs/README.md) for workflow, agent, and operations design notes.
 4. For cross-package data, read the [contracts guide](contracts/README.md) and the affected contract-family README before changing a schema, fixture, generated projection, artifact, or API shape.
 
-Do not infer ownership from directory size or document length. Runtime roles have explicit ownership even when multiple roles share one source package.
+Use the documented responsibilities and actual callers to determine who owns a change, rather than directory size or document length. Components in the same source package may still be responsible for different tasks.
 
 ## Prepare A Change
 
