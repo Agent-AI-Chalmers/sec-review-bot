@@ -44,7 +44,7 @@
 
 来源内容变化时，也要核对并更新文档中的相关说明。中英文对应的标记内容必须一致。
 
-使用以下命令查找已标记事实：
+查找已标记的信息：
 
 ```bash
 rg 'doc-(default|time-sensitive):' --glob '*.md' --glob '!docs/DOCUMENTATION_GUIDE*.md'
