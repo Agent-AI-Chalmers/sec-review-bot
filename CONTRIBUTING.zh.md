@@ -33,7 +33,7 @@
 
 在每个受影响的包中运行检查，不要只检查直接改了代码的包。具体命令见各包的 README、`package.json` 或 `pyproject.toml`。
 
-| 区域 | 开发指南 | 基线验证 |
+| 区域 | 开发指南 | 基本检查 |
 | --- | --- | --- |
 | Execution、Memory Extraction 和 Memory Maintenance Worker | [`agents/README.zh.md`](agents/README.zh.md) | Ruff、Black、mypy、Pyright、pytest |
 | GitHub Integration | [`apps/github-integration/README.zh.md`](apps/github-integration/README.zh.md) | format、lint、typecheck、单元测试；数据库边界变化时运行集成测试 |

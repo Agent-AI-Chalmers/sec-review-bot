@@ -31,7 +31,7 @@ Use the documented responsibilities and actual callers to determine who owns a c
 
 Run checks from every affected package, not only from the package where the first edit occurred. The package README and `package.json` or `pyproject.toml` define the exact local commands.
 
-| Area | Development guide | Baseline validation |
+| Area | Development guide | Basic checks |
 | --- | --- | --- |
 | Execution, Memory Extraction, and Memory Maintenance Workers | [`agents/README.md`](agents/README.md) | Ruff, Black, mypy, Pyright, pytest |
 | GitHub Integration | [`apps/github-integration/README.md`](apps/github-integration/README.md) | format, lint, typecheck, unit tests; integration tests when the database boundary changes |
