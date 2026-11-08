@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
 本族收录 Review Runs 与其调用方交换的形状。单一事实来源是手写的 [v1/openapi.yaml](v1/openapi.yaml)；路由、请求/响应 schema 与安全方案都从它派生。两个凭据不同的面：控制台消费的脱敏读取面，以及 GitHub 集成调用的完整读/写面。
 

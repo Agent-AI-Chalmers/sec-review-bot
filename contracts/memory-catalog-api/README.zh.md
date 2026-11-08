@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
 [v1/openapi.yaml](v1/openapi.yaml) 是人工维护的 Memory Catalog Server HTTP 边界唯一真值，不由服务代码生成。服务从该文档挂载路由和校验，生成的 TypeScript 投影把服务端与 Control Plane UI 绑定到其中的 operation 和 schema，Python client 的契约测试则校验它发送和消费的 payload。
 

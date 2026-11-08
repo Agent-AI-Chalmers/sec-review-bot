@@ -2,7 +2,7 @@
 
 语言：[English](CAPABILITY_BOUNDARIES.md) | 中文
 
-本文是 [CAPABILITY_BOUNDARIES.md](CAPABILITY_BOUNDARIES.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [CAPABILITY_BOUNDARIES.md](CAPABILITY_BOUNDARIES.md) 的中文译文；如有差异，以英文版为准。
 
 agent 处理的是这次交给它的仓库里、能通过 patch 修掉的安全问题。它不负责治理 git 历史、外部系统状态，也不负责需要组织协调的安全运营动作。
 

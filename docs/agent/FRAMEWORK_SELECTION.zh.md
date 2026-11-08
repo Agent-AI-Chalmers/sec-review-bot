@@ -2,7 +2,7 @@
 
 语言：[English](FRAMEWORK_SELECTION.md) | 中文
 
-本文是 [FRAMEWORK_SELECTION.md](FRAMEWORK_SELECTION.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [FRAMEWORK_SELECTION.md](FRAMEWORK_SELECTION.md) 的中文译文；如有差异，以英文版为准。
 
 本文记录 agent 框架为什么现在使用 LangChain `create_agent` 加项目自己的 middleware 来构造各阶段 agent，而不是直接使用高层的 `deepagents.create_deep_agent`，也不是直接下沉到原始 LangGraph。
 

@@ -2,7 +2,7 @@
 
 语言：[English](DEPENDENCY_MAINTENANCE.md) | 中文
 
-本文是 [DEPENDENCY_MAINTENANCE.md](DEPENDENCY_MAINTENANCE.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [DEPENDENCY_MAINTENANCE.md](DEPENDENCY_MAINTENANCE.md) 的中文译文；如有差异，以英文版为准。
 
 本文说明本仓库如何处理 GitHub integration、Python agents、GitHub Actions，以及运行时与工具链版本相关的更新。
 

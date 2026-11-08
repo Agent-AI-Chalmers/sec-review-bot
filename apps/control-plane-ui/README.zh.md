@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
 这是用于查看和处置 Review Runs run、检查执行诊断与 artifact、管理 agent memory，以及阅读执行轨迹的内部控制台。服务端数据只通过该应用的同源 BFF 获取；BFF 持有上游凭据，并仅代理明确白名单内的路由。独立的执行轨迹查看器完全在浏览器中处理上传或粘贴的输入。
 

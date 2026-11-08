@@ -2,7 +2,7 @@
 
 语言：[English](SKILLS.md) | 中文
 
-本文是 [SKILLS.md](SKILLS.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [SKILLS.md](SKILLS.md) 的中文译文；如有差异，以英文版为准。
 
 本文说明本项目如何选择、准备、挂载和读取内置 agent skills。
 

@@ -2,7 +2,7 @@
 
 语言：[English](CONTRIBUTING.md) | 中文
 
-本文是 [CONTRIBUTING.md](CONTRIBUTING.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [CONTRIBUTING.md](CONTRIBUTING.md) 的中文译文；如有差异，以英文版为准。
 
 每次修改应围绕明确的问题展开，保持各组件的职责清晰，并检查所有受影响的包和契约。本指南介绍通用的贡献流程。各包的安装、配置和检查命令，以及契约的修改要求，见对应目录的 README。
 

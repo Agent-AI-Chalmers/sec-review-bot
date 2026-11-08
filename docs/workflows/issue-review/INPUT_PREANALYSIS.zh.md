@@ -2,7 +2,7 @@
 
 语言：[English](INPUT_PREANALYSIS.md) | 中文
 
-本文是 [INPUT_PREANALYSIS.md](INPUT_PREANALYSIS.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [INPUT_PREANALYSIS.md](INPUT_PREANALYSIS.md) 的中文译文；如有差异，以英文版为准。
 
 ## What Actually Happens When An Issue Arrives
 

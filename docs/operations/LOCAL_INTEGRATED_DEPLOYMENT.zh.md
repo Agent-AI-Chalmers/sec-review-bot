@@ -2,7 +2,7 @@
 
 语言：[English](LOCAL_INTEGRATED_DEPLOYMENT.md) | 中文
 
-本文是 [LOCAL_INTEGRATED_DEPLOYMENT.md](LOCAL_INTEGRATED_DEPLOYMENT.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [LOCAL_INTEGRATED_DEPLOYMENT.md](LOCAL_INTEGRATED_DEPLOYMENT.md) 的中文译文；如有差异，以英文版为准。
 
 这是 GitHub integration、Review Runs、运行服务、Temporal、对象存储以及宿主机 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker 的本地部署说明。
 

@@ -2,7 +2,7 @@
 
 语言：[English](LOCAL_GITHUB_INBOUND_SETUP.md) | 中文
 
-本文是 [LOCAL_GITHUB_INBOUND_SETUP.md](LOCAL_GITHUB_INBOUND_SETUP.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [LOCAL_GITHUB_INBOUND_SETUP.md](LOCAL_GITHUB_INBOUND_SETUP.md) 的中文译文；如有差异，以英文版为准。
 
 ## 什么是 webhook
 

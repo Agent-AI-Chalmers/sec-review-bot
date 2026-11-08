@@ -2,7 +2,7 @@
 
 语言：[English](BOUNDED_VERIFIER_FEEDBACK_RETRY.md) | 中文
 
-本文是 [BOUNDED_VERIFIER_FEEDBACK_RETRY.md](BOUNDED_VERIFIER_FEEDBACK_RETRY.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [BOUNDED_VERIFIER_FEEDBACK_RETRY.md](BOUNDED_VERIFIER_FEEDBACK_RETRY.md) 的中文译文；如有差异，以英文版为准。
 
 ## Summary
 

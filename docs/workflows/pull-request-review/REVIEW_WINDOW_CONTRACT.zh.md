@@ -2,7 +2,7 @@
 
 语言：[English](REVIEW_WINDOW_CONTRACT.md) | 中文
 
-本文是 [REVIEW_WINDOW_CONTRACT.md](REVIEW_WINDOW_CONTRACT.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [REVIEW_WINDOW_CONTRACT.md](REVIEW_WINDOW_CONTRACT.md) 的中文译文；如有差异，以英文版为准。
 
 ## 问题
 

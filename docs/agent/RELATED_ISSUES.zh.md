@@ -2,7 +2,7 @@
 
 语言：[English](RELATED_ISSUES.md) | 中文
 
-本文是 [RELATED_ISSUES.md](RELATED_ISSUES.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [RELATED_ISSUES.md](RELATED_ISSUES.md) 的中文译文；如有差异，以英文版为准。
 
 本文记录本项目在 agent 能力、上下文、缓存和压缩上的设计判断。
 

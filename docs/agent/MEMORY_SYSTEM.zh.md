@@ -2,7 +2,7 @@
 
 语言：[English](MEMORY_SYSTEM.md) | 中文
 
-本文是 [MEMORY_SYSTEM.md](MEMORY_SYSTEM.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [MEMORY_SYSTEM.md](MEMORY_SYSTEM.md) 的中文译文；如有差异，以英文版为准。
 
 参考资料：
 

@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
 这个仅用于开发的 package 负责 Execution API、Review Runs API 和 Memory Catalog API 工具共用的 OpenAPI 到 TypeScript 渲染规则。各 family 继续负责自己的契约、生成入口、产物 manifest、格式化和生成一致性检查。
 

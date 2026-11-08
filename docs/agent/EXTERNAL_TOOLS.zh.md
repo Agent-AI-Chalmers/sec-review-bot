@@ -2,7 +2,7 @@
 
 语言：[English](EXTERNAL_TOOLS.md) | 中文
 
-本文是 [EXTERNAL_TOOLS.md](EXTERNAL_TOOLS.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [EXTERNAL_TOOLS.md](EXTERNAL_TOOLS.md) 的中文译文；如有差异，以英文版为准。
 
 本文说明 agent 使用哪些外部工具，以及这些工具如何进入 runtime。我们首先关注工具带来的能力；CLI、skills 和 Model Context Protocol (MCP) 都只是可能的接入方式，本身不是目标。
 

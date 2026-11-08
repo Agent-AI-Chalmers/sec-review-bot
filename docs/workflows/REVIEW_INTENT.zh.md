@@ -2,7 +2,7 @@
 
 语言：[English](REVIEW_INTENT.md) | 中文
 
-本文是 [REVIEW_INTENT.md](REVIEW_INTENT.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [REVIEW_INTENT.md](REVIEW_INTENT.md) 的中文译文；如有差异，以英文版为准。
 
 `review_intent` 记录**调用方**要求**被调用方**服务哪一种 review 目标，外加一个对最终 mitigation patch 的可选约束。
 

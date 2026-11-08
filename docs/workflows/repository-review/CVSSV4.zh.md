@@ -2,7 +2,7 @@
 
 语言：[English](CVSSV4.md) | 中文
 
-本文是 [CVSSV4.md](CVSSV4.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [CVSSV4.md](CVSSV4.md) 的中文译文；如有差异，以英文版为准。
 
 `cvss-v4-scoring` 是 `repository-review` workflow 的一部分。
 

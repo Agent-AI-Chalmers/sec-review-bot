@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
 Review Runs 是 review run 协调服务。它接纳 review 请求，并持久协调输入准备、执行和结果发布的完整生命周期。
 

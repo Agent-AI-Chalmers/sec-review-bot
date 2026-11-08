@@ -2,7 +2,7 @@
 
 语言：[English](CONTRACT.md) | 中文
 
-本文是 [CONTRACT.md](CONTRACT.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [CONTRACT.md](CONTRACT.md) 的中文译文；如有差异，以英文版为准。
 
 代表性的 JSON 测试样例位于 [`fixtures`](fixtures)。Python 和 TypeScript 契约测试都会读取这些测试样例。
 

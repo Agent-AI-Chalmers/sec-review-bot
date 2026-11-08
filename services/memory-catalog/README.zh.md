@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
 `services/memory-catalog/` 提供登记已完成 extraction、协调 observation 处理与提交 memory tree revision 的 HTTP API。协调状态保存在 PostgreSQL 中；worker 把不可变的 memory tree 和压缩后的 memory-agent trajectory 发布到对象存储，catalog 保存对应的 artifact reference。
 

@@ -2,7 +2,7 @@
 
 语言：[English](AGENT_PARTITION_WORKBENCH.md) | 中文
 
-本文是 [AGENT_PARTITION_WORKBENCH.md](AGENT_PARTITION_WORKBENCH.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [AGENT_PARTITION_WORKBENCH.md](AGENT_PARTITION_WORKBENCH.md) 的中文译文；如有差异，以英文版为准。
 
 ## 背景
 

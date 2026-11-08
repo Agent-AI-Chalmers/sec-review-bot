@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
 这里是 `sec-review-bot` 的项目文档入口，包含 agent 设计说明、public contracts、workflow 设计说明和本地运行指南。
 

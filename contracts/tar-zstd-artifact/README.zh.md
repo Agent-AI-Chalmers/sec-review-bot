@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
 本 family 定义项目自有、media type 为 `application/tar+zstd` 的 artifact 所共享的 archive envelope，以及规定每种 artifact 内部组织的 profiles。
 

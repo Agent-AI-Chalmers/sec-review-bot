@@ -2,7 +2,7 @@
 
 语言：[English](FUTURE_WORK.md) | 中文
 
-本文是 [FUTURE_WORK.md](FUTURE_WORK.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [FUTURE_WORK.md](FUTURE_WORK.md) 的中文译文；如有差异，以英文版为准。
 
 这里记录以后值得探索的方向。每项分别记录提出时间和解决时间，✅ 表示已完成，⏳ 表示待完成。
 

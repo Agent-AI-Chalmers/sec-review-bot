@@ -2,7 +2,7 @@
 
 语言：[English](TRIAGE_BOUNDARIES.md) | 中文
 
-本文是 [TRIAGE_BOUNDARIES.md](TRIAGE_BOUNDARIES.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [TRIAGE_BOUNDARIES.md](TRIAGE_BOUNDARIES.md) 的中文译文；如有差异，以英文版为准。
 
 triage 的输入来自 discovery 阶段。discovery 负责高召回地产生安全候选信号，但 candidate 不是漏洞结论，其中会混有重复项、弱信号、前端/后端同一问题的不同视角，以及明显不值得继续分析的噪音。
 

@@ -2,7 +2,7 @@
 
 语言：[English](NARRATIVE_FIRST_REVIEW.md) | 中文
 
-本文是 [NARRATIVE_FIRST_REVIEW.md](NARRATIVE_FIRST_REVIEW.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [NARRATIVE_FIRST_REVIEW.md](NARRATIVE_FIRST_REVIEW.md) 的中文译文；如有差异，以英文版为准。
 
 analyzer 的输出不是“随手列几个发现”，而是围绕 narrative 来组织。这里的 narrative 不是空泛猜测，而是一个带有独立证据和 verdict 的可审查分析方向。它可以解释 confirmed issue、plausible risk、inconclusive path，也可以表示某个方向已经审过且结论是 no-actionable-finding。
 

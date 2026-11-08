@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
 `agents/` 是项目里的 Python 侧。它把 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker 实现为三个独立的 Temporal runtime，并提供 workflow 执行、filesystem / workspace runtime、delivery 产物生成和 observability。
 

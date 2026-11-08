@@ -2,7 +2,7 @@
 
 语言：[English](REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.md) | 中文
 
-本文是 [REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.md](REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.md](REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.md) 的中文译文；如有差异，以英文版为准。
 
 在仓库级定时调度（例如每周 `schedule`）场景下，如果每次都做全量扫描，成本与时延会持续上升。因此需要增量模式。
 

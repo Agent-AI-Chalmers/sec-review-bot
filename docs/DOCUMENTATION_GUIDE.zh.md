@@ -2,7 +2,7 @@
 
 语言：[English](DOCUMENTATION_GUIDE.md) | 中文
 
-本文是 [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md) 的中文译文；如有差异，以英文版为准。
 
 本指南说明如何编写和更新本项目维护的文档，包括各包的 README、架构与工作流说明、契约指南和运维指南。生成文件和第三方材料按各自来源的规则处理。
 

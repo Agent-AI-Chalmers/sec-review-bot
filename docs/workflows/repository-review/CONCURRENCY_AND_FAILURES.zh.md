@@ -2,7 +2,7 @@
 
 语言：[English](CONCURRENCY_AND_FAILURES.md) | 中文
 
-本文是 [CONCURRENCY_AND_FAILURES.md](CONCURRENCY_AND_FAILURES.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [CONCURRENCY_AND_FAILURES.md](CONCURRENCY_AND_FAILURES.md) 的中文译文；如有差异，以英文版为准。
 
 这份文档说明 `repository-review` 如何使用阶段内并发、哪些调参入口影响墙钟时间，以及失败如何被边界收住。
 

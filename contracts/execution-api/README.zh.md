@@ -2,7 +2,7 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
 本族定义完整的公开 Execution API：HTTP 操作、execution 输入、workflow 结果、错误、`ReviewRecord` 和 repository `deliveries[]`。一个版本覆盖这整个接口；传输层与 payload schema 不再分别使用不同版本。
 

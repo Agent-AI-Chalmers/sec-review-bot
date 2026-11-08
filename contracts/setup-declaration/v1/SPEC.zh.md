@@ -2,7 +2,7 @@
 
 语言：[English](SPEC.md) | 中文
 
-本文是 [SPEC.md](SPEC.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [SPEC.md](SPEC.md) 的中文译文；如有差异，以英文版为准。
 
 设置声明告诉审查沙箱在 agent 启动前如何准备自己。它是仓库放在 **默认分支** 上 `.sec-review/setup.yml` 处的一个小型 YAML 文件。一次审查运行时，声明会在 agent 启动前于 Docker 沙箱内执行，因此 agent 一开始就处于依赖已安装好的环境。
 

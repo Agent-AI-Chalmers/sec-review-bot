@@ -2,7 +2,7 @@
 
 语言：[English](STAGE_AGENT_OWNERSHIP.md) | 中文
 
-本文是 [STAGE_AGENT_OWNERSHIP.md](STAGE_AGENT_OWNERSHIP.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [STAGE_AGENT_OWNERSHIP.md](STAGE_AGENT_OWNERSHIP.md) 的中文译文；如有差异，以英文版为准。
 
 这份项目使用大模型检查代码、提出修复，并把结果交给后续流程。一次这样的任务，除了调用模型，还需要准备代码文件、提供工具、保存结果和清理临时环境。本文解释这些工作为什么分在 stage 和 agent 两处，以及写代码时怎样决定由谁负责。
 
