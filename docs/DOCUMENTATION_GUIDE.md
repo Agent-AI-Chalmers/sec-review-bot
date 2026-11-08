@@ -16,8 +16,6 @@ Avoid unnecessary counts: when a list or the named services already show what is
 
 Do not delete a number just because it may change later. Keep values readers need to configure, operate, or understand the system, along with quantity limits enforced by the implementation or contract. For example, if a configuration table says “the timeout defaults to 60 seconds,” do not replace the value with “a timeout is configured.” Readers need the duration to judge whether to change it. The 60 seconds here is an example, not a project default.
 
-Use `always`, `never`, `only`, `exactly`, and exhaustive lists only for behavior enforced by code, a schema, an operational boundary, or tests. Otherwise narrow the statement to the context actually established.
-
 ## Mutable Facts
 
 Important facts may still be expected to change. Keep them visible when they help readers, and place an HTML comment immediately before the paragraph, list item, or table that contains them. GitHub does not render these comments, while source search and documentation-review tools can find them.
