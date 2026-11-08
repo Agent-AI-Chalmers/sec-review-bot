@@ -8,7 +8,7 @@ Keep each change focused on a concrete problem, keep component responsibilities 
 
 Before editing code, consult the documentation relevant to the change:
 
-- Read the [system architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) when the change crosses services, workers, storage, or deployment boundaries.
+- Before changing calls between services or Workers, data storage, or deployment configuration, consult the [system architecture](docs/architecture/SYSTEM_ARCHITECTURE.md).
 - Read the `README.md` in the directory containing the code you plan to change, or the nearest parent directory that has one. It explains what that code is responsible for, how to set it up and configure it, and which checks to run.
 - If you need to change data exchanged between packages, first read the [contracts guide](contracts/README.md) and the README for the relevant contract. Identify which packages depend on these agreements and how the change would affect them.
 

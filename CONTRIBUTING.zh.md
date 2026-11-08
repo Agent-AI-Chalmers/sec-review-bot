@@ -10,7 +10,7 @@
 
 修改代码前，根据修改涉及的内容查阅相关说明：
 
-- 变更跨越服务、worker、存储或部署边界时，阅读[系统架构](docs/architecture/SYSTEM_ARCHITECTURE.zh.md)。
+- 要改服务或 Worker 之间的调用、数据存储或部署配置，参阅[系统架构](docs/architecture/SYSTEM_ARCHITECTURE.zh.md)。
 - 阅读准备修改的代码所在目录的 `README.md`；该目录没有时，向上查找最近一级目录的 README。通过它了解这部分代码负责什么、如何准备环境和配置，以及需要运行哪些检查。
 - 如果需要修改多个包之间交换的数据，应先阅读[契约指南](contracts/README.zh.md)和相关契约目录的 README，确认哪些包依赖这些约定，以及修改会怎样影响它们。
 
