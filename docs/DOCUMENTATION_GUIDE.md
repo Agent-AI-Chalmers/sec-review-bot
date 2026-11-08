@@ -6,7 +6,7 @@ This guide defines repository-wide rules for maintained documentation. It applie
 
 ## Prefer Durable Statements
 
-Write the current system directly. Avoid historical rewrite traces, migration narration, and statements framed around what an earlier version did unless history is necessary to operate or interpret persisted data.
+Describe how the system works now rather than recounting each edit or refactor. Include historical context when readers need it to operate or maintain the system or interpret existing data.
 
 Remove details that merely recount nearby content and can become false independently of it. Common examples include a number before a list, a count of roles already named in the same sentence, and a claim that an open set is complete. Prefer:
 
