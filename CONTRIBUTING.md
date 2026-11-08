@@ -43,7 +43,7 @@ Run checks from every affected package, not only from the package where the firs
 | Repository scripts | [`scripts/README.md`](scripts/README.md) | Ruff, Black, Python syntax checks; check the changed scripts as appropriate, for example with `--help` or test inputs |
 | Documentation | [`docs/DOCUMENTATION_GUIDE.md`](docs/DOCUMENTATION_GUIDE.md) and [`docs/README.md`](docs/README.md) | As applicable, check that local links work, prose paragraphs remain unwrapped as required, and English/Chinese heading structures match |
 
-For a contract change, run the affected family tool from `contracts/<family>/tools/`: regenerate projections, check that committed artifacts are fresh, and run formatting, lint, contract lint when present, typechecking, and tests. Then run the consuming package checks. See the [contracts change checklist](contracts/README.md#change-checklist).
+After changing a contract, complete the checks required by the [contracts guide](contracts/README.md) and the relevant contract README, then check all affected packages.
 
 List the commands you ran to check the change and report the results. Also note any relevant checks you did not run.
 

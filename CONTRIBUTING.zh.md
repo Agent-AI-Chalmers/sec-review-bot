@@ -45,7 +45,7 @@
 | 仓库脚本 | [`scripts/README.md`](scripts/README.md) | Ruff、Black、Python 语法检查；根据修改内容，运行脚本的 `--help` 或用测试数据检查相关功能 |
 | 文档 | [`docs/DOCUMENTATION_GUIDE.zh.md`](docs/DOCUMENTATION_GUIDE.zh.md) 和 [`docs/README.zh.md`](docs/README.zh.md) | 根据修改内容，检查本地链接是否有效、正文段落是否按要求不折行，以及中英文标题结构是否一致 |
 
-修改 contract 时，在 `contracts/<family>/tools/` 中运行受影响 family 的工具：重新生成投影，检查已提交 artifact 是否为最新，并运行格式化、lint、存在时的 contract lint、typecheck 和测试。随后运行消费方 package 的检查。参见 [contracts 变更检查清单](contracts/README.zh.md#变更检查清单)。
+修改契约后，按[契约指南](contracts/README.zh.md)和相关契约目录 README 的要求完成检查，并检查所有受影响的包。
 
 列出你实际运行的检查命令，并说明结果。如果还有与本次修改有关的检查没有运行，也要写清楚。
 
