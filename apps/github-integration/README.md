@@ -99,10 +99,10 @@ The paths below are relative to `src/`.
   - `reviews/repositories/` - repository review, summary issue, and repair draft PR
 - `github/` - thin GitHub API wrappers and webhook helpers
 - `review-runs/` - Client-side code through which GitHub Integration communicates and works with the Review Runs service
-- `execution/` - Execution input, result, and error contracts consumed by this connector
+- `execution/` - Provides GitHub Integration with types for review inputs and results, validates input bundles and review results, and distinguishes errors encountered when publishing results to GitHub
 - `artifacts/` - input bundle storage and Git workspace preparation
 - `ingress/` - inbound HTTP, GitHub Actions, and GitHub webhook handling
-- `triggers/` - turns webhook / Actions / comment requests into Review Runs review submissions
+- `triggers/` - Starts reviews from Webhooks, GitHub Actions, or comment commands, calls the input preparation code, and submits the prepared inputs to Review Runs
 - `utils/` - lightweight logging and helpers
 
 ## Triggers

@@ -95,17 +95,17 @@ GitHub App webhook 和 Actions dispatch 的本地转发说明见 [本地 GitHub 
 
 以下路径均相对于 `src/`。
 
-- `reviews/` - 各类 review workflow 的输入准备、提交、发布与渲染
-  - `reviews/issues/` - issue review
-  - `reviews/pull-requests/` - PR review、建议评论
-  - `reviews/repositories/` - repository review、摘要 issue 与修复 draft PR
-- `github/` - GitHub API 薄封装和 webhook 辅助函数
+- `reviews/` - 各类审查工作流的输入准备、请求提交、结果发布和展示内容生成
+  - `reviews/issues/` - Issue 审查
+  - `reviews/pull-requests/` - PR 审查及 review suggestions
+  - `reviews/repositories/` - 仓库审查、汇总结果的 Issue 和修复用的 draft PR
+- `github/` - GitHub API 调用封装和 Webhook 辅助函数
 - `review-runs/` - GitHub Integration 与 Review Runs 服务通信、协作所用的客户端代码
-- `execution/` - 此 connector 消费的 Execution input、result 与错误契约
-- `artifacts/` - input bundle 存储与 Git workspace 准备
-- `ingress/` - HTTP、GitHub Actions 和 GitHub webhook 的入站处理
-- `triggers/` - 把 webhook / Actions / comment 请求转换为提交给 Review Runs 的 review 请求
-- `utils/` - 轻量日志与辅助函数
+- `execution/` - 为 GitHub Integration 提供审查输入和结果的数据类型，检查输入材料包及审查结果的格式，并区分结果发布到 GitHub 时遇到的错误
+- `artifacts/` - 输入材料包的存储和 Git 工作区准备
+- `ingress/` - 接收 HTTP 请求、GitHub Actions 请求和 GitHub Webhook
+- `triggers/` - 根据 Webhook、GitHub Actions 或评论命令启动审查，调用输入准备代码，并将准备好的输入提交给 Review Runs
+- `utils/` - 日志和通用辅助函数
 
 ## 触发
 
