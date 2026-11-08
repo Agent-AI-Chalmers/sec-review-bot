@@ -2,7 +2,7 @@
 
 Language: English | [中文](CONTRIBUTING.zh.md)
 
-Keep changes focused, preserve explicit ownership boundaries, and validate the packages and contracts that actually consume the change. This guide explains the common contribution process. For installation, configuration, check commands, and contract-specific change requirements, read the README in the relevant directory.
+Keep each change focused on a concrete problem, keep component responsibilities clear, and check all affected packages and contracts. This guide explains the common contribution process. For installation, configuration, check commands, and contract-specific change requirements, read the README in the relevant directory.
 
 ## Find The Code Responsible For The Behavior
 
