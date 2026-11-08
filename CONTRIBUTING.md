@@ -81,7 +81,7 @@ Follow [the pull request template](.github/pull_request_template.md):
 - `Summary` explains what changed and why.
 - `Compatibility` selects exactly one of `No compatibility impact`, `Backward-compatible behavior change`, or `Breaking change`. A breaking change must state what breaks and how callers or operators should migrate.
 - `Validation` describes the checks and tests you ran, their results, and any relevant checks you did not run.
-- `Review Notes` is optional and should contain only information that helps review, such as useful review order, non-obvious trade-offs, deliberately preserved behavior, excluded scope, unusual artifacts, uncertainties, or follow-up work.
+- `Review Notes` is optional. Use it for details that help reviewers, such as where to start reading, why you chose the approach, or what remains for later.
 
 The repository checks that the three required sections are present and non-empty, that `Compatibility` contains exactly one supported classification, and that a breaking change includes migration guidance. Additional headings and sections are welcome and are not interpreted by the check. Delete `Review Notes` when it adds no value.
 

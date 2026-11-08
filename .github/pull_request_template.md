@@ -22,7 +22,7 @@ operators should migrate.
 <!--
 Optional. Delete this section when there is nothing useful to add.
 
-Call out details that help review but do not belong in the summary, such as where to start, non-obvious trade-offs, deliberately preserved behavior, excluded scope, unusual artifacts, uncertainties, or follow-up work.
+Add details that help reviewers and are not already covered above, such as where to start reading, why you chose the approach, or what remains for later.
 -->
 
 <!-- Add any other headings or sections that help explain this pull request. -->
