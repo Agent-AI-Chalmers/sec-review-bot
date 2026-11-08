@@ -16,6 +16,10 @@ English · [中文](README.zh.md)
 
 Sec Review Bot uses AI agents to audit codebases and handle security-review tasks for issues, pull requests, full-repository scans, and incremental scans.
 
+This project is experimental and intended for local development, integration testing, and workflow research. Internal package layout and agent workflows may still change.
+
+The agent's final behavior depends heavily on the underlying LLM's code understanding, reasoning, and patch-generation ability, as well as input quality and the tool/runtime environment. The workflow and execution design is not a model-independent performance guarantee.
+
 ## Capabilities
 
 | Capability          | What happens                                                                                              |
@@ -24,7 +28,9 @@ Sec Review Bot uses AI agents to audit codebases and handle security-review task
 | Pull request review | Reviews PR changes and can publish review suggestions.                                                    |
 | Repository review   | Runs full-repository or incremental scans with discovery, triage, case processing, and delivery planning. |
 
-## What It Looks Like
+For GitHub triggers and commands, see [github-integration](apps/github-integration/README.md#triggers).
+
+### What It Looks Like
 
 Repository review publishes a summary and creates draft PRs when publishable patches are available:
 
@@ -38,105 +44,33 @@ A draft PR includes modified files, case details, analyzer / verifier output, an
   <img src="assets/screenshots/repository-delivery-pr.png" alt="Repository review delivery PR" width="720">
 </p>
 
-## Architecture
+## Quick Start
 
-The repository-owned runtime roles are GitHub Integration, Review Runs, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server. They cooperate through authenticated HTTP, Temporal, object storage, and durable PostgreSQL state. Langfuse is a trusted but independently deployed observability dependency rather than a repository-owned runtime role.
+Choose an entry point for your goal:
 
-- [`apps/github-integration/`](apps/github-integration/README.md): TypeScript GitHub integration service for webhooks, Actions-authenticated HTTP dispatch, input bundle preparation, and GitHub publishing
-- [`services/review-runs/`](services/review-runs/README.md): independently deployed TypeScript service for review-run admission and durable coordination
-- [`apps/control-plane-ui/`](apps/control-plane-ui/README.md): independently deployed web console for inspecting review runs
-- [`services/execution-gateway/`](services/execution-gateway/README.md): independent TypeScript HTTP service that validates requests and submits Temporal executions
-- [`agents/`](agents/README.md): Python Execution Worker, Memory Extraction Worker, and Memory Maintenance Worker
-- [`services/memory-catalog/`](services/memory-catalog/README.md): independent TypeScript HTTP service for managed-memory catalog state and revision commits
+- **Run a review locally**: follow [agents](agents/README.md#install-and-activate-the-environment) to install and activate the Python environment, complete [LLM setup](agents/README.md#llm-setup), then run the [local review commands](agents/README.md#local-runs). Reviewing code requires Docker and a configured model; no GitHub integration deployment is needed.
+- **Connect to GitHub**: follow [LOCAL_INTEGRATED_DEPLOYMENT](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) to prepare the GitHub App, model, and service configuration, then start the integrated service. To forward GitHub requests to your machine, see [LOCAL_GITHUB_INBOUND_SETUP](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md).
 
-Each contract family under [`contracts/`](contracts/README.md) owns the tool that renders and checks its projections (`contracts/<family>/tools/`); that is build-time, not a runtime entity.
+## Architecture Overview
+
+GitHub Integration receives review requests from GitHub and publishes review results back to GitHub. Review Runs persists task state and coordinates input preparation, execution, and publication. Execution Gateway submits execution requests to Temporal, and Execution Worker runs the review workflows. Memory Extraction Worker and Memory Maintenance Worker extract and maintain review experience, Memory Catalog records extraction results and manages memory-tree revision history and the active revision, and Control Plane UI provides the operator interface.
+
+Temporal schedules workflows and activities, PostgreSQL stores coordination state, and object storage holds inputs and artifacts. Langfuse is deployed independently for model-call tracing and usage statistics; core review execution does not depend on it.
 
 ![Sec Review Bot runtime topology](assets/architecture/runtime-topology.svg)
 
-## Runtime Stack
+See [SYSTEM_ARCHITECTURE](docs/architecture/SYSTEM_ARCHITECTURE.md) for component responsibilities and data flow.
 
-- **Languages**: [TypeScript](https://www.typescriptlang.org/) ([Node.js](https://nodejs.org/)) for the integration, Review Runs, Execution Gateway, Memory Catalog, and UI server; [Python](https://www.python.org/) 3.14 for the Execution Worker, the memory extraction and maintenance roles, and the agent runtime.
-- **Web and UI**: [Fastify](https://fastify.dev/) serves Review Runs, Execution Gateway, and Memory Catalog APIs; [Vite](https://vitejs.dev/) + [React](https://react.dev/) + [Mantine](https://mantine.dev/) make up the console.
-- **Agent runtime**: [LangChain](https://www.langchain.com/) / [LangGraph](https://langchain-ai.github.io/langgraph/) ([deepagents](https://github.com/langchain-ai/deepagents)) for chat-model adapters, structured output, and tool calls.
-- **Durable execution**: [Temporal](https://temporal.io/) owns workflow / activity scheduling, worker dispatch, retry, timeout, and failure state.
-- **State and storage**: [PostgreSQL](https://www.postgresql.org/) for coordination state; S3-compatible object storage ([RustFS](https://github.com/rustfs/rustfs) locally) for input bundles and diagnostic artifacts.
-- **Observability**: [Langfuse](https://langfuse.com/) is independently deployed and strongly recommended. Core review execution does not require it, but LLM-call tracing and Review Runs model-usage statistics do.
-- **Execution isolation**: [Docker](https://www.docker.com/) sandbox, used by the host execution worker.
-- **Local deployment**: [Docker Compose](https://docs.docker.com/compose/) + [systemd](https://systemd.io/).
+## Development And Documentation
 
-## Project Status
+Package READMEs maintain installation, configuration, and development commands:
 
-This project is experimental and intended for local development, integration testing, and workflow research. Internal package layout and agent workflows may still change.
-
-The agent's final behavior depends heavily on the underlying LLM's code understanding, reasoning, and patch-generation ability, as well as input quality and the tool/runtime environment. The workflow and execution design is not a model-independent performance guarantee.
-
-## Agent-Focused Entry Points
-
-If you only want to inspect or run the agent side, start from:
-
-- [Agents local run guide](agents/README.md) for Python backend setup, capabilities, local runs, and runtime boundaries.
-- [LLM setup](agents/README.md#llm-setup) and [`agents/config/model-providers.sample.toml`](agents/config/model-providers.sample.toml) for model deployment bindings.
-
-## Supported Workflows
-
-| Path                | Trigger                                       | Output                                                                 |
-| ------------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
-| Issue review | `issues.opened`, `@<app-slug> review` | Posts the review results as a comment on the original Issue; a draft PR may be created when `--open-pr` is specified and the patch is ready for publication |
-| Pull request review | PR webhook, `@<app-slug> review`              | PR review / suggestions                                                |
-| Repository review   | scheduled / manually dispatched GitHub Action | Repository summary and deliveries                                      |
-
-Full trigger behavior is documented in the [GitHub integration triggers guide](apps/github-integration/README.md#triggers).
-
-## Quick Start
-
-### Run The Stack Locally
-
-Create the integrated deployment configuration:
-
-```bash
-ops/init-local-deployment-config.sh
-# Fill the GitHub App fields in apps/github-integration/.env, place the private
-# key at apps/github-integration/private-key.pem, and configure at least one
-# model deployment in agents/config/model-providers.toml.
-```
-
-Build all required images and install the integrated service:
-
-```bash
-cd agents
-uv sync --frozen --no-dev
-cd ..
-docker compose --profile app build
-sudo ops/systemd/install.sh "$USER"
-sudo systemctl enable --now sec-review-bot.target
-```
-
-`sec-review-bot.target` is the systemd entry point for the complete service. See the [local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) for configuration, status inspection, updates, and component-level development.
-
-### Local Development
-
-<!-- doc-default: node-workspace.toolchain; source=package.json -->
-Use Node.js 26 LTS and pnpm 12 to develop the UI or Node.js services. The root `package.json` declares the supported Node.js range and the exact pnpm version; pnpm automatically selects that project version. Run from the repository root:
-
-```bash
-npm install --global pnpm@12
-pnpm install --frozen-lockfile
-```
-
-Then follow the target package's README for development commands. For Python development setup, see [agents/README.md](agents/README.md).
-
-## Where To Start
-
-Package-specific setup and commands live in the package READMEs.
-
-| Goal                                           | Start here                                                                          |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Understand runtime roles and ownership         | [System architecture](docs/architecture/SYSTEM_ARCHITECTURE.md)                     |
-| Run the full local stack and execution workers | [Local integrated deployment guide](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) |
-| Develop a package or service                   | [Documentation map](docs/README.md) and the package's README                        |
-| Contract and generated-artifact changes        | [Contracts guide](contracts/README.md)                                              |
-| GitHub inbound routing to local                | [Local GitHub inbound setup](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md)         |
-| Prepare a contribution                         | [Contributing guide](CONTRIBUTING.md)                                               |
+| Goal | Start here |
+| --- | --- |
+| Change agents or review workflows | [agents](agents/README.md#developer-navigation) |
+| Develop services or the console | [Documentation map](docs/README.md) and the relevant package README |
+| Change contracts or generated artifacts | [contracts](contracts/README.md) |
+| Contribute | [CONTRIBUTING](CONTRIBUTING.md) |
 
 ## Publication
 
