@@ -52,6 +52,10 @@ rg 'doc-(default|time-sensitive):' --glob '*.md' --glob '!docs/DOCUMENTATION_GUI
 
 When documenting how to use a feature, first state what the reader can do and what they need to prepare, then give a minimal working example. Put implementation details after these instructions. For example, a service startup guide can cover preparing dependencies, setting configuration, running the startup command, and confirming that the service is available before explaining module layout and internal call flow.
 
+## Wording In Chinese Documentation
+
+Use natural Chinese for explanations and descriptive headings, while keeping code identifiers, commands, paths, protocol values, and component names unchanged. Briefly explain terms readers may not know when they first appear.
+
 ## Documentation Review
 
 When reviewing maintained documentation:
