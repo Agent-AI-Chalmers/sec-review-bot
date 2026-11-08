@@ -17,7 +17,7 @@ Use the documented responsibilities and actual callers to determine who owns a c
 
 ## Prepare A Change
 
-- Search for current callers, tests, generated consumers, repository scripts, and comments before treating a path as obsolete.
+- Before deciding that code or a path is obsolete, look for its callers, related tests, repository scripts, and comments. If generated files are involved, also check where they are used.
 - Keep the patch close to the owning boundary. Remove misleading compatibility and false indirection instead of wrapping them again.
 - Decide compatibility explicitly. A breaking change must identify affected callers, artifacts, persisted data, configuration, or operational behavior and provide a migration path.
 - Update documentation when responsibilities, setup, configuration, public behavior, or operational procedures change. Follow the [documentation guide](docs/DOCUMENTATION_GUIDE.md) for durable wording and mutable-fact markers.
