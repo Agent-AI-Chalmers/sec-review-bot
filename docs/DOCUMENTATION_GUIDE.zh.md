@@ -22,7 +22,7 @@
 
 有用的信息即使可能变化也应保留，并在所在段落、列表项或表格前添加 HTML 注释，注明来源以便日后核对。注释不会显示在 GitHub 渲染后的页面中，但可以在 Markdown 源文件中搜索到。
 
-仓库所有的默认值和易变实现选择使用以下 marker：
+仓库内定义的默认值和可能变化的实现选择使用以下标记：
 
 ```md
 <!-- doc-default: <stable-key>; source=<repository-relative-path> -->
@@ -32,7 +32,7 @@
 
 仅供举例的数字注明是示例即可，不需要添加来源标记。
 
-需要定期复核的外部事实或带日期判断使用以下 marker：
+需要定期核对的外部信息或阶段性结论使用以下标记：
 
 ```md
 <!-- doc-time-sensitive: <subject>; checked=<YYYY-MM-DD>; source=<URL-or-repository-relative-path> -->
