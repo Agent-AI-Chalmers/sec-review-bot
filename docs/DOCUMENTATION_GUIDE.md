@@ -34,7 +34,7 @@ Use this marker for dated external facts or conclusions that require periodic re
 <!-- doc-time-sensitive: <subject>; checked=<YYYY-MM-DD>; source=<URL-or-repository-relative-path> -->
 ```
 
-The date records when the statement was checked, not when the document was edited. Update it only after revalidating the cited fact.
+`checked` records the date when you last verified the statement against its source. Update it only after checking again; rewording a sentence or fixing a typo is not a reason to replace it with today’s date.
 
 Markers identify review obligations; they do not make stale prose correct. When the source changes, update every marked statement that depends on it. English and translated documents must use the same marker key, source, and checked date.
 

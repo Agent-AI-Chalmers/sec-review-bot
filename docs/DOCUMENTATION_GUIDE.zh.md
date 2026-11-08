@@ -36,7 +36,7 @@
 <!-- doc-time-sensitive: <subject>; checked=<YYYY-MM-DD>; source=<URL-or-repository-relative-path> -->
 ```
 
-日期表示该说法最近一次经过核对的时间，而不是文档编辑时间。只有重新核对引用事实后才能更新日期。
+`checked` 填写最近一次核对这条信息的日期。只有重新核对过来源，才能更新它；修改措辞或修正错别字时，不要顺手把日期改成当天。
 
 Marker 表示复核义务，并不会自动保证正文正确。来源变化时，应更新所有依赖它的已标记表述。英文文档与译文必须使用相同的 marker key、source 和 checked date。
 
