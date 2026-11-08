@@ -176,14 +176,14 @@ Agents can declare the skills they need. The worker prepares and mounts the decl
 
 ### Memory
 
-This package implements the memory extractor, maintainer, and their workers. Review agents read maintained memory through an invocation-scoped filesystem view. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the overall design and [local Memory development](../docs/operations/LOCAL_MEMORY_DEVELOPMENT.md) for infrastructure setup and operation.
+This package implements memory extraction, maintenance, and their workers. The main review agents—Analyzer, Mitigator, and Verifier—read maintained memory through an invocation-scoped filesystem view. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the overall design and [local Memory development](../docs/operations/LOCAL_MEMORY_DEVELOPMENT.md) for infrastructure setup and operation.
 
 | Variable | Purpose |
 | --- | --- |
-| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog base URL. Without it, review agents have no memory view and memory processing cannot run. |
+| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog base URL. Without it, the main review agents have no memory view and memory processing cannot run. |
 | `AGENT_MEMORY_CATALOG_TOKEN` | Worker bearer token for Memory Catalog extraction and automatic maintenance. Required when `AGENT_MEMORY_CATALOG_URL` is set. |
-| `AGENT_MEMORY_CONSUMPTION_ENABLED` | Whether review agents load the active memory tree.  |
-| `AGENT_MEMORY_PROCESSING_ENABLED` | Whether extraction and maintenance activities run.  |
+| `AGENT_MEMORY_CONSUMPTION_ENABLED` | Whether the main review agents load the active memory tree.  |
+| `AGENT_MEMORY_PROCESSING_ENABLED` | Whether memory extraction and maintenance are enabled.  |
 
 ### Structured Output
 
@@ -200,9 +200,9 @@ There is no value that selects the local filesystem backend. It has no shell, so
 
 When using Docker sandbox, set `AGENT_DOCKER_IMAGE` to choose the default workspace container image.
 
-### Workspace Tools
+### Tools Inside The Sandbox
 
-The optional workspace tools image installs [Joern](https://joern.io/), [CodeGraph](https://github.com/colbymchenry/codegraph), [Playwright](https://playwright.dev/), and [Chromium](https://www.chromium.org/) in the Docker sandbox. Build the image and select it for a local run:
+The optional sandbox tools image installs [Joern](https://joern.io/), [CodeGraph](https://github.com/colbymchenry/codegraph), [Playwright](https://playwright.dev/), and [Chromium](https://www.chromium.org/) in the Docker sandbox. Build the image and select it for a local run:
 
 ```bash
 docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
@@ -230,19 +230,19 @@ The Python package is easiest to read by responsibility:
 1. Agent implementations.
    - `agents/`: prompts, runtime setup, tools, and output schemas for each agent.
 
-2. Stage pipeline: shared execution, stage artifacts, and public result contracts.
+2. Stage execution, artifacts, and public result contracts.
    - `scan_stages/`: repository discovery / triage stage execution; turns repository scan signals into cases.
-   - `review_stages/`: analysis / mitigation / verification / CVSS stage execution, stage result payloads, review record projection, and verifier feedback logic.
-   - `delivery_stages/`: repository delivery planning, delivery execution, patch synthesis execution, and delivery result generation.
+   - `review_stages/`: runs analysis, mitigation, verification, and CVSS scoring stages; defines stage results, projects review records, and handles Verifier feedback.
+   - `delivery_stages/`: runs repository delivery planning, delivery, and patch synthesis, and generates delivery results.
 
-3. Workflows: combines stages into product paths.
+3. Workflows: combines stages.
    - `workflows/`: `issue/`, `pull_request/`, and `repository/` are the public workflows; `repository_case/` is the per-case review used inside repository workflow.
 
 4. Local and operator commands.
    - `cli/`: commands for development and operations that perform one requested task and exit, plus their local-only support code.
 
 5. Production entrypoints.
-   - `entrypoints/`: the Temporal execution worker plus its execution contract, run protocol, and workflow input preparation boundaries.
+   - `entrypoints/`: Temporal Worker entrypoints, execution contracts and protocols, and workflow input preparation.
 
 6. Artifact persistence and run diagnostics.
    - `artifacts/`: immutable artifact references, local and S3 transport, materialization, and safe archive extraction. References bind a `file://` or `s3://` location to its media type, size, and digest; consumers own transport configuration and materialize verified references before use.
@@ -266,9 +266,9 @@ flowchart LR
     direct --> execution
 ```
 
-The external TypeScript Gateway receives HTTP run requests and uses the Temporal client to start and query workflows. Temporal Server persists workflow state and dispatches review work to Execution Worker through its task queue.
+Execution Gateway receives HTTP execution requests and uses the Temporal client to start and query Temporal workflows. Temporal Server persists workflow state and dispatches review tasks to Execution Worker through its task queue.
 
-- Direct local execution bypasses the HTTP service and Temporal while reusing activity functions.
+- Direct local execution bypasses the HTTP service and Temporal while reusing Temporal activity functions.
 - `run-local-* --temporal` bypasses the HTTP service but uses Temporal Server and Execution Worker.
 
 ### Development Checks

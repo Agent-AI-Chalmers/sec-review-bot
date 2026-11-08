@@ -23,7 +23,7 @@ source .venv/bin/activate
 
 本目录自带 `.python-version`；`pyproject.toml` 要求 Python 3.14 或更新版本。
 
-> *Python 3.14 是当前 package 的默认开发、CI、package 和容器 runtime 基线。*
+> *Python 3.14 是本包开发、CI、打包和容器运行使用的基线版本。*
 
 ## LLM 配置
 
@@ -174,37 +174,37 @@ Docker Compose 控制平面和宿主机 Worker 的运行方式见[本地集成�
 
 ### Skills
 
-Agent 可以声明自己需要的 skills。worker 启动 agent 时会自动准备并挂载声明的 skills。更多设计细节见 [Agent Skills](../docs/agent/SKILLS.zh.md)。
+Agent 可以声明自己需要的 skills。Worker 启动 Agent 时会自动准备并挂载声明的 skills。更多设计细节见 [SKILLS](../docs/agent/SKILLS.zh.md)。
 
 ### Memory
 
-本包实现 memory extractor、maintainer 及对应 workers；review agent 通过 invocation-scoped 文件系统视图读取维护后的 Memory。整体设计见 [Agent Memory System](../docs/agent/MEMORY_SYSTEM.zh.md)，基础设施搭建与运维见[本地 Memory 开发](../docs/operations/LOCAL_MEMORY_DEVELOPMENT.zh.md)。
+本包实现经验提取、记忆维护及对应 Worker。主链路的 Analyzer、Mitigator 和 Verifier 通过每次调用专用的文件系统视图读取维护后的记忆。整体设计见 [MEMORY_SYSTEM](../docs/agent/MEMORY_SYSTEM.zh.md)，基础设施搭建与运维见[LOCAL_MEMORY_DEVELOPMENT](../docs/operations/LOCAL_MEMORY_DEVELOPMENT.zh.md)。
 
 | 变量 | 用途 |
 | --- | --- |
-| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 的基础 URL。未配置时，review agent 不加载 memory，memory processing 也无法运行。 |
-| `AGENT_MEMORY_CATALOG_TOKEN` | Memory Catalog extraction 和自动 maintenance 使用的 worker bearer token。配置 `AGENT_MEMORY_CATALOG_URL` 时必须同时配置。 |
-| `AGENT_MEMORY_CONSUMPTION_ENABLED` | 是否让 review agent 加载 active memory tree。 |
-| `AGENT_MEMORY_PROCESSING_ENABLED` | 是否运行 extraction 和 maintenance activities。 |
+| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 的基础 URL。未配置时，主链路 Agent 不加载记忆，记忆处理也无法运行。 |
+| `AGENT_MEMORY_CATALOG_TOKEN` | Memory Catalog 经验提取和自动记忆维护使用的 Worker bearer token。配置 `AGENT_MEMORY_CATALOG_URL` 时必须同时配置。 |
+| `AGENT_MEMORY_CONSUMPTION_ENABLED` | 是否让主链路 Agent 加载当前生效的记忆文件树。 |
+| `AGENT_MEMORY_PROCESSING_ENABLED` | 是否启用经验提取和记忆维护。 |
 
 ### 结构化输出
 
 <!-- doc-default: AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES; source=agents/src/sec_review_agents/runtime/structured_response_middleware.py -->
 需要结构化输出的 Agent 必须返回 `structured_response`。模型只返回普通文本，或工具参数无法解析且没有有效工具调用可以继续时，中间件会在同一次 Agent 执行中追加纠正消息并重试。`AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES` 控制重试上限，默认 `2`。这与服务商 API 请求重试不同；已解析参数的 schema 校验错误仍由 LangChain 的结构化输出机制处理。
 
-## Sandbox 运行环境
+## 沙箱运行环境
 
-审查代码的 agent stage 必须运行在能够执行命令的 sandbox 里，否则它无法运行测试、读取历史或复现发现。具体用哪个 sandbox 属于部署配置：
+审查代码的 Agent 阶段必须运行在能够执行命令的 sandbox 里，否则它无法运行测试、读取历史或复现发现。具体用哪个 sandbox 属于部署配置：
 
 - `AGENT_SANDBOX_BACKEND` 不设置或设置为 `docker`：要求使用 Docker sandbox
 
-没有任何取值可以选择本地 filesystem backend。它没有 shell，把它交给审查代码的 stage，等于悄悄让那一步无法执行任何命令。不需要 shell 的 stage 会自行选择它，因此这不是部署配置。
+没有任何取值可以选择本地 filesystem backend。它没有 shell，把它交给审查代码的阶段，等于悄悄让那一步无法执行任何命令。不需要 shell 的阶段会自行选择它，因此这不是部署配置。
 
-使用 Docker sandbox 时，可通过 `AGENT_DOCKER_IMAGE` 设置默认的 workspace 容器镜像。
+使用 Docker sandbox 时，可通过 `AGENT_DOCKER_IMAGE` 设置默认的工作区容器镜像。
 
-### Workspace 工具
+### 沙箱内工具
 
-可选的 workspace tools 镜像在 Docker sandbox 中安装了 [Joern](https://joern.io/)、[CodeGraph](https://github.com/colbymchenry/codegraph)、[Playwright](https://playwright.dev/) 和 [Chromium](https://www.chromium.org/)。构建镜像，并在本地运行时选用它：
+可选的沙箱工具镜像在 Docker sandbox 中安装了 [Joern](https://joern.io/)、[CodeGraph](https://github.com/colbymchenry/codegraph)、[Playwright](https://playwright.dev/) 和 [Chromium](https://www.chromium.org/)。构建镜像，并在本地运行时选用它：
 
 ```bash
 docker build -f agents/docker/workspace-tools.Dockerfile -t sec-review-bot-workspace:tools agents
@@ -227,31 +227,31 @@ export AGENT_MCP_ENABLED=true
 
 ### 目录
 
-Python package 按职责读最清楚：
+Python 包按职责读最清楚：
 
-1. Agent implementations。
-   - `agents/`：各类 agent 的提示词、运行配置、工具和输出结构。
+1. Agent 实现。
+   - `agents/`：各类 Agent 的提示词、运行配置、工具和输出结构。
 
-2. Stage pipeline：共享执行、stage 产物和公开结果契约。
-   - `scan_stages/`：repository discovery / triage stage execution，把仓库扫描信号整理成 cases。
-   - `review_stages/`：analysis / mitigation / verification / CVSS stage execution、stage result payloads、review record projection 和 verifier feedback 逻辑。
-   - `delivery_stages/`：repository delivery planning、delivery execution、patch synthesis execution 和 delivery result 生成。
+2. 阶段执行、产物和公开结果契约。
+   - `scan_stages/`：执行仓库初筛和候选整理，将扫描线索整理为 case。
+   - `review_stages/`：执行分析、修复、验证和 CVSS 评分阶段，定义阶段结果、生成审查记录，并处理 Verifier 反馈。
+   - `delivery_stages/`：执行仓库交付规划、交付和补丁合成，生成交付结果。
 
-3. Workflows：把 stage 组合成产品路径。
-   - `workflows/`：`issue/`、`pull_request/`、`repository/` 是三个 public workflow；`repository_case/` 是 repository workflow 内部的单 case review。
+3. 工作流：组合各阶段。
+   - `workflows/`：`issue/`、`pull_request/`、`repository/` 是对外工作流；`repository_case/` 用于仓库工作流内部的单 case 审查。
 
 4. 本地与运维命令。
    - `cli/`：用于开发和运维、完成一次指定任务后退出的命令，以及只服务于本地命令的支持代码。
 
-5. 生产 entrypoints。
-   - `entrypoints/`：Temporal execution worker，以及它的 execution contract、run protocol 和 workflow input preparation 边界。
+5. 生产入口。
+   - `entrypoints/`：Temporal Worker 入口，以及执行契约、执行协议和工作流输入准备。
 
-6. Artifact 持久化与 run diagnostics。
-   - `artifacts/`：不可变 artifact reference、本地与 S3 传输、物化和安全 archive 解包。Reference 将 `file://` 或 `s3://` 位置与 media type、大小和 digest 绑定；consumer 持有传输配置，并在使用前校验和物化 reference。
-   - `run_diagnostics/`：per-run diagnostic bundle 的格式、构建与物化逻辑，以及对应的 Temporal publication activity。
+6. 产物持久化与运行诊断。
+   - `artifacts/`：不可变产物引用、本地与 S3 传输、物化和安全归档解包。产物引用将 `file://` 或 `s3://` 位置与媒体类型、大小和摘要绑定；使用方持有传输配置，并在使用前校验和物化引用。
+   - `run_diagnostics/`：每次运行的诊断包的格式、构建与物化逻辑，以及对应的 Temporal 发布 activity。
 
-7. Runtime support：agent 运行所需基础设施。
-   - `runtime/`、`filesystem/`、`workspace/`、`llm/`、`resources/`、`observability/`：agent runtime、filesystem sandbox、workspace 产物、模型配置、prompt / skill 资源和诊断支持。
+7. Agent 运行所需基础设施。
+   - `runtime/`、`filesystem/`、`workspace/`、`llm/`、`resources/`、`observability/`：Agent 运行时、文件系统沙箱、工作区产物、模型配置、提示词 / skill 资源和诊断支持。
 
 ### 执行架构
 
@@ -268,7 +268,7 @@ flowchart LR
     direct --> execution
 ```
 
-外部 TypeScript Gateway 接收 HTTP run 请求，并通过 Temporal client 启动和查询 workflow。Temporal Server 持久化 workflow 状态，并通过 task queue 将 review 工作分发给 Execution Worker。
+Execution Gateway 接收 HTTP 执行请求，并通过 Temporal client 启动和查询 Temporal workflow。Temporal Server 持久化 workflow 状态，并通过 task queue 将审查任务分发给 Execution Worker。
 
 - Direct 本地执行不经过 HTTP 服务和 Temporal 调度，但复用 Temporal activity 函数。
 - `run-local-* --temporal` 绕过 HTTP service，但会经过 Temporal Server 和 Execution Worker。
