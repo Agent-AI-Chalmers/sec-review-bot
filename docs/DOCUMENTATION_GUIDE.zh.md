@@ -28,7 +28,7 @@
 <!-- doc-default: <stable-key>; source=<repository-relative-path> -->
 ```
 
-`<stable-key>` 使用环境变量、配置字段、导出常量或带 package 限定的名称。`source` 必须指向拥有该值的仓库文件，不能指向另一篇说明文档。
+`<stable-key>` 填写对应的环境变量名、配置字段、导出常量名，或带包名的名称。`source` 填写实际定义该值的文件路径，相对于仓库根目录，不要填写另一篇说明文档的路径。例如，`AGENT_DOCKER_NETWORK_MODE` 的来源是 `agents/src/sec_review_agents/filesystem/docker_runtime.py`。
 
 需要定期复核的外部事实或带日期判断使用以下 marker：
 

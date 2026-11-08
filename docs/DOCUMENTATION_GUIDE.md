@@ -26,7 +26,7 @@ Use this marker for repository-owned defaults and mutable implementation choices
 <!-- doc-default: <stable-key>; source=<repository-relative-path> -->
 ```
 
-Use an environment variable, configuration field, exported constant, or package-qualified name as `<stable-key>`. `source` must point to the repository file that owns the value, not another prose document.
+For `<stable-key>`, use the relevant environment variable name, configuration field, exported constant name, or package-qualified name. For `source`, give the path to the file that defines the value, relative to the repository root, rather than another documentation page. For example, `AGENT_DOCKER_NETWORK_MODE` is defined in `agents/src/sec_review_agents/filesystem/docker_runtime.py`.
 
 Use this marker for dated external facts or conclusions that require periodic revalidation:
 
