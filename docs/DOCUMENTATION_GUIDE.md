@@ -28,6 +28,8 @@ Use this marker for repository-owned defaults and mutable implementation choices
 
 For `<stable-key>`, use the relevant environment variable name, configuration field, exported constant name, or package-qualified name. For `source`, give the path to the file that defines the value, relative to the repository root, rather than another documentation page. For example, `AGENT_DOCKER_NETWORK_MODE` is defined in `agents/src/sec_review_agents/filesystem/docker_runtime.py`.
 
+Numbers used only for illustration need no source marker, but must be clearly identified as examples.
+
 Use this marker for dated external facts or conclusions that require periodic revalidation:
 
 ```md
@@ -36,6 +38,8 @@ Use this marker for dated external facts or conclusions that require periodic re
 
 `checked` records the date when you last verified the statement against its source. Update it only after checking again; rewording a sentence or fixing a typo is not a reason to replace it with today’s date.
 
+Date measurement and experiment results, and do not present a single result as a lasting guarantee. Keep the time context for dependency behavior and external release plans too.
+
 When the source information changes, check and update the corresponding documentation. Corresponding markers in English and Chinese documents must have identical contents.
 
 Find marked facts with:
@@ -43,12 +47,6 @@ Find marked facts with:
 ```bash
 rg 'doc-(default|time-sensitive):' --glob '*.md' --glob '!docs/DOCUMENTATION_GUIDE*.md'
 ```
-
-## Defaults And Examples
-
-Keep a default in prose when it changes how a reader should operate or understand the system. Prefer one canonical configuration table when the value is merely reference data. A narrative may repeat the value when the consequence is the point, such as explaining how long recovery can pause or how a concurrency limit affects scheduling; mark that repetition with `doc-default`.
-
-Label measurements and experiments as dated observations. Do not turn a sample result, current dependency behavior, or external release schedule into a permanent system property. Examples may use arbitrary numbers without markers when the text clearly identifies them as examples rather than defaults or guarantees.
 
 ## Documentation Review
 
