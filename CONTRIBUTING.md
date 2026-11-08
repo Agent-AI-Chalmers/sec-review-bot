@@ -15,7 +15,7 @@ Before editing code, use the maintained documentation in this order:
 
 Use the documented responsibilities and actual callers to determine who owns a change, rather than directory size or document length. Components in the same source package may still be responsible for different tasks.
 
-## Prepare A Change
+## Guidelines For Making Changes
 
 - Before deciding that code or a path is obsolete, look for its callers, related tests, repository scripts, and comments. If generated files are involved, also check where they are used.
 - Keep the patch close to the owning boundary. Remove misleading compatibility and false indirection instead of wrapping them again.
