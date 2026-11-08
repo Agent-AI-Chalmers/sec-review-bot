@@ -11,9 +11,8 @@ Describe how the system works now rather than recounting each edit or refactor. 
 Avoid unnecessary counts: when a list or the named services already show what is included, there is usually no need to state the total again. If you are giving examples, do not present them as a complete list. Prefer:
 
 - `The supported execution paths are:` over `There are three execution paths:`;
-- named owners over `the two services`;
-- `includes` over `consists of` when the set may grow;
-- `these artifacts`, `the workers`, or `the lifecycle axes` after the members have been named.
+- specific service names over `the two services`;
+- `for example` or `includes` when listing examples, rather than presenting them as `all` or `the only` possibilities.
 
 Do not remove a number merely because it may change. Keep it when readers need the value to configure, operate, or reason about the system, or when it expresses an enforced invariant. Examples include a retry limit, timeout, concurrency default, protocol cardinality, and the single-maintainer guarantee.
 
