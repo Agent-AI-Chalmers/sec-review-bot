@@ -1,10 +1,10 @@
-# Run Diagnostic Artifact
+# 任务诊断产物
 
 语言：[English](README.md) | 中文
 
 本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-本目录定义一个已完成 review run 所发布的 archive。它是共享 [envelope v1](../../envelope/v1/SPEC.zh.md) 上的 profile，不属于 Execution API contract。
+本目录定义一次审查任务结束后发布的诊断归档。它是在共享 [envelope v1](../../envelope/v1/SPEC.zh.md) 之上定义的 profile，不属于 Execution API 契约。
 
-- [v1/SPEC.zh.md](v1/SPEC.zh.md) 定义内部目录树与 manifest 关系。
-- [v1/corpus](v1/corpus) 包含每个 run-diagnostic consumer 都必须执行的真实 archive，并补充共享 envelope corpus。
+- [SPEC](v1/SPEC.zh.md) 规定内部目录树及清单之间的关系。
+- [v1/corpus](v1/corpus) 保存真实归档；诊断包的所有读取组件都必须测试这些输入，也必须执行共享 envelope 的测试输入。

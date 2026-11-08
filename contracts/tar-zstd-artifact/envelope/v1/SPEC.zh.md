@@ -1,4 +1,4 @@
-# Tar+Zstandard Artifact Envelope - v1
+# Tar+Zstandard Envelope — v1
 
 语言：[English](SPEC.md) | 中文
 
@@ -6,49 +6,49 @@
 
 ## 范围
 
-本 contract 只定义项目自有 `application/tar+zstd` artifact 共享的表示。各 profile 自行定义允许的目录树、语义 metadata、规范顺序、资源限制和生产规则。
+本契约只规定本项目 `application/tar+zstd` 产物共用的编码格式。各 profile 另行规定允许的目录树、业务元数据、排列顺序、资源限制和生成要求。
 
 ## 压缩
 
-payload 是一个包含单个 tar archive 的 Zstandard frame。profile 可以规定更严格的压缩与解压大小限制。消费者必须拒绝错误压缩；当 decoder 能区分时，还必须拒绝拼接 frame 或尾随的非 frame 数据。
+内容由一个 Zstandard 帧封装，解压后是一个 tar 归档。各 profile 可以进一步限制压缩前后的大小。读取方必须拒绝压缩格式错误的输入；解码器能够识别时，还必须拒绝多个帧拼接或帧后附带非帧数据的输入。
 
 ## 受限 POSIX PAX 方言
 
-tar stream 使用 POSIX ustar header，并允许在被修改 member 前紧邻一个局部 PAX extended header（`typeflag` 为 `x`）。能直接由 ustar 表达的 member 不需要 extended header，仍属于本 PAX 方言。
+tar 数据流使用 POSIX ustar 头部，允许在条目之前紧邻放置一个局部 PAX 扩展头（`typeflag` 为 `x`），修改紧随其后的条目。能直接用 ustar 表达的条目不需要扩展头，同样符合本格式。
 
-支持的 PAX 子集有意保持精简：
+只接受以下 PAX 用法：
 
-- 局部 extended header 恰好包含一条 key 为 `path` 的 record；
-- 单个局部 extended header 最大为 1 MiB；
-- record length 必须精确，record 以 LF 结尾，value 必须是合法 UTF-8；
-- `path` value 覆盖下一个 member 的 ustar name 与 prefix 字段；
-- 连续或悬空的局部 extended header 无效；
-- 禁止全局 PAX header（`g`）、未知 PAX key、重复 `path` record、GNU long-name（`L`）、GNU long-link（`K`）和 GNU sparse（`S`）extension。
+- 局部扩展头恰好包含一条键为 `path` 的记录；
+- 单个局部扩展头最大为 1 MiB；
+- 记录长度必须准确，记录以 LF 结尾，值必须是合法 UTF-8；
+- `path` 的值覆盖下一个条目的 ustar `name` 和 `prefix` 字段；
+- 连续出现局部扩展头，或扩展头后没有对应条目，均无效；
+- 禁止全局 PAX 头（`g`）、未知 PAX 键、重复 `path` 记录、GNU long-name（`L`）、GNU long-link（`K`）和 GNU sparse（`S`）扩展。
 
-消费者必须校验应用 `path` 后的有效路径；底层 ustar member 的占位名称不具权威。
+读取方必须按 `path` 覆盖后的实际路径校验，不能以底层 ustar 条目的占位名称为准。
 
-## Canonical Entry
+## 条目格式要求
 
-只允许 regular file 和 directory。每个 entry 使用 canonical metadata：
+只允许普通文件和目录。所有条目的元数据必须符合下表：
 
-| Field | Regular file | Directory |
+| 字段 | 普通文件 | 目录 |
 | --- | --- | --- |
 | `mtime` | `0` | `0` |
 | `uid`, `gid` | `0`, `0` | `0`, `0` |
-| `uname`, `gname` | empty | empty |
+| `uname`, `gname` | 空 | 空 |
 | mode | `0644` | `0755` |
-| size | 实际 body length | `0` |
+| size | 实际内容字节数 | `0` |
 
-profile 负责规定允许的 file 与 directory，但不能放宽这些共享 entry 规则。
+各 profile 可以限制允许的文件和目录，但不能放宽上述通用条目规则。
 
 ## Tar 结构
 
-每个 header 都必须有合法 checksum 与 POSIX ustar magic。entry body 补齐到 512-byte block。archive 至少以两个全零 block 结束，之后只允许全零 padding。
+每个头部都必须具有有效校验和及 POSIX ustar 标识。条目内容按 512 字节块补齐。归档至少以两个全零块结束，之后只允许全零填充。
 
 ## 生产者规则
 
-有效路径能放入普通 ustar 字段时，生产者使用普通字段；只有确有必要时才输出局部 `path` header。不得输出可选 timestamp、ownership key、实现私有 key 或冗余 PAX metadata。
+生成方应优先使用普通 ustar 字段；只有这些字段容纳不下实际路径时，才输出局部 PAX `path` 扩展头。不得输出可选时间戳、所有者属性、实现专用属性或多余的 PAX 元数据。
 
-## 共享 Corpus
+## 共享测试输入
 
-[corpus/manifest.json](corpus/manifest.json) 标识真实 `.tar.zst` byte stream；每个消费者都必须在 envelope boundary 接受或拒绝相应样本。各 profile 的 corpus 另行覆盖内部布局与语义规则。
+[corpus/manifest.json](corpus/manifest.json) 列出真实的 `.tar.zst` 归档输入及其预期结果。所有读取方都必须按 envelope 规则接受或拒绝这些输入。各 profile 再用自己的测试输入检查内部布局和内容规则。

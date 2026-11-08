@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-This contract defines the shared archive envelope used by project-owned artifacts whose media type is `application/tar+zstd`, together with the profiles that define each artifact's internal organization.
+This directory defines artifact formats with media type `application/tar+zstd`. The envelope specifies the shared Zstandard compression and tar format; each profile specifies the file layout and content requirements.
 
 - [envelope/v1/SPEC.md](envelope/v1/SPEC.md) defines the restricted POSIX PAX dialect.
 - [envelope/v1/corpus](envelope/v1/corpus) contains encoded interoperability and rejection cases consumed by every archive reader.
