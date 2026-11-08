@@ -41,7 +41,7 @@ Run checks from every affected package, not only from the package where the firs
 | Memory Catalog Server | [`services/memory-catalog/README.md`](services/memory-catalog/README.md) | format, lint, typecheck, tests, PostgreSQL integration tests |
 | Execution submission system path | [`system-tests/README.md`](system-tests/README.md) | Review Runs client, Execution Gateway HTTP, and Temporal system test |
 | Repository scripts | [`scripts/README.md`](scripts/README.md) | Ruff, Black, Python syntax checks; check the changed scripts as appropriate, for example with `--help` or test inputs |
-| Documentation | [`docs/DOCUMENTATION_GUIDE.md`](docs/DOCUMENTATION_GUIDE.md) and [`docs/README.md`](docs/README.md) | link, wrapping, and translated-heading checks as applicable |
+| Documentation | [`docs/DOCUMENTATION_GUIDE.md`](docs/DOCUMENTATION_GUIDE.md) and [`docs/README.md`](docs/README.md) | As applicable, check that local links work, prose paragraphs remain unwrapped as required, and English/Chinese heading structures match |
 
 For a contract change, run the affected family tool from `contracts/<family>/tools/`: regenerate projections, check that committed artifacts are fresh, and run formatting, lint, contract lint when present, typechecking, and tests. Then run the consuming package checks. See the [contracts change checklist](contracts/README.md#change-checklist).
 
