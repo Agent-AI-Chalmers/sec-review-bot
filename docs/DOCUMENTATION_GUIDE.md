@@ -2,7 +2,7 @@
 
 Language: English | [中文](DOCUMENTATION_GUIDE.zh.md)
 
-This guide defines repository-wide rules for maintained documentation. It applies to package READMEs, architecture and workflow documents, contract guides, and operations guides. Generated artifacts and third-party material follow their owning source instead.
+This guide explains how to write and update documentation maintained by this project, including package READMEs, architecture and workflow descriptions, contract guides, and operations guides. Generated files and third-party material follow the rules of their respective sources.
 
 ## Prefer Durable Statements
 
