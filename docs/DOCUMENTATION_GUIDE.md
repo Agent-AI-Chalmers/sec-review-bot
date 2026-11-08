@@ -36,7 +36,7 @@ Use this marker for dated external facts or conclusions that require periodic re
 
 `checked` records the date when you last verified the statement against its source. Update it only after checking again; rewording a sentence or fixing a typo is not a reason to replace it with today’s date.
 
-Markers identify review obligations; they do not make stale prose correct. When the source changes, update every marked statement that depends on it. English and translated documents must use the same marker key, source, and checked date.
+When the source information changes, check and update the corresponding documentation. Corresponding markers in English and Chinese documents must have identical contents.
 
 Find marked facts with:
 
