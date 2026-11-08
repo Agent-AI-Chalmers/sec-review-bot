@@ -66,7 +66,7 @@ When reviewing maintained documentation:
 
 1. Remove redundant counts and exhaustive wording that add no meaning.
 2. Preserve operationally useful defaults, limits, dates, and measured facts.
-3. Add or update mutable-fact markers and verify their sources.
+3. Add or update source markers for information that may change, and check the cited sources.
 4. Check that absolute language is backed by an enforceable boundary.
 5. Keep English and translated documents aligned in meaning, headings, and markers.
 6. Run the documentation checks listed in `AGENTS.md`.
