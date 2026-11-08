@@ -26,7 +26,7 @@ Sec Review Bot 支持使用 AI Agent 执行代码库安全审计，覆盖 issue�
 
 ## 运行结果示例
 
-仓库级 review 会发布摘要，并生成对应的 draft PR：
+仓库审查会发布摘要，并在有符合发布条件的补丁时创建 draft PR：
 
 <p align="center">
   <img src="assets/screenshots/repository-review-summary.png" alt="Repository review summary" width="720">

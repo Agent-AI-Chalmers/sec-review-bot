@@ -26,7 +26,7 @@ Sec Review Bot uses AI agents to audit codebases and handle security-review task
 
 ## What It Looks Like
 
-Repository review publishes a summary and draft PRs:
+Repository review publishes a summary and creates draft PRs when publishable patches are available:
 
 <p align="center">
   <img src="assets/screenshots/repository-review-summary.png" alt="Repository review summary" width="720">
