@@ -8,7 +8,7 @@
 
 ## TL;DR
 
-选定的默认外部工具是用于 code property graph 分析的 Joern，以及用于浏览器运行时验证的 Playwright。配置 `AGENT_JOERN_ENABLED=true` 和 `AGENT_PLAYWRIGHT_ENABLED=true` 后，它们通过 bash 和各自的 CLI 暴露给 agent。默认不需要为它们提供 bundled skill。
+项目提供 Joern 代码属性图分析和 Playwright 浏览器验证两类可选能力。镜像安装相应工具后，可用 `AGENT_JOERN_ENABLED=true`、`AGENT_PLAYWRIGHT_ENABLED=true` 启用；声明支持该工具的 Agent 会获得 CLI 使用提示，并通过 bash 调用命令。它们不依赖额外的内置 Skill。
 
 项目同时保留 MCP 集成框架。CodeGraph 和 Playwright 已为能够使用它们的 agent 提供可选 MCP 配置，但 MCP 默认关闭。这些集成仍可用于开发、实验，以及明确选择 MCP 的部署环境。
 

@@ -213,7 +213,7 @@ export AGENT_JOERN_ENABLED=true
 export AGENT_PLAYWRIGHT_ENABLED=true
 ```
 
-本项目计划通过 bash 和各自的 CLI 使用 Joern 和 Playwright。
+部署开关与 Agent 的工具声明同时启用某项工具时，Agent 会通过 bash 调用 Joern 或 Playwright 的 CLI。所选镜像必须已安装对应命令；开启开关不会安装工具。
 
 现有 CodeGraph 和 Playwright MCP 集成仍然可用，但默认关闭；需要时显式开启：
 

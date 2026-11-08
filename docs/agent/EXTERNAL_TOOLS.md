@@ -6,7 +6,7 @@ This page explains which external tools the agent uses and how those tools enter
 
 ## TL;DR
 
-The chosen default external tools are Joern for code property graph analysis and Playwright for browser-based runtime validation. They are exposed through bash and their CLIs when `AGENT_JOERN_ENABLED=true` and `AGENT_PLAYWRIGHT_ENABLED=true` are configured. Neither tool requires a bundled skill by default.
+The project offers optional Joern code property graph analysis and Playwright browser validation. Install the commands in the image, then enable them with `AGENT_JOERN_ENABLED=true` and `AGENT_PLAYWRIGHT_ENABLED=true`. Agents that declare the selected capability receive CLI guidance and invoke the commands through bash. Neither tool requires a bundled skill.
 
 The project also retains its MCP integration framework. CodeGraph and Playwright have optional MCP configurations for the agents that can use them, but MCP is disabled by default. These integrations remain available for development, experiments, and deployments that deliberately choose MCP.
 

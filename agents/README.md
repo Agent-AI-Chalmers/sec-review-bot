@@ -211,7 +211,7 @@ export AGENT_JOERN_ENABLED=true
 export AGENT_PLAYWRIGHT_ENABLED=true
 ```
 
-This project intends to use Joern and Playwright through bash and their CLIs.
+Agents use Joern and Playwright through bash and their CLIs when the corresponding deployment switch and agent declaration enable them. The selected image must contain the commands; enabling a switch does not install a tool.
 
 The existing CodeGraph and Playwright MCP integrations remain available but are disabled by default. Enable them explicitly when needed:
 
