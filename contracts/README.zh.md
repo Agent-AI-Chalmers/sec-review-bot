@@ -90,11 +90,11 @@ Fixture 是契约校验的一部分。Manifest 记录每个 schema 必须接受�
 
 ## 派生产物
 
-有些产物是从手写契约生成的，而不是手工维护——例如 API 的 TypeScript 投影、提交的 JSON Schema、生成的参数列表。每个 owning family 或 layered-family component 都把渲染并校验其投影的工具放在本地 `tools/` 目录中：读取契约的工具就挨着契约，而它的产物落在哪里（可能在别的包中）不影响谁拥有该检查。该工具的 `generated-artifacts.json` 列出它派生什么、落到哪里。
+API 的 TypeScript 类型、部分 JSON Schema 和参数列表等文件由契约生成。生成和校验工具放在对应契约或分层格式的 `tools/` 目录中。即使生成结果写入另一个包，仍由这套工具负责检查；`generated-artifacts.json` 列出全部输出及其位置。
 
 稳定的包内入口按调用方消费的职责命名，即使它由生成器维护，例如 `execution-api-version.ts`。原始机械投影可以在文件名中保留 `generated`，用于提示该文件不应逐渐承载手写行为，例如 `contract-types-generated.ts`。文件名不是强制边界：每个提交到仓库的生成产物都必须在文件头标明其生成身份、列入该族的 manifest，并由下述 freshness 与 CI 检查覆盖。
 
-每个工具在本地提供 `generate` 命令重新生成全部产物，以及 `check` 校验已提交副本是否一致。每个族的测试会断言 manifest 与生成器自身声明的输出一致，并断言 CI 的变更过滤器覆盖清单中每一个产物；因此新增一个投影只需把它列进清单，而不必记得再接一个检查。
+各工具提供 `generate` 重新生成文件，提供 `check` 检查仓库中的结果是否一致。测试会核对输出清单与生成器声明，并检查 CI 的变更触发规则是否覆盖每个输出文件。因此新增生成文件时，应将其列入清单，由现有检查确认覆盖情况。
 
 API family 工具通过显式的本地 package 依赖共享开发工具 [TypeScript 渲染器](codegen/README.md)。各 family 继续负责自己的契约投影及检查。
 

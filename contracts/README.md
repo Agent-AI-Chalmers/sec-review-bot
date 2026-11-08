@@ -88,11 +88,11 @@ Each family README records who owns which side of its boundary and what callers 
 
 ## Derived Artifacts
 
-Some artifacts are generated from a hand-written contract rather than maintained by hand — a TypeScript projection of an API, committed JSON Schemas, a generated parameter list. Each owning family or layered-family component keeps the tool that renders and checks its projections in its local `tools/` directory, so the tool that reads a contract lives beside it and where its outputs land (which may be another package) does not change who owns the check. That tool's `generated-artifacts.json` lists what it derives and where it lands.
+API TypeScript types, some JSON Schemas, and parameter lists are generated from contracts. The owning family or format layer keeps its generation and validation tools in `tools/`. Those tools remain responsible for checking outputs even when the files are written into another package. `generated-artifacts.json` lists each output and its location.
 
 Name a stable package entry point for the responsibility callers consume, even when a generator maintains it (`execution-api-version.ts`, for example). Raw mechanical projections may carry `generated` in the filename when that helps distinguish files that should not accumulate hand-written behavior (`contract-types-generated.ts`, for example). The filename is not the enforcement boundary: every committed generated artifact must identify itself in its header, appear in the family manifest, and be covered by the freshness and CI checks below.
 
-Each tool provides a local `generate` command to render every artifact and `check` to prove the committed copies match. A family's test asserts the manifest matches the generators' own declared outputs and that the CI change filter triggers on every listed artifact, so a new projection is covered by being listed, not by remembering to wire up a check.
+Each tool provides `generate` to regenerate its outputs and `check` to compare them with committed files. Tests compare the output manifest with the generator declarations and verify that CI change filters cover each listed output. Add new outputs to that manifest so the existing checks can verify coverage.
 
 The API-family tools share the development-only [TypeScript renderer](codegen/README.md). Each family installs it as an explicit local package dependency and retains ownership of its contract-specific projections and checks.
 

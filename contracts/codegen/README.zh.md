@@ -4,9 +4,9 @@
 
 本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-这个仅用于开发的 package 负责 Execution API、Review Runs API 和 Memory Catalog API 工具共用的 OpenAPI 到 TypeScript 渲染规则。各 family 继续负责自己的契约、生成入口、产物 manifest、格式化和生成一致性检查。
+本包仅用于开发，为 Execution API、Review Runs API 和 Memory Catalog API 的工具提供共用的 OpenAPI 到 TypeScript 代码生成规则。各类契约仍分别维护规范、生成命令、输出清单、格式和生成结果一致性检查。
 
-消费者声明 `workspace:*` 依赖。在仓库根目录运行 `pnpm install --frozen-lockfile`，使用统一锁文件安装 workspace。无需单独构建 codegen：带有类型检查的 JSDoc 使这个 JavaScript package 可以直接执行，`src/index.d.ts` 则声明精简的 TypeScript 接口。
+使用本工具的包通过 `workspace:*` 声明依赖。在仓库根目录运行 `pnpm install --frozen-lockfile`，按统一锁文件安装即可。安装依赖后即可运行，无需单独构建。
 
 Kubb resolver 将操作响应的聚合类型命名为 `…ResponseBodyByStatus` 和 `…ResponseBody`，与 `HealthResponse` 等契约 schema 名称区分。状态码映射直接包含响应体及其生成说明，不再保留中间的 `StatusNNN` 别名。聚合类型通过索引精确选取 Kubb 选择的状态码：有成功响应时选择成功响应，否则沿用其响应体回退规则。它表示响应体，而不是携带状态码判别字段的 HTTP 响应对象。
 

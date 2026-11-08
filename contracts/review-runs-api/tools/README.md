@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-This package renders and checks every artifact derived from [this family's OpenAPI contract](../v1/openapi.yaml): Kubb-generated TypeScript projections, operation route maps, and committed v1 JSON Schemas. It lives beside the contract it reads, so the tool that owns a projection is not the package the projection lands in.
+This package generates and checks every artifact derived from the [family OpenAPI contract](../v1/openapi.yaml): TypeScript types, operation-route mappings, and committed v1 JSON Schemas. The tools live beside the contract and remain responsible for checking outputs written into other packages.
 
 ## Commands
 
@@ -16,7 +16,7 @@ pnpm run typecheck
 pnpm test
 ```
 
-`generate` and `check` share one description of what is generated (`generatedArtifacts()` in each generator), so they cannot disagree. `tools/generated-artifacts.json` lists what this family derives and where it lands; a test asserts it matches the generators and that CI triggers on every listed artifact.
+`generate` and `check` use the same output descriptions from each generator's `generatedArtifacts()`, avoiding two separately maintained lists. `tools/generated-artifacts.json` records every output and location; tests compare it with the generators and verify CI coverage for each file.
 
 ## Layout
 

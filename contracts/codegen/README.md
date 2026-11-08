@@ -2,9 +2,9 @@
 
 Language: English | [中文](README.zh.md)
 
-This development-only package owns the shared OpenAPI-to-TypeScript rendering policy used by the Execution API, Review Runs API, and Memory Catalog API tools. Each family retains its own contract, generation entry point, output manifest, formatting, and freshness check.
+This development-only package provides the OpenAPI-to-TypeScript generation rules shared by the Execution API, Review Runs API, and Memory Catalog API tools. Each family maintains its own contract, generation command, output manifest, formatting, and generated-output consistency checks.
 
-Consumers declare a `workspace:*` dependency. Run `pnpm install --frozen-lockfile` from the repository root to install the workspace using its shared lockfile. No separate codegen build is required: JavaScript with checked JSDoc keeps this package directly executable, while `src/index.d.ts` declares the small TypeScript interface.
+Consumers declare a `workspace:*` dependency. Run `pnpm install --frozen-lockfile` from the repository root to use the shared workspace lockfile. After installing dependencies, the tool is ready to run; no separate build is needed.
 
 Kubb's resolver names operation aggregates `…ResponseBodyByStatus` and `…ResponseBody`, keeping them distinct from contract schema names such as `HealthResponse`. The status map contains response bodies directly, including their generated documentation. Intermediate `StatusNNN` aliases are removed. The aggregate indexes exactly the statuses Kubb selected: success responses when available, otherwise its response-body fallback. It represents a body, not an HTTP response carrying a status discriminator.
 
