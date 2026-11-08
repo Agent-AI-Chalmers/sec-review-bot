@@ -18,7 +18,7 @@ Do not delete a number just because it may change later. Keep values readers nee
 
 ## Mutable Facts
 
-Important facts may still be expected to change. Keep them visible when they help readers, and place an HTML comment immediately before the paragraph, list item, or table that contains them. GitHub does not render these comments, while source search and documentation-review tools can find them.
+Keep useful information even when it may change, and add an HTML comment immediately before the paragraph, list item, or table containing it. Record the source so maintainers can check it later. These comments are searchable in the Markdown source but hidden on the rendered GitHub page.
 
 Use this marker for repository-owned defaults and mutable implementation choices:
 
