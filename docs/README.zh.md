@@ -63,7 +63,7 @@
 
 ### 工作流
 
-主要 public workflow ID 是 `issue-review`、`pull-request-review` 和 `repository-review`。Issue / PR review 走 analysis、mitigation 和 verification；repository review 还包括 discovery、triage、CVSS scoring 和 delivery planning。
+以下文档介绍 `issue-review`、`pull-request-review` 和 `repository-review`，包括工作流的组织方式，以及 Analyzer、Mitigator、Verifier、Discovery、Triage、CVSS Scoring 和 Delivery Planning 等 Agent 的职责。
 
 #### 通用审查规则
 

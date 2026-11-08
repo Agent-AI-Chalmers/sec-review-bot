@@ -61,7 +61,7 @@ The [Contracts README](../contracts/README.md) lists the data exchanged between 
 
 ### Workflows
 
-The main public workflow IDs are `issue-review`, `pull-request-review`, and `repository-review`. Issue and PR reviews run analysis, mitigation, and verification; repository review adds discovery, triage, CVSS scoring, and delivery planning.
+The documents below cover `issue-review`, `pull-request-review`, and `repository-review`, including how the workflows are organized and the responsibilities of agents such as Analyzer, Mitigator, Verifier, Discovery, Triage, CVSS Scoring, and Delivery Planning.
 
 #### Shared Review Rules
 
