@@ -79,7 +79,7 @@ Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和
 
 | 路径                | 触发方式                              | 输出                                                  |
 | ------------------- | ------------------------------------- | ----------------------------------------------------- |
-| Issue review        | `issues.opened`、`@<app-slug> review` | issue comment（确认问题并产出 patch 后再开 draft PR） |
+| Issue review | `issues.opened`、`@<app-slug> review` | 将审查结果作为评论发布到原 Issue；指定 `--open-pr` 且补丁符合发布条件时，可创建 draft PR |
 | Pull request review | PR webhook、`@<app-slug> review`      | PR review / suggestions                               |
 | Repository review   | 定时或手动触发的 GitHub Action        | repository summary 和 deliveries                      |
 

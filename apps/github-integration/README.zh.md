@@ -163,7 +163,7 @@ issue 与 PR conversation comment 共用同一套命令语法；下面的参数�
 
 - `review`：触发一次 review；若产生最终 patch，默认允许其中包含合理的测试改动。
 - `--test-changes allow|deny`：最终 mitigation patch 是否允许包含测试改动。`deny` 表示不得包含测试改动；测试只能作为临时验证手段。不带该参数时 Execution Worker 使用 `allow`。
-- `--open-pr`：仅对 issue review 生效；当 review 产出可用的 patch 时，允许本次运行创建 draft pull request；不带该参数时 patch 只保留在 issue 的 summary comment 中。`issues.opened` 自动触发的 review 永不创建 draft PR。在 PR 评论上该参数无对应动作，会被忽略，因为 PR review 不会创建分支或新的 pull request。
+- `--open-pr`：仅适用于 Issue 审查。指定此参数且补丁符合发布条件时，允许创建 draft PR；不指定时，补丁只展示在原 Issue 的审查结果评论中。`issues.opened` 自动触发的审查不会创建 draft PR。
 
 各参数与顺序无关，可组合使用。没有 objective 参数：GitHub 侧一律以 `audit` 模式审查。
 

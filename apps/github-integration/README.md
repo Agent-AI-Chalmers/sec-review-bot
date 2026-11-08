@@ -161,7 +161,7 @@ Issue and PR conversation comments share one command grammar. The flags below ar
 
 - `review`: triggers a review. The final patch, if any, may include reasonable test changes.
 - `--test-changes allow|deny`: whether the final mitigation patch may contain test changes. `deny` forbids test changes; tests may only be used as temporary validation work. With no flag the Execution Worker uses `allow`.
-- `--open-pr`: issue reviews only. Allows the run to open a draft pull request when the review produces a ready patch; without it the patch stays in the issue summary comment. Automatic `issues.opened` reviews never open a draft PR. On a PR comment this flag has no effect and is ignored, because a PR review does not create a branch or a new pull request.
+- `--open-pr`: issue reviews only. With this flag, a ready patch may be published as a draft PR; otherwise the patch is shown only in the review results posted as a comment on the original Issue. Automatic `issues.opened` reviews never create a draft PR.
 
 Flags are order-independent and may be combined. There is no objective argument: the GitHub integration always reviews in `audit` mode.
 

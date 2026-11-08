@@ -81,7 +81,7 @@ If you only want to inspect or run the agent side, start from:
 
 | Path                | Trigger                                       | Output                                                                 |
 | ------------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
-| Issue review        | `issues.opened`, `@<app-slug> review`         | Issue comment (and a draft PR once a confirmed finding yields a patch) |
+| Issue review | `issues.opened`, `@<app-slug> review` | Posts the review results as a comment on the original Issue; a draft PR may be created when `--open-pr` is specified and the patch is ready for publication |
 | Pull request review | PR webhook, `@<app-slug> review`              | PR review / suggestions                                                |
 | Repository review   | scheduled / manually dispatched GitHub Action | Repository summary and deliveries                                      |
 
