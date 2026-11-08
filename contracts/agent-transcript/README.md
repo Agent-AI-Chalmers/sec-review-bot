@@ -16,4 +16,4 @@ Python and TypeScript run the same corpus through their own readers. Producer te
 
 There are no generated projections or family-specific generation tools. Changes to the schema, corpus, specification, and participating readers are reviewed together.
 
-Usage is a closed six-field nullable record normalized by producers. Consumers validate the canonical usage fields before using them.
+Producers normalize usage into a fixed six-field object with no additional fields; unavailable values are `null`. Consumers validate these fields before accounting. See the v1 specification for the full requirements.
