@@ -41,7 +41,7 @@ Run checks from every affected package, not only from the package where the firs
 
 For a contract change, run the affected family tool from `contracts/<family>/tools/`: regenerate projections, check that committed artifacts are fresh, and run formatting, lint, contract lint when present, typechecking, and tests. Then run the consuming package checks. See the [contracts change checklist](contracts/README.md#change-checklist).
 
-Record commands and focused probes actually run. State relevant gaps instead of implying broader coverage.
+List the commands you ran to check the change and report the results. Also note any relevant checks you did not run.
 
 ## Submit A Pull Request
 

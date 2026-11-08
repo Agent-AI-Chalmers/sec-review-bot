@@ -43,7 +43,7 @@
 
 修改 contract 时，在 `contracts/<family>/tools/` 中运行受影响 family 的工具：重新生成投影，检查已提交 artifact 是否为最新，并运行格式化、lint、存在时的 contract lint、typecheck 和测试。随后运行消费方 package 的检查。参见 [contracts 变更检查清单](contracts/README.zh.md#变更检查清单)。
 
-记录实际运行的命令和聚焦探针。明确说明相关缺口，不要暗示执行了更广泛的验证。
+列出你实际运行的检查命令，并说明结果。如果还有与本次修改有关的检查没有运行，也要写清楚。
 
 ## 提交 Pull Request
 
