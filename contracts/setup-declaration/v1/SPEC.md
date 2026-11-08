@@ -2,9 +2,9 @@
 
 Language: English | [中文](SPEC.zh.md)
 
-A setup declaration tells a review sandbox how to prepare itself before the agent starts. It is a small YAML file that a repository keeps at `.sec-review/setup.yml` on its **default branch**. When a review runs, the declaration is executed inside the Docker sandbox before the agent starts, so the agent begins in an environment with its dependencies installed.
+A setup declaration is a small YAML file at `.sec-review/setup.yml` on the repository's **default branch**. Its steps run inside the Docker sandbox before the agent starts to install dependencies and prepare the workspace. Failed steps and an unparseable declaration have different outcomes, described below.
 
-The declaration is optional. A repository without one is reviewed in a declaration-free environment.
+The declaration is optional. Without one, no declaration steps run and the agent uses the base sandbox environment.
 
 ## Format
 
@@ -38,7 +38,7 @@ Parsing is strict. Anything outside the format above is rejected, never silently
 - `setup` must be a list of mappings (each a step);
 - each step may carry only `run`, `working-directory`, `env`, and `timeout_seconds`;
 - `run` is required and must be a non-empty string;
-- `working-directory`, when present, must be a non-empty string that is relative and stays inside the repository root (no leading `/`, no `..` segment). Containment is checked lexically on the declared path; it does not resolve symlinks, so a symlink inside the repository is not followed by this rule (the declaration is trusted content, so this is containment, not a sandbox);
+- `working-directory`, when present, must be a non-empty string that is relative and stays inside the repository root (no leading `/`, no `..` segment). Containment is checked on the path text without resolving symlinks. This check cannot prevent a symlink from resolving outside the repository; it is not sandbox isolation, and declaration provenance must still be trusted;
 - `env`, when present, must be a mapping of string keys to string values, with keys matching the identifier pattern above. The declaration is parsed with the **YAML 1.2 Core schema**, so a key or value must be a string under that schema: `on`, `yes`, `off`, `no`, `y`, and `n` are plain strings, but `true`, `123`, and `null` are not and are rejected. This applies to `run` and `working-directory` too (see "Scalars and YAML dialects");
 - `timeout_seconds`, when present, must be a positive integer (booleans are not integers). It must also be written in integer syntax: a float-syntax value (`1.0`, `1e3`) is rejected by inspecting the scalar's source text, because JS resolves it to an integer-valued number while Python resolves it to a float — without that check the two enforcers would disagree. Hex/octal integers (`0x10`, `0o10`) and signed decimals are accepted by both.
 
@@ -58,7 +58,9 @@ The format is enforced by two independent implementations that must agree:
 They have different jobs on the same rules:
 
 - **GitHub Integration owns the content rules at the producer boundary**: it reads the file from the base repository's default branch, validates it, and rejects an invalid declaration **before** submitting the run — with the repository, ref, and path attached. A broken `.sec-review/setup.yml` on the default branch is a maintainer error that fails loudly rather than silently degrading to an unbootstrapped environment.
-- The **Execution Worker re-validates as defense in depth** before executing. A *step* that fails is a best-effort `incomplete` environment (the review still proceeds); a declaration that does not *parse* at the worker fails the run, because the environment it asked for can never be prepared. GitHub Integration rejecting first is what makes an unparseable declaration at the worker a backstop: it should only happen if the two enforcers disagree (see "Scalars and YAML dialects") or an out-of-band caller supplied unvalidated text.
+- Execution Worker validates the declaration again before execution. An invalid declaration fails the run. If the declaration is valid but a setup step fails, the remaining setup steps stop, the environment is marked `incomplete`, and the review continues.
+
+GitHub Integration normally rejects invalid declarations before submitting a run. Worker validation also checks declarations supplied by other callers and can reveal disagreements between the two validators.
 
 There is no JSON Schema for this contract. The rules that matter — a `working-directory` that cannot escape the root, an `env` name that cannot smuggle shell syntax, a timeout that is a positive integer — are decision logic, not a structural shape. Expressing them as JSON Schema would create a second definition ("schema says valid, parser says no") that the repository's contract rules explicitly avoid: schemas own structural shape, cross-field and policy rules stay with the code that enforces them.
 

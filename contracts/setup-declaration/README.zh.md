@@ -1,4 +1,4 @@
-# 设置声明
+# Setup 声明
 
 语言：[English](README.md) | 中文
 
