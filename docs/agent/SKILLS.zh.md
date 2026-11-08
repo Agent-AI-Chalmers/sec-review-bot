@@ -4,7 +4,7 @@
 
 本文为 [SKILLS.md](SKILLS.md) 的中文译文；如有差异，以英文版为准。
 
-本文说明本项目如何选择、准备、挂载和读取内置 agent skills。
+本文说明本项目如何选择、准备、挂载和读取内置技能（Skill）。Skill 为 Agent 提供按需读取的专业知识，不替代审查工作流。
 
 ## Skills 是什么
 
@@ -39,7 +39,7 @@ skills/
 
 ## LangChain / deepagents 的模型与边界
 
-LangChain 本身没有强治理的通用 skill 模型。deepagents 的 `SkillsMiddleware` 更像一个轻量 filesystem 协议：
+在本项目使用的版本中，LangChain 本身还缺少完善的 Skills 封装。deepagents 提供了 `SkillsMiddleware`，通过文件系统发现 skills 并加载元数据：
 
 - 调用方配置一个或多个 source path。
 - middleware 在 source path 下寻找 `<skill>/SKILL.md`。

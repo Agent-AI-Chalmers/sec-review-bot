@@ -2,7 +2,7 @@
 
 Language: English | [中文](SKILLS.zh.md)
 
-This page describes how this project selects, prepares, mounts, and reads bundled agent skills.
+This page explains how the project selects, prepares, mounts, and reads bundled agent skills. A skill supplies specialized knowledge on demand; it does not replace the review workflow.
 
 ## What Skills Are
 
@@ -37,7 +37,7 @@ skills/
 
 ## LangChain / deepagents Model and Boundary
 
-LangChain itself does not provide a governed skills model. deepagents `SkillsMiddleware` is closer to a lightweight filesystem protocol:
+In the versions used by this project, LangChain itself lacks a complete Skills abstraction. deepagents provides `SkillsMiddleware` for filesystem-based skill discovery and metadata loading:
 
 - The caller configures one or more source paths.
 - The middleware looks for `<skill>/SKILL.md` under those source paths.
