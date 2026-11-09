@@ -80,7 +80,7 @@ Verifier output separates current-code coverage from the next workflow action:
 
 `next_step` has three values:
 
-- `none`: no further action is needed for this verifier outcome. With `coverage=full`, this requires `regression` to be `passed`, `not-run`, or `not-applicable`.
+- `none`: no further action is needed for this verifier outcome. For a completed Verifier assessment, this requires `coverage=full` and `regression` to be `passed`, `not-run`, or `not-applicable`.
 - `retry-ai`: a concrete, in-scope security gap or confirmed regression is likely fixable by one bounded AI mitigation retry pass.
 - `manual-review`: unresolved regression evidence is the remaining factor that determines the next action, or the remaining work needs human judgment, repository administrator action, credential rotation, deployment/configuration changes, history cleanup, cache/fork cleanup, or some other action outside a normal workspace patch.
 

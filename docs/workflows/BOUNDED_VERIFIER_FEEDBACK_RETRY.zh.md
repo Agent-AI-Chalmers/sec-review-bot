@@ -77,7 +77,7 @@ Verifier 分别输出：
 
 `next_step` 的取值为：
 
-- `none`：无需后续动作。`coverage=full` 时，`regression` 必须是 `passed`、`not-run` 或 `not-applicable`。
+- `none`：无需后续动作。对于完成态 Verifier 判断，必须满足 `coverage=full`，且 `regression` 为 `passed`、`not-run` 或 `not-applicable`。
 - `retry-ai`：有具体、范围内的安全缺口或已确认回归，预计可通过有限次数的修复重试处理。
 - `manual-review`：未解决的回归证据决定了下一步，或剩余工作需要人工判断、管理员操作、密钥轮换、部署配置变更、历史清理、缓存或 fork 清理等补丁之外的动作。
 
