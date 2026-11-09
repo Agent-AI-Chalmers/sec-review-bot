@@ -6,6 +6,8 @@ Language: English | [中文](README.zh.md)
 
 ## Capabilities
 
+A Worker is a long-running background process that receives and executes tasks scheduled by Temporal. This package provides three types of Workers with distinct responsibilities:
+
 - **Execution Worker** runs `issue-review`, `pull-request-review`, and `repository-review`. Repository reviews include discovery, triage, per-case analysis, CVSS scoring, mitigation, verification, and delivery. Cases without a delivery remain visible in case results.
 - **Memory Extraction Worker** extracts reusable review experience from execution trajectories.
 - **Memory Maintenance Worker** reviews extracted experience and updates shared memory.
@@ -25,7 +27,7 @@ This directory carries its own `.python-version`; `pyproject.toml` requires Pyth
 
 ## LLM Setup
 
-Copy the configuration files from the repository root, then edit the TOML model endpoints, credential references, and agent bindings. The sample lists the available fields and binding names; every agent used by the task needs an available model binding.
+Copy the configuration files from the repository root, then follow the sample to configure model services, access credentials, and which model each Agent uses. Every Agent involved in a task must have a configured model.
 
 ```bash
 cp agents/.env.sample agents/.env
@@ -36,7 +38,7 @@ Local review commands read `agents/.env` and `agents/config/model-providers.toml
 
 The local `run-local-*` CLIs and `sec-review-agents-check-llm-deployments` load `agents/.env`, but never overwrite environment variables already set in the process.
 
-Local commands load `agents/.env`; Worker startup commands do not. Set environment variables through the shell, a process manager, or CI when starting Workers.
+Local run commands and the development launcher automatically load `agents/.env`. When starting a Worker separately, set environment variables through the shell, a process manager, or CI first.
 
 `[agent_deployment_bindings]` explicitly binds agents to deployments. Every agent that can run must be declared; undeclared agents fail fast and do not inherit a default model.
 

@@ -256,9 +256,7 @@ async def prepare_memory_extraction_activity(
     from sec_review_agents.memory.catalog_client import (
         configured_memory_catalog_client,
     )
-    from sec_review_agents.utils.env import bootstrap_agents_env
 
-    bootstrap_agents_env()
     if not memory_processing_enabled():
         return MemoryExtractionPreparationResult(
             kind="disabled",
@@ -284,9 +282,7 @@ def register_memory_extraction_activity(
         MemoryCatalogConflictError,
         configured_memory_catalog_client,
     )
-    from sec_review_agents.utils.env import bootstrap_agents_env
 
-    bootstrap_agents_env()
     catalog_client = configured_memory_catalog_client()
     if catalog_client is None:
         raise RuntimeError("Memory catalog is required to register an extraction.")

@@ -1,5 +1,11 @@
 import ast
+import importlib
+import os
+import sys
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 from tests.project_paths import PACKAGE_ROOT
 
@@ -55,3 +61,38 @@ def test_cli_mains_bootstrap_env_explicitly() -> None:
             missing.append(module_name)
 
     assert missing == []
+
+
+@pytest.mark.parametrize(
+    "module_name",
+    [
+        "run_local_issue",
+        "run_local_pr",
+        "run_local_repository",
+        "check_llm_deployments",
+    ],
+)
+def test_local_cli_loads_dotenv_without_overwriting_process_values(
+    module_name: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Moving dotenv out of activities must preserve local entrypoint configuration."""
+    module = importlib.import_module(f"sec_review_agents.cli.{module_name}")
+    dotenv = tmp_path / ".env"
+    dotenv.write_text(
+        "AGENT_MEMORY_PROCESSING_ENABLED=false\n"
+        "AGENT_MEMORY_CATALOG_TOKEN=file-token\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.utils.package_paths.default_agents_env_path", lambda: dotenv
+    )
+    monkeypatch.setattr("sec_review_agents.utils.env._AGENTS_ENV_BOOTSTRAPPED", False)
+    monkeypatch.setattr(sys, "argv", [module_name, "--help"])
+    with patch.dict(
+        os.environ, {"AGENT_MEMORY_CATALOG_TOKEN": "process-token"}, clear=True
+    ):
+        with pytest.raises(SystemExit) as stopped:
+            module.main()
+        assert stopped.value.code == 0
+        assert os.environ["AGENT_MEMORY_PROCESSING_ENABLED"] == "false"
+        assert os.environ["AGENT_MEMORY_CATALOG_TOKEN"] == "process-token"

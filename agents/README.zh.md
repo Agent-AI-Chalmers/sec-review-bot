@@ -8,6 +8,8 @@
 
 ## 能力
 
+Worker 是持续运行的后台进程，负责接收并执行 Temporal 调度的任务。这里按职责分为以下三类：
+
 - **Execution Worker** 执行 `issue-review`、`pull-request-review` 和 `repository-review`。仓库审查包括 Discovery、Triage、逐项分析、CVSS 评分、修复、验证和交付；没有交付结果的 case 仍会展示在 case 结果中。
 - **Memory Extraction Worker** 从执行轨迹中提取可复用的审查经验。
 - **Memory Maintenance Worker** 审阅提取出的经验，并更新共享记忆。
@@ -27,7 +29,7 @@ source .venv/bin/activate
 
 ## LLM 配置
 
-先在仓库根目录复制配置文件，再编辑 TOML 中的模型地址、凭据引用和 Agent 绑定。可用字段和绑定名称见示例文件；运行任务涉及的每个 Agent 都需要绑定可用模型。
+先在仓库根目录复制配置文件，再按照示例配置模型服务、访问凭据，以及各 Agent 使用的模型。任务涉及的每个 Agent 都必须配置模型。
 
 ```bash
 cp agents/.env.sample agents/.env
@@ -38,7 +40,7 @@ cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 
 本地 `run-local-*` CLI 和 `sec-review-agents-check-llm-deployments` 会加载 `agents/.env`，但不会覆盖进程里已有的环境变量。
 
-本地命令会加载 `agents/.env`，Worker 启动命令不会。启动 Worker 时，需要通过 shell、进程管理器或 CI 设置环境变量。
+本地运行命令和开发启动脚本会自动读取 `agents/.env`。单独启动 Worker 时，请先通过 shell、进程管理器或 CI 设置环境变量。
 
 `[agent_deployment_bindings]` 用来把具体 Agent 显式绑定到某个模型部署。所有运行到的 Agent 都必须显式声明；未声明的 Agent 会 fail fast，不会继承默认模型。
 

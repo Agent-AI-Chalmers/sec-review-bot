@@ -24,9 +24,7 @@ def publish_run_diagnostic_activity(
         DiagnosticReviewUnit,
         publish_run_diagnostic_bundle,
     )
-    from sec_review_agents.utils.env import bootstrap_agents_env
 
-    bootstrap_agents_env()
     units = [
         DiagnosticReviewUnit(
             unit_id=str(unit["unit_id"]),

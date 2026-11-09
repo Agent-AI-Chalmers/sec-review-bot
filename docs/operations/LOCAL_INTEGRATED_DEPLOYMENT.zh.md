@@ -105,7 +105,7 @@ ops/init-local-deployment-config.sh
 
 初始化命令会复制维护中的 sample，为内部服务生成彼此独立的凭据，同步 Compose 与宿主 Worker 共同使用的值，并将四个文件的权限设为 `0600`。它不会覆盖已有配置。执行完成后，只需填写 GitHub App 身份、webhook secret、私钥和模型 deployment；Langfuse 等可选外部服务仍需填写各自的凭据。systemd 安装脚本会将部署设置与仓库路径合并后写入 `/etc`，见下文。
 
-`agents/.env` 供 `run-local-*` 和其他本地 CLI 使用，不会被 Compose 或 systemd Worker 自动读取。本地 CLI 的配置方式见 [agents](../../agents/README.zh.md)。
+`agents/.env` 供 `run-local-*` 和其他本地 CLI 使用，不会被 Compose 或 systemd Worker 在启动或执行 activity 时自动读取。systemd units 通过 `EnvironmentFile` 配置接收部署设置。
 
 ### 1. Compose `.env`
 

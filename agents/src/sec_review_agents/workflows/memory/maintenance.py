@@ -71,9 +71,7 @@ async def prepare_memory_maintenance_activity(
     from sec_review_agents.memory.coordinated_maintenance import (
         prepare_coordinated_memory_revision,
     )
-    from sec_review_agents.utils.env import bootstrap_agents_env
 
-    bootstrap_agents_env()
     if request.batch_size < 1:
         raise ValueError("Memory maintenance batch_size must be positive.")
     if not memory_processing_enabled():
@@ -117,9 +115,7 @@ def commit_memory_tree_revision_activity(
         MemoryMaintenancePausedError,
         configured_memory_catalog_client,
     )
-    from sec_review_agents.utils.env import bootstrap_agents_env
 
-    bootstrap_agents_env()
     catalog_client = configured_memory_catalog_client()
     if catalog_client is None:
         raise RuntimeError(
@@ -168,9 +164,7 @@ def count_pending_memory_observations_activity() -> dict[str, Any]:
     from sec_review_agents.memory.catalog_client import (
         configured_memory_catalog_client,
     )
-    from sec_review_agents.utils.env import bootstrap_agents_env
 
-    bootstrap_agents_env()
     if not memory_processing_enabled():
         return {
             "ok": True,
