@@ -283,7 +283,7 @@ Main quality observations:
 
 - `single-pro` was the quality ceiling in this run; `single-flash` was close and faster.
 - `batch-flash` was the most promising batch shape: fast and cheap, but needs refinement to better correct batch-boundary loss.
-- `batch-pro` is not suitable as default; it corrected one smaller cookie over-merge but left more serious checkout / JWT / addReview bridge merges.
+- The `batch-pro` result in this experiment did not justify selecting it as the default; it corrected one smaller cookie over-merge but left more serious checkout / JWT / addReview bridge merges.
 - Delivery count alone is not a quality metric. Fewer deliveries can be effective merging or harmful over-merge.
 
 Short-term strategy from this run:
