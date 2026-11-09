@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import Sequence
 from datetime import timedelta
 from pathlib import Path
@@ -34,6 +33,7 @@ from sec_review_agents.scan_stages.triage.result import TriageCase, TriageResult
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
+from sec_review_agents.utils.bounded_map import map_bounded
 from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
 from sec_review_agents.workflows.prepared_input import PreparedRepositoryInput
 from sec_review_agents.workflows.repository.scan_result import (
@@ -565,44 +565,27 @@ class RepositoryDiscoveryWorkflow:
         )
         max_concurrency = max(1, manifest.max_concurrency)
         chunks = manifest.chunks
-        chunk_results: list[DiscoveryChunkResult | None] = [None] * len(chunks)
-        pending: dict[asyncio.Task, int] = {}
-        next_index = 0
 
-        def schedule_chunk(index: int) -> None:
-            chunk = chunks[index]
-            task = asyncio.create_task(
-                workflow.execute_activity(
-                    scan_repository_discovery_chunk_activity,
-                    args=[request, manifest, chunk],
-                    schedule_to_close_timeout=timedelta(
-                        seconds=request.timeout_seconds
-                    ),
-                    retry_policy=activity_retry_policy(),
-                )
+        async def run_chunk(chunk: DiscoveryChunk) -> DiscoveryChunkResult:
+            return await workflow.execute_activity(
+                scan_repository_discovery_chunk_activity,
+                args=[request, manifest, chunk],
+                schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+                retry_policy=activity_retry_policy(),
             )
-            pending[task] = index
 
-        while next_index < len(chunks) and len(pending) < max_concurrency:
-            schedule_chunk(next_index)
-            next_index += 1
+        chunk_results = await map_bounded(
+            chunks,
+            run_chunk,
+            max_concurrency=max_concurrency,
+            wait=workflow.wait,
+        )
 
-        while pending:
-            done, _ = await workflow.wait(
-                pending.keys(),
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            for task in done:
-                index = pending.pop(task)
-                chunk_results[index] = await task
-                while next_index < len(chunks) and len(pending) < max_concurrency:
-                    schedule_chunk(next_index)
-                    next_index += 1
         discovery_result = await workflow.execute_activity(
             build_repository_discovery_result_activity,
             args=[
                 manifest,
-                [result for result in chunk_results if result is not None],
+                chunk_results,
             ],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
@@ -672,47 +655,28 @@ class RepositoryCaseProcessingWorkflow:
         )
         case_requests = case_batch.case_requests
         max_concurrency = case_batch.max_concurrency
-        case_results: list[RepositoryCaseResult | None] = [None] * len(case_requests)
-        pending: dict[asyncio.Task, int] = {}
-        next_index = 0
 
-        def schedule_case(index: int) -> None:
-            case_request = case_requests[index]
-            task = asyncio.create_task(
-                workflow.execute_child_workflow(
+        async def run_case(
+            case_request: RepositoryCaseReviewRequest,
+        ) -> RepositoryCaseResult:
+            try:
+                return await workflow.execute_child_workflow(
                     RepositoryCaseReviewWorkflow.run,
                     case_request,
                     id=_repository_case_workflow_id(request, case_request),
                 )
-            )
-            pending[task] = index
+            except Exception as error:
+                return build_blocked_repository_case_result(
+                    case_request,
+                    f"Case processing failed after retries: {error}",
+                )
 
-        while next_index < len(case_requests) and len(pending) < max_concurrency:
-            schedule_case(next_index)
-            next_index += 1
-
-        while pending:
-            done, _ = await workflow.wait(
-                pending.keys(),
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            for task in done:
-                index = pending.pop(task)
-                case_request = case_requests[index]
-                try:
-                    case_results[index] = await task
-                except Exception as error:
-                    case_results[index] = build_blocked_repository_case_result(
-                        case_request,
-                        f"Case processing failed after retries: {error}",
-                    )
-                while (
-                    next_index < len(case_requests) and len(pending) < max_concurrency
-                ):
-                    schedule_case(next_index)
-                    next_index += 1
-
-        return [result for result in case_results if result is not None]
+        return await map_bounded(
+            case_requests,
+            run_case,
+            max_concurrency=max_concurrency,
+            wait=workflow.wait,
+        )
 
 
 @workflow.defn
@@ -755,47 +719,30 @@ class RepositoryDeliveryWorkflow:
         )
         max_concurrency = max(1, delivery_execution.max_concurrency)
         patch_outcomes: list[DeliveryExecutionResult | None] = [None] * len(deliveries)
-        pending: dict[asyncio.Task, int] = {}
-        next_index = 0
 
         for index, outcome in single_outcomes.items():
             patch_outcomes[index] = outcome
 
-        def schedule_delivery(index: int) -> None:
-            delivery_request = combined_delivery_execution_items[index]
-            task = asyncio.create_task(
-                workflow.execute_activity(
-                    execute_repository_combined_delivery_activity,
-                    args=[request, delivery_execution, delivery_request],
-                    schedule_to_close_timeout=timedelta(
-                        seconds=request.timeout_seconds
-                    ),
-                    retry_policy=activity_retry_policy(),
-                )
+        async def run_delivery(
+            delivery_request: DeliveryExecutionItem,
+        ) -> DeliveryExecutionResult | None:
+            return await workflow.execute_activity(
+                execute_repository_combined_delivery_activity,
+                args=[request, delivery_execution, delivery_request],
+                schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
+                retry_policy=activity_retry_policy(),
             )
-            pending[task] = delivery_request.index
 
-        while (
-            next_index < len(combined_delivery_execution_items)
-            and len(pending) < max_concurrency
+        combined_outcomes = await map_bounded(
+            combined_delivery_execution_items,
+            run_delivery,
+            max_concurrency=max_concurrency,
+            wait=workflow.wait,
+        )
+        for delivery_request, combined_outcome in zip(
+            combined_delivery_execution_items, combined_outcomes, strict=True
         ):
-            schedule_delivery(next_index)
-            next_index += 1
-
-        while pending:
-            done, _ = await workflow.wait(
-                pending.keys(),
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-            for task in done:
-                index = pending.pop(task)
-                patch_outcomes[index] = await task
-                while (
-                    next_index < len(combined_delivery_execution_items)
-                    and len(pending) < max_concurrency
-                ):
-                    schedule_delivery(next_index)
-                    next_index += 1
+            patch_outcomes[delivery_request.index] = combined_outcome
 
         return await workflow.execute_activity(
             build_repository_delivery_result_activity,
