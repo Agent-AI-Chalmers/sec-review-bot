@@ -48,7 +48,7 @@ Temporal schedules and retries stages; the activity that creates the environment
 
 ### What the field reports
 
-The split above is not unique to this project. The following work names it directly.
+Other research discusses this gap between saved execution state and the environment needed to continue:
 
 - [Safe to Resume? Breaking Execution Continuity of Agent Execution via Rollback](https://arxiv.org/abs/2608.29381) (arXiv 2608.29381) studies checkpoint and rollback as a security surface rather than only a performance one. Its central claim is that correct rollback does not imply secure recovery: a faithfully restored checkpoint can resume an execution whose internal state, assumptions, and external effects never coexisted in any valid history. It lists stale external dependencies and unrecorded external effects among the failure modes, demonstrates them against several frameworks including LangGraph, and attributes them to a common gap between the state a checkpoint restores and the dependencies a safe continuation needs. That is the same gap this document describes at the stage boundary.
 - [DART: Semantic Recoverability for Structured Tool Agents](https://arxiv.org/abs/2605.23311) (arXiv 2605.23311) states the recovery dilemma directly: replaying the whole task is safe but wasteful, while restoring from a local checkpoint is efficient but can leave committed downstream work tied to an upstream history that no longer exists. It formalizes *semantic recoverability*, certifies which boundaries of a failed instance are recoverable, and admits a restore point only when it preserves committed downstream work. Its evaluation includes external validation on a LangGraph substrate, and it reports that controller legality does not imply semantic validity.
@@ -68,12 +68,8 @@ Reasons for using Temporal:
 
 - Review runs are long-running flows, so queued, running, completed, and failed states should be owned by the execution system.
 - The Temporal task queue is the only queue for review execution.
-- Temporal workflow history is the source of truth for later durable step splitting; handwritten checkpoint files are no longer used.
+- Temporal workflow history stores execution history used to recover workflow progress.
 - Internal workflow / activity orchestration needs durable scheduling, retry, timeout, and failure propagation across prepare / analysis / mitigation / verification / delivery stages.
-
-Temporal also documents a reasonable Temporal + agent design: put the agent loop inside the workflow definition, persist the message history in workflow state, and call the LLM and tools through activities. That design makes the agent loop itself durable, but it does not make the stage environment durable, which is why it would not change the conclusion above.
-
-This project does not take that path. Temporal is durable workflow orchestration, not the agent reasoning layer. The project uses Temporal for stages, activities, retries, outputs, and failure propagation instead of putting a free-form agent loop directly inside the workflow definition. The core unit is a security review workflow with clear stages, input contracts, and structured output; Temporal manages reliability and scheduling, while agents handle judgment and generation.
 
 ## Future Direction
 
@@ -81,4 +77,4 @@ If a stage becomes stable enough that its agent loop is mostly fixed, it can be 
 
 That is not the current bottleneck. Similar project-specific responsibilities are still easier to evolve in our own runtime than inside a larger harness.
 
-Finer recovery within a stage has to start from the sandbox, not from a checkpointer. The shape worth evaluating is a stage environment keyed by a stable per-stage identity, restored from the snapshot and artifact directory, so that a resumed node finds the sandbox it expects. Until that exists, a checkpointer would only add a second, incompatible notion of where a run is. The [DART](https://arxiv.org/abs/2605.23311) admissibility check is the criterion that such a restore would have to satisfy: a resumed stage must not continue work whose upstream inputs no longer exist.
+Supporting recovery in the middle of a stage would require restoring not only Agent state but also the files, processes, and tool sessions it depends on. For example, if a checkpoint records that a test has started but the original container has been deleted, restoring Agent state alone cannot resume reading the test results.
