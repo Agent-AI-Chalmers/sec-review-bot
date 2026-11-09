@@ -48,7 +48,7 @@ With sliding windows, completed slots are filled immediately instead of waiting 
 
 ### Discovery
 
-Discovery splits repository files into chunks. Temporal and direct paths both execute discovery chunks with a sliding window.
+Discovery groups one or more complete files into a chunk as the input to one scan. See [DISCOVERY_AGENT_DESIGN](DISCOVERY_AGENT_DESIGN.md) for the grouping strategies. Both Temporal and `direct` paths execute these chunks with a sliding window.
 
 <!-- doc-default: AGENT_DISCOVERY_MAX_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
 The concurrency limit comes from `AGENT_DISCOVERY_MAX_CONCURRENCY`. The default is `1`. Effective concurrency never exceeds the number of chunks.
@@ -128,7 +128,7 @@ Common ways to raise the ceiling:
 - higher total LLM budget
 - higher-TPM / higher-RPM LLM APIs
 - multiple LLM API sources sharing load
-- a larger Temporal activity worker pool
+- More Temporal Workers
 
 ## Example Measurements
 
