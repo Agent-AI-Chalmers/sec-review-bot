@@ -3,7 +3,6 @@
 import asyncio
 import subprocess
 import sys
-import textwrap
 from collections.abc import Iterator, Sequence
 from pathlib import Path
 from threading import Event
@@ -201,56 +200,9 @@ async def test_tracing_cleanup_preserves_agent_cancellation(tracing_delivery) ->
 def test_normal_process_exit_delivers_queued_traces(tmp_path: Path) -> None:
     """Short-lived CLI processes rely on SDK exit cleanup after the review returns."""
     output = tmp_path / "exported.txt"
-    probe = textwrap.dedent("""
-        import asyncio
-        import os
-        import sys
-        from pathlib import Path
-        from typing import TypedDict
-        from langfuse import Langfuse
-        from langgraph.graph import StateGraph, START, END
-        from opentelemetry.sdk.trace import TracerProvider
-        from opentelemetry.sdk.trace.export import SpanExporter, SpanExportResult
-        from pydantic import BaseModel
-        from sec_review_agents.runtime.agent_runtime_graph import invoke_agent_runtime_graph
-
-        output = Path(sys.argv[1])
-        returned = output.with_suffix('.returned')
-        class Exporter(SpanExporter):
-            def export(self, spans):
-                assert returned.exists(), 'Export must not be forced before the review returns.'
-                output.write_text(str(len(spans)))
-                return SpanExportResult.SUCCESS
-            def shutdown(self):
-                pass
-
-        os.environ.update(
-            LANGFUSE_PUBLIC_KEY='pk-exit-test', LANGFUSE_SECRET_KEY='sk-exit-test',
-            LANGFUSE_BASE_URL='https://langfuse.invalid',
-        )
-        client = Langfuse(
-            tracer_provider=TracerProvider(), span_exporter=Exporter(),
-            flush_at=512, flush_interval=3600,
-        )
-        class Output(BaseModel):
-            status: str
-        class ProbeState(TypedDict, total=False):
-            messages: list[object]
-            structured_response: Output
-        graph = StateGraph(ProbeState)
-        graph.add_node('model', lambda state: {'structured_response': Output(status='ok')})
-        graph.add_edge(START, 'model')
-        graph.add_edge('model', END)
-        result = asyncio.run(invoke_agent_runtime_graph(
-            agent=graph.compile(), response_format=Output,
-            agent_name='exit-test', user_prompt='prompt',
-        ))
-        assert result.status == 'ok'
-        assert not output.exists(), 'Trace batch should still be queued.'
-        returned.write_text('ok')
-    """)
+    probe = Path(__file__).parent / "fixtures" / "tracing_exit_probe.py"
     completed = subprocess.run(
-        [sys.executable, "-c", probe, str(output)],
+        [sys.executable, str(probe), str(output)],
         capture_output=True,
         text=True,
         timeout=15,
