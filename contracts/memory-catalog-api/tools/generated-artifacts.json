@@ -12,7 +12,7 @@
         "apps/control-plane-ui/browser/features/memory/api-types.generated.ts"
       ],
       "code_inputs": [
-        "contracts/codegen/src/index.js",
+        "contracts/codegen/src/index.ts",
         "contracts/codegen/package.json"
       ]
     }
