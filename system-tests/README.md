@@ -14,7 +14,7 @@ These smoke tests use production code across package or language boundaries with
 | [Memory Catalog client](memory-catalog/test_memory_catalog.py) | agents package’s Memory Catalog client → Memory Catalog HTTP → PostgreSQL | Confirmation required; duplicate registration is idempotent; conflicting intent and bad credentials are rejected. | PR by path + merge queue |
 | [Input bundle](input-bundle/test_input_bundle.py) | TypeScript archive/upload → RustFS → Python input preparation | Repeated publication preserves identity; workspace bytes survive transport; wrong digest is rejected. | PR by path + merge queue |
 | [Memory operator edit](memory-operator-edit/test_memory_bff.py) | UI BFF → Catalog/PostgreSQL + RustFS | Edit replay creates no extra revision; stale edits conflict; restore returns the prior pointer and readable artifact. | PR by path + merge queue |
-| [Execution lifecycle](execution-lifecycle/test_execution_lifecycle.py) | Review Runs coordination → Execution Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | Activity retry, completed execution, readable diagnostics, and a durable publication result after reopening the store. Analysis is deterministic; no real model or GitHub publication. | Manual only |
+| [Execution lifecycle](execution-lifecycle/test_execution_lifecycle.py) | Review Runs coordination → Execution Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | Activity retry, completed execution, readable execution archives, and a durable publication result after reopening the store. Analysis is deterministic; no real model or GitHub publication. | Manual only |
 
 Review Runs HTTP and execution submission share the `Smoke — Service Boundaries` job. Catalog client, input bundle, and operator edit share `Smoke — Memory and Artifacts` so selected tests can reuse disposable services; they remain separate tests with separate path filters. The manual workflow is `Smoke — Execution Lifecycle`. The shared job is an execution-cost choice, not a separate category of smoke tests.
 
@@ -85,7 +85,7 @@ The main CI selects probes by their consuming paths through `.github/ci/changed-
 
 ## Manual Execution Lifecycle Probe
 
-Run `Smoke — Execution Lifecycle` manually in GitHub Actions; it is not a required check for merging PRs. It exercises the Execution API client in Review Runs and durable stores, Execution Gateway HTTP, Temporal execution and issue workflows, Worker input preparation, diagnostic publication to RustFS, and terminal observation back into PostgreSQL. It then reopens the store and claims the persisted publication result.
+Run `Smoke — Execution Lifecycle` manually in GitHub Actions; it is not a required check for merging PRs. It exercises the Execution API client in Review Runs and durable stores, Execution Gateway HTTP, Temporal execution and issue workflows, Worker input preparation, execution archive publication to RustFS, and terminal observation back into PostgreSQL. It then reopens the store and claims the persisted publication result.
 
 The analysis activity returns a deterministic no-finding result; its first attempt fails deliberately to exercise retry. Mitigation and verification use their production stages with deterministic model outputs that make no changes. Snapshot restoration, baseline commit resolution, and result persistence still run. This validates orchestration and artifact transport, not model quality, actual repairs, GitHub publication, or memory extraction.
 

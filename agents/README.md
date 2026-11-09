@@ -54,11 +54,11 @@ The supported local execution paths are:
 - Local `--temporal` run: for exercising workflow / activity orchestration.
 - Manually started service and worker: for testing the HTTP service, Temporal, and Worker together without starting the full Compose stack.
 
-| Execution path | Diagnostic publication | Memory processing |
+| Execution path | Execution archive publication | Memory processing |
 | --- | --- | --- |
-| Direct `run-local-*`, standard workflow | Local diagnostic bundle | Disabled |
-| Local `--temporal`, standard workflow | Local diagnostic bundle | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED` |
-| Manually started service and workers | Diagnostic bundle in S3-compatible storage | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED` in the Execution Worker environment |
+| Direct `run-local-*`, standard workflow | Local execution archive | Disabled |
+| Local `--temporal`, standard workflow | Local execution archive | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED` |
+| Manually started service and workers | Execution archive in S3-compatible storage | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED` in the Execution Worker environment |
 
 ### `run-local-*` Commands
 
@@ -246,9 +246,9 @@ The Python package is easiest to read by responsibility:
 5. Production entrypoints.
    - `entrypoints/`: Temporal Worker entrypoints, execution contracts and protocols, and workflow input preparation.
 
-6. Artifact persistence and run diagnostics.
+6. Artifact persistence and execution archives.
    - `artifacts/`: immutable artifact references, local and S3 transport, materialization, and safe archive extraction. References bind a `file://` or `s3://` location to its media type, size, and digest; consumers own transport configuration and materialize verified references before use.
-   - `run_diagnostics/`: the per-run diagnostic bundle format, build and materialize logic, and its Temporal publication activity.
+   - `execution_archives/`: the per-execution archive format, build and materialize logic, and its Temporal publication activity.
 
 7. Runtime support: infrastructure needed to run agents.
    - `runtime/`, `filesystem/`, `workspace/`, `llm/`, `resources/`, `observability/`: agent runtime, filesystem sandbox, workspace artifacts, model config, prompt / skill resources, and diagnostics.
@@ -295,7 +295,7 @@ uv run ruff check . --fix
 
 Local issue reviews use the multi-stage workflow by default. For ablation experiments, add `--strategy two-stage` to run the two-stage variant, or `--strategy single-agent` to run single-agent.
 
-The ablation paths publish local diagnostic bundles and disable memory processing, both in direct runs and with `--temporal`.
+The ablation paths publish local execution archives and disable memory processing, both in direct runs and with `--temporal`.
 
 ```bash
 cd /path/to/sec-review-bot

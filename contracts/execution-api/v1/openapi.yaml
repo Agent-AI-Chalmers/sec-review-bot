@@ -26,15 +26,15 @@ components:
       type: object
     ExecutionArtifactStorage:
       description: |-
-        Where a terminal run's diagnostics went, or why they are not there.
+        Where a terminal run's archive went, or why it is not there.
 
         The Execution API provider only attaches this once a run reaches a terminal state, and reports a failed
-        upload as a status rather than an error, because storage is diagnostic metadata and not
+        upload as a status rather than an error, because archive storage is execution metadata and not
         the business result.
       properties:
         artifact:
           anyOf:
-            - $ref: "#/components/schemas/ExecutionDiagnosticArtifact"
+            - $ref: "#/components/schemas/ExecutionArchive"
             - type: "null"
         error_code:
           anyOf:
@@ -57,14 +57,14 @@ components:
         - status
       title: ExecutionArtifactStorage
       type: object
-    ExecutionDiagnosticArtifact:
-      description: The Execution's public projection of one stored diagnostic bundle.
+    ExecutionArchive:
+      description: The Execution's public projection of one stored execution archive.
       properties:
         digest:
           title: Digest
           type: string
         kind:
-          const: diagnostic_bundle
+          const: execution_archive
           title: Kind
           type: string
         media_type:
@@ -82,7 +82,7 @@ components:
         - media_type
         - digest
         - size_bytes
-      title: ExecutionDiagnosticArtifact
+      title: ExecutionArchive
       type: object
     ExecutionError:
       description: The envelope every execution error carries.

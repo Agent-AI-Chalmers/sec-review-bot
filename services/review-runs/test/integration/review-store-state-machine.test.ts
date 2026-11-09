@@ -169,8 +169,8 @@ test('ReviewRunStore persists queued runs and keeps preparing runs out of pollin
     const artifactStorage: ExecutionArtifactStorage = {
       status: 'available',
       artifact: {
-        kind: 'diagnostic_bundle',
-        uri: `s3://sec-review/runs/${queuedId}/artifacts/diagnostic-tree.v1.tar.zst`,
+        kind: 'execution_archive',
+        uri: `s3://sec-review/runs/${queuedId}/artifacts/execution-archive.v1.tar.zst`,
         media_type: 'application/tar+zstd',
         digest: `sha256:${'a'.repeat(64)}`,
         size_bytes: 123

@@ -13,12 +13,12 @@ from sec_review_agents.temporal.support import activity_retry_policy
 
 @dataclass(frozen=True)
 class MemoryExtractionRequest:
-    """Extract durable memory from one unit in an immutable run diagnostic."""
+    """Extract durable memory from one unit in an immutable execution archive."""
 
     source_workflow: str
     run_id: str
     unit_id: str
-    diagnostic_bundle: dict[str, Any]
+    execution_archive: dict[str, Any]
     timeout_seconds: int
 
 
@@ -28,7 +28,7 @@ class MemoryExtractionRegistrationPayload:
     source_workflow: str
     source_run_id: str
     source_unit_id: str
-    diagnostic_bundle_digest: str
+    execution_archive_digest: str
     trajectory_reference: ArtifactReference
     observation_markdown: str | None
     skipped: bool
@@ -41,7 +41,7 @@ class MemoryExtractionRegistrationPayload:
             self.source_workflow,
             self.source_run_id,
             self.source_unit_id,
-            self.diagnostic_bundle_digest,
+            self.execution_archive_digest,
             self.summary,
         )
         if any(not isinstance(value, str) for value in string_fields):
@@ -102,11 +102,11 @@ class MemoryExtractionPreparationResult:
 
 def memory_extraction_workflow_id(
     *,
-    diagnostic_bundle_digest: str,
+    execution_archive_digest: str,
     unit_id: str,
 ) -> str:
     """Return the stable Temporal identity for one trajectory unit."""
-    identity = f"{diagnostic_bundle_digest}\0{unit_id}".encode()
+    identity = f"{execution_archive_digest}\0{unit_id}".encode()
     return f"memory-extraction:{hashlib.sha256(identity).hexdigest()}"
 
 
@@ -123,6 +123,9 @@ async def prepare_memory_extraction(
         publish_immutable_s3_artifact,
         s3_artifact_exists,
     )
+    from sec_review_agents.execution_archives.bundle import (
+        materialize_archive_trajectory_unit,
+    )
     from sec_review_agents.memory.catalog_client import configured_memory_catalog_client
     from sec_review_agents.memory.extractor import (
         preview_memory_observation_from_paths,
@@ -131,17 +134,14 @@ async def prepare_memory_extraction(
         build_memory_agent_trajectory,
         memory_agent_trajectory_s3_key,
     )
-    from sec_review_agents.run_diagnostics.bundle import (
-        materialize_diagnostic_trajectory_unit,
-    )
     from sec_review_agents.runtime.trajectories import trajectory_path
 
     catalog = configured_memory_catalog_client()
     if catalog is None:
         raise RuntimeError("Memory catalog is required for extraction publication.")
-    reference = ArtifactReference.from_mapping(request.diagnostic_bundle)
+    reference = ArtifactReference.from_mapping(request.execution_archive)
     extraction_id = memory_extraction_workflow_id(
-        diagnostic_bundle_digest=reference.digest,
+        execution_archive_digest=reference.digest,
         unit_id=request.unit_id,
     )
     for publication in catalog.list_extraction_publications(extraction_id):
@@ -151,7 +151,7 @@ async def prepare_memory_extraction(
             registration["source_run_id"],
             registration["source_unit_id"],
             registration["source_workflow"],
-            registration["diagnostic_bundle_digest"],
+            registration["execution_archive_digest"],
         ) != (
             request.run_id,
             request.unit_id,
@@ -172,11 +172,11 @@ async def prepare_memory_extraction(
             raise RuntimeError("Selected extraction publication artifact is missing.")
     with tempfile.TemporaryDirectory(prefix="sec-review-extraction-input-") as tempdir:
         temp_root = Path(tempdir)
-        materialized = materialize_diagnostic_trajectory_unit(
+        materialized = materialize_archive_trajectory_unit(
             reference,
             run_id=request.run_id,
             unit_id=request.unit_id,
-            destination=temp_root / "diagnostic-bundle",
+            destination=temp_root / "execution-archive",
         )
         extractor_trajectory_path = trajectory_path(
             temp_root / "memory-agent-trajectories",
@@ -207,7 +207,7 @@ async def prepare_memory_extraction(
                 "source_workflow": request.source_workflow,
                 "source_run_id": request.run_id,
                 "source_unit_id": request.unit_id,
-                "diagnostic_bundle_digest": reference.digest,
+                "execution_archive_digest": reference.digest,
                 "trajectory_reference": remote.as_dict(),
                 "observation": (
                     {"body_markdown": preview.observation_markdown}
@@ -235,7 +235,7 @@ def _registration_payload(
         source_workflow=registration["source_workflow"],
         source_run_id=registration["source_run_id"],
         source_unit_id=registration["source_unit_id"],
-        diagnostic_bundle_digest=registration["diagnostic_bundle_digest"],
+        execution_archive_digest=registration["execution_archive_digest"],
         trajectory_reference=ArtifactReference.from_mapping(
             registration["trajectory_reference"]
         ),
@@ -292,7 +292,7 @@ def register_memory_extraction_activity(
             source_workflow=payload.source_workflow,
             source_run_id=payload.source_run_id,
             source_unit_id=payload.source_unit_id,
-            diagnostic_bundle_digest=payload.diagnostic_bundle_digest,
+            execution_archive_digest=payload.execution_archive_digest,
             trajectory_reference=payload.trajectory_reference,
             observation_markdown=payload.observation_markdown,
         )

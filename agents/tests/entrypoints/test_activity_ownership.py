@@ -16,16 +16,16 @@ from sec_review_agents.entrypoints.memory_maintenance_worker.workflows import (
 from sec_review_agents.entrypoints.memory_maintenance_worker.workflows import (
     WORKFLOWS as MEMORY_MAINTENANCE_WORKFLOWS,
 )
-from sec_review_agents.run_diagnostics.publication import (
-    publish_run_diagnostic_activity,
+from sec_review_agents.execution_archives.publication import (
+    publish_execution_archive_activity,
 )
 
 
-def test_execution_worker_owns_run_diagnostic_publication() -> None:
+def test_execution_worker_owns_execution_archive_publication() -> None:
     """Publication belongs to review execution; memory only consumes bundles."""
-    assert publish_run_diagnostic_activity in EXECUTION_ACTIVITIES
-    assert publish_run_diagnostic_activity not in MEMORY_EXTRACTION_ACTIVITIES
-    assert publish_run_diagnostic_activity not in MEMORY_MAINTENANCE_ACTIVITIES
+    assert publish_execution_archive_activity in EXECUTION_ACTIVITIES
+    assert publish_execution_archive_activity not in MEMORY_EXTRACTION_ACTIVITIES
+    assert publish_execution_archive_activity not in MEMORY_MAINTENANCE_ACTIVITIES
 
 
 def test_memory_worker_registrations_are_disjoint() -> None:

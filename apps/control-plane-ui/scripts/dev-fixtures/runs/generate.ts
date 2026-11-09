@@ -417,8 +417,8 @@ function artifactFor(
     return {
       status: 'available',
       artifact: {
-        kind: 'diagnostic_bundle',
-        uri: `s3://sec-review/runs/${run_id}/artifacts/diagnostic-tree.v1.tar.zst`,
+        kind: 'execution_archive',
+        uri: `s3://sec-review/runs/${run_id}/artifacts/execution-archive.v1.tar.zst`,
         media_type: 'application/tar+zstd',
         digest: `sha256:${'0'.repeat(64)}`,
         size_bytes: 12_345
@@ -430,7 +430,7 @@ function artifactFor(
   }
   return {
     status: 'unavailable',
-    message: 'The Execution API reported no diagnostic bundle.'
+    message: 'The Execution API reported no execution archive.'
   }
 }
 
@@ -632,7 +632,7 @@ function stepsFor(
  * Rejects any generated run that Review Runs could never produce. The
  * checks mirror the store's write paths: publication only starts after a
  * succeeded execution, every terminal failure marks the publication
- * `skipped` in the same transaction, and the diagnostic artifact is
+ * `skipped` in the same transaction, and the execution archive is
  * reported only when the execution is terminal.
  */
 function noticeCommentUrl(status: NoticeStage): string | null {
@@ -944,7 +944,7 @@ if (executionParkedIndex >= 0) {
   run.publication.status = 'pending'
   run.publication.started_at = null
   run.publication.finished_at = null
-  // A disconnected execution has no result yet, so there is no diagnostic artifact to report.
+  // A disconnected execution has no result yet, so there is no execution archive to report.
   run.artifact_storage = null
   run.failure_code = null
   run.notices = noticesFor(

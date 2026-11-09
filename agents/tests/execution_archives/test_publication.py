@@ -3,10 +3,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 from sec_review_agents.artifacts.reference import ArtifactReference
-from sec_review_agents.run_diagnostics.bundle import PublishedDiagnosticBundle
-from sec_review_agents.run_diagnostics.publication import (
-    RunDiagnosticPublicationRequest,
-    publish_run_diagnostic_activity,
+from sec_review_agents.execution_archives.bundle import ExecutionArchive
+from sec_review_agents.execution_archives.publication import (
+    ExecutionArchivePublicationRequest,
+    publish_execution_archive_activity,
 )
 
 
@@ -17,22 +17,22 @@ def test_publication_activity_uses_publisher_unit_ids(
     empty = tmp_path / "empty"
     (empty / "0001-fake.jsonl").mkdir(parents=True)
     reference = ArtifactReference(
-        uri="file:///tmp/diagnostic-tree.v1.tar.zst",
+        uri="file:///tmp/execution-archive.v1.tar.zst",
         digest=f"sha256:{'a' * 64}",
         media_type="application/tar+zstd",
         size_bytes=42,
     )
-    publication = PublishedDiagnosticBundle(
+    publication = ExecutionArchive(
         reference=reference,
         unit_ids=("case-a",),
     )
     monkeypatch.setattr(
-        "sec_review_agents.run_diagnostics.bundle.publish_run_diagnostic_bundle",
+        "sec_review_agents.execution_archives.bundle.publish_execution_archive",
         lambda **_kwargs: publication,
     )
 
-    result = publish_run_diagnostic_activity(
-        RunDiagnosticPublicationRequest(
+    result = publish_execution_archive_activity(
+        ExecutionArchivePublicationRequest(
             run_id="run-1",
             artifact_root_path=str(tmp_path / "artifacts"),
             review_units=[
@@ -59,7 +59,7 @@ def test_publication_activity_keeps_worker_storage_environment(tmp_path, monkeyp
     )
     monkeypatch.setattr("sec_review_agents.utils.env._AGENTS_ENV_BOOTSTRAPPED", False)
     reference = ArtifactReference(
-        uri="s3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst",
+        uri="s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst",
         digest=f"sha256:{'a' * 64}",
         media_type="application/tar+zstd",
         size_bytes=42,
@@ -67,15 +67,15 @@ def test_publication_activity_keeps_worker_storage_environment(tmp_path, monkeyp
 
     def publish(**kwargs):
         assert dict(os.environ) == {"AWS_ACCESS_KEY_ID": "worker-key"}
-        return PublishedDiagnosticBundle(reference=reference, unit_ids=())
+        return ExecutionArchive(reference=reference, unit_ids=())
 
     monkeypatch.setattr(
-        "sec_review_agents.run_diagnostics.bundle.publish_run_diagnostic_bundle",
+        "sec_review_agents.execution_archives.bundle.publish_execution_archive",
         publish,
     )
     with patch.dict(os.environ, {"AWS_ACCESS_KEY_ID": "worker-key"}, clear=True):
-        result = publish_run_diagnostic_activity(
-            RunDiagnosticPublicationRequest(
+        result = publish_execution_archive_activity(
+            ExecutionArchivePublicationRequest(
                 run_id="run-1",
                 artifact_root_path=str(tmp_path),
                 review_units=[],
@@ -84,4 +84,4 @@ def test_publication_activity_keeps_worker_storage_environment(tmp_path, monkeyp
             )
         )
         assert dict(os.environ) == {"AWS_ACCESS_KEY_ID": "worker-key"}
-    assert result["diagnostic_bundle"] == reference.as_dict()
+    assert result["execution_archive"] == reference.as_dict()

@@ -11,13 +11,13 @@ import pytest
 from botocore.config import Config  # type: ignore[import-untyped]
 
 from sec_review_agents.artifacts.reference import ArtifactReference
-from sec_review_agents.run_diagnostics.bundle import (
-    diagnostic_bundle_s3_key,
-    materialize_diagnostic_trajectory_unit,
+from sec_review_agents.execution_archives.bundle import (
+    execution_archive_s3_key,
+    materialize_archive_trajectory_unit,
 )
-from sec_review_agents.run_diagnostics.publication import (
-    RunDiagnosticPublicationRequest,
-    publish_run_diagnostic_activity,
+from sec_review_agents.execution_archives.publication import (
+    ExecutionArchivePublicationRequest,
+    publish_execution_archive_activity,
 )
 
 pytestmark = pytest.mark.integration
@@ -54,12 +54,12 @@ def test_diagnostic_recovery_after_successful_put_with_lost_response(
     monkeypatch.setattr(
         "sec_review_agents.artifacts.s3_adapter._s3_client", lambda: storage
     )
-    run_id = f"diagnostic-recovery-{secrets.token_hex(8)}"
+    run_id = f"archive-recovery-{secrets.token_hex(8)}"
     root = tmp_path / "lost-worker"
     trajectories = root / "trajectories"
     trajectories.mkdir(parents=True)
     (trajectories / "0001.jsonl").write_text('{"event":"original"}\n', encoding="utf-8")
-    request = RunDiagnosticPublicationRequest(
+    request = ExecutionArchivePublicationRequest(
         run_id,
         str(root),
         [{"unit_id": "review", "trajectory_root": str(trajectories)}],
@@ -68,14 +68,14 @@ def test_diagnostic_recovery_after_successful_put_with_lost_response(
     )
     try:
         with pytest.raises(ConnectionResetError):
-            publish_run_diagnostic_activity(request)
+            publish_execution_archive_activity(request)
         shutil.rmtree(root)
-        recovered = publish_run_diagnostic_activity(request)
+        recovered = publish_execution_archive_activity(request)
         assert not root.exists()
         assert recovered["unit_ids"] == ["review"]
-        reference = ArtifactReference.from_mapping(recovered["diagnostic_bundle"])
-        assert reference.uri == f"s3://{bucket}/{diagnostic_bundle_s3_key(run_id)}"
-        unit = materialize_diagnostic_trajectory_unit(
+        reference = ArtifactReference.from_mapping(recovered["execution_archive"])
+        assert reference.uri == f"s3://{bucket}/{execution_archive_s3_key(run_id)}"
+        unit = materialize_archive_trajectory_unit(
             reference, run_id=run_id, unit_id="review", destination=tmp_path / "reader"
         )
         assert [path.read_text(encoding="utf-8") for path in unit.trajectory_paths] == [
@@ -84,5 +84,5 @@ def test_diagnostic_recovery_after_successful_put_with_lost_response(
         assert storage.put_object.call_count == 1
     finally:
         cleanup_client.delete_object(
-            Bucket=bucket, Key=diagnostic_bundle_s3_key(run_id)
+            Bucket=bucket, Key=execution_archive_s3_key(run_id)
         )

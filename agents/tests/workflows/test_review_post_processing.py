@@ -3,12 +3,12 @@ from datetime import timedelta
 import pytest
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
+from sec_review_agents.execution_archives.publication import (
+    ExecutionArchivePublicationRequest,
+)
 from sec_review_agents.review_stages.record import ReviewRecord
 from sec_review_agents.review_stages.verification.result import (
     build_skipped_verification_result,
-)
-from sec_review_agents.run_diagnostics.publication import (
-    RunDiagnosticPublicationRequest,
 )
 from sec_review_agents.workflows.issue import single_agent as single_agent_workflow
 from sec_review_agents.workflows.issue import two_stage as two_stage_workflow
@@ -29,8 +29,8 @@ from tests.prepared_input_fixtures import (
 
 def _finalized(*unit_ids: str) -> dict[str, object]:
     return {
-        "diagnostic_bundle": {
-            "uri": "s3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst",
+        "execution_archive": {
+            "uri": "s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst",
             "digest": f"sha256:{'a' * 64}",
             "media_type": "application/tar+zstd",
             "size_bytes": 42,
@@ -38,8 +38,8 @@ def _finalized(*unit_ids: str) -> dict[str, object]:
         "artifact_storage": {
             "status": "available",
             "artifact": {
-                "kind": "diagnostic_bundle",
-                "uri": "s3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst",
+                "kind": "execution_archive",
+                "uri": "s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst",
                 "digest": f"sha256:{'a' * 64}",
                 "media_type": "application/tar+zstd",
                 "size_bytes": 42,
@@ -62,14 +62,14 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
     workflow_module,
     workflow_class,
 ) -> None:
-    publications: list[RunDiagnosticPublicationRequest] = []
+    publications: list[ExecutionArchivePublicationRequest] = []
     public_result = {"api_version": EXECUTION_API_VERSION}
 
     async def fake_execute_activity(activity_fn, *args, **kwargs):
         activity_args = kwargs.get("args", args)
         if activity_fn.__name__.startswith("build_"):
             return public_result
-        if activity_fn is workflow_module.publish_run_diagnostic_activity:
+        if activity_fn is workflow_module.publish_execution_archive_activity:
             publications.append(activity_args[0])
             return _finalized("review")
         return {}
@@ -87,7 +87,7 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
             ),
             timeout_seconds=30,
             runtime_context={},
-            post_processing=ReviewPostProcessingPolicy(diagnostic_scheme="file"),
+            post_processing=ReviewPostProcessingPolicy(execution_archive_scheme="file"),
         )
     )
 
@@ -97,7 +97,7 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
         "artifact_storage": _finalized("review")["artifact_storage"],
     }
     assert publications == [
-        RunDiagnosticPublicationRequest(
+        ExecutionArchivePublicationRequest(
             run_id="run-1",
             artifact_root_path="/tmp/run-1/artifacts",
             review_units=[
@@ -127,13 +127,13 @@ async def test_single_review_publishes_before_scheduling_memory(
     workflow_name,
 ) -> None:
     events: list[str] = []
-    publications: list[RunDiagnosticPublicationRequest] = []
+    publications: list[ExecutionArchivePublicationRequest] = []
 
     async def fake_execute_activity(activity_fn, *args, **kwargs):
         activity_args = kwargs.get("args", args)
         if activity_fn.__name__.startswith("build_"):
             return {"api_version": EXECUTION_API_VERSION}
-        if activity_fn is workflow_module.publish_run_diagnostic_activity:
+        if activity_fn is workflow_module.publish_execution_archive_activity:
             assert kwargs["schedule_to_close_timeout"] == timedelta(seconds=30)
             events.append("publish")
             publications.append(activity_args[0])
@@ -194,13 +194,13 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
             {"delivery": "done"},
         ]
     )
-    publications: list[RunDiagnosticPublicationRequest] = []
+    publications: list[ExecutionArchivePublicationRequest] = []
 
     async def fake_execute_activity(activity_fn, *args, **kwargs):
         activity_args = kwargs.get("args", args)
         if activity_fn is repository_workflow.build_repository_review_result_activity:
             return {"api_version": EXECUTION_API_VERSION}
-        if activity_fn is repository_workflow.publish_run_diagnostic_activity:
+        if activity_fn is repository_workflow.publish_execution_archive_activity:
             publications.append(activity_args[0])
             return _finalized("case-a", "case-b")
         if activity_fn.__name__.startswith("verify_"):
@@ -252,14 +252,14 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
 
 
 @pytest.mark.asyncio
-async def test_repository_without_cases_still_publishes_run_diagnostic(
+async def test_repository_without_cases_still_publishes_execution_archive(
     monkeypatch,
 ) -> None:
     async def fake_execute_activity(activity_fn, *args, **kwargs):
         activity_args = kwargs.get("args", args)
         if activity_fn is repository_workflow.build_repository_review_result_activity:
             return {"api_version": EXECUTION_API_VERSION}
-        if activity_fn is repository_workflow.publish_run_diagnostic_activity:
+        if activity_fn is repository_workflow.publish_execution_archive_activity:
             publications.append(activity_args[0])
             return _finalized()
         if activity_fn.__name__.startswith("verify_"):
@@ -269,7 +269,7 @@ async def test_repository_without_cases_still_publishes_run_diagnostic(
     async def fake_execute_child_workflow(*_args, **_kwargs):
         return {}
 
-    publications: list[RunDiagnosticPublicationRequest] = []
+    publications: list[ExecutionArchivePublicationRequest] = []
 
     monkeypatch.setattr(
         repository_workflow.workflow, "execute_activity", fake_execute_activity
@@ -304,7 +304,7 @@ async def test_disabling_memory_does_not_skip_review_publication(monkeypatch) ->
     async def fake_execute_activity(activity_fn, *args, **_kwargs):
         if activity_fn is issue_workflow.build_issue_review_result_activity:
             return {"api_version": EXECUTION_API_VERSION}
-        if activity_fn is issue_workflow.publish_run_diagnostic_activity:
+        if activity_fn is issue_workflow.publish_execution_archive_activity:
             events.append("publish")
             return _finalized("review")
         if activity_fn.__name__.startswith("verify_"):
@@ -344,7 +344,7 @@ async def test_publication_failure_fails_review_before_memory_scheduling(
     async def fake_execute_activity(activity_fn, *args, **_kwargs):
         if activity_fn is issue_workflow.build_issue_review_result_activity:
             return {"api_version": EXECUTION_API_VERSION}
-        if activity_fn is issue_workflow.publish_run_diagnostic_activity:
+        if activity_fn is issue_workflow.publish_execution_archive_activity:
             raise RuntimeError("storage unavailable")
         if activity_fn.__name__.startswith("verify_"):
             return build_skipped_verification_result(reason="Test verification skipped")

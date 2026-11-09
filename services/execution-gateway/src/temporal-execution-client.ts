@@ -171,7 +171,7 @@ export class TemporalExecutionClient {
         }
         let artifact_storage: ArtifactStorageProjection
         try {
-          artifact_storage = parseRunDiagnosticArtifact(
+          artifact_storage = parseExecutionArchiveArtifact(
             response.artifact_storage,
             runId,
           )
@@ -183,7 +183,8 @@ export class TemporalExecutionClient {
             artifact_storage: {
               status: 'failed',
               error_code: 'ARTIFACT_REFERENCE_INVALID',
-              message: 'Execution returned an invalid run diagnostic artifact.',
+              message:
+                'Execution returned an invalid execution archive artifact.',
             },
             error: executionError(
               'EXECUTION_RESPONSE_INVALID',
@@ -239,7 +240,7 @@ export class TemporalExecutionClient {
 }
 
 /**
- * The published diagnostic bundle, in the shape the contract declares for it.
+ * The published execution archive, in the shape the contract declares for it.
  *
  * Derived from the generated storage type rather than restated: the fields are the contract's,
  * and only two things are narrowed — the status this parser guarantees, and the media type it
@@ -253,7 +254,7 @@ type ArtifactStorageProjection = ExecutionArtifactStorage & {
   }
 }
 
-export function parseRunDiagnosticArtifact(
+export function parseExecutionArchiveArtifact(
   value: unknown,
   runId: string,
 ): ArtifactStorageProjection {
@@ -262,7 +263,7 @@ export function parseRunDiagnosticArtifact(
   const artifact = value.artifact
   if (
     !isRecord(artifact) ||
-    artifact.kind !== 'diagnostic_bundle' ||
+    artifact.kind !== 'execution_archive' ||
     artifact.media_type !== 'application/tar+zstd' ||
     typeof artifact.uri !== 'string' ||
     typeof artifact.digest !== 'string' ||
@@ -275,20 +276,18 @@ export function parseRunDiagnosticArtifact(
   if (
     uri.protocol !== 's3:' ||
     uri.hostname === '' ||
-    uri.pathname !== `/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst` ||
+    uri.pathname !== `/runs/${runId}/artifacts/execution-archive.v1.tar.zst` ||
     uri.username !== '' ||
     uri.password !== '' ||
     uri.port !== '' ||
     uri.search !== '' ||
     uri.hash !== ''
   )
-    throw new Error(
-      'Execution response has an invalid diagnostic artifact URI.',
-    )
+    throw new Error('Execution response has an invalid execution archive URI.')
   return {
     status: 'available',
     artifact: {
-      kind: 'diagnostic_bundle',
+      kind: 'execution_archive',
       uri: artifact.uri,
       media_type: 'application/tar+zstd',
       digest: artifact.digest,

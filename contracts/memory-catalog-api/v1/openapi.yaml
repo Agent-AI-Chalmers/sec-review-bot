@@ -76,7 +76,7 @@ components:
         - source_workflow
         - source_run_id
         - source_unit_id
-        - diagnostic_bundle_digest
+        - execution_archive_digest
         - trajectory_reference
         - observation
       properties:
@@ -85,7 +85,7 @@ components:
         source_workflow: { type: string, minLength: 1 }
         source_run_id: { type: string, minLength: 1 }
         source_unit_id: { type: string, minLength: 1 }
-        diagnostic_bundle_digest:
+        execution_archive_digest:
           type: string
           pattern: ^sha256:[0-9a-f]{64}$
         trajectory_reference:
@@ -151,7 +151,7 @@ components:
         - source_workflow
         - source_run_id
         - source_unit_id
-        - diagnostic_bundle_digest
+        - execution_archive_digest
         - trajectory_reference
         - observation
         - created_at
@@ -161,7 +161,7 @@ components:
         source_workflow: { type: string, minLength: 1 }
         source_run_id: { type: string, minLength: 1 }
         source_unit_id: { type: string, minLength: 1 }
-        diagnostic_bundle_digest:
+        execution_archive_digest:
           type: string
           pattern: ^sha256:[0-9a-f]{64}$
         trajectory_reference:

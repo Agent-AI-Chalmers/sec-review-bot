@@ -27,22 +27,22 @@ from sec_review_agents.artifacts.tar_zstd import (
     canonical_tar_info,
     validate_restricted_pax_archive,
 )
-from sec_review_agents.contract_versions import RUN_DIAGNOSTIC_ARTIFACT_VERSION
+from sec_review_agents.contract_versions import EXECUTION_ARCHIVE_ARTIFACT_VERSION
 from sec_review_agents.runtime.trajectories import TRAJECTORY_SUFFIX
 
-DIAGNOSTIC_BUNDLE_FILENAME = (
-    f"diagnostic-tree.{RUN_DIAGNOSTIC_ARTIFACT_VERSION}.tar.zst"
+EXECUTION_ARCHIVE_FILENAME = (
+    f"execution-archive.{EXECUTION_ARCHIVE_ARTIFACT_VERSION}.tar.zst"
 )
-DIAGNOSTIC_BUNDLE_MANIFEST = "manifest.json"
-DIAGNOSTIC_BUNDLE_MANIFEST_VERSION = 1
-DIAGNOSTIC_TREE_DIR = "artifact-tree"
-MAX_DIAGNOSTIC_BUNDLE_BYTES = 1024 * 1024 * 1024
-MAX_DIAGNOSTIC_BUNDLE_ENTRIES = 100_000
-MAX_EXTRACTED_DIAGNOSTIC_BYTES = 8 * 1024 * 1024 * 1024
+EXECUTION_ARCHIVE_MANIFEST = "manifest.json"
+EXECUTION_ARCHIVE_MANIFEST_VERSION = 1
+ARCHIVE_TREE_DIR = "artifact-tree"
+MAX_EXECUTION_ARCHIVE_BYTES = 1024 * 1024 * 1024
+MAX_EXECUTION_ARCHIVE_ENTRIES = 100_000
+MAX_EXTRACTED_ARCHIVE_BYTES = 8 * 1024 * 1024 * 1024
 
 
 @dataclass(frozen=True)
-class DiagnosticReviewUnit:
+class ArchiveReviewUnit:
     unit_id: str
     trajectory_root: Path
 
@@ -54,35 +54,33 @@ class MaterializedTrajectoryUnit:
 
 
 @dataclass(frozen=True)
-class PublishedDiagnosticBundle:
+class ExecutionArchive:
     reference: ArtifactReference
     unit_ids: tuple[str, ...]
 
 
-def diagnostic_bundle_s3_key(run_id: str) -> str:
+def execution_archive_s3_key(run_id: str) -> str:
     _validate_path_component(run_id, label="run_id")
-    return f"runs/{run_id}/artifacts/{DIAGNOSTIC_BUNDLE_FILENAME}"
+    return f"runs/{run_id}/artifacts/{EXECUTION_ARCHIVE_FILENAME}"
 
 
 def _validate_path_component(value: str, *, label: str) -> str:
     if not value or value in {".", ".."} or Path(value).name != value:
-        raise ValueError(f"Diagnostic bundle {label} must be one path component.")
+        raise ValueError(f"Execution archive {label} must be one path component.")
     return value
 
 
-def publish_run_diagnostic_bundle(
+def publish_execution_archive(
     *,
     run_id: str,
     artifact_root: Path,
-    review_units: list[DiagnosticReviewUnit],
+    review_units: list[ArchiveReviewUnit],
     result: dict[str, Any],
     destination_scheme: Literal["file", "s3"] = "s3",
-) -> PublishedDiagnosticBundle:
+) -> ExecutionArchive:
     """Archive one complete review run and publish it through the selected scheme."""
     if destination_scheme not in {"file", "s3"}:
-        raise ValueError(
-            f"Unsupported diagnostic artifact scheme: {destination_scheme}"
-        )
+        raise ValueError(f"Unsupported execution archive scheme: {destination_scheme}")
     _validate_path_component(run_id, label="run_id")
     if destination_scheme == "s3":
         recovered = _recover_s3_publication(
@@ -96,12 +94,12 @@ def publish_run_diagnostic_bundle(
     artifact_root = artifact_root.resolve()
     output_dir = artifact_root / "published"
     output_dir.mkdir(parents=True, exist_ok=True)
-    archive_path = (output_dir / DIAGNOSTIC_BUNDLE_FILENAME).resolve()
+    archive_path = (output_dir / EXECUTION_ARCHIVE_FILENAME).resolve()
     manifest_units = _manifest_units(artifact_root, review_units)
 
     temporary_archive = _temporary_archive_path(output_dir)
     try:
-        _build_diagnostic_archive(
+        _build_execution_archive(
             temporary_archive,
             artifact_root=artifact_root,
             manifest_units=manifest_units,
@@ -121,10 +119,10 @@ def publish_run_diagnostic_bundle(
     if destination_scheme == "s3":
         reference = publish_immutable_s3_artifact(
             reference,
-            key=diagnostic_bundle_s3_key(run_id),
-            description="run diagnostic bundle",
+            key=execution_archive_s3_key(run_id),
+            description="execution archive",
         )
-    return PublishedDiagnosticBundle(
+    return ExecutionArchive(
         reference=reference,
         unit_ids=tuple(str(unit["id"]) for unit in manifest_units),
     )
@@ -134,19 +132,19 @@ def _recover_s3_publication(
     *,
     run_id: str,
     artifact_root: Path,
-    review_units: list[DiagnosticReviewUnit],
+    review_units: list[ArchiveReviewUnit],
     result: dict[str, Any],
-) -> PublishedDiagnosticBundle | None:
+) -> ExecutionArchive | None:
     # Use request paths without inspecting the lost worker's filesystem. The
     # immutable archive, not a new glob over local trajectories, owns its unit IDs.
     request_root = Path(os.path.abspath(artifact_root))
-    relative_units: list[DiagnosticReviewUnit] = []
+    relative_units: list[ArchiveReviewUnit] = []
     seen: set[str] = set()
     for unit in review_units:
         _validate_path_component(unit.unit_id, label="unit_id")
         if unit.unit_id in seen:
             raise ValueError(
-                f"Diagnostic bundle review unit is duplicated: {unit.unit_id}"
+                f"Execution archive review unit is duplicated: {unit.unit_id}"
             )
         seen.add(unit.unit_id)
         try:
@@ -155,30 +153,28 @@ def _recover_s3_publication(
             )
         except ValueError as error:
             raise ValueError(
-                "Diagnostic bundle trajectory root must be inside artifact root."
+                "Execution archive trajectory root must be inside artifact root."
             ) from error
-        relative_units.append(DiagnosticReviewUnit(unit.unit_id, relative_root))
+        relative_units.append(ArchiveReviewUnit(unit.unit_id, relative_root))
 
-    key = diagnostic_bundle_s3_key(run_id)
+    key = execution_archive_s3_key(run_id)
     reference = read_s3_artifact_reference(key=key)
     if reference is None:
         return None
     require_artifact_media_type(reference, ARCHIVE_MEDIA_TYPE)
-    with tempfile.TemporaryDirectory(
-        prefix="sec-review-diagnostic-recovery-"
-    ) as tempdir:
+    with tempfile.TemporaryDirectory(prefix="sec-review-archive-recovery-") as tempdir:
         recovery_root = Path(tempdir)
         archive = materialize_verified_artifact_file(
             reference,
-            local_destination=recovery_root / DIAGNOSTIC_BUNDLE_FILENAME,
-            maximum_bytes=MAX_DIAGNOSTIC_BUNDLE_BYTES,
+            local_destination=recovery_root / EXECUTION_ARCHIVE_FILENAME,
+            maximum_bytes=MAX_EXECUTION_ARCHIVE_BYTES,
             expected_s3_key=key,
         )
         root = extract_archive(
             archive,
             recovery_root / "bundle",
-            maximum_entries=MAX_DIAGNOSTIC_BUNDLE_ENTRIES,
-            maximum_extracted_bytes=MAX_EXTRACTED_DIAGNOSTIC_BYTES,
+            maximum_entries=MAX_EXECUTION_ARCHIVE_ENTRIES,
+            maximum_extracted_bytes=MAX_EXTRACTED_ARCHIVE_BYTES,
         )
         units = _validate_materialized_bundle(root, run_id=run_id)
         stored_result = json.loads((root / "result.json").read_text(encoding="utf-8"))
@@ -186,39 +182,39 @@ def _recover_s3_publication(
             stored_result, sort_keys=True, separators=(",", ":")
         ) != json.dumps(result, sort_keys=True, separators=(",", ":")):
             raise ValueError(
-                "Existing diagnostic bundle result does not match publication request."
+                "Existing execution archive result does not match publication request."
             )
-        tree = root / DIAGNOSTIC_TREE_DIR
+        tree = root / ARCHIVE_TREE_DIR
         if not tree.is_dir():
-            raise ValueError("Existing diagnostic bundle artifact tree is missing.")
+            raise ValueError("Existing execution archive artifact tree is missing.")
         expected_units = _manifest_units(
             tree,
             [
-                DiagnosticReviewUnit(unit.unit_id, tree / unit.trajectory_root)
+                ArchiveReviewUnit(unit.unit_id, tree / unit.trajectory_root)
                 for unit in relative_units
             ],
         )
         manifest = json.loads(
-            (root / DIAGNOSTIC_BUNDLE_MANIFEST).read_text(encoding="utf-8")
+            (root / EXECUTION_ARCHIVE_MANIFEST).read_text(encoding="utf-8")
         )
         if manifest["review_units"] != expected_units:
             raise ValueError(
-                "Existing diagnostic bundle review units do not match publication request."
+                "Existing execution archive review units do not match publication request."
             )
-    return PublishedDiagnosticBundle(reference=reference, unit_ids=tuple(units))
+    return ExecutionArchive(reference=reference, unit_ids=tuple(units))
 
 
 def _temporary_archive_path(output_dir: Path) -> Path:
     # mkstemp creates the archive 0600; hard-linking preserves that owner-only
-    # mode at the published path because diagnostics contain trajectories.
+    # mode at the published path because the archive contains trajectories.
     descriptor, value = tempfile.mkstemp(
-        prefix=f".{DIAGNOSTIC_BUNDLE_FILENAME}.", suffix=".tmp", dir=output_dir
+        prefix=f".{EXECUTION_ARCHIVE_FILENAME}.", suffix=".tmp", dir=output_dir
     )
     os.close(descriptor)
     return Path(value)
 
 
-def _build_diagnostic_archive(
+def _build_execution_archive(
     archive_path: Path,
     *,
     artifact_root: Path,
@@ -229,7 +225,7 @@ def _build_diagnostic_archive(
     manifest_bytes = (
         json.dumps(
             {
-                "version": DIAGNOSTIC_BUNDLE_MANIFEST_VERSION,
+                "version": EXECUTION_ARCHIVE_MANIFEST_VERSION,
                 "run_id": run_id,
                 "result": "result.json",
                 "review_units": manifest_units,
@@ -242,23 +238,23 @@ def _build_diagnostic_archive(
     result_bytes = (
         json.dumps(result, separators=(",", ":"), sort_keys=True) + "\n"
     ).encode()
-    # A diagnostic bundle is authoritative, so exceeding its contract is an error rather than a
+    # The archive is authoritative, so exceeding its contract is an error rather than a
     # reason to silently omit files. Reuse this scan for archive construction so the budget and
     # the emitted entry set cannot drift within one publication attempt.
     artifact_paths = _artifact_tree_paths(artifact_root)
     entry_count = 3 + len(artifact_paths)
-    if entry_count > MAX_DIAGNOSTIC_BUNDLE_ENTRIES:
-        raise ValueError("Diagnostic bundle exceeds the entry count limit.")
+    if entry_count > MAX_EXECUTION_ARCHIVE_ENTRIES:
+        raise ValueError("Execution archive exceeds the entry count limit.")
     extracted_bytes = (
         len(manifest_bytes)
         + len(result_bytes)
         + sum(path.stat().st_size for path in artifact_paths if path.is_file())
     )
-    if extracted_bytes > MAX_EXTRACTED_DIAGNOSTIC_BYTES:
-        raise ValueError("Diagnostic bundle exceeds the extracted size limit.")
+    if extracted_bytes > MAX_EXTRACTED_ARCHIVE_BYTES:
+        raise ValueError("Execution archive exceeds the extracted size limit.")
 
-    with tempfile.TemporaryDirectory(prefix="sec-review-diagnostic-bundle-") as tempdir:
-        manifest_path = Path(tempdir) / DIAGNOSTIC_BUNDLE_MANIFEST
+    with tempfile.TemporaryDirectory(prefix="sec-review-execution-archive-") as tempdir:
+        manifest_path = Path(tempdir) / EXECUTION_ARCHIVE_MANIFEST
         manifest_path.write_bytes(manifest_bytes)
         result_path = Path(tempdir) / "result.json"
         result_path.write_bytes(result_bytes)
@@ -267,7 +263,7 @@ def _build_diagnostic_archive(
         ) as archive:
             archive.add(
                 manifest_path,
-                arcname=DIAGNOSTIC_BUNDLE_MANIFEST,
+                arcname=EXECUTION_ARCHIVE_MANIFEST,
                 filter=canonical_tar_info,
             )
             archive.add(
@@ -276,8 +272,8 @@ def _build_diagnostic_archive(
                 filter=canonical_tar_info,
             )
             _add_artifact_tree(archive, artifact_root, artifact_paths)
-    if archive_path.stat().st_size > MAX_DIAGNOSTIC_BUNDLE_BYTES:
-        raise ValueError("Diagnostic bundle exceeds the compressed size limit.")
+    if archive_path.stat().st_size > MAX_EXECUTION_ARCHIVE_BYTES:
+        raise ValueError("Execution archive exceeds the compressed size limit.")
     validate_restricted_pax_archive(archive_path)
     with archive_path.open("rb") as archive_file:
         os.fsync(archive_file.fileno())
@@ -298,7 +294,7 @@ def _install_immutable_file_archive(
             or existing.size_bytes != reference.size_bytes
         ):
             raise RuntimeError(
-                "Existing run diagnostic bundle differs from immutable publication."
+                "Existing execution archive differs from immutable publication."
             ) from None
     else:
         _fsync_directory(destination.parent)
@@ -320,7 +316,7 @@ def _fsync_directory(directory: Path) -> None:
 
 def _manifest_units(
     artifact_root: Path,
-    review_units: list[DiagnosticReviewUnit],
+    review_units: list[ArchiveReviewUnit],
 ) -> list[dict[str, Any]]:
     manifest_units: list[dict[str, Any]] = []
     seen_unit_ids: set[str] = set()
@@ -328,7 +324,7 @@ def _manifest_units(
         _validate_path_component(unit.unit_id, label="unit_id")
         if unit.unit_id in seen_unit_ids:
             raise ValueError(
-                f"Diagnostic bundle review unit is duplicated: {unit.unit_id}"
+                f"Execution archive review unit is duplicated: {unit.unit_id}"
             )
         seen_unit_ids.add(unit.unit_id)
         trajectory_root = unit.trajectory_root.resolve()
@@ -336,10 +332,10 @@ def _manifest_units(
             trajectory_root.relative_to(artifact_root)
         except ValueError as error:
             raise ValueError(
-                "Diagnostic bundle trajectory root must be inside artifact root."
+                "Execution archive trajectory root must be inside artifact root."
             ) from error
         trajectory_paths = [
-            f"{DIAGNOSTIC_TREE_DIR}/{path.relative_to(artifact_root).as_posix()}"
+            f"{ARCHIVE_TREE_DIR}/{path.relative_to(artifact_root).as_posix()}"
             for path in sorted(trajectory_root.glob(f"*{TRAJECTORY_SUFFIX}"))
             if path.is_file()
         ]
@@ -364,7 +360,7 @@ def _add_artifact_tree(
 ) -> None:
     archive.add(
         artifact_root,
-        arcname=DIAGNOSTIC_TREE_DIR,
+        arcname=ARCHIVE_TREE_DIR,
         recursive=False,
         filter=canonical_tar_info,
     )
@@ -372,13 +368,13 @@ def _add_artifact_tree(
         relative = path.relative_to(artifact_root)
         archive.add(
             path,
-            arcname=f"{DIAGNOSTIC_TREE_DIR}/{relative.as_posix()}",
+            arcname=f"{ARCHIVE_TREE_DIR}/{relative.as_posix()}",
             recursive=False,
             filter=canonical_tar_info,
         )
 
 
-def materialize_diagnostic_trajectory_unit(
+def materialize_archive_trajectory_unit(
     reference: ArtifactReference,
     *,
     run_id: str,
@@ -389,9 +385,9 @@ def materialize_diagnostic_trajectory_unit(
     archive_path = materialize_verified_artifact_file(
         reference,
         local_destination=destination.with_suffix(".tar.zst"),
-        maximum_bytes=MAX_DIAGNOSTIC_BUNDLE_BYTES,
+        maximum_bytes=MAX_EXECUTION_ARCHIVE_BYTES,
         expected_s3_key=(
-            diagnostic_bundle_s3_key(run_id)
+            execution_archive_s3_key(run_id)
             if urlparse(reference.uri).scheme == "s3"
             else None
         ),
@@ -399,8 +395,8 @@ def materialize_diagnostic_trajectory_unit(
     root = extract_archive(
         archive_path,
         destination,
-        maximum_entries=MAX_DIAGNOSTIC_BUNDLE_ENTRIES,
-        maximum_extracted_bytes=MAX_EXTRACTED_DIAGNOSTIC_BYTES,
+        maximum_entries=MAX_EXECUTION_ARCHIVE_ENTRIES,
+        maximum_extracted_bytes=MAX_EXTRACTED_ARCHIVE_BYTES,
     )
     units = _validate_materialized_bundle(root, run_id=run_id)
     for current_unit_id, trajectory_paths in units.items():
@@ -409,7 +405,7 @@ def materialize_diagnostic_trajectory_unit(
                 unit_id=unit_id,
                 trajectory_paths=trajectory_paths,
             )
-    raise ValueError(f"Diagnostic review unit not found: {unit_id}")
+    raise ValueError(f"Archive review unit not found: {unit_id}")
 
 
 def _validate_materialized_bundle(
@@ -417,26 +413,26 @@ def _validate_materialized_bundle(
 ) -> dict[str, tuple[Path, ...]]:
     try:
         manifest = json.loads(
-            (root / DIAGNOSTIC_BUNDLE_MANIFEST).read_text(encoding="utf-8")
+            (root / EXECUTION_ARCHIVE_MANIFEST).read_text(encoding="utf-8")
         )
         json.loads((root / "result.json").read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
-        raise ValueError("Diagnostic bundle JSON documents are invalid.") from error
+        raise ValueError("Execution archive JSON documents are invalid.") from error
     if (
         not isinstance(manifest, dict)
-        or manifest.get("version") != DIAGNOSTIC_BUNDLE_MANIFEST_VERSION
+        or manifest.get("version") != EXECUTION_ARCHIVE_MANIFEST_VERSION
         or manifest.get("run_id") != run_id
         or manifest.get("result") != "result.json"
     ):
-        raise ValueError("Diagnostic bundle manifest does not match the requested run.")
+        raise ValueError("Execution archive manifest does not match the requested run.")
     units = manifest.get("review_units")
     if not isinstance(units, list):
-        raise ValueError("Diagnostic bundle manifest has no review units.")
+        raise ValueError("Execution archive manifest has no review units.")
     resolved_root = root.resolve()
     validated: dict[str, tuple[Path, ...]] = {}
     for unit in units:
         if not isinstance(unit, dict):
-            raise ValueError("Diagnostic review unit is invalid.")
+            raise ValueError("Archive review unit is invalid.")
         current_unit_id = unit.get("id")
         paths = unit.get("trajectories")
         if (
@@ -446,18 +442,18 @@ def _validate_materialized_bundle(
             or not isinstance(paths, list)
             or not paths
         ):
-            raise ValueError("Diagnostic review unit is invalid.")
+            raise ValueError("Archive review unit is invalid.")
         resolved_paths: list[Path] = []
         for value in paths:
             if not isinstance(value, str) or not _is_trajectory_manifest_path(value):
-                raise ValueError("Diagnostic manifest path is invalid.")
+                raise ValueError("Archive manifest path is invalid.")
             path = (root / value).resolve()
             try:
                 path.relative_to(resolved_root)
             except ValueError as error:
-                raise ValueError("Diagnostic manifest path escapes bundle.") from error
+                raise ValueError("Archive manifest path escapes bundle.") from error
             if not path.is_file() or path.suffix != TRAJECTORY_SUFFIX:
-                raise ValueError(f"Diagnostic bundle file is missing: {value}")
+                raise ValueError(f"Execution archive file is missing: {value}")
             resolved_paths.append(path)
         validated[current_unit_id] = tuple(resolved_paths)
     return validated
@@ -468,17 +464,17 @@ def _is_trajectory_manifest_path(value: str) -> bool:
     return (
         "\\" not in value
         and len(parts) > 1
-        and parts[0] == DIAGNOSTIC_TREE_DIR
+        and parts[0] == ARCHIVE_TREE_DIR
         and all(part not in {"", ".", ".."} for part in parts)
         and value.endswith(TRAJECTORY_SUFFIX)
     )
 
 
 __all__ = [
-    "DiagnosticReviewUnit",
+    "ArchiveReviewUnit",
+    "ExecutionArchive",
     "MaterializedTrajectoryUnit",
-    "PublishedDiagnosticBundle",
-    "diagnostic_bundle_s3_key",
-    "materialize_diagnostic_trajectory_unit",
-    "publish_run_diagnostic_bundle",
+    "execution_archive_s3_key",
+    "materialize_archive_trajectory_unit",
+    "publish_execution_archive",
 ]

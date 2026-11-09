@@ -6,8 +6,8 @@ from sec_review_agents.entrypoints.execution_worker.workflow import (
     ExecutionWorkflow,
     prepare_execution_run_activity,
 )
-from sec_review_agents.run_diagnostics.publication import (
-    publish_run_diagnostic_activity,
+from sec_review_agents.execution_archives.publication import (
+    publish_execution_archive_activity,
 )
 from sec_review_agents.workflows.issue.single_agent import (
     IssueSingleAgentWorkflow,
@@ -88,7 +88,7 @@ ACTIVITIES: list[Any] = [
     build_issue_review_result_activity,
     build_issue_single_agent_result_activity,
     build_issue_two_stage_result_activity,
-    publish_run_diagnostic_activity,
+    publish_execution_archive_activity,
     analyze_pull_request_activity,
     mitigate_pull_request_activity,
     verify_pull_request_activity,

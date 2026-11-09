@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-Internal web console for inspecting and operating review runs, execution diagnostics and artifacts, agent memory, and trajectories. Server-backed data goes only through this application's same-origin BFF, which holds upstream credentials and proxies explicit route allowlists; the standalone trajectory Viewer processes uploaded or pasted input entirely in the browser.
+Internal web console for inspecting and operating review runs, execution archives and artifacts, agent memory, and trajectories. Server-backed data goes only through this application's same-origin BFF, which holds upstream credentials and proxies explicit route allowlists; the standalone trajectory Viewer processes uploaded or pasted input entirely in the browser.
 
 ## Interface preview
 
@@ -139,7 +139,7 @@ The production server binds to `127.0.0.1` by default. Set `CONTROL_PLANE_UI_HOS
 
 When an HTTPS reverse proxy terminates TLS, set `CONTROL_PLANE_UI_SECURE_COOKIES=true` so session and sign-out cookies carry the `Secure` attribute. Keep the plain HTTP listener unreachable from untrusted networks; the access token is submitted only to `/api/session`, but TLS remains the transport protection for that request.
 
-The BFF also proxies diagnostic artifact downloads from private RustFS storage. It receives a dedicated `s3:GetObject` credential restricted to `sec-review/runs/*/artifacts/*`; the browser supplies only a run ID and never receives storage credentials or an object URI. Before responding to the browser, the BFF writes the object to a temporary file and verifies its size and SHA-256 digest against Review Runs metadata. Downloads are attachment-only, subject to a storage idle timeout, and protected by the same HTTP-only session.
+The BFF also proxies execution archive downloads from private RustFS storage. It receives a dedicated `s3:GetObject` credential restricted to `sec-review/runs/*/artifacts/*`; the browser supplies only a run ID and never receives storage credentials or an object URI. Before responding to the browser, the BFF writes the object to a temporary file and verifies its size and SHA-256 digest against Review Runs metadata. Downloads are attachment-only, subject to a storage idle timeout, and protected by the same HTTP-only session.
 
 ## Memory Management
 

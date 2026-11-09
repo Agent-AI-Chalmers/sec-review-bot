@@ -10,7 +10,7 @@
 - [envelope/v1/corpus](envelope/v1/corpus) 保存各归档读取组件共用的真实归档测试输入，包括应接受和拒绝的格式。
 - [profiles/memory-tree](profiles/memory-tree/README.zh.md) 规定不可变的记忆文件树归档。
 - [profiles/input-bundle](profiles/input-bundle/README.zh.md) 规定已准备好的执行输入归档。
-- [profiles/run-diagnostic](profiles/run-diagnostic/README.zh.md) 规定已结束任务的诊断归档。
+- [profiles/execution-archive](profiles/execution-archive/README.zh.md) 规定已结束任务的执行归档。
 
 envelope 和各 profile 分别维护版本。每份 profile 规范都会说明所用的 envelope 版本。
 
@@ -22,5 +22,5 @@ envelope 和各 profile 分别维护版本。每份 profile 规范都会说明�
 pnpm --dir contracts/tar-zstd-artifact/envelope/tools run check
 pnpm --dir contracts/tar-zstd-artifact/profiles/memory-tree/tools run check
 pnpm --dir contracts/tar-zstd-artifact/profiles/input-bundle/tools run check
-pnpm --dir contracts/tar-zstd-artifact/profiles/run-diagnostic/tools run check
+pnpm --dir contracts/tar-zstd-artifact/profiles/execution-archive/tools run check
 ```

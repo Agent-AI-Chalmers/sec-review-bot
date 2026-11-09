@@ -272,7 +272,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       const inserted = await client.query(
         `insert into extractions (
            extraction_id, source_workflow, source_run_id, source_unit_id,
-           diagnostic_bundle_digest, trajectory_reference
+           execution_archive_digest, trajectory_reference
          ) values ($1,$2,$3,$4,$5,$6)
          on conflict (extraction_id) do nothing`,
         [
@@ -280,7 +280,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           input.source_workflow,
           input.source_run_id,
           input.source_unit_id,
-          input.diagnostic_bundle_digest,
+          input.execution_archive_digest,
           input.trajectory_reference,
         ],
       )
@@ -296,7 +296,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       }
       const existing = await client.query<{ identical: boolean }>(
         `select source_workflow=$2 and source_run_id=$3 and
-                source_unit_id=$4 and diagnostic_bundle_digest=$5 and
+                source_unit_id=$4 and execution_archive_digest=$5 and
                 trajectory_reference=$6::jsonb and
                 (($7::text is null and observation.body_markdown is null) or
                  observation.body_markdown=$7) as identical
@@ -308,7 +308,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           input.source_workflow,
           input.source_run_id,
           input.source_unit_id,
-          input.diagnostic_bundle_digest,
+          input.execution_archive_digest,
           JSON.stringify(input.trajectory_reference),
           input.observation?.body_markdown ?? null,
         ],

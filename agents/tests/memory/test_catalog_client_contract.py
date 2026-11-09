@@ -99,7 +99,7 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         "source_workflow": "issue-review",
         "source_run_id": "run-1",
         "source_unit_id": "review",
-        "diagnostic_bundle_digest": f"sha256:{'b' * 64}",
+        "execution_archive_digest": f"sha256:{'b' * 64}",
         "trajectory_reference": _artifact(
             "extraction-trajectory.jsonl.zst",
             media_type="application/zstd",
@@ -152,7 +152,7 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         source_workflow="issue-review",
         source_run_id="run-1",
         source_unit_id="review",
-        diagnostic_bundle_digest=f"sha256:{'b' * 64}",
+        execution_archive_digest=f"sha256:{'b' * 64}",
         trajectory_reference=_artifact(
             "extraction-trajectory.jsonl.zst",
             media_type="application/zstd",
@@ -292,7 +292,7 @@ def test_extraction_conflict_preserves_non_retryable_catalog_semantics() -> None
             source_workflow="issue-review",
             source_run_id="run-1",
             source_unit_id="review",
-            diagnostic_bundle_digest=f"sha256:{'b' * 64}",
+            execution_archive_digest=f"sha256:{'b' * 64}",
             trajectory_reference=_artifact(
                 "extraction-trajectory.jsonl.zst",
                 media_type="application/zstd",

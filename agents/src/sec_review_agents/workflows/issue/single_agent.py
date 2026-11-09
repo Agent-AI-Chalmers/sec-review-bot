@@ -7,6 +7,10 @@ from typing import Any
 
 from temporalio import activity, workflow
 
+from sec_review_agents.execution_archives.publication import (
+    ExecutionArchivePublicationRequest,
+    publish_execution_archive_activity,
+)
 from sec_review_agents.review_stages.record import (
     ReviewRecord,
     ReviewRecordAnalysis,
@@ -14,10 +18,6 @@ from sec_review_agents.review_stages.record import (
     ReviewRecordVerification,
 )
 from sec_review_agents.review_stages.single_agent.result import SingleAgentFixOutcome
-from sec_review_agents.run_diagnostics.publication import (
-    RunDiagnosticPublicationRequest,
-    publish_run_diagnostic_activity,
-)
 from sec_review_agents.runtime.runtime_config import (
     ExecutionRuntimeContext,
     runtime_workspace_path,
@@ -179,9 +179,9 @@ class IssueSingleAgentWorkflow:
             label="artifact_root_path",
         )
         finalized = await workflow.execute_activity(
-            publish_run_diagnostic_activity,
+            publish_execution_archive_activity,
             args=[
-                RunDiagnosticPublicationRequest(
+                ExecutionArchivePublicationRequest(
                     run_id=request.run_id,
                     artifact_root_path=str(artifact_root),
                     review_units=[
@@ -191,7 +191,7 @@ class IssueSingleAgentWorkflow:
                         }
                     ],
                     result=public_result,
-                    destination_scheme=request.post_processing.diagnostic_scheme,
+                    destination_scheme=request.post_processing.execution_archive_scheme,
                 )
             ],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),

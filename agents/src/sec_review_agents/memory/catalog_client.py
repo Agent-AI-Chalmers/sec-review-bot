@@ -144,7 +144,7 @@ class MemoryCatalogClient:
         source_workflow: str,
         source_run_id: str,
         source_unit_id: str,
-        diagnostic_bundle_digest: str,
+        execution_archive_digest: str,
         trajectory_reference: ArtifactReference,
         observation_markdown: str | None,
     ) -> bool:
@@ -156,7 +156,7 @@ class MemoryCatalogClient:
                 "source_workflow": source_workflow,
                 "source_run_id": source_run_id,
                 "source_unit_id": source_unit_id,
-                "diagnostic_bundle_digest": diagnostic_bundle_digest,
+                "execution_archive_digest": execution_archive_digest,
                 "trajectory_reference": trajectory_reference.as_dict(),
                 "observation": (
                     {"body_markdown": observation_markdown}

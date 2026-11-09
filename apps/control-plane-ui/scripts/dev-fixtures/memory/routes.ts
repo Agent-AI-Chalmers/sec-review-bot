@@ -117,7 +117,7 @@ export function createMemoryHandler(
       source_workflow: 'repository-review',
       source_run_id: sourceRunIds['repository-review'],
       source_unit_id: 'case-reachability',
-      diagnostic_bundle_digest: `sha256:${'2'.repeat(64)}`,
+      execution_archive_digest: `sha256:${'2'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
       observation: null,
       created_at: new Date(BASE_TIME - 300_000).toISOString()
@@ -127,7 +127,7 @@ export function createMemoryHandler(
       source_workflow: 'repository-review',
       source_run_id: sourceRunIds['repository-review'],
       source_unit_id: 'case-authentication',
-      diagnostic_bundle_digest: `sha256:${'3'.repeat(64)}`,
+      execution_archive_digest: `sha256:${'3'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
       observation: {
         body_markdown:
@@ -140,7 +140,7 @@ export function createMemoryHandler(
       source_workflow: 'repository-review',
       source_run_id: sourceRunIds['repository-review'],
       source_unit_id: 'case-proxy-boundary',
-      diagnostic_bundle_digest: `sha256:${'4'.repeat(64)}`,
+      execution_archive_digest: `sha256:${'4'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
       observation: {
         body_markdown:
@@ -153,7 +153,7 @@ export function createMemoryHandler(
       source_workflow: 'pull-request-review',
       source_run_id: sourceRunIds['pull-request-review'],
       source_unit_id: 'pull-request',
-      diagnostic_bundle_digest: `sha256:${'5'.repeat(64)}`,
+      execution_archive_digest: `sha256:${'5'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
       observation: {
         body_markdown:
@@ -166,7 +166,7 @@ export function createMemoryHandler(
       source_workflow: 'issue-review',
       source_run_id: sourceRunIds['issue-review'],
       source_unit_id: 'issue',
-      diagnostic_bundle_digest: `sha256:${'6'.repeat(64)}`,
+      execution_archive_digest: `sha256:${'6'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
       observation: null,
       created_at: new Date(BASE_TIME + 240_000).toISOString()
@@ -176,7 +176,7 @@ export function createMemoryHandler(
       source_workflow: 'repository-review',
       source_run_id: sourceRunIds['repository-review'],
       source_unit_id: 'case-reachability',
-      diagnostic_bundle_digest: `sha256:${'7'.repeat(64)}`,
+      execution_archive_digest: `sha256:${'7'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
       observation: null,
       created_at: new Date(BASE_TIME + 300_000).toISOString()

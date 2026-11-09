@@ -5,12 +5,12 @@ from unittest.mock import patch
 import pytest
 
 from sec_review_agents.artifacts.reference import local_artifact_reference
-from sec_review_agents.contract_versions import RUN_DIAGNOSTIC_ARTIFACT_VERSION
-from sec_review_agents.run_diagnostics.bundle import (
-    DIAGNOSTIC_BUNDLE_FILENAME,
-    DiagnosticReviewUnit,
-    materialize_diagnostic_trajectory_unit,
-    publish_run_diagnostic_bundle,
+from sec_review_agents.contract_versions import EXECUTION_ARCHIVE_ARTIFACT_VERSION
+from sec_review_agents.execution_archives.bundle import (
+    EXECUTION_ARCHIVE_FILENAME,
+    ArchiveReviewUnit,
+    materialize_archive_trajectory_unit,
+    publish_execution_archive,
 )
 from tests.project_paths import CONTRACTS_ROOT
 
@@ -18,13 +18,13 @@ CORPUS = (
     CONTRACTS_ROOT
     / "tar-zstd-artifact"
     / "profiles"
-    / "run-diagnostic"
-    / RUN_DIAGNOSTIC_ARTIFACT_VERSION
+    / "execution-archive"
+    / EXECUTION_ARCHIVE_ARTIFACT_VERSION
     / "corpus"
 )
 
 
-def test_diagnostic_bundle_contains_artifacts_and_selects_one_review_unit(
+def test_execution_archive_contains_artifacts_and_selects_one_review_unit(
     tmp_path: Path,
 ) -> None:
     artifact_root = tmp_path / "artifacts"
@@ -42,17 +42,17 @@ def test_diagnostic_bundle_contains_artifacts_and_selects_one_review_unit(
     (artifact_root / "triage" / "result.json").write_text("{}\n", encoding="utf-8")
 
     with patch.dict("os.environ", {}, clear=True):
-        publication = publish_run_diagnostic_bundle(
+        publication = publish_execution_archive(
             run_id="run-1",
             artifact_root=artifact_root,
             review_units=[
-                DiagnosticReviewUnit("case-a", first),
-                DiagnosticReviewUnit("case-b", second),
+                ArchiveReviewUnit("case-a", first),
+                ArchiveReviewUnit("case-b", second),
             ],
             result={"review_record": {"overview": "done"}},
             destination_scheme="file",
         )
-    materialized = materialize_diagnostic_trajectory_unit(
+    materialized = materialize_archive_trajectory_unit(
         publication.reference,
         run_id="run-1",
         unit_id="case-b",
@@ -68,7 +68,7 @@ def test_diagnostic_bundle_contains_artifacts_and_selects_one_review_unit(
     ) == '{"review_record":{"overview":"done"}}\n'
 
 
-def test_diagnostic_bundle_is_byte_stable_across_retries(tmp_path: Path) -> None:
+def test_execution_archive_is_byte_stable_across_retries(tmp_path: Path) -> None:
     """A retry must reuse the published archive rather than replace it."""
     artifact_root = tmp_path / "artifacts"
     trajectories = artifact_root / "trajectories"
@@ -77,20 +77,20 @@ def test_diagnostic_bundle_is_byte_stable_across_retries(tmp_path: Path) -> None
         '{"event":"message"}\n', encoding="utf-8"
     )
 
-    first = publish_run_diagnostic_bundle(
+    first = publish_execution_archive(
         run_id="run-1",
         artifact_root=artifact_root,
-        review_units=[DiagnosticReviewUnit("review", trajectories)],
+        review_units=[ArchiveReviewUnit("review", trajectories)],
         result={"z": 1, "a": 2},
         destination_scheme="file",
     ).reference
     first_path = Path(first.uri.removeprefix("file://"))
     first_bytes = first_path.read_bytes()
     first_inode = first_path.stat().st_ino
-    second = publish_run_diagnostic_bundle(
+    second = publish_execution_archive(
         run_id="run-1",
         artifact_root=artifact_root,
-        review_units=[DiagnosticReviewUnit("review", trajectories)],
+        review_units=[ArchiveReviewUnit("review", trajectories)],
         result={"a": 2, "z": 1},
         destination_scheme="file",
     ).reference
@@ -100,13 +100,13 @@ def test_diagnostic_bundle_is_byte_stable_across_retries(tmp_path: Path) -> None
     assert first_path.stat().st_ino == first_inode
 
 
-def test_diagnostic_bundle_publishes_owner_only_archive(tmp_path: Path) -> None:
+def test_execution_archive_publishes_owner_only_archive(tmp_path: Path) -> None:
     """Diagnostics contain trajectories, so the published archive stays private."""
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir()
     (artifact_root / "result.json").write_text("{}\n", encoding="utf-8")
 
-    reference = publish_run_diagnostic_bundle(
+    reference = publish_execution_archive(
         run_id="run-1",
         artifact_root=artifact_root,
         review_units=[],
@@ -118,16 +118,16 @@ def test_diagnostic_bundle_publishes_owner_only_archive(tmp_path: Path) -> None:
     assert archive.stat().st_mode & 0o777 == 0o600
 
 
-def test_diagnostic_bundle_rejects_conflicting_existing_file(tmp_path: Path) -> None:
+def test_execution_archive_rejects_conflicting_existing_file(tmp_path: Path) -> None:
     """A different existing archive must fail without replacing the original."""
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir()
-    destination = artifact_root / "published" / DIAGNOSTIC_BUNDLE_FILENAME
+    destination = artifact_root / "published" / EXECUTION_ARCHIVE_FILENAME
     destination.parent.mkdir()
     destination.write_bytes(b"existing")
 
     with pytest.raises(RuntimeError, match="differs from immutable publication"):
-        publish_run_diagnostic_bundle(
+        publish_execution_archive(
             run_id="run-1",
             artifact_root=artifact_root,
             review_units=[],
@@ -139,24 +139,24 @@ def test_diagnostic_bundle_rejects_conflicting_existing_file(tmp_path: Path) -> 
     assert list(destination.parent.glob(".*.tmp")) == []
 
 
-def test_diagnostic_bundle_build_failure_preserves_existing_file(
+def test_execution_archive_build_failure_preserves_existing_file(
     tmp_path: Path,
 ) -> None:
     """A failed rebuild must not damage the archive already published."""
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir()
-    destination = artifact_root / "published" / DIAGNOSTIC_BUNDLE_FILENAME
+    destination = artifact_root / "published" / EXECUTION_ARCHIVE_FILENAME
     destination.parent.mkdir()
     destination.write_bytes(b"existing")
 
     with (
         patch(
-            "sec_review_agents.run_diagnostics.bundle.tarfile.open",
+            "sec_review_agents.execution_archives.bundle.tarfile.open",
             side_effect=OSError("archive failed"),
         ),
         pytest.raises(OSError, match="archive failed"),
     ):
-        publish_run_diagnostic_bundle(
+        publish_execution_archive(
             run_id="run-1",
             artifact_root=artifact_root,
             review_units=[],
@@ -168,22 +168,22 @@ def test_diagnostic_bundle_build_failure_preserves_existing_file(
     assert list(destination.parent.glob(".*.tmp")) == []
 
 
-def test_diagnostic_bundle_rejects_review_unit_path_traversal(tmp_path: Path) -> None:
+def test_execution_archive_rejects_review_unit_path_traversal(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     trajectories = artifact_root / "trajectories"
     trajectories.mkdir(parents=True)
     (trajectories / "0001-analyzer-initial.jsonl").write_text("{}\n", encoding="utf-8")
 
     with pytest.raises(ValueError, match="one path component"):
-        publish_run_diagnostic_bundle(
+        publish_execution_archive(
             run_id="run-1",
             artifact_root=artifact_root,
-            review_units=[DiagnosticReviewUnit("../outside", trajectories)],
+            review_units=[ArchiveReviewUnit("../outside", trajectories)],
             result={},
         )
 
 
-def test_s3_diagnostic_bundle_requires_s3_configuration(
+def test_s3_execution_archive_requires_s3_configuration(
     tmp_path: Path,
 ) -> None:
     artifact_root = tmp_path / "artifacts"
@@ -195,20 +195,20 @@ def test_s3_diagnostic_bundle_requires_s3_configuration(
         patch.dict("os.environ", {}, clear=True),
         pytest.raises(RuntimeError, match="SEC_REVIEW_ARTIFACT_S3_BUCKET"),
     ):
-        publish_run_diagnostic_bundle(
+        publish_execution_archive(
             run_id="run-1",
             artifact_root=artifact_root,
-            review_units=[DiagnosticReviewUnit("review", trajectories)],
+            review_units=[ArchiveReviewUnit("review", trajectories)],
             result={},
         )
 
 
-def test_diagnostic_bundle_rejects_unknown_destination_scheme(tmp_path: Path) -> None:
+def test_execution_archive_rejects_unknown_destination_scheme(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir()
 
-    with pytest.raises(ValueError, match="Unsupported diagnostic artifact scheme"):
-        publish_run_diagnostic_bundle(
+    with pytest.raises(ValueError, match="Unsupported execution archive scheme"):
+        publish_execution_archive(
             run_id="run-1",
             artifact_root=artifact_root,
             review_units=[],
@@ -229,12 +229,12 @@ def test_publication_reports_only_units_included_in_manifest(tmp_path: Path) -> 
     empty.mkdir()
     (empty / "0001-fake.jsonl").mkdir()
 
-    publication = publish_run_diagnostic_bundle(
+    publication = publish_execution_archive(
         run_id="run-1",
         artifact_root=artifact_root,
         review_units=[
-            DiagnosticReviewUnit("included", trajectories),
-            DiagnosticReviewUnit("empty", empty),
+            ArchiveReviewUnit("included", trajectories),
+            ArchiveReviewUnit("empty", empty),
         ],
         result={},
         destination_scheme="file",
@@ -243,12 +243,12 @@ def test_publication_reports_only_units_included_in_manifest(tmp_path: Path) -> 
     assert publication.unit_ids == ("included",)
 
 
-def test_diagnostic_bundle_can_have_no_memory_units(tmp_path: Path) -> None:
+def test_execution_archive_can_have_no_memory_units(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir()
     (artifact_root / "result.json").write_text("{}\n", encoding="utf-8")
 
-    publication = publish_run_diagnostic_bundle(
+    publication = publish_execution_archive(
         run_id="run-1",
         artifact_root=artifact_root,
         review_units=[],
@@ -257,24 +257,24 @@ def test_diagnostic_bundle_can_have_no_memory_units(tmp_path: Path) -> None:
     )
 
     assert publication.reference.uri.endswith(
-        f"/published/{DIAGNOSTIC_BUNDLE_FILENAME}"
+        f"/published/{EXECUTION_ARCHIVE_FILENAME}"
     )
     assert publication.unit_ids == ()
 
 
-def test_diagnostic_bundle_rejects_too_many_entries(tmp_path: Path) -> None:
+def test_execution_archive_rejects_too_many_entries(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir()
     (artifact_root / "one.txt").write_text("one", encoding="utf-8")
 
     with (
         patch(
-            "sec_review_agents.run_diagnostics.bundle.MAX_DIAGNOSTIC_BUNDLE_ENTRIES",
+            "sec_review_agents.execution_archives.bundle.MAX_EXECUTION_ARCHIVE_ENTRIES",
             3,
         ),
         pytest.raises(ValueError, match="entry count limit"),
     ):
-        publish_run_diagnostic_bundle(
+        publish_execution_archive(
             run_id="run-1",
             artifact_root=artifact_root,
             review_units=[],
@@ -283,19 +283,19 @@ def test_diagnostic_bundle_rejects_too_many_entries(tmp_path: Path) -> None:
         )
 
 
-def test_diagnostic_bundle_rejects_too_many_extracted_bytes(tmp_path: Path) -> None:
+def test_execution_archive_rejects_too_many_extracted_bytes(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir()
     (artifact_root / "large.txt").write_bytes(b"large")
 
     with (
         patch(
-            "sec_review_agents.run_diagnostics.bundle.MAX_EXTRACTED_DIAGNOSTIC_BYTES",
+            "sec_review_agents.execution_archives.bundle.MAX_EXTRACTED_ARCHIVE_BYTES",
             1,
         ),
         pytest.raises(ValueError, match="extracted size limit"),
     ):
-        publish_run_diagnostic_bundle(
+        publish_execution_archive(
             run_id="run-1",
             artifact_root=artifact_root,
             review_units=[],
@@ -304,18 +304,18 @@ def test_diagnostic_bundle_rejects_too_many_extracted_bytes(tmp_path: Path) -> N
         )
 
 
-def test_diagnostic_bundle_rejects_too_many_compressed_bytes(tmp_path: Path) -> None:
+def test_execution_archive_rejects_too_many_compressed_bytes(tmp_path: Path) -> None:
     artifact_root = tmp_path / "artifacts"
     artifact_root.mkdir()
 
     with (
         patch(
-            "sec_review_agents.run_diagnostics.bundle.MAX_DIAGNOSTIC_BUNDLE_BYTES",
+            "sec_review_agents.execution_archives.bundle.MAX_EXECUTION_ARCHIVE_BYTES",
             1,
         ),
         pytest.raises(ValueError, match="compressed size limit"),
     ):
-        publish_run_diagnostic_bundle(
+        publish_execution_archive(
             run_id="run-1",
             artifact_root=artifact_root,
             review_units=[],
@@ -323,10 +323,10 @@ def test_diagnostic_bundle_rejects_too_many_compressed_bytes(tmp_path: Path) -> 
             destination_scheme="file",
         )
 
-    assert not (artifact_root / "published" / DIAGNOSTIC_BUNDLE_FILENAME).exists()
+    assert not (artifact_root / "published" / EXECUTION_ARCHIVE_FILENAME).exists()
 
 
-def test_python_reader_matches_shared_run_diagnostic_corpus(tmp_path: Path) -> None:
+def test_python_reader_matches_shared_execution_archive_corpus(tmp_path: Path) -> None:
     manifest = json.loads((CORPUS / "manifest.json").read_text(encoding="utf-8"))
 
     for case in manifest["corpus"]:
@@ -336,7 +336,7 @@ def test_python_reader_matches_shared_run_diagnostic_corpus(tmp_path: Path) -> N
         destination = tmp_path / case["file"]
 
         if case["expected"] == "valid":
-            result = materialize_diagnostic_trajectory_unit(
+            result = materialize_archive_trajectory_unit(
                 local_artifact_reference(archive),
                 run_id=run_id,
                 unit_id=unit_id,
@@ -345,7 +345,7 @@ def test_python_reader_matches_shared_run_diagnostic_corpus(tmp_path: Path) -> N
             assert result.trajectory_paths
         else:
             with pytest.raises(ValueError):
-                materialize_diagnostic_trajectory_unit(
+                materialize_archive_trajectory_unit(
                     local_artifact_reference(archive),
                     run_id=run_id,
                     unit_id=unit_id,

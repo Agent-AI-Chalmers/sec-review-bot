@@ -86,7 +86,7 @@ def prepare_execution_run_activity(
                 timeout_seconds=parsed_request.timeout_seconds,
                 post_processing=ReviewPostProcessingPolicy(
                     memory_processing_enabled=memory_processing_enabled(),
-                    diagnostic_scheme="s3",
+                    execution_archive_scheme="s3",
                 ),
             )
     except ValueError as error:

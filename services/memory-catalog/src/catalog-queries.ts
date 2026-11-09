@@ -118,14 +118,14 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       source_workflow: string
       source_run_id: string
       source_unit_id: string
-      diagnostic_bundle_digest: string
+      execution_archive_digest: string
       trajectory_reference: ArtifactReference
       body_markdown: string | null
       created_at: Date
     }>(
       `select extraction.extraction_id, extraction.source_workflow,
               extraction.source_run_id, extraction.source_unit_id,
-              extraction.diagnostic_bundle_digest, extraction.trajectory_reference,
+              extraction.execution_archive_digest, extraction.trajectory_reference,
               observation.body_markdown, extraction.created_at
        from extractions extraction
        left join observations observation using (extraction_id)
@@ -139,7 +139,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
           source_workflow: row.source_workflow,
           source_run_id: row.source_run_id,
           source_unit_id: row.source_unit_id,
-          diagnostic_bundle_digest: row.diagnostic_bundle_digest,
+          execution_archive_digest: row.execution_archive_digest,
           trajectory_reference: row.trajectory_reference,
           observation:
             row.body_markdown === null
@@ -161,14 +161,14 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       source_workflow: string
       source_run_id: string
       source_unit_id: string
-      diagnostic_bundle_digest: string
+      execution_archive_digest: string
       trajectory_reference: ArtifactReference
       body_markdown: string | null
       created_at: Date
     }>(
       `select extraction.extraction_id, extraction.source_workflow,
               extraction.source_run_id, extraction.source_unit_id,
-              extraction.diagnostic_bundle_digest, extraction.trajectory_reference,
+              extraction.execution_archive_digest, extraction.trajectory_reference,
               observation.body_markdown, extraction.created_at
        from extractions extraction
        left join observations observation using (extraction_id)
@@ -525,7 +525,7 @@ function projectExtraction(row: {
   source_workflow: string
   source_run_id: string
   source_unit_id: string
-  diagnostic_bundle_digest: string
+  execution_archive_digest: string
   trajectory_reference: ArtifactReference
   body_markdown: string | null
   created_at: Date
@@ -535,7 +535,7 @@ function projectExtraction(row: {
     source_workflow: row.source_workflow,
     source_run_id: row.source_run_id,
     source_unit_id: row.source_unit_id,
-    diagnostic_bundle_digest: row.diagnostic_bundle_digest,
+    execution_archive_digest: row.execution_archive_digest,
     trajectory_reference: row.trajectory_reference,
     observation:
       row.body_markdown === null ? null : { body_markdown: row.body_markdown },

@@ -5,7 +5,7 @@ import { Readable } from 'node:stream'
 import test from 'node:test'
 
 import { createControlPlaneUiBffServer } from '../server/create-bff.js'
-import { diagnosticBundle, loginCookie } from './server-support.js'
+import { executionArchive, loginCookie } from './server-support.js'
 
 test('BFF streams only the artifact referenced by an authenticated run', async () => {
   const runId = 'run-1'
@@ -19,8 +19,8 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
           artifact_storage: {
             status: 'available',
             artifact: {
-              kind: 'diagnostic_bundle',
-              uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
+              kind: 'execution_archive',
+              uri: `s3://sec-review/runs/${runId}/artifacts/execution-archive.v1.tar.zst`,
               media_type: 'application/tar+zstd',
               digest: `sha256:${crypto.createHash('sha256').update(artifactBody).digest('hex')}`,
               size_bytes: 8
@@ -68,7 +68,7 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
     assert.strictEqual(await download.text(), 'artifact')
     assert.strictEqual(
       requestedKey,
-      `runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`
+      `runs/${runId}/artifacts/execution-archive.v1.tar.zst`
     )
     assert.strictEqual(
       download.headers.get('content-type'),
@@ -76,7 +76,7 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
     )
     assert.strictEqual(
       download.headers.get('content-disposition'),
-      'attachment; filename="diagnostic-tree.v1.tar.zst"'
+      'attachment; filename="execution-archive.v1.tar.zst"'
     )
     assert.strictEqual(
       download.headers.get('cache-control'),
@@ -94,9 +94,9 @@ test('BFF streams only the artifact referenced by an authenticated run', async (
   }
 })
 
-test('BFF verifies and reads a diagnostic bundle for the run files viewer', async () => {
+test('BFF verifies and reads a execution archive for the run files viewer', async () => {
   const runId = 'run-files-1'
-  const artifactBody = await diagnosticBundle(runId)
+  const artifactBody = await executionArchive(runId)
   const upstream = createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' })
     response.end(
@@ -106,8 +106,8 @@ test('BFF verifies and reads a diagnostic bundle for the run files viewer', asyn
           artifact_storage: {
             status: 'available',
             artifact: {
-              kind: 'diagnostic_bundle',
-              uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
+              kind: 'execution_archive',
+              uri: `s3://sec-review/runs/${runId}/artifacts/execution-archive.v1.tar.zst`,
               media_type: 'application/tar+zstd',
               digest: `sha256:${crypto.createHash('sha256').update(artifactBody).digest('hex')}`,
               size_bytes: artifactBody.length
@@ -180,8 +180,8 @@ test('BFF rejects artifact metadata that does not belong to the requested run', 
           artifact_storage: {
             status: 'available',
             artifact: {
-              kind: 'diagnostic_bundle',
-              uri: 's3://sec-review/runs/run-2/artifacts/diagnostic-tree.v1.tar.zst',
+              kind: 'execution_archive',
+              uri: 's3://sec-review/runs/run-2/artifacts/execution-archive.v1.tar.zst',
               media_type: 'application/tar+zstd',
               digest: `sha256:${'a'.repeat(64)}`,
               size_bytes: 8
@@ -242,8 +242,8 @@ test('BFF rejects an object whose size does not match the available artifact', a
           artifact_storage: {
             status: 'available',
             artifact: {
-              kind: 'diagnostic_bundle',
-              uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
+              kind: 'execution_archive',
+              uri: `s3://sec-review/runs/${runId}/artifacts/execution-archive.v1.tar.zst`,
               media_type: 'application/tar+zstd',
               digest: `sha256:${'a'.repeat(64)}`,
               size_bytes: 8
@@ -304,8 +304,8 @@ test('BFF rejects same-size artifact content that does not match the stored dige
           artifact_storage: {
             status: 'available',
             artifact: {
-              kind: 'diagnostic_bundle',
-              uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
+              kind: 'execution_archive',
+              uri: `s3://sec-review/runs/${runId}/artifacts/execution-archive.v1.tar.zst`,
               media_type: 'application/tar+zstd',
               digest: `sha256:${crypto.createHash('sha256').update('expected').digest('hex')}`,
               size_bytes: 8
@@ -366,8 +366,8 @@ test('BFF times out a stalled artifact download', async () => {
           artifact_storage: {
             status: 'available',
             artifact: {
-              kind: 'diagnostic_bundle',
-              uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
+              kind: 'execution_archive',
+              uri: `s3://sec-review/runs/${runId}/artifacts/execution-archive.v1.tar.zst`,
               media_type: 'application/tar+zstd',
               digest: `sha256:${'a'.repeat(64)}`,
               size_bytes: 8
@@ -471,7 +471,7 @@ test('BFF reports a Review Runs metadata timeout separately', async () => {
 
 test('BFF lets a progressing artifact preview outlive the metadata timeout', async () => {
   const runId = 'run-1'
-  const bundle = await diagnosticBundle(runId)
+  const bundle = await executionArchive(runId)
   const digest = `sha256:${crypto.createHash('sha256').update(bundle).digest('hex')}`
   const upstream = createServer((_request, response) => {
     response.writeHead(200, { 'content-type': 'application/json' })
@@ -482,8 +482,8 @@ test('BFF lets a progressing artifact preview outlive the metadata timeout', asy
           artifact_storage: {
             status: 'available',
             artifact: {
-              kind: 'diagnostic_bundle',
-              uri: `s3://sec-review/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`,
+              kind: 'execution_archive',
+              uri: `s3://sec-review/runs/${runId}/artifacts/execution-archive.v1.tar.zst`,
               media_type: 'application/tar+zstd',
               digest,
               size_bytes: bundle.length

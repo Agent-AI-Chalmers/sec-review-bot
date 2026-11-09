@@ -4,9 +4,9 @@ import pytest
 
 from sec_review_agents.contract_versions import (
     AGENT_TRAJECTORY_VERSION,
+    EXECUTION_ARCHIVE_ARTIFACT_VERSION,
     INPUT_BUNDLE_ARTIFACT_VERSION,
     MEMORY_TREE_ARTIFACT_VERSION,
-    RUN_DIAGNOSTIC_ARTIFACT_VERSION,
     TAR_ZSTD_ENVELOPE_VERSION,
 )
 from tests.project_paths import CONTRACTS_ROOT
@@ -29,8 +29,8 @@ from tests.project_paths import CONTRACTS_ROOT
             INPUT_BUNDLE_ARTIFACT_VERSION,
         ),
         (
-            Path("tar-zstd-artifact/profiles/run-diagnostic"),
-            RUN_DIAGNOSTIC_ARTIFACT_VERSION,
+            Path("tar-zstd-artifact/profiles/execution-archive"),
+            EXECUTION_ARCHIVE_ARTIFACT_VERSION,
         ),
     ],
 )

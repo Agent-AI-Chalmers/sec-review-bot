@@ -28,7 +28,7 @@
   "artifact_storage": {
     "status": "available",
     "artifact": {
-      "kind": "diagnostic_bundle",
+      "kind": "execution_archive",
       "media_type": "application/tar+zstd",
       "digest": "sha256:a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4",
       "size_bytes": 12345

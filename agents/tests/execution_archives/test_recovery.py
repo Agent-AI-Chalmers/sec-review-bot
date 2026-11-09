@@ -12,9 +12,9 @@ from unittest.mock import Mock
 import pytest
 from botocore.exceptions import ClientError  # type: ignore[import-untyped]
 
-from sec_review_agents.run_diagnostics.publication import (
-    RunDiagnosticPublicationRequest,
-    publish_run_diagnostic_activity,
+from sec_review_agents.execution_archives.publication import (
+    ExecutionArchivePublicationRequest,
+    publish_execution_archive_activity,
 )
 
 
@@ -61,13 +61,13 @@ def storage(monkeypatch):
     return client, objects
 
 
-def request_for(root: Path) -> RunDiagnosticPublicationRequest:
+def request_for(root: Path) -> ExecutionArchivePublicationRequest:
     trajectory = root / "cases" / "case-a" / "trajectories"
     trajectory.mkdir(parents=True)
     (trajectory / "0001.jsonl").write_text('{"event":"original"}\n', encoding="utf-8")
     empty = root / "cases" / "empty" / "trajectories"
     empty.mkdir(parents=True)
-    return RunDiagnosticPublicationRequest(
+    return ExecutionArchivePublicationRequest(
         run_id="run-1",
         artifact_root_path=str(root),
         review_units=[
@@ -95,14 +95,14 @@ def test_activity_recovers_after_upload_and_loss_of_local_artifacts(
 
         client.put_object.side_effect = put_then_disconnect
         with pytest.raises(ConnectionResetError):
-            publish_run_diagnostic_activity(request)
+            publish_execution_archive_activity(request)
     else:
-        publish_run_diagnostic_activity(
+        publish_execution_archive_activity(
             request
         )  # Worker dies before Temporal records this result.
     shutil.rmtree(root)
 
-    result = publish_run_diagnostic_activity(request)
+    result = publish_execution_archive_activity(request)
 
     assert (
         not root.exists()
@@ -111,12 +111,12 @@ def test_activity_recovers_after_upload_and_loss_of_local_artifacts(
         "case-a"
     ], "Empty units stay omitted without re-globbing local paths."
     blob = next(iter(objects.values()))[0]
-    reference = result["diagnostic_bundle"]
+    reference = result["execution_archive"]
     assert reference["digest"] == f"sha256:{hashlib.sha256(blob).hexdigest()}"
     assert reference["size_bytes"] == len(blob)
     assert (
         reference["uri"]
-        == "s3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst"
+        == "s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst"
     )
     assert result["artifact_storage"]["artifact"]["digest"] == reference["digest"]
     assert client.put_object.call_count == 1
@@ -132,7 +132,7 @@ def test_recovery_rejects_a_bundle_that_does_not_match_the_request(
     client, objects = storage
     root = tmp_path / "worker-artifacts"
     request = request_for(root)
-    publish_run_diagnostic_activity(request)
+    publish_execution_archive_activity(request)
     shutil.rmtree(root)
     if changed == "run":
         request = replace(request, run_id="run-2")
@@ -152,7 +152,7 @@ def test_recovery_rejects_a_bundle_that_does_not_match_the_request(
     else:
         request = replace(request, review_units=[])
     with pytest.raises(ValueError, match="does not match|do not match"):
-        publish_run_diagnostic_activity(request)
+        publish_execution_archive_activity(request)
     assert client.put_object.call_count == 1
     assert not root.exists()
 
@@ -167,7 +167,7 @@ def test_recovery_does_not_rebuild_when_storage_is_uncertain_or_invalid(
     client, objects = storage
     root = tmp_path / "worker-artifacts"
     request = request_for(root)
-    publish_run_diagnostic_activity(request)
+    publish_execution_archive_activity(request)
     if fault == "listing":
         client.list_objects_v2.side_effect = ClientError(
             {"ResponseMetadata": {"HTTPStatusCode": 503}}, "ListObjectsV2"
@@ -190,13 +190,13 @@ def test_recovery_does_not_rebuild_when_storage_is_uncertain_or_invalid(
     else:
         from unittest.mock import patch
 
-        from sec_review_agents.run_diagnostics import bundle
+        from sec_review_agents.execution_archives import bundle
 
         with (
-            patch.object(bundle, "MAX_DIAGNOSTIC_BUNDLE_BYTES", 1),
+            patch.object(bundle, "MAX_EXECUTION_ARCHIVE_BYTES", 1),
             pytest.raises(ValueError, match="size limit"),
         ):
-            publish_run_diagnostic_activity(request)
+            publish_execution_archive_activity(request)
         assert client.get_object.call_count == 0
         return
     expected_error = (
@@ -205,7 +205,7 @@ def test_recovery_does_not_rebuild_when_storage_is_uncertain_or_invalid(
         else TimeoutError if fault == "download" else ValueError
     )
     with pytest.raises(expected_error):
-        publish_run_diagnostic_activity(request)
+        publish_execution_archive_activity(request)
     assert client.put_object.call_count == 1
 
 
@@ -234,13 +234,13 @@ def test_recovery_requires_the_artifact_tree_even_when_no_review_units_exist(
             info.size = len(content)
             archive.addfile(info, io.BytesIO(content))
     blob = buffer.getvalue()
-    objects["runs/run-1/artifacts/diagnostic-tree.v1.tar.zst"] = (
+    objects["runs/run-1/artifacts/execution-archive.v1.tar.zst"] = (
         blob,
         "application/tar+zstd",
         {"sha256": hashlib.sha256(blob).hexdigest(), "size-bytes": str(len(blob))},
     )
     with pytest.raises(ValueError, match="artifact tree is missing"):
-        publish_run_diagnostic_activity(request)
+        publish_execution_archive_activity(request)
     client.put_object.assert_not_called()
 
 
@@ -249,10 +249,10 @@ def test_exact_key_listing_does_not_reuse_a_longer_key_with_the_same_prefix(
 ):
     client, objects = storage
     request = request_for(tmp_path / "worker-artifacts")
-    original = publish_run_diagnostic_activity(request)
+    original = publish_execution_archive_activity(request)
     key = next(iter(objects))
     objects[key + ".other"] = objects.pop(key)
-    recovered = publish_run_diagnostic_activity(request)
+    recovered = publish_execution_archive_activity(request)
     assert recovered == original
     assert key in objects
     assert client.put_object.call_count == 2
@@ -263,7 +263,7 @@ def test_recovery_rejects_same_size_replacement_between_head_and_get(tmp_path, s
     """Discovery is not a lock: bytes read later must match the discovered digest."""
     client, objects = storage
     request = request_for(tmp_path / "worker-artifacts")
-    publish_run_diagnostic_activity(request)
+    publish_execution_archive_activity(request)
     original_get = client.get_object.side_effect
 
     def replace_then_get(**kwargs):
@@ -274,7 +274,7 @@ def test_recovery_rejects_same_size_replacement_between_head_and_get(tmp_path, s
 
     client.get_object.side_effect = replace_then_get
     with pytest.raises(ValueError, match="digest does not match"):
-        publish_run_diagnostic_activity(request)
+        publish_execution_archive_activity(request)
     assert client.put_object.call_count == 1
 
 
@@ -283,7 +283,7 @@ def test_concurrent_publication_after_absent_listing_cannot_overwrite_winner(
 ):
     client, objects = storage
     request = request_for(tmp_path / "worker-artifacts")
-    original = publish_run_diagnostic_activity(request)
+    original = publish_execution_archive_activity(request)
     key = next(iter(objects))
     winner = objects.pop(key)
     original_put = client.put_object.side_effect
@@ -293,7 +293,7 @@ def test_concurrent_publication_after_absent_listing_cannot_overwrite_winner(
         return original_put(**kwargs)
 
     client.put_object.side_effect = concurrent_winner
-    replay = publish_run_diagnostic_activity(request)
+    replay = publish_execution_archive_activity(request)
     assert replay == original
     assert objects[key] == winner
     assert client.put_object.call_count == 2

@@ -112,7 +112,12 @@ Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个�
 
 初始化命令会用彼此独立的随机值填充服务 token 与 PostgreSQL/RustFS 凭据，并把宿主 Worker 所需的 Memory Catalog token 和各角色存储凭据同步写入 `ops/systemd/deployment.env`，无需手工复制。安装脚本会把该源文件投影为独立的 worker 环境文件，因此 execution 与 memory 进程只会收到各自的凭据。集成部署默认使用 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`。Compose 支持通过 `SEC_REVIEW_TEMPORAL_STATE_DIR`、`SEC_REVIEW_RUSTFS_STATE_DIR` 和 `SEC_REVIEW_POSTGRES_STATE_DIR` 为独立的 Memory 开发环境指定其他路径。
 
-RustFS 按存储职责分配身份：integration 写入 input object；Execution Worker 读取 input、写入 run diagnostic bundle 并读取 active memory revision；Memory Extraction Worker 和 Memory Maintenance Worker 共用一套 memory storage identity，用于访问 run diagnostic、memory revision 和压缩后的 memory-agent trajectory；UI BFF 为经过认证的下载读取已存储 diagnostic。Extraction 与 maintenance 仍然是独立的 Temporal worker identity、进程和 task queue。这里保留共享 S3 credential，是因为当前对象存储 policy 覆盖同一个 memory artifact namespace；在本次部署拆分中进一步拆 IAM contract 不会单独改善进程隔离。
+RustFS 按存储职责分配凭据：
+
+- GitHub Integration 写入输入对象。
+- Execution Worker 读取输入对象、写入执行归档，并读取当前启用的记忆版本。
+- Memory Extraction Worker 和 Memory Maintenance Worker 共用一套存储凭据，用于读取执行归档，以及读写记忆版本和压缩后的 memory-agent 执行轨迹。
+- UI BFF 读取已保存的执行归档，供经过认证的用户下载。
 
 ### 2. GitHub Integration `.env`
 
@@ -180,15 +185,15 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `AGENT_MEMORY_PROCESSING_ENABLED` | 允许 trajectory extraction 和 memory maintenance；默认是 `true`。 |
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 可选的自定义 S3-compatible endpoint。本地 RustFS 部署使用 `http://127.0.0.1:9100`；使用由 `AWS_REGION` 选择的 AWS endpoint 时省略该项。 |
 | `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` | S3 请求寻址方式：`auto`、`path` 或 `virtual`。本地 RustFS 部署使用 `path`；外部存储可以使用 `auto` 或 `virtual`，无需改变 artifact reference。 |
-| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入 run diagnostic bundle，并读取 active memory revision。 |
-| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Extraction Worker 和 Memory Maintenance Worker 共用的存储凭据；可读取 run diagnostic bundle，并读写 memory revision 和压缩后的 memory-agent trajectory。 |
+| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入执行归档，并读取 active memory revision。 |
+| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Extraction Worker 和 Memory Maintenance Worker 共用的存储凭据；可读取执行归档，并读写 memory revision 和压缩后的 memory-agent trajectory。 |
 | `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 协调状态 API；Compose 默认是 `http://127.0.0.1:8092`。 |
 | `AGENT_MEMORY_CATALOG_TOKEN` | Extraction 和自动 maintenance 使用的 worker 凭据；不提供 PostgreSQL 直连权限。 |
 | `AGENT_MEMORY_CATALOG_OPERATOR_TOKEN` | Control Plane UI 用于 memory 读取与人工控制操作的 operator 凭据。 |
 
 #### 产物与存储凭据
 
-- Execution Worker 在 workflow 成功前，将权威 run diagnostic 发布到 `runs/*/artifacts/*`。
+- Execution Worker 在 workflow 成功前，将权威归档发布到 `runs/*/artifacts/*`。
 - Execution Gateway 只校验并转发不可变引用，不持有对象存储凭据，也不挂载 Worker 产物目录。
 - Agent sandbox 不会收到 workload storage 凭据。
 
@@ -286,8 +291,8 @@ CodeGraph 在 sandbox 内运行，因此需要一个能执行命令的 backend�
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
-| `.agent-rustfs-state` | RustFS | run inputs、diagnostics、memory-tree revisions、memory-agent trajectories 及其他 artifacts 的持久对象存储 |
-| `.agent-run-inputs` | 宿主机 Worker | 活跃运行所需的本地输入；不会进入对外发布的诊断材料 |
+| `.agent-rustfs-state` | RustFS | run inputs、执行归档、memory-tree revisions、memory-agent trajectories 及其他 artifacts 的持久对象存储 |
+| `.agent-run-inputs` | 宿主机 Worker | 活跃运行所需的本地输入；不会进入对外发布的执行归档 |
 | `.agent-artifacts` | 宿主机 Worker | 每次运行的 agent 产物和 workflow 输出 |
 | `.agent-postgres-state` | PostgreSQL | Review Runs run 状态与 Memory Catalog 协调状态 |
 | `.agent-temporal-state` | Temporal | workflow history 和待处理 task state |
@@ -460,7 +465,7 @@ sudo rm -rf .agent-temporal-state .agent-postgres-state
 sudo systemctl start sec-review-bot.target
 ```
 
-该操作会永久删除 workflow history、待处理任务、轮询状态和发布状态。运行开始前准备的输入材料（上传到 RustFS 的 archive）以及运行结束后生成的诊断材料（diagnostic artifact）当前没有自动保留期限；本地工作目录中的相应文件也一样默认无限期保留，用于恢复、重放和诊断。部署不会配置生命周期过期规则，因此磁盘用量由运维人员监控。确认没有仍需保留的 run 依赖它们后，才可以手动清理：
+该操作会永久删除 workflow history、待处理任务、轮询状态和发布状态。运行前上传到 RustFS 的输入材料和执行后生成的归档当前没有自动保留期限；本地工作目录中的相应文件也一样默认无限期保留，用于恢复、重放和诊断。部署不会配置生命周期过期规则，因此磁盘用量由运维人员监控。确认没有仍需保留的 run 依赖它们后，才可以手动清理：
 
 ```bash
 sudo rm -rf .agent-rustfs-state .agent-run-inputs .agent-artifacts

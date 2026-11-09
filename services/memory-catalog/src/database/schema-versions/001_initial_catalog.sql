@@ -5,15 +5,15 @@ create table extractions (
   source_workflow text not null,
   source_run_id text not null,
   source_unit_id text not null,
-  diagnostic_bundle_digest text not null,
+  execution_archive_digest text not null,
   trajectory_reference jsonb not null,
   created_at timestamptz not null default clock_timestamp()
 );
 
 comment on table extractions is
   'Completed memory extractor invocations and their content-addressed trajectories.';
-comment on column extractions.diagnostic_bundle_digest is
-  'Digest of the immutable run diagnostic bundle supplied to the extraction workflow.';
+comment on column extractions.execution_archive_digest is
+  'Digest of the immutable execution archive supplied to the extraction workflow.';
 comment on column extractions.trajectory_reference is
   'Content-addressed compressed trajectory for this extractor invocation.';
 

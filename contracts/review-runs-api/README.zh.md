@@ -30,7 +30,7 @@ Review Runs 通过 `observeRun()` 生成供读取接口使用的脱敏记录，�
 - `execution_statistics` 是可空的用量统计快照，包括统计核对状态、已观察到的模型调用与 token 汇总，以及按流程位置、Agent、服务商和模型分组的统计。问题单元、交付单元、执行轮次、草稿批次和初筛分块等位置字段可以为空，因为多数阶段不涉及这些位置。整个字段为 `null` 表示尚无快照，不代表没有消耗；
 - token 总量采用 OpenTelemetry GenAI 口径：`input_tokens` 包含已报告的缓存输入子集，`output_tokens` 包含已报告的推理输出子集。Langfuse 中互不重叠的计费分项会在写入本契约数据前转换成这一口径；
 - 各 token 字段可以独立为 `null`，表示无法确定所有已覆盖调用的该项用量，不代表零。`total_tokens` 为输入与输出总量之和；任一项未知时，它也为 `null`。缓存和推理用量是总量的子集，不能重复相加；
-- `artifact_storage` 可以不存在；可以是 `unavailable` 或 `failed`，并附带可选的 `error_code` 和 `message`；也可以是 `available`，并包含已保存的诊断包。
+- `artifact_storage` 可以不存在；可以是 `unavailable` 或 `failed`，并附带可选的 `error_code` 和 `message`；也可以是 `available`，并包含已保存的执行归档。
 
 ## 如何校验
 

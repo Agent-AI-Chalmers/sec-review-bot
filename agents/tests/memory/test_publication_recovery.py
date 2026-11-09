@@ -30,7 +30,7 @@ async def test_extraction_recovers_full_intent_without_rerunning_model(
 ):
     diagnostic = reference("a")
     extraction_id = memory_extraction_workflow_id(
-        diagnostic_bundle_digest=diagnostic["digest"], unit_id="review"
+        execution_archive_digest=diagnostic["digest"], unit_id="review"
     )
     intent = {
         "registration": {
@@ -38,7 +38,7 @@ async def test_extraction_recovers_full_intent_without_rerunning_model(
             "source_workflow": "issue-review",
             "source_run_id": "run-1",
             "source_unit_id": "review",
-            "diagnostic_bundle_digest": diagnostic["digest"],
+            "execution_archive_digest": diagnostic["digest"],
             "trajectory_reference": reference("b"),
             "observation": {"body_markdown": "Original observation."},
         },

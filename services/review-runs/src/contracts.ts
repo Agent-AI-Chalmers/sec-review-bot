@@ -20,7 +20,7 @@ import type {
 export type ReviewRunWorkflow = CreateRunOptions['path']['workflow']
 
 /**
- * Where a terminal run's diagnostics went.
+ * Where a terminal run's archive went.
  *
  * The hand-maintained Execution API contract owns this shape;
  * `execution-api-schema.ts` is its generated local projection.

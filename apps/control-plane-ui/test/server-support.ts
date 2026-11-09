@@ -3,7 +3,7 @@ import { zstdCompressSync } from 'node:zlib'
 
 import tar from 'tar-stream'
 
-export async function diagnosticBundle(runId: string): Promise<Buffer> {
+export async function executionArchive(runId: string): Promise<Buffer> {
   const pack = tar.pack()
   const chunks: Buffer[] = []
   const collecting = (async (): Promise<void> => {

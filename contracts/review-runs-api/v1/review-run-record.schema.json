@@ -221,11 +221,11 @@
               "properties": {
                 "kind": {
                   "type": "string",
-                  "enum": ["diagnostic_bundle"]
+                  "enum": ["execution_archive"]
                 },
                 "uri": {
                   "type": "string",
-                  "pattern": "^s3://[^/]+/runs/[^/]+/artifacts/diagnostic-tree\\.v1\\.tar\\.zst$"
+                  "pattern": "^s3://[^/]+/runs/[^/]+/artifacts/execution-archive\\.v1\\.tar\\.zst$"
                 },
                 "media_type": {
                   "type": "string",

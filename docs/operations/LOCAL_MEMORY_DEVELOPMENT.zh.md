@@ -85,7 +85,7 @@ uv --project agents run python -m scripts.dev.dev_workers \
 
 launcher 会将不同的对象存储身份传给对应 Worker，将 Memory Maintenance Worker 的 activity concurrency 保持为 `1`，并在任一 Worker 退出或收到 `SIGINT`/`SIGTERM` 时停止整个 Worker 组。它不负责启动或停止 Compose services。
 
-本地 Temporal 模式启用记忆处理时，Memory Extraction Worker 会从本地文件系统读取 Execution Worker 生成的诊断包，因此两个 Worker 必须能访问同一个文件路径。提取结果仍通过 Memory Catalog 保存 observation 和产物引用，通过 S3 兼容存储保存 extractor 的执行轨迹。
+本地 Temporal 模式启用记忆处理时，Memory Extraction Worker 会从本地文件系统读取 Execution Worker 生成的执行归档，因此两个 Worker 必须能访问同一个文件路径。提取结果仍通过 Memory Catalog 保存 observation 和产物引用，通过 S3 兼容存储保存 extractor 的执行轨迹。
 
 从仓库根目录运行运维脚本（见 [scripts 说明](../../scripts/README.md#memory-operations)）：
 

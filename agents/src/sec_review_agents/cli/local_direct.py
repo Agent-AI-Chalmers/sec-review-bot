@@ -8,9 +8,9 @@ from sec_review_agents.cli.local_execution import (
     direct_run_for_bundle,
 )
 from sec_review_agents.cli.local_materialization.common import ReviewBundle
-from sec_review_agents.run_diagnostics.bundle import (
-    DiagnosticReviewUnit,
-    publish_run_diagnostic_bundle,
+from sec_review_agents.execution_archives.bundle import (
+    ArchiveReviewUnit,
+    publish_execution_archive,
 )
 from sec_review_agents.temporal.config import DEFAULT_WORKFLOW_TIMEOUT_SECONDS
 
@@ -41,7 +41,7 @@ def _publish_local_diagnostic(
     artifact_root = bundle.artifact_root_path
     if bundle.workflow == "repository-review":
         units = [
-            DiagnosticReviewUnit(
+            ArchiveReviewUnit(
                 unit_id=case_root.name,
                 trajectory_root=case_root / "trajectories",
             )
@@ -51,13 +51,13 @@ def _publish_local_diagnostic(
     else:
         trajectory_root = artifact_root / "trajectories"
         units = (
-            [DiagnosticReviewUnit("review", trajectory_root)]
+            [ArchiveReviewUnit("review", trajectory_root)]
             if list(trajectory_root.glob("*.jsonl"))
             else []
         )
     # Direct mode is an offline producer even when the shell also carries
     # S3 settings.
-    publish_run_diagnostic_bundle(
+    publish_execution_archive(
         run_id=bundle.run_id,
         artifact_root=Path(artifact_root),
         review_units=units,

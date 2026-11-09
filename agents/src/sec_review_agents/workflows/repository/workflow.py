@@ -16,11 +16,11 @@ from sec_review_agents.delivery_stages.model import (
     DeliveryPlan,
 )
 from sec_review_agents.delivery_stages.result import DeliveryResult
-from sec_review_agents.review_stages.record import build_review_record
-from sec_review_agents.run_diagnostics.publication import (
-    RunDiagnosticPublicationRequest,
-    publish_run_diagnostic_activity,
+from sec_review_agents.execution_archives.publication import (
+    ExecutionArchivePublicationRequest,
+    publish_execution_archive_activity,
 )
+from sec_review_agents.review_stages.record import build_review_record
 from sec_review_agents.scan_stages.discovery.input import (
     DiscoveryChunk,
     DiscoveryManifest,
@@ -791,14 +791,14 @@ class RepositoryReviewWorkflow:
             for case_result in case_results
         ]
         finalized = await workflow.execute_activity(
-            publish_run_diagnostic_activity,
+            publish_execution_archive_activity,
             args=[
-                RunDiagnosticPublicationRequest(
+                ExecutionArchivePublicationRequest(
                     run_id=request.run_id,
                     artifact_root_path=str(artifact_root),
                     review_units=review_units,
                     result=result,
-                    destination_scheme=request.post_processing.diagnostic_scheme,
+                    destination_scheme=request.post_processing.execution_archive_scheme,
                 )
             ],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
@@ -809,7 +809,7 @@ class RepositoryReviewWorkflow:
             memory_processing = await schedule_memory_extractions(
                 source_workflow=request.workflow,
                 run_id=request.run_id,
-                diagnostic_bundle=dict(finalized["diagnostic_bundle"]),
+                execution_archive=dict(finalized["execution_archive"]),
                 unit_ids=[str(value) for value in finalized["unit_ids"]],
                 timeout_seconds=request.timeout_seconds,
                 enabled=request.post_processing.memory_processing_enabled,

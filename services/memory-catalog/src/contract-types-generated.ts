@@ -91,7 +91,7 @@ export type ExtractionRegistration = {
    * @pattern ^sha256:[0-9a-f]{64}$
    * @type string
    */
-  diagnostic_bundle_digest: string
+  execution_archive_digest: string
   trajectory_reference: ArtifactReference
   observation: ExtractionObservation | null
 }
@@ -183,7 +183,7 @@ export type ExtractionRecord = {
    * @pattern ^sha256:[0-9a-f]{64}$
    * @type string
    */
-  diagnostic_bundle_digest: string
+  execution_archive_digest: string
   trajectory_reference: ArtifactReference
   observation: ExtractionObservation | null
   /**
