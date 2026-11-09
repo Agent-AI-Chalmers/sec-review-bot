@@ -4,9 +4,9 @@
 
 本文为 [LOCAL_INTEGRATED_DEPLOYMENT.md](LOCAL_INTEGRATED_DEPLOYMENT.md) 的中文译文；如有差异，以英文版为准。
 
-这是 GitHub integration、Review Runs、运行服务、Temporal、对象存储以及宿主机 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker 的本地部署说明。
+这是 GitHub Integration、Review Runs、Execution Gateway、Temporal、对象存储以及宿主机 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker 的本地部署说明。
 
-如果你要在本地跑完整集成链路，读本文。不经过 HTTP 运行服务、直接在本地运行 agent，或使用 `run-local-* --temporal` 调试时，见 [agents 本地运行说明](../../agents/README.zh.md)。
+如果你要在本地跑完整集成链路，读本文。不经过 HTTP Execution Gateway、直接在本地运行 Agent，或使用 `run-local-* --temporal` 调试时，见 [agents](../../agents/README.zh.md)。
 
 
 本地 Memory 开发环境见[本地 Memory 开发](LOCAL_MEMORY_DEVELOPMENT.zh.md)。
@@ -17,9 +17,9 @@
 
 `cloudflared` 作为单独管理的宿主机服务运行，不由 Docker Compose 管理。
 
-Cloudflare Tunnel 将 GitHub 流量转发到 integration 服务。Review Runs 协调每个 review run；Temporal 把 review、memory extraction 和 memory maintenance 工作分发给三个独立的 worker pool。PostgreSQL 保存控制和 catalog 状态，RustFS 保存运行输入、trajectory、memory revision 和 artifact。
+Cloudflare Tunnel 将 GitHub 流量转发到 GitHub Integration。Review Runs 协调每个 review run；Temporal 把 review、memory extraction 和 memory maintenance 工作分发给三个独立的 worker pool。PostgreSQL 保存控制和 catalog 状态，RustFS 保存运行输入、trajectory、memory revision 和 artifact。
 
-图中的 Langfuse 同时位于 Docker Compose 和宿主机 worker 边界之外，因为它是独立部署的。Worker 可以向其导出 LLM observations，Review Runs 可以读取这些 observations 并生成模型用量 snapshot；两条链路都不会阻塞 review execution 或 publication。
+图中的 Langfuse 独立部署，位于 Docker Compose 和宿主机 Worker 边界之外。Worker 可以向其导出模型调用记录，Review Runs 再读取这些记录，生成模型用量快照；这两条链路都不会阻塞审查执行或结果发布。
 
 Control Plane UI 是独立部署的控制台。它的同源服务端从 Review Runs 读取运行状态并代理 artifact 下载，因此服务凭据和存储凭据都不会进入浏览器代码。公网 endpoint 的配置见[本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
@@ -29,7 +29,7 @@ Control Plane UI 是独立部署的控制台。它的同源服务端从 Review R
 
 | Service | URL |
 | --- | --- |
-| GitHub integration | `http://127.0.0.1:30000` |
+| GitHub Integration | `http://127.0.0.1:30000` |
 | Review Runs | `http://127.0.0.1:8090` |
 | Control Plane UI | `http://127.0.0.1:8091` |
 | Execution Gateway | `http://127.0.0.1:8000` |
@@ -40,7 +40,7 @@ Control Plane UI 是独立部署的控制台。它的同源服务端从 Review R
 | RustFS API | `http://127.0.0.1:9100` |
 | RustFS Console | `http://127.0.0.1:9101` |
 
-Temporal 接入只与 Execution Gateway 共享的专用 Compose internal network。gRPC 与 Web UI 端口发布在宿主 loopback，供宿主 worker 和本地 operator 使用。
+Temporal 接入只与 Execution Gateway 共享的专用 Compose internal network。gRPC 与 Web UI 端口发布在宿主 loopback，供宿主 Worker 和本地 operator 使用。
 
 ## 前提
 
@@ -72,7 +72,7 @@ Temporal 接入只与 Execution Gateway 共享的专用 Compose internal network
 
 ### GitHub App webhook 配置
 
-如果要把公网 URL 转发到本地 GitHub integration service，见 [本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
+如果要把公网 URL 转发到本地 GitHub Integration，见 [本地 GitHub 入站设置](LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
 ### Actions secrets 配置
 
@@ -91,7 +91,7 @@ Repository review workflow 使用 GitHub Actions OIDC 向 App 鉴权。workflow 
 集成部署使用四份源配置。Compose `.env` 还承载对象存储 endpoint 和服务凭据；这些凭据只传递给各自需要的服务：
 
 - 根目录 `.env`：Compose 控制平面；
-- `apps/github-integration/.env`：GitHub integration；
+- `apps/github-integration/.env`：GitHub Integration；
 - `agents/config/model-providers.toml`：模型 deployment；
 - `ops/systemd/deployment.env`：安装前的 systemd 部署配置。
 
@@ -103,21 +103,21 @@ Repository review workflow 使用 GitHub Actions OIDC 向 App 鉴权。workflow 
 ops/init-local-deployment-config.sh
 ```
 
-初始化命令会复制维护中的 sample，为内部服务生成彼此独立的凭据，同步 Compose 与宿主 worker 共同使用的值，并将四个文件的权限设为 `0600`。它不会覆盖已有配置。执行完成后，只需填写 GitHub App 身份、webhook secret、私钥和模型 deployment；Langfuse 等可选外部服务仍需填写各自的凭据。systemd 安装脚本会将部署设置与仓库路径合并后写入 `/etc`，见下文。
+初始化命令会复制维护中的 sample，为内部服务生成彼此独立的凭据，同步 Compose 与宿主 Worker 共同使用的值，并将四个文件的权限设为 `0600`。它不会覆盖已有配置。执行完成后，只需填写 GitHub App 身份、webhook secret、私钥和模型 deployment；Langfuse 等可选外部服务仍需填写各自的凭据。systemd 安装脚本会将部署设置与仓库路径合并后写入 `/etc`，见下文。
 
-`agents/.env` 供 `run-local-*` 和其他本地 CLI 使用，不会被 Compose 或 systemd worker 自动读取。本地 CLI 的配置方式见 [agents 本地运行说明](../../agents/README.zh.md)。
+`agents/.env` 供 `run-local-*` 和其他本地 CLI 使用，不会被 Compose 或 systemd Worker 自动读取。本地 CLI 的配置方式见 [agents](../../agents/README.zh.md)。
 
 ### 1. Compose `.env`
 
 Compose 层默认值在 [compose.env.sample](../../compose.env.sample)。这个文件只管 Compose 怎么启动容器、挂载哪些本地目录、暴露哪些端口。
 
-初始化命令会用彼此独立的随机值填充服务 token 与 PostgreSQL/RustFS 凭据，并把宿主 worker 所需的 Memory Catalog token 和各角色存储凭据同步写入 `ops/systemd/deployment.env`，无需手工复制。安装脚本会把该源文件投影为独立的 worker 环境文件，因此 execution 与 memory 进程只会收到各自的凭据。集成部署默认使用 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`。Compose 支持通过 `SEC_REVIEW_TEMPORAL_STATE_DIR`、`SEC_REVIEW_RUSTFS_STATE_DIR` 和 `SEC_REVIEW_POSTGRES_STATE_DIR` 为独立的 Memory 开发环境指定其他路径。
+初始化命令会用彼此独立的随机值填充服务 token 与 PostgreSQL/RustFS 凭据，并把宿主 Worker 所需的 Memory Catalog token 和各角色存储凭据同步写入 `ops/systemd/deployment.env`，无需手工复制。安装脚本会把该源文件投影为独立的 worker 环境文件，因此 execution 与 memory 进程只会收到各自的凭据。集成部署默认使用 `.agent-temporal-state`、`.agent-rustfs-state` 和 `.agent-postgres-state`。Compose 支持通过 `SEC_REVIEW_TEMPORAL_STATE_DIR`、`SEC_REVIEW_RUSTFS_STATE_DIR` 和 `SEC_REVIEW_POSTGRES_STATE_DIR` 为独立的 Memory 开发环境指定其他路径。
 
 RustFS 按存储职责分配身份：integration 写入 input object；Execution Worker 读取 input、写入 run diagnostic bundle 并读取 active memory revision；Memory Extraction Worker 和 Memory Maintenance Worker 共用一套 memory storage identity，用于访问 run diagnostic、memory revision 和压缩后的 memory-agent trajectory；UI BFF 为经过认证的下载读取已存储 diagnostic。Extraction 与 maintenance 仍然是独立的 Temporal worker identity、进程和 task queue。这里保留共享 S3 credential，是因为当前对象存储 policy 覆盖同一个 memory artifact namespace；在本次部署拆分中进一步拆 IAM contract 不会单独改善进程隔离。
 
-### 2. GitHub integration `.env`
+### 2. GitHub Integration `.env`
 
-GitHub integration 运行配置见 [apps/github-integration/.env.sample](../../apps/github-integration/.env.sample)。本地最小配置：
+GitHub Integration 运行配置见 [apps/github-integration/.env.sample](../../apps/github-integration/.env.sample)。本地最小配置：
 
 ```bash
 APP_ID=123456
@@ -159,7 +159,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 `ops/systemd/deployment.env` 是供用户编辑的源配置。每次运行安装脚本时，都会将该文件与当前 checkout 推导出的路径合并，并替换 `/etc/sec-review-bot/deployment.env`、`/etc/sec-review-bot/compose.env`、`/etc/sec-review-bot/execution-worker.env` 和 `/etc/sec-review-bot/memory-worker.env`。每个 unit 读取自己的 role-scoped 文件。
 
-`SEC_REVIEW_BOT_DIR` 和 `SEC_REVIEW_AGENTS_DIR` 由安装脚本负责，不要把它们加入可编辑的源文件。安装脚本会删除旧值，并根据自身所在的仓库重新生成。Input archive 改由 RustFS 交换，因此 integration 容器和宿主 worker 不再共享 `.agent-input-bundles`。
+`SEC_REVIEW_BOT_DIR` 和 `SEC_REVIEW_AGENTS_DIR` 由安装脚本负责，不要把它们加入可编辑的源文件。安装脚本会删除旧值，并根据自身所在的仓库重新生成。Input archive 改由 RustFS 交换，因此 integration 容器和宿主 Worker 不再共享 `.agent-input-bundles`。
 
 安装脚本还会生成内部使用的 `SEC_REVIEW_SERVICE_UID` 和 `SEC_REVIEW_SERVICE_GID`。在 Compose 启动前，它会为该 service user 创建仓库内的状态目录。这样可以避免 Docker 自动创建无法由非 root 容器写入的 root-owned bind mount 源目录，并让 Temporal 容器以同一用户写入 SQLite 数据库。
 
@@ -182,22 +182,46 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 可选的自定义 S3-compatible endpoint。本地 RustFS 部署使用 `http://127.0.0.1:9100`；使用由 `AWS_REGION` 选择的 AWS endpoint 时省略该项。 |
 | `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` | S3 请求寻址方式：`auto`、`path` 或 `virtual`。本地 RustFS 部署使用 `path`；外部存储可以使用 `auto` 或 `virtual`，无需改变 artifact reference。 |
 | `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入 run diagnostic bundle，并读取 active memory revision。 |
-| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | 两个 memory worker 共用的存储凭据；可读取 run diagnostic bundle，并读写 memory revision 和压缩后的 memory-agent trajectory。 |
+| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Extraction Worker 和 Memory Maintenance Worker 共用的存储凭据；可读取 run diagnostic bundle，并读写 memory revision 和压缩后的 memory-agent trajectory。 |
 | `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 协调状态 API；Compose 默认是 `http://127.0.0.1:8092`。 |
 | `AGENT_MEMORY_CATALOG_TOKEN` | Extraction 和自动 maintenance 使用的 worker 凭据；不提供 PostgreSQL 直连权限。 |
 | `AGENT_MEMORY_CATALOG_OPERATOR_TOKEN` | Control Plane UI 用于 memory 读取与人工控制操作的 operator 凭据。 |
 
-Execution Worker 会在 workflow 成功前把权威 run diagnostic 发布到 `runs/*/artifacts/*`。Execution Gateway 只校验并转发该不可变引用，不持有对象存储凭据，也不挂载 worker artifact tree。Agent sandbox 不会收到任何 workload storage 凭据。
+#### 产物与存储凭据
 
-Memory Catalog Server 是独立 TypeScript 服务，不属于 Review Runs。Compose 只运行一个 PostgreSQL 实例，其中包含相互独立的 `sec_review_review_runs` 和 `sec_review_memory_catalog` database 与 login role；每个服务只接收自己的 database URL。Memory Catalog 在自己的 database 中保存 extraction records 及其可选 observations、memory-tree revision history 和 active revision pointer。每个 revision 记录对应的 maintenance identity 和 maintainer trajectory reference。Temporal 负责 extraction 执行和单例 maintenance workflow；PostgreSQL 是持久 catalog 与 compare-and-swap 提交边界。宿主 worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用它；memory-tree revisions 和 memory-agent trajectories 以不可变对象保存在 RustFS 中。Worker 将这些对象物化到 invocation 级临时 worktree，agent sandbox 只看到最终 filesystem mount。
+- Execution Worker 在 workflow 成功前，将权威 run diagnostic 发布到 `runs/*/artifacts/*`。
+- Execution Gateway 只校验并转发不可变引用，不持有对象存储凭据，也不挂载 Worker 产物目录。
+- Agent sandbox 不会收到 workload storage 凭据。
 
-Compose 会向 Control Plane UI 提供 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_OPERATOR_TOKEN`。经过认证的 browser session 可以通过 BFF 查看和管理 memory，而不会获得 Catalog 或对象存储凭据。UI storage identity 可以读取 run artifact、memory tree 和 memory trajectory，但只能在 `memory/trees/*` 下创建不可变对象。编辑或恢复失败后，maintenance 会保持暂停，直到 operator 显式恢复。系统不会自动清理未引用的 memory object。
+#### Memory Catalog 与记忆存储
 
-PostgreSQL 初始化脚本只会在 `.agent-postgres-state` 为空时执行。采用或修改 database 名称后，应先停止部署并删除该目录，再重新启动 Compose。此操作会删除已有的 Review Runs 和 Memory Catalog 数据。
+Memory Catalog Server 是独立 TypeScript 服务，不属于 Review Runs。
 
-大多数本地部署可以保留这些默认值。移动 checkout 后，重新运行安装脚本。
+- **数据库隔离。** Compose 运行一个 PostgreSQL 实例，其中有独立的 `sec_review_review_runs` 和 `sec_review_memory_catalog` database 与 login role。每个服务只接收自己的 database URL。
+- **保存的状态。** Memory Catalog 保存 extraction records 及其可选 observations、memory-tree revision history 和 active revision pointer。每个 revision 还记录 maintenance identity 和 maintainer trajectory reference。
+- **执行与提交。** Temporal 负责 extraction 执行和单例 maintenance workflow；PostgreSQL 保存 catalog 状态，并在提交时检查 compare-and-swap 条件。宿主 Worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用 Memory Catalog。
+- **对象存储。** memory-tree revisions 和 memory-agent trajectories 作为不可变对象保存在 RustFS 中。Worker 将对象物化到每次调用的临时 worktree，Agent sandbox 只看到最终的文件系统挂载。
 
-以下变量按需添加或修改。
+#### Control Plane UI 的记忆管理
+
+Compose 向 Control Plane UI 提供 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_OPERATOR_TOKEN`。
+
+- 经过认证的 browser session 通过 BFF 查看和管理 memory，不会获得 Catalog 或对象存储凭据。
+- UI storage identity 可以读取 run 产物、memory tree 和 memory trajectory，但只能在 `memory/trees/*` 下创建不可变对象。
+- 编辑或恢复失败后，maintenance 保持暂停，直到 operator 显式恢复。
+- 系统不自动清理未引用的 memory object。
+
+#### PostgreSQL 初始化与重新安装
+
+PostgreSQL 初始化脚本只在 `.agent-postgres-state` 为空时执行。采用或修改 database 名称后：
+
+1. 停止部署。
+2. 删除 `.agent-postgres-state`。
+3. 重新启动 Compose。
+
+**此操作会删除已有的 Review Runs 和 Memory Catalog 数据。**
+
+大多数本地部署可以保留默认值。移动 checkout 后，重新运行安装脚本。以下变量按需添加或修改。
 
 #### Langfuse tracing
 
@@ -225,7 +249,7 @@ AGENT_DISCOVERY_MAX_CONCURRENCY=1
 AGENT_CASE_PROCESSING_MAX_CONCURRENCY=1
 ```
 
-并发值只限制同时在飞请求数，不等价于 TPM/RPM 限流控制；是否触发配额更取决于 token 体积、请求速率和重试行为。
+并发值只限制同时推进的任务数，不等同于 TPM/RPM 限流；是否触发配额还取决于单次请求的 token 数量、请求频率和重试行为。
 
 #### Docker sandbox
 
@@ -239,8 +263,6 @@ AGENT_JOERN_ENABLED=false
 AGENT_PLAYWRIGHT_ENABLED=false
 AGENT_MCP_ENABLED=false
 ```
-
-执行节点使用 `AGENT_SANDBOX_BACKEND=docker` 后，Docker 不可用时 Execution Worker 会在启动阶段失败；两个 memory worker 都不会初始化或依赖 Docker sandbox 边界。
 
 要通过仓库提供的 Docker 镜像使用 Joern 和 Playwright CLI，先构建 workspace tools 镜像，再修改 `ops/systemd/deployment.env`：
 
@@ -266,8 +288,8 @@ CodeGraph 在 sandbox 内运行，因此需要一个能执行命令的 backend�
 | Path | Owner | Purpose |
 | --- | --- | --- |
 | `.agent-rustfs-state` | RustFS | run inputs、diagnostics、memory-tree revisions、memory-agent trajectories 及其他 artifacts 的持久对象存储 |
-| `.agent-run-inputs` | 宿主机 worker | 活跃运行所需的本地输入；不会进入对外发布的诊断材料 |
-| `.agent-artifacts` | 宿主机 worker | 每次运行的 agent 产物和 workflow 输出 |
+| `.agent-run-inputs` | 宿主机 Worker | 活跃运行所需的本地输入；不会进入对外发布的诊断材料 |
+| `.agent-artifacts` | 宿主机 Worker | 每次运行的 agent 产物和 workflow 输出 |
 | `.agent-postgres-state` | PostgreSQL | Review Runs run 状态与 Memory Catalog 协调状态 |
 | `.agent-temporal-state` | Temporal | workflow history 和待处理 task state |
 
@@ -301,7 +323,7 @@ sudo systemctl enable --now sec-review-bot.target
 
 `sec-review-bot.target` 是整套部署统一的 systemd 入口。它把 `sec-review-bot-compose-stack.service`、`sec-review-execution-worker@1.service`、`sec-review-memory-extraction-worker@1.service` 和单例 `sec-review-memory-maintenance-worker.service` 组合起来统一管理。
 
-控制平面包括 GitHub integration、Execution Gateway 和 Temporal。Execution Worker 运行 review workflow、创建 Docker sandbox 并发布 run diagnostic；Memory Extraction Worker 消费诊断包并登记 observations；Memory Maintenance Worker 串行更新共享 memory tree，并负责修复 maintenance schedule。两个 memory worker 都不拥有 review sandbox 边界。
+控制平面包括 GitHub Integration、Execution Gateway 和 Temporal。
 
 启动期失败和运行期失败的监督方式不同，排查时这个区别很关键：
 
@@ -380,7 +402,7 @@ curl -sS http://127.0.0.1:8090/readyz
 
 ### 组件级操作
 
-排障或只更新一个组件时，可以分别重启控制平面或任一个 worker：
+排障或只更新一个组件时，可以分别重启控制平面或任一个 Worker：
 
 ```bash
 sudo systemctl restart sec-review-bot-compose-stack.service
@@ -395,11 +417,20 @@ sudo systemctl restart sec-review-memory-maintenance-worker.service
 docker compose --profile app up --build
 ```
 
-这个命令不会启动任何宿主机 worker。
+这个命令不会启动任何宿主机 Worker。
 
 ### Worker 并发
 
-`TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` 限制每个 Execution Worker 同时执行的 review activities 数量，默认值为 `2`。每个 review activity 都可能创建 sandbox 并发出多次模型请求，因此单机部署应从这个保守值开始。`TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES` 独立限制每个 Memory Extraction Worker 的 activity 数量，默认值为 `4`。Memory Maintenance Worker 始终使用 `TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES=1`；其 unit 特意不是 template，不应扩容。
+<!-- doc-default: TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES; source=agents/src/sec_review_agents/entrypoints/execution_worker/main.py -->
+<!-- doc-default: TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES; source=agents/src/sec_review_agents/entrypoints/memory_extraction_worker/main.py -->
+<!-- doc-default: TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES; source=agents/src/sec_review_agents/entrypoints/memory_maintenance_worker/main.py -->
+| 配置项 | 对应 Worker | 每个进程的 activity 并发上限 |
+| --- | --- | --- |
+| `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` | Execution Worker | 默认 `2`，限制同时执行的 review activity 数量。 |
+| `TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES` | Memory Extraction Worker | 默认 `4`，独立限制提取 activity 数量。 |
+| `TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES` | Memory Maintenance Worker | 固定为 `1`；unit 不是 template，不应扩容。 |
+
+每个 review activity 都可能创建 sandbox 并发出多次模型请求，因此单机部署应从默认的保守值开始。
 
 两套 systemd template 可以分别扩展 Execution 和 Memory Extraction worker pool：
 
@@ -442,7 +473,7 @@ RustFS 状态和 PostgreSQL 状态是两套独立数据。应将 `.agent-rustfs-
 
 ## 代理
 
-GitHub integration 的镜像构建和 Git workspace 拉取使用不同的网络配置。Compose 部署在根目录 `.env` 中设置这些变量；非 Compose 启动时，在 GitHub integration 的 `.env` 中设置运行时变量。
+GitHub Integration 的镜像构建和 Git workspace 拉取使用不同的网络配置。Compose 部署在根目录 `.env` 中设置这些变量；非 Compose 启动时，在 GitHub Integration 的 `.env` 中设置运行时变量。
 
 ### pnpm 与 npm registry
 
@@ -459,7 +490,7 @@ NPM_CONFIG_REGISTRY=https://registry.npmmirror.com
 
 ### Git fetch
 
-GitHub integration 在准备 review input bundle 时通过 `git fetch` 拉取目标 commit。如果容器无法直接连接 GitHub，可以只为这些 fetch 配置宿主机 HTTP 代理：
+GitHub Integration 在准备 review input bundle 时通过 `git fetch` 拉取目标 commit。如果容器无法直接连接 GitHub，可以只为这些 fetch 配置宿主机 HTTP 代理：
 
 ```bash
 GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://host.docker.internal:7897
@@ -467,12 +498,13 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://host.docker.internal:7897
 
 Compose 会把 `host.docker.internal` 映射到宿主机。代理必须监听 Docker 容器可访问的地址，而不是只监听 `127.0.0.1`。这个变量不会改变 GitHub API、Execution Gateway、worker 或 sandbox 的网络路径。
 
-非 Compose 启动 GitHub integration 时，可以改用宿主机进程能够访问的地址，例如：
+非 Compose 启动 GitHub Integration 时，可以改用宿主机进程能够访问的地址，例如：
 
 ```bash
 GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 ```
 
+<!-- doc-default: GITHUB_INTEGRATION_GIT_TIMEOUT_MS; source=apps/github-integration/src/artifacts/git-workspace.ts -->
 每条 git 命令和快照命令都受 `GITHUB_INTEGRATION_GIT_TIMEOUT_MS` 约束（默认 `600000`，即 10 分钟），避免远端挂起时无限拖住输入准备。若仓库的冷克隆确实更慢，可以提高该值。
 
 ## 为何这样部署
