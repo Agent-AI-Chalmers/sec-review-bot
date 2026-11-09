@@ -428,7 +428,7 @@ jobs:
       - name: Check Markdown wrapping
         run: python -m scripts.checks.markdown_wrapping
 
-      - name: Check translated document headings
+      - name: Check translated document structure and examples
         run: python -m scripts.checks.translated_doc_headings
 
   ci-status:
