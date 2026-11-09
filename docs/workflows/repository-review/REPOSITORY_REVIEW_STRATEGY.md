@@ -24,7 +24,8 @@ The workflow is organized into these segments:
 
 Discovery screens local chunks instead of giving an agent free-form repository exploration.
 
-Files are chunked by path proximity and context budget. Each chunk invokes the model once and produces candidates for that chunk. The chunk contains nearby files, enough for local cross-file clues without becoming whole-repository context.
+<!-- doc-default: AGENT_DISCOVERY_CHUNK_STRATEGY; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
+Discovery defaults to `single-file`: each model call scans one complete file. Deployments can select `AGENT_DISCOVERY_CHUNK_STRATEGY=batched` to group nearby files within a context budget and share local context. See [Discovery design](DISCOVERY_AGENT_DESIGN.md) for file selection and budget rules.
 
 Discovery emits structured `candidate`s with location, category, rationale, and confidence. It stops short of vulnerability confirmation and `vulnerability_type` / `CWE` classification, keeping this stage high-recall and lightweight.
 
@@ -40,9 +41,9 @@ It should not over-merge just because candidates share a file, route, or vulnera
 
 ### `analyzer`
 
-Only cases retained by `triage` enter `analyzer`. This stage reuses the narrative-first approach and outputs narratives ordered by `priority`, locations, source facts, sink facts, proof gaps, vulnerability type / CWE classification, and reviewer-facing summary.
+Ordinary cases enter `analyzer` after `triage` retains them. Incremental reviews also create deletion cases that enter analysis directly; see [incremental review strategy](REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.md). This stage reuses the narrative-first approach and outputs narratives ordered by `priority`, locations, source facts, sink facts, proof gaps, vulnerability type / CWE classification, and reviewer-facing summary.
 
-Analyzer turns candidate clues into evidence-backed conclusions before mitigation or delivery begins. Mitigation should not start from vague suspicion.
+Analyzer checks candidate clues and produces evidence-backed conclusions before mitigation and delivery. Its verdict does not gate mitigation or verification; later stages may leave code unchanged when no justified repair exists.
 
 `analyzer` must respect case scope boundaries:
 
@@ -58,7 +59,7 @@ The stage performs targeted fact checks and standardized scoring within the curr
 
 ### `mitigator`
 
-`mitigator` serves high-confidence, converged issues. It keeps patches close to the real boundary or sink, with minimal scope and reviewable changes. Broad discovery, free-form reanalysis, and large refactors belong outside this stage.
+`mitigator` uses the analysis and repository evidence to decide whether a repair is justified. When it changes code, it should keep the patch close to the actual boundary or dangerous operation, with minimal, reviewable scope. Broad discovery, unrelated reanalysis, and large refactors are outside this stage.
 
 ### `verifier`
 
@@ -66,16 +67,11 @@ The stage performs targeted fact checks and standardized scoring within the curr
 
 In repository review, `verifier` checks both the report and the patch and provides the final quality gate for keep/blocked decisions.
 
-To reduce the risk that a mitigation report claims a patch was applied while verifier sees baseline code and incorrectly concludes the patch was not applied, repository verifier uses two input views:
-
-- `/workspace`: read-only baseline view without the patch
-- `/workspace-patched`: read-only view built temporarily during verifier stage by applying `workspace.patch` to a clean workspace snapshot
-
-When `workspace.patch` exists and applies cleanly, `coverage` is judged primarily from `/workspace-patched`; `/workspace` is used only for baseline comparison. If the patched view cannot be built, verification fails instead of judging patch coverage from baseline code.
+Verifier restores an independent workspace from the input snapshot and applies the mitigation patch before starting its investigation. The workspace contains the patched code and is writable for verification commands and tests. If the patch cannot be applied, verification fails rather than judging patch coverage from unpatched baseline code.
 
 ### `delivery-planning`
 
-Only verified cases enter delivery-planning / delivery-execution.
+Only case results with `disposition="keep"` enter delivery planning and execution.
 
 `delivery-planning` groups verified cases into delivery units. Its main facts come from prepared per-case outputs, not the final shared workspace state. It prefers case item payload, mitigation overview, changed files, and workbench state; it reads per-case patches only when those inputs cannot explain a delivery coupling question.
 
