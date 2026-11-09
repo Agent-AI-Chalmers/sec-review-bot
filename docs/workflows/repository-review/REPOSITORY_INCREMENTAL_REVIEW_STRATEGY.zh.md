@@ -47,9 +47,9 @@
 case 的边界并不完美：`src/`、`config/`、根目录这类宽目录可能混进多个独立机制。
 
 <!-- doc-default: MAX_DELETED_FILES; source=agents/src/sec_review_agents/workflows/repository/case_execution_input.py -->
-为此设一个总删除文件数上限（200）。超过上限时，**这个窗口的删除审计整体跳过**，不做拆分，也不逐目录挑拣：拆分会让结果看起来审过了，逐目录挑拣则会产生一个残缺但看似完整的结果。窗口是调用方给的，窗口过宽是调用方的选择，系统用它听得懂的结论回应——这次删除规模不适合走增量审查，请缩小窗口。
+为此对 `paths_ignore` 过滤后剩余的删除文件总数设上限（200）。超过上限时，**这个窗口的删除审计整体跳过**，不做拆分，也不逐目录挑拣：拆分会让结果看起来审过了，逐目录挑拣则会产生一个残缺但看似完整的结果。窗口是调用方给的，窗口过宽是调用方的选择，系统用它听得懂的结论回应——这次删除规模不适合走增量审查，请缩小窗口。
 
-跳过不影响其他环节：由 Triage 产生的普通 case 照常审查。结果里有两项说明这件事：`scan_summary.deleted_file_count` 给出窗口删除了多少文件，`deletion_review_skipped` 说明是否因此整体跳过。删除数放在 scan summary 里，是为了解释一次增量为何发现很少——删除文件本来就不会进入 Discovery。
+跳过不影响其他环节：由 Triage 产生的普通 case 照常审查。结果里有两项说明这件事：`scan_summary.deleted_file_count` 给出窗口中经 `paths_ignore` 过滤后剩余的删除文件数，`deletion_review_skipped` 说明是否因此整体跳过。删除数放在 scan summary 里，是为了解释一次增量为何发现很少——删除文件本来就不会进入 Discovery。
 
 ## 模式定义
 

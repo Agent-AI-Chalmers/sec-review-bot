@@ -92,4 +92,4 @@ delivery execution 接收 `delivery-planning` 的计划，并产出 GitHub Integ
 delivery execution 按 delivery 策略分两种路径：
 
 - `single`：不调用 Agent，不进入 patch synthesis 并发窗口，也不重新应用或复制 case `workspace.patch`。它直接消费对应 case 的 `review_record.mitigation.file_changes`，投影为可发布 delivery 产物；若没有可发布 `file_changes`，该 delivery 不写入对外 `deliveries[]`。
-- `combined`：调用 patch-synthesis Agent，在隔离的初始工作区中消费该 delivery 的 case 摘要、Verifier 结果和 reference 补丁，直接生成该 delivery 的最终文件状态。并发上限由 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY` 控制，默认 `4`。
+- `combined`：调用 patch-synthesis Agent，在隔离的初始工作区中消费该 delivery 的 case 摘要、Verifier 结果和 reference 补丁，直接生成该 delivery 的最终文件状态。Temporal 路径的并发上限由 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY` 控制，默认 `4`。

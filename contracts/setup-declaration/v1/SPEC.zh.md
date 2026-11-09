@@ -40,9 +40,10 @@ setup:
 - `setup` 必须是映射的列表（每个映射表示一个步骤）；
 - 每个步骤只能携带 `run`、`working-directory`、`env`、`timeout_seconds`；
 - `run` 必填且必须是非空字符串；
-- `working-directory` 若存在，必须是非空字符串、相对路径、且留在仓库根内（不得以 `/` 开头，不得含 `..` 片段）。这里按路径文本检查是否越出根目录，不解析符号链接。该检查不能阻止路径经符号链接指向仓库之外，因此不是沙箱隔离保障；声明来源仍必须可信；
-- `env` 若存在，必须是字符串键到字符串值的映射，键需匹配上面的标识符模式。声明使用 **YAML 1.2 Core schema** 解析，因此键和值必须在该 schema 下是字符串：`on`、`yes`、`off`、`no`、`y`、`n` 都是普通字符串，而 `true`、`123`、`null` 不是字符串，会被拒绝。这条规则同样适用于 `run` 与 `working-directory`（见"标量与 YAML 方言"）；
-- `timeout_seconds` 若存在，必须是正整数（布尔不算整数），并且必须以整数语法书写：浮点语法的值（`1.0`、`1e3`）会被拒绝，判定依据是标量的源文本——因为 JS 会将其解析为整数值的 number，而 Python 会解析为 float，若不检查，两侧会产生分歧。十六进制/八进制整数（`0x10`、`0o10`）与带符号十进制数两侧都接受。
+- 可选字段 `working-directory`、`env`、`timeout_seconds` 可以省略，也可以设为 YAML null（`null`、`~` 或空值）；两者使用相同的默认值：仓库根目录、不额外添加环境变量，以及受 Worker 上限约束的默认 timeout。这不适用于必填字段 `run`，也不适用于 `env` 映射内部的键和值；
+- `working-directory` 非 null 时，必须是非空字符串、相对路径、且留在仓库根内（不得以 `/` 开头，不得含 `..` 片段）。这里按路径文本检查是否越出根目录，不解析符号链接。该检查不能阻止路径经符号链接指向仓库之外，因此不是沙箱隔离保障；声明来源仍必须可信；
+- `env` 非 null 时，必须是字符串键到字符串值的映射，键需匹配上面的标识符模式。声明使用 **YAML 1.2 Core schema** 解析，因此键和值必须在该 schema 下是字符串：`on`、`yes`、`off`、`no`、`y`、`n` 都是普通字符串，而 `true`、`123`、`null` 不是字符串，会被拒绝。这条规则同样适用于 `run` 与非 null 的 `working-directory`（见"标量与 YAML 方言"）；
+- `timeout_seconds` 非 null 时，必须是正整数（布尔不算整数），并且必须以整数语法书写：浮点语法的值（`1.0`、`1e3`）会被拒绝，判定依据是标量的源文本——因为 JS 会将其解析为整数值的 number，而 Python 会解析为 float，若不检查，两侧会产生分歧。十六进制/八进制整数（`0x10`、`0o10`）与带符号十进制数两侧都接受。
 
 **空白内容不是声明。** 空文件或只含空白的文件会被完全当作文件不存在：它合法，且表示"无声明"。这不是错误。
 
@@ -79,7 +80,7 @@ GitHub Integration 通常会在提交任务前拒绝无效声明。Worker 再次
 - Execution Worker 在 PyYAML 之上使用 `yamlcore` 的 Core schema loader；
 - GitHub Integration 使用 `yaml` 库并设置 `schema: 'core'`。
 
-两侧都采用同一 YAML schema，并对源文本和类型作额外检查，以便对声明是否有效作出一致判断。特别地，在 Core schema 下 `on`、`yes`、`off`、`no`、`y`、`n` 都是**普通字符串**，不是布尔值——所以 `run: on` 就是命令字符串 `on`，`env: { yes: ok }` 会设置 `yes=ok`。未加引号的 `true`/`false` 是布尔值，`123` 是数字，`null`/`~` 是 null；它们在任何字符串位置（`run`、`working-directory`、`env` 的键与值）都会被拒绝，因为不是字符串。加引号总能强制成字符串（`run: "on"`），但对 Core schema 的这些词并非必须。
+两侧都采用同一 YAML schema，并对源文本和类型作额外检查，以便对声明是否有效作出一致判断。特别地，在 Core schema 下 `on`、`yes`、`off`、`no`、`y`、`n` 都是**普通字符串**，不是布尔值——所以 `run: on` 就是命令字符串 `on`，`env: { yes: ok }` 会设置 `yes=ok`。未加引号的 `true`/`false` 是布尔值，`123` 是数字，`null`/`~` 是 null；布尔值与数字在字符串位置（`run`、`working-directory`、`env` 的键与值）都会被拒绝。Null 在 `run` 和 `env` 的键与值中也会被拒绝；`working-directory` 为 null 时使用前述默认目录。加引号总能强制成字符串（`run: "on"`），但对 Core schema 的这些词并非必须。
 
 **显式标签会被拒绝。** 两侧都不接受显式标注的节点（`!!bool`、`!!int`、`!!str`、`!!seq`、`!!set` 等）。声明使用普通 Core schema，它已经会解析布尔、数字与 null，永远不需要显式标签；而且两个库对显式标签的处理并不一致（当标签对应的标量不匹配时，`yaml` 会静默回退为原始字符串，例如 `!!bool on` 解析为 `"on"`，而 `yamlcore`/PyYAML 会抛错）。拒绝一切显式标签，可让两端实现保持完全一致，并把畸形标签变成干净的声明错误，而不是内部异常栈。隐式解析不受影响：未加标签的 `on` 仍是字符串 `on`，未加标签的 `true` 仍是布尔值。
 

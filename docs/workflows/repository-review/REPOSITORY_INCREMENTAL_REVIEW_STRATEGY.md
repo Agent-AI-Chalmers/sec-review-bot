@@ -45,9 +45,9 @@ The boundary is the directory, not a count, because a directory is a boundary th
 The boundary is imperfect: a broad directory such as `src/`, `config/`, or the repository root can hold several independent mechanisms.
 
 <!-- doc-default: MAX_DELETED_FILES; source=agents/src/sec_review_agents/workflows/repository/case_execution_input.py -->
-A single cap on the number of deleted files (200) therefore decides whether deletion review happens at all. Past the cap the whole window's deletion review is skipped: it is not split, and directories are not picked over one by one. Splitting would make the result look reviewed, and picking would produce a partial result that reads as complete. The caller chose the window, so an oversized one is the caller's to narrow, and the answer is one they can act on rather than a result they have to audit.
+A single cap on the number of deleted files remaining after `paths_ignore` filtering (200) therefore decides whether deletion review happens at all. Past the cap the whole window's deletion review is skipped: it is not split, and directories are not picked over one by one. Splitting would make the result look reviewed, and picking would produce a partial result that reads as complete. The caller chose the window, so an oversized one is the caller's to narrow, and the answer is one they can act on rather than a result they have to audit.
 
-The skip does not affect anything else: ordinary triaged cases still run. Two fields in the result report it: `scan_summary.deleted_file_count` is how many files the window removed, and `deletion_review_skipped` says whether review was skipped because of that. The count sits in the scan summary because it explains a thin incremental run: deleted files never reach discovery.
+The skip does not affect anything else: ordinary triaged cases still run. Two fields in the result report it: `scan_summary.deleted_file_count` is how many deleted files remain in the window after `paths_ignore` filtering, and `deletion_review_skipped` says whether review was skipped because of that. The count sits in the scan summary because it explains a thin incremental run: deleted files never reach discovery.
 
 ## Mode Definition
 

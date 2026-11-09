@@ -17,7 +17,7 @@ App 提交的 run、workflow fanout 和 Worker activity 容量之间的系统级
 - case processing 可以并发处理 cases。
 - 单个 case 内部，CVSS scoring 可以和 mitigation / verification 路径重叠执行。
 - delivery planning 可以并发处理 batch drafts。
-- delivery execution 可以并发处理 combined deliveries。
+- Temporal delivery execution 可以并发处理 combined deliveries。
 
 ## 滑动窗口
 
@@ -90,12 +90,12 @@ Delivery execution 只消费 `disposition == "keep"` 的 case。
 
 `single` delivery 不调用 agent，不占用 patch synthesis 并发名额。它直接投影 case 级 `review_record.mitigation.file_changes`。
 
-`combined` delivery 会调用 patch-synthesis agent。多个 combined deliveries 会按滑动窗口执行。
+`combined` delivery 会调用 patch-synthesis agent。Temporal 路径中，多个 combined deliveries 会按滑动窗口执行。
 
 <!-- doc-default: REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/execution/input.py -->
-并发上限来自 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`，默认是 `4`。
+Temporal 路径的并发上限来自 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`，默认是 `4`。
 
-Temporal 路径里，combined delivery patch synthesis 是独立 activity；`single` delivery 仍然是轻量投影，不占 patch synthesis 并发窗口。Direct 路径仍然在本地进程内用滑动窗口执行。
+Temporal 路径里，combined delivery patch synthesis 是独立 activity；`single` delivery 仍然是轻量投影，不占 patch synthesis 并发窗口。
 
 如果某个 combined delivery 的 patch synthesis 失败，其他 deliveries 继续执行。public `deliveries[]` 只包含成功 delivery。失败的 synthesis 排障看运行日志。
 
@@ -103,7 +103,7 @@ Temporal 路径里，combined delivery patch synthesis 是独立 activity；`sin
 
 通常最值得先调的是 `AGENT_CASE_PROCESSING_MAX_CONCURRENCY`。Case processing 通常占据最长的墙钟窗口，而且 Analyzer / Mitigator / Verifier 都可能是 需要频繁调用模型或使用沙箱。
 
-第二个常见杠杆是 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`。它只影响 `combined` delivery 的 patch synthesis。它不会改变 delivery 边界，也不会把不同 deliveries 合并成一个最终 patch。
+对于 Temporal run，第二个常见杠杆是 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`。它只影响 `combined` delivery 的 patch synthesis。它不会改变 delivery 边界，也不会把不同 deliveries 合并成一个最终 patch。
 
 Discovery 是否值得调，取决于 chunk 数和单个 chunk 的耗时。如果仓库只形成一个 chunk，提高 `AGENT_DISCOVERY_MAX_CONCURRENCY` 没有意义。如果 chunk 很多，调高 discovery 并发可以减少 discovery 的墙钟时间。
 

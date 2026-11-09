@@ -48,9 +48,19 @@ Review Runs polls `queued` and `running` runs. A successful Execution result is 
 
 Re-admitting an already-observed ingress identity is a read-only replay: it returns the existing run and does not claim its preparation. Admission creates that row as `preparing`, which only the original admitter owns, so a process that died mid-preparation is recovered through lease expiry rather than by the replayed request. With the default claim timeout this means a replay can take up to ten minutes to make progress — long enough that a client must not treat "the request returned" as "the work resumed".
 
+If Execution API service submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. Entering that state is not a failure and queues no notice: an unconfirmed submission may still be accepted on replay, so announcing it would state a conclusion the run may contradict — and a posted comment cannot be taken back.
+
+Replay outcomes are handled as follows:
+
 <!-- doc-default: MAX_SUBMISSION_RECOVERY_ATTEMPTS; source=services/review-runs/src/runtime/submission-recovery.ts -->
 
-If Execution API service submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. Entering that state is not a failure and queues no notice: an unconfirmed submission may still be accepted on replay, so announcing it would state a conclusion the run may contradict — and a posted comment cannot be taken back. A replay that is accepted returns the run to normal progress; one the Execution API service rejects, or one that produces no answer across the replay budget (`executions.attempt_count`, currently eight), fails the run, makes publication `skipped`, and only then queues the notice. Without that budget an unresolved submission would stay `uncertain` forever and would never be reported at all. A terminal preparation or Execution API service failure makes publication `skipped`. A terminal failure on any axis creates connector-owned notice work, so a connector can tell its user even when the process that observed the failure had already crashed; the notice records which axis failed so the reply describes how far the run actually got.
+- **Accepted:** the run returns to normal progress.
+- **Definitively rejected by the Execution API service:** the run fails, publication becomes `skipped`, and a failure notice is queued.
+- **Still unknown when the replay budget is exhausted** (`executions.attempt_count`, currently eight): execution becomes `disconnected` and queues an attention notice with `SUBMISSION_RECOVERY_EXHAUSTED`. Exhaustion does not establish failure or make publication `skipped`. Automatic replay stops so an operator can investigate the remote outcome and decide whether to resume recovery or give up waiting.
+
+Without that budget, unresolved submissions could keep generating automatic replays indefinitely.
+
+A terminal preparation or Execution API service failure makes publication `skipped`. A terminal failure on any axis creates connector-owned notice work, so a connector can tell its user even when the process that observed the failure had already crashed; the notice records which axis failed so the reply describes how far the run actually got.
 
 ## Persistence model
 

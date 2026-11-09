@@ -50,9 +50,19 @@ Review Runs 轮询 `queued` 和 `running` run。Execution API 服务成功后，
 
 重复接纳一个已经见过的 ingress 身份是一次只读重放：它返回既有的 run，不会去 claim 它的 preparation。接纳时创建的 preparation 行是 `preparing`，只由最初的接纳方持有，因此在中途崩溃的进程是靠租约过期恢复的，而不是靠重放请求。在默认 claim 超时下，这意味着一次重放最多要等十分钟才能推进——所以客户端不能把"请求返回了"当成"工作已继续"。
 
+如果 Execution API 服务 submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。进入该状态不是失败，也不会创建 notice：未确认的提交仍可能在重放时被接受，此时宣告失败就是在陈述一个 run 可能推翻的结论——而已发布的评论无法撤回。
+
+重放结果按以下方式处理：
+
 <!-- doc-default: MAX_SUBMISSION_RECOVERY_ATTEMPTS; source=services/review-runs/src/runtime/submission-recovery.ts -->
 
-如果 Execution API 服务 submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。进入该状态不是失败，也不会创建 notice：未确认的提交仍可能在重放时被接受，此时宣告失败就是在陈述一个 run 可能推翻的结论——而已发布的评论无法撤回。被接受的重放会让 run 恢复正常推进；而被 Execution API 服务拒绝的重放，或在重放预算（`executions.attempt_count`，当前为八次）内始终得不到答复的重放，会让 run 失败、把 publication 标为 `skipped`，并只在那时才创建 notice。若没有这个预算，未解决的提交会永远停留在 `uncertain`，完全不会被报告。Preparation 或 Execution API 服务的终态失败会将 publication 标为 `skipped`。任一轴的终态失败都会创建 connector 所有的 notice work，因此即使观察到失败的进程已崩溃，connector 仍可告知用户；notice 会记录失败发生在哪一轴，回复便可说明 run 实际走到了哪一步。
+- **被接受：** run 恢复正常推进。
+- **被 Execution API 服务明确拒绝：** run 失败，publication 标为 `skipped`，并创建 failure notice。
+- **重放预算耗尽时结果仍未知**（`executions.attempt_count`，当前为八次）：execution 进入 `disconnected`，并创建带有 `SUBMISSION_RECOVERY_EXHAUSTED` 的 attention notice。预算耗尽不代表失败，也不会使 publication 变为 `skipped`。自动重放会停止，由运维人员查证远端结果，再决定恢复自动重试还是放弃等待。
+
+若没有这个预算，未解决的提交可能无限地产生自动重放。
+
+Preparation 或 Execution API 服务的终态失败会将 publication 标为 `skipped`。任一轴的终态失败都会创建 connector 所有的 notice work，因此即使观察到失败的进程已崩溃，connector 仍可告知用户；notice 会记录失败发生在哪一轴，回复便可说明 run 实际走到了哪一步。
 
 ## 持久化模型
 
@@ -67,6 +77,8 @@ run 主干和各条生命周期轴分别存放在不同的表中。`review_runs`
 | `executions`              | Execution API 服务提交、观察和终态结果 | `pending`、`queued`、`running`、`uncertain`、`disconnected`、`succeeded`、`skipped`、`failed` |
 | `publications`            | 整体发布的所有权和结果                      | `pending`、`publishing`、`uncertain`、`disconnected`、`published`、`failed`、`skipped`        |
 | `publication_steps`       | 可恢复的单个 connector 副作用               | `pending`、`running`、`uncertain`、`disconnected`、`succeeded`、`failed`、`terminal_failed`   |
+| `execution_statistics` | 统计 reconciliation 状态与 run totals | `pending`、`reconciling`、`settled`、`unavailable` |
+| `execution_statistics_groups` | 按 workflow 坐标、Agent、provider 和 model 聚合的调用数与 token totals | — |
 | `review_run_events`       | 每条轴状态转换的只追加审计日志              | —                                                                                             |
 
 `preparations.status`：
@@ -175,7 +187,7 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 
 契约在**请求侧是强制执行的**：路由、path/query/body 校验与鉴权都由它派生，因此任何不符合该文档的请求都会在进入 handler 之前被拒绝。响应侧由契约**描述**，但运行时并不对其校验——`fastify-openapi-glue` 只处理请求——因此声明的响应 schema 是 handler 需要遵守的约定，由测试而非框架来固定。`services/review-runs/test/observed-run-contract.test.ts` 会用共享 schema 校验已提交的 fixtures 以及 `observeRun()` 实际产出的形状，`services/review-runs/test/server-http.test.ts` 则覆盖 HTTP 面，这正是防止响应在无人察觉的情况下偏离其 schema 的机制。
 
-查询响应不包含 `execution_input` 和 `publish_context`。它们会保留 `source_platform`，用于稳定的平台聚合；也会保留 `connector_id`，用于标识拥有该 run 的 connector 类型与实例。UI BFF 持有 read token；浏览器代码不接收任何 Review Runs token。
+查询响应不包含 `execution_input` 和 `publish_context`。它们会保留 `source_platform`，用于稳定的平台聚合；也会保留 `connector_id`，用于标识拥有该 run 的 connector 类型与实例。没有 snapshot row 时，`execution_statistics` 为 `null`；存在时，它从两张关系型统计表投影 reconciliation 状态、已观测 totals 和分组 totals。缺失或不完整的 snapshot 不代表零用量。UI BFF 持有 read token；浏览器代码既不接收 Review Runs token，也不接收 Langfuse 凭据。
 
 service token 用于协调 run 的各个组件，read token 用于脱敏读取，可选的 admin token 用于 `/v1/admin` 下的运维面。这些 token 分别授予不同能力：持有 service token 无法访问 admin 路由，admin token 也不能接纳 run 或让 run 走正常生命周期。只有在配置了 `REVIEW_RUNS_ADMIN_TOKEN` 时 `/v1/admin` 才存在——否则这些路径返回 404 而不是 401，因此未配置的部署不会暴露任何运维面。查看 parked 队列（三轴合一的"停止重试"列表）只需要 read token，因为"知道某个 run 卡住了"并不属于特权；只有"决定放弃它、不再等待它、或把它交回自动恢复"才需要 admin token。
 
