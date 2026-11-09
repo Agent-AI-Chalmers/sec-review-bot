@@ -47,7 +47,7 @@ setup:
 
 **空白内容不是声明。** 空文件或只含空白的文件会被完全当作文件不存在：它合法，且表示"无声明"。这不是错误。
 
-**只有普通文件才是声明。** GitHub Integration 通过 Contents API 读取该路径，仅当 GitHub 报告该条目为文件时才接受。目录条目、符号链接（其 API `content` 是目标路径，而非文件内容）或任何其他非文件条目，都会被当作文件不存在：“无声明”。因此不会跟随符号链接形式的声明——希望提供声明的仓库需将其保持为 `.sec-review/setup.yml` 这个普通文件。
+**只有普通文件才是声明。** GitHub Integration 从已解析的默认分支 commit 出发，逐层读取非递归 Git tree，要求 `.sec-review` 是目录（`040000`、`tree`），`setup.yml` 是普通文件（`100644` 或 `100755`、`blob`），再通过 Contents API 从同一个 commit 读取内容。路径不存在、文件位置是目录、任一路径组成部分是符号链接、submodule 或其他非普通条目，都表示“无声明”。必须检查 Git mode，因为 Contents API 可能将仓库内符号链接的目标内容作为文件返回。Tree 响应被截断时，input preparation 会失败，而不会将其当作路径不存在的证据。希望提供声明的仓库需将其保持为 `.sec-review/setup.yml` 这个普通文件。
 
 **声明文本有大小上限。** 校验后的文本会内联进工作流 input，因此上限为 64 KiB（UTF-8）。GitHub Integration 在提交前拒绝超限文件；Execution Worker 与 input schema 携带同一上限。
 

@@ -1,0 +1,10 @@
+# Hexadecimal e/E digits are not decimal exponent markers.
+setup:
+  - run: x
+    timeout_seconds: 0xDE
+  - run: x
+    timeout_seconds: 0x1e2
+  - run: x
+    timeout_seconds: 0o10
+  - run: x
+    timeout_seconds: +5

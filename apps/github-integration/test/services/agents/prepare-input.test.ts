@@ -226,6 +226,8 @@ function repositoryOctokit(refs: {
       const ref = decodeURIComponent(pathname.split('/commits/')[1] ?? '')
       return githubJson({ sha: ref })
     }
+    if (pathname.includes('/git/trees/'))
+      return githubJson({ tree: [], truncated: false })
     if (pathname.includes('/contents/')) {
       return githubJson({ message: 'Not Found' }, 404)
     }
@@ -292,6 +294,8 @@ test(
 
       const octokit = fakeGitHub(({ url }) => {
         const pathname = new URL(url).pathname
+        if (pathname.includes('/git/trees/'))
+          return githubJson({ tree: [], truncated: false })
         if (pathname.includes('/contents/'))
           return githubJson({ message: 'Not Found' }, 404)
         if (pathname.includes('/branches/'))
@@ -434,6 +438,8 @@ test(
             }
           })
         }
+        if (pathname.includes('/git/trees/'))
+          return githubJson({ tree: [], truncated: false })
         if (pathname.includes('/contents/'))
           return githubJson({ message: 'Not Found' }, 404)
         if (pathname.includes('/branches/'))
@@ -760,6 +766,8 @@ test(
             }
           })
         }
+        if (pathname.includes('/git/trees/'))
+          return githubJson({ tree: [], truncated: false })
         if (pathname.includes('/contents/'))
           return githubJson({ message: 'Not Found' }, 404)
         if (pathname.includes('/branches/'))
