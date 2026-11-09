@@ -36,7 +36,7 @@ Local review commands read `agents/.env` and `agents/config/model-providers.toml
 
 The local `run-local-*` CLIs and `sec-review-agents-check-llm-deployments` load `agents/.env`, but never overwrite environment variables already set in the process.
 
-Local commands load `agents/.env`; Worker startup commands do not. Set environment variables through the shell, a process manager, or CI when starting Workers.
+Local commands load `agents/.env`; Worker entrypoints and activities do not load dotenv files. Set environment variables through the shell, a process manager, or CI when starting Workers. The local development launcher loads its configuration before spawning Workers, which inherit the resulting environment.
 
 `[agent_deployment_bindings]` explicitly binds agents to deployments. Every agent that can run must be declared; undeclared agents fail fast and do not inherit a default model.
 

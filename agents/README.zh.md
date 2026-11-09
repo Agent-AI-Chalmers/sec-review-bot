@@ -38,7 +38,7 @@ cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 
 本地 `run-local-*` CLI 和 `sec-review-agents-check-llm-deployments` 会加载 `agents/.env`，但不会覆盖进程里已有的环境变量。
 
-本地命令会加载 `agents/.env`，Worker 启动命令不会。启动 Worker 时，需要通过 shell、进程管理器或 CI 设置环境变量。
+本地命令会加载 `agents/.env`，Worker 入口和 activities 不会加载 dotenv 文件。启动 Worker 时，需要通过 shell、进程管理器或 CI 设置环境变量。本地开发启动脚本会先加载配置，再创建 Worker 子进程；Worker 继承加载后的环境。
 
 `[agent_deployment_bindings]` 用来把具体 Agent 显式绑定到某个模型部署。所有运行到的 Agent 都必须显式声明；未声明的 Agent 会 fail fast，不会继承默认模型。
 

@@ -102,7 +102,7 @@ ops/init-local-deployment-config.sh
 
 The initialization command copies the maintained samples, generates independent internal credentials, synchronizes values shared by Compose and the host workers, and gives all four files mode `0600`. It refuses to overwrite an existing configuration. After it completes, configure the GitHub App identity, webhook secret, private key, and model deployments. Optional external services such as Langfuse still require their own credentials. The systemd installer combines the deployment settings with repository paths and writes the result to `/etc` as described below.
 
-`agents/.env` is used by `run-local-*` and other local CLIs. Compose and the systemd worker do not load it automatically. See the [agents local running guide](../../agents/README.md) for local CLI configuration.
+`agents/.env` is used by `run-local-*` and other local CLIs. Compose and systemd Workers do not load it automatically, either at startup or from activities. The systemd units receive deployment settings through their `EnvironmentFile` configuration.
 
 ### 1. Compose `.env`
 
