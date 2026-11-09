@@ -6,25 +6,25 @@ This page records design judgments about agent capability, context, cache, and c
 
 ## Context Limits and Compression Mechanisms
 
-For an agent that is truly used in production, context trimming and compression are a necessary fallback to avoid long conversations or multi-turn tool use hitting the context limit, regardless of whether the mechanism is ultimately triggered.
+Long conversations and repeated tool calls can exceed a model's context window, so a deployment needs a way to handle that limit. Compression and trimming are possible strategies; proactive use also requires evaluating evidence loss and actual cost.
 
-Some coding-agent systems treat compression as a high-watermark fallback rather than proactive cost optimization. Claude Code documents auto-compaction near the context limit ([Help Center](https://support.claude.com/en/articles/14552983-models-usage-and-limits-in-claude-code)), and Codex exposes `model_auto_compact_token_limit` as the token threshold for automatic history compaction ([config reference](https://developers.openai.com/codex/config-reference)).
+For coding-agent compression settings, see the [Claude Code documentation](https://support.claude.com/en/articles/14552983-models-usage-and-limits-in-claude-code) and [Codex configuration reference](https://developers.openai.com/codex/config-reference). Whether and when this project compacts context depends on its own runtime configuration.
 
-There is also the idea of proactive compression / trimming for reducing cost or improving LLM attention. I personally find that questionable, for the following reasons:
+Proactive compression does not necessarily reduce cost or improve judgment. Consider these risks:
 
-1. Raw evidence is reinterpreted, and details are lost.
+1. Summaries reinterpret raw evidence and may lose details.
 2. Prompt cache may be broken.
 
 Cache is especially important. Stable long context with a high cache-hit rate is not necessarily more expensive than a short summary with a low cache-hit rate. If compression makes the prompt prefix change every round, cheap cache reads may become more expensive cache misses.
 
-For DeepSeek V4 Pro, cache-miss input price is 120 times the cache-hit input price. Therefore, if a piece of context that would have hit cache is compressed into a new summary, and that summary does not hit cache, then the summary must be smaller than `1 / 120` of the original text, about `0.83%`, for input cost to become cheaper.
+The following calculation reuses prices from the original notes only as an example, not a current provider quote. Assume uncached input costs 120 times cached input and exclude the cost of generating a summary. If the original would hit cache but the summary would not, the summary must be smaller than `1 / 120` of the original, about `0.83%`, to reduce the input cost of one subsequent request:
 
 ```text
 120,000 tokens original cache hit: 120,000 * 0.025 / 1,000,000 = 0.003 CNY
 5,000 tokens summary cache miss:     5,000 * 3     / 1,000,000 = 0.015 CNY
 ```
 
-Overall, I see compression / trimming as an unavoidable way to avoid hitting the context limit.
+Token reduction alone does not establish savings: include summary-generation cost, the number of later requests, and changes in cache hits. Compaction must also preserve evidence needed to continue the review.
 
 ---
 
@@ -35,13 +35,13 @@ Agent design also has other mechanisms to suppress pathological context growth, 
 
 ---
 
-For this project specifically, experiments also showed that our agents have never reached the context limit. Based on historical runs using DeepSeek V4 Pro, the highest context input peak for a single AI call was only 210,292 tokens. DeepSeek V4 Pro's public API context length is 1M tokens. In other words, the peak in this batch was about 210K, around 21% of the context window, still far from the limit.
+A historical batch using DeepSeek V4 Pro reported a maximum single-call input of 210,292 tokens, about 21% of the 1M-token window used in that record. The notes omit the date, full model version, and artifact locations. This is a historical observation, not a guarantee that other tasks will stay within the limit or that the model currently offers the same window.
 
-This may be because this project is not an infinite conversation system. A single issue / PR / repository review has clear input, stage boundaries, and structured output. It is not an infinite-dialogue agent or a free-form creative agent, so even difficult tasks do not expand indefinitely.
+This may be because this project is not an infinite conversation system. A single issue / PR / repository review has clear input, stage boundaries, and structured output. It is not an infinite-dialogue agent or a free-form creative agent, which may limit context growth, but does not guarantee that difficult tasks stay within the limit.
 
 Even so, having a default compression mechanism is still a good fallback.
 
-The current fallback is LangChain `SummarizationMiddleware` with a project-specific handoff prompt. A run usually begins with one authoritative stage input, so compaction must preserve that input boundary and keep user requests separate from repository and tool content.
+The current fallback is LangChain `SummarizationMiddleware` with a project-specific handoff prompt. A run usually begins with one caller-supplied stage input, so compaction must preserve that input boundary and keep user requests separate from repository and tool content.
 
 ## Should Agents Read Repository Instructions and Documentation Broadly?
 
@@ -74,7 +74,7 @@ On-demand reading can still miss a documented constraint. A concise entry point 
 
 The system explicitly distinguishes `audit` / `repair` through `review_intent.objective`. `review_intent.test_changes` can also constrain whether the final mitigation patch may contain test changes, independently of the objective. Therefore, whether the agent is currently auditing or repairing is not guessed by the model on the spot, and is not implied by output text; it is part of the input contract.
 
-The objective is the execution goal chosen by the user, not a factual assertion that a vulnerability definitely exists.
+The objective is selected by the caller, not a guarantee that a vulnerability exists. GitHub integration selects `audit`; the local issue CLI lets the user select the objective.
 
 ## How Much Should We Trust Agent Output?
 

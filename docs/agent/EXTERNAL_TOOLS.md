@@ -6,7 +6,7 @@ This page explains which external tools the agent uses and how those tools enter
 
 ## TL;DR
 
-The chosen default external tools are Joern for code property graph analysis and Playwright for browser-based runtime validation. They are exposed through bash and their CLIs when `AGENT_JOERN_ENABLED=true` and `AGENT_PLAYWRIGHT_ENABLED=true` are configured. Neither tool requires a bundled skill by default.
+The project offers optional Joern code property graph analysis and Playwright browser validation. Install the commands in the image, then enable them with `AGENT_JOERN_ENABLED=true` and `AGENT_PLAYWRIGHT_ENABLED=true`. Agents that declare the selected capability receive CLI guidance and invoke the commands through bash. Neither tool requires a bundled skill.
 
 The project also retains its MCP integration framework. CodeGraph and Playwright have optional MCP configurations for the agents that can use them, but MCP is disabled by default. These integrations remain available for development, experiments, and deployments that deliberately choose MCP.
 
@@ -49,7 +49,7 @@ Until such a gap appears, advertising the command and allowing the agent to insp
 
 ## Why Joern And Playwright Use Only CLIs
 
-Joern contributes code property graphs, structural queries, call relationships, and data-flow analysis. Playwright contributes browser interaction and runtime evidence. The project chooses them for those capabilities, not for any particular integration protocol.
+Joern contributes code property graphs, structural queries, call relationships, and data-flow analysis. Playwright contributes browser interaction and runtime evidence.
 
 The current gated probes establish availability and agent use, not a general improvement in review outcomes. Real-checkout comparisons have produced neutral and negative results as well as additional graph evidence. Joern is therefore retained for the distinct analysis capability it makes available, not because the project has demonstrated that enabling it consistently raises agent success rates.
 

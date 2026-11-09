@@ -16,17 +16,23 @@
 
 Sec Review Bot 支持使用 AI Agent 执行代码库安全审计，覆盖 issue、pull request、全仓扫描和增量扫描等安全审查任务。
 
+本项目仍处于实验阶段，主要用于本地开发、集成测试和 workflow 研究。内部 package layout 和 agent workflow 仍可能调整。
+
+Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和补丁生成能力，也取决于输入质量和工具 / 运行时环境。本文中的 workflow 设计和运行链路不是独立于模型能力的固定性能保证。
+
 ## 能力
 
 | 能力                | 行为                                                                 |
 | ------------------- | -------------------------------------------------------------------- |
-| Issue review        | 审计 issue 报告，并在需要修复时产出经过复核的补丁或 draft PR。       |
+| Issue review        | 核查 Issue 报告、分析问题及其影响，再根据证据决定是否尝试修复，并独立验证分析结论和修复结果；有可交付补丁且指定 `--open-pr` 时，可创建 draft PR。       |
 | Pull request review | 审查 PR 变更，并可发布 review suggestions。                          |
 | Repository review   | 对仓库执行全仓或增量扫描，并进行问题发现、筛选、逐项处理和交付规划。 |
 
-## 运行结果示例
+GitHub 触发条件和命令见 [github-integration](apps/github-integration/README.zh.md#触发)。
 
-仓库级 review 会发布摘要，并生成对应的 draft PR：
+### 运行结果示例
+
+仓库审查会发布摘要，并在有符合发布条件的补丁时创建 draft PR：
 
 <p align="center">
   <img src="assets/screenshots/repository-review-summary.png" alt="Repository review summary" width="720">
@@ -38,103 +44,33 @@ Draft PR 会包含修改文件、case 详情、analyzer / verifier 输出和补�
   <img src="assets/screenshots/repository-delivery-pr.png" alt="Repository review delivery PR" width="720">
 </p>
 
-## 架构
+## 快速开始
 
-本仓库负责的运行角色包括 GitHub Integration、Review Runs、Control Plane UI、Execution Gateway、Execution Worker、Memory Extraction Worker、Memory Maintenance Worker 和 Memory Catalog Server。它们通过受认证的 HTTP、Temporal、对象存储和持久化 PostgreSQL 状态协作。Langfuse 是受信任但独立部署的可观测性依赖，不属于本仓库负责的运行角色。
+按你的目标选择入口：
 
-- [`apps/github-integration/`](apps/github-integration/README.zh.md)：TypeScript 编写的 GitHub integration service，负责 GitHub App webhook、由 GitHub Actions 鉴权的 HTTP dispatch、输入材料准备和 GitHub 发布
-- [`services/review-runs/`](services/review-runs/README.zh.md)：独立部署的 TypeScript 服务，负责 review run 接纳和持久化协调
-- [`apps/control-plane-ui/`](apps/control-plane-ui/README.zh.md)：独立部署的 Review Runs 运维界面
-- [`services/execution-gateway/`](services/execution-gateway/README.zh.md)：独立的 TypeScript HTTP 服务，负责校验请求并提交 Temporal execution
-- [`agents/`](agents/README.zh.md)：Python 编写的 Execution Worker、Memory Extraction Worker 和 Memory Maintenance Worker
-- [`services/memory-catalog/`](services/memory-catalog/README.zh.md)：独立的 TypeScript HTTP 服务，负责 managed memory catalog 状态和 revision 提交
+- **在本地运行一次审查**：按 [agents](agents/README.zh.md#安装激活环境) 安装并激活 Python 环境，完成 [LLM 配置](agents/README.zh.md#llm-配置)，再运行[本地审查命令](agents/README.zh.md#本地运行)。审查代码需要 Docker 和可用的模型配置，无需部署 GitHub 集成。
+- **接入 GitHub**：按 [LOCAL_INTEGRATED_DEPLOYMENT](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md) 准备 GitHub App、模型和服务配置，再启动集成服务。需要将 GitHub 请求转发到本机时，参阅 [LOCAL_GITHUB_INBOUND_SETUP](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
+
+## 架构概览
+
+GitHub Integration 接收来自 GitHub 的审查请求，并将审查结果发布回 GitHub；Review Runs 保存任务状态并协调输入准备、执行和发布；Execution Gateway 将执行请求提交给 Temporal，由 Execution Worker 运行审查工作流。Memory Extraction Worker 和 Memory Maintenance Worker 负责提取与维护审查经验，Memory Catalog 记录经验提取结果，管理记忆树的修订历史和当前生效版本，Control Plane UI 提供运维界面。
+
+Temporal 调度 workflow/activity，PostgreSQL 保存协调状态，对象存储保存输入和产物。Langfuse 独立部署，用于模型调用追踪和用量统计，核心审查执行不依赖它。
 
 ![Sec Review Bot 运行拓扑](assets/architecture/runtime-topology.zh.svg)
 
-## 运行技术栈
+组件职责与数据流见 [SYSTEM_ARCHITECTURE](docs/architecture/SYSTEM_ARCHITECTURE.zh.md)。
 
-- **语言**：[TypeScript](https://www.typescriptlang.org/)（[Node.js](https://nodejs.org/)）用于集成、Review Runs、Execution Gateway、Memory Catalog 和 UI 服务端；[Python](https://www.python.org/) 3.14 用于 Execution Worker、memory extraction 与 maintenance 角色和 agent runtime。
-- **Web 与 UI**：[Fastify](https://fastify.dev/) 提供 Review Runs、Execution Gateway 和 Memory Catalog API；[Vite](https://vitejs.dev/) + [React](https://react.dev/) + [Mantine](https://mantine.dev/) 构成控制台。
-- **Agent 运行时**：[LangChain](https://www.langchain.com/) / [LangGraph](https://langchain-ai.github.io/langgraph/)（[deepagents](https://github.com/langchain-ai/deepagents)），负责模型适配、结构化输出和工具调用。
-- **持久执行**：[Temporal](https://temporal.io/) 负责 workflow/activity 调度、worker 分发、重试、超时和失败状态。
-- **状态与存储**：[PostgreSQL](https://www.postgresql.org/) 存协调状态；S3 兼容对象存储（本地为 [RustFS](https://github.com/rustfs/rustfs)）存输入材料包和诊断产物。
-- **可观测性**：[Langfuse](https://langfuse.com/) 独立部署，强烈建议配置。核心审查执行不依赖它，但 LLM 调用追踪和 Review Runs 模型用量统计依赖它。
-- **执行隔离**：[Docker](https://www.docker.com/) sandbox，由宿主机执行 worker 使用。
-- **本地部署**：[Docker Compose](https://docs.docker.com/compose/) + [systemd](https://systemd.io/)。
+## 开发与文档
 
-## 项目状态
+安装、配置和开发命令由各包的 README 维护：
 
-本项目仍处于实验阶段，主要用于本地开发、集成测试和 workflow 研究。内部 package layout 和 agent workflow 仍可能调整。
-
-Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和补丁生成能力，也取决于输入质量和工具 / 运行时环境。本文中的 workflow 设计和运行链路不是独立于模型能力的固定性能保证。
-
-## Agent 入口
-
-如果只想看或运行 agent 侧，可以从这里开始：
-
-- [Agents 本地运行说明](agents/README.zh.md)：Python 运行后端安装、能力、本地运行和运行边界。
-- [LLM 配置](agents/README.zh.md#llm-配置) 和 [`agents/config/model-providers.sample.toml`](agents/config/model-providers.sample.toml)：模型 deployment 绑定。
-
-## 支持的工作流
-
-| 路径                | 触发方式                              | 输出                                                  |
-| ------------------- | ------------------------------------- | ----------------------------------------------------- |
-| Issue review        | `issues.opened`、`@<app-slug> review` | issue comment（确认问题并产出 patch 后再开 draft PR） |
-| Pull request review | PR webhook、`@<app-slug> review`      | PR review / suggestions                               |
-| Repository review   | 定时或手动触发的 GitHub Action        | repository summary 和 deliveries                      |
-
-完整触发行为见 [GitHub integration 触发说明](apps/github-integration/README.zh.md#触发)。
-
-## 快速开始
-
-### 本地启动完整链路
-
-创建集成部署配置：
-
-```bash
-ops/init-local-deployment-config.sh
-# 填好 apps/github-integration/.env 中的 GitHub App 配置，把私钥放到
-# apps/github-integration/private-key.pem，并在
-# agents/config/model-providers.toml 中配置至少一个模型 deployment。
-```
-
-构建所有需要的镜像并安装集成服务：
-
-```bash
-cd agents
-uv sync --frozen --no-dev
-cd ..
-docker compose --profile app build
-sudo ops/systemd/install.sh "$USER"
-sudo systemctl enable --now sec-review-bot.target
-```
-
-`sec-review-bot.target` 是整套服务的 systemd 入口。配置、状态查看、更新和组件级调试见[本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
-
-### 本地开发
-
-<!-- doc-default: node-workspace.toolchain; source=package.json -->
-开发 UI 或 Node.js 服务时，使用 Node.js 26 LTS 和 pnpm 12。根 `package.json` 声明支持的 Node.js 范围和 pnpm 精确版本；pnpm 会自动选择该项目版本。在仓库根目录执行：
-
-```bash
-npm install --global pnpm@12
-pnpm install --frozen-lockfile
-```
-
-随后按目标包 README 中的命令进行开发。Python 开发环境安装见 [agents/README.zh.md](agents/README.zh.md)。
-
-## 从哪里开始
-
-各 package 的安装和开发命令放在对应 package README 里。
-
-| 目标                          | 入口                                                                     |
-| ----------------------------- | ------------------------------------------------------------------------ |
-| 理解运行实体与职责边界        | [系统架构](docs/architecture/SYSTEM_ARCHITECTURE.zh.md)                  |
-| 本地启动完整链路和执行 worker | [本地集成部署说明](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)    |
-| 开发某个 package 或服务       | [文档地图](docs/README.zh.md)及对应 package 的 README                    |
-| 修改 contract 或生成产物      | [Contracts 说明](contracts/README.zh.md)                                 |
-| 把 GitHub 入站请求转发到本地  | [本地 GitHub 入站设置](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) |
-| 准备贡献                      | [贡献指南](CONTRIBUTING.zh.md)                                           |
+| 目标 | 入口 |
+| --- | --- |
+| 修改 Agent 或审查工作流 | [agents](agents/README.zh.md#开发者导航) |
+| 开发服务或控制台 | [文档地图](docs/README.zh.md)及对应包的 README |
+| 修改契约或生成产物 | [contracts](contracts/README.zh.md) |
+| 提交贡献 | [CONTRIBUTING](CONTRIBUTING.zh.md) |
 
 ## 论文
 

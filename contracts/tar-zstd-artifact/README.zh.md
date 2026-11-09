@@ -1,22 +1,22 @@
-# Tar+Zstandard Artifacts
+# Tar+Zstandard 产物
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-本 family 定义项目自有、media type 为 `application/tar+zstd` 的 artifact 所共享的 archive envelope，以及规定每种 artifact 内部组织的 profiles。
+本目录定义媒体类型为 `application/tar+zstd` 的产物格式。envelope 规定各类产物共用的 Zstandard 压缩和 tar 格式；profile 规定其中的文件布局与内容要求。
 
-- [envelope/v1/SPEC.zh.md](envelope/v1/SPEC.zh.md) 定义受限 POSIX PAX 方言。
-- [envelope/v1/corpus](envelope/v1/corpus) 包含由所有 archive reader 共同执行的编码互操作与拒绝用例。
-- [profiles/memory-tree](profiles/memory-tree/README.zh.md) 定义不可变 memory-tree archive。
-- [profiles/input-bundle](profiles/input-bundle/README.zh.md) 定义已准备的 execution input archive。
-- [profiles/run-diagnostic](profiles/run-diagnostic/README.zh.md) 定义 completed-run diagnostic archive。
+- [SPEC](envelope/v1/SPEC.zh.md) 规定受限的 POSIX PAX 格式。
+- [envelope/v1/corpus](envelope/v1/corpus) 保存各归档读取组件共用的真实归档测试输入，包括应接受和拒绝的格式。
+- [profiles/memory-tree](profiles/memory-tree/README.zh.md) 规定不可变的记忆文件树归档。
+- [profiles/input-bundle](profiles/input-bundle/README.zh.md) 规定已准备好的执行输入归档。
+- [profiles/run-diagnostic](profiles/run-diagnostic/README.zh.md) 规定已结束任务的诊断归档。
 
-Envelope 与 profile version 相互独立。每个 profile specification 都明确声明自己使用的 envelope version。
+envelope 和各 profile 分别维护版本。每份 profile 规范都会说明所用的 envelope 版本。
 
 ## 工具
 
-从拥有对应层的目录运行其工具：
+在对应格式的工具目录中运行检查：
 
 ```bash
 pnpm --dir contracts/tar-zstd-artifact/envelope/tools run check

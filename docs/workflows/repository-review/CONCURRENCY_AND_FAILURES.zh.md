@@ -2,11 +2,11 @@
 
 语言：[English](CONCURRENCY_AND_FAILURES.md) | 中文
 
-本文是 [CONCURRENCY_AND_FAILURES.md](CONCURRENCY_AND_FAILURES.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [CONCURRENCY_AND_FAILURES.md](CONCURRENCY_AND_FAILURES.md) 的中文译文；如有差异，以英文版为准。
 
 这份文档说明 `repository-review` 如何使用阶段内并发、哪些调参入口影响墙钟时间，以及失败如何被边界收住。
 
-App 提交的 runs、workflow fanout 和 worker activity 容量之间的系统级并发关系，见 [../CONCURRENCY_MODEL.zh.md](../CONCURRENCY_MODEL.zh.md)。本文只聚焦一个 repository run 被接收后，repository review workflow 内部的并发与失败边界。
+App 提交的 run、workflow fanout 和 Worker activity 容量之间的系统级并发关系，见 [CONCURRENCY_MODEL](../CONCURRENCY_MODEL.zh.md)。本文只聚焦一个 repository run 被接收后，repository review workflow 内部的并发与失败边界。
 
 ## 总览
 
@@ -17,13 +17,13 @@ App 提交的 runs、workflow fanout 和 worker activity 容量之间的系统�
 - case processing 可以并发处理 cases。
 - 单个 case 内部，CVSS scoring 可以和 mitigation / verification 路径重叠执行。
 - delivery planning 可以并发处理 batch drafts。
-- delivery execution 可以并发处理 combined deliveries。
+- Temporal delivery execution 可以并发处理 combined deliveries。
 
 ## 滑动窗口
 
 本文讨论的 repository review 阶段内并发都按滑动窗口理解。
 
-滑动窗口并发的意思是：最多保持 N 个任务在飞；任意一个任务完成后，立即补下一个任务。
+滑动窗口并发的意思是：最多同时推进 N 个任务；任意一个任务完成后，立即补下一个任务。
 
 ```text
 先启动最多 N 个任务
@@ -50,7 +50,7 @@ App 提交的 runs、workflow fanout 和 worker activity 容量之间的系统�
 
 ### Discovery
 
-Discovery 会把仓库文件打成 chunks。Temporal 路径和 direct 路径都会按滑动窗口执行 discovery chunks。
+Discovery 将一个或多个完整文件组织成一个 chunk，作为一次扫描的输入。具体组织策略见 [DISCOVERY_AGENT_DESIGN](DISCOVERY_AGENT_DESIGN.zh.md)。Temporal 和 `direct` 路径都按滑动窗口执行这些 chunk。
 
 <!-- doc-default: AGENT_DISCOVERY_MAX_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
 并发上限来自 `AGENT_DISCOVERY_MAX_CONCURRENCY`，默认是 `1`。实际有效并发不会超过 chunk 数。
@@ -62,7 +62,7 @@ Discovery 会把仓库文件打成 chunks。Temporal 路径和 direct 路径都�
 Triage 在一个 activity 内部运行。batched triage 会按滑动窗口执行 batch drafts，然后进入全局 refinement / workbench state。
 
 <!-- doc-default: TRIAGE_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/triage/agent_passes.py -->
-当前 batch draft 并发上限是代码常量 `TRIAGE_MAX_BATCH_CONCURRENCY = 3`。这不是常规部署环境变量。Triage 的输出是全局 case set；某个 batch 失败时，整个 triage 失败。
+当前 batch draft 并发上限是代码常量 `TRIAGE_MAX_BATCH_CONCURRENCY = 3`。这不是常规部署环境变量。Triage 的输出是全局 case set；某个 batch 失败时，整个 Triage 失败。
 
 ### Case Processing
 
@@ -88,36 +88,36 @@ Delivery planning 可以按滑动窗口执行 batch drafts，然后进入全局 
 
 Delivery execution 只消费 `disposition == "keep"` 的 case。
 
-`single` delivery 不调用 agent，不进入 patch synthesis 并发池。它直接投影 case 级 `review_record.mitigation.file_changes`。
+`single` delivery 不调用 agent，不占用 patch synthesis 并发名额。它直接投影 case 级 `review_record.mitigation.file_changes`。
 
-`combined` delivery 会调用 patch-synthesis agent。多个 combined deliveries 会按滑动窗口执行。
+`combined` delivery 会调用 patch-synthesis agent。Temporal 路径中，多个 combined deliveries 会按滑动窗口执行。
 
 <!-- doc-default: REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/execution/input.py -->
-并发上限来自 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`，默认是 `4`。
+Temporal 路径的并发上限来自 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`，默认是 `4`。
 
-Temporal 路径里，combined delivery patch synthesis 是独立 activity；`single` delivery 仍然是轻量投影，不占 patch synthesis 并发窗口。Direct 路径仍然在本地进程内用滑动窗口执行。
+Temporal 路径里，combined delivery patch synthesis 是独立 activity；`single` delivery 仍然是轻量投影，不占 patch synthesis 并发窗口。
 
 如果某个 combined delivery 的 patch synthesis 失败，其他 deliveries 继续执行。public `deliveries[]` 只包含成功 delivery。失败的 synthesis 排障看运行日志。
 
 ## 调参顺序
 
-通常最值得先调的是 `AGENT_CASE_PROCESSING_MAX_CONCURRENCY`。Case processing 通常占据最长的墙钟窗口，而且 analyzer / mitigator / verifier 都可能是 LLM-heavy 或 sandbox-heavy。
+通常最值得先调的是 `AGENT_CASE_PROCESSING_MAX_CONCURRENCY`。Case processing 通常占据最长的墙钟窗口，而且 Analyzer / Mitigator / Verifier 都可能是 需要频繁调用模型或使用沙箱。
 
-第二个常见杠杆是 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`。它只影响 `combined` delivery 的 patch synthesis。它不会改变 delivery 边界，也不会把不同 deliveries 合并成一个最终 patch。
+对于 Temporal run，第二个常见杠杆是 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`。它只影响 `combined` delivery 的 patch synthesis。它不会改变 delivery 边界，也不会把不同 deliveries 合并成一个最终 patch。
 
 Discovery 是否值得调，取决于 chunk 数和单个 chunk 的耗时。如果仓库只形成一个 chunk，提高 `AGENT_DISCOVERY_MAX_CONCURRENCY` 没有意义。如果 chunk 很多，调高 discovery 并发可以减少 discovery 的墙钟时间。
 
 ---
 
-Temporal 部署还通过 `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` 限制单个 Execution Worker 进程同时执行的 review activities 数量。上面的 workflow 并发配置控制 workflow 最多允许多少任务同时在飞。如果 worker 容量太小，workflow 已经调度出去的 activity 仍然会在 Temporal 侧等待。
+Temporal 部署还通过 `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` 限制单个 Execution Worker 进程同时执行的 review activities 数量。上面的 workflow 并发配置控制 workflow 最多允许同时推进多少任务。如果 Worker 的 activity 并发容量不足，workflow 已经调度出去的 activity 仍然会在 Temporal 侧等待。
 
 ## 资源限制
 
-并发上升后，首先可能触及本地资源上限。例如同时运行过多 analyzer / mitigator / verifier containers，可能让 CPU、内存、网络或磁盘 IO 成为瓶颈。
+并发上升后，首先可能触及本地资源上限。例如同时运行过多 Analyzer / Mitigator / Verifier containers，可能让 CPU、内存、网络或磁盘 IO 成为瓶颈。
 
 LLM 服务商限制也会变得更明显，例如 TPM、RPM 或瞬时并发请求限制。
 
-并发数本身不等于 TPM。TPM 取决于单位时间内实际发出的 token 速率，而这又受到任务类型、请求频率、单次请求 token 规模和 agent 行为模式影响。
+并发数本身不等于 TPM。TPM 取决于单位时间内实际发出的 token 速率，而这又受到任务类型、请求频率、单次请求 token 规模和 Agent 行为模式影响。
 
 会出现两种情况：
 
@@ -132,7 +132,7 @@ LLM 服务商限制也会变得更明显，例如 TPM、RPM 或瞬时并发请�
 - 更高 LLM 总预算
 - 更高 TPM / RPM 的 LLM API
 - 多个 LLM API 来源分担负载
-- 更大的 Temporal activity worker pool
+- 增加 Temporal Worker
 
 ## 观测例子
 

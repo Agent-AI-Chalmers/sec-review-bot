@@ -9,12 +9,12 @@ These smoke tests use production code across package or language boundaries with
 
 | Smoke scenario / entrypoint | Real boundary exercised | Main assertions | CI execution |
 | --- | --- | --- | --- |
-| [Review Runs HTTP](review-runs-http/review-runs-http.test.mjs) | Integration client → Review Runs HTTP | Empty successful responses resolve without JSON parsing errors; JSON responses still parse. | PR by path + merge queue |
-| [Execution submission](execution-submission/execution-submission.test.mjs) | Review Runs client → Gateway HTTP → Temporal | Submit, replay the same submission, and read running status. Stops before Worker execution. | PR by path + merge queue |
-| [Memory Catalog client](memory-catalog/test_memory_catalog.py) | Python client → Catalog HTTP → PostgreSQL | Confirmation required; duplicate registration is idempotent; conflicting intent and bad credentials are rejected. | PR by path + merge queue |
+| [Review Runs HTTP](review-runs-http/review-runs-http.test.mjs) | GitHub Integration’s Review Runs client → Review Runs HTTP | Empty successful responses resolve without JSON parsing errors; JSON responses still parse. | PR by path + merge queue |
+| [Execution submission](execution-submission/execution-submission.test.mjs) | Review Runs’s Execution API client → Execution Gateway HTTP → Temporal | Submit, replay the same submission, and read running status. Stops before Worker execution. | PR by path + merge queue |
+| [Memory Catalog client](memory-catalog/test_memory_catalog.py) | agents package’s Memory Catalog client → Memory Catalog HTTP → PostgreSQL | Confirmation required; duplicate registration is idempotent; conflicting intent and bad credentials are rejected. | PR by path + merge queue |
 | [Input bundle](input-bundle/test_input_bundle.py) | TypeScript archive/upload → RustFS → Python input preparation | Repeated publication preserves identity; workspace bytes survive transport; wrong digest is rejected. | PR by path + merge queue |
 | [Memory operator edit](memory-operator-edit/test_memory_bff.py) | UI BFF → Catalog/PostgreSQL + RustFS | Edit replay creates no extra revision; stale edits conflict; restore returns the prior pointer and readable artifact. | PR by path + merge queue |
-| [Execution lifecycle](execution-lifecycle/test_execution_lifecycle.py) | Review Runs coordination → Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | Activity retry, completed execution, readable diagnostics, and a durable publication result after reopening the store. Analysis is deterministic; no real model or GitHub publication. | Manual only |
+| [Execution lifecycle](execution-lifecycle/test_execution_lifecycle.py) | Review Runs coordination → Execution Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | Activity retry, completed execution, readable diagnostics, and a durable publication result after reopening the store. Analysis is deterministic; no real model or GitHub publication. | Manual only |
 
 Review Runs HTTP and execution submission share the `Smoke — Service Boundaries` job. Catalog client, input bundle, and operator edit share `Smoke — Memory and Artifacts` so selected tests can reuse disposable services; they remain separate tests with separate path filters. The manual workflow is `Smoke — Execution Lifecycle`. The shared job is an execution-cost choice, not a separate category of smoke tests.
 
@@ -48,7 +48,7 @@ Install and build only the participants needed for the selected test. The origin
 
 ## Review Runs HTTP
 
-This test combines the compiled Integration client and Review Runs HTTP routes on an ephemeral loopback port. It protects against parsing an empty HTTP 200 response as JSON while also checking a JSON-returning operation. Storage is stubbed; this test needs no database or Docker daemon.
+This test combines the compiled GitHub Integration’s Review Runs client and Review Runs HTTP routes on an ephemeral loopback port. It protects against parsing an empty HTTP 200 response as JSON while also checking a JSON-returning operation. Storage is stubbed; this test needs no database or Docker daemon.
 
 ```bash
 pnpm --dir apps/github-integration run build
@@ -58,7 +58,7 @@ node --test system-tests/review-runs-http/review-runs-http.test.mjs
 
 ## Execution Submission
 
-The execution-submission system test covers the submission boundary. It builds Review Runs and Execution Gateway, starts a disposable Temporal service, and verifies that the production Review Runs client can submit, replay, and read a run through the real Gateway HTTP surface:
+The execution-submission system test covers the submission boundary. It builds Review Runs and Execution Gateway, starts a disposable Temporal service, and verifies that the Execution API client in Review Runs can submit, replay, and read a run through the real Execution Gateway HTTP surface:
 
 ```bash
 node --test system-tests/execution-submission/execution-submission.test.mjs
@@ -70,7 +70,7 @@ Set `TEST_TEMPORAL_ADDRESS` to use an existing disposable Temporal service. Othe
 
 This command runs the Catalog client, input bundle, and memory operator edit scenarios from the inventory above.
 
-Install the agents test dependencies and the participating Node packages with their lockfiles, then run from the repository root:
+Run from the repository root:
 
 ```bash
 pnpm --dir services/memory-catalog run build
@@ -85,7 +85,7 @@ The main CI selects probes by their consuming paths through `.github/ci/changed-
 
 ## Manual Execution Lifecycle Probe
 
-The separate `Smoke — Execution Lifecycle` GitHub workflow uses only `workflow_dispatch`; it does not add a required PR check. It exercises the production Review Runs client and durable stores, Gateway HTTP, Temporal execution and issue workflows, Worker input preparation, diagnostic publication to RustFS, and terminal observation back into PostgreSQL. It then reopens the store and claims the persisted publication result.
+Run `Smoke — Execution Lifecycle` manually in GitHub Actions; it is not a required check for merging PRs. It exercises the Execution API client in Review Runs and durable stores, Execution Gateway HTTP, Temporal execution and issue workflows, Worker input preparation, diagnostic publication to RustFS, and terminal observation back into PostgreSQL. It then reopens the store and claims the persisted publication result.
 
 The analysis activity returns a deterministic no-finding result; its first attempt fails deliberately to exercise retry. Mitigation and verification use their production stages with deterministic model outputs that make no changes. Snapshot restoration, baseline commit resolution, and result persistence still run. This validates orchestration and artifact transport, not model quality, actual repairs, GitHub publication, or memory extraction.
 

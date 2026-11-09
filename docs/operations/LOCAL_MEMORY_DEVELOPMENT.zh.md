@@ -4,7 +4,7 @@
 
 本文介绍独立的本地 Memory 开发环境。整体设计见 [Agent Memory System](../agent/MEMORY_SYSTEM.zh.md)；完整控制平面的部署与 systemd 运维见[本地集成部署](LOCAL_INTEGRATED_DEPLOYMENT.zh.md)。
 
-本地 Memory 开发由 Compose 运行基础设施，各个 worker 则作为宿主机进程运行。
+本地 Memory 开发由 Compose 运行基础设施，各个 Worker 则作为宿主机进程运行。
 
 ```mermaid
 flowchart LR
@@ -33,16 +33,16 @@ flowchart LR
     maintenance --> rustfs
 ```
 
-Temporal Server 向 workers 分发任务；Memory Catalog 在 PostgreSQL 中保存协调状态，RustFS 保存 artifacts。`rustfs-init` 是一次性存储初始化任务。此环境不启动 GitHub Integration、Review Runs、Execution Gateway 或 Control Plane UI。
+Temporal Server 向 Worker 分发任务；Memory Catalog 在 PostgreSQL 中保存协调状态，RustFS 保存产物。`rustfs-init` 是一次性存储初始化任务。此环境不启动 GitHub Integration、Review Runs、Execution Gateway 或 Control Plane UI。
 
 <!-- doc-default: memory-dev-isolation; source=compose.memory.env.sample -->
 
-示例配置使用 Compose 项目名 `sec-review-memory-dev`，数据放在 `.agent-memory-dev/` 下，宿主端口分别为：PostgreSQL `55433`、RustFS API/console `19100`/`19101`、Temporal API/UI `17233`/`18233`、Memory Catalog `18092`。worker 地址使用对应的新端口。从仓库根目录运行命令，避免 shell 环境变量覆盖这些设置。
+示例配置使用 Compose 项目名 `sec-review-memory-dev`，数据放在 `.agent-memory-dev/` 下，宿主端口分别为：PostgreSQL `55433`、RustFS API/console `19100`/`19101`、Temporal API/UI `17233`/`18233`、Memory Catalog `18092`。Worker 地址使用对应的新端口。从仓库根目录运行命令，避免 shell 环境变量覆盖这些设置。
 
-如果已有 `compose.memory.env`，启动前请按示例更新项目名、数据路径、端口和 worker 地址。现有完整部署数据不会被迁移或删除。
+如果已有 `compose.memory.env`，启动前请按示例更新项目名、数据路径、端口和 Worker 地址。现有完整部署数据不会被迁移或删除。
 
 > [!WARNING]
-> 仓库提供的是只供 loopback 开发使用的固定凭据。它们不是 secret，不得用于共享机器或可被其他主机访问的部署。
+> 仓库提供的是只供回环地址开发使用的固定凭据。它们不是 secret，不得用于共享机器或可被其他主机访问的部署。
 
 在 **仓库根目录** 中创建被忽略的本地 env 文件，并启动基础设施：
 
@@ -70,7 +70,7 @@ docker compose \
 curl --fail http://127.0.0.1:18092/healthz
 ```
 
-填好 `agents/.env` 和 `agents/config/model-providers.toml` 中的模型配置，然后一起启动 Execution、Memory Extraction 和 Memory Maintenance workers：
+填好 `agents/.env` 和 `agents/config/model-providers.toml` 中的模型配置，然后一起启动 Execution、Memory Extraction 和 Memory Maintenance Worker：
 
 ```bash
 # 进入仓库根目录（替换为实际路径）。
@@ -83,9 +83,9 @@ uv --project agents run python -m scripts.dev.dev_workers \
 
 <!-- doc-default: local-memory-worker-launcher; source=scripts/dev/dev_workers.py -->
 
-launcher 会将不同的对象存储身份传给对应 worker，将 Memory Maintenance Worker 的 activity concurrency 保持为 `1`，并在任一 worker 退出或收到 `SIGINT`/`SIGTERM` 时停止整个 worker 组。它不负责启动或停止 Compose services。
+launcher 会将不同的对象存储身份传给对应 Worker，将 Memory Maintenance Worker 的 activity concurrency 保持为 `1`，并在任一 Worker 退出或收到 `SIGINT`/`SIGTERM` 时停止整个 Worker 组。它不负责启动或停止 Compose services。
 
-本地 Temporal 模式启用 memory processing 时，Memory Extraction Worker 会从本地文件系统读取 Execution Worker 生成的 diagnostic bundle，因此两个 worker 必须能访问同一个文件路径。提取结果仍通过 Memory Catalog 保存 observations 和产物引用，通过 S3 兼容存储保存 extractor 的执行轨迹。
+本地 Temporal 模式启用记忆处理时，Memory Extraction Worker 会从本地文件系统读取 Execution Worker 生成的诊断包，因此两个 Worker 必须能访问同一个文件路径。提取结果仍通过 Memory Catalog 保存 observation 和产物引用，通过 S3 兼容存储保存 extractor 的执行轨迹。
 
 从仓库根目录运行运维脚本（见 [scripts 说明](../../scripts/README.md#memory-operations)）：
 

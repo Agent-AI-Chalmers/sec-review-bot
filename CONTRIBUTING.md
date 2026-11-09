@@ -2,32 +2,36 @@
 
 Language: English | [中文](CONTRIBUTING.zh.md)
 
-Keep changes focused, preserve explicit ownership boundaries, and validate the packages and contracts that actually consume the change. This guide provides the repository-wide workflow; package and contract READMEs remain the source of truth for local details.
+Keep each change focused on a concrete problem, keep component responsibilities clear, and check all affected packages and contracts. This guide explains the common contribution process. For installation, configuration, check commands, and contract-specific change requirements, read the README in the relevant directory.
 
-## Find The Owning Boundary
+## Find The Code Responsible For The Behavior
 
-Before editing code, use the maintained documentation in this order:
+Before editing code, consult the documentation relevant to the change:
 
-1. Read the [system architecture](docs/architecture/SYSTEM_ARCHITECTURE.md) when the change crosses services, workers, storage, or deployment boundaries.
-2. Read the nearest package or directory `README.md` for local responsibilities, setup, configuration, and commands.
-3. Read the [documentation map](docs/README.md) for workflow, agent, and operations design notes.
-4. For cross-package data, read the [contracts guide](contracts/README.md) and the affected contract-family README before changing a schema, fixture, generated projection, artifact, or API shape.
+- Before changing calls between services or Workers, data storage, or deployment configuration, consult the [system architecture](docs/architecture/SYSTEM_ARCHITECTURE.md).
+- Read the `README.md` in the directory containing the code you plan to change, or the nearest parent directory that has one. It explains what that code is responsible for, how to set it up and configure it, and which checks to run.
+- If you need to change data exchanged between packages, first read the [contracts guide](contracts/README.md) and the README for the relevant contract. Identify which packages depend on these agreements and how the change would affect them.
 
-Do not infer ownership from directory size or document length. Runtime roles have explicit ownership even when multiple roles share one source package.
+Use the documented responsibilities and actual callers to determine who owns a change, rather than directory size or document length. Components in the same source package may still be responsible for different tasks.
 
-## Prepare A Change
+## Guidelines For Making Changes
 
-- Search for current callers, tests, generated consumers, repository scripts, and comments before treating a path as obsolete.
-- Keep the patch close to the owning boundary. Remove misleading compatibility and false indirection instead of wrapping them again.
-- Decide compatibility explicitly. A breaking change must identify affected callers, artifacts, persisted data, configuration, or operational behavior and provide a migration path.
-- Update documentation when responsibilities, setup, configuration, public behavior, or operational procedures change. Follow the [documentation guide](docs/DOCUMENTATION_GUIDE.md) for durable wording and mutable-fact markers.
-- Do not hand-edit generated artifacts without changing their source and running the owning generator.
+- Before deciding that code or a path is obsolete, look for its callers, related tests, repository scripts, and comments. If generated files are involved, also check where they are used.
+- Prefer changing the code that implements the behavior.
+
+  For example, suppose an HTTP endpoint and a CLI command use the same input-validation function. If that function accepts invalid input, fix the shared function so both entry points benefit, rather than adding a check only to the HTTP endpoint.
+- Prefer removing an unnecessary intermediate layer over adding another wrapper.
+
+  For example, consider `caller -> A() -> B()`. If `A()` only forwards arguments to `B()` and returns its result unchanged, with no other role such as validation, logging, or compatibility with an old interface, consider letting callers use `B()` directly. Check the callers first; if the old interface is still needed, do not simply delete `A()`. Handle any compatibility break as described below.
+- State whether the change preserves compatibility. If it breaks compatibility, list the affected callers, artifacts, persisted data, configuration, or operational procedures and explain how to migrate.
+- If a change affects component responsibilities, environment setup, configuration, public behavior, or operational steps, update the relevant documentation too.
+- If you need to change a generated file, edit its source and run the corresponding generator. Do not edit the generated output directly.
 
 ## Validate The Affected Areas
 
 Run checks from every affected package, not only from the package where the first edit occurred. The package README and `package.json` or `pyproject.toml` define the exact local commands.
 
-| Area | Development guide | Baseline validation |
+| Area | Development guide | Basic checks |
 | --- | --- | --- |
 | Execution, Memory Extraction, and Memory Maintenance Workers | [`agents/README.md`](agents/README.md) | Ruff, Black, mypy, Pyright, pytest |
 | GitHub Integration | [`apps/github-integration/README.md`](apps/github-integration/README.md) | format, lint, typecheck, unit tests; integration tests when the database boundary changes |
@@ -35,13 +39,13 @@ Run checks from every affected package, not only from the package where the firs
 | Control Plane UI | [`apps/control-plane-ui/README.md`](apps/control-plane-ui/README.md) | format, lint, typecheck, tests, build, browser smoke test for user-visible flows |
 | Execution Gateway | [`services/execution-gateway/README.md`](services/execution-gateway/README.md) | format, lint, typecheck, tests, Temporal integration tests |
 | Memory Catalog Server | [`services/memory-catalog/README.md`](services/memory-catalog/README.md) | format, lint, typecheck, tests, PostgreSQL integration tests |
-| Execution submission system path | [`system-tests/README.md`](system-tests/README.md) | Review Runs client, Execution Gateway HTTP, and Temporal system test |
-| Repository scripts | [`scripts/README.md`](scripts/README.md) | Ruff, Black, compile checks, and focused entrypoint probes |
-| Documentation | [`docs/DOCUMENTATION_GUIDE.md`](docs/DOCUMENTATION_GUIDE.md) and [`docs/README.md`](docs/README.md) | link, wrapping, and translated-heading checks as applicable |
+| Cross-service system tests | [`system-tests/README.md`](system-tests/README.md) | Run the system tests relevant to the affected services and data flows |
+| Repository scripts | [`scripts/README.md`](scripts/README.md) | Ruff, Black, Python syntax checks; check the changed scripts as appropriate, for example with `--help` or test inputs |
+| Documentation | [`docs/DOCUMENTATION_GUIDE.md`](docs/DOCUMENTATION_GUIDE.md) and [`docs/README.md`](docs/README.md) | As applicable, check that local links work, prose paragraphs remain unwrapped as required, and English/Chinese heading structures match |
 
-For a contract change, run the affected family tool from `contracts/<family>/tools/`: regenerate projections, check that committed artifacts are fresh, and run formatting, lint, contract lint when present, typechecking, and tests. Then run the consuming package checks. See the [contracts change checklist](contracts/README.md#change-checklist).
+After changing a contract, complete the checks required by the [contracts guide](contracts/README.md) and the relevant contract README, then check all affected packages.
 
-Record commands and focused probes actually run. State relevant gaps instead of implying broader coverage.
+List the commands you ran to check the change and report the results. Also note any relevant checks you did not run.
 
 ## Submit A Pull Request
 
@@ -53,7 +57,11 @@ Use this format:
 <type>(<optional-scope>): <concise summary>
 ```
 
-Allowed types are `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`, and `ci`. Use a scope only when it identifies the primary owner clearly, and add `!` before the colon for a breaking change.
+Allowed `type` values are `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `build`, and `ci`.
+
+Use the optional `scope` to name the component being changed: `agents` in `fix(agents): ...`, for example. If no component needs naming, omit it and write `fix: ...`.
+
+Add `!` before the colon for a breaking change.
 
 Examples:
 
@@ -72,9 +80,7 @@ Follow [the pull request template](.github/pull_request_template.md):
 
 - `Summary` explains what changed and why.
 - `Compatibility` selects exactly one of `No compatibility impact`, `Backward-compatible behavior change`, or `Breaking change`. A breaking change must state what breaks and how callers or operators should migrate.
-- `Validation` lists checks, tests, and focused probes actually run, including relevant gaps.
-- `Review Notes` is optional and should contain only information that helps review, such as useful review order, non-obvious trade-offs, deliberately preserved behavior, excluded scope, unusual artifacts, uncertainties, or follow-up work.
+- `Validation` describes the checks and tests you ran, their results, and any relevant checks you did not run.
+- `Review Notes` is optional. Use it for details that help reviewers, such as where to start reading, why you chose the approach, or what remains for later.
 
-The repository checks that the three required sections are present and non-empty, that `Compatibility` contains exactly one supported classification, and that a breaking change includes migration guidance. Additional headings and sections are welcome and are not interpreted by the check. Delete `Review Notes` when it adds no value.
-
-Dependabot pull requests keep their generated dependency summary, release notes, and command block instead of using the human-authored template. They remain subject to the title rule, package checks, review, and compatibility assessment.
+The PR description must include non-empty `Summary`, `Compatibility`, and `Validation` sections. In `Compatibility`, keep the template options and select exactly one. You may add other sections to help reviewers. Delete `Review Notes` if there is nothing useful to add.

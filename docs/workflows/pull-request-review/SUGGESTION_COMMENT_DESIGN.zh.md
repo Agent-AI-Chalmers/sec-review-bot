@@ -1,99 +1,97 @@
-# Suggestion Comment Design
+# Suggestion Comment 设计
 
 语言：[English](SUGGESTION_COMMENT_DESIGN.md) | 中文
 
-本文是 [SUGGESTION_COMMENT_DESIGN.md](SUGGESTION_COMMENT_DESIGN.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [SUGGESTION_COMMENT_DESIGN.md](SUGGESTION_COMMENT_DESIGN.md) 的中文译文；如有差异，以英文版为准。
 
-## Goal
+## 目标
 
-把 patch diff 映射成 GitHub PR review suggestions，让 reviewer 可以直接在 PR UI 中应用一个聚焦的修复。例如：
+将修复补丁映射为 GitHub PR 的 inline suggestion，让审查者直接在 PR 页面应用修复：
 
-![Suggestion](../../../assets/screenshots/suggestion.png)
+![修改建议](../../../assets/screenshots/suggestion.png)
 
-Suggestion reviews 是这里唯一能让 reviewer 从 PR diff 中直接应用 proposed mitigation 的 GitHub 发布面。普通 summary comment 可以解释问题，standalone patch 可以描述编辑，但它们都不能在 changed lines 上提供 anchored apply button。
+本项目通过这种评论提供与变更行关联的应用建议入口。普通摘要评论用于解释问题，补丁用于表达修改；它们不提供同样的行内操作。
 
-Sources:
+参考资料：
 
-- GitHub REST API, "Create a review for a pull request": <https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request>
-- GitHub REST API, "Create a review comment for a pull request": <https://docs.github.com/en/rest/pulls/comments>
-- GitHub Docs, "Reviewing proposed changes in a pull request": <https://docs.github.com/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/reviewing-proposed-changes-in-a-pull-request>
+- [GitHub REST API - Create a review for a pull request](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request)
+- [GitHub REST API - Create a review comment for a pull request](https://docs.github.com/en/rest/pulls/comments)
+- [GitHub Docs - Reviewing proposed changes in a pull request](https://docs.github.com/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/reviewing-proposed-changes-in-a-pull-request)
 
-## Hard Guardrail
+## inline suggestion 的范围限制
 
-GitHub suggestions 是 PR-diff-anchored review comments，不是 generic patch transport channel。
+inline suggestion 必须关联 PR diff 中的文件和行区间，不能用来传递任意补丁。每条 inline suggestion 必须：
 
-GitHub 要求每个 inline suggestion：
+- 对应 PR 变更文件列表中的文件；
+- 能定位到 PR diff 中可见的行区间。
 
-- target 一个已经存在于 PR changed-file set 中的文件。
-- anchor 到 PR diff 中可见的 line interval。
+修复补丁中超出这些范围的修改仍可保留，但通过摘要说明，不强行转换成 inline suggestion。
 
-因此，这个 workflow 只为 mitigation patch 中能映射到这些 PR-visible lines 的部分发 suggestions。PR diff 外的 mitigation edits 可以继续保留在 mitigation diff 中，但会 fallback 到标准 summary path，而不是被强行塞进 inline suggestions。
+## 实现
 
-## Implementation
+### 发布条件
 
-### Eligibility Rules
+存在修复补丁，且至少一个 diff hunk 可以映射到 PR 可见行时，生成 candidate。每个 candidate 必须满足：
 
-当存在 mitigation patch，且至少一个 patch hunk 可以 anchor 到 PR-visible diff hunk 时，emit suggestion candidates。
-
-每个 candidate 的必需条件：
-
-1. Patch file 存在于 PR changed-file set 中，并且有 PR patch content。
-2. Patch hunk 有非空 suggestion replacement content。
-3. Patch hunk 可以 anchor 到 right-side（current-version）PR diff interval。
+1. 文件出现在 PR 变更列表中，且有可用的 PR diff 内容。
+2. diff hunk 能生成 suggestion block；删除操作允许替换内容为空。
+3. diff hunk 能够定位到 PR diff 右侧，即当前版本的行区间。
 
 这是 partial-admission pipeline：
 
-- non-anchorable files/hunks 会被跳过，anchorable ones 仍会被 emit。
-- skipped entries 会在 suggestion manifest 的 `unmapped_changes` 中报告。
+- 无法定位的文件或 diff hunk 会被跳过，能够定位的建议仍会生成。
+- 跳过项记录在 suggestion manifest 的 `unmapped_changes` 中。
 
-### Mapping Pipeline
+### 映射流程
 
-#### 1. Parse the mitigation diff
+#### 1. 解析修复补丁
 
-解析 unified diff content，并按文件收集：
+解析 unified diff，按文件收集：
 
-- `path`
-- hunk header (`old_start`, `old_count`, `new_start`, `new_count`)
-- hunk lines
+- `path`；
+- diff hunk 头部的 `old_start`、`old_count`、`new_start`、`new_count`；
+- diff hunk 中的各行内容。
 
-#### 2. Restrict to PR-visible files
+#### 2. 筛选 PR 可见文件
 
-只保留能匹配 `pulls.listFiles` entries 的 patch files；`pulls.listFiles` 是 GitHub API 中 PR changed-file metadata 和 visible patch hunks 的来源。
+只保留与 `pulls.listFiles` 返回项匹配的文件。该 API 提供 PR 变更文件信息和可见 diff hunk。
 
-#### 3. Build suggestion replacements and bodies
+#### 3. 构造替换内容和评论正文
 
-对每个 eligible patch hunk：
+将 diff hunk 中连续的增删行拆成 suggestion block：
 
-- 从 non-removed hunk lines 构造 replacement text。
-- 构造 suggestion body：short mitigation summary，然后是 literal ```` ```suggestion ```` fence、replacement lines，以及 closing ```` ``` ```` fence。
+- 替换操作使用新增行作为替换文本；
+- 删除操作使用空替换文本；
+- 纯插入操作使用相邻上下文行定位，并把该行保留在替换文本中；
+- 将替换文本放入 `suggestion` 代码块，作为评论正文。
 
-#### 4. Build review anchors from overlapping PR patch hunks
+#### 4. 根据重叠的 PR diff hunk 计算行位置
 
-对每个 patch hunk，在同一文件中找到 overlapping PR patch hunk，并派生 right-side anchors：
+对每个 suggestion block，在同一文件中寻找与其重叠的 PR diff hunk，并取两者在 PR 当前版本中的重叠行区间：
 
-- `start_line = new_start`
-- `line = new_start + new_count - 1`
+- `start_line = max(block.start_line, pr_hunk.new_start)`
+- `line = min(block.line, pr_hunk.new_start + pr_hunk.new_count - 1)`
 - `side = RIGHT`
 
-如果 `start_line === line`，提交 single-line anchor。如果 `start_line < line`，提交带 `start_line` 和 `start_side` 的 multi-line anchor。
+没有有效重叠区间时跳过。`start_line === line` 时提交单行建议；`start_line < line` 时提交多行建议，并附带 `start_line` 和 `start_side`。
 
-#### 5. Publish one review with all inline suggestions
+#### 5. 在一次 Review 中发布 inline suggestion
 
-创建一个 PR review，包含：
+创建一次 PR Review，包含：
 
-- inline suggestion comments (`path`, `body`, `line`, `side`, optional `start_line`, `start_side`)
-- `commit_id = head_sha`
+- inline suggestion 评论：`path`、`body`、`line`、`side`，以及需要时的 `start_line`、`start_side`；
+- `commit_id = head_sha`。
 
-### Fallback Behavior
+### 无法映射时如何处理
 
-当没有 candidate 被 emit：
+没有生成 candidate 时：
 
 1. 不发布 inline suggestions。
 2. 发布标准 top-level PR summary comment。
 
-这样可以保持 deterministic behavior，并避免 weakly anchored 或 misleading inline edits。
+这样可以保持行为确定，并避免位置不准确或容易误导的 inline edits。
 
-当部分 candidates 被 emit，但部分 hunks 不可 anchor：
+部分 candidate 已生成，但部分 diff hunk 无法 anchor 时：
 
-1. 为 anchorable candidates 发布 inline suggestions。
-2. 在 review body 中追加 `Unmapped Mitigation Changes` section，说明 non-anchorable hunks。
+1. 为能够 anchor 的 candidate 发布 inline suggestions。
+2. 在 review body 中追加 `Unmapped Mitigation Changes` section，说明无法 anchor 的 diff hunk。

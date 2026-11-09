@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-This family holds the format a repository uses to tell a review sandbox how to prepare itself before the agent starts: the `.sec-review/setup.yml` declaration.
+This contract holds the format a repository uses to tell a review sandbox how to prepare itself before the agent starts: the `.sec-review/setup.yml` declaration.
 
 Use these documents:
 
@@ -20,7 +20,7 @@ Only the *format* is this contract. Where a declaration came from — trust in i
 
 ## Enforcement
 
-There is no JSON Schema for this family. The rules that matter are decision logic (a `working-directory` that cannot escape the repository root, an `env` name that cannot smuggle shell syntax, a positive-integer timeout), not a structural shape, so they stay in the Execution Worker and GitHub Integration parsers rather than in a schema that could disagree with them:
+There is no JSON Schema for this contract. The rules that matter are decision logic (a `working-directory` that cannot escape the repository root, an `env` name that cannot smuggle shell syntax, a positive-integer timeout), not a structural shape, so they stay in the Execution Worker and GitHub Integration parsers rather than in a schema that could disagree with them:
 
 - Python (Execution Worker): `agents/src/sec_review_agents/entrypoints/setup_declaration.py`
 - TypeScript (GitHub Integration): `apps/github-integration/src/github/setup-declaration.ts`

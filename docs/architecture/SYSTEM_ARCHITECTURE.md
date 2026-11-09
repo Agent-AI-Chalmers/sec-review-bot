@@ -4,15 +4,24 @@ Language: English | [中文](SYSTEM_ARCHITECTURE.zh.md)
 
 Sec Review Bot's repository-owned runtime roles are GitHub Integration, Review Runs, Control Plane UI, Execution Gateway, Execution Worker, Memory Extraction Worker, Memory Maintenance Worker, and Memory Catalog Server. Langfuse is a trusted observability dependency with an independent deployment and lifecycle, not a repository-owned runtime role.
 
+Distinguish the review task, its execution, and its delivery:
+
+| Term | Meaning |
+| --- | --- |
+| run | An admitted review task in Review Runs, including preparation, execution, and publication state. |
+| execution | Work submitted through Execution Gateway to Temporal. |
+| case | A repository-scan problem unit requiring independent analysis and verification. |
+| delivery | A publishable repair result for one or more cases. |
+
 ## Runtime topology
 
 ![Sec Review Bot runtime topology](../../assets/architecture/runtime-topology.svg)
 
 Temporal Server is infrastructure, but it directly dispatches work to the worker processes, so the topology presents it with the runtime services. PostgreSQL and Object Storage remain separate persistence facilities. Langfuse appears outside the repository deployment boundary: workers optionally export LLM observations to it, and Review Runs reads those observations asynchronously to persist model-usage snapshots. Review execution, memory extraction, and memory maintenance use independent worker processes and task queues.
 
-The memory path has one deployment-independent state model. Memory Catalog owns coordination state in PostgreSQL, Object Storage owns immutable memory-tree and trajectory artifacts, and Temporal owns workflow execution. Each review invocation materializes the current memory tree into a temporary directory for its agent backend and removes that directory afterward.
+Memory Catalog owns coordination state in PostgreSQL, Object Storage owns immutable memory-tree and trajectory artifacts, and Temporal owns workflow execution. When memory consumption is enabled and an active revision exists, a review invocation materializes that memory tree into a temporary directory for the agent and removes it afterward.
 
-Control Plane UI manages Memory Catalog through its BFF and never exposes Catalog tokens, storage credentials, or `s3://` references to the browser. The BFF fetches and identity-checks artifact downloads. Authenticated operators can pause or resume automatic maintenance, create operator edit revisions, and restore the active pointer to an existing revision. New revisions retain that active revision as their predecessor while revision identities remain globally increasing. The BFF can create immutable memory-tree objects, while run artifacts and memory trajectories remain read-only.
+Control Plane UI accesses Memory Catalog through its same-origin backend (BFF). The browser receives no Catalog tokens, storage credentials, or `s3://` references. The BFF checks artifact references, size, and digest before returning downloaded content. Authenticated operators can pause or resume automatic maintenance, commit manual edits, and restore an existing revision. New revisions record the revision active at creation as their predecessor, while revision numbers remain globally increasing. The BFF can create immutable memory-tree objects but has read-only access to review artifacts and memory trajectories.
 
 ## Runtime ownership map
 
@@ -121,11 +130,13 @@ sequenceDiagram
   Runs-->>UI: Return snapshot, pending state, or no observation record
 ```
 
-Langfuse stores the individual model-call observations. Review Runs reads and aggregates them into its own database for display in the Control Plane UI.
+Langfuse stores model-call records. Review Runs reads and aggregates them into its own database for display in the Control Plane UI.
 
 ## Artifact publication and recovery
 
-PostgreSQL and object storage commit separately. Input and memory publishers first persist a publication intent: the intended artifact references and the business payload needed to finish attachment after a crash.
+Review input publication, extraction registration, automatic maintenance revisions, and manual edit revisions all upload files to object storage and register results in PostgreSQL separately. These writes cannot be completed in one local transaction, creating a [dual-write consistency problem](https://docs.aws.amazon.com/prescriptive-guidance/latest/cloud-design-patterns/transactional-outbox.html): an upload may succeed before the process stops without registering it in the database, leaving an unreferenced object. Registering the database reference first creates the opposite risk: a failed upload can leave a reference to a missing file.
+
+To support retries after an interruption, input and memory publishers first persist a publication intent containing the intended artifact references and complete registration payload, then upload the objects and register the result. Retries can inspect existing objects and continue from that record instead of blindly repeating uploads or model calls.
 
 ```mermaid
 sequenceDiagram

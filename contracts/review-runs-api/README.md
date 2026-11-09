@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-This family holds the shapes Review Runs exchanges with its callers. The single source of truth is the hand-written [v1/openapi.yaml](v1/openapi.yaml); routes, request/response schemas, and security all derive from it. Two surfaces answer to different credentials: the redacted read surface the console consumes, and the full read/write surface the GitHub integration calls.
+This contract holds the shapes Review Runs exchanges with its callers. The single source of truth is the hand-written [v1/openapi.yaml](v1/openapi.yaml); routes, request/response schemas, and security all derive from it. Two surfaces answer to different credentials: the redacted read surface the console consumes, and the full read/write surface the GitHub integration calls.
 
 Use these documents:
 
@@ -30,11 +30,11 @@ Consumers can rely on:
 - token fields are nullable: `null` means the value could not be established for every covered call, never zero. `input_tokens`, `output_tokens` and their subsets are independently nullable; `total_tokens` is computed as their sum and is null whenever either is missing. Cache and reasoning fields are subsets and must not be added to the totals;
 - the `artifact_storage` variants: absent; an error variant whose status is `unavailable` or `failed`, with optional `error_code` and `message`; or `available` with a stored bundle.
 
-The following are not part of this contract:
+## Enforcement
 
-- internal store records, such as the row shape persisted in Postgres;
-- connector-owned preparation input, claim tokens, and full reconciliation identities;
-- anything the console derives for display, such as relative times or phase durations.
+The console's `Run` type is generated from the contract, and a committed fixture pins it at build time: if the fixture gains, loses, or renames a field, the console stops compiling until the generated type and the fixture agree again. That check compares key sets rather than values, because TypeScript widens JSON strings and a value-level assignment would reject a correct fixture.
+
+Review Runs owns the value-level half in `services/review-runs/test/observed-run-contract.test.ts`: it validates every fixture as the manifest claims, and validates what `observeRun()` actually returns. The type↔schema binding needs no separate key-set comparison because both derive from the same `ObservedRun` in the contract (`openapi.yaml`). A status outside the schema enums, a broken pattern, or a malformed timestamp therefore fails the suite instead of reaching the console.
 
 ## Tooling
 
@@ -49,12 +49,6 @@ pnpm run lint:contract
 pnpm run typecheck
 pnpm test
 ```
-
-## Enforcement
-
-The console's `Run` type is generated from the contract, and a committed fixture pins it at build time: if the fixture gains, loses, or renames a field, the console stops compiling until the generated type and the fixture agree again. That check compares key sets rather than values, because TypeScript widens JSON strings and a value-level assignment would reject a correct fixture.
-
-Review Runs owns the value-level half in `services/review-runs/test/observed-run-contract.test.ts`: it validates every fixture as the manifest claims, and validates what `observeRun()` actually returns. The type↔schema binding needs no separate key-set comparison because both derive from the same `ObservedRun` in the contract (`openapi.yaml`). A status outside the schema enums, a broken pattern, or a malformed timestamp therefore fails the suite instead of reaching the console.
 
 ## Error codes
 

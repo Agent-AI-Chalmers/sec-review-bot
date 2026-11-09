@@ -14,7 +14,7 @@ When verifier concludes that an attempted patch is materially weak, incomplete, 
 
 - `analyzer -> mitigator(pass1) -> verifier(pass1) -> mitigator(pass2) -> verifier(pass2)`
 
-This is intentionally **not** an open-ended loop. The architecture supports a retry budget, but the operating policy remains single-retry.
+Feedback retries have **an explicit limit** to prevent mitigation and verification from repeating indefinitely. The current policy allows one additional retry.
 
 ## Why This Exists
 
@@ -48,7 +48,7 @@ In practice, though, many security repair tasks do not come with runnable PoCs, 
 
 - `analyzer -> mitigator -> verifier`
 
-If the first verifier result is acceptable, the workflow ends.
+If the first verification result needs no further action, no feedback retry is scheduled; the workflow continues to result assembly and any delivery steps.
 
 ### Recovery Path
 
@@ -65,27 +65,28 @@ Architecturally, the workflow is modeled as:
 where:
 
 - `k <= maxFeedbackRetries`
-- operating policy uses `maxFeedbackRetries = 1`
+- the current policy allows one additional retry
 
-The important property is the budget, not the exact number. The design leaves room for modest future experiments without turning the workflow into an unbounded conversational loop.
+<!-- doc-default: MAX_FEEDBACK_RETRY_ATTEMPTS; source=agents/src/sec_review_agents/review_stages/feedback_loop.py -->
+The code constant `MAX_FEEDBACK_RETRY_ATTEMPTS` limits additional retries to `1`. This is not a deployment setting. The budget leaves room for bounded experiments without allowing mitigation and verification to repeat indefinitely.
 
 ## Next Step
 
 Verifier output separates current-code coverage from the next workflow action:
 
-- `coverage`: how fully current code resolves the reviewed target claim, with or without a patch
-- `regression`: whether regression, build, test, or behavior-preservation evidence clears the patched workspace
+- `coverage`: how fully current code resolves the scoped security claim actually checked (`target_claim`), with or without a patch. It may be `full` when the original problem is already fixed or the claim is disproved by evidence
+- `regression`: the conclusion supported by regression, build, test, or behavior-preservation evidence: `passed`, `failed`, `not-run`, `not-applicable`, or `unresolved`
 - `next_step`: what should happen after the verification judgment
 
 `next_step` has three values:
 
-- `none`: no further action is needed for this verifier outcome. With `coverage=full`, this requires `regression` to be `passed`, `not-run`, or `not-applicable`.
+- `none`: no further action is needed for this verifier outcome. For a completed Verifier assessment, this requires `coverage=full` and `regression` to be `passed`, `not-run`, or `not-applicable`.
 - `retry-ai`: a concrete, in-scope security gap or confirmed regression is likely fixable by one bounded AI mitigation retry pass.
 - `manual-review`: unresolved regression evidence is the remaining factor that determines the next action, or the remaining work needs human judgment, repository administrator action, credential rotation, deployment/configuration changes, history cleanup, cache/fork cleanup, or some other action outside a normal workspace patch.
 
-Coverage and regression status are independent judgments. A patch may fully cover the security target while failing a supported behavior contract. That outcome is `coverage=full` with `regression=failed`, but it is not delivery-ready and must use `retry-ai` or `manual-review` rather than `none`.
+`coverage` and `regression` are independent judgments. A patch may fully cover the security target while failing a supported behavior contract. That outcome is `coverage=full` with `regression=failed`, but it is not delivery-ready and must use `retry-ai` or `manual-review` rather than `none`.
 
-When a separate, concrete security gap is still suitable for bounded repair, `retry-ai` may be used even if `regression=unresolved`. The unresolved regression must remain in `findings` and be reassessed after the retry. If the unresolved regression itself determines the next action, including when security coverage is already `full`, use `manual-review`.
+When a separate, concrete security gap is still suitable for bounded repair, `retry-ai` may be used even if `regression=unresolved`. The unresolved regression must remain in `findings` and be reassessed after the retry. If the unresolved regression itself determines the next action, use `manual-review`. In particular, `coverage=full` with `regression=unresolved` requires `next_step=manual-review`.
 
 `partial` does not automatically mean retry. A partial patch can either expose an actionable code gap that should be retried, or it can represent useful current-snapshot hardening with residual work that only a human or repository administrator can complete.
 
@@ -124,7 +125,7 @@ The design intent is simple: retry only when verifier has produced actionable pa
 
 The retrying mitigator should be framed as a bounded revision pass that receives:
 
-- a brief previous mitigation summary, including status, overview, and changed files
+- a brief previous mitigation summary, including overview and changed files
 - the latest verifier result summary
 - a compact history projection of earlier verifier feedback
 

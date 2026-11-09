@@ -10,15 +10,15 @@ The triage stage does not confirm vulnerabilities. It organizes these candidates
 - which candidates describe the same issue and can be merged into one case
 - which candidates cannot be rejected at the shallow stage and should be conservatively kept
 
-The downstream contract still receives `cases` and `suppressed_candidates`. The agent does not write those results directly. It only edits groups in the workbench, and the system exports results from the groups after constraints pass.
+The downstream contract still receives `cases` and `suppressed_candidates`. The agent does not write those results directly. It only edits groups in the workbench, and the system exports results from the groups after constraints pass. Triage judges only the supplied candidate payloads; it does not read repository files.
 
 ## Discovery and Triage Boundary
 
 High recall does not mean every "security-flavored" observation should be sent to triage. Discovery should try to produce candidates within the vulnerability domain: attacker-controlled input, permission boundaries, dangerous sinks, sensitive data impact, or trusted-side state changes in concrete repository code.
 
-Security process or best-practice suggestions such as CI scan frequency, security bot coverage, schema audit fields, placeholder copy, or generalized configuration hardening should preferably not be produced by discovery.
+Suggestions merely to increase CI scan frequency, expand security scanning coverage, add schema audit fields, or harden configuration should not be emitted as vulnerability candidates unless they identify a concrete attack path, sensitive operation, or trust-boundary issue.
 
-Even with tighter discovery, triage still needs suppression. Some candidates look suspicious in a single-file local view, but have no independent case value when compared with the broader inventory or code semantics. Examples:
+Even with tighter discovery, triage still needs suppression. Some candidates look suspicious in a single-file local view, but have no independent case value when compared with evidence in the other supplied candidates. Examples:
 
 - The client sends `filename`, `userId`, or `total`, but whether that is a vulnerability depends on whether the server re-authorizes, validates, or recomputes it.
 - A schema has weak signals such as `password TEXT`, but the same plaintext password problem is already covered by runtime evidence from register/login code in the same batch or globally.
@@ -43,7 +43,7 @@ If the answer is no, for example it only says "missing validation", "possible in
 
 If the answer is yes, even weak evidence should usually be conservatively kept. At that point, the item provides a repository-specific anchor, and downstream analyzer can inspect cross-file authorization, session behavior, data flow, schema, callers, or dangerous sinks around that anchor.
 
-Thus triage suppression is more like cleanup of "no analyzable object", not a final judgment that the vulnerability is false.
+Suppression removes clues with no analyzable object or independent value; it does not replace Analyzer's final judgment of whether a vulnerability exists.
 
 ## Merge Boundary
 

@@ -2,46 +2,41 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-本族收录 Review Runs 与其调用方交换的形状。单一事实来源是手写的 [v1/openapi.yaml](v1/openapi.yaml)；路由、请求/响应 schema 与安全方案都从它派生。两个凭据不同的面：控制台消费的脱敏读取面，以及 GitHub 集成调用的完整读/写面。
+本目录定义 Review Runs 与调用方交换的数据。接口依据人工维护的 [v1/openapi.yaml](v1/openapi.yaml) 生成，包括路由、请求与响应 schema 和鉴权方案。控制台使用脱敏读取接口，GitHub Integration 使用完整读写接口，两者要求不同的凭据。
 
-从这些文档开始：
+相关文件：
 
-- [v1/openapi.yaml](v1/openapi.yaml)：OpenAPI 3.1 契约——每个操作（带 `operationId`）、它的请求/响应 schema、安全方案，以及 `components.schemas` 里的领域形状。
-- [v1/observed-run.schema.json](v1/observed-run.schema.json)：读取响应返回的、已脱敏的形状。
-- [v1/review-run-record.schema.json](v1/review-run-record.schema.json)：协调记录的形状。
-- [v1/fixtures](v1/fixtures)：可执行示例，包含本契约必须拒绝的形状。
+- [v1/openapi.yaml](v1/openapi.yaml)：OpenAPI 3.1 契约，包括各操作的 `operationId`、请求与响应 schema、鉴权方案和 `components.schemas` 中的业务数据结构。
+- [v1/observed-run.schema.json](v1/observed-run.schema.json)：读取接口返回的脱敏运行记录结构。
+- [v1/review-run-record.schema.json](v1/review-run-record.schema.json)：协调服务使用的运行记录结构。
+- [v1/fixtures](v1/fixtures)：用于测试的输入示例，包括必须拒绝的输入。
 
-Input publication 操作在 preparation claim 下预约完整不可变提案、列出待恢复提案，并确认对象存在或放弃。Prepared submission 必须完整匹配已存在或已选中的提案。Preparation 仍持有 run 时接受完全相同的提交重放；修改 reference、input 或 publish context 会被拒绝。候选记录包含存储 locator 和 prepared input，因此属于经过认证的 service 协调面，不进入 console 的 observed-run 投影。
+输入发布接口要求调用方持有输入准备任务的领取凭据（preparation claim）。调用方先预留内容完整、不可修改的发布意图；中断后可以列出意图，确认对象存在或放弃候选。提交准备结果时，内容必须与已确认存在或已选中的意图完全一致。仍持有准备任务时，可以重复提交相同内容；修改引用、输入或发布上下文会被拒绝。候选记录含存储位置和已准备输入，只供经过认证的服务协调接口使用，不进入控制台的脱敏运行记录。
 
-## 边界
+## 两种运行记录
 
-Review Runs 通过 `observeRun()` 产出每个 observed run，通过 `rowToRecord()` 产出每条记录。记录携带 `failure_message`，而脱敏后的读取形状刻意丢弃了它，因此它只跨越 service token 那条边界。
+Review Runs 通过 `observeRun()` 生成供读取接口使用的脱敏记录，通过 `rowToRecord()` 生成协调记录。后者包含 `failure_message`；脱敏记录会移除该字段，因此只有使用 service token 的接口才返回它。
 
-## 公开边界
+## 调用方可以依赖什么
 
-消费者可以依赖：
+调用方可以依赖以下内容：
 
-- observed run 的字段名与必填字段；
-- `source_platform`：用于稳定聚合的源码托管平台；以及 `connector_id`：admit 并拥有该 run 的 connector 类型与实例命名空间；
-- 以嵌套对象报告的三条生命周期轴：脱敏的 `preparation` 摘要，以及 `execution` / `publication`。每组各自报告 `status`、`started_at`、`finished_at` 与该轴的 `updated_at`（最后一次写入时间，不是阶段边界）；用于筛选它们的查询参数沿用既有的 `*_status` 拼写；
-- `notices`：当 run 的某个环节失败或需要关注时，应由集成展示给用户的消息。消息按产生时间从早到晚排列；同一 run 发生多次独立事件时会保留多条，不会合并；
-- `execution_statistics`：Review Runs 生成的可空统计快照，包含 reconciliation 状态、已观察到的模型调用与 token 汇总，以及流程坐标/agent/provider/model 分组。case、delivery、pass、draft batch 和 discovery chunk 坐标可空，因为多数阶段没有这些坐标。`null` 表示尚无快照记录，不表示零消耗；
-- execution statistics 的 token 总量采用 OpenTelemetry GenAI 语义：`input_tokens` 和 `output_tokens` 包含各自已报告的缓存与 reasoning 子集。Langfuse 的互斥计费 bucket 会在进入本 contract 前完成标准化；
-- `artifact_storage` 的变体：不存在；状态为 `unavailable` 或 `failed` 的错误变体，可带 `error_code` 与 `message`；或 `available` 且带有已存储的 bundle。
+- 脱敏运行记录的字段名和必填要求；
+- `source_platform` 标识源码托管平台，用于稳定分组；`connector_id` 标识接收并负责该任务的集成类型与实例命名空间；
+- `preparation`、`execution`、`publication` 分别报告准备、执行和发布状态。各自包含 `status`、`started_at`、`finished_at` 和 `updated_at`。其中 `updated_at` 是该组状态最后写入时间，不是阶段起止时间；筛选参数仍使用 `*_status` 命名；
+- `notices` 记录某环节失败或需要关注时，应由集成展示给用户的消息。消息按产生时间从早到晚排列，多次独立事件分别保留；
+- `execution_statistics` 是可空的用量统计快照，包括统计核对状态、已观察到的模型调用与 token 汇总，以及按流程位置、Agent、服务商和模型分组的统计。问题单元、交付单元、执行轮次、草稿批次和初筛分块等位置字段可以为空，因为多数阶段不涉及这些位置。整个字段为 `null` 表示尚无快照，不代表没有消耗；
+- token 总量采用 OpenTelemetry GenAI 口径：`input_tokens` 包含已报告的缓存输入子集，`output_tokens` 包含已报告的推理输出子集。Langfuse 中互不重叠的计费分项会在写入本契约数据前转换成这一口径；
+- 各 token 字段可以独立为 `null`，表示无法确定所有已覆盖调用的该项用量，不代表零。`total_tokens` 为输入与输出总量之和；任一项未知时，它也为 `null`。缓存和推理用量是总量的子集，不能重复相加；
+- `artifact_storage` 可以不存在；可以是 `unavailable` 或 `failed`，并附带可选的 `error_code` 和 `message`；也可以是 `available`，并包含已保存的诊断包。
 
-以下不属于本契约：
+## 如何校验
 
-- 内部存储记录，例如持久化在 Postgres 里的行形状；
-- connector-owned preparation input、claim token 和完整 reconciliation identity；
-- 控制台为展示而派生的任何内容，例如相对时间或各阶段耗时。
+控制台的 `Run` 类型由契约生成，构建时会对照测试数据检查字段集合。测试数据增加、删除或改名字段后，类型不一致就会导致编译失败。这里只比较字段集合：TypeScript 读取 JSON 时会将字符串推断为较宽泛的类型，直接比较值类型可能误拒绝合法测试数据。
 
-## 执行方式
-
-控制台的 `Run` 类型由契约生成，并由本 fixture 在构建期钉住：如果 fixture 增加、删除或改名了某个字段，控制台会停止编译，直到生成类型与 fixture 重新一致。该检查比较的是**键集合**而不是值，因为 TypeScript 会放宽 JSON 字符串，值层面的赋值会拒绝一个正确的 fixture。
-
-值层面的一半由 Review Runs 在 `services/review-runs/test/observed-run-contract.test.ts` 中承担：它按 manifest 的声明校验每个 fixture，并校验 `observeRun()` 的真实输出。类型与 schema 的绑定不再需要单独的键集合对照，因为两者都源自契约（`openapi.yaml`）里同一个 `ObservedRun`。因此，schema 枚举之外的某个状态、被破坏的 pattern、或格式错误的 timestamp 都会让测试失败，而不是流到控制台。
+字段值由 Review Runs 的 `services/review-runs/test/observed-run-contract.test.ts` 验证：测试按清单校验每份输入，也校验 `observeRun()` 的实际输出。类型和 schema 都来自 `openapi.yaml` 的 `ObservedRun`，无需另外维护一份字段对照。超出枚举的状态、不符合 schema 中 pattern 约束的值或格式错误的时间戳都会让测试失败。
 
 ## 工具
 
@@ -59,7 +54,7 @@ pnpm test
 
 ## 错误码
 
-- **校验错误码** —— `INVALID_QUERY`、`INVALID_BODY`、`INVALID_PATH_PARAMETER` —— 指明请求的哪一部分未通过契约自身的 schema，因此按 `code` 分类的调用方可以区分运行列表过滤器出错、请求体出错、还是路径参数出错。运行列表请求还会对声明的 query 参数做严格校验：未声明的 query 参数会以 `INVALID_QUERY` 被拒绝，而不是被忽略，因为 `listRuns` 把过滤器建模为一个 `additionalProperties: false` 的对象，而非裸参数列表。它们以 HTTP 400 + 字符串 `code` 呈现。服务端把整个 enum 投影为 `ERROR_RESPONSE_CODES_FROM_CONTRACT`，并拒绝发出契约未声明的码，因此信封不会对外宣称一个 [openapi.yaml](v1/openapi.yaml) 的 `ErrorResponse.code` enum 之外的值。
-- **控制流错误码** —— Review Runs 作为终态（确定性）发布失败而发出的四个 `PUBLICATION_STEP_*` 码 —— 单一事实来源化在 [openapi.yaml](v1/openapi.yaml) 的 `ErrorResponse.code` enum 里，并在写面上以 HTTP 409 + 字符串 `code` 呈现。服务端的 `PUBLICATION_STEP_ERROR_CODES`（review-runs）是这份 enum 的投影，GitHub 集成为每个码分类为 `retry: false`，因此任一侧新增一个码都会被 `publication-error-code-alignment.test.ts` 捕获，而不是让发布流程永续重试。
-- **不带 `code` 的响应** —— 每个操作都声明了内部故障的 HTTP 500（`InternalError`），每个读取请求体的操作还声明了请求体超过 1 MiB 上限的 HTTP 413（`PayloadTooLarge`）。两者都不带 `code`：故障信息刻意不透明，超限的请求体在契约自身的 schema 之前就被拒绝。Spectral 规则（`operation-declares-server-errors`）会让遗漏它们的新操作失败。
-- **诊断错误码**（`failure_code`、执行错误 `code`）是开放集合，在词汇稳定之前不做枚举。
+- **请求校验错误**：`INVALID_QUERY`、`INVALID_BODY`、`INVALID_PATH_PARAMETER` 分别表示查询参数、请求体和路径参数未通过 schema 校验，返回 HTTP 400 和字符串 `code`。运行列表不接受未声明的查询参数：`listRuns` 将过滤条件定义为 `additionalProperties: false` 的对象，因此未知参数返回 `INVALID_QUERY`。服务端从契约枚举生成 `ERROR_RESPONSE_CODES_FROM_CONTRACT`，不会返回枚举之外的 `ErrorResponse.code`。
+- **发布流程错误**：`PUBLICATION_STEP_*` 错误码表示确定的、应停止自动重试的发布失败，定义在 [openapi.yaml](v1/openapi.yaml) 的 `ErrorResponse.code` 中，写入接口以 HTTP 409 和字符串 `code` 返回。Review Runs 从该枚举生成 `PUBLICATION_STEP_ERROR_CODES`；GitHub Integration 为每个码设置 `retry: false`。两侧不一致时，`publication-error-code-alignment.test.ts` 会失败，避免遗漏停止重试规则。
+- **不带 `code` 的错误**：每个操作都声明 HTTP 500（`InternalError`）；读取请求体的操作还声明超过 1 MiB 上限时的 HTTP 413（`PayloadTooLarge`）。两者不返回 `code`：内部错误不暴露细节，过大的请求体则在 schema 校验前被拒绝。Spectral 规则 `operation-declares-server-errors` 会检查新增操作是否遗漏这些响应。
+- **诊断错误码**：`failure_code` 和执行错误的 `code` 暂不限定为枚举，可以增加新值。

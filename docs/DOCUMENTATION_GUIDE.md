@@ -2,26 +2,23 @@
 
 Language: English | [中文](DOCUMENTATION_GUIDE.zh.md)
 
-This guide defines repository-wide rules for maintained documentation. It applies to package READMEs, architecture and workflow documents, contract guides, and operations guides. Generated artifacts and third-party material follow their owning source instead.
+This guide explains how to write and update documentation maintained by this project, including package READMEs, architecture and workflow descriptions, contract guides, and operations guides. Generated files and third-party material follow the rules of their respective sources.
 
 ## Prefer Durable Statements
 
-Write the current system directly. Avoid historical rewrite traces, migration narration, and statements framed around what an earlier version did unless history is necessary to operate or interpret persisted data.
+Describe how the system works now rather than recounting each edit or refactor. Include historical context when readers need it to operate or maintain the system or interpret existing data.
 
-Remove details that merely recount nearby content and can become false independently of it. Common examples include a number before a list, a count of roles already named in the same sentence, and a claim that an open set is complete. Prefer:
+Avoid unnecessary counts: when a list or the named services already show what is included, there is usually no need to state the total again. If you are giving examples, do not present them as a complete list. Prefer:
 
 - `The supported execution paths are:` over `There are three execution paths:`;
-- named owners over `the two services`;
-- `includes` over `consists of` when the set may grow;
-- `these artifacts`, `the workers`, or `the lifecycle axes` after the members have been named.
+- specific service names over `the two services`;
+- `for example` or `includes` when listing examples, rather than presenting them as `all` or `the only` possibilities.
 
-Do not remove a number merely because it may change. Keep it when readers need the value to configure, operate, or reason about the system, or when it expresses an enforced invariant. Examples include a retry limit, timeout, concurrency default, protocol cardinality, and the single-maintainer guarantee.
-
-Use `always`, `never`, `only`, `exactly`, and exhaustive lists only for behavior enforced by code, a schema, an operational boundary, or tests. Otherwise narrow the statement to the context actually established.
+Do not delete a number just because it may change later. Keep values readers need to configure, operate, or understand the system, along with quantity limits enforced by the implementation or contract. For example, if a configuration table says “the timeout defaults to 60 seconds,” do not replace the value with “a timeout is configured.” Readers need the duration to judge whether to change it. The 60 seconds here is an example, not a project default.
 
 ## Mutable Facts
 
-Important facts may still be expected to change. Keep them visible when they help readers, and place an HTML comment immediately before the paragraph, list item, or table that contains them. GitHub does not render these comments, while source search and documentation-review tools can find them.
+Keep useful information even when it may change, and add an HTML comment immediately before the paragraph, list item, or table containing it. Record the source so maintainers can check it later. These comments are searchable in the Markdown source but hidden on the rendered GitHub page.
 
 Use this marker for repository-owned defaults and mutable implementation choices:
 
@@ -29,7 +26,9 @@ Use this marker for repository-owned defaults and mutable implementation choices
 <!-- doc-default: <stable-key>; source=<repository-relative-path> -->
 ```
 
-Use an environment variable, configuration field, exported constant, or package-qualified name as `<stable-key>`. `source` must point to the repository file that owns the value, not another prose document.
+For `<stable-key>`, use the relevant environment variable name, configuration field, exported constant name, or package-qualified name. For `source`, give the path to the file that defines the value, relative to the repository root, rather than another documentation page. For example, `AGENT_DOCKER_NETWORK_MODE` is defined in `agents/src/sec_review_agents/filesystem/docker_runtime.py`.
+
+Numbers used only for illustration need no source marker, but must be clearly identified as examples.
 
 Use this marker for dated external facts or conclusions that require periodic revalidation:
 
@@ -37,9 +36,11 @@ Use this marker for dated external facts or conclusions that require periodic re
 <!-- doc-time-sensitive: <subject>; checked=<YYYY-MM-DD>; source=<URL-or-repository-relative-path> -->
 ```
 
-The date records when the statement was checked, not when the document was edited. Update it only after revalidating the cited fact.
+`checked` records the date when you last verified the statement against its source. Update it only after checking again; rewording a sentence or fixing a typo is not a reason to replace it with today’s date.
 
-Markers identify review obligations; they do not make stale prose correct. When the source changes, update every marked statement that depends on it. English and translated documents must use the same marker key, source, and checked date.
+Date measurement and experiment results, and do not present a single result as a lasting guarantee. Keep the time context for dependency behavior and external release plans too.
+
+When the source information changes, check and update the corresponding documentation. Corresponding markers in English and Chinese documents must have identical contents.
 
 Find marked facts with:
 
@@ -47,21 +48,25 @@ Find marked facts with:
 rg 'doc-(default|time-sensitive):' --glob '*.md' --glob '!docs/DOCUMENTATION_GUIDE*.md'
 ```
 
-The exclusion keeps the marker templates in this guide out of the review-obligation set.
+## Explain How To Use It First
 
-## Defaults And Examples
+When documenting how to use a feature, first state what the reader can do and what they need to prepare, then give a minimal working example. Put implementation details after these instructions. For example, a service startup guide can cover preparing dependencies, setting configuration, running the startup command, and confirming that the service is available before explaining module layout and internal call flow.
 
-Keep a default in prose when it changes how a reader should operate or understand the system. Prefer one canonical configuration table when the value is merely reference data. A narrative may repeat the value when the consequence is the point, such as explaining how long recovery can pause or how a concurrency limit affects scheduling; mark that repetition with `doc-default`.
+## Wording In Chinese Documentation
 
-Label measurements and experiments as dated observations. Do not turn a sample result, current dependency behavior, or external release schedule into a permanent system property. Examples may use arbitrary numbers without markers when the text clearly identifies them as examples rather than defaults or guarantees.
+Use natural Chinese for explanations and descriptive headings, while keeping code identifiers, commands, paths, protocol values, and component names unchanged. Briefly explain terms readers may not know when they first appear.
+
+## Preserve Meaning When Rewriting
+
+Rewriting should make explanations clearer without changing their meaning. For example, “may fail” does not mean “will fail,” and shortening “validate the file before extraction” to “check the file” loses the required order of operations. For contract documentation, check field names, allowed values, specific numbers, and inputs that must be rejected against the contract definitions.
 
 ## Documentation Review
 
 When reviewing maintained documentation:
 
-1. Remove redundant counts and exhaustive wording that add no meaning.
-2. Preserve operationally useful defaults, limits, dates, and measured facts.
-3. Add or update mutable-fact markers and verify their sources.
-4. Check that absolute language is backed by an enforceable boundary.
-5. Keep English and translated documents aligned in meaning, headings, and markers.
+1. Remove unnecessary counts and check that examples are not presented as a complete list.
+2. Keep defaults, limits, dates, and measurement results that readers need to configure, operate, or understand the system.
+3. Add or update source markers for information that may change, and check the cited sources.
+4. Check statements about system behavior against the implementation and relevant contracts.
+5. Keep English and Chinese documents consistent in meaning, heading structure, and source markers.
 6. Run the documentation checks listed in `AGENTS.md`.

@@ -2,93 +2,105 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-这里是 `sec-review-bot` 的项目文档入口，包含 agent 设计说明、public contracts、workflow 设计说明和本地运行指南。
+这里汇总 `sec-review-bot` 的 Agent 设计、对外接口与数据格式、工作流和本地运行说明。
 
 如果想先看项目概览，从仓库根目录的 [README](../README.zh.md) 开始。
 
-## 文档地图
+## 按任务选择阅读路线
 
-- [DOCUMENTATION_GUIDE.md](DOCUMENTATION_GUIDE.md) / [中文](DOCUMENTATION_GUIDE.zh.md)：关于耐久表述、易变事实、翻译和文档审核的仓库级规则。
-
-### architecture/
-
-- [SYSTEM_ARCHITECTURE.md](architecture/SYSTEM_ARCHITECTURE.md) / [中文](architecture/SYSTEM_ARCHITECTURE.zh.md)：逻辑运行角色、当前部署边界、职责所有权，以及主 review 与异步 memory 链路。
-- [STAGE_AGENT_OWNERSHIP.zh.md](architecture/STAGE_AGENT_OWNERSHIP.zh.md)：stage 与 agent 的职责、资源生命周期和 MCP 会话归属。
-
-### Packages 与服务
-
-Package README 负责本地 setup、命令、配置与实现布局。运行角色和源码 package 并非一一对应：`agents/` 实现 Execution Worker、Memory Extraction Worker 与 Memory Maintenance Worker。
-
-| 运行角色 | Package 指南 |
+| 你想做什么 | 建议顺序 |
 | --- | --- |
-| GitHub Integration | [`apps/github-integration/README.md`](../apps/github-integration/README.zh.md) |
-| Review Runs | [`services/review-runs/README.md`](../services/review-runs/README.zh.md) |
-| Control Plane UI | [`apps/control-plane-ui/README.md`](../apps/control-plane-ui/README.md) |
-| Execution Gateway | [`services/execution-gateway/README.md`](../services/execution-gateway/README.zh.md) |
-| Execution Worker | [`agents/README.md`](../agents/README.zh.md) |
-| Memory Extraction Worker | [`agents/README.md`](../agents/README.zh.md) |
-| Memory Maintenance Worker | [`agents/README.md`](../agents/README.zh.md) |
-| Memory Catalog Server | [`services/memory-catalog/README.md`](../services/memory-catalog/README.zh.md) |
+| 在本地运行一次审查 | [Agents 安装与模型配置](../agents/README.zh.md) → [本地运行示例](../agents/README.zh.md#本地运行)；无需先部署 GitHub 集成。 |
+| 部署 GitHub 审查服务 | [LOCAL_INTEGRATED_DEPLOYMENT](operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md) → [LOCAL_GITHUB_INBOUND_SETUP](operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) → [触发命令](../apps/github-integration/README.zh.md#触发)。 |
+| 修改 Agent 或工作流 | [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.zh.md) → [README](../agents/README.zh.md) → 对应工作流文档。 |
+| 修改服务间接口或产物格式 | [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.zh.md) → [契约目录](../contracts/README.zh.md) → 对应契约目录和使用方的说明。 |
+| 开发控制台界面 | [Control Plane UI](../apps/control-plane-ui/README.zh.md)，先用测试数据预览，无需启动完整后端。 |
 
-### agent/
+下面的目录用于按主题查阅，不要求从头读到尾。
 
-需要理解 agent 边界、能力或 framework 取舍时，看这里。
+## 文档目录
 
-- [CAPABILITY_BOUNDARIES.md](agent/CAPABILITY_BOUNDARIES.md) / [中文](agent/CAPABILITY_BOUNDARIES.zh.md)：Agent 能力边界，包括 git history 和外部状态限制。
-- [Agent transcript 契约](../contracts/agent-transcript/README.zh.md)：JSONL 消息、执行关系与用量核算。
-- [CONTEXT_LOADING.md](agent/CONTEXT_LOADING.md) / [中文](agent/CONTEXT_LOADING.zh.md)：哪些上下文进 prompt、哪些由 agent 按需读取，以及本项目各 agent 如何选择。
-- [SKILLS.md](agent/SKILLS.md) / [中文](agent/SKILLS.zh.md)：Agent skills 的选择、准备和挂载。
-- [FRAMEWORK_SELECTION.md](agent/FRAMEWORK_SELECTION.md) / [中文](agent/FRAMEWORK_SELECTION.zh.md)：Agent framework 的选型。
-- [MEMORY_SYSTEM.md](agent/MEMORY_SYSTEM.md) / [中文](agent/MEMORY_SYSTEM.zh.md)：Agent memory system、经验提取和整理。
-- [EXTERNAL_TOOLS.md](agent/EXTERNAL_TOOLS.md) / [中文](agent/EXTERNAL_TOOLS.zh.md)：Agent 外部工具、默认 CLI 接入方式与可选 MCP 集成。
-- [RELATED_ISSUES.md](agent/RELATED_ISSUES.md) / [中文](agent/RELATED_ISSUES.zh.md)：Agent 相关设计问题。
+- [DOCUMENTATION_GUIDE](DOCUMENTATION_GUIDE.zh.md)：项目文档的编写、更新、翻译和审查要求。
 
-### contracts/
+### 架构
 
-完整的跨 package 边界目录、所有者、版本、可执行资产与变更流程统一维护在 [Contracts README](../contracts/README.zh.md) 中。各契约族 README 再分别定义消费者可以依赖什么，以及哪些规则刻意留给领域代码。
+- [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.zh.md)：各运行组件的职责、部署方式，以及审查执行和异步记忆处理的数据流。
+- [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.zh.md)：阶段与 Agent 分别负责什么，以及临时工作区、连接和 MCP 会话由谁创建、何时关闭。
 
-### workflows/
+### 包与服务
 
-主要 public workflow ID 是 `issue-review`、`pull-request-review` 和 `repository-review`。Issue / PR review 走 analysis、mitigation 和 verification；repository review 还包括 discovery、triage、CVSS scoring 和 delivery planning。
+各包的 README 说明安装、命令、配置和代码结构。一个源码包可以实现多个独立运行的组件，例如 `agents/` 实现 Execution Worker、Memory Extraction Worker 与 Memory Maintenance Worker。
 
-#### 共享 Review 规则
+| 运行角色 | 包说明 |
+| --- | --- |
+| GitHub Integration | [README](../apps/github-integration/README.zh.md) |
+| Review Runs | [README](../services/review-runs/README.zh.md) |
+| Control Plane UI | [README](../apps/control-plane-ui/README.zh.md) |
+| Execution Gateway | [README](../services/execution-gateway/README.zh.md) |
+| Execution Worker | [README](../agents/README.zh.md) |
+| Memory Extraction Worker | [README](../agents/README.zh.md) |
+| Memory Maintenance Worker | [README](../agents/README.zh.md) |
+| Memory Catalog Server | [README](../services/memory-catalog/README.zh.md) |
 
-- [CONCURRENCY_MODEL.md](workflows/CONCURRENCY_MODEL.md) / [中文](workflows/CONCURRENCY_MODEL.zh.md)：Workflow 并发模型。
-- [NARRATIVE_FIRST_REVIEW.md](workflows/NARRATIVE_FIRST_REVIEW.md) / [中文](workflows/NARRATIVE_FIRST_REVIEW.zh.md)：Narrative-first analyzer 输出纪律。
-- [REVIEW_INTENT.md](workflows/REVIEW_INTENT.md) / [中文](workflows/REVIEW_INTENT.zh.md)：Review intent 和修复阶段约束。
-- [BOUNDED_VERIFIER_FEEDBACK_RETRY.md](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.md) / [中文](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.zh.md)：Verifier 反馈的有界重试。
-- [TRUSTED_SETUP.md](workflows/TRUSTED_SETUP.md) / [中文](workflows/TRUSTED_SETUP.zh.md)：设置声明为何是这样——信任问题、它推出的约束、与信任无关的决定，以及不变量。
+### Agent
 
-#### issue-review
+以下文档介绍 Agent 的能力、上下文加载方式和框架选择。
 
-- [INPUT_PREANALYSIS.md](workflows/issue-review/INPUT_PREANALYSIS.md) / [中文](workflows/issue-review/INPUT_PREANALYSIS.zh.md)：Issue input 的预分析。
+- [CAPABILITY_BOUNDARIES](agent/CAPABILITY_BOUNDARIES.zh.md)：Agent 能力边界，包括 Git 历史和仓库外状态的处理限制。
+- [agent-transcript](../contracts/agent-transcript/README.zh.md)：JSONL 消息、执行关系与用量核算。
+- [CONTEXT_LOADING](agent/CONTEXT_LOADING.zh.md)：哪些内容直接放进提示词，哪些由 Agent 按需读取，以及各类 Agent 采用哪种方式。
+- [SKILLS](agent/SKILLS.zh.md)：Agent 技能的选择、准备和挂载。
+- [FRAMEWORK_SELECTION](agent/FRAMEWORK_SELECTION.zh.md)：Agent 框架的选择及理由。
+- [MEMORY_SYSTEM](agent/MEMORY_SYSTEM.zh.md)：Agent 如何读取记忆，以及如何提取和整理审查经验。
+- [EXTERNAL_TOOLS](agent/EXTERNAL_TOOLS.zh.md)：Agent 外部工具、默认 CLI 接入方式与可选 MCP 集成。
+- [RELATED_ISSUES](agent/RELATED_ISSUES.zh.md)：Agent 相关设计问题。
 
-#### pull-request-review
+### 契约
 
-- [REVIEW_WINDOW_CONTRACT.md](workflows/pull-request-review/REVIEW_WINDOW_CONTRACT.md) / [中文](workflows/pull-request-review/REVIEW_WINDOW_CONTRACT.zh.md)：`synchronize` 的审查窗口语义、实测的 GitHub API 行为，以及让 changed files、patch 与 suggestion 锚定共用同一窗口的契约。
-- [SUGGESTION_COMMENT_DESIGN.md](workflows/pull-request-review/SUGGESTION_COMMENT_DESIGN.md) / [中文](workflows/pull-request-review/SUGGESTION_COMMENT_DESIGN.zh.md)：PR suggestion comment 映射规则。
+包与包之间交换哪些数据、由谁维护、使用哪个版本，以及如何校验和修改，见[契约目录说明](../contracts/README.zh.md)。每类契约的 README 进一步说明接口保证什么、调用方还需自行处理哪些规则。
 
-#### repository-review
+### 工作流
 
-- [REPOSITORY_REVIEW_STRATEGY.md](workflows/repository-review/REPOSITORY_REVIEW_STRATEGY.md) / [中文](workflows/repository-review/REPOSITORY_REVIEW_STRATEGY.zh.md)：Repository review 策略和 delivery 边界。
-- [DISCOVERY_AGENT_DESIGN.md](workflows/repository-review/DISCOVERY_AGENT_DESIGN.md) / [中文](workflows/repository-review/DISCOVERY_AGENT_DESIGN.zh.md)：Discovery agent 的职责、文件选择、chunking 和资源边界。
-- [REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.md](workflows/repository-review/REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.md) / [中文](workflows/repository-review/REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.zh.md)：Incremental review 策略。
-- [TRIAGE_BOUNDARIES.md](workflows/repository-review/TRIAGE_BOUNDARIES.md) / [中文](workflows/repository-review/TRIAGE_BOUNDARIES.zh.md)：Triage 的边界。
-- [AGENT_PARTITION_WORKBENCH.md](workflows/repository-review/AGENT_PARTITION_WORKBENCH.md) / [中文](workflows/repository-review/AGENT_PARTITION_WORKBENCH.zh.md)：Agent 直接编辑的分组工作台。
-- [CVSSV4.md](workflows/repository-review/CVSSV4.md) / [中文](workflows/repository-review/CVSSV4.zh.md)：CVSS v4 评分。
-- [CONCURRENCY_AND_FAILURES.md](workflows/repository-review/CONCURRENCY_AND_FAILURES.md) / [中文](workflows/repository-review/CONCURRENCY_AND_FAILURES.zh.md)：Repository review 并发与失败边界。
+以下文档介绍 `issue-review`、`pull-request-review` 和 `repository-review`，包括工作流的组织方式，以及 Analyzer、Mitigator、Verifier、Discovery、Triage、CVSS Scoring 和 Delivery Planning 等 Agent 的职责。
 
-### operations/
+#### 通用审查规则
+
+- [CONCURRENCY_MODEL](workflows/CONCURRENCY_MODEL.zh.md)：工作流如何控制并发。
+- [NARRATIVE_FIRST_REVIEW](workflows/NARRATIVE_FIRST_REVIEW.zh.md)：为什么采用 narrative-first（叙事为先），以及 Analyzer、Mitigator 和 Verifier 如何围绕 narrative 组织和使用证据与结论。
+- [REVIEW_INTENT](workflows/REVIEW_INTENT.zh.md)：`review_intent` 如何指定审查目标，并约束最终补丁中的测试改动。
+- [BOUNDED_VERIFIER_FEEDBACK_RETRY](workflows/BOUNDED_VERIFIER_FEEDBACK_RETRY.zh.md)：何时根据 Verifier 的反馈重新执行修复和验证、重试时传递哪些上下文，以及如何限制重试次数。
+- [TRUSTED_SETUP](workflows/TRUSTED_SETUP.zh.md)：为什么从默认分支读取环境准备步骤、审查 fork PR 时为何需要授权，以及这些步骤如何在沙箱中执行。
+
+#### Issue 审查
+
+- [INPUT_ANALYSIS](workflows/issue-review/INPUT_ANALYSIS.zh.md)：如何根据 Issue 中的线索开始调查，避免过早相信报告或无目的地扩大调查范围。
+
+#### PR 审查
+
+- [REVIEW_WINDOW_CONTRACT](workflows/pull-request-review/REVIEW_WINDOW_CONTRACT.zh.md)：变更文件列表、补丁和行内修改建议如何使用同一 PR 审查窗口。
+- [SUGGESTION_COMMENT_DESIGN](workflows/pull-request-review/SUGGESTION_COMMENT_DESIGN.zh.md)：如何将修复补丁映射为 GitHub PR review comment 中的 suggestion 代码块。
+
+#### 仓库审查
+
+- [REPOSITORY_REVIEW_STRATEGY](workflows/repository-review/REPOSITORY_REVIEW_STRATEGY.zh.md)：仓库审查各阶段的职责，以及如何组织可交付的修复。
+- [DISCOVERY_AGENT_DESIGN](workflows/repository-review/DISCOVERY_AGENT_DESIGN.zh.md)：Discovery Agent 的职责、文件选择、分块方式和资源限制。
+- [REPOSITORY_INCREMENTAL_REVIEW_STRATEGY](workflows/repository-review/REPOSITORY_INCREMENTAL_REVIEW_STRATEGY.zh.md)：增量审查如何选择扫描文件、处理删除和限定审查窗口。
+- [TRIAGE_BOUNDARIES](workflows/repository-review/TRIAGE_BOUNDARIES.zh.md)：Triage 阶段何时保留、合并或排除候选线索。
+- [AGENT_PARTITION_WORKBENCH](workflows/repository-review/AGENT_PARTITION_WORKBENCH.zh.md)：Agent 直接编辑的分组工作台。
+- [CVSSV4](workflows/repository-review/CVSSV4.zh.md)：CVSS v4 评分。
+- [CONCURRENCY_AND_FAILURES](workflows/repository-review/CONCURRENCY_AND_FAILURES.zh.md)：仓库审查如何并发执行，以及局部失败会影响哪些任务。
+
+### 运维
 
 本地运行系统或配置 GitHub webhook 时，看这里：
 
-- [DEPENDENCY_MAINTENANCE.md](operations/DEPENDENCY_MAINTENANCE.md) / [中文](operations/DEPENDENCY_MAINTENANCE.zh.md)：依赖更新策略、本地检查命令和验证方式。
-- [LOCAL_INTEGRATED_DEPLOYMENT.md](operations/LOCAL_INTEGRATED_DEPLOYMENT.md) / [中文](operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)：本地控制平面、宿主机执行 worker、systemd 运维和扩展方式。
-- [LOCAL_MEMORY_DEVELOPMENT.md](operations/LOCAL_MEMORY_DEVELOPMENT.md) / [中文](operations/LOCAL_MEMORY_DEVELOPMENT.zh.md)：独立的本地 Memory 基础设施、worker 启动与维护操作。
-- [LOCAL_GITHUB_INBOUND_SETUP.md](operations/LOCAL_GITHUB_INBOUND_SETUP.md) / [中文](operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md)：将 GitHub App webhook 和 Actions 仓库级 review 请求转发到本地服务。
+- [DEPENDENCY_MAINTENANCE](operations/DEPENDENCY_MAINTENANCE.zh.md)：依赖更新策略、本地检查命令和验证方式。
+- [LOCAL_INTEGRATED_DEPLOYMENT](operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md)：本地控制平面、宿主机执行 Worker、systemd 运维和扩展方式。
+- [LOCAL_MEMORY_DEVELOPMENT](operations/LOCAL_MEMORY_DEVELOPMENT.zh.md)：如何搭建本地 Memory 开发环境、启动 Worker 和执行维护操作。
+- [LOCAL_GITHUB_INBOUND_SETUP](operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md)：将 GitHub App webhook 和 GitHub Actions 发起的仓库审查请求转发到本地服务。
 
-### roadmap/
+### 后续工作
 
-- [FUTURE_WORK.md](roadmap/FUTURE_WORK.md) / [中文](roadmap/FUTURE_WORK.zh.md)：将来工作。
+- [FUTURE_WORK](roadmap/FUTURE_WORK.zh.md)：后续可探索的工作。

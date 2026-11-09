@@ -2,7 +2,7 @@
 
 Language: English | [中文](SKILLS.zh.md)
 
-This page describes how this project selects, prepares, mounts, and reads bundled agent skills.
+This page explains how the project selects, prepares, mounts, and reads bundled agent skills. A skill supplies specialized knowledge on demand; it does not replace the review workflow.
 
 ## What Skills Are
 
@@ -37,7 +37,7 @@ skills/
 
 ## LangChain / deepagents Model and Boundary
 
-LangChain itself does not provide a governed skills model. deepagents `SkillsMiddleware` is closer to a lightweight filesystem protocol:
+In the versions used by this project, LangChain itself lacks a complete Skills abstraction. deepagents provides `SkillsMiddleware` for filesystem-based skill discovery and metadata loading:
 
 - The caller configures one or more source paths.
 - The middleware looks for `<skill>/SKILL.md` under those source paths.
@@ -60,7 +60,7 @@ deepagents only reads the source paths it is given. It does not choose or filter
 
 Some external skills or commands cover capabilities this project already implements as workflows. Anthropic's [`security-review.md`](https://github.com/anthropics/claude-code-security-review/blob/main/.claude/commands/security-review.md) describes "perform security review", and OrchestKit's [`review-pr.md`](https://github.com/yonatangross/orchestkit/blob/main/plugins/ork/commands/review-pr.md) describes "review a PR". Here, those capabilities are built into the public workflows and their review stages rather than one standalone skill.
 
-Bundled skills stay one layer below the project goal. They supplement the review workflow with reusable security knowledge; they do not redefine the workflow itself.
+Bundled skills stay one layer below the project goal. They supplement the review workflow with reusable security knowledge.
 
 The bundled knowledge layer contains:
 
@@ -93,7 +93,7 @@ sec_review_agents/resources/skill_source_notes/
 
 These files map decision-changing rules to authoritative sources and applicability limits.
 
-### Source Note Maintenance Contract
+#### Source Note Maintenance Contract
 
 Maintain source notes per reference or small rule group. They are evidence ledgers, not reading lists. Record:
 
@@ -113,6 +113,6 @@ When adding or changing a bundled skill:
 2. `SKILL.md` metadata should be general enough for discovery, while precise enough that the agent can decide when to read it. Do not write the description as a one-off test hint.
 3. Default to `SKILL.md` plus narrow `references/` files. Add templates or assets only for a concrete existing need; do not add `scripts/` unless the filesystem backend and permission model explicitly support skill execution.
 4. Trace decision-changing rules to authoritative sources under `sec_review_agents/resources/skill_source_notes/`.
-5. Declare the skill in the target agent or stage-local `skills.py`. Do not add skill names to docs, backend helpers, or runtime preparation code just to make them visible.
+5. Declare the required skill in the `skills.py` for the target agent or stage.
 6. Ensure the target backend consumes the declaration, prepares the allowlisted view, mounts it at `/skills`, and enables skills middleware for that agent session.
 7. Add focused tests for skill preparation and backend exposure. Follow the model-case structure documented in [`agents/tests/skills/README.md`](../../agents/tests/skills/README.md).

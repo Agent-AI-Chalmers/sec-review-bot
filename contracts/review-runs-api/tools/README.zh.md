@@ -2,9 +2,9 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-本包渲染并校验从[本族的 OpenAPI 契约](../v1/openapi.yaml)派生的全部产物：Kubb 生成的 TypeScript 投影、operation 路由映射与提交的 v1 JSON Schema。它住在所读契约旁边，因此"拥有某个投影的工具"不是"该投影落在的包"。
+本包根据[本类契约的 OpenAPI 文件](../v1/openapi.yaml)生成并校验 TypeScript 类型、操作路由映射和 v1 JSON Schema。工具与契约放在一起；即使生成文件写入其他包，仍由这里负责检查。
 
 ## 命令
 
@@ -18,13 +18,13 @@ pnpm run typecheck
 pnpm test
 ```
 
-`generate` 与 `check` 共享同一份"什么被生成"的描述（各生成器中的 `generatedArtifacts()`），因此二者不可能不一致。`tools/generated-artifacts.json` 记录本族派生什么、落到哪里；一个测试会断言它与生成器一致，并断言 CI 覆盖清单中每个产物。
+`generate` 和 `check` 共用各生成器的 `generatedArtifacts()` 输出描述，避免维护两份清单。`tools/generated-artifacts.json` 记录生成哪些文件及写入位置；测试会核对它与生成器一致，并检查 CI 是否覆盖每个输出文件。
 
 ## 目录结构
 
 ```text
 tools/
-  generated-artifacts.json   本族派生什么、落到哪里
+  generated-artifacts.json   本契约派生什么、落到哪里
   src/
     generate.ts              pnpm run generate
     check.ts                 pnpm run check

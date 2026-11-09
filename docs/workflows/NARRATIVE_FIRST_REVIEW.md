@@ -2,9 +2,9 @@
 
 Language: English | [中文](NARRATIVE_FIRST_REVIEW.zh.md)
 
-Analyzer output is not a casual list of findings. It is organized around narratives. A narrative here is not vague speculation; it is a reviewable analysis direction with its own evidence and verdict. It can explain a confirmed issue, a plausible risk, an inconclusive path, or a direction reviewed as no-actionable-finding.
+Analyzer organizes results into analysis directions, called narratives. Each carries its own evidence and verdict: a confirmed issue, plausible risk, inconclusive path, or direction reviewed without an actionable finding. `narratives` stores those directions, and `verdict` expresses the conclusion. The purpose is to prevent the agent from accumulating scattered observations while reading code and leaving only a vague impression.
 
-The purpose is to avoid an agent reading code, accumulating scattered observations, and leaving only a blurry impression. Instead, the system expects the agent to converge on a comparable set of explanations with clear priority. The basic output shape is:
+The system expects the agent to converge on a comparable set of explanations, called narratives, with clear priorities. Output includes:
 
 - a set of narratives, each with an integer `priority`, where `1` is highest
 - a small number of materially competing alternatives when needed, ordered through `priority`
@@ -28,7 +28,7 @@ A review of a PR that changed how review results are published to GitHub ended w
 
 | Priority | Review direction | Main question | Representative boundaries |
 | --- | --- | --- | --- |
-| 1 | Input reaching dangerous sinks | Can untrusted input or repository content cause SQL injection, path escape, branch injection, or Markdown breakout? | Parameterized SQL, branch-segment normalization, sensitive-path policy, Markdown code fences |
+| 1 | Input reaching dangerous sinks | Can untrusted input or repository content cause SQL injection, path escape, branch injection, or premature termination of Markdown code fences? | Parameterized SQL, branch-segment normalization, sensitive-path policy, Markdown code fences |
 | 2 | Concurrency and remote side effects | During timeout, takeover, and retry, what state can a stale worker commit and how are remote GitHub operations recovered? | Claim tokens, heartbeats, publication steps, markers, and stable branch identity |
 
 Their relationship can be represented as:

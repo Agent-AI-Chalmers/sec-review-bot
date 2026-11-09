@@ -2,31 +2,31 @@
 
 语言：[English](LOCAL_GITHUB_INBOUND_SETUP.md) | 中文
 
-本文是 [LOCAL_GITHUB_INBOUND_SETUP.md](LOCAL_GITHUB_INBOUND_SETUP.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [LOCAL_GITHUB_INBOUND_SETUP.md](LOCAL_GITHUB_INBOUND_SETUP.md) 的中文译文；如有差异，以英文版为准。
 
-## 什么是 webhook
+## 什么是 Webhook
 
-webhook 可以理解成“事件发生后，对方向你预留的地址发一个 HTTP 请求”。
+Webhook 可以理解成“事件发生后，对方向你预留的地址发一个 HTTP 请求”。
 
 在这个项目里：
 
 - GitHub 是事件源
 - 你的 `sec-review-bot` 服务是接收方
-- 你需要给 GitHub 一个可访问的 webhook URL
+- 你需要给 GitHub 一个可访问的 Webhook URL
 - 当 issue / PR 事件发生后，GitHub 会把 payload 发到这个 URL
 
 这和“你去轮询 GitHub”不一样，而是 GitHub 主动把事件推给你。
 
 ## Webhook 和 API 权限
 
-本地 webhook 设置只解决“收事件”这件事。一个能工作的 GitHub App 还需要 API 权限，才能在收到事件后继续回写 GitHub。
+本地 Webhook 设置只解决“收事件”这件事。一个能工作的 GitHub App 还需要 API 权限，才能在收到事件后继续回写 GitHub。
 
 - Webhook 决定 App 能收到哪些 GitHub 事件。
-- GitHub API 权限决定 App 后续能做什么，例如发 comment、创建 review、开 draft PR。
+- GitHub API 权限决定 App 后续能做什么，例如发评论、创建 review、开 draft PR。
 
 这个项目里的服务端会：
 
-1. 验证 webhook secret
+1. 验证 Webhook secret
 2. 解析 GitHub 发来的事件 payload
 3. 通过 App 身份去请求 GitHub API
 
@@ -34,7 +34,7 @@ webhook 可以理解成“事件发生后，对方向你预留的地址发一个
 
 GitHub 的服务器无法直接访问你本机的 `localhost:30000`。
 
-因此在本地开发时，你需要一个“GitHub 能访问到的公网 HTTPS 地址”，再把这个地址转发到你的本地 webhook 服务：
+因此在本地开发时，你需要一个“GitHub 能访问到的公网 HTTPS 地址”，再把这个地址转发到你的本地 Webhook 服务：
 
 ```text
 GitHub -> 公网 HTTPS URL -> 本地 http://localhost:30000/api/webhook
@@ -45,11 +45,11 @@ GitHub -> 公网 HTTPS URL -> 本地 http://localhost:30000/api/webhook
 - `smee`
   - 快速、轻量，适合本地调试
 - Cloudflare Tunnel
-  - 更正式，适合你已经有域名或希望固定一个稳定 webhook 地址
+  - 更正式，适合你已经有域名或希望固定一个稳定 Webhook 地址
 
 ## 本地服务地址
 
-GitHub integration 默认提供以下入站 endpoint：
+GitHub Integration 默认提供以下入站 endpoint：
 
 ```text
 http://localhost:30000/api/webhook
@@ -61,16 +61,16 @@ http://localhost:30000/api/repository-review/dispatch
 - `/api/webhook` 接收 GitHub App 的 issue 和 PR 事件。
 - `/api/repository-review/dispatch` 接收 GitHub Actions 发起的仓库级 review 请求。
 
-端口来自 `PORT`。只调试 GitHub App webhook 时配置第一个地址即可；使用仓库级 review workflow 时，第二个地址也必须能从公网访问。
+端口来自 `PORT`。只调试 GitHub App Webhook 时配置第一个地址即可；使用仓库级 review 工作流时，第二个地址也必须能从公网访问。
 
 ## 方案一：使用 `smee`
 
-很多 GitHub App / webhook 教程都会使用 [`smee.io`](https://smee.io/)，因为它很适合“先把链路打通”的本地开发场景。
+很多 GitHub App / Webhook 教程都会使用 [`smee.io`](https://smee.io/)，因为它很适合“先把链路打通”的本地开发场景。
 
 ### `smee` 的工作方式
 
 1. 在 `smee.io` 获取一个临时公网 URL
-2. GitHub 把 webhook 发到这个公网 URL
+2. GitHub 把 Webhook 发到这个公网 URL
 3. 本地运行 `smee` 客户端，把事件转发到你的本地服务
 
 ### 命令
@@ -82,18 +82,18 @@ npx smee -u https://smee.io/xxxxxxxxxxxx -t http://localhost:30000/api/webhook
 其中：
 
 - `-u`: 你的公网 `smee` channel 地址
-- `-t`: 本地 webhook 服务地址
+- `-t`: 本地 Webhook 服务地址
 
 ### 适合使用 `smee` 的场景
 
-- 本地快速调试 webhook
+- 本地快速调试 Webhook
 - 临时验证 GitHub App 配置
 - 不想自己处理证书、反向代理、入站端口和域名
 
 ### 代价
 
 - URL 往往更像临时调试地址
-- 更适合开发态，不太适合作为正式 webhook 地址
+- 更适合开发态，不太适合作为正式 Webhook 地址
 
 ## 方案二：使用 Cloudflare Tunnel
 
@@ -102,7 +102,7 @@ npx smee -u https://smee.io/xxxxxxxxxxxx -t http://localhost:30000/api/webhook
 ### Cloudflare Tunnel 的工作方式
 
 1. 在一台可运行 `cloudflared` 的机器上创建 tunnel
-2. 把某个域名或子域名路由到本地 GitHub integration 服务
+2. 把某个域名或子域名路由到本地 GitHub Integration 服务
 3. GitHub App 和 GitHub Actions 通过这个稳定的 HTTPS 地址访问各自的 endpoint
 
 在 Cloudflare Tunnel 中为每个 endpoint 添加一条 Published application route。这些 route 使用相同的 Hostname 和 Service，只填写不同的 Path：
@@ -145,16 +145,16 @@ sudo cloudflared service uninstall
 
 ### 适合使用 Cloudflare Tunnel 的场景
 
-- 想要稳定、正式、可长期复用的 webhook URL
+- 想要稳定、正式、可长期复用的 Webhook URL
 - 已经有 Cloudflare 和域名
 - 不想自己维护 nginx、证书和公网端口暴露
 
 ## 与 GitHub App 权限相关的常见坑
 
 - 你改了 App 权限，但 installation 还没重新批准
-- webhook secret 和本地配置不一致
-- webhook URL 填对了，但本地转发工具没在跑
-- Cloudflare Tunnel 只配置了 `/api/webhook`，导致 repository review dispatch 返回 `404`
+- Webhook secret 和本地配置不一致
+- Webhook URL 填对了，但本地转发工具没在跑
+- Cloudflare Tunnel 只配置了 `/api/webhook`，导致 GitHub Actions 发起的仓库审查请求返回 `404`
 - 你以为自己在监听公网地址，其实本地服务没有监听对应端口
 - App 没有 `Pull requests`、`Issues` 或 `Contents` 的足够权限，导致后续回写失败
 
@@ -170,5 +170,5 @@ sudo cloudflared service uninstall
 
 - GitHub App quickstart:
   - <https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/quickstart>
-- GitHub webhook guide:
+- GitHub Webhook guide:
   - <https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/building-a-github-app-that-responds-to-webhook-events>

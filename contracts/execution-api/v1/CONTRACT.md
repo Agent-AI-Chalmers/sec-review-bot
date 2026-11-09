@@ -58,7 +58,7 @@ Each workflow input has its own schema:
 Pull request inputs carry a `pr` subject describing the pull request as this run sees it. Two of its fields deserve a note because the schema cannot express their relationship:
 
 - `base_sha` and `head_sha` identify the pull request itself and stay constant for the run.
-- `review_window` states the range the run covers. On `synchronize` it is narrower than `base_sha..head_sha`, because the run covers only the commits pushed since the previous review. `review_window.reason` records why a run fell back to the full range.
+- `review_window` states the range the run covers. On `synchronize` it normally covers newly pushed commits and is narrower than `base_sha..head_sha`; fallback conditions may instead select the full PR range. `review_window.reason` records why a run fell back to the full range.
 
 The Execution API provider and Execution Worker both validate input at their process boundaries. All workflows require these common fields:
 
@@ -78,7 +78,7 @@ The Execution API provider and Execution Worker both validate input at their pro
 
 `test_changes` is a prompt constraint for the agent. It is not mechanical enforcement; the Execution Worker does not classify repository paths as tests or reject file changes based on path heuristics.
 
-`setup_declaration` is an optional string carrying the repository's setup declaration (the contents of `.sec-review/setup.yml` on the base-repo default branch). It is inline declaration text, not a path: callers fetch the file and pass its contents. Omission means the environment stays unbootstrapped. The declaration is parsed strictly and executed inside the sandbox before the agent starts. Trust in its provenance is the caller's responsibility: it comes from the base-repo default branch, and the Execution Worker does not re-verify it against a source.
+`setup_declaration` is an optional string carrying the contents of `.sec-review/setup.yml` on the reviewed repository's default branch. For pull requests, use the base repository's default branch, not the fork or PR head. It is inline declaration text, not a path: callers fetch the file and pass its contents. Omission means no setup declaration steps run. The declaration is parsed strictly and executed inside the sandbox before the agent starts. The caller is responsible for trusted provenance; Execution Worker does not check the declaration against its repository source.
 
 `repository-review` uses `scan_target` and `scan_scope` as its explicit cost and coverage boundary.
 
@@ -111,7 +111,10 @@ Issue and PR presentation use `ReviewRecord` directly. Repository case presentat
 
 The Execution Worker produces this projection from internal stage output. Its `ReviewRecord` builder intentionally keeps only the public fields: unknown internal fields are discarded, malformed optional scalar values become `null`, and malformed list members are omitted. This degradation policy applies only while producing optional report detail. The completed public result must still validate against the full workflow result schema before it crosses the Execution API boundary.
 
-Runtime exceptions are not part of `ReviewRecord`. If analyzer / mitigator / verifier / discovery / delivery synthesis fails at runtime, the workflow run should fail and the Execution API should return a structured execution error. Do not publish stage-level `status="error"`, `unavailable`, or other compatibility error projections in the public result.
+`ReviewRecord` contains review results, not runtime exceptions. Exceptions are handled as follows:
+
+- Unhandled exceptions in stages such as Discovery, Triage, Analyzer, Mitigator, Verifier, and delivery / patch synthesis fail the workflow run. Execution API returns a structured execution error.
+- Patch synthesis failures caught by the delivery layer are recorded in delivery results.
 
 > *CVSS is an optional score shown in the report, not the pass/fail signal for the review. If repository CVSS scoring fails after the case review itself succeeds, publish `ReviewRecord.cvss` as `null` and keep the scoring failure details in diagnostics and artifacts.*
 
@@ -123,8 +126,6 @@ Runtime exceptions are not part of `ReviewRecord`. If analyzer / mitigator / ver
 
 `verification.next_step` describes the next action after verifier judgment: `none` means no further action is needed; `retry-ai` means there is a concrete patch gap that bounded AI mitigation can continue fixing; `manual-review` means remaining work requires human review, administrator action, credential rotation, history cleanup, deployment/configuration changes, or another capability outside normal workspace patching.
 
-The local `single-agent` ablation has no independent Verifier assessment, so its `verification.coverage` is `null`. It retains self-check notes rather than inferring safety coverage from file presence.
-
 ### Issue Review Result
 
 Workflow: `issue-review`
@@ -132,8 +133,6 @@ Workflow: `issue-review`
 Input keeps the existing issue input contract and expresses review intent through `review_intent`. This is the workflow where `review_intent.objective = "repair"` changes analyzer stance. Analyzer conclusions do not determine admission to mitigation or verification.
 
 The result shape is defined by [`issue-review-result.schema.json`](schemas/issue-review-result.schema.json).
-
-The `two-stage` and `single-agent` issue strategies (`--strategy` on the local issue CLI) are local evaluation / ablation paths. They start as local-only Temporal workflows on the `issue-review` workflow, but they are not part of Execution API v1.
 
 Callers must render issue comments, decide whether a patch exists, and create draft PRs from `review_record`. When publishing a draft PR, `review_record.mitigation.file_changes` is the authoritative source for final file contents.
 
@@ -156,8 +155,6 @@ Repository review is composed of `scan -> case review -> delivery`:
 - `deliveries[]` contains repository delivery results and publishable artifacts produced by delivery execution.
 
 The result shape is defined by [`repository-review-result.schema.json`](schemas/repository-review-result.schema.json). `case_results[]` expresses case-level public results through `case_id`, `disposition`, `reason`, and `review_record`.
-
-The GitHub summary renderer can render confirmed cases that did not reach the delivery gate as blocked case cards from `case_results[]`.
 
 ### Repository Deliveries
 

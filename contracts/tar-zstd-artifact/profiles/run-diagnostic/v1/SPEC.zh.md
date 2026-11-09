@@ -1,31 +1,31 @@
-# Run Diagnostic Artifact - v1
+# 任务诊断产物 — v1
 
 语言：[English](SPEC.md) | 中文
 
-本文是 [SPEC.md](SPEC.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [SPEC.md](SPEC.md) 的中文译文；如有差异，以英文版为准。
 
 ## Envelope
 
-artifact 使用受限 POSIX PAX [envelope v1](../../../envelope/v1/SPEC.zh.md)，media type 为 `application/tar+zstd`，文件名为 `diagnostic-tree.v1.tar.zst`。
+产物使用受限 POSIX PAX [envelope v1](../../../envelope/v1/SPEC.zh.md)，媒体类型为 `application/tar+zstd`，文件名为 `diagnostic-tree.v1.tar.zst`。
 
 | 属性 | 限制 |
 | --- | --- |
-| 压缩 archive 大小 | 1 GiB（`1,073,741,824` bytes） |
-| entry 数量 | 100,000，包含文件与目录 |
-| regular file 总大小 | 8 GiB（`8,589,934,592` bytes） |
+| 压缩归档大小 | 1 GiB（`1,073,741,824` 字节） |
+| 条目数量 | 100,000，包含文件与目录 |
+| 普通文件总大小 | 8 GiB（`8,589,934,592` 字节） |
 
 ## 目录树
 
-archive 包含 `manifest.json`、`result.json`，以及保存 run 持久化诊断文件的 `artifact-tree/` 目录。只允许 regular file 与 directory。路径必须相对 archive root、使用 `/`、不包含空 segment、`.`、`..` 或反斜杠。重复的有效路径无效。
+归档包含 `manifest.json`、`result.json` 和 `artifact-tree/` 目录，后者保存该任务已持久化的诊断文件。只允许普通文件和目录。路径必须相对于归档根目录，使用 `/` 分隔，不能包含空片段、`.`、`..` 或反斜杠，也不能重复。
 
-manifest 是 UTF-8 JSON object，包含 `version: 1`、所属 `run_id`、`result: "result.json"` 与 `review_units` array。每个 review unit 包含唯一 string `id` 和 `trajectories` array。Trajectory path 遵循与 archive entry 相同的规范相对路径规则，指向 `artifact-tree/` 下的 `.jsonl` 文件，并且必须真实存在于 archive 中。
+清单是 UTF-8 JSON 对象，包含 `version: 1`、所属 `run_id`、`result: "result.json"` 与 `review_units` 数组。每个审查单元包含唯一的字符串 `id` 和 `trajectories` 数组。轨迹路径遵循与归档条目相同的规范相对路径规则，指向 `artifact-tree/` 下的 `.jsonl` 文件，并且必须真实存在于归档中。
 
-`result.json` 必须是合法 UTF-8 JSON。消费者可以使用低于发布限制的角色专属 preview limit，但必须先执行 envelope 校验，再解释两个 JSON document。
+`result.json` 必须是合法 UTF-8 JSON。读取方可以根据用途设置更低的预览大小限制，但必须先完成 envelope 校验，再解析这两个 JSON 文件。
 
 ## 生产
 
-生产者应用 envelope 的 canonical entry 规则，从 `artifact-tree/` 排除 publication directory 和 symlink，在发布前执行本 profile 的限制，显式选择 POSIX PAX 输出，并按共享 envelope 与本 profile 校验已完成 archive。消费者在读取和解压时执行相同限制。
+生成方遵守 envelope 的条目规则，从 `artifact-tree/` 中排除发布目录和符号链接，在发布前检查本格式的资源限制，并明确选择 POSIX PAX 输出。生成完成后，按共享 envelope 和本格式校验归档，再发布。读取方在读取和提取文件时执行相同限制。
 
-## 共享 Corpus
+## 共享测试输入
 
-[corpus/manifest.json](corpus/manifest.json) 记录真实的合法与非法 run-diagnostic archive。每个消费者除了 envelope corpus 外，还必须执行这些 bytes。用例覆盖最小合法 tree、由 PAX 承载的合法 trajectory 长路径、manifest result reference、缺失 trajectory、非规范 trajectory path、trajectory filename 要求、重复 review-unit identity 与 link entry。
+[corpus/manifest.json](corpus/manifest.json) 记录真实的合法与非法诊断归档。所有读取方都必须测试这些实际字节，也必须执行共享 envelope 的测试输入。用例覆盖最小合法目录树、使用 PAX 的合法轨迹长路径、清单中的结果引用、轨迹缺失、轨迹路径不规范、轨迹文件名要求、审查单元标识重复，以及链接条目。

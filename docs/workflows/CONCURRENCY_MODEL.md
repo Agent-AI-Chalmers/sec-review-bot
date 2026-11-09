@@ -4,6 +4,19 @@ Language: English | [中文](CONCURRENCY_MODEL.zh.md)
 
 This document explains the system-wide concurrency layers. It is about how runs, workflows, and activities share capacity; repository-review stage concurrency is covered separately in [repository-review/CONCURRENCY_AND_FAILURES.md](repository-review/CONCURRENCY_AND_FAILURES.md).
 
+## Basic Temporal Terms
+
+| Term | Meaning |
+| --- | --- |
+| workflow | Code that orchestrates work by scheduling activities, starting child workflows, and handling results. |
+| workflow execution | A specific execution of a workflow whose execution history is stored by Temporal. |
+| child workflow | A workflow started by another workflow, such as processing an individual repository-review case. |
+| activity | A unit of concrete work, such as running Analyzer; a failed execution can be attempted again according to its retry policy. |
+| workflow task | A task in which a Worker advances workflow orchestration, such as handling an activity completion and scheduling the next step. |
+| Worker | A process that polls task queues and executes workflow tasks or activity tasks. |
+| task queue | A queue through which Temporal dispatches workflow tasks or activity tasks to Workers. |
+| activity slot | A place available for a Worker to execute an activity. For example, 8 slots allow at most 8 activities to execute at the same time. |
+
 ## Layers
 
 Concurrency is controlled at three different layers:
@@ -18,9 +31,16 @@ These layers are related, but they are not the same knob.
 
 The execution gateway starts Temporal workflows for app-submitted runs. Temporal does not treat one whole run as one worker slot. A run is decomposed into workflow tasks, activity tasks, and sometimes child workflows.
 
-`TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` limits how many review activities one Execution Worker process can execute at once. `TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES` independently controls the Memory Extraction Worker. The Memory Maintenance Worker uses `TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES`, which is constrained to `1` because maintenance is a singleton operation. None of these values means "how many app-submitted runs may be active."
+<!-- doc-default: TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES; source=agents/src/sec_review_agents/entrypoints/memory_maintenance_worker/main.py -->
+| Setting | Worker | Limit |
+| --- | --- | --- |
+| `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` | Execution Worker | Review activities executing concurrently per process. |
+| `TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES` | Memory Extraction Worker | Activities executing concurrently per process. |
+| `TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES` | Memory Maintenance Worker | Activities executing concurrently, fixed at `1`. |
 
-Execution and memory extraction capacity can grow by adding worker processes that poll their respective queues. Memory maintenance is deliberately different: the integrated deployment runs one non-template service with one activity slot, and provides no scale-out path for that pool.
+These settings limit concurrent activities, not the number of submitted runs that have yet to finish. Multiple runs share Worker activity capacity, as illustrated below.
+
+Execution and memory extraction capacity can grow by adding worker processes that poll their respective queues. Memory maintenance is deliberately different: the integrated deployment runs one non-template service with one activity slot, and does not support adding more maintenance Worker processes.
 
 For example, with `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES=8`:
 
@@ -28,7 +48,7 @@ For example, with `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES=8`:
 run-1 currently has 3 activities executing
 run-2 currently has 4 activities executing
 run-3 currently has 1 activity executing
-=> the worker activity pool is full
+=> this Worker has reached its activity concurrency limit
 ```
 
 Those numbers are momentary activity usage. They are not fixed reservations per run. A linear issue review may usually occupy one major activity at a time, while a repository review can fan out chunks, cases, or delivery work and consume more activity capacity.
@@ -49,4 +69,4 @@ Some workflows control their own internal fanout. Repository review is the main 
 - case processing can keep several case child workflows in flight;
 - delivery execution can keep several combined delivery activities in flight.
 
-Those workflow-level windows cap how much one run can expand. Worker activity capacity still applies underneath: if the worker pool is full, already-scheduled activities wait on the Temporal side until a worker can execute them.
+Those workflow-level windows cap how much one run can expand. Worker activity capacity still applies underneath: if all Workers have reached their activity concurrency limits, already-scheduled activities wait on the Temporal side until a worker can execute them.

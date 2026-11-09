@@ -2,13 +2,13 @@
 
 语言：[English](AGENT_PARTITION_WORKBENCH.md) | 中文
 
-本文是 [AGENT_PARTITION_WORKBENCH.md](AGENT_PARTITION_WORKBENCH.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [AGENT_PARTITION_WORKBENCH.md](AGENT_PARTITION_WORKBENCH.md) 的中文译文；如有差异，以英文版为准。
 
 ## 背景
 
 有些 repository workflow 阶段不是逐个判断对象，而是把一批 item 整理成更少的工作单元。
 
-这类任务不适合让 agent 一次性输出一个巨大的最终结构，因为很难同时保证没有漏项、重复消费或非法归属。更自然的方式是让系统维护一个工作台，agent 只通过少量工具查看和编辑它，最终由系统导出结果。
+这类任务不适合让 Agent 一次性输出一个巨大的最终结构，因为很难同时保证没有漏项、重复消费或非法归属。更自然的方式是让系统维护一个工作台，Agent 只通过少量工具查看和编辑它，最终由系统导出结果。
 
 ## 问题定义
 
@@ -33,7 +33,7 @@
 
 ### 不满足闭包
 
-group membership 通常满足交换性：如果 A 和 B 属于同一个 group，成员顺序不改变 group 含义。但语义关系不一定满足传递性：A 和 B 共享边界、B 和 C 共享边界，不代表 A 和 C 也应该同组。B 可能只是 bridge item。不能把 pairwise relatedness 当成连通图做 transitive closure；每个 group 都应该有一个所有成员共同落入的 primary boundary。
+group membership 通常满足交换性：如果 A 和 B 属于同一个 group，成员顺序不改变 group 含义。但语义关系不一定满足传递性：A 和 B 共享边界、B 和 C 共享边界，不代表 A 和 C 也应该同组。B 可能只是 bridge item。不能把 pairwise relatedness 当成连通图做 transitive closure；每个 group 都应该有一个所有成员都符合的 primary boundary。
 
 Partition workbench 是这个问题的一种 agent-edited 实现，后面再说明系统状态、工具和完成信号如何落地。
 
@@ -49,13 +49,13 @@ Partition workbench 是这个问题的一种 agent-edited 实现，后面再说�
 
 交互模型上，它最接近 interactive clustering 和 mixed-initiative clustering。这类系统维护一个显式 partition，由语义编辑者通过创建、删除、移动、合并、拆分 group，以及在 groups 之间移动单个 item 等局部操作持续修正当前状态。[Mixed-Initiative Clustering](https://www.lti.cs.cmu.edu/people/alumni/alumni-thesis/huang-yifen-thesis.pdf) 描述了一个可编辑的 clustering state，其中包括 add、remove、move、merge、split，以及在 clusters 之间移动 document 等操作。[Local Algorithms for Interactive Clustering](https://jmlr.org/papers/v18/15-085.html) 同样研究通过局部 split / merge 修正当前 clustering，同时尽量保持未受影响部分稳定，而不是每次重新生成完整结果。
 
-Partition workbench 采用了这种局部编辑形态，但把 human editor 换成 LLM agent，并把 backend state 设为 authoritative state。groups 是带类型和阶段 metadata 的 workflow resources，而不是普通相似度 clusters。agent 负责语义判断和局部编辑意图；系统负责 item identity、membership consistency、coverage、non-overlap、必需 metadata、完成检查和最终导出。系统不需要推断一个隐藏的 target clustering，也不需要在每次编辑后重新运行 clustering algorithm。
+Partition workbench 采用了这种局部编辑形态，但把 human editor 换成 LLM agent，并把 backend state 设为 authoritative state。groups 是带类型和阶段 metadata 的 workflow resources，而不是普通相似度 clusters。Agent 负责语义判断和局部编辑意图；系统负责 item identity、membership consistency、coverage、non-overlap、必需 metadata、完成检查和最终导出。系统不需要推断一个隐藏的 target clustering，也不需要在每次编辑后重新运行 clustering algorithm。
 
-2025 年和 2026 年发表的 human-in-the-loop analysis systems 比 one-shot clustering pipeline 提供了更接近的 workbench 类比。[ADAPTIVE IE](https://aclanthology.org/2025.coling-main.392/) 支持围绕当前 clustering 迭代执行 merge、split、rearrange 和 rename；[Perspectives](https://aclanthology.org/2026.nlp4dh-1.36/) 则提供一个交互式 document-clustering workbench，让用户围绕 analytical lens 持续修正 grouping。这些系统仍以 human editor 为中心，通常也保留底层 clustering procedure；这里则由 agent 通过 tools 直接编辑 authoritative typed partition。
+2025 年和 2026 年发表的 human-in-the-loop analysis systems 比 one-shot clustering pipeline 提供了更接近的 workbench 类比。[ADAPTIVE IE](https://aclanthology.org/2025.coling-main.392/) 支持围绕当前 clustering 迭代执行 merge、split、rearrange 和 rename；[Perspectives](https://aclanthology.org/2026.nlp4dh-1.36/) 则提供一个交互式 document-clustering workbench，让用户围绕 analytical lens 持续修正 grouping。这些系统仍以 human editor 为中心，通常也保留底层 clustering procedure；这里则由 Agent 通过 tools 直接编辑 authoritative typed partition。
 
 数学状态上，它也与 constrained partitioning 有关：系统要把 items 分到 groups，同时满足 coverage、non-overlap、合法 group kind 和阶段规则。Google OR-Tools 的 [assignment with allowed groups](https://developers.google.com/optimization/assignment/assignment_groups) 展示了可枚举 group 约束下的 assignment。这个类比有助于描述形式，但不是主要交互模型：优化建模通常要求求解前已经有明确目标和可枚举约束，而“是否同一 root issue / patch boundary / trust failure”等边界是在 agent 检查和修正过程中逐步发现的。
 
-如果把 agent 的判断改成 must-link / cannot-link pairwise constraints，再由系统自动聚合 groups，那么它会更接近 constrained clustering。这篇 [constrained clustering 综述](https://link.springer.com/article/10.1007/s10462-024-11103-8) 讨论了 hard、soft 和 noisy constraints。correlation clustering 是另一个相邻形式：它从 positive / negative pairwise relationships 寻找 partition；带约束的变体可能需要较重的求解机制，例如这个 [weighted partial MaxSAT formulation](https://www.sciencedirect.com/science/article/pii/S0004370215001022)。这些方向可以提供内部 hints，但如果把它们作为主要接口，就会引入 pair 数量爆炸、噪声、冲突和 constraint selection 问题。
+如果把 Agent 的判断改成 must-link / cannot-link pairwise constraints，再由系统自动聚合 groups，那么它会更接近 constrained clustering。这篇 [constrained clustering 综述](https://link.springer.com/article/10.1007/s10462-024-11103-8) 讨论了 hard、soft 和 noisy constraints。correlation clustering 是另一个相邻形式：它从 positive / negative pairwise relationships 寻找 partition；带约束的变体可能需要较重的求解机制，例如这个 [weighted partial MaxSAT formulation](https://www.sciencedirect.com/science/article/pii/S0004370215001022)。这些方向可以提供内部 hints，但如果把它们作为主要接口，就会引入 pair 数量爆炸、噪声、冲突和 constraint selection 问题。
 
 LLM-guided clustering 展示了另一种责任划分。[Large Language Models Enable Few-Shot Clustering](https://aclanthology.org/2024.tacl-1.18/) 让 LLM 生成 pairwise constraints，再运行 clustering。共同点是让 LLM 参与语义分组判断；架构差异在于当前 workbench 采用 `agent judgment -> typed CRUD edits -> authoritative partition -> system validation and export`，而不是 `LLM judgment -> pairwise constraints -> clustering algorithm -> partition`。
 
@@ -63,9 +63,9 @@ LLM-guided clustering 展示了另一种责任划分。[Large Language Models En
 
 ## 为什么这样做
 
-这类 partition 任务有大量语义判断，通常很难完全写成静态规则或优化目标。例如两个 items 是否应该同组，可能取决于 shared root issue、patch boundary、trust failure、review unit、弱旁证是否有独立价值等上下文判断。这些判断适合交给 agent 做。
+这类 partition 任务有大量语义判断，通常很难完全写成静态规则或优化目标。例如两个 items 是否应该同组，可能取决于 shared root issue、patch boundary、trust failure、review unit、弱旁证是否有独立价值等上下文判断。这些判断适合交给 Agent 做。
 
-最直接的 agent 方案，是让 agent 一次性输出完整的 item -> group 映射或最终 JSON。但这种做法会把太多机械责任也交给 agent：
+最直接的 Agent 方案，是让 Agent 一次性输出完整的 item -> group 映射或最终 JSON。但这种做法会把太多机械责任也交给 Agent：
 
 - 记住所有 item。
 - 保证阶段要求的 coverage。
@@ -74,7 +74,7 @@ LLM-guided clustering 展示了另一种责任划分。[Large Language Models En
 - 在发现局部错误后重写整份结果。
 - 在完成后额外生成不受 contract 约束的自然语言总结。
 
-Partition workbench 的取舍是：让 agent 继续负责语义判断，但把机械责任交还给系统。agent 只负责创建、移动、合并、拆分和解释 groups；系统负责状态一致性、结构约束检查和最终导出。
+Partition workbench 的取舍是：让 Agent 继续负责语义判断，但把机械责任交还给系统。Agent 只负责创建、移动、合并、拆分和解释 groups；系统负责状态一致性、结构约束检查和最终导出。
 
 这种模式更接近人类处理复杂集合任务的方式：不是一次性写出最终表格，而是在一个可见工作台上持续整理、移动、修正，直到状态通过检查。
 
@@ -83,11 +83,11 @@ Partition workbench 的取舍是：让 agent 继续负责语义判断，但把�
 系统维护两类核心状态：
 
 - `items`: 输入项，只读。每个 item 有稳定 id 和阶段定义的 payload。
-- `groups`: agent 创建和编辑的工作单元。
+- `groups`: Agent 创建和编辑的工作单元。
 
 item 到 group 的归属关系由系统从 `groups[*].item_ids` 派生维护。
 
-Partition workbench 的底层操作和 payload 语义无关。payload 是阶段提供给 agent 的只读判断材料；工作台只按 item id 和 group membership 维护状态、检查结构约束，并在结束时导出阶段结果。
+Partition workbench 的底层操作和 payload 语义无关。payload 是阶段提供给 Agent 的只读判断材料；工作台只按 item id 和 group membership 维护状态、检查结构约束，并在结束时导出阶段结果。
 
 编辑过程中，系统维护 non-overlap：
 
@@ -102,7 +102,7 @@ Partition workbench 的底层操作和 payload 语义无关。payload 是阶段�
 
 对 delivery planning 来说，所有 item 最终都必须进入同一种 `delivery` group；对 triage 来说，item 可以进入 `keep` group，也可以进入 `suppress` group，具体规则由阶段定义。
 
-## 工具形状
+## 工具接口
 
 工具的语义保持小而通用，核心是对 group 资源做 CRUD。
 
@@ -133,7 +133,7 @@ Partition workbench 的底层操作和 payload 语义无关。payload 是阶段�
 
 不暴露的工具（经验之谈），主要目的都是减少不必要的 agent tool call：
 
-- 不暴露 `read_group`: agent 应通过 `read_groups` 判断当前 draft 结构；按单个 group 再展开 item payload 容易重复 prompt 中已有证据，并诱导反复读取。
+- 不暴露 `read_group`: Agent 应通过 `read_groups` 判断当前 draft 结构；按单个 group 再展开 item payload 容易重复 prompt 中已有证据，并诱导反复读取。
 - 不暴露 `read_item` / `read_items`: item payload 通常作为 user prompt 输入直接提供。工作台底层只按 item id 和 group membership 操作，不需要 agent 逐项读取 item payload。
 
 ### 写入工具返回值
@@ -142,19 +142,19 @@ Partition workbench 的底层操作和 payload 语义无关。payload 是阶段�
 
 写入工具的返回值应该是 compact mutation result，只说明本次写入发生了什么，以及当前硬约束是否仍然满足。完整 group 列表只能通过 `read_groups` 显式读取。
 
-避免写入工具每次返回完整 groups 很重要。否则一次小编辑会把全量 group metadata 反复塞回上下文，造成 token 放大，也容易让 agent 在巨大 tool output 中误读状态。
+避免写入工具每次返回完整 groups 很重要。否则一次小编辑会把全量 group metadata 反复塞回上下文，造成 token 放大，也容易让 Agent 在巨大 tool output 中误读状态。
 
 ### 完成信号
 
-agent 不通过普通工具导出最终结果，而是返回一个极薄的 structured completion response，例如 `{"done": true}`。
+Agent 不通过普通工具导出最终结果，而是返回一个极薄的 structured completion response，例如 `{"done": true}`。
 
 系统在完成信号处运行 structural constraints checker。只有 coverage、non-overlap、合法 `kind`、必填 metadata 和最终导出契约等结构约束通过时，完成信号才有效；之后系统从工作台状态导出最终结果。
 
-如果结构约束没有通过，系统会拒绝完成信号，agent 应继续调整工作台，而不是结束。语义边界是否正确仍是 agent 的判断结果，不由 constraints checker 自动证明。
+如果结构约束没有通过，系统会拒绝完成信号，Agent 应继续调整工作台，而不是结束。语义边界是否正确仍是 Agent 的判断结果，不由 constraints checker 自动证明。
 
 ## Agent 工作方式
 
-agent 不直接输出最终 plan。它应该像人在工作台前整理卡片一样工作：
+Agent 不直接输出最终 plan。它应该像人在工作台前整理卡片一样工作：
 
 1. 首先看到了输入中的静态背景信息（通常是全部 item 的 payload）。
 2. 查看未处理 item，当前工作台状态，并结合输入中的静态背景信号。
@@ -165,15 +165,15 @@ agent 不直接输出最终 plan。它应该像人在工作台前整理卡片一
 
 最终结果由系统从工作台状态导出，而不是由 agent 手写完整 JSON 或自然语言总结。
 
-这个工作方式应该是可重入的：agent 可能面对一个空工作台，也可能面对上一轮已经整理过的 groups。它每次都先读取当前状态；如果已有 groups，大多时候把它们当作草稿做局部修正，而不是从头重建。
+这个工作方式应该是可重入的：Agent 可能面对一个空工作台，也可能面对上一轮已经整理过的 groups。它每次都先读取当前状态；如果已有 groups，大多时候把它们当作草稿做局部修正，而不是从头重建。
 
 ### Refinement
 
 可重入性让第二轮 refinement 变得自然：第一次 agent run 可以从空工作台创建完整草稿；第二次 agent run 可以继承同一个工作台，把已有 groups 当作 draft 做质量修正。
 
-引入 refinement 的原因不是 coverage。coverage 是系统 constraints checker 的任务。真实问题是 agent 在第一次 pass 里常常读完整输入后直接用 `create_groups` 一次性创建草稿，然后很自信地结束。这种草稿通常满足 constraints，但仍可能有 over-merge、missed merge、weak reason 或 keep/suppress 边界错误。
+引入 refinement 的原因不是 coverage。coverage 是系统 constraints checker 的任务。真实问题是 Agent 在第一次 pass 里常常读完整输入后直接用 `create_groups` 一次性创建草稿，然后很自信地结束。这种草稿通常满足 constraints，但仍可能有 over-merge、missed merge、weak reason 或 keep/suppress 边界错误。
 
-一个自然想法是让同一轮 agent 在结束前自检。但“自检”很容易被模型执行成 bookkeeping：重新数 items、复述 groups、为已有分组写长篇理由，或证明 coverage 完整。它会增加 token 和上下文噪声，却不稳定地产生更好的 edits。Refinement 的价值在于先把第一轮判断外化成 workbench state，再让下一轮把它当作 draft，只寻找具体可编辑的 group 边界问题；没有具体 edit 就结束。
+一个自然想法是让同一轮 Agent 在结束前自检。但“自检”很容易被模型执行成 bookkeeping：重新数 items、复述 groups、为已有分组写长篇理由，或证明 coverage 完整。它会增加 token 和上下文噪声，却不稳定地产生更好的 edits。Refinement 的价值在于先把第一轮判断外化成 workbench state，再让下一轮把它当作 draft，只寻找具体可编辑的 group 边界问题；没有具体 edit 就结束。
 
 有效的 refinement 应该：
 
@@ -183,7 +183,7 @@ agent 不直接输出最终 plan。它应该像人在工作台前整理卡片一
 - 通过 `update_group(s)` / `create_group(s)` / `delete_group(s)` 做 targeted group edits；
 - 最后读 constraints 并结束。
 
-不应鼓励 agent 在 constraints ok 后手动数 item_ids、列出每个 group 或重述 coverage。这些 bookkeeping 会污染后续上下文，而且系统已经能可靠检查。
+不应鼓励 Agent 在 constraints ok 后手动数 item_ids、列出每个 group 或重述 coverage。这些 bookkeeping 会污染后续上下文，而且系统已经能可靠检查。
 
 ### Single 与 Batch
 
@@ -201,7 +201,7 @@ batch 的好处是快，**尤其在慢模型上明显**。但它有实际代价�
 - batch draft 看不到跨 batch 的合并机会，也就是所谓的缺少全局视野；
 - global refinement 仍然需要全局审计。
 
-因此，batch 更适合作为 latency workaround，而不是默认形态。尤其当较快模型的 single run 已经足够快时，batch 的 wall-time 优势会变小，坏处反而更明显：它会引入 batch 边界损失，并且仍然刚需一轮 global refinement 来恢复全局判断。
+因此，batch 更适合作为 latency workaround，而不是默认形态。尤其当较快模型的 single run 已经足够快时，batch 的 wall-time 优势会变小，坏处反而更明显：它会引入 batch 边界损失，并且仍然需要一轮 global refinement 来恢复全局判断。
 
 也不要过早把这个 batch 设计描述成“解决超大输入”的方案。如果 refinement 仍然需要读全量 item payload，那么 batch 只是降低了单次 draft invoke 的输入规模和推理耗时，并没有消除最终全局审计面对全量 items 的问题。
 
@@ -209,7 +209,7 @@ batch 的好处是快，**尤其在慢模型上明显**。但它有实际代价�
 
 当一个阶段用 batch draft 再接 global refinement 时，系统可以在 refinement 的 user prompt 里提供轻量的 draft origin 列表，帮助 agent 优先检查跨局部上下文的边界问题。
 
-推荐形状是按 origin scope 列出 group id：
+建议按 origin scope 列出 group id：
 
 ```markdown
 Use this section only to prioritize refinement attention. Groups from different draft scopes may not have been compared in the same pass.
@@ -220,7 +220,7 @@ Use this section only to prioritize refinement attention. Groups from different 
 
 这不是 group metadata，也不是新的工具视图。group 本体仍然只表达当前工作台状态；draft origins 只是 refinement pass 的只读上下文，用来说明哪些 groups 是在同一个局部 draft scope 中产生的。
 
-这样做的目的不是让 agent 信任 batch 内结果，而是调整注意力优先级：
+这样做的目的不是让 Agent 信任 batch 内结果，而是调整注意力优先级：
 
 - 优先检查不同 draft scope 之间的重复、漏合并、边界错位或 keep/suppress 不一致。
 - 同一 draft scope 内的 groups 已经在同一个局部上下文中被共同看过，除非边界明显弱，不需要平均投入同等审查成本。
@@ -230,7 +230,7 @@ Use this section only to prioritize refinement attention. Groups from different 
 
 ## 常见分组意图如何落到工具
 
-这些分组意图不需要作为独立工具暴露给 agent。下面只用简短情景说明它们如何落到基础工具上。
+这些分组意图不需要作为独立工具暴露给 Agent。下面只用简短情景说明它们如何落到基础工具上。
 
 普通分组和调整：
 
@@ -253,7 +253,7 @@ Use this section only to prioritize refinement attention. Groups from different 
 | 多个 item 因同一原因被压掉 | 创建 `suppress` group，把这些 item 作为初始成员，并写清 reason。 | create_group(kind=suppress, item_ids=[...]) |
 | 一个被压掉的 item 又应该恢复 | 更新正常 group 的 item_ids 接走它，或删除 `suppress` group 让它回到未处理状态。 | update_group(item_ids=[...]) 或 delete_group |
 
-从 prompt 的角度，可以继续使用这些分组意图帮助 agent 理解任务；从工具的角度，仍然保留 group 读取、constraints 检查、单个 group CRUD 和批量 group CRUD。结束由 structured completion response 表达。
+从 prompt 的角度，可以继续使用这些分组意图帮助 Agent 理解任务；从工具的角度，仍然保留 group 读取、constraints 检查、单个 group CRUD 和批量 group CRUD。结束由 structured completion response 表达。
 
 ## 附录
 
@@ -285,7 +285,7 @@ Use this section only to prioritize refinement attention. Groups from different 
 
 - `single-pro` 是这轮质量上界；`single-flash` 接近它，但更快。
 - `batch-flash` 是最有希望的 batch 形态：快、便宜，但需要 refinement 更好地修正 batch 边界损失。
-- `batch-pro` 不适合作为默认；它修正了一个较小的 cookie 过合并，但留下了更严重的 checkout / JWT / addReview bridge 合并。
+- 这轮 `batch-pro` 结果不足以支持将它选为默认；它修正了一个较小的 cookie 过合并，但留下了更严重的 checkout / JWT / addReview bridge 合并。
 - Delivery count 不能单独作为质量指标。数量少可能是有效合并，也可能是 harmful over-merge。
 
 从这轮实验得到的短期策略：

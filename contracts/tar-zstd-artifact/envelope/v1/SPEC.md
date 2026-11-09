@@ -1,4 +1,4 @@
-# Tar+Zstandard Artifact Envelope - v1
+# Tar+Zstandard Envelope — v1
 
 Language: English | [中文](SPEC.zh.md)
 

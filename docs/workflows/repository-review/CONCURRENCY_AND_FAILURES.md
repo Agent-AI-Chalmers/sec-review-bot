@@ -15,7 +15,7 @@ For system-wide concurrency between app-submitted runs, workflow fanout, and wor
 - case processing can process cases concurrently.
 - within one case, CVSS scoring can overlap with the mitigation / verification path.
 - delivery planning can process batch drafts concurrently.
-- delivery execution can process combined deliveries concurrently.
+- Temporal delivery execution can process combined deliveries concurrently.
 
 ## Sliding Windows
 
@@ -48,7 +48,7 @@ With sliding windows, completed slots are filled immediately instead of waiting 
 
 ### Discovery
 
-Discovery splits repository files into chunks. Temporal and direct paths both execute discovery chunks with a sliding window.
+Discovery groups one or more complete files into a chunk as the input to one scan. See [DISCOVERY_AGENT_DESIGN](DISCOVERY_AGENT_DESIGN.md) for the grouping strategies. Both Temporal and `direct` paths execute these chunks with a sliding window.
 
 <!-- doc-default: AGENT_DISCOVERY_MAX_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
 The concurrency limit comes from `AGENT_DISCOVERY_MAX_CONCURRENCY`. The default is `1`. Effective concurrency never exceeds the number of chunks.
@@ -88,12 +88,12 @@ Delivery execution only consumes cases with `disposition == "keep"`.
 
 `single` delivery does not call an agent and does not enter the patch synthesis concurrency pool. It directly projects case-level `review_record.mitigation.file_changes`.
 
-`combined` delivery calls the patch-synthesis agent. Multiple combined deliveries execute with a sliding window.
+`combined` delivery calls the patch-synthesis agent. In the Temporal path, multiple combined deliveries execute with a sliding window.
 
 <!-- doc-default: REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/execution/input.py -->
-The concurrency limit comes from `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`. The default is `4`.
+The Temporal concurrency limit comes from `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`. The default is `4`.
 
-In the Temporal path, combined delivery patch synthesis is an independent activity. `single` delivery remains a lightweight projection and does not occupy the patch synthesis window. The direct path still executes locally with a sliding window.
+In the Temporal path, combined delivery patch synthesis is an independent activity. `single` delivery remains a lightweight projection and does not occupy the patch synthesis window.
 
 If one combined delivery patch synthesis fails, other deliveries continue. Public `deliveries[]` only contains successful deliveries. Check run logs for failed synthesis debugging.
 
@@ -101,7 +101,7 @@ If one combined delivery patch synthesis fails, other deliveries continue. Publi
 
 Usually the first knob to tune is `AGENT_CASE_PROCESSING_MAX_CONCURRENCY`. Case processing usually occupies the longest wall-clock window, and analyzer / mitigator / verifier work can be LLM-heavy or sandbox-heavy.
 
-The second common knob is `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`. It only affects `combined` delivery patch synthesis. It does not change delivery boundaries or merge different deliveries into one final patch.
+For Temporal runs, the second common knob is `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`. It only affects `combined` delivery patch synthesis. It does not change delivery boundaries or merge different deliveries into one final patch.
 
 Discovery tuning depends on chunk count and per-chunk cost. If a repository produces only one chunk, raising `AGENT_DISCOVERY_MAX_CONCURRENCY` does nothing. If there are many chunks, raising discovery concurrency can reduce discovery wall time.
 
@@ -128,7 +128,7 @@ Common ways to raise the ceiling:
 - higher total LLM budget
 - higher-TPM / higher-RPM LLM APIs
 - multiple LLM API sources sharing load
-- a larger Temporal activity worker pool
+- More Temporal Workers
 
 ## Example Measurements
 

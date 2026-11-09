@@ -2,13 +2,13 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-`services/execution-gateway/` 是 Review Runs 与 Temporal 之间可独立部署的 TypeScript HTTP 边界。它校验 execution request、启动稳定的 Temporal execution workflow，并向调用方投影 workflow 状态。
+`services/execution-gateway/` 是 Review Runs 与 Temporal 之间的可独立部署的 TypeScript HTTP 服务。它校验执行请求、按约定的身份启动 Temporal execution workflow，并向调用方返回执行状态。
 
 Execution API v1 由 [`contracts/execution-api/v1`](../../contracts/execution-api/v1/CONTRACT.zh.md) 定义。Temporal Execution Workflow 输入由 [`contracts/execution-workflow/v1`](../../contracts/execution-workflow/v1/CONTRACT.md) 定义。
 
-Gateway 不加载 agent 实现，也不运行 Temporal worker。这些职责属于 `agents/`。
+Execution Gateway 不加载 Agent 实现，也不运行 Temporal Worker；审查执行由 `agents/` 提供。
 
 ## 本地运行
 

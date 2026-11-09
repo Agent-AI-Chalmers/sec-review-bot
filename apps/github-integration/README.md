@@ -4,7 +4,7 @@ Language: English | [中文](README.zh.md)
 
 This package contains the GitHub integration service for the project.
 
-It does not execute agent workflows directly. It prepares inputs, submits and observes review runs through Review Runs, and publishes terminal results back to GitHub.
+It prepares inputs, submits and observes review runs through Review Runs, and publishes terminal results back to GitHub.
 
 ## Setup
 
@@ -40,6 +40,8 @@ For non-Compose startup, fill `apps/github-integration/.env` from `apps/github-i
 
 When `SEC_REVIEW_ARTIFACT_STORE=s3`, configure the bucket and AWS credentials. `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` is optional for AWS and required for a custom S3-compatible endpoint. `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` accepts `auto` (default), `path`, or `virtual`; the local RustFS deployment uses `path`. This transport setting does not change the submitted `s3://bucket/key` artifact reference.
 
+<!-- doc-default: REVIEW_RUNS_REQUEST_TIMEOUT_MS; source=apps/github-integration/src/review-runs/client.ts -->
+
 `REVIEW_RUNS_REQUEST_TIMEOUT_MS` bounds every Review Runs request and defaults to 30 seconds. In particular, a publication lease renewal that fails or times out is treated as lost ownership: the publisher stops before starting another GitHub mutation and leaves recovery to lease takeover.
 
 ```bash
@@ -74,33 +76,34 @@ GitHub references:
 
 If you already have a domain, you can also use Cloudflare Tunnel to route a public address to the local service.
 
-For local GitHub App webhook and Actions dispatch routing, see the [local GitHub inbound setup guide](../../docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md).
+For local GitHub App webhook routing and repository review requests from GitHub Actions, see the [local GitHub inbound setup guide](../../docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md).
 
 ## Role
 
 - Read GitHub App metadata and installation identity
 
 - Receive GitHub webhooks
-- Receive OIDC-authenticated HTTP dispatches initiated by GitHub Actions
+- Receive repository review HTTP requests from GitHub Actions and authenticate them with OIDC
 
-- Prepare issue / pull request review input
-- Prepare repository review input
+- Prepare issue, pull request, and repository review inputs
 
 - Submit prepared inputs to Review Runs and claim publication work
 - Publish structured results back to GitHub
 
 ## Layout
 
+The paths below are relative to `src/`.
+
 - `reviews/` - input preparation, submission, publishing, and rendering for review workflows
   - `reviews/issues/` - issue review
   - `reviews/pull-requests/` - pull request review and suggestion comments
   - `reviews/repositories/` - repository review, summary issue, and repair draft PR
 - `github/` - thin GitHub API wrappers and webhook helpers
-- `services/review-runs/` - Review Runs client, claim handling, and publication coordination
-- `execution/` - Execution input, result, and error contracts consumed by this connector
+- `review-runs/` - Client-side code through which GitHub Integration communicates and works with the Review Runs service
+- `execution/` - Provides GitHub Integration with types for review inputs and results, validates input bundles and review results, and distinguishes errors encountered when publishing results to GitHub
 - `artifacts/` - input bundle storage and Git workspace preparation
 - `ingress/` - inbound HTTP, GitHub Actions, and GitHub webhook handling
-- `triggers/` - turns webhook / Actions / comment requests into Review Runs review submissions
+- `triggers/` - Starts reviews from Webhooks, GitHub Actions, or comment commands, calls the input preparation code, and submits the prepared inputs to Review Runs
 - `utils/` - lightweight logging and helpers
 
 ## Triggers
@@ -139,7 +142,7 @@ Notes:
 - [`.github/workflows/sec-review-bot.yml`](../../.github/workflows/sec-review-bot.yml) contains GitHub Actions scheduling only; bot runtime configuration belongs in `.sec-review/config.yml`.
 - If [`.sec-review/config.yml`](../../.sec-review/config.yml) is missing, the default behavior is `trigger_mode: manual_only`.
 - If the config file exists but the YAML is invalid, `sec_review_bot.trigger_mode` is missing, or the value is not allowed, automatic webhooks fail strictly instead of silently downgrading.
-- `paths_ignore` only affects repository-review discovery file scanning. It does not affect PR/Issue webhook trigger decisions.
+- `paths_ignore` filters repository-review Discovery file scanning and incremental deletion cases. Deleted paths excluded by it do not contribute to `scan_summary.deleted_file_count` or the deletion-review size limit. It does not affect PR/Issue webhook trigger decisions.
 - Config is always read from the **default branch** (resolved via the GitHub API), never from the PR base ref or a repository-review `target_branch`. A non-default branch scan therefore uses the default branch's `trigger_mode` / `paths_ignore`.
 - Repository config does not support selecting a workspace image. The GitHub integration does not parse image configuration fields from `.sec-review/config.yml`.
 
@@ -161,7 +164,7 @@ Issue and PR conversation comments share one command grammar. The flags below ar
 
 - `review`: triggers a review. The final patch, if any, may include reasonable test changes.
 - `--test-changes allow|deny`: whether the final mitigation patch may contain test changes. `deny` forbids test changes; tests may only be used as temporary validation work. With no flag the Execution Worker uses `allow`.
-- `--open-pr`: issue reviews only. Allows the run to open a draft pull request when the review produces a ready patch; without it the patch stays in the issue summary comment. Automatic `issues.opened` reviews never open a draft PR. On a PR comment this flag has no effect and is ignored, because a PR review does not create a branch or a new pull request.
+- `--open-pr`: issue reviews only. With this flag, a ready patch may be published as a draft PR; otherwise the patch is shown only in the review results posted as a comment on the original Issue. Automatic `issues.opened` reviews never create a draft PR.
 
 Flags are order-independent and may be combined. There is no objective argument: the GitHub integration always reviews in `audit` mode.
 
@@ -173,9 +176,9 @@ Repository-level review is triggered through [`.github/workflows/sec-review-bot.
 
 The target repository must configure these Actions secrets:
 
-- `SEC_BOT_DISPATCH_URL`: the full public HTTPS URL for the App dispatch endpoint, for example `https://your-bot-dev.example.com/api/repository-review/dispatch`
+- `SEC_BOT_DISPATCH_URL`: the public HTTPS URL where GitHub Actions submits repository review requests, for example `https://your-bot-dev.example.com/api/repository-review/dispatch`
 
-Repository-level dispatch uses GitHub Actions OIDC. The workflow must grant `id-token: write`, and the token audience is fixed to `sec-review-bot`.
+GitHub Actions authenticates repository review requests with OIDC. The workflow must grant `id-token: write`, and the token audience is fixed to `sec-review-bot`.
 
 Manual `workflow_dispatch` supports:
 

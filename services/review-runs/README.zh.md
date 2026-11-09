@@ -2,72 +2,84 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-Review Runs 是 review run 协调服务。它接纳 review 请求，并持久协调输入准备、执行和结果发布的完整生命周期。
+Review Runs 是 review run 协调服务。它接收审查请求，保存状态，并协调输入准备、执行和结果发布；服务重启后仍可根据数据库记录恢复处理。
 
 ## 在系统中的位置
 
 ```mermaid
 flowchart LR
-  integration[GitHub integration] <-->|review 接纳、input 交接与 publication 协调| control[Review Run 协调服务]
+  integration[GitHub Integration] <-->|review 接纳、input 交接与 publication 协调| control[Review Run 协调服务]
   control -->|提交并轮询| execution[Execution API]
   control <-->|run 和 publication 状态| postgres[(PostgreSQL)]
-  workers[Agent Workers] -.->|导出 LLM observations| langfuse[Langfuse]
-  control -->|读取 observations 并生成统计| langfuse
+  workers[Agent Workers] -.->|导出模型调用记录| langfuse[Langfuse]
+  control -->|读取模型调用记录并生成统计| langfuse
   ui[Control Plane UI] -->|查询| control
 ```
 
-- **GitHub integration** 负责解析 GitHub 请求、准备 input 和执行 GitHub 副作用。
+- **GitHub Integration** 负责解析 GitHub 请求、准备输入材料，以及发布评论、创建分支和 PR 等 GitHub 操作。
 - **Review Run 协调服务** 负责接纳、持久生命周期状态、恢复、execution 观察和 publication 协调。
-- **Execution API provider、Temporal 和 workers** 负责 workflow 执行。
-- **Langfuse** 独立保存可选的 LLM observations；Review Runs 异步读取这些数据来生成统计。
+- **Execution API 服务、Temporal 和 workers** 负责 workflow 执行。
+- **Langfuse** 独立保存可选的模型调用记录；Review Runs 异步读取这些数据来生成统计。
 
-完整数据流见[系统架构](../../docs/architecture/SYSTEM_ARCHITECTURE.zh.md)。
+完整数据流见[SYSTEM_ARCHITECTURE](../../docs/architecture/SYSTEM_ARCHITECTURE.zh.md)。
 
 ## 功能
 
 - 在 input 准备开始前接纳已校验请求并分配 `run_id`。
 - 对重复送达的 GitHub webhook 和 Actions 入口身份进行去重。
-- 在提交 Execution API provider 前持久化已准备的 Execution input，使状态不确定的提交可以恢复。
-- 轮询 Execution API provider，并记录执行进度、终态 workflow result 和终态 artifact 引用。
+- 在提交 Execution API 服务前持久化已准备的 Execution input，使状态不确定的提交可以恢复。
+- 轮询 Execution API 服务，并记录执行进度、workflow 最终结果和产物引用。
 - 让所属 integration 可以领取成功终态并执行 GitHub 发布。
-- 持久化 publication step，避免进程重启后重复已完成的远程副作用。
+- 保存 publication step，避免进程重启后重复已完成的远程操作。
 - 从外部 Langfuse 协调终态 run 的模型调用总量，但不改变 execution 或 publication 结果。
 - 为 Control Plane UI 提供脱敏的 run 查询，包括可选的 execution-statistics snapshot。
 
 ## Run 生命周期
 
-Run 在接纳后立即进入 `pending`：在 Execution API provider 轴上表示其 input 尚未提交。准备进度单独记录在 `preparations` 中，其自身的 `preparing` 状态表示当前有 preparer 持有用于隔离 input 构造的 claim。GitHub integration 准备并上传 input bundle，再使用该 claim 提交可重放的 Execution input。Review Runs 记录 input，并且只在 Execution API provider 接受请求后将 run 转为 `queued`。
+Run 在接纳后立即进入 `pending`：在 Execution API 服务轴上表示其 input 尚未提交。准备进度单独记录在 `preparations` 中，其自身的 `preparing` 状态表示当前有 preparer 持有用于隔离 input 构造的 claim。GitHub Integration 准备并上传 input bundle，再使用该 claim 提交可重放的 Execution input。Review Runs 记录 input，并且只在 Execution API 服务接受请求后将 run 转为 `queued`。
 
 Input bundle publication 由独立的 `input_bundle_candidates` ledger 跟踪。Connector 在上传字节前预约完整 artifact reference、prepared input 和 publish context，确认对象存在后，在保存 prepared submission 的同一事务中选中候选。预约、确认和选择都要求当前未过期的 preparation claim。接管者先检查已有提案再重建：对象匹配则恢复原提交，未采用对象确实缺失则放弃候选，存储不可访问只能视为错误，不能当成对象不存在。Preparation 仍有效时，完全相同的提案可以重新预约并激活已放弃的候选；已选中的 input 不能替换。
 
 S3 input 对象使用包含 run 和 digest 的 key。选中另一份 input 或 preparation 终止时会放弃未采用候选；放弃不删除远端字节，因为旧上传者仍可能完成，同一内容的提案也可能共享对象。系统不自动回收对象。初始 SQL 可用于新部署，但已应用 `001` checksum 的数据库需要重建或显式升级，才能启动此版本。
 
-Review Runs 轮询 `queued` 和 `running` run。Execution API provider 成功后，Review Runs 将结果保存为 `succeeded`，使其可以被领取并发布。Integration 领取该工作，执行 GitHub 副作用，再记录 `published`、可重试的 publication 失败或终态 publication 失败。
+Review Runs 轮询 `queued` 和 `running` run。Execution API 服务成功后，Review Runs 将结果保存为 `succeeded`，使其可以被领取并发布。Integration 领取该工作，执行 GitHub 副作用，再记录 `published`、可重试的 publication 失败或终态 publication 失败。
 
 <!-- doc-default: DEFAULT_CLAIM_TIMEOUT_MS; source=services/review-runs/src/persistence/review-run-store.ts -->
 
 重复接纳一个已经见过的 ingress 身份是一次只读重放：它返回既有的 run，不会去 claim 它的 preparation。接纳时创建的 preparation 行是 `preparing`，只由最初的接纳方持有，因此在中途崩溃的进程是靠租约过期恢复的，而不是靠重放请求。在默认 claim 超时下，这意味着一次重放最多要等十分钟才能推进——所以客户端不能把"请求返回了"当成"工作已继续"。
 
+如果 Execution API 服务 submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。进入该状态不是失败，也不会创建 notice：未确认的提交仍可能在重放时被接受，此时宣告失败就是在陈述一个 run 可能推翻的结论——而已发布的评论无法撤回。
+
+重放结果按以下方式处理：
+
 <!-- doc-default: MAX_SUBMISSION_RECOVERY_ATTEMPTS; source=services/review-runs/src/runtime/submission-recovery.ts -->
 
-如果 Execution API provider submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。进入该状态不是失败，也不会创建 notice：未确认的提交仍可能在重放时被接受，此时宣告失败就是在陈述一个 run 可能推翻的结论——而已发布的评论无法撤回。被接受的重放会让 run 恢复正常推进；而被 Execution API provider 拒绝的重放，或在重放预算（`executions.attempt_count`，当前为八次）内始终得不到答复的重放，会让 run 失败、把 publication 标为 `skipped`，并只在那时才创建 notice。若没有这个预算，未解决的提交会永远停留在 `uncertain`，完全不会被报告。Preparation 或 Execution API provider 的终态失败会将 publication 标为 `skipped`。任一轴的终态失败都会创建 connector 所有的 notice work，因此即使观察到失败的进程已崩溃，connector 仍可告知用户；notice 会记录失败发生在哪一轴，回复便可说明 run 实际走到了哪一步。
+- **被接受：** run 恢复正常推进。
+- **被 Execution API 服务明确拒绝：** run 失败，publication 标为 `skipped`，并创建 failure notice。
+- **重放预算耗尽时结果仍未知**（`executions.attempt_count`，当前为八次）：execution 进入 `disconnected`，并创建带有 `SUBMISSION_RECOVERY_EXHAUSTED` 的 attention notice。预算耗尽不代表失败，也不会使 publication 变为 `skipped`。自动重放会停止，由运维人员查证远端结果，再决定恢复自动重试还是放弃等待。
+
+若没有这个预算，未解决的提交可能无限地产生自动重放。
+
+Preparation 或 Execution API 服务的终态失败会将 publication 标为 `skipped`。任一轴的终态失败都会创建 connector 所有的 notice work，因此即使观察到失败的进程已崩溃，connector 仍可告知用户；notice 会记录失败发生在哪一轴，回复便可说明 run 实际走到了哪一步。
 
 ## 持久化模型
 
 run 主干和各条生命周期轴分别存放在不同的表中。`review_runs` 只保存被接纳的身份；每条轴各自保存自己的状态和输入：
 
-| 表                        | 职责                                        | 状态                                                                                          |
-| ------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `review_runs`             | 所有轴共享的接纳身份（没有更新路径）        | —                                                                                             |
-| `preparations`            | 可领取的 input preparation                  | `pending`、`preparing`、`uncertain`、`disconnected`、`submitted`、`failed`                    |
-| `input_bundle_candidates` | 持久 input publication 提案与原子选择       | `reserved`, `present`, `selected`, `abandoned`                                                |
-| `run_notices`             | connector 所有的用户可见失败与待确认通知    | `pending`、`delivering`、`delivered`、`failed`                                                |
-| `executions`              | Execution API provider 提交、观察和终态结果 | `pending`、`queued`、`running`、`uncertain`、`disconnected`、`succeeded`、`skipped`、`failed` |
-| `publications`            | 整体发布的所有权和结果                      | `pending`、`publishing`、`uncertain`、`disconnected`、`published`、`failed`、`skipped`        |
-| `publication_steps`       | 可恢复的单个 connector 副作用               | `pending`、`running`、`uncertain`、`disconnected`、`succeeded`、`failed`、`terminal_failed`   |
-| `review_run_events`       | 每条轴状态转换的只追加审计日志              | —                                                                                             |
+| 表                            | 职责                                                                   | 状态                                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `review_runs`                 | 所有轴共享的接纳身份（没有更新路径）                                   | —                                                                                             |
+| `preparations`                | 可领取的 input preparation                                             | `pending`、`preparing`、`uncertain`、`disconnected`、`submitted`、`failed`                    |
+| `input_bundle_candidates`     | 持久 input publication 提案与原子选择                                  | `reserved`, `present`, `selected`, `abandoned`                                                |
+| `run_notices`                 | connector 所有的用户可见失败与待确认通知                               | `pending`、`delivering`、`delivered`、`failed`                                                |
+| `executions`                  | Execution API 服务提交、观察和终态结果                                 | `pending`、`queued`、`running`、`uncertain`、`disconnected`、`succeeded`、`skipped`、`failed` |
+| `publications`                | 整体发布的所有权和结果                                                 | `pending`、`publishing`、`uncertain`、`disconnected`、`published`、`failed`、`skipped`        |
+| `publication_steps`           | 可恢复的单个 connector 副作用                                          | `pending`、`running`、`uncertain`、`disconnected`、`succeeded`、`failed`、`terminal_failed`   |
+| `execution_statistics`        | 统计 reconciliation 状态与 run totals                                  | `pending`、`reconciling`、`settled`、`unavailable`                                            |
+| `execution_statistics_groups` | 按 workflow 坐标、Agent、provider 和 model 聚合的调用数与 token totals | —                                                                                             |
+| `review_run_events`           | 每条轴状态转换的只追加审计日志                                         | —                                                                                             |
 
 `preparations.status`：
 
@@ -125,7 +137,7 @@ flowchart LR
 
 ### Claim 租约
 
-Preparation、submission recovery、publication、publication step 提交和 run notice 都使用 claim token 拒绝过期 owner 的写入。GitHub integration 会续租活跃的 preparation 和 publication claim。租约过期只会使工作进入可恢复状态，不能单独证明上一位 owner 是否完成了远端操作。
+Preparation、submission recovery、publication、publication step 提交和 run notice 都使用 claim token 拒绝过期 owner 的写入。GitHub Integration 会续租活跃的 preparation 和 publication claim。租约过期只会使工作进入可恢复状态，不能单独证明上一位 owner 是否完成了远端操作。
 
 ### 自动恢复
 
@@ -155,7 +167,7 @@ Run 不满足适用条件时，这些操作返回 409。它们不幂等：第一
 
 `run_id` 在 PostgreSQL 中全局唯一。`ingress_kind` 和 `ingress_key` 提供 connector 范围的入口幂等。`connector_id` 隔离读取、claim、publication 和 publication step。持久化操作日志同时包含 `connector_id` 和 `run_id`。
 
-Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独立的恢复输入。Execution API provider run 缺失不表示 publication 成功；远程副作用只有在 publication step 记录成功后才算完成。
+Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独立的恢复输入。Execution API 服务 run 缺失不表示 publication 成功；远程副作用只有在 publication step 记录成功后才算完成。
 
 ## HTTP API
 
@@ -175,48 +187,51 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 
 契约在**请求侧是强制执行的**：路由、path/query/body 校验与鉴权都由它派生，因此任何不符合该文档的请求都会在进入 handler 之前被拒绝。响应侧由契约**描述**，但运行时并不对其校验——`fastify-openapi-glue` 只处理请求——因此声明的响应 schema 是 handler 需要遵守的约定，由测试而非框架来固定。`services/review-runs/test/observed-run-contract.test.ts` 会用共享 schema 校验已提交的 fixtures 以及 `observeRun()` 实际产出的形状，`services/review-runs/test/server-http.test.ts` 则覆盖 HTTP 面，这正是防止响应在无人察觉的情况下偏离其 schema 的机制。
 
-查询响应不包含 `execution_input` 和 `publish_context`。它们会保留 `source_platform`，用于稳定的平台聚合；也会保留 `connector_id`，用于标识拥有该 run 的 connector 类型与实例。UI BFF 持有 read token；浏览器代码不接收任何 Review Runs token。
+查询响应不包含 `execution_input` 和 `publish_context`。它们会保留 `source_platform`，用于稳定的平台聚合；也会保留 `connector_id`，用于标识拥有该 run 的 connector 类型与实例。没有 snapshot row 时，`execution_statistics` 为 `null`；存在时，它从两张关系型统计表投影 reconciliation 状态、已观测 totals 和分组 totals。缺失或不完整的 snapshot 不代表零用量。UI BFF 持有 read token；浏览器代码既不接收 Review Runs token，也不接收 Langfuse 凭据。
 
 service token 用于协调 run 的各个组件，read token 用于脱敏读取，可选的 admin token 用于 `/v1/admin` 下的运维面。这些 token 分别授予不同能力：持有 service token 无法访问 admin 路由，admin token 也不能接纳 run 或让 run 走正常生命周期。只有在配置了 `REVIEW_RUNS_ADMIN_TOKEN` 时 `/v1/admin` 才存在——否则这些路径返回 404 而不是 401，因此未配置的部署不会暴露任何运维面。查看 parked 队列（三轴合一的"停止重试"列表）只需要 read token，因为"知道某个 run 卡住了"并不属于特权；只有"决定放弃它、不再等待它、或把它交回自动恢复"才需要 admin token。
 
 查询响应以形状一致的嵌套对象报告彼此独立的生命周期轴：`preparation`、`execution` 与 `publication`。每组各自带有 `status`、`started_at`、`finished_at` 与 `updated_at`。preparation 摘要额外给出 `attempt_count` 以及终态的 `failure_code`，但绝不包含其 opaque input 或 claim token。`notices` 包含 run 的某个环节失败或需要关注时应由集成展示给用户的消息。消息按产生时间从早到晚排列；同一 run 发生多次独立事件时会保留多条，不会合并。
 
-`/healthz` 只证明 HTTP 进程仍存活。`/readyz` 会验证当前 PostgreSQL 连接池可以执行 schema ledger 查询，且 ledger 的完整版本集合与本应用完全一致；否则返回不含数据库细节的 `503 {"status":"unavailable"}`。Compose 将 `/readyz` 用作 Review Runs healthcheck。Execution API provider 与 GitHub 被有意排除：它们的瞬时不可达不会使 durable admission、读取或 PostgreSQL 支持的恢复变得不安全，其故障由各自的状态机恢复路径处理。
+`/healthz` 只证明 HTTP 进程仍存活。`/readyz` 会验证当前 PostgreSQL 连接池可以执行 schema ledger 查询，且 ledger 的完整版本集合与本应用完全一致；否则返回不含数据库细节的 `503 {"status":"unavailable"}`。Compose 将 `/readyz` 用作 Review Runs healthcheck。Execution API 服务与 GitHub 被有意排除：它们的瞬时不可达不会使 durable admission、读取或 PostgreSQL 支持的恢复变得不安全，其故障由各自的状态机恢复路径处理。
 
 ## 配置
 
-| 变量                                          | 是否必需                                           | 用途                                                                   |
-| --------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------- |
-| `DATABASE_URL`                                | 是                                                 | PostgreSQL connection string                                           |
-| `REVIEW_RUNS_READ_TOKEN`                      | 是                                                 | 脱敏读 API；控制台后端与任何只读消费方都用它                           |
-| `REVIEW_RUNS_SERVICE_TOKEN`                   | 是                                                 | 组件协调（接纳、领取、终态）；无法访问 `/v1/admin`                     |
-| `REVIEW_RUNS_ADMIN_TOKEN`                     | 否                                                 | `/v1/admin/*` 的运维认证；未配置时整个 admin 面返回 404                |
-| `EXECUTION_API_URL`                           | 是                                                 | Execution API provider base URL                                        |
-| `EXECUTION_API_TOKEN`                         | 非 loopback 或受保护的 Execution API provider 必需 | Execution API provider 认证                                            |
-| `REVIEW_RUNS_PORT`                            | 否                                                 | 监听端口；默认 `8090`                                                  |
-| `CONNECTOR_ID`                                | 否                                                 | 协调 namespace；默认 `github-integration:default`                      |
-| `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS` | 否                                                 | Coordinator 间隔；默认 `15000`                                         |
-| `EXECUTION_API_REQUEST_TIMEOUT_MS`            | 否                                                 | Execution API provider 请求超时；默认 `30000`                          |
-| `EXECUTION_API_REQUEST_RETRIES`               | 否                                                 | Execution API provider transport 重试次数；默认 `2`                    |
-| `EXECUTION_API_RETRY_BASE_DELAY_MS`           | 否                                                 | 初始重试延迟；默认 `500`                                               |
-| `LANGFUSE_BASE_URL`                           | 否                                                 | 外部 Langfuse URL；配置 Langfuse URL 和凭据后启用 execution statistics |
-| `LANGFUSE_PUBLIC_KEY`                         | 与 `LANGFUSE_BASE_URL` 一起配置                    | Langfuse project public key                                            |
-| `LANGFUSE_SECRET_KEY`                         | 与 `LANGFUSE_BASE_URL` 一起配置                    | Langfuse project secret key                                            |
-| `LANGFUSE_REQUEST_TIMEOUT_MS`                 | 否                                                 | 单次 Langfuse 请求超时；默认 `30000`                                   |
-| `EXECUTION_STATISTICS_POLL_INTERVAL_MS`       | 否                                                 | Statistics coordinator 间隔；默认 `15000`                              |
-| `EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS`     | 否                                                 | 每轮最多处理的到期 run 数；默认 `20`                                   |
-| `EXECUTION_STATISTICS_INITIAL_DELAY_MS`       | 否                                                 | Execution 完成后首次读取 Langfuse 的延迟；默认 `30000`                 |
-| `EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS`  | 否                                                 | 两次 snapshot 稳定确认之间的延迟；默认 `30000`                         |
-| `EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS`   | 否                                                 | Observation settling 总时间窗口；默认 `600000`                         |
-| `EXECUTION_STATISTICS_MAX_FAILURES`           | 否                                                 | 连续 Langfuse 读取失败多少次后标记 unavailable；默认 `8`               |
-| `EXECUTION_STATISTICS_RETRY_DELAY_MS`         | 否                                                 | Langfuse 读取失败后的重试延迟；默认 `30000`                            |
-| `EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS`       | 否                                                 | Statistics reconciliation claim 超时；默认 `600000`                    |
+<!-- doc-default: review-runs.startReviewRunsServer; source=services/review-runs/src/runtime/server-runtime.ts -->
+<!-- doc-default: EXECUTION_API_REQUEST_TIMEOUT_MS; source=services/review-runs/src/execution-client.ts -->
+
+| 变量                                          | 是否必需                                      | 用途                                                                   |
+| --------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
+| `DATABASE_URL`                                | 是                                            | PostgreSQL 连接字符串                                                  |
+| `REVIEW_RUNS_READ_TOKEN`                      | 是                                            | 脱敏读 API；控制台后端与任何只读消费方都用它                           |
+| `REVIEW_RUNS_SERVICE_TOKEN`                   | 是                                            | 组件协调（接纳、领取、终态）；无法访问 `/v1/admin`                     |
+| `REVIEW_RUNS_ADMIN_TOKEN`                     | 否                                            | `/v1/admin/*` 的运维认证；未配置时整个 admin 面返回 404                |
+| `EXECUTION_API_URL`                           | 是                                            | Execution API 服务 base URL                                            |
+| `EXECUTION_API_TOKEN`                         | 非 loopback 或受保护的 Execution API 服务必需 | Execution API 服务认证                                                 |
+| `REVIEW_RUNS_PORT`                            | 否                                            | 监听端口；默认 `8090`                                                  |
+| `CONNECTOR_ID`                                | 否                                            | 协调 namespace；默认 `github-integration:default`                      |
+| `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS` | 否                                            | 协调循环间隔；默认 `15000`                                             |
+| `EXECUTION_API_REQUEST_TIMEOUT_MS`            | 否                                            | Execution API 服务请求超时；默认 `30000`                               |
+| `EXECUTION_API_REQUEST_RETRIES`               | 否                                            | Execution API 服务 transport 重试次数；默认 `2`                        |
+| `EXECUTION_API_RETRY_BASE_DELAY_MS`           | 否                                            | 初始重试延迟；默认 `500`                                               |
+| `LANGFUSE_BASE_URL`                           | 否                                            | 外部 Langfuse URL；配置 Langfuse URL 和凭据后启用 execution statistics |
+| `LANGFUSE_PUBLIC_KEY`                         | 与 `LANGFUSE_BASE_URL` 一起配置               | Langfuse project public key                                            |
+| `LANGFUSE_SECRET_KEY`                         | 与 `LANGFUSE_BASE_URL` 一起配置               | Langfuse project secret key                                            |
+| `LANGFUSE_REQUEST_TIMEOUT_MS`                 | 否                                            | 单次 Langfuse 请求超时；默认 `30000`                                   |
+| `EXECUTION_STATISTICS_POLL_INTERVAL_MS`       | 否                                            | 用量统计协调循环间隔；默认 `15000`                                     |
+| `EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS`     | 否                                            | 每轮最多处理的到期 run 数；默认 `20`                                   |
+| `EXECUTION_STATISTICS_INITIAL_DELAY_MS`       | 否                                            | Execution 完成后首次读取 Langfuse 的延迟；默认 `30000`                 |
+| `EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS`  | 否                                            | 两次 snapshot 稳定确认之间的延迟；默认 `30000`                         |
+| `EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS`   | 否                                            | Observation settling 总时间窗口；默认 `600000`                         |
+| `EXECUTION_STATISTICS_MAX_FAILURES`           | 否                                            | 连续 Langfuse 读取失败多少次后标记 unavailable；默认 `8`               |
+| `EXECUTION_STATISTICS_RETRY_DELAY_MS`         | 否                                            | Langfuse 读取失败后的重试延迟；默认 `30000`                            |
+| `EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS`       | 否                                            | Statistics reconciliation claim 超时；默认 `600000`                    |
 
 ## 数据库 schema
 
 Schema 文件位于 `src/database/schema-versions`。已执行版本及 SHA-256 checksum 记录在 `schema_versions`。启动时使用 PostgreSQL advisory lock 串行执行 schema，并在数据库记录的 checksum 与当前文件不一致时拒绝启动。实验部署策略允许破坏性 schema reset。
 
-Execution statistics 存储在 `execution_statistics` 和 `execution_statistics_groups` 中：前者保存 reconciliation 状态和 run totals，后者保存按 case、delivery、pass、draft batch、discovery chunk、agent、provider 和 model 聚合的 totals。逐 call observations 继续保留在外部 Langfuse。至少包含一个审查 root 的连续两次读取结果相同后，snapshot 才是 `settled`；先到达 reconciliation 截止时间则标记为 `partial_window`，如果截止前没有出现审查 root，则标记为 `no_observations`。Usage coverage 只描述 Langfuse 返回的 calls，不证明所有真实模型调用都已上传。
+Execution statistics 存储在 `execution_statistics` 和 `execution_statistics_groups` 中：前者保存 reconciliation 状态和 run totals，后者保存按 case、delivery、pass、draft batch、discovery chunk、agent、provider 和 model 聚合的 totals。每次模型调用的记录继续保留在外部 Langfuse。至少包含一个审查 root 的连续两次读取结果相同后，snapshot 才是 `settled`；先到达 reconciliation 截止时间则标记为 `partial_window`，如果截止前没有出现审查 root，则标记为 `no_observations`。Usage coverage 只描述 Langfuse 返回的 calls，不证明所有真实模型调用都已上传。
 
 Statistics 边界会把 Langfuse 的互斥计费 bucket 标准化为 OpenTelemetry GenAI token 语义。`input_tokens` 包含 cache read 与 cache creation 输入，`output_tokens` 包含 reasoning 输出；cache 与 reasoning 字段继续作为子集提供，而不是额外总量。
 

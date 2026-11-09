@@ -44,9 +44,10 @@ The boundary is the directory, not a count, because a directory is a boundary th
 
 The boundary is imperfect: a broad directory such as `src/`, `config/`, or the repository root can hold several independent mechanisms.
 
-A single cap on the number of deleted files (200) therefore decides whether deletion review happens at all. Past the cap the whole window's deletion review is skipped: it is not split, and directories are not picked over one by one. Splitting would make the result look reviewed, and picking would produce a partial result that reads as complete. The caller chose the window, so an oversized one is the caller's to narrow, and the answer is one they can act on rather than a result they have to audit.
+<!-- doc-default: MAX_DELETED_FILES; source=agents/src/sec_review_agents/workflows/repository/case_execution_input.py -->
+A single cap on the number of deleted files remaining after `paths_ignore` filtering (200) therefore decides whether deletion review happens at all. Past the cap the whole window's deletion review is skipped: it is not split, and directories are not picked over one by one. Splitting would make the result look reviewed, and picking would produce a partial result that reads as complete. The caller chose the window, so an oversized one is the caller's to narrow, and the answer is one they can act on rather than a result they have to audit.
 
-The skip does not affect anything else: ordinary triaged cases still run. Two fields in the result report it: `scan_summary.deleted_file_count` is how many files the window removed, and `deletion_review_skipped` says whether review was skipped because of that. The count sits in the scan summary because it explains a thin incremental run: deleted files never reach discovery.
+The skip does not affect anything else: ordinary triaged cases still run. Two fields in the result report it: `scan_summary.deleted_file_count` is how many deleted files remain in the window after `paths_ignore` filtering, and `deletion_review_skipped` says whether review was skipped because of that. The count sits in the scan summary because it explains a thin incremental run: deleted files never reach discovery.
 
 ## Mode Definition
 
@@ -55,7 +56,7 @@ Scan mode has two values:
 - `full`: repository-level full scan, the existing behavior.
 - `incremental`: incremental scan based on `base..head`.
 
-Dispatch payload introduces:
+Repository review requests include:
 
 - `scan_mode`: `"full" | "incremental"`
 - `base_sha`: string, incremental window start commit boundary
@@ -140,9 +141,9 @@ Reasons:
 ### Scheduled vs Manual Window Semantics
 
 - `schedule` (scheduled incremental):
-  - the caller sends `target_branch` and the cron `schedule` to the GitHub integration HTTP dispatch endpoint;
-  - the App dispatch resolver resolves `head_sha` from `target_branch`;
-  - the App dispatch resolver computes `base_sha` by looking back roughly one schedule interval and selecting the latest commit before that cutoff;
+  - GitHub Actions submits `target_branch` and the cron `schedule` to the GitHub Integration repository review HTTP endpoint;
+  - GitHub Integration resolves `head_sha` from `target_branch`;
+  - GitHub Integration computes `base_sha` by looking back roughly one schedule interval and selecting the latest commit before that cutoff;
   - actual scan window is `base_sha..head_sha`.
 - `manual` (manual incremental):
   - caller must explicitly specify `base_sha`; `head_sha` may be omitted;

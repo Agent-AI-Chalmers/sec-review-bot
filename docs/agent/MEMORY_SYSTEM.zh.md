@@ -2,7 +2,7 @@
 
 语言：[English](MEMORY_SYSTEM.md) | 中文
 
-本文是 [MEMORY_SYSTEM.md](MEMORY_SYSTEM.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [MEMORY_SYSTEM.md](MEMORY_SYSTEM.md) 的中文译文；如有差异，以英文版为准。
 
 参考资料：
 
@@ -103,20 +103,20 @@ memory 应该保持小而可审计。它一旦长成笔记堆，就应该通过�
 
 ---
 
-但是如果情景变了，那就可以加了，而且甚至可以加的很自然：`USER.md` + `preference/` 目录就行。
+如果使用场景改变，也可以自然地加入：`USER.md` + `preference/` 目录就行。
 
 ### 没有热读写
 
 本项目没有把 memory 写入放在主 agent 的主流程关键路径上，核心原因有两个：
 
 1. 是多 agent 并发。多个 review、多个阶段 agent 或多个 repository case 同时运行时，如果它们都直接改长期 memory，会遇到直接的写冲突问题。文件化 memory 尤其如此。即使用文件锁串行化写入，也会把锁等待和写入延迟带回主流程。
-2. 我们这里并没有所谓的 supervisor，且单个 agent 并不具有全局的视野，仅靠它自己，通常很难稳定地产生足够好的长期经验。
+2. 本项目没有 supervisor，单个 agent 也缺少全局视角，仅靠它自身，通常很难稳定地产生足够好的长期经验。
 
 因此，当前实现只让主 agent 留下 trajectories，把经验写入、筛选和归并放到异步 extraction / maintenance 流程里。这样会牺牲一部分即时记忆体验，但换来更清楚的来源、更稳定的主流程，以及更容易审计和回滚的 memory 更新。
 
 ---
 
-但是也要注意，一定要结合情景，比如：
+但仍需结合使用场景判断，例如：
 
 - 假设台前工作的只有一个 agent/session
 - 确实有一个 supervisor
@@ -124,7 +124,7 @@ memory 应该保持小而可审计。它一旦长成笔记堆，就应该通过�
 
 那么就是可以考虑热读写的。
 
-意外的是，通常这三点集中的出现在个人助理 agent / coding agent 上。
+这三个条件通常同时出现在个人助理 agent / coding agent 中。
 
 ### 其他
 

@@ -2,9 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-[v1/openapi.yaml](v1/openapi.yaml) is the hand-maintained single source of truth for the Memory Catalog Server HTTP boundary. It is not generated from service code. The server mounts routes and validation from it, generated TypeScript projections bind both the server and Control Plane UI to its operations and schemas, and Python client contract tests validate the payloads and responses they consume.
-
-The contract deliberately excludes PostgreSQL rows, Temporal workflow state, trajectory contents, and object-storage credentials.
+[v1/openapi.yaml](v1/openapi.yaml) is the hand-maintained single source of truth for the Memory Catalog Server HTTP boundary. The server mounts routes and validation from it, generated TypeScript projections bind both the server and Control Plane UI to its operations and schemas, and Python client contract tests validate the payloads and responses they consume.
 
 Extraction and observation collection reads use opaque, exclusive cursors with deterministic newest-first ordering. Callers must pass the same filters while advancing `next_cursor`; cursor encoding is an implementation detail. Revision history retains its public, exclusive `before_revision` cursor because revision numbers are already immutable monotonic identities.
 
@@ -16,7 +14,9 @@ Worker credentials register extractions, read maintenance input, and submit main
 
 Maintenance control exposes only `enabled` and `paused`. Pause and resume requests use an idempotent `operation_id` and `expected_generation` compare-and-swap. An identical replay returns the original resulting control snapshot even if current state has since changed.
 
-Publication reserve/confirm endpoints accept complete extraction or revision publication intents; list endpoints recover them by extraction ID or revision source identity. Confirmation is the authenticated producer's assertion that every referenced object is present. Attachment requires an exactly matching confirmed publication intent and atomically selects it. Revision publication endpoints enforce the same worker/operator source roles as revision creation. Extraction recovery retains the summary alongside the full registration payload. Candidates are retained for recovery and inspection; the API does not imply object deletion or automatic reconciliation.
+To publish an extraction result or memory revision, first reserve a publication intent containing the complete result and artifact references. After uploading the objects, the uploader confirms that they exist. This confirmation is the uploader's assertion, not a Catalog check of object storage. When registering the result, Catalog requires an exact match with a confirmed publication intent and completes registration and intent selection in the same transaction.
+
+After an interrupted publication, callers can query recorded intents for retries. Catalog retains these records but does not automatically complete interrupted publications or clean up the associated objects.
 
 ## Tooling
 

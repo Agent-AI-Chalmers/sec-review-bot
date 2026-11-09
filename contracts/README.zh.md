@@ -2,14 +2,14 @@
 
 语言：[English](README.md) | 中文
 
-本文是 [README.md](README.md) 的中文译文。英文版是权威版本；如果两者不一致，以英文版为准。
+本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-本目录是项目自有契约的工作区级根目录。它同时保存契约的人类可读规范，以及执行该规范的可执行资产。
+本目录集中维护各包之间使用的接口和数据格式约定。每类契约对应一个目录，保存规范，以及用于生成文件、校验输入和运行测试的工具与数据。
 
 ## Package Workspace
 
 <!-- doc-default: node-workspace; source=pnpm-workspace.yaml -->
-契约工具和 `contracts/codegen` 属于仓库根目录的 pnpm workspace，与应用、服务共用根锁文件。`codegen` 仍由 contracts 维护，消费者通过 `workspace:*` 显式声明依赖。
+契约工具和 `contracts/codegen` 都在根目录的 pnpm 工作区中，与应用和服务共用锁文件。`contracts/codegen` 由契约工具的维护方负责；使用它的包通过 `workspace:*` 声明依赖。
 
 在仓库根目录运行：
 
@@ -21,82 +21,82 @@ pnpm --filter "./contracts/**" test
 pnpm --filter @sec-review-bot/execution-api-tools run generate
 ```
 
-安装后仍可在各工具目录运行包级命令。CI 从仓库根目录安装，然后在各 matrix package 中执行检查。依赖变更应同时更新根目录的 `pnpm-lock.yaml`。
+安装完成后，也可以进入各工具目录运行命令。CI 在仓库根目录安装依赖，再分别检查各个包。修改依赖时，应同步更新根目录的 `pnpm-lock.yaml`。
 
 ## 布局
 
-每个契约族占一个目录，每个受支持的版本占一个子目录，内含该版本的规范、schema 和 fixture：
+每类契约使用一个目录，每个受支持的版本再使用一个子目录，保存该版本的规范、schema 和测试数据：
 
 ```text
 contracts/
-  <family>/
+  <contract>/
     <version>/
       <SPEC>.md        该版本的书面契约
       schemas/*.json   可机器校验的形状（当契约是数据形状时）
       fixtures/*.json  可执行示例，以及配对它们的 manifest
       corpus/*         共享的非 JSON 输入，外加 manifest（当契约是由代码强制的格式、
                        而不是数据形状时）
-  <layered-family>/
+  <layered-contract>/
     envelope/<version>/{SPEC.md,corpus/}
     profiles/<name>/<version>/{SPEC.md,corpus/}
 ```
 
-并非每个族都使用每一种资产。若契约的规则是决策逻辑而非结构形状，它会携带 `corpus/` 而不是 `schemas/` 与 `fixtures/`，并在代码中强制该格式。参见 [setup-declaration](setup-declaration/README.zh.md)。
+并非每类契约都有上述全部文件。规则主要涉及判断逻辑、不能只用数据结构描述时，由代码执行校验，并在 `corpus/` 中维护两端共用的测试输入，而不是使用 `schemas/` 和 `fixtures/`。例如 [setup-declaration](setup-declaration/README.zh.md)。
 
-一个族也可以存放适用于所有版本的文档，例如传输层参考。
+契约目录还可以保存适用于所有版本的文档，例如传输方式说明。
 
-当多个格式确实共享一个更底层表示时，同一 family 可以用独立版本的 `envelope/` 与 `profiles/<name>/` 目录显式表达该关系。每一层分别拥有自己的 specification、corpus 与 tooling；目录嵌套不绑定其 version number。参见 [tar-zstd-artifact](tar-zstd-artifact/README.zh.md)。
+如果多种格式共用底层封装，可以在同一契约目录中使用 `envelope/` 定义封装，用 `profiles/<name>/` 定义各类内容格式。两者分别维护规范、测试输入、工具和版本号；目录嵌套不代表版本必须同步。参见 [tar-zstd-artifact](tar-zstd-artifact/README.zh.md)。
 
-## 契约族
+## 契约分类
 
-| 契约族                                                | 边界                                         | 参与方                                             | 当前版本                                                                                                                                                                                                      |
+| 契约类别                                                | 约定内容                                         | 参与方                                             | 当前版本                                                                                                                                                                                                      |
 | ----------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [execution-api](execution-api/README.zh.md)           | 公开 HTTP 操作、workflow 输入、结果与错误    | Execution API provider、调用方与下游发布方         | [v1](execution-api/v1/CONTRACT.zh.md)                                                                                                                                                                         |
+| [execution-api](execution-api/README.zh.md)           | 公开 HTTP 操作、工作流输入、结果与错误    | Execution API 服务、调用方与结果发布方         | [v1](execution-api/v1/CONTRACT.zh.md)                                                                                                                                                                         |
 | [execution-workflow](execution-workflow/README.zh.md) | Temporal Execution Workflow 输入             | Execution Gateway 与 Execution Worker              | [v1](execution-workflow/v1/CONTRACT.md)                                                                                                                                                                       |
-| [review-runs-api](review-runs-api/README.zh.md)       | Review Runs HTTP API 与 observed run 形状    | Review Runs 与其调用方                             | [v1](review-runs-api/v1/openapi.yaml)                                                                                                                                                                         |
-| [memory-catalog-api](memory-catalog-api/README.zh.md) | Memory coordination HTTP API                 | Memory Catalog Server 与 workers                   | [v1](memory-catalog-api/v1/openapi.yaml)                                                                                                                                                                      |
-| [tar-zstd-artifact](tar-zstd-artifact/README.zh.md)   | 共享 archive envelope 及其 artifact profiles | 所有项目自有 tar+zstd producer 与 consumer         | [envelope v1](tar-zstd-artifact/envelope/v1/SPEC.zh.md)、[input-bundle v1](tar-zstd-artifact/profiles/input-bundle/v1/SPEC.zh.md)、[memory-tree v1](tar-zstd-artifact/profiles/memory-tree/v1/SPEC.zh.md)、[run-diagnostic v1](tar-zstd-artifact/profiles/run-diagnostic/v1/SPEC.zh.md) |
+| [review-runs-api](review-runs-api/README.zh.md)       | Review Runs HTTP API 与脱敏运行记录结构    | Review Runs 与其调用方                             | [v1](review-runs-api/v1/openapi.yaml)                                                                                                                                                                         |
+| [memory-catalog-api](memory-catalog-api/README.zh.md) | 记忆协调服务的 HTTP API                 | Memory Catalog Server 与 Worker                   | [v1](memory-catalog-api/v1/openapi.yaml)                                                                                                                                                                      |
+| [tar-zstd-artifact](tar-zstd-artifact/README.zh.md)   | 共享归档封装与各类产物格式 | 本项目中生成或读取 tar+zstd 产物的组件         | [envelope v1](tar-zstd-artifact/envelope/v1/SPEC.zh.md)、[input-bundle v1](tar-zstd-artifact/profiles/input-bundle/v1/SPEC.zh.md)、[memory-tree v1](tar-zstd-artifact/profiles/memory-tree/v1/SPEC.zh.md)、[run-diagnostic v1](tar-zstd-artifact/profiles/run-diagnostic/v1/SPEC.zh.md) |
 | [agent-transcript](agent-transcript/README.zh.md) | Agent 执行 JSONL | Agent 运行时、Memory、UI 和用量脚本 | [v1](agent-transcript/v1/SPEC.zh.md) |
 | [setup-declaration](setup-declaration/README.zh.md)   | 受信任的 `.sec-review/setup.yml` 格式        | 被审查仓库、GitHub Integration 与 Execution Worker | [v1](setup-declaration/v1/SPEC.zh.md)                                                                                                                                                                         |
 
-## 适用于每个族的规则
+## 各类契约的维护规则
 
-族名取自这个族覆盖的内容。若所有形状都属于同一个组件，就以该组件命名——`review-runs-api` 就是 Review Runs 自己的形状；若形状横跨多方，就以它们的交汇点命名——`execution-api` 横跨 Execution provider、调用方和下游发布方。
+契约名称应体现它约定的内容。如果数据结构都由一个组件提供，就按该组件命名，例如 `review-runs-api`；如果约定涉及多个组件，就按它们共同使用的接口命名，例如 `execution-api` 由 Execution Gateway 提供，Review Runs 提交执行请求并查询状态，GitHub Integration 使用结果向 GitHub 发布评论、修改建议或 draft PR。
 
-不要用某个消费方命名，因为消费方会变、提供方不会；也不要复用别的族已用于其他含义的词。
+不要仅按某个使用方命名，以免新增使用方后名称失去代表性；也不要把其他契约已经使用的名称用于不同含义。
 
-规范、schema、fixture 和 fixture manifest 一起变更。
+修改规则时，同步更新规范、schema、测试数据及其清单。
 
-Schema 负责结构形状：必填字段、JSON 类型、枚举、带标签的变体，以及多余字段策略。Schema 不替代领域代码。跨字段规则留在做出该决策的 workflow 中；安全路径、平台权限、发布资格和重试行为等副作用策略留在消费者一侧。
+Schema 校验必填字段、JSON 类型、枚举、带类型标签的不同结构，以及是否允许额外字段。涉及多个字段的业务判断仍由对应工作流执行；路径是否允许发布、平台权限、发布条件和重试方式等规则由使用方处理，不能只靠 schema 校验。
 
-Fixture 是契约校验的一部分。Manifest 记录每个 schema 必须接受哪些有效 fixture、必须拒绝哪些无效 fixture，因此每个实现执行同一条结构边界。
+测试数据也是契约的一部分。清单规定每个 schema 必须接受和拒绝哪些输入，使不同语言的实现可以验证相同规则。
 
-### 二进制与内容寻址 artifact
+### 二进制与按内容寻址的产物
 
-对于 archive、压缩 stream 或其他内容寻址 artifact，规范必须区分生产者义务与消费者义务。应明确生产者必须输出哪种表示、消费者可以接受哪些替代表示，以及所有消费者必须拒绝哪些输入。库的默认行为属于实现细节，不是契约规则。
+归档、压缩流或其他按内容寻址的产物，必须分别说明生成方和读取方的要求：生成方必须使用哪种表示，读取方可以接受哪些替代表示，以及必须拒绝哪些输入。不能直接把所用库的默认行为当成契约规则。
 
-若契约定义了规范存储位置，artifact reference 必须同时绑定声明的 media type、压缩字节大小、digest 与规范位置。消费者先验证 reference 形状和位置，再验证压缩大小与 digest，之后才能解压或进行语义解析。对象存储可信或 digest 匹配，不能代替对 archive 路径、entry 类型、元数据、限制和内部 manifest 的验证。
+产物引用应同时记录媒体类型、压缩后的字节数和摘要；契约规定存储位置时，还必须绑定该位置。读取方先检查引用结构和位置，再检查实际压缩数据的大小与摘要，然后才解压或解析内容。对象存储可信、摘要匹配，都不能代替对归档路径、条目类型、元数据、资源限制和内部清单的检查。
 
-契约族拥有一套共享的真实编码字节 corpus。它应覆盖合法互操作案例、错误结构、表示扩展、重复或歧义名称、link 与特殊 entry，以及具体资源限制。每个消费者执行同一套 corpus。每个生产者也应有聚焦测试，证明其输出等价于合法 corpus，并拒绝那些若编码就会离开规范格式的输入。
+这类契约维护真实归档文件的共享测试集（corpus），覆盖合法格式、错误结构、格式扩展、重复或歧义名称、链接、特殊条目和资源限制。所有读取方都执行同一套输入。生成方还需有专项测试，确认输出符合规范，并拒绝无法按规范编码的输入。
 
-压力 fixture 仍保留真实 artifact，但其可读 manifest 可以记录 `entryCount` 等聚合事实，而不展开数千个重复 entry。fixture 字节与 validator 结果仍是判定依据。
+压力测试仍保存真实产物，但清单可以只记录 `entryCount` 等汇总信息，不必展开数千个重复条目。判断是否通过仍以实际字节和校验结果为准。
 
-测试通过各包自己的助手读取 fixture，而不是把路径写死在单个测试里：
+测试使用各包自己的辅助函数读取测试数据，不要在单个测试中写死路径：
 
 - Python：`tests.contract_fixtures`
 - TypeScript：`test/contract-fixtures.ts`
 
-每个族的 README 记录该边界两侧的归属，以及调用方可以依赖什么。
+每类契约的 README 都应说明提供方和使用方分别负责什么，以及调用方可以依赖哪些保证。
 
 ## 派生产物
 
-有些产物是从手写契约生成的，而不是手工维护——例如 API 的 TypeScript 投影、提交的 JSON Schema、生成的参数列表。每个 owning family 或 layered-family component 都把渲染并校验其投影的工具放在本地 `tools/` 目录中：读取契约的工具就挨着契约，而它的产物落在哪里（可能在别的包中）不影响谁拥有该检查。该工具的 `generated-artifacts.json` 列出它派生什么、落到哪里。
+API 的 TypeScript 类型、部分 JSON Schema 和参数列表等文件由契约生成。生成和校验工具放在对应契约或分层格式的 `tools/` 目录中。即使生成结果写入另一个包，仍由这套工具负责检查；`generated-artifacts.json` 列出全部输出及其位置。
 
-稳定的包内入口按调用方消费的职责命名，即使它由生成器维护，例如 `execution-api-version.ts`。原始机械投影可以在文件名中保留 `generated`，用于提示该文件不应逐渐承载手写行为，例如 `contract-types-generated.ts`。文件名不是强制边界：每个提交到仓库的生成产物都必须在文件头标明其生成身份、列入该族的 manifest，并由下述 freshness 与 CI 检查覆盖。
+对外提供固定用途的包内文件按用途命名，例如 `execution-api-version.ts`，即使该文件由工具生成。纯生成文件可以在名称中保留 `generated`，例如 `contract-types-generated.ts`，提醒维护者不要往里添加手写逻辑。不论文件名如何，所有提交到仓库的生成文件都必须在文件头注明来源、列入输出清单，并纳入生成结果一致性检查和 CI。
 
-每个工具在本地提供 `generate` 命令重新生成全部产物，以及 `check` 校验已提交副本是否一致。每个族的测试会断言 manifest 与生成器自身声明的输出一致，并断言 CI 的变更过滤器覆盖清单中每一个产物；因此新增一个投影只需把它列进清单，而不必记得再接一个检查。
+各工具提供 `generate` 重新生成文件，提供 `check` 检查仓库中的结果是否一致。测试会核对输出清单与生成器声明，并检查 CI 的变更触发规则是否覆盖每个输出文件。因此新增生成文件时，应将其列入清单，由现有检查确认覆盖情况。
 
-API family 工具通过显式的本地 package 依赖共享开发工具 [TypeScript 渲染器](codegen/README.md)。各 family 继续负责自己的契约投影及检查。
+各 API 契约工具通过本地包依赖共用 [TypeScript 代码生成工具](codegen/README.md)，但各自维护具体契约的生成结果和检查。
 
 ## 变更清单
 
@@ -104,7 +104,7 @@ API family 工具通过显式的本地 package 依赖共享开发工具 [TypeScr
 
 - 更新受影响版本的规范；
 - 更新它的 schema；
-- 更新或新增它的 fixture 与 manifest 条目；
-- 用 owning family 或 layer 的本地工具重新生成任何派生产物（例如 Review Runs 提交的 `v1` schema 与生成的类型），再运行该工具的 `check` 命令；
+- 更新或新增测试输入及清单条目；
+- 使用对应契约或格式层的工具重新生成派生文件（例如 Review Runs 的 `v1` schema 和类型），再运行该工具的 `check` 命令；
 - 让 Python 和 TypeScript 测试校验同一批文件。
-- 对二进制 artifact，运行生产者测试、每个消费者的共享 corpus 测试，以及至少一条从 reference 到字节验证的端到端路径。
+- 对二进制产物，运行生成方测试、每个读取方的共享 corpus 测试，以及至少一项从产物引用到实际字节校验的端到端测试。

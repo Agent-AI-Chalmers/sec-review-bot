@@ -18,17 +18,12 @@ Dependabot is configured in [`.github/dependabot.yml`](../../.github/dependabot.
 
 Dependency maintenance also includes wrappers, adapters, prompts, and tool-description overrides that compensate for upstream behavior. When a direct dependency changes, compare each local override with the current upstream implementation and the behavior it originally supplied. Keep only project-specific behavior that upstream does not own; replacing an upstream contract locally can hide later fixes and create a silent fork.
 
-> **Example: Deep Agents filesystem tools.** Deep Agents 0.7.26 already provides literal `grep` guidance, regex-miss recovery, backend-aware `rg` fallback, `max_count`, offloaded-result instructions, complete `read_file` pagination and result-shape guidance, and an `execute.timeout` schema with an explicit upper limit. This repository therefore keeps only its project-specific command-evidence policy in the composed agent prompt instead of replacing those tool descriptions.
+> **Example: Deep Agents filesystem tools.** Deep Agents 0.7.26 already provides literal `grep` guidance, regex-miss recovery, backend-aware `rg` fallback, `max_count`, offloaded-result instructions, complete `read_file` pagination and result-shape guidance, and an `execute.timeout` schema with an explicit upper limit. This repository therefore uses the upstream tool descriptions and adds project-specific requirements in the agent prompt. For example, test success must be judged from the original command's exit status, not a successful trailing `grep`; this does not require rewriting the entire `execute` tool description.
 
 ## Node Packages (pnpm)
 
-The Node packages use `pnpm`, each with its own manifest and lockfile:
-
-- `apps/github-integration/`
-- `apps/control-plane-ui/`
-- `services/review-runs/`
-- `contracts/review-runs-api/tools/`
-- `contracts/execution-api/tools/`
+<!-- doc-default: node-workspace; source=pnpm-workspace.yaml -->
+Node.js packages have individual `package.json` manifests and share the root pnpm workspace and `pnpm-lock.yaml`. See `pnpm-workspace.yaml` for the package list. Dependency changes update the shared root lockfile rather than creating package-local lockfiles.
 
 | Goal | Command (run in a package directory) |
 | --- | --- |
@@ -75,4 +70,4 @@ When the next version can be adopted:
 - Python 3.15: once the native-extension packages we build against publish 3.15 wheels. 3.15 shipped on 2026-10-09 but several are still source-only.
 - TypeScript 7: once `typescript-eslint` accepts it. Its peer range is still `>=4.8.4 <6.1.0` and the tracking issue is open.
 
-A version change is not a dependency update: move the declaration, the CI version file, and any Dockerfile base image together, then re-run the full local checks.
+Review major upgrades separately. Update version declarations, CI version configuration, and relevant Dockerfile base images together, then run the complete checks; a lockfile-only update is insufficient.

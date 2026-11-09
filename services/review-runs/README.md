@@ -2,24 +2,24 @@
 
 Language: English | [中文](README.zh.md)
 
-Review Runs is the review-run coordination service. It accepts review requests and durably coordinates their complete lifecycle across input preparation, execution, and result publication.
+Review Runs is the review-run coordination service. It accepts review requests, persists state, and coordinates input preparation, execution, and result publication. After a restart, it can resume processing from database records.
 
 ## Where it fits
 
 ```mermaid
 flowchart LR
-  integration[GitHub integration] <-->|review admission, input handoff, and publication coordination| control[Review Run Coordination Service]
+  integration[GitHub Integration] <-->|review admission, input handoff, and publication coordination| control[Review Run Coordination Service]
   control -->|submit and poll| execution[Execution API]
   control <-->|run and publication state| postgres[(PostgreSQL)]
-  workers[Agent Workers] -.->|export LLM observations| langfuse[Langfuse]
-  control -->|read observations for statistics| langfuse
+  workers[Agent Workers] -.->|export model-call records| langfuse[Langfuse]
+  control -->|read model-call records for statistics| langfuse
   ui[Control Plane UI] -->|queries| control
 ```
 
-- **GitHub integration** owns GitHub request parsing, input preparation, and GitHub side effects.
+- **GitHub Integration** owns GitHub request parsing, input preparation, and GitHub side effects.
 - **Review Run Coordination Service** owns admission, durable lifecycle state, recovery, execution observation, and publication coordination.
-- **Execution API provider, Temporal, and workers** own workflow execution.
-- **Langfuse** independently stores optional LLM observations; Review Runs reads them asynchronously to build statistics.
+- **Execution API service, Temporal, and workers** own workflow execution.
+- **Langfuse** independently stores optional model-call records; Review Runs reads them asynchronously to build statistics.
 
 See the [system architecture](../../docs/architecture/SYSTEM_ARCHITECTURE.md) for the complete data flow.
 
@@ -28,7 +28,7 @@ See the [system architecture](../../docs/architecture/SYSTEM_ARCHITECTURE.md) fo
 - Admits a validated request and assigns its `run_id` before input preparation begins.
 - Deduplicates replayed GitHub webhook and Actions ingress identities.
 - Persists prepared Execution input before submitting it, so an uncertain submission can be recovered.
-- Polls Execution API provider and records execution progress, terminal workflow results, and terminal artifact references.
+- Polls Execution API service and records execution progress, final workflow results, and artifact references.
 - Makes successful terminal results claimable by the owning integration for GitHub publication.
 - Persists publication steps so completed remote side effects are not repeated after restart.
 - Reconciles terminal-run model-call totals from external Langfuse without changing execution or publication outcomes.
@@ -36,7 +36,7 @@ See the [system architecture](../../docs/architecture/SYSTEM_ARCHITECTURE.md) fo
 
 ## Run lifecycle
 
-A run begins in `pending` immediately after admission: on the Execution API provider axis its input has not been submitted yet. Preparation progress is tracked separately in `preparations`, whose own `preparing` state means a preparer currently owns the claim that fences input construction. GitHub integration prepares and uploads the input bundle, then submits the replayable Execution input under that claim. Review Runs records the input and moves the run to `queued` only after Execution API provider accepts it.
+A run begins in `pending` immediately after admission: on the Execution API service axis its input has not been submitted yet. Preparation progress is tracked separately in `preparations`, whose own `preparing` state means a preparer currently owns the claim that fences input construction. GitHub Integration prepares and uploads the input bundle, then submits the replayable Execution input under that claim. Review Runs records the input and moves the run to `queued` only after Execution API service accepts it.
 
 Input bundle publication has its own `input_bundle_candidates` ledger. The connector reserves the complete artifact reference, prepared input, and publish context before uploading bytes, confirms presence, and selects the candidate in the same transaction that saves the prepared submission. Reservation, confirmation, and selection require the current unexpired preparation claim. A replacement preparer checks existing publication intents before rebuilding: a matching object resumes the original submission, a missing unused object is abandoned, and an unavailable store remains an error rather than evidence of absence. Exact publication intent re-reservation may reactivate an abandoned candidate while preparation is still active; selected input cannot be replaced.
 
@@ -48,26 +48,36 @@ Review Runs polls `queued` and `running` runs. A successful Execution result is 
 
 Re-admitting an already-observed ingress identity is a read-only replay: it returns the existing run and does not claim its preparation. Admission creates that row as `preparing`, which only the original admitter owns, so a process that died mid-preparation is recovered through lease expiry rather than by the replayed request. With the default claim timeout this means a replay can take up to ten minutes to make progress — long enough that a client must not treat "the request returned" as "the work resumed".
 
+If Execution API service submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. Entering that state is not a failure and queues no notice: an unconfirmed submission may still be accepted on replay, so announcing it would state a conclusion the run may contradict — and a posted comment cannot be taken back.
+
+Replay outcomes are handled as follows:
+
 <!-- doc-default: MAX_SUBMISSION_RECOVERY_ATTEMPTS; source=services/review-runs/src/runtime/submission-recovery.ts -->
 
-If Execution API provider submission may have succeeded but its response was lost, the run enters recovery instead of creating a second identity. Entering that state is not a failure and queues no notice: an unconfirmed submission may still be accepted on replay, so announcing it would state a conclusion the run may contradict — and a posted comment cannot be taken back. A replay that is accepted returns the run to normal progress; one the Execution API provider rejects, or one that produces no answer across the replay budget (`executions.attempt_count`, currently eight), fails the run, makes publication `skipped`, and only then queues the notice. Without that budget an unresolved submission would stay `uncertain` forever and would never be reported at all. A terminal preparation or Execution API provider failure makes publication `skipped`. A terminal failure on any axis creates connector-owned notice work, so a connector can tell its user even when the process that observed the failure had already crashed; the notice records which axis failed so the reply describes how far the run actually got.
+- **Accepted:** the run returns to normal progress.
+- **Definitively rejected by the Execution API service:** the run fails, publication becomes `skipped`, and a failure notice is queued.
+- **Still unknown when the replay budget is exhausted** (`executions.attempt_count`, currently eight): execution becomes `disconnected` and queues an attention notice with `SUBMISSION_RECOVERY_EXHAUSTED`. Exhaustion does not establish failure or make publication `skipped`. Automatic replay stops so an operator can investigate the remote outcome and decide whether to resume recovery or give up waiting.
+
+Without that budget, unresolved submissions could keep generating automatic replays indefinitely.
+
+A terminal preparation or Execution API service failure makes publication `skipped`. A terminal failure on any axis creates connector-owned notice work, so a connector can tell its user even when the process that observed the failure had already crashed; the notice records which axis failed so the reply describes how far the run actually got.
 
 ## Persistence model
 
 The run trunk and the lifecycle axes are separate tables. `review_runs` holds only the admitted identity; each axis keeps its own state and its own input:
 
-| Table                         | Responsibility                                                      | Status                                                                                        |
-| ----------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `review_runs`                 | Admission identity shared by all axes (no update path)              | —                                                                                             |
-| `preparations`                | Claimable input preparation                                         | `pending`, `preparing`, `uncertain`, `disconnected`, `submitted`, `failed`                    |
-| `input_bundle_candidates`     | Durable input publication intents and atomic selection              | `reserved`, `present`, `selected`, `abandoned`                                                |
-| `run_notices`                 | Connector-owned user-visible failure and attention work             | `pending`, `delivering`, `delivered`, `failed`                                                |
-| `executions`                  | Execution API provider submission, observation, and terminal result | `pending`, `queued`, `running`, `uncertain`, `disconnected`, `succeeded`, `skipped`, `failed` |
-| `publications`                | Whole-publication ownership and outcome                             | `pending`, `publishing`, `uncertain`, `disconnected`, `published`, `failed`, `skipped`        |
-| `publication_steps`           | Recoverable individual connector side effects                       | `pending`, `running`, `uncertain`, `disconnected`, `succeeded`, `failed`, `terminal_failed`   |
-| `execution_statistics`        | Statistics reconciliation state and run totals                      | `pending`, `reconciling`, `settled`, `unavailable`                                            |
-| `execution_statistics_groups` | Workflow-coordinate/agent/provider/model call and token totals      | —                                                                                             |
-| `review_run_events`           | Append-only audit log of transitions on every axis                  | —                                                                                             |
+| Table                         | Responsibility                                                     | Status                                                                                        |
+| ----------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `review_runs`                 | Admission identity shared by all axes (no update path)             | —                                                                                             |
+| `preparations`                | Claimable input preparation                                        | `pending`, `preparing`, `uncertain`, `disconnected`, `submitted`, `failed`                    |
+| `input_bundle_candidates`     | Durable input publication intents and atomic selection             | `reserved`, `present`, `selected`, `abandoned`                                                |
+| `run_notices`                 | Connector-owned user-visible failure and attention work            | `pending`, `delivering`, `delivered`, `failed`                                                |
+| `executions`                  | Execution API service submission, observation, and terminal result | `pending`, `queued`, `running`, `uncertain`, `disconnected`, `succeeded`, `skipped`, `failed` |
+| `publications`                | Whole-publication ownership and outcome                            | `pending`, `publishing`, `uncertain`, `disconnected`, `published`, `failed`, `skipped`        |
+| `publication_steps`           | Recoverable individual connector side effects                      | `pending`, `running`, `uncertain`, `disconnected`, `succeeded`, `failed`, `terminal_failed`   |
+| `execution_statistics`        | Statistics reconciliation state and run totals                     | `pending`, `reconciling`, `settled`, `unavailable`                                            |
+| `execution_statistics_groups` | Workflow-coordinate/agent/provider/model call and token totals     | —                                                                                             |
+| `review_run_events`           | Append-only audit log of transitions on every axis                 | —                                                                                             |
 
 `preparations.status`:
 
@@ -125,7 +135,7 @@ Reaching the attempt limit does not fail a step. Any attempt that started may ha
 
 ### Claim leases
 
-Preparation, submission recovery, publication, publication-step commits, and run notices use claim tokens to reject writes from stale owners. GitHub integration renews active preparation and publication claims. A lease expiry makes the work recoverable; it does not by itself establish whether the previous owner completed a remote operation.
+Preparation, submission recovery, publication, publication-step commits, and run notices use claim tokens to reject writes from stale owners. GitHub Integration renews active preparation and publication claims. A lease expiry makes the work recoverable; it does not by itself establish whether the previous owner completed a remote operation.
 
 ### Automatic recovery
 
@@ -155,7 +165,7 @@ For automatic preparation recovery, a connector includes its versioned, opaque p
 
 `run_id` is globally unique in PostgreSQL. `ingress_kind` and `ingress_key` provide connector-scoped ingress idempotency. `connector_id` fences reads, claims, publications, and publication steps. Durable-operation logs include both `connector_id` and `run_id`.
 
-Temporal history, PostgreSQL coordination state, and object-storage artifacts are independent recovery inputs. A missing Execution API provider run does not imply publication success, and a remote side effect is complete only after its publication step records success.
+Temporal history, PostgreSQL coordination state, and object-storage artifacts are independent recovery inputs. A missing Execution API service run does not imply publication success, and a remote side effect is complete only after its publication step records success.
 
 ## HTTP API
 
@@ -181,42 +191,45 @@ The service token authenticates components coordinating a run; the read token au
 
 Read responses report the independent lifecycle axes as nested objects of the same shape: `preparation`, `execution`, and `publication`. Each carries its own `status`, `started_at`, `finished_at`, and `updated_at`. The preparation summary adds `attempt_count` and its terminal `failure_code`, but never its opaque input, claim token, or connector identity. `notices` contains messages that an integration should show when part of the run fails or needs attention. They are ordered from oldest to newest, and separate events remain separate entries.
 
-`/healthz` only proves the HTTP process is alive. `/readyz` verifies that the current PostgreSQL pool can execute a schema-ledger query and that its complete version set exactly matches this application; it returns `503 {"status":"unavailable"}` without database details otherwise. Compose uses `/readyz` for its Review Runs healthcheck. Execution API provider and GitHub are deliberately excluded: their transient reachability does not make durable admission, reads, or PostgreSQL-backed recovery unsafe, and their failures have separate state-machine recovery paths.
+`/healthz` only proves the HTTP process is alive. `/readyz` verifies that the current PostgreSQL pool can execute a schema-ledger query and that its complete version set exactly matches this application; it returns `503 {"status":"unavailable"}` without database details otherwise. Compose uses `/readyz` for its Review Runs healthcheck. Execution API service and GitHub are deliberately excluded: their transient reachability does not make durable admission, reads, or PostgreSQL-backed recovery unsafe, and their failures have separate state-machine recovery paths.
 
 ## Configuration
 
-| Variable                                      | Required                                             | Purpose                                                                                                  |
-| --------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                | Yes                                                  | PostgreSQL connection string                                                                             |
-| `REVIEW_RUNS_READ_TOKEN`                      | Yes                                                  | Redacted read API; the console backend and any read-only consumer use this one                           |
-| `REVIEW_RUNS_SERVICE_TOKEN`                   | Yes                                                  | Component coordination (admission, claims, terminal outcomes); cannot reach `/v1/admin`                  |
-| `REVIEW_RUNS_ADMIN_TOKEN`                     | No                                                   | Operator authentication for `/v1/admin/*`; when unset the whole admin surface answers 404                |
-| `EXECUTION_API_URL`                           | Yes                                                  | Execution API provider base URL                                                                          |
-| `EXECUTION_API_TOKEN`                         | For non-loopback or protected Execution API provider | Execution API provider authentication                                                                    |
-| `REVIEW_RUNS_PORT`                            | No                                                   | Listen port; default `8090`                                                                              |
-| `CONNECTOR_ID`                                | No                                                   | Coordination namespace; default `github-integration:default`                                             |
-| `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS` | No                                                   | Coordinator interval; default `15000`                                                                    |
-| `EXECUTION_API_REQUEST_TIMEOUT_MS`            | No                                                   | Execution API provider request timeout; default `30000`                                                  |
-| `EXECUTION_API_REQUEST_RETRIES`               | No                                                   | Execution API provider transport retries; default `2`                                                    |
-| `EXECUTION_API_RETRY_BASE_DELAY_MS`           | No                                                   | Initial retry delay; default `500`                                                                       |
-| `LANGFUSE_BASE_URL`                           | No                                                   | External Langfuse URL; enables execution statistics when the Langfuse URL and credentials are configured |
-| `LANGFUSE_PUBLIC_KEY`                         | With `LANGFUSE_BASE_URL`                             | Langfuse project public key                                                                              |
-| `LANGFUSE_SECRET_KEY`                         | With `LANGFUSE_BASE_URL`                             | Langfuse project secret key                                                                              |
-| `LANGFUSE_REQUEST_TIMEOUT_MS`                 | No                                                   | One Langfuse request timeout; default `30000`                                                            |
-| `EXECUTION_STATISTICS_POLL_INTERVAL_MS`       | No                                                   | Statistics coordinator interval; default `15000`                                                         |
-| `EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS`     | No                                                   | Maximum due runs reconciled per coordinator pass; default `20`                                           |
-| `EXECUTION_STATISTICS_INITIAL_DELAY_MS`       | No                                                   | Delay after execution completion before the first Langfuse read; default `30000`                         |
-| `EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS`  | No                                                   | Delay before confirming that two snapshots match; default `30000`                                        |
-| `EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS`   | No                                                   | Maximum observation-settling window; default `600000`                                                    |
-| `EXECUTION_STATISTICS_MAX_FAILURES`           | No                                                   | Consecutive Langfuse read failures before marking statistics unavailable; default `8`                    |
-| `EXECUTION_STATISTICS_RETRY_DELAY_MS`         | No                                                   | Delay after a failed Langfuse read; default `30000`                                                      |
-| `EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS`       | No                                                   | Lease timeout for a statistics reconciliation claim; default `600000`                                    |
+<!-- doc-default: review-runs.startReviewRunsServer; source=services/review-runs/src/runtime/server-runtime.ts -->
+<!-- doc-default: EXECUTION_API_REQUEST_TIMEOUT_MS; source=services/review-runs/src/execution-client.ts -->
+
+| Variable                                      | Required                                            | Purpose                                                                                                  |
+| --------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                | Yes                                                 | PostgreSQL connection string                                                                             |
+| `REVIEW_RUNS_READ_TOKEN`                      | Yes                                                 | Redacted read API; the console backend and any read-only consumer use this one                           |
+| `REVIEW_RUNS_SERVICE_TOKEN`                   | Yes                                                 | Component coordination (admission, claims, terminal outcomes); cannot reach `/v1/admin`                  |
+| `REVIEW_RUNS_ADMIN_TOKEN`                     | No                                                  | Operator authentication for `/v1/admin/*`; when unset the whole admin surface answers 404                |
+| `EXECUTION_API_URL`                           | Yes                                                 | Execution API service base URL                                                                           |
+| `EXECUTION_API_TOKEN`                         | For non-loopback or protected Execution API service | Execution API service authentication                                                                     |
+| `REVIEW_RUNS_PORT`                            | No                                                  | Listen port; default `8090`                                                                              |
+| `CONNECTOR_ID`                                | No                                                  | Coordination namespace; default `github-integration:default`                                             |
+| `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS` | No                                                  | Coordinator interval; default `15000`                                                                    |
+| `EXECUTION_API_REQUEST_TIMEOUT_MS`            | No                                                  | Execution API service request timeout; default `30000`                                                   |
+| `EXECUTION_API_REQUEST_RETRIES`               | No                                                  | Execution API service transport retries; default `2`                                                     |
+| `EXECUTION_API_RETRY_BASE_DELAY_MS`           | No                                                  | Initial retry delay; default `500`                                                                       |
+| `LANGFUSE_BASE_URL`                           | No                                                  | External Langfuse URL; enables execution statistics when the Langfuse URL and credentials are configured |
+| `LANGFUSE_PUBLIC_KEY`                         | With `LANGFUSE_BASE_URL`                            | Langfuse project public key                                                                              |
+| `LANGFUSE_SECRET_KEY`                         | With `LANGFUSE_BASE_URL`                            | Langfuse project secret key                                                                              |
+| `LANGFUSE_REQUEST_TIMEOUT_MS`                 | No                                                  | One Langfuse request timeout; default `30000`                                                            |
+| `EXECUTION_STATISTICS_POLL_INTERVAL_MS`       | No                                                  | Statistics coordinator interval; default `15000`                                                         |
+| `EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS`     | No                                                  | Maximum due runs reconciled per coordinator pass; default `20`                                           |
+| `EXECUTION_STATISTICS_INITIAL_DELAY_MS`       | No                                                  | Delay after execution completion before the first Langfuse read; default `30000`                         |
+| `EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS`  | No                                                  | Delay before confirming that two snapshots match; default `30000`                                        |
+| `EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS`   | No                                                  | Maximum observation-settling window; default `600000`                                                    |
+| `EXECUTION_STATISTICS_MAX_FAILURES`           | No                                                  | Consecutive Langfuse read failures before marking statistics unavailable; default `8`                    |
+| `EXECUTION_STATISTICS_RETRY_DELAY_MS`         | No                                                  | Delay after a failed Langfuse read; default `30000`                                                      |
+| `EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS`       | No                                                  | Lease timeout for a statistics reconciliation claim; default `600000`                                    |
 
 ## Database schema
 
 Schema files live in `src/database/schema-versions`. Applied versions and SHA-256 checksums are recorded in `schema_versions`. Startup uses a PostgreSQL advisory lock to serialize schema work and rejects a database whose recorded checksum differs from the checked-in file. The experimental deployment policy permits destructive schema resets.
 
-Execution statistics are stored in `execution_statistics`, which owns reconciliation state and run totals, and `execution_statistics_groups`, which stores totals by case, delivery, pass, draft batch, discovery chunk, agent, provider, and model. Call-level observations remain in external Langfuse. A snapshot is `settled` only after two matching reads that contain at least one review root; reaching the reconciliation deadline first produces `partial_window`, or `no_observations` when no review root arrived before that deadline. Usage coverage applies only to calls returned by Langfuse and is not an upload-completeness claim.
+Execution statistics are stored in `execution_statistics`, which owns reconciliation state and run totals, and `execution_statistics_groups`, which stores totals by case, delivery, pass, draft batch, discovery chunk, agent, provider, and model. Model-call records remain in external Langfuse. A snapshot is `settled` only after two matching reads that contain at least one review root; reaching the reconciliation deadline first produces `partial_window`, or `no_observations` when no review root arrived before that deadline. Usage coverage applies only to calls returned by Langfuse and is not an upload-completeness claim.
 
 The statistics boundary normalizes Langfuse's mutually exclusive billing buckets to OpenTelemetry GenAI token semantics. `input_tokens` includes cache-read and cache-creation input, and `output_tokens` includes reasoning output; the cache and reasoning fields remain available as subsets rather than additional totals.
 

@@ -2,14 +2,14 @@
 
 Language: English | [中文](README.zh.md)
 
-`services/memory-catalog/` exposes the HTTP API that records completed memory extractions, coordinates observation processing, and commits memory tree revisions. Coordination state is stored in PostgreSQL. Workers publish immutable memory trees and compressed memory-agent trajectories to object storage, and the catalog stores their artifact references.
+Memory Catalog provides an HTTP API to record completed extractions, manage pending observations, and retain memory-tree revision history and the active revision.
 
 ## API
 
 | Method | Path                                   | Purpose                                                                                                   |
 | ------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `GET`  | `/healthz`                             | Report service health.                                                                                    |
-| `POST` | `/v1/extractions`                      | Atomically register a completed extraction, its trajectory reference, and its optional observation.       |
+| `POST` | `/v1/extractions`                      | Register a completed extraction, its trajectory reference, and its optional observation.                  |
 | `GET`  | `/v1/extractions`                      | List completed extractions with stable cursor pagination and provenance filters.                          |
 | `GET`  | `/v1/extractions/{extraction_id}`      | Return one extraction, its trajectory reference, and its optional observation.                            |
 | `GET`  | `/v1/observations`                     | List observations with stable cursor pagination and consumption filters.                                  |
@@ -25,21 +25,29 @@ Language: English | [中文](README.zh.md)
 | `GET`  | `/v1/memory-tree/revisions`            | List memory tree revision history.                                                                        |
 | `GET`  | `/v1/memory-tree/revisions/{revision}` | Return one memory tree revision, its maintenance identity, and its artifact references.                   |
 
-The service owns its PostgreSQL database and its `schema_versions` ledger. The default integrated deployment places that database beside, but separate from, Review Runs database in the same PostgreSQL instance.
+## Usage Notes
 
-Collection cursors are opaque and exclusive. Extractions and observations are ordered by `created_at` and then `extraction_id`, both descending, so records with equal timestamps remain stable across pages. The maintenance-control row is durable and initially records `enabled` with generation `0`; the API returns its current state and changes it through the pause and resume operations.
+### Storage And Pagination
 
-Only one maintainer may execute at a time. Temporal enforces that invariant with one fixed workflow ID and a schedule overlap policy of `SKIP`; the catalog therefore does not implement batch leases or concurrent claims.
+The service uses its own PostgreSQL database, with applied schema versions recorded in `schema_versions`. The default integrated deployment shares a PostgreSQL instance with Review Runs but uses separate databases.
 
-Before uploading, producers reserve complete extraction or revision publication intents through the publication endpoints. An extraction publication intent includes its observation and summary; a maintenance publication intent keeps the tree, trajectory, observation IDs, and expected active revision together. Producers confirm only after all objects are present. Registration and revision creation require a matching confirmed publication intent and select it in the same transaction as the authoritative records. Different model attempts may reserve different digest candidates, but each logical owner has at most one selected publication intent.
+Extractions and observations are ordered by `created_at` and then `extraction_id`, both descending. Callers should paginate with the returned cursor without interpreting its contents; the next page excludes the cursor item.
 
-Preparation retries list recorded publication intents and verify immutable S3 metadata before rerunning a model. Storage errors remain uncertain and stop recovery; definite absence permits a new candidate unless the publication intent is already selected. Candidates remain recorded after CAS/pause conflicts or partial uploads; this protocol does not delete unreferenced objects or provide automatic background completion after retries are exhausted. The UI BFF can reconstruct an operator publication intent from the same edit request and retries its immutable upload. The browser retains the operation ID and original expected revision for retries of unchanged content within the open editor.
+### Revisions And Automatic Maintenance
 
-Temporal also records the prepared result before dispatching the registration or revision commit activity, so commit retries reuse the same payload.
+Revision sources use `maintenance` for automatic maintenance and `operator` for manual edits. `predecessor_revision` records the revision active at creation. Restoring an earlier revision only changes the active revision; it creates no new revision, and later revision numbers continue increasing. Manual edits do not consume pending observations.
 
-Revision provenance is a tagged maintenance/operator source. Every revision records the active revision from which it was created as `predecessor_revision`; revision numbers remain globally increasing even after the active pointer moves backward. Operator `operation_id` values are unique: identical replays return the original revision, while changed content conflicts. Operator edits never consume observations. Restore has its own idempotency ledger and moves only the active pointer, so the next automatic or operator revision names the restored revision as its predecessor.
+Automatic maintenance supports `enabled` and `paused`, initially `enabled`. Pause and resume requests require `operation_id` and `expected_generation` to prevent duplicate operations and overwriting concurrent changes. Automatic maintenance commits are rejected with `MAINTENANCE_PAUSED` while paused; operator revisions are unaffected.
 
-Pause and resume operations have their own idempotency ledger. Identical replay returns the operation's stored result before inspecting the current generation; a new operation locks the control singleton, checks `expected_generation` and the legal transition, then increments generation. A new maintenance revision locks that same row in its commit transaction and is rejected while paused with the `MAINTENANCE_PAUSED` conflict code, distinct from a revision compare-and-swap conflict. Operator revisions are unaffected. Worker preflight reads only avoid unnecessary work and do not replace this transaction boundary.
+Only one maintenance task may run at a time, enforced by Temporal's fixed workflow ID and `SKIP` overlap policy.
+
+### Publication And Retries
+
+To publish an extraction result or memory revision, first record a publication intent containing the complete result and artifact references, then upload the files, confirm the upload, and register the result. Registration must match the confirmed publication intent.
+
+After an interruption, retries check recorded intents and storage objects before deciding whether to rerun the model. A storage access failure does not mean an object is missing. If an object referenced by a registered result is lost, recovery must fail rather than replace it with a new result.
+
+Manual edit retries reuse the operation ID and original expected revision. Identical content returns the original result; changed content conflicts. The protocol does not automatically clean up unreferenced objects or complete publications after retries are exhausted. See [SYSTEM_ARCHITECTURE](../../docs/architecture/SYSTEM_ARCHITECTURE.md#artifact-publication-and-recovery) for the detailed flow.
 
 ## Run Locally
 

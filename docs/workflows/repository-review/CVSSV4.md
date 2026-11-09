@@ -15,7 +15,7 @@ CVSS v4 is a standardized task. Once analyzer has provided sufficiently stable a
 
 The hard part is therefore input fact quality, not score calculation itself.
 
-The reason to use an agent is to let CVSS scoring verify metric-relevant facts in a limited, read-only repository context instead of merely mapping analyzer summaries to scores. In other words, it should use repository evidence to calibrate key judgments such as `AV/PR/UI/AT/SC/SI/SA`, but it must not become an open-ended analyzer again.
+The reason to use an agent is to let CVSS scoring verify metric-relevant facts in a limited repository context instead of merely mapping analyzer summaries to scores. In other words, it should use repository evidence to calibrate key judgments such as `AV/PR/UI/AT/SC/SI/SA`, but it must not become an open-ended analyzer again.
 
 ## Use In The System
 
@@ -28,7 +28,7 @@ Its main role is to **help human reviewers quickly understand severity**.
 `cvss-v4-scoring` is responsible for:
 
 - reading structured facts from analyzer output
-- directionally verifying a small amount of evidence for the current case in a read-only repository workspace
+- directionally verifying a small amount of evidence for the current case in a repository workspace copy
 - deciding whether the current case is an independently scoreable CVSS object
 - deciding metrics according to the CVSS v4 Base standard
 - outputting vector, base_score, severity, and metric-level rationale
@@ -45,7 +45,7 @@ If it needs to read code, it should only perform targeted verification around th
 
 ## Repository Access
 
-The CVSS agent does not only read analyzer results. It can also see the read-only repository and read some files.
+The CVSS agent does not only read analyzer results. It can also read a repository copy prepared for this stage. The copy allows tools to write indexes or caches; the prompt requires read-only investigation without modifying the code being scored.
 
 The purpose of this capability is not to rediscover vulnerabilities. It is to resolve local uncertainty in scoring, for example:
 
@@ -74,12 +74,11 @@ If the current case only amplifies another vulnerability's impact, for example "
 
 This is not a scoring failure. It is a clear conclusion that the current case should not be scored.
 
-## Conclusions Consistent With Implementation
+## Stage Placement And Input Requirements
 
-- **Position**: after analyzer is correct and implemented
-- **Not after repair**: it does not run after mitigator/verifier, avoiding contamination from post-fix information
+- **Position**: after Analyzer, scoring the analyzed vulnerability facts; not after Mitigator / Verifier, to avoid contamination from post-fix information
+- **Precondition**: Analyzer fact quality determines the scoring quality ceiling
 - **Use**: presentation-layer standard score, not the core internal scheduling signal
-- **Precondition**: analyzer fact quality determines the scoring quality ceiling
 
 ## References
 
