@@ -24,10 +24,10 @@ from sec_review_agents.entrypoints.execution_worker.workflow import (
     ExecutionWorkflow,
     prepare_execution_run_activity,
 )
-from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.execution_archives.publication import (
     publish_execution_archive_activity,
 )
+from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.temporal.client import connect_temporal_client
 from sec_review_agents.workflows.issue.workflow import (
     IssueReviewWorkflow,
