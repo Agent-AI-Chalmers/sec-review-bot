@@ -75,7 +75,7 @@
 
 #### Issue 审查
 
-- [INPUT_PREANALYSIS](workflows/issue-review/INPUT_PREANALYSIS.zh.md)：如何根据 Issue 中的线索开始调查，避免过早相信报告或无目的地扩大调查范围。
+- [INPUT_ANALYSIS](workflows/issue-review/INPUT_ANALYSIS.zh.md)：如何根据 Issue 中的线索开始调查，避免过早相信报告或无目的地扩大调查范围。
 
 #### PR 审查
 

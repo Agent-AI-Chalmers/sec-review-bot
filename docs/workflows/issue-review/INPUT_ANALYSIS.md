@@ -1,22 +1,20 @@
-# Issue Input Pre-Analysis
+# Issue Input Analysis
 
-Language: English | [中文](INPUT_PREANALYSIS.zh.md)
+Language: English | [中文](INPUT_ANALYSIS.zh.md)
 
-## What Actually Happens When An Issue Arrives
+## Starting From An Issue
 
-When an issue arrives, the agent usually only has `title` and `body`. The important point is that an issue is not a fact or an answer. It is directional input. The agent is not initially facing an already-established problem; it is facing a claim someone provided. That claim can be correct, partially correct, wrong about the root cause, overstated in impact, or already obsolete in the current code.
+An issue's title and body provide leads, not established facts. A report may be correct, describe only part of the behavior, misidentify the cause, overstate the impact, or refer to a problem already fixed.
 
-Therefore, the agent's first job is not "fix it". It is to decide whether the issue's claim is true, or at least whether it is a clue worth investigating.
+The agent cannot trust the issue directly, but it cannot ignore the direction it provides either: without those leads, it may not know where to start looking in code. For example, if the issue describes inconsistent state, helpers behaving differently, or a fallback problem, the agent should follow those leads to find the first code evidence.
 
-There is also a practical constraint: the agent must not trust the issue directly, but it also cannot ignore the issue entirely. Without following the issue's statement at first, the agent often does not even know where to start looking in code.
+The issue **provides the initial search direction**; the agent **follows its leads without treating its claims as facts**.
 
-For example, if an issue mentions inconsistent state, several helpers behaving differently, or a fallback problem, the agent should first follow those claims into the code and gather the first batch of evidence.
+*This page describes investigation under `audit`; see [review intent](../REVIEW_INTENT.md) for how `repair` uses trusted repair leads.*
 
-So the issue's role is to **provide the initial search direction**. The agent should **follow the issue while investigating, but not treat its words as facts**.
+## The Two Investigation Risks
 
-## The Two Risks: Trusting Too Fast vs Expanding Too Far
-
-Once the agent starts following the issue, it can easily fall into two extremes.
+Avoid both premature conclusions and unbounded investigation.
 
 ### Risk 1: Trusting the Issue Too Early
 
@@ -112,7 +110,7 @@ Compressed into a simple working flow:
 
 1. The issue arrives. Do not treat it as fact; treat it as an investigation entry point and follow it to the first code evidence.
 2. While investigating, update the judgment of the issue's claims.
-3. If the issue is not supported, stop.
+3. If the issue's claim is disproved, stop pursuing that claim; this does not directly terminate the entire workflow.
 4. If the broad direction is supported, carefully decide whether to expand the investigation scope.
 5. Avoid both extremes throughout: trusting the first explanation too early and expanding forever for completeness.
 6. End with a conclusion: whether the issue exists in the current repository; if it does, what the evidence and reasoning chain are and which narrative follows; if it does not, where the claim fails.

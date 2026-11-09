@@ -73,7 +73,7 @@ The documents below cover `issue-review`, `pull-request-review`, and `repository
 
 #### Issue Review
 
-- [INPUT_PREANALYSIS](workflows/issue-review/INPUT_PREANALYSIS.md): How to investigate issue reports without accepting claims too early or expanding the investigation without a question.
+- [INPUT_ANALYSIS](workflows/issue-review/INPUT_ANALYSIS.md): How to investigate issue reports without accepting claims too early or expanding the investigation without a question.
 
 #### Pull Request Review
 
