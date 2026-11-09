@@ -477,30 +477,32 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 
 ## 为何这样部署
 
-这套部署由两个运行时承担：Compose 跑协调服务，systemd 跑三个宿主机 worker pool。哪个组件由哪个运行时承载，取决于该组件要做什么，这也决定了监督能覆盖到哪里。
+这套部署由两个运行时承担：Compose 跑协调服务，systemd 管理宿主机上的审查执行、记忆提取和记忆维护进程。哪个组件由哪个运行时承载，取决于该组件要做什么，这也决定了监督能覆盖到哪里。
 
-### workers 跑在宿主机上
+### Worker 跑在宿主机上
 
-Execution Worker 是整条链路里唯一会运行被审查仓库代码的组件。它为每次 agent 调用启动一个 Docker 容器，因此需要访问宿主机的 Docker daemon。把它放进 Compose 只有两种做法：把 Docker socket 挂进一个本来就在运行不可信代码的容器，或者在容器内再跑一个特权 daemon。无论哪种，只要某次 review 出了事，影响都会超出沙箱。放在宿主机上，它直接使用 daemon，并由 systemd 监督，因此具备真实的 unit 状态、有上限的重启策略，以及对控制平面的依赖关系。Memory Extraction Worker 和 Memory Maintenance Worker 通过各自的 systemd unit 在宿主机并列运行，但不会初始化 Docker sandbox。
+Execution Worker 通过 Docker 守护进程创建沙箱，在沙箱内运行被审查仓库的代码。本项目将 Worker 管理进程放在宿主机，由 systemd 管理启动依赖、日志和重启；Memory Extraction Worker 与 Memory Maintenance Worker 也使用各自的 systemd unit，但不会创建 Docker 沙箱。
 
-在 Temporal 的任务队列模型里，worker 部署在宿主上属于常规做法，算不上变通：worker 主动轮询队列，部署在哪里并不影响 workflow 的推进。worker 消失只会让任务延后，不会丢失 workflow 状态。
+管理进程与执行仓库代码的沙箱是不同的边界。访问 Docker 守护进程的权限属于受信任管理进程。
+
+Worker 暂时不可用时，Temporal 仍保留执行历史；后续能否继续执行，取决于任务的超时和重试配置。
 
 ### 协调服务跑在 Compose 里
 
-PostgreSQL、Temporal、对象存储和三个 HTTP 服务都是普通的长驻容器。Compose 为它们提供镜像固定、基于健康门控的依赖顺序、网络隔离，以及单一配置文件——这些都是 worker 不需要的。
+PostgreSQL、Temporal、对象存储、GitHub Integration、Review Runs、Execution Gateway、Memory Catalog 和 Control Plane UI 由 Compose 管理。Compose 集中描述镜像、启动依赖、网络和持久化目录；宿主机 Worker 通过配置的地址访问这些服务。
 
 ### 同样的形态在别处也存在
 
-执行不可信任务的 runner 系统也这样划分两个角色：
+CI 系统中也常见 runner 进程与执行任务代码的环境分开的做法：
 
-- [GitHub 的 self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/configuring-the-self-hosted-runner-application-as-a-service) 安装为宿主机上的服务，每个 job 在容器里启动。
-- [Gitea 的 act runner](https://docs.gitea.com/usage/actions/act-runner) 以宿主 daemon 运行，提供 `docker://`、`kubernetes://` 和 `host` 三种 job 环境，并明确警告 host 模式的 job 没有隔离。
-- [GitLab Runner](https://docs.gitlab.com/runner/executors/) 的 manager 同样位于宿主机，把 job 分派给 Docker。
+- [GitHub self-hosted runner](https://docs.github.com/en/actions/reference/runners/self-hosted-runners) 从 GitHub Actions 接收任务，可以在配置的容器中执行 job。
+- [Gitea act runner](https://docs.gitea.com/1.26/usage/actions/act-runner/) 支持用 Docker 容器执行 job，也支持直接在 runner 所在环境执行。
+- [使用 Docker executor 的 GitLab Runner](https://docs.gitlab.com/runner/executors/docker/) 创建容器执行 job；Runner 进程本身既可以在宿主机上运行，也可以[在容器中运行](https://docs.gitlab.com/runner/install/docker/)。
 
-这三者的控制平面都在机器之外，因此 worker 失败从来不需要传播进去。
+这些系统的 runner 可以作为宿主机服务运行，再通过 Docker 创建任务容器。本项目也采用这种部署方式：Execution Worker 由 systemd 在宿主机上运行，并通过 Docker 创建审查沙箱。
 
 ### 这样做的代价
 
-本项目的控制平面与 worker 同机，于是两个运行时必须在失败处理上取得一致，而它们在一处并不一致：systemd 会把失败的 worker 报告为失败的 unit，而一个用尽重启次数的 Compose 服务会让 unit 仍显示 `active (running)`。unit 的前台进程只负责跟随日志；Compose 没有办法把单个服务的永久失败转成进程退出，除非同时把所有崩溃都当作整栈失败——而那正是之前把 PostgreSQL 一起拖垮的做法。
+本项目的控制平面与 Worker 部署在同一台机器上，但两者呈现故障的方式不同：Worker 失败时，systemd 会将其 unit 标记为失败；Compose 中某个服务用尽重启次数并停止后，整体 unit 仍可能显示 `active (running)`。unit 的前台进程只负责跟随日志；当前日志转发进程不会因为某个容器停止而退出，因此单个服务失败不会自动变为整栈失败。
 
-因此，健康门控之下的运行期失败要靠检查容器发现，而不是靠 unit 状态——上文的状态检查一节说明了做法。若要在 Compose 内部补上这个缺口，需要一个读取期望服务状态的监督器，而这些期望状态只能存放在服务定义之外。对本地部署而言，运维人员本来就在机器前，这笔取舍并不划算。如果这套部署将来需要无人值守地运行，它会是第一个需要重新评估的地方。
+因此，服务启动后是否发生故障，需要检查各个容器，不能只看 systemd unit 的状态。具体命令见上文的状态检查说明。若要在 Compose 内部补上这个缺口，需要一个读取期望服务状态的监督器，并区分长驻服务与一次性初始化任务。对本地部署而言，运维人员本来就在机器前，这笔取舍并不划算。如果这套部署将来需要无人值守地运行，它会是第一个需要重新评估的地方。

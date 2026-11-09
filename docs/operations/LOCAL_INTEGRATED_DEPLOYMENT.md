@@ -475,30 +475,32 @@ Each git and snapshot command has a `GITHUB_INTEGRATION_GIT_TIMEOUT_MS` timeout 
 
 ## Why The Deployment Looks Like This
 
-Two runtimes carry this deployment: Compose runs the coordinating services, while systemd runs three host worker pools. Which runtime hosts each component follows from what that component does, and it also decides where supervision ends.
+Two runtimes carry this deployment: Compose runs the coordinating services, while systemd manages host review-execution, memory-extraction, and memory-maintenance processes. Which runtime hosts each component follows from what that component does, and it also decides where supervision ends.
 
 ### The workers run on the host
 
-Execution Worker is the only component that runs code from a reviewed repository. It starts a Docker container per agent invocation, so it needs access to the host Docker daemon. Putting it inside Compose would mean either mounting the Docker socket into a container that already runs untrusted code, or running a privileged nested daemon. Both let a compromised review reach past the sandbox. On the host it uses the daemon directly and is supervised by systemd, which gives it a real unit state, a bounded restart policy, and a dependency on the control plane. The Memory Extraction and Memory Maintenance Workers run beside it under separate systemd units but do not initialize Docker sandboxes.
+Execution Worker uses the Docker daemon to create sandboxes that run code from the reviewed repository. This deployment runs the worker manager on the host under systemd for startup dependencies, logs, and restart handling. Memory Extraction and Memory Maintenance Workers have separate systemd units and do not create Docker sandboxes.
 
-Temporal's task-queue model makes this placement natural rather than a workaround: a worker polls the queue, and its location does not matter to the workflows it advances. Losing the worker delays work; it does not lose workflow state.
+The trusted manager and the sandbox running repository code are separate boundaries. Docker daemon access belongs to the manager.
+
+Temporal retains execution history while a worker is unavailable. Whether work can resume depends on task timeouts and retry policies.
 
 ### The coordinating services run in Compose
 
-PostgreSQL, Temporal, object storage, and the three HTTP services are ordinary long-running containers. Compose gives them image pinning, dependency ordering through health gates, network isolation, and a single configuration file, none of which the worker needs.
+Compose manages PostgreSQL, Temporal, object storage, GitHub Integration, Review Runs, Execution Gateway, Memory Catalog, and Control Plane UI. Its configuration describes images, startup dependencies, networks, and persistent directories; host workers connect to those services at configured addresses.
 
 ### The same shape appears elsewhere
 
-Runner systems that execute untrusted jobs separate the two roles the same way:
+Separating the runner process from the environment executing job code is also common in CI systems:
 
-- [GitHub's self-hosted runner](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/configuring-the-self-hosted-runner-application-as-a-service) is installed as a service on the host and launches each job in a container.
-- [Gitea's act runner](https://docs.gitea.com/usage/actions/act-runner) runs as a host daemon and offers `docker://`, `kubernetes://`, and `host` job environments, warning explicitly that host jobs get no isolation.
-- [GitLab Runner](https://docs.gitlab.com/runner/executors/) keeps its manager on the host and dispatches jobs to Docker.
+- [GitHub self-hosted runners](https://docs.github.com/en/actions/reference/runners/self-hosted-runners) receive jobs from GitHub Actions and can execute jobs in configured containers.
+- [Gitea act runner](https://docs.gitea.com/1.26/usage/actions/act-runner/) supports Docker job containers as well as execution directly in the runner environment.
+- [GitLab Runner with the Docker executor](https://docs.gitlab.com/runner/executors/docker/) creates containers to execute jobs; the Runner process itself can run on the host or [in a container](https://docs.gitlab.com/runner/install/docker/).
 
-In all three the control plane sits outside the machine, so worker failure never has to propagate into it.
+These runners can run as host services and use Docker to create job containers. This project uses that deployment shape: systemd runs Execution Worker on the host, and Execution Worker uses Docker to create review sandboxes.
 
 ### What this costs
 
-Here the control plane shares the machine, so the two runtimes must agree on failure handling. They do not, in one specific way: systemd reports a failed worker as a failed unit, while a Compose service that exhausts its restarts leaves the unit `active (running)`. The unit's foreground process follows logs; Compose offers no way to turn a single service's permanent failure into a process exit without also treating every crash as a whole-stack failure, which is what pulled PostgreSQL down before.
+The control plane and workers share a machine, but failures appear differently: systemd marks a failed worker unit as failed, while the stack unit may still show `active (running)` after an individual Compose service exhausts its restarts and stops. The unit's foreground process follows logs; the current log-forwarding process does not exit when an individual container stops, so one service failure does not automatically become a whole-stack failure.
 
-So a runtime failure below the startup gate is found by checking containers, not by unit state — the status section above covers how. Closing that gap inside Compose would need a supervisor that reads expected service states, and the expected states would have to live somewhere other than the services themselves. That trade has not been worth making for a local deployment where the operator is already at the machine. It would be the first thing to revisit if this deployment ever has to run unattended.
+To detect failures after startup, check the individual containers rather than relying only on the systemd unit state. See the status checks above for the commands. Closing that gap inside Compose would need a supervisor that reads expected service states, and distinguishes long-running services from one-time initialization jobs. That trade has not been worth making for a local deployment where the operator is already at the machine. It would be the first thing to revisit if this deployment ever has to run unattended.
