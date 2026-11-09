@@ -43,7 +43,7 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
     source_workflow: 'issue-review',
     source_run_id: 'run-1',
     source_unit_id: 'review',
-    diagnostic_bundle_digest: `sha256:${'d'.repeat(64)}`,
+    execution_archive_digest: `sha256:${'d'.repeat(64)}`,
     trajectory_reference: artifact(
       'trajectories/memory-extractor/trajectory.v1.jsonl.zst',
       'c',

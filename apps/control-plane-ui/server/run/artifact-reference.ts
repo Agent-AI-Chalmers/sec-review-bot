@@ -1,9 +1,9 @@
 import type { PublishedArtifact } from '../artifacts/published-artifact.js'
 import { publishedArtifact } from '../artifacts/published-artifact.js'
-import { MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES } from './diagnostic-bundle.js'
+import { MAX_EXECUTION_ARCHIVE_VIEW_BYTES } from './execution-archive.js'
 
-const DIAGNOSTIC_BUNDLE = 'diagnostic-tree.v1.tar.zst'
-const DIAGNOSTIC_BUNDLE_MEDIA_TYPE = 'application/tar+zstd'
+const EXECUTION_ARCHIVE = 'execution-archive.v1.tar.zst'
+const EXECUTION_ARCHIVE_MEDIA_TYPE = 'application/tar+zstd'
 
 /** The part of a Review Runs run body that says which artifact the run published. */
 export interface PublishedRunArtifact {
@@ -12,12 +12,12 @@ export interface PublishedRunArtifact {
 }
 
 /**
- * The diagnostic bundle one run published, if this body is the run that was asked for.
+ * The execution archive one run published, if this body is the run that was asked for.
  *
  * The identity check belongs here rather than at each caller: a body for another run must
  * not resolve to an artifact this request would then serve under the wrong run id.
  */
-export function runDiagnosticBundle(
+export function publishedExecutionArchive(
   run: PublishedRunArtifact | undefined,
   runId: string,
   bucket: string
@@ -28,8 +28,8 @@ export function runDiagnosticBundle(
   if (storage?.status !== 'available') return { kind: 'invalid' }
   return publishedArtifact(storage.artifact, {
     bucket,
-    mediaType: DIAGNOSTIC_BUNDLE_MEDIA_TYPE,
-    maximumSize: MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES,
-    acceptsKey: (key) => key === `runs/${runId}/artifacts/${DIAGNOSTIC_BUNDLE}`
+    mediaType: EXECUTION_ARCHIVE_MEDIA_TYPE,
+    maximumSize: MAX_EXECUTION_ARCHIVE_VIEW_BYTES,
+    acceptsKey: (key) => key === `runs/${runId}/artifacts/${EXECUTION_ARCHIVE}`
   })
 }

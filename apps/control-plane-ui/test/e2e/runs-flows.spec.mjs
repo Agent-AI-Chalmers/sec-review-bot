@@ -62,7 +62,7 @@ async function runFilesError(page, baseURL) {
   await page
     .getByText('The run files could not be opened.', { exact: true })
     .waitFor()
-  await page.getByRole('link', { name: 'Download diagnostic bundle' }).waitFor()
+  await page.getByRole('link', { name: 'Download execution archive' }).waitFor()
 }
 
 async function skipEmptyExternalRuns(page, fixtureRuntime) {

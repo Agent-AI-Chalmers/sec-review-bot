@@ -34,7 +34,7 @@ export function RunFilesContent({
         loadFailedMessage: 'runFilesLoadFailed',
         download: {
           href: `/api/runs/${encodeURIComponent(runId)}/artifact`,
-          label: 'downloadDiagnosticBundle'
+          label: 'downloadExecutionArchive'
         }
       }}
     />

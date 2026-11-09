@@ -31,8 +31,8 @@ Control Plane UI accesses Memory Catalog through its same-origin backend (BFF). 
 | Review Runs | `services/review-runs/` | Admission, durable run state, recovery, execution observation, and publication coordination | [README](../../services/review-runs/README.md) |
 | Control Plane UI | `apps/control-plane-ui/` | Authenticated operator console for Review Runs inspection and memory management | [README](../../apps/control-plane-ui/README.md) |
 | Execution Gateway | `services/execution-gateway/` | Authenticated Execution API and HTTP-to-Temporal translation | [README](../../services/execution-gateway/README.md) |
-| Execution Worker | `agents/` | Review workflows, activities, agent runtime, stage artifacts, and run diagnostic publication | [README](../../agents/README.md) |
-| Memory Extraction Worker | `agents/` | Per-run diagnostic consumption, extractor invocation, trajectory publication, and extraction registration | [README](../../agents/README.md) |
+| Execution Worker | `agents/` | Review workflows, activities, agent runtime, stage artifacts, and execution archive publication | [README](../../agents/README.md) |
+| Memory Extraction Worker | `agents/` | Per-execution archive consumption, extractor invocation, trajectory publication, and extraction registration | [README](../../agents/README.md) |
 | Memory Maintenance Worker | `agents/` | Batched maintenance input consumption, maintainer invocation, memory tree publication, and revision commit | [README](../../agents/README.md) |
 | Memory Catalog Server | `services/memory-catalog/` | Observation catalog, immutable memory revision history, and active revision coordination | [README](../../services/memory-catalog/README.md) |
 
@@ -63,9 +63,9 @@ sequenceDiagram
     Control->>Gateway: Observe execution
     Gateway-->>Control: Current status
   end
-  ExecutionWorker->>Storage: Publish run diagnostic bundle
-  ExecutionWorker-->>Gateway: Workflow result and diagnostic reference
-  Gateway-->>Control: Result and diagnostic reference
+  ExecutionWorker->>Storage: Publish execution archive
+  ExecutionWorker-->>Gateway: Workflow result and archive reference
+  Gateway-->>Control: Result and archive reference
   Integration->>Control: Claim publication work
   Control-->>Integration: Result and publish context
   Integration->>GitHub: Publish review output
@@ -85,8 +85,8 @@ sequenceDiagram
 
   ExecutionWorker->>Temporal: Request asynchronous memory processing
   Temporal->>ExtractionWorker: Dispatch memory extraction work
-  ExtractionWorker->>Storage: Download run diagnostic bundle
-  Storage-->>ExtractionWorker: Run diagnostic bundle
+  ExtractionWorker->>Storage: Download execution archive
+  Storage-->>ExtractionWorker: Archive
   Note over ExtractionWorker: Read review trajectories and run extractor
   ExtractionWorker->>Storage: Store extractor trajectory
   ExtractionWorker->>Catalog: Save extraction result, trajectory reference, and observation (if any) in one transaction
@@ -162,7 +162,7 @@ After an interruption, retries check the recorded publication intent and object 
 | Extraction trajectory | Memory Catalog publication intent containing the trajectory reference, observation, and summary | Retries check recorded candidates before rerunning the model; selection and extraction registration commit together. |
 | Maintenance revision | Memory Catalog publication intent grouping the tree, trajectory, observation IDs, and expected active revision | Different model outputs can be separate candidates; selection, revision creation, observation consumption, and active pointer update commit together. |
 | Operator edit revision | Memory Catalog publication intent containing the tree reference, operation ID, and expected active revision; the UI BFF uploads the tree | Retries of unchanged content within the open editor retain the operation ID and original expected revision. The BFF repeats reservation, conditional upload, confirmation, and idempotent revision creation. |
-| Run diagnostic bundle in S3 | Temporal publication request and the fixed run key | Recovery verifies the existing bundle against the request before using local files. If neither a complete uploaded bundle nor local artifacts remain, the request cannot reconstruct the diagnostic bytes. |
+| Execution archive in S3 | Temporal publication request and the fixed run key | Recovery verifies the existing archive against the request before using local files. If neither a complete uploaded archive nor local artifacts remain, the request cannot reconstruct the archive bytes. |
 
 UI restore moves the active pointer to an existing revision in a Catalog transaction; it creates neither a revision nor an object and does not repair missing bytes.
 

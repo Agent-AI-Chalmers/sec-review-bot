@@ -9,10 +9,10 @@ storage client: normal services never receive the root credentials used here.
 The resulting ownership model is:
 
 * GitHub integration can read and write immutable input bundles.
-* The execution worker reads input bundles, writes run diagnostic bundles, and
+* The execution worker reads input bundles, writes execution archives, and
   reads active immutable memory versions.
 * The memory extraction and maintenance workers share a storage identity that
-  reads run diagnostics and reads/writes immutable memory artifacts.
+  reads execution archives and reads/writes immutable memory artifacts.
 * Control Plane UI reads terminal result and memory artifacts, and can create
   immutable memory-tree objects for operator edits.
 

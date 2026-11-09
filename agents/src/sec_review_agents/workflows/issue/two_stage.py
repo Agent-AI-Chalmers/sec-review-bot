@@ -7,13 +7,13 @@ from typing import Any
 
 from temporalio import activity, workflow
 
+from sec_review_agents.execution_archives.publication import (
+    ExecutionArchivePublicationRequest,
+    publish_execution_archive_activity,
+)
 from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.record import build_review_record
-from sec_review_agents.run_diagnostics.publication import (
-    RunDiagnosticPublicationRequest,
-    publish_run_diagnostic_activity,
-)
 from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
@@ -132,9 +132,9 @@ class IssueTwoStageWorkflow:
             label="artifact_root_path",
         )
         finalized = await workflow.execute_activity(
-            publish_run_diagnostic_activity,
+            publish_execution_archive_activity,
             args=[
-                RunDiagnosticPublicationRequest(
+                ExecutionArchivePublicationRequest(
                     run_id=request.run_id,
                     artifact_root_path=str(artifact_root),
                     review_units=[
@@ -144,7 +144,7 @@ class IssueTwoStageWorkflow:
                         }
                     ],
                     result=public_result,
-                    destination_scheme=request.post_processing.diagnostic_scheme,
+                    destination_scheme=request.post_processing.execution_archive_scheme,
                 )
             ],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),

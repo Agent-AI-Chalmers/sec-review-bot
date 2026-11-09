@@ -14,7 +14,7 @@
 | [Memory Catalog 客户端](memory-catalog/test_memory_catalog.py) | agents 包的 Memory Catalog 客户端 → Memory Catalog HTTP → PostgreSQL | 必须先确认；重复注册保持幂等；拒绝冲突的发布意图和错误凭据。 | PR 按路径触发 + 合并队列 |
 | [输入包](input-bundle/test_input_bundle.py) | TypeScript 归档/上传 → RustFS → Python 输入准备 | 重复发布保持身份一致；工作区字节在传输后保持不变；拒绝错误摘要。 | PR 按路径触发 + 合并队列 |
 | [Memory 操作员编辑](memory-operator-edit/test_memory_bff.py) | UI BFF → Catalog/PostgreSQL + RustFS | 重放编辑不会创建额外修订；过期编辑产生冲突；恢复返回先前指针和可读取的产物。 | PR 按路径触发 + 合并队列 |
-| [执行生命周期](execution-lifecycle/test_execution_lifecycle.py) | Review Runs 协调 → Execution Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | 任务失败后能自动重试、执行能完成、诊断文件可读取，且重新打开存储后仍能读取发布结果。安全分析使用预设结果，不调用真实模型或向 GitHub 发布。 | 仅手动执行 |
+| [执行生命周期](execution-lifecycle/test_execution_lifecycle.py) | Review Runs 协调 → Execution Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | 任务失败后能自动重试、执行能完成、运行文件可读取，且重新打开存储后仍能读取发布结果。安全分析使用预设结果，不调用真实模型或向 GitHub 发布。 | 仅手动执行 |
 
 Review Runs HTTP 和 run 提交共用 `Smoke — Service Boundaries` job。Catalog 客户端、输入包和操作员编辑共用 `Smoke — Memory and Artifacts`，让选中的测试复用临时服务；各测试仍有独立的路径过滤器。手动工作流为 `Smoke — Execution Lifecycle`。共用 job 是执行成本上的选择，不代表另一类冒烟测试。
 

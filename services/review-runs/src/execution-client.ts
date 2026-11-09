@@ -196,7 +196,7 @@ function parseArtifactStorage(
   const artifact = value.artifact
   const artifactUri =
     typeof artifact === 'object' && artifact !== null && 'uri' in artifact
-      ? parseDiagnosticArtifactUri(artifact.uri, runId)
+      ? parseExecutionArchiveUri(artifact.uri, runId)
       : undefined
   if (
     Object.keys(value).some((key) => !['status', 'artifact'].includes(key)) ||
@@ -205,7 +205,7 @@ function parseArtifactStorage(
       (key) =>
         !['kind', 'uri', 'media_type', 'digest', 'size_bytes'].includes(key)
     ) ||
-    artifact.kind !== 'diagnostic_bundle' ||
+    artifact.kind !== 'execution_archive' ||
     artifactUri === undefined ||
     artifact.media_type !== 'application/tar+zstd' ||
     typeof artifact.digest !== 'string' ||
@@ -221,7 +221,7 @@ function parseArtifactStorage(
     status,
     artifact: {
       // The literal that was just checked, not the unvalidated field it came from.
-      kind: 'diagnostic_bundle',
+      kind: 'execution_archive',
       uri: artifactUri,
       media_type: artifact.media_type,
       digest: artifact.digest,
@@ -230,7 +230,7 @@ function parseArtifactStorage(
   }
 }
 
-function parseDiagnosticArtifactUri(
+function parseExecutionArchiveUri(
   value: unknown,
   runId: string
 ): string | undefined {
@@ -249,7 +249,7 @@ function parseDiagnosticArtifactUri(
     uri.port !== '' ||
     uri.search !== '' ||
     uri.hash !== '' ||
-    uri.pathname !== `/runs/${runId}/artifacts/diagnostic-tree.v1.tar.zst`
+    uri.pathname !== `/runs/${runId}/artifacts/execution-archive.v1.tar.zst`
   )
     return undefined
   return value

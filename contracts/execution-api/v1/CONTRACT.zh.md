@@ -105,7 +105,7 @@ Execution API 服务和 Execution Worker 都会在各自的进程边界校验输
 
 Issue / PR 结果展示直接使用 `ReviewRecord`。Repository case 的展示使用 case ID，以及 `ReviewRecord` 中的分析、修复、验证和 CVSS 字段。
 
-`ReviewRecord` 汇总工作流对外返回的审查结果，不包含用于观测和调试的运行诊断。
+`ReviewRecord` 汇总工作流对外返回的审查结果，不包含用于观测和调试的执行归档。
 
 补丁的最终文件内容以 `ReviewRecord.mitigation.file_changes` 为准。展示路径从 `file_changes[].path` 派生，不再存在独立的 `changed_files` 字段。`patch_diff` 是缓存的审查与定位产物，可以从基线文件树和 `file_changes` 重新生成；不能把它当成另一份最终文件内容来源。
 
@@ -152,7 +152,7 @@ Execution Worker 根据内部阶段输出构造对外结果。构造 `ReviewReco
 
 Repository review 由 `scan -> case review -> delivery` 组成：
 
-- `scan_summary` 是扫描阶段公开摘要；完整 Discovery / Triage 输出保存在诊断产物中。
+- `scan_summary` 是扫描阶段公开摘要；完整 Discovery / Triage 输出保存在执行归档中。
 - `case_results[].review_record` 是每个 case 的审查结果。
 - `deliveries[]` 是 delivery execution 产出的 repository delivery result 和可发布产物。
 

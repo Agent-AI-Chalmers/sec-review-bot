@@ -4,7 +4,7 @@
 
 本文为 [README.md](README.md) 的中文译文；如有差异，以英文版为准。
 
-这是内部运维控制台，用于查看和处置run、下载诊断产物、管理 Agent 记忆和阅读执行轨迹。浏览器通过本应用的同源服务端（BFF）访问后端数据；BFF 保存服务凭据，只代理允许的路由。独立的执行轨迹查看器在浏览器本地处理上传或粘贴的内容。
+这是内部运维控制台，用于查看和处置run、下载执行归档、管理 Agent 记忆和阅读执行轨迹。浏览器通过本应用的同源服务端（BFF）访问后端数据；BFF 保存服务凭据，只代理允许的路由。独立的执行轨迹查看器在浏览器本地处理上传或粘贴的内容。
 
 ## 界面预览
 
@@ -141,7 +141,7 @@ pnpm run build
 
 由 HTTPS 反向代理终止 TLS 时，设置 `CONTROL_PLANE_UI_SECURE_COOKIES=true`，使会话和退出登录 cookie 带有 `Secure` 属性。明文 HTTP 监听地址必须对不受信网络不可达；访问 token 只提交到 `/api/session`，但该请求的传输保护仍依赖 TLS。
 
-BFF 还负责代理下载私有 RustFS 中的诊断产物。它使用单独的 `s3:GetObject` 凭据，该凭据仅可读取 `sec-review/runs/*/artifacts/*`；浏览器只提交 run ID，不会收到存储凭据或对象 URI。BFF 会先将对象写入临时文件，并根据 Review Runs 元数据校验大小和 SHA-256 摘要，再向浏览器返回下载。下载使用同一个 HTTP-only 会话鉴权，固定作为附件返回，并受存储空闲超时限制。
+BFF 还负责代理下载私有 RustFS 中的执行归档。它使用单独的 `s3:GetObject` 凭据，该凭据仅可读取 `sec-review/runs/*/artifacts/*`；浏览器只提交 run ID，不会收到存储凭据或对象 URI。BFF 会先将对象写入临时文件，并根据 Review Runs 元数据校验大小和 SHA-256 摘要，再向浏览器返回下载。下载使用同一个 HTTP-only 会话鉴权，固定作为附件返回，并受存储空闲超时限制。
 
 ## 记忆管理
 

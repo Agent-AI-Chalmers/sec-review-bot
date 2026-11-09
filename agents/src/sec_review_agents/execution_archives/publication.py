@@ -1,4 +1,4 @@
-"""Publish the authoritative run diagnostic bundle from a Temporal activity."""
+"""Publish the authoritative execution archive from a Temporal activity."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,7 +8,7 @@ from temporalio import activity
 
 
 @dataclass(frozen=True)
-class RunDiagnosticPublicationRequest:
+class ExecutionArchivePublicationRequest:
     run_id: str
     artifact_root_path: str
     review_units: list[dict[str, str]]
@@ -17,22 +17,22 @@ class RunDiagnosticPublicationRequest:
 
 
 @activity.defn
-def publish_run_diagnostic_activity(
-    request: RunDiagnosticPublicationRequest,
+def publish_execution_archive_activity(
+    request: ExecutionArchivePublicationRequest,
 ) -> dict[str, Any]:
-    from sec_review_agents.run_diagnostics.bundle import (
-        DiagnosticReviewUnit,
-        publish_run_diagnostic_bundle,
+    from sec_review_agents.execution_archives.bundle import (
+        ArchiveReviewUnit,
+        publish_execution_archive,
     )
 
     units = [
-        DiagnosticReviewUnit(
+        ArchiveReviewUnit(
             unit_id=str(unit["unit_id"]),
             trajectory_root=Path(unit["trajectory_root"]),
         )
         for unit in request.review_units
     ]
-    publication = publish_run_diagnostic_bundle(
+    publication = publish_execution_archive(
         run_id=request.run_id,
         artifact_root=Path(request.artifact_root_path),
         review_units=units,
@@ -44,16 +44,16 @@ def publish_run_diagnostic_activity(
         "artifact_storage": {
             "status": "available",
             "artifact": {
-                "kind": "diagnostic_bundle",
+                "kind": "execution_archive",
                 **reference.as_dict(),
             },
         },
-        "diagnostic_bundle": reference.as_dict(),
+        "execution_archive": reference.as_dict(),
         "unit_ids": list(publication.unit_ids),
     }
 
 
 __all__ = [
-    "RunDiagnosticPublicationRequest",
-    "publish_run_diagnostic_activity",
+    "ExecutionArchivePublicationRequest",
+    "publish_execution_archive_activity",
 ]

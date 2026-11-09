@@ -25,7 +25,7 @@ def test_python_catalog_publication_replay_and_conflict(catalog):
         "source_workflow": "issue-review",
         "source_run_id": extraction_id,
         "source_unit_id": "review",
-        "diagnostic_bundle_digest": f"sha256:{'b' * 64}",
+        "execution_archive_digest": f"sha256:{'b' * 64}",
         "trajectory_reference": trajectory.as_dict(),
         "observation": {"body_markdown": "跨语言 observation"},
     }

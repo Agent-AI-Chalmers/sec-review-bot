@@ -28,27 +28,27 @@ export type CreateRunRequest = {
 }
 
 /**
- * @description The Execution's public projection of one stored diagnostic bundle.
+ * @description The Execution's public projection of one stored execution archive.
  * @type object
  */
-export type ExecutionDiagnosticArtifact = {
+export type ExecutionArchive = {
   digest: string
-  kind: 'diagnostic_bundle'
+  kind: 'execution_archive'
   media_type: string
   size_bytes: number
   uri: string
 }
 
 /**
- * @description Where a terminal run's diagnostics went, or why they are not there.
+ * @description Where a terminal run's archive went, or why it is not there.
  *
  * The Execution API provider only attaches this once a run reaches a terminal state, and reports a failed
- * upload as a status rather than an error, because storage is diagnostic metadata and not
+ * upload as a status rather than an error, because archive storage is execution metadata and not
  * the business result.
  * @type object
  */
 export type ExecutionArtifactStorage = {
-  artifact?: ExecutionDiagnosticArtifact | null
+  artifact?: ExecutionArchive | null
   error_code?: string | null
   message?: string | null
   status: 'available' | 'unavailable' | 'failed'

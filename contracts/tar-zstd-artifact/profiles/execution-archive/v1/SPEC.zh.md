@@ -1,4 +1,4 @@
-# 任务诊断产物 — v1
+# 执行归档 — v1
 
 语言：[English](SPEC.md) | 中文
 
@@ -6,7 +6,7 @@
 
 ## Envelope
 
-产物使用受限 POSIX PAX [envelope v1](../../../envelope/v1/SPEC.zh.md)，媒体类型为 `application/tar+zstd`，文件名为 `diagnostic-tree.v1.tar.zst`。
+产物使用受限 POSIX PAX [envelope v1](../../../envelope/v1/SPEC.zh.md)，媒体类型为 `application/tar+zstd`，文件名为 `execution-archive.v1.tar.zst`。
 
 | 属性 | 限制 |
 | --- | --- |
@@ -16,7 +16,7 @@
 
 ## 目录树
 
-归档包含 `manifest.json`、`result.json` 和 `artifact-tree/` 目录，后者保存该任务已持久化的诊断文件。只允许普通文件和目录。路径必须相对于归档根目录，使用 `/` 分隔，不能包含空片段、`.`、`..` 或反斜杠，也不能重复。
+归档包含 `manifest.json`、`result.json` 和 `artifact-tree/` 目录，后者保存该任务已持久化的运行文件。只允许普通文件和目录。路径必须相对于归档根目录，使用 `/` 分隔，不能包含空片段、`.`、`..` 或反斜杠，也不能重复。
 
 清单是 UTF-8 JSON 对象，包含 `version: 1`、所属 `run_id`、`result: "result.json"` 与 `review_units` 数组。每个审查单元包含唯一的字符串 `id` 和 `trajectories` 数组。轨迹路径遵循与归档条目相同的规范相对路径规则，指向 `artifact-tree/` 下的 `.jsonl` 文件，并且必须真实存在于归档中。
 
@@ -28,4 +28,4 @@
 
 ## 共享测试输入
 
-[corpus/manifest.json](corpus/manifest.json) 记录真实的合法与非法诊断归档。所有读取方都必须测试这些实际字节，也必须执行共享 envelope 的测试输入。用例覆盖最小合法目录树、使用 PAX 的合法轨迹长路径、清单中的结果引用、轨迹缺失、轨迹路径不规范、轨迹文件名要求、审查单元标识重复，以及链接条目。
+[corpus/manifest.json](corpus/manifest.json) 记录真实的合法与非法执行归档。所有读取方都必须测试这些实际字节，也必须执行共享 envelope 的测试输入。用例覆盖最小合法目录树、使用 PAX 的合法轨迹长路径、清单中的结果引用、轨迹缺失、轨迹路径不规范、轨迹文件名要求、审查单元标识重复，以及链接条目。

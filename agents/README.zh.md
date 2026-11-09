@@ -56,11 +56,11 @@ cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 - Local `--temporal` 任务：用于验证 workflow / activity 编排。
 - 手动启动 Service 和 Worker：联调 HTTP 服务、Temporal 和 Worker，无需启动完整 Compose 栈。
 
-| 执行路径 | 诊断包发布 | 记忆处理 |
+| 执行路径 | 执行归档发布 | 记忆处理 |
 | --- | --- | --- |
-| Direct `run-local-*`，标准工作流 | 本地诊断包 | 禁用 |
-| 本地 `--temporal`，标准工作流 | 本地诊断包 | 由 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
-| 手动启动 Service 和 Worker | S3 兼容存储中的诊断包 | 由 Execution Worker 环境中的 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
+| Direct `run-local-*`，标准工作流 | 本地执行归档 | 禁用 |
+| 本地 `--temporal`，标准工作流 | 本地执行归档 | 由 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
+| 手动启动 Service 和 Worker | S3 兼容存储中的执行归档 | 由 Execution Worker 环境中的 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
 
 ### `run-local-*` 命令
 
@@ -248,9 +248,9 @@ Python 包按职责读最清楚：
 5. 生产入口。
    - `entrypoints/`：Temporal Worker 入口，以及执行契约、执行协议和工作流输入准备。
 
-6. 产物持久化与运行诊断。
+6. 产物持久化与执行归档。
    - `artifacts/`：不可变产物引用、本地与 S3 传输、物化和安全归档解包。产物引用将 `file://` 或 `s3://` 位置与媒体类型、大小和摘要绑定；使用方持有传输配置，并在使用前校验和物化引用。
-   - `run_diagnostics/`：每次运行的诊断包的格式、构建与物化逻辑，以及对应的 Temporal 发布 activity。
+   - `execution_archives/`：单次执行的归档格式、构建与物化逻辑，以及对应的 Temporal 发布 activity。
 
 7. Agent 运行所需基础设施。
    - `runtime/`、`filesystem/`、`workspace/`、`llm/`、`resources/`、`observability/`：Agent 运行时、文件系统沙箱、工作区产物、模型配置、提示词 / skill 资源和诊断支持。
@@ -297,7 +297,7 @@ uv run ruff check . --fix
 
 本地 Issue 审查默认使用多阶段工作流。做消融实验时，添加 `--strategy two-stage` 运行双阶段版本，或添加 `--strategy single-agent` 运行 single-agent。
 
-消融实验路径生成本地诊断包，且禁用记忆处理；直接运行和添加 `--temporal` 时均如此。
+消融实验路径生成本地执行归档，且禁用记忆处理；直接运行和添加 `--temporal` 时均如此。
 
 ```bash
 cd /path/to/sec-review-bot

@@ -5,7 +5,7 @@ import { publishedArtifact } from '../server/artifacts/published-artifact.js'
 import { ARTIFACT_BUCKET } from '../server/artifacts/store.js'
 import { catalogArtifactReference } from '../server/memory/artifact-reference.js'
 import { memoryTreeObjectKey } from '../server/memory/memory-tree-artifact.js'
-import { runDiagnosticBundle } from '../server/run/artifact-reference.js'
+import { publishedExecutionArchive } from '../server/run/artifact-reference.js'
 
 const BUCKET = ARTIFACT_BUCKET
 const DIGEST = `sha256:${'a'.repeat(64)}`
@@ -21,8 +21,8 @@ function runBody(artifact: Record<string, unknown>): {
 }
 
 const bundleArtifact = {
-  kind: 'diagnostic_bundle',
-  uri: `s3://${BUCKET}/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst`,
+  kind: 'execution_archive',
+  uri: `s3://${BUCKET}/runs/run-1/artifacts/execution-archive.v1.tar.zst`,
   digest: DIGEST,
   media_type: 'application/tar+zstd',
   size_bytes: 1024
@@ -33,8 +33,8 @@ const bundleArtifact = {
  * served is checked by the same module. These assert the rules that must not drift between
  * the run and memory artifact kinds.
  */
-test('a run diagnostic bundle resolves to the object it names', () => {
-  const published = runDiagnosticBundle(
+test('a execution archive resolves to the object it names', () => {
+  const published = publishedExecutionArchive(
     runBody(bundleArtifact),
     'run-1',
     BUCKET
@@ -44,7 +44,7 @@ test('a run diagnostic bundle resolves to the object it names', () => {
     published.kind === 'available' ? published.artifact : null,
     {
       digest: DIGEST,
-      key: 'runs/run-1/artifacts/diagnostic-tree.v1.tar.zst',
+      key: 'runs/run-1/artifacts/execution-archive.v1.tar.zst',
       maximumSize: 128 * 1024 * 1024,
       sizeBytes: 1024
     }
@@ -53,14 +53,14 @@ test('a run diagnostic bundle resolves to the object it names', () => {
 
 test('a run body for another run never resolves an artifact', () => {
   assert.deepStrictEqual(
-    runDiagnosticBundle(runBody(bundleArtifact), 'run-2', BUCKET),
+    publishedExecutionArchive(runBody(bundleArtifact), 'run-2', BUCKET),
     { kind: 'invalid' }
   )
 })
 
 test('a run that has not published an artifact resolves nothing', () => {
   assert.deepStrictEqual(
-    runDiagnosticBundle(
+    publishedExecutionArchive(
       { run_id: 'run-1', artifact_storage: { status: 'pending' } },
       'run-1',
       BUCKET
@@ -75,15 +75,15 @@ test('a reference naming a different object is invalid', () => {
     uri: `s3://${BUCKET}/runs/run-1/artifacts/other.v1.tar.zst`
   }
   assert.deepStrictEqual(
-    runDiagnosticBundle(runBody(elsewhere), 'run-1', BUCKET),
+    publishedExecutionArchive(runBody(elsewhere), 'run-1', BUCKET),
     { kind: 'invalid' }
   )
   const wrongBucket = {
     ...bundleArtifact,
-    uri: 's3://other-bucket/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst'
+    uri: 's3://other-bucket/runs/run-1/artifacts/execution-archive.v1.tar.zst'
   }
   assert.deepStrictEqual(
-    runDiagnosticBundle(runBody(wrongBucket), 'run-1', BUCKET),
+    publishedExecutionArchive(runBody(wrongBucket), 'run-1', BUCKET),
     { kind: 'invalid' }
   )
 })
@@ -98,7 +98,7 @@ test('malformed fields are invalid rather than unavailable', () => {
     { ...bundleArtifact, uri: 42 }
   ])
     assert.deepStrictEqual(
-      runDiagnosticBundle(runBody(broken), 'run-1', BUCKET),
+      publishedExecutionArchive(runBody(broken), 'run-1', BUCKET),
       { kind: 'invalid' },
       JSON.stringify(broken)
     )
@@ -107,7 +107,7 @@ test('malformed fields are invalid rather than unavailable', () => {
 test('an object over the serving budget is reported as too large', () => {
   const oversized = { ...bundleArtifact, size_bytes: 128 * 1024 * 1024 + 1 }
   assert.deepStrictEqual(
-    runDiagnosticBundle(runBody(oversized), 'run-1', BUCKET),
+    publishedExecutionArchive(runBody(oversized), 'run-1', BUCKET),
     { kind: 'too_large' }
   )
 })

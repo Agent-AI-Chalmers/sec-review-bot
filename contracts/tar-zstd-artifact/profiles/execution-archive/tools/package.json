@@ -1,5 +1,5 @@
 {
-  "name": "@sec-review-bot/run-diagnostic-artifact-tools",
+  "name": "@sec-review-bot/execution-archive-artifact-tools",
   "private": true,
   "version": "0.0.1",
   "license": "Apache-2.0",

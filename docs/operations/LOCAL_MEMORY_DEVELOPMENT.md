@@ -85,7 +85,7 @@ uv --project agents run python -m scripts.dev.dev_workers \
 
 The launcher maps the separate object-storage identities to their workers, keeps Memory Maintenance Worker activity concurrency at `1`, and stops the worker group when one worker exits or the launcher receives `SIGINT`/`SIGTERM`. It does not start or stop Compose services.
 
-When memory processing is enabled in local Temporal mode, Memory Extraction Worker reads the diagnostic bundle produced by Execution Worker from the local filesystem. Both workers must be able to access the same file path. Extraction results still use Memory Catalog to store observations and artifact references, and S3-compatible storage to store the extractor trajectory.
+When memory processing is enabled in local Temporal mode, Memory Extraction Worker reads the execution archive produced by Execution Worker from the local filesystem. Both workers must be able to access the same file path. Extraction results still use Memory Catalog to store observations and artifact references, and S3-compatible storage to store the extractor trajectory.
 
 Run the operational script from the repository root (see [scripts guide](../../scripts/README.md#memory-operations)):
 

@@ -37,7 +37,7 @@ from tests.temporal_test_utils import temporal_time_skipping_environment
 
 def _reference() -> ArtifactReference:
     return ArtifactReference(
-        uri="s3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst",
+        uri="s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst",
         digest=f"sha256:{'a' * 64}",
         media_type="application/tar+zstd",
         size_bytes=42,
@@ -144,15 +144,15 @@ def test_maintenance_preparation_result_rejects_mixed_variants() -> None:
 
 def test_extraction_workflow_id_is_stable_per_trajectory_unit() -> None:
     first = memory_extraction_workflow_id(
-        diagnostic_bundle_digest=_reference().digest,
+        execution_archive_digest=_reference().digest,
         unit_id="case-a",
     )
     assert first == memory_extraction_workflow_id(
-        diagnostic_bundle_digest=_reference().digest,
+        execution_archive_digest=_reference().digest,
         unit_id="case-a",
     )
     assert first != memory_extraction_workflow_id(
-        diagnostic_bundle_digest=_reference().digest,
+        execution_archive_digest=_reference().digest,
         unit_id="case-b",
     )
 
@@ -165,7 +165,7 @@ async def test_extraction_workflow_prepares_then_registers_fixed_payload(
         source_workflow="issue-review",
         run_id="run-1",
         unit_id="review",
-        diagnostic_bundle=_reference().as_dict(),
+        execution_archive=_reference().as_dict(),
         timeout_seconds=30,
     )
     payload = MemoryExtractionRegistrationPayload(
@@ -173,7 +173,7 @@ async def test_extraction_workflow_prepares_then_registers_fixed_payload(
         source_workflow="issue-review",
         source_run_id="run-1",
         source_unit_id="review",
-        diagnostic_bundle_digest=_reference().digest,
+        execution_archive_digest=_reference().digest,
         trajectory_reference=_reference(),
         observation_markdown="Remember this.",
         skipped=False,
@@ -220,7 +220,7 @@ async def test_prepare_extraction_returns_complete_serializable_payload(
     )
 
     monkeypatch.setattr(
-        "sec_review_agents.run_diagnostics.bundle.materialize_diagnostic_trajectory_unit",
+        "sec_review_agents.execution_archives.bundle.materialize_archive_trajectory_unit",
         lambda *_args, **_kwargs: SimpleNamespace(trajectory_paths=(trajectory,)),
     )
     monkeypatch.setattr(
@@ -235,7 +235,7 @@ async def test_prepare_extraction_returns_complete_serializable_payload(
         source_workflow="issue-review",
         run_id="run-1",
         unit_id="review",
-        diagnostic_bundle=_reference().as_dict(),
+        execution_archive=_reference().as_dict(),
         timeout_seconds=30,
     )
 
@@ -257,13 +257,13 @@ async def test_prepare_extraction_returns_complete_serializable_payload(
 
     assert result == MemoryExtractionRegistrationPayload(
         extraction_id=memory_extraction_workflow_id(
-            diagnostic_bundle_digest=_reference().digest,
+            execution_archive_digest=_reference().digest,
             unit_id="review",
         ),
         source_workflow="issue-review",
         source_run_id="run-1",
         source_unit_id="review",
-        diagnostic_bundle_digest=_reference().digest,
+        execution_archive_digest=_reference().digest,
         trajectory_reference=extraction_trajectory,
         observation_markdown="Remember this.",
         skipped=False,
@@ -279,7 +279,7 @@ async def test_extraction_payload_round_trips_through_temporal_converter() -> No
         source_workflow="issue-review",
         source_run_id="run-1",
         source_unit_id="review",
-        diagnostic_bundle_digest=_reference().digest,
+        execution_archive_digest=_reference().digest,
         trajectory_reference=_reference(),
         observation_markdown=None,
         skipped=True,
@@ -304,7 +304,7 @@ async def test_extraction_payload_rejects_wrong_field_type_during_conversion() -
                 "source_workflow": "issue-review",
                 "source_run_id": "run-1",
                 "source_unit_id": "review",
-                "diagnostic_bundle_digest": _reference().digest,
+                "execution_archive_digest": _reference().digest,
                 "trajectory_reference": _reference().as_dict(),
                 "observation_markdown": None,
                 "skipped": "yes",
@@ -329,7 +329,7 @@ async def test_extraction_payload_rejects_inconsistent_observation_flags() -> No
                 "source_workflow": "issue-review",
                 "source_run_id": "run-1",
                 "source_unit_id": "review",
-                "diagnostic_bundle_digest": _reference().digest,
+                "execution_archive_digest": _reference().digest,
                 "trajectory_reference": _reference().as_dict(),
                 "observation_markdown": "Remember this.",
                 "skipped": True,
@@ -369,7 +369,7 @@ def test_register_extraction_retries_with_identical_payload_and_no_observation(
         source_workflow="issue-review",
         source_run_id="run-1",
         source_unit_id="review",
-        diagnostic_bundle_digest=_reference().digest,
+        execution_archive_digest=_reference().digest,
         trajectory_reference=trajectory_reference,
         observation_markdown=None,
         skipped=True,
@@ -398,7 +398,7 @@ def test_register_extraction_retries_with_identical_payload_and_no_observation(
         "source_workflow": "issue-review",
         "source_run_id": "run-1",
         "source_unit_id": "review",
-        "diagnostic_bundle_digest": _reference().digest,
+        "execution_archive_digest": _reference().digest,
         "trajectory_reference": trajectory_reference,
         "observation_markdown": None,
     }
@@ -414,7 +414,7 @@ async def test_extraction_workflow_retries_registration_with_history_payload() -
         source_workflow="issue-review",
         source_run_id="run-1",
         source_unit_id="review",
-        diagnostic_bundle_digest=_reference().digest,
+        execution_archive_digest=_reference().digest,
         trajectory_reference=_reference(),
         observation_markdown=None,
         skipped=True,
@@ -454,7 +454,7 @@ async def test_extraction_workflow_retries_registration_with_history_payload() -
         source_workflow="issue-review",
         run_id="run-1",
         unit_id="review",
-        diagnostic_bundle=_reference().as_dict(),
+        execution_archive=_reference().as_dict(),
         timeout_seconds=30,
     )
     async with temporal_time_skipping_environment() as env:
@@ -496,7 +496,7 @@ def test_catalog_extraction_conflict_is_not_retried(monkeypatch) -> None:
         source_workflow="issue-review",
         source_run_id="run-1",
         source_unit_id="review",
-        diagnostic_bundle_digest=_reference().digest,
+        execution_archive_digest=_reference().digest,
         trajectory_reference=_reference(),
         observation_markdown=None,
         skipped=True,
@@ -519,7 +519,7 @@ async def test_extraction_activity_requires_catalog_when_processing_is_enabled(
         source_workflow="issue-review",
         run_id="run-1",
         unit_id="review",
-        diagnostic_bundle=_reference().as_dict(),
+        execution_archive=_reference().as_dict(),
         timeout_seconds=30,
     )
     monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "true")
@@ -537,7 +537,7 @@ async def test_extraction_activity_skips_when_processing_is_disabled(
         source_workflow="issue-review",
         run_id="run-1",
         unit_id="review",
-        diagnostic_bundle=_reference().as_dict(),
+        execution_archive=_reference().as_dict(),
         timeout_seconds=30,
     )
     prepare_extraction = AsyncMock()

@@ -5,8 +5,8 @@ import { normalizeArtifactStorage } from '../src/shapes.js'
 
 test('an available artifact storage record keeps its artifact reference', () => {
   const artifact = {
-    kind: 'diagnostic_bundle' as const,
-    uri: 's3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst',
+    kind: 'execution_archive' as const,
+    uri: 's3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst',
     media_type: 'application/tar+zstd' as const,
     digest: `sha256:${'a'.repeat(64)}`,
     size_bytes: 42

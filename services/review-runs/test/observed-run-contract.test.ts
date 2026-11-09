@@ -328,8 +328,8 @@ test('what observeRun returns validates against the shared schema', () => {
     recordWith({
       status: 'available',
       artifact: {
-        kind: 'diagnostic_bundle',
-        uri: 's3://sec-review/runs/run-contract/artifacts/diagnostic-tree.v1.tar.zst',
+        kind: 'execution_archive',
+        uri: 's3://sec-review/runs/run-contract/artifacts/execution-archive.v1.tar.zst',
         media_type: 'application/tar+zstd',
         digest: `sha256:${'ab'.repeat(32)}`,
         size_bytes: 1234

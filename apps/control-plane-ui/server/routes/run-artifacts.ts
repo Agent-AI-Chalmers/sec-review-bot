@@ -17,10 +17,10 @@ import { PROXIED_CONTENT_TYPE, sendJson } from '../http.js'
 import type { ReviewRunsClient } from '../upstream/review-runs-client.js'
 import { UpstreamRequestError } from '../upstream/request.js'
 import {
-  runDiagnosticBundle,
+  publishedExecutionArchive,
   type PublishedRunArtifact
 } from '../run/artifact-reference.js'
-import { readDiagnosticBundle } from '../run/diagnostic-bundle.js'
+import { readExecutionArchive } from '../run/execution-archive.js'
 
 function decodeRunId(raw: string | undefined): string | null {
   let runId: string
@@ -36,7 +36,7 @@ export interface RunArtifactRoutes {
   handle(request: IncomingMessage, response: ServerResponse): Promise<boolean>
 }
 
-/** Own the run diagnostic preview and attachment download. */
+/** Own the execution archive preview and attachment download. */
 export function createRunArtifactRoutes({
   reviewRuns,
   artifactStore,
@@ -67,7 +67,11 @@ export function createRunArtifactRoutes({
       const body = JSON.parse(upstream.body.toString('utf8')) as {
         run?: PublishedRunArtifact
       }
-      const published = runDiagnosticBundle(body.run, runId, ARTIFACT_BUCKET)
+      const published = publishedExecutionArchive(
+        body.run,
+        runId,
+        ARTIFACT_BUCKET
+      )
       if (published.kind === 'invalid') {
         sendJson(response, 409, { error: 'artifact_unavailable' })
         return
@@ -81,7 +85,7 @@ export function createRunArtifactRoutes({
         published.artifact,
         { idleTimeoutMs: artifactDownloadIdleTimeoutMs }
       )
-      const view = await readDiagnosticBundle(complete, runId)
+      const view = await readExecutionArchive(complete, runId)
       response.writeHead(200, {
         'content-type': PROXIED_CONTENT_TYPE,
         'cache-control': 'private, no-store'
@@ -105,9 +109,9 @@ export function createRunArtifactRoutes({
             ? 'upstream_response_too_large'
             : message === 'artifact_identity_mismatch'
               ? 'artifact_identity_mismatch'
-              : message === 'diagnostic_bundle_too_large'
+              : message === 'execution_archive_too_large'
                 ? 'artifact_preview_too_large'
-                : 'invalid_diagnostic_bundle'
+                : 'invalid_execution_archive'
       })
     }
   }
@@ -139,7 +143,11 @@ export function createRunArtifactRoutes({
       const body = JSON.parse(upstream.body.toString('utf8')) as {
         run?: PublishedRunArtifact
       }
-      const published = runDiagnosticBundle(body.run, runId, ARTIFACT_BUCKET)
+      const published = publishedExecutionArchive(
+        body.run,
+        runId,
+        ARTIFACT_BUCKET
+      )
       if (published.kind === 'invalid') {
         sendJson(response, 409, { error: 'artifact_unavailable' })
         return
@@ -152,7 +160,7 @@ export function createRunArtifactRoutes({
         artifactStore,
         published.artifact,
         {
-          filename: 'diagnostic-tree.v1.tar.zst',
+          filename: 'execution-archive.v1.tar.zst',
           idleTimeoutMs: artifactDownloadIdleTimeoutMs,
           signal: downloadController.signal
         },
@@ -160,7 +168,7 @@ export function createRunArtifactRoutes({
           response.writeHead(200, {
             'content-type': 'application/octet-stream',
             'content-disposition':
-              'attachment; filename="diagnostic-tree.v1.tar.zst"',
+              'attachment; filename="execution-archive.v1.tar.zst"',
             'cache-control': 'private, no-store',
             'content-length': String(file.sizeBytes)
           })

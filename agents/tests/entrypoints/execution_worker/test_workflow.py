@@ -74,7 +74,7 @@ async def test_execution_gateway_runs_publish_diagnostics_to_s3(
         prepared_input=prepared_issue_input(artifact_root_path="/tmp/run-1/artifacts"),
         runtime_context={},
         timeout_seconds=30,
-        post_processing=ReviewPostProcessingPolicy(diagnostic_scheme="s3"),
+        post_processing=ReviewPostProcessingPolicy(execution_archive_scheme="s3"),
     )
     captured = []
     activity_calls = []
@@ -116,7 +116,7 @@ async def test_execution_gateway_runs_publish_diagnostics_to_s3(
         == execution_workflow.EXECUTION_INPUT_PREPARATION_TIMEOUT
     )
     assert captured[0] is prepared
-    assert captured[0].post_processing.diagnostic_scheme == "s3"
+    assert captured[0].post_processing.execution_archive_scheme == "s3"
 
 
 @pytest.mark.parametrize(
@@ -143,7 +143,7 @@ async def test_preparation_result_temporal_conversion(success: bool) -> None:
             timeout_seconds=30,
             runtime_context={"workspace_image": "review:latest"},
             post_processing=ReviewPostProcessingPolicy(
-                memory_processing_enabled=False, diagnostic_scheme="s3"
+                memory_processing_enabled=False, execution_archive_scheme="s3"
             ),
         )
         if success
@@ -220,7 +220,7 @@ def test_preparation_builds_production_review_request(monkeypatch, memory_enable
     assert isinstance(result, ReviewWorkflowRequest)
     assert result.prepared_input is prepared_input
     assert result.post_processing == ReviewPostProcessingPolicy(
-        memory_processing_enabled=memory_enabled, diagnostic_scheme="s3"
+        memory_processing_enabled=memory_enabled, execution_archive_scheme="s3"
     )
 
 
@@ -233,7 +233,7 @@ class PreparedRequestProbe:
             "run_id": request.run_id,
             "prepared_input": request.prepared_input.model_dump(mode="json"),
             "prepared_type": type(request.prepared_input).__name__,
-            "diagnostic_scheme": request.post_processing.diagnostic_scheme,
+            "execution_archive_scheme": request.post_processing.execution_archive_scheme,
             "memory_processing_enabled": request.post_processing.memory_processing_enabled,
         }
 
@@ -281,6 +281,6 @@ async def test_prepared_request_reaches_child_through_real_temporal(
             artifact_root_path="/tmp/run-1/artifacts"
         ).model_dump(mode="json"),
         "prepared_type": "PreparedIssueInput",
-        "diagnostic_scheme": "s3",
+        "execution_archive_scheme": "s3",
         "memory_processing_enabled": False,
     }

@@ -160,9 +160,9 @@ export type ArtifactStorage =
   | {
       status: 'available'
       artifact: {
-        kind: 'diagnostic_bundle'
+        kind: 'execution_archive'
         /**
-         * @pattern ^s3://[^/]+/runs/[^/]+/artifacts/diagnostic-tree\.v1\.tar\.zst$
+         * @pattern ^s3://[^/]+/runs/[^/]+/artifacts/execution-archive\.v1\.tar\.zst$
          * @type string
          */
         uri: string

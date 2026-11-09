@@ -33,8 +33,8 @@ Control Plane UI 通过同源服务端（BFF）访问 Memory Catalog，浏览器
 | Review Runs | `services/review-runs/` | 接收任务、保存运行状态、恢复处理、跟踪执行和协调发布 | [README](../../services/review-runs/README.zh.md) |
 | Control Plane UI | `apps/control-plane-ui/` | 经身份验证的运维控制台，用于查看 run 和管理记忆 | [README](../../apps/control-plane-ui/README.zh.md) |
 | Execution Gateway | `services/execution-gateway/` | 经过鉴权的 Execution API 与 HTTP-to-Temporal 转换 | [README](../../services/execution-gateway/README.zh.md) |
-| Execution Worker | `agents/` | 执行审查工作流、activity 和 Agent，保存阶段产物并发布诊断包 | [README](../../agents/README.zh.md) |
-| Memory Extraction Worker | `agents/` | 读取审查诊断包、提取经验、发布轨迹并登记 extraction | [README](../../agents/README.zh.md) |
+| Execution Worker | `agents/` | 执行审查工作流、activity 和 Agent，保存阶段产物并发布执行归档 | [README](../../agents/README.zh.md) |
+| Memory Extraction Worker | `agents/` | 读取执行归档、提取经验、发布轨迹并登记 extraction | [README](../../agents/README.zh.md) |
 | Memory Maintenance Worker | `agents/` | 分批整理待处理经验、发布记忆文件树并提交修订 | [README](../../agents/README.zh.md) |
 | Memory Catalog Server | `services/memory-catalog/` | 保存 extraction、不可变修订历史和当前生效版本 | [README](../../services/memory-catalog/README.zh.md) |
 
@@ -65,9 +65,9 @@ sequenceDiagram
     Control->>Gateway: 观察 execution
     Gateway-->>Control: 返回当前状态
   end
-  ExecutionWorker->>Storage: 发布 run diagnostic bundle
-  ExecutionWorker-->>Gateway: 返回 workflow result 和 diagnostic 引用
-  Gateway-->>Control: 返回 result 和 diagnostic 引用
+  ExecutionWorker->>Storage: 发布执行归档
+  ExecutionWorker-->>Gateway: 返回 workflow result 和归档引用
+  Gateway-->>Control: 返回 result 和归档引用
   Integration->>Control: 领取 publication 工作
   Control-->>Integration: 返回 result 和 publish context
   Integration->>GitHub: 发布 review 结果
@@ -87,8 +87,8 @@ sequenceDiagram
 
   ExecutionWorker->>Temporal: 请求异步 memory 处理
   Temporal->>ExtractionWorker: 分发 memory extraction 工作
-  ExtractionWorker->>Storage: 下载 run diagnostic bundle
-  Storage-->>ExtractionWorker: run diagnostic bundle
+  ExtractionWorker->>Storage: 下载执行归档
+  Storage-->>ExtractionWorker: 归档
   Note over ExtractionWorker: 读取 review trajectories 并运行 extractor
   ExtractionWorker->>Storage: 保存 extractor trajectory
   ExtractionWorker->>Catalog: 在同一事务中保存 extraction 结果、trajectory reference 和 observation（如果有）
@@ -164,7 +164,7 @@ sequenceDiagram
 | 经验提取轨迹 | Memory Catalog 发布意图：轨迹引用、observation 和摘要 | 重试先检查已有候选记录，再决定是否重新调用模型；选定记录和登记 extraction 在同一事务中完成。 |
 | 自动维护修订 | Memory Catalog 发布意图：记忆树、轨迹、observation ID 和预期生效修订 | 不同模型输出可以对应不同候选记录；选定记录、创建修订、标记 observation 已处理和更新生效版本在同一事务中完成。 |
 | 人工编辑修订 | Memory Catalog 发布意图：记忆树引用、operation ID 和预期生效修订；UI BFF 上传记忆树 | 编辑器保持打开且内容未变时，重试复用 operation ID 和最初预期的修订。BFF 重新执行预留、条件上传、确认和幂等修订创建。 |
-| S3 中的 run 诊断包 | Temporal 发布请求和固定的 run 对象键 | 恢复时先按请求校验已上传的诊断包，再考虑本地文件。如果完整上传的诊断包和本地产物都已丢失，仅凭请求无法重建诊断内容。 |
+| S3 中的执行归档 | Temporal 发布请求和固定的 run 对象键 | 恢复时先按请求校验已上传的归档，再考虑本地文件。如果完整归档和本地产物都已丢失，仅凭请求无法重建归档内容。 |
 
 UI 恢复版本在 Catalog 事务中将生效版本指针移到已有修订，不创建修订或对象，也不会修复丢失的字节。
 

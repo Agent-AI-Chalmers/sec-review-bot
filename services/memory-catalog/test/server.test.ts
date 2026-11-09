@@ -50,7 +50,7 @@ const extraction = {
   source_workflow: 'issue-review',
   source_run_id: 'run-1',
   source_unit_id: 'review',
-  diagnostic_bundle_digest: `sha256:${'b'.repeat(64)}`,
+  execution_archive_digest: `sha256:${'b'.repeat(64)}`,
   trajectory_reference: {
     uri: 's3://sec-review/memory/trajectories/memory-extractor/trajectory.v1.jsonl.zst',
     digest: `sha256:${'a'.repeat(64)}`,

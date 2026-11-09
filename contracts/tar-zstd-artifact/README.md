@@ -8,7 +8,7 @@ This directory defines artifact formats with media type `application/tar+zstd`. 
 - [envelope/v1/corpus](envelope/v1/corpus) contains encoded interoperability and rejection cases consumed by every archive reader.
 - [profiles/memory-tree](profiles/memory-tree/README.md) defines immutable memory-tree archives.
 - [profiles/input-bundle](profiles/input-bundle/README.md) defines prepared execution input archives.
-- [profiles/run-diagnostic](profiles/run-diagnostic/README.md) defines completed-run diagnostic archives.
+- [profiles/execution-archive](profiles/execution-archive/README.md) defines completed-execution archives.
 
 Envelope and profile versions are independent. Each profile specification names the envelope version it uses.
 
@@ -20,5 +20,5 @@ Run each tool from the directory that owns its layer:
 pnpm --dir contracts/tar-zstd-artifact/envelope/tools run check
 pnpm --dir contracts/tar-zstd-artifact/profiles/memory-tree/tools run check
 pnpm --dir contracts/tar-zstd-artifact/profiles/input-bundle/tools run check
-pnpm --dir contracts/tar-zstd-artifact/profiles/run-diagnostic/tools run check
+pnpm --dir contracts/tar-zstd-artifact/profiles/execution-archive/tools run check
 ```

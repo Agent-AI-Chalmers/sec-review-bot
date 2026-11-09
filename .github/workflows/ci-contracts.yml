@@ -28,8 +28,8 @@ jobs:
             tools_directory: contracts/tar-zstd-artifact/profiles/memory-tree/tools
           - name: input-bundle-profile
             tools_directory: contracts/tar-zstd-artifact/profiles/input-bundle/tools
-          - name: run-diagnostic-profile
-            tools_directory: contracts/tar-zstd-artifact/profiles/run-diagnostic/tools
+          - name: execution-archive-profile
+            tools_directory: contracts/tar-zstd-artifact/profiles/execution-archive/tools
     defaults:
       run:
         working-directory: ${{ matrix.tools_directory }}

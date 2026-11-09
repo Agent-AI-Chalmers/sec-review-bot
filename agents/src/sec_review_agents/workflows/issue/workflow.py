@@ -5,6 +5,10 @@ from typing import Any
 from temporalio import activity, workflow
 
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
+from sec_review_agents.execution_archives.publication import (
+    ExecutionArchivePublicationRequest,
+    publish_execution_archive_activity,
+)
 from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
@@ -15,10 +19,6 @@ from sec_review_agents.review_stages.feedback_loop import (
 )
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.verification.result import VerificationStageResult
-from sec_review_agents.run_diagnostics.publication import (
-    RunDiagnosticPublicationRequest,
-    publish_run_diagnostic_activity,
-)
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
@@ -323,9 +323,9 @@ class IssueReviewWorkflow:
             label="artifact_root_path",
         )
         finalized = await workflow.execute_activity(
-            publish_run_diagnostic_activity,
+            publish_execution_archive_activity,
             args=[
-                RunDiagnosticPublicationRequest(
+                ExecutionArchivePublicationRequest(
                     run_id=request.run_id,
                     artifact_root_path=str(artifact_root),
                     review_units=[
@@ -335,7 +335,7 @@ class IssueReviewWorkflow:
                         }
                     ],
                     result=result,
-                    destination_scheme=request.post_processing.diagnostic_scheme,
+                    destination_scheme=request.post_processing.execution_archive_scheme,
                 )
             ],
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
@@ -344,7 +344,7 @@ class IssueReviewWorkflow:
         memory_processing = await schedule_memory_extractions(
             source_workflow=request.workflow,
             run_id=request.run_id,
-            diagnostic_bundle=dict(finalized["diagnostic_bundle"]),
+            execution_archive=dict(finalized["execution_archive"]),
             unit_ids=[str(value) for value in finalized["unit_ids"]],
             timeout_seconds=request.timeout_seconds,
             enabled=request.post_processing.memory_processing_enabled,

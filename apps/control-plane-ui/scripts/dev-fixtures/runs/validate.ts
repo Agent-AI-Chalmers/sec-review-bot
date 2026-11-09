@@ -201,7 +201,7 @@ export function validateRun(
     run.artifact_storage !== null &&
     !['succeeded', 'failed'].includes(execution)
   ) {
-    fail('the diagnostic artifact is only reported at execution terminal')
+    fail('the execution archive is only reported at execution terminal')
   }
   const failedOnAnAxis =
     execution === 'failed' ||

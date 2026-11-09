@@ -65,7 +65,7 @@ async def test_preparation_requires_worker_catalog_even_when_dotenv_provides_one
                     source_workflow="issue-review",
                     run_id="run-1",
                     unit_id="review",
-                    diagnostic_bundle={},
+                    execution_archive={},
                     timeout_seconds=30,
                 )
             )
@@ -98,7 +98,7 @@ def test_commit_requires_worker_catalog_even_when_dotenv_provides_one(
                     source_workflow="issue-review",
                     source_run_id="run-1",
                     source_unit_id="review",
-                    diagnostic_bundle_digest=reference.digest,
+                    execution_archive_digest=reference.digest,
                     trajectory_reference=reference,
                     observation_markdown=None,
                     skipped=True,

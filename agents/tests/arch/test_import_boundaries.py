@@ -113,9 +113,9 @@ def test_stages_and_runtime_do_not_manage_agent_mcp_connections() -> None:
     assert violations == []
 
 
-def test_run_diagnostics_package_does_not_import_orchestration_packages() -> None:
+def test_execution_archives_package_does_not_import_orchestration_packages() -> None:
     violations = import_violations(
-        PACKAGE_ROOT / "run_diagnostics",
+        PACKAGE_ROOT / "execution_archives",
         (
             "sec_review_agents.cli",
             "sec_review_agents.entrypoints",
@@ -127,17 +127,17 @@ def test_run_diagnostics_package_does_not_import_orchestration_packages() -> Non
     assert violations == []
 
 
-def test_memory_package_does_not_own_run_diagnostic_publication() -> None:
+def test_memory_package_does_not_own_execution_archive_publication() -> None:
     memory_root = PACKAGE_ROOT / "memory"
     forbidden_symbols = {
-        "RunDiagnosticPublicationRequest",
-        "publish_run_diagnostic_activity",
+        "ExecutionArchivePublicationRequest",
+        "publish_execution_archive_activity",
     }
     violations = import_violations(
         memory_root,
         (
             "sec_review_agents.workflows.memory.scheduling",
-            "sec_review_agents.run_diagnostics.publication",
+            "sec_review_agents.execution_archives.publication",
         ),
     )
 

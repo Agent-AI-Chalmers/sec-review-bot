@@ -6,7 +6,7 @@ import { zstdCompressSync } from 'node:zlib'
 
 import tar from 'tar-stream'
 
-import { readDiagnosticBundle } from '../server/run/diagnostic-bundle.js'
+import { readExecutionArchive } from '../server/run/execution-archive.js'
 
 const repositoryRoot = path.resolve(import.meta.dirname, '../../..')
 
@@ -64,8 +64,8 @@ function manifest(runId = 'run-1'): string {
   })
 }
 
-test('diagnostic bundle reader exposes text and marks binary files unpreviewable', async () => {
-  const view = await readDiagnosticBundle(
+test('execution archive reader exposes text and marks binary files unpreviewable', async () => {
+  const view = await readExecutionArchive(
     await bundle([
       { name: 'manifest.json', body: manifest() },
       { name: 'result.json', body: '{"status":"completed"}' },
@@ -92,9 +92,9 @@ test('diagnostic bundle reader exposes text and marks binary files unpreviewable
   )
 })
 
-test('diagnostic bundle reader rejects another run and unsafe archive paths', async () => {
+test('execution archive reader rejects another run and unsafe archive paths', async () => {
   await assert.rejects(
-    readDiagnosticBundle(
+    readExecutionArchive(
       await bundle([
         { name: 'manifest.json', body: manifest('run-2') },
         { name: 'result.json', body: '{}' },
@@ -102,10 +102,10 @@ test('diagnostic bundle reader rejects another run and unsafe archive paths', as
       ]),
       'run-1'
     ),
-    /invalid_diagnostic_bundle/
+    /invalid_execution_archive/
   )
   await assert.rejects(
-    readDiagnosticBundle(
+    readExecutionArchive(
       await bundle([
         { name: 'manifest.json', body: manifest() },
         { name: 'result.json', body: '{}' },
@@ -114,13 +114,13 @@ test('diagnostic bundle reader rejects another run and unsafe archive paths', as
       ]),
       'run-1'
     ),
-    /invalid_diagnostic_bundle/
+    /invalid_execution_archive/
   )
 })
 
-test('diagnostic bundle reader rejects links and missing manifest entries', async () => {
+test('execution archive reader rejects links and missing manifest entries', async () => {
   await assert.rejects(
-    readDiagnosticBundle(
+    readExecutionArchive(
       await bundle([
         { name: 'manifest.json', body: manifest() },
         { name: 'result.json', body: '{}' },
@@ -128,24 +128,24 @@ test('diagnostic bundle reader rejects links and missing manifest entries', asyn
       ]),
       'run-1'
     ),
-    /invalid_diagnostic_bundle/
+    /invalid_execution_archive/
   )
   await assert.rejects(
-    readDiagnosticBundle(
+    readExecutionArchive(
       await bundle([{ name: 'result.json', body: '{}' }]),
       'run-1'
     ),
-    /invalid_diagnostic_bundle/
+    /invalid_execution_archive/
   )
 })
 
-test('diagnostic bundle reader matches the shared profile corpus', async () => {
+test('execution archive reader matches the shared profile corpus', async () => {
   const corpus = path.join(
     repositoryRoot,
     'contracts',
     'tar-zstd-artifact',
     'profiles',
-    'run-diagnostic',
+    'execution-archive',
     'v1',
     'corpus'
   )
@@ -160,18 +160,18 @@ test('diagnostic bundle reader matches the shared profile corpus', async () => {
   }
 
   for (const item of manifest.corpus) {
-    const read = readDiagnosticBundle(
+    const read = readExecutionArchive(
       await readFile(path.join(corpus, item.file)),
       item.runId
     )
     if (item.expected === 'valid') await read
-    else await assert.rejects(read, /invalid_diagnostic_bundle/, item.file)
+    else await assert.rejects(read, /invalid_execution_archive/, item.file)
   }
 })
 
-test('diagnostic bundle reader rejects duplicate directory paths', async () => {
+test('execution archive reader rejects duplicate directory paths', async () => {
   await assert.rejects(
-    readDiagnosticBundle(
+    readExecutionArchive(
       await bundle([
         { name: 'manifest.json', body: manifest() },
         { name: 'result.json', body: '{}' },
@@ -181,6 +181,6 @@ test('diagnostic bundle reader rejects duplicate directory paths', async () => {
       ]),
       'run-1'
     ),
-    /invalid_diagnostic_bundle/
+    /invalid_execution_archive/
   )
 })

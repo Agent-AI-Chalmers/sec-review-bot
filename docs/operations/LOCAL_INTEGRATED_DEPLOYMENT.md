@@ -110,7 +110,12 @@ Compose-level defaults are documented in [compose.env.sample](../../compose.env.
 
 The initialization command fills the service tokens and PostgreSQL/RustFS credentials with independently generated values. It also copies the Memory Catalog and role-specific storage credentials needed by host workers into `ops/systemd/deployment.env`; no manual token synchronization is required. The installer projects that source into separate worker environment files, so execution and memory processes receive only their own credentials. The integrated deployment uses `.agent-temporal-state`, `.agent-rustfs-state`, and `.agent-postgres-state` by default. Compose supports `SEC_REVIEW_TEMPORAL_STATE_DIR`, `SEC_REVIEW_RUSTFS_STATE_DIR`, and `SEC_REVIEW_POSTGRES_STATE_DIR` overrides for the separate Memory development environment.
 
-RustFS uses a separate workload identity for each storage responsibility: the integration writes input objects; Execution Worker reads inputs, writes run diagnostic bundles, and reads active memory revisions; the Memory Extraction and Memory Maintenance Workers share one memory-storage identity for run diagnostics, memory revisions, and compressed memory-agent trajectories; and the UI BFF reads stored diagnostics for authenticated downloads. Extraction and maintenance remain separate Temporal worker identities, processes, and task queues. Their shared S3 credential is retained because the current object-store policy covers one common memory artifact namespace; splitting that policy is outside this deployment change and would not improve process isolation by itself.
+RustFS credentials are assigned by storage responsibility:
+
+- GitHub Integration writes input objects.
+- Execution Worker reads inputs, writes execution archives, and reads the active memory revision.
+- Memory Extraction Worker and Memory Maintenance Worker share one storage credential to read execution archives and read/write memory revisions and compressed memory-agent trajectories.
+- The UI BFF reads stored execution archives for authenticated downloads.
 
 ### 2. GitHub Integration `.env`
 
@@ -178,15 +183,15 @@ Core fields:
 | `AGENT_MEMORY_PROCESSING_ENABLED` | Allow trajectory extraction and memory maintenance; defaults to `true`. |
 | `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Optional custom S3-compatible endpoint. The local RustFS deployment uses `http://127.0.0.1:9100`; omit it to use the AWS endpoint selected from `AWS_REGION`. |
 | `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` | S3 request addressing: `auto`, `path`, or `virtual`. The local RustFS deployment uses `path`; external storage can use `auto` or `virtual` without changing artifact references. |
-| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`, `SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker credential; it can read run inputs, write run diagnostic bundles, and read active memory revisions. |
-| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`, `SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Shared storage credential for both memory workers; it can read run diagnostic bundles and read/write memory revisions and compressed memory-agent trajectories. |
+| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`, `SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker credential; it can read run inputs, write execution archives, and read active memory revisions. |
+| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`, `SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Shared storage credential for both memory workers; it can read execution archives and read/write memory revisions and compressed memory-agent trajectories. |
 | `AGENT_MEMORY_CATALOG_URL` | Memory Catalog coordination API; the Compose default is `http://127.0.0.1:8092`. |
 | `AGENT_MEMORY_CATALOG_TOKEN` | Worker credential for extraction and automatic maintenance; it grants no direct PostgreSQL access. |
 | `AGENT_MEMORY_CATALOG_OPERATOR_TOKEN` | Operator credential used by Control Plane UI for memory reads and manual control operations. |
 
 #### Artifacts And Storage Credentials
 
-- Execution Worker publishes authoritative run diagnostics to `runs/*/artifacts/*` before the workflow succeeds.
+- Execution Worker publishes the authoritative archive to `runs/*/artifacts/*` before the workflow succeeds.
 - Execution Gateway only validates and forwards the immutable reference. It holds no object-storage credentials and mounts no Worker artifact directories.
 - Agent sandboxes receive no workload storage credentials.
 
@@ -286,8 +291,8 @@ With the sample configuration, the integrated deployment stores runtime data in 
 
 | Path | Owner | Purpose |
 | --- | --- | --- |
-| `.agent-rustfs-state` | RustFS | Persistent object storage for run inputs, diagnostics, memory-tree revisions, memory-agent trajectories, and other artifacts |
-| `.agent-run-inputs` | Host worker | Materialized input for active runs; never included in published diagnostic bundles |
+| `.agent-rustfs-state` | RustFS | Persistent object storage for run inputs, execution archives, memory-tree revisions, memory-agent trajectories, and other artifacts |
+| `.agent-run-inputs` | Host worker | Materialized input for active runs; never included in published execution archives |
 | `.agent-artifacts` | Host worker | Agent artifacts and workflow output for each task |
 | `.agent-postgres-state` | PostgreSQL | Review Runs run state and Memory Catalog coordination state |
 | `.agent-temporal-state` | Temporal | Workflow history and pending task state |
@@ -460,7 +465,7 @@ sudo rm -rf .agent-temporal-state .agent-postgres-state
 sudo systemctl start sec-review-bot.target
 ```
 
-This permanently deletes workflow history, pending tasks, polling state, and publication state. The materials prepared before a run starts (the archive uploaded to RustFS) and the diagnostic materials produced after a run ends currently have no automatic retention period; their corresponding local files are also retained indefinitely by default for recovery, replay, and diagnostics. The deployment does not configure lifecycle expiration, so the operator must monitor disk usage. They can be removed manually after confirming that no retained run needs them:
+This permanently deletes workflow history, pending tasks, polling state, and publication state. The input materials uploaded to RustFS before execution and the archive produced afterward currently have no automatic retention period; their corresponding local files are also retained indefinitely by default for recovery, replay, and diagnostics. The deployment does not configure lifecycle expiration, so the operator must monitor disk usage. They can be removed manually after confirming that no retained run needs them:
 
 ```bash
 sudo rm -rf .agent-rustfs-state .agent-run-inputs .agent-artifacts

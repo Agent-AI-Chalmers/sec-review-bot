@@ -12,7 +12,7 @@ from sec_review_agents.workflows.memory.scheduling import schedule_memory_extrac
 
 def _reference() -> ArtifactReference:
     return ArtifactReference(
-        uri="s3://sec-review/runs/run-1/artifacts/diagnostic-tree.v1.tar.zst",
+        uri="s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst",
         digest=f"sha256:{'a' * 64}",
         media_type="application/tar+zstd",
         size_bytes=42,
@@ -37,7 +37,7 @@ async def test_scheduling_starts_one_abandoned_child_per_review_unit(
     result = await schedule_memory_extractions(
         source_workflow="repository-review",
         run_id="run-1",
-        diagnostic_bundle=_reference().as_dict(),
+        execution_archive=_reference().as_dict(),
         unit_ids=["case-a", "case-b"],
         timeout_seconds=30,
         enabled=True,
@@ -80,7 +80,7 @@ async def test_scheduling_reports_an_existing_extraction(monkeypatch) -> None:
     result = await schedule_memory_extractions(
         source_workflow="issue-review",
         run_id="run-1",
-        diagnostic_bundle=_reference().as_dict(),
+        execution_archive=_reference().as_dict(),
         unit_ids=["case-a"],
         timeout_seconds=30,
         enabled=True,
@@ -90,7 +90,7 @@ async def test_scheduling_reports_an_existing_extraction(monkeypatch) -> None:
         {
             "unit_id": "case-a",
             "workflow_id": memory_extraction_workflow_id(
-                diagnostic_bundle_digest=_reference().digest,
+                execution_archive_digest=_reference().digest,
                 unit_id="case-a",
             ),
             "status": "already_started",
@@ -110,7 +110,7 @@ async def test_disabled_scheduling_does_not_start_children(monkeypatch) -> None:
     result = await schedule_memory_extractions(
         source_workflow="issue-review",
         run_id="run-1",
-        diagnostic_bundle=_reference().as_dict(),
+        execution_archive=_reference().as_dict(),
         unit_ids=["review"],
         timeout_seconds=30,
         enabled=False,

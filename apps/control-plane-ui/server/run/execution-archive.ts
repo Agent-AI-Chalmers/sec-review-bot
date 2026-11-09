@@ -3,14 +3,14 @@ import tar from 'tar-stream'
 
 import { decompressRestrictedPaxArchive } from '../artifacts/tar-zstd.js'
 
-export const MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES = 128 * 1024 * 1024
+export const MAX_EXECUTION_ARCHIVE_VIEW_BYTES = 128 * 1024 * 1024
 const MAX_ENTRIES = 100_000
 const MAX_EXTRACTED_BYTES = 512 * 1024 * 1024
 const MAX_PREVIEW_FILE_BYTES = 8 * 1024 * 1024
 const MAX_PREVIEW_TEXT_BYTES = 64 * 1024 * 1024
 const utf8 = new TextDecoder('utf-8', { fatal: true })
 
-export interface DiagnosticBundleView {
+export interface ExecutionArchiveView {
   files: Record<string, string>
   unpreviewableFiles: Record<string, { sizeBytes: number }>
 }
@@ -36,24 +36,24 @@ async function collectEntry(
   for await (const chunk of stream) {
     const bytes = Buffer.from(chunk)
     size += bytes.length
-    if (size > expectedSize) throw new Error('invalid_diagnostic_bundle')
+    if (size > expectedSize) throw new Error('invalid_execution_archive')
     chunks.push(bytes)
   }
-  if (size !== expectedSize) throw new Error('invalid_diagnostic_bundle')
+  if (size !== expectedSize) throw new Error('invalid_execution_archive')
   return Buffer.concat(chunks)
 }
 
 /**
- * Read the diagnostic bundle contract for the run-files UI. This is intentionally independent
+ * Read the execution archive contract for the run-files UI. This is intentionally independent
  * from the memory archive reader: the two archives have different roots, manifests and limits.
  * Trajectory JSONL remains ordinary source text here; trajectory semantics belong to its viewer.
  */
-export async function readDiagnosticBundle(
+export async function readExecutionArchive(
   bytes: Buffer,
   expectedRunId: string
-): Promise<DiagnosticBundleView> {
-  if (bytes.length > MAX_DIAGNOSTIC_BUNDLE_VIEW_BYTES)
-    throw new Error('diagnostic_bundle_too_large')
+): Promise<ExecutionArchiveView> {
+  if (bytes.length > MAX_EXECUTION_ARCHIVE_VIEW_BYTES)
+    throw new Error('execution_archive_too_large')
   let tarBytes: Buffer
   try {
     tarBytes = decompressRestrictedPaxArchive(
@@ -62,7 +62,7 @@ export async function readDiagnosticBundle(
     )
   } catch (error) {
     if (error instanceof Error && error.message === 'invalid_tar_zstd_envelope')
-      throw new Error('invalid_diagnostic_bundle', { cause: error })
+      throw new Error('invalid_execution_archive', { cause: error })
     throw error
   }
   const extract = tar.extract()
@@ -76,11 +76,11 @@ export async function readDiagnosticBundle(
       void (async (): Promise<void> => {
         entryCount += 1
         if (entryCount > MAX_ENTRIES || !safePath(header.name))
-          throw new Error('invalid_diagnostic_bundle')
+          throw new Error('invalid_execution_archive')
         if (header.type !== 'file' && header.type !== 'directory')
-          throw new Error('invalid_diagnostic_bundle')
+          throw new Error('invalid_execution_archive')
         const name = header.name.replace(/\/$/, '')
-        if (seenPaths.has(name)) throw new Error('invalid_diagnostic_bundle')
+        if (seenPaths.has(name)) throw new Error('invalid_execution_archive')
         seenPaths.add(name)
         if (header.type === 'directory') {
           stream.resume()
@@ -91,7 +91,7 @@ export async function readDiagnosticBundle(
         } else {
           extractedBytes += header.size
           if (extractedBytes > MAX_EXTRACTED_BYTES)
-            throw new Error('diagnostic_bundle_too_large')
+            throw new Error('execution_archive_too_large')
           entries.set(
             name,
             await collectEntry(
@@ -116,7 +116,7 @@ export async function readDiagnosticBundle(
     !resultBytes ||
     ![...entries.keys()].some((name) => name.startsWith('artifact-tree/'))
   )
-    throw new Error('invalid_diagnostic_bundle')
+    throw new Error('invalid_execution_archive')
   let manifestText: string
   let resultText: string
   try {
@@ -124,20 +124,20 @@ export async function readDiagnosticBundle(
     resultText = utf8.decode(resultBytes)
     JSON.parse(resultText)
   } catch {
-    throw new Error('invalid_diagnostic_bundle')
+    throw new Error('invalid_execution_archive')
   }
   let manifest: unknown
   try {
     manifest = JSON.parse(manifestText)
   } catch {
-    throw new Error('invalid_diagnostic_bundle')
+    throw new Error('invalid_execution_archive')
   }
   if (
     typeof manifest !== 'object' ||
     manifest === null ||
     Array.isArray(manifest)
   )
-    throw new Error('invalid_diagnostic_bundle')
+    throw new Error('invalid_execution_archive')
   const record = manifest as Record<string, unknown>
   if (
     record.version !== 1 ||
@@ -145,11 +145,11 @@ export async function readDiagnosticBundle(
     record.result !== 'result.json' ||
     !Array.isArray(record.review_units)
   )
-    throw new Error('invalid_diagnostic_bundle')
+    throw new Error('invalid_execution_archive')
   const unitIds = new Set<string>()
   for (const unit of record.review_units) {
     if (typeof unit !== 'object' || unit === null || Array.isArray(unit))
-      throw new Error('invalid_diagnostic_bundle')
+      throw new Error('invalid_execution_archive')
     const reviewUnit = unit as Record<string, unknown>
     if (
       typeof reviewUnit.id !== 'string' ||
@@ -158,7 +158,7 @@ export async function readDiagnosticBundle(
       !Array.isArray(reviewUnit.trajectories) ||
       reviewUnit.trajectories.length === 0
     )
-      throw new Error('invalid_diagnostic_bundle')
+      throw new Error('invalid_execution_archive')
     unitIds.add(reviewUnit.id)
     for (const trajectory of reviewUnit.trajectories) {
       if (
@@ -168,7 +168,7 @@ export async function readDiagnosticBundle(
         !trajectory.endsWith('.jsonl') ||
         !entries.has(trajectory)
       )
-        throw new Error('invalid_diagnostic_bundle')
+        throw new Error('invalid_execution_archive')
     }
   }
 

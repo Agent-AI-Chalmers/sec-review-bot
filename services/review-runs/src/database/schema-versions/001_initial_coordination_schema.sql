@@ -246,7 +246,7 @@ COMMENT ON COLUMN executions.failure_code IS
 COMMENT ON COLUMN executions.failure_message IS
   'Operator-readable detail associated with failure_code.';
 COMMENT ON COLUMN executions.artifact_storage IS
-  'Execution-reported terminal diagnostic artifact storage result and immutable object reference when available.';
+  'Execution-reported terminal execution archive storage result and immutable object reference when available.';
 COMMENT ON COLUMN executions.workflow_result IS
   'Terminal successful workflow result returned by the Execution and consumed by the connector publisher.';
 COMMENT ON COLUMN executions.claim_token IS
