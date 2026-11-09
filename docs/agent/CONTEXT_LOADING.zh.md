@@ -41,17 +41,17 @@
 
 其中两类正是按需读取额外引入的成本。当 agent 自己决定取什么时，它可能按假设的结构行动而不是真实结构，也可能用看起来合理的东西填补空缺而不是回到源头。预加载把这些决策取消了：无论 agent 会不会正确地索取，内容都在那里。这正是“小而必需的输入”值得预加载的理由，也是 discovery 分块以内联完整形式送达、而不是挂载一个路径的原因。
 
-## 本项目各 agent 的选择
+## 本项目各 Agent 的选择
 
-| agent | 策略 | 预加载了什么，或为什么不预加载 |
+| Agent | 策略 | 预加载了什么，或为什么不预加载 |
 | --- | --- | --- |
-| 仓库 discovery | 预加载 | 被扫描的文件以内联形式随 prompt 到达。discovery 不挂载任何 workspace，因此无法自行读取：输入必须完整，prompt 也明确说明这些内联内容就是全部输入。 |
-| 仓库 triage | 预加载 | 候选 payload 随 prompt 到达。triage 按设计不挂载 workspace，其判断被定义为“仅凭 payload 作出”。 |
-| pull request 的 analyzer、mitigator、verifier | 按需读取 | 挂载 workspace 与 `/history`，agent 通过 git 读取窗口。prompt 携带 PR 文本、引用信息与上一阶段结果，但不含渲染好的文件清单或 diff。 |
-| issue 的 analyzer、mitigator、verifier | 按需读取 | 挂载 workspace 与 `/history`；issue 文本被预加载，因为它是本次审查的信号本身。 |
-| 仓库 case 的 analyzer、mitigator、verifier | 按需读取 | 挂载 workspace、`/history` 与 `/incremental-window`，case 审查输入只给出锚点，不摘抄文件。 |
-| CVSS | 混合 | 评分需要看一次代码，因此挂载 workspace，并预加载待评分的发现。 |
-| 删除 case | 预加载，仅路径 | case 携带文件路径与窗口，从不携带文件内容。当前没有文件可读，所以路径就是完整输入；内容来自 patch 或 git。 |
+| 仓库 Discovery | 预加载 | 被扫描的文件以内联形式随提示词到达。Discovery 不挂载任何工作区，因此无法按需读取仓库文件：输入必须完整，提示词也明确说明这些内联内容就是全部输入。 |
+| 仓库 Triage | 预加载 | 候选内容随提示词到达。Triage 按设计不挂载工作区，其判断被定义为“只根据提供的内容作出”。 |
+| pull request 的 Analyzer、Mitigator、Verifier | 按需读取 | 挂载工作区与 `/history`，Agent 通过 git 读取窗口。提示词携带 PR 文本、引用信息与上一阶段结果，但不含渲染好的文件清单或差异。 |
+| issue 的 Analyzer、Mitigator、Verifier | 按需读取 | 挂载工作区与 `/history`；issue 文本被预加载，因为它是本次审查的信号本身。 |
+| 仓库 case 的 Analyzer、Mitigator、Verifier | 按需读取 | 挂载工作区；增量扫描还会挂载 `/history` 与 `/incremental-window`。case 审查输入提供定位线索，不摘抄文件内容。 |
+| CVSS Scoring | 混合 | 为核对评分事实提供代码访问能力，因此挂载工作区，并预加载待评分的发现。 |
+| 删除 case | 预加载，仅路径 | case 携带文件路径与窗口，从不携带文件内容。当前没有文件可读，所以路径就是完整输入；内容来自补丁或 git。 |
 
 ## 仓库指导
 

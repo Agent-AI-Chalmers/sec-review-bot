@@ -43,12 +43,12 @@ Two of these are costs that on-demand reading adds. When an agent decides what t
 
 | Agent | Strategy | What is preloaded, or why not |
 | --- | --- | --- |
-| Repository discovery | Preload | The scanned files arrive inline with their diff removed from the prompt. Discovery mounts no workspace, so it cannot fetch anything: the input must be complete, and the prompt states that the inline contents are the whole input. |
-| Repository triage | Preload | Candidate payloads arrive in the prompt. Triage mounts no workspace by design, and its judgement is defined as one made from the payload alone. |
-| Pull request analyzer, mitigator, verifier | On demand | The workspace and `/history` are mounted, and the agent reads the window through git. The prompt carries the pull request text, reference, and prior stage results, but no rendered file list or diff. |
-| Issue analyzer, mitigator, verifier | On demand | The workspace and `/history` are mounted; the issue text is preloaded because it is the signal under review. |
-| Repository case analyzer, mitigator, verifier | On demand | The workspace, `/history`, and `/incremental-window` are mounted, and the case review input names the anchors rather than quoting the files. |
-| CVSS | Mixed | Scoring needs the code once, so the workspace is mounted and the finding under scoring is preloaded. |
+| Repository Discovery | Preload | The scanned files arrive inline in the prompt. Discovery mounts no workspace, so it cannot read repository files on demand: the input must be complete, and the prompt states that the inline contents are the whole input. |
+| Repository Triage | Preload | Candidate payloads arrive in the prompt. Triage mounts no workspace by design, and its judgement is defined as one made from the payload alone. |
+| Pull request Analyzer, Mitigator, Verifier | On demand | The workspace and `/history` are mounted, and the agent reads the window through git. The prompt carries the pull request text, reference, and prior stage results, but no rendered file list or diff. |
+| Issue Analyzer, Mitigator, Verifier | On demand | The workspace and `/history` are mounted; the issue text is preloaded because it is the signal under review. |
+| Repository case Analyzer, Mitigator, Verifier | On demand | The workspace is mounted; incremental scans also mount `/history` and `/incremental-window`. The case review input names the anchors rather than quoting the files. |
+| CVSS Scoring | Mixed | The workspace is mounted to allow targeted scoring fact checks and the finding under scoring is preloaded. |
 | Deletion cases | Preload, paths only | The case carries file paths and the window, never file contents. There is no current file to read, so the paths are the complete input; the content comes from the patch or git. |
 
 ## Repository Guidance
