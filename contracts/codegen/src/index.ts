@@ -6,8 +6,7 @@ import ts from 'typescript'
 const BODY_SUFFIX = 'ResponseBody'
 const MAP_SUFFIX = 'ResponseBodyByStatus'
 
-/** @param {string} source */
-function normalizeResponseTypes(source) {
+function normalizeResponseTypes(source: string): string {
   const file = ts.createSourceFile(
     'types.ts',
     source,
@@ -19,10 +18,8 @@ function normalizeResponseTypes(source) {
       .filter(ts.isTypeAliasDeclaration)
       .map((node) => [node.name.text, node])
   )
-  /** @type {Array<{start: number, end: number, text: string}>} */
-  const edits = []
-  /** @type {Set<ts.TypeAliasDeclaration>} */
-  const removed = new Set()
+  const edits: { start: number; end: number; text: string }[] = []
+  const removed = new Set<ts.TypeAliasDeclaration>()
   for (const [name, mapping] of aliases) {
     if (!name.endsWith(MAP_SUFFIX)) continue
     if (!ts.isTypeLiteralNode(mapping.type))
@@ -41,8 +38,7 @@ function normalizeResponseTypes(source) {
         throw new Error(`Unexpected response body member in ${bodyName}`)
       return member.typeName.text
     })
-    /** @type {Map<string, string>} */
-    const statusByAlias = new Map()
+    const statusByAlias = new Map<string, string>()
     for (const property of mapping.type.members) {
       if (
         !ts.isPropertySignature(property) ||
@@ -108,8 +104,7 @@ function normalizeResponseTypes(source) {
   return source
 }
 
-/** @param {string} specPath @returns {Promise<string>} */
-export async function renderOpenApiTypes(specPath) {
+export async function renderOpenApiTypes(specPath: string): Promise<string> {
   const kubb = createKubb({
     input: specPath,
     output: { path: 'generated' },

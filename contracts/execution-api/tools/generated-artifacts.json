@@ -9,7 +9,7 @@
         "contracts/execution-api/tools/src/generate-api-types.ts",
         "services/review-runs/.prettierrc.json",
         "services/execution-gateway/.prettierrc.json",
-        "contracts/codegen/src/index.js",
+        "contracts/codegen/src/index.ts",
         "contracts/codegen/package.json"
       ],
       "command": "pnpm --dir contracts/execution-api/tools run generate",

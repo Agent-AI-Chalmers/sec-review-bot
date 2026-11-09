@@ -17,10 +17,8 @@
     "declaration": false,
     "types": ["node"],
     "noImplicitAny": true,
-    "useUnknownInCatchVariables": true,
-    "allowJs": true,
-    "checkJs": true
+    "useUnknownInCatchVariables": true
   },
-  "include": ["src/**/*.js", "test/**/*.ts"],
+  "include": ["src/**/*.ts", "test/**/*.ts"],
   "exclude": ["node_modules"]
 }

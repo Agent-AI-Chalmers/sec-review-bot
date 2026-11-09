@@ -20,7 +20,7 @@
         "apps/control-plane-ui/shared/list-run-query-params.ts"
       ],
       "code_inputs": [
-        "contracts/codegen/src/index.js",
+        "contracts/codegen/src/index.ts",
         "contracts/codegen/package.json"
       ]
     },
