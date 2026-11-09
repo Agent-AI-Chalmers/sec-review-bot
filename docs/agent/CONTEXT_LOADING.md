@@ -2,11 +2,11 @@
 
 Language: English | [中文](CONTEXT_LOADING.zh.md)
 
-Agents in this project receive context in two ways: some content arrives already rendered in the prompt, and some is left in the workspace for the agent to fetch with its own tools. Choosing between them per agent is a design decision, not a preference, and the two choices lead to different costs when the choice is wrong.
+Agents in this project receive context in two ways: some content arrives already rendered in the prompt, and some remains in readable files for the agent to fetch with its own tools. Different agents need different inputs; choose a loading strategy for each and assess tool-call cost and context usage.
 
 ## Two Strategies
 
-**Preload.** Content goes directly into the prompt. The model reads it on the first turn with no tool call, no extra round trip, and no chance of fetching the wrong thing. The cost is unconditional: every request carries the content whether or not this task needs it, and the prompt stops being reusable when the underlying data changes.
+**Preload.** Content goes directly into the prompt. The model reads it on the first turn without an extra tool call to fetch that content. The cost is unconditional: every request carries the content whether or not this task needs it, and the prompt stops being reusable when the underlying data changes.
 
 **On demand.** Content stays in a mounted path and the agent fetches it with `read_file`, `grep`, `ls`, or `execute`. The model pays for a tool turn and some latency, chooses what to read, and can read only the part a question needs. The cost is paid only when a task actually needs the content.
 
@@ -67,6 +67,6 @@ When adding context to an agent, ask:
 
 1. Is this content required for every run of this agent? If not, leave it on disk.
 2. Will the agent inspect the same ground through its own tools anyway? If so, preloading a rendered copy duplicates work and risks going stale.
-3. Is the agent even mounted to fetch it? If the backend exposes no paths, preload is the only option, and the prompt should say that the inline input is complete.
+3. Can the agent read it through the provided file views? If file tools cannot access the relevant paths, preload is the only option, and the prompt should say that the inline input is complete.
 
 When preloading, keep it to the content a decision needs. A rendered listing of files that the agent can query itself is the case this project removed, not the model to follow.
