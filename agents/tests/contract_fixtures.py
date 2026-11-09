@@ -7,7 +7,7 @@ from jsonschema import Draft202012Validator
 from referencing import Registry, Resource
 
 from sec_review_agents.contract_versions import (
-    AGENT_TRANSCRIPT_VERSION,
+    AGENT_TRAJECTORY_VERSION,
     EXECUTION_API_VERSION,
     EXECUTION_WORKFLOW_VERSION,
 )
@@ -104,14 +104,14 @@ def format_schema_errors(errors: Iterable) -> str:
     )
 
 
-AGENT_TRANSCRIPT_ROOT = CONTRACTS_ROOT / "agent-transcript" / AGENT_TRANSCRIPT_VERSION
+AGENT_TRAJECTORY_ROOT = CONTRACTS_ROOT / "agent-trajectory" / AGENT_TRAJECTORY_VERSION
 
 
-def transcript_corpus_file(name: str) -> Path:
-    return AGENT_TRANSCRIPT_ROOT / "corpus" / name
+def trajectory_corpus_file(name: str) -> Path:
+    return AGENT_TRAJECTORY_ROOT / "corpus" / name
 
 
-def transcript_corpus_manifest() -> dict[str, Any]:
+def trajectory_corpus_manifest() -> dict[str, Any]:
     return json.loads(
-        transcript_corpus_file("manifest.json").read_text(encoding="utf-8")
+        trajectory_corpus_file("manifest.json").read_text(encoding="utf-8")
     )

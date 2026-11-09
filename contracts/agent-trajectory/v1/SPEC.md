@@ -1,14 +1,14 @@
-# Agent Transcript v1
+# Agent Trajectory v1
 
 Language: English | [中文](SPEC.zh.md)
 
-A transcript records an agent execution for inspection, Memory extraction, and usage accounting. It preserves messages, their sources, and execution relationships independently of any particular agent framework or observability service.
+A trajectory records an agent execution for inspection, Memory extraction, and usage accounting. It preserves messages, their sources, and execution relationships independently of any particular agent framework or observability service.
 
 The [record schema](schemas/record.schema.json) defines structural requirements. The [corpus manifest](corpus/manifest.json) defines shared acceptance cases.
 
 ## File and Record Format
 
-A transcript uses UTF-8 JSONL: one JSON object per line. Newlines inside message content are escaped within that object. Each record has a positive integer `seq` and an `event` name. Sequence numbers increase within one file and need not be contiguous.
+A trajectory uses UTF-8 JSONL: one JSON object per line. Newlines inside message content are escaped within that object. Each record has a positive integer `seq` and an `event` name. Sequence numbers increase within one file and need not be contiguous.
 
 Records are separated by LF (`U+000A`); CRLF is also accepted. Unicode separators such as `U+0085`, `U+2028`, and `U+2029` inside JSON strings are content, not record boundaries.
 
@@ -18,7 +18,7 @@ Messages use `event: "message"`. Their envelope carries provenance and execution
 
 | Field | Meaning |
 | --- | --- |
-| `message.id` | Message identity, unique within the transcript; repeated observations of the same message retain this identity and are recorded once |
+| `message.id` | Message identity, unique within the trajectory; repeated observations of the same message retain this identity and are recorded once |
 | `message.role` | `system`, `user`, `assistant`, or `tool` |
 | `message.content` | Original text or structured content blocks; a block's `type` describes its content kind, not the message role |
 | `agent` | Agent responsible for the message's conversation or execution branch, when known |
@@ -34,7 +34,7 @@ Preserve tool status, structured results, reasoning, and other available message
 
 `seq` describes the flat reading order. When the initial system instruction is available, place it before that agent's user input, followed by responses and tool interactions. A changed system instruction appears before the invocation that uses it. Concurrent Subagents may interleave; provenance and ancestry distinguish their branches.
 
-A transcript is an execution history, not a complete request snapshot for every model invocation. A message stored once may be used in multiple requests. Sequence numbers alone do not establish which messages were included in a particular request or imply a shared context across agents.
+A trajectory is an execution history, not a complete request snapshot for every model invocation. A message stored once may be used in multiple requests. Sequence numbers alone do not establish which messages were included in a particular request or imply a shared context across agents.
 
 Retain observed history even when it is later removed from the active conversation or replaced by a summary. Do not fabricate a system instruction when execution stops before it becomes available.
 
@@ -53,7 +53,7 @@ Retain observed history even when it is later removed from the active conversati
 
 A response is stored once as a message. Its call-end record references it rather than duplicating the response or its usage. A call that fails or is interrupted may have a start without an end; do not manufacture a successful response for it.
 
-Model call IDs identify invocations within the transcript. Tool requests use `message.tool_calls[].id`; tool results use `message.tool_call_id`. These tool IDs associate requests and results within an execution branch. They do not replace model call IDs or execution ancestry. If the available relationships are ambiguous, leave the association unresolved rather than selecting an arbitrary result.
+Model call IDs identify invocations within the trajectory. Tool requests use `message.tool_calls[].id`; tool results use `message.tool_call_id`. These tool IDs associate requests and results within an execution branch. They do not replace model call IDs or execution ancestry. If the available relationships are ambiguous, leave the association unresolved rather than selecting an arbitrary result.
 
 The following abbreviated example shows a completed invocation:
 
@@ -90,7 +90,7 @@ Producers normalize at their adapter boundary. LangChain totals and OpenAI promp
 
 Consumers read canonical usage without interpreting provider metadata or LangChain detail maps. Aggregate each field only when every covered call has a known value for that field; otherwise that field's aggregate is unknown. No observed calls means unknown totals. A lower-bound partial sum may be exposed separately with an explicit label, never as the complete total. Derived uncached input and ratios remain unknown if any required operand is unknown. Complete usage accounting requires finished call recording and all six fields known for every covered invocation; known input/output totals alone do not establish cache or reasoning coverage.
 
-The agents runtime owns framework/provider conversion and transcript usage validation. Repository scripts own run discovery, workflow-specific effective-patch selection, and report rendering. Langfuse query code owns its external-source conversion; its normalized field meanings match this contract and the Review Runs token totals.
+The agents runtime owns framework/provider conversion and trajectory usage validation. Repository scripts own run discovery, workflow-specific effective-patch selection, and report rendering. Langfuse query code owns its external-source conversion; its normalized field meanings match this contract and the Review Runs token totals.
 
 Run-level aggregate usage belongs in a separate metrics artifact or an explicitly distinguished aggregate record. Do not attach it to an individual response. Where only aggregate usage is available, preserve it without inventing per-call allocation.
 
@@ -102,11 +102,11 @@ When assessing completeness, distinguish these conclusions within the stated obs
 
 A completion marker alone does not prove call or usage completeness. Accounting reports identify known coverage limits, such as missing usage, unfinished calls, or a missing terminal marker. They may report available totals without claiming complete usage; consumers are not expected to discover invocations outside their observation scope.
 
-## Partial and External Transcripts
+## Partial and External Trajectories
 
 External producers may lack system instructions, call boundaries, ancestry, or per-call usage. Preserve what they actually provide and treat unavailable information as unknown; readable messages remain useful without establishing complete accounting.
 
-Readers reject malformed JSONL and records that violate this format. An interrupted transcript containing valid records remains readable. Accounting reports distinguish known usage from a claim of complete accounting. Inconsistent references must not be treated as complete accounting. No consumer should infer successful tool execution from a request without its result.
+Readers reject malformed JSONL and records that violate this format. An interrupted trajectory containing valid records remains readable. Accounting reports distinguish known usage from a claim of complete accounting. Inconsistent references must not be treated as complete accounting. No consumer should infer successful tool execution from a request without its result.
 
 ## Whole-File Rules
 
@@ -114,7 +114,7 @@ The input is UTF-8 JSONL. Each nonblank line is one record. Sequence numbers are
 
 When call lifecycle events are supplied, recording begins with `model_calls_start`. Each model call start has a distinct `call_id`. A call end follows its start and references an already recorded response with the same `call_id`. An execution recording end follows its recording start, and no records follow it. An unfinished recording is valid input with incomplete execution coverage.
 
-Message-only transcripts are valid but cannot establish complete model-call coverage. Records must not be repaired or inferred to make an invalid file valid.
+Message-only trajectories are valid but cannot establish complete model-call coverage. Records must not be repaired or inferred to make an invalid file valid.
 
 `metadata` is an optional JSON object containing supplementary observations. It does not define message identity, role, provenance, call relationships, or usage. Defined top-level fields and `message` fields remain authoritative; consumers must not fill them from metadata. Producers may preserve original observations unchanged; metadata keys are not part of the contract.
 
@@ -122,6 +122,6 @@ Message-only transcripts are valid but cannot establish complete model-call cove
 
 Producers write the canonical message roles and source fields, retain original content, and record each message once. Per-call usage belongs to the response that incurred it. Run aggregates are separate from response usage.
 
-Consumers validate the supplied file before using it. Invalid input produces an explicit error; missing optional information does not by itself invalidate a transcript.
+Consumers validate the supplied file before using it. Invalid input produces an explicit error; missing optional information does not by itself invalidate a trajectory.
 
 Consumer obligations follow their purpose. Display consumers may project messages and recorded usage without assessing execution or accounting completeness. Accounting consumers retain the execution records needed for their calculations and state known coverage limits. Neither kind of consumer may infer missing facts or claim completeness beyond the available evidence.

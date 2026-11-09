@@ -1,4 +1,4 @@
-"""Normalize at the producer boundary rather than guessing in transcript readers."""
+"""Normalize at the producer boundary rather than guessing in trajectory readers."""
 
 import pytest
 from langchain_core.messages import AIMessage
@@ -157,7 +157,7 @@ def test_langchain_aggregated_service_tier_buckets_are_added_once():
 
 
 def test_source_total_disagreement_warns_and_uses_normalized_components():
-    with pytest.warns(RuntimeWarning, match="transcript_source_total_mismatch"):
+    with pytest.warns(RuntimeWarning, match="trajectory_source_total_mismatch"):
         usage = normalize_langchain_usage(
             {"input_tokens": 10, "output_tokens": 5, "total_tokens": 999}
         )

@@ -215,7 +215,7 @@ def build_trajectory_tools(trajectory_root: Path) -> list[StructuredTool]:
         try:
             events = read_events(normalized)
         except OSError, ValueError:
-            return {"ok": False, "error": "Unreadable or invalid transcript JSONL."}
+            return {"ok": False, "error": "Unreadable or invalid trajectory JSONL."}
         messages: list[dict[str, Any]] = []
         message_events = [event for event in events if event["event"] == "message"]
         for event in message_events[offset : offset + limit]:
@@ -306,7 +306,7 @@ def build_trajectory_tools(trajectory_root: Path) -> list[StructuredTool]:
         try:
             events = read_events(normalized)
         except OSError, ValueError:
-            return {"ok": False, "error": "Unreadable or invalid transcript JSONL."}
+            return {"ok": False, "error": "Unreadable or invalid trajectory JSONL."}
         for event in events:
             if event.get("seq") == seq and isinstance(event.get("message"), dict):
                 try:

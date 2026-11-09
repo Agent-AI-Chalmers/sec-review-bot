@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from sec_review_agents.contract_versions import (
-    AGENT_TRANSCRIPT_VERSION,
+    AGENT_TRAJECTORY_VERSION,
     INPUT_BUNDLE_ARTIFACT_VERSION,
     MEMORY_TREE_ARTIFACT_VERSION,
     RUN_DIAGNOSTIC_ARTIFACT_VERSION,
@@ -15,7 +15,7 @@ from tests.project_paths import CONTRACTS_ROOT
 @pytest.mark.parametrize(
     ("family_root", "version"),
     [
-        (Path("agent-transcript"), AGENT_TRANSCRIPT_VERSION),
+        (Path("agent-trajectory"), AGENT_TRAJECTORY_VERSION),
         (
             Path("tar-zstd-artifact/envelope"),
             TAR_ZSTD_ENVELOPE_VERSION,

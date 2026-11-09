@@ -53,7 +53,7 @@ def test_no_calls_has_no_measured_totals():
     assert all(value is None for value in result["token_usage"].values())
 
 
-def test_normalized_langfuse_and_transcript_usage_use_the_same_vocabulary():
+def test_normalized_langfuse_and_trajectory_usage_use_the_same_vocabulary():
     from sec_review_agents.runtime.token_usage import normalize_langchain_usage
 
     call = {

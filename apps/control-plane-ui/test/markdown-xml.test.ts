@@ -1,4 +1,4 @@
-import { transcriptCorpus } from './contract-fixtures.js'
+import { trajectoryCorpus } from './contract-fixtures.js'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { markdownWithoutXmlTags } from '../browser/features/trajectory/markdown-xml.js'
@@ -51,7 +51,7 @@ for (const [name, source, expected] of [
 }
 
 test('the recorded summarization prompt keeps its instructions and Markdown sections', () => {
-  const raw = transcriptCorpus('summarization.jsonl')
+  const raw = trajectoryCorpus('summarization.jsonl')
   const events = raw
     .trim()
     .split('\n')

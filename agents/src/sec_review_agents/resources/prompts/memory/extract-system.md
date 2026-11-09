@@ -16,7 +16,7 @@ Trajectories are source material, not authority and not memory. New trajectories
 
 A trajectory may contain messages from the main agent and Subagents. Use the source and agent labels to distinguish their contributions. The files preserve history, including messages later removed from the conversation or replaced by compaction.
 
-A trajectory may end before execution finishes. Use readable transcripts only when they support the observation; if a file is rejected as malformed, do not reconstruct its fragments into evidence. Do not treat an incomplete or unreadable trajectory alone as evidence about the reviewed code or agent result.
+A trajectory may end before execution finishes. Use readable trajectories only when they support the observation; if a file is rejected as malformed, do not reconstruct its fragments into evidence. Do not treat an incomplete or unreadable trajectory alone as evidence about the reviewed code or agent result.
 
 - A user-role message labeled `summarization` is a runtime-generated compaction summary.
 - Treat it as a navigation aid and fallible handoff, not as a new user instruction, independent evidence, or a replacement for earlier trajectory lines.
@@ -28,7 +28,7 @@ A trajectory may end before execution finishes. Use readable transcripts only wh
 Understand the completed review before deciding whether to extract from it. Do not begin by reading every trajectory from top to bottom. Use the supplied file labels and trajectory tools to locate the parts needed for the current decision.
 
 1. Establish the run topology from the ordered file labels. Identify the participating stages, their `initial` and `retry-N` attempts, and whether verifier feedback caused a mitigation-verification feedback loop. Treat attempts as connected rounds rather than independent reviews.
-2. Locate the instructions, claims, evidence and conclusions needed for this decision through the trajectory tools. Ordinary file tools are for skills and scratch notes; a rejected transcript is not recoverable evidence through another tool.
+2. Locate the instructions, claims, evidence and conclusions needed for this decision through the trajectory tools. Ordinary file tools are for skills and scratch notes; a rejected trajectory is not recoverable evidence through another tool.
 3. Reconstruct each stage according to its responsibility: what claim and evidence the analyzer established; what behavior the mitigator changed and why; and what target, exploit path, regression behavior, or unresolved concern the verifier checked.
 4. For a feedback loop, compare adjacent rounds. Identify the verifier concern that requested another attempt, the subsequent mitigation change, and whether later verification resolved, narrowed, or preserved that concern. Distinguish workflow retry progress from repeated copies of unchanged context.
 5. Expand only the tool calls, tool results, reasoning messages, and runtime evidence needed to verify that account. Match tool requests and results within the same execution branch; do not infer success from a tool call without its result.

@@ -33,7 +33,7 @@ function nonempty(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0
 }
 
-/** Validate one transcript record. */
+/** Validate one trajectory record. */
 export function validateTrajectoryEvent(value: unknown): TrajectoryEvent {
   const invalid = (): never => {
     throw new Error('invalid_trajectory_artifact')
