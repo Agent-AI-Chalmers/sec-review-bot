@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from sec_review_agents.delivery_stages.execution.input import (
+    DeliveryExecutionItem,
     build_delivery_execution_input,
     persist_delivery_execution_input,
 )
@@ -19,6 +20,7 @@ from sec_review_agents.scan_stages.discovery.result import (
     DiscoveryChunkResult,
     DiscoveryResult,
 )
+from sec_review_agents.utils.bounded_map import map_bounded
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.repository.scan_result import RepositoryScanResult
 from sec_review_agents.workflows.repository.workflow import (
@@ -75,25 +77,19 @@ async def run_repository_discovery_direct(
     max_concurrency = max(1, manifest.max_concurrency)
     chunks = manifest.chunks
 
-    semaphore = asyncio.Semaphore(max_concurrency)
+    async def run_chunk(chunk: DiscoveryChunk) -> DiscoveryChunkResult:
+        return await scan_repository_discovery_chunk_activity(request, manifest, chunk)
 
-    async def scan_chunk(
-        index: int, chunk: DiscoveryChunk
-    ) -> tuple[int, DiscoveryChunkResult]:
-        async with semaphore:
-            return index, await scan_repository_discovery_chunk_activity(
-                request, manifest, chunk
-            )
-
-    chunk_results: list[DiscoveryChunkResult | None] = [None] * len(chunks)
-    for index, result in await asyncio.gather(
-        *(scan_chunk(index, chunk) for index, chunk in enumerate(chunks))
-    ):
-        chunk_results[index] = result
+    chunk_results = await map_bounded(
+        chunks,
+        run_chunk,
+        max_concurrency=max_concurrency,
+        wait=asyncio.wait,
+    )
 
     return build_repository_discovery_result_activity(
         manifest,
-        [result for result in chunk_results if result is not None],
+        chunk_results,
     )
 
 
@@ -104,35 +100,27 @@ async def run_repository_case_reviews_direct(
     cases = scan_result.triage_result.cases
     case_batch = prepare_repository_case_review_inputs_activity(request, cases)
     case_requests = case_batch.case_requests
-    max_concurrency = case_batch.max_concurrency
-    semaphore = asyncio.Semaphore(max_concurrency)
+    max_concurrency = max(1, case_batch.max_concurrency)
 
     async def run_case(
-        index: int, case_request: RepositoryCaseReviewRequest
-    ) -> tuple[int, RepositoryCaseResult]:
-        async with semaphore:
-            try:
-                return (
-                    index,
-                    await repository_case_direct.run_repository_case_review_direct(
-                        case_request
-                    ),
-                )
-            except Exception as error:
-                return index, build_blocked_repository_case_result(
-                    case_request,
-                    f"Case processing failed: {error}",
-                )
+        case_request: RepositoryCaseReviewRequest,
+    ) -> RepositoryCaseResult:
+        try:
+            return await repository_case_direct.run_repository_case_review_direct(
+                case_request
+            )
+        except Exception as error:
+            return build_blocked_repository_case_result(
+                case_request,
+                f"Case processing failed: {error}",
+            )
 
-    case_results: list[RepositoryCaseResult | None] = [None] * len(case_requests)
-    for index, result in await asyncio.gather(
-        *(
-            run_case(index, case_request)
-            for index, case_request in enumerate(case_requests)
-        )
-    ):
-        case_results[index] = result
-    return [result for result in case_results if result is not None]
+    return await map_bounded(
+        case_requests,
+        run_case,
+        max_concurrency=max_concurrency,
+        wait=asyncio.wait,
+    )
 
 
 async def run_repository_delivery_direct(
@@ -184,14 +172,28 @@ async def run_repository_delivery_direct(
     combined_delivery_execution_items = (
         delivery_execution.combined_delivery_execution_items
     )
-    for delivery_request in combined_delivery_execution_items:
-        delivery_index = delivery_request.index
-        patch_outcomes[delivery_index] = await execute_delivery_entry(
+    max_concurrency = max(1, delivery_execution.max_concurrency)
+
+    async def run_delivery(
+        delivery_request: DeliveryExecutionItem,
+    ) -> DeliveryExecutionResult | None:
+        return await execute_delivery_entry(
             run_artifacts_root=run_artifacts_root,
             workspace_snapshot_tar_path=workspace_snapshot_tar_path,
             delivery_entry=delivery_request.delivery,
             case_results=delivery_request.case_items,
         )
+
+    combined_outcomes = await map_bounded(
+        combined_delivery_execution_items,
+        run_delivery,
+        max_concurrency=max_concurrency,
+        wait=asyncio.wait,
+    )
+    for delivery_request, outcome in zip(
+        combined_delivery_execution_items, combined_outcomes, strict=True
+    ):
+        patch_outcomes[delivery_request.index] = outcome
 
     result = build_delivery_result_from_outcomes(
         deliveries=deliveries,

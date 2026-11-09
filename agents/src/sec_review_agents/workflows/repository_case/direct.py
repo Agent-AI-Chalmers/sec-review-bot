@@ -91,7 +91,7 @@ async def run_repository_case_review_direct(
             cvss_result = await cvss_result_task
         except Exception:
             cvss_result = None
-    except Exception:
+    except Exception, asyncio.CancelledError:
         cvss_result_task.cancel()
         with contextlib.suppress(asyncio.CancelledError, Exception):
             await cvss_result_task

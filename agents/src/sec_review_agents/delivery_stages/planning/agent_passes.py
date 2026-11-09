@@ -27,6 +27,7 @@ from sec_review_agents.delivery_stages.planning.batching import planning_case_id
 from sec_review_agents.observability.trace_context import bind_trace_context
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.trajectories import remove_trajectories, trajectory_path
+from sec_review_agents.utils.bounded_map import map_bounded
 from sec_review_agents.utils.files import persist_json_artifact
 
 DEFAULT_DELIVERY_PLANNING_PASSES = 2
@@ -164,33 +165,28 @@ async def _run_batched_delivery_planning_passes(
     # Batch drafts run concurrently, but each batch owns its own workbench state.
     # The shared global state is updated only below, in batch index order, so
     # async interleaving cannot reorder or race delivery group creation.
-    semaphore = asyncio.Semaphore(DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY)
 
-    async def run_batch(
-        index: int,
-        cases: list[DeliveryPlanningCase],
-    ) -> tuple[int, list[dict]]:
-        async with semaphore:
-            batch_group_drafts = await _run_delivery_planning_batch_draft(
-                delivery_planning_root=delivery_planning_root,
-                batch_cases=cases,
-                batch={
-                    "kind": "batch",
-                    "index": index,
-                    "count": len(batches),
-                    "max_batch_size": max_batch_size,
-                },
-            )
-            return index, batch_group_drafts
+    async def run_batch(index: int) -> list[dict]:
+        return await _run_delivery_planning_batch_draft(
+            delivery_planning_root=delivery_planning_root,
+            batch_cases=batch_cases[index],
+            batch={
+                "kind": "batch",
+                "index": index + 1,
+                "count": len(batches),
+                "max_batch_size": max_batch_size,
+            },
+        )
 
-    batch_results = await asyncio.gather(
-        *(run_batch(index, cases) for index, cases in enumerate(batch_cases, start=1))
+    batch_results = await map_bounded(
+        range(len(batch_cases)),
+        run_batch,
+        max_concurrency=DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY,
+        wait=asyncio.wait,
     )
-    indexed_batch_results = dict(batch_results)
     pass_count += len(batch_results)
 
-    for index in range(1, len(batches) + 1):
-        batch_group_drafts = indexed_batch_results[index]
+    for index, batch_group_drafts in enumerate(batch_results, start=1):
         if not batch_group_drafts:
             continue
         create_result = global_state.create_groups(groups=batch_group_drafts)

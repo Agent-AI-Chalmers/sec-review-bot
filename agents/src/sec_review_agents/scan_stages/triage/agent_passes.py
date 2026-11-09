@@ -24,6 +24,7 @@ from sec_review_agents.scan_stages.triage.result import (
     TriageMetadata,
     TriageResult,
 )
+from sec_review_agents.utils.bounded_map import map_bounded
 from sec_review_agents.utils.files import persist_json_artifact
 
 DEFAULT_TRIAGE_PASSES = 2
@@ -168,36 +169,28 @@ async def _run_batched_triage_passes(
     # Batch drafts run concurrently, but each batch owns its own workbench state.
     # The shared global state is updated only below, in batch index order, so
     # async interleaving cannot reorder or race group creation.
-    semaphore = asyncio.Semaphore(TRIAGE_MAX_BATCH_CONCURRENCY)
 
-    async def run_batch(
-        index: int,
-        candidates: list[DiscoveryCandidateResult],
-    ) -> tuple[int, list[dict]]:
-        async with semaphore:
-            batch_group_drafts = await _run_triage_batch_draft(
-                triage_root=triage_root,
-                batch_candidates=candidates,
-                batch={
-                    "kind": "batch",
-                    "index": index,
-                    "count": len(batches),
-                    "max_batch_size": max_batch_size,
-                },
-            )
-            return index, batch_group_drafts
-
-    batch_results = await asyncio.gather(
-        *(
-            run_batch(index, candidates)
-            for index, candidates in enumerate(batch_candidates, start=1)
+    async def run_batch(index: int) -> list[dict]:
+        return await _run_triage_batch_draft(
+            triage_root=triage_root,
+            batch_candidates=batch_candidates[index],
+            batch={
+                "kind": "batch",
+                "index": index + 1,
+                "count": len(batches),
+                "max_batch_size": max_batch_size,
+            },
         )
+
+    batch_results = await map_bounded(
+        range(len(batch_candidates)),
+        run_batch,
+        max_concurrency=TRIAGE_MAX_BATCH_CONCURRENCY,
+        wait=asyncio.wait,
     )
-    indexed_batch_results = dict(batch_results)
     pass_count += len(batch_results)
 
-    for index in range(1, len(batches) + 1):
-        batch_group_drafts = indexed_batch_results[index]
+    for index, batch_group_drafts in enumerate(batch_results, start=1):
         if not batch_group_drafts:
             continue
         create_result = global_state.create_groups(groups=batch_group_drafts)

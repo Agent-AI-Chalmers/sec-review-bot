@@ -1,14 +1,16 @@
 import asyncio
 import os
 import threading
+from collections.abc import Coroutine
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 from temporalio import activity
 from temporalio.exceptions import ApplicationError
-from temporalio.worker import Worker
+from temporalio.worker import Replayer, Worker
 
 from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.cvss.result import (
@@ -502,7 +504,7 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
                     ],
                     activity_executor=executor,
                 ):
-                    return await env.client.execute_workflow(
+                    handle = await env.client.start_workflow(
                         RepositoryCaseProcessingWorkflow.run,
                         args=[
                             ReviewWorkflowRequest(
@@ -517,6 +519,12 @@ async def test_repository_review_workflow_isolates_case_failure_and_refills_wind
                         id="repository-review-concurrency-test",
                         task_queue="repository-review-concurrency-test",
                     )
+                    results = await handle.result()
+                    await Replayer(
+                        workflows=[RepositoryCaseProcessingWorkflow],
+                        data_converter=env.client.data_converter,
+                    ).replay_workflow(await handle.fetch_history())
+                    return results
         raise AssertionError("Temporal test worker exited before returning.")
 
     results = await run_workflow()
@@ -1324,3 +1332,189 @@ async def test_direct_case_processing_cvss_failure_does_not_block_case() -> None
 
     assert result.case_id == "case-1"
     assert result.review_record.cvss is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("stage", ["discovery", "cases"])
+@pytest.mark.parametrize("outcome", ["success", "failure", "cancel"])
+async def test_direct_window_bounds_pending_work_and_cleans_up(
+    monkeypatch: pytest.MonkeyPatch, stage: str, outcome: str
+) -> None:
+    """Limit admitted tasks as well as execution; preserve each stage's failure boundary."""
+    started = [asyncio.Event() for _ in range(5)]
+    release = [asyncio.Event() for _ in range(5)]
+    closed: list[int] = []
+    error = RuntimeError("Work item failed.")
+
+    async def execute(index: int) -> None:
+        started[index].set()
+        try:
+            await release[index].wait()
+            if index == 1 and outcome == "failure":
+                raise error
+        finally:
+            closed.append(index)
+
+    request = _review_workflow_request()
+    operation: Coroutine[Any, Any, DiscoveryResult | list[RepositoryCaseResult]]
+    if stage == "discovery":
+        manifest = DiscoveryManifest(
+            workspace_root="/tmp/workspace",
+            discovery_artifacts_path="/tmp/discovery",
+            scan_mode="full",
+            entries=[],
+            skipped_files=[],
+            chunks=[
+                DiscoveryChunk(chunk_id=f"chunk-{i}", entries=[], token_count=0)
+                for i in range(5)
+            ],
+            deployment_input_limit_tokens=1000,
+            chunk_target_tokens=200,
+            chunk_target_ratio="1/5",
+            chunk_hard_limit_tokens=800,
+            chunk_strategy="batched",
+            max_concurrency=2,
+        )
+
+        async def scan(_request, _manifest, chunk):
+            await execute(int(chunk.chunk_id.split("-")[1]))
+            return DiscoveryChunkResult(
+                chunk_id=chunk.chunk_id,
+                file_candidates=[],
+                file_results=[],
+                skipped_files=[],
+            )
+
+        monkeypatch.setattr(
+            repository_direct,
+            "build_repository_discovery_manifest_activity",
+            lambda request: manifest,
+        )
+        monkeypatch.setattr(
+            repository_direct, "scan_repository_discovery_chunk_activity", scan
+        )
+        operation = repository_direct.run_repository_discovery_direct(request)
+    else:
+        case_requests = [
+            repository_case_review_request(f"case-{index}") for index in range(5)
+        ]
+        monkeypatch.setattr(
+            repository_direct,
+            "prepare_repository_case_review_inputs_activity",
+            lambda *args: RepositoryCaseRequestBatch(
+                max_concurrency=2, case_requests=case_requests
+            ),
+        )
+
+        async def review(case_request):
+            case_id = case_request.case_execution_input.case_id
+            await execute(int(case_id.split("-")[1]))
+            return RepositoryCaseResult.model_validate(
+                {"case_id": case_id, "disposition": "keep", "review_record": {}}
+            )
+
+        monkeypatch.setattr(
+            repository_case_direct, "run_repository_case_review_direct", review
+        )
+        operation = repository_direct.run_repository_case_reviews_direct(
+            request, scan_result_fixture(case_count=5)
+        )
+
+    baseline = asyncio.all_tasks()
+    run = asyncio.create_task(operation)
+    try:
+        for index in range(2):
+            await asyncio.wait_for(started[index].wait(), timeout=2)
+        assert not any(event.is_set() for event in started[2:])
+        assert len(asyncio.all_tasks() - baseline) <= 3
+        if outcome == "cancel":
+            run.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await run
+        elif outcome == "failure" and stage == "discovery":
+            release[1].set()
+            with pytest.raises(RuntimeError) as captured:
+                await asyncio.wait_for(run, timeout=2)
+            assert captured.value is error
+        else:
+            for index in range(1, 4):
+                release[index].set()
+                await asyncio.wait_for(started[index + 1].wait(), timeout=2)
+                assert 0 not in closed
+            for event in release:
+                event.set()
+            result = await asyncio.wait_for(run, timeout=2)
+            if stage == "cases":
+                assert isinstance(result, list)
+                assert [item.case_id for item in result] == [
+                    f"case-{i}" for i in range(5)
+                ]
+                if outcome == "failure":
+                    assert result[1].disposition == "blocked"
+        expected = (
+            [0, 1]
+            if outcome == "cancel" or (outcome == "failure" and stage == "discovery")
+            else list(range(5))
+        )
+        assert sorted(closed) == expected
+        assert not (asyncio.all_tasks() - baseline)
+    finally:
+        for event in release:
+            event.set()
+        if not run.done():
+            run.cancel()
+        await asyncio.gather(run, return_exceptions=True)
+
+
+@pytest.mark.asyncio
+async def test_direct_case_cancellation_drains_parallel_cvss() -> None:
+    """Cancelling a case window must also stop the scoring task owned by each case."""
+    cvss_started = asyncio.Event()
+    mitigation_started = asyncio.Event()
+    cvss_closed = asyncio.Event()
+
+    async def score(*args):
+        cvss_started.set()
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cvss_closed.set()
+
+    async def mitigate(*args):
+        mitigation_started.set()
+        await asyncio.Event().wait()
+
+    with (
+        patch.object(repository_case_direct, "prepare_repository_case_activity"),
+        patch.object(repository_case_direct, "analyze_repository_case_activity"),
+        patch.object(
+            repository_case_direct,
+            "score_repository_case_cvss_activity",
+            side_effect=score,
+        ),
+        patch.object(
+            repository_case_direct,
+            "mitigate_repository_case_activity",
+            side_effect=mitigate,
+        ),
+    ):
+        baseline = asyncio.all_tasks()
+        run = asyncio.create_task(
+            repository_case_direct.run_repository_case_review_direct(
+                repository_case_review_request("case-1")
+            )
+        )
+        try:
+            await asyncio.wait_for(cvss_started.wait(), timeout=2)
+            await asyncio.wait_for(mitigation_started.wait(), timeout=2)
+            run.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await run
+            assert cvss_closed.is_set()
+        finally:
+            if not run.done():
+                run.cancel()
+            remaining = asyncio.all_tasks() - baseline
+            for task in remaining:
+                task.cancel()
+            await asyncio.gather(run, *remaining, return_exceptions=True)

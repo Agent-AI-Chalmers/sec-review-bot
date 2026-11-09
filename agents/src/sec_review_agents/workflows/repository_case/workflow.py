@@ -396,7 +396,7 @@ class RepositoryCaseReviewWorkflow:
                 cvss_result = await cvss_task
             except Exception:
                 cvss_result = None
-        except Exception:
+        except Exception, asyncio.CancelledError:
             if not cvss_task.done():
                 cvss_task.cancel()
             try:

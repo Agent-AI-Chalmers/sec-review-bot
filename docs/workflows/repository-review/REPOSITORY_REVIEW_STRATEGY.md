@@ -90,4 +90,4 @@ Execution order is fixed:
 Delivery execution has two paths by delivery strategy:
 
 - `single`: does not call an agent, does not enter the patch synthesis concurrency pool, and does not re-apply or copy case `workspace.patch`. It directly consumes the corresponding case's `review_record.mitigation.file_changes` and projects them into a publishable delivery output. If there are no publishable `file_changes`, that delivery is not written into public `deliveries[]`.
-- `combined`: calls the patch-synthesis agent in an isolated clean workspace, consumes that delivery's case summaries, verifier results, and reference patches, and directly generates the final file state for that delivery. In the Temporal path, concurrency is controlled by `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`, default `4`.
+- `combined`: calls the patch-synthesis agent in an isolated clean workspace, consumes that delivery's case summaries, verifier results, and reference patches, and directly generates the final file state for that delivery. Concurrency is controlled by `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`, default `4`.
