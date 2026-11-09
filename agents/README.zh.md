@@ -29,7 +29,7 @@ source .venv/bin/activate
 
 ## LLM 配置
 
-先在仓库根目录复制配置文件，再编辑 TOML 中的模型地址、凭据引用和 Agent 绑定。可用字段和绑定名称见示例文件；运行任务涉及的每个 Agent 都需要绑定可用模型。
+先在仓库根目录复制配置文件，再按照示例配置模型服务、访问凭据，以及各 Agent 使用的模型。任务涉及的每个 Agent 都必须配置模型。
 
 ```bash
 cp agents/.env.sample agents/.env

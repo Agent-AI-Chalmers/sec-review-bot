@@ -27,7 +27,7 @@ This directory carries its own `.python-version`; `pyproject.toml` requires Pyth
 
 ## LLM Setup
 
-Copy the configuration files from the repository root, then edit the TOML model endpoints, credential references, and agent bindings. The sample lists the available fields and binding names; every agent used by the task needs an available model binding.
+Copy the configuration files from the repository root, then follow the sample to configure model services, access credentials, and which model each Agent uses. Every Agent involved in a task must have a configured model.
 
 ```bash
 cp agents/.env.sample agents/.env
