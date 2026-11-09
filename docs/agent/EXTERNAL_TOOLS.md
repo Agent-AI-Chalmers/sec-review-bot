@@ -49,7 +49,7 @@ Until such a gap appears, advertising the command and allowing the agent to insp
 
 ## Why Joern And Playwright Use Only CLIs
 
-Joern contributes code property graphs, structural queries, call relationships, and data-flow analysis. Playwright contributes browser interaction and runtime evidence. The project chooses them for those capabilities, not for any particular integration protocol.
+Joern contributes code property graphs, structural queries, call relationships, and data-flow analysis. Playwright contributes browser interaction and runtime evidence.
 
 The current gated probes establish availability and agent use, not a general improvement in review outcomes. Real-checkout comparisons have produced neutral and negative results as well as additional graph evidence. Joern is therefore retained for the distinct analysis capability it makes available, not because the project has demonstrated that enabling it consistently raises agent success rates.
 
