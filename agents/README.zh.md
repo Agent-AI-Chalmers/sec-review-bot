@@ -8,6 +8,8 @@
 
 ## 能力
 
+Worker 是持续运行的后台进程，负责接收并执行 Temporal 调度的任务。这里按职责分为以下三类：
+
 - **Execution Worker** 执行 `issue-review`、`pull-request-review` 和 `repository-review`。仓库审查包括 Discovery、Triage、逐项分析、CVSS 评分、修复、验证和交付；没有交付结果的 case 仍会展示在 case 结果中。
 - **Memory Extraction Worker** 从执行轨迹中提取可复用的审查经验。
 - **Memory Maintenance Worker** 审阅提取出的经验，并更新共享记忆。

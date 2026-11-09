@@ -6,6 +6,8 @@ Language: English | [中文](README.zh.md)
 
 ## Capabilities
 
+A Worker is a long-running background process that receives and executes tasks scheduled by Temporal. This package provides three types of Workers with distinct responsibilities:
+
 - **Execution Worker** runs `issue-review`, `pull-request-review`, and `repository-review`. Repository reviews include discovery, triage, per-case analysis, CVSS scoring, mitigation, verification, and delivery. Cases without a delivery remain visible in case results.
 - **Memory Extraction Worker** extracts reusable review experience from execution trajectories.
 - **Memory Maintenance Worker** reviews extracted experience and updates shared memory.
