@@ -1,33 +1,31 @@
-# Suggestion Comment Design
+# Suggestion Comment 设计
 
 语言：[English](SUGGESTION_COMMENT_DESIGN.md) | 中文
 
 本文为 [SUGGESTION_COMMENT_DESIGN.md](SUGGESTION_COMMENT_DESIGN.md) 的中文译文；如有差异，以英文版为准。
 
-## Goal
+## 目标
 
-把 patch diff 映射成 GitHub PR review suggestions，让 reviewer 可以直接在 PR UI 中应用一个聚焦的修复。例如：
+将修复补丁映射为 GitHub PR 的行内修改建议，让审查者直接在 PR 页面应用修复：
 
-![Suggestion](../../../assets/screenshots/suggestion.png)
+![修改建议](../../../assets/screenshots/suggestion.png)
 
-Suggestion reviews 是这里唯一能让 reviewer 从 PR diff 中直接应用 proposed mitigation 的 GitHub 发布面。普通 summary comment 可以解释问题，standalone patch 可以描述编辑，但它们都不能在 changed lines 上提供 anchored apply button。
+本项目通过这种评论提供与变更行关联的应用建议入口。普通摘要评论用于解释问题，补丁用于表达修改；它们不提供同样的行内操作。
 
-Sources:
+参考资料：
 
-- GitHub REST API, "Create a review for a pull request": <https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request>
-- GitHub REST API, "Create a review comment for a pull request": <https://docs.github.com/en/rest/pulls/comments>
-- GitHub Docs, "Reviewing proposed changes in a pull request": <https://docs.github.com/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/reviewing-proposed-changes-in-a-pull-request>
+- [GitHub REST API - Create a review for a pull request](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request)
+- [GitHub REST API - Create a review comment for a pull request](https://docs.github.com/en/rest/pulls/comments)
+- [GitHub Docs - Reviewing proposed changes in a pull request](https://docs.github.com/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/reviewing-proposed-changes-in-a-pull-request)
 
-## Hard Guardrail
+## 行内建议的范围限制
 
-GitHub suggestions 是 PR-diff-anchored review comments，不是 generic patch transport channel。
+行内建议必须关联 PR diff 中的文件和行区间，不能用来传递任意补丁。每条行内建议必须：
 
-GitHub 要求每个 inline suggestion：
+- 对应 PR 变更文件列表中的文件；
+- 能定位到 PR diff 中可见的行区间。
 
-- target 一个已经存在于 PR changed-file set 中的文件。
-- anchor 到 PR diff 中可见的 line interval。
-
-因此，这个 workflow 只为 mitigation patch 中能映射到这些 PR-visible lines 的部分发 suggestions。PR diff 外的 mitigation edits 可以继续保留在 mitigation diff 中，但会 fallback 到标准 summary path，而不是被强行塞进 inline suggestions。
+修复补丁中超出这些范围的修改仍可保留，但通过摘要说明，不强行转换成行内建议。
 
 ## Implementation
 

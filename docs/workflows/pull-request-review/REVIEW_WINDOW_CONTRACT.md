@@ -60,13 +60,20 @@ A three-dot diff requires a merge base, so the workspace must not be shallow. Mu
 
 ### Fetching by SHA leaves commits unreachable
 
-Fetching a specific commit SHA creates no branch or tag pointing at it. The existing workspace sanitize step prunes unreachable objects (`reflog expire --expire=now --all` followed by `gc --prune=now`), which deleted the base commit and made the comparison fail with `fatal: Invalid symmetric difference expression`. Fetched commits are now pinned under `refs/sec-review/base` and `refs/sec-review/head` before sanitizing, named for their role in the review window. `head` is the last requested ref; `base` is whichever ref matches the caller's explicit `window_base_sha`. A pull request passes its own base before the window base, and on `synchronize` those are different commits, so the first ref is pinned as `pinned-N` rather than assumed to be the window start.
+Fetching a specific commit SHA creates no branch or tag pointing at it. The existing workspace sanitize step prunes unreachable objects (`reflog expire --expire=now --all` followed by `gc --prune=now`), which deleted the base commit and made the comparison fail with `fatal: Invalid symmetric difference expression`.
+
+Fetched commits are now pinned under `refs/sec-review/base` and `refs/sec-review/head` before sanitizing, named for their role in the review window:
+
+- `head` is the last requested ref;
+- `base` is whichever ref matches the caller's explicit `window_base_sha`.
+
+A pull request passes its own base before the window base, and on `synchronize` those are different commits, so the first ref is pinned as `pinned-N` rather than assumed to be the window start.
 
 ### The files API omits `patch` on large pull requests
 
-The [`GET /repos/{owner}/{repo}/pulls/{number}/files`](https://docs.github.com/en/rest/pulls/pulls#list-files-for-a-pull-request) endpoint returns every changed path but leaves `patch` empty for part of a large pull request. Measured on `apache/hbase` #7722: 340 files returned, 93 without a patch, including the largest ones. The documented response cap is 3000 files.
+The [`GET /repos/{owner}/{repo}/pulls/{number}/files`](https://docs.github.com/en/rest/pulls/pulls#list-files-for-a-pull-request) endpoint has a documented response cap of 3000 files. For large pull requests, some files may have an empty `patch` field, so that field cannot reliably provide the complete patch. This project exports the patch from the workspace repository to avoid omitting changes.
 
-Building the patch from that field therefore drops changes silently. The patch is now exported from the workspace repository instead, which yields all 340 files for the same pull request.
+Measured example: `apache/hbase` #7722 returned 340 files, of which 93 had no `patch`, including some of the largest files. The patch exported from the workspace repository included all 340 files.
 
 ### Compare against an unreachable base fails, it does not return empty
 

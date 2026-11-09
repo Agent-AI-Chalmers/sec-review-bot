@@ -8,15 +8,15 @@ Map the patch diff into GitHub PR review suggestions so reviewers can apply a fo
 
 ![Suggestion](../../../assets/screenshots/suggestion.png)
 
-Suggestion reviews are the only GitHub publishing surface here that lets a reviewer apply a proposed mitigation directly from the PR diff. A normal summary comment can explain the issue, and a standalone patch can describe the edit, but neither gives the reviewer an anchored apply button at the changed lines.
+These comments provide an apply-suggestion action anchored to changed lines. Summary comments explain issues and patches describe edits; neither provides the same inline action.
 
 Sources:
 
-- GitHub REST API, "Create a review for a pull request": <https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request>
-- GitHub REST API, "Create a review comment for a pull request": <https://docs.github.com/en/rest/pulls/comments>
-- GitHub Docs, "Reviewing proposed changes in a pull request": <https://docs.github.com/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/reviewing-proposed-changes-in-a-pull-request>
+- [GitHub REST API - Create a review for a pull request](https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request)
+- [GitHub REST API - Create a review comment for a pull request](https://docs.github.com/en/rest/pulls/comments)
+- [GitHub Docs - Reviewing proposed changes in a pull request](https://docs.github.com/pull-requests/collaborating-with-pull-requests/reviewing-changes-in-pull-requests/reviewing-proposed-changes-in-a-pull-request)
 
-## Hard Guardrail
+## Inline Suggestion Scope
 
 GitHub suggestions are PR-diff-anchored review comments, not a generic patch transport channel.
 
