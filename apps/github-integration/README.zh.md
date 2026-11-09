@@ -43,6 +43,7 @@ pnpm run test:integration
 使用 `SEC_REVIEW_ARTIFACT_STORE=s3` 时，需要配置存储桶和 AWS 凭据。AWS 可以省略 `SEC_REVIEW_ARTIFACT_S3_ENDPOINT`，自定义 S3-compatible 接口地址则需要设置它。`SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` 接受 `auto`（默认）、`path` 或 `virtual`；本地 RustFS 部署使用 `path`。该传输配置不会改变提交的 `s3://bucket/key` 产物引用。
 
 <!-- doc-default: REVIEW_RUNS_REQUEST_TIMEOUT_MS; source=apps/github-integration/src/review-runs/client.ts -->
+
 `REVIEW_RUNS_REQUEST_TIMEOUT_MS` 限制每次 Review Runs 请求的最长等待时间，默认 30 秒。发布租约续租失败或超时会被视为持有任务的资格已丢失：发布组件不再启动新的 GitHub 写操作，而是等待租约接管恢复。
 
 ```bash

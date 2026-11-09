@@ -9,7 +9,7 @@ Memory Catalog provides an HTTP API to record completed extractions, manage pend
 | Method | Path                                   | Purpose                                                                                                   |
 | ------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | `GET`  | `/healthz`                             | Report service health.                                                                                    |
-| `POST` | `/v1/extractions`                      | Register a completed extraction, its trajectory reference, and its optional observation.       |
+| `POST` | `/v1/extractions`                      | Register a completed extraction, its trajectory reference, and its optional observation.                  |
 | `GET`  | `/v1/extractions`                      | List completed extractions with stable cursor pagination and provenance filters.                          |
 | `GET`  | `/v1/extractions/{extraction_id}`      | Return one extraction, its trajectory reference, and its optional observation.                            |
 | `GET`  | `/v1/observations`                     | List observations with stable cursor pagination and consumption filters.                                  |

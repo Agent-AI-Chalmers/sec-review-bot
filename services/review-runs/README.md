@@ -66,18 +66,18 @@ A terminal preparation or Execution API service failure makes publication `skipp
 
 The run trunk and the lifecycle axes are separate tables. `review_runs` holds only the admitted identity; each axis keeps its own state and its own input:
 
-| Table                         | Responsibility                                                      | Status                                                                                        |
-| ----------------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `review_runs`                 | Admission identity shared by all axes (no update path)              | —                                                                                             |
-| `preparations`                | Claimable input preparation                                         | `pending`, `preparing`, `uncertain`, `disconnected`, `submitted`, `failed`                    |
-| `input_bundle_candidates`     | Durable input publication intents and atomic selection              | `reserved`, `present`, `selected`, `abandoned`                                                |
-| `run_notices`                 | Connector-owned user-visible failure and attention work             | `pending`, `delivering`, `delivered`, `failed`                                                |
+| Table                         | Responsibility                                                     | Status                                                                                        |
+| ----------------------------- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| `review_runs`                 | Admission identity shared by all axes (no update path)             | —                                                                                             |
+| `preparations`                | Claimable input preparation                                        | `pending`, `preparing`, `uncertain`, `disconnected`, `submitted`, `failed`                    |
+| `input_bundle_candidates`     | Durable input publication intents and atomic selection             | `reserved`, `present`, `selected`, `abandoned`                                                |
+| `run_notices`                 | Connector-owned user-visible failure and attention work            | `pending`, `delivering`, `delivered`, `failed`                                                |
 | `executions`                  | Execution API service submission, observation, and terminal result | `pending`, `queued`, `running`, `uncertain`, `disconnected`, `succeeded`, `skipped`, `failed` |
-| `publications`                | Whole-publication ownership and outcome                             | `pending`, `publishing`, `uncertain`, `disconnected`, `published`, `failed`, `skipped`        |
-| `publication_steps`           | Recoverable individual connector side effects                       | `pending`, `running`, `uncertain`, `disconnected`, `succeeded`, `failed`, `terminal_failed`   |
-| `execution_statistics`        | Statistics reconciliation state and run totals                      | `pending`, `reconciling`, `settled`, `unavailable`                                            |
-| `execution_statistics_groups` | Workflow-coordinate/agent/provider/model call and token totals      | —                                                                                             |
-| `review_run_events`           | Append-only audit log of transitions on every axis                  | —                                                                                             |
+| `publications`                | Whole-publication ownership and outcome                            | `pending`, `publishing`, `uncertain`, `disconnected`, `published`, `failed`, `skipped`        |
+| `publication_steps`           | Recoverable individual connector side effects                      | `pending`, `running`, `uncertain`, `disconnected`, `succeeded`, `failed`, `terminal_failed`   |
+| `execution_statistics`        | Statistics reconciliation state and run totals                     | `pending`, `reconciling`, `settled`, `unavailable`                                            |
+| `execution_statistics_groups` | Workflow-coordinate/agent/provider/model call and token totals     | —                                                                                             |
+| `review_run_events`           | Append-only audit log of transitions on every axis                 | —                                                                                             |
 
 `preparations.status`:
 
@@ -197,32 +197,33 @@ Read responses report the independent lifecycle axes as nested objects of the sa
 
 <!-- doc-default: review-runs.startReviewRunsServer; source=services/review-runs/src/runtime/server-runtime.ts -->
 <!-- doc-default: EXECUTION_API_REQUEST_TIMEOUT_MS; source=services/review-runs/src/execution-client.ts -->
-| Variable                                      | Required                                             | Purpose                                                                                                  |
-| --------------------------------------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                | Yes                                                  | PostgreSQL connection string                                                                             |
-| `REVIEW_RUNS_READ_TOKEN`                      | Yes                                                  | Redacted read API; the console backend and any read-only consumer use this one                           |
-| `REVIEW_RUNS_SERVICE_TOKEN`                   | Yes                                                  | Component coordination (admission, claims, terminal outcomes); cannot reach `/v1/admin`                  |
-| `REVIEW_RUNS_ADMIN_TOKEN`                     | No                                                   | Operator authentication for `/v1/admin/*`; when unset the whole admin surface answers 404                |
-| `EXECUTION_API_URL`                           | Yes                                                  | Execution API service base URL                                                                          |
-| `EXECUTION_API_TOKEN`                         | For non-loopback or protected Execution API service | Execution API service authentication                                                                    |
-| `REVIEW_RUNS_PORT`                            | No                                                   | Listen port; default `8090`                                                                              |
-| `CONNECTOR_ID`                                | No                                                   | Coordination namespace; default `github-integration:default`                                             |
-| `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS` | No                                                   | Coordinator interval; default `15000`                                                                    |
-| `EXECUTION_API_REQUEST_TIMEOUT_MS`            | No                                                   | Execution API service request timeout; default `30000`                                                  |
-| `EXECUTION_API_REQUEST_RETRIES`               | No                                                   | Execution API service transport retries; default `2`                                                    |
-| `EXECUTION_API_RETRY_BASE_DELAY_MS`           | No                                                   | Initial retry delay; default `500`                                                                       |
-| `LANGFUSE_BASE_URL`                           | No                                                   | External Langfuse URL; enables execution statistics when the Langfuse URL and credentials are configured |
-| `LANGFUSE_PUBLIC_KEY`                         | With `LANGFUSE_BASE_URL`                             | Langfuse project public key                                                                              |
-| `LANGFUSE_SECRET_KEY`                         | With `LANGFUSE_BASE_URL`                             | Langfuse project secret key                                                                              |
-| `LANGFUSE_REQUEST_TIMEOUT_MS`                 | No                                                   | One Langfuse request timeout; default `30000`                                                            |
-| `EXECUTION_STATISTICS_POLL_INTERVAL_MS`       | No                                                   | Statistics coordinator interval; default `15000`                                                         |
-| `EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS`     | No                                                   | Maximum due runs reconciled per coordinator pass; default `20`                                           |
-| `EXECUTION_STATISTICS_INITIAL_DELAY_MS`       | No                                                   | Delay after execution completion before the first Langfuse read; default `30000`                         |
-| `EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS`  | No                                                   | Delay before confirming that two snapshots match; default `30000`                                        |
-| `EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS`   | No                                                   | Maximum observation-settling window; default `600000`                                                    |
-| `EXECUTION_STATISTICS_MAX_FAILURES`           | No                                                   | Consecutive Langfuse read failures before marking statistics unavailable; default `8`                    |
-| `EXECUTION_STATISTICS_RETRY_DELAY_MS`         | No                                                   | Delay after a failed Langfuse read; default `30000`                                                      |
-| `EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS`       | No                                                   | Lease timeout for a statistics reconciliation claim; default `600000`                                    |
+
+| Variable                                      | Required                                            | Purpose                                                                                                  |
+| --------------------------------------------- | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                                | Yes                                                 | PostgreSQL connection string                                                                             |
+| `REVIEW_RUNS_READ_TOKEN`                      | Yes                                                 | Redacted read API; the console backend and any read-only consumer use this one                           |
+| `REVIEW_RUNS_SERVICE_TOKEN`                   | Yes                                                 | Component coordination (admission, claims, terminal outcomes); cannot reach `/v1/admin`                  |
+| `REVIEW_RUNS_ADMIN_TOKEN`                     | No                                                  | Operator authentication for `/v1/admin/*`; when unset the whole admin surface answers 404                |
+| `EXECUTION_API_URL`                           | Yes                                                 | Execution API service base URL                                                                           |
+| `EXECUTION_API_TOKEN`                         | For non-loopback or protected Execution API service | Execution API service authentication                                                                     |
+| `REVIEW_RUNS_PORT`                            | No                                                  | Listen port; default `8090`                                                                              |
+| `CONNECTOR_ID`                                | No                                                  | Coordination namespace; default `github-integration:default`                                             |
+| `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS` | No                                                  | Coordinator interval; default `15000`                                                                    |
+| `EXECUTION_API_REQUEST_TIMEOUT_MS`            | No                                                  | Execution API service request timeout; default `30000`                                                   |
+| `EXECUTION_API_REQUEST_RETRIES`               | No                                                  | Execution API service transport retries; default `2`                                                     |
+| `EXECUTION_API_RETRY_BASE_DELAY_MS`           | No                                                  | Initial retry delay; default `500`                                                                       |
+| `LANGFUSE_BASE_URL`                           | No                                                  | External Langfuse URL; enables execution statistics when the Langfuse URL and credentials are configured |
+| `LANGFUSE_PUBLIC_KEY`                         | With `LANGFUSE_BASE_URL`                            | Langfuse project public key                                                                              |
+| `LANGFUSE_SECRET_KEY`                         | With `LANGFUSE_BASE_URL`                            | Langfuse project secret key                                                                              |
+| `LANGFUSE_REQUEST_TIMEOUT_MS`                 | No                                                  | One Langfuse request timeout; default `30000`                                                            |
+| `EXECUTION_STATISTICS_POLL_INTERVAL_MS`       | No                                                  | Statistics coordinator interval; default `15000`                                                         |
+| `EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS`     | No                                                  | Maximum due runs reconciled per coordinator pass; default `20`                                           |
+| `EXECUTION_STATISTICS_INITIAL_DELAY_MS`       | No                                                  | Delay after execution completion before the first Langfuse read; default `30000`                         |
+| `EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS`  | No                                                  | Delay before confirming that two snapshots match; default `30000`                                        |
+| `EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS`   | No                                                  | Maximum observation-settling window; default `600000`                                                    |
+| `EXECUTION_STATISTICS_MAX_FAILURES`           | No                                                  | Consecutive Langfuse read failures before marking statistics unavailable; default `8`                    |
+| `EXECUTION_STATISTICS_RETRY_DELAY_MS`         | No                                                  | Delay after a failed Langfuse read; default `30000`                                                      |
+| `EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS`       | No                                                  | Lease timeout for a statistics reconciliation claim; default `600000`                                    |
 
 ## Database schema
 

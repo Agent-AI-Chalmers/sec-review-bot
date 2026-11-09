@@ -68,18 +68,18 @@ Preparation 或 Execution API 服务的终态失败会将 publication 标为 `sk
 
 run 主干和各条生命周期轴分别存放在不同的表中。`review_runs` 只保存被接纳的身份；每条轴各自保存自己的状态和输入：
 
-| 表                        | 职责                                        | 状态                                                                                          |
-| ------------------------- | ------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `review_runs`             | 所有轴共享的接纳身份（没有更新路径）        | —                                                                                             |
-| `preparations`            | 可领取的 input preparation                  | `pending`、`preparing`、`uncertain`、`disconnected`、`submitted`、`failed`                    |
-| `input_bundle_candidates` | 持久 input publication 提案与原子选择       | `reserved`, `present`, `selected`, `abandoned`                                                |
-| `run_notices`             | connector 所有的用户可见失败与待确认通知    | `pending`、`delivering`、`delivered`、`failed`                                                |
-| `executions`              | Execution API 服务提交、观察和终态结果 | `pending`、`queued`、`running`、`uncertain`、`disconnected`、`succeeded`、`skipped`、`failed` |
-| `publications`            | 整体发布的所有权和结果                      | `pending`、`publishing`、`uncertain`、`disconnected`、`published`、`failed`、`skipped`        |
-| `publication_steps`       | 可恢复的单个 connector 副作用               | `pending`、`running`、`uncertain`、`disconnected`、`succeeded`、`failed`、`terminal_failed`   |
-| `execution_statistics` | 统计 reconciliation 状态与 run totals | `pending`、`reconciling`、`settled`、`unavailable` |
-| `execution_statistics_groups` | 按 workflow 坐标、Agent、provider 和 model 聚合的调用数与 token totals | — |
-| `review_run_events`       | 每条轴状态转换的只追加审计日志              | —                                                                                             |
+| 表                            | 职责                                                                   | 状态                                                                                          |
+| ----------------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `review_runs`                 | 所有轴共享的接纳身份（没有更新路径）                                   | —                                                                                             |
+| `preparations`                | 可领取的 input preparation                                             | `pending`、`preparing`、`uncertain`、`disconnected`、`submitted`、`failed`                    |
+| `input_bundle_candidates`     | 持久 input publication 提案与原子选择                                  | `reserved`, `present`, `selected`, `abandoned`                                                |
+| `run_notices`                 | connector 所有的用户可见失败与待确认通知                               | `pending`、`delivering`、`delivered`、`failed`                                                |
+| `executions`                  | Execution API 服务提交、观察和终态结果                                 | `pending`、`queued`、`running`、`uncertain`、`disconnected`、`succeeded`、`skipped`、`failed` |
+| `publications`                | 整体发布的所有权和结果                                                 | `pending`、`publishing`、`uncertain`、`disconnected`、`published`、`failed`、`skipped`        |
+| `publication_steps`           | 可恢复的单个 connector 副作用                                          | `pending`、`running`、`uncertain`、`disconnected`、`succeeded`、`failed`、`terminal_failed`   |
+| `execution_statistics`        | 统计 reconciliation 状态与 run totals                                  | `pending`、`reconciling`、`settled`、`unavailable`                                            |
+| `execution_statistics_groups` | 按 workflow 坐标、Agent、provider 和 model 聚合的调用数与 token totals | —                                                                                             |
+| `review_run_events`           | 每条轴状态转换的只追加审计日志                                         | —                                                                                             |
 
 `preparations.status`：
 
@@ -199,32 +199,33 @@ service token 用于协调 run 的各个组件，read token 用于脱敏读取�
 
 <!-- doc-default: review-runs.startReviewRunsServer; source=services/review-runs/src/runtime/server-runtime.ts -->
 <!-- doc-default: EXECUTION_API_REQUEST_TIMEOUT_MS; source=services/review-runs/src/execution-client.ts -->
-| 变量                                          | 是否必需                                           | 用途                                                                   |
-| --------------------------------------------- | -------------------------------------------------- | ---------------------------------------------------------------------- |
-| `DATABASE_URL`                                | 是                                                 | PostgreSQL 连接字符串                                           |
-| `REVIEW_RUNS_READ_TOKEN`                      | 是                                                 | 脱敏读 API；控制台后端与任何只读消费方都用它                           |
-| `REVIEW_RUNS_SERVICE_TOKEN`                   | 是                                                 | 组件协调（接纳、领取、终态）；无法访问 `/v1/admin`                     |
-| `REVIEW_RUNS_ADMIN_TOKEN`                     | 否                                                 | `/v1/admin/*` 的运维认证；未配置时整个 admin 面返回 404                |
-| `EXECUTION_API_URL`                           | 是                                                 | Execution API 服务 base URL                                        |
-| `EXECUTION_API_TOKEN`                         | 非 loopback 或受保护的 Execution API 服务必需 | Execution API 服务认证                                            |
-| `REVIEW_RUNS_PORT`                            | 否                                                 | 监听端口；默认 `8090`                                                  |
-| `CONNECTOR_ID`                                | 否                                                 | 协调 namespace；默认 `github-integration:default`                      |
-| `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS` | 否                                                 | 协调循环间隔；默认 `15000`                                         |
-| `EXECUTION_API_REQUEST_TIMEOUT_MS`            | 否                                                 | Execution API 服务请求超时；默认 `30000`                          |
-| `EXECUTION_API_REQUEST_RETRIES`               | 否                                                 | Execution API 服务 transport 重试次数；默认 `2`                    |
-| `EXECUTION_API_RETRY_BASE_DELAY_MS`           | 否                                                 | 初始重试延迟；默认 `500`                                               |
-| `LANGFUSE_BASE_URL`                           | 否                                                 | 外部 Langfuse URL；配置 Langfuse URL 和凭据后启用 execution statistics |
-| `LANGFUSE_PUBLIC_KEY`                         | 与 `LANGFUSE_BASE_URL` 一起配置                    | Langfuse project public key                                            |
-| `LANGFUSE_SECRET_KEY`                         | 与 `LANGFUSE_BASE_URL` 一起配置                    | Langfuse project secret key                                            |
-| `LANGFUSE_REQUEST_TIMEOUT_MS`                 | 否                                                 | 单次 Langfuse 请求超时；默认 `30000`                                   |
-| `EXECUTION_STATISTICS_POLL_INTERVAL_MS`       | 否                                                 | 用量统计协调循环间隔；默认 `15000`                              |
-| `EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS`     | 否                                                 | 每轮最多处理的到期 run 数；默认 `20`                                   |
-| `EXECUTION_STATISTICS_INITIAL_DELAY_MS`       | 否                                                 | Execution 完成后首次读取 Langfuse 的延迟；默认 `30000`                 |
-| `EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS`  | 否                                                 | 两次 snapshot 稳定确认之间的延迟；默认 `30000`                         |
-| `EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS`   | 否                                                 | Observation settling 总时间窗口；默认 `600000`                         |
-| `EXECUTION_STATISTICS_MAX_FAILURES`           | 否                                                 | 连续 Langfuse 读取失败多少次后标记 unavailable；默认 `8`               |
-| `EXECUTION_STATISTICS_RETRY_DELAY_MS`         | 否                                                 | Langfuse 读取失败后的重试延迟；默认 `30000`                            |
-| `EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS`       | 否                                                 | Statistics reconciliation claim 超时；默认 `600000`                    |
+
+| 变量                                          | 是否必需                                      | 用途                                                                   |
+| --------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------------------- |
+| `DATABASE_URL`                                | 是                                            | PostgreSQL 连接字符串                                                  |
+| `REVIEW_RUNS_READ_TOKEN`                      | 是                                            | 脱敏读 API；控制台后端与任何只读消费方都用它                           |
+| `REVIEW_RUNS_SERVICE_TOKEN`                   | 是                                            | 组件协调（接纳、领取、终态）；无法访问 `/v1/admin`                     |
+| `REVIEW_RUNS_ADMIN_TOKEN`                     | 否                                            | `/v1/admin/*` 的运维认证；未配置时整个 admin 面返回 404                |
+| `EXECUTION_API_URL`                           | 是                                            | Execution API 服务 base URL                                            |
+| `EXECUTION_API_TOKEN`                         | 非 loopback 或受保护的 Execution API 服务必需 | Execution API 服务认证                                                 |
+| `REVIEW_RUNS_PORT`                            | 否                                            | 监听端口；默认 `8090`                                                  |
+| `CONNECTOR_ID`                                | 否                                            | 协调 namespace；默认 `github-integration:default`                      |
+| `AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS` | 否                                            | 协调循环间隔；默认 `15000`                                             |
+| `EXECUTION_API_REQUEST_TIMEOUT_MS`            | 否                                            | Execution API 服务请求超时；默认 `30000`                               |
+| `EXECUTION_API_REQUEST_RETRIES`               | 否                                            | Execution API 服务 transport 重试次数；默认 `2`                        |
+| `EXECUTION_API_RETRY_BASE_DELAY_MS`           | 否                                            | 初始重试延迟；默认 `500`                                               |
+| `LANGFUSE_BASE_URL`                           | 否                                            | 外部 Langfuse URL；配置 Langfuse URL 和凭据后启用 execution statistics |
+| `LANGFUSE_PUBLIC_KEY`                         | 与 `LANGFUSE_BASE_URL` 一起配置               | Langfuse project public key                                            |
+| `LANGFUSE_SECRET_KEY`                         | 与 `LANGFUSE_BASE_URL` 一起配置               | Langfuse project secret key                                            |
+| `LANGFUSE_REQUEST_TIMEOUT_MS`                 | 否                                            | 单次 Langfuse 请求超时；默认 `30000`                                   |
+| `EXECUTION_STATISTICS_POLL_INTERVAL_MS`       | 否                                            | 用量统计协调循环间隔；默认 `15000`                                     |
+| `EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS`     | 否                                            | 每轮最多处理的到期 run 数；默认 `20`                                   |
+| `EXECUTION_STATISTICS_INITIAL_DELAY_MS`       | 否                                            | Execution 完成后首次读取 Langfuse 的延迟；默认 `30000`                 |
+| `EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS`  | 否                                            | 两次 snapshot 稳定确认之间的延迟；默认 `30000`                         |
+| `EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS`   | 否                                            | Observation settling 总时间窗口；默认 `600000`                         |
+| `EXECUTION_STATISTICS_MAX_FAILURES`           | 否                                            | 连续 Langfuse 读取失败多少次后标记 unavailable；默认 `8`               |
+| `EXECUTION_STATISTICS_RETRY_DELAY_MS`         | 否                                            | Langfuse 读取失败后的重试延迟；默认 `30000`                            |
+| `EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS`       | 否                                            | Statistics reconciliation claim 超时；默认 `600000`                    |
 
 ## 数据库 schema
 

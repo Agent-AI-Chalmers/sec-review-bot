@@ -8,24 +8,24 @@ Memory Catalog 提供 HTTP API，登记 extraction（一次已完成的经验提
 
 ## API
 
-| 方法   | 路径                                   | 用途                                                                                             |
-| ------ | -------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `GET`  | `/healthz`                             | 返回服务健康状态。                                                                               |
-| `POST` | `/v1/extractions`                      | 登记 extraction、执行轨迹引用和可选 observation。                             |
-| `GET`  | `/v1/extractions`                      | 使用稳定游标分页和来源记录过滤列出已完成的 extraction。                                   |
-| `GET`  | `/v1/extractions/{extraction_id}`      | 返回指定 extraction、执行轨迹引用和可选 observation。                                   |
-| `GET`  | `/v1/overview`                         | 汇总已完成提取的单元覆盖、经验产出，以及 30 天、90 天或全部历史的趋势。                   |
-| `GET`  | `/v1/observations`                     | 使用稳定游标分页和消费状态过滤列出 observation。                                            |
-| `GET`  | `/v1/observation-backlog`              | 返回待处理 observation 的数量和最早等待时间。                                                 |
-| `GET`  | `/v1/maintenance-control`              | 返回已保存的自动维护 `enabled` 或 `paused` 状态。                                          |
-| `POST` | `/v1/maintenance-control/pause`        | 按 operation ID 幂等处理，并通过控制版本 CAS 检查暂停自动维护。                         |
-| `POST` | `/v1/maintenance-control/resume`       | 按 operation ID 幂等处理，并通过控制版本 CAS 检查恢复自动维护。                         |
-| `GET`  | `/v1/maintenance-input?limit=...`      | 返回不超过 `limit` 条 observation，以及记忆维护 Agent 必须基于的当前生效记忆状态。              |
-| `POST` | `/v1/memory-tree/revisions`            | 通过幂等身份和预期生效版本 CAS 检查，创建自动维护或人工修订。 |
-| `GET`  | `/v1/memory-tree`                      | 返回当前记忆文件树及其修订。                                                             |
-| `POST` | `/v1/memory-tree/restore`              | 把当前生效版本指针移到已有修订，不创建修订。                                           |
-| `GET`  | `/v1/memory-tree/revisions`            | 列出记忆文件树修订历史。                                                                 |
-| `GET`  | `/v1/memory-tree/revisions/{revision}` | 返回指定记忆文件树修订、维护任务身份和产物引用。                     |
+| 方法   | 路径                                   | 用途                                                                               |
+| ------ | -------------------------------------- | ---------------------------------------------------------------------------------- |
+| `GET`  | `/healthz`                             | 返回服务健康状态。                                                                 |
+| `POST` | `/v1/extractions`                      | 登记 extraction、执行轨迹引用和可选 observation。                                  |
+| `GET`  | `/v1/extractions`                      | 使用稳定游标分页和来源记录过滤列出已完成的 extraction。                            |
+| `GET`  | `/v1/extractions/{extraction_id}`      | 返回指定 extraction、执行轨迹引用和可选 observation。                              |
+| `GET`  | `/v1/overview`                         | 汇总已完成提取的单元覆盖、经验产出，以及 30 天、90 天或全部历史的趋势。            |
+| `GET`  | `/v1/observations`                     | 使用稳定游标分页和消费状态过滤列出 observation。                                   |
+| `GET`  | `/v1/observation-backlog`              | 返回待处理 observation 的数量和最早等待时间。                                      |
+| `GET`  | `/v1/maintenance-control`              | 返回已保存的自动维护 `enabled` 或 `paused` 状态。                                  |
+| `POST` | `/v1/maintenance-control/pause`        | 按 operation ID 幂等处理，并通过控制版本 CAS 检查暂停自动维护。                    |
+| `POST` | `/v1/maintenance-control/resume`       | 按 operation ID 幂等处理，并通过控制版本 CAS 检查恢复自动维护。                    |
+| `GET`  | `/v1/maintenance-input?limit=...`      | 返回不超过 `limit` 条 observation，以及记忆维护 Agent 必须基于的当前生效记忆状态。 |
+| `POST` | `/v1/memory-tree/revisions`            | 通过幂等身份和预期生效版本 CAS 检查，创建自动维护或人工修订。                      |
+| `GET`  | `/v1/memory-tree`                      | 返回当前记忆文件树及其修订。                                                       |
+| `POST` | `/v1/memory-tree/restore`              | 把当前生效版本指针移到已有修订，不创建修订。                                       |
+| `GET`  | `/v1/memory-tree/revisions`            | 列出记忆文件树修订历史。                                                           |
+| `GET`  | `/v1/memory-tree/revisions/{revision}` | 返回指定记忆文件树修订、维护任务身份和产物引用。                                   |
 
 ## 使用说明
 
