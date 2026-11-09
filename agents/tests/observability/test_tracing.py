@@ -91,7 +91,7 @@ def test_tracing_excludes_duplicate_anthropic_sdk_spans(monkeypatch) -> None:
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "public")
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "secret")
     monkeypatch.setenv("LANGFUSE_BASE_URL", "https://langfuse.example")
-    client = Mock(flush=Mock())
+    client = Mock()
     langfuse = Mock(return_value=client)
     default_filter = Mock(return_value=True)
     callback = Mock()

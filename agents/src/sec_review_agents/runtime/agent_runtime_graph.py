@@ -216,4 +216,3 @@ async def invoke_agent_runtime_graph[T: BaseModel](
         if trajectory_writer is not None:
             trajectory_writer.flush_pending_messages()
             trajectory_writer.write_event("model_calls_end", status=status)
-        tracing_config.flush()
