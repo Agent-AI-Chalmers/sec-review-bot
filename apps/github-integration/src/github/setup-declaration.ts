@@ -185,8 +185,8 @@ function rejectNonIntegerTimeoutScalars(contents: Node | null): void {
       return
     }
     const source = typeof timeout.source === 'string' ? timeout.source : ''
-    // Integer syntax only: no fraction/exponent marker.
-    if (/[.eE]/.test(source)) {
+    // Validate the full integer syntax: hexadecimal e/E digits are not exponents.
+    if (!/^(?:[-+]?[0-9]+|0o[0-7]+|0x[0-9a-fA-F]+)$/.test(source)) {
       throw new SetupDeclarationError(
         `setup[${index}].timeout_seconds must be an integer.`,
         {

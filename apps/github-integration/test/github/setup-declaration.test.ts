@@ -170,13 +170,19 @@ test('rejects a float-syntax timeout', () => {
       `timeout ${raw} should be rejected`
     )
   }
-  for (const raw of ['100', '0x10', '0o10', '+5']) {
-    assert.doesNotThrow(
-      () =>
-        parseSetupDeclaration(
-          `setup:\n  - run: x\n    timeout_seconds: ${raw}\n`
-        ),
-      `timeout ${raw} should be accepted`
+  for (const [raw, expected] of [
+    ['100', 100],
+    ['0x10', 16],
+    ['0xDE', 222],
+    ['0x1e2', 482],
+    ['0o10', 8],
+    ['+5', 5]
+  ] as const) {
+    assert.strictEqual(
+      parseSetupDeclaration(`setup:\n  - run: x\n    timeout_seconds: ${raw}\n`)
+        ?.steps[0]?.timeout_seconds,
+      expected,
+      `timeout ${raw} should preserve its integer value`
     )
   }
 })

@@ -15,7 +15,7 @@ import { MAX_WORKFLOW_INPUT_BYTES } from '../../../src/execution/input.js'
 import { fakeGitHub, githubFile, githubJson } from '../../github-client.js'
 
 /**
- * Read setup declarations through an octokit whose Contents API is served by a
+ * Read setup declarations through an octokit whose Git Trees and Contents APIs use a
  * map from `path` to file text. `sha` is passed straight through `ref`; the
  * mock records the request so tests can assert the declaration is read at the
  * exact default-branch SHA, not a branch name.
@@ -26,6 +26,29 @@ function octokitForContent(
 ): Octokit {
   return fakeGitHub((request) => {
     const parsed = new URL(request.url)
+    if (parsed.pathname.includes('/git/trees/')) {
+      const subtree = parsed.pathname.endsWith('/' + '1'.repeat(40))
+      return githubJson({
+        truncated: false,
+        tree: subtree
+          ? Object.keys(files).map((file) => ({
+              path: file.split('/')[1],
+              type: 'blob',
+              mode: '100644',
+              sha: '2'.repeat(40)
+            }))
+          : Object.keys(files).some((file) => file.startsWith('.sec-review/'))
+            ? [
+                {
+                  path: '.sec-review',
+                  type: 'tree',
+                  mode: '040000',
+                  sha: '1'.repeat(40)
+                }
+              ]
+            : []
+      })
+    }
     const query = parsed.searchParams
     const path = decodeURIComponent(
       parsed.pathname.split('/contents/')[1] ?? ''
@@ -148,48 +171,145 @@ test('readSetupDeclaration propagates a non-404 read failure instead of skipping
   )
 })
 
-test('readSetupDeclaration ignores a symlink entry, whose content is the target path', async () => {
-  // GitHub returns a symlink as a single object too, but with `type: "symlink"`
-  // and `content` set to the base64 of the *target path* (not the file body).
-  // Treating it as a declaration would feed a path string to the parser; the
-  // reader must treat any non-`file` entry as "no declaration".
-  const octokit = fakeGitHub(() =>
-    githubJson({
-      type: 'symlink',
-      target: '../shared/setup.yml',
-      content: Buffer.from('../shared/setup.yml', 'utf8').toString('base64')
+for (const [name, parentMode, parentType, fileMode, fileType] of [
+  ['symlink to a regular file', '040000', 'tree', '120000', 'blob'],
+  ['symlinked parent directory', '120000', 'blob', '100644', 'blob'],
+  ['directory', '040000', 'tree', '040000', 'tree'],
+  ['submodule', '040000', 'tree', '160000', 'commit']
+]) {
+  test(`readSetupDeclaration ignores a ${name} even if Contents would return file contents`, async () => {
+    const { octokit, requests } = fakeGitHub(({ url }) => {
+      const pathname = decodeURIComponent(new URL(url).pathname)
+      if (pathname.includes('/git/trees/')) {
+        const root = pathname.endsWith('/' + 'f'.repeat(40))
+        return githubJson({
+          truncated: false,
+          tree: [
+            {
+              path: root ? '.sec-review' : 'setup.yml',
+              type: root ? parentType : fileType,
+              mode: root ? parentMode : fileMode,
+              sha: '1'.repeat(40)
+            }
+          ]
+        })
+      }
+      return githubFile('setup:\n  - run: echo hi\n', '.sec-review/setup.yml')
     })
-  ).octokit
-
-  const declaration = await readSetupDeclaration({
-    octokit,
-    default_sha: 'f'.repeat(40),
-    owner_login: 'octo',
-    repo_name: 'demo'
+    assert.strictEqual(
+      await readSetupDeclaration({
+        octokit,
+        default_sha: 'f'.repeat(40),
+        owner_login: 'octo',
+        repo_name: 'demo'
+      }),
+      null
+    )
+    assert.ok(requests.every(({ url }) => !url.includes('/contents/')))
   })
+}
 
-  assert.strictEqual(declaration, null)
+test('readSetupDeclaration returns null when the setup directory exists without a declaration', async () => {
+  assert.strictEqual(
+    await readSetupDeclaration({
+      octokit: octokitForContent({ '.sec-review/other.yml': 'x' }),
+      default_sha: 'a'.repeat(40),
+      owner_login: 'octo',
+      repo_name: 'demo'
+    }),
+    null
+  )
 })
 
-test('readSetupDeclaration treats a directory entry as absent', async () => {
-  const octokit = fakeGitHub(() =>
-    githubJson([
-      {
-        type: 'file',
-        path: '.sec-review/setup.yml/README.md',
-        content: Buffer.from('x', 'utf8').toString('base64')
-      }
-    ])
-  ).octokit
-
-  const declaration = await readSetupDeclaration({
-    octokit,
-    default_sha: 'a'.repeat(40),
-    owner_login: 'octo',
-    repo_name: 'demo'
+for (const failingPath of [
+  '/git/trees/' + '1'.repeat(40),
+  '/contents/.sec-review/setup.yml'
+]) {
+  test(`readSetupDeclaration propagates a read failure at ${failingPath}`, async () => {
+    const octokit = fakeGitHub(({ url }) => {
+      const pathname = decodeURIComponent(new URL(url).pathname)
+      if (pathname.endsWith(failingPath))
+        return githubJson({ message: 'Forbidden' }, 403)
+      const root = pathname.endsWith('/' + 'a'.repeat(40))
+      return githubJson({
+        truncated: false,
+        tree: [
+          {
+            path: root ? '.sec-review' : 'setup.yml',
+            type: root ? 'tree' : 'blob',
+            mode: root ? '040000' : '100644',
+            sha: '1'.repeat(40)
+          }
+        ]
+      })
+    }).octokit
+    await assert.rejects(
+      readSetupDeclaration({
+        octokit,
+        default_sha: 'a'.repeat(40),
+        owner_login: 'octo',
+        repo_name: 'demo'
+      }),
+      /Forbidden/
+    )
   })
+}
 
-  assert.strictEqual(declaration, null)
+test('readSetupDeclaration fails on a truncated tree instead of assuming absence', async () => {
+  const octokit = fakeGitHub(() =>
+    githubJson({ tree: [], truncated: true })
+  ).octokit
+  await assert.rejects(
+    readSetupDeclaration({
+      octokit,
+      default_sha: 'f'.repeat(40),
+      owner_login: 'octo',
+      repo_name: 'demo'
+    }),
+    /truncated/i
+  )
+})
+
+test('readSetupDeclaration accepts executable files and checks trees at pinned SHAs', async () => {
+  const sha = 'a'.repeat(40)
+  const subtree = 'b'.repeat(40)
+  const { octokit, requests } = fakeGitHub(({ url }) => {
+    const pathname = decodeURIComponent(new URL(url).pathname)
+    if (pathname.endsWith(`/git/trees/${sha}`))
+      return githubJson({
+        truncated: false,
+        tree: [
+          { path: '.sec-review', type: 'tree', mode: '040000', sha: subtree }
+        ]
+      })
+    if (pathname.endsWith(`/git/trees/${subtree}`))
+      return githubJson({
+        truncated: false,
+        tree: [
+          {
+            path: 'setup.yml',
+            type: 'blob',
+            mode: '100755',
+            sha: 'c'.repeat(40)
+          }
+        ]
+      })
+    if (pathname.endsWith('/contents/.sec-review/setup.yml')) {
+      assert.strictEqual(new URL(url).searchParams.get('ref'), sha)
+      return githubFile('setup:\n  - run: echo hi\n', '.sec-review/setup.yml')
+    }
+    throw new Error(`Unexpected GitHub request: ${url}`)
+  })
+  assert.strictEqual(
+    await readSetupDeclaration({
+      octokit,
+      default_sha: sha,
+      owner_login: 'octo',
+      repo_name: 'demo'
+    }),
+    'setup:\n  - run: echo hi\n'
+  )
+  assert.strictEqual(requests.length, 3)
 })
 
 test('assertWorkflowInputFits rejects an input past the contract byte limit', () => {

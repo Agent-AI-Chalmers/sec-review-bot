@@ -169,7 +169,7 @@ export async function readSetupDeclaration({
 }
 
 /**
- * Read a single file at an exact commit through the Contents API.
+ * Read a regular file at an exact commit, checking each path component in Git trees.
  *
  * Reading by API at the already-resolved SHA avoids a second git clone, and
  * avoids relying on the server allowing a wanted-SHA fetch. A missing file is
@@ -192,6 +192,33 @@ async function readRepositoryFileAtSha({
 }): Promise<string | null> {
   let response: { data: unknown }
   try {
+    // Contents can return a symlink target as a file. Check Git modes first,
+    // including parent directories, without traversing unrelated subtrees.
+    const components = path.split('/')
+    let tree_sha = sha
+    for (const [index, component] of components.entries()) {
+      const tree = await octokit.rest.git.getTree({
+        owner: owner_login,
+        repo: repo_name,
+        tree_sha
+      })
+      if (tree.data.truncated) {
+        throw new Error(
+          `Git tree is truncated while reading ${path} at ${sha}.`
+        )
+      }
+      const entry = tree.data.tree.find((item) => item.path === component)
+      if (entry === undefined) return null
+      if (index < components.length - 1) {
+        if (entry.type !== 'tree' || entry.mode !== '040000') return null
+        tree_sha = entry.sha
+      } else if (
+        entry.type !== 'blob' ||
+        (entry.mode !== '100644' && entry.mode !== '100755')
+      ) {
+        return null
+      }
+    }
     response = await octokit.rest.repos.getContent({
       owner: owner_login,
       repo: repo_name,
@@ -212,10 +239,6 @@ async function readRepositoryFileAtSha({
   if (!isRecord(response.data) || typeof response.data.content !== 'string') {
     return null
   }
-  // Only a regular file is a declaration. A symlink is returned as an object
-  // whose `content` is the base64 of the *target path*, not the file body, so
-  // treating it as a declaration would feed the target string to the parser.
-  // Anything that is not `file` (symlink, submodule, ...) means "no declaration".
   if (response.data.type !== 'file') {
     return null
   }

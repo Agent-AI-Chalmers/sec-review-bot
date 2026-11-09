@@ -2,6 +2,7 @@
   "$comment": "Corpus of setup-declaration inputs shared by the Execution Worker (Python) and GitHub Integration (TypeScript). Each valid case must parse as a declaration; each invalid case must be rejected. The file-name prefix classifies a case, and the manifest records it explicitly so both implementations are checked against the same boundary.",
   "valid": [
     "valid-all-keys.yml",
+    "valid-integer-timeouts.yml",
     "valid-large-timeout.yml",
     "valid-minimal.yml",
     "valid-portable-env-names.yml",
@@ -19,6 +20,7 @@
     "invalid-explicit-bool-tag.yml",
     "invalid-explicit-int-tag.yml",
     "invalid-explicit-str-tag.yml",
+    "invalid-exponent-timeout.yml",
     "invalid-float-timeout.yml",
     "invalid-missing-run.yml",
     "invalid-missing-setup-key.yml",

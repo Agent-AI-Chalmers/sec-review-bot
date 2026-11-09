@@ -1,8 +1,33 @@
 """Fixtures and policies that apply across the agents test suite."""
 
+import os
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _isolate_git_environment(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Iterator[None]:
+    """Keep fixture repositories independent of developer Git settings.
+
+    Apply before other test fixtures create repositories. Tests can still set
+    repository-local configuration or explicitly override the environment.
+    """
+    config = tmp_path_factory.mktemp("git-config") / "config"
+    # Disabling global config alone leaves Git's default XDG attributes file active.
+    config.write_text(f'[core]\n\tattributesFile = "{os.devnull}"\n', encoding="utf-8")
+    with pytest.MonkeyPatch.context() as patch:
+        for key in tuple(os.environ):
+            if key.startswith("GIT_"):
+                patch.delenv(key)
+        patch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+        patch.setenv("GIT_CONFIG_SYSTEM", os.devnull)
+        patch.setenv("GIT_CONFIG_GLOBAL", str(config))
+        patch.setenv("GIT_ATTR_NOSYSTEM", "1")
+        yield
 
 
 @pytest.fixture(scope="session")

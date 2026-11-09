@@ -13,7 +13,7 @@ import { fakeGitHub, githubFile, githubJson } from '../github-client.js'
 
 // The setup declaration is read for private repositories too. The read goes
 // through the same installation-authenticated octokit the preparer already
-// holds (the Contents API), *not* an unauthenticated client and not a separate
+// holds (the Git Trees and Contents APIs), *not* an unauthenticated client and not a separate
 // git credential. These tests assert the preparers pass that octokit through
 // and request the declaration at the exact default-branch SHA, so a private
 // repository's declaration is read with the App's auth and a mismatched SHA
@@ -73,7 +73,7 @@ interface OctokitRecording {
   }>
 }
 
-/** An octokit whose Contents API serves `files` and records each request. */
+/** An octokit whose Git Trees and Contents APIs serve `files`, recording content requests. */
 function octokitWithSetupDeclaration(
   sha: string,
   files: Record<string, string> = { '.sec-review/setup.yml': DECLARATION }
@@ -109,6 +109,27 @@ function octokitWithSetupDeclaration(
     const repo = repoMatch?.[2] ?? ''
     const tail = repoMatch?.[3] ?? ''
 
+    if (tail.startsWith('/git/trees/')) {
+      const subtree = tail.endsWith('/' + '1'.repeat(40))
+      return githubJson({
+        truncated: false,
+        tree: subtree
+          ? Object.keys(files).map((file) => ({
+              path: file.split('/')[1],
+              type: 'blob',
+              mode: '100644',
+              sha: '2'.repeat(40)
+            }))
+          : [
+              {
+                path: '.sec-review',
+                type: 'tree',
+                mode: '040000',
+                sha: '1'.repeat(40)
+              }
+            ]
+      })
+    }
     if (tail.startsWith('/contents/')) {
       const path = decodeURIComponent(tail.slice('/contents/'.length))
       const ref = parsed.searchParams.get('ref') ?? undefined
