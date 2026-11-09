@@ -36,7 +36,7 @@ Emit suggestion candidates when a mitigation patch exists and at least one patch
 Per candidate, required conditions are:
 
 1. Patch file exists in PR changed-file set and has PR patch content.
-2. Patch hunk has non-empty suggestion replacement content.
+2. Patch hunk produces a suggestion block; deletion allows empty replacement content.
 3. Patch hunk can be anchored to a right-side (current-version) PR diff interval.
 
 This is a partial-admission pipeline:
@@ -60,20 +60,22 @@ Keep only patch files that match entries from `pulls.listFiles`, the GitHub API 
 
 #### 3. Build suggestion replacements and bodies
 
-For each eligible patch hunk:
+Split each patch hunk into suggestion blocks of consecutive added and removed lines:
 
-- Build replacement text from non-removed hunk lines.
-- Build suggestion body as: short mitigation summary, then a literal ```` ```suggestion ```` fence, replacement lines, and a closing ```` ``` ```` fence.
+- Replacements use the added lines as replacement text.
+- Deletions use empty replacement text.
+- Pure insertions anchor to a neighboring context line and preserve that line in the replacement.
+- Put the replacement text in a `suggestion` code block as the comment body.
 
 #### 4. Build review anchors from overlapping PR patch hunks
 
-For each patch hunk, find an overlapping PR patch hunk in the same file and derive right-side anchors:
+For each suggestion block, find an overlapping PR patch hunk in the same file and intersect their line ranges in the PR's current version:
 
-- `start_line = new_start`
-- `line = new_start + new_count - 1`
+- `start_line = max(block.start_line, pr_hunk.new_start)`
+- `line = min(block.line, pr_hunk.new_start + pr_hunk.new_count - 1)`
 - `side = RIGHT`
 
-If `start_line === line`, submit a single-line anchor. If `start_line < line`, submit a multi-line anchor with `start_line` and `start_side`.
+Skip blocks with no valid overlap. If `start_line === line`, submit a single-line anchor. If `start_line < line`, submit a multi-line anchor with `start_line` and `start_side`.
 
 #### 5. Publish one review with all inline suggestions
 
