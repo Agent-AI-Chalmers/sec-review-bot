@@ -1,8 +1,8 @@
-# Agent Transcript
+# Agent Trajectory
 
 Language: English | [中文](README.zh.md)
 
-This contract owns the JSONL transcript exchanged by agent runtimes, Memory readers, the UI, and usage-reporting scripts.
+This contract owns the JSONL trajectory exchanged by agent runtimes, Memory readers, the UI, and usage-reporting scripts.
 
 - [v1 specification](v1/SPEC.md) defines the boundary.
 - [Record schema](v1/schemas/record.schema.json) defines the structural shape.

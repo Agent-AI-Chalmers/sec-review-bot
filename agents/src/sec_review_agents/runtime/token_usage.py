@@ -1,4 +1,4 @@
-"""Normalize model-adapter usage at the transcript producer boundary."""
+"""Normalize model-adapter usage at the trajectory producer boundary."""
 
 import warnings
 from collections.abc import Mapping
@@ -24,10 +24,10 @@ def validate_token_usage(value: Any) -> None:
     if value is None:
         return
     if not isinstance(value, dict) or set(value) != set(TOKEN_FIELDS):
-        raise ValueError("Transcript usage requires the canonical token fields")
+        raise ValueError("Trajectory usage requires the canonical token fields")
     for count in value.values():
         if count is not None and token_count(count) is None:
-            raise ValueError("Invalid transcript token count")
+            raise ValueError("Invalid trajectory token count")
     input_tokens = value["input_tokens"]
     output_tokens = value["output_tokens"]
     expected = (
@@ -36,17 +36,17 @@ def validate_token_usage(value: Any) -> None:
         else None
     )
     if value["total_tokens"] != expected:
-        raise ValueError("Transcript total must equal inclusive input plus output")
+        raise ValueError("Trajectory total must equal inclusive input plus output")
     caches = [value["cache_read_input_tokens"], value["cache_creation_input_tokens"]]
     if input_tokens is not None and sum(c or 0 for c in caches) > input_tokens:
-        raise ValueError("Transcript cache subsets exceed input tokens")
+        raise ValueError("Trajectory cache subsets exceed input tokens")
     reasoning = value["reasoning_tokens"]
     if (
         output_tokens is not None
         and reasoning is not None
         and reasoning > output_tokens
     ):
-        raise ValueError("Transcript reasoning subset exceeds output tokens")
+        raise ValueError("Trajectory reasoning subset exceeds output tokens")
 
 
 def _canonical(
@@ -64,7 +64,7 @@ def _canonical(
     )
     reported_total = token_count(source_total)
     if reported_total is not None and total is not None and reported_total != total:
-        warnings.warn("transcript_source_total_mismatch", RuntimeWarning, stacklevel=3)
+        warnings.warn("trajectory_source_total_mismatch", RuntimeWarning, stacklevel=3)
     result: dict[str, int | None] = dict(
         zip(
             TOKEN_FIELDS,

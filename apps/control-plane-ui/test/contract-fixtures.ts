@@ -12,22 +12,22 @@ function workspaceRoot(): string {
   return current
 }
 
-export const TRANSCRIPT_CONTRACT_ROOT = path.join(
+export const TRAJECTORY_CONTRACT_ROOT = path.join(
   workspaceRoot(),
   'contracts',
-  'agent-transcript',
+  'agent-trajectory',
   'v1'
 )
 
-export function transcriptCorpus(name: string): string {
+export function trajectoryCorpus(name: string): string {
   return readFileSync(
-    path.join(TRANSCRIPT_CONTRACT_ROOT, 'corpus', name),
+    path.join(TRAJECTORY_CONTRACT_ROOT, 'corpus', name),
     'utf8'
   )
 }
 
-export function transcriptManifest(): { valid: string[]; invalid: string[] } {
-  return JSON.parse(transcriptCorpus('manifest.json')) as {
+export function trajectoryManifest(): { valid: string[]; invalid: string[] } {
+  return JSON.parse(trajectoryCorpus('manifest.json')) as {
     valid: string[]
     invalid: string[]
   }

@@ -107,9 +107,9 @@ def serialize_agent_message(message: Any, *, message_id: str) -> dict:
 
 
 def validate_trajectory_event(event: Any) -> dict[str, Any]:
-    """Validate one transcript record."""
+    """Validate one trajectory record."""
     if not isinstance(event, dict):
-        raise ValueError("Transcript record must be an object")
+        raise ValueError("Trajectory record must be an object")
     seq = event.get("seq")
     if (
         not isinstance(seq, int)
@@ -117,53 +117,53 @@ def validate_trajectory_event(event: Any) -> dict[str, Any]:
         or seq < 1
         or seq > 9007199254740991
     ):
-        raise ValueError("Transcript seq must be a positive integer")
+        raise ValueError("Trajectory seq must be a positive integer")
     kind = event.get("event")
     if kind == "message":
         message = event.get("message")
         if not isinstance(message, dict) or "type" in message:
-            raise ValueError("Transcript message must use role")
+            raise ValueError("Trajectory message must use role")
         if not isinstance(message.get("role"), str) or message["role"] not in {
             "system",
             "user",
             "assistant",
             "tool",
         }:
-            raise ValueError("Invalid transcript message role")
+            raise ValueError("Invalid trajectory message role")
         if not isinstance(message.get("id"), str) or not message["id"]:
-            raise ValueError("Transcript message requires an ID")
+            raise ValueError("Trajectory message requires an ID")
         if not isinstance(message.get("content"), (str, list)):
-            raise ValueError("Transcript content must be text or content blocks")
+            raise ValueError("Trajectory content must be text or content blocks")
         validate_token_usage(message.get("usage_metadata"))
     elif kind == "model_calls_start":
         pass
     elif kind == "model_calls_end":
         if event.get("status") not in {"completed", "failed", "interrupted"}:
-            raise ValueError("Invalid transcript execution status")
+            raise ValueError("Invalid trajectory execution status")
     elif kind in {"model_call_start", "model_call_end"}:
         if not isinstance(event.get("call_id"), str) or not event["call_id"]:
-            raise ValueError("Transcript model call requires an ID")
+            raise ValueError("Trajectory model call requires an ID")
         if kind == "model_call_end" and (
             not isinstance(event.get("message_id"), str) or not event["message_id"]
         ):
-            raise ValueError("Transcript call end requires a response ID")
+            raise ValueError("Trajectory call end requires a response ID")
     else:
-        raise ValueError("Unknown transcript event")
+        raise ValueError("Unknown trajectory event")
     metadata = event.get("metadata")
     if "metadata" in event and not isinstance(metadata, dict):
-        raise ValueError("Invalid transcript metadata")
+        raise ValueError("Invalid trajectory metadata")
     for key in ("agent", "source", "run_id", "call_id"):
         if (
             key in event
             and event[key] is not None
             and (not isinstance(event[key], str) or not event[key])
         ):
-            raise ValueError(f"Invalid transcript {key}")
+            raise ValueError(f"Invalid trajectory {key}")
     if "parent_ids" in event and (
         not isinstance(event["parent_ids"], list)
         or any(not isinstance(value, str) or not value for value in event["parent_ids"])
     ):
-        raise ValueError("Invalid transcript ancestry")
+        raise ValueError("Invalid trajectory ancestry")
     return event
 
 
@@ -181,34 +181,34 @@ def parse_trajectory_jsonl(content: str) -> list[dict[str, Any]]:
             continue
         event = validate_trajectory_event(json.loads(line))
         if closed or (events and event["seq"] <= events[-1]["seq"]):
-            raise ValueError("Invalid transcript record order")
+            raise ValueError("Invalid trajectory record order")
         kind = event["event"]
         if kind == "message":
             message_id = event["message"]["id"]
             if message_id in seen:
-                raise ValueError("Duplicate transcript message ID")
+                raise ValueError("Duplicate trajectory message ID")
             if (
                 opened
                 and event.get("call_id") is not None
                 and event["call_id"] not in starts
             ):
-                raise ValueError("Transcript response has no model call start")
+                raise ValueError("Trajectory response has no model call start")
             seen[message_id] = event
         elif kind == "model_calls_start":
             if opened:
-                raise ValueError("Duplicate transcript recording start")
+                raise ValueError("Duplicate trajectory recording start")
             opened = True
         elif kind == "model_calls_end":
             if not opened:
-                raise ValueError("Transcript recording end has no start")
+                raise ValueError("Trajectory recording end has no start")
             closed = True
         elif kind in {"model_call_start", "model_call_end"}:
             if not opened:
-                raise ValueError("Transcript model call has no recording start")
+                raise ValueError("Trajectory model call has no recording start")
             call_id = event["call_id"]
             if kind == "model_call_start":
                 if call_id in starts:
-                    raise ValueError("Duplicate transcript model call start")
+                    raise ValueError("Duplicate trajectory model call start")
                 starts.add(call_id)
             else:
                 response = seen.get(event["message_id"])
@@ -218,7 +218,7 @@ def parse_trajectory_jsonl(content: str) -> list[dict[str, Any]]:
                     or response is None
                     or response.get("call_id") != call_id
                 ):
-                    raise ValueError("Inconsistent transcript model call end")
+                    raise ValueError("Inconsistent trajectory model call end")
                 ends.add(call_id)
         events.append(event)
     return events

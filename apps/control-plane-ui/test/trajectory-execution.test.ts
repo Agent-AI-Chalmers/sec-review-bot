@@ -1,4 +1,4 @@
-import { transcriptCorpus } from './contract-fixtures.js'
+import { trajectoryCorpus } from './contract-fixtures.js'
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { zstdCompressSync } from 'node:zlib'
@@ -118,7 +118,7 @@ test('runtime fixtures preserve flat conversation order and identify subagents a
     ['subagents', 4868],
     ['summarization', 4105]
   ] as const) {
-    const raw = transcriptCorpus(`${name}.jsonl`)
+    const raw = trajectoryCorpus(`${name}.jsonl`)
     const events = readTrajectoryArtifact(zstdCompressSync(Buffer.from(raw)))
     assert.deepEqual(parseViewerInput(raw), events)
     const document = buildTrajectoryDocument(events)
@@ -155,11 +155,11 @@ test('runtime fixtures preserve flat conversation order and identify subagents a
   }
 })
 
-test('viewer and memory artifact readers enforce the transcript contract corpus', async () => {
-  const { transcriptManifest } = await import('./contract-fixtures.js')
-  const manifest = transcriptManifest()
+test('viewer and memory artifact readers enforce the trajectory contract corpus', async () => {
+  const { trajectoryManifest } = await import('./contract-fixtures.js')
+  const manifest = trajectoryManifest()
   for (const name of manifest.valid) {
-    const input = transcriptCorpus(name)
+    const input = trajectoryCorpus(name)
     assert.deepEqual(
       parseViewerInput(input),
       readTrajectoryArtifact(zstdCompressSync(Buffer.from(input))),
@@ -167,7 +167,7 @@ test('viewer and memory artifact readers enforce the transcript contract corpus'
     )
   }
   for (const name of manifest.invalid) {
-    const input = transcriptCorpus(name)
+    const input = trajectoryCorpus(name)
     assert.throws(() => parseViewerInput(input), name)
     assert.throws(
       () => readTrajectoryArtifact(zstdCompressSync(Buffer.from(input))),

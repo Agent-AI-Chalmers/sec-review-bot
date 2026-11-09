@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { transcriptCorpus } from '../contract-fixtures.ts'
+import { trajectoryCorpus } from '../contract-fixtures.ts'
 import { expect } from '@playwright/test'
 
 import { runViewerFlow } from '../browser-flows/viewer.mjs'
@@ -18,7 +18,7 @@ test('runtime recordings show natural flat order with subagent and summary label
   for (const name of ['subagents', 'summarization']) {
     const edit = page.getByRole('button', { name: 'Edit input' })
     if (await edit.isVisible()) await edit.click()
-    const raw = transcriptCorpus(`${name}.jsonl`)
+    const raw = trajectoryCorpus(`${name}.jsonl`)
     await page.getByLabel('Paste trajectory JSONL').fill(raw)
     await page.getByRole('button', { name: 'Render', exact: true }).click()
     const messages = page.locator('[data-trajectory-message-key]')
@@ -191,14 +191,14 @@ test('failed analysis retains readable tool errors and repeated prompt navigatio
   }
 })
 
-test('truncated transcript shows a parse alert outside message cards', async ({
+test('truncated trajectory shows a parse alert outside message cards', async ({
   page
 }) => {
   await openAuthenticatedRuns(page)
   await page.getByRole('link', { name: 'Viewer', exact: true }).click()
   const raw = readFileSync(
     new URL(
-      '../../../../contracts/agent-transcript/v1/corpus/truncated.jsonl',
+      '../../../../contracts/agent-trajectory/v1/corpus/truncated.jsonl',
       import.meta.url
     ),
     'utf8'
@@ -209,5 +209,5 @@ test('truncated transcript shows a parse alert outside message cards', async ({
   await expect(page.locator('.trajectory-message')).toHaveCount(0)
   await page
     .getByRole('alert')
-    .screenshot({ path: test.info().outputPath('transcript-parse-error.png') })
+    .screenshot({ path: test.info().outputPath('trajectory-parse-error.png') })
 })

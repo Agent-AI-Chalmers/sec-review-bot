@@ -303,7 +303,7 @@ async def test_cancellation_before_first_model_call_preserves_deferred_input(tmp
         [{"role": "user", "content": "array"}],
     ],
 )
-def test_transcript_reader_rejects_noncanonical_records(tmp_path, record):
+def test_trajectory_reader_rejects_noncanonical_records(tmp_path, record):
     import json
 
     path = tmp_path / "trajectory.jsonl"
@@ -312,7 +312,7 @@ def test_transcript_reader_rejects_noncanonical_records(tmp_path, record):
         read_trajectory_events(path)
 
 
-def test_transcript_producer_writes_canonical_roles_and_provenance(tmp_path):
+def test_trajectory_producer_writes_canonical_roles_and_provenance(tmp_path):
     from langchain_core.messages import AIMessage
 
     path = tmp_path / "trajectory.jsonl"

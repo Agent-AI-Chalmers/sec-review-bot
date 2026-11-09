@@ -10,7 +10,7 @@ from sec_review_agents.runtime.trajectories import (
     read_trajectory_events,
     read_trajectory_messages,
 )
-from tests.contract_fixtures import transcript_corpus_file
+from tests.contract_fixtures import trajectory_corpus_file
 
 
 @pytest.mark.parametrize(
@@ -20,7 +20,7 @@ from tests.contract_fixtures import transcript_corpus_file
 def test_recorded_trajectory_is_complete_and_readable_by_memory(
     tmp_path, filename, message_count, call_count, total_tokens
 ):
-    path = transcript_corpus_file(filename)
+    path = trajectory_corpus_file(filename)
     events = read_trajectory_events(path)
     messages = read_trajectory_messages(path)
     assert [event["seq"] for event in events] == list(range(1, len(events) + 1))
@@ -95,7 +95,7 @@ def test_recorded_trajectory_is_complete_and_readable_by_memory(
 
 
 def test_subagent_fixture_preserves_delegation_and_independent_branches():
-    events = read_trajectory_events(transcript_corpus_file("subagents.jsonl"))
+    events = read_trajectory_events(trajectory_corpus_file("subagents.jsonl"))
     generated = [e for e in events if e["event"] == "message" and e.get("call_id")]
     parent = generated[0]
     assert {c["args"]["subagent_type"] for c in parent["message"]["tool_calls"]} == {
@@ -130,7 +130,7 @@ def test_subagent_fixture_preserves_delegation_and_independent_branches():
 
 
 def test_summarization_fixture_keeps_response_context_and_original_evidence():
-    events = read_trajectory_events(transcript_corpus_file("summarization.jsonl"))
+    events = read_trajectory_events(trajectory_corpus_file("summarization.jsonl"))
     summary = next(
         e
         for e in events
@@ -164,7 +164,7 @@ def test_summarization_fixture_keeps_response_context_and_original_evidence():
 
 def test_fixture_seq_preserves_each_agents_conversation_order():
     for filename in ("subagents.jsonl", "summarization.jsonl"):
-        events = read_trajectory_events(transcript_corpus_file(filename))
+        events = read_trajectory_events(trajectory_corpus_file(filename))
         records = [e for e in events if e["event"] == "message"]
         assert records[0]["message"]["role"] == "system"
         assert records[1]["message"]["role"] == "user"
@@ -189,31 +189,31 @@ def test_fixture_seq_preserves_each_agents_conversation_order():
             assert "src/download.py" in summary[0]["message"]["content"]
 
 
-def test_transcript_contract_corpus():
-    from tests.contract_fixtures import transcript_corpus_manifest
+def test_trajectory_contract_corpus():
+    from tests.contract_fixtures import trajectory_corpus_manifest
 
-    manifest = transcript_corpus_manifest()
+    manifest = trajectory_corpus_manifest()
     for name in manifest["valid"]:
-        read_trajectory_events(transcript_corpus_file(name))
+        read_trajectory_events(trajectory_corpus_file(name))
     for name in manifest["invalid"]:
         with pytest.raises(ValueError):
-            read_trajectory_events(transcript_corpus_file(name))
+            read_trajectory_events(trajectory_corpus_file(name))
 
 
-def test_transcript_records_match_contract_schema():
+def test_trajectory_records_match_contract_schema():
 
     from jsonschema import Draft202012Validator
 
     from tests.contract_fixtures import (
-        AGENT_TRANSCRIPT_ROOT,
-        transcript_corpus_manifest,
+        AGENT_TRAJECTORY_ROOT,
+        trajectory_corpus_manifest,
     )
 
     schema = json.loads(
-        (AGENT_TRANSCRIPT_ROOT / "schemas/record.schema.json").read_text()
+        (AGENT_TRAJECTORY_ROOT / "schemas/record.schema.json").read_text()
     )
     Draft202012Validator.check_schema(schema)
     validator = Draft202012Validator(schema)
-    for name in transcript_corpus_manifest()["valid"]:
-        for event in read_trajectory_events(transcript_corpus_file(name)):
+    for name in trajectory_corpus_manifest()["valid"]:
+        for event in read_trajectory_events(trajectory_corpus_file(name)):
             validator.validate(event)

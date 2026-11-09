@@ -177,7 +177,7 @@ def test_list_trajectory_messages_rejects_partial_jsonl(
     )
 
     assert result["ok"] is False
-    assert "transcript JSONL" in result["error"]
+    assert "trajectory JSONL" in result["error"]
 
 
 def test_collect_review_memory_trajectories_uses_flat_published_files(

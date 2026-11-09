@@ -47,7 +47,7 @@ Package READMEs explain installation, commands, configuration, and code layout. 
 These documents explain agent capabilities, context loading, and framework choices.
 
 - [CAPABILITY_BOUNDARIES](agent/CAPABILITY_BOUNDARIES.md): Agent capabilities and limits when working with Git history and state outside the repository.
-- [agent-transcript](../contracts/agent-transcript/README.md): JSONL messages, execution relationships, and usage accounting.
+- [agent-trajectory](../contracts/agent-trajectory/README.md): JSONL messages, execution relationships, and usage accounting.
 - [CONTEXT_LOADING](agent/CONTEXT_LOADING.md): What goes directly into prompts, what agents read on demand, and how each agent uses these approaches.
 - [SKILLS](agent/SKILLS.md): How agent skills are selected, prepared, and mounted.
 - [FRAMEWORK_SELECTION](agent/FRAMEWORK_SELECTION.md): Agent framework choices and their rationale.

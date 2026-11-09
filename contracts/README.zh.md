@@ -56,7 +56,7 @@ contracts/
 | [review-runs-api](review-runs-api/README.zh.md)       | Review Runs HTTP API 与脱敏运行记录结构    | Review Runs 与其调用方                             | [v1](review-runs-api/v1/openapi.yaml)                                                                                                                                                                         |
 | [memory-catalog-api](memory-catalog-api/README.zh.md) | 记忆协调服务的 HTTP API                 | Memory Catalog Server 与 Worker                   | [v1](memory-catalog-api/v1/openapi.yaml)                                                                                                                                                                      |
 | [tar-zstd-artifact](tar-zstd-artifact/README.zh.md)   | 共享归档封装与各类产物格式 | 本项目中生成或读取 tar+zstd 产物的组件         | [envelope v1](tar-zstd-artifact/envelope/v1/SPEC.zh.md)、[input-bundle v1](tar-zstd-artifact/profiles/input-bundle/v1/SPEC.zh.md)、[memory-tree v1](tar-zstd-artifact/profiles/memory-tree/v1/SPEC.zh.md)、[run-diagnostic v1](tar-zstd-artifact/profiles/run-diagnostic/v1/SPEC.zh.md) |
-| [agent-transcript](agent-transcript/README.zh.md) | Agent 执行 JSONL | Agent 运行时、Memory、UI 和用量脚本 | [v1](agent-transcript/v1/SPEC.zh.md) |
+| [agent-trajectory](agent-trajectory/README.zh.md) | Agent 执行轨迹（JSONL） | Agent 运行时、Memory、UI 和用量脚本 | [v1](agent-trajectory/v1/SPEC.zh.md) |
 | [setup-declaration](setup-declaration/README.zh.md)   | 受信任的 `.sec-review/setup.yml` 格式        | 被审查仓库、GitHub Integration 与 Execution Worker | [v1](setup-declaration/v1/SPEC.zh.md)                                                                                                                                                                         |
 
 ## 各类契约的维护规则

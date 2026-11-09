@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://sec-review-bot/contracts/agent-transcript/v1/record.schema.json",
-  "title": "Agent transcript record",
+  "$id": "https://sec-review-bot/contracts/agent-trajectory/v1/record.schema.json",
+  "title": "Agent trajectory record",
   "type": "object",
   "required": [
     "seq",

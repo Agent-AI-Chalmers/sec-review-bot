@@ -49,7 +49,7 @@
 以下文档介绍 Agent 的能力、上下文加载方式和框架选择。
 
 - [CAPABILITY_BOUNDARIES](agent/CAPABILITY_BOUNDARIES.zh.md)：Agent 能力边界，包括 Git 历史和仓库外状态的处理限制。
-- [agent-transcript](../contracts/agent-transcript/README.zh.md)：JSONL 消息、执行关系与用量核算。
+- [agent-trajectory](../contracts/agent-trajectory/README.zh.md)：JSONL 消息、执行关系与用量核算。
 - [CONTEXT_LOADING](agent/CONTEXT_LOADING.zh.md)：哪些内容直接放进提示词，哪些由 Agent 按需读取，以及各类 Agent 采用哪种方式。
 - [SKILLS](agent/SKILLS.zh.md)：Agent 技能的选择、准备和挂载。
 - [FRAMEWORK_SELECTION](agent/FRAMEWORK_SELECTION.zh.md)：Agent 框架的选择及理由。
