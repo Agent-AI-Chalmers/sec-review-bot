@@ -1,4 +1,4 @@
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from langchain_core.callbacks import BaseCallbackHandler
@@ -19,7 +19,6 @@ class TracingConfig:
     callback: BaseCallbackHandler | None
     metadata: dict[str, str]
     run_name: str
-    flush: Callable[[], None]
 
     def to_langchain_config(self) -> RunnableConfig:
         config: RunnableConfig = {
@@ -92,7 +91,6 @@ def _disabled_tracing_config(
         callback=None,
         metadata=metadata,
         run_name=agent_name,
-        flush=lambda: None,
     )
 
 
@@ -134,7 +132,9 @@ def build_tracing_config(
 
         # Initialize the per-public-key singleton before CallbackHandler asks get_client()
         # for it, so the exporter filter is installed on the shared span processor.
-        client = Langfuse(should_export_span=should_export_span)
+        # The SDK owns background batch export and its atexit cleanup. Per-invocation
+        # config must not expose a flush that can block or replace a review outcome.
+        Langfuse(should_export_span=should_export_span)
         callback = CallbackHandler()
 
         return TracingConfig(
@@ -142,7 +142,6 @@ def build_tracing_config(
             callback=callback,
             metadata=metadata,
             run_name=agent_name,
-            flush=client.flush if hasattr(client, "flush") else (lambda: None),
         )
     except Exception as error:
         if not _LANGFUSE_IMPORT_WARNING_EMITTED:

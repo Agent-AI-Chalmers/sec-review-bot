@@ -94,13 +94,11 @@ async def test_trajectory_callback_does_not_mark_langfuse_tracing_enabled(
     tmp_path: Path,
 ) -> None:
     agent = _successful_agent()
-    flush = Mock()
     tracing_config = TracingConfig(
         enabled=False,
         callback=None,
         metadata={"sec_review_agent": "test-agent"},
         run_name="test-agent",
-        flush=flush,
     )
 
     trajectory_path = tmp_path / "trajectory.jsonl"
@@ -137,7 +135,6 @@ async def test_trajectory_callback_does_not_mark_langfuse_tracing_enabled(
     assert not started_mock.call_args.kwargs["tracing_enabled"]
     assert "callbacks" not in agent.astream_events.call_args.kwargs["config"]
     assert trajectory_messages[0]["role"] == "user"
-    flush.assert_called_once_with()
 
 
 @pytest.mark.asyncio
@@ -153,7 +150,6 @@ async def test_trajectory_export_preserves_callback_manager(
         callback=None,
         metadata={"sec_review_agent": "test-agent"},
         run_name="test-agent",
-        flush=lambda: None,
     )
 
     with (
