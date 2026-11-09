@@ -51,24 +51,25 @@ Discovery input supports these organization strategies.
 
 The `single-file` strategy gives each discovery agent one file. Its advantage is concentrated attention and a sharply defined code scope for every call. The tradeoff is that every file requires a separate model call and reloads the system prompt, output schema, and other fixed context. In a repository with many small files, that repeated overhead can materially increase cost. A single-file view also provides no local cross-file context by itself.
 
-The `batched` strategy groups several files into a chunk and gives each discovery agent one chunk. This amortizes fixed prompt cost and preserves some cross-file context. The corresponding risk is that larger chunks ask the model to attend to more material at once. Experiments also show that a long context can reduce security-clue recall even when the request remains below the maximum input limit.
+The `batched` strategy groups several files into a chunk and gives each discovery agent one chunk. This amortizes fixed prompt cost and preserves some cross-file context. The corresponding risk is that larger chunks ask the model to attend to more material at once. Staying below the input limit does not guarantee equal attention to each file; evaluate that tradeoff with concrete cases.
 
-The current default is `single-file`, so each model call focuses on one file. `batched` remains available as a worker-side deployment setting through `AGENT_DISCOVERY_CHUNK_STRATEGY`; it is not selectable by a review request. When batching is enabled, the target for an ordinary chunk is one fifth of the selected model's measured context-window input limit, leaving explicit room between efficient batching and concentrated attention.
+<!-- doc-default: AGENT_DISCOVERY_CHUNK_STRATEGY; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
+The current default is `single-file`, so each model call focuses on one file. `batched` remains available as a worker-side deployment setting through `AGENT_DISCOVERY_CHUNK_STRATEGY`; it is not selectable by a review request. When batching is enabled, the target for an ordinary chunk is one fifth of the input token limit (`max_input_tokens`) configured for the selected deployment, leaving explicit room between efficient batching and concentrated attention.
 
 Discovery applies an ordinary chunk target and a single-file hard limit:
 
 | Input shape | Boundary | Behavior |
 | --- | --- | --- |
-| Ordinary multi-file chunk | One fifth of the selected model context-window input limit | Files are grouped until the next file would exceed this target. |
-| Single-file chunk | Four fifths of the selected model context-window input limit | A file that exceeds the ordinary target may still be scanned alone, with the remaining fifth reserved for runtime overhead. |
-| Over the single-file limit | Above four fifths of the selected model context-window input limit | The file is skipped as exceeding the discovery token budget. |
+| Ordinary multi-file chunk | One fifth of the selected deployment’s configured input token limit | Files are grouped until the next file would exceed this target. |
+| Single-file chunk | Four fifths of the selected deployment’s configured input token limit | A file that exceeds the ordinary target may still be scanned alone, with the remaining fifth reserved for runtime overhead. |
+| Over the single-file limit | Above four fifths of the selected deployment’s configured input token limit | The file is skipped as exceeding the discovery token budget. |
 
 One fifth constrains ordinary multi-file chunks; it must not prevent a complete file from being scanned. A file that exceeds the ordinary target but remains within the single-file hard limit still forms its own chunk. Only a file above the hard limit cannot enter discovery.
 
 The hard limit leaves the remaining one fifth for runtime-added schemas, skill guidance, tool turns, and token-estimation error. Files remain whole rather than being split to satisfy the target. This avoids breaking local semantics at arbitrary positions and keeps candidate locations and scan coverage easier to interpret.
 
-All token boundaries come from the selected model's measured context-window input limit. Prompt size refers to the complete request, including system and user prompts, file metadata, and file contents.
+All token boundaries come from the input token limit (`max_input_tokens`) configured for the selected deployment. Prompt size refers to the complete request, including system and user prompts, file metadata, and file contents.
 
 ### Experimental Evidence
 
-The `single-file` strategy has a clear recall advantage. A likely explanation is that limiting each call to one file concentrates model attention on local security clues and avoids dilution by multi-file context. Because discovery only needs to surface a lead rather than prove the complete vulnerability, even a cross-file issue should expose a suspicious local anchor in at least one file; later stages can reconstruct the full chain.
+The original experimental note reported a recall advantage for `single-file`. One possible explanation is that concentrating each call on one file reduces dilution of local security clues by multi-file context. Discovery provides investigation leads; later stages reconstruct cross-file chains. However, the note did not provide a date, model version, code revision, or locatable results, so it cannot establish the same benefit for other models or repositories. Compare candidate recall, false signals, total cost, and downstream reconstruction of cross-file issues with fixed inputs and models before changing strategy.
