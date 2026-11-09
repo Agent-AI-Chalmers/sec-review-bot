@@ -1,72 +1,70 @@
-# Triage Boundaries
+# Triage 职责
 
 语言：[English](TRIAGE_BOUNDARIES.md) | 中文
 
 本文为 [TRIAGE_BOUNDARIES.md](TRIAGE_BOUNDARIES.md) 的中文译文；如有差异，以英文版为准。
 
-triage 的输入来自 discovery 阶段。discovery 负责高召回地产生安全候选信号，但 candidate 不是漏洞结论，其中会混有重复项、弱信号、前端/后端同一问题的不同视角，以及明显不值得继续分析的噪音。
+初筛阶段 Discovery 尽量多地找出安全线索，再交给 Triage 整理。candidate 并不等于漏洞：其中可能包含重复报告、证据较弱的推测、同一问题的前后端视角，以及明显不值得继续分析的噪音。
 
-triage 阶段不确认漏洞，而是把这些 candidates 整理成后续 analyzer 更容易处理的问题单元：
+Triage 阶段不确认漏洞，而是把这些 candidate 整理成后续 Analyzer 更容易处理的 case：
 
-- 哪些 candidate 明显不值得继续分析，可以 suppress；
-- 哪些 candidate 描述同一个问题，可以合并成一个 case；
-- 哪些 candidate 还不能在浅层阶段否定，应该保守 keep。
+- 哪些 candidate 不值得继续分析，可以 suppress；
+- 哪些 candidate 描述同一个问题，可以 merge 为一个 case；
+- 哪些 candidate 暂时无法 suppress，应保守 keep，交给 Analyzer 调查。
 
-下游契约仍然接收 `cases` 和 `suppressed_candidates`。agent 不直接手写这些结果；它只编辑 workbench 里的 groups，系统在 constraints 通过后从 groups 导出结果。
+下游仍接收 `cases` 和 `suppressed_candidates`。Agent 通过工具编辑工作台分组，不直接编写这些结果；程序在约束检查通过后，从分组状态导出结果。Triage 只根据输入中的 candidate 内容判断，不自行读取仓库文件。
 
 ## Discovery 和 Triage 的边界
 
-高召回不等于把所有“有安全味道”的内容都交给 triage。discovery 应该尽量只生产漏洞域内的候选：具体仓库代码里的 attacker-controlled input、权限边界、危险 sink、敏感数据影响或可信侧状态变更。
+追求召回率不意味着把所有与安全沾边的内容都保留下来。Discovery 应关注具体代码中的攻击者可控输入、权限边界、危险操作、敏感数据影响，或可信侧的状态变更。
 
-CI 扫描频率、security bot coverage、schema 审计字段、placeholder 文案、泛化配置硬化这类安全流程或最佳实践建议，最好在 discovery 阶段就不要产出。
+仅建议提高 CI 扫描频率、扩大安全扫描覆盖范围、增加 schema 审计字段或加固配置，却没有指出具体的攻击路径、敏感操作或信任边界问题时，不应作为漏洞 candidate 输出。
 
-但即使 discovery 已经收紧，triage 仍然需要 suppress。有些候选在单文件、局部视野里合理可疑，但放到更完整的 inventory 或代码语义里就没有独立 case 价值。例如：
+即使初筛已限制范围，Triage 仍需要 suppress candidate。某个线索在单文件内看似可疑，但结合输入中其他 candidate 的证据后，可能没有独立调查价值。例如：
 
-- 客户端传了 `filename`、`userId`、`total`，但真正是否成漏洞取决于服务端是否重新鉴权、校验或重算。
-- schema 里有弱信号，例如 `password TEXT`，但同批或全局已经有 register/login 的运行时代码证据覆盖同一个明文密码问题。
-- UI 暴露了 `/admin` 链接，但真正的安全边界是 admin API 是否做 server-side role check。
-- localStorage 或 React state 可以被用户改写，但可信侧服务端状态并不受它影响。
+- 客户端提交 `filename`、`userId` 或 `total`，但是否存在漏洞取决于服务端是否重新鉴权、校验或计算。
+- schema 中出现 `password TEXT`，但注册、登录的运行代码已经提供同一明文密码问题的更直接证据。
+- UI 显示 `/admin` 链接，但真正决定访问权限的是管理 API 的服务端角色检查。
+- 用户可以修改 localStorage 或 React 状态，但可信服务端的状态并不受其影响。
 
-因此，`merge` 和 `suppress` 的分工不是“相关就合并，不相关才舍弃”：
+`merge` 和 `suppress` 分别解决不同问题：
 
-- `merge`: 多个 item 共同描述同一个 root cause、sink、信任边界或修复点；合并后导出的 case 更完整、更准确。
-- `suppress`: item 本身不是漏洞域问题，或只是弱旁证/重复信号，或被更强 root-cause item 覆盖后没有独立分析或修复价值。
-- `keep`: item 有具体仓库落点，浅层阶段不能否定，也不能明显并入其他 keep group。
+- `merge`：多个 item 描述同一根因、危险操作、信任边界或修复点，merge 后能更完整地说明问题。
+- `suppress`：item 不属于漏洞问题，或只是弱旁证、重复线索，被更直接的证据覆盖后没有独立分析或修复价值。
+- `keep`：item 指向具体仓库代码，初步判断不足以 suppress，也无法明确并入其他保留组。
 
-理想状态是：discovery 不大量生产非漏洞域噪音；triage 仍保留 suppress 能力，用来处理局部可疑但全局不成立、无独立价值或过度声称的候选。
+Discovery 尽量减少与漏洞无关的 candidate；Triage 再根据全部输入，suppress 不成立、没有独立价值或夸大问题的线索。
 
-## Suppress 边界
+## 何时 suppress candidate
 
-triage 是 recall-first 阶段。suppress 的门槛高，keep 的门槛低。
+Triage 优先避免漏掉值得调查的问题，因此 suppress 需要较充分的理由，有具体线索时则倾向保留，避免过早 suppress。
 
-判断边界可以用一个问题概括：这个 item payload 是否给了 analyzer 一个具体、仓库内的落点？
+判断边界可以用一个问题概括：这个 item payload 是否给了 Analyzer 一个具体、仓库内的落点？
 
 如果答案是否定的，例如只是泛化地说“缺少校验”“可能信息泄露”“不够安全”，却没有任何具体文件位置、route、action、数据字段、source/sink、权限边界或 sensitive effect，那么可以 suppress。
 
-如果答案是肯定的，即使证据很弱，也通常应保守 keep。因为这时 item 已经提供了一个 repository-specific anchor，后续 analyzer 可以围绕这个落点检查跨文件鉴权、session 行为、数据流、schema、调用方或危险 sink。
+如果答案是肯定的，即使证据很弱，也通常应保守 keep。因为这时 item 已经提供了一个 repository-specific anchor，后续 Analyzer 可以围绕这个落点检查跨文件鉴权、session 行为、数据流、schema、调用方或危险 sink。
 
-因此，triage suppress 更像“没有可分析对象的清理”，不是“漏洞不成立的最终判断”。
+因此，suppress candidate 主要是清理没有可分析对象或没有独立价值的线索，不是代替 Analyzer 最终判定漏洞是否成立。
 
-## Merge 边界
+## 何时 merge candidate
 
-Merge 只在候选明显描述同一个问题时发生。好的 merge 通常具备这些特征：
+只有明显描述同一问题的 candidate 才应 merge。常见依据包括：
 
-- 同一个 root cause；
-- 同一个危险 sink；
-- 同一个信任边界；
-- 同一个修复点；
-- 前端/后端分别描述同一个 trust failure；
-- 一个 item 明显是另一个 item 的子方面。
+- 同一根因；
+- 同一危险操作；
+- 同一信任边界；
+- 同一修复点；
+- 前后端分别描述同一次信任校验失效；
+- 一个 item 明显是另一个 item 的组成部分。
 
-不要因为这些弱信号就 merge：
+不要仅凭以下弱信号就 merge：
 
-- 同 CWE；
-- 同文件但不同操作；
-- 同 endpoint family；
-- 都是 `missing validation`；
-- 都是 logging / hardening / policy 类泛化问题；
-- 一个弱 companion 只提供上下文颜色，没有增强同一 root cause、sink 或 trust boundary。
+- CWE 相同；
+- 文件相同，但操作不同；
+- 接口属于同一类；
+- 都被描述为 `missing validation`；
+- 都涉及日志、加固或策略建议；
+- 某个弱线索只补充背景，没有为同一根因、危险操作或信任边界增加证据。
 
-如果 merge certainty 不高，保守拆开。
-
-triage 的 over-merge 更容易表现成“宽泛 issue 主题”合并：例如把多个独立 endpoint 的 missing validation、多个无直接数据流关系的客户端信号、或一组同 feature 的弱安全建议合成一个大 case。
+无法确定时，优先分开。尤其不要仅按宽泛主题，把多个独立接口的校验问题、没有直接数据流关系的客户端线索，或同一功能中的一般安全建议合成一个大 case。
