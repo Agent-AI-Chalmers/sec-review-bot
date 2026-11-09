@@ -8,7 +8,6 @@
 
 如果你要在本地跑完整集成链路，读本文。不经过 HTTP Execution Gateway、直接在本地运行 Agent，或使用 `run-local-* --temporal` 调试时，见 [agents](../../agents/README.zh.md)。
 
-
 本地 Memory 开发环境见[本地 Memory 开发](LOCAL_MEMORY_DEVELOPMENT.zh.md)。
 
 ## 部署结构
