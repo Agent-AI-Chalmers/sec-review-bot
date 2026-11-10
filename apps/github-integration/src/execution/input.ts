@@ -35,7 +35,6 @@ export type {
 }
 
 export type TestChangesPolicy = NonNullable<ReviewIntent['test_changes']>
-export type ReviewObjective = ReviewIntent['objective']
 
 /**
  * The pull request subject a `pull-request-review` run carries.
@@ -45,8 +44,5 @@ export type ReviewObjective = ReviewIntent['objective']
  * `synchronize`.
  */
 export type PullRequestReviewSubject = PullRequestReviewInput['pr']
-
-/** The change range a run covers. */
-export type ReviewWindowReference = PullRequestReviewSubject['review_window']
 
 export const INPUT_BUNDLE_MEDIA_TYPE = 'application/tar+zstd' as const

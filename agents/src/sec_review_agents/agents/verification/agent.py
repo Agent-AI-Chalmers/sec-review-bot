@@ -100,5 +100,4 @@ async def run_verification_agent(
             trajectory_paths=trajectory_paths,
         )
 
-        # These stage callers still consume the existing dictionary contract.
         return result

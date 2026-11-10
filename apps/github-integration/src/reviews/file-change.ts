@@ -4,7 +4,6 @@ type UpsertFileChange = Extract<FileChange, { status: 'upsert' }>
 
 export type { FileChange }
 
-export type TextEncoding = UpsertFileChange['content_encoding']
 export type FileMode = NonNullable<UpsertFileChange['mode']>
 
 export function fileChangePaths(file_changes: unknown): string[] {

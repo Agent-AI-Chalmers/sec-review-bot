@@ -5,13 +5,6 @@ interface RepoParts {
   repo_name: string
 }
 
-interface OpenRepositorySecurityPullRequest {
-  number: number
-  title: string
-  html_url: string
-  head_ref: string
-}
-
 interface RepositoryIssue {
   number: number
   title: string
@@ -64,50 +57,6 @@ export async function getRepositoryRefSha(
     })
     return commit.data.sha
   }
-}
-
-export async function listOpenRepositorySecurityPullRequests(
-  octokit: Octokit,
-  { owner_login, repo_name }: RepoParts
-): Promise<OpenRepositorySecurityPullRequest[]> {
-  const items: OpenRepositorySecurityPullRequest[] = []
-  let page = 1
-
-  while (true) {
-    const response = await octokit.rest.pulls.list({
-      owner: owner_login,
-      repo: repo_name,
-      state: 'open',
-      per_page: 100,
-      page
-    })
-
-    if (response.data.length === 0) {
-      break
-    }
-
-    for (const item of response.data) {
-      const head_ref = item.head?.ref ?? ''
-      if (!head_ref.startsWith('sec-review-bot/repo-scan/')) {
-        continue
-      }
-
-      items.push({
-        number: item.number,
-        title: item.title,
-        html_url: item.html_url,
-        head_ref
-      })
-    }
-
-    if (response.data.length < 100) {
-      break
-    }
-
-    page += 1
-  }
-
-  return items
 }
 
 export async function findRepositorySecuritySummaryIssue(

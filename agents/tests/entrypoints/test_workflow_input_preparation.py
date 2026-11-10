@@ -187,7 +187,11 @@ def test_prepare_run_input_omits_setup_declaration_when_absent(tmp_path: Path) -
     assert not hasattr(prepared, "setup_declaration_content")
 
 
-def test_prepare_run_input_rejects_unsupported_workflow() -> None:
+@pytest.mark.parametrize(
+    "workflow", ["issue-review-single-agent", "issue-review-two-stage"]
+)
+def test_prepare_run_input_rejects_unsupported_workflow(workflow: str) -> None:
+    """Retained issue variants stay local-only and are not public Execution workflows."""
     with pytest.raises(ValueError, match="Unsupported workflow"):
         prepare_run_input(
             {
@@ -195,7 +199,7 @@ def test_prepare_run_input_rejects_unsupported_workflow() -> None:
                 "input_bundle": {},
             },
             run_id="run-input-preparation",
-            workflow="issue-review-single-agent",
+            workflow=workflow,
         )
 
 

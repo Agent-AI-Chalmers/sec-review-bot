@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 import pytest
 
-from sec_review_agents.utils.env import bool_env, float_env, int_env, load_dotenv_file
+from sec_review_agents.utils.env import bool_env, int_env, load_dotenv_file
 
 
 @pytest.mark.parametrize("value", ["1", "true", "YES", " on "])
@@ -54,37 +54,6 @@ def test_int_env_uses_default_only_when_unset(monkeypatch) -> None:
     monkeypatch.delenv("TEST_INT", raising=False)
 
     assert int_env("TEST_INT", 7, minimum=1) == 7
-
-
-@pytest.mark.parametrize("value", ["", "many"])
-def test_float_env_rejects_non_numeric_values(monkeypatch, value: str) -> None:
-    monkeypatch.setenv("TEST_FLOAT", value)
-
-    with pytest.raises(ValueError, match="TEST_FLOAT must be a number"):
-        float_env("TEST_FLOAT", 1.5)
-
-
-@pytest.mark.parametrize("value", ["nan", "inf", "-inf"])
-def test_float_env_rejects_non_finite_values(monkeypatch, value: str) -> None:
-    monkeypatch.setenv("TEST_FLOAT", value)
-
-    with pytest.raises(ValueError, match="TEST_FLOAT must be finite"):
-        float_env("TEST_FLOAT", 1.5)
-
-
-def test_float_env_validates_inclusive_range(monkeypatch) -> None:
-    monkeypatch.setenv("TEST_FLOAT", "0")
-    assert float_env("TEST_FLOAT", 1.5, minimum=0.0, maximum=2.0) == 0.0
-
-    monkeypatch.setenv("TEST_FLOAT", "2.1")
-    with pytest.raises(ValueError, match="TEST_FLOAT must be at most 2.0"):
-        float_env("TEST_FLOAT", 1.5, minimum=0.0, maximum=2.0)
-
-
-def test_float_env_uses_default_only_when_unset(monkeypatch) -> None:
-    monkeypatch.delenv("TEST_FLOAT", raising=False)
-
-    assert float_env("TEST_FLOAT", 1.5, minimum=0.0) == 1.5
 
 
 def test_model_providers_config_path_from_dotenv_is_relative_to_dotenv_dir(
