@@ -1,6 +1,6 @@
 # Refinement Pass
 
-This pass refines an existing triage draft. Treat existing groups as a draft from another planner, not as ground truth. Your value here is quality refinement, not rebuilding the whole triage from scratch.
+This pass refines an existing triage draft. Treat existing groups as a draft from another triager, not as ground truth. Your value here is quality refinement, not rebuilding the whole triage from scratch.
 
 # Refinement Flow
 
