@@ -180,3 +180,26 @@ def test_prose_wrapping_does_not_change_block_counts(tmp_path):
     path = tmp_path / "example.md"
     path.write_text("# Example\n\nFirst line\nsecond line.\n\n> Note\n> continued.\n")
     assert sections(path)[1].blocks == {"paragraph": 1, "blockquote paragraph": 1}
+
+
+@pytest.mark.parametrize(
+    "translated, expected_error",
+    [
+        ("# 示例\n## 额外章节\n", "different heading counts"),
+        ("## 示例\n", "heading structures differ"),
+        ("# 示例\n```sh\nunterminated\n", "unclosed code fence"),
+    ],
+)
+def test_structure_errors_suppress_content_comparison(
+    tmp_path, translated, expected_error
+):
+    """Unreliable section alignment must not produce misleading content diagnostics."""
+    (tmp_path / "README.md").write_text(
+        "# Example\n<!-- doc-default: mode -->\nProse.\n```sh\ntool\n```\n"
+    )
+    (tmp_path / "README.zh.md").write_text(translated)
+    warnings = []
+    failures = pair_failures(tmp_path, "README.md", "README.zh.md", warnings)
+    assert len(failures) == 1
+    assert expected_error in failures[0]
+    assert warnings == []

@@ -32,10 +32,12 @@ class Heading:
 
     @property
     def signature(self) -> tuple[int, str | None]:
+        """Return the heading structure that must survive translation."""
         return (self.level, self.number)
 
 
 def translated_doc_pairs(root: Path) -> list[tuple[str, str]]:
+    """Return root-relative source/translation pairs outside generated directories."""
     pairs: list[tuple[str, str]] = []
     for translated_path in translated_doc_paths(root):
         if any(
@@ -55,6 +57,10 @@ def translated_doc_pairs(root: Path) -> list[tuple[str, str]]:
 
 
 def translated_doc_paths(root: Path) -> list[Path]:
+    """List tracked translations, falling back to a filesystem scan if Git fails.
+
+    The Git listing excludes TEMP_ files; the fallback includes all *.zh.md files.
+    """
     try:
         completed = subprocess.run(
             ["git", "-C", str(root), "ls-files", "*.zh.md"],
@@ -83,6 +89,7 @@ class Section:
 
     @property
     def line(self) -> int:
+        """Return the heading line, or line one for the document preamble."""
         return self.heading.line if self.heading else 1
 
 
@@ -143,7 +150,55 @@ def shell_tokens(code: str) -> list[str]:
     return tokens
 
 
+def _collect_shell_example(section: Section, code: str, path: Path, start: int) -> None:
+    """Append normalized commands with a block boundary, or record a parse error."""
+    try:
+        tokens = shell_tokens(code)
+    except ValueError as error:
+        section.errors.append(f"{path}:{start}: invalid shell example: {error}")
+    else:
+        if tokens:
+            if section.shell_tokens:
+                section.shell_tokens.append("\n")
+            section.shell_tokens.extend(tokens)
+
+
+def _count_content_block(section: Section, line: str, paragraph: bool) -> bool:
+    """Update advisory block counts for a nonempty line and return paragraph state.
+
+    The caller handles headings, comments, and code before passing prose here.
+    Translation disclaimers leave both counts and paragraph state unchanged.
+    """
+    stripped = line.strip()
+    # The standard translation disclaimer has no English counterpart.
+    if stripped.startswith("本文为 ") and "的中文译文" in stripped:
+        return paragraph
+    if re.match(r"^\s*([-+*]|\d+[.)])\s+", line):
+        section.blocks["list item"] += 1
+        paragraph = True
+    elif stripped.startswith("|") and stripped.endswith("|"):
+        if not re.fullmatch(r"[| :\-]+", stripped):
+            section.blocks["table row"] += 1
+        paragraph = False
+    elif re.fullmatch(r"(?:\*\s*){3,}|(?:-\s*){3,}|(?:_\s*){3,}", stripped):
+        paragraph = False
+    elif stripped.startswith(">"):
+        if not paragraph:
+            section.blocks["blockquote paragraph"] += 1
+        paragraph = bool(stripped.lstrip("> "))
+    elif not paragraph:
+        section.blocks["paragraph"] += 1
+        paragraph = True
+    return paragraph
+
+
 def sections(path: Path) -> list[Section]:
+    """Extract a preamble and ATX heading sections using a limited Markdown scan.
+
+    Fences and HTML comments shield embedded headings and markers; indented code
+    is skipped. Shell parse errors and unclosed fences are recorded per section.
+    Content block counts are approximate and only support advisory diagnostics.
+    """
     result = [Section()]
     fence: tuple[str, str, int] | None = None
     body: list[str] = []
@@ -180,17 +235,7 @@ def sections(path: Path) -> list[Section]:
                 and not match[2].strip()
             ):
                 if language in SHELL_LANGUAGES:
-                    try:
-                        tokens = shell_tokens("\n".join(body))
-                    except ValueError as error:
-                        section.errors.append(
-                            f"{path}:{start}: invalid shell example: {error}"
-                        )
-                    else:
-                        if tokens:
-                            if section.shell_tokens:
-                                section.shell_tokens.append("\n")
-                            section.shell_tokens.extend(tokens)
+                    _collect_shell_example(section, "\n".join(body), path, start)
                 fence = None
             else:
                 body.append(line)
@@ -215,39 +260,37 @@ def sections(path: Path) -> list[Section]:
                 )
             )
         elif stripped:
-            # The standard translation disclaimer has no English counterpart.
-            if stripped.startswith("本文为 ") and "的中文译文" in stripped:
-                continue
-            if re.match(r"^\s*([-+*]|\d+[.)])\s+", line):
-                section.blocks["list item"] += 1
-                paragraph = True
-            elif stripped.startswith("|") and stripped.endswith("|"):
-                if not re.fullmatch(r"[| :\-]+", stripped):
-                    section.blocks["table row"] += 1
-                paragraph = False
-            elif re.fullmatch(r"(?:\*\s*){3,}|(?:-\s*){3,}|(?:_\s*){3,}", stripped):
-                paragraph = False
-            elif stripped.startswith(">"):
-                if not paragraph:
-                    section.blocks["blockquote paragraph"] += 1
-                paragraph = bool(stripped.lstrip("> "))
-            elif not paragraph:
-                section.blocks["paragraph"] += 1
-                paragraph = True
+            paragraph = _count_content_block(section, line, paragraph)
     if fence is not None:
         result[-1].errors.append(f"{path}:{fence[2]}: unclosed code fence")
     return result
 
 
-def pair_failures(
-    root: Path, english: str, translated: str, warnings: list[str] | None = None
+def _shell_difference(expected: list[str], actual: list[str]) -> str | None:
+    """Describe the first token mismatch with nearby context, or return None."""
+    if expected == actual:
+        return None
+    index = next(
+        (i for i, (x, y) in enumerate(zip(expected, actual)) if x != y),
+        min(len(expected), len(actual)),
+    )
+    return (
+        f"shell examples differ near token {index + 1}: "
+        f"{expected[index : index + 5]!r} != {actual[index : index + 5]!r}"
+    )
+
+
+def _section_structure_failures(
+    english: str,
+    translated: str,
+    english_sections: list[Section],
+    translated_sections: list[Section],
 ) -> list[str]:
-    english_path = root / english
-    translated_path = root / translated
-    if not english_path.is_file():
-        return [f"{translated} has no English source pair: {english}"]
-    english_sections = sections(english_path)
-    translated_sections = sections(translated_path)
+    """Collect parse and heading errors that prevent reliable content comparison.
+
+    Unequal section counts stop positional heading checks; otherwise both parse
+    errors and heading signature mismatches are reported before content checks.
+    """
     failures = [
         error
         for section in english_sections + translated_sections
@@ -269,6 +312,27 @@ def pair_failures(
             failures.append(
                 f"{english}:{english_section.line} and {translated}:{translated_section.line} heading structures differ: {english_section.heading.signature} {english_section.heading.text!r} != {translated_section.heading.signature} {translated_section.heading.text!r}"
             )
+    return failures
+
+
+def pair_failures(
+    root: Path, english: str, translated: str, warnings: list[str] | None = None
+) -> list[str]:
+    """Return hard failures and optionally append advisory block-count warnings.
+
+    Missing sources, parse errors, or heading mismatches stop content comparison
+    so markers and commands are compared only between reliably aligned sections.
+    The supplied warnings list is mutated; advisory differences never fail a pair.
+    """
+    english_path = root / english
+    translated_path = root / translated
+    if not english_path.is_file():
+        return [f"{translated} has no English source pair: {english}"]
+    english_sections = sections(english_path)
+    translated_sections = sections(translated_path)
+    failures = _section_structure_failures(
+        english, translated, english_sections, translated_sections
+    )
     if failures:
         return failures
     for english_section, translated_section in zip(
@@ -285,32 +349,16 @@ def pair_failures(
             failures.append(
                 f"{location} fact markers differ: missing {dict(missing)}, extra {dict(extra)}"
             )
-        if english_section.shell_tokens != translated_section.shell_tokens:
-            index = next(
-                (
-                    i
-                    for i, (x, y) in enumerate(
-                        zip(
-                            english_section.shell_tokens,
-                            translated_section.shell_tokens,
-                        )
-                    )
-                    if x != y
-                ),
-                min(
-                    len(english_section.shell_tokens),
-                    len(translated_section.shell_tokens),
-                ),
-            )
-            expected = english_section.shell_tokens[index : index + 5]
-            actual = translated_section.shell_tokens[index : index + 5]
-            failures.append(
-                f"{location} shell examples differ near token {index + 1}: {expected!r} != {actual!r}"
-            )
+        shell_difference = _shell_difference(
+            english_section.shell_tokens, translated_section.shell_tokens
+        )
+        if shell_difference is not None:
+            failures.append(f"{location} {shell_difference}")
     return failures
 
 
 def main() -> int:
+    """Report repository drift and return a failing exit code for hard errors only."""
     parser = argparse.ArgumentParser(
         description="Check translated Markdown headings, fact markers, and shell examples."
     )
