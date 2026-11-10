@@ -3,6 +3,7 @@ from unittest.mock import patch
 import pytest
 
 from sec_review_agents.agents.patch_synthesis.agent import (
+    EMPTY_REPAIR_CORRECTION,
     run_patch_synthesis_agent,
 )
 from sec_review_agents.agents.patch_synthesis.model import PatchSynthesisOutput
@@ -77,4 +78,4 @@ async def test_run_patch_synthesis_agent_uses_fixed_response_format(
     assert len(acceptance) == 1
     assert acceptance[0].baseline_commit == "baseline"
     assert acceptance[0].workspace_snapshot_tar_path == tmp_path / "baseline.tar"
-    assert acceptance[0].require_changes
+    assert acceptance[0].empty_repair_correction == EMPTY_REPAIR_CORRECTION

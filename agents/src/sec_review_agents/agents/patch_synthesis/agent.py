@@ -28,6 +28,16 @@ from sec_review_agents.runtime.summarization_middleware import (
 )
 
 PATCH_SYNTHESIS_AGENT_NAME = "patch-synthesizer"
+# A combined delivery must commit a repair, but contradictory cases legitimately
+# yield none; the correction lets the agent fix a forgotten commit without being
+# pushed to stitch incompatible intents together.
+EMPTY_REPAIR_CORRECTION = (
+    "Your response has no committed repair. If you made changes, stage and commit "
+    "them, then return your final response again. If the cases' repair intents "
+    "contradict each other, commit nothing and return your final response again "
+    "naming the conflicting cases; this delivery will then be marked failed, which "
+    "is the correct outcome."
+)
 
 
 async def run_patch_synthesis_agent(
@@ -54,7 +64,7 @@ async def run_patch_synthesis_agent(
             worktree_path=workspace_root_path,
             baseline_commit=baseline_commit,
             workspace_snapshot_tar_path=workspace_snapshot_tar_path,
-            require_changes=True,
+            empty_repair_correction=EMPTY_REPAIR_CORRECTION,
         )
     )
     agent_middleware.append(

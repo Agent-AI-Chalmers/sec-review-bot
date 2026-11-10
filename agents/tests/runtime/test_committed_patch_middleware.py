@@ -61,13 +61,9 @@ def test_checks_committed_patch_against_original_snapshot(
     check.assert_called_once_with(tmp_path / "baseline.tar", "patch")
 
 
-@pytest.mark.parametrize("require_changes", [False, True])
-def test_empty_commit_result_depends_on_stage_policy(
-    tmp_path: Path, monkeypatch, require_changes: bool
-) -> None:
-    middleware = CommittedPatchMiddleware(
-        tmp_path, "baseline", tmp_path / "baseline.tar", require_changes=require_changes
-    )
+def _empty_commit_middleware(
+    tmp_path: Path, monkeypatch, empty_repair_correction: str | None
+) -> tuple[CommittedPatchMiddleware, Mock]:
     monkeypatch.setattr(
         "sec_review_agents.runtime.committed_patch_middleware.build_committed_patch",
         Mock(return_value=PatchArtifact(patch_diff="", file_changes=[])),
@@ -77,20 +73,52 @@ def test_empty_commit_result_depends_on_stage_policy(
         "sec_review_agents.runtime.committed_patch_middleware.check_workspace_patch_applies_to_fresh_baseline",
         check,
     )
+    middleware = CommittedPatchMiddleware(
+        tmp_path,
+        "baseline",
+        tmp_path / "baseline.tar",
+        empty_repair_correction=empty_repair_correction,
+    )
+    return middleware, check
+
+
+def test_empty_commit_is_accepted_without_a_caller_correction(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Mitigation and single-agent may legitimately conclude that nothing changes."""
+    middleware, check = _empty_commit_middleware(tmp_path, monkeypatch, None)
     state = cast(CommittedPatchState, {"messages": [], "structured_response": object()})
+
+    assert middleware.after_model(state, cast(Runtime[Any], None)) is None
+    check.assert_called_once()
+
+
+def test_empty_commit_gets_the_caller_correction_once_then_fails(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The caller owns the wording, so synthesis can allow an honest empty result.
+
+    A generic "correct the commits" message pushed synthesis to stitch
+    contradictory cases together; the middleware must relay the caller's text.
+    """
+    middleware, check = _empty_commit_middleware(
+        tmp_path, monkeypatch, "caller correction text"
+    )
+    state = cast(CommittedPatchState, {"messages": [], "structured_response": object()})
+
     correction = middleware.after_model(state, cast(Runtime[Any], None))
-    if require_changes:
-        assert correction is not None
-        assert correction["jump_to"] == "model"
-        state["committed_patch_correction_attempted"] = correction[
-            "committed_patch_correction_attempted"
-        ]
-        with pytest.raises(ValueError, match="non-empty committed repair"):
-            middleware.after_model(state, cast(Runtime[Any], None))
-        check.assert_not_called()
-    else:
-        assert correction is None
-        check.assert_called_once()
+    assert correction is not None
+    assert correction["jump_to"] == "model"
+    assert [message.content for message in correction["messages"]] == [
+        "caller correction text"
+    ]
+
+    state["committed_patch_correction_attempted"] = correction[
+        "committed_patch_correction_attempted"
+    ]
+    with pytest.raises(ValueError, match="empty"):
+        middleware.after_model(state, cast(Runtime[Any], None))
+    check.assert_not_called()
 
 
 class PatchClaimProbeOutput(BaseModel):
