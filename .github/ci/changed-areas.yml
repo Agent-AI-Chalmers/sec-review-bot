@@ -175,15 +175,24 @@ scripts:
 documentation:
   # Documentation.
   - '**/*.md'
-  # The documentation checkers.
-  - 'scripts/checks/**'
+  # Root formatting inputs outside workspace packages, plus checkers and setup.
+  - '.github/**'
+  - '.sec-review/**'
+  - 'contracts/spectral-functions/**'
+  - 'ops/**'
+  - 'scripts/**'
+  - 'system-tests/**'
+  - 'compose.yaml'
+  - 'package.json'
+  - 'pnpm-workspace.yaml'
+  - 'pnpm-lock.yaml'
+  - '.editorconfig'
+  - '.gitignore'
   - '.markdownlint-cli2.jsonc'
   - '.prettierrc.json'
   - '.prettierignore'
   - '.autocorrectrc'
   - 'lefthook.yml'
-  # CI tooling.
-  - '.github/workflows/ci.yml'
 
 catalog-seam:
   - 'package.json'
