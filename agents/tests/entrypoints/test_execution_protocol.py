@@ -42,16 +42,3 @@ def test_validate_run_id_rejects_path_like_or_noncanonical_values(
     with pytest.raises(ValueError) as error:
         execution_protocol.validate_run_id(run_id)
     assert str(error.value) == execution_protocol.RUN_ID_REQUIREMENT_MESSAGE
-
-
-def test_public_execution_workflow_allowlist() -> None:
-    assert execution_protocol.SUPPORTED_EXECUTION_WORKFLOWS == {
-        "issue-review",
-        "pull-request-review",
-        "repository-review",
-    }
-    assert execution_protocol.is_supported_workflow("issue-review") is True
-    assert (
-        execution_protocol.is_supported_workflow("issue-review-single-agent") is False
-    )
-    assert execution_protocol.is_supported_workflow("issue-review-two-stage") is False

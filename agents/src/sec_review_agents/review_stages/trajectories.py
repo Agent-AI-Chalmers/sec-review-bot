@@ -33,8 +33,24 @@ def review_trajectory_path(
     )
 
 
+def review_trajectory_outputs(
+    local_path: Path, published_path: Path | None
+) -> tuple[Path, ...]:
+    """Return a stage run's local and optional published trajectory outputs.
+
+    The writer truncates its outputs only once it starts. Remove the previous
+    published copy first so a run that fails before then does not leave the
+    previous attempt's trajectory under this run's published name.
+    """
+    if published_path is None:
+        return (local_path,)
+    published_path.unlink(missing_ok=True)
+    return (local_path, published_path)
+
+
 __all__ = [
     "TRAJECTORIES_DIRNAME",
     "review_trajectories_root",
+    "review_trajectory_outputs",
     "review_trajectory_path",
 ]

@@ -5,7 +5,7 @@ import { Pool, type PoolClient } from 'pg'
 import type { Database } from '../database/database.js'
 
 import type { PreparationWork as ContractPreparationWork } from '../contract-types-generated.js'
-import type { ReviewRunWorkflow as WorkflowName } from '../contracts.js'
+import type { ReviewRunWorkflow } from '../contracts.js'
 import { transaction } from '../database/transaction.js'
 import { SUBMISSION_STATE_UNCERTAIN } from '../errors.js'
 import { appendEvent } from './review-run-events.js'
@@ -85,7 +85,7 @@ export class PreparationStore {
       // deliberately not part of `PreparationWork`, which is the connector-facing message.
       const candidate = await client.query<{
         run_id: string
-        workflow: WorkflowName
+        workflow: ReviewRunWorkflow
         input_version: string
         input: JsonObject
         attempt_count: number

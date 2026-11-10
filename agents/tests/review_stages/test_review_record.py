@@ -6,14 +6,12 @@ from sec_review_agents.review_stages.cvss.result import build_cvss_v4_stage_resu
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.record import ReviewRecord, build_review_record
 from sec_review_agents.review_stages.single_agent.result import SingleAgentFixOutcome
-from sec_review_agents.review_stages.verification.result import (
-    build_skipped_verification_result,
-)
 from sec_review_agents.workflows.issue.single_agent import (
     build_issue_single_agent_review_record,
 )
 from tests.analysis_fixtures import analysis_fixture
 from tests.contract_fixtures import contract_validator
+from tests.verification_fixtures import skipped_verification_fixture
 
 
 def test_review_record_builder_retains_model() -> None:
@@ -331,7 +329,7 @@ async def test_stage_models_project_to_record_without_losing_nested_narratives()
         file_changes=[{"path": "app.py", "status": "deleted"}],
         patch_diff="reference patch",
     )
-    verification = build_skipped_verification_result(reason="Not requested")
+    verification = skipped_verification_fixture(reason="Not requested")
     cvss = build_cvss_v4_stage_result(
         outcome="not-scored",
         overview="Needs impact evidence",

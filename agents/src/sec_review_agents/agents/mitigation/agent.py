@@ -113,5 +113,4 @@ async def run_mitigation_agent(
             trajectory_paths=trajectory_paths,
         )
 
-        # These stage callers still consume the existing dictionary contract.
         return result

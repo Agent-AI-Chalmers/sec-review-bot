@@ -7,9 +7,6 @@ from sec_review_agents.execution_archives.publication import (
     ExecutionArchivePublicationRequest,
 )
 from sec_review_agents.review_stages.record import ReviewRecord
-from sec_review_agents.review_stages.verification.result import (
-    build_skipped_verification_result,
-)
 from sec_review_agents.workflows.issue import single_agent as single_agent_workflow
 from sec_review_agents.workflows.issue import two_stage as two_stage_workflow
 from sec_review_agents.workflows.issue import workflow as issue_workflow
@@ -25,6 +22,7 @@ from tests.prepared_input_fixtures import (
     prepared_pull_request_input,
     prepared_repository_input,
 )
+from tests.verification_fixtures import skipped_verification_fixture
 
 
 def _finalized(*unit_ids: str) -> dict[str, object]:
@@ -139,7 +137,7 @@ async def test_single_review_publishes_before_scheduling_memory(
             publications.append(activity_args[0])
             return _finalized("review")
         if activity_fn.__name__.startswith("verify_"):
-            return build_skipped_verification_result(reason="Test verification skipped")
+            return skipped_verification_fixture(reason="Test verification skipped")
         return {}
 
     async def fake_schedule(**kwargs):
@@ -204,7 +202,7 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
             publications.append(activity_args[0])
             return _finalized("case-a", "case-b")
         if activity_fn.__name__.startswith("verify_"):
-            return build_skipped_verification_result(reason="Test verification skipped")
+            return skipped_verification_fixture(reason="Test verification skipped")
         return {}
 
     async def fake_execute_child_workflow(*_args, **_kwargs):
@@ -263,7 +261,7 @@ async def test_repository_without_cases_still_publishes_execution_archive(
             publications.append(activity_args[0])
             return _finalized()
         if activity_fn.__name__.startswith("verify_"):
-            return build_skipped_verification_result(reason="Test verification skipped")
+            return skipped_verification_fixture(reason="Test verification skipped")
         return {}
 
     async def fake_execute_child_workflow(*_args, **_kwargs):
@@ -308,7 +306,7 @@ async def test_disabling_memory_does_not_skip_review_publication(monkeypatch) ->
             events.append("publish")
             return _finalized("review")
         if activity_fn.__name__.startswith("verify_"):
-            return build_skipped_verification_result(reason="Test verification skipped")
+            return skipped_verification_fixture(reason="Test verification skipped")
         return {}
 
     async def fake_schedule(**kwargs):
@@ -347,7 +345,7 @@ async def test_publication_failure_fails_review_before_memory_scheduling(
         if activity_fn is issue_workflow.publish_execution_archive_activity:
             raise RuntimeError("storage unavailable")
         if activity_fn.__name__.startswith("verify_"):
-            return build_skipped_verification_result(reason="Test verification skipped")
+            return skipped_verification_fixture(reason="Test verification skipped")
         return {}
 
     async def unexpected_schedule(**_kwargs):

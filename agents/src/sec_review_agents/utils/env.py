@@ -144,26 +144,8 @@ def int_env(
     return value
 
 
-def float_env(
-    name: str,
-    default: float,
-    *,
-    minimum: float | None = None,
-    maximum: float | None = None,
-) -> float:
-    """Read a finite float environment variable and validate its range."""
-    raw_value = os.environ.get(name)
-    if raw_value is None:
-        return default
-
-    try:
-        value = float(raw_value.strip())
-    except ValueError as error:
-        raise ValueError(f"{name} must be a number.") from error
-    if not (float("-inf") < value < float("inf")):
-        raise ValueError(f"{name} must be finite.")
-    if minimum is not None and value < minimum:
-        raise ValueError(f"{name} must be at least {minimum}.")
-    if maximum is not None and value > maximum:
-        raise ValueError(f"{name} must be at most {maximum}.")
-    return value
+def bounded_concurrency(item_count: int, env_name: str, default: int) -> int:
+    """Cap a configured worker limit by the number of items, never below 1."""
+    if item_count <= 0:
+        return 1
+    return min(item_count, int_env(env_name, default, minimum=1))

@@ -1,9 +1,9 @@
 import pytest
 
-from sec_review_agents.mcp.resolver import resolve_agent_mcp_connection_factories
+from sec_review_agents.mcp.resolver import resolve_agent_mcp_connections
 
 
-def test_mcp_connection_factories_resolve_declared_codegraph_tool(monkeypatch) -> None:
+def test_mcp_connections_resolve_declared_codegraph_tool(monkeypatch) -> None:
     monkeypatch.setenv("AGENT_MCP_ENABLED", "true")
     backend = object()
     calls = []
@@ -17,14 +17,13 @@ def test_mcp_connection_factories_resolve_declared_codegraph_tool(monkeypatch) -
         fake_codegraph_connections,
     )
 
-    factories = resolve_agent_mcp_connection_factories(("codegraph",), backend)
+    connections = resolve_agent_mcp_connections(("codegraph",), backend)
 
-    assert len(factories) == 1
-    assert factories[0]() == {"codegraph": {"transport": "stdio"}}
+    assert connections == {"codegraph": {"transport": "stdio"}}
     assert calls == [backend]
 
 
-def test_mcp_connection_factories_resolve_declared_playwright_tool(
+def test_mcp_connections_resolve_declared_playwright_tool(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("AGENT_MCP_ENABLED", "true")
@@ -40,30 +39,29 @@ def test_mcp_connection_factories_resolve_declared_playwright_tool(
         fake_playwright_connections,
     )
 
-    factories = resolve_agent_mcp_connection_factories(("playwright",), backend)
+    connections = resolve_agent_mcp_connections(("playwright",), backend)
 
-    assert len(factories) == 1
-    assert factories[0]() == {"playwright": {"transport": "stdio"}}
+    assert connections == {"playwright": {"transport": "stdio"}}
     assert calls == [backend]
 
 
-def test_mcp_connection_factories_reject_unknown_tool() -> None:
+def test_mcp_connections_reject_unknown_tool() -> None:
     with pytest.raises(ValueError, match="Unknown agent MCP tool: osv"):
-        resolve_agent_mcp_connection_factories(("osv",), object())
+        resolve_agent_mcp_connections(("osv",), object())
 
 
-def test_mcp_connection_factories_global_disable_skips_resolution(monkeypatch) -> None:
+def test_mcp_connections_global_disable_skips_resolution(monkeypatch) -> None:
     monkeypatch.setenv("AGENT_MCP_ENABLED", "false")
 
-    factories = resolve_agent_mcp_connection_factories(("codegraph",), object())
+    connections = resolve_agent_mcp_connections(("codegraph",), object())
 
-    assert factories == []
+    assert connections == {}
 
 
-def test_mcp_connection_factories_global_disable_still_rejects_unknown_tool(
+def test_mcp_connections_global_disable_still_rejects_unknown_tool(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("AGENT_MCP_ENABLED", "false")
 
     with pytest.raises(ValueError, match="Unknown agent MCP tool: osv"):
-        resolve_agent_mcp_connection_factories(("osv", "codegraph"), object())
+        resolve_agent_mcp_connections(("osv", "codegraph"), object())

@@ -67,17 +67,6 @@ export interface PullRequestFile {
   patch?: string | null
 }
 
-export interface PullRequestFileSummary {
-  filename: string
-  status: string
-  additions: number
-  deletions: number
-  changes: number
-  blob_url: string | null
-  raw_url: string | null
-  patch: string | null
-}
-
 interface LinkedIssueRef {
   event: 'cross-referenced'
   issue_number: number
@@ -274,29 +263,6 @@ export async function listPullRequestFiles(
   return files
 }
 
-export async function listFilesChangedBetweenCommits(
-  octokit: Octokit,
-  {
-    owner_login,
-    repo_name,
-    previous_head_sha,
-    current_head_sha
-  }: {
-    owner_login: string
-    repo_name: string
-    previous_head_sha: string
-    current_head_sha: string
-  }
-): Promise<PullRequestFile[]> {
-  const response = await octokit.rest.repos.compareCommitsWithBasehead({
-    owner: owner_login,
-    repo: repo_name,
-    basehead: `${previous_head_sha}...${current_head_sha}`
-  })
-
-  return response.data.files ?? []
-}
-
 /**
  * Compare two commits and report whether the base is an ancestor of the head.
  *
@@ -332,21 +298,6 @@ export async function compareCommitsBetween(
     // which is exactly "the head does not contain the base".
     previous_head_is_ancestor: (response.data.behind_by ?? 0) === 0
   }
-}
-
-export function summarizePullRequestFiles(
-  files: PullRequestFile[]
-): PullRequestFileSummary[] {
-  return files.map((file) => ({
-    filename: file.filename,
-    status: file.status,
-    additions: file.additions,
-    deletions: file.deletions,
-    changes: file.changes,
-    blob_url: file.blob_url ?? null,
-    raw_url: file.raw_url ?? null,
-    patch: file.patch ?? null
-  }))
 }
 
 function isSameRepositoryIssueSource(

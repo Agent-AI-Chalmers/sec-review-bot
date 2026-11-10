@@ -9,22 +9,13 @@ from sec_review_agents.delivery_stages.model import (
     DeliveryCaseInput,
     DeliveryEntry,
 )
-from sec_review_agents.utils.env import int_env
+from sec_review_agents.utils.env import bounded_concurrency
 from sec_review_agents.utils.files import persist_json_artifact
 from sec_review_agents.workspace.file_changes import (
     FileChange,
 )
 
 DELIVERY_PATCH_MAX_CONCURRENCY = 4
-
-
-def resolve_delivery_patch_max_concurrency(delivery_count: int) -> int:
-    if delivery_count <= 0:
-        return 1
-    configured = int_env("REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY", None, minimum=1)
-    if configured is not None:
-        return min(delivery_count, configured)
-    return min(delivery_count, DELIVERY_PATCH_MAX_CONCURRENCY)
 
 
 class DeliveryPatchCase(BaseModel):
@@ -105,8 +96,10 @@ def build_delivery_execution_input(
     return DeliveryExecutionInput(
         run_artifacts_root_path=str(run_artifacts_root),
         workspace_snapshot_tar_path=str(workspace_snapshot_tar_path),
-        max_concurrency=resolve_delivery_patch_max_concurrency(
-            len(combined_delivery_execution_items)
+        max_concurrency=bounded_concurrency(
+            len(combined_delivery_execution_items),
+            "REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY",
+            DELIVERY_PATCH_MAX_CONCURRENCY,
         ),
         deliveries=delivery_items,
         keep_case_ids=[item.case_id for item in keep_case_results],
@@ -151,5 +144,4 @@ def persist_delivery_execution_input(
 __all__ = [
     "build_delivery_execution_input",
     "persist_delivery_execution_input",
-    "resolve_delivery_patch_max_concurrency",
 ]

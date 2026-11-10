@@ -18,7 +18,6 @@ from sec_review_agents.runtime.memory_middleware import MemoryMiddleware
 from sec_review_agents.runtime.project_instructions_middleware import (
     REPOSITORY_INSTRUCTIONS_MAX_CHARS,
     REPOSITORY_INSTRUCTIONS_MAX_LINES,
-    REPOSITORY_INSTRUCTIONS_SYSTEM_PROMPT,
     ProjectInstructionsMiddleware,
 )
 from tests.runtime.fake_chat_models import ToolCallingFakeMessagesListChatModel
@@ -50,8 +49,9 @@ async def test_guidance_is_loaded_without_tool_calls_and_refreshed_on_resume(
     instructions = tmp_path / "AGENTS.md"
     instructions.write_text("Use the public API tests.\n<!-- maintainer note -->\n")
     model = RecordingModel(responses=[AIMessage(content="done")])
+    instructions_middleware = ProjectInstructionsMiddleware(backend=backend)
     middleware: list[AgentMiddleware[Any, Any, Any]] = [
-        ProjectInstructionsMiddleware(backend=backend),
+        instructions_middleware,
         MemoryMiddleware(),
     ]
     agent = create_agent(
@@ -85,7 +85,7 @@ async def test_guidance_is_loaded_without_tool_calls_and_refreshed_on_resume(
         assert texts[:2] == ["Stage role.", "Evidence contract."]
         if content is not None:
             assert isinstance(texts[2], str)
-            assert REPOSITORY_INSTRUCTIONS_SYSTEM_PROMPT in texts[2]
+            assert instructions_middleware.instructions_prompt in texts[2]
             assert content in texts[2]
             assert "maintainer note" not in texts[2]
             assert len(texts) == 4  # Repository guidance precedes experience memory.

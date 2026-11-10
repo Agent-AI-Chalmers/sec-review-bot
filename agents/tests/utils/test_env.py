@@ -4,7 +4,12 @@ from unittest.mock import patch
 
 import pytest
 
-from sec_review_agents.utils.env import bool_env, float_env, int_env, load_dotenv_file
+from sec_review_agents.utils.env import (
+    bool_env,
+    bounded_concurrency,
+    int_env,
+    load_dotenv_file,
+)
 
 
 @pytest.mark.parametrize("value", ["1", "true", "YES", " on "])
@@ -56,35 +61,26 @@ def test_int_env_uses_default_only_when_unset(monkeypatch) -> None:
     assert int_env("TEST_INT", 7, minimum=1) == 7
 
 
-@pytest.mark.parametrize("value", ["", "many"])
-def test_float_env_rejects_non_numeric_values(monkeypatch, value: str) -> None:
-    monkeypatch.setenv("TEST_FLOAT", value)
+@pytest.mark.parametrize(
+    ("item_count", "configured", "expected"),
+    [(0, None, 1), (-1, "8", 1), (3, None, 3), (10, None, 4), (10, "2", 2)],
+)
+def test_bounded_concurrency_caps_configured_limit_by_item_count(
+    monkeypatch, item_count: int, configured: str | None, expected: int
+) -> None:
+    if configured is None:
+        monkeypatch.delenv("TEST_CONCURRENCY", raising=False)
+    else:
+        monkeypatch.setenv("TEST_CONCURRENCY", configured)
 
-    with pytest.raises(ValueError, match="TEST_FLOAT must be a number"):
-        float_env("TEST_FLOAT", 1.5)
-
-
-@pytest.mark.parametrize("value", ["nan", "inf", "-inf"])
-def test_float_env_rejects_non_finite_values(monkeypatch, value: str) -> None:
-    monkeypatch.setenv("TEST_FLOAT", value)
-
-    with pytest.raises(ValueError, match="TEST_FLOAT must be finite"):
-        float_env("TEST_FLOAT", 1.5)
-
-
-def test_float_env_validates_inclusive_range(monkeypatch) -> None:
-    monkeypatch.setenv("TEST_FLOAT", "0")
-    assert float_env("TEST_FLOAT", 1.5, minimum=0.0, maximum=2.0) == 0.0
-
-    monkeypatch.setenv("TEST_FLOAT", "2.1")
-    with pytest.raises(ValueError, match="TEST_FLOAT must be at most 2.0"):
-        float_env("TEST_FLOAT", 1.5, minimum=0.0, maximum=2.0)
+    assert bounded_concurrency(item_count, "TEST_CONCURRENCY", 4) == expected
 
 
-def test_float_env_uses_default_only_when_unset(monkeypatch) -> None:
-    monkeypatch.delenv("TEST_FLOAT", raising=False)
+def test_bounded_concurrency_rejects_non_positive_configuration(monkeypatch) -> None:
+    monkeypatch.setenv("TEST_CONCURRENCY", "0")
 
-    assert float_env("TEST_FLOAT", 1.5, minimum=0.0) == 1.5
+    with pytest.raises(ValueError, match="TEST_CONCURRENCY must be at least 1"):
+        bounded_concurrency(3, "TEST_CONCURRENCY", 4)
 
 
 def test_model_providers_config_path_from_dotenv_is_relative_to_dotenv_dir(

@@ -3,7 +3,7 @@
 import type { Pool } from 'pg'
 import type { Database } from '../database/database.js'
 
-import type { ReviewRunWorkflow as WorkflowName } from '../contracts.js'
+import type { ReviewRunWorkflow } from '../contracts.js'
 import type {
   ExecutionStatisticsSummary,
   ExecutionStatus,
@@ -97,7 +97,7 @@ export interface ListRunsOptions {
   publication_status?: PublicationStatus
   preparation_status?: PreparationStatus
   source_platform?: ReviewRunRecord['source_platform']
-  workflow?: WorkflowName
+  workflow?: ReviewRunWorkflow
   from?: string
   to?: string
 }

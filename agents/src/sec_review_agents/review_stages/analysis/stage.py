@@ -15,12 +15,16 @@ from sec_review_agents.memory.runtime_view import materialized_memory_view
 from sec_review_agents.review_stages.analysis.result import (
     AnalysisStageResult,
 )
+from sec_review_agents.review_stages.trajectories import review_trajectory_outputs
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
     record_bootstrap_result,
 )
-from sec_review_agents.runtime.trajectories import remove_trajectories, trajectory_path
+from sec_review_agents.runtime.trajectories import (
+    remove_trajectories,
+    trajectory_path,
+)
 from sec_review_agents.utils.files import (
     persist_json_artifact,
     remove_json_artifacts,
@@ -56,9 +60,8 @@ async def run_analysis_stage(
             tar_path=workspace_snapshot_tar_path,
             destination_path=workspace_path,
         )
-        trajectory_paths = prepare_analysis_trajectory(
-            analyzer_artifacts_path=analyzer_artifacts_path,
-            published_trajectory_path=published_trajectory_path,
+        trajectory_paths = review_trajectory_outputs(
+            trajectory_path(analyzer_artifacts_path), published_trajectory_path
         )
         config = build_backend_config(workspace_path)
         workspace_root = config.get("working_directory", "/workspace")
@@ -102,23 +105,6 @@ async def run_analysis_stage(
 def reset_analysis_artifacts(*, analyzer_artifacts_path: Path) -> None:
     remove_json_artifacts(analyzer_artifacts_path, ("analysis-result",))
     remove_trajectories((trajectory_path(analyzer_artifacts_path),))
-
-
-def prepare_analysis_trajectory(
-    *,
-    analyzer_artifacts_path: Path,
-    published_trajectory_path: Path | None,
-) -> tuple[Path, ...]:
-    """Return local and optional published outputs for this analysis.
-
-    Remove any old published copy; the runtime writer initializes the returned files.
-    """
-    local_trajectory_path = trajectory_path(analyzer_artifacts_path)
-    if published_trajectory_path is None:
-        return (local_trajectory_path,)
-
-    published_trajectory_path.unlink(missing_ok=True)
-    return (local_trajectory_path, published_trajectory_path)
 
 
 # Result persistence

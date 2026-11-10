@@ -1,14 +1,12 @@
-"""Define the Execution protocol: workflow support, run ID validation, and errors."""
+"""Define the Execution protocol: run ID validation and errors."""
 
 from typing import Any
 
-from sec_review_agents.entrypoints.execution_api_schema import INPUT_SCHEMA_BY_WORKFLOW
 from sec_review_agents.entrypoints.execution_workflow import (
     RUN_ID_PATTERN,
     RUN_ID_PATTERN_TEXT,
 )
 
-SUPPORTED_EXECUTION_WORKFLOWS = frozenset(INPUT_SCHEMA_BY_WORKFLOW)
 RUN_ID_REQUIREMENT_MESSAGE = f"Execution run_id must match {RUN_ID_PATTERN_TEXT}."
 
 # The caller sent a request that the Execution Worker cannot validate or prepare.
@@ -42,16 +40,10 @@ def validate_run_id(value: object) -> str:
     return value
 
 
-def is_supported_workflow(workflow: str) -> bool:
-    return workflow in SUPPORTED_EXECUTION_WORKFLOWS
-
-
 __all__ = [
     "EXECUTION_REQUEST_INVALID",
     "EXECUTION_WORKFLOW_UNSUPPORTED",
     "RUN_ID_REQUIREMENT_MESSAGE",
-    "SUPPORTED_EXECUTION_WORKFLOWS",
     "build_execution_error",
-    "is_supported_workflow",
     "validate_run_id",
 ]

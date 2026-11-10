@@ -5,10 +5,7 @@
  * execute the run. Review Runs only admits a validated request, persists its
  * coordination identity, and coordinates execution by reference.
  */
-import type {
-  CreateRunOptions,
-  ExecutionArtifactStorage as ContractExecutionArtifactStorage
-} from './execution-api-schema.js'
+import type { CreateRunOptions } from './execution-api-schema.js'
 
 /**
  * The workflows this service accepts.
@@ -25,4 +22,4 @@ export type ReviewRunWorkflow = CreateRunOptions['path']['workflow']
  * The hand-maintained Execution API contract owns this shape;
  * `execution-api-schema.ts` is its generated local projection.
  */
-export type ExecutionArtifactStorage = ContractExecutionArtifactStorage
+export type { ExecutionArtifactStorage } from './execution-api-schema.js'

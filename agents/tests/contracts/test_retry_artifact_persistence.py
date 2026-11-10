@@ -12,9 +12,6 @@ from sec_review_agents.review_stages.mitigation.stage import (
     persist_mitigation_result,
     reset_mitigation_attempt_artifacts,
 )
-from sec_review_agents.review_stages.verification.result import (
-    build_skipped_verification_result,
-)
 from sec_review_agents.review_stages.verification.stage import (
     persist_verification_result,
     reset_verification_attempt_artifacts,
@@ -26,6 +23,7 @@ from sec_review_agents.workspace.snapshots import (
     WORKSPACE_SNAPSHOT_TAR_NAME,
     create_workspace_snapshot_tar,
 )
+from tests.verification_fixtures import skipped_verification_fixture
 
 
 def test_mitigation_trajectories_are_scoped_by_business_attempt(
@@ -123,7 +121,7 @@ def test_verification_persists_latest_and_attempt_specific_files(
     tmp_path: Path,
 ) -> None:
     root = tmp_path
-    result = build_skipped_verification_result(reason="verified")
+    result = skipped_verification_fixture(reason="verified")
 
     persist_verification_result(root, result, attempt_label="retry-1")
 

@@ -39,7 +39,7 @@ class StructuredRenderSchema:
     field_order: Mapping[str, int] = field(default_factory=dict)
 
 
-StructuredRenderProfile = Literal["prompt", "preview", "public_report"]
+StructuredRenderProfile = Literal["prompt", "preview"]
 
 
 DEFAULT_STRUCTURED_RENDER_SCHEMA = StructuredRenderSchema()
@@ -78,18 +78,6 @@ PROMPT_STRUCTURED_RENDER_SCHEMA = StructuredRenderSchema(
         "residual_risks": 90,
     },
 )
-PREVIEW_STRUCTURED_RENDER_SCHEMA = DEFAULT_STRUCTURED_RENDER_SCHEMA
-PUBLIC_REPORT_STRUCTURED_RENDER_SCHEMA = DEFAULT_STRUCTURED_RENDER_SCHEMA
-
-_SCHEMA_BY_PROFILE: Mapping[StructuredRenderProfile, StructuredRenderSchema] = {
-    "prompt": PROMPT_STRUCTURED_RENDER_SCHEMA,
-    "preview": PREVIEW_STRUCTURED_RENDER_SCHEMA,
-    "public_report": PUBLIC_REPORT_STRUCTURED_RENDER_SCHEMA,
-}
-
-
-def schema_for_profile(profile: StructuredRenderProfile) -> StructuredRenderSchema:
-    return _SCHEMA_BY_PROFILE[profile]
 
 
 def _humanize_key(key: Any, schema: StructuredRenderSchema) -> str:
@@ -251,7 +239,11 @@ def render_structured_markdown(
     """
     if max_depth < 0:
         return []
-    schema = schema or schema_for_profile(profile)
+    schema = schema or (
+        PROMPT_STRUCTURED_RENDER_SCHEMA
+        if profile == "prompt"
+        else DEFAULT_STRUCTURED_RENDER_SCHEMA
+    )
     lines: list[str] = []
     prefix = "  " * indent
     mapping = {str(key): item for key, item in value.items()}
