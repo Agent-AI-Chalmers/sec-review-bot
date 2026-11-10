@@ -7,7 +7,7 @@ description: "Use for web security at browser and HTTP boundaries: authenticatio
 
 Use this skill as a compact reference pack for web application security review. It helps identify source/sink shapes, relevant guards, report conditions, and common false positives.
 
-Do not use this skill as a general web security checklist or as proof that a vulnerability exists. The analyzer must still establish attacker influence, sink reachability, control coverage, control limits, and concrete security impact from repository evidence.
+Do not use this skill as a general web security checklist or as proof that a vulnerability exists. The review must still establish attacker influence, sink reachability, control coverage, control limits, and concrete security impact from repository evidence.
 
 ## Route
 
