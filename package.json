@@ -23,7 +23,7 @@
     "format:root:check": "git ls-files -z | xargs -0 prettier --check --ignore-unknown",
     "lint:zh": "git ls-files -z \"*.zh.md\" | xargs -0 autocorrect --lint",
     "lint:zh:fix": "git ls-files -z \"*.zh.md\" | xargs -0 autocorrect --fix",
-    "prepare": "lefthook install"
+    "prepare": "lefthook install || true"
   },
   "devDependencies": {
     "autocorrect-node": "2.14.0",

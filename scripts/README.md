@@ -39,7 +39,7 @@ Repository-level files outside workspace packages are formatted by the root `.pr
 
 Chinese documentation spacing and punctuation are checked by AutoCorrect, configured in the root `.autocorrectrc`. Run `pnpm run lint:zh` from the repository root.
 
-`pnpm install` at the repository root installs a pre-commit hook from `lefthook.yml` that runs these three tools on staged files.
+`pnpm install` at the repository root attempts to install a pre-commit hook from `lefthook.yml` that runs these three tools on staged files. Hook installation failures do not block dependency installation, including in Docker builds and source archives without `.git`. CI runs the checks independently.
 
 `translated_doc_headings.py` scans all tracked `*.zh.md` files and finds the matching English `.md` source. It checks heading levels and numbered section markers, then compares `doc-default` / `doc-time-sensitive` marker contents and counts and shell command examples within corresponding sections. Shell comments, blank lines, continuation wrapping, and code-block splitting may differ. Prose and non-shell examples may be localized; their semantic equivalence still requires review. It also reports possible omissions by comparing paragraph, list-item, table-row, blockquote-paragraph, and non-shell example counts per section. These counts are advisory: translation may legitimately merge or split blocks; they do not affect the exit code.
 

@@ -39,7 +39,7 @@ Markdown 格式由 markdownlint 检查，配置在仓库根目录的 `.markdownl
 
 中文文档的中英文间距和标点由 AutoCorrect 检查，配置在仓库根目录的 `.autocorrectrc`。在仓库根目录运行 `pnpm run lint:zh`。
 
-在仓库根目录执行 `pnpm install` 会根据 `lefthook.yml` 安装 pre-commit hook，对暂存文件运行以上三个工具。
+在仓库根目录执行 `pnpm install` 会尝试根据 `lefthook.yml` 安装 pre-commit hook，对暂存文件运行以上三个工具。Hook 安装失败不会阻断依赖安装，包括没有 `.git` 的 Docker 构建和源码归档环境。CI 会独立运行这些检查。
 
 `translated_doc_headings.py` 扫描所有已跟踪的 `*.zh.md` 文件并找到对应的英文 `.md` 源文件。它检查标题层级和章节编号，并在对应章节内比较 `doc-default` / `doc-time-sensitive` 标记的内容、出现次数和 shell 命令示例。shell 注释、空行、续行排版和代码块拆分可以不同。正文和非 shell 示例可以翻译，其语义是否一致仍需审阅。另按对应章节比较段落、列表项、表格行、引用段落和非 shell 示例的数量，提示可能的遗漏。数量差异仅供核对：翻译可以合理合并或拆分内容块，不影响退出码。
 
