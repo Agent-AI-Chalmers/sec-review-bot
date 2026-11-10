@@ -44,10 +44,10 @@ Do not enter this workflow when:
 
 - A CWE label is optional, not mandatory.
 - Only assign a CWE when the fit is natural and evidence-supported.
-- If assigned, include:
+- If assigned, fill `cwe_mapping` with:
   - `cwe_id`
   - `cwe_name`
-  - a short rationale explaining why the label fits this finding
+  - `cwe_rationale`: a short rationale explaining why the label fits this finding
 
 ## Guardrails
 
