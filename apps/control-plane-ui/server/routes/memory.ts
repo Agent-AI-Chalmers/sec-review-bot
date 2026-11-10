@@ -10,6 +10,8 @@ import { createMemoryArtifactRoutes } from './memory-artifacts.js'
 function memoryCatalogPath(bffUrl: string): string | null {
   const url = new URL(bffUrl, 'http://control-plane-ui.local')
   const path = url.pathname
+  if (path === '/api/memory/tree/automation')
+    return `/v1/memory-tree/automation${url.search}`
   if (path === '/api/memory/tree') return `/v1/memory-tree${url.search}`
   if (
     path === '/api/memory/revisions' ||
@@ -20,7 +22,6 @@ function memoryCatalogPath(bffUrl: string): string | null {
     path === '/api/memory/overview' ||
     path === '/api/memory/extractions' ||
     path === '/api/memory/observations' ||
-    path === '/api/memory/maintenance-control' ||
     /^\/api\/memory\/extractions\/[A-Za-z0-9._:-]+$/.test(path)
   if (!allowed) return null
   return `/v1${path.slice('/api/memory'.length)}${url.search}`

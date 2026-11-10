@@ -4,8 +4,11 @@ import test from 'node:test'
 
 import { Pool } from 'pg'
 
+import { PostgresMemoryCatalogQueries } from '../../src/catalog-queries.js'
+
 import {
   ExtractionConflictError,
+  AutomationPausedError,
   MemoryTreeRevisionConflictError,
   PostgresMemoryCatalogStore,
 } from '../../src/catalog-store.js'
@@ -95,9 +98,9 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
       extraction.extraction_id,
     )
 
-    const maintenanceInput = await store.getMaintenanceInput(10)
-    assert.equal(maintenanceInput?.expected_active_revision, 0)
-    assert.deepEqual(maintenanceInput?.observations, [
+    const learningInput = await store.getLearningInput(10)
+    assert.equal(learningInput?.expected_active_revision, 0)
+    assert.deepEqual(learningInput?.observations, [
       {
         extraction_id: extraction.extraction_id,
         body_markdown: observationBody,
@@ -108,8 +111,8 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
       expected_active_revision: 0,
       memory_tree_reference: artifact('trees/memory-tree.v1.tar.zst', 'a'),
       source: {
-        kind: 'maintenance' as const,
-        maintenance_id: 'maintenance-1',
+        kind: 'learning' as const,
+        operation_id: 'maintenance-1',
         extraction_ids: [extraction.extraction_id],
         trajectory_reference: artifact(
           'trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
@@ -122,12 +125,12 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
     assert.deepEqual(await store.createMemoryTreeRevision(revisionInput), {
       created: true,
       revision: 1,
-      source: { kind: 'maintenance', maintenance_id: 'maintenance-1' },
+      source: { kind: 'learning', operation_id: 'maintenance-1' },
     })
     assert.deepEqual(await store.createMemoryTreeRevision(revisionInput), {
       created: false,
       revision: 1,
-      source: { kind: 'maintenance', maintenance_id: 'maintenance-1' },
+      source: { kind: 'learning', operation_id: 'maintenance-1' },
     })
 
     assert.equal((await store.queries.getObservationBacklog()).pending_count, 0)
@@ -164,12 +167,168 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
           'e',
         ),
         source: {
-          kind: 'operator',
+          kind: 'manual',
           operation_id: 'operator-1',
           actor: { kind: 'user', id: 'reviewer@example.com' },
         },
       }),
       MemoryTreeRevisionConflictError,
+    )
+
+    const reorganizationInput = {
+      expected_active_revision: 1,
+      memory_tree_reference: artifact(
+        'trees/reorganized-memory-tree.tar.zst',
+        'f',
+      ),
+      source: {
+        kind: 'reorganization' as const,
+        operation_id: 'reorganization-1',
+        trajectory_reference: artifact(
+          'trajectories/memory-maintainer/reorganization.v1.jsonl.zst',
+          'e',
+        ),
+      },
+    }
+    for (const source of [
+      {
+        ...reorganizationInput.source,
+        operation_id: revisionInput.source.operation_id,
+      },
+      {
+        kind: 'manual' as const,
+        operation_id: revisionInput.source.operation_id,
+        actor: { kind: 'user' as const, id: 'reviewer@example.com' },
+      },
+    ]) {
+      const conflictingInput = { ...reorganizationInput, source }
+      await store.reserveRevisionPublication(conflictingInput)
+      await store.confirmRevisionPublication(conflictingInput)
+      await assert.rejects(
+        store.createMemoryTreeRevision(conflictingInput),
+        MemoryTreeRevisionConflictError,
+      )
+    }
+    assert.equal((await store.queries.getMemoryTree()).revision, 1)
+
+    await store.reserveRevisionPublication(reorganizationInput)
+    await store.confirmRevisionPublication(reorganizationInput)
+    assert.deepEqual(
+      await store.createMemoryTreeRevision(reorganizationInput),
+      {
+        created: true,
+        revision: 2,
+        source: { kind: 'reorganization', operation_id: 'reorganization-1' },
+      },
+    )
+    assert.deepEqual(
+      await store.createMemoryTreeRevision(reorganizationInput),
+      {
+        created: false,
+        revision: 2,
+        source: { kind: 'reorganization', operation_id: 'reorganization-1' },
+      },
+    )
+    const queries = new PostgresMemoryCatalogQueries(pool)
+    const revision = await queries.getMemoryTreeRevision(2)
+    assert.deepEqual(revision?.source, reorganizationInput.source)
+    const reorganizationHistory = await queries.listMemoryTreeRevisions(
+      undefined,
+      10,
+    )
+    assert.deepEqual(reorganizationHistory.revisions[0], revision)
+
+    const actor = { kind: 'user' as const, id: 'reviewer@example.com' }
+    const pause = {
+      operation_id: 'pause-automation',
+      expected_generation: 0,
+      actor,
+    }
+    const paused = await store.changeMemoryTreeAutomation('paused', pause)
+    assert.equal(paused.automation.state, 'paused')
+    assert.equal(
+      (await store.createMemoryTreeRevision(revisionInput)).created,
+      false,
+    )
+    assert.equal(
+      (await store.createMemoryTreeRevision(reorganizationInput)).created,
+      false,
+    )
+
+    const pendingExtraction = {
+      ...extraction,
+      extraction_id: 'extraction-while-paused',
+    }
+    const pendingPublication = {
+      registration: pendingExtraction,
+      summary: 'Observation while paused.',
+    }
+    await store.reserveExtractionPublication(pendingPublication)
+    await store.confirmExtractionPublication(pendingPublication)
+    assert.equal(await store.registerExtraction(pendingExtraction), true)
+    for (const source of [
+      {
+        ...revisionInput.source,
+        operation_id: 'paused-learning',
+        extraction_ids: [pendingExtraction.extraction_id],
+      },
+      { ...reorganizationInput.source, operation_id: 'paused-reorganization' },
+    ]) {
+      const candidate = {
+        ...reorganizationInput,
+        expected_active_revision: 2,
+        source,
+      }
+      await store.reserveRevisionPublication(candidate)
+      await store.confirmRevisionPublication(candidate)
+      await assert.rejects(
+        store.createMemoryTreeRevision(candidate),
+        AutomationPausedError,
+      )
+      assert.equal(
+        (
+          await store.listRevisionPublications(source.kind, source.operation_id)
+        )[0]?.status,
+        'abandoned',
+      )
+    }
+    const manual = {
+      expected_active_revision: 2,
+      memory_tree_reference: artifact('trees/manual-while-paused.tar.zst', 'c'),
+      source: {
+        kind: 'manual' as const,
+        operation_id: 'manual-while-paused',
+        actor,
+      },
+    }
+    await store.reserveRevisionPublication(manual)
+    await store.confirmRevisionPublication(manual)
+    assert.equal((await store.createMemoryTreeRevision(manual)).revision, 3)
+    assert.equal((await store.queries.getObservationBacklog()).pending_count, 1)
+    assert.equal(
+      (
+        await store.restoreMemoryTree({
+          operation_id: 'restore-while-paused',
+          expected_active_revision: 3,
+          restored_revision: 1,
+          actor,
+        })
+      ).active_revision,
+      1,
+    )
+    const resumed = await store.changeMemoryTreeAutomation('enabled', {
+      operation_id: 'resume-automation',
+      expected_generation: 1,
+      actor,
+    })
+    assert.equal(resumed.automation.state, 'enabled')
+    assert.deepEqual(await store.changeMemoryTreeAutomation('paused', pause), {
+      ...paused,
+      created: false,
+    })
+    assert.deepEqual(
+      await store.queries.getMemoryTreeAutomation(),
+      resumed.automation,
     )
   } finally {
     await store.close()

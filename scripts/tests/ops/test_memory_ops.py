@@ -96,6 +96,36 @@ async def test_manual_maintenance_starts_singleton_workflow(monkeypatch) -> None
 
 
 @pytest.mark.asyncio
+async def test_manual_reorganization_starts_reorganization_mode(monkeypatch) -> None:
+    start = AsyncMock()
+    client = AsyncMock()
+    client.start_workflow = start
+    monkeypatch.setattr(
+        memory, "connect_temporal_client", AsyncMock(return_value=client)
+    )
+    args = Namespace(
+        temporal_address="temporal:7233",
+        temporal_namespace="default",
+        timeout_seconds=30,
+        batch_size=5,
+        task_queue="memory",
+        mode="reorganization",
+    )
+
+    assert await memory._start_memory_maintenance_workflow(args) == "started"
+    start.assert_awaited_once_with(
+        MemoryMaintenanceWorkflow.run,
+        MemoryMaintenanceRequest(
+            timeout_seconds=30,
+            batch_size=5,
+            mode="reorganization",
+        ),
+        id=MEMORY_MAINTENANCE_WORKFLOW_ID,
+        task_queue="memory",
+    )
+
+
+@pytest.mark.asyncio
 async def test_schedule_ensure_uses_maintenance_contract(monkeypatch) -> None:
     client = object()
     monkeypatch.setattr(

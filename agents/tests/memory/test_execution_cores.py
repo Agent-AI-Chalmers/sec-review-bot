@@ -8,7 +8,8 @@ from sec_review_agents.agents.memory_extractor.model import MemoryObservationOut
 from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.memory.coordinated_maintenance import (
-    prepare_coordinated_memory_revision,
+    prepare_coordinated_memory_learning,
+    prepare_coordinated_memory_reorganization,
 )
 from sec_review_agents.memory.extractor import preview_memory_observation_from_paths
 from sec_review_agents.memory.maintainer import maintain_memory_tree
@@ -207,6 +208,86 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("topic_path", ["topics/existing.md", "topics/web/auth.md"])
+async def test_maintainer_reorganization_accepts_base_without_observations(
+    tmp_path: Path,
+    topic_path: str,
+) -> None:
+    base_tree = tmp_path / "base"
+    (base_tree / "topics").mkdir(parents=True)
+    (base_tree / "MEMORY.md").write_text("# Existing\n", encoding="utf-8")
+    (base_tree / topic_path).parent.mkdir(parents=True, exist_ok=True)
+    (base_tree / topic_path).write_text("Existing topic.\n", encoding="utf-8")
+    candidate = tmp_path / "candidate"
+    agent_trajectory = tmp_path / "maintainer.jsonl"
+
+    async def invoke_agent(**kwargs) -> MemoryMaintenanceOutput:
+        assert (candidate / "observations").is_dir()
+        assert not list((candidate / "observations").iterdir())
+        assert "None. No observations" in kwargs["user_prompt"]
+        (candidate / "MEMORY.md").write_text("# Reorganized\n", encoding="utf-8")
+        return MemoryMaintenanceOutput()
+
+    with (
+        patch(
+            "sec_review_agents.memory.maintainer.create_chat_model",
+            return_value=Mock(name="memory-maintainer-model"),
+        ),
+        patch(
+            "sec_review_agents.memory.maintainer.run_memory_maintainer_agent",
+            AsyncMock(side_effect=invoke_agent),
+        ),
+    ):
+        result = await maintain_memory_tree(
+            base_memory_tree=base_tree,
+            observations=[],
+            worktree_root=candidate,
+            maintainer_trajectory_path=agent_trajectory,
+            reorganization=True,
+        )
+
+    assert (result.memory_tree_path / "MEMORY.md").read_text() == "# Reorganized\n"
+    assert (result.memory_tree_path / topic_path).is_file()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("with_base", "with_observation"),
+    [
+        (False, False),
+        (True, False),
+        (True, True),
+    ],
+)
+async def test_maintainer_rejects_invalid_reorganization_inputs(
+    tmp_path: Path,
+    with_base: bool,
+    with_observation: bool,
+) -> None:
+    base_tree = tmp_path / "base"
+    (base_tree / "topics").mkdir(parents=True)
+    (base_tree / "MEMORY.md").write_text("# Existing\n", encoding="utf-8")
+    observation = tmp_path / "observation.md"
+    observation.write_text("New lesson.\n", encoding="utf-8")
+    invoke = AsyncMock()
+    with (
+        patch(
+            "sec_review_agents.memory.maintainer.run_memory_maintainer_agent",
+            invoke,
+        ),
+        pytest.raises(ValueError),
+    ):
+        await maintain_memory_tree(
+            base_memory_tree=base_tree if with_base else None,
+            observations=([("extraction-1", observation)] if with_observation else []),
+            worktree_root=tmp_path / "candidate",
+            maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
+            reorganization=True,
+        )
+    invoke.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("base_index", "observations", "expected_exception"),
     [
@@ -262,7 +343,7 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
 ) -> None:
     client = Mock()
     client.list_revision_publications.return_value = []
-    client.get_maintenance_input.return_value = {
+    client.get_learning_input.return_value = {
         "expected_active_revision": expected_active_revision,
         "active_memory_tree_reference": active_reference,
         "observations": [
@@ -303,9 +384,9 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
             return_value=memory_reference,
         ),
     ):
-        prepared = await prepare_coordinated_memory_revision(
+        prepared = await prepare_coordinated_memory_learning(
             catalog_client=client,
-            maintenance_id="maintenance-1",
+            operation_id="maintenance-1",
             batch_size=10,
         )
 
@@ -323,8 +404,152 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("topic_path", ["topics/existing.md", "topics/web/auth.md"])
+async def test_coordinated_reorganization_uses_active_memory_without_observations(
+    tmp_path: Path,
+    topic_path: str,
+) -> None:
+    client = Mock()
+    client.list_revision_publications.return_value = []
+    active_reference = _s3_reference("active-memory-tree")
+    client.get_memory_tree.return_value = {
+        "revision": 2,
+        "memory_tree_reference": active_reference.as_dict(),
+    }
+    active_tree = tmp_path / "active"
+    (active_tree / "topics").mkdir(parents=True)
+    (active_tree / "MEMORY.md").write_text("# Existing\n", encoding="utf-8")
+    (active_tree / topic_path).parent.mkdir(parents=True, exist_ok=True)
+    (active_tree / topic_path).write_text("Existing topic.\n", encoding="utf-8")
+    candidate_tree = tmp_path / "candidate"
+    candidate_tree.mkdir()
+    result = SimpleNamespace(
+        memory_tree_path=candidate_tree,
+        maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
+    )
+    candidate_reference = ArtifactReference(
+        uri="s3://sec-review/candidate-memory-tree",
+        digest=f"sha256:{'b' * 64}",
+        media_type="application/tar+zstd",
+        size_bytes=42,
+    )
+    trajectory_reference = _s3_reference("maintainer-trajectory")
+
+    with (
+        patch(
+            "sec_review_agents.memory.coordinated_maintenance.planned_s3_artifact",
+            side_effect=lambda reference, **_: reference,
+        ),
+        patch(
+            "sec_review_agents.memory.coordinated_maintenance.publish_immutable_s3_artifact"
+        ),
+        patch(
+            "sec_review_agents.memory.coordinated_maintenance.materialize_memory_tree",
+            return_value=active_tree,
+        ),
+        patch(
+            "sec_review_agents.memory.coordinated_maintenance.maintain_memory_tree",
+            AsyncMock(return_value=result),
+        ) as maintain,
+        patch(
+            "sec_review_agents.memory.coordinated_maintenance.build_memory_agent_trajectory",
+            return_value=trajectory_reference,
+        ),
+        patch(
+            "sec_review_agents.memory.coordinated_maintenance.build_memory_tree_artifact",
+            side_effect=[
+                SimpleNamespace(digest=candidate_reference.digest),
+                candidate_reference,
+            ],
+        ),
+    ):
+        reorganized = await prepare_coordinated_memory_reorganization(
+            catalog_client=client,
+            operation_id="maintenance-1",
+        )
+
+    assert reorganized.commit_input is not None
+    assert reorganized.commit_input.source_kind == "reorganization"
+    assert reorganized.commit_input.extraction_ids == ()
+    assert reorganized.commit_input.expected_active_revision == 2
+    assert maintain.await_args is not None
+    assert maintain.await_args.kwargs["observations"] == []
+    assert maintain.await_args.kwargs["reorganization"] is True
+    client.list_revision_publications.assert_called_once_with(
+        "maintenance-1", kind="reorganization"
+    )
+    intent = client.reserve_revision_publication.call_args.args[0]
+    assert intent["source"]["kind"] == "reorganization"
+    assert "extraction_ids" not in intent["source"]
+
+
+@pytest.mark.asyncio
+async def test_coordinated_reorganization_skips_unchanged_tree(
+    tmp_path: Path,
+) -> None:
+    client = Mock()
+    client.list_revision_publications.return_value = []
+    active_reference = _s3_reference("active-memory-tree")
+    client.get_memory_tree.return_value = {
+        "revision": 2,
+        "memory_tree_reference": active_reference.as_dict(),
+    }
+    active_tree = tmp_path / "active"
+    (active_tree / "topics").mkdir(parents=True)
+    (active_tree / "MEMORY.md").write_text("# Existing\n", encoding="utf-8")
+    (active_tree / "topics" / "existing.md").write_text(
+        "Existing topic.\n", encoding="utf-8"
+    )
+    result = SimpleNamespace(
+        memory_tree_path=tmp_path / "candidate",
+        maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
+    )
+
+    with (
+        patch(
+            "sec_review_agents.memory.coordinated_maintenance.materialize_memory_tree",
+            return_value=active_tree,
+        ),
+        patch(
+            "sec_review_agents.memory.coordinated_maintenance.maintain_memory_tree",
+            AsyncMock(return_value=result),
+        ),
+        patch(
+            "sec_review_agents.memory.coordinated_maintenance.build_memory_tree_artifact",
+            return_value=SimpleNamespace(digest=active_reference.digest),
+        ),
+    ):
+        reorganized = await prepare_coordinated_memory_reorganization(
+            catalog_client=client,
+            operation_id="maintenance-1",
+        )
+
+    assert reorganized.commit_input is None
+    assert reorganized.summary == "Reorganization produced no memory changes."
+    client.reserve_revision_publication.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
+    client = Mock()
+    client.list_revision_publications.return_value = []
+    client.get_memory_tree.return_value = {
+        "revision": 0,
+        "memory_tree_reference": None,
+    }
+
+    reorganized = await prepare_coordinated_memory_reorganization(
+        catalog_client=client,
+        operation_id="maintenance-1",
+    )
+
+    assert reorganized.commit_input is None
+    assert reorganized.summary == "No active memory to reorganize."
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("maintenance_input", "message"),
+    ("learning_input", "message"),
     [
         (
             {
@@ -401,16 +626,16 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
     ],
 )
 async def test_coordinated_maintenance_rejects_invalid_catalog_payloads(
-    maintenance_input: dict[str, object],
+    learning_input: dict[str, object],
     message: str,
 ) -> None:
     client = Mock()
     client.list_revision_publications.return_value = []
-    client.get_maintenance_input.return_value = maintenance_input
+    client.get_learning_input.return_value = learning_input
 
     with pytest.raises(ValueError, match=message):
-        await prepare_coordinated_memory_revision(
+        await prepare_coordinated_memory_learning(
             catalog_client=client,
-            maintenance_id="maintenance-1",
+            operation_id="maintenance-1",
             batch_size=10,
         )

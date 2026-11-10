@@ -200,7 +200,7 @@ Core fields:
 Memory Catalog Server is a separate TypeScript service, not part of Review Runs.
 
 - **Database isolation.** Compose runs one PostgreSQL instance with separate `sec_review_review_runs` and `sec_review_memory_catalog` databases and login roles. Each service receives only its own database URL.
-- **Stored state.** Memory Catalog stores extraction records and their optional observations, memory-tree revision history, and the active revision pointer. Each revision also records its maintenance identity and maintainer trajectory reference.
+- **Stored state.** Memory Catalog stores extraction records and their optional observations, memory-tree revision history, and the active revision pointer. Each revision also records its source and globally unique operation ID; learning and reorganization revisions include a maintainer trajectory reference.
 - **Execution and commits.** Temporal runs extraction and the singleton maintenance workflow; PostgreSQL stores catalog state and checks compare-and-swap conditions at commit. Host Workers call Memory Catalog with `AGENT_MEMORY_CATALOG_TOKEN`.
 - **Object storage.** Memory-tree revisions and memory-agent trajectories remain immutable objects in RustFS. Workers materialize them into invocation-scoped temporary worktrees; agent sandboxes see only the resulting filesystem mounts.
 
@@ -210,7 +210,7 @@ Compose gives Control Plane UI `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_OPERATOR
 
 - Authenticated browser sessions inspect and manage memory through the BFF without receiving Catalog or object-storage credentials.
 - The UI storage identity can read run artifacts, memory trees, and memory trajectories, but creates immutable objects only under `memory/trees/*`.
-- A failed edit or restore leaves maintenance paused until an operator explicitly resumes it.
+- Editing or restoring does not change memory-tree automation state. Operators can pause automatic revision commits independently; manual edits and restores remain available while paused.
 - Unreferenced memory objects are not cleaned up automatically.
 
 #### PostgreSQL Initialization And Reinstallation

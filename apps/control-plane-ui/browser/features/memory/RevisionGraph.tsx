@@ -317,9 +317,11 @@ export function RevisionGraph({
                 )}
               </strong>
               <span>
-                {item.source.kind === 'maintenance'
-                  ? t('sourceMaintenance')
-                  : t('sourceOperatorEdit')}
+                {item.source.kind === 'learning'
+                  ? t('sourceLearning')
+                  : item.source.kind === 'reorganization'
+                    ? t('sourceReorganization')
+                    : t('sourceManual')}
                 {activeRevision !== undefined &&
                 item.revision === activeRevision
                   ? ` · ${t('current')}`
@@ -341,9 +343,11 @@ export function RevisionGraph({
               </Text>
               <Text size="sm" c="dimmed">
                 {formatDate(selected.created_at, language)} ·{' '}
-                {selected.source.kind === 'maintenance'
-                  ? t('sourceMaintenance')
-                  : t('sourceOperatorEdit')}
+                {selected.source.kind === 'learning'
+                  ? t('sourceLearning')
+                  : selected.source.kind === 'reorganization'
+                    ? t('sourceReorganization')
+                    : t('sourceManual')}
               </Text>
             </div>
             <Group gap="xs" wrap="nowrap">
@@ -363,7 +367,7 @@ export function RevisionGraph({
               >
                 {t('compareWithPredecessor')}
               </Button>
-              {selected.source.kind === 'maintenance' && (
+              {selected.source.kind !== 'manual' && (
                 <Button
                   size="xs"
                   variant="subtle"

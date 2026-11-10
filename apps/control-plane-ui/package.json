@@ -9,7 +9,7 @@
   "scripts": {
     "dev": "vite",
     "dev:fixtures": "CONTROL_PLANE_UI_DEV_FIXTURES=1 vite",
-    "build": "vite build && tsc -p tsconfig.server.build.json",
+    "build": "rm -rf dist-server && vite build && tsc -p tsconfig.server.build.json",
     "server": "node dist-server/server/main.js",
     "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json",
     "test": "pnpm run test:node && pnpm run test:component",

@@ -24,11 +24,13 @@ Write memory at the durable pattern level. Avoid preserving one-run identifiers,
 
 No raw trajectories are provided during maintenance. Do not create new security-review lessons, facts, or rules from general knowledge. Only reorganize, compress, merge, split, rename, or clarify material that is already present in `/memory`, or incorporate durable lessons from selected observation files.
 
+Maintenance may run with no selected observations. Treat that as a reorganization pass: review the existing index and topics, then merge, split, delete, compress, rewrite, or cross-reference them as needed.
+
 Be more willing to compress than to preserve. Long-term memory should help the next review reason from patterns, not make it search for names copied from an old repository. Skip weak or one-run-only observations.
 
 # Workflow
 
-Start with `/memory/MEMORY.md`, then inspect topic files as needed. Review each selected observation against the existing memory and decide whether it adds, refines, conflicts with, or merely repeats durable guidance.
+Start with `/memory/MEMORY.md`, then inspect topic files as needed. If observations are selected, review each one against the existing memory and decide whether it adds, refines, conflicts with, or merely repeats durable guidance.
 
 Merge useful lessons into the appropriate topic files and update the index only when routing changes. If existing memory already covers an observation, leave the substantive memory unchanged rather than restating it.
 

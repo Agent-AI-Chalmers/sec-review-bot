@@ -6,7 +6,7 @@ import type { Pool } from 'pg'
 import { PostgresMemoryCatalogStore } from '../src/catalog-store.js'
 import {
   ExtractionConflictError,
-  MaintenancePausedError,
+  AutomationPausedError,
   MemoryTreeRevisionConflictError,
 } from '../src/catalog-store.js'
 
@@ -17,7 +17,7 @@ const artifact = {
   size_bytes: 42,
 }
 
-const maintenanceTrajectory = {
+const revisionTrajectory = {
   uri: 's3://sec-review/memory/trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
   digest: `sha256:${'b'.repeat(64)}`,
   media_type: 'application/zstd',
@@ -136,7 +136,7 @@ await test('extraction replay compares the optional observation as part of ident
   )
 })
 
-await test('maintenance commit records immutable history before moving the active pointer', async () => {
+await test('learning commit records immutable history before moving the active pointer', async () => {
   const statements: Array<{ sql: string; parameters?: unknown[] }> = []
   const client = {
     query: (sql: string, parameters?: unknown[]) => {
@@ -152,7 +152,7 @@ await test('maintenance commit records immutable history before moving the activ
         )
       )
         return Promise.resolve({ rows: [{ revision: '3' }], rowCount: 1 })
-      if (sql.includes('select state from maintenance_control'))
+      if (sql.includes('select state from memory_tree_automation'))
         return Promise.resolve({ rows: [{ state: 'enabled' }], rowCount: 1 })
       if (sql.includes('select extraction_id from observations'))
         return Promise.resolve({
@@ -176,16 +176,16 @@ await test('maintenance commit records immutable history before moving the activ
       expected_active_revision: 3,
       memory_tree_reference: artifact,
       source: {
-        kind: 'maintenance',
-        maintenance_id: 'maintenance-1',
+        kind: 'learning',
+        operation_id: 'maintenance-1',
         extraction_ids: ['extraction-1'],
-        trajectory_reference: maintenanceTrajectory,
+        trajectory_reference: revisionTrajectory,
       },
     }),
     {
       created: true,
       revision: 4,
-      source: { kind: 'maintenance', maintenance_id: 'maintenance-1' },
+      source: { kind: 'learning', operation_id: 'maintenance-1' },
     },
   )
 
@@ -199,8 +199,8 @@ await test('maintenance commit records immutable history before moving the activ
         !sql.includes('memory_revision_publications') &&
         !sql.includes('pg_advisory_xact_lock'),
     )
-  assert.match(operations[0] ?? '', /maintenance_id/)
-  assert.match(operations[1] ?? '', /maintenance_control/)
+  assert.match(operations[0] ?? '', /operation_id/)
+  assert.match(operations[1] ?? '', /memory_tree_automation/)
   assert.match(operations[2] ?? '', /memory_tree_state/)
   assert.match(operations[3] ?? '', /observations/)
   assert.match(operations[4] ?? '', /coalesce\(max\(revision\)/)
@@ -219,7 +219,71 @@ await test('maintenance commit records immutable history before moving the activ
   )
 })
 
-await test('an identical maintenance id replays the created revision', async () => {
+await test('reorganization commit records history without consuming observations', async () => {
+  const statements: Array<{ sql: string; parameters?: unknown[] }> = []
+  const client = {
+    query: (sql: string, parameters?: unknown[]) => {
+      statements.push({ sql, ...(parameters ? { parameters } : {}) })
+      if (
+        sql.includes('select 1 from memory_revision_publications') &&
+        sql.includes('and tree_digest=$3')
+      )
+        return Promise.resolve({ rows: [{}], rowCount: 1 })
+      if (sql.includes('select active_revision as revision'))
+        return Promise.resolve({ rows: [{ revision: '3' }], rowCount: 1 })
+      if (sql.includes('select state from memory_tree_automation'))
+        return Promise.resolve({ rows: [{ state: 'enabled' }], rowCount: 1 })
+      if (sql.includes('coalesce(max(revision)'))
+        return Promise.resolve({ rows: [{ revision: '4' }], rowCount: 1 })
+      return Promise.resolve({ rows: [], rowCount: 1 })
+    },
+    release: () => undefined,
+  }
+  const pool = {
+    connect: () => Promise.resolve(client),
+    end: () => Promise.resolve(),
+  } as unknown as Pool
+  const store = new PostgresMemoryCatalogStore('unused', pool)
+
+  assert.deepEqual(
+    await store.createMemoryTreeRevision({
+      expected_active_revision: 3,
+      memory_tree_reference: artifact,
+      source: {
+        kind: 'reorganization',
+        operation_id: 'maintenance-1',
+        trajectory_reference: revisionTrajectory,
+      },
+    }),
+    {
+      created: true,
+      revision: 4,
+      source: { kind: 'reorganization', operation_id: 'maintenance-1' },
+    },
+  )
+  assert.equal(
+    statements.some(
+      ({ sql }) =>
+        sql.includes('select extraction_id from observations') ||
+        sql.includes('update observations set consumed_revision'),
+    ),
+    false,
+  )
+  const insert = statements.find(({ sql }) =>
+    sql.includes('insert into memory_tree_revisions'),
+  )
+  assert.deepEqual(insert?.parameters, [
+    4,
+    3,
+    artifact,
+    'reorganization',
+    'maintenance-1',
+    revisionTrajectory,
+    null,
+  ])
+})
+
+await test('an identical learning operation id replays the created revision', async () => {
   const client = {
     query: (sql: string) => {
       if (
@@ -227,7 +291,7 @@ await test('an identical maintenance id replays the created revision', async () 
         sql.includes('and tree_digest=$3')
       )
         return Promise.resolve({ rows: [{}], rowCount: 1 })
-      if (sql.includes('revision.maintenance_id=$1')) {
+      if (sql.includes('revision.operation_id=$1')) {
         return Promise.resolve({
           rows: [{ revision: '4', identical: true }],
           rowCount: 1,
@@ -248,21 +312,21 @@ await test('an identical maintenance id replays the created revision', async () 
       expected_active_revision: 3,
       memory_tree_reference: artifact,
       source: {
-        kind: 'maintenance',
-        maintenance_id: 'maintenance-1',
+        kind: 'learning',
+        operation_id: 'maintenance-1',
         extraction_ids: ['extraction-1'],
-        trajectory_reference: maintenanceTrajectory,
+        trajectory_reference: revisionTrajectory,
       },
     }),
     {
       created: false,
       revision: 4,
-      source: { kind: 'maintenance', maintenance_id: 'maintenance-1' },
+      source: { kind: 'learning', operation_id: 'maintenance-1' },
     },
   )
 })
 
-await test('paused control rejects a new maintenance commit before active CAS', async () => {
+await test('paused control rejects a new automatic revision commit before active CAS', async () => {
   const statements: string[] = []
   const client = {
     query: (sql: string) => {
@@ -272,7 +336,7 @@ await test('paused control rejects a new maintenance commit before active CAS', 
       )
         return Promise.resolve({ rows: [{}], rowCount: 1 })
       statements.push(sql)
-      if (sql.includes('select state from maintenance_control'))
+      if (sql.includes('select state from memory_tree_automation'))
         return Promise.resolve({ rows: [{ state: 'paused' }], rowCount: 1 })
       return Promise.resolve({ rows: [], rowCount: 0 })
     },
@@ -289,13 +353,13 @@ await test('paused control rejects a new maintenance commit before active CAS', 
       expected_active_revision: 3,
       memory_tree_reference: artifact,
       source: {
-        kind: 'maintenance',
-        maintenance_id: 'maintenance-1',
+        kind: 'learning',
+        operation_id: 'maintenance-1',
         extraction_ids: ['extraction-1'],
-        trajectory_reference: maintenanceTrajectory,
+        trajectory_reference: revisionTrajectory,
       },
     }),
-    MaintenancePausedError,
+    AutomationPausedError,
   )
   assert.equal(
     statements.some((sql) => sql.includes('select active_revision')),
@@ -303,7 +367,7 @@ await test('paused control rejects a new maintenance commit before active CAS', 
   )
 })
 
-await test('operator edit commits without consuming observations', async () => {
+await test('manual edit commits without consuming observations', async () => {
   const statements: Array<{ sql: string; parameters?: unknown[] }> = []
   const client = {
     query: (sql: string, parameters?: unknown[]) => {
@@ -335,7 +399,7 @@ await test('operator edit commits without consuming observations', async () => {
       expected_active_revision: 1,
       memory_tree_reference: artifact,
       source: {
-        kind: 'operator',
+        kind: 'manual',
         operation_id: 'operation-1',
         actor: { kind: 'user', id: 'alice' },
       },
@@ -343,7 +407,7 @@ await test('operator edit commits without consuming observations', async () => {
     {
       created: true,
       revision: 3,
-      source: { kind: 'operator', operation_id: 'operation-1' },
+      source: { kind: 'manual', operation_id: 'operation-1' },
     },
   )
   assert.equal(
@@ -360,7 +424,7 @@ await test('operator edit commits without consuming observations', async () => {
   assert.deepEqual(insert?.parameters?.slice(0, 2), [3, 1])
 })
 
-await test('operator operation id replays identical content and rejects drift', async () => {
+await test('manual operation id replays identical content and rejects drift', async () => {
   let identical = true
   const client = {
     query: (sql: string) => {
@@ -387,7 +451,7 @@ await test('operator operation id replays identical content and rejects drift', 
     expected_active_revision: 4,
     memory_tree_reference: artifact,
     source: {
-      kind: 'operator' as const,
+      kind: 'manual' as const,
       operation_id: 'operation-1',
       actor: { kind: 'user' as const, id: 'alice' },
     },
@@ -396,7 +460,7 @@ await test('operator operation id replays identical content and rejects drift', 
   assert.deepEqual(await store.createMemoryTreeRevision(input), {
     created: false,
     revision: 5,
-    source: { kind: 'operator', operation_id: 'operation-1' },
+    source: { kind: 'manual', operation_id: 'operation-1' },
   })
   identical = false
   await assert.rejects(
@@ -461,7 +525,7 @@ await test('control replay precedes generation checks and returns stored result'
           )
             return Promise.resolve({ rows: [{}], rowCount: 1 })
           statements.push(sql)
-          if (sql.includes('from maintenance_control_operations'))
+          if (sql.includes('from memory_tree_automation_operations'))
             return Promise.resolve({
               rows: [
                 {
@@ -483,14 +547,14 @@ await test('control replay precedes generation checks and returns stored result'
   const store = new PostgresMemoryCatalogStore('unused', pool)
 
   assert.deepEqual(
-    await store.changeMaintenanceControl('paused', {
+    await store.changeMemoryTreeAutomation('paused', {
       operation_id: 'pause-1',
       expected_generation: 1,
       actor: { kind: 'user', id: 'alice' },
     }),
     {
       created: false,
-      control: {
+      automation: {
         state: 'paused',
         generation: 2,
         changed_by: { kind: 'user', id: 'alice' },
@@ -499,7 +563,7 @@ await test('control replay precedes generation checks and returns stored result'
     },
   )
   assert.equal(
-    statements.some((sql) => sql.includes('from maintenance_control\n')),
+    statements.some((sql) => sql.includes('from memory_tree_automation\n')),
     false,
   )
 })
@@ -516,14 +580,16 @@ await test('new control operation locks, checks, updates, and records the transi
           )
             return Promise.resolve({ rows: [{}], rowCount: 1 })
           statements.push(sql)
-          if (sql.includes('from maintenance_control_operations'))
+          if (sql.includes('from memory_tree_automation_operations'))
             return Promise.resolve({ rows: [], rowCount: 0 })
-          if (sql.includes('select state, generation from maintenance_control'))
+          if (
+            sql.includes('select state, generation from memory_tree_automation')
+          )
             return Promise.resolve({
               rows: [{ state: 'enabled', generation: '3' }],
               rowCount: 1,
             })
-          if (sql.includes('update maintenance_control'))
+          if (sql.includes('update memory_tree_automation'))
             return Promise.resolve({
               rows: [
                 {
@@ -543,7 +609,7 @@ await test('new control operation locks, checks, updates, and records the transi
   } as unknown as Pool
   const store = new PostgresMemoryCatalogStore('unused', pool)
 
-  const result = await store.changeMaintenanceControl('paused', {
+  const result = await store.changeMemoryTreeAutomation('paused', {
     operation_id: 'pause-1',
     expected_generation: 3,
     actor: { kind: 'user', id: 'alice' },
@@ -551,9 +617,9 @@ await test('new control operation locks, checks, updates, and records the transi
 
   assert.equal(result.created, true)
   assert.match(statements[2] ?? '', /for update/)
-  assert.match(statements[3] ?? '', /update maintenance_control/)
+  assert.match(statements[3] ?? '', /update memory_tree_automation/)
   assert.match(
     statements[4] ?? '',
-    /insert into maintenance_control_operations/,
+    /insert into memory_tree_automation_operations/,
   )
 })

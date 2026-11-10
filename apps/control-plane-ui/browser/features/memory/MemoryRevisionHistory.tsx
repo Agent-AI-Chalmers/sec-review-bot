@@ -117,9 +117,11 @@ export function MemoryRevisionHistory({
                     {item.predecessor_revision ?? '—'}
                   </Table.Td>
                   <Table.Td>
-                    {item.source.kind === 'maintenance'
-                      ? t('sourceMaintenance')
-                      : t('sourceOperatorEdit')}
+                    {item.source.kind === 'learning'
+                      ? t('sourceLearning')
+                      : item.source.kind === 'reorganization'
+                        ? t('sourceReorganization')
+                        : t('sourceManual')}
                   </Table.Td>
                   <Table.Td>{formatDate(item.created_at, language)}</Table.Td>
                   <Table.Td>
@@ -140,7 +142,7 @@ export function MemoryRevisionHistory({
                       >
                         {t('compareWithPredecessor')}
                       </Button>
-                      {item.source.kind === 'maintenance' ? (
+                      {item.source.kind !== 'manual' ? (
                         <Button
                           size="xs"
                           variant="subtle"

@@ -56,7 +56,7 @@ test.each([
         treeReads++
         return { revision: currentRevision }
       }
-      if (path === '/memory/maintenance-control')
+      if (path === '/memory/tree/automation')
         return { state: 'paused', generation: 1 }
       if (path.endsWith('/content')) {
         const revision = currentRevision

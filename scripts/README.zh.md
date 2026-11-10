@@ -98,7 +98,7 @@ uv --project agents run python -m scripts.experiments.memory_maintain \
   --output-dir runs/memory-02
 ```
 
-输入按参数顺序处理，使用不含扩展名的文件名作为 observation ID，且这些 ID 必须唯一。可用 `--deployment` 覆盖 maintainer 的模型部署。输出目录必须尚不存在，其中包含 `memory/`、记忆维护 Agent 执行轨迹和 `manifest.json`；清单记录输入哈希、基础文件树指纹、部署覆盖参数、时间戳、执行状态及成功输出的指纹。输入文件和基础文件树不会被修改。成功输出会移除暂存的 observation；失败尝试保留部分文件并记录失败状态。重试须使用新目录。不接受空 observation 批次，不自动分批或重试。
+输入按参数顺序处理，使用不含扩展名的文件名作为 observation ID，且这些 ID 必须唯一。可用 `--deployment` 覆盖 maintainer 的模型部署。输出目录必须尚不存在，其中包含 `memory/`、记忆维护 Agent 执行轨迹和 `manifest.json`；清单记录输入哈希、基础文件树指纹、部署覆盖参数、时间戳、执行状态及成功输出的指纹。输入文件和基础文件树不会被修改。成功输出会移除暂存的 observation；失败尝试保留部分文件并记录失败状态。重试须使用新目录。learning 至少需要一条 observation；reorganization 必须提供 `--base-memory`，且不接收 observation。不自动分批或重试。
 
 ## 本地开发 Workers
 
@@ -121,8 +121,12 @@ uv --project agents run python -m scripts.dev.dev_workers --env-file compose.mem
 # 在 Temporal 中启动一次维护 workflow。
 uv --project agents run python -m scripts.ops.memory_ops --env-file compose.memory.env maintain
 
+# 在 Temporal 中手动启动一次仅整理已有记忆的 workflow。
+uv --project agents run python -m scripts.ops.memory_ops --env-file compose.memory.env maintain --mode reorganization
+
 # 创建或更新周期性维护触发计划。
 uv --project agents run python -m scripts.ops.memory_ops --env-file compose.memory.env schedules maintenance ensure
 ```
 
-`maintain` 在 Temporal 中启动维护 workflow；`schedules maintenance ensure` 创建或更新其周期触发计划。两者均需要配置好的 Temporal 服务；实际维护还需要 Worker、Memory Catalog 和对象存储。通过各子命令的 `--help` 查看连接、超时、批次及调度参数。
+<!-- doc-default: memory-maintenance-mode; source=scripts/ops/memory_ops.py -->
+`maintain` 在 Temporal 中启动维护 workflow。默认的 `--mode learning` 处理待处理 observations；`--mode reorganization` 只整理当前生效记忆，不消费 observation，由人工手动触发。`schedules maintenance ensure` 创建或更新 learning 的周期触发计划。两者均需要配置好的 Temporal 服务；实际维护还需要 Worker、Memory Catalog 和对象存储。通过各子命令的 `--help` 查看连接、超时、批次及调度参数。

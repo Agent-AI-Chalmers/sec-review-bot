@@ -118,7 +118,7 @@ async function publishMemoryEdit({
       media_type: artifact.mediaType,
       size_bytes: artifact.sizeBytes
     },
-    source: { kind: 'operator', operation_id: command.operation_id }
+    source: { kind: 'manual', operation_id: command.operation_id }
   }
   const reserved = await catalog.write(
     '/v1/memory-tree/revisions/publications/reserve',
@@ -195,7 +195,7 @@ export function createMemoryWriteRoutes({
         case 'pause':
         case 'resume': {
           const upstream = await catalog.write(
-            `/v1/maintenance-control/${command.action}`,
+            `/v1/memory-tree/automation/${command.action}`,
             {
               operation_id: command.operation_id,
               expected_generation: command.expected_generation
@@ -226,11 +226,12 @@ export function createMemoryWriteRoutes({
     response: ServerResponse
   ): Promise<boolean> => {
     if (request.method !== 'POST') return false
-    const match = /^\/api\/memory\/(pause|resume|edit|restore)$/.exec(
-      request.url ?? ''
-    )
+    const match =
+      /^\/api\/memory\/(?:tree\/automation\/(pause|resume)|(edit|restore))$/.exec(
+        request.url ?? ''
+      )
     if (match === null) return false
-    await writeMemory(request, response, match[1])
+    await writeMemory(request, response, match[1] ?? match[2])
     return true
   }
   return { handle }

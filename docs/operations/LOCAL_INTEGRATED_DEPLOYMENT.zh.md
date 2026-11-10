@@ -202,7 +202,7 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 Memory Catalog Server 是独立 TypeScript 服务，不属于 Review Runs。
 
 - **数据库隔离。** Compose 运行一个 PostgreSQL 实例，其中有独立的 `sec_review_review_runs` 和 `sec_review_memory_catalog` database 与 login role。每个服务只接收自己的 database URL。
-- **保存的状态。** Memory Catalog 保存 extraction records 及其可选 observations、memory-tree revision history 和 active revision pointer。每个 revision 还记录 maintenance identity 和 maintainer trajectory reference。
+- **保存的状态。** Memory Catalog 保存 extraction records 及其可选 observations、memory-tree revision history 和 active revision pointer。每个 revision 还记录 source 和全局唯一的 operation ID；learning 和 reorganization 修订包含 maintainer trajectory reference。
 - **执行与提交。** Temporal 负责 extraction 执行和单例 maintenance workflow；PostgreSQL 保存 catalog 状态，并在提交时检查 compare-and-swap 条件。宿主 Worker 使用 `AGENT_MEMORY_CATALOG_TOKEN` 调用 Memory Catalog。
 - **对象存储。** memory-tree revisions 和 memory-agent trajectories 作为不可变对象保存在 RustFS 中。Worker 将对象物化到每次调用的临时 worktree，Agent sandbox 只看到最终的文件系统挂载。
 
@@ -212,7 +212,7 @@ Compose 向 Control Plane UI 提供 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_OPE
 
 - 经过认证的 browser session 通过 BFF 查看和管理 memory，不会获得 Catalog 或对象存储凭据。
 - UI storage identity 可以读取 run 产物、memory tree 和 memory trajectory，但只能在 `memory/trees/*` 下创建不可变对象。
-- 编辑或恢复失败后，maintenance 保持暂停，直到 operator 显式恢复。
+- 编辑或恢复不会改变记忆树自动更新状态。operator 可以独立暂停自动修订提交；暂停期间仍可人工编辑或恢复版本。
 - 系统不自动清理未引用的 memory object。
 
 #### PostgreSQL 初始化与重新安装

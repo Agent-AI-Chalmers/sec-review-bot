@@ -11,11 +11,12 @@ import Fastify, {
 
 import {
   ExtractionConflictError,
-  MaintenanceControlConflictError,
-  MaintenancePausedError,
+  MemoryTreeAutomationConflictError,
+  AutomationPausedError,
+  PublicationAbandonedError,
   PostgresMemoryCatalogStore,
   MemoryTreeRevisionConflictError,
-  type AuthenticatedMaintenanceControlOperation,
+  type AuthenticatedMemoryTreeAutomationOperation,
   type AuthenticatedMemoryTreeRestoreOperation,
   type AuthenticatedMemoryTreeRevisionCreation,
   type MemoryCatalogStore,
@@ -71,8 +72,8 @@ function specPath(): string {
 function errorStatusCode(error: unknown): number {
   if (
     error instanceof ExtractionConflictError ||
-    error instanceof MaintenanceControlConflictError ||
-    error instanceof MaintenancePausedError ||
+    error instanceof MemoryTreeAutomationConflictError ||
+    error instanceof AutomationPausedError ||
     error instanceof MemoryTreeRevisionConflictError
   )
     return 409
@@ -115,14 +116,15 @@ export async function registerMemoryCatalogRoutes(
     request: FastifyRequest,
   ): AuthenticatedMemoryTreeRevisionCreation => {
     const input = request.body as RequestBody<'createMemoryTreeRevision'>
+    const requiresWorker =
+      input.source.kind === 'learning' || input.source.kind === 'reorganization'
     if (
-      (input.source.kind === 'maintenance' &&
-        authenticatedRoles.get(request) !== 'worker') ||
-      (input.source.kind === 'operator' &&
+      (requiresWorker && authenticatedRoles.get(request) !== 'worker') ||
+      (input.source.kind === 'manual' &&
         authenticatedRoles.get(request) !== 'operator')
     )
       throw unauthorized()
-    return input.source.kind === 'operator'
+    return input.source.kind === 'manual'
       ? { ...input, source: { ...input.source, actor: operatorActor } }
       : { ...input, source: input.source }
   }
@@ -143,6 +145,11 @@ export async function registerMemoryCatalogRoutes(
             .extraction_id,
         ),
       }),
+      abandonRevisionPublications: async (request: FastifyRequest) => ({
+        publications: await store.abandonRevisionPublications(
+          request.body as RequestBody<'abandonRevisionPublications'>,
+        ),
+      }),
       reserveRevisionPublication: async (request: FastifyRequest) =>
         await store.reserveRevisionPublication(
           authenticatedRevisionInput(request),
@@ -155,10 +162,9 @@ export async function registerMemoryCatalogRoutes(
         const { kind, owner_id } =
           request.params as PathParameters<'listRevisionPublications'>
         if (
-          (kind === 'maintenance' &&
+          ((kind === 'learning' || kind === 'reorganization') &&
             authenticatedRoles.get(request) !== 'worker') ||
-          (kind === 'operator' &&
-            authenticatedRoles.get(request) !== 'operator')
+          (kind === 'manual' && authenticatedRoles.get(request) !== 'operator')
         )
           throw unauthorized()
         return {
@@ -211,35 +217,35 @@ export async function registerMemoryCatalogRoutes(
         const query = request.query as QueryParameters<'getCatalogOverview'>
         return await store.queries.getCatalogOverview(query.range ?? '30d')
       },
-      getMaintenanceControl: async () =>
-        await store.queries.getMaintenanceControl(),
-      pauseMaintenance: async (
+      getMemoryTreeAutomation: async () =>
+        await store.queries.getMemoryTreeAutomation(),
+      pauseMemoryTreeAutomation: async (
         request: FastifyRequest,
         reply: FastifyReply,
       ) => {
-        const result = await store.changeMaintenanceControl('paused', {
-          ...(request.body as RequestBody<'pauseMaintenance'>),
+        const result = await store.changeMemoryTreeAutomation('paused', {
+          ...(request.body as RequestBody<'pauseMemoryTreeAutomation'>),
           actor: operatorActor,
-        } satisfies AuthenticatedMaintenanceControlOperation)
+        } satisfies AuthenticatedMemoryTreeAutomationOperation)
         if (result.created) void reply.status(201)
         return result
       },
-      resumeMaintenance: async (
+      resumeMemoryTreeAutomation: async (
         request: FastifyRequest,
         reply: FastifyReply,
       ) => {
-        const result = await store.changeMaintenanceControl('enabled', {
-          ...(request.body as RequestBody<'resumeMaintenance'>),
+        const result = await store.changeMemoryTreeAutomation('enabled', {
+          ...(request.body as RequestBody<'resumeMemoryTreeAutomation'>),
           actor: operatorActor,
-        } satisfies AuthenticatedMaintenanceControlOperation)
+        } satisfies AuthenticatedMemoryTreeAutomationOperation)
         if (result.created) void reply.status(201)
         return result
       },
-      getMaintenanceInput: async (request: FastifyRequest) => {
+      getLearningInput: async (request: FastifyRequest) => {
         const limit = Number(
-          (request.query as QueryParameters<'getMaintenanceInput'>).limit,
+          (request.query as QueryParameters<'getLearningInput'>).limit,
         )
-        return { input: await store.getMaintenanceInput(limit) }
+        return { input: await store.getLearningInput(limit) }
       },
       createMemoryTreeRevision: async (
         request: FastifyRequest,
@@ -328,9 +334,11 @@ export async function createApp(options: {
         : statusCode === 401
           ? 'UNAUTHORIZED'
           : statusCode === 409
-            ? error instanceof MaintenancePausedError
-              ? 'MAINTENANCE_PAUSED'
-              : 'CONFLICT'
+            ? error instanceof PublicationAbandonedError
+              ? 'PUBLICATION_ABANDONED'
+              : error instanceof AutomationPausedError
+                ? 'AUTOMATION_PAUSED'
+                : 'CONFLICT'
             : 'INTERNAL_ERROR'
     const message = error instanceof Error ? error.message : String(error)
     void reply.status(statusCode).send({

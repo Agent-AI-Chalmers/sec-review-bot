@@ -51,6 +51,62 @@ async def test_build_preserves_inputs_and_excludes_staged_observations(
 
 
 @pytest.mark.asyncio
+async def test_reorganization_uses_base_memory_and_no_observations(
+    tmp_path, monkeypatch
+):
+    base = tmp_path / "base"
+    (base / "topics").mkdir(parents=True)
+    (base / "MEMORY.md").write_text("Existing\n")
+    (base / "topics" / "topic.md").write_text("Topic\n")
+    args = Namespace(
+        inputs=[],
+        base_memory=base,
+        output_dir=tmp_path / "run",
+        deployment="test",
+        mode="reorganization",
+    )
+
+    async def maintain(**kwargs):
+        assert kwargs["base_memory_tree"] == base
+        assert kwargs["observations"] == []
+        assert kwargs["reorganization"] is True
+        tree = kwargs["worktree_root"]
+        (tree / "observations").mkdir(parents=True)
+        (tree / "MEMORY.md").write_text("Reorganized\n")
+        kwargs["maintainer_trajectory_path"].write_text("trajectory\n")
+
+    monkeypatch.setattr(memory_maintain, "maintain_memory_tree", maintain)
+    tree = await memory_maintain.run(args)
+    assert (tree / "MEMORY.md").read_text() == "Reorganized\n"
+    manifest = json.loads((args.output_dir / "manifest.json").read_text())
+    assert manifest["mode"] == "reorganization"
+    assert manifest["observations"] == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("invalid", ["with_input", "without_base"])
+async def test_invalid_reorganization_inputs_do_not_call_model(
+    tmp_path, monkeypatch, invalid
+):
+    args = Namespace(
+        inputs=[],
+        base_memory=None,
+        output_dir=tmp_path / "run",
+        deployment="test",
+        mode="reorganization",
+    )
+    if invalid == "with_input":
+        observation = tmp_path / "task.md"
+        observation.write_text("Experience\n")
+        args.inputs = [observation]
+    maintain = AsyncMock()
+    monkeypatch.setattr(memory_maintain, "maintain_memory_tree", maintain)
+    with pytest.raises(ValueError):
+        await memory_maintain.run(args)
+    maintain.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("invalid", ["existing", "duplicate", "missing_base"])
 async def test_invalid_inputs_do_not_call_model(tmp_path, monkeypatch, invalid):
     args = _args(tmp_path)

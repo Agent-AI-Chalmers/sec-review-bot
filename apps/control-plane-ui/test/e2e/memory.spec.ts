@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures.js'
 
-test('maintenance control mutates only this worker fixture server', async ({
+test('memory-tree automation mutates only this worker fixture server', async ({
   page,
   fixtureRuntime
 }) => {
@@ -12,7 +12,7 @@ test('maintenance control mutates only this worker fixture server', async ({
   await page.goto('/memory')
 
   const control = page.getByRole('switch', {
-    name: 'Automatic maintenance'
+    name: 'Automatic memory updates'
   })
   await expect(control).toBeChecked()
 

@@ -1,4 +1,4 @@
-"""Build a local Memory tree from observations, without deployed services."""
+"""Build or reorganize a local Memory tree without deployed services."""
 
 import argparse
 import asyncio
@@ -27,8 +27,14 @@ def _tree_fingerprint(root: Path) -> list[dict[str, str]]:
 
 
 async def run(args: argparse.Namespace) -> Path:
+    mode = getattr(args, "mode", "learning")
     inputs = [path.expanduser().resolve() for path in args.inputs]
-    if not inputs:
+    if mode == "reorganization":
+        if inputs:
+            raise ValueError("Reorganization does not accept observation inputs.")
+        if args.base_memory is None:
+            raise ValueError("Reorganization requires --base-memory.")
+    elif not inputs:
         raise ValueError("At least one observation is required.")
     ids = [path.stem for path in inputs]
     if len(set(inputs)) != len(inputs) or len(set(ids)) != len(ids):
@@ -49,6 +55,7 @@ async def run(args: argparse.Namespace) -> Path:
             raise ValueError("Output directory must be outside the base memory tree.")
     manifest = {
         "status": "running",
+        "mode": mode,
         "started_at": datetime.now(UTC).isoformat(),
         "deployment_override": args.deployment,
         "observations": [
@@ -75,9 +82,12 @@ async def run(args: argparse.Namespace) -> Path:
             worktree_root=output / "memory",
             maintainer_trajectory_path=trajectory_path(output, name="maintainer"),
             deployment=args.deployment,
+            reorganization=mode == "reorganization",
         )
         # Observations are maintainer input, not part of the published Memory tree.
-        shutil.rmtree(output / "memory" / "observations")
+        observations_root = output / "memory" / "observations"
+        if observations_root.exists():
+            shutil.rmtree(observations_root)
         if not (output / "memory" / "MEMORY.md").is_file():
             raise ValueError("Maintainer output is missing MEMORY.md.")
         manifest["memory_files"] = _tree_fingerprint(output / "memory")
@@ -95,14 +105,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "inputs",
-        nargs="+",
+        nargs="*",
         type=Path,
         help="Observation Markdown files in processing order.",
     )
     parser.add_argument(
+        "--mode",
+        choices=("learning", "reorganization"),
+        default="learning",
+        help="Learning consumes observations; reorganization only reorganizes base memory.",
+    )
+    parser.add_argument(
         "--base-memory",
         type=Path,
-        help="Existing Memory tree; omitted for an empty initial tree.",
+        help="Existing Memory tree; required for reorganization and omitted for an empty initial tree.",
     )
     parser.add_argument(
         "--output-dir",

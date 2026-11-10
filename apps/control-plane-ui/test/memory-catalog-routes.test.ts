@@ -23,7 +23,7 @@ test('memory writes require configured catalog access', async () => {
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
-    const response = await fetch(`${base}/api/memory/pause`, {
+    const response = await fetch(`${base}/api/memory/tree/automation/pause`, {
       method: 'POST',
       headers: { cookie, origin: base, 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -31,6 +31,17 @@ test('memory writes require configured catalog access', async () => {
         expected_generation: 1
       })
     })
+    for (const [method, path] of [
+      ['GET', '/api/memory/maintenance-control'],
+      ['POST', '/api/memory/pause'],
+      ['POST', '/api/memory/resume']
+    ]) {
+      const obsolete = await fetch(`${base}${path}`, {
+        method,
+        headers: { cookie, origin: base }
+      })
+      assert.equal(obsolete.status, 404)
+    }
     assert.strictEqual(response.status, 503)
     assert.deepStrictEqual(await response.json(), {
       error: 'memory_catalog_unavailable'
@@ -208,7 +219,7 @@ test('memory writes classify an unreachable catalog as an upstream failure', asy
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
-    const response = await fetch(`${base}/api/memory/pause`, {
+    const response = await fetch(`${base}/api/memory/tree/automation/pause`, {
       method: 'POST',
       headers: { cookie, origin: base, 'content-type': 'application/json' },
       body: JSON.stringify({ operation_id: 'op-1', expected_generation: 1 })
@@ -241,7 +252,7 @@ test('memory writes classify a catalog timeout separately', async () => {
   const base = `http://127.0.0.1:${address.port}`
   try {
     const cookie = await loginCookie(base)
-    const response = await fetch(`${base}/api/memory/pause`, {
+    const response = await fetch(`${base}/api/memory/tree/automation/pause`, {
       method: 'POST',
       headers: { cookie, origin: base, 'content-type': 'application/json' },
       body: JSON.stringify({ operation_id: 'op-1', expected_generation: 1 })
@@ -368,11 +379,14 @@ async function memoryWriteFixture(
   const cookie = await loginCookie(base)
   return {
     post: (action, body) =>
-      fetch(`${base}/api/memory/${action}`, {
-        method: 'POST',
-        body,
-        headers: { cookie, origin: base, 'content-type': 'application/json' }
-      }),
+      fetch(
+        `${base}/api/memory/${action === 'pause' || action === 'resume' ? `tree/automation/${action}` : action}`,
+        {
+          method: 'POST',
+          body,
+          headers: { cookie, origin: base, 'content-type': 'application/json' }
+        }
+      ),
     writes,
     uploads: () => uploads
   }
@@ -521,11 +535,11 @@ test('valid control writes preserve zero generations and ignore client-supplied 
     const body = { ...validMemoryWrites[action], expected_generation: 0 }
     const response = await fixture.post(
       action,
-      JSON.stringify({ ...body, actor: { kind: 'operator', id: 'forged' } })
+      JSON.stringify({ ...body, actor: { kind: 'manual', id: 'forged' } })
     )
     assert.equal(response.status, 201)
     assert.deepEqual(fixture.writes.at(-1), {
-      path: `/v1/maintenance-control/${action}`,
+      path: `/v1/memory-tree/automation/${action}`,
       body
     })
   }

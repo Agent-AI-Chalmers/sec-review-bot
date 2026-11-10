@@ -39,13 +39,6 @@ export type ExtractionId = string
  * @pattern ^[A-Za-z0-9._:-]+$
  * @type string
  */
-export type MaintenanceId = string
-
-/**
- * @minLength 1
- * @pattern ^[A-Za-z0-9._:-]+$
- * @type string
- */
 export type OperationId = string
 
 export type Actor = {
@@ -110,20 +103,45 @@ export type ExtractionPublicationList = {
   publications: ExtractionPublication[]
 }
 
-export type MaintenanceRevisionSource = {
-  kind: 'maintenance'
+export type AutomaticRevisionPublicationOwner = {
+  kind: 'learning' | 'reorganization'
   /**
    * @minLength 1
    * @pattern ^[A-Za-z0-9._:-]+$
    * @type string
    */
-  maintenance_id: MaintenanceId
+  operation_id: string
+}
+
+export type LearningRevisionSource = {
+  kind: 'learning'
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  operation_id: OperationId
   extraction_ids: ExtractionId[]
   trajectory_reference: ArtifactReference
 }
 
-export type OperatorRevisionCreationSource = {
-  kind: 'operator'
+/**
+ * @description A maintainer-only curation of existing memory that consumes no observations.
+ * @type object
+ */
+export type ReorganizationRevisionSource = {
+  kind: 'reorganization'
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  operation_id: OperationId
+  trajectory_reference: ArtifactReference
+}
+
+export type ManualRevisionCreationSource = {
+  kind: 'manual'
   /**
    * @minLength 1
    * @pattern ^[A-Za-z0-9._:-]+$
@@ -140,12 +158,15 @@ export type MemoryTreeRevisionCreation = {
    */
   expected_active_revision: number
   memory_tree_reference: ArtifactReference
-  source: MaintenanceRevisionSource | OperatorRevisionCreationSource
+  source:
+    | LearningRevisionSource
+    | ReorganizationRevisionSource
+    | ManualRevisionCreationSource
 }
 
 export type RevisionPublication = {
   intent: MemoryTreeRevisionCreation
-  status: 'reserved' | 'present' | 'selected'
+  status: 'reserved' | 'present' | 'selected' | 'abandoned'
 }
 
 export type RevisionPublicationList = {
@@ -342,7 +363,7 @@ export type CatalogOverview = {
   workflows: CatalogOverviewWorkflow[]
 }
 
-export type MaintenanceObservation = {
+export type LearningObservation = {
   /**
    * @minLength 1
    * @pattern ^[A-Za-z0-9._:-]+$
@@ -356,23 +377,23 @@ export type MaintenanceObservation = {
   body_markdown: string
 }
 
-export type MaintenanceInput = {
+export type LearningInput = {
   /**
-   * @description Active revision that must still be current when this maintenance input is committed.
+   * @description Active revision that must still be current when this learning input is committed.
    * @minimum 0
    * @type integer
    */
   expected_active_revision: number
   active_memory_tree_reference: ArtifactReference | null
-  observations: MaintenanceObservation[]
+  observations: LearningObservation[]
 }
 
-export type MaintenanceInputResult = {
-  input: MaintenanceInput | null
+export type LearningInputResult = {
+  input: LearningInput | null
 }
 
-export type OperatorRevisionSource = {
-  kind: 'operator'
+export type ManualRevisionSource = {
+  kind: 'manual'
   /**
    * @minLength 1
    * @pattern ^[A-Za-z0-9._:-]+$
@@ -383,7 +404,7 @@ export type OperatorRevisionSource = {
 }
 
 export type MemoryTreeRevisionSource =
-  MaintenanceRevisionSource | OperatorRevisionSource
+  LearningRevisionSource | ReorganizationRevisionSource | ManualRevisionSource
 
 export type MemoryTreeRevisionCreationResult = {
   created: boolean
@@ -394,16 +415,25 @@ export type MemoryTreeRevisionCreationResult = {
   revision: number
   source:
     | {
-        kind: 'maintenance'
+        kind: 'learning'
         /**
          * @minLength 1
          * @pattern ^[A-Za-z0-9._:-]+$
          * @type string
          */
-        maintenance_id: MaintenanceId
+        operation_id: OperationId
       }
     | {
-        kind: 'operator'
+        kind: 'reorganization'
+        /**
+         * @minLength 1
+         * @pattern ^[A-Za-z0-9._:-]+$
+         * @type string
+         */
+        operation_id: OperationId
+      }
+    | {
+        kind: 'manual'
         /**
          * @minLength 1
          * @pattern ^[A-Za-z0-9._:-]+$
@@ -487,7 +517,15 @@ export type MemoryTreeRevisionList = {
   next_before_revision: number | null
 }
 
-export type MaintenanceControl = {
+/**
+ * @description Admission state for new learning and reorganization revision commits. Pausing does not cancel running work or block manual revisions, restores, extraction registration, artifact publication, or successful-operation replays.
+ * @type object
+ */
+export type MemoryTreeAutomation = {
+  /**
+   * @description Whether new learning and reorganization revisions may commit; this is not a worker execution status.
+   * @type string
+   */
   state: 'enabled' | 'paused'
   /**
    * @minimum 0
@@ -503,7 +541,7 @@ export type MaintenanceControl = {
   changed_at: string
 }
 
-export type MaintenanceControlOperation = {
+export type MemoryTreeAutomationOperation = {
   /**
    * @minLength 1
    * @pattern ^[A-Za-z0-9._:-]+$
@@ -517,9 +555,13 @@ export type MaintenanceControlOperation = {
   expected_generation: number
 }
 
-export type MaintenanceControlOperationResult = {
+export type MemoryTreeAutomationOperationResult = {
   created: boolean
-  control: MaintenanceControl
+  /**
+   * @description Admission state for new learning and reorganization revision commits. Pausing does not cancel running work or block manual revisions, restores, extraction registration, artifact publication, or successful-operation replays.
+   * @type object
+   */
+  automation: MemoryTreeAutomation
 }
 
 export type Health = {
@@ -533,7 +575,8 @@ export type ErrorResponse = {
     | 'UNAUTHORIZED'
     | 'NOT_FOUND'
     | 'CONFLICT'
-    | 'MAINTENANCE_PAUSED'
+    | 'AUTOMATION_PAUSED'
+    | 'PUBLICATION_ABANDONED'
     | 'INTERNAL_ERROR'
 }
 
@@ -722,7 +765,7 @@ export type GetCatalogOverviewResponseBodyByStatus = {
 export type GetCatalogOverviewResponseBody =
   GetCatalogOverviewResponseBodyByStatus['200']
 
-export type GetMaintenanceInputQuery = {
+export type GetLearningInputQuery = {
   /**
    * @pattern ^(?:[1-9]|[1-9][0-9]|100)$
    * @type string
@@ -730,23 +773,23 @@ export type GetMaintenanceInputQuery = {
   limit: string
 }
 
-export type GetMaintenanceInputOptions = {
+export type GetLearningInputOptions = {
   body?: never
   path?: never
-  query: GetMaintenanceInputQuery
+  query: GetLearningInputQuery
   headers?: never
 }
 
-export type GetMaintenanceInputResponseBodyByStatus = {
-  '200': MaintenanceInputResult
+export type GetLearningInputResponseBodyByStatus = {
+  '200': LearningInputResult
   '400': ErrorResponse
   '401': ErrorResponse
   '500': ErrorResponse
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetMaintenanceInputResponseBody =
-  GetMaintenanceInputResponseBodyByStatus['200']
+export type GetLearningInputResponseBody =
+  GetLearningInputResponseBodyByStatus['200']
 
 export type CreateMemoryTreeRevisionBody = MemoryTreeRevisionCreation
 
@@ -841,35 +884,39 @@ export type RestoreMemoryTreeResponseBodyByStatus = {
 export type RestoreMemoryTreeResponseBody =
   RestoreMemoryTreeResponseBodyByStatus['200' | '201']
 
-export type GetMaintenanceControlOptions = {
+export type GetMemoryTreeAutomationOptions = {
   body?: never
   path?: never
   query?: never
   headers?: never
 }
 
-export type GetMaintenanceControlResponseBodyByStatus = {
-  '200': MaintenanceControl
+export type GetMemoryTreeAutomationResponseBodyByStatus = {
+  /**
+   * @description Admission state for new learning and reorganization revision commits. Pausing does not cancel running work or block manual revisions, restores, extraction registration, artifact publication, or successful-operation replays.
+   * @type object
+   */
+  '200': MemoryTreeAutomation
   '401': ErrorResponse
   '500': ErrorResponse
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type GetMaintenanceControlResponseBody =
-  GetMaintenanceControlResponseBodyByStatus['200']
+export type GetMemoryTreeAutomationResponseBody =
+  GetMemoryTreeAutomationResponseBodyByStatus['200']
 
-export type PauseMaintenanceBody = MaintenanceControlOperation
+export type PauseMemoryTreeAutomationBody = MemoryTreeAutomationOperation
 
-export type PauseMaintenanceOptions = {
-  body: PauseMaintenanceBody
+export type PauseMemoryTreeAutomationOptions = {
+  body: PauseMemoryTreeAutomationBody
   path?: never
   query?: never
   headers?: never
 }
 
-export type PauseMaintenanceResponseBodyByStatus = {
-  '200': MaintenanceControlOperationResult
-  '201': MaintenanceControlOperationResult
+export type PauseMemoryTreeAutomationResponseBodyByStatus = {
+  '200': MemoryTreeAutomationOperationResult
+  '201': MemoryTreeAutomationOperationResult
   '400': ErrorResponse
   '401': ErrorResponse
   '409': ErrorResponse
@@ -878,21 +925,21 @@ export type PauseMaintenanceResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type PauseMaintenanceResponseBody = PauseMaintenanceResponseBodyByStatus[
-  '200' | '201']
+export type PauseMemoryTreeAutomationResponseBody =
+  PauseMemoryTreeAutomationResponseBodyByStatus['200' | '201']
 
-export type ResumeMaintenanceBody = MaintenanceControlOperation
+export type ResumeMemoryTreeAutomationBody = MemoryTreeAutomationOperation
 
-export type ResumeMaintenanceOptions = {
-  body: ResumeMaintenanceBody
+export type ResumeMemoryTreeAutomationOptions = {
+  body: ResumeMemoryTreeAutomationBody
   path?: never
   query?: never
   headers?: never
 }
 
-export type ResumeMaintenanceResponseBodyByStatus = {
-  '200': MaintenanceControlOperationResult
-  '201': MaintenanceControlOperationResult
+export type ResumeMemoryTreeAutomationResponseBodyByStatus = {
+  '200': MemoryTreeAutomationOperationResult
+  '201': MemoryTreeAutomationOperationResult
   '400': ErrorResponse
   '401': ErrorResponse
   '409': ErrorResponse
@@ -901,8 +948,8 @@ export type ResumeMaintenanceResponseBodyByStatus = {
 }
 
 /** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
-export type ResumeMaintenanceResponseBody =
-  ResumeMaintenanceResponseBodyByStatus['200' | '201']
+export type ResumeMemoryTreeAutomationResponseBody =
+  ResumeMemoryTreeAutomationResponseBodyByStatus['200' | '201']
 
 export type GetMemoryTreeRevisionPath = {
   /**
@@ -1002,6 +1049,27 @@ export type ListExtractionPublicationsResponseBodyByStatus = {
 export type ListExtractionPublicationsResponseBody =
   ListExtractionPublicationsResponseBodyByStatus['200']
 
+export type AbandonRevisionPublicationsBody = AutomaticRevisionPublicationOwner
+
+export type AbandonRevisionPublicationsOptions = {
+  body: AbandonRevisionPublicationsBody
+  path?: never
+  query?: never
+  headers?: never
+}
+
+export type AbandonRevisionPublicationsResponseBodyByStatus = {
+  '200': RevisionPublicationList
+  '400': ErrorResponse
+  '401': ErrorResponse
+  '413': ErrorResponse
+  '500': ErrorResponse
+}
+
+/** Response body selected by Kubb: success statuses when present, otherwise declared response bodies. */
+export type AbandonRevisionPublicationsResponseBody =
+  AbandonRevisionPublicationsResponseBodyByStatus['200']
+
 export type ReserveRevisionPublicationBody = MemoryTreeRevisionCreation
 
 export type ReserveRevisionPublicationOptions = {
@@ -1047,7 +1115,7 @@ export type ConfirmRevisionPublicationResponseBody =
   ConfirmRevisionPublicationResponseBodyByStatus['200']
 
 export type ListRevisionPublicationsPath = {
-  kind: 'maintenance' | 'operator'
+  kind: 'learning' | 'reorganization' | 'manual'
   /**
    * @minLength 1
    * @pattern ^[A-Za-z0-9._:-]+$
@@ -1082,18 +1150,19 @@ export interface OperationOptionsById {
   getObservationBacklog: GetObservationBacklogOptions
   listObservations: ListObservationsOptions
   getCatalogOverview: GetCatalogOverviewOptions
-  getMaintenanceInput: GetMaintenanceInputOptions
+  getLearningInput: GetLearningInputOptions
   createMemoryTreeRevision: CreateMemoryTreeRevisionOptions
   listMemoryTreeRevisions: ListMemoryTreeRevisionsOptions
   getMemoryTree: GetMemoryTreeOptions
   restoreMemoryTree: RestoreMemoryTreeOptions
-  getMaintenanceControl: GetMaintenanceControlOptions
-  pauseMaintenance: PauseMaintenanceOptions
-  resumeMaintenance: ResumeMaintenanceOptions
+  getMemoryTreeAutomation: GetMemoryTreeAutomationOptions
+  pauseMemoryTreeAutomation: PauseMemoryTreeAutomationOptions
+  resumeMemoryTreeAutomation: ResumeMemoryTreeAutomationOptions
   getMemoryTreeRevision: GetMemoryTreeRevisionOptions
   reserveExtractionPublication: ReserveExtractionPublicationOptions
   confirmExtractionPublication: ConfirmExtractionPublicationOptions
   listExtractionPublications: ListExtractionPublicationsOptions
+  abandonRevisionPublications: AbandonRevisionPublicationsOptions
   reserveRevisionPublication: ReserveRevisionPublicationOptions
   confirmRevisionPublication: ConfirmRevisionPublicationOptions
   listRevisionPublications: ListRevisionPublicationsOptions

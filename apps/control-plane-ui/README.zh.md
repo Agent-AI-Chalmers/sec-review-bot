@@ -147,8 +147,8 @@ BFF 还负责代理下载私有 RustFS 中的执行归档。它使用单独的 `
 
 服务端记忆文件树读取和构建代码实现版本化的 [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.zh.md)。它们不会进入浏览器 bundle；BFF 负责校验、摘要计算和规范对象键。
 
-设置 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_OPERATOR_TOKEN` 后，即可在控制台管理记忆：暂停或恢复自动维护、编辑当前生效的记忆文件树，以及恢复已有修订。
+设置 `MEMORY_CATALOG_URL` 和 `MEMORY_CATALOG_OPERATOR_TOKEN` 后，即可在控制台管理记忆：暂停或恢复记忆自动更新、编辑当前生效的记忆文件树，以及恢复已有修订。
 
 BFF 负责访问 Catalog 和对象存储，并在返回产物前校验大小和 SHA-256 摘要。浏览器不会获得存储 URI 或凭据。
 
-编辑失败后，保持编辑器打开且内容不变，可以重试同一次操作，复用原来的 operation ID；关闭或重新加载编辑器会开始新操作。编辑或恢复失败后，不会自动恢复记忆维护。
+编辑失败后，保持编辑器打开且内容不变，可以重试同一次操作，复用原来的 operation ID；关闭或重新加载编辑器会开始新操作。编辑和恢复版本不会改变记忆树自动更新状态。

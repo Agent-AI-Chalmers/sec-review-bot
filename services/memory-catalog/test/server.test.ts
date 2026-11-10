@@ -4,7 +4,8 @@ import { test } from 'node:test'
 import type { MemoryCatalogStore } from '../src/catalog-store.js'
 import {
   ExtractionConflictError,
-  MaintenancePausedError,
+  AutomationPausedError,
+  PublicationAbandonedError,
   MemoryTreeRevisionConflictError,
 } from '../src/catalog-store.js'
 import { createApp } from '../src/server.js'
@@ -26,8 +27,8 @@ const revision = {
     size_bytes: 42,
   },
   source: {
-    kind: 'maintenance' as const,
-    maintenance_id: 'maintenance-1',
+    kind: 'learning' as const,
+    operation_id: 'maintenance-1',
     extraction_ids: ['extraction-1'],
     trajectory_reference: {
       uri: 's3://sec-review/memory/trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
@@ -42,7 +43,7 @@ const revision = {
 const revisionCreationResult = {
   created: true,
   revision: 1,
-  source: { kind: 'maintenance' as const, maintenance_id: 'maintenance-1' },
+  source: { kind: 'learning' as const, operation_id: 'maintenance-1' },
 }
 
 const extraction = {
@@ -81,6 +82,7 @@ await test('the contract authenticates and validates extraction registration', a
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
     confirmExtractionPublication: () => Promise.reject(new Error('unused')),
     listExtractionPublications: () => Promise.resolve([]),
+    abandonRevisionPublications: () => Promise.resolve([]),
     reserveRevisionPublication: () => Promise.reject(new Error('unused')),
     confirmRevisionPublication: () => Promise.reject(new Error('unused')),
     listRevisionPublications: () => Promise.resolve([]),
@@ -90,8 +92,8 @@ await test('the contract authenticates and validates extraction registration', a
       extractions.push(input)
       return Promise.resolve(true)
     },
-    changeMaintenanceControl: () => Promise.reject(new Error('not used')),
-    getMaintenanceInput: () => Promise.resolve(null),
+    changeMemoryTreeAutomation: () => Promise.reject(new Error('not used')),
+    getLearningInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.resolve(revisionCreationResult),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
@@ -103,7 +105,7 @@ await test('the contract authenticates and validates extraction registration', a
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
-      getMaintenanceControl: () =>
+      getMemoryTreeAutomation: () =>
         Promise.resolve({
           state: 'enabled',
           generation: 0,
@@ -118,6 +120,15 @@ await test('the contract authenticates and validates extraction registration', a
     },
   }
   const app = await createApp({ store, ...auth })
+  for (const [method, url] of [
+    ['GET', '/v1/maintenance-control'],
+    ['POST', '/v1/maintenance-control/pause'],
+    ['POST', '/v1/maintenance-control/resume'],
+  ] as const) {
+    const obsolete = await app.inject({ method, url, headers: operatorHeaders })
+    assert.equal(obsolete.statusCode, 404)
+  }
+
   const unauthorized = await app.inject({
     method: 'POST',
     url: '/v1/extractions',
@@ -154,21 +165,21 @@ await test('worker and operator credentials are restricted to their write roles'
   })
   const workerPause = await app.inject({
     method: 'POST',
-    url: '/v1/maintenance-control/pause',
+    url: '/v1/memory-tree/automation/pause',
     headers: workerHeaders,
     payload: { operation_id: 'pause-1', expected_generation: 0 },
   })
-  const workerOperatorRevision = await app.inject({
+  const workerManualRevision = await app.inject({
     method: 'POST',
     url: '/v1/memory-tree/revisions',
     headers: workerHeaders,
     payload: {
       expected_active_revision: 0,
       memory_tree_reference: revision.memory_tree_reference,
-      source: { kind: 'operator', operation_id: 'edit-1' },
+      source: { kind: 'manual', operation_id: 'edit-1' },
     },
   })
-  const operatorMaintenanceRevision = await app.inject({
+  const operatorLearningRevision = await app.inject({
     method: 'POST',
     url: '/v1/memory-tree/revisions',
     headers: operatorHeaders,
@@ -178,11 +189,26 @@ await test('worker and operator credentials are restricted to their write roles'
       source: revision.source,
     },
   })
+  const operatorReorganizationRevision = await app.inject({
+    method: 'POST',
+    url: '/v1/memory-tree/revisions',
+    headers: operatorHeaders,
+    payload: {
+      expected_active_revision: 0,
+      memory_tree_reference: revision.memory_tree_reference,
+      source: {
+        kind: 'reorganization',
+        operation_id: 'maintenance-1',
+        trajectory_reference: revision.source.trajectory_reference,
+      },
+    },
+  })
 
   assert.equal(operatorRegistration.statusCode, 401)
   assert.equal(workerPause.statusCode, 401)
-  assert.equal(workerOperatorRevision.statusCode, 401)
-  assert.equal(operatorMaintenanceRevision.statusCode, 401)
+  assert.equal(workerManualRevision.statusCode, 401)
+  assert.equal(operatorLearningRevision.statusCode, 401)
+  assert.equal(operatorReorganizationRevision.statusCode, 401)
   await app.close()
 })
 
@@ -191,6 +217,7 @@ await test('an extraction identity conflict is a declared 409', async () => {
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
     confirmExtractionPublication: () => Promise.reject(new Error('unused')),
     listExtractionPublications: () => Promise.resolve([]),
+    abandonRevisionPublications: () => Promise.resolve([]),
     reserveRevisionPublication: () => Promise.reject(new Error('unused')),
     confirmRevisionPublication: () => Promise.reject(new Error('unused')),
     listRevisionPublications: () => Promise.resolve([]),
@@ -198,8 +225,8 @@ await test('an extraction identity conflict is a declared 409', async () => {
     close: () => Promise.resolve(),
     registerExtraction: () =>
       Promise.reject(new ExtractionConflictError('different content')),
-    changeMaintenanceControl: () => Promise.reject(new Error('not used')),
-    getMaintenanceInput: () => Promise.resolve(null),
+    changeMemoryTreeAutomation: () => Promise.reject(new Error('not used')),
+    getLearningInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.resolve(revisionCreationResult),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
@@ -211,7 +238,7 @@ await test('an extraction identity conflict is a declared 409', async () => {
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
-      getMaintenanceControl: () =>
+      getMemoryTreeAutomation: () =>
         Promise.resolve({
           state: 'enabled',
           generation: 0,
@@ -261,14 +288,15 @@ await test('completed extractions are queryable with or without an observation',
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
     confirmExtractionPublication: () => Promise.reject(new Error('unused')),
     listExtractionPublications: () => Promise.resolve([]),
+    abandonRevisionPublications: () => Promise.resolve([]),
     reserveRevisionPublication: () => Promise.reject(new Error('unused')),
     confirmRevisionPublication: () => Promise.reject(new Error('unused')),
     listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
-    changeMaintenanceControl: () => Promise.reject(new Error('not used')),
-    getMaintenanceInput: () => Promise.resolve(null),
+    changeMemoryTreeAutomation: () => Promise.reject(new Error('not used')),
+    getLearningInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.resolve(revisionCreationResult),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
@@ -281,7 +309,7 @@ await test('completed extractions are queryable with or without an observation',
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
-      getMaintenanceControl: () =>
+      getMemoryTreeAutomation: () =>
         Promise.resolve({
           state: 'enabled',
           generation: 0,
@@ -327,6 +355,7 @@ await test('completed extractions are queryable with or without an observation',
 await test('UI catalog reads expose paginated records and durable control state', async () => {
   const calls: unknown[] = []
   const overviewRanges: string[] = []
+  const automationChanges: unknown[] = []
   const control = {
     state: 'paused' as const,
     generation: 2,
@@ -337,14 +366,21 @@ await test('UI catalog reads expose paginated records and durable control state'
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
     confirmExtractionPublication: () => Promise.reject(new Error('unused')),
     listExtractionPublications: () => Promise.resolve([]),
+    abandonRevisionPublications: () => Promise.resolve([]),
     reserveRevisionPublication: () => Promise.reject(new Error('unused')),
     confirmRevisionPublication: () => Promise.reject(new Error('unused')),
     listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
-    changeMaintenanceControl: () => Promise.reject(new Error('not used')),
-    getMaintenanceInput: () => Promise.resolve(null),
+    changeMemoryTreeAutomation: (state, input) => {
+      automationChanges.push([state, input])
+      return Promise.resolve({
+        created: true,
+        automation: { ...control, state },
+      })
+    },
+    getLearningInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.resolve(revisionCreationResult),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
@@ -406,7 +442,7 @@ await test('UI catalog reads expose paginated records and durable control state'
           ],
         })
       },
-      getMaintenanceControl: () => Promise.resolve(control),
+      getMemoryTreeAutomation: () => Promise.resolve(control),
       getMemoryTree: () =>
         Promise.resolve({ revision: 0, memory_tree_reference: null }),
       getMemoryTreeRevision: () => Promise.resolve(undefined),
@@ -427,9 +463,9 @@ await test('UI catalog reads expose paginated records and durable control state'
     url: '/v1/observations?cursor=cursor-2&limit=20&status=consumed&consumed_revision=1',
     headers,
   })
-  const maintenanceControl = await app.inject({
+  const memoryTreeAutomation = await app.inject({
     method: 'GET',
-    url: '/v1/maintenance-control',
+    url: '/v1/memory-tree/automation',
     headers,
   })
   const overview = await app.inject({
@@ -469,7 +505,7 @@ await test('UI catalog reads expose paginated records and durable control state'
       },
     ],
   })
-  assert.deepEqual(maintenanceControl.json(), control)
+  assert.deepEqual(memoryTreeAutomation.json(), control)
   assert.deepEqual(overviewRanges, ['90d'])
   assert.deepEqual(calls, [
     [
@@ -489,11 +525,35 @@ await test('UI catalog reads expose paginated records and durable control state'
       { status: 'consumed', consumedRevision: 1 },
     ],
   ])
+  for (const [action, state] of [
+    ['pause', 'paused'],
+    ['resume', 'enabled'],
+  ] as const) {
+    const payload = {
+      operation_id: `automation-${action}`,
+      expected_generation: 2,
+    }
+    const response = await app.inject({
+      method: 'POST',
+      url: `/v1/memory-tree/automation/${action}`,
+      headers: operatorHeaders,
+      payload,
+    })
+    assert.equal(response.statusCode, 201)
+    assert.deepEqual(response.json(), {
+      created: true,
+      automation: { ...control, state },
+    })
+    assert.deepEqual(automationChanges.at(-1), [
+      state,
+      { ...payload, actor: { kind: 'service', id: 'memory-catalog-operator' } },
+    ])
+  }
   await app.close()
 })
 
-await test('maintenance input is read and a revision is created with resource semantics', async () => {
-  const maintenanceInput = {
+await test('learning input is read and a revision is created with resource semantics', async () => {
+  const learningInput = {
     expected_active_revision: 0,
     active_memory_tree_reference: null,
     observations: [
@@ -504,26 +564,32 @@ await test('maintenance input is read and a revision is created with resource se
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
     confirmExtractionPublication: () => Promise.reject(new Error('unused')),
     listExtractionPublications: () => Promise.resolve([]),
+    abandonRevisionPublications: () => Promise.resolve([]),
     reserveRevisionPublication: () => Promise.reject(new Error('unused')),
     confirmRevisionPublication: () => Promise.reject(new Error('unused')),
     listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
-    changeMaintenanceControl: () => Promise.reject(new Error('not used')),
-    getMaintenanceInput: (limit) =>
-      Promise.resolve(limit === 10 ? maintenanceInput : null),
+    changeMemoryTreeAutomation: () => Promise.reject(new Error('not used')),
+    getLearningInput: (limit) =>
+      Promise.resolve(limit === 10 ? learningInput : null),
     createMemoryTreeRevision: (input) =>
       Promise.resolve({
         created: true,
         revision: 1,
         source:
-          input.source.kind === 'maintenance'
+          input.source.kind === 'learning'
             ? {
-                kind: 'maintenance',
-                maintenance_id: input.source.maintenance_id,
+                kind: 'learning',
+                operation_id: input.source.operation_id,
               }
-            : { kind: 'operator', operation_id: input.source.operation_id },
+            : input.source.kind === 'reorganization'
+              ? {
+                  kind: 'reorganization',
+                  operation_id: input.source.operation_id,
+                }
+              : { kind: 'manual', operation_id: input.source.operation_id },
       }),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
@@ -535,7 +601,7 @@ await test('maintenance input is read and a revision is created with resource se
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 1, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
-      getMaintenanceControl: () =>
+      getMemoryTreeAutomation: () =>
         Promise.resolve({
           state: 'enabled',
           generation: 0,
@@ -553,7 +619,7 @@ await test('maintenance input is read and a revision is created with resource se
   const headers = workerHeaders
   const input = await app.inject({
     method: 'GET',
-    url: '/v1/maintenance-input?limit=10',
+    url: '/v1/learning-input?limit=10',
     headers,
   })
   const backlog = await app.inject({
@@ -576,13 +642,13 @@ await test('maintenance input is read and a revision is created with resource se
     pending_count: 1,
     oldest_pending_created_at: null,
   })
-  assert.deepEqual(input.json(), { input: maintenanceInput })
+  assert.deepEqual(input.json(), { input: learningInput })
   assert.equal(created.statusCode, 201)
   assert.equal(created.headers.location, '/v1/memory-tree/revisions/1')
   assert.deepEqual(created.json(), {
     created: true,
     revision: 1,
-    source: { kind: 'maintenance', maintenance_id: 'maintenance-1' },
+    source: { kind: 'learning', operation_id: 'maintenance-1' },
   })
   await app.close()
 })
@@ -592,14 +658,15 @@ function storeWithRevisionFailure(error: Error): MemoryCatalogStore {
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
     confirmExtractionPublication: () => Promise.reject(new Error('unused')),
     listExtractionPublications: () => Promise.resolve([]),
+    abandonRevisionPublications: () => Promise.resolve([]),
     reserveRevisionPublication: () => Promise.reject(new Error('unused')),
     confirmRevisionPublication: () => Promise.reject(new Error('unused')),
     listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
-    changeMaintenanceControl: () => Promise.reject(new Error('not used')),
-    getMaintenanceInput: () => Promise.resolve(null),
+    changeMemoryTreeAutomation: () => Promise.reject(new Error('not used')),
+    getLearningInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.reject(error),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
@@ -611,7 +678,7 @@ function storeWithRevisionFailure(error: Error): MemoryCatalogStore {
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
-      getMaintenanceControl: () =>
+      getMemoryTreeAutomation: () =>
         Promise.resolve({
           state: 'enabled',
           generation: 0,
@@ -663,15 +730,17 @@ await test('revision conflicts are declared as 409', async () => {
   assert.equal(responseCode(response), 'CONFLICT')
 })
 
-await test('a paused maintenance commit has its own 409 code', async () => {
+await test('a paused automatic revision commit has its own 409 code', async () => {
   const response = await postRevision(
     storeWithRevisionFailure(
-      new MaintenancePausedError('Automatic memory maintenance is paused.'),
+      new AutomationPausedError(
+        'Automatic memory-tree revision commits are paused.',
+      ),
     ),
   )
 
   assert.equal(response.statusCode, 409)
-  assert.equal(responseCode(response), 'MAINTENANCE_PAUSED')
+  assert.equal(responseCode(response), 'AUTOMATION_PAUSED')
 })
 
 await test('restore moves the active pointer through its own operation', async () => {
@@ -680,14 +749,15 @@ await test('restore moves the active pointer through its own operation', async (
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
     confirmExtractionPublication: () => Promise.reject(new Error('unused')),
     listExtractionPublications: () => Promise.resolve([]),
+    abandonRevisionPublications: () => Promise.resolve([]),
     reserveRevisionPublication: () => Promise.reject(new Error('unused')),
     confirmRevisionPublication: () => Promise.reject(new Error('unused')),
     listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
-    changeMaintenanceControl: () => Promise.reject(new Error('not used')),
-    getMaintenanceInput: () => Promise.resolve(null),
+    changeMemoryTreeAutomation: () => Promise.reject(new Error('not used')),
+    getLearningInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.resolve(revisionCreationResult),
     restoreMemoryTree: (input) => {
       restores.push(input)
@@ -706,7 +776,7 @@ await test('restore moves the active pointer through its own operation', async (
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
-      getMaintenanceControl: () =>
+      getMemoryTreeAutomation: () =>
         Promise.resolve({
           state: 'enabled',
           generation: 0,
@@ -754,14 +824,15 @@ await test('memory tree revision history is queryable through the public contrac
     reserveExtractionPublication: () => Promise.reject(new Error('unused')),
     confirmExtractionPublication: () => Promise.reject(new Error('unused')),
     listExtractionPublications: () => Promise.resolve([]),
+    abandonRevisionPublications: () => Promise.resolve([]),
     reserveRevisionPublication: () => Promise.reject(new Error('unused')),
     confirmRevisionPublication: () => Promise.reject(new Error('unused')),
     listRevisionPublications: () => Promise.resolve([]),
     initialize: () => Promise.resolve(),
     close: () => Promise.resolve(),
     registerExtraction: () => Promise.resolve(true),
-    changeMaintenanceControl: () => Promise.reject(new Error('not used')),
-    getMaintenanceInput: () => Promise.resolve(null),
+    changeMemoryTreeAutomation: () => Promise.reject(new Error('not used')),
+    getLearningInput: () => Promise.resolve(null),
     createMemoryTreeRevision: () => Promise.resolve(revisionCreationResult),
     restoreMemoryTree: () => Promise.reject(new Error('not used')),
     queries: {
@@ -773,7 +844,7 @@ await test('memory tree revision history is queryable through the public contrac
       getObservationBacklog: () =>
         Promise.resolve({ pending_count: 0, oldest_pending_created_at: null }),
       getCatalogOverview: () => Promise.resolve(emptyOverview),
-      getMaintenanceControl: () =>
+      getMemoryTreeAutomation: () =>
         Promise.resolve({
           state: 'enabled',
           generation: 0,
@@ -887,7 +958,7 @@ await test('publication endpoints enforce producer roles and return complete rec
     }
     const listed = await app.inject({
       method: 'GET',
-      url: '/v1/memory-tree/revisions/publications/maintenance/maintenance-1',
+      url: '/v1/memory-tree/revisions/publications/learning/maintenance-1',
       headers: workerHeaders,
     })
     assert.deepEqual(listed.json(), {
@@ -895,7 +966,7 @@ await test('publication endpoints enforce producer roles and return complete rec
     })
     const forbidden = await app.inject({
       method: 'GET',
-      url: '/v1/memory-tree/revisions/publications/operator/edit-1',
+      url: '/v1/memory-tree/revisions/publications/manual/edit-1',
       headers: workerHeaders,
     })
     assert.equal(forbidden.statusCode, 401)
@@ -925,6 +996,62 @@ await test('publication endpoints enforce producer roles and return complete rec
       status: 'reserved',
     })
     assert.equal(calls.length, 1)
+  } finally {
+    await app.close()
+  }
+})
+
+await test('only workers can abandon automatic publications and abandoned commits have a distinct error code', async () => {
+  const store = storeWithRevisionFailure(
+    new PublicationAbandonedError('Revision operation has been abandoned.'),
+  )
+  const calls: unknown[] = []
+  store.abandonRevisionPublications = (input) => {
+    calls.push(input)
+    return Promise.resolve([])
+  }
+  const app = await createApp({ store, ...auth })
+  try {
+    const payload = { kind: 'learning', operation_id: 'abandon-1' }
+    const url = '/v1/memory-tree/revisions/publications/abandon'
+    const denied = await app.inject({
+      method: 'POST',
+      url,
+      headers: operatorHeaders,
+      payload,
+    })
+    assert.equal(denied.statusCode, 401)
+    const invalid = await app.inject({
+      method: 'POST',
+      url,
+      headers: workerHeaders,
+      payload: { ...payload, kind: 'manual' },
+    })
+    assert.equal(invalid.statusCode, 400)
+    const accepted = await app.inject({
+      method: 'POST',
+      url,
+      headers: workerHeaders,
+      payload,
+    })
+    assert.equal(accepted.statusCode, 200)
+    assert.deepEqual(accepted.json(), { publications: [] })
+    assert.deepEqual(calls, [payload])
+    const committed = await app.inject({
+      method: 'POST',
+      url: '/v1/memory-tree/revisions',
+      headers: workerHeaders,
+      payload: {
+        expected_active_revision: 0,
+        memory_tree_reference: revision.memory_tree_reference,
+        source: revision.source,
+      },
+    })
+    assert.equal(committed.statusCode, 409)
+    assert.equal(
+      committed.json<{ code: string }>().code,
+      'PUBLICATION_ABANDONED',
+    )
   } finally {
     await app.close()
   }

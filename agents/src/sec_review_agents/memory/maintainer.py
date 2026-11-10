@@ -31,8 +31,18 @@ def _prepare_worktree(
     base_memory_tree: Path | None,
     observations: list[tuple[str, Path]],
     worktree_root: Path,
+    reorganization: bool,
 ) -> list[tuple[str, str]]:
-    if not observations:
+    if reorganization:
+        if base_memory_tree is None:
+            raise ValueError(
+                "Memory reorganization requires an existing base memory tree."
+            )
+        if observations:
+            raise ValueError(
+                "Memory reorganization must not receive selected observations."
+            )
+    elif not observations:
         raise ValueError("Memory maintenance requires at least one observation.")
     extraction_ids = [extraction_id for extraction_id, _path in observations]
     if len(extraction_ids) != len(set(extraction_ids)):
@@ -49,6 +59,9 @@ def _prepare_worktree(
         if not (resolved_base / "MEMORY.md").is_file():
             raise ValueError(f"Base memory tree index is missing: {resolved_base}")
         shutil.copytree(resolved_base, worktree_root)
+
+    if reorganization and not any((worktree_root / "topics").rglob("*.md")):
+        raise ValueError("Memory reorganization requires at least one existing topic.")
 
     observations_root = worktree_root / "observations"
     observations_root.mkdir()
@@ -70,12 +83,14 @@ async def maintain_memory_tree(
     worktree_root: Path,
     maintainer_trajectory_path: Path,
     deployment: str | None = None,
+    reorganization: bool = False,
 ) -> MemoryMaintenanceResult:
     """Generate a candidate memory tree from explicit immutable inputs."""
     prompt_observations = _prepare_worktree(
         base_memory_tree=base_memory_tree,
         observations=observations,
         worktree_root=worktree_root,
+        reorganization=reorganization,
     )
     backend = create_backend_with_path_views(
         container_name_prefix="memory-maintainer",
@@ -91,7 +106,9 @@ async def maintain_memory_tree(
             model=model,
             backend=backend,
             worktree_root=worktree_root,
-            user_prompt=build_maintenance_prompt(prompt_observations),
+            user_prompt=build_maintenance_prompt(
+                prompt_observations, reorganization=reorganization
+            ),
             trajectory_paths=(maintainer_trajectory_path,),
         )
     return MemoryMaintenanceResult(

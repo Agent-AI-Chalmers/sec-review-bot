@@ -15,9 +15,10 @@ from jsonschema.exceptions import ValidationError
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.contract_versions import MEMORY_CATALOG_API_VERSION
 from sec_review_agents.memory.catalog_client import (
+    MemoryAutomationPausedError,
     MemoryCatalogClient,
     MemoryCatalogConflictError,
-    MemoryMaintenancePausedError,
+    MemoryPublicationAbandonedError,
 )
 from tests.project_paths import CONTRACTS_ROOT
 
@@ -77,8 +78,8 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         "predecessor_revision": None,
         "memory_tree_reference": _artifact("memory").as_dict(),
         "source": {
-            "kind": "maintenance",
-            "maintenance_id": "maintenance-1",
+            "kind": "learning",
+            "operation_id": "maintenance-1",
             "extraction_ids": ["extraction-1"],
             "trajectory_reference": _artifact(
                 "maintenance-trajectory.jsonl.zst",
@@ -87,7 +88,7 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         },
         "created_at": "2026-10-23T00:00:00Z",
     }
-    maintenance_input = {
+    learning_input = {
         "expected_active_revision": 1,
         "active_memory_tree_reference": _artifact("memory").as_dict(),
         "observations": [
@@ -121,7 +122,7 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         ],
         "next_cursor": None,
     }
-    maintenance_control = {
+    memory_tree_automation = {
         "state": "enabled",
         "generation": 0,
         "changed_by": {"kind": "service", "id": "memory-catalog"},
@@ -134,12 +135,12 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
             extraction_list,
             observation_list,
             {"pending_count": 1, "oldest_pending_created_at": None},
-            maintenance_control,
-            {"input": maintenance_input},
+            memory_tree_automation,
+            {"input": learning_input},
             {
                 "created": True,
                 "revision": 2,
-                "source": {"kind": "maintenance", "maintenance_id": "maintenance-2"},
+                "source": {"kind": "learning", "operation_id": "maintenance-2"},
             },
             memory_tree,
             revision,
@@ -180,21 +181,21 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         == observation_list
     )
     assert client.get_observation_backlog()["pending_count"] == 1
-    assert client.get_maintenance_control() == maintenance_control
-    assert client.get_maintenance_input(limit=10) == maintenance_input
-    assert client.create_memory_tree_revision(
-        maintenance_id="maintenance-2",
+    assert client.get_memory_tree_automation() == memory_tree_automation
+    assert client.get_learning_input(limit=10) == learning_input
+    assert client.create_learning_revision(
+        operation_id="maintenance-2",
         expected_active_revision=1,
         extraction_ids=["extraction-1"],
         memory_tree_reference=_artifact("memory-2"),
-        maintenance_trajectory_reference=_artifact(
+        trajectory_reference=_artifact(
             "maintenance-trajectory.jsonl.zst",
             media_type="application/zstd",
         ),
     ) == {
         "created": True,
         "revision": 2,
-        "source": {"kind": "maintenance", "maintenance_id": "maintenance-2"},
+        "source": {"kind": "learning", "operation_id": "maintenance-2"},
     }
     assert client.get_memory_tree() == memory_tree
     assert client.get_memory_tree_revision(1) == revision
@@ -221,8 +222,8 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
             ),
         ),
         ("GET", f"{API_ROOT}/observation-backlog"),
-        ("GET", f"{API_ROOT}/maintenance-control"),
-        ("GET", f"{API_ROOT}/maintenance-input?limit=10"),
+        ("GET", f"{API_ROOT}/memory-tree/automation"),
+        ("GET", f"{API_ROOT}/learning-input?limit=10"),
         ("POST", f"{API_ROOT}/memory-tree/revisions"),
         ("GET", f"{API_ROOT}/memory-tree"),
         ("GET", f"{API_ROOT}/memory-tree/revisions/1"),
@@ -250,14 +251,14 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
             "ObservationBacklog",
             {"pending_count": 1, "oldest_pending_created_at": None},
         ),
-        ("MaintenanceControl", maintenance_control),
-        ("MaintenanceInputResult", {"input": maintenance_input}),
+        ("MemoryTreeAutomation", memory_tree_automation),
+        ("LearningInputResult", {"input": learning_input}),
         (
             "MemoryTreeRevisionCreationResult",
             {
                 "created": True,
                 "revision": 2,
-                "source": {"kind": "maintenance", "maintenance_id": "maintenance-2"},
+                "source": {"kind": "learning", "operation_id": "maintenance-2"},
             },
         ),
         ("MemoryTree", memory_tree),
@@ -301,11 +302,16 @@ def test_extraction_conflict_preserves_non_retryable_catalog_semantics() -> None
         )
 
 
-def test_maintenance_pause_preserves_its_own_conflict_semantics() -> None:
+def test_automation_pause_preserves_its_own_conflict_semantics() -> None:
+    for obsolete_code in ["MAINTENANCE_PAUSED", "MEMORY_MAINTENANCE_PAUSED"]:
+        with pytest.raises(ValidationError):
+            _validator("ErrorResponse").validate(
+                {"error": "Paused.", "code": obsolete_code}
+            )
     _validator("ErrorResponse").validate(
         {
-            "error": "Automatic memory maintenance is paused.",
-            "code": "MAINTENANCE_PAUSED",
+            "error": "Automatic memory-tree revision commits are paused.",
+            "code": "AUTOMATION_PAUSED",
         }
     )
     client = MemoryCatalogClient(base_url="http://catalog", token="secret")
@@ -315,8 +321,8 @@ def test_maintenance_pause_preserves_its_own_conflict_semantics() -> None:
         "Conflict",
         Message(),
         BytesIO(
-            b'{"error":"Automatic memory maintenance is paused.",'
-            b'"code":"MAINTENANCE_PAUSED"}'
+            b'{"error":"Automatic memory-tree revision commits are paused.",'
+            b'"code":"AUTOMATION_PAUSED"}'
         ),
     )
 
@@ -325,14 +331,14 @@ def test_maintenance_pause_preserves_its_own_conflict_semantics() -> None:
             "sec_review_agents.memory.catalog_client._open_catalog_request",
             side_effect=paused,
         ),
-        pytest.raises(MemoryMaintenancePausedError, match="HTTP 409"),
+        pytest.raises(MemoryAutomationPausedError, match="HTTP 409"),
     ):
-        client.create_memory_tree_revision(
-            maintenance_id="maintenance-1",
+        client.create_learning_revision(
+            operation_id="maintenance-1",
             expected_active_revision=1,
             extraction_ids=["extraction-1"],
             memory_tree_reference=_artifact("memory"),
-            maintenance_trajectory_reference=_artifact(
+            trajectory_reference=_artifact(
                 "maintenance-trajectory.jsonl.zst",
                 media_type="application/zstd",
             ),
@@ -389,9 +395,9 @@ def test_catalog_client_does_not_forward_credentials_across_redirects() -> None:
         target.server_close()
 
 
-def test_operator_revision_and_restore_contracts_are_separate() -> None:
+def test_manual_revision_and_restore_contracts_are_separate() -> None:
     source: dict[str, Any] = {
-        "kind": "operator",
+        "kind": "manual",
         "operation_id": "operation-1",
     }
     base = {
@@ -420,4 +426,132 @@ def test_operator_revision_and_restore_contracts_are_separate() -> None:
     with pytest.raises(ValidationError):
         restore_validator.validate(
             {key: value for key, value in restore.items() if key != "restored_revision"}
+        )
+
+
+@pytest.mark.parametrize(
+    ("kind", "old_kind"),
+    [
+        ("learning", "maintenance"),
+        ("reorganization", "consolidation"),
+        ("manual", "operator"),
+    ],
+)
+def test_revision_kind_contract_uses_explicit_revision_types(
+    kind: str, old_kind: str
+) -> None:
+    source: dict[str, Any] = {"kind": kind, "operation_id": "operation-1"}
+    if kind != "manual":
+        source["trajectory_reference"] = _artifact(
+            "trajectory.jsonl.zst", media_type="application/zstd"
+        ).as_dict()
+        if kind == "learning":
+            source["extraction_ids"] = ["extraction-1"]
+    value = {
+        "expected_active_revision": 1,
+        "memory_tree_reference": _artifact("memory").as_dict(),
+        "source": source,
+    }
+    validator = _validator("MemoryTreeRevisionCreation")
+    validator.validate(value)
+    if kind != "manual":
+        with pytest.raises(ValidationError):
+            validator.validate(
+                {
+                    **value,
+                    "source": {
+                        **{
+                            key: item
+                            for key, item in source.items()
+                            if key != "operation_id"
+                        },
+                        "maintenance_id": source["operation_id"],
+                    },
+                }
+            )
+    source["kind"] = old_kind
+    with pytest.raises(ValidationError):
+        validator.validate(value)
+
+
+@pytest.mark.parametrize(
+    ("state", "action"), [("paused", "pause"), ("enabled", "resume")]
+)
+def test_automation_control_request_matches_contract(state: str, action: str) -> None:
+    automation = {
+        "state": state,
+        "generation": 1,
+        "changed_by": {"kind": "service", "id": "memory-catalog"},
+        "changed_at": "2026-11-10T00:00:00Z",
+    }
+    expected = {"created": True, "automation": automation}
+    client = _RecordingClient([expected])
+    result = client.change_memory_tree_automation(
+        target_state=state, operation_id="automation-1", expected_generation=0
+    )
+    assert result == expected
+    method, path, body = client.requests[0]
+    assert (method, path) == ("POST", f"{API_ROOT}/memory-tree/automation/{action}")
+    _validator("MemoryTreeAutomationOperation").validate(body)
+    _validator("MemoryTreeAutomationOperationResult").validate(result)
+
+
+@pytest.mark.parametrize("kind", ["learning", "reorganization"])
+def test_publication_abandonment_matches_worker_contract(kind):
+    client = _RecordingClient([{"publications": []}])
+    client.abandon_revision_publications("operation-1", kind=kind)
+    method, path, body = client.requests[0]
+    assert method == "POST"
+    assert path == f"{API_ROOT}/memory-tree/revisions/publications/abandon"
+    _validator("AutomaticRevisionPublicationOwner").validate(body)
+    assert body == {"kind": kind, "operation_id": "operation-1"}
+
+
+@pytest.mark.parametrize("action", ["reserve", "confirm"])
+def test_abandoned_publication_responses_stop_preparation(action):
+    intent = {
+        "expected_active_revision": 0,
+        "memory_tree_reference": _artifact("tree").as_dict(),
+        "source": {
+            "kind": "reorganization",
+            "operation_id": "operation-1",
+            "trajectory_reference": _artifact(
+                "trajectory", media_type="application/zstd"
+            ).as_dict(),
+        },
+    }
+    response = {"intent": intent, "status": "abandoned"}
+    _validator("RevisionPublication").validate(response)
+    client = _RecordingClient([response])
+    with pytest.raises(MemoryPublicationAbandonedError):
+        if action == "reserve":
+            client.reserve_revision_publication(intent)
+        else:
+            client.confirm_revision_publication(intent)
+
+
+def test_abandoned_publication_http_conflict_preserves_its_semantics():
+    client = MemoryCatalogClient(base_url="http://catalog", token="secret")
+    error = HTTPError(
+        "http://catalog",
+        409,
+        "Conflict",
+        Message(),
+        BytesIO(b'{"error":"Abandoned.","code":"PUBLICATION_ABANDONED"}'),
+    )
+    _validator("ErrorResponse").validate(
+        {"error": "Abandoned.", "code": "PUBLICATION_ABANDONED"}
+    )
+    with (
+        patch(
+            "sec_review_agents.memory.catalog_client._open_catalog_request",
+            side_effect=error,
+        ),
+        pytest.raises(MemoryPublicationAbandonedError),
+    ):
+        client.create_reorganization_revision(
+            operation_id="operation-1",
+            expected_active_revision=0,
+            memory_tree_reference=_artifact("tree"),
+            trajectory_reference=_artifact("trajectory", media_type="application/zstd"),
         )

@@ -15,7 +15,7 @@ const artifact = {
   size_bytes: 42,
 }
 
-const maintenanceTrajectory = {
+const revisionTrajectory = {
   uri: 's3://sec-review/memory/trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
   digest: `sha256:${'b'.repeat(64)}`,
   media_type: 'application/zstd',
@@ -38,37 +38,34 @@ await test('memory tree revision history pagination returns an exclusive descend
         rows: [
           {
             revision: '4',
-            source_kind: 'maintenance',
-            maintenance_id: 'maintenance-4',
+            source_kind: 'learning',
+            operation_id: 'maintenance-4',
             predecessor_revision: '3',
             extraction_ids: ['extraction-4'],
             memory_tree_reference: artifact,
-            maintenance_trajectory_reference: maintenanceTrajectory,
-            operation_id: null,
+            trajectory_reference: revisionTrajectory,
             actor: null,
             created_at: new Date('2026-10-23T04:00:00Z'),
           },
           {
             revision: '3',
-            source_kind: 'maintenance',
-            maintenance_id: 'maintenance-3',
+            source_kind: 'learning',
+            operation_id: 'maintenance-3',
             predecessor_revision: '2',
             extraction_ids: ['extraction-3'],
             memory_tree_reference: artifact,
-            maintenance_trajectory_reference: maintenanceTrajectory,
-            operation_id: null,
+            trajectory_reference: revisionTrajectory,
             actor: null,
             created_at: new Date('2026-10-23T03:00:00Z'),
           },
           {
             revision: '2',
-            source_kind: 'maintenance',
-            maintenance_id: 'maintenance-2',
+            source_kind: 'learning',
+            operation_id: 'maintenance-2',
             predecessor_revision: '1',
             extraction_ids: ['extraction-2'],
             memory_tree_reference: artifact,
-            maintenance_trajectory_reference: maintenanceTrajectory,
-            operation_id: null,
+            trajectory_reference: revisionTrajectory,
             actor: null,
             created_at: new Date('2026-10-23T02:00:00Z'),
           },
@@ -325,7 +322,7 @@ await test('all-time catalog overview uses UTC month periods including an empty 
   assert.match(trendQuery?.sql ?? '', /coalesce\(/)
 })
 
-await test('maintenance control reads the durable singleton state', async () => {
+await test('memory-tree automation reads the durable singleton state', async () => {
   const pool = {
     query: () =>
       Promise.resolve({
@@ -343,10 +340,48 @@ await test('maintenance control reads the durable singleton state', async () => 
   } as unknown as Pool
   const queries = new PostgresMemoryCatalogQueries(pool)
 
-  assert.deepEqual(await queries.getMaintenanceControl(), {
+  assert.deepEqual(await queries.getMemoryTreeAutomation(), {
     state: 'enabled',
     generation: 0,
     changed_by: { kind: 'service', id: 'memory-catalog' },
     changed_at: '2026-10-23T00:00:00.000Z',
+  })
+})
+
+await test('reorganization revisions retain their source and trajectory in detail and history', async () => {
+  const pool = {
+    query: () =>
+      Promise.resolve({
+        rows: [
+          {
+            revision: '2',
+            predecessor_revision: '1',
+            source_kind: 'reorganization',
+            operation_id: 'reorganization-2',
+            extraction_ids: [],
+            trajectory_reference: revisionTrajectory,
+            actor: null,
+            memory_tree_reference: artifact,
+            created_at: new Date('2026-10-23T04:00:00Z'),
+          },
+        ],
+      }),
+  } as unknown as Pool
+  const queries = new PostgresMemoryCatalogQueries(pool)
+  const expected = {
+    revision: 2,
+    predecessor_revision: 1,
+    source: {
+      kind: 'reorganization',
+      operation_id: 'reorganization-2',
+      trajectory_reference: revisionTrajectory,
+    },
+    memory_tree_reference: artifact,
+    created_at: '2026-10-23T04:00:00.000Z',
+  }
+  assert.deepEqual(await queries.getMemoryTreeRevision(2), expected)
+  assert.deepEqual(await queries.listMemoryTreeRevisions(undefined, 10), {
+    revisions: [expected],
+    next_before_revision: null,
   })
 })

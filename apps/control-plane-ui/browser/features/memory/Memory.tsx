@@ -8,7 +8,7 @@ import {
 } from '../../shared/api-client.js'
 import { useMessages, type Message } from '../../shared/i18n.js'
 import type {
-  MaintenanceControlOperation,
+  MemoryTreeAutomationOperation,
   MemoryTreeRestoreOperation,
   MemoryTreeRevision
 } from './api-types.generated.js'
@@ -28,7 +28,6 @@ import {
 } from '../trajectory/TrajectoryViewer.js'
 
 type Revision = MemoryTreeRevision
-type MaintenanceControlRequest = Omit<MaintenanceControlOperation, 'actor'>
 type RestoreRequest = Omit<MemoryTreeRestoreOperation, 'actor'>
 
 function operationId(): string {
@@ -38,7 +37,7 @@ function operationId(): string {
 export function Memory(): React.JSX.Element {
   const t = useMessages()
   const {
-    control,
+    automation,
     tree,
     revisions,
     observations,
@@ -80,23 +79,25 @@ export function Memory(): React.JSX.Element {
     })
   }
 
-  const controlAction = async (action: 'pause' | 'resume'): Promise<void> => {
-    if (control.data === undefined) return
+  const automationAction = async (
+    action: 'pause' | 'resume'
+  ): Promise<void> => {
+    if (automation.data === undefined) return
     setBusy(true)
     setError('')
     try {
       const request = {
         operation_id: operationId(),
-        expected_generation: control.data.generation
-      } satisfies MaintenanceControlRequest
-      await apiPost(`/memory/${action}`, request)
+        expected_generation: automation.data.generation
+      } satisfies MemoryTreeAutomationOperation
+      await apiPost(`/memory/tree/automation/${action}`, request)
       await refresh()
     } catch (failure) {
       if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
       setError(
         failure instanceof ApiError && failure.status === 409
-          ? t('memoryControlConflict')
-          : t('memoryControlFailed')
+          ? t('memoryAutomationConflict')
+          : t('memoryAutomationFailed')
       )
     } finally {
       setBusy(false)
@@ -159,7 +160,7 @@ export function Memory(): React.JSX.Element {
   const queryError =
     queryFailure ??
     [
-      control.error,
+      automation.error,
       tree.error,
       revisions.error,
       observations.error,
@@ -170,7 +171,10 @@ export function Memory(): React.JSX.Element {
   // A failure the boundary should handle is not also rendered as a per-panel message.
   const failureText = (failure: unknown, message: Message): string =>
     failure === undefined || isUnauthorizedApiError(failure) ? '' : t(message)
-  const controlError = failureText(control.error, 'memoryControlLoadFailed')
+  const automationError = failureText(
+    automation.error,
+    'memoryAutomationLoadFailed'
+  )
   const treeError = failureText(tree.error, 'memoryTreeLoadFailed')
   const revisionsError = failureText(
     revisions.error,
@@ -193,20 +197,20 @@ export function Memory(): React.JSX.Element {
         </Alert>
       )}
       <MemoryHeader
-        control={control.data}
+        automation={automation.data}
         activeRevision={activeRevision}
         busy={busy}
-        controlLoading={control.loading}
+        automationLoading={automation.loading}
         treeLoading={tree.loading}
-        controlError={controlError}
+        automationError={automationError}
         treeError={treeError}
         refresh={refresh}
         refreshing={refreshing}
         lastChecked={lastChecked}
-        onToggleMaintenance={() => {
-          if (control.data)
-            void controlAction(
-              control.data.state === 'enabled' ? 'pause' : 'resume'
+        onToggleAutomation={() => {
+          if (automation.data)
+            void automationAction(
+              automation.data.state === 'enabled' ? 'pause' : 'resume'
             )
         }}
         onEdit={() => void beginEdit()}
