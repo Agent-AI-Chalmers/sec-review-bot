@@ -24,12 +24,8 @@ from langgraph.runtime import Runtime
 from sec_review_agents.resources.loader import load_prompt_resource
 from sec_review_agents.runtime.system_messages import append_to_system_message
 
-REPOSITORY_INSTRUCTIONS_PATH = "/workspace/AGENTS.md"
 REPOSITORY_INSTRUCTIONS_MAX_LINES = 1000
 REPOSITORY_INSTRUCTIONS_MAX_CHARS = 64_000
-REPOSITORY_INSTRUCTIONS_SYSTEM_PROMPT = load_prompt_resource(
-    "repository-instructions/system.md"
-)
 _HTML_COMMENTS = re.compile(r"<!--.*?-->", re.DOTALL)
 
 
