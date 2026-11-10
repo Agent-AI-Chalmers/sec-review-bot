@@ -52,7 +52,7 @@ Parse unified diff content and collect, per file:
 
 #### 2. Restrict to PR-visible files
 
-Keep only patch files that match entries from `pulls.listFiles`, the GitHub API source for PR changed-file metadata and visible patch hunks.
+Keep only patch files that are in the run's review window: the whole pull request, or for an incremental review only the files changed since the previously reviewed head. These entries carry the changed-file metadata and patch hunks that step 4 anchors against.
 
 #### 3. Build suggestion replacements and bodies
 

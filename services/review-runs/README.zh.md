@@ -88,7 +88,12 @@ flowchart LR
   prepending[pending] -->|领取| preparing
   preparing -->|input 被接受| submitted
   preparing -->|重试| prepending
-  preparing -->|失败| prepfailed[failed]
+  preparing -->|领取租约过期| prepuncertain[uncertain]
+  prepuncertain -->|重新领取以确认| preparing
+  preparing -->|无法自动得出结论| prepdisconnected[disconnected]
+  prepdisconnected -->|操作员恢复| prepuncertain
+  prepdisconnected -->|操作员放弃| prepfailed[failed]
+  preparing -->|失败| prepfailed
 ```
 
 `executions.status` / `execution.status`：
@@ -98,12 +103,15 @@ flowchart LR
   pending -->|提交 input| queued
   pending -->|准备失败| skipped
   pending -->|提交结果未确认| uncertain
+  uncertain -->|重放被接受| queued
+  uncertain -->|重放被拒绝| failed
+  uncertain -->|恢复预算用尽| disconnected
+  disconnected -->|操作员恢复| uncertain
+  disconnected -->|操作员放弃| failed
   queued --> running --> succeeded
   queued --> succeeded
   queued --> failed
   running --> failed
-  uncertain -->|重放被接受| queued
-  uncertain -->|重放被拒绝| failed
 ```
 
 `publications.status`：
@@ -111,8 +119,13 @@ flowchart LR
 ```mermaid
 flowchart LR
   pubpending[pending] --> publishing --> published
+  publishing -->|某步骤可能已生效| pubuncertain[uncertain]
+  pubuncertain -->|步骤已确定| publishing
+  pubuncertain -->|核对无法得出结论| pubdisconnected[disconnected]
+  pubdisconnected -->|操作员恢复| pubpending
+  pubdisconnected -->|操作员放弃| pubfailed[failed]
   publishing -->|可重试失败| pubpending
-  publishing -->|终态失败| pubfailed[failed]
+  publishing -->|终态失败| pubfailed
   pubpending -->|执行结果不可发布| skipped
   publishing -->|执行失败| skipped
 ```
@@ -124,14 +137,37 @@ flowchart LR
   steppending[pending] --> runningstep[running] --> stepsucceeded[succeeded]
   runningstep --> stepfailed[failed]
   stepfailed --> runningstep
-  stepfailed -->|达到上限且确认远端不存在| terminalfailed[terminal_failed]
+  runningstep -->|终态错误| terminalfailed[terminal_failed]
+  stepfailed -->|尝试次数用尽| stepuncertain[uncertain]
+  runningstep -->|尝试次数用尽| stepuncertain
+  stepuncertain -->|核对确认远端存在| stepsucceeded
+  stepuncertain -->|核对确认远端不存在| terminalfailed
+  stepuncertain -->|核对预算用尽| stepdisconnected[disconnected]
+  stepdisconnected -->|操作员恢复| steppending
 ```
 
-这些轴通过以下跨轴触发关系连接：preparation 进入 `submitted` 后提交 Execution input，execution 进入 `succeeded` 后 publication 变为可领取，publication 被领取后初始化 connector 副作用。这些是 orchestration trigger，不是同一张表内的状态迁移。
+_图中省略了两条只记录审计事件、不改变状态的自环：execution 的 `uncertain → uncertain`（领取重放）和 publication 的 `publishing → publishing`（发布租约过期）。_
 
-`publication_steps.attempt_count` 就是该步骤的重试预算，而预算唯一计量的单位是「尝试」：一次尝试在被启动时就已消耗，因此中途死亡的 publisher 与一次失败的尝试消耗同样的额度。判断「还能不能再试一次」只以这个计数为准——不是失败次数，不是崩溃次数，也不是时间。系统不单独保存失败次数：步骤上的 `failed` 迁移本身，已经由 `failure_code`、`failure_message` 以及 run 的事件日志记录下来。`recovery_attempt_count` 则记录确认远端结果的失败次数：查询远端状态不会重复写入副作用，因此普通的远端结果确认不会推进 `attempt_count`。
+各轴之间由三个跨轴触发连接。它们是 orchestration trigger，不是同一张表内的状态迁移：
 
-达到尝试上限并不会让步骤直接失败。任何启动过的尝试，都可能在其所有者死亡或响应丢失之前已在远端系统完成了副作用，而 Review Runs 看不到那个系统，所以一个耗尽预算的步骤交给 connector 去查证，而不是直接下结论。connector 按自己这一步本应产生的效果去查找（run 专属分支、review 或 comment 的 marker），并通过 `settleExhaustedPublicationStep` 回报结果：找到效果则步骤变为 `succeeded`，只有确认效果不存在时步骤才进入 `terminal_failed`。无法查询或无法确认远端结果并不构成“不存在”的证据，因此错误会向上抛出，而不是被当作结论。
+- preparation 进入 `submitted` 后，提交 Execution input；
+- execution 进入 `succeeded` 后，publication 变为可领取；
+- publication 被领取后，初始化 connector 副作用。
+
+**`publication_steps` 的两个预算**
+
+| 字段                     | 计量什么                         | 何时增加                                                                       |
+| ------------------------ | -------------------------------- | ------------------------------------------------------------------------------ |
+| `attempt_count`          | 写入副作用的尝试，也就是重试预算 | 尝试启动时就消耗，所以中途死亡的 publisher 与一次失败的尝试消耗同样的额度      |
+| `recovery_attempt_count` | 确认远端结果的尝试               | 一次确认没能得出结论时。查询远端不会重复写入副作用，所以不推进 `attempt_count` |
+
+能否再试一次只看 `attempt_count`，不看失败次数、崩溃次数或经过的时间。系统也不另存失败次数：每次 `failed` 迁移已经由 `failure_code`、`failure_message` 和 run 的事件日志记录下来。
+
+**尝试用尽后交给 connector 查证，而不是直接判失败**。任何启动过的尝试，都可能在所有者死亡或响应丢失前已经在远端完成了副作用，而 Review Runs 看不到远端系统。因此：
+
+1. connector 查找这一步本应产生的效果，例如 run 专属分支，或 review、comment 上的 marker；
+2. 通过 `settleExhaustedPublicationStep` 回报：找到效果，步骤变为 `succeeded`；确认效果不存在，步骤才进入 `terminal_failed`；
+3. 无法查询或无法确认，不算"不存在"的证据：错误向上抛出，不作结论。
 
 ## Claim 和恢复
 

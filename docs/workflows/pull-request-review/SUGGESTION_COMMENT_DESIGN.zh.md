@@ -54,7 +54,7 @@ inline suggestion 必须关联 PR diff 中的文件和行区间，不能用来�
 
 #### 2. 筛选 PR 可见文件
 
-只保留与 `pulls.listFiles` 返回项匹配的文件。该 API 提供 PR 变更文件信息和可见 diff hunk。
+只保留本次运行 review window 内的文件：完整审查时是整个 PR，增量审查时只是上次审查的 head 之后变更的文件。这些文件带有变更信息和 diff hunk，供第 4 步锚定使用。
 
 #### 3. 构造替换内容和评论正文
 
