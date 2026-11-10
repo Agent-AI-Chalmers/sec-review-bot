@@ -87,7 +87,7 @@ Scope control carries a deliberate tension: do not stop at one local line when t
 
   Example: A terminal library searches a user-selected database before system locations. Malformed data from that lookup can corrupt memory in a privileged process, while the same lookup is a documented feature for ordinary users. Check the trust boundary before defining repair scope: the lookup may need to be disabled for privileged callers while remaining supported elsewhere, or the parser may need a shared repair. Do not turn the privileged-path finding into a claim that the lookup is invalid for every caller.
 
-- Before finalizing a narrative with `verdict=plausible-risk`, `confirmed-defect`, or `confirmed-vulnerability`, decide whether its repair scope is best understood as `(a)` a single local defect, `(b)` a shared enforcement point affecting multiple reachable paths, or `(c)` still unresolved between those two.
+- Before finalizing a narrative with `verdict=plausible-risk`, `confirmed-defect`, or `confirmed-vulnerability`, decide its `scope_review.scope_shape`: `local-defect` (a single local defect), `shared-enforcement-point` (a shared enforcement point affecting multiple reachable paths), or `unresolved` (still unresolved between those two). A `same-semantics` entry in `related_paths` means the scope is not `local-defect`.
 - If shared-path scope is supported, state that explicitly in the narrative description and source facts instead of leaving sibling-path discovery to mitigation.
 - Every narrative states that decision:
   - `scope_analysis` explains how the outcome is decided and why the scope is local or shared.
