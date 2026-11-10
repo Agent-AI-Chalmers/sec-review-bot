@@ -4,7 +4,12 @@ from unittest.mock import patch
 
 import pytest
 
-from sec_review_agents.utils.env import bool_env, int_env, load_dotenv_file
+from sec_review_agents.utils.env import (
+    bool_env,
+    bounded_concurrency,
+    int_env,
+    load_dotenv_file,
+)
 
 
 @pytest.mark.parametrize("value", ["1", "true", "YES", " on "])
@@ -54,6 +59,28 @@ def test_int_env_uses_default_only_when_unset(monkeypatch) -> None:
     monkeypatch.delenv("TEST_INT", raising=False)
 
     assert int_env("TEST_INT", 7, minimum=1) == 7
+
+
+@pytest.mark.parametrize(
+    ("item_count", "configured", "expected"),
+    [(0, None, 1), (-1, "8", 1), (3, None, 3), (10, None, 4), (10, "2", 2)],
+)
+def test_bounded_concurrency_caps_configured_limit_by_item_count(
+    monkeypatch, item_count: int, configured: str | None, expected: int
+) -> None:
+    if configured is None:
+        monkeypatch.delenv("TEST_CONCURRENCY", raising=False)
+    else:
+        monkeypatch.setenv("TEST_CONCURRENCY", configured)
+
+    assert bounded_concurrency(item_count, "TEST_CONCURRENCY", 4) == expected
+
+
+def test_bounded_concurrency_rejects_non_positive_configuration(monkeypatch) -> None:
+    monkeypatch.setenv("TEST_CONCURRENCY", "0")
+
+    with pytest.raises(ValueError, match="TEST_CONCURRENCY must be at least 1"):
+        bounded_concurrency(3, "TEST_CONCURRENCY", 4)
 
 
 def test_model_providers_config_path_from_dotenv_is_relative_to_dotenv_dir(

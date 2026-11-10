@@ -35,7 +35,7 @@ from sec_review_agents.scan_stages.discovery.result import (
     DiscoveryResult,
 )
 from sec_review_agents.scan_stages.input import RepositoryScanScope
-from sec_review_agents.utils.env import int_env
+from sec_review_agents.utils.env import bounded_concurrency, int_env
 from sec_review_agents.utils.files import persist_json_artifact, remove_json_artifacts
 from sec_review_agents.utils.paths_ignore import (
     matches_paths_ignore,
@@ -667,17 +667,6 @@ def _pack_discovery_chunks(
     return chunks, skipped
 
 
-def _resolve_discovery_max_concurrency(entry_count: int) -> int:
-    configured = int_env(
-        "AGENT_DISCOVERY_MAX_CONCURRENCY",
-        DEFAULT_DISCOVERY_MAX_CONCURRENCY,
-        minimum=1,
-    )
-    if entry_count <= 0:
-        return 1
-    return min(configured, entry_count)
-
-
 async def scan_discovery_chunk(
     *,
     chunk: DiscoveryChunk,
@@ -903,5 +892,9 @@ def prepare_discovery_chunks(
         chunk_target_ratio=chunk_target_ratio_text,
         chunk_hard_limit_tokens=chunk_hard_limit_tokens,
         chunk_strategy=resolved_chunk_strategy,
-        max_concurrency=_resolve_discovery_max_concurrency(len(chunks)),
+        max_concurrency=bounded_concurrency(
+            len(chunks),
+            "AGENT_DISCOVERY_MAX_CONCURRENCY",
+            DEFAULT_DISCOVERY_MAX_CONCURRENCY,
+        ),
     )

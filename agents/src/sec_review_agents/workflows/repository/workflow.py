@@ -95,16 +95,13 @@ def _repository_case_timeout_seconds(
 
 
 def resolve_repository_case_processing_max_concurrency(case_count: int) -> int:
-    from sec_review_agents.utils.env import int_env
+    from sec_review_agents.utils.env import bounded_concurrency
 
-    if case_count <= 0:
-        return 1
-    configured = int_env(
+    return bounded_concurrency(
+        case_count,
         "AGENT_CASE_PROCESSING_MAX_CONCURRENCY",
         DEFAULT_CASE_PROCESSING_MAX_CONCURRENCY,
-        minimum=1,
     )
-    return min(case_count, configured)
 
 
 @activity.defn

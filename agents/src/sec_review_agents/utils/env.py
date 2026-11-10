@@ -142,3 +142,10 @@ def int_env(
     if maximum is not None and value > maximum:
         raise ValueError(f"{name} must be at most {maximum}.")
     return value
+
+
+def bounded_concurrency(item_count: int, env_name: str, default: int) -> int:
+    """Cap a configured worker limit by the number of items, never below 1."""
+    if item_count <= 0:
+        return 1
+    return min(item_count, int_env(env_name, default, minimum=1))
