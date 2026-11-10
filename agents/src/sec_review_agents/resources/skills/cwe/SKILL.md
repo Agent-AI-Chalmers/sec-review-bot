@@ -1,6 +1,6 @@
 ---
 name: cwe
-description: "Assign a concrete, evidence-supported CWE only after a repository-grounded security finding already exists. Use this skill to narrow classification, avoid bad labels, and explain why the chosen CWE fits."
+description: "Assign a concrete, evidence-supported CWE only after a repository-grounded security finding or narrowly scoped plausible risk already exists. Use this skill to narrow classification, avoid bad labels, and explain why the chosen CWE fits."
 ---
 
 # CWE Classification Skill
@@ -44,10 +44,10 @@ Do not enter this workflow when:
 
 - A CWE label is optional, not mandatory.
 - Only assign a CWE when the fit is natural and evidence-supported.
-- If assigned, include:
+- If assigned, fill `cwe_mapping` with:
   - `cwe_id`
   - `cwe_name`
-  - a short rationale explaining why the label fits this finding
+  - `cwe_rationale`: a short rationale explaining why the label fits this finding
 
 ## Guardrails
 

@@ -105,10 +105,6 @@ async def _create_case_agent(
             "sec_review_agents.agents.analysis.repository.agent_skills_enabled",
             return_value=skills_enabled,
         ),
-        patch(
-            "sec_review_agents.agents.analysis.repository.memory_consumption_enabled",
-            return_value=False,
-        ),
     ):
         backend = create_backend_with_path_views(
             **build_repository_analyzer_backend_config(

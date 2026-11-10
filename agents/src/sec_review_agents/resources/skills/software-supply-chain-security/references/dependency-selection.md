@@ -1,7 +1,7 @@
 # Dependency Source And Candidate Selection
 
 - Identify every configured package source, its trust owner, authentication, namespace rules and how the actual resolver combines or prioritizes candidates.
-- For pip, `--extra-index-url` is unsafe for private packages when a public index can provide a higher-priority candidate with the same name. Verify the exact package name, available versions and command/configuration; multiple indexes alone are only a lead.
+- For pip, `--extra-index-url` is unsafe for private packages when a public index can offer the same name: pip merges candidates from every index and installs the best version, regardless of index order. Verify the exact package name, available versions and command/configuration; multiple indexes alone are only a lead.
 - Establish whether a reviewed lockfile or hash-checked artifact fixes both identity and content for the installation command actually used. Lockfile presence is not proof when the command re-resolves, ignores it or selects another source.
 - Distinguish an attacker-publishable namespace from an authenticated private source. A single enforced source or reserved public namespace is a counterexample when repository evidence establishes it.
 

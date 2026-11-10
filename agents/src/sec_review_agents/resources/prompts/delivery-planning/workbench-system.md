@@ -85,10 +85,9 @@ Unclear overlap defaults to single. Obvious same-patch-surface, alternative-impl
 
 # Evidence Priority
 
-- Let case-card changed files and mitigation overview drive delivery judgment.
-- Treat case-card patch context as prepared artifact context, not as proof that the current repository already contains those changes.
+- Let each item payload's `changed_files` and `overview` (the mitigation overview) drive delivery judgment.
+- Treat `changed_files` and `/patches` as prepared mitigation artifacts, not as proof that the current repository already contains those changes.
 - Do not rediscover the repository and do not re-run triage.
-- Do not let analyzer narrative dominate delivery shaping.
 
 # Patch Inspection Discipline
 

@@ -7,4 +7,4 @@
 
 ## Repair Inputs
 
-- For repository full-scan cases, do not use broad git-history inspection as a default repair input. Prefer the current workspace and any provided incremental artifacts when present.
+- Repair from the current workspace. Full-scan cases carry no incremental artifacts, so do not use broad git-history inspection as a default repair input; incremental cases follow the Incremental Evidence Rule and the user prompt's Incremental Evidence section.

@@ -70,3 +70,47 @@ def test_declared_skills_are_discoverable_with_readable_local_references(
             assert resource.error is None, (reference, resource.error)
             assert resource.file_data is not None
             assert resource.file_data["content"]
+
+
+@pytest.mark.parametrize(
+    "declared",
+    [
+        ANALYSIS_AGENT_SKILLS,
+        DISCOVERY_AGENT_SKILLS,
+        MITIGATION_AGENT_SKILLS,
+        SINGLE_AGENT_SKILLS,
+        TRIAGE_AGENT_SKILLS,
+        VERIFICATION_AGENT_SKILLS,
+    ],
+    ids=[
+        "analysis",
+        "discovery",
+        "mitigation",
+        "single-agent",
+        "triage",
+        "verification",
+    ],
+)
+def test_reference_files_point_only_at_mounted_skill_paths(
+    declared: tuple[str, ...],
+) -> None:
+    """A reference may hand off to another skill's reference by absolute path.
+
+    The target must be mounted for every agent that mounts the citing skill;
+    otherwise the hand-off sends the agent to a path it cannot read.
+    """
+    backend = create_backend_with_path_views(
+        container_name_prefix="skill-reference-test",
+        path_views=[skill_view(host_path=materialize_agent_skills_view(declared))],
+        backend_kind="local",
+    )
+    for name in declared:
+        listing = backend.ls(f"/skills/{name}/references")
+        assert listing.error is None
+        for info in listing.entries or []:
+            entry = backend.read(info["path"])
+            assert entry.file_data is not None
+            text = entry.file_data["content"]
+            for target in set(re.findall(r"`(/skills/[^`]+\.md)`", text)):
+                resolved = backend.read(target)
+                assert resolved.error is None, (info["path"], target)

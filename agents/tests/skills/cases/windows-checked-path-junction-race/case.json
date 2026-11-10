@@ -1,0 +1,22 @@
+{
+  "id": "windows-checked-path-junction-race",
+  "skill": "os-boundary-security",
+  "reference": "windows-filesystem-authority.md",
+  "modes": ["discovery"],
+  "task": "A Windows service validates a tenant-supplied relative name by checking that Path.GetFullPath(Path.Combine(root, name)) starts with the tenant root, then later opens that path with File.Open. Assess whether the checked path still identifies the object the service opens.",
+  "facts": [
+    "The service runs as LocalSystem; tenants run as low-privilege users with write access inside their own root.",
+    "A tenant can replace an intermediate directory under its root with an NTFS junction between the check and the open.",
+    "File.Open follows reparse points, and no handle-relative open, FILE_FLAG_OPEN_REPARSE_POINT, or final-path re-check is used.",
+    "The junction can target a directory readable only by the service account."
+  ],
+  "oracles": {
+    "decision": {
+      "verdict": "confirmed",
+      "explanation_requirements": [
+        "junction|reparse",
+        "check|open|race|time"
+      ]
+    }
+  }
+}

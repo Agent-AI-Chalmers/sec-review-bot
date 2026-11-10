@@ -1,6 +1,6 @@
 ---
 name: cryptography-security
-description: "Use for cryptographic primitive contracts, key and nonce scope, randomness requirements, verification failure, authenticated-result consumption, and password verifier storage. It is not a general PKI or algorithm checklist."
+description: "Use for cryptographic primitive contracts, key and nonce scope, randomness requirements, key derivation, signature representation, verification failure, authenticated-result consumption, certificate path and service identity, and password verifier storage. It is not a general algorithm checklist."
 ---
 
 # Cryptography Security

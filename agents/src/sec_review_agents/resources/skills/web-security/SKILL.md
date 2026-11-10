@@ -7,7 +7,7 @@ description: "Use for web security at browser and HTTP boundaries: authenticatio
 
 Use this skill as a compact reference pack for web application security review. It helps identify source/sink shapes, relevant guards, report conditions, and common false positives.
 
-Do not use this skill as a general web security checklist or as proof that a vulnerability exists. The analyzer must still establish attacker influence, sink reachability, control coverage, control limits, and concrete security impact from repository evidence.
+Do not use this skill as a general web security checklist or as proof that a vulnerability exists. The review must still establish attacker influence, sink reachability, control coverage, control limits, and concrete security impact from repository evidence.
 
 ## Route
 
@@ -21,11 +21,10 @@ Start with the narrowest reference matching the current reviewed lead. Read anot
 - Credentials, tokens, private data, or diagnostic details exposed in HTTP responses, browser bundles, source maps, tenant-visible logs, or web debug endpoints: read `/skills/web-security/references/sensitive-data-exposure.md`.
 - Raw HTML, DOM insertion, framework escape hatches, script execution, template output: read `/skills/web-security/references/xss.md`.
 
-If the current lead is only broad hardening, missing policy, missing rate limiting, or checklist posture, do not load more references. Keep the concern non-confirmed unless repository evidence shows a concrete attacker-influenced path to a security-relevant effect.
+If the current lead is only broad hardening, missing policy, missing rate limiting, or checklist posture, do not load more references. Do not report it as a finding unless repository evidence shows a concrete attacker-influenced path to a security-relevant effect.
 
 ## Use Rules
 
 - Use references to choose what to inspect, not to conclude.
-- Prefer the narrowest reference. Do not read the full skill directory.
 - Treat examples as structural patterns. Framework and library behavior must still be verified from repository code and checked dependencies when material.
 - When a reference lists a false-positive precedent, use it to lower or reject unsupported findings, not to ignore repository-specific dangerous sinks.

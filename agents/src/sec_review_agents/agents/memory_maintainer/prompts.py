@@ -2,6 +2,48 @@ from sec_review_agents.resources.loader import load_prompt_resource
 
 MEMORY_MAINTAINER_SYSTEM_PROMPT = load_prompt_resource("memory/maintain-system.md")
 
+MEMORY_REORGANIZATION_PROMPT = "\n".join(
+    [
+        "### Selected Observations",
+        "",
+        "None. No observations were selected for this reorganization pass.",
+        "",
+        "### Task",
+        "",
+        (
+            "Maintain `/memory/MEMORY.md` and `/memory/topics/*.md` using only "
+            "the current memory."
+        ),
+        "",
+        (
+            "You may merge, split, delete, rename, compress, rewrite, or "
+            "cross-reference topic files. Do not add security-review facts or "
+            "rules that are not already present in the current memory."
+        ),
+        "",
+        (
+            "If the memory is already clear and needs no reorganization, leave it "
+            "unchanged."
+        ),
+    ]
+)
+
+MEMORY_MAINTENANCE_TASK = "\n".join(
+    [
+        "### Task",
+        "",
+        (
+            "Maintain `/memory/MEMORY.md` and `/memory/topics/*.md` using the "
+            "current memory and the selected observations."
+        ),
+        "",
+        (
+            "If the memory is already clear and the selected observations add no "
+            "durable material, leave memory unchanged."
+        ),
+    ]
+)
+
 
 def build_maintenance_prompt(
     observations: list[tuple[str, str]],
@@ -13,31 +55,7 @@ def build_maintenance_prompt(
             raise ValueError(
                 "Memory reorganization must not receive selected observations."
             )
-        return "\n".join(
-            [
-                "### Selected Observations",
-                "",
-                "None. No observations were selected for this reorganization pass.",
-                "",
-                "### Task",
-                "",
-                (
-                    "Maintain `/memory/MEMORY.md` and `/memory/topics/*.md` using only "
-                    "the current memory."
-                ),
-                "",
-                (
-                    "You may merge, split, delete, rename, compress, rewrite, or "
-                    "cross-reference topic files. Do not add security-review facts or "
-                    "rules that are not already present in the current memory."
-                ),
-                "",
-                (
-                    "If the memory is already clear and needs no reorganization, leave it "
-                    "unchanged and say so."
-                ),
-            ]
-        )
+        return MEMORY_REORGANIZATION_PROMPT
     if not observations:
         raise ValueError("Memory maintenance requires at least one observation.")
     selected = "\n".join(
@@ -45,21 +63,5 @@ def build_maintenance_prompt(
         for extraction_id, mounted_path in observations
     )
     return "\n".join(
-        [
-            "### Selected Observations",
-            "",
-            selected,
-            "",
-            "### Task",
-            "",
-            (
-                "Maintain `/memory/MEMORY.md` and `/memory/topics/*.md` using the "
-                "current memory and the selected observations."
-            ),
-            "",
-            (
-                "If the memory is already clear and the selected observations add no "
-                "durable material, leave memory unchanged and say so."
-            ),
-        ]
+        ["### Selected Observations", "", selected, "", MEMORY_MAINTENANCE_TASK]
     )

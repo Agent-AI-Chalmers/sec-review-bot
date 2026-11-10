@@ -193,7 +193,7 @@ async def synthesize_combined_delivery_patch(
             workspace_writable=True,
         )
         async with amanaged_backend(backend):
-            await run_patch_synthesis_agent(
+            output = await run_patch_synthesis_agent(
                 backend=backend,
                 workspace_root_path=workspace_path,
                 baseline_commit=baseline_commit,
@@ -207,7 +207,9 @@ async def synthesize_combined_delivery_patch(
             workspace_path, baseline_commit=baseline_commit
         )
         if not patch_artifact.file_changes:
-            raise ValueError("Patch synthesis requires a non-empty committed repair.")
+            # The agent commits nothing when the cases' intents contradict; its
+            # overview is the only record of which cases conflict and why.
+            raise ValueError(f"No committed repair. Agent overview: {output.overview}")
         persist_text_artifact(
             delivery_artifacts_root,
             "workspace.patch",

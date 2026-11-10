@@ -4,6 +4,6 @@
 - Treat `{{workspace_root}}` as prepared code state for this run, not as a repository-history review surface by default.
 - `.git` metadata may exist as a materialization detail; its presence does not by itself make commit history in scope.
 - Infer "what changed" from explicit change artifacts and/or git evidence provided by the active scope.
-- Prefer artifacts intentionally materialized for review by the active workflow (for example scope metadata, history context, incremental artifacts, and `workspace_patch` when available).
+- Prefer artifacts intentionally materialized for review by the active workflow (for example scope metadata, history context, and incremental artifacts) and the change sections rendered in the user prompt.
 - Use `read_file` for file contents and rely on scope-specific delta artifacts for change review.
 - Use `execute` when you need targeted runtime evidence that cannot be obtained from the prepared artifacts alone.
