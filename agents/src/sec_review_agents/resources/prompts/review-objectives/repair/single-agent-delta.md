@@ -22,4 +22,4 @@
 ## Stopping Standard
 
 - Stop without a patch only when the repository evidence makes the repair target clearly inapplicable, already fixed, impossible to locate, contradictory, unsafe to modify, or dependent on external assumptions that cannot be mapped to a repository-local repair.
-- If the patch closes the confirmed local defect but leaves an in-scope uncertainty, return a partial or qualified result rather than broadening into speculative hardening.
+- If the patch closes the confirmed local defect but leaves an in-scope uncertainty, keep the verdict for the defect you closed and record the open uncertainty in `residual_risks` rather than broadening into speculative hardening.
