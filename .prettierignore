@@ -1,0 +1,14 @@
+# Workspace packages run Prettier with their own config and ignore file.
+apps/*/
+services/*/
+contracts/codegen/
+contracts/**/tools/
+# Agent runtime inputs and test fixtures keep their exact bytes.
+agents/src/sec_review_agents/resources/
+agents/tests/**/fixtures/
+agents/tests/**/cases/
+pnpm-lock.yaml
+# Contract sources are versioned interfaces and test corpora; reformatting them is a contract change.
+contracts/**/*.json
+contracts/**/*.yaml
+contracts/**/*.yml

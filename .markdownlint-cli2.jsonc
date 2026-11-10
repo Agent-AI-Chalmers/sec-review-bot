@@ -1,0 +1,18 @@
+// Markdown lint for tracked documentation. Run `pnpm run lint:md` from the repository root; it passes `git ls-files` output, so untracked and ignored trees are never scanned.
+{
+  "config": {
+    "default": true,
+    // Prose is not hard-wrapped; scripts/checks/markdown_wrapping.py owns line-shape policy.
+    "MD013": false,
+    // The README hero block centers the logo and badges.
+    "MD033": { "allowed_elements": ["div", "p", "img"] },
+    // README files open with that hero block instead of a first-line heading.
+    "MD041": false
+  },
+  "ignores": [
+    // Agent prompts, skills, and test fixtures are runtime inputs, not maintained documentation.
+    "agents/src/sec_review_agents/resources/**",
+    "agents/tests/**/fixtures/**",
+    "agents/tests/mcp/cases/**"
+  ]
+}

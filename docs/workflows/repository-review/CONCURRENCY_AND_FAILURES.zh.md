@@ -36,7 +36,7 @@ App 提交的 run、workflow fanout 和 Worker activity 容量之间的系统级
 
 以下面两种 case workflow 的并发图为例，并发数都是 `3`，但是调度方式不同。固定批次会等一整组跑完后再启动下一组。
 
-> *本节的 timeline 截图仅用于说明调度形态和执行顺序；图中的 workflow / activity 名称可能来自旧运行或早期命名，不代表当前 API 名称。*
+> _本节的 timeline 截图仅用于说明调度形态和执行顺序；图中的 workflow / activity 名称可能来自旧运行或早期命名，不代表当前 API 名称。_
 
 ![固定批次的 repository case workflow timeline](../../../assets/screenshots/repository-case-fixed-batch-timeline.png)
 
@@ -44,7 +44,7 @@ App 提交的 run、workflow fanout 和 Worker activity 容量之间的系统级
 
 ![滑动窗口的 repository case workflow timeline](../../../assets/screenshots/repository-case-sliding-window-timeline.png)
 
-*读图时看每条 case 横条的左端点：长横条只是运行时间更长的 case；其他空位释放后，后续 case 仍会立刻启动。*
+_读图时看每条 case 横条的左端点：长横条只是运行时间更长的 case；其他空位释放后，后续 case 仍会立刻启动。_
 
 ## 阶段细节
 
@@ -53,6 +53,7 @@ App 提交的 run、workflow fanout 和 Worker activity 容量之间的系统级
 Discovery 将一个或多个完整文件组织成一个 chunk，作为一次扫描的输入。具体组织策略见 [DISCOVERY_AGENT_DESIGN](DISCOVERY_AGENT_DESIGN.zh.md)。Temporal 和 `direct` 路径都按滑动窗口执行这些 chunk。
 
 <!-- doc-default: AGENT_DISCOVERY_MAX_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
+
 并发上限来自 `AGENT_DISCOVERY_MAX_CONCURRENCY`，默认是 `1`。实际有效并发不会超过 chunk 数。
 
 在 Temporal 路径里，每个 discovery chunk 是一个 activity，会走 Temporal activity retry。retry 之后仍失败时，整个 discovery 失败。Discovery 不合成 partial completed result，因为缺一个 chunk 就意味着扫描覆盖不完整。
@@ -62,6 +63,7 @@ Discovery 将一个或多个完整文件组织成一个 chunk，作为一次扫�
 Triage 在一个 activity 内部运行。batched triage 会按滑动窗口执行 batch drafts，然后进入全局 refinement / workbench state。
 
 <!-- doc-default: TRIAGE_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/triage/agent_passes.py -->
+
 当前 batch draft 并发上限是代码常量 `TRIAGE_MAX_BATCH_CONCURRENCY = 3`。这不是常规部署环境变量。Triage 的输出是全局 case set；某个 batch 失败时，整个 Triage 失败。
 
 ### Case Processing
@@ -69,6 +71,7 @@ Triage 在一个 activity 内部运行。batched triage 会按滑动窗口执行
 Triage 后的每个 case 是独立审查单元。Repository review 会按滑动窗口执行 case workflows。
 
 <!-- doc-default: AGENT_CASE_PROCESSING_MAX_CONCURRENCY; source=agents/src/sec_review_agents/workflows/repository/workflow.py -->
+
 并发上限来自 `AGENT_CASE_PROCESSING_MAX_CONCURRENCY`，默认是 `1`。实际有效并发不会超过 case 数。
 
 单个 case workflow 内部也有并行。Temporal 时间线里，CVSS scoring 可以和 mitigation / verification 路径重叠执行：
@@ -82,6 +85,7 @@ Triage 后的每个 case 是独立审查单元。Repository review 会按滑动�
 Delivery planning 可以按滑动窗口执行 batch drafts，然后进入全局 refinement / workbench state。
 
 <!-- doc-default: DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/planning/agent_passes.py -->
+
 当前 batch draft 并发上限是代码常量 `DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY = 3`。这不是常规部署环境变量。Delivery planning 产出的是全局 delivery plan；某个 batch 失败时，整个 delivery planning 失败。
 
 ### Delivery Execution
@@ -93,6 +97,7 @@ Delivery execution 只消费 `disposition == "keep"` 的 case。
 `combined` delivery 会调用 patch-synthesis agent。多个 combined deliveries 会按滑动窗口执行。
 
 <!-- doc-default: REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/execution/input.py -->
+
 并发上限来自 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`，默认是 `4`。
 
 Temporal 路径里，combined delivery patch synthesis 是独立 activity；`single` delivery 仍然是轻量投影，不占 patch synthesis 并发窗口。
@@ -101,13 +106,11 @@ Temporal 路径里，combined delivery patch synthesis 是独立 activity；`sin
 
 ## 调参顺序
 
-通常最值得先调的是 `AGENT_CASE_PROCESSING_MAX_CONCURRENCY`。Case processing 通常占据最长的墙钟窗口，而且 Analyzer / Mitigator / Verifier 都可能是 需要频繁调用模型或使用沙箱。
+通常最值得先调的是 `AGENT_CASE_PROCESSING_MAX_CONCURRENCY`。Case processing 通常占据最长的墙钟窗口，而且 Analyzer / Mitigator / Verifier 都可能需要频繁调用模型或使用沙箱。
 
 第二个常见杠杆是 `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`。它只影响 `combined` delivery 的 patch synthesis。它不会改变 delivery 边界，也不会把不同 deliveries 合并成一个最终 patch。
 
 Discovery 是否值得调，取决于 chunk 数和单个 chunk 的耗时。如果仓库只形成一个 chunk，提高 `AGENT_DISCOVERY_MAX_CONCURRENCY` 没有意义。如果 chunk 很多，调高 discovery 并发可以减少 discovery 的墙钟时间。
-
----
 
 Temporal 部署还通过 `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` 限制单个 Execution Worker 进程同时执行的 review activities 数量。上面的 workflow 并发配置控制 workflow 最多允许同时推进多少任务。如果 Worker 的 activity 并发容量不足，workflow 已经调度出去的 activity 仍然会在 Temporal 侧等待。
 
@@ -138,11 +141,11 @@ LLM 服务商限制也会变得更明显，例如 TPM、RPM 或瞬时并发请�
 
 下面是一次 repository review 的近似观测，用来说明 case processing 并发的影响。
 
-| Run | Case 并发 | 总时长 | Discovery | Triage | Case processing | Delivery planning | Patch synthesis |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| A | 3 | 49 分 46.8 秒 | 0 分 42 秒，约 1.4% | 4 分 30 秒，约 9.0% | 约 32 分 44 秒，约 65.8% | 2 分 29 秒，约 5.0% | 约 9 分 20 秒，约 18.8% |
-| B | 6 | 31 分 21 秒 | 5 分 46 秒，约 18.4% | 4 分 33 秒，约 14.5% | 约 15 分 10 秒，约 48.7% | 2 分 38 秒，约 8.4% | 约 3 分 12 秒，约 10.2% |
-| C | 8 | 32 分 19 秒 | 1 分 58 秒，约 6.1% | 3 分 23 秒，约 10.5% | 约 18 分 51 秒，约 58.3% | 3 分 13 秒，约 9.9% | 约 4 分 54 秒，约 15.2% |
+| Run | Case 并发 |        总时长 |            Discovery |               Triage |          Case processing |   Delivery planning |         Patch synthesis |
+| --- | --------: | ------------: | -------------------: | -------------------: | -----------------------: | ------------------: | ----------------------: |
+| A   |         3 | 49 分 46.8 秒 |  0 分 42 秒，约 1.4% |  4 分 30 秒，约 9.0% | 约 32 分 44 秒，约 65.8% | 2 分 29 秒，约 5.0% | 约 9 分 20 秒，约 18.8% |
+| B   |         6 |   31 分 21 秒 | 5 分 46 秒，约 18.4% | 4 分 33 秒，约 14.5% | 约 15 分 10 秒，约 48.7% | 2 分 38 秒，约 8.4% | 约 3 分 12 秒，约 10.2% |
+| C   |         8 |   32 分 19 秒 |  1 分 58 秒，约 6.1% | 3 分 23 秒，约 10.5% | 约 18 分 51 秒，约 58.3% | 3 分 13 秒，约 9.9% | 约 4 分 54 秒，约 15.2% |
 
-- 并发从 `3` 提到 `6` 后，总时长显著下降；最关键变化是中段 case processing 被明显压缩。
-- 并发从 `6` 提到 `8` 后，总时长没有继续下降，反而从 **31 分 21 秒** 变为 **32 分 19 秒**，大约多了 **58 秒**。这说明在这组 workload 下，case 并发继续升高已经没有明显收益，系统开始更多受到单 case 长尾、阶段波动和其他资源瓶颈影响。
+- 并发从 `3` 提到 `6` 后，总时长显著下降，主要是 case processing 缩短了。
+- 并发从 `6` 提到 `8` 后，总时长没有继续下降，从 **31 分 21 秒**变为 **32 分 19 秒**，大约多了 **58 秒**。在这组 workload 下，继续提高 case 并发已经没有明显收益，总时长更多取决于单 case 长尾、阶段波动和其他资源瓶颈。

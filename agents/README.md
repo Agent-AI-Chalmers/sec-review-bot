@@ -6,7 +6,7 @@ Language: English | [中文](README.zh.md)
 
 ## Capabilities
 
-A Worker is a long-running background process that receives and executes tasks scheduled by Temporal. This package provides three types of Workers with distinct responsibilities:
+A Worker is a long-running background process that receives and executes tasks scheduled by Temporal. This package provides three Workers, one per responsibility:
 
 - **Execution Worker** runs `issue-review`, `pull-request-review`, and `repository-review`. Repository reviews include discovery, triage, per-case analysis, CVSS scoring, mitigation, verification, and delivery. Cases without a delivery remain visible in case results.
 - **Memory Extraction Worker** extracts reusable review experience from execution trajectories.
@@ -23,7 +23,7 @@ source .venv/bin/activate
 
 This directory carries its own `.python-version`; `pyproject.toml` requires Python 3.14 or newer.
 
-> *Python 3.14 is the default development, CI, package, and container runtime baseline for this package.*
+> _Python 3.14 is the default development, CI, package, and container runtime baseline for this package._
 
 ## LLM Setup
 
@@ -54,11 +54,11 @@ The supported local execution paths are:
 - Local `--temporal` run: for exercising workflow / activity orchestration.
 - Manually started service and worker: for testing the HTTP service, Temporal, and Worker together without starting the full Compose stack.
 
-| Execution path | Execution archive publication | Memory processing |
-| --- | --- | --- |
-| Direct `run-local-*`, standard workflow | Local execution archive | Disabled |
-| Local `--temporal`, standard workflow | Local execution archive | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED` |
-| Manually started service and workers | Execution archive in S3-compatible storage | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED` in the Execution Worker environment |
+| Execution path                          | Execution archive publication              | Memory processing                                                                   |
+| --------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------- |
+| Direct `run-local-*`, standard workflow | Local execution archive                    | Disabled                                                                            |
+| Local `--temporal`, standard workflow   | Local execution archive                    | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED`                                     |
+| Manually started service and workers    | Execution archive in S3-compatible storage | Controlled by `AGENT_MEMORY_PROCESSING_ENABLED` in the Execution Worker environment |
 
 ### `run-local-*` Commands
 
@@ -178,23 +178,24 @@ Agents can declare the skills they need. The worker prepares and mounts the decl
 
 ### Memory
 
-This package implements memory extraction, maintenance, and their workers. The main review agents—Analyzer, Mitigator, and Verifier—read maintained memory through an invocation-scoped filesystem view. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the overall design and [local Memory development](../docs/operations/LOCAL_MEMORY_DEVELOPMENT.md) for infrastructure setup and operation.
+This package implements memory extraction, maintenance, and their workers. The main review agents (Analyzer, Mitigator, and Verifier) read maintained memory through an invocation-scoped filesystem view. See [Agent Memory System](../docs/agent/MEMORY_SYSTEM.md) for the overall design and [local Memory development](../docs/operations/LOCAL_MEMORY_DEVELOPMENT.md) for infrastructure setup and operation.
 
-| Variable | Purpose |
-| --- | --- |
-| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog base URL. Without it, the main review agents have no memory view and memory processing cannot run. |
-| `AGENT_MEMORY_CATALOG_TOKEN` | Worker bearer token for Memory Catalog extraction and automatic maintenance. Required when `AGENT_MEMORY_CATALOG_URL` is set. |
-| `AGENT_MEMORY_CONSUMPTION_ENABLED` | Whether the main review agents load the active memory tree.  |
-| `AGENT_MEMORY_PROCESSING_ENABLED` | Whether memory extraction and maintenance are enabled.  |
+| Variable                           | Purpose                                                                                                                       |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `AGENT_MEMORY_CATALOG_URL`         | Memory Catalog base URL. Without it, the main review agents have no memory view and memory processing cannot run.             |
+| `AGENT_MEMORY_CATALOG_TOKEN`       | Worker bearer token for Memory Catalog extraction and automatic maintenance. Required when `AGENT_MEMORY_CATALOG_URL` is set. |
+| `AGENT_MEMORY_CONSUMPTION_ENABLED` | Whether the main review agents load the active memory tree.                                                                   |
+| `AGENT_MEMORY_PROCESSING_ENABLED`  | Whether memory extraction and maintenance are enabled.                                                                        |
 
 ### Structured Output
 
 <!-- doc-default: AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES; source=agents/src/sec_review_agents/runtime/structured_response_middleware.py -->
+
 Agents that require structured output must return `structured_response`. If a model returns only prose, or unparseable tool arguments leave no valid tool call to proceed with, middleware appends a correction message and retries inside the same agent invocation. `AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES` controls the retry limit, default `2`. This is separate from provider/API request retries; schema validation errors in parsed arguments remain under LangChain structured-output handling.
 
 ## Sandbox Runtime
 
-Agent stages that review code run in a sandbox that can execute commands, because without one they cannot run tests, read history, or reproduce a finding. Which sandbox that is, is deployment configuration:
+Agent stages that review code run in a sandbox that can execute commands, because without one they cannot run tests, read history, or reproduce a finding. Deployment configuration selects the sandbox:
 
 - `AGENT_SANDBOX_BACKEND` unset or set to `docker`: require the Docker sandbox
 

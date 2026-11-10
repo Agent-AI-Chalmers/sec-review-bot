@@ -49,13 +49,13 @@ Repository scan scope (`scan_scope` in the same schema) declares `paths_ignore` 
 
 Each workflow input has its own schema:
 
-| Workflow | Schema |
-| --- | --- |
-| `issue-review` | [`issue-review-input.schema.json`](schemas/issue-review-input.schema.json) |
+| Workflow              | Schema                                                                                   |
+| --------------------- | ---------------------------------------------------------------------------------------- |
+| `issue-review`        | [`issue-review-input.schema.json`](schemas/issue-review-input.schema.json)               |
 | `pull-request-review` | [`pull-request-review-input.schema.json`](schemas/pull-request-review-input.schema.json) |
-| `repository-review` | [`repository-review-input.schema.json`](schemas/repository-review-input.schema.json) |
+| `repository-review`   | [`repository-review-input.schema.json`](schemas/repository-review-input.schema.json)     |
 
-Pull request inputs carry a `pr` subject describing the pull request as this run sees it. Two of its fields deserve a note because the schema cannot express their relationship:
+Pull request inputs carry a `pr` subject describing the pull request as this run sees it. The schema cannot express how two of its fields relate:
 
 - `base_sha` and `head_sha` identify the pull request itself and stay constant for the run.
 - `review_window` states the range the run covers. On `synchronize` it normally covers newly pushed commits and is narrower than `base_sha..head_sha`; fallback conditions may instead select the full PR range. `review_window.reason` records why a run fell back to the full range.
@@ -84,9 +84,9 @@ The Execution API provider and Execution Worker both validate input at their pro
 
 The `scan_mode` selects the window shape:
 
-| Mode | Required / shape |
-| --- | --- |
-| `full` | `scan_scope.incremental_changed_files: []`; `base_sha: null`; `commit_shas: []` |
+| Mode          | Required / shape                                                                                                                                                                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `full`        | `scan_scope.incremental_changed_files: []`; `base_sha: null`; `commit_shas: []`                                                                                                                                                                                                                  |
 | `incremental` | input bundle manifest includes `incremental_window.path`; `base_sha` is a non-empty string distinct from `head_sha`; `commit_shas` is non-empty; `scan_scope.incremental_changed_files` declares the changed-file scope and may be empty when the explicit window has no scannable changed files |
 
 Repository scan scope controls cost and coverage. The Execution Worker must not guess it:
@@ -116,7 +116,7 @@ The Execution Worker produces this projection from internal stage output. Its `R
 - Unhandled exceptions in stages such as Discovery, Triage, Analyzer, Mitigator, Verifier, and delivery / patch synthesis fail the workflow run. Execution API returns a structured execution error.
 - Patch synthesis failures caught by the delivery layer are recorded in delivery results.
 
-> *CVSS is an optional score shown in the report, not the pass/fail signal for the review. If repository CVSS scoring fails after the case review itself succeeds, publish `ReviewRecord.cvss` as `null` and keep the scoring failure details in diagnostics and artifacts.*
+> _CVSS is an optional score shown in the report, not the pass/fail signal for the review. If repository CVSS scoring fails after the case review itself succeeds, publish `ReviewRecord.cvss` as `null` and keep the scoring failure details in diagnostics and artifacts._
 
 `verification.coverage` describes current-code safety for `target_claim`, independently of patch presence. `full` means repository evidence establishes that the target is resolved, already fixed, or not applicable to this code; `partial`, `local-only`, and `misaligned` describe remaining gaps, and `unresolved` means evidence is insufficient. With no changes, assess the baseline. Use `mitigation.file_changes` to determine whether a patch exists. Coverage alone does not approve delivery: a patch must exist, regression evidence must not block it, and `next_step` must be `none`. Report concerns about unnecessary or unrelated changes in findings and the next action even when current-code coverage is `full`.
 

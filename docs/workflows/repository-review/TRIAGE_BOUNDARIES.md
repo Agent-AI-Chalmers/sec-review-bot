@@ -25,7 +25,7 @@ Even with tighter discovery, triage still needs suppression. Some candidates loo
 - The UI exposes an `/admin` link, but the true security boundary is whether the admin API performs server-side role checks.
 - localStorage or React state can be modified by the user, but trusted server-side state is not affected by it.
 
-Therefore, `merge` and `suppress` are not divided as "related means merge; unrelated means discard":
+Relatedness alone does not decide between `merge` and `suppress`:
 
 - `merge`: multiple items jointly describe the same root cause, sink, trust boundary, or repair point; the exported case is more complete and accurate after merging.
 - `suppress`: the item itself is not a vulnerability-domain issue, is only weak supporting/repeated signal, or has no independent analysis or repair value after being covered by a stronger root-cause item.
@@ -43,7 +43,7 @@ If the answer is no, for example it only says "missing validation", "possible in
 
 If the answer is yes, even weak evidence should usually be conservatively kept. At that point, the item provides a repository-specific anchor, and downstream analyzer can inspect cross-file authorization, session behavior, data flow, schema, callers, or dangerous sinks around that anchor.
 
-Suppression removes clues with no analyzable object or independent value; it does not replace Analyzer's final judgment of whether a vulnerability exists.
+Suppression removes clues with no analyzable object or independent value. Analyzer still makes the final judgment of whether a vulnerability exists.
 
 ## Merge Boundary
 

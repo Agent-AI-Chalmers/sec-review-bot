@@ -54,4 +54,3 @@ jobs:
           pnpm --if-present run lint:contract
           pnpm --if-present run typecheck
           pnpm test
-

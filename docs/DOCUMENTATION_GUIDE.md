@@ -8,13 +8,13 @@ This guide explains how to write and update documentation maintained by this pro
 
 Describe how the system works now rather than recounting each edit or refactor. Include historical context when readers need it to operate or maintain the system or interpret existing data.
 
-Avoid unnecessary counts: when a list or the named services already show what is included, there is usually no need to state the total again. If you are giving examples, do not present them as a complete list. Prefer:
+Skip counts the reader can already see: when a list or the named services show what is included, you usually do not need to state the total. If you are giving examples, do not present them as a complete list. Prefer:
 
 - `The supported execution paths are:` over `There are three execution paths:`;
 - specific service names over `the two services`;
 - `for example` or `includes` when listing examples, rather than presenting them as `all` or `the only` possibilities.
 
-Do not delete a number just because it may change later. Keep values readers need to configure, operate, or understand the system, along with quantity limits enforced by the implementation or contract. For example, if a configuration table says “the timeout defaults to 60 seconds,” do not replace the value with “a timeout is configured.” Readers need the duration to judge whether to change it. The 60 seconds here is an example, not a project default.
+Do not delete a number just because it may change later. Keep values readers need to configure, operate, or understand the system, along with quantity limits enforced by the implementation or contract. For example, if a configuration table says "the timeout defaults to 60 seconds," do not replace the value with "a timeout is configured." Readers need the duration to judge whether to change it. The 60 seconds here is an example, not a project default.
 
 ## Mutable Facts
 
@@ -36,7 +36,7 @@ Use this marker for dated external facts or conclusions that require periodic re
 <!-- doc-time-sensitive: <subject>; checked=<YYYY-MM-DD>; source=<URL-or-repository-relative-path> -->
 ```
 
-`checked` records the date when you last verified the statement against its source. Update it only after checking again; rewording a sentence or fixing a typo is not a reason to replace it with today’s date.
+`checked` records the date when you last verified the statement against its source. Update it only after checking again; rewording a sentence or fixing a typo is not a reason to replace it with today's date.
 
 Date measurement and experiment results, and do not present a single result as a lasting guarantee. Keep the time context for dependency behavior and external release plans too.
 
@@ -56,9 +56,11 @@ When documenting how to use a feature, first state what the reader can do and wh
 
 Use natural Chinese for explanations and descriptive headings, while keeping code identifiers, commands, paths, protocol values, and component names unchanged. Briefly explain terms readers may not know when they first appear.
 
+Keep punctuation outside bold and italic markers: write `**标签**：正文`, not `**标签：**正文`. GitHub's CommonMark parser does not close emphasis when punctuation sits just inside the marker and a Chinese character follows it without a space, so the asterisks render as literal text.
+
 ## Preserve Meaning When Rewriting
 
-Rewriting should make explanations clearer without changing their meaning. For example, “may fail” does not mean “will fail,” and shortening “validate the file before extraction” to “check the file” loses the required order of operations. For contract documentation, check field names, allowed values, specific numbers, and inputs that must be rejected against the contract definitions.
+Rewriting should make explanations clearer without changing their meaning. For example, "may fail" does not mean "will fail," and shortening "validate the file before extraction" to "check the file" loses the required order of operations. For contract documentation, check field names, allowed values, specific numbers, and inputs that must be rejected against the contract definitions.
 
 ## Documentation Review
 

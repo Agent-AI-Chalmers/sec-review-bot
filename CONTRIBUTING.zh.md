@@ -22,9 +22,11 @@
 - 优先修改实际负责该功能的代码。
 
   例如，HTTP 接口和命令行都调用同一个输入校验函数。如果这个函数会放过非法输入，就应修复这个公共函数，让两个入口都得到修复，而不是只在 HTTP 接口中补一道检查。
+
 - 对没有必要的中间层，优先考虑移除，而不是继续加包装。
 
   例如，调用关系是 `调用方 -> A() -> B()`。如果 `A()` 只是把参数原样传给 `B()`，再原样返回结果，也不承担校验、日志记录或旧接口兼容等其他职责，就可以考虑让调用方直接调用 `B()`。删除前先检查调用方；如果仍需保留旧接口，就不能直接删掉 `A()`。涉及破坏性变更时，按下条要求处理。
+
 - 明确说明是否保持兼容。破坏性变更必须列出受影响的调用方、产物、已保存的数据、配置或运维操作，并说明如何迁移。
 - 如果修改改变了组件职责、环境准备方式、配置、对外行为或运维步骤，也要更新相应文档。
 - 如果需要修改生成文件，应先修改其源文件，再运行对应的生成器，不要直接手改生成结果。
@@ -33,17 +35,17 @@
 
 在每个受影响的包中运行检查，不要只检查直接改了代码的包。具体命令见各包的 README、`package.json` 或 `pyproject.toml`。
 
-| 区域 | 开发指南 | 基本检查 |
-| --- | --- | --- |
-| Execution、Memory Extraction 和 Memory Maintenance Worker | [`agents/README.zh.md`](agents/README.zh.md) | Ruff、Black、mypy、Pyright、pytest |
-| GitHub Integration | [`apps/github-integration/README.zh.md`](apps/github-integration/README.zh.md) | format、lint、typecheck、单元测试；数据库边界变化时运行集成测试 |
-| Review Runs | [`services/review-runs/README.zh.md`](services/review-runs/README.zh.md) | format、lint、typecheck、测试、PostgreSQL 集成测试 |
-| Control Plane UI | [`apps/control-plane-ui/README.zh.md`](apps/control-plane-ui/README.zh.md) | format、lint、typecheck、测试、build；涉及用户可见的界面或操作流程时，运行浏览器冒烟测试 |
-| Execution Gateway | [`services/execution-gateway/README.zh.md`](services/execution-gateway/README.zh.md) | format、lint、typecheck、测试、Temporal 集成测试 |
-| Memory Catalog Server | [`services/memory-catalog/README.zh.md`](services/memory-catalog/README.zh.md) | format、lint、typecheck、测试、PostgreSQL 集成测试 |
-| 跨服务系统测试 | [`system-tests/README.md`](system-tests/README.md) | 根据修改涉及的服务和数据流，运行相关系统测试 |
-| 仓库脚本 | [`scripts/README.md`](scripts/README.md) | Ruff、Black、Python 语法检查；根据修改内容，运行脚本的 `--help` 或用测试数据检查相关功能 |
-| 文档 | [`docs/DOCUMENTATION_GUIDE.zh.md`](docs/DOCUMENTATION_GUIDE.zh.md) 和 [`docs/README.zh.md`](docs/README.zh.md) | 根据修改内容，检查本地链接是否有效、正文段落是否按要求不折行，以及中英文标题结构是否一致 |
+| 区域                                                      | 开发指南                                                                                                       | 基本检查                                                                                 |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Execution、Memory Extraction 和 Memory Maintenance Worker | [`agents/README.zh.md`](agents/README.zh.md)                                                                   | Ruff、Black、mypy、Pyright、pytest                                                       |
+| GitHub Integration                                        | [`apps/github-integration/README.zh.md`](apps/github-integration/README.zh.md)                                 | format、lint、typecheck、单元测试；数据库边界变化时运行集成测试                          |
+| Review Runs                                               | [`services/review-runs/README.zh.md`](services/review-runs/README.zh.md)                                       | format、lint、typecheck、测试、PostgreSQL 集成测试                                       |
+| Control Plane UI                                          | [`apps/control-plane-ui/README.zh.md`](apps/control-plane-ui/README.zh.md)                                     | format、lint、typecheck、测试、build；涉及用户可见的界面或操作流程时，运行浏览器冒烟测试 |
+| Execution Gateway                                         | [`services/execution-gateway/README.zh.md`](services/execution-gateway/README.zh.md)                           | format、lint、typecheck、测试、Temporal 集成测试                                         |
+| Memory Catalog Server                                     | [`services/memory-catalog/README.zh.md`](services/memory-catalog/README.zh.md)                                 | format、lint、typecheck、测试、PostgreSQL 集成测试                                       |
+| 跨服务系统测试                                            | [`system-tests/README.md`](system-tests/README.md)                                                             | 根据修改涉及的服务和数据流，运行相关系统测试                                             |
+| 仓库脚本                                                  | [`scripts/README.md`](scripts/README.md)                                                                       | Ruff、Black、Python 语法检查；根据修改内容，运行脚本的 `--help` 或用测试数据检查相关功能 |
+| 文档                                                      | [`docs/DOCUMENTATION_GUIDE.zh.md`](docs/DOCUMENTATION_GUIDE.zh.md) 和 [`docs/README.zh.md`](docs/README.zh.md) | 根据修改内容，检查本地链接是否有效、正文段落是否按要求不折行，以及中英文标题结构是否一致 |
 
 修改契约后，按[契约指南](contracts/README.zh.md)和相关契约目录 README 的要求完成检查，并检查所有受影响的包。
 

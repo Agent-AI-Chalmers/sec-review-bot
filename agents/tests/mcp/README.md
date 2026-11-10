@@ -10,7 +10,7 @@ This directory owns MCP contract, capability, and LLM behavior tests. Each scena
 
 Put repository files visible to the agent under `workspace/`, container bootstrap commands in `setup.yml`, and mode-specific inputs and oracles in `case.json`.
 
-The current cases include reflected XSS capability and discovery plus a paired DOM XSS comparison. The DOM case uses a URL fragment, which is not sent to the HTTP server, so runtime browser behavior is the decisive evidence rather than an HTTP response alone. CodeGraph has a deterministic cross-file capability case.
+The current cases include reflected XSS capability and discovery plus a paired DOM XSS comparison. The DOM case uses a URL fragment, which is not sent to the HTTP server, so the decisive evidence comes from runtime browser behavior; an HTTP response alone cannot show it. CodeGraph has a deterministic cross-file capability case.
 
 These cases exercise normal product workflows. They do not inject MCP connections or call MCP adapters directly. The runner selects the Docker sandbox, enables MCP, uses the configured tools image, and keeps networking disabled unless a future case establishes a separate requirement.
 

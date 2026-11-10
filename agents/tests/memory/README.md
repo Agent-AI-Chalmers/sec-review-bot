@@ -12,7 +12,7 @@ The `test_llm_*.py` files are focused real-model probes:
 - `test_llm_extraction.py` checks trajectory-to-observation extraction.
 - `test_llm_maintenance.py` checks candidate memory-tree reorganization.
 
-These probes have distinct inputs and behavior oracles, so they remain explicit tests rather than being forced into a shared `case.json` schema.
+Each probe has its own inputs and behavior oracle, so they stay as separate explicit tests and do not share a `case.json` schema.
 
 ## Running Tests
 

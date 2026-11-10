@@ -6,11 +6,11 @@ Language: English | [中文](SPEC.zh.md)
 
 The artifact uses the restricted POSIX PAX [envelope v1](../../../envelope/v1/SPEC.md) and media type `application/tar+zstd`. Its filename is `execution-archive.v1.tar.zst`.
 
-| Property | Limit |
-| --- | --- |
-| Compressed archive size | 1 GiB (`1,073,741,824` bytes) |
-| Entry count | 100,000, including files and directories |
-| Total regular-file size | 8 GiB (`8,589,934,592` bytes) |
+| Property                | Limit                                    |
+| ----------------------- | ---------------------------------------- |
+| Compressed archive size | 1 GiB (`1,073,741,824` bytes)            |
+| Entry count             | 100,000, including files and directories |
+| Total regular-file size | 8 GiB (`8,589,934,592` bytes)            |
 
 ## Tree
 
@@ -22,7 +22,7 @@ The manifest is a UTF-8 JSON object with `version: 1`, the owning `run_id`, `res
 
 ## Production
 
-Producers apply the envelope's canonical entry rules, exclude the publication directory and symbolic links from `artifact-tree/`, enforce the profile limits before publication, explicitly select POSIX PAX output, and validate the completed archive against the shared envelope and this profile before publication. Consumers enforce the same limits while reading and extracting.
+Producers apply the envelope's canonical entry rules, exclude the publication directory and symbolic links from `artifact-tree/`, enforce the profile limits before publication, and explicitly select POSIX PAX output. They validate the completed archive against the shared envelope and this profile before publishing it. Consumers enforce the same limits while reading and extracting.
 
 ## Shared Corpus
 

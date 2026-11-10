@@ -4,21 +4,21 @@ services:
     # Bounded: a service that cannot start must not restart forever. Five attempts covers a
     # transient dependency blip; past that the stack needs a human, and the stopped container
     # stays visible in `docker compose ps --all` instead of hiding behind a restart loop.
-    restart: "on-failure:5"
-    user: "${SEC_REVIEW_SERVICE_UID:-1000}:${SEC_REVIEW_SERVICE_GID:-1000}"
+    restart: 'on-failure:5'
+    user: '${SEC_REVIEW_SERVICE_UID:-1000}:${SEC_REVIEW_SERVICE_GID:-1000}'
     environment:
-      RUSTFS_VOLUMES: "/data"
-      RUSTFS_ADDRESS: "0.0.0.0:9000"
-      RUSTFS_CONSOLE_ADDRESS: "0.0.0.0:9001"
-      RUSTFS_CONSOLE_ENABLE: "true"
-      RUSTFS_ACCESS_KEY: "${RUSTFS_ROOT_USER:-sec-review-root}"
-      RUSTFS_SECRET_KEY: "${RUSTFS_ROOT_PASSWORD:?RUSTFS_ROOT_PASSWORD is required}"
-      RUSTFS_OBS_LOG_DIRECTORY: "/data/logs"
+      RUSTFS_VOLUMES: '/data'
+      RUSTFS_ADDRESS: '0.0.0.0:9000'
+      RUSTFS_CONSOLE_ADDRESS: '0.0.0.0:9001'
+      RUSTFS_CONSOLE_ENABLE: 'true'
+      RUSTFS_ACCESS_KEY: '${RUSTFS_ROOT_USER:-sec-review-root}'
+      RUSTFS_SECRET_KEY: '${RUSTFS_ROOT_PASSWORD:?RUSTFS_ROOT_PASSWORD is required}'
+      RUSTFS_OBS_LOG_DIRECTORY: '/data/logs'
     volumes:
-      - "${SEC_REVIEW_RUSTFS_STATE_DIR:-${PWD}/.agent-rustfs-state}:/data"
+      - '${SEC_REVIEW_RUSTFS_STATE_DIR:-${PWD}/.agent-rustfs-state}:/data'
     ports:
-      - "127.0.0.1:${RUSTFS_API_PORT:-9100}:9000"
-      - "127.0.0.1:${RUSTFS_CONSOLE_PORT:-9101}:9001"
+      - '127.0.0.1:${RUSTFS_API_PORT:-9100}:9000'
+      - '127.0.0.1:${RUSTFS_CONSOLE_PORT:-9101}:9001'
   rustfs-init:
     build:
       context: ops/rustfs-init
@@ -26,37 +26,37 @@ services:
       rustfs:
         condition: service_started
     environment:
-      RUSTFS_ROOT_USER: "${RUSTFS_ROOT_USER:-sec-review-root}"
-      RUSTFS_ROOT_PASSWORD: "${RUSTFS_ROOT_PASSWORD:?RUSTFS_ROOT_PASSWORD is required}"
-      SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY: "${SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY:-sec-review-integration}"
-      SEC_REVIEW_INTEGRATION_S3_SECRET_KEY: "${SEC_REVIEW_INTEGRATION_S3_SECRET_KEY:?SEC_REVIEW_INTEGRATION_S3_SECRET_KEY is required}"
-      SEC_REVIEW_EXECUTION_S3_ACCESS_KEY: "${SEC_REVIEW_EXECUTION_S3_ACCESS_KEY:-sec-review-execution-worker}"
-      SEC_REVIEW_EXECUTION_S3_SECRET_KEY: "${SEC_REVIEW_EXECUTION_S3_SECRET_KEY:?SEC_REVIEW_EXECUTION_S3_SECRET_KEY is required}"
-      SEC_REVIEW_MEMORY_S3_ACCESS_KEY: "${SEC_REVIEW_MEMORY_S3_ACCESS_KEY:-sec-review-memory-worker}"
-      SEC_REVIEW_MEMORY_S3_SECRET_KEY: "${SEC_REVIEW_MEMORY_S3_SECRET_KEY:?SEC_REVIEW_MEMORY_S3_SECRET_KEY is required}"
-      SEC_REVIEW_UI_S3_ACCESS_KEY: "${SEC_REVIEW_UI_S3_ACCESS_KEY:-sec-review-control-plane-ui}"
-      SEC_REVIEW_UI_S3_SECRET_KEY: "${SEC_REVIEW_UI_S3_SECRET_KEY:?SEC_REVIEW_UI_S3_SECRET_KEY is required}"
+      RUSTFS_ROOT_USER: '${RUSTFS_ROOT_USER:-sec-review-root}'
+      RUSTFS_ROOT_PASSWORD: '${RUSTFS_ROOT_PASSWORD:?RUSTFS_ROOT_PASSWORD is required}'
+      SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY: '${SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY:-sec-review-integration}'
+      SEC_REVIEW_INTEGRATION_S3_SECRET_KEY: '${SEC_REVIEW_INTEGRATION_S3_SECRET_KEY:?SEC_REVIEW_INTEGRATION_S3_SECRET_KEY is required}'
+      SEC_REVIEW_EXECUTION_S3_ACCESS_KEY: '${SEC_REVIEW_EXECUTION_S3_ACCESS_KEY:-sec-review-execution-worker}'
+      SEC_REVIEW_EXECUTION_S3_SECRET_KEY: '${SEC_REVIEW_EXECUTION_S3_SECRET_KEY:?SEC_REVIEW_EXECUTION_S3_SECRET_KEY is required}'
+      SEC_REVIEW_MEMORY_S3_ACCESS_KEY: '${SEC_REVIEW_MEMORY_S3_ACCESS_KEY:-sec-review-memory-worker}'
+      SEC_REVIEW_MEMORY_S3_SECRET_KEY: '${SEC_REVIEW_MEMORY_S3_SECRET_KEY:?SEC_REVIEW_MEMORY_S3_SECRET_KEY is required}'
+      SEC_REVIEW_UI_S3_ACCESS_KEY: '${SEC_REVIEW_UI_S3_ACCESS_KEY:-sec-review-control-plane-ui}'
+      SEC_REVIEW_UI_S3_SECRET_KEY: '${SEC_REVIEW_UI_S3_SECRET_KEY:?SEC_REVIEW_UI_S3_SECRET_KEY is required}'
     volumes:
-      - "./ops/rustfs-init:/policies:ro"
+      - './ops/rustfs-init:/policies:ro'
   postgres:
     image: postgres:18-alpine
-    restart: "on-failure:5"
+    restart: 'on-failure:5'
     environment:
-      POSTGRES_DB: "postgres"
-      POSTGRES_USER: "${POSTGRES_USER:-sec_review_bot}"
-      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
-      REVIEW_RUNS_POSTGRES_PASSWORD: "${REVIEW_RUNS_POSTGRES_PASSWORD:?REVIEW_RUNS_POSTGRES_PASSWORD is required}"
-      MEMORY_CATALOG_POSTGRES_PASSWORD: "${MEMORY_CATALOG_POSTGRES_PASSWORD:?MEMORY_CATALOG_POSTGRES_PASSWORD is required}"
+      POSTGRES_DB: 'postgres'
+      POSTGRES_USER: '${POSTGRES_USER:-sec_review_bot}'
+      POSTGRES_PASSWORD: '${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}'
+      REVIEW_RUNS_POSTGRES_PASSWORD: '${REVIEW_RUNS_POSTGRES_PASSWORD:?REVIEW_RUNS_POSTGRES_PASSWORD is required}'
+      MEMORY_CATALOG_POSTGRES_PASSWORD: '${MEMORY_CATALOG_POSTGRES_PASSWORD:?MEMORY_CATALOG_POSTGRES_PASSWORD is required}'
     volumes:
-      - "${SEC_REVIEW_POSTGRES_STATE_DIR:-${PWD}/.agent-postgres-state}:/var/lib/postgresql"
-      - "./ops/postgres-init:/docker-entrypoint-initdb.d:ro"
+      - '${SEC_REVIEW_POSTGRES_STATE_DIR:-${PWD}/.agent-postgres-state}:/var/lib/postgresql'
+      - './ops/postgres-init:/docker-entrypoint-initdb.d:ro'
     ports:
-      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+      - '127.0.0.1:${POSTGRES_PORT:-5432}:5432'
     healthcheck:
       test:
         [
-          "CMD-SHELL",
-          "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} && psql -U $${POSTGRES_USER} -d $${POSTGRES_DB} -tAc \"select count(*) from pg_database where datname in ('sec_review_review_runs','sec_review_memory_catalog')\" | grep -q 2",
+          'CMD-SHELL',
+          'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} && psql -U $${POSTGRES_USER} -d $${POSTGRES_DB} -tAc "select count(*) from pg_database where datname in (''sec_review_review_runs'',''sec_review_memory_catalog'')" | grep -q 2'
         ]
       interval: 2s
       timeout: 5s
@@ -64,10 +64,10 @@ services:
 
   temporal:
     image: temporalio/temporal:latest
-    restart: "on-failure:5"
+    restart: 'on-failure:5'
     # Match the host service user so the bind-mounted SQLite directory remains
     # writable without making local workflow state world-writable.
-    user: "${SEC_REVIEW_SERVICE_UID:-1000}:${SEC_REVIEW_SERVICE_GID:-1000}"
+    user: '${SEC_REVIEW_SERVICE_UID:-1000}:${SEC_REVIEW_SERVICE_GID:-1000}'
     command:
       - server
       - start-dev
@@ -77,15 +77,15 @@ services:
       - /var/lib/temporal/temporal.db
     volumes:
       # Keep workflow state across the process restarts performed by systemd.
-      - "${SEC_REVIEW_TEMPORAL_STATE_DIR:-${PWD}/.agent-temporal-state}:/var/lib/temporal"
+      - '${SEC_REVIEW_TEMPORAL_STATE_DIR:-${PWD}/.agent-temporal-state}:/var/lib/temporal'
     ports:
-      - "127.0.0.1:${TEMPORAL_PORT:-7233}:7233"
-      - "127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8233"
+      - '127.0.0.1:${TEMPORAL_PORT:-7233}:7233'
+      - '127.0.0.1:${TEMPORAL_UI_PORT:-8233}:8233'
     networks:
       - temporal-internal
 
   execution-gateway:
-    restart: "on-failure:5"
+    restart: 'on-failure:5'
     build:
       context: services/execution-gateway
       dockerfile: Dockerfile
@@ -93,25 +93,25 @@ services:
         workspace: .
         contracts: contracts
       args:
-        NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
+        NPM_CONFIG_REGISTRY: '${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}'
     environment:
-      EXECUTION_GATEWAY_HOST: "0.0.0.0"
-      EXECUTION_GATEWAY_PORT: "8000"
-      TEMPORAL_ADDRESS: "temporal:7233"
-      TEMPORAL_NAMESPACE: "${TEMPORAL_NAMESPACE:-default}"
-      TEMPORAL_EXECUTION_TASK_QUEUE: "${TEMPORAL_EXECUTION_TASK_QUEUE:-sec-review-execution}"
+      EXECUTION_GATEWAY_HOST: '0.0.0.0'
+      EXECUTION_GATEWAY_PORT: '8000'
+      TEMPORAL_ADDRESS: 'temporal:7233'
+      TEMPORAL_NAMESPACE: '${TEMPORAL_NAMESPACE:-default}'
+      TEMPORAL_EXECUTION_TASK_QUEUE: '${TEMPORAL_EXECUTION_TASK_QUEUE:-sec-review-execution}'
       # No default token: the runner can spend LLM quota and execute workflows.
-      EXECUTION_GATEWAY_TOKEN: "${EXECUTION_API_TOKEN:?EXECUTION_API_TOKEN is required}"
-      TEMPORAL_WORKFLOW_TIMEOUT_SECONDS: "${TEMPORAL_WORKFLOW_TIMEOUT_SECONDS:-10800}"
+      EXECUTION_GATEWAY_TOKEN: '${EXECUTION_API_TOKEN:?EXECUTION_API_TOKEN is required}'
+      TEMPORAL_WORKFLOW_TIMEOUT_SECONDS: '${TEMPORAL_WORKFLOW_TIMEOUT_SECONDS:-10800}'
     ports:
-      - "127.0.0.1:${EXECUTION_GATEWAY_PORT:-8000}:8000"
+      - '127.0.0.1:${EXECUTION_GATEWAY_PORT:-8000}:8000'
     healthcheck:
       test:
         [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:8000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8000/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
         ]
       interval: 5s
       timeout: 3s
@@ -124,8 +124,8 @@ services:
       - temporal-internal
 
   memory-catalog-server:
-    restart: "on-failure:5"
-    profiles: ["app", "memory"]
+    restart: 'on-failure:5'
+    profiles: ['app', 'memory']
     build:
       context: services/memory-catalog
       dockerfile: Dockerfile
@@ -133,24 +133,24 @@ services:
         workspace: .
         contracts: contracts
       args:
-        NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
+        NPM_CONFIG_REGISTRY: '${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}'
     environment:
-      MEMORY_CATALOG_HOST: "0.0.0.0"
-      MEMORY_CATALOG_PORT: "8092"
+      MEMORY_CATALOG_HOST: '0.0.0.0'
+      MEMORY_CATALOG_PORT: '8092'
       # Keep profile-independent Compose commands usable when managed memory is not
       # enabled. The service itself rejects empty credentials before binding its port.
-      MEMORY_CATALOG_WORKER_TOKEN: "${AGENT_MEMORY_CATALOG_TOKEN:-}"
-      MEMORY_CATALOG_OPERATOR_TOKEN: "${AGENT_MEMORY_CATALOG_OPERATOR_TOKEN:-}"
-      MEMORY_CATALOG_DATABASE_URL: "postgresql://sec_review_memory_catalog:${MEMORY_CATALOG_POSTGRES_PASSWORD:?MEMORY_CATALOG_POSTGRES_PASSWORD is required}@postgres:5432/sec_review_memory_catalog"
+      MEMORY_CATALOG_WORKER_TOKEN: '${AGENT_MEMORY_CATALOG_TOKEN:-}'
+      MEMORY_CATALOG_OPERATOR_TOKEN: '${AGENT_MEMORY_CATALOG_OPERATOR_TOKEN:-}'
+      MEMORY_CATALOG_DATABASE_URL: 'postgresql://sec_review_memory_catalog:${MEMORY_CATALOG_POSTGRES_PASSWORD:?MEMORY_CATALOG_POSTGRES_PASSWORD is required}@postgres:5432/sec_review_memory_catalog'
     ports:
-      - "127.0.0.1:${MEMORY_CATALOG_HOST_PORT:-8092}:8092"
+      - '127.0.0.1:${MEMORY_CATALOG_HOST_PORT:-8092}:8092'
     healthcheck:
       test:
         [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:8092/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8092/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
         ]
       interval: 5s
       timeout: 3s
@@ -160,8 +160,8 @@ services:
         condition: service_healthy
 
   review-runs:
-    restart: "on-failure:5"
-    profiles: ["app"]
+    restart: 'on-failure:5'
+    profiles: ['app']
     build:
       context: services/review-runs
       dockerfile: Dockerfile
@@ -169,40 +169,40 @@ services:
         workspace: .
         contracts: contracts
       args:
-        NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
+        NPM_CONFIG_REGISTRY: '${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}'
     environment:
-      REVIEW_RUNS_PORT: "8090"
-      REVIEW_RUNS_SERVICE_TOKEN: "${REVIEW_RUNS_SERVICE_TOKEN:?REVIEW_RUNS_SERVICE_TOKEN is required}"
-      REVIEW_RUNS_READ_TOKEN: "${REVIEW_RUNS_READ_TOKEN:?REVIEW_RUNS_READ_TOKEN is required}"
+      REVIEW_RUNS_PORT: '8090'
+      REVIEW_RUNS_SERVICE_TOKEN: '${REVIEW_RUNS_SERVICE_TOKEN:?REVIEW_RUNS_SERVICE_TOKEN is required}'
+      REVIEW_RUNS_READ_TOKEN: '${REVIEW_RUNS_READ_TOKEN:?REVIEW_RUNS_READ_TOKEN is required}'
       # Optional: an empty value disables the /v1/admin surface entirely (it answers 404).
-      REVIEW_RUNS_ADMIN_TOKEN: "${REVIEW_RUNS_ADMIN_TOKEN:-}"
-      CONNECTOR_ID: "${CONNECTOR_ID:-github-integration:default}"
-      DATABASE_URL: "postgresql://sec_review_review_runs:${REVIEW_RUNS_POSTGRES_PASSWORD:?REVIEW_RUNS_POSTGRES_PASSWORD is required}@postgres:5432/sec_review_review_runs"
-      EXECUTION_API_URL: "http://execution-gateway:8000"
-      EXECUTION_API_TOKEN: "${EXECUTION_API_TOKEN:?EXECUTION_API_TOKEN is required}"
-      AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS: "${AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS:-15000}"
+      REVIEW_RUNS_ADMIN_TOKEN: '${REVIEW_RUNS_ADMIN_TOKEN:-}'
+      CONNECTOR_ID: '${CONNECTOR_ID:-github-integration:default}'
+      DATABASE_URL: 'postgresql://sec_review_review_runs:${REVIEW_RUNS_POSTGRES_PASSWORD:?REVIEW_RUNS_POSTGRES_PASSWORD is required}@postgres:5432/sec_review_review_runs'
+      EXECUTION_API_URL: 'http://execution-gateway:8000'
+      EXECUTION_API_TOKEN: '${EXECUTION_API_TOKEN:?EXECUTION_API_TOKEN is required}'
+      AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS: '${AGENT_EXECUTION_BACKGROUND_POLL_INTERVAL_MS:-15000}'
       # Optional external Langfuse. All three values are required together; empty disables statistics.
-      LANGFUSE_BASE_URL: "${LANGFUSE_BASE_URL:-}"
-      LANGFUSE_PUBLIC_KEY: "${LANGFUSE_PUBLIC_KEY:-}"
-      LANGFUSE_SECRET_KEY: "${LANGFUSE_SECRET_KEY:-}"
-      LANGFUSE_REQUEST_TIMEOUT_MS: "${LANGFUSE_REQUEST_TIMEOUT_MS:-30000}"
-      EXECUTION_STATISTICS_POLL_INTERVAL_MS: "${EXECUTION_STATISTICS_POLL_INTERVAL_MS:-15000}"
-      EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS: "${EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS:-20}"
-      EXECUTION_STATISTICS_INITIAL_DELAY_MS: "${EXECUTION_STATISTICS_INITIAL_DELAY_MS:-30000}"
-      EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS: "${EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS:-30000}"
-      EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS: "${EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS:-600000}"
-      EXECUTION_STATISTICS_MAX_FAILURES: "${EXECUTION_STATISTICS_MAX_FAILURES:-8}"
-      EXECUTION_STATISTICS_RETRY_DELAY_MS: "${EXECUTION_STATISTICS_RETRY_DELAY_MS:-30000}"
-      EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS: "${EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS:-600000}"
+      LANGFUSE_BASE_URL: '${LANGFUSE_BASE_URL:-}'
+      LANGFUSE_PUBLIC_KEY: '${LANGFUSE_PUBLIC_KEY:-}'
+      LANGFUSE_SECRET_KEY: '${LANGFUSE_SECRET_KEY:-}'
+      LANGFUSE_REQUEST_TIMEOUT_MS: '${LANGFUSE_REQUEST_TIMEOUT_MS:-30000}'
+      EXECUTION_STATISTICS_POLL_INTERVAL_MS: '${EXECUTION_STATISTICS_POLL_INTERVAL_MS:-15000}'
+      EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS: '${EXECUTION_STATISTICS_MAX_ITEMS_PER_PASS:-20}'
+      EXECUTION_STATISTICS_INITIAL_DELAY_MS: '${EXECUTION_STATISTICS_INITIAL_DELAY_MS:-30000}'
+      EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS: '${EXECUTION_STATISTICS_CONFIRMATION_DELAY_MS:-30000}'
+      EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS: '${EXECUTION_STATISTICS_SETTLEMENT_WINDOW_MS:-600000}'
+      EXECUTION_STATISTICS_MAX_FAILURES: '${EXECUTION_STATISTICS_MAX_FAILURES:-8}'
+      EXECUTION_STATISTICS_RETRY_DELAY_MS: '${EXECUTION_STATISTICS_RETRY_DELAY_MS:-30000}'
+      EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS: '${EXECUTION_STATISTICS_CLAIM_TIMEOUT_MS:-600000}'
     ports:
-      - "127.0.0.1:${REVIEW_RUNS_HOST_PORT:-8090}:8090"
+      - '127.0.0.1:${REVIEW_RUNS_HOST_PORT:-8090}:8090'
     healthcheck:
       test:
         [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:8090/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8090/readyz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
         ]
       interval: 5s
       timeout: 3s
@@ -214,40 +214,40 @@ services:
         condition: service_healthy
 
   control-plane-ui:
-    restart: "on-failure:5"
-    profiles: ["app"]
+    restart: 'on-failure:5'
+    profiles: ['app']
     build:
       context: apps/control-plane-ui
       dockerfile: Dockerfile
       additional_contexts:
         workspace: .
       args:
-        NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
+        NPM_CONFIG_REGISTRY: '${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}'
     environment:
       # The container listens on its network interface, while the published host port below
       # remains loopback-only. Set secure cookies when placing the BFF behind HTTPS instead.
-      CONTROL_PLANE_UI_HOST: "0.0.0.0"
-      CONTROL_PLANE_UI_PORT: "8091"
-      REVIEW_RUNS_URL: "http://review-runs:8090"
-      REVIEW_RUNS_READ_TOKEN: "${REVIEW_RUNS_READ_TOKEN:?REVIEW_RUNS_READ_TOKEN is required}"
-      CONTROL_PLANE_UI_ACCESS_TOKEN: "${CONTROL_PLANE_UI_ACCESS_TOKEN:?CONTROL_PLANE_UI_ACCESS_TOKEN is required}"
-      MEMORY_CATALOG_URL: "http://memory-catalog-server:8092"
-      MEMORY_CATALOG_OPERATOR_TOKEN: "${AGENT_MEMORY_CATALOG_OPERATOR_TOKEN:?AGENT_MEMORY_CATALOG_OPERATOR_TOKEN is required}"
-      SEC_REVIEW_ARTIFACT_S3_ENDPOINT: "http://rustfs:9000"
-      SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE: "path"
-      SEC_REVIEW_ARTIFACT_S3_BUCKET: "sec-review"
-      AWS_REGION: "us-east-1"
-      AWS_ACCESS_KEY_ID: "${SEC_REVIEW_UI_S3_ACCESS_KEY:-sec-review-control-plane-ui}"
-      AWS_SECRET_ACCESS_KEY: "${SEC_REVIEW_UI_S3_SECRET_KEY:?SEC_REVIEW_UI_S3_SECRET_KEY is required}"
+      CONTROL_PLANE_UI_HOST: '0.0.0.0'
+      CONTROL_PLANE_UI_PORT: '8091'
+      REVIEW_RUNS_URL: 'http://review-runs:8090'
+      REVIEW_RUNS_READ_TOKEN: '${REVIEW_RUNS_READ_TOKEN:?REVIEW_RUNS_READ_TOKEN is required}'
+      CONTROL_PLANE_UI_ACCESS_TOKEN: '${CONTROL_PLANE_UI_ACCESS_TOKEN:?CONTROL_PLANE_UI_ACCESS_TOKEN is required}'
+      MEMORY_CATALOG_URL: 'http://memory-catalog-server:8092'
+      MEMORY_CATALOG_OPERATOR_TOKEN: '${AGENT_MEMORY_CATALOG_OPERATOR_TOKEN:?AGENT_MEMORY_CATALOG_OPERATOR_TOKEN is required}'
+      SEC_REVIEW_ARTIFACT_S3_ENDPOINT: 'http://rustfs:9000'
+      SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE: 'path'
+      SEC_REVIEW_ARTIFACT_S3_BUCKET: 'sec-review'
+      AWS_REGION: 'us-east-1'
+      AWS_ACCESS_KEY_ID: '${SEC_REVIEW_UI_S3_ACCESS_KEY:-sec-review-control-plane-ui}'
+      AWS_SECRET_ACCESS_KEY: '${SEC_REVIEW_UI_S3_SECRET_KEY:?SEC_REVIEW_UI_S3_SECRET_KEY is required}'
     ports:
-      - "127.0.0.1:${CONTROL_PLANE_UI_HOST_PORT:-8091}:8091"
+      - '127.0.0.1:${CONTROL_PLANE_UI_HOST_PORT:-8091}:8091'
     healthcheck:
       test:
         [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://127.0.0.1:8091/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:8091/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
         ]
       interval: 5s
       timeout: 3s
@@ -261,8 +261,8 @@ services:
         condition: service_completed_successfully
 
   github-integration:
-    restart: "on-failure:5"
-    profiles: ["app"]
+    restart: 'on-failure:5'
+    profiles: ['app']
     build:
       context: apps/github-integration
       dockerfile: Dockerfile
@@ -272,26 +272,26 @@ services:
       args:
         # Override for networks where the public npm registry is unreliable.
         # The default preserves the normal npm registry behavior.
-        NPM_CONFIG_REGISTRY: "${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}"
+        NPM_CONFIG_REGISTRY: '${NPM_CONFIG_REGISTRY:-https://registry.npmjs.org}'
     env_file:
       - apps/github-integration/.env
     environment:
-      PRIVATE_KEY_PATH: "/run/secrets/github-app-private-key.pem"
-      REVIEW_RUNS_PUBLICATION_POLL_INTERVAL_MS: "${REVIEW_RUNS_PUBLICATION_POLL_INTERVAL_MS:-15000}"
-      REVIEW_RUNS_SERVICE_URL: "http://review-runs:8090"
-      REVIEW_RUNS_SERVICE_TOKEN: "${REVIEW_RUNS_SERVICE_TOKEN:?REVIEW_RUNS_SERVICE_TOKEN is required}"
-      GITHUB_INTEGRATION_GIT_HTTP_PROXY: "${GITHUB_INTEGRATION_GIT_HTTP_PROXY:-}"
-      SEC_REVIEW_ARTIFACT_STORE: "s3"
-      SEC_REVIEW_ARTIFACT_S3_BUCKET: "sec-review"
-      SEC_REVIEW_ARTIFACT_S3_ENDPOINT: "http://rustfs:9000"
-      SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE: "path"
-      AWS_REGION: "us-east-1"
-      AWS_ACCESS_KEY_ID: "${SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY:-sec-review-integration}"
-      AWS_SECRET_ACCESS_KEY: "${SEC_REVIEW_INTEGRATION_S3_SECRET_KEY:?SEC_REVIEW_INTEGRATION_S3_SECRET_KEY is required}"
+      PRIVATE_KEY_PATH: '/run/secrets/github-app-private-key.pem'
+      REVIEW_RUNS_PUBLICATION_POLL_INTERVAL_MS: '${REVIEW_RUNS_PUBLICATION_POLL_INTERVAL_MS:-15000}'
+      REVIEW_RUNS_SERVICE_URL: 'http://review-runs:8090'
+      REVIEW_RUNS_SERVICE_TOKEN: '${REVIEW_RUNS_SERVICE_TOKEN:?REVIEW_RUNS_SERVICE_TOKEN is required}'
+      GITHUB_INTEGRATION_GIT_HTTP_PROXY: '${GITHUB_INTEGRATION_GIT_HTTP_PROXY:-}'
+      SEC_REVIEW_ARTIFACT_STORE: 's3'
+      SEC_REVIEW_ARTIFACT_S3_BUCKET: 'sec-review'
+      SEC_REVIEW_ARTIFACT_S3_ENDPOINT: 'http://rustfs:9000'
+      SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE: 'path'
+      AWS_REGION: 'us-east-1'
+      AWS_ACCESS_KEY_ID: '${SEC_REVIEW_INTEGRATION_S3_ACCESS_KEY:-sec-review-integration}'
+      AWS_SECRET_ACCESS_KEY: '${SEC_REVIEW_INTEGRATION_S3_SECRET_KEY:?SEC_REVIEW_INTEGRATION_S3_SECRET_KEY is required}'
     extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - 'host.docker.internal:host-gateway'
     ports:
-      - "127.0.0.1:${GITHUB_INTEGRATION_HOST_PORT:-30000}:30000"
+      - '127.0.0.1:${GITHUB_INTEGRATION_HOST_PORT:-30000}:30000'
     secrets:
       - source: github-app-private-key
         target: github-app-private-key.pem

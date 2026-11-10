@@ -9,6 +9,7 @@
 ## Package Workspace
 
 <!-- doc-default: node-workspace; source=pnpm-workspace.yaml -->
+
 契约工具和 `contracts/codegen` 都在根目录的 pnpm 工作区中，与应用和服务共用锁文件。`contracts/codegen` 由契约工具的维护方负责；使用它的包通过 `workspace:*` 声明依赖。
 
 在仓库根目录运行：
@@ -41,7 +42,7 @@ contracts/
     profiles/<name>/<version>/{SPEC.md,corpus/}
 ```
 
-并非每类契约都有上述全部文件。规则主要涉及判断逻辑、不能只用数据结构描述时，由代码执行校验，并在 `corpus/` 中维护两端共用的测试输入，而不是使用 `schemas/` 和 `fixtures/`。例如 [setup-declaration](setup-declaration/README.zh.md)。
+并非每类契约都有上述全部文件。规则主要涉及判断逻辑、不能只用数据结构描述时，由代码执行校验，并在 `corpus/` 中维护两端共用的测试输入，不使用 `schemas/` 和 `fixtures/`。例如 [setup-declaration](setup-declaration/README.zh.md)。
 
 契约目录还可以保存适用于所有版本的文档，例如传输方式说明。
 
@@ -49,15 +50,15 @@ contracts/
 
 ## 契约分类
 
-| 契约类别                                                | 约定内容                                         | 参与方                                             | 当前版本                                                                                                                                                                                                      |
-| ----------------------------------------------------- | -------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [execution-api](execution-api/README.zh.md)           | 公开 HTTP 操作、工作流输入、结果与错误    | Execution API 服务、调用方与结果发布方         | [v1](execution-api/v1/CONTRACT.zh.md)                                                                                                                                                                         |
-| [execution-workflow](execution-workflow/README.zh.md) | Temporal Execution Workflow 输入             | Execution Gateway 与 Execution Worker              | [v1](execution-workflow/v1/CONTRACT.md)                                                                                                                                                                       |
-| [review-runs-api](review-runs-api/README.zh.md)       | Review Runs HTTP API 与脱敏运行记录结构    | Review Runs 与其调用方                             | [v1](review-runs-api/v1/openapi.yaml)                                                                                                                                                                         |
-| [memory-catalog-api](memory-catalog-api/README.zh.md) | 记忆协调服务的 HTTP API                 | Memory Catalog Server 与 Worker                   | [v1](memory-catalog-api/v1/openapi.yaml)                                                                                                                                                                      |
-| [tar-zstd-artifact](tar-zstd-artifact/README.zh.md)   | 共享归档封装与各类产物格式 | 本项目中生成或读取 tar+zstd 产物的组件         | [envelope v1](tar-zstd-artifact/envelope/v1/SPEC.zh.md)、[input-bundle v1](tar-zstd-artifact/profiles/input-bundle/v1/SPEC.zh.md)、[memory-tree v1](tar-zstd-artifact/profiles/memory-tree/v1/SPEC.zh.md)、[execution-archive v1](tar-zstd-artifact/profiles/execution-archive/v1/SPEC.zh.md) |
-| [agent-trajectory](agent-trajectory/README.zh.md) | Agent 执行轨迹（JSONL） | Agent 运行时、Memory、UI 和用量脚本 | [v1](agent-trajectory/v1/SPEC.zh.md) |
-| [setup-declaration](setup-declaration/README.zh.md)   | 受信任的 `.sec-review/setup.yml` 格式        | 被审查仓库、GitHub Integration 与 Execution Worker | [v1](setup-declaration/v1/SPEC.zh.md)                                                                                                                                                                         |
+| 契约类别                                              | 约定内容                                | 参与方                                             | 当前版本                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------- | --------------------------------------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [execution-api](execution-api/README.zh.md)           | 公开 HTTP 操作、工作流输入、结果与错误  | Execution API 服务、调用方与结果发布方             | [v1](execution-api/v1/CONTRACT.zh.md)                                                                                                                                                                                                                                                         |
+| [execution-workflow](execution-workflow/README.zh.md) | Temporal Execution Workflow 输入        | Execution Gateway 与 Execution Worker              | [v1](execution-workflow/v1/CONTRACT.md)                                                                                                                                                                                                                                                       |
+| [review-runs-api](review-runs-api/README.zh.md)       | Review Runs HTTP API 与脱敏运行记录结构 | Review Runs 与其调用方                             | [v1](review-runs-api/v1/openapi.yaml)                                                                                                                                                                                                                                                         |
+| [memory-catalog-api](memory-catalog-api/README.zh.md) | 记忆协调服务的 HTTP API                 | Memory Catalog Server 与 Worker                    | [v1](memory-catalog-api/v1/openapi.yaml)                                                                                                                                                                                                                                                      |
+| [tar-zstd-artifact](tar-zstd-artifact/README.zh.md)   | 共享归档封装与各类产物格式              | 本项目中生成或读取 tar+zstd 产物的组件             | [envelope v1](tar-zstd-artifact/envelope/v1/SPEC.zh.md)、[input-bundle v1](tar-zstd-artifact/profiles/input-bundle/v1/SPEC.zh.md)、[memory-tree v1](tar-zstd-artifact/profiles/memory-tree/v1/SPEC.zh.md)、[execution-archive v1](tar-zstd-artifact/profiles/execution-archive/v1/SPEC.zh.md) |
+| [agent-trajectory](agent-trajectory/README.zh.md)     | Agent 执行轨迹（JSONL）                 | Agent 运行时、Memory、UI 和用量脚本                | [v1](agent-trajectory/v1/SPEC.zh.md)                                                                                                                                                                                                                                                          |
+| [setup-declaration](setup-declaration/README.zh.md)   | 受信任的 `.sec-review/setup.yml` 格式   | 被审查仓库、GitHub Integration 与 Execution Worker | [v1](setup-declaration/v1/SPEC.zh.md)                                                                                                                                                                                                                                                         |
 
 ## 各类契约的维护规则
 
@@ -73,7 +74,7 @@ Schema 校验必填字段、JSON 类型、枚举、带类型标签的不同结�
 
 ### 二进制与按内容寻址的产物
 
-归档、压缩流或其他按内容寻址的产物，必须分别说明生成方和读取方的要求：生成方必须使用哪种表示，读取方可以接受哪些替代表示，以及必须拒绝哪些输入。不能直接把所用库的默认行为当成契约规则。
+归档、压缩流或其他按内容寻址的产物，必须分别说明生成方和读取方的要求：生成方必须使用哪种表示，读取方可以接受哪些替代表示，以及必须拒绝哪些输入。所用库的默认行为属于实现细节，不算契约规则。
 
 产物引用应同时记录媒体类型、压缩后的字节数和摘要；契约规定存储位置时，还必须绑定该位置。读取方先检查引用结构和位置，再检查实际压缩数据的大小与摘要，然后才解压或解析内容。对象存储可信、摘要匹配，都不能代替对归档路径、条目类型、元数据、资源限制和内部清单的检查。
 

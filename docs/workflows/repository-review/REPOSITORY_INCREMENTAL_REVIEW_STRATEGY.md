@@ -8,13 +8,13 @@ In repository-level scheduled runs, such as weekly `schedule`, always running a 
 
 A time window gives us `base` and `head`. Between them sit many commits, and comparing the two ends yields files that were modified, added, deleted, or renamed.
 
-Does discovery need to read all of that change in order to find vulnerabilities? No, for one reason:
+Discovery does not need to read all of that change to find vulnerabilities, because:
 
 > A change that introduces a problem leaves that problem in the current code. Once it is there, it no longer depends on the change.
 
 So the change is used for one thing: finding out which files were modified. Those files become the scan targets, and scanning them is what makes this cheaper than a full scan. The current code is the evidence surface; the window only decides where to look.
 
-That leaves one placement question: where does the window judgement live? In the analyzer. Discovery makes a single-file judgement and reports what a file currently looks like; it cannot see the window, so it does not try to. The analyzer already holds the diff and the rest of the context, so judging whether a lead is true and whether it belongs to this window costs about the same. A finding that is real but pre-existing is identified there and dropped for this run.
+The window judgement lives in the analyzer. Discovery makes a single-file judgement and reports what a file currently looks like; it cannot see the window, so it does not try to. The analyzer already holds the diff and the rest of the context, so judging whether a lead is true and whether it belongs to this window costs about the same. A finding that is real but pre-existing is identified there and dropped for this run.
 
 Putting window attribution in analyzer rather than discovery is a deliberate cost trade-off. Giving discovery its own change-aware mode would mean a second discovery pipeline with its own prompts and candidate handling, which is expensive for what it buys.
 
@@ -26,7 +26,7 @@ Removing a protection does not leave the problem on a line of current code; it l
 
 That produces a stable class of misses:
 
-- A unified authentication middleware is deleted while every route file is untouched. The routes never held the auth logic — the middleware did — so in current code they look exactly as they did yesterday.
+- A unified authentication middleware is deleted while every route file is untouched. The routes never held the auth logic (the middleware did), so in current code they look exactly as they did yesterday.
 - A shared validation function is deleted while its call sites are unchanged. The call sites still call it; no line of them looks unsafe.
 - A denylist, certificate, or policy file is deleted while the code it governed is unchanged.
 
@@ -40,11 +40,12 @@ The fix is to turn deleted files into cases directly. Deleted files skip discove
 
 It is cheap: no model decides which cases exist, and no discovery or candidate logic changes. A deletion belongs to this window by construction, so no second scope judgement is needed.
 
-The boundary is the directory, not a count, because a directory is a boundary the repository itself drew: files removed together from one place usually belong to one mechanism -- a middleware and the policy beside it -- and analysing them separately makes the analyzer re-read the same callers per file while hiding that they went together. Slicing by a fixed number would instead assert a relevance nothing supports.
+The boundary is the directory, not a count, because a directory is a boundary the repository itself drew: files removed together from one place usually belong to one mechanism (a middleware and the policy beside it), and analysing them separately makes the analyzer re-read the same callers per file while hiding that they went together. Slicing by a fixed number would instead assert a relevance nothing supports.
 
 The boundary is imperfect: a broad directory such as `src/`, `config/`, or the repository root can hold several independent mechanisms.
 
 <!-- doc-default: MAX_DELETED_FILES; source=agents/src/sec_review_agents/workflows/repository/case_execution_input.py -->
+
 A single cap on the number of deleted files remaining after `paths_ignore` filtering (200) therefore decides whether deletion review happens at all. Past the cap the whole window's deletion review is skipped: it is not split, and directories are not picked over one by one. Splitting would make the result look reviewed, and picking would produce a partial result that reads as complete. The caller chose the window, so an oversized one is the caller's to narrow, and the answer is one they can act on rather than a result they have to audit.
 
 The skip does not affect anything else: ordinary triaged cases still run. Two fields in the result report it: `scan_summary.deleted_file_count` is how many deleted files remain in the window after `paths_ignore` filtering, and `deletion_review_skipped` says whether review was skipped because of that. The count sits in the scan summary because it explains a thin incremental run: deleted files never reach discovery.

@@ -74,7 +74,7 @@ The most direct agent approach is to ask the agent to output the complete item -
 
 Partition workbench makes a tradeoff: the agent keeps semantic judgment, while mechanical responsibility returns to the system. The agent only creates, moves, merges, splits, and explains groups. The system owns state consistency, structural constraint checking, and final export.
 
-This resembles how humans handle complex collection tasks: not by writing the final table in one shot, but by continuously organizing, moving, and correcting cards on a visible workbench until the state passes checks.
+This resembles how people handle complex collection tasks: they organize, move, and correct cards on a visible workbench until the state passes checks.
 
 ## Workbench Model
 
@@ -117,7 +117,7 @@ Batch write tools:
 - `delete_groups`
 
 1. Batch tools are not a new grouping method. They are isomorphic batch forms of atomic group CRUD. They follow the same membership and constraints rules as `create_group` / `update_group` / `delete_group`, and exist to reduce tool call count and intermediate-state noise.
-2. Batch tools should not be understood as final submit tools. If the agent can form a full draft directly from input payload, it is reasonable to use `create_groups` to create that full draft at once, then use atomic or batch tools to correct small mistakes. If a full rewrite of an existing draft is needed, use `delete_groups` to clear relevant groups first, then `create_groups` to create the new draft.
+2. Batch tools are not final submit tools. If the agent can form a full draft directly from input payload, it is reasonable to use `create_groups` to create that full draft at once, then use atomic or batch tools to correct small mistakes. If a full rewrite of an existing draft is needed, use `delete_groups` to clear relevant groups first, then `create_groups` to create the new draft.
 
 Batch write tools should check command-level structural conflicts as much as possible before modifying the workbench. In particular, tools like `create_groups` that create resources should check `group_id` conflicts within the batch and against existing state before writing. If a batch call fails, it should not leave partially created groups or partially recorded edit events.
 
@@ -140,7 +140,7 @@ Tools not exposed, based on experience, mainly to reduce unnecessary agent tool 
 
 Their return value should be a compact mutation result: what changed in this call and whether current hard constraints are still satisfied. The full group list should only be read through explicit `read_groups`.
 
-Avoiding full groups in every write response is important. Otherwise, a small edit repeatedly injects all group metadata back into context, amplifying tokens and making it easier for the agent to misread state inside huge tool output.
+If every write response returned full groups, a small edit repeatedly injects all group metadata back into context, amplifying tokens and making it easier for the agent to misread state inside huge tool output.
 
 ### Completion Signal
 
@@ -161,7 +161,7 @@ The agent does not directly output the final plan. It should work like a person 
 5. Inspect current state and constraints.
 6. Return the completion response once constraints pass.
 
-The final result is exported by the system from workbench state, not handwritten by the agent as full JSON or natural-language summary.
+The system exports the final result from workbench state; the agent does not handwrite it as full JSON or a natural-language summary.
 
 This working style should be reentrant: the agent may face an empty workbench or groups already organized by a previous round. Each run reads current state first. If groups already exist, most runs should treat them as a draft and make local corrections rather than rebuilding from scratch.
 
@@ -169,7 +169,7 @@ This working style should be reentrant: the agent may face an empty workbench or
 
 Reentrancy makes a second refinement round natural: the first agent run can create a full draft from an empty workbench; the second agent run can inherit the same workbench and treat existing groups as a draft for quality correction.
 
-Refinement is not introduced for coverage. Coverage is the system constraints checker's job. The real issue is that in the first pass, the agent often reads the full input and then confidently creates a draft with `create_groups` in one call. That draft usually satisfies constraints, but may still contain over-merge, missed merge, weak reason, or keep/suppress boundary errors.
+Coverage is the system constraints checker's job, so refinement targets something else. In the first pass, the agent often reads the full input and then confidently creates a draft with `create_groups` in one call. That draft usually satisfies constraints, but may still contain over-merge, missed merge, weak reason, or keep/suppress boundary errors.
 
 A natural idea is to ask the same agent run to self-check before finishing. But "self-check" is easily executed as bookkeeping: recounting items, restating groups, writing long justifications for existing groups, or proving coverage. It increases tokens and context noise without reliably producing better edits. Refinement is valuable because the first judgment is externalized into workbench state, and the next round treats it as a draft while looking only for concrete editable group boundary problems. If there is no concrete edit, it ends.
 
@@ -190,16 +190,16 @@ Common execution modes on this workbench model:
 - `single + optional refinement`: one agent pass processes the full item inventory; if quality correction is needed, run refinement on the same workbench.
 - `batch + refinement`: multiple batch drafts process item subsets in parallel, then merge drafts into one global workbench for refinement.
 
-Batch is a wall-time tradeoff, not a smarter default planning mode.
+Batch is a wall-time tradeoff and not a smarter default planning mode.
 
-It was initially introduced not because medium-sized input necessarily failed to fit in context, but because **slower models took too long to process many items at once**. Batch can split the draft stage in parallel, reducing input size and wait time per draft invoke.
+It was introduced because **slower models took too long to process many items at once**; medium-sized input did not necessarily fail to fit in context. Batch can split the draft stage in parallel, reducing input size and wait time per draft invoke.
 
 Batch is faster, **especially on slow models**. But it has real costs:
 
 - batch drafts do not see cross-batch merge opportunities, i.e. they lack global view;
 - global refinement is still required for global audit.
 
-Therefore, batch is better treated as a latency workaround, not the default shape. Especially when a fast model's single run is already fast enough, batch wall-time advantage shrinks and its downsides become more visible: it introduces batch-boundary loss and still requires global refinement to recover global judgment.
+Treat batch as a latency workaround rather than the default shape. When a fast model's single run is already fast enough, batch wall-time advantage shrinks and its downsides become more visible: it introduces batch-boundary loss and still requires global refinement to recover global judgment.
 
 Do not describe this batch design as a solution for huge input too early. If refinement still needs to read all item payloads, batch only reduces draft invoke input size and reasoning time. It does not remove the problem that final global audit faces all items.
 
@@ -220,7 +220,7 @@ Use this section only to prioritize refinement attention. Groups from different 
 
 This is not group metadata and not a new tool view. Groups themselves still express current workbench state. Draft origins are only read-only context for the refinement pass, explaining which groups were produced in the same local draft scope.
 
-The goal is not to make the agent trust in-batch results, but to adjust attention priority:
+Draft origins adjust attention priority; they do not ask the agent to trust in-batch results:
 
 - Prioritize duplicate, missed-merge, boundary-misalignment, or keep/suppress inconsistency across different draft scopes.
 - Groups from the same draft scope were already seen together in one local context, so they do not need equal review cost unless the boundary is obviously weak.
@@ -234,23 +234,23 @@ These grouping intents do not need separate tools exposed to the agent. The tabl
 
 Normal grouping and adjustment:
 
-| Scenario | Method | Tool call |
-| --- | --- | --- |
-| One item should remain alone | Create a normal group with this item as initial member. | create_group(item_ids=[item_id]) |
-| Multiple items should be handled together | Create a normal group with these items as initial members. | create_group(item_ids=[...]) |
-| Two existing groups are later found to be one group | Update the target group's item_ids to include both sides, then delete the emptied group. | update_group(item_ids=[...]) -> delete_group |
-| A group contains items that should not be together | Create a new group to take some items, then update original group item_ids. | create_group(item_ids=[...]) -> update_group(item_ids=[...]) |
-| A group's members should be rewritten wholesale | Update the group with new item_ids. | update_group(item_ids=[...]) |
-| An item is in the wrong group | Update the correct group's item_ids to include this item; the system automatically removes old ownership. | update_group(item_ids=[...]) |
-| An item should temporarily belong to no group | Update the current group's item_ids to remove this item. | update_group(item_ids=[...]) |
-| A group's explanation is inaccurate | Update group reason. | update_group(reason=...) |
+| Scenario                                            | Method                                                                                                    | Tool call                                                    |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| One item should remain alone                        | Create a normal group with this item as initial member.                                                   | create_group(item_ids=[item_id])                             |
+| Multiple items should be handled together           | Create a normal group with these items as initial members.                                                | create_group(item_ids=[...])                                 |
+| Two existing groups are later found to be one group | Update the target group's item_ids to include both sides, then delete the emptied group.                  | update_group(item_ids=[...]) -> delete_group                 |
+| A group contains items that should not be together  | Create a new group to take some items, then update original group item_ids.                               | create_group(item_ids=[...]) -> update_group(item_ids=[...]) |
+| A group's members should be rewritten wholesale     | Update the group with new item_ids.                                                                       | update_group(item_ids=[...])                                 |
+| An item is in the wrong group                       | Update the correct group's item_ids to include this item; the system automatically removes old ownership. | update_group(item_ids=[...])                                 |
+| An item should temporarily belong to no group       | Update the current group's item_ids to remove this item.                                                  | update_group(item_ids=[...])                                 |
+| A group's explanation is inaccurate                 | Update group reason.                                                                                      | update_group(reason=...)                                     |
 
 Stages that allow discarding items need `suppress` groups:
 
-| Scenario | Method | Tool call |
-| --- | --- | --- |
-| One item should be suppressed | Create a `suppress` group with this item as initial member. | create_group(kind=suppress, item_ids=[item_id]) |
-| Multiple items are suppressed for the same reason | Create a `suppress` group with these items as initial members and a clear reason. | create_group(kind=suppress, item_ids=[...]) |
-| A suppressed item should be restored | Update a normal group's item_ids to take it, or delete the `suppress` group so it becomes unprocessed. | update_group(item_ids=[...]) or delete_group |
+| Scenario                                          | Method                                                                                                 | Tool call                                       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| One item should be suppressed                     | Create a `suppress` group with this item as initial member.                                            | create_group(kind=suppress, item_ids=[item_id]) |
+| Multiple items are suppressed for the same reason | Create a `suppress` group with these items as initial members and a clear reason.                      | create_group(kind=suppress, item_ids=[...])     |
+| A suppressed item should be restored              | Update a normal group's item_ids to take it, or delete the `suppress` group so it becomes unprocessed. | update_group(item_ids=[...]) or delete_group    |
 
 Prompts may keep using these grouping intents to help the agent understand the task. Tools should still expose group reading, constraints checking, single group CRUD, and batch group CRUD. Completion is expressed through structured completion response.

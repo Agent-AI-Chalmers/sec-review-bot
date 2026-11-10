@@ -8,7 +8,7 @@
 
 `repository-review` 是一条独立于 `issue-review` 和 `pull-request-review` 的仓库级工作流。它会扫描仓库，把文件级可疑点收束成少量高价值的问题簇，后文称为 `case`。值得处理的 `case` 会进入 `analyzer / cvss-v4-scoring / mitigator / verifier`，最终发布 scan 摘要和少量 draft PR。
 
-这条工作流优先追求初筛覆盖、后置去噪与问题收束，以及审查者可以审查的最终输出。它不是“单 Agent 理解完整仓库”的设计，也不追求最大化发现数量。
+这条工作流先追求初筛覆盖，再做去噪与问题收束，最终产出审查者可以审查的结果。它不要求单个 Agent 理解整个仓库，也不追求最大化发现数量。
 
 ## 阶段组成
 
@@ -27,6 +27,7 @@
 Discovery 采用局部 chunk 初筛，而不是让 Agent 在整个仓库里自由探索。
 
 <!-- doc-default: AGENT_DISCOVERY_CHUNK_STRATEGY; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
+
 Discovery 默认采用 `single-file`，每次模型调用扫描一个完整文件。部署侧可以通过 `AGENT_DISCOVERY_CHUNK_STRATEGY=batched` 将路径相近的文件按上下文预算组成 chunk，以共享局部上下文。具体文件选择和预算规则见 [DISCOVERY_AGENT_DESIGN](DISCOVERY_AGENT_DESIGN.zh.md)。
 
 Discovery 产出结构化 `candidate`，包括位置、类别、理由和置信度。它不直接确认漏洞，也不做 `vulnerability_type` / `CWE` 分类，以保持高召回和轻量输入。

@@ -157,6 +157,18 @@ For agent-facing Markdown such as skills and memory notes, prefer semantic parag
 python -m scripts.checks.markdown_wrapping
 ```
 
+For any Markdown change, run markdownlint from the repository root. `pnpm run lint:md:fix` applies mechanical fixes:
+
+```bash
+pnpm run lint:md
+```
+
+Repository-level files outside workspace packages (Markdown, YAML, JSON, and root scripts) are formatted by the root Prettier config. Run `pnpm run format:root` to apply it and `pnpm run format:root:check` to verify.
+
+For `*.zh.md` changes, run `pnpm run lint:zh` to check spacing between Chinese and Latin text and Chinese punctuation. `pnpm run lint:zh:fix` applies the fixes.
+
+`pnpm install` at the repository root installs a lefthook pre-commit hook (`lefthook.yml`) that runs Prettier, markdownlint, and AutoCorrect on staged files. It does not replace the checks above; CI still runs them across the repository.
+
 For translated contract documents, preserve code identifiers such as field names, interface names, workflow names, enum values, file paths, and directory names. Localize descriptive prose and section titles; project asset terms such as `schemas` and `fixtures` may remain in English when they refer to repository directories or test assets.
 
 ### General Change Rules

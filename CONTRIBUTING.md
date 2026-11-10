@@ -20,9 +20,11 @@ Use the documented responsibilities and actual callers to determine who owns a c
 - Prefer changing the code that implements the behavior.
 
   For example, suppose an HTTP endpoint and a CLI command use the same input-validation function. If that function accepts invalid input, fix the shared function so both entry points benefit, rather than adding a check only to the HTTP endpoint.
+
 - Prefer removing an unnecessary intermediate layer over adding another wrapper.
 
   For example, consider `caller -> A() -> B()`. If `A()` only forwards arguments to `B()` and returns its result unchanged, with no other role such as validation, logging, or compatibility with an old interface, consider letting callers use `B()` directly. Check the callers first; if the old interface is still needed, do not simply delete `A()`. Handle any compatibility break as described below.
+
 - State whether the change preserves compatibility. If it breaks compatibility, list the affected callers, artifacts, persisted data, configuration, or operational procedures and explain how to migrate.
 - If a change affects component responsibilities, environment setup, configuration, public behavior, or operational steps, update the relevant documentation too.
 - If you need to change a generated file, edit its source and run the corresponding generator. Do not edit the generated output directly.
@@ -31,17 +33,17 @@ Use the documented responsibilities and actual callers to determine who owns a c
 
 Run checks from every affected package, not only from the package where the first edit occurred. The package README and `package.json` or `pyproject.toml` define the exact local commands.
 
-| Area | Development guide | Basic checks |
-| --- | --- | --- |
-| Execution, Memory Extraction, and Memory Maintenance Workers | [`agents/README.md`](agents/README.md) | Ruff, Black, mypy, Pyright, pytest |
-| GitHub Integration | [`apps/github-integration/README.md`](apps/github-integration/README.md) | format, lint, typecheck, unit tests; integration tests when the database boundary changes |
-| Review Runs | [`services/review-runs/README.md`](services/review-runs/README.md) | format, lint, typecheck, tests, PostgreSQL integration tests |
-| Control Plane UI | [`apps/control-plane-ui/README.md`](apps/control-plane-ui/README.md) | format, lint, typecheck, tests, build, browser smoke test for user-visible flows |
-| Execution Gateway | [`services/execution-gateway/README.md`](services/execution-gateway/README.md) | format, lint, typecheck, tests, Temporal integration tests |
-| Memory Catalog Server | [`services/memory-catalog/README.md`](services/memory-catalog/README.md) | format, lint, typecheck, tests, PostgreSQL integration tests |
-| Cross-service system tests | [`system-tests/README.md`](system-tests/README.md) | Run the system tests relevant to the affected services and data flows |
-| Repository scripts | [`scripts/README.md`](scripts/README.md) | Ruff, Black, Python syntax checks; check the changed scripts as appropriate, for example with `--help` or test inputs |
-| Documentation | [`docs/DOCUMENTATION_GUIDE.md`](docs/DOCUMENTATION_GUIDE.md) and [`docs/README.md`](docs/README.md) | As applicable, check that local links work, prose paragraphs remain unwrapped as required, and English/Chinese heading structures match |
+| Area                                                         | Development guide                                                                                   | Basic checks                                                                                                                            |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Execution, Memory Extraction, and Memory Maintenance Workers | [`agents/README.md`](agents/README.md)                                                              | Ruff, Black, mypy, Pyright, pytest                                                                                                      |
+| GitHub Integration                                           | [`apps/github-integration/README.md`](apps/github-integration/README.md)                            | format, lint, typecheck, unit tests; integration tests when the database boundary changes                                               |
+| Review Runs                                                  | [`services/review-runs/README.md`](services/review-runs/README.md)                                  | format, lint, typecheck, tests, PostgreSQL integration tests                                                                            |
+| Control Plane UI                                             | [`apps/control-plane-ui/README.md`](apps/control-plane-ui/README.md)                                | format, lint, typecheck, tests, build, browser smoke test for user-visible flows                                                        |
+| Execution Gateway                                            | [`services/execution-gateway/README.md`](services/execution-gateway/README.md)                      | format, lint, typecheck, tests, Temporal integration tests                                                                              |
+| Memory Catalog Server                                        | [`services/memory-catalog/README.md`](services/memory-catalog/README.md)                            | format, lint, typecheck, tests, PostgreSQL integration tests                                                                            |
+| Cross-service system tests                                   | [`system-tests/README.md`](system-tests/README.md)                                                  | Run the system tests relevant to the affected services and data flows                                                                   |
+| Repository scripts                                           | [`scripts/README.md`](scripts/README.md)                                                            | Ruff, Black, Python syntax checks; check the changed scripts as appropriate, for example with `--help` or test inputs                   |
+| Documentation                                                | [`docs/DOCUMENTATION_GUIDE.md`](docs/DOCUMENTATION_GUIDE.md) and [`docs/README.md`](docs/README.md) | As applicable, check that local links work, prose paragraphs remain unwrapped as required, and English/Chinese heading structures match |
 
 After changing a contract, complete the checks required by the [contracts guide](contracts/README.md) and the relevant contract README, then check all affected packages.
 

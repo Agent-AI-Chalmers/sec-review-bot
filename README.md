@@ -22,11 +22,11 @@ The agent's final behavior depends heavily on the underlying LLM's code understa
 
 ## Capabilities
 
-| Capability          | What happens                                                                                              |
-| ------------------- | --------------------------------------------------------------------------------------------------------- |
-| Issue review        | Investigates issue reports, analyzes the problem and its impact, decides from evidence whether to attempt a repair, and independently verifies the analysis and repair outcome; a ready patch can be published as a draft PR when `--open-pr` is specified.              |
-| Pull request review | Reviews PR changes and can publish review suggestions.                                                    |
-| Repository review   | Runs full-repository or incremental scans with discovery, triage, case processing, and delivery planning. |
+| Capability          | What happens                                                                                                                                                                                                                                                |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Issue review        | Investigates issue reports, analyzes the problem and its impact, decides from evidence whether to attempt a repair, and independently verifies the analysis and repair outcome; a ready patch can be published as a draft PR when `--open-pr` is specified. |
+| Pull request review | Reviews PR changes and can publish review suggestions.                                                                                                                                                                                                      |
+| Repository review   | Runs full-repository or incremental scans with discovery, triage, case processing, and delivery planning.                                                                                                                                                   |
 
 For GitHub triggers and commands, see [github-integration](apps/github-integration/README.md#triggers).
 
@@ -65,12 +65,12 @@ See [SYSTEM_ARCHITECTURE](docs/architecture/SYSTEM_ARCHITECTURE.md) for componen
 
 Package READMEs maintain installation, configuration, and development commands:
 
-| Goal | Start here |
-| --- | --- |
-| Change agents or review workflows | [agents](agents/README.md#developer-navigation) |
-| Develop services or the console | [Documentation map](docs/README.md) and the relevant package README |
-| Change contracts or generated artifacts | [contracts](contracts/README.md) |
-| Contribute | [CONTRIBUTING](CONTRIBUTING.md) |
+| Goal                                    | Start here                                                          |
+| --------------------------------------- | ------------------------------------------------------------------- |
+| Change agents or review workflows       | [agents](agents/README.md#developer-navigation)                     |
+| Develop services or the console         | [Documentation map](docs/README.md) and the relevant package README |
+| Change contracts or generated artifacts | [contracts](contracts/README.md)                                    |
+| Contribute                              | [CONTRIBUTING](CONTRIBUTING.md)                                     |
 
 ## Publication
 

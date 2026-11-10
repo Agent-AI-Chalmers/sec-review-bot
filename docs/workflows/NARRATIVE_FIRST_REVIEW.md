@@ -2,7 +2,7 @@
 
 Language: English | [中文](NARRATIVE_FIRST_REVIEW.zh.md)
 
-Analyzer organizes results into analysis directions, called narratives. Each carries its own evidence and verdict: a confirmed issue, plausible risk, inconclusive path, or direction reviewed without an actionable finding. `narratives` stores those directions, and `verdict` expresses the conclusion. The purpose is to prevent the agent from accumulating scattered observations while reading code and leaving only a vague impression.
+Analyzer organizes results into analysis directions, called narratives. Each carries its own evidence and verdict: a confirmed issue, plausible risk, inconclusive path, or direction reviewed without an actionable finding. `narratives` stores those directions, and `verdict` expresses the conclusion. This keeps the agent from piling up scattered observations while reading code and ending with only a vague impression.
 
 The system expects the agent to converge on a comparable set of explanations, called narratives, with clear priorities. Output includes:
 
@@ -18,18 +18,18 @@ This model has several constraints:
 - A no-actionable narrative should state the reviewed direction, the repository evidence that rejects an actionable concern, and any material proof gaps.
 - `support_review.proof_gaps` records what evidence is still missing for a narrative.
 
-For readers, the most important distinction is that the system does not first ask "is there a checklist vulnerability type here?" It first asks "which review directions are worth carrying forward, and what verdict does the evidence support for each one?" Vulnerability type, CWE, and verdict expand outward from this narrative-first structure, rather than choosing a label first and then assembling evidence around it.
+The system does not start by asking "is there a checklist vulnerability type here?" It starts with "which review directions are worth carrying forward, and what verdict does the evidence support for each one?" Vulnerability type, CWE, and verdict follow from the narratives; the system does not pick a label first and then assemble evidence around it.
 
-This structure does not only serve analyzer output. Later stages consume it as a shared work object. The mitigator does not apply equal effort to an entire report; it prioritizes high-priority narratives whose verdict is `confirmed-vulnerability` or `confirmed-defect` when deciding whether to repair, where to repair, and where the smallest repair boundary should be. The verifier also does not redo a free-form analysis by default; it independently reviews the analyzer report, including narratives, priority, and verdict, together with the mitigation result. In other words, narrative-first is not only an output format. It is the shared work object across analyzer, mitigator, and verifier.
+Narratives are also the shared work object across analyzer, mitigator, and verifier. When deciding whether to repair, where to repair, and where the smallest repair boundary should be, the mitigator focuses on high-priority narratives whose verdict is `confirmed-vulnerability` or `confirmed-defect` instead of spreading effort across the whole report. By default, the verifier does not redo a free-form analysis. It independently reviews the analyzer report, including narratives, priority, and verdict, together with the mitigation result.
 
 ## A Real Example With Two Narratives
 
-A review of a PR that changed how review results are published to GitHub ended with `no-actionable-finding`, while the analyzer retained two narratives. The PR used PostgreSQL to record publication progress so work could continue after process exits, timeout takeovers, or retries. The two narratives were neither two vulnerabilities nor competing explanations of the same issue. They were two independent review directions supporting the same overall verdict:
+A review of a PR that changed how review results are published to GitHub ended with `no-actionable-finding`, while the analyzer retained two narratives. The PR used PostgreSQL to record publication progress so work could continue after process exits, timeout takeovers, or retries. The two narratives were independent review directions supporting the same overall verdict, not two vulnerabilities or competing explanations of one issue:
 
-| Priority | Review direction | Main question | Representative boundaries |
-| --- | --- | --- | --- |
-| 1 | Input reaching dangerous sinks | Can untrusted input or repository content cause SQL injection, path escape, branch injection, or premature termination of Markdown code fences? | Parameterized SQL, branch-segment normalization, sensitive-path policy, Markdown code fences |
-| 2 | Concurrency and remote side effects | During timeout, takeover, and retry, what state can a stale worker commit and how are remote GitHub operations recovered? | Claim tokens, heartbeats, publication steps, markers, and stable branch identity |
+| Priority | Review direction                    | Main question                                                                                                                                   | Representative boundaries                                                                    |
+| -------- | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 1        | Input reaching dangerous sinks      | Can untrusted input or repository content cause SQL injection, path escape, branch injection, or premature termination of Markdown code fences? | Parameterized SQL, branch-segment normalization, sensitive-path policy, Markdown code fences |
+| 2        | Concurrency and remote side effects | During timeout, takeover, and retry, what state can a stale worker commit and how are remote GitHub operations recovered?                       | Claim tokens, heartbeats, publication steps, markers, and stable branch identity             |
 
 Their relationship can be represented as:
 
@@ -41,4 +41,4 @@ overall verdict: no-actionable-finding
 
 Keeping them separate is useful because they depend on different evidence and can change verdict independently. Parameterized SQL does not establish safe concurrent publication, and a claim token does not establish safe file paths. Combining both directions into one narrative would mix their sources, sinks, controls, and proof gaps.
 
-> The example also shows that multiple no-actionable narratives must still describe control limits precisely. Database fencing prevents a stale owner from committing local state, but it cannot revoke a GitHub request that was already sent. Heartbeats, marker reconciliation, and stable remote identities reduce and coordinate duplicate-side-effect risk; they do not provide remote atomic exactly-once execution. The defensible second narrative is therefore that local commits are fenced and remote retries use recoverable identities, not that duplicate GitHub side effects are impossible.
+> Even when several narratives are no-actionable, each must describe its control limits precisely. Database fencing prevents a stale owner from committing local state, but it cannot revoke a GitHub request that was already sent. Heartbeats, marker reconciliation, and stable remote identities reduce and coordinate duplicate-side-effect risk; they do not provide remote atomic exactly-once execution. The defensible second narrative is therefore that local commits are fenced and remote retries use recoverable identities, not that duplicate GitHub side effects are impossible.

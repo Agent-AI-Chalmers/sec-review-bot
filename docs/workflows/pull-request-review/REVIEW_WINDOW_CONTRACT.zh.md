@@ -20,7 +20,7 @@ Agent 通过工作区里的 git 读取窗口，边界取自本次 run 自己的�
 
 ### 产物为什么保留
 
-`changed-files.json` 与 `incremental.patch` 是本次 run 审过什么的稳定记录，不必依赖仓库状态重建窗口即可查看。这是 run 自身的属性，不取决于任何消费者，也就不受“让 Agent 读什么”影响。
+`changed-files.json` 与 `incremental.patch` 是本次 run 审过什么的稳定记录，不必依赖仓库状态重建窗口即可查看。这份记录属于 run 本身，因此不受“让 Agent 读什么”影响。
 
 suggestion 锚定是另一件事，它使用输入中的 `files` 集合，由输入准备阶段与补丁一起导出。
 
@@ -30,10 +30,10 @@ suggestion 锚定是另一件事，它使用输入中的 `files` 集合，由输
 
 对任意一次 run，候选窗口如下：
 
-| 窗口 | 范围 | 含义 |
-| --- | --- | --- |
-| 完整 PR | `base_sha...head_sha` | pull request 相对 merge base 引入的全部变更。 |
-| Push | `previous_head_sha..head_sha` | 仅触发本次 run 的 `synchronize` 事件新增的提交。 |
+| 窗口    | 范围                          | 含义                                             |
+| ------- | ----------------------------- | ------------------------------------------------ |
+| 完整 PR | `base_sha...head_sha`         | pull request 相对 merge base 引入的全部变更。    |
+| Push    | `previous_head_sha..head_sha` | 仅触发本次 run 的 `synchronize` 事件新增的提交。 |
 
 `previous_head_sha` 来自 [`pull_request` webhook 的 `before` 字段](https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request)。本仓库依赖的 `@octokit/openapi-webhooks-types` 中，`synchronize` 载荷类型要求同时存在 `after` 与 `before`。
 
@@ -72,12 +72,13 @@ pull request 会先传自身 base 再传窗口 base，且在 `synchronize` 时�
 
 [`GET /repos/{owner}/{repo}/compare/{basehead}`](https://docs.github.com/en/rest/commits/commits#compare-two-commits) 在两种关键情形下行为不同：
 
-| 情形 | 响应 |
-| --- | --- |
+| 情形                  | 响应                                    |
+| --------------------- | --------------------------------------- |
 | 两个相同提交，空 diff | `200`、`files: []`、`status: identical` |
-| base commit 不可达 | `404 Not Found` |
+| base commit 不可达    | `404 Not Found`                         |
 
 <!-- doc-default: github-integration.resolveReviewWindowFiles; source=apps/github-integration/src/reviews/pull-requests/review-window.ts -->
+
 `synchronize` 事件通常只审查本次推送的变更。如果 GitHub 无法提供上次提交到当前提交的比较结果，并返回 `404`，则改为审查整个 PR，回退原因为 `synchronize-previous-head-unreachable`。其他请求错误仍按准备阶段的重试和失败规则处理。
 
 强制推送后，旧提交不一定立即无法访问。因此，是否因 `404` 回退取决于接口响应，而不是是否发生过强制推送。
@@ -115,15 +116,15 @@ pull request 会先传自身 base 再传窗口 base，且在 `synchronize` 时�
 
 促使本文形成的审计把选择框定为下列契约。在本项目中这些契约并不对等。
 
-| | `synchronize` 时完整复审 | `synchronize` 时增量复审 |
-| --- | --- | --- |
-| 窗口 | 所有产物都用 `base...head` | 所有产物都用 `previous..head` |
-| 成本 | 每次 push 重复完整分析 | 受 push 规模限制 |
-| 重复报告 | 跨 run 很可能出现 | 不太可能出现 |
-| 跨文件因果 | 保留 | push 修改共享代码时**可能遗漏** |
-| `changed-files.json` 语义 | 与补丁一致 | 与补丁一致 |
+|                           | `synchronize` 时完整复审   | `synchronize` 时增量复审        |
+| ------------------------- | -------------------------- | ------------------------------- |
+| 窗口                      | 所有产物都用 `base...head` | 所有产物都用 `previous..head`   |
+| 成本                      | 每次 push 重复完整分析     | 受 push 规模限制                |
+| 重复报告                  | 跨 run 很可能出现          | 不太可能出现                    |
+| 跨文件因果                | 保留                       | push 修改共享代码时**可能遗漏** |
+| `changed-files.json` 语义 | 与补丁一致                 | 与补丁一致                      |
 
-决定性的要求不是哪个窗口更好，而是**无论选哪个窗口，这些产物都必须共用它**。
+**无论选哪个窗口，这些产物都必须共用它**。比起窗口本身的选择，这条要求对契约更具决定性。
 
 ## 本项目采用的契约
 
@@ -134,7 +135,7 @@ pull request 会先传自身 base 再传窗口 base，且在 `synchronize` 时�
 - 每次 push 完整重审的成本随 pull request 规模线性增长，这与本仓库实测的大 pull request 成本（一个真实 340 文件的 pull request 是 7.6 MB 的 diff）配合不佳；
 - Analyzer 仍然可以读取 `/workspace` 获取跨文件上下文，被收窄的只是**报告范围**。
 
-窗口只解析**一次**并贯穿传递，而不是由每个产物各自决定。由一个函数决定窗口，并同时产出文件列表、补丁范围和 suggestion 文件集合。
+窗口只解析**一次**并贯穿传递，任何产物都不会各自决定窗口。由一个函数决定窗口，并同时产出文件列表、补丁范围和 suggestion 文件集合。
 
 实现还提供以下保护：
 
@@ -143,4 +144,4 @@ pull request 会先传自身 base 再传窗口 base，且在 `synchronize` 时�
 
 3. **当 push 窗口不是快进时回退到完整窗口。** 前一个 head 不是当前 head 的祖先时，compare 响应会在两侧都报告提交（`behind_by`），这正是 force-push 留下的状态。这样的窗口已不再描述增量变更，工作区也无从包含被丢弃的 head，因此 run 改为覆盖整个 pull request。
 
-祖先判定读取的是 compare 响应本来就返回的字段，不产生额外请求。GitHub 仍未文档化被 force-push 的提交能保持可解析多久，因此上述 404 回退依然必要而非冗余。
+祖先判定读取的是 compare 响应本来就返回的字段，不产生额外请求。GitHub 仍未文档化被 force-push 的提交能保持可解析多久，因此上述 404 回退仍然需要。

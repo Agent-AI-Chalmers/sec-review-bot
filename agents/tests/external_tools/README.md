@@ -16,7 +16,7 @@ Discovery cases run a product agent against a small local workspace. They test w
 
 Compare cases run the same task twice against identical source: once without the external tool and once with it enabled. Their prompts may name the tool because autonomous selection is already covered by discovery cases.
 
-The OFF arm uses `mcr.microsoft.com/devcontainers/universal:6-noble`. The ON arm uses `sec-review-bot-workspace:tools`. Merely removing the tool prompt would not create a valid baseline because the CLI would remain discoverable in the image. Override these images with `AGENT_EXTERNAL_TOOLS_BASELINE_DOCKER_IMAGE` and `AGENT_EXTERNAL_TOOLS_DOCKER_IMAGE` when necessary.
+The OFF arm uses `mcr.microsoft.com/devcontainers/universal:6-noble`. The ON arm uses `sec-review-bot-workspace:tools`. Removing only the tool prompt would not create a valid baseline because the CLI would remain discoverable in the image. Override these images with `AGENT_EXTERNAL_TOOLS_BASELINE_DOCKER_IMAGE` and `AGENT_EXTERNAL_TOOLS_DOCKER_IMAGE` when necessary.
 
 A compare case requires the ON arm to provide genuine tool-use evidence, but it does not require that arm to outperform the baseline. The summary records result-oracle status, evidence-coverage scores, and the score delta. A neutral or worse ON result is retained as experimental evidence rather than treated as a harness failure.
 

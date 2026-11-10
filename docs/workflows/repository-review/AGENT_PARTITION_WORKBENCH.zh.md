@@ -76,7 +76,7 @@ LLM-guided clustering 展示了另一种责任划分。[Large Language Models En
 
 Partition workbench 的取舍是：让 Agent 继续负责语义判断，但把机械责任交还给系统。Agent 只负责创建、移动、合并、拆分和解释 groups；系统负责状态一致性、结构约束检查和最终导出。
 
-这种模式更接近人类处理复杂集合任务的方式：不是一次性写出最终表格，而是在一个可见工作台上持续整理、移动、修正，直到状态通过检查。
+这种模式接近人处理复杂集合任务的方式：在一个可见工作台上持续整理、移动、修正卡片，直到状态通过检查。
 
 ## 工作台模型
 
@@ -142,7 +142,7 @@ Partition workbench 的底层操作和 payload 语义无关。payload 是阶段�
 
 写入工具的返回值应该是 compact mutation result，只说明本次写入发生了什么，以及当前硬约束是否仍然满足。完整 group 列表只能通过 `read_groups` 显式读取。
 
-避免写入工具每次返回完整 groups 很重要。否则一次小编辑会把全量 group metadata 反复塞回上下文，造成 token 放大，也容易让 Agent 在巨大 tool output 中误读状态。
+如果写入工具每次都返回完整 groups，一次小编辑会把全量 group metadata 反复塞回上下文，造成 token 放大，也容易让 Agent 在巨大 tool output 中误读状态。
 
 ### 完成信号
 
@@ -163,7 +163,7 @@ Agent 不直接输出最终 plan。它应该像人在工作台前整理卡片一
 5. 查看当前状态和 constraints。
 6. constraints 通过后返回 completion response 结束。
 
-最终结果由系统从工作台状态导出，而不是由 agent 手写完整 JSON 或自然语言总结。
+最终结果由系统从工作台状态导出；agent 不手写完整 JSON 或自然语言总结。
 
 这个工作方式应该是可重入的：Agent 可能面对一个空工作台，也可能面对上一轮已经整理过的 groups。它每次都先读取当前状态；如果已有 groups，大多时候把它们当作草稿做局部修正，而不是从头重建。
 
@@ -171,7 +171,7 @@ Agent 不直接输出最终 plan。它应该像人在工作台前整理卡片一
 
 可重入性让第二轮 refinement 变得自然：第一次 agent run 可以从空工作台创建完整草稿；第二次 agent run 可以继承同一个工作台，把已有 groups 当作 draft 做质量修正。
 
-引入 refinement 的原因不是 coverage。coverage 是系统 constraints checker 的任务。真实问题是 Agent 在第一次 pass 里常常读完整输入后直接用 `create_groups` 一次性创建草稿，然后很自信地结束。这种草稿通常满足 constraints，但仍可能有 over-merge、missed merge、weak reason 或 keep/suppress 边界错误。
+coverage 是系统 constraints checker 的任务，refinement 针对的是别的问题：Agent 在第一次 pass 里常常读完整输入后直接用 `create_groups` 一次性创建草稿，然后很自信地结束。这种草稿通常满足 constraints，但仍可能有 over-merge、missed merge、weak reason 或 keep/suppress 边界错误。
 
 一个自然想法是让同一轮 Agent 在结束前自检。但“自检”很容易被模型执行成 bookkeeping：重新数 items、复述 groups、为已有分组写长篇理由，或证明 coverage 完整。它会增加 token 和上下文噪声，却不稳定地产生更好的 edits。Refinement 的价值在于先把第一轮判断外化成 workbench state，再让下一轮把它当作 draft，只寻找具体可编辑的 group 边界问题；没有具体 edit 就结束。
 
@@ -194,14 +194,14 @@ Agent 不直接输出最终 plan。它应该像人在工作台前整理卡片一
 
 batch 是 wall-time 压力下的折中，不是默认更聪明的规划方式。
 
-它最初被引入，不是因为中等规模输入必然放不进上下文，而是因为**较慢模型一次处理较多 items 时 wall time 太长**。batch 可以把 draft 阶段拆开并行，降低每个 draft invoke 的输入规模和等待时间。
+它最初被引入，是因为**较慢模型一次处理较多 items 时 wall time 太长**；中等规模输入并不一定放不进上下文。batch 可以把 draft 阶段拆开并行，降低每个 draft invoke 的输入规模和等待时间。
 
 batch 的好处是快，**尤其在慢模型上明显**。但它有实际代价：
 
 - batch draft 看不到跨 batch 的合并机会，也就是所谓的缺少全局视野；
 - global refinement 仍然需要全局审计。
 
-因此，batch 更适合作为 latency workaround，而不是默认形态。尤其当较快模型的 single run 已经足够快时，batch 的 wall-time 优势会变小，坏处反而更明显：它会引入 batch 边界损失，并且仍然需要一轮 global refinement 来恢复全局判断。
+因此，batch 更适合作为 latency workaround，而不是默认形态。当较快模型的 single run 已经足够快时，batch 的 wall-time 优势会变小，坏处反而更明显：它会引入 batch 边界损失，并且仍然需要一轮 global refinement 来恢复全局判断。
 
 也不要过早把这个 batch 设计描述成“解决超大输入”的方案。如果 refinement 仍然需要读全量 item payload，那么 batch 只是降低了单次 draft invoke 的输入规模和推理耗时，并没有消除最终全局审计面对全量 items 的问题。
 
@@ -222,7 +222,7 @@ Use this section only to prioritize refinement attention. Groups from different 
 
 这不是 group metadata，也不是新的工具视图。group 本体仍然只表达当前工作台状态；draft origins 只是 refinement pass 的只读上下文，用来说明哪些 groups 是在同一个局部 draft scope 中产生的。
 
-这样做的目的不是让 Agent 信任 batch 内结果，而是调整注意力优先级：
+draft origins 用来调整注意力优先级，并不要求 Agent 信任 batch 内结果：
 
 - 优先检查不同 draft scope 之间的重复、漏合并、边界错位或 keep/suppress 不一致。
 - 同一 draft scope 内的 groups 已经在同一个局部上下文中被共同看过，除非边界明显弱，不需要平均投入同等审查成本。
@@ -236,23 +236,23 @@ Use this section only to prioritize refinement attention. Groups from different 
 
 普通分组和调整：
 
-| 情景 | 做法 | Tool 调用 |
-| --- | --- | --- |
-| 一个 item 应该单独留下 | 创建一个正常 group，并把这个 item 作为初始成员。 | create_group(item_ids=[item_id]) |
-| 多个 item 应该一起处理 | 创建一个正常 group，并把这些 item 作为初始成员。 | create_group(item_ids=[...]) |
-| 两个已有 group 后来发现其实是一组 | 更新目标 group 的 item_ids，让它包含两边的 item，再删除空出来的 group。 | update_group(item_ids=[...]) -> delete_group |
-| 一个 group 里混进了不该在一起的 item | 创建新 group 接走一部分 item，再更新原 group 的 item_ids。 | create_group(item_ids=[...]) -> update_group(item_ids=[...]) |
-| 一个 group 的成员应该整体重写 | 用新的 item_ids 更新这个 group。 | update_group(item_ids=[...]) |
-| 一个 item 放错了 group | 更新正确 group 的 item_ids，把这个 item 放进去；系统会自动移除旧归属。 | update_group(item_ids=[...]) |
-| 一个 item 暂时不应属于任何 group | 更新当前 group 的 item_ids，把这个 item 移出。 | update_group(item_ids=[...]) |
-| group 的解释不准确 | 更新 group 的 reason。 | update_group(reason=...) |
+| 情景                                 | 做法                                                                    | Tool 调用                                                    |
+| ------------------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------ |
+| 一个 item 应该单独留下               | 创建一个正常 group，并把这个 item 作为初始成员。                        | create_group(item_ids=[item_id])                             |
+| 多个 item 应该一起处理               | 创建一个正常 group，并把这些 item 作为初始成员。                        | create_group(item_ids=[...])                                 |
+| 两个已有 group 后来发现其实是一组    | 更新目标 group 的 item_ids，让它包含两边的 item，再删除空出来的 group。 | update_group(item_ids=[...]) -> delete_group                 |
+| 一个 group 里混进了不该在一起的 item | 创建新 group 接走一部分 item，再更新原 group 的 item_ids。              | create_group(item_ids=[...]) -> update_group(item_ids=[...]) |
+| 一个 group 的成员应该整体重写        | 用新的 item_ids 更新这个 group。                                        | update_group(item_ids=[...])                                 |
+| 一个 item 放错了 group               | 更新正确 group 的 item_ids，把这个 item 放进去；系统会自动移除旧归属。  | update_group(item_ids=[...])                                 |
+| 一个 item 暂时不应属于任何 group     | 更新当前 group 的 item_ids，把这个 item 移出。                          | update_group(item_ids=[...])                                 |
+| group 的解释不准确                   | 更新 group 的 reason。                                                  | update_group(reason=...)                                     |
 
 允许舍弃 item 的阶段才需要 `suppress` group：
 
-| 情景 | 做法 | Tool 调用 |
-| --- | --- | --- |
-| 一个 item 应该被压掉 | 创建 `suppress` group，并把这个 item 作为初始成员。 | create_group(kind=suppress, item_ids=[item_id]) |
-| 多个 item 因同一原因被压掉 | 创建 `suppress` group，把这些 item 作为初始成员，并写清 reason。 | create_group(kind=suppress, item_ids=[...]) |
-| 一个被压掉的 item 又应该恢复 | 更新正常 group 的 item_ids 接走它，或删除 `suppress` group 让它回到未处理状态。 | update_group(item_ids=[...]) 或 delete_group |
+| 情景                         | 做法                                                                            | Tool 调用                                       |
+| ---------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------- |
+| 一个 item 应该被压掉         | 创建 `suppress` group，并把这个 item 作为初始成员。                             | create_group(kind=suppress, item_ids=[item_id]) |
+| 多个 item 因同一原因被压掉   | 创建 `suppress` group，把这些 item 作为初始成员，并写清 reason。                | create_group(kind=suppress, item_ids=[...])     |
+| 一个被压掉的 item 又应该恢复 | 更新正常 group 的 item_ids 接走它，或删除 `suppress` group 让它回到未处理状态。 | update_group(item_ids=[...]) 或 delete_group    |
 
 从 prompt 的角度，可以继续使用这些分组意图帮助 Agent 理解任务；从工具的角度，仍然保留 group 读取、constraints 检查、单个 group CRUD 和批量 group CRUD。结束由 structured completion response 表达。

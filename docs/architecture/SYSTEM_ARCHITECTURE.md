@@ -6,12 +6,12 @@ Sec Review Bot's repository-owned runtime roles are GitHub Integration, Review R
 
 Distinguish the review task, its execution, and its delivery:
 
-| Term | Meaning |
-| --- | --- |
-| run | An admitted review task in Review Runs, including preparation, execution, and publication state. |
-| execution | Work submitted through Execution Gateway to Temporal. |
-| case | A repository-scan problem unit requiring independent analysis and verification. |
-| delivery | A publishable repair result for one or more cases. |
+| Term      | Meaning                                                                                          |
+| --------- | ------------------------------------------------------------------------------------------------ |
+| run       | An admitted review task in Review Runs, including preparation, execution, and publication state. |
+| execution | Work submitted through Execution Gateway to Temporal.                                            |
+| case      | A repository-scan problem unit requiring independent analysis and verification.                  |
+| delivery  | A publishable repair result for one or more cases.                                               |
 
 ## Runtime topology
 
@@ -25,16 +25,16 @@ Control Plane UI accesses Memory Catalog through its same-origin backend (BFF). 
 
 ## Runtime ownership map
 
-| Runtime role | Code | Owns | Local guide |
-| --- | --- | --- | --- |
-| GitHub Integration | `apps/github-integration/` | GitHub ingress, input preparation, Review Runs client, and GitHub publication | [README](../../apps/github-integration/README.md) |
-| Review Runs | `services/review-runs/` | Admission, durable run state, recovery, execution observation, and publication coordination | [README](../../services/review-runs/README.md) |
-| Control Plane UI | `apps/control-plane-ui/` | Authenticated operator console for Review Runs inspection and memory management | [README](../../apps/control-plane-ui/README.md) |
-| Execution Gateway | `services/execution-gateway/` | Authenticated Execution API and HTTP-to-Temporal translation | [README](../../services/execution-gateway/README.md) |
-| Execution Worker | `agents/` | Review workflows, activities, agent runtime, stage artifacts, and execution archive publication | [README](../../agents/README.md) |
-| Memory Extraction Worker | `agents/` | Per-execution archive consumption, extractor invocation, trajectory publication, and extraction registration | [README](../../agents/README.md) |
-| Memory Maintenance Worker | `agents/` | Batched maintenance input consumption, maintainer invocation, memory tree publication, and revision commit | [README](../../agents/README.md) |
-| Memory Catalog Server | `services/memory-catalog/` | Observation catalog, immutable memory revision history, and active revision coordination | [README](../../services/memory-catalog/README.md) |
+| Runtime role              | Code                          | Owns                                                                                                         | Local guide                                          |
+| ------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| GitHub Integration        | `apps/github-integration/`    | GitHub ingress, input preparation, Review Runs client, and GitHub publication                                | [README](../../apps/github-integration/README.md)    |
+| Review Runs               | `services/review-runs/`       | Admission, durable run state, recovery, execution observation, and publication coordination                  | [README](../../services/review-runs/README.md)       |
+| Control Plane UI          | `apps/control-plane-ui/`      | Authenticated operator console for Review Runs inspection and memory management                              | [README](../../apps/control-plane-ui/README.md)      |
+| Execution Gateway         | `services/execution-gateway/` | Authenticated Execution API and HTTP-to-Temporal translation                                                 | [README](../../services/execution-gateway/README.md) |
+| Execution Worker          | `agents/`                     | Review workflows, activities, agent runtime, stage artifacts, and execution archive publication              | [README](../../agents/README.md)                     |
+| Memory Extraction Worker  | `agents/`                     | Per-execution archive consumption, extractor invocation, trajectory publication, and extraction registration | [README](../../agents/README.md)                     |
+| Memory Maintenance Worker | `agents/`                     | Batched maintenance input consumption, maintainer invocation, memory tree publication, and revision commit   | [README](../../agents/README.md)                     |
+| Memory Catalog Server     | `services/memory-catalog/`    | Observation catalog, immutable memory revision history, and active revision coordination                     | [README](../../services/memory-catalog/README.md)    |
 
 The runtime roles communicate through project-owned boundaries under [`contracts/`](../../contracts/README.md). `services/` groups the internal HTTP service packages; each retains its own configuration, build, and deployment. Package location does not determine process topology: `agents/` implements independently deployed Temporal workers. Applications under `apps/` remain independently deployed services.
 
@@ -156,13 +156,13 @@ sequenceDiagram
 
 After an interruption, retries check the recorded publication intent and object state first. A [Temporal Activity retry](https://docs.temporal.io/activity-definition#idempotency) can repeat an upload after a lost completion response; it does not make storage and SQL one transaction.
 
-| Artifact | Durable recovery basis | Recovery boundary |
-| --- | --- | --- |
-| Review input bundle | Review Runs publication intent: reference, prepared input, and publish context | A replacement preparation claim can reuse the original publication intent when the object is present. Only definite absence permits abandoning an unused candidate and rebuilding. |
-| Extraction trajectory | Memory Catalog publication intent containing the trajectory reference, observation, and summary | Retries check recorded candidates before rerunning the model; selection and extraction registration commit together. |
-| Learning or reorganization revision | Memory Catalog publication intent grouping the tree, trajectory, operation ID, expected active revision, and observation IDs for learning | Different model outputs can be separate candidates; selection, revision creation, observation consumption for learning, and active pointer update commit together. |
-| Manual revision | Memory Catalog publication intent containing the tree reference, operation ID, and expected active revision; the UI BFF uploads the tree | Retries of unchanged content within the open editor retain the operation ID and original expected revision. The BFF repeats reservation, conditional upload, confirmation, and idempotent revision creation. |
-| Execution archive in S3 | Temporal publication request and the fixed run key | Recovery verifies the existing archive against the request before using local files. If neither a complete uploaded archive nor local artifacts remain, the request cannot reconstruct the archive bytes. |
+| Artifact                            | Durable recovery basis                                                                                                                    | Recovery boundary                                                                                                                                                                                            |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Review input bundle                 | Review Runs publication intent: reference, prepared input, and publish context                                                            | A replacement preparation claim can reuse the original publication intent when the object is present. Only definite absence permits abandoning an unused candidate and rebuilding.                           |
+| Extraction trajectory               | Memory Catalog publication intent containing the trajectory reference, observation, and summary                                           | Retries check recorded candidates before rerunning the model; selection and extraction registration commit together.                                                                                         |
+| Learning or reorganization revision | Memory Catalog publication intent grouping the tree, trajectory, operation ID, expected active revision, and observation IDs for learning | Different model outputs can be separate candidates; selection, revision creation, observation consumption for learning, and active pointer update commit together.                                           |
+| Manual revision                     | Memory Catalog publication intent containing the tree reference, operation ID, and expected active revision; the UI BFF uploads the tree  | Retries of unchanged content within the open editor retain the operation ID and original expected revision. The BFF repeats reservation, conditional upload, confirmation, and idempotent revision creation. |
+| Execution archive in S3             | Temporal publication request and the fixed run key                                                                                        | Recovery verifies the existing archive against the request before using local files. If neither a complete uploaded archive nor local artifacts remain, the request cannot reconstruct the archive bytes.    |
 
 UI restore moves the active pointer to an existing revision in a Catalog transaction; it creates neither a revision nor an object and does not repair missing bytes.
 
@@ -172,4 +172,4 @@ The input and memory protocols are described in the [Review Runs](../../services
 
 [Conditional PUT](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html) prevents cooperating publishers from overwriting an occupied key. It does not enforce retention against other identities with overwrite or delete permission. Consumers verify size and SHA-256 before use: this rejects replacement content but cannot recover lost bytes. S3-compatible deployments must verify the APIs and policy conditions they rely on against their deployed storage version.
 
-Abandoning a candidate does not delete its object, and no automatic object garbage collection is implemented. A stale uploader may still finish, and candidates may share content keys. Future cleanup must account for historical revisions, extraction references, and prepared references retained in Temporal history, rather than treating every object without a current database attachment as disposable.
+Abandoning a candidate does not delete its object, and no automatic object garbage collection is implemented. A stale uploader may still finish, and candidates may share content keys. An object without a current database attachment is not necessarily disposable: future cleanup must account for historical revisions, extraction references, and prepared references retained in Temporal history.

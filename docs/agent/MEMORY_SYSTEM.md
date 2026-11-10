@@ -17,7 +17,7 @@ Agent memory is a fast-moving area: new concept papers, open-source libraries, a
 
 This project currently learns mainly from Claude Code and Codex, especially Claude Code. Their public memory shape does not introduce complex layers, data indexes, query systems, or RAG infrastructure. It is closer to a skills-like file layout: memory documents are organized with progressive disclosure, only a routing index is injected at startup, and substantive rules, patterns, cautions, and examples live in narrower topic files.
 
-In short, this kind of mechanism can be understood as:
+The resulting layout looks like this:
 
 ```text
 memory/
@@ -75,9 +75,11 @@ Roughly, the flow is a set of asynchronous checks:
 - Source: after an issue or pull-request review publishes trajectories, the review enters asynchronous memory processing. Repository review contributes one extraction unit per case whose trajectories exist.
 - Extraction processes each review independently and produces pending observations.
   - Multiple extractions can run concurrently.
+
 <!-- doc-default: MEMORY_MAINTENANCE_SCHEDULE_DEFAULT_INTERVAL_SECONDS; source=agents/src/sec_review_agents/entrypoints/memory_maintenance_worker/schedules.py -->
 <!-- doc-default: MEMORY_MAINTENANCE_PENDING_THRESHOLD; source=agents/src/sec_review_agents/workflows/memory/maintenance.py -->
 <!-- doc-default: MEMORY_MAINTENANCE_PENDING_MAX_AGE; source=agents/src/sec_review_agents/workflows/memory/maintenance.py -->
+
 - Maintenance checks periodically and runs when the threshold or age condition is met: the maintenance trigger schedule runs every hour by default. It starts maintenance only when at least 10 observations are pending, or when the oldest pending observation has waited at least one day.
   - Maintenance does not run in parallel; only one maintenance run exists at a time, though one run may process multiple observations.
   - `processed` means reviewed and handled. It does not mean the experience was necessarily absorbed into memory.

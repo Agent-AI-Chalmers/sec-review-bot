@@ -2,7 +2,7 @@
 
 The `subagents.jsonl` and `summarization.jsonl` recordings are generated through the runtime with scripted models and in-memory file tools. Source files, findings, model names, and token usage are synthetic; no real repository review or paid model call is represented. Execution ancestry, middleware behavior, and serialization come from the actual framework.
 
-- [`subagents.jsonl`](subagents.jsonl): a path-traversal review delegates source and test inspection to two parallel Subagents. Each reads a file and reports back; the parent returns a structured verdict.
+- [`subagents.jsonl`](subagents.jsonl): a path-traversal review delegates source and test inspection to two parallel Subagents. Each Subagent reads one file and reports back, and the parent returns a structured verdict.
 - [`summarization.jsonl`](summarization.jsonl): the reviewer reads source and tests, then Summarization middleware compacts the context before the final verdict. The original evidence, model-generated summary, and user-role context summary remain available.
 
 Open either file in the UI trajectory viewer, or use it with the trajectory readers and Memory tools. The files contain complete event streams, including call starts, response references, and completion markers. Tool request IDs are distinct throughout each file.

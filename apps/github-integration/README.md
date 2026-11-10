@@ -2,13 +2,13 @@
 
 Language: English | [中文](README.zh.md)
 
-This package contains the GitHub Integration service for the project.
+This package contains the GitHub Integration service.
 
 It prepares inputs, submits and observes review runs through Review Runs, and publishes terminal results back to GitHub.
 
 ## Setup
 
-For local development, install Review Runs service and integration dependencies from the repository root:
+For local development, install the Review Runs service and integration dependencies from the repository root:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -25,7 +25,7 @@ pnpm run build
 pnpm test
 ```
 
-`pnpm test` runs tests that do not require external services. The integration suite uses Review Runs test database for publisher boundary tests:
+`pnpm test` runs tests that do not require external services. The integration suite uses the Review Runs test database for publisher boundary tests:
 
 ```bash
 TEST_DATABASE_URL=postgresql://sec_review_bot:password@127.0.0.1:5432/sec_review_bot_test \
@@ -63,11 +63,11 @@ The paths below are relative to `src/`.
   - `reviews/pull-requests/` - pull request review and suggestion comments
   - `reviews/repositories/` - repository review, summary issue, and repair draft PR
 - `github/` - thin GitHub API wrappers and webhook helpers
-- `review-runs/` - Client-side code through which GitHub Integration communicates and works with the Review Runs service
-- `execution/` - Provides GitHub Integration with types for review inputs and results, validates input bundles and review results, and distinguishes errors encountered when publishing results to GitHub
+- `review-runs/` - client code that GitHub Integration uses to call the Review Runs service
+- `execution/` - types for review inputs and results, validation of input bundles and review results, and classification of errors raised while publishing results to GitHub
 - `artifacts/` - input bundle storage and Git workspace preparation
 - `ingress/` - inbound HTTP, GitHub Actions, and GitHub webhook handling
-- `triggers/` - Starts reviews from Webhooks, GitHub Actions, or comment commands, calls the input preparation code, and submits the prepared inputs to Review Runs
+- `triggers/` - starts reviews from webhooks, GitHub Actions, or comment commands, calls the input preparation code, and submits the prepared inputs to Review Runs
 - `utils/` - lightweight logging and helpers
 
 ## Triggers

@@ -23,23 +23,24 @@ Dependency maintenance also includes wrappers, adapters, prompts, and tool-descr
 ## Node Packages (pnpm)
 
 <!-- doc-default: node-workspace; source=pnpm-workspace.yaml -->
+
 Node.js packages have individual `package.json` manifests and share the root pnpm workspace and `pnpm-lock.yaml`. See `pnpm-workspace.yaml` for the package list. Dependency changes update the shared root lockfile rather than creating package-local lockfiles.
 
-| Goal | Command (run in a package directory) |
-| --- | --- |
-| Inspect outdated dependencies | `pnpm outdated` |
-| Update within manifest ranges | `pnpm update` |
-| Local checks | `pnpm run lint`, `pnpm run typecheck`, `pnpm test` |
+| Goal                          | Command (run in a package directory)               |
+| ----------------------------- | -------------------------------------------------- |
+| Inspect outdated dependencies | `pnpm outdated`                                    |
+| Update within manifest ranges | `pnpm update`                                      |
+| Local checks                  | `pnpm run lint`, `pnpm run typecheck`, `pnpm test` |
 
 ## Python Agents
 
 The agents package uses `uv` in `agents/`. Direct dependencies live in [`agents/pyproject.toml`](../../agents/pyproject.toml); resolved packages live in [`agents/uv.lock`](../../agents/uv.lock).
 
-| Goal | Command |
-| --- | --- |
+| Goal                                | Command                                     |
+| ----------------------------------- | ------------------------------------------- |
 | Inspect top-level outdated packages | `uv tree --outdated --all-groups --depth 1` |
-| Preview a full lockfile refresh | `uv lock --upgrade --dry-run` |
-| Apply a full lockfile refresh | `uv lock --upgrade` |
+| Preview a full lockfile refresh     | `uv lock --upgrade --dry-run`               |
+| Apply a full lockfile refresh       | `uv lock --upgrade`                         |
 
 Checks:
 
@@ -63,6 +64,7 @@ Actions are pinned by major tag in `.github/workflows/` and updated by Dependabo
 ## Runtime And Toolchain Versions
 
 <!-- doc-default: node-runtime; source=package.json -->
+
 Current declarations: every TypeScript package pins `engines.node` to `>=26.13.0 <27`, CI installs Node from `package.json` via `node-version-file`, and Dependabot ignores semver-major for `typescript` and `@types/node`. The agents package declares `requires-python = ">=3.14"` with the exact patch in `agents/.python-version`, and CI installs Python via `python-version-file`.
 
 When the next version can be adopted:

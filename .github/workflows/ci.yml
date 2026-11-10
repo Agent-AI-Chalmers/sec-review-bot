@@ -431,6 +431,20 @@ jobs:
       - name: Check translated document structure and examples
         run: python -m scripts.checks.translated_doc_headings
 
+      - name: Set up Node package
+        uses: ./.github/actions/setup-node
+        with:
+          directory: .
+
+      - name: Lint Markdown
+        run: pnpm run lint:md
+
+      - name: Check repository-level formatting
+        run: pnpm run format:root:check
+
+      - name: Check Chinese documentation spacing and punctuation
+        run: pnpm run lint:zh
+
   ci-status:
     name: CI Status
     needs:

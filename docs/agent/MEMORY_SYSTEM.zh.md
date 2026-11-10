@@ -17,9 +17,9 @@
 
 agent 记忆机制是一个正在快速发展的领域：新的概念论文、开源库和产品方案仍在不断出现。复杂路线可以参考 TencentDB-Agent-Memory 这类系统，它把 memory 做成带有分层长期记忆、短期符号记忆、异构存储和可追溯检索的完整基础设施。
 
-目前本项目主要学习 Claude Code 和 Codex，尤其是 Claude Code。它们的公开 memory 形态没有引入复杂的多个层级、数据索引、查询或 RAG 系统，而是更接近 skills 的文件化组织方式：用 progressive disclosure 组织 memory 文档，启动时只注入路由索引，实质性的规则、模式、注意事项和例子放在更细的主题文件里。
+目前本项目主要学习 Claude Code 和 Codex，尤其是 Claude Code。它们的公开 memory 形态没有引入复杂的多个层级、数据索引、查询或 RAG 系统，更接近 skills 的文件化组织方式：用 progressive disclosure 组织 memory 文档，启动时只注入路由索引，实质性的规则、模式、注意事项和例子放在更细的主题文件里。
 
-简单来说，可以把这类机制理解成：
+这类机制的文件布局大致如下：
 
 ```text
 memory/
@@ -77,9 +77,11 @@ maintenance 会读取 extraction 产生的 observations，并把有用经验并�
 - 来源：issue 或 pull-request review 发布 trajectories 后，会进入异步 memory 处理。repository review 则会按每个实际存在 trajectories 的 case 形成一个 extraction unit。
 - extraction 会分别处理各个 review，并产出 pending observations。
   - 可以并发执行多个 extraction。
+
 <!-- doc-default: MEMORY_MAINTENANCE_SCHEDULE_DEFAULT_INTERVAL_SECONDS; source=agents/src/sec_review_agents/entrypoints/memory_maintenance_worker/schedules.py -->
 <!-- doc-default: MEMORY_MAINTENANCE_PENDING_THRESHOLD; source=agents/src/sec_review_agents/workflows/memory/maintenance.py -->
 <!-- doc-default: MEMORY_MAINTENANCE_PENDING_MAX_AGE; source=agents/src/sec_review_agents/workflows/memory/maintenance.py -->
+
 - maintenance 定时检查，达到阈值或者时间过长就处理：maintenance trigger schedule 默认每小时运行一次。只有 pending observations 至少有 10 条，或者最老的 pending observation 已经等待至少 1 天时，才启动 maintenance。
   - maintenance 不可并行，同一时间只有一个；但是一次会处理多条 observations；
   - 用 `processed` 表示已经审阅并处理过，不表示经验一定被吸收进 memory（如上会做判断）。

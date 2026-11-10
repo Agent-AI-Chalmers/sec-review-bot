@@ -3,20 +3,21 @@
 Language: English | [中文](README.zh.md)
 
 <!-- doc-default: system-tests.inventory; source=system-tests/ -->
+
 These smoke tests use production code across package or language boundaries without calling a real model. The inventory lists their CI execution policies. All commands below run from the repository root.
 
 ## Smoke Inventory
 
-| Smoke scenario / entrypoint | Real boundary exercised | Main assertions | CI execution |
-| --- | --- | --- | --- |
-| [Review Runs HTTP](review-runs-http/review-runs-http.test.mjs) | GitHub Integration’s Review Runs client → Review Runs HTTP | Empty successful responses resolve without JSON parsing errors; JSON responses still parse. | PR by path + merge queue |
-| [Execution submission](execution-submission/execution-submission.test.mjs) | Review Runs’s Execution API client → Execution Gateway HTTP → Temporal | Submit, replay the same submission, and read running status. Stops before Worker execution. | PR by path + merge queue |
-| [Memory Catalog client](memory-catalog/test_memory_catalog.py) | agents package’s Memory Catalog client → Memory Catalog HTTP → PostgreSQL | Confirmation required; duplicate registration is idempotent; conflicting intent and bad credentials are rejected. | PR by path + merge queue |
-| [Input bundle](input-bundle/test_input_bundle.py) | TypeScript archive/upload → RustFS → Python input preparation | Repeated publication preserves identity; workspace bytes survive transport; wrong digest is rejected. | PR by path + merge queue |
-| [Memory operator edit](memory-operator-edit/test_memory_bff.py) | UI BFF → Catalog/PostgreSQL + RustFS | Edit replay creates no extra revision; stale edits conflict; restore returns the prior pointer and readable artifact. | PR by path + merge queue |
-| [Execution lifecycle](execution-lifecycle/test_execution_lifecycle.py) | Review Runs coordination → Execution Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | Activity retry, completed execution, readable execution archives, and a durable publication result after reopening the store. Analysis is deterministic; no real model or GitHub publication. | Manual only |
+| Smoke scenario / entrypoint                                                | Real boundary exercised                                                                          | Main assertions                                                                                                                                                                               | CI execution             |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| [Review Runs HTTP](review-runs-http/review-runs-http.test.mjs)             | GitHub Integration’s Review Runs client → Review Runs HTTP                                       | Empty successful responses resolve without JSON parsing errors; JSON responses still parse.                                                                                                   | PR by path + merge queue |
+| [Execution submission](execution-submission/execution-submission.test.mjs) | Review Runs’s Execution API client → Execution Gateway HTTP → Temporal                           | Submit, replay the same submission, and read running status. Stops before Worker execution.                                                                                                   | PR by path + merge queue |
+| [Memory Catalog client](memory-catalog/test_memory_catalog.py)             | agents package’s Memory Catalog client → Memory Catalog HTTP → PostgreSQL                        | Confirmation required; duplicate registration is idempotent; conflicting intent and bad credentials are rejected.                                                                             | PR by path + merge queue |
+| [Input bundle](input-bundle/test_input_bundle.py)                          | TypeScript archive/upload → RustFS → Python input preparation                                    | Repeated publication preserves identity; workspace bytes survive transport; wrong digest is rejected.                                                                                         | PR by path + merge queue |
+| [Memory operator edit](memory-operator-edit/test_memory_bff.py)            | UI BFF → Catalog/PostgreSQL + RustFS                                                             | Edit replay creates no extra revision; stale edits conflict; restore returns the prior pointer and readable artifact.                                                                         | PR by path + merge queue |
+| [Execution lifecycle](execution-lifecycle/test_execution_lifecycle.py)     | Review Runs coordination → Execution Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | Activity retry, completed execution, readable execution archives, and a durable publication result after reopening the store. Analysis is deterministic; no real model or GitHub publication. | Manual only              |
 
-Review Runs HTTP and execution submission share the `Smoke — Service Boundaries` job. Catalog client, input bundle, and operator edit share `Smoke — Memory and Artifacts` so selected tests can reuse disposable services; they remain separate tests with separate path filters. The manual workflow is `Smoke — Execution Lifecycle`. The shared job is an execution-cost choice, not a separate category of smoke tests.
+Review Runs HTTP and execution submission share the `Smoke — Service Boundaries` job. Catalog client, input bundle, and operator edit share `Smoke — Memory and Artifacts` so selected tests can reuse disposable services; they remain separate tests with separate path filters. The manual workflow is `Smoke — Execution Lifecycle`. Sharing a job saves execution cost; it does not make these tests a separate category.
 
 ## Directory Layout
 
@@ -44,7 +45,7 @@ uv --project agents sync --group test --frozen
 pnpm install --frozen-lockfile
 ```
 
-Install and build only the participants needed for the selected test. The original submission test builds its own packages; the Python probes consume compiled Node modules and require the build commands shown below.
+Install and build only the participants needed for the selected test. The execution-submission test builds its own packages; the Python probes consume compiled Node modules and require the build commands shown below.
 
 ## Review Runs HTTP
 

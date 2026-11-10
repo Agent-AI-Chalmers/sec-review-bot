@@ -20,4 +20,4 @@ Execution Gateway 启动 `execution-workflow` 时构造这份输入。Execution 
 
 Execution Gateway 使用 Ajv 校验。Execution Worker 在工作流反序列化时保留 Temporal 传入的原始映射，在输入准备 activity 开始时使用 `jsonschema` 校验，通过后再转换为 `ExecutionWorkflowInput`。该 activity 使用 Worker 自己配置的准备超时，不使用尚未校验的请求超时。
 
-两端测试都会执行清单中的全部用例。清单必须包含目录中的每个 JSON 测试文件，因此新增用例时，两端实现必须接受或拒绝相同的输入。
+两端测试都会执行清单中的全部用例，清单必须包含目录中的每个 JSON 测试文件。新增用例必须被两端实现一致地接受或拒绝。

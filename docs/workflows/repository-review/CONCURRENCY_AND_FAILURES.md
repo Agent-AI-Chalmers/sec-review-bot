@@ -34,7 +34,7 @@ This is different from fixed batches, where the system waits for a whole batch t
 
 The two case workflow timelines below both use concurrency `3`, but they schedule work differently. Fixed batches wait for a whole group to finish before starting the next group:
 
-> *Timeline screenshots in this section are for scheduling-shape and execution-order reference only; workflow and activity labels may come from older runs and are not the current API names.*
+> _Timeline screenshots in this section are for scheduling-shape and execution-order reference only; workflow and activity labels may come from older runs and are not the current API names._
 
 ![Fixed-batch repository case workflow timeline](../../../assets/screenshots/repository-case-fixed-batch-timeline.png)
 
@@ -42,7 +42,7 @@ With sliding windows, completed slots are filled immediately instead of waiting 
 
 ![Sliding-window repository case workflow timeline](../../../assets/screenshots/repository-case-sliding-window-timeline.png)
 
-*Read the left edge of each case bar as its start time. The long bars are cases that simply take longer to run; later cases still start as soon as other slots finish.*
+_Read the left edge of each case bar as its start time. The long bars are cases that simply take longer to run; later cases still start as soon as other slots finish._
 
 ## Stage Details
 
@@ -51,6 +51,7 @@ With sliding windows, completed slots are filled immediately instead of waiting 
 Discovery groups one or more complete files into a chunk as the input to one scan. See [DISCOVERY_AGENT_DESIGN](DISCOVERY_AGENT_DESIGN.md) for the grouping strategies. Both Temporal and `direct` paths execute these chunks with a sliding window.
 
 <!-- doc-default: AGENT_DISCOVERY_MAX_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
+
 The concurrency limit comes from `AGENT_DISCOVERY_MAX_CONCURRENCY`. The default is `1`. Effective concurrency never exceeds the number of chunks.
 
 In the Temporal path, each discovery chunk is an activity and uses Temporal activity retry. If a chunk still fails after retry, the whole discovery fails. Discovery does not produce a partial completed result because missing a chunk means scan coverage is incomplete.
@@ -60,6 +61,7 @@ In the Temporal path, each discovery chunk is an activity and uses Temporal acti
 Triage runs inside one activity. Batched triage executes batch drafts with a sliding window, then enters global refinement / workbench state.
 
 <!-- doc-default: TRIAGE_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/scan_stages/triage/agent_passes.py -->
+
 The current batch draft concurrency limit is the code constant `TRIAGE_MAX_BATCH_CONCURRENCY = 3`. This is not a normal deployment environment variable. Triage produces a global case set, so a failed batch fails the whole triage stage.
 
 ### Case Processing
@@ -67,6 +69,7 @@ The current batch draft concurrency limit is the code constant `TRIAGE_MAX_BATCH
 After triage, each case is an independent review unit. Repository review executes case workflows with a sliding window.
 
 <!-- doc-default: AGENT_CASE_PROCESSING_MAX_CONCURRENCY; source=agents/src/sec_review_agents/workflows/repository/workflow.py -->
+
 The concurrency limit comes from `AGENT_CASE_PROCESSING_MAX_CONCURRENCY`. The default is `1`. Effective concurrency never exceeds the number of cases.
 
 One case also has internal parallelism. In Temporal, CVSS scoring can run while the mitigation / verification path continues:
@@ -80,6 +83,7 @@ If a case still fails after activity retry, repository review records a blocked 
 Delivery planning can execute batch drafts with a sliding window, then enters global refinement / workbench state.
 
 <!-- doc-default: DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/planning/agent_passes.py -->
+
 The current batch draft concurrency limit is the code constant `DELIVERY_PLANNING_MAX_BATCH_CONCURRENCY = 3`. This is not a normal deployment environment variable. Delivery planning produces a global delivery plan, so a failed batch fails the whole delivery planning stage.
 
 ### Delivery Execution
@@ -91,6 +95,7 @@ Delivery execution only consumes cases with `disposition == "keep"`.
 `combined` delivery calls the patch-synthesis agent. Multiple combined deliveries execute with a sliding window.
 
 <!-- doc-default: REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY; source=agents/src/sec_review_agents/delivery_stages/execution/input.py -->
+
 The concurrency limit comes from `REPOSITORY_PATCH_SYNTHESIS_MAX_CONCURRENCY`. The default is `4`.
 
 In the Temporal path, combined delivery patch synthesis is an independent activity. `single` delivery remains a lightweight projection and does not occupy the patch synthesis window.
@@ -128,17 +133,17 @@ Common ways to raise the ceiling:
 - higher total LLM budget
 - higher-TPM / higher-RPM LLM APIs
 - multiple LLM API sources sharing load
-- More Temporal Workers
+- more Temporal Workers
 
 ## Example Measurements
 
 The following approximate measurements show the effect of case processing concurrency in one repository review run.
 
-| Run | Case Concurrency | Total Duration | Discovery | Triage | Case Processing | Delivery Planning | Patch Synthesis |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| A | 3 | 49m46.8s | 0m42s, about 1.4% | 4m30s, about 9.0% | about 32m44s, about 65.8% | 2m29s, about 5.0% | about 9m20s, about 18.8% |
-| B | 6 | 31m21s | 5m46s, about 18.4% | 4m33s, about 14.5% | about 15m10s, about 48.7% | 2m38s, about 8.4% | about 3m12s, about 10.2% |
-| C | 8 | 32m19s | 1m58s, about 6.1% | 3m23s, about 10.5% | about 18m51s, about 58.3% | 3m13s, about 9.9% | about 4m54s, about 15.2% |
+| Run | Case Concurrency | Total Duration |          Discovery |             Triage |           Case Processing | Delivery Planning |          Patch Synthesis |
+| --- | ---------------: | -------------: | -----------------: | -----------------: | ------------------------: | ----------------: | -----------------------: |
+| A   |                3 |       49m46.8s |  0m42s, about 1.4% |  4m30s, about 9.0% | about 32m44s, about 65.8% | 2m29s, about 5.0% | about 9m20s, about 18.8% |
+| B   |                6 |         31m21s | 5m46s, about 18.4% | 4m33s, about 14.5% | about 15m10s, about 48.7% | 2m38s, about 8.4% | about 3m12s, about 10.2% |
+| C   |                8 |         32m19s |  1m58s, about 6.1% | 3m23s, about 10.5% | about 18m51s, about 58.3% | 3m13s, about 9.9% | about 4m54s, about 15.2% |
 
 - Increasing case concurrency from `3` to `6` significantly reduced total duration. The main change was that case processing shrank.
-- Increasing case concurrency from `6` to `8` did not reduce total duration further. It increased from **31m21s** to **32m19s**, about **58 seconds** longer. In this workload, raising case concurrency further had no clear benefit; the system was increasingly shaped by single-case tail latency, stage variance, and other resource bottlenecks.
+- Increasing case concurrency from `6` to `8` did not reduce total duration further. It rose from **31m21s** to **32m19s**, about **58 seconds** longer. In this workload, more case concurrency stopped helping, and total time depended more on single-case tail latency, stage variance, and other resource bottlenecks.

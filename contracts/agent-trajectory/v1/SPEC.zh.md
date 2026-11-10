@@ -16,15 +16,15 @@ Trajectory 使用 UTF-8 JSONL：每行一个 JSON 对象。消息正文中的换
 
 ## 消息与来源
 
-| 字段 | 含义 |
-| --- | --- |
-| `message.id` | 消息身份，在 trajectory 内唯一；同一消息被多次观察时保持该身份，只记录一次 |
-| `message.role` | `system`、`user`、`assistant` 或 `tool` |
-| `message.content` | 原始文本或结构化内容块；内容块的 `type` 描述内容种类，不表示消息角色 |
-| `agent` | 消息所属对话或执行分支的 Agent，已知时提供 |
-| `source` | 消息来源或用途，已知时提供；`summarization` 标识摘要相关材料 |
-| `call_id` | 生成该响应的模型调用，适用时提供 |
-| `run_id`、`parent_ids` | 执行身份，以及从根到直接父执行的有序祖先关系，可用时提供 |
+| 字段                   | 含义                                                                       |
+| ---------------------- | -------------------------------------------------------------------------- |
+| `message.id`           | 消息身份，在 trajectory 内唯一；同一消息被多次观察时保持该身份，只记录一次 |
+| `message.role`         | `system`、`user`、`assistant` 或 `tool`                                    |
+| `message.content`      | 原始文本或结构化内容块；内容块的 `type` 描述内容种类，不表示消息角色       |
+| `agent`                | 消息所属对话或执行分支的 Agent，已知时提供                                 |
+| `source`               | 消息来源或用途，已知时提供；`summarization` 标识摘要相关材料               |
+| `call_id`              | 生成该响应的模型调用，适用时提供                                           |
+| `run_id`、`parent_ids` | 执行身份，以及从根到直接父执行的有序祖先关系，可用时提供                   |
 
 不同生产端的 `agent` 和 `source` 含义一致。框架特有的元数据可以作为附加证据保留，但读取端不需要依赖它来解释这些字段。缺少标签表示来源未知，不默认归属于根 Agent。
 
@@ -44,12 +44,12 @@ Trajectory 是执行历史，不是每次模型调用的完整请求快照。只
 
 ## 模型调用与工具交互
 
-| 事件 | 含义 |
-| --- | --- |
-| `model_calls_start` | 开始记录本次执行的模型调用 |
-| `model_call_start` | 开始一次模型调用，由 `call_id` 标识 |
-| `model_call_end` | 该调用成功返回；`message_id` 引用其响应消息 |
-| `model_calls_end` | 记录结束，执行状态为 `completed`、`failed` 或 `interrupted` |
+| 事件                | 含义                                                        |
+| ------------------- | ----------------------------------------------------------- |
+| `model_calls_start` | 开始记录本次执行的模型调用                                  |
+| `model_call_start`  | 开始一次模型调用，由 `call_id` 标识                         |
+| `model_call_end`    | 该调用成功返回；`message_id` 引用其响应消息                 |
+| `model_calls_end`   | 记录结束，执行状态为 `completed`、`failed` 或 `interrupted` |
 
 响应以消息形式保存一次。调用结束记录引用它，不重复保存响应或 usage。失败或中断的调用可能只有开始记录，没有结束记录；不要为其补造成功响应。
 
@@ -75,14 +75,14 @@ Trajectory 是执行历史，不是每次模型调用的完整请求快照。只
 
 本契约遵循 OpenTelemetry GenAI 的 token 统计语义：输入/输出采用包含式总量，缓存和推理作为子集。JSON 字段名及记录结构由本项目定义，不照搬 OpenTelemetry 的属性名或指标名。OpenTelemetry GenAI 规范独立演进；上游命名变化不会自动改变本契约。生产端负责将来源词汇映射为下表定义的字段。
 
-| 字段 | 含义 |
-| --- | --- |
-| `input_tokens` | 包含缓存读取和缓存写入的输入总量 |
-| `output_tokens` | 包含推理的输出总量 |
-| `total_tokens` | `input_tokens` 与 `output_tokens` 均已知时为 `input_tokens + output_tokens`，否则为 `null` |
-| `cache_read_input_tokens` | 输入中的缓存读取子集 |
-| `cache_creation_input_tokens` | 输入中的缓存写入子集，与缓存读取不重叠 |
-| `reasoning_tokens` | 输出中的推理子集 |
+| 字段                          | 含义                                                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------ |
+| `input_tokens`                | 包含缓存读取和缓存写入的输入总量                                                           |
+| `output_tokens`               | 包含推理的输出总量                                                                         |
+| `total_tokens`                | `input_tokens` 与 `output_tokens` 均已知时为 `input_tokens + output_tokens`，否则为 `null` |
+| `cache_read_input_tokens`     | 输入中的缓存读取子集                                                                       |
+| `cache_creation_input_tokens` | 输入中的缓存写入子集，与缓存读取不重叠                                                     |
+| `reasoning_tokens`            | 输出中的推理子集                                                                           |
 
 已知缓存子集之和不能超过已知输入；已知推理量不能超过已知输出。消费端拒绝不可能的子集、不一致的总量、非 null 用量对象缺少字段，以及标准用量内的框架专用详情字段。计数上限为 `9007199254740991`，保证 Python/JavaScript 互操作。缓存和推理是子集，不得额外加到包含式总量上。
 

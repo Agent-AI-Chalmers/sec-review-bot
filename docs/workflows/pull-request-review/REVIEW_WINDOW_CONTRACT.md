@@ -18,7 +18,7 @@ An agent reads the window through git in the workspace, using the run's own rang
 
 ### Why the artifacts stay
 
-`changed-files.json` and `incremental.patch` are a stable record of what a run reviewed, readable without reconstructing the window from repository state. That is a property of the run, not of any consumer, so it holds regardless of what an agent is told to read.
+`changed-files.json` and `incremental.patch` are a stable record of what a run reviewed, readable without reconstructing the window from repository state. The record belongs to the run itself, so it holds regardless of what an agent is told to read.
 
 Suggestion anchoring is a separate concern and uses the input's `files` collection, which input preparation exports alongside the patch.
 
@@ -28,10 +28,10 @@ This document records the window semantics, the measured behavior of the GitHub 
 
 For a given run, the candidate windows are:
 
-| Window | Range | Meaning |
-| --- | --- | --- |
-| Full PR | `base_sha...head_sha` | Everything the pull request introduces relative to the merge base. |
-| Push | `previous_head_sha..head_sha` | Only the commits added by the `synchronize` event that triggered this run. |
+| Window  | Range                         | Meaning                                                                    |
+| ------- | ----------------------------- | -------------------------------------------------------------------------- |
+| Full PR | `base_sha...head_sha`         | Everything the pull request introduces relative to the merge base.         |
+| Push    | `previous_head_sha..head_sha` | Only the commits added by the `synchronize` event that triggered this run. |
 
 `previous_head_sha` comes from the [`before` field of the `pull_request` webhook](https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request). The `synchronize` payload type in this repository's `@octokit/openapi-webhooks-types` dependency requires both `after` and `before`.
 
@@ -70,12 +70,13 @@ Measured example: `apache/hbase` #7722 returned 340 files, of which 93 had no `p
 
 [`GET /repos/{owner}/{repo}/compare/{basehead}`](https://docs.github.com/en/rest/commits/commits#compare-two-commits) behaves differently for the two situations that matter:
 
-| Situation | Response |
-| --- | --- |
+| Situation                     | Response                                |
+| ----------------------------- | --------------------------------------- |
 | Identical commits, empty diff | `200`, `files: []`, `status: identical` |
-| Unreachable base commit | `404 Not Found` |
+| Unreachable base commit       | `404 Not Found`                         |
 
 <!-- doc-default: github-integration.resolveReviewWindowFiles; source=apps/github-integration/src/reviews/pull-requests/review-window.ts -->
+
 A `synchronize` event normally reviews only the changes in the latest push. If GitHub cannot provide the comparison from the previous commit to the current commit and returns `404`, the run reviews the entire PR instead, with reason `synchronize-previous-head-unreachable`. Other request errors follow the preparation retry and failure rules.
 
 A force-push does not necessarily make the old commit immediately inaccessible. Whether to fall back because of `404` therefore depends on the API response, not on whether a force-push occurred.
@@ -113,15 +114,15 @@ The structural lesson is the one this document argues for: PR-Agent derives the 
 
 The audit that motivated this document framed the choice as the contracts below. They are not symmetric in this project.
 
-| | Full revision on `synchronize` | Incremental revision on `synchronize` |
-| --- | --- | --- |
-| Window | all artifacts on `base...head` | all artifacts on `previous..head` |
-| Cost | repeats full analysis on every push | scales with push size |
-| Repeated findings | likely, across runs | unlikely |
-| Cross-file causality | preserved | **can be missed** when a push changes shared code |
-| `changed-files.json` semantics | matches the patch | matches the patch |
+|                                | Full revision on `synchronize`      | Incremental revision on `synchronize`             |
+| ------------------------------ | ----------------------------------- | ------------------------------------------------- |
+| Window                         | all artifacts on `base...head`      | all artifacts on `previous..head`                 |
+| Cost                           | repeats full analysis on every push | scales with push size                             |
+| Repeated findings              | likely, across runs                 | unlikely                                          |
+| Cross-file causality           | preserved                           | **can be missed** when a push changes shared code |
+| `changed-files.json` semantics | matches the patch                   | matches the patch                                 |
 
-The decisive requirement is not which window is better; it is that **whatever window is chosen, the artifacts share it**.
+**Whichever window is chosen, all the artifacts must share it.** That requirement decides the contract more than the choice of window does.
 
 ## Contract This Project Adopts
 
@@ -132,7 +133,7 @@ The decisive requirement is not which window is better; it is that **whatever wi
 - full re-review on every push scales linearly with pull request size, which interacts badly with the large-pull-request cost measured in this repository (a real 340-file pull request is a 7.6 MB diff);
 - the analyzer can still read `/workspace` for cross-file context; only the **reported scope** is narrowed.
 
-The window is resolved **once** and threaded through, rather than being decided independently by each artifact. A single function decides the window and produces the file list, the patch range, and the suggestion file set together.
+The window is resolved **once** and threaded through, so no artifact decides it independently. A single function decides the window and produces the file list, the patch range, and the suggestion file set together.
 
 The implementation also provides these guards:
 
@@ -141,4 +142,4 @@ The implementation also provides these guards:
 
 3. **Fall back to the full window when the push window is not a fast-forward.** The compare response reports commits on both sides (`behind_by`) when the previous head is not an ancestor of the current head, which is what a force-push leaves behind. Such a window no longer describes an incremental change, and the workspace cannot even contain the discarded head, so the run covers the whole pull request instead.
 
-The ancestry check reads a field the compare response already returns, so it costs no extra request. GitHub still does not document how long a force-pushed commit stays resolvable, which is why the 404 fallback above remains necessary rather than redundant.
+The ancestry check reads a field the compare response already returns, so it costs no extra request. GitHub still does not document how long a force-pushed commit stays resolvable, which is why the 404 fallback above is still needed.

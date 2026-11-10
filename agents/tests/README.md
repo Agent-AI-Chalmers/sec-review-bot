@@ -77,13 +77,13 @@ Probe-agent tests also require `LLM_TEST_DEPLOYMENT=<deployment name>`. Product 
 
 ### Light Probes
 
-| Probe | Enable with | Extra requirements | Purpose |
-| --- | --- | --- | --- |
-| Context summarization | `RUN_LLM_CONTEXT_SUMMARIZATION_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Checks real summarization middleware behavior. |
-| Project instructions | `RUN_LLM_PROJECT_INSTRUCTIONS_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Uses a local workspace to check that the agent uses a preloaded project validation command, inspects source, and leaves guidance unchanged. |
-| Memory probes | `RUN_LLM_MEMORY_MIDDLEWARE_INTEGRATION=1`, `RUN_LLM_MEMORY_EXTRACTION_INTEGRATION=1`, `RUN_LLM_MEMORY_MAINTENANCE_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT` | Checks memory topic use, trajectory extraction, and candidate memory-tree maintenance. |
-| Bundled skill cases | `RUN_LLM_SKILL_CASES=1` | `LLM_TEST_DEPLOYMENT` | Runs JSON-defined prompted, discovery, and compare cases, including web, CI, and CWE checks. Compare cases record paired Skills OFF/ON outputs without automatically declaring a winner. |
-| CodeGraph MCP smoke | `RUN_LLM_CODEGRAPH_MCP_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT`, `codegraph` on `PATH` | Checks local CodeGraph MCP wiring. |
+| Probe                 | Enable with                                                                                                                      | Extra requirements                           | Purpose                                                                                                                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Context summarization | `RUN_LLM_CONTEXT_SUMMARIZATION_INTEGRATION=1`                                                                                    | `LLM_TEST_DEPLOYMENT`                        | Checks real summarization middleware behavior.                                                                                                                                           |
+| Project instructions  | `RUN_LLM_PROJECT_INSTRUCTIONS_INTEGRATION=1`                                                                                     | `LLM_TEST_DEPLOYMENT`                        | Uses a local workspace to check that the agent uses a preloaded project validation command, inspects source, and leaves guidance unchanged.                                              |
+| Memory probes         | `RUN_LLM_MEMORY_MIDDLEWARE_INTEGRATION=1`, `RUN_LLM_MEMORY_EXTRACTION_INTEGRATION=1`, `RUN_LLM_MEMORY_MAINTENANCE_INTEGRATION=1` | `LLM_TEST_DEPLOYMENT`                        | Checks memory topic use, trajectory extraction, and candidate memory-tree maintenance.                                                                                                   |
+| Bundled skill cases   | `RUN_LLM_SKILL_CASES=1`                                                                                                          | `LLM_TEST_DEPLOYMENT`                        | Runs JSON-defined prompted, discovery, and compare cases, including web, CI, and CWE checks. Compare cases record paired Skills OFF/ON outputs without automatically declaring a winner. |
+| CodeGraph MCP smoke   | `RUN_LLM_CODEGRAPH_MCP_INTEGRATION=1`                                                                                            | `LLM_TEST_DEPLOYMENT`, `codegraph` on `PATH` | Checks local CodeGraph MCP wiring.                                                                                                                                                       |
 
 Run the project-instructions probe with:
 
@@ -128,12 +128,12 @@ uv run python -m pytest tests/memory/test_llm_maintenance.py -q -s
 
 These use real workflow agents and normal deployment bindings.
 
-| Probe | Enable with | Extra requirements | Purpose |
-| --- | --- | --- | --- |
-| Issue review narratives | `RUN_LLM_ISSUE_REVIEW_INTEGRATION=1` | issue analyzer binding | Runs the issue analyzer on small synthetic cases, including non-dataflow evidence-shape probes for concurrency, cryptography, delegated authority, and cancellation. |
-| False-positive precedent | `RUN_LLM_FALSE_POSITIVE_PRECEDENT_INTEGRATION=1` | pull-request analyzer binding | Checks precedent-guided false-positive handling. |
-| Delivery workbench | `RUN_LLM_DELIVERY_WORKBENCH_INTEGRATION=1` | delivery planning binding | Checks delivery planning workbench use. |
-| Triage workflow | `RUN_LLM_TRIAGE_WORKFLOW_INTEGRATION=1` | triage binding | Checks candidate retention and suppression on scanner-shaped input, including use of mounted guidance. |
+| Probe                    | Enable with                                      | Extra requirements            | Purpose                                                                                                                                                              |
+| ------------------------ | ------------------------------------------------ | ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Issue review narratives  | `RUN_LLM_ISSUE_REVIEW_INTEGRATION=1`             | issue analyzer binding        | Runs the issue analyzer on small synthetic cases, including non-dataflow evidence-shape probes for concurrency, cryptography, delegated authority, and cancellation. |
+| False-positive precedent | `RUN_LLM_FALSE_POSITIVE_PRECEDENT_INTEGRATION=1` | pull-request analyzer binding | Checks precedent-guided false-positive handling.                                                                                                                     |
+| Delivery workbench       | `RUN_LLM_DELIVERY_WORKBENCH_INTEGRATION=1`       | delivery planning binding     | Checks delivery planning workbench use.                                                                                                                              |
+| Triage workflow          | `RUN_LLM_TRIAGE_WORKFLOW_INTEGRATION=1`          | triage binding                | Checks candidate retention and suppression on scanner-shaped input, including use of mounted guidance.                                                               |
 
 Example:
 
@@ -156,14 +156,14 @@ Results are written under `.agent-artifacts/non-dataflow-evidence/` by default. 
 
 ### Heavy Probes
 
-Heavy probes should be run deliberately. They may start Docker containers, run full analyzer workflows, clone public repositories, or retain artifacts for manual inspection.
+Run heavy probes only on purpose. They may start Docker containers, run full analyzer workflows, clone public repositories, or retain artifacts for manual inspection.
 
-| Probe | Enable with | Extra requirements | Purpose |
-| --- | --- | --- | --- |
-| Analyzer Docker + CodeGraph | `RUN_LLM_ANALYZER_CODEGRAPH_DOCKER_INTEGRATION=1` | repository analyzer binding, `sec-review-bot-workspace:tools` image | Compares analyzer behavior with and without CodeGraph on a cross-file case. |
-| CodeGraph public checkout | `RUN_LLM_CODEGRAPH_REAL_CHECKOUT_INTEGRATION=1` | issue analyzer binding, `sec-review-bot-workspace:tools` image, network for clone | Runs a pinned public vulnerable checkout comparison. |
-| MCP cases | `RUN_LLM_MCP_CASES=1` | relevant product agent bindings, `sec-review-bot-workspace:tools` image | Runs data-driven MCP discovery and paired comparison cases through normal product workflows. Transport and state continuity are covered by separate no-model capability tests. |
-| External tool cases | `RUN_LLM_EXTERNAL_TOOL_CASES=1` | product agent bindings, base and `sec-review-bot-workspace:tools` images | Runs Joern and Playwright CLI discovery cases plus pinned public-checkout comparisons with skills and MCP disabled. Comparison OFF arms use the base image so the CLI is genuinely unavailable. Installation and CLI behavior are covered by separate no-model capability tests. |
+| Probe                       | Enable with                                       | Extra requirements                                                                | Purpose                                                                                                                                                                                                                                                                          |
+| --------------------------- | ------------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Analyzer Docker + CodeGraph | `RUN_LLM_ANALYZER_CODEGRAPH_DOCKER_INTEGRATION=1` | repository analyzer binding, `sec-review-bot-workspace:tools` image               | Compares analyzer behavior with and without CodeGraph on a cross-file case.                                                                                                                                                                                                      |
+| CodeGraph public checkout   | `RUN_LLM_CODEGRAPH_REAL_CHECKOUT_INTEGRATION=1`   | issue analyzer binding, `sec-review-bot-workspace:tools` image, network for clone | Runs a pinned public vulnerable checkout comparison.                                                                                                                                                                                                                             |
+| MCP cases                   | `RUN_LLM_MCP_CASES=1`                             | relevant product agent bindings, `sec-review-bot-workspace:tools` image           | Runs data-driven MCP discovery and paired comparison cases through normal product workflows. Transport and state continuity are covered by separate no-model capability tests.                                                                                                   |
+| External tool cases         | `RUN_LLM_EXTERNAL_TOOL_CASES=1`                   | product agent bindings, base and `sec-review-bot-workspace:tools` images          | Runs Joern and Playwright CLI discovery cases plus pinned public-checkout comparisons with skills and MCP disabled. Comparison OFF arms use the base image so the CLI is genuinely unavailable. Installation and CLI behavior are covered by separate no-model capability tests. |
 
 Build the workspace tools image when a probe needs CodeGraph or Playwright:
 

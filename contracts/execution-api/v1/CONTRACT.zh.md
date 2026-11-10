@@ -51,13 +51,13 @@ v1 Execution Worker 只接受以下规范的 input-bundle URI 形式：
 
 每种工作流输入都有自己的 schema：
 
-| 工作流 | Schema |
-| --- | --- |
-| `issue-review` | [`issue-review-input.schema.json`](schemas/issue-review-input.schema.json) |
+| 工作流                | Schema                                                                                   |
+| --------------------- | ---------------------------------------------------------------------------------------- |
+| `issue-review`        | [`issue-review-input.schema.json`](schemas/issue-review-input.schema.json)               |
 | `pull-request-review` | [`pull-request-review-input.schema.json`](schemas/pull-request-review-input.schema.json) |
-| `repository-review` | [`repository-review-input.schema.json`](schemas/repository-review-input.schema.json) |
+| `repository-review`   | [`repository-review-input.schema.json`](schemas/repository-review-input.schema.json)     |
 
-PR 输入携带 `pr` 对象，描述本次 run 所看到的 PR。其中两个字段的关系无法由 schema 表达，因此需要单独说明：
+PR 输入携带 `pr` 对象，描述本次 run 所看到的 PR。其中两个字段的关系无法由 schema 表达：
 
 - `base_sha` 与 `head_sha` 标识 PR 本身，在一次 run 内保持不变。
 - `review_window` 说明本次 run 覆盖的范围。`synchronize` 通常只覆盖新推送的提交，因此范围较窄；触发回退条件时，也可能覆盖完整 PR。`review_window.reason` 记录 run 为何回退到完整范围。
@@ -86,9 +86,9 @@ Execution API 服务和 Execution Worker 都会在各自的进程边界校验输
 
 `scan_mode` 决定窗口形状：
 
-| 模式 | 要求 / 结构 |
-| --- | --- |
-| `full` | `scan_scope.incremental_changed_files: []`; `base_sha: null`; `commit_shas: []` |
+| 模式          | 要求 / 结构                                                                                                                                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `full`        | `scan_scope.incremental_changed_files: []`; `base_sha: null`; `commit_shas: []`                                                                                                                                     |
 | `incremental` | 输入材料包清单包含 `incremental_window.path`；`base_sha` 是非空字符串且不同于 `head_sha`；`commit_shas` 非空；`scan_scope.incremental_changed_files` 声明变更文件范围，当明确窗口内没有可扫描改动文件时可以为空列表 |
 
 仓库扫描范围用来控制成本和覆盖面，不能由 Execution Worker 猜测：
@@ -109,7 +109,7 @@ Issue / PR 结果展示直接使用 `ReviewRecord`。Repository case 的展示�
 
 补丁的最终文件内容以 `ReviewRecord.mitigation.file_changes` 为准。展示路径从 `file_changes[].path` 派生，不再存在独立的 `changed_files` 字段。`patch_diff` 是缓存的审查与定位产物，可以从基线文件树和 `file_changes` 重新生成；不能把它当成另一份最终文件内容来源。
 
-`file_changes` 的新增或更新操作使用 Git 文件模式，由 `mode` 字段指定：`100644`（普通文件）、`100755`（可执行文件）或 `120000`（符号链接）。省略 `mode` 表示 `100644`。对于 `120000`，解码后的 `content` 保存链接目标的字节，而不是目标文件的内容；发布时不得解析目标。目标可以是相对路径、绝对路径或不存在的路径，条目自身的 `path` 仍须通过仓库路径校验。删除操作使用不带 `mode` 的 `status: "deleted"`，也适用于删除链接。切换文件模式会替换条目类型。在开始输出 `120000` 前，生产者和发布者必须一起升级；旧消费者可能拒绝新增的枚举值。 Worker 的文本 `patch_diff` 导出要求差异字节为 UTF-8，并明确拒绝非 UTF-8 差异；`file_changes` 支持 base64 并不意味着该导出限制已经消失。
+`file_changes` 的新增或更新操作使用 Git 文件模式，由 `mode` 字段指定：`100644`（普通文件）、`100755`（可执行文件）或 `120000`（符号链接）。省略 `mode` 表示 `100644`。对于 `120000`，解码后的 `content` 保存链接目标的字节，而不是目标文件的内容；发布时不得解析目标。目标可以是相对路径、绝对路径或不存在的路径，条目自身的 `path` 仍须通过仓库路径校验。删除操作使用不带 `mode` 的 `status: "deleted"`，也适用于删除链接。切换文件模式会替换条目类型。在开始输出 `120000` 前，生产者和发布者必须一起升级；旧消费者可能拒绝新增的枚举值。Worker 的文本 `patch_diff` 导出要求差异字节为 UTF-8，并明确拒绝非 UTF-8 差异；`file_changes` 支持 base64 并不意味着该导出限制已经消失。
 
 Execution Worker 根据内部阶段输出构造对外结果。构造 `ReviewRecord` 时只保留公开字段：丢弃未知内部字段，将格式错误的可选标量值设为 `null`，并省略列表中格式错误的成员。这些处理只适用于生成可选报告细节；返回完整结果前，仍必须通过对应工作流的完整 schema 校验。
 
@@ -118,7 +118,7 @@ Execution Worker 根据内部阶段输出构造对外结果。构造 `ReviewReco
 - Discovery、Triage、Analyzer、Mitigator、Verifier，以及 delivery / patch synthesis 等阶段出现未处理异常时，workflow run 失败，Execution API 返回结构化执行错误。
 - patch synthesis 失败若已被 delivery 层捕获，则记录在 delivery 结果中。
 
-> *CVSS 是报告里展示的可选评分，不是判断本次审查成功或失败的信号。如果仓库 CVSS 评分失败，但 case review 本身已经成功，公开结果中的 `ReviewRecord.cvss` 应为 `null`，失败细节保留在诊断信息和产物中。*
+> _CVSS 是报告里展示的可选评分，不是判断本次审查成功或失败的信号。如果仓库 CVSS 评分失败，但 case review 本身已经成功，公开结果中的 `ReviewRecord.cvss` 应为 `null`，失败细节保留在诊断信息和产物中。_
 
 `verification.coverage` 表达当前代码对 `target_claim` 的解决程度，与是否有补丁无关。`full` 表示仓库证据证明问题已经解决、基线已经修好，或该问题在当前代码中不成立；`partial`、`local-only` 和 `misaligned` 表达仍有缺口，`unresolved` 表示证据不足。没有修改时检查基线，是否有补丁由 `mitigation.file_changes` 表达。`coverage` 本身不代表批准交付：还必须有补丁、没有阻断交付的回归证据，且 `next_step=none`。即使当前代码为 `full`，不必要或无关修改的交付问题仍须写入发现及下一步动作。
 

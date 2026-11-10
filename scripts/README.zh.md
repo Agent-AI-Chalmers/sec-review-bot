@@ -33,7 +33,15 @@ python -m scripts.checks.markdown_wrapping
 python -m scripts.checks.translated_doc_headings
 ```
 
-`translated_doc_headings.py` 扫描所有已跟踪的 `*.zh.md` 文件并找到对应的英文 `.md` 源文件。它检查标题层级和章节编号，并在对应章节内比较 `doc-default` / `doc-time-sensitive` 标记的内容、出现次数和 shell 命令示例。shell 注释、空行、续行排版和代码块拆分可以不同。正文和非 shell 示例可以翻译，其语义是否一致仍需审阅。 另按对应章节比较段落、列表项、表格行、引用段落和非 shell 示例的数量，提示可能的遗漏。数量差异仅供核对：翻译可以合理合并或拆分内容块，不影响退出码。
+Markdown 格式由 markdownlint 检查，配置在仓库根目录的 `.markdownlint-cli2.jsonc`。在仓库根目录运行 `pnpm run lint:md`。
+
+工作区包以外的仓库级文件由根目录的 `.prettierrc.json` 格式化。在仓库根目录运行 `pnpm run format:root:check`。
+
+中文文档的中英文间距和标点由 AutoCorrect 检查，配置在仓库根目录的 `.autocorrectrc`。在仓库根目录运行 `pnpm run lint:zh`。
+
+在仓库根目录执行 `pnpm install` 会根据 `lefthook.yml` 安装 pre-commit hook，对暂存文件运行以上三个工具。
+
+`translated_doc_headings.py` 扫描所有已跟踪的 `*.zh.md` 文件并找到对应的英文 `.md` 源文件。它检查标题层级和章节编号，并在对应章节内比较 `doc-default` / `doc-time-sensitive` 标记的内容、出现次数和 shell 命令示例。shell 注释、空行、续行排版和代码块拆分可以不同。正文和非 shell 示例可以翻译，其语义是否一致仍需审阅。另按对应章节比较段落、列表项、表格行、引用段落和非 shell 示例的数量，提示可能的遗漏。数量差异仅供核对：翻译可以合理合并或拆分内容块，不影响退出码。
 
 ## 本地辅助工具
 
@@ -129,4 +137,5 @@ uv --project agents run python -m scripts.ops.memory_ops --env-file compose.memo
 ```
 
 <!-- doc-default: memory-maintenance-mode; source=scripts/ops/memory_ops.py -->
+
 `maintain` 在 Temporal 中启动维护 workflow。默认的 `--mode learning` 处理待处理 observations；`--mode reorganization` 只整理当前生效记忆，不消费 observation，由人工手动触发。`schedules maintenance ensure` 创建或更新 learning 的周期触发计划。两者均需要配置好的 Temporal 服务；实际维护还需要 Worker、Memory Catalog 和对象存储。通过各子命令的 `--help` 查看连接、超时、批次及调度参数。

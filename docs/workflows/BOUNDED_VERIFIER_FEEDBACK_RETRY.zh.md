@@ -11,6 +11,7 @@
 - `analyzer -> mitigator -> verifier -> [feedback-guided mitigator -> verifier] * k`
 
 <!-- doc-default: MAX_FEEDBACK_RETRY_ATTEMPTS; source=agents/src/sec_review_agents/review_stages/feedback_loop.py -->
+
 代码常量 `MAX_FEEDBACK_RETRY_ATTEMPTS` 将 `k` 限制为 `1`。这不是部署配置项。修改上限需要同时考虑上下文增长、耗时和模型成本，并重新运行针对 agent 行为的聚焦验证。
 
 ## 为什么需要反馈重试
@@ -24,11 +25,7 @@ Verifier 不只是最后的审计阶段。它也负责识别：
 
 没有反馈重试路径，这些判断只能描述问题，不能推动修正。反馈重试让 Verifier 的判断能够推动后续修复，同时保持明确的停止条件。
 
----
-
 这个机制还有结构性原因。单个 Agent 通常可以在一次连续执行中验证并修改自己的补丁。多阶段 workflow 将分析、修复、验证拆开后，Verifier 的输出默认只会向下游传递；要让它推动修正，系统必须显式反馈给 Mitigator。没有这条路径，多阶段设计就缺少一个基本的自我纠正循环。
-
----
 
 Verifier 反馈来自模型判断，其证据强度通常弱于失败的 PoC、失败测试或其他可直接复现的失败信号，因为后者来自实际运行代码。
 
@@ -87,7 +84,7 @@ Verifier 分别输出：
 
 选择 `next_step=retry-ai` 时，Verifier 应在 `findings[]` 中提供具体修正问题，让 Mitigator 获得明确反馈，而不是模糊的否定结论。
 
-只有反馈指出具体修正问题时才重试。这个机制不是为了重新开启每一次未成功的审查。
+只有反馈指出具体修正问题时才重试，因此不会重新开启每一次未成功的审查。
 
 ## 重试需要哪些上下文
 
@@ -139,7 +136,7 @@ workflow 保留完整重试历史（初次结果、后续重试和重试触发�
 
 ## 设计适用范围
 
-这套架构有意针对**少量重试**优化，而不是任意大的 `N`。
+这套架构有意针对**少量重试**优化，并非为任意大的 `N` 设计。
 
 提高重试上限会增加：
 

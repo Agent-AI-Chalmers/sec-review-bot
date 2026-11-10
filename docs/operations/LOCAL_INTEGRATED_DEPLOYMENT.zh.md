@@ -26,18 +26,18 @@ Control Plane UI 是独立部署的控制台。它的同源服务端从 Review R
 
 默认本地端口：
 
-| Service | URL |
-| --- | --- |
-| GitHub Integration | `http://127.0.0.1:30000` |
-| Review Runs | `http://127.0.0.1:8090` |
-| Control Plane UI | `http://127.0.0.1:8091` |
-| Execution Gateway | `http://127.0.0.1:8000` |
-| Memory Catalog Server | `http://127.0.0.1:8092` |
-| PostgreSQL | `postgresql://127.0.0.1:5432` |
-| Temporal gRPC | `127.0.0.1:7233` |
-| Temporal Web UI | `http://127.0.0.1:8233` |
-| RustFS API | `http://127.0.0.1:9100` |
-| RustFS Console | `http://127.0.0.1:9101` |
+| Service               | URL                           |
+| --------------------- | ----------------------------- |
+| GitHub Integration    | `http://127.0.0.1:30000`      |
+| Review Runs           | `http://127.0.0.1:8090`       |
+| Control Plane UI      | `http://127.0.0.1:8091`       |
+| Execution Gateway     | `http://127.0.0.1:8000`       |
+| Memory Catalog Server | `http://127.0.0.1:8092`       |
+| PostgreSQL            | `postgresql://127.0.0.1:5432` |
+| Temporal gRPC         | `127.0.0.1:7233`              |
+| Temporal Web UI       | `http://127.0.0.1:8233`       |
+| RustFS API            | `http://127.0.0.1:9100`       |
+| RustFS Console        | `http://127.0.0.1:9101`       |
 
 Temporal 接入只与 Execution Gateway 共享的专用 Compose internal network。gRPC 与 Web UI 端口发布在宿主 loopback，供宿主 Worker 和本地 operator 使用。
 
@@ -173,23 +173,23 @@ uv run sec-review-agents-check-llm-deployments --fail-fast
 
 核心字段：
 
-| Field | 如何配置 |
-| --- | --- |
-| `TEMPORAL_ADDRESS` | 必须使用根目录 `.env` 中 `TEMPORAL_PORT` 暴露的宿主机端口；默认是 `127.0.0.1:7233`。 |
-| `TEMPORAL_NAMESPACE`、`TEMPORAL_EXECUTION_TASK_QUEUE` | 必须与根目录 `.env` 中的同名值一致。 |
-| `AGENT_DOCKER_IMAGE` | Docker sandbox 使用的镜像；默认使用通用镜像。 |
-| `AGENT_SKILLS_ENABLED` | 为声明了 bundled skills 的 agent 物化对应 skills；默认是 `true`。 |
-| `AGENT_JOERN_ENABLED`、`AGENT_PLAYWRIGHT_ENABLED` | 向适用的 agent 提示镜像中已安装的相应 CLI；两者默认均为 `false`。 |
-| `AGENT_MCP_ENABLED` | 启用已配置的 MCP 集成；默认是 `false`。 |
-| `AGENT_MEMORY_CONSUMPTION_ENABLED` | 允许 review agent 读取整理后的 memory；默认是 `true`。 |
-| `AGENT_MEMORY_PROCESSING_ENABLED` | 允许 trajectory extraction 和 memory maintenance；默认是 `true`。 |
-| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | 可选的自定义 S3-compatible endpoint。本地 RustFS 部署使用 `http://127.0.0.1:9100`；使用由 `AWS_REGION` 选择的 AWS endpoint 时省略该项。 |
-| `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` | S3 请求寻址方式：`auto`、`path` 或 `virtual`。本地 RustFS 部署使用 `path`；外部存储可以使用 `auto` 或 `virtual`，无需改变 artifact reference。 |
-| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入执行归档，并读取 active memory revision。 |
-| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Memory Extraction Worker 和 Memory Maintenance Worker 共用的存储凭据；可读取执行归档，并读写 memory revision 和压缩后的 memory-agent trajectory。 |
-| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 协调状态 API；Compose 默认是 `http://127.0.0.1:8092`。 |
-| `AGENT_MEMORY_CATALOG_TOKEN` | Extraction 和自动 maintenance 使用的 worker 凭据；不提供 PostgreSQL 直连权限。 |
-| `AGENT_MEMORY_CATALOG_OPERATOR_TOKEN` | Control Plane UI 用于 memory 读取与人工控制操作的 operator 凭据。 |
+| Field                                                                      | 如何配置                                                                                                                                          |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TEMPORAL_ADDRESS`                                                         | 必须使用根目录 `.env` 中 `TEMPORAL_PORT` 暴露的宿主机端口；默认是 `127.0.0.1:7233`。                                                              |
+| `TEMPORAL_NAMESPACE`、`TEMPORAL_EXECUTION_TASK_QUEUE`                      | 必须与根目录 `.env` 中的同名值一致。                                                                                                              |
+| `AGENT_DOCKER_IMAGE`                                                       | Docker sandbox 使用的镜像；默认使用通用镜像。                                                                                                     |
+| `AGENT_SKILLS_ENABLED`                                                     | 为声明了 bundled skills 的 agent 物化对应 skills；默认是 `true`。                                                                                 |
+| `AGENT_JOERN_ENABLED`、`AGENT_PLAYWRIGHT_ENABLED`                          | 向适用的 agent 提示镜像中已安装的相应 CLI；两者默认均为 `false`。                                                                                 |
+| `AGENT_MCP_ENABLED`                                                        | 启用已配置的 MCP 集成；默认是 `false`。                                                                                                           |
+| `AGENT_MEMORY_CONSUMPTION_ENABLED`                                         | 允许 review agent 读取整理后的 memory；默认是 `true`。                                                                                            |
+| `AGENT_MEMORY_PROCESSING_ENABLED`                                          | 允许 trajectory extraction 和 memory maintenance；默认是 `true`。                                                                                 |
+| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT`                                          | 可选的自定义 S3-compatible endpoint。本地 RustFS 部署使用 `http://127.0.0.1:9100`；使用由 `AWS_REGION` 选择的 AWS endpoint 时省略该项。           |
+| `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE`                                  | S3 请求寻址方式：`auto`、`path` 或 `virtual`。本地 RustFS 部署使用 `path`；外部存储可以使用 `auto` 或 `virtual`，无需改变 artifact reference。    |
+| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`、`SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker 凭据；可读取 run input、写入执行归档，并读取 active memory revision。                                                            |
+| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`、`SEC_REVIEW_MEMORY_S3_SECRET_KEY`       | Memory Extraction Worker 和 Memory Maintenance Worker 共用的存储凭据；可读取执行归档，并读写 memory revision 和压缩后的 memory-agent trajectory。 |
+| `AGENT_MEMORY_CATALOG_URL`                                                 | Memory Catalog 协调状态 API；Compose 默认是 `http://127.0.0.1:8092`。                                                                             |
+| `AGENT_MEMORY_CATALOG_TOKEN`                                               | Extraction 和自动 maintenance 使用的 worker 凭据；不提供 PostgreSQL 直连权限。                                                                    |
+| `AGENT_MEMORY_CATALOG_OPERATOR_TOKEN`                                      | Control Plane UI 用于 memory 读取与人工控制操作的 operator 凭据。                                                                                 |
 
 #### 产物与存储凭据
 
@@ -291,13 +291,13 @@ CodeGraph 在 sandbox 内运行，因此需要一个能执行命令的 backend�
 
 使用 sample 配置时，集成部署默认把运行数据写入以下仓库级路径：
 
-| Path | Owner | Purpose |
-| --- | --- | --- |
-| `.agent-rustfs-state` | RustFS | run inputs、执行归档、memory-tree revisions、memory-agent trajectories 及其他 artifacts 的持久对象存储 |
-| `.agent-run-inputs` | 宿主机 Worker | 活跃运行所需的本地输入；不会进入对外发布的执行归档 |
-| `.agent-artifacts` | 宿主机 Worker | 每次运行的 agent 产物和 workflow 输出 |
-| `.agent-postgres-state` | PostgreSQL | Review Runs run 状态与 Memory Catalog 协调状态 |
-| `.agent-temporal-state` | Temporal | workflow history 和待处理 task state |
+| Path                    | Owner         | Purpose                                                                                                |
+| ----------------------- | ------------- | ------------------------------------------------------------------------------------------------------ |
+| `.agent-rustfs-state`   | RustFS        | run inputs、执行归档、memory-tree revisions、memory-agent trajectories 及其他 artifacts 的持久对象存储 |
+| `.agent-run-inputs`     | 宿主机 Worker | 活跃运行所需的本地输入；不会进入对外发布的执行归档                                                     |
+| `.agent-artifacts`      | 宿主机 Worker | 每次运行的 agent 产物和 workflow 输出                                                                  |
+| `.agent-postgres-state` | PostgreSQL    | Review Runs run 状态与 Memory Catalog 协调状态                                                         |
+| `.agent-temporal-state` | Temporal      | workflow history 和待处理 task state                                                                   |
 
 ## 运行部署
 
@@ -430,11 +430,12 @@ docker compose --profile app up --build
 <!-- doc-default: TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES; source=agents/src/sec_review_agents/entrypoints/execution_worker/main.py -->
 <!-- doc-default: TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES; source=agents/src/sec_review_agents/entrypoints/memory_extraction_worker/main.py -->
 <!-- doc-default: TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES; source=agents/src/sec_review_agents/entrypoints/memory_maintenance_worker/main.py -->
-| 配置项 | 对应 Worker | 每个进程的 activity 并发上限 |
-| --- | --- | --- |
-| `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` | Execution Worker | 默认 `2`，限制同时执行的 review activity 数量。 |
-| `TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES` | Memory Extraction Worker | 默认 `4`，独立限制提取 activity 数量。 |
-| `TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES` | Memory Maintenance Worker | 固定为 `1`；unit 不是 template，不应扩容。 |
+
+| 配置项                                                  | 对应 Worker               | 每个进程的 activity 并发上限                    |
+| ------------------------------------------------------- | ------------------------- | ----------------------------------------------- |
+| `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES`          | Execution Worker          | 默认 `2`，限制同时执行的 review activity 数量。 |
+| `TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES`  | Memory Extraction Worker  | 默认 `4`，独立限制提取 activity 数量。          |
+| `TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES` | Memory Maintenance Worker | 固定为 `1`；unit 不是 template，不应扩容。      |
 
 每个 review activity 都可能创建 sandbox 并发出多次模型请求，因此单机部署应从默认的保守值开始。
 
@@ -484,6 +485,7 @@ GitHub Integration 的镜像构建和 Git workspace 拉取使用不同的网络�
 ### pnpm 与 npm registry
 
 <!-- doc-default: node-workspace.package-manager; source=package.json -->
+
 Node 服务构建从官方 `ghcr.io/pnpm/pnpm:12-alpine` 镜像复制 pnpm。pnpm 根据根 `package.json#packageManager` 选择项目版本。Docker 需要能访问 GHCR；pnpm 使用 `NPM_CONFIG_REGISTRY` 选择的 npm registry。
 
 pnpm 默认从 `https://registry.npmjs.org` 下载项目依赖。该地址不可用或速度不稳定时，可以改用可达的 npm registry：
@@ -511,6 +513,7 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 ```
 
 <!-- doc-default: GITHUB_INTEGRATION_GIT_TIMEOUT_MS; source=apps/github-integration/src/artifacts/git-workspace.ts -->
+
 每条 git 命令和快照命令都受 `GITHUB_INTEGRATION_GIT_TIMEOUT_MS` 约束（默认 `600000`，即 10 分钟），避免远端挂起时无限拖住输入准备。若仓库的冷克隆确实更慢，可以提高该值。
 
 ## 为何这样部署

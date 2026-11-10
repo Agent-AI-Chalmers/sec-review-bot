@@ -1,73 +1,73 @@
 version: 2
 
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
-      interval: "monthly"
-      time: "06:00"
-      timezone: "Asia/Shanghai"
+      interval: 'monthly'
+      time: '06:00'
+      timezone: 'Asia/Shanghai'
     commit-message:
-      prefix: "build(deps)"
-      prefix-development: "build(deps-dev)"
+      prefix: 'build(deps)'
+      prefix-development: 'build(deps-dev)'
     groups:
       node-workspace:
         patterns:
-          - "*"
+          - '*'
     ignore:
-      - dependency-name: "@types/node"
+      - dependency-name: '@types/node'
         update-types:
-          - "version-update:semver-major"
-      - dependency-name: "typescript"
+          - 'version-update:semver-major'
+      - dependency-name: 'typescript'
         update-types:
-          - "version-update:semver-major"
+          - 'version-update:semver-major'
 
-  - package-ecosystem: "uv"
-    directory: "/agents"
+  - package-ecosystem: 'uv'
+    directory: '/agents'
     schedule:
-      interval: "monthly"
-      time: "06:00"
-      timezone: "Asia/Shanghai"
+      interval: 'monthly'
+      time: '06:00'
+      timezone: 'Asia/Shanghai'
     commit-message:
-      prefix: "build(deps)"
-      prefix-development: "build(deps-dev)"
+      prefix: 'build(deps)'
+      prefix-development: 'build(deps-dev)'
     groups:
       python-tooling:
         patterns:
-          - "ruff"
-          - "black"
-          - "mypy"
-          - "pyright"
-          - "pytest"
-          - "pytest-asyncio"
+          - 'ruff'
+          - 'black'
+          - 'mypy'
+          - 'pyright'
+          - 'pytest'
+          - 'pytest-asyncio'
       agents-runtime:
         patterns:
-          - "deepagents"
-          - "langchain*"
-          - "langgraph"
-          - "langfuse"
-          - "google-genai"
-          - "anthropic"
-          - "openai"
-          - "mcp"
-          - "temporalio"
-          - "opentelemetry-*"
+          - 'deepagents'
+          - 'langchain*'
+          - 'langgraph'
+          - 'langfuse'
+          - 'google-genai'
+          - 'anthropic'
+          - 'openai'
+          - 'mcp'
+          - 'temporalio'
+          - 'opentelemetry-*'
 
-  - package-ecosystem: "pip"
-    directory: "/ops/rustfs-init"
+  - package-ecosystem: 'pip'
+    directory: '/ops/rustfs-init'
     schedule:
-      interval: "monthly"
-      time: "06:00"
-      timezone: "Asia/Shanghai"
+      interval: 'monthly'
+      time: '06:00'
+      timezone: 'Asia/Shanghai'
     commit-message:
-      prefix: "build(deps)"
-      prefix-development: "build(deps-dev)"
+      prefix: 'build(deps)'
+      prefix-development: 'build(deps-dev)'
 
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: 'github-actions'
+    directory: '/'
     schedule:
-      interval: "monthly"
-      time: "06:00"
-      timezone: "Asia/Shanghai"
+      interval: 'monthly'
+      time: '06:00'
+      timezone: 'Asia/Shanghai'
     commit-message:
-      prefix: "ci(deps)"
+      prefix: 'ci(deps)'

@@ -13,15 +13,13 @@ CVSS v4 is a standardized task. Once analyzer has provided sufficiently stable a
 - calculate the base score
 - output severity and concise rationale
 
-The hard part is therefore input fact quality, not score calculation itself.
+The hard part is the quality of the input facts. Calculating the score is straightforward.
 
-The reason to use an agent is to let CVSS scoring verify metric-relevant facts in a limited repository context instead of merely mapping analyzer summaries to scores. In other words, it should use repository evidence to calibrate key judgments such as `AV/PR/UI/AT/SC/SI/SA`, but it must not become an open-ended analyzer again.
+An agent does the scoring so it can check metric-relevant facts in a limited repository context, which a plain mapping from analyzer summaries to scores cannot do. It uses repository evidence to calibrate judgments such as `AV/PR/UI/AT/SC/SI/SA`, but it must not turn into a second open-ended analyzer.
 
 ## Use In The System
 
-CVSS v4 scoring is used for **standardized risk expression in the result presentation layer**, not as the main internal signal for repair priority.
-
-Its main role is to **help human reviewers quickly understand severity**.
+CVSS v4 scoring gives a **standardized risk expression in the result presentation layer**. It is not the main internal signal for repair priority. Its main job is to **help human reviewers understand severity quickly**.
 
 ## Design Boundary
 
@@ -47,14 +45,14 @@ If it needs to read code, it should only perform targeted verification around th
 
 The CVSS agent does not only read analyzer results. It can also read a repository copy prepared for this stage. The copy allows tools to write indexes or caches; the prompt requires read-only investigation without modifying the code being scored.
 
-The purpose of this capability is not to rediscover vulnerabilities. It is to resolve local uncertainty in scoring, for example:
+The agent uses this access to resolve local uncertainty in scoring, not to rediscover vulnerabilities. For example:
 
 - whether an endpoint requires authentication
 - whether the vulnerability entry point is actually network-reachable
 - whether impact is limited to the current service or repository evidence supports subsequent-system impact
 - whether an analyzer location or source fact is consistent with code
 
-Therefore, its code reading boundary is:
+Its code reading stays within these limits:
 
 - prefer the selected narrative with `verdict=confirmed-vulnerability` and provided locations / affected paths
 - open files that help decide one or two CVSS metrics
@@ -64,15 +62,15 @@ Therefore, its code reading boundary is:
 
 ## Not-Scored Boundary
 
-The CVSS agent only scores **the current case itself**. This means it may see or discover other vulnerabilities, but it must score only the current case.
+The CVSS agent scores only **the current case**. It may see or discover other vulnerabilities while reading code, but it does not score them.
 
-If the current case only amplifies another vulnerability's impact, for example "the container does not set `USER`, so impact is worse after successful RCE", then this case is a hardening recommendation / impact amplifier, not an independent CVSS object. In that case, the CVSS stage should return:
+If the current case only amplifies another vulnerability's impact, for example "the container does not set `USER`, so impact is worse after successful RCE", then this case is a hardening recommendation or impact amplifier and has no independent CVSS score. The CVSS stage should then return:
 
 - `scoring_status: not-scored`
 - `overview`
 - `not_scored_reason`
 
-This is not a scoring failure. It is a clear conclusion that the current case should not be scored.
+`not-scored` is a deliberate conclusion that the current case should not be scored. It does not mean scoring failed.
 
 ## Stage Placement And Input Requirements
 

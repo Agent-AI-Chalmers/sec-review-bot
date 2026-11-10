@@ -16,6 +16,19 @@
     "test": "pnpm -r --workspace-concurrency=1 --if-present run test",
     "contracts:check": "pnpm --filter \"./contracts/**\" --if-present run check",
     "contracts:generate": "pnpm --filter \"./contracts/**\" --if-present run generate",
-    "format": "pnpm -r --if-present run format"
+    "format": "pnpm -r --if-present run format",
+    "lint:md": "git ls-files -z \"*.md\" | xargs -0 markdownlint-cli2",
+    "lint:md:fix": "git ls-files -z \"*.md\" | xargs -0 markdownlint-cli2 --fix",
+    "format:root": "git ls-files -z | xargs -0 prettier --write --ignore-unknown",
+    "format:root:check": "git ls-files -z | xargs -0 prettier --check --ignore-unknown",
+    "lint:zh": "git ls-files -z \"*.zh.md\" | xargs -0 autocorrect --lint",
+    "lint:zh:fix": "git ls-files -z \"*.zh.md\" | xargs -0 autocorrect --fix",
+    "prepare": "lefthook install"
+  },
+  "devDependencies": {
+    "autocorrect-node": "2.14.0",
+    "lefthook": "2.2.2",
+    "markdownlint-cli2": "0.24.0",
+    "prettier": "3.9.10"
   }
 }

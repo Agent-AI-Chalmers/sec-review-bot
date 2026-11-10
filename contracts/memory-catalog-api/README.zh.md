@@ -16,7 +16,7 @@ Worker 凭据允许登记 extraction、读取 learning 输入和提交 learning 
 
 `GET /v1/memory-tree/automation` 返回 `enabled` 或 `paused`，表示是否允许提交新的 `learning` 和 `reorganization` 修订。暂停时，这些提交返回 HTTP 409 和 `AUTOMATION_PAUSED`；暂停不会中止已运行的任务，也不阻止产物发布、extraction 登记、`manual` 修订、恢复版本或成功提交的相同请求重放。`/pause` 和 `/resume` 请求通过 `operation_id` 保证幂等，并用 `expected_generation` 做 CAS 检查。响应包含 `created` 和 `automation` 状态快照。相同请求重放时返回该操作原先产生的快照，即使当前状态后来已经改变。
 
-发布 extraction 或记忆修订时，先登记发布意图，记录完整结果和文件引用；上传文件后，再由上传方确认这些文件已存在。这里的确认是上传方的声明，并非 Catalog 检查对象存储的结果。正式登记结果时，Catalog 要求提交内容与已确认的发布意图一致，并在同一事务中完成登记和意图选定。
+发布 extraction 或记忆修订时，先登记发布意图，记录完整结果和文件引用；上传文件后，再由上传方确认这些文件已存在。Catalog 以上传方的确认为准，自身不检查对象存储。正式登记结果时，Catalog 要求提交内容与已确认的发布意图一致，并在同一事务中完成登记和意图选定。
 
 发布中断后，调用方可以查询已记录的意图，用于重试。Catalog 会保留这些记录，但不会自动完成中断的发布，也不会自动清理相关对象。
 
