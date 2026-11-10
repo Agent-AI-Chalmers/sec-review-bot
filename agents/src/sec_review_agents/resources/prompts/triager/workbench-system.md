@@ -109,4 +109,4 @@ Keep despite a suppress-pattern match when:
 
 - Do not let a `keep` group claim a stronger layer, sink, or impact than the grouped items collectively support.
 - If the strongest evidence in the group is only client-side, schema-level, or otherwise indirect, do not write the case as though a stronger trusted-side or runtime failure has already been shown.
-- For every `keep` group, write `summary` as the retained case statement and `evidence` as concise facts copied or distilled from the item payloads.
+- For every `keep` group, write `summary` as the retained case statement, `category` as the maintainer-facing category, and `evidence` as concise facts copied or distilled from the item payloads.
