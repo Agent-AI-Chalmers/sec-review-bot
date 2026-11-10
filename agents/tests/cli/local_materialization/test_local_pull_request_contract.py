@@ -89,3 +89,28 @@ def test_local_pull_request_metadata_is_the_agent_facing_subset(
         )
     )
     assert sorted(metadata) == ["commit_shas", "review_window"]
+
+
+def test_local_pull_request_materializes_the_incremental_window_files(
+    git_repo: Path, tmp_path: Path
+) -> None:
+    """The review window contract keeps both files as the run's record.
+
+    Agents read the window through git, but REVIEW_WINDOW_CONTRACT.md keeps
+    changed-files.json and incremental.patch as the stable record of what a run
+    reviewed, matching what the GitHub producer materializes.
+    """
+    bundle = build_local_pull_request_bundle(
+        repo_path=git_repo,
+        title="Local change",
+        body="body",
+        pr_number=1,
+        repo_full_name_value="octo/demo",
+        output_dir=tmp_path / "out",
+        base_ref="HEAD~1",
+    )
+
+    build_local_workflow_request(bundle, timeout_seconds=60)
+    window = bundle.local_root_path / "input" / "incremental-window"
+    assert json.loads((window / "changed-files.json").read_text(encoding="utf-8"))
+    assert (window / "incremental.patch").read_text(encoding="utf-8").strip()
