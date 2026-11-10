@@ -16,6 +16,7 @@ from sec_review_agents.review_stages.feedback_loop import (
     MAX_FEEDBACK_RETRY_ATTEMPTS,
     FeedbackRetryContext,
 )
+from sec_review_agents.review_stages.trajectories import review_trajectory_outputs
 from sec_review_agents.review_stages.verification.result import (
     VerificationStageResult,
     build_verification_stage_result,
@@ -59,10 +60,11 @@ async def run_verification_stage(
         tempfile.TemporaryDirectory(prefix="sec-review-verifier-") as tempdir,
         materialized_memory_view() as memory_path_view,
     ):
-        trajectory_paths = prepare_verification_trajectory(
-            verifier_artifacts_path=verifier_artifacts_path,
-            published_trajectory_path=published_trajectory_path,
-            attempt_label=attempt_label,
+        trajectory_paths = review_trajectory_outputs(
+            trajectory_path(
+                verifier_artifacts_path / "trajectories", name=attempt_label
+            ),
+            published_trajectory_path,
         )
 
         workspace_path = Path(tempdir)
@@ -154,27 +156,6 @@ def reset_verification_attempt_artifacts(
         )
         for trajectory_attempt in trajectory_attempts
     )
-
-
-def prepare_verification_trajectory(
-    *,
-    verifier_artifacts_path: Path,
-    published_trajectory_path: Path | None,
-    attempt_label: str,
-) -> tuple[Path, ...]:
-    """Return local and optional published outputs for this verification attempt.
-
-    Remove any old published copy; the runtime writer initializes the returned files.
-    """
-    local_trajectory_path = trajectory_path(
-        verifier_artifacts_path / "trajectories",
-        name=attempt_label,
-    )
-    if published_trajectory_path is None:
-        return (local_trajectory_path,)
-
-    published_trajectory_path.unlink(missing_ok=True)
-    return (local_trajectory_path, published_trajectory_path)
 
 
 # Result validation and persistence

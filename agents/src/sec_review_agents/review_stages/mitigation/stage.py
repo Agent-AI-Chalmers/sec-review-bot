@@ -19,6 +19,7 @@ from sec_review_agents.review_stages.feedback_loop import (
 from sec_review_agents.review_stages.mitigation.result import (
     MitigationStageResult,
 )
+from sec_review_agents.review_stages.trajectories import review_trajectory_outputs
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 from sec_review_agents.runtime.setup_bootstrap import (
     bootstrap_environment,
@@ -74,10 +75,11 @@ async def run_mitigation_stage(
             tar_path=workspace_snapshot_tar_path,
             destination_path=workspace_path,
         )
-        trajectory_paths = prepare_mitigation_trajectory(
-            mitigator_artifacts_path=mitigator_artifacts_path,
-            published_trajectory_path=published_trajectory_path,
-            attempt_label=attempt_label,
+        trajectory_paths = review_trajectory_outputs(
+            trajectory_path(
+                mitigator_artifacts_path / "trajectories", name=attempt_label
+            ),
+            published_trajectory_path,
         )
         # Setup and the agent may move HEAD; delivery stays anchored to this seed.
         baseline_commit = resolve_workspace_commit(workspace_path)
@@ -178,27 +180,6 @@ def reset_mitigation_attempt_artifacts(
         )
         for trajectory_attempt in trajectory_attempts
     )
-
-
-def prepare_mitigation_trajectory(
-    *,
-    mitigator_artifacts_path: Path,
-    published_trajectory_path: Path | None,
-    attempt_label: str,
-) -> tuple[Path, ...]:
-    """Return local and optional published outputs for this mitigation attempt.
-
-    Remove any old published copy; the runtime writer initializes the returned files.
-    """
-    local_trajectory_path = trajectory_path(
-        mitigator_artifacts_path / "trajectories",
-        name=attempt_label,
-    )
-    if published_trajectory_path is None:
-        return (local_trajectory_path,)
-
-    published_trajectory_path.unlink(missing_ok=True)
-    return (local_trajectory_path, published_trajectory_path)
 
 
 # Result persistence
