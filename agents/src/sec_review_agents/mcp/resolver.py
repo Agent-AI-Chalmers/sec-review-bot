@@ -8,41 +8,31 @@ from sec_review_agents.mcp.playwright import playwright_mcp_connections_for_back
 CODEGRAPH_MCP_TOOL = "codegraph"
 PLAYWRIGHT_MCP_TOOL = "playwright"
 
-_AGENT_MCP_RESOLVERS: dict[str, Callable[[Any], Callable[[], Any]]] = {
-    CODEGRAPH_MCP_TOOL: lambda backend: (
-        lambda: codegraph_mcp_connections_for_backend(backend)
-    ),
-    PLAYWRIGHT_MCP_TOOL: lambda backend: (
-        lambda: playwright_mcp_connections_for_backend(backend)
+# Look builders up at call time so tests can patch the module attributes.
+_AGENT_MCP_CONNECTIONS: dict[str, Callable[[Any], dict[str, Any]]] = {
+    CODEGRAPH_MCP_TOOL: lambda backend: codegraph_mcp_connections_for_backend(backend),
+    PLAYWRIGHT_MCP_TOOL: lambda backend: playwright_mcp_connections_for_backend(
+        backend
     ),
 }
-
-
-def resolve_agent_mcp_connection_factories(
-    tool_names: tuple[str, ...],
-    backend: Any,
-) -> list[Callable[[], Any]]:
-    factories: list[Callable[[], Any]] = []
-    for tool_name in tool_names:
-        # This is an allowlist resolver, not MCP discovery. Agent declarations
-        # name project-owned integrations; each name must map to explicit code.
-        resolver = _AGENT_MCP_RESOLVERS.get(tool_name)
-        if resolver is None:
-            raise ValueError(f"Unknown agent MCP tool: {tool_name}")
-        factories.append(resolver(backend))
-    if not agent_mcp_enabled():
-        return []
-    return factories
 
 
 def resolve_agent_mcp_connections(
     tool_names: tuple[str, ...],
     backend: Any,
 ) -> dict[str, Any]:
+    # This is an allowlist resolver, not MCP discovery. Agent declarations name
+    # project-owned integrations; each name must map to explicit code. Unknown
+    # names fail even when MCP is globally disabled.
+    builders = []
+    for tool_name in tool_names:
+        builder = _AGENT_MCP_CONNECTIONS.get(tool_name)
+        if builder is None:
+            raise ValueError(f"Unknown agent MCP tool: {tool_name}")
+        builders.append(builder)
+    if not agent_mcp_enabled():
+        return {}
     connections: dict[str, Any] = {}
-    for connection_factory in resolve_agent_mcp_connection_factories(
-        tool_names,
-        backend,
-    ):
-        connections.update(connection_factory())
+    for builder in builders:
+        connections.update(builder(backend))
     return connections
