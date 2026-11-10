@@ -17,7 +17,7 @@ import type { Run, RunEvent } from '../api.js'
 import { formatDate, useLanguage, useMessages } from '../../../shared/i18n.js'
 import { axisLabel } from '../status.js'
 import { useNow } from '../../../shared/useNow.js'
-import { type StateAxis } from '../state-machines.generated.js'
+import type { DiagrammedAxis } from './state-machine-layout.js'
 import { failureCodeLabel, formatDuration } from '../format.js'
 import {
   TRANSITIONS_PAGE_SIZE,
@@ -78,7 +78,7 @@ export function RunTransitions({
   const t = useMessages()
   const { language } = useLanguage()
   const [opened, setOpened] = React.useState(false)
-  const [axis, setAxis] = React.useState<StateAxis>(() =>
+  const [axis, setAxis] = React.useState<DiagrammedAxis>(() =>
     latestTransitionAxis(events)
   )
   const [page, setPage] = React.useState(1)
@@ -126,7 +126,7 @@ export function RunTransitions({
           <SegmentedControl
             fullWidth
             value={axis}
-            onChange={(value) => setAxis(value as StateAxis)}
+            onChange={(value) => setAxis(value as DiagrammedAxis)}
             data={machines.map((candidate) => ({
               value: candidate.axis,
               label: machineTitle(candidate, t)

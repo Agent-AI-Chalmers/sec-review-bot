@@ -64,6 +64,12 @@ async function createQueuedRun(
   return runId
 }
 
+/** Machines whose transitions are written to the run event log. Publication steps are not, so
+ * their edges are pinned by publication-step-edges.test.ts instead. */
+const AUDITED_MACHINES = STATE_MACHINES.filter(
+  (machine) => machine.axis !== 'publication_step'
+)
+
 function declaredEdges(axis: StateAxis): Set<string> {
   const machine = STATE_MACHINES.find((candidate) => candidate.axis === axis)
   assert.ok(machine, `the contract declares an ${axis} machine`)
@@ -792,7 +798,10 @@ function recordEveryPathOnce(): Promise<RecordedEdge[]> {
 test('every transition a run records is declared in the contract', async () => {
   const recorded = await recordEveryPathOnce()
   const declared = new Map(
-    STATE_MACHINES.map((machine) => [machine.axis, declaredEdges(machine.axis)])
+    AUDITED_MACHINES.map((machine) => [
+      machine.axis,
+      declaredEdges(machine.axis)
+    ])
   )
   for (const { axis, edge } of recorded) {
     assert.ok(
@@ -814,7 +823,7 @@ test('every declared edge is reachable by a write path', async () => {
     edges.add(edge)
     observed.set(axis, edges)
   }
-  for (const machine of STATE_MACHINES) {
+  for (const machine of AUDITED_MACHINES) {
     for (const edge of declaredEdges(machine.axis)) {
       assert.ok(
         observed.get(machine.axis)?.has(edge),
@@ -833,7 +842,7 @@ test('every declared edge is reachable by a write path', async () => {
  * A `null` entry means the edge deliberately accepts any reason (a connector-supplied code). */
 function declaredReasons(): Map<string, Array<string | null>> {
   const reasons = new Map<string, Array<string | null>>()
-  for (const machine of STATE_MACHINES) {
+  for (const machine of AUDITED_MACHINES) {
     for (const edge of machine.transitions) {
       const key = `${machine.axis} ${edge.from}->${edge.to}`
       const existing = reasons.get(key) ?? []

@@ -5,7 +5,10 @@ import {
   type StateMachine as StateMachineDefinition
 } from '../state-machines.generated.js'
 import type { Message } from '../../../shared/i18n.js'
-import { DIAGRAMMED_AXES } from './state-machine-layout.js'
+import {
+  isDiagrammedAxis,
+  type DiagrammedAxis
+} from './state-machine-layout.js'
 
 export const TRANSITIONS_PAGE_SIZE = 12
 
@@ -67,7 +70,7 @@ export function actualTransitions(events: RunEvent[]): RunEvent[] {
   return events.filter((event) => event.from_status !== null)
 }
 
-export function latestTransitionAxis(events: RunEvent[]): StateAxis {
+export function latestTransitionAxis(events: RunEvent[]): DiagrammedAxis {
   let latest: RunEvent | undefined
   for (const event of events) {
     if (event.from_status === null) continue
@@ -138,12 +141,7 @@ export function transitionDuration(
     }
   }
   const machine = machines.find((candidate) => candidate.axis === event.axis)
-  const summary =
-    event.axis === 'preparation'
-      ? run.preparation
-      : event.axis === 'execution'
-        ? run.execution
-        : run.publication
+  const summary = run[event.axis]
   if (
     summary.finished_at !== null ||
     (machine !== undefined && machine.terminal.includes(event.to_status))
@@ -155,9 +153,13 @@ export function transitionDuration(
   }
 }
 
+export type DiagrammedMachine = StateMachineDefinition & {
+  axis: DiagrammedAxis
+}
+
 /** The machines the console draws, in presentation order. */
-export function diagrammedMachines(): readonly StateMachineDefinition[] {
-  return STATE_MACHINES.filter((machine) =>
-    (DIAGRAMMED_AXES as readonly string[]).includes(machine.axis)
+export function diagrammedMachines(): readonly DiagrammedMachine[] {
+  return STATE_MACHINES.filter((machine): machine is DiagrammedMachine =>
+    isDiagrammedAxis(machine.axis)
   )
 }

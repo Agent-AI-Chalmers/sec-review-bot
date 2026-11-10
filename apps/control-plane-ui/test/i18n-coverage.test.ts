@@ -10,7 +10,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { STATE_MACHINES } from '../browser/features/runs/state-machines.generated.js'
+import { diagrammedMachines } from '../browser/features/runs/detail/transitions.js'
 import { messages } from '../browser/shared/i18n.js'
 
 test('an edge pair the contract has not split is worded for all of its decisions', () => {
@@ -22,7 +22,7 @@ test('an edge pair the contract has not split is worded for all of its decisions
   // itself. This pins the set of pairs known to be collapsed, so a future decision added to an
   // existing pair shows up here instead of silently losing its label.
   const collapsed: string[] = []
-  for (const machine of STATE_MACHINES) {
+  for (const machine of diagrammedMachines()) {
     const decisions = new Map<string, number>()
     for (const edge of machine.transitions) {
       const pair = `${machine.axis} ${edge.from}->${edge.to}`
@@ -39,7 +39,7 @@ test('an edge pair the contract has not split is worded for all of its decisions
 test('every state-machine label has a key in both languages', () => {
   for (const language of ['en', 'zh'] as const) {
     const table = messages[language] as Record<string, string>
-    for (const machine of STATE_MACHINES) {
+    for (const machine of diagrammedMachines()) {
       const required = [
         `machine_${machine.axis}_title`,
         ...machine.states.flatMap((state) => [

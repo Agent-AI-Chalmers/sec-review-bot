@@ -134,19 +134,21 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  steppending[pending] --> runningstep[running] --> stepsucceeded[succeeded]
-  runningstep --> stepfailed[failed]
-  stepfailed --> runningstep
-  runningstep -->|终态错误| terminalfailed[terminal_failed]
-  stepfailed -->|尝试次数用尽| stepuncertain[uncertain]
-  runningstep -->|尝试次数用尽| stepuncertain
+  steppending[pending] -->|开始尝试| runningstep[running]
+  runningstep -->|副作用已写入| stepsucceeded[succeeded]
+  runningstep -->|可重试失败| stepfailed[failed]
+  stepfailed -->|开始重试| runningstep
+  runningstep -->|终态失败| terminalfailed[terminal_failed]
+  runningstep -->|尝试次数用尽| stepuncertain[uncertain]
+  stepfailed -->|尝试次数用尽| stepuncertain
   stepuncertain -->|核对确认远端存在| stepsucceeded
-  stepuncertain -->|核对确认远端不存在| terminalfailed
+  stepuncertain -->|核对确认远端不存在或终态失败| terminalfailed
+  stepuncertain -->|上报失败但未要求重试| stepfailed
   stepuncertain -->|核对预算用尽| stepdisconnected[disconnected]
   stepdisconnected -->|操作员恢复| steppending
 ```
 
-_图中省略了两条只记录审计事件、不改变状态的自环：execution 的 `uncertain → uncertain`（领取重放）和 publication 的 `publishing → publishing`（发布租约过期）。_
+_图中省略了四条不改变状态的自环：execution 的 `uncertain → uncertain`（领取重放）和 publication 的 `publishing → publishing`（发布租约过期）只记录审计事件；publication step 的 `running → running`（新 owner 接管）和 `uncertain → uncertain`（核对无结论）只推进尝试或核对计数。_
 
 各轴之间由三个跨轴触发连接。它们是 orchestration trigger，不是同一张表内的状态迁移：
 

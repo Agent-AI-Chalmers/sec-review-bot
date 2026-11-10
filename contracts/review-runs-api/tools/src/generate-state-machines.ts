@@ -20,7 +20,8 @@ const SPEC_PATH = path.resolve(
   'openapi.yaml'
 )
 
-export type StateAxis = 'preparation' | 'execution' | 'publication'
+export type StateAxis =
+  'preparation' | 'execution' | 'publication' | 'publication_step'
 
 export interface StateTransition {
   from: string
@@ -57,7 +58,12 @@ export interface StateMachine {
   transitions: StateTransition[]
 }
 
-const AXES: readonly StateAxis[] = ['preparation', 'execution', 'publication']
+const AXES: readonly StateAxis[] = [
+  'preparation',
+  'execution',
+  'publication',
+  'publication_step'
+]
 
 /** Read and validate the `x-state-machines` block. Validation here is deliberately strict:
  * a generator that silently accepts a malformed machine would produce a diagram that no
