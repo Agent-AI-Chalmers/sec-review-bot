@@ -21,10 +21,7 @@ const SPEC_PATH = path.resolve(
 )
 
 export type StateAxis =
-  | 'preparation'
-  | 'execution'
-  | 'publication'
-  | 'publication_step'
+  'preparation' | 'execution' | 'publication' | 'publication_step'
 
 export interface StateTransition {
   from: string
