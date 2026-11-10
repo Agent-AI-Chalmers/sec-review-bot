@@ -58,17 +58,3 @@ def build_verification_stage_result(
         regression=regression,
         residual_risks=residual_risks,
     )
-
-
-def build_skipped_verification_result(*, reason: str) -> VerificationStageResult:
-    return VerificationStageResult(
-        overview=reason,
-        target_claim=None,
-        coverage=None,
-        next_step="none",
-        findings=[],
-        evidence=[],
-        validation_level=None,
-        regression=None,
-        residual_risks=[],
-    )
