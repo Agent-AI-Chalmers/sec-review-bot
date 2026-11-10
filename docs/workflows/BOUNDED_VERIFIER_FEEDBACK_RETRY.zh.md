@@ -6,17 +6,12 @@
 
 ## 概要
 
-本文说明共享审查工作流中，由 Verifier 反馈驱动的有限重试机制。
+基础下游路径是 `analyzer -> mitigator -> verifier`。如果 Verifier 在修复尝试中发现具体、可修复的问题，工作流可以执行有限的反馈重试：
 
-基础下游路径是：
+- `analyzer -> mitigator -> verifier -> [feedback-guided mitigator -> verifier] * k`
 
-- `analyzer -> mitigator -> verifier`
-
-如果验证发现具体且可修复的问题，工作流可以再执行修复和验证：
-
-- `analyzer -> mitigator(pass1) -> verifier(pass1) -> mitigator(pass2) -> verifier(pass2)`
-
-反馈重试有明确的次数上限，避免修复与验证反复执行而无法结束。次数及实现位置见下文“重试次数上限”。
+<!-- doc-default: MAX_FEEDBACK_RETRY_ATTEMPTS; source=agents/src/sec_review_agents/review_stages/feedback_loop.py -->
+代码常量 `MAX_FEEDBACK_RETRY_ATTEMPTS` 将 `k` 限制为 `1`。这不是部署配置项。修改上限需要同时考虑上下文增长、耗时和模型成本，并重新运行针对 agent 行为的聚焦验证。
 
 ## 为什么需要反馈重试
 
@@ -44,33 +39,8 @@ Verifier 反馈来自模型判断，其证据强度通常弱于失败的 PoC、�
 - Analyzer 的结论不会阻止后续修复和验证阶段运行。
 - Mitigator 根据证据决定是否修改代码；没有安全、合理的方案时可以不修改。
 - Verifier 独立核查问题是否成立，以及修复处理是否合理；没有补丁也会核查。
-- Verifier 找到具体、可修复的问题时，可以请求再试一次。重试优先处理验证指出的问题，保留原分析作为上下文，不重新运行 Analyzer。
-
-### 正常路径
-
-- `analyzer -> mitigator -> verifier`
-
-第一次验证结果无需后续动作时，不安排反馈重试，继续组装结果及执行后续交付步骤。
-
-### 重试路径
-
-- `analyzer -> mitigator(pass1) -> verifier(pass1) -> mitigator(retry) -> verifier(retry)`
-
-Mitigator 参考前一次修复结果和验证反馈，从准备好的原始工作区重新生成补丁，不在旧补丁上继续叠加修改。它先核查验证指出的问题，再根据代码和执行证据决定是否修改、如何修改。重试仍受原审查任务的范围约束。
-
-### 重试次数上限
-
-有限重试可表示为：
-
-- `analyzer -> mitigator -> verifier -> [feedback-guided mitigator -> verifier] * k`
-
-其中：
-
-- `k` 表示额外执行修复和验证的重试次数
-- 代码常量 `MAX_FEEDBACK_RETRY_ATTEMPTS` 约束 `k` 的上限
-
-<!-- doc-default: MAX_FEEDBACK_RETRY_ATTEMPTS; source=agents/src/sec_review_agents/review_stages/feedback_loop.py -->
-代码常量 `MAX_FEEDBACK_RETRY_ATTEMPTS` 将额外重试限制为 `1` 次，即 `k <= 1`。这不是部署配置项。修改上限需要同时考虑上下文增长、耗时和模型成本，并重新运行针对 agent 行为的聚焦验证。
+- 只有 `next_step=retry-ai` 才会安排重试（见[验证后如何决定下一步](#验证后如何决定下一步)）；其他结果继续组装结果及执行后续交付步骤。
+- 重试只重新执行修复和验证，不重新运行 Analyzer，原分析仍界定审查范围。Mitigator 从准备好的原始工作区重新生成补丁，并优先处理验证指出的问题。
 
 ## 验证后如何决定下一步
 
@@ -163,36 +133,9 @@ Verifier 分别输出：
 
 再次执行的 Verifier 默认不重做完整的 Analyzer 调查。先前的 Verifier 判断用于保持调查连贯，不是必须服从的权威。新补丁和当前仓库证据仍是本次验证的依据。
 
-## 历史记录如何保留和传递
+### 历史记录如何保留
 
-workflow 可以在本地保留完整重试历史，但 Agent 应只接收适合当前任务的 **history projection**。
-
-workflow 应保留：
-
-- 初次修复和验证结果；
-- 后续重试；
-- 重试触发原因。
-
-完整历史用于：
-
-- 审计；
-- 比较初次与修订后的结果；
-- 下游检查。
-
-传给 Mitigator 的 history projection 应围绕：
-
-- 原 Analyzer 的审查范围；
-- 最新 Verifier 反馈；
-- 前一次修复尝试做了什么、改了哪些文件；
-- 更早 Verifier 指出的补丁问题，以精简历史呈现。
-
-传给 Verifier 的 history projection 应围绕：
-
-- 当前补丁和仓库证据；
-- 前一次 Verifier 指出的补丁问题；
-- 判断这些问题已解决、仍然存在或已被取代所需的上下文。
-
-较早的 Verifier 历史应按结构整理摘要，而不是盲目重放完整报告。
+workflow 保留完整重试历史（初次结果、后续重试和重试触发原因），用于审计和下游检查。Agent 只接收上文所述的 history projection；较早的 Verifier 历史按结构整理摘要，而不是重放完整报告。
 
 ## 设计适用范围
 

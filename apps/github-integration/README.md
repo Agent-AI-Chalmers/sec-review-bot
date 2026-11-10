@@ -34,7 +34,7 @@ pnpm run test:integration
 
 ## Local Receiver
 
-A complete review also needs the execution gateway and worker. To run the whole stack locally, use the repository-level Docker Compose deployment. The commands below only start the GitHub Integration service.
+A complete review also needs the execution gateway and worker. To run the whole stack locally, use the repository-level Docker Compose deployment. This section covers only the GitHub Integration service.
 
 For non-Compose startup, fill `apps/github-integration/.env` from `apps/github-integration/.env.sample`; at minimum set `APP_ID`, `PRIVATE_KEY_PATH`, `WEBHOOK_SECRET`, `REVIEW_RUNS_SERVICE_URL`, and `REVIEW_RUNS_SERVICE_TOKEN`.
 
@@ -44,49 +44,13 @@ When `SEC_REVIEW_ARTIFACT_STORE=s3`, configure the bucket and AWS credentials. `
 
 `REVIEW_RUNS_REQUEST_TIMEOUT_MS` bounds every Review Runs request and defaults to 30 seconds. In particular, a publication lease renewal that fails or times out is treated as lost ownership: the publisher stops before starting another GitHub mutation and leaves recovery to lease takeover.
 
-```bash
-pnpm run server
-```
-
-Development mode:
-
-```bash
-pnpm run dev
-```
-
-Local URLs:
-
-```text
-http://localhost:30000/api/webhook
-http://localhost:30000/api/repository-review/dispatch
-```
-
-If you do not have a public HTTPS address locally, use `smee`:
-
-```bash
-npx smee -u https://smee.io/your-channel -t http://localhost:30000/api/webhook
-```
-
-GitHub references:
-
-- GitHub App quickstart:
-  - <https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/quickstart>
-- GitHub webhook app guide:
-  - <https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/building-a-github-app-that-responds-to-webhook-events>
-
-If you already have a domain, you can also use Cloudflare Tunnel to route a public address to the local service.
-
-For local GitHub App webhook routing and repository review requests from GitHub Actions, see the [local GitHub inbound setup guide](../../docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md).
+Start it with `pnpm run server`, or `pnpm run dev` for development. It listens on `http://localhost:30000/api/webhook` for GitHub App webhooks and on `http://localhost:30000/api/repository-review/dispatch` for repository review requests from GitHub Actions. To expose these endpoints to GitHub through `smee` or Cloudflare Tunnel, see the [local GitHub inbound setup guide](../../docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md).
 
 ## Role
 
 - Read GitHub App metadata and installation identity
-
-- Receive GitHub webhooks
-- Receive repository review HTTP requests from GitHub Actions and authenticate them with OIDC
-
+- Receive GitHub webhooks, and repository review HTTP requests from GitHub Actions authenticated with OIDC
 - Prepare issue, pull request, and repository review inputs
-
 - Submit prepared inputs to Review Runs and claim publication work
 - Publish structured results back to GitHub
 

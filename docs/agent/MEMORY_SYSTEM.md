@@ -75,11 +75,12 @@ Roughly, the flow is a set of asynchronous checks:
 - Source: after an issue or pull-request review publishes trajectories, the review enters asynchronous memory processing. Repository review contributes one extraction unit per case whose trajectories exist.
 - Extraction processes each review independently and produces pending observations.
   - Multiple extractions can run concurrently.
+<!-- doc-default: MEMORY_MAINTENANCE_SCHEDULE_DEFAULT_INTERVAL_SECONDS; source=agents/src/sec_review_agents/entrypoints/memory_maintenance_worker/schedules.py -->
+<!-- doc-default: MEMORY_MAINTENANCE_PENDING_THRESHOLD; source=agents/src/sec_review_agents/workflows/memory/maintenance.py -->
+<!-- doc-default: MEMORY_MAINTENANCE_PENDING_MAX_AGE; source=agents/src/sec_review_agents/workflows/memory/maintenance.py -->
 - Maintenance checks periodically and runs when the threshold or age condition is met: the maintenance trigger schedule runs every hour by default. It starts maintenance only when at least 10 observations are pending, or when the oldest pending observation has waited at least one day.
   - Maintenance does not run in parallel; only one maintenance run exists at a time, though one run may process multiple observations.
   - `processed` means reviewed and handled. It does not mean the experience was necessarily absorbed into memory.
-
-> The threshold of 10 is an empirical design choice and can be adjusted.
 
 ## Governance
 
@@ -87,45 +88,31 @@ Memory does not make extracted experience trustworthy by itself. Important exper
 
 Memory should stay small and inspectable. Once it becomes a pile of notes, it should be cleaned up by merging, rewriting, and deleting, or important material should be promoted into prompts, skills, or other stronger surfaces.
 
-> Note: for a **formal product**, this behavior needs caution even from a prompt-engineering perspective, because the improvement has to be demonstrated. But for a personal assistant agent, automatic skill generation can be considered; in that setting it can become a good self-governing system.
-
 Retrieval belongs on purpose-built systems once material has outgrown memory. Customer records, user profiles, and documentation corpora need explicit schema, owners, permissions, retention policy, evaluation, and operating procedures; search or RAG does not make an oversized memory tree healthy.
 
 `MEMORY.md` has a startup-injection cap. Exceeding that cap means memory already needs cleanup: maintenance should shorten the index and move details down into topic files, rather than treating truncation as a normal retrieval path.
 
 ## Design Tradeoffs
 
+Each choice below fits this project's scenario: many concurrent review agents collecting security-review experience. A different scenario can reasonably choose otherwise.
+
 ### No User Preference Records
 
-The most typical example is Hermes Agent. It has `USER.md`, a file for recording user preferences and identity information. But this project is about code review, so there is no need to maintain so-called user preferences.
-
----
-
-If the scenario changes, this can be added naturally: `USER.md` plus a `preference/` directory would be enough.
+Systems such as Hermes Agent keep a `USER.md` for user preferences and identity. Code review has no user to profile, so this project does not. If the scenario changes, a `USER.md` plus a `preference/` directory would be enough.
 
 ### No Hot Read/Write
 
-This project does not put memory writes on the main agents' critical path. There are two core reasons:
+Memory writes stay off the main agents' critical path for two reasons:
 
-1. Multi-agent concurrency. When multiple reviews, stage agents, or repository cases run at the same time, direct writes to long-term memory would create immediate write-conflict problems. File-based memory is especially exposed to this. Even if file locks serialize writes, lock waiting and write latency would be brought back into the main flow.
-2. There is no supervisor here, and a single agent does not have a global view. By itself, it is usually hard for one agent to stably produce long-term experience of sufficient quality.
+1. Concurrency. Many review tasks run at once, each with several stage agents. If they all wrote directly to file-based memory, they would conflict; locking would queue the writes and bring lock waits and write latency back into the main flow.
+2. No supervisor. A single stage agent lacks a global view and rarely produces durable experience of sufficient quality alone.
 
-Therefore, the current implementation only lets main agents leave trajectories, while experience writing, filtering, and merging live in asynchronous extraction / maintenance workflows. This sacrifices some immediate memory experience, but gives clearer sources, a more stable main flow, and memory updates that are easier to audit and roll back.
+Main agents therefore leave only trajectories, and asynchronous extraction and maintenance write memory. This gives up immediate recall in exchange for clearer sources, a stable main flow, and memory updates that are easy to audit and roll back.
 
----
+Hot read/write becomes reasonable when there is a single foreground agent or session, a real supervisor, and memory also holds user preferences. These conditions usually appear together in personal assistant and coding agents.
 
-But this must always be judged against the scenario. For example, consider these conditions:
+### Not Built
 
-- there is only one foreground agent/session
-- there really is a supervisor
-- memory is not only collecting experience, but also collecting user preferences
-
-Under these conditions, hot read/write can be considered.
-
-These three conditions usually appear together in personal assistant agents / coding agents.
-
-### Other
-
-- No complex DB or vector retrieval
-- No `session_search` that allows agents to query details from previous conversations
-- Automatic skill generation is feasible for personal agents, but questionable for formal products; see the governance section above
+- No vector retrieval.
+- No `session_search` for querying earlier conversations.
+- No automatic skill generation. It can work for a personal agent, but a formal product must first demonstrate that each generated change is an improvement.

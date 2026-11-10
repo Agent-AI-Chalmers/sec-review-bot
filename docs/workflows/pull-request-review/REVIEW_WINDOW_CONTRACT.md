@@ -33,18 +33,9 @@ For a given run, the candidate windows are:
 | Full PR | `base_sha...head_sha` | Everything the pull request introduces relative to the merge base. |
 | Push | `previous_head_sha..head_sha` | Only the commits added by the `synchronize` event that triggered this run. |
 
-`previous_head_sha` comes from the [`before` field of the `pull_request` webhook](https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request). The `synchronize` payload type requires both `after` and `before`, as pinned in this repository's `@octokit/openapi-webhooks-types` dependency:
+`previous_head_sha` comes from the [`before` field of the `pull_request` webhook](https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request). The `synchronize` payload type in this repository's `@octokit/openapi-webhooks-types` dependency requires both `after` and `before`.
 
-```ts
-"webhook-pull-request-synchronize": {
-  action: "synchronize";
-  after: string;
-  before: string;
-  ...
-}
-```
-
-That type is the only normative statement available. The webhook documentation says nothing about what `before` means when the branch was force-pushed, and the [compare endpoint](https://docs.github.com/en/rest/commits/commits#compare-two-commits) documents its own `basehead` parameter but not the reachability of the commits behind it.
+That type is the only normative statement available. The webhook documentation says nothing about what `before` means when the branch was force-pushed, and the [compare endpoint](https://docs.github.com/en/rest/commits/commits#compare-two-commits) documents the format of its `basehead` parameter but not whether a commit discarded by a force-push can still be compared.
 
 ## Measured API Behavior
 

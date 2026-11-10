@@ -203,6 +203,8 @@ Therefore, batch is better treated as a latency workaround, not the default shap
 
 Do not describe this batch design as a solution for huge input too early. If refinement still needs to read all item payloads, batch only reduces draft invoke input size and reasoning time. It does not remove the problem that final global audit faces all items.
 
+Model strength and single versus batch have no fixed best choice for this grouping task: a stronger model is not necessarily better, and fewer groups can mean either correct merging or harmful over-merge. Choose them by testing on representative inputs and inspecting group quality, not by group count alone.
+
 ### Batch Refinement Context
 
 When a stage uses batch draft followed by global refinement, the system can provide a lightweight draft origin list in the refinement user prompt to help the agent prioritize cross-local-context boundary checks.
@@ -252,81 +254,3 @@ Stages that allow discarding items need `suppress` groups:
 | A suppressed item should be restored | Update a normal group's item_ids to take it, or delete the `suppress` group so it becomes unprocessed. | update_group(item_ids=[...]) or delete_group |
 
 Prompts may keep using these grouping intents to help the agent understand the task. Tools should still expose group reading, constraints checking, single group CRUD, and batch group CRUD. Completion is expressed through structured completion response.
-
-## Appendix
-
-### Delivery Planning Experiment Notes
-
-The following records a comparison experiment for bookshop repository delivery planning on a 53-item input. The goal was not to rank models permanently, but to understand single / batch and flash / pro tradeoffs in the current workflow design.
-
-Experiment setup:
-
-- `single-flash`: single draft + refinement, using flash model.
-- `single-pro`: single draft + refinement, using pro model.
-- `batch-flash`: two parallel batch drafts + global refinement, using flash model.
-- `batch-pro`: two parallel batch drafts + global refinement, using pro model.
-
-| Experiment | Passes | Wall time | Total tokens | AI messages | Deliveries | Notes |
-| --- | ---: | ---: | ---: | ---: | ---: | --- |
-| `batch-flash` | 3 | ~2m58s | 285k | 13 | 27 | Fastest; controlled cost; minor over-merge caused by batch boundary. |
-| `batch-pro` | 3 | ~9m00s | 268k | 12 | 26 | Token no longer exploded, but quality was worse, leaving multiple bridge / transitive merges. |
-| `single-flash` | 2 | ~3m59s | 449k | 12 | 28 | Good quality; refinement read two patches, increasing token use. |
-| `single-pro` | 2 | ~15m06s | 272k | 9 | 29 | Best and most conservative quality, but highest wall time. |
-
-Notes:
-
-- Batch wall time is end-to-end: two drafts run in parallel, taking the slower draft time, plus global refinement.
-- `single-flash` token count was high mainly because refinement inspected patches.
-- `batch-pro` problem was not token count but quality: it was more likely to create transitive merges through bridge cases.
-
-Main quality observations:
-
-- `single-pro` was the quality ceiling in this run; `single-flash` was close and faster.
-- `batch-flash` was the most promising batch shape: fast and cheap, but needs refinement to better correct batch-boundary loss.
-- The `batch-pro` result in this experiment did not justify selecting it as the default; it corrected one smaller cookie over-merge but left more serious checkout / JWT / addReview bridge merges.
-- Delivery count alone is not a quality metric. Fewer deliveries can be effective merging or harmful over-merge.
-
-Short-term strategy from this run:
-
-- Use `single` as the quality baseline.
-- Do not enable batch by default when a faster model's single run is already fast enough.
-- Use batch as a latency workaround only when single wall time or single-pass burden is unacceptable.
-- `batch draft + full global refinement` cannot claim to solve huge input, because refinement still needs global evidence.
-
-### Triage Experiment Notes
-
-The following records an intermediate comparison experiment for bookshop repository triage on a 95-candidate input. It happened before later prompt tightening, so it is better treated as workflow observation than final quality conclusion.
-
-Experiment setup:
-
-- `single-flash`: single draft + refinement, using flash model.
-- `single-pro`: single draft, using pro model.
-- `batch-flash`: multiple parallel batch drafts + global refinement, using flash model.
-- `batch-pro`: multiple parallel batch drafts + global refinement, using pro model.
-
-| Experiment | Passes | Wall time | Total tokens | AI messages | Keep cases | Suppressed | Notes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `batch-flash` | 5 | ~2m36s | 434k | 20 | 62 | 27 | Fastest; controlled cost, but refinement still had cost. |
-| `batch-pro` | 5 | ~12m03s | 476k | 22 | 45 | 25 | Slower than flash, more conservative output, still needed cross-batch boundary checks. |
-| `single-flash` | 2 | ~3m40s | 492k | 11 | 73 | 22 | Acceptable speed, but tends to keep more independent cases. |
-| `single-pro` | 1 | ~12m08s | 333k | 7 | 33 | 42 | Most aggressive, suppressing and merging more candidates; needs human confirmation for overreach. |
-
-Notes:
-
-- Batch wall time is end-to-end: batch drafts run in parallel, followed by global refinement.
-- Triage case count is harder to interpret than delivery planning count: fewer cases may be correct dedup / suppress, or over-suppress / over-merge; more cases may be conservative, or missed merge.
-- Batch's main purpose remains reducing single-round input size and wall time. One side effect in triage is reducing the chance that a single pass over many candidates over-merges by broad theme; the cost is more cross-batch missed merge or mistaken split, so global refinement remains necessary.
-
-Main quality observations:
-
-- `single-flash` tends to keep more cases and is useful as a conservative baseline, but may retain weak companion, schema/client-only, or generalized hardening candidates.
-- `single-pro` tends toward stronger compression and can reduce noise, but needs more caution for over-suppress and cross-boundary merge.
-- `batch-flash` balances speed and quality; it suggests triage batch is not only a latency workaround, but also changes grouping tendency when the model faces large input.
-- `batch-pro` did not clearly become the quality ceiling; a stronger model is not necessarily better for this grouping task.
-
-Short-term strategy from this run:
-
-- Triage should clearly explain "same root issue / direct call chain / same sink or trust failure" while avoiding unfamiliar concepts and excessive rule enumeration.
-- For triage, batch can reduce single-round input pressure; reducing broad-theme over-merge is only a side effect and cannot replace refinement.
-- Do not judge quality only by keep case count; inspect whether suppressed candidates are reasonable, same root issues are merged, and independent sinks are incorrectly merged.
-- In the current shape, `single-flash` and `batch-flash` are both worth keeping as experiment entries; `pro` is better as a comparison point and should not be assumed as default.

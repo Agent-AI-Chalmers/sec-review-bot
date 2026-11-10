@@ -46,11 +46,7 @@ inline suggestion 必须关联 PR diff 中的文件和行区间，不能用来�
 
 #### 1. 解析修复补丁
 
-解析 unified diff，按文件收集：
-
-- `path`；
-- diff hunk 头部的 `old_start`、`old_count`、`new_start`、`new_count`；
-- diff hunk 中的各行内容。
+把 unified diff 解析为按文件分组的 hunk。
 
 #### 2. 筛选 PR 可见文件
 
@@ -67,13 +63,7 @@ inline suggestion 必须关联 PR diff 中的文件和行区间，不能用来�
 
 #### 4. 根据重叠的 PR diff hunk 计算行位置
 
-对每个 suggestion block，在同一文件中寻找与其重叠的 PR diff hunk，并取两者在 PR 当前版本中的重叠行区间：
-
-- `start_line = max(block.start_line, pr_hunk.new_start)`
-- `line = min(block.line, pr_hunk.new_start + pr_hunk.new_count - 1)`
-- `side = RIGHT`
-
-没有有效重叠区间时跳过。`start_line === line` 时提交单行建议；`start_line < line` 时提交多行建议，并附带 `start_line` 和 `start_side`。
+对每个 suggestion block，在同一文件中寻找与其重叠的 PR diff hunk，取两者在 PR 当前版本（右侧）中的重叠行区间作为锚点。没有重叠时跳过；重叠一行时提交单行建议，多行时提交多行建议。
 
 #### 5. 在一次 Review 中发布 inline suggestion
 

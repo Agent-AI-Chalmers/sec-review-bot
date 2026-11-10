@@ -205,6 +205,8 @@ batch 的好处是快，**尤其在慢模型上明显**。但它有实际代价�
 
 也不要过早把这个 batch 设计描述成“解决超大输入”的方案。如果 refinement 仍然需要读全量 item payload，那么 batch 只是降低了单次 draft invoke 的输入规模和推理耗时，并没有消除最终全局审计面对全量 items 的问题。
 
+模型强弱以及 single 还是 batch，在这类分组任务上没有固定的最优选择：更强的模型不一定更好，分组更少既可能是正确合并，也可能是有害的过度合并。应在有代表性的输入上实际测试并检查分组质量后再决定，不要只看分组数量。
+
 ### Batch Refinement Context
 
 当一个阶段用 batch draft 再接 global refinement 时，系统可以在 refinement 的 user prompt 里提供轻量的 draft origin 列表，帮助 agent 优先检查跨局部上下文的边界问题。
@@ -254,81 +256,3 @@ Use this section only to prioritize refinement attention. Groups from different 
 | 一个被压掉的 item 又应该恢复 | 更新正常 group 的 item_ids 接走它，或删除 `suppress` group 让它回到未处理状态。 | update_group(item_ids=[...]) 或 delete_group |
 
 从 prompt 的角度，可以继续使用这些分组意图帮助 Agent 理解任务；从工具的角度，仍然保留 group 读取、constraints 检查、单个 group CRUD 和批量 group CRUD。结束由 structured completion response 表达。
-
-## 附录
-
-### Delivery Planning 实验记录
-
-下面记录的是 bookshop repository delivery planning 在一次 53-item 输入上的对比实验。实验目的不是给模型永久排名，而是帮助理解 single / batch、flash / pro 在当前 workflow 设计下的取舍。
-
-实验设置：
-
-- `single-flash`: single draft + refinement，使用 flash 模型。
-- `single-pro`: single draft + refinement，使用 pro 模型。
-- `batch-flash`: 两个 batch draft 并行 + global refinement，使用 flash 模型。
-- `batch-pro`: 两个 batch draft 并行 + global refinement，使用 pro 模型。
-
-| Experiment | Passes | Wall time | Total tokens | AI messages | Deliveries | Notes |
-| --- | ---: | ---: | ---: | ---: | ---: | --- |
-| `batch-flash` | 3 | ~2m58s | 285k | 13 | 27 | 最快；成本可控；有少量 batch 边界导致的过合并。 |
-| `batch-pro` | 3 | ~9m00s | 268k | 12 | 26 | token 不再爆炸，但质量较差，留下多个 bridge / transitive merge。 |
-| `single-flash` | 2 | ~3m59s | 449k | 12 | 28 | 质量较好；refinement 读了两个 patch，导致 token 偏高。 |
-| `single-pro` | 2 | ~15m06s | 272k | 9 | 29 | 质量最好、最保守，但 wall time 最高。 |
-
-说明：
-
-- batch 的 wall time 按端到端计算：两个 draft 并行，取较慢的 draft 时间，再加 global refinement。
-- `single-flash` 的 token 偏高主要来自 refinement 中的 patch inspection。
-- `batch-pro` 的问题不是 token，而是质量：它更容易通过 bridge case 做 transitive merge。
-
-主要质量观察：
-
-- `single-pro` 是这轮质量上界；`single-flash` 接近它，但更快。
-- `batch-flash` 是最有希望的 batch 形态：快、便宜，但需要 refinement 更好地修正 batch 边界损失。
-- 这轮 `batch-pro` 结果不足以支持将它选为默认；它修正了一个较小的 cookie 过合并，但留下了更严重的 checkout / JWT / addReview bridge 合并。
-- Delivery count 不能单独作为质量指标。数量少可能是有效合并，也可能是 harmful over-merge。
-
-从这轮实验得到的短期策略：
-
-- 以 `single` 作为质量基线。
-- 当较快模型的 single run 已经足够快时，不默认启用 batch。
-- 只有 single 的 wall time 或单次处理负担不可接受时，再把 batch 作为 latency workaround。
-- `batch draft + full global refinement` 不能声称解决了超大输入问题，因为 refinement 仍然需要全局 evidence。
-
-### Triage 实验记录
-
-下面记录的是 bookshop repository triage 在一次 95-candidate 输入上的阶段性对比实验。它发生在后续几轮 prompt 继续收紧之前，因此更适合作为 workflow 观察，而不是最终质量结论。
-
-实验设置：
-
-- `single-flash`: single draft + refinement，使用 flash 模型。
-- `single-pro`: single draft，使用 pro 模型。
-- `batch-flash`: 多个 batch draft 并行 + global refinement，使用 flash 模型。
-- `batch-pro`: 多个 batch draft 并行 + global refinement，使用 pro 模型。
-
-| Experiment | Passes | Wall time | Total tokens | AI messages | Keep cases | Suppressed | Notes |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
-| `batch-flash` | 5 | ~2m36s | 434k | 20 | 62 | 27 | 最快；成本可控，但 refinement 仍有成本。 |
-| `batch-pro` | 5 | ~12m03s | 476k | 22 | 45 | 25 | 比 flash 更慢，输出更保守，仍需要检查跨 batch 边界。 |
-| `single-flash` | 2 | ~3m40s | 492k | 11 | 73 | 22 | 速度可接受，但偏向保留更多独立 case。 |
-| `single-pro` | 1 | ~12m08s | 333k | 7 | 33 | 42 | 最激进，压掉和合并更多 candidate；需要人工确认是否过度。 |
-
-说明：
-
-- batch 的 wall time 按端到端计算：batch draft 并行，之后再加 global refinement。
-- triage 的 case 数量比 delivery planning 更难直接解释：数量少可能是正确去重 / suppress，也可能是 over-suppress 或 over-merge；数量多可能是保守，也可能是漏合并。
-- batch 的主要目的仍是降低单轮输入规模和 wall time。它在 triage 里的一个副作用是减少 single pass 一次看见大量 candidate 时按宽泛主题过度合并的机会；代价是更容易产生跨 batch 漏合并或误分裂，所以 global refinement 必不可少。
-
-主要质量观察：
-
-- `single-flash` 倾向保留更多 case，适合作为保守基线，但可能把弱 companion、schema/client-only 或泛化 hardening 保留下来。
-- `single-pro` 倾向更强压缩，能减少噪声，但更需要警惕 over-suppress 和跨边界合并。
-- `batch-flash` 在速度和质量之间比较均衡；它提示 triage 的 batch 不只是 latency workaround，也会改变模型面对大输入时的分组倾向。
-- `batch-pro` 没有明显成为质量上界；更强模型不一定更适合这个 grouping 任务。
-
-从这轮实验得到的短期策略：
-
-- triage 需要把“同一 root issue / 直接调用链 / 同一 sink 或 trust failure”讲清楚，同时避免陌生概念和过度枚举规则。
-- 对 triage 来说，batch 可以用于降低单轮输入压力；它减少宽泛主题过度合并只是副作用，不能替代 refinement。
-- 不应只用 keep case 数量判断质量；需要看 suppressed 是否合理、同一 root issue 是否合并、独立 sink 是否被错误合并。
-- 在当前形态下，`single-flash` 和 `batch-flash` 都值得保留实验入口；`pro` 更适合做对照，不宜直接假设为默认更好。
