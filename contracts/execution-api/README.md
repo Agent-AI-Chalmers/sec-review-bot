@@ -27,7 +27,7 @@ The following are not stable public APIs:
 - internal Python module paths under `agents`;
 - Temporal workflow names or workflow/stage implementation details;
 - diagnostic stage artifact shapes unless explicitly documented as contract fields;
-- GitHub integration internal orchestration details;
+- GitHub Integration internal orchestration details;
 - non-contract fields used only by publishing strategy or local tooling.
 
 ## Ownership
@@ -46,7 +46,7 @@ Agents are responsible for:
 - producing structured workflow results centered on `review_record` and repository `deliveries[]`;
 - saving artifacts.
 
-The GitHub integration is one implementation of the caller side: it turns GitHub events and publishing rules into execution inputs and result publication.
+The GitHub Integration is one implementation of the caller side: it turns GitHub events and publishing rules into execution inputs and result publication.
 
 This split is also a security boundary. GitHub identity, permissions, API calls, publishing, retry, and audit behavior stay on the caller side. Agents operate inside the Execution API boundary and do not directly control GitHub platform capabilities.
 

@@ -2,7 +2,7 @@
 
 Language: English | [中文](DEPENDENCY_MAINTENANCE.zh.md)
 
-This page describes how this repository handles dependency updates for the GitHub integration, Python agents, GitHub Actions, and runtime and toolchain versions.
+This page describes how this repository handles dependency updates for the GitHub Integration, Python agents, GitHub Actions, and runtime and toolchain versions.
 
 ## Policy
 

@@ -29,11 +29,11 @@ python -m scripts.checks.markdown_links
 # Check prose for hard wrapping.
 python -m scripts.checks.markdown_wrapping
 
-# Check translated heading structure.
+# Check translated headings, fact markers, and shell examples.
 python -m scripts.checks.translated_doc_headings
 ```
 
-`translated_doc_headings.py` scans all tracked `*.zh.md` files, finds the matching English `.md` source, and verifies that heading levels and numbered section markers stay aligned.
+`translated_doc_headings.py` scans all tracked `*.zh.md` files and finds the matching English `.md` source. It checks heading levels and numbered section markers, then compares `doc-default` / `doc-time-sensitive` marker contents and counts and shell command examples within corresponding sections. Shell comments, blank lines, continuation wrapping, and code-block splitting may differ. Prose and non-shell examples may be localized; their semantic equivalence still requires review. It also reports possible omissions by comparing paragraph, list-item, table-row, blockquote-paragraph, and non-shell example counts per section. These counts are advisory: translation may legitimately merge or split blocks; they do not affect the exit code.
 
 ## Local Helpers
 

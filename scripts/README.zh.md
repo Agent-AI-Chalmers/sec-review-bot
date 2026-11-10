@@ -29,11 +29,11 @@ python -m scripts.checks.markdown_links
 # 检查正文是否存在固定列宽硬换行。
 python -m scripts.checks.markdown_wrapping
 
-# 检查中英文文档的标题结构是否对齐。
+# 检查中英文标题、事实标记和 shell 命令示例是否对齐。
 python -m scripts.checks.translated_doc_headings
 ```
 
-`translated_doc_headings.py` 扫描所有已跟踪的 `*.zh.md` 文件，找到对应的英文 `.md` 源文件，检查标题层级和章节编号是否对齐。
+`translated_doc_headings.py` 扫描所有已跟踪的 `*.zh.md` 文件并找到对应的英文 `.md` 源文件。它检查标题层级和章节编号，并在对应章节内比较 `doc-default` / `doc-time-sensitive` 标记的内容、出现次数和 shell 命令示例。shell 注释、空行、续行排版和代码块拆分可以不同。正文和非 shell 示例可以翻译，其语义是否一致仍需审阅。 另按对应章节比较段落、列表项、表格行、引用段落和非 shell 示例的数量，提示可能的遗漏。数量差异仅供核对：翻译可以合理合并或拆分内容块，不影响退出码。
 
 ## 本地辅助工具
 

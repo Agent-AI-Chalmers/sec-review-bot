@@ -18,9 +18,7 @@ Sources:
 
 ## Inline Suggestion Scope
 
-GitHub suggestions are PR-diff-anchored review comments, not a generic patch transport channel.
-
-GitHub requires each inline suggestion to:
+GitHub suggestions are PR-diff-anchored review comments, not a generic patch transport channel. GitHub requires each inline suggestion to:
 
 - target a file already present in the PR changed-file set.
 - anchor to a line interval visible in the PR diff.
@@ -31,9 +29,7 @@ Therefore this workflow emits suggestions only for the part of a mitigation patc
 
 ### Eligibility Rules
 
-Emit suggestion candidates when a mitigation patch exists and at least one patch hunk can be anchored to a PR-visible diff hunk.
-
-Per candidate, required conditions are:
+Emit suggestion candidates when a mitigation patch exists and at least one patch hunk can be anchored to a PR-visible diff hunk. Each candidate must meet these conditions:
 
 1. Patch file exists in PR changed-file set and has PR patch content.
 2. Patch hunk produces a suggestion block; deletion allows empty replacement content.

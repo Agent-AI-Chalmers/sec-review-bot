@@ -257,6 +257,8 @@ AGENT_CASE_PROCESSING_MAX_CONCURRENCY=1
 
 #### Docker sandbox
 
+系统正常运行需要 Docker。
+
 `deployment.env.sample` 默认使用通用 sandbox 镜像，并关闭可选 external-tool prompt 与 MCP：
 
 ```bash

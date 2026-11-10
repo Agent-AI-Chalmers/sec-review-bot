@@ -10,7 +10,7 @@ For a project overview, start with the repository [README](../README.md).
 
 | Task | Suggested order |
 | --- | --- |
-| Run one local review | [Agents installation and model setup](../agents/README.md) → [local run examples](../agents/README.md#local-runs); GitHub integration is not required. |
+| Run one local review | [Agents installation and model setup](../agents/README.md) → [local run examples](../agents/README.md#local-runs); GitHub Integration is not required. |
 | Deploy GitHub reviews | [LOCAL_INTEGRATED_DEPLOYMENT](operations/LOCAL_INTEGRATED_DEPLOYMENT.md) → [LOCAL_GITHUB_INBOUND_SETUP](operations/LOCAL_GITHUB_INBOUND_SETUP.md) → [trigger commands](../apps/github-integration/README.md#triggers). |
 | Change an agent or workflow | [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.md) → [README](../agents/README.md) → the relevant workflow document. |
 | Change a service interface or artifact format | [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.md) → [contracts catalog](../contracts/README.md) → the family and consumer guides. |

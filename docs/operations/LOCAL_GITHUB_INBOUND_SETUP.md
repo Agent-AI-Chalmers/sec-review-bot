@@ -2,7 +2,7 @@
 
 Language: English | [中文](LOCAL_GITHUB_INBOUND_SETUP.zh.md)
 
-This page explains how to route GitHub App webhooks and GitHub Actions repository review requests to the local GitHub integration service.
+This page explains how to route GitHub App webhooks and GitHub Actions repository review requests to the local GitHub Integration service.
 
 ## What a Webhook Is
 
@@ -49,7 +49,7 @@ Common choices:
 
 ## Local Service Addresses
 
-The GitHub integration service provides these inbound endpoints by default:
+The GitHub Integration service provides these inbound endpoints by default:
 
 ```text
 http://localhost:30000/api/webhook
@@ -102,7 +102,7 @@ If you already have a domain but no public inbound service, or if you do not wan
 ### How Cloudflare Tunnel Works
 
 1. Create a tunnel on a machine that can run `cloudflared`.
-2. Route a domain or subdomain to the local GitHub integration service.
+2. Route a domain or subdomain to the local GitHub Integration service.
 3. The GitHub App and GitHub Actions use that stable HTTPS address for their respective endpoints.
 
 Add a Published application route for each endpoint. The routes use the same Hostname and Service but have different Paths:
