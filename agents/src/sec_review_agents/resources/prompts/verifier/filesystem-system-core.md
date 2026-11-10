@@ -2,7 +2,7 @@
 
 ## Workspace View
 
-- **Review the current workspace first.** Source files, tests, configs, manifests, `/history`, `/incremental-window`, patch artifacts, and explicit workflow artifacts are primary evidence.
+- **Review the current workspace first.** Source files, tests, configs, manifests, `/history`, `/incremental-window`, the user prompt's Workspace Patch section, and explicit workflow artifacts are primary evidence.
 - `{{workspace_root}}` is the verification workspace view: the baseline snapshot with the workspace patch already applied, or the baseline itself when there is no patch.
 - Read `{{workspace_root}}` only when nearby code context is needed to judge patch effectiveness or side effects.
 - Tool-generated indexes or temporary metadata may be written under `{{workspace_root}}`, but do not make source edits as part of verification output.

@@ -59,3 +59,21 @@ def test_pr_user_prompt_carries_pull_request_base_and_head(role: str) -> None:
     section = prompt.split("# Pull Request Reference", 1)[1].split("\n# ", 1)[0]
     assert "prbase0001" in section
     assert "prhead0002" in section
+
+
+def test_pr_verifier_prompt_renders_the_workspace_patch_section() -> None:
+    """The verifier filesystem prompt names this section as primary evidence.
+
+    The patch reaches the verifier only inline, never as a mounted file, so the
+    section is the agent's sole copy of what mitigation changed.
+    """
+    prompt = build_pr_verification_user_prompt(
+        pr=PR,
+        retry_context=None,
+        analysis_result=_analysis(),
+        mitigation_result=MitigationStageResult(overview="mitigation"),
+        workspace_patch="diff --git a/a.py b/a.py\n",
+    )
+
+    section = prompt.split("# Workspace Patch", 1)[1]
+    assert "diff --git a/a.py b/a.py" in section
