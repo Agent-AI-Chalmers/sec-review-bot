@@ -176,13 +176,13 @@ importers:
         specifier: 0.24.0
         version: 0.24.0(supports-color@7.2.0)
       prettier:
-        specifier: 3.9.10
+        specifier: ^3.9.10
         version: 3.9.10
 
   apps/control-plane-ui:
     dependencies:
       '@aws-sdk/client-s3':
-        specifier: 3.1161.0
+        specifier: ^3.1161.0
         version: 3.1161.0
       '@codemirror/lang-json':
         specifier: 6.0.2
@@ -395,7 +395,7 @@ importers:
         specifier: ^10.1.8
         version: 10.1.8(eslint@10.14.0(jiti@2.7.0)(supports-color@5.5.0))
       globals:
-        specifier: ^17.0.0
+        specifier: ^17.14.0
         version: 17.14.0
       prettier:
         specifier: ^3.9.10
@@ -605,10 +605,10 @@ importers:
   contracts/tar-zstd-artifact/profiles/memory-tree/tools:
     dependencies:
       ajv:
-        specifier: ^8.17.1
+        specifier: ^8.20.0
         version: 8.20.0
       prettier:
-        specifier: ^3.9.0
+        specifier: ^3.9.10
         version: 3.9.10
     devDependencies:
       '@eslint/js':
@@ -627,10 +627,10 @@ importers:
         specifier: ^10.1.8
         version: 10.1.8(eslint@10.14.0(jiti@2.7.0)(supports-color@5.5.0))
       tsx:
-        specifier: ^4.20.0
+        specifier: ^4.23.15
         version: 4.23.15
       typescript:
-        specifier: ^6.0.0
+        specifier: ^6.0.3
         version: 6.0.3
       typescript-eslint:
         specifier: ^8.72.1
@@ -638,9 +638,6 @@ importers:
 
   services/execution-gateway:
     dependencies:
-      '@aws-sdk/client-s3':
-        specifier: ^3.1161.0
-        version: 3.1161.0
       '@platformatic/fastify-openapi-glue':
         specifier: ^5.2.0
         version: 5.2.0
