@@ -2,7 +2,7 @@
 
 Language: English | [中文](LOCAL_INTEGRATED_DEPLOYMENT.zh.md)
 
-This guide covers local deployment of the GitHub integration, Review Runs, Execution Gateway, Temporal, object storage, and the host Execution, Memory Extraction, and Memory Maintenance Workers.
+This guide covers local deployment of the GitHub Integration, Review Runs, Execution Gateway, Temporal, object storage, and the host Execution, Memory Extraction, and Memory Maintenance Workers.
 
 Use it to run the complete integrated path locally. For running agents directly without the HTTP Execution Gateway, or for debugging with `run-local-* --temporal`, see the [agents local running guide](../../agents/README.md).
 
@@ -26,7 +26,7 @@ Default local endpoints:
 
 | Service | URL |
 | --- | --- |
-| GitHub integration | `http://127.0.0.1:30000` |
+| GitHub Integration | `http://127.0.0.1:30000` |
 | Review Runs | `http://127.0.0.1:8090` |
 | Control Plane UI | `http://127.0.0.1:8091` |
 | Execution Gateway | `http://127.0.0.1:8000` |
@@ -69,7 +69,7 @@ Generate a secret in the GitHub App webhook settings and set `WEBHOOK_SECRET` in
 
 ### GitHub App Webhook Configuration
 
-To forward a public URL to the local GitHub integration service, see [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md).
+To forward a public URL to the local GitHub Integration service, see [Local GitHub Inbound Setup](LOCAL_GITHUB_INBOUND_SETUP.md).
 
 ### Actions Secrets Configuration
 
@@ -88,7 +88,7 @@ The repository review workflow authenticates to the App with GitHub Actions OIDC
 The integrated deployment uses four source configuration files. Compose `.env` also carries the object-storage endpoint and service credentials; these credentials are passed to the appropriate service only:
 
 - repository-root `.env`: Compose control plane;
-- `apps/github-integration/.env`: GitHub integration;
+- `apps/github-integration/.env`: GitHub Integration;
 - `agents/config/model-providers.toml`: model deployments;
 - `ops/systemd/deployment.env`: systemd deployment configuration before installation.
 
@@ -119,7 +119,7 @@ RustFS credentials are assigned by storage responsibility:
 
 ### 2. GitHub Integration `.env`
 
-GitHub integration runtime settings are documented in [apps/github-integration/.env.sample](../../apps/github-integration/.env.sample). Minimum local configuration:
+GitHub Integration runtime settings are documented in [apps/github-integration/.env.sample](../../apps/github-integration/.env.sample). Minimum local configuration:
 
 ```bash
 APP_ID=123456
@@ -477,7 +477,7 @@ RustFS state and PostgreSQL state are independent data sets. Back up `.agent-rus
 
 ## Proxies
 
-The GitHub integration image build and Git workspace fetches use separate network settings. For Compose, set these variables in the repository `.env`; for non-Compose startup, set runtime variables in the GitHub integration `.env`.
+The GitHub Integration image build and Git workspace fetches use separate network settings. For Compose, set these variables in the repository `.env`; for non-Compose startup, set runtime variables in the GitHub Integration `.env`.
 
 ### pnpm And npm Registries
 
@@ -494,7 +494,7 @@ This variable is passed only to pnpm during the image build; it does not change 
 
 ### Git Fetch
 
-GitHub integration uses `git fetch` to retrieve the target commit while preparing a review input bundle. If the container cannot connect directly to GitHub, configure the host HTTP proxy only for these fetches:
+GitHub Integration uses `git fetch` to retrieve the target commit while preparing a review input bundle. If the container cannot connect directly to GitHub, configure the host HTTP proxy only for these fetches:
 
 ```bash
 GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://host.docker.internal:7897
@@ -502,7 +502,7 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://host.docker.internal:7897
 
 Compose maps `host.docker.internal` to the host. The proxy must listen on an address reachable from Docker containers instead of loopback only. This variable does not change the network path used by the GitHub API, Execution Gateway, worker, or sandboxes.
 
-When running GitHub integration without Compose, use an address reachable by the host process instead, for example:
+When running GitHub Integration without Compose, use an address reachable by the host process instead, for example:
 
 ```bash
 GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897

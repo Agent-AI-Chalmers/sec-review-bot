@@ -48,7 +48,7 @@ A draft PR includes modified files, case details, analyzer / verifier output, an
 
 Choose an entry point for your goal:
 
-- **Run a review locally**: follow [agents](agents/README.md#install-and-activate-the-environment) to install and activate the Python environment, complete [LLM setup](agents/README.md#llm-setup), then run the [local review commands](agents/README.md#local-runs). Reviewing code requires Docker and a configured model; no GitHub integration deployment is needed.
+- **Run a review locally**: follow [agents](agents/README.md#install-and-activate-the-environment) to install and activate the Python environment, complete [LLM setup](agents/README.md#llm-setup), then run the [local review commands](agents/README.md#local-runs). Reviewing code requires Docker and a configured model; no GitHub Integration deployment is needed.
 - **Connect to GitHub**: follow [LOCAL_INTEGRATED_DEPLOYMENT](docs/operations/LOCAL_INTEGRATED_DEPLOYMENT.md) to prepare the GitHub App, model, and service configuration, then start the integrated service. To forward GitHub requests to your machine, see [LOCAL_GITHUB_INBOUND_SETUP](docs/operations/LOCAL_GITHUB_INBOUND_SETUP.md).
 
 ## Architecture Overview

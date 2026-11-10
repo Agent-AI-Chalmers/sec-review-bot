@@ -74,7 +74,7 @@ On-demand reading can still miss a documented constraint. A concise entry point 
 
 The system explicitly distinguishes `audit` / `repair` through `review_intent.objective`. `review_intent.test_changes` can also constrain whether the final mitigation patch may contain test changes, independently of the objective. Therefore, whether the agent is currently auditing or repairing is not guessed by the model on the spot, and is not implied by output text; it is part of the input contract.
 
-The objective is selected by the caller, not a guarantee that a vulnerability exists. GitHub integration selects `audit`; the local issue CLI lets the user select the objective.
+The objective is selected by the caller, not a guarantee that a vulnerability exists. GitHub Integration selects `audit`; the local issue CLI lets the user select the objective.
 
 ## How Much Should We Trust Agent Output?
 

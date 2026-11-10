@@ -114,13 +114,15 @@ Therefore, the current implementation only lets main agents leave trajectories, 
 
 ---
 
-But this must always be judged against the scenario. For example, hot read/write can be considered when:
+But this must always be judged against the scenario. For example, consider these conditions:
 
 - there is only one foreground agent/session
 - there really is a supervisor
 - memory is not only collecting experience, but also collecting user preferences
 
-Unexpectedly, these three conditions usually appear together in personal assistant agents / coding agents.
+Under these conditions, hot read/write can be considered.
+
+These three conditions usually appear together in personal assistant agents / coding agents.
 
 ### Other
 

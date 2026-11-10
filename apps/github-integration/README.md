@@ -2,7 +2,7 @@
 
 Language: English | [中文](README.zh.md)
 
-This package contains the GitHub integration service for the project.
+This package contains the GitHub Integration service for the project.
 
 It prepares inputs, submits and observes review runs through Review Runs, and publishes terminal results back to GitHub.
 
@@ -34,7 +34,7 @@ pnpm run test:integration
 
 ## Local Receiver
 
-A complete review also needs the execution gateway and worker. To run the whole stack locally, use the repository-level Docker Compose deployment. The commands below only start the GitHub integration service.
+A complete review also needs the execution gateway and worker. To run the whole stack locally, use the repository-level Docker Compose deployment. The commands below only start the GitHub Integration service.
 
 For non-Compose startup, fill `apps/github-integration/.env` from `apps/github-integration/.env.sample`; at minimum set `APP_ID`, `PRIVATE_KEY_PATH`, `WEBHOOK_SECRET`, `REVIEW_RUNS_SERVICE_URL`, and `REVIEW_RUNS_SERVICE_TOKEN`.
 
@@ -144,9 +144,9 @@ Notes:
 - If the config file exists but the YAML is invalid, `sec_review_bot.trigger_mode` is missing, or the value is not allowed, automatic webhooks fail strictly instead of silently downgrading.
 - `paths_ignore` filters repository-review Discovery file scanning and incremental deletion cases. Deleted paths excluded by it do not contribute to `scan_summary.deleted_file_count` or the deletion-review size limit. It does not affect PR/Issue webhook trigger decisions.
 - Config is always read from the **default branch** (resolved via the GitHub API), never from the PR base ref or a repository-review `target_branch`. A non-default branch scan therefore uses the default branch's `trigger_mode` / `paths_ignore`.
-- Repository config does not support selecting a workspace image. The GitHub integration does not parse image configuration fields from `.sec-review/config.yml`.
+- Repository config does not support selecting a workspace image. The GitHub Integration does not parse image configuration fields from `.sec-review/config.yml`.
 
-A repository can also declare how to prepare a dependency-complete environment for the agent in [`.sec-review/setup.yml`](../../.sec-review/setup.yml). The GitHub integration reads and validates that declaration on the default branch before submitting the run; the format is owned by the [setup declaration contract](../../contracts/setup-declaration/README.md) and the reasoning by [Trusted Setup](../../docs/workflows/TRUSTED_SETUP.md).
+A repository can also declare how to prepare a dependency-complete environment for the agent in [`.sec-review/setup.yml`](../../.sec-review/setup.yml). The GitHub Integration reads and validates that declaration on the default branch before submitting the run; the format is owned by the [setup declaration contract](../../contracts/setup-declaration/README.md) and the reasoning by [Trusted Setup](../../docs/workflows/TRUSTED_SETUP.md).
 
 ### Manual commands
 
@@ -166,7 +166,7 @@ Issue and PR conversation comments share one command grammar. The flags below ar
 - `--test-changes allow|deny`: whether the final mitigation patch may contain test changes. `deny` forbids test changes; tests may only be used as temporary validation work. With no flag the Execution Worker uses `allow`.
 - `--open-pr`: issue reviews only. With this flag, a ready patch may be published as a draft PR; otherwise the patch is shown only in the review results posted as a comment on the original Issue. Automatic `issues.opened` reviews never create a draft PR.
 
-Flags are order-independent and may be combined. There is no objective argument: the GitHub integration always reviews in `audit` mode.
+Flags are order-independent and may be combined. There is no objective argument: the GitHub Integration always reviews in `audit` mode.
 
 ### Repository-level Actions trigger
 

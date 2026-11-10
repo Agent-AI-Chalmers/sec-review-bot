@@ -64,8 +64,13 @@ Mitigator 参考前一次修复结果和验证反馈，从准备好的原始工�
 
 - `analyzer -> mitigator -> verifier -> [feedback-guided mitigator -> verifier] * k`
 
+其中：
+
+- `k` 表示额外执行修复和验证的重试次数
+- 代码常量 `MAX_FEEDBACK_RETRY_ATTEMPTS` 约束 `k` 的上限
+
 <!-- doc-default: MAX_FEEDBACK_RETRY_ATTEMPTS; source=agents/src/sec_review_agents/review_stages/feedback_loop.py -->
-代码常量 `MAX_FEEDBACK_RETRY_ATTEMPTS` 将额外重试限制为 `1` 次，即 `k <= 1`。这不是部署配置项。修改上限需要同时考虑上下文增长、耗时和模型成本。
+代码常量 `MAX_FEEDBACK_RETRY_ATTEMPTS` 将额外重试限制为 `1` 次，即 `k <= 1`。这不是部署配置项。修改上限需要同时考虑上下文增长、耗时和模型成本，并重新运行针对 agent 行为的聚焦验证。
 
 ## 验证后如何决定下一步
 

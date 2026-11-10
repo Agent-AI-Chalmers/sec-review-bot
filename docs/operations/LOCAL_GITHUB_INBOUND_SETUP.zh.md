@@ -4,6 +4,8 @@
 
 本文为 [LOCAL_GITHUB_INBOUND_SETUP.md](LOCAL_GITHUB_INBOUND_SETUP.md) 的中文译文；如有差异，以英文版为准。
 
+本文介绍如何将 GitHub App webhook 和 GitHub Actions 发起的仓库审查请求路由到本地 GitHub Integration 服务。
+
 ## 什么是 Webhook
 
 Webhook 可以理解成“事件发生后，对方向你预留的地址发一个 HTTP 请求”。

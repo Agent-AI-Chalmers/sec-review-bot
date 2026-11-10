@@ -64,11 +64,11 @@ Architecturally, the workflow is modeled as:
 
 where:
 
-- `k <= maxFeedbackRetries`
-- the current policy allows one additional retry
+- `k` is the number of additional mitigation/verification retries
+- the code constant `MAX_FEEDBACK_RETRY_ATTEMPTS` bounds `k`
 
 <!-- doc-default: MAX_FEEDBACK_RETRY_ATTEMPTS; source=agents/src/sec_review_agents/review_stages/feedback_loop.py -->
-The code constant `MAX_FEEDBACK_RETRY_ATTEMPTS` limits additional retries to `1`. This is not a deployment setting. The budget leaves room for bounded experiments without allowing mitigation and verification to repeat indefinitely.
+The code constant `MAX_FEEDBACK_RETRY_ATTEMPTS` limits additional retries to `1`, so `k <= 1`. This is not a deployment setting. Changing the limit requires considering context growth, latency, and model cost, and rerunning focused agent-behavior probes.
 
 ## Next Step
 
@@ -88,9 +88,7 @@ Verifier output separates current-code coverage from the next workflow action:
 
 When a separate, concrete security gap is still suitable for bounded repair, `retry-ai` may be used even if `regression=unresolved`. The unresolved regression must remain in `findings` and be reassessed after the retry. If the unresolved regression itself determines the next action, use `manual-review`. In particular, `coverage=full` with `regression=unresolved` requires `next_step=manual-review`.
 
-`partial` does not automatically mean retry. A partial patch can either expose an actionable code gap that should be retried, or it can represent useful current-snapshot hardening with residual work that only a human or repository administrator can complete.
-
-Examples:
+`partial` does not automatically mean retry. A partial patch can either expose an actionable code gap that should be retried, or it can represent useful current-snapshot hardening with residual work that only a human or repository administrator can complete. Examples:
 
 - SSRF bypass remains in the patched URL/IP validation logic -> `coverage=partial`, `next_step=retry-ai`
 - a bounded security gap remains and regression evidence is also unresolved -> `coverage=partial`, `regression=unresolved`, `next_step=retry-ai`, with both concerns retained in `findings`
