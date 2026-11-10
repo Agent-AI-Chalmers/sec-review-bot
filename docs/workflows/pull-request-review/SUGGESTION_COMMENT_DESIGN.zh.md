@@ -20,12 +20,12 @@
 
 ## inline suggestion 的范围限制
 
-inline suggestion 必须关联 PR diff 中的文件和行区间，不能用来传递任意补丁。每条 inline suggestion 必须：
+GitHub suggestion 是锚定在 PR diff 上的审查评论，因此不能承载任意补丁。GitHub 要求每条 inline suggestion 必须：
 
 - 对应 PR 变更文件列表中的文件；
 - 能定位到 PR diff 中可见的行区间。
 
-修复补丁中超出这些范围的修改仍可保留，但通过摘要说明，不强行转换成 inline suggestion。
+本流程只为修复补丁中能映射到这些 PR 可见行的部分生成 suggestion。超出 PR diff 的修改保留在修复补丁中，走标准摘要路径。
 
 ## 实现
 
@@ -39,7 +39,7 @@ inline suggestion 必须关联 PR diff 中的文件和行区间，不能用来�
 
 这是 partial-admission pipeline：
 
-- 无法定位的文件或 diff hunk 会被跳过，能够定位的建议仍会生成。
+- 无法定位的文件或 diff hunk 会被跳过，能够定位的仍会生成。
 - 跳过项记录在 suggestion manifest 的 `unmapped_changes` 中。
 
 ### 映射流程

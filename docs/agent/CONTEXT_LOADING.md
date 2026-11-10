@@ -12,7 +12,7 @@ Agents in this project receive context in two ways: some content arrives already
 
 ## When Each Wins
 
-The deciding question is not how large the content is. It is whether the content is **stable and always needed**:
+Size does not decide it. What decides it is whether the content is **stable and always needed**:
 
 - **Preload only when the content is both necessary and complete for the decision.** Necessary means every run of this agent needs it to answer at all; complete means the preloaded part is the whole input, not a sample an agent would have to extend. A case summary, a candidate list, or the inline files of a discovery chunk are this kind. Preloading something the agent then has to go and complete is the worst of both: a tool turn on top of a payload that may already be stale.
 - **On demand** when the content is large, changes every run, or is only partly relevant. A repository, a diff, or an artifact the model may or may not consult is this kind.
@@ -25,13 +25,13 @@ Neither strategy wins outright. The closest comparison is [Skill Blocks: How Sho
 
 On-demand loading cut effective input by 52.8% to 73.0% on two other sets, and the same paper notes longer outputs can eat a small input saving. [Just-in-time retrieval](https://learn.agentpatterns.ai/context-engineering/just-in-time-retrieval/) arrives at the same rule from the context-engineering side: keep a small stable core in context and load the rest when a task arrives at it.
 
-Preloading has its own support, and it is not merely the smaller-cost option.
+Preloading also has support beyond cost.
 
 **Position matters more than presence.** [Lost in the Middle](https://arxiv.org/abs/2307.03172) (TACL 2023) measured how well models use what they are given:
 
 > performance is often highest when relevant information occurs at the beginning or end of the input context, and significantly degrades when models must access relevant information in the middle of long contexts, even for explicitly long-context models
 
-Fetching on demand does not avoid that problem. A tool result lands in the middle of a growing conversation, competing with every later turn, while preloaded content sits in a fixed position the model reads first. On-demand reading buys selectivity, not guaranteed attention.
+Fetching on demand does not avoid that problem. A tool result lands in the middle of a growing conversation, competing with every later turn, while preloaded content sits in a fixed position the model reads first. On-demand reading lets the agent choose what to read, but it does not guarantee the model attends to it.
 
 **Selective reading needs the agent to choose well.** A qualitative analysis of 900 agent traces found four recurring failure archetypes across three model families ([arXiv 2512.07497](https://ar5iv.labs.arxiv.org/html/2512.07497)):
 
@@ -41,15 +41,15 @@ Two of these are costs that on-demand reading adds. When an agent decides what t
 
 ## How Each Agent Chooses Here
 
-| Agent | Strategy | What is preloaded, or why not |
-| --- | --- | --- |
-| Repository Discovery | Preload | The scanned files arrive inline in the prompt. Discovery mounts no workspace, so it cannot read repository files on demand: the input must be complete, and the prompt states that the inline contents are the whole input. |
-| Repository Triage | Preload | Candidate payloads arrive in the prompt. Triage mounts no workspace by design, and its judgement is defined as one made from the payload alone. |
-| Pull request Analyzer, Mitigator, Verifier | On demand | The workspace and `/history` are mounted, and the agent reads the window through git. The prompt carries the pull request text, reference, and prior stage results, but no rendered file list or diff. |
-| Issue Analyzer, Mitigator, Verifier | On demand | The workspace and `/history` are mounted; the issue text is preloaded because it is the signal under review. |
-| Repository case Analyzer, Mitigator, Verifier | On demand | The workspace is mounted; incremental scans also mount `/history` and `/incremental-window`. The case review input names the anchors rather than quoting the files. |
-| CVSS Scoring | Mixed | The workspace is mounted to allow targeted scoring fact checks and the finding under scoring is preloaded. |
-| Deletion cases | Preload, paths only | The case carries file paths and the window, never file contents. There is no current file to read, so the paths are the complete input; the content comes from the patch or git. |
+| Agent                                         | Strategy            | What is preloaded, or why not                                                                                                                                                                                               |
+| --------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Repository Discovery                          | Preload             | The scanned files arrive inline in the prompt. Discovery mounts no workspace, so it cannot read repository files on demand: the input must be complete, and the prompt states that the inline contents are the whole input. |
+| Repository Triage                             | Preload             | Candidate payloads arrive in the prompt. Triage mounts no workspace by design, and its judgement is defined as one made from the payload alone.                                                                             |
+| Pull request Analyzer, Mitigator, Verifier    | On demand           | The workspace and `/history` are mounted, and the agent reads the window through git. The prompt carries the pull request text, reference, and prior stage results, but no rendered file list or diff.                      |
+| Issue Analyzer, Mitigator, Verifier           | On demand           | The workspace and `/history` are mounted; the issue text is preloaded because it is the signal under review.                                                                                                                |
+| Repository case Analyzer, Mitigator, Verifier | On demand           | The workspace is mounted; incremental scans also mount `/history` and `/incremental-window`. The case review input names the anchors rather than quoting the files.                                                         |
+| CVSS Scoring                                  | Mixed               | The workspace is mounted to allow targeted scoring fact checks and the finding under scoring is preloaded.                                                                                                                  |
+| Deletion cases                                | Preload, paths only | The case carries file paths and the window, never file contents. There is no current file to read, so the paths are the complete input; the content comes from the patch or git.                                            |
 
 ## Repository Guidance
 

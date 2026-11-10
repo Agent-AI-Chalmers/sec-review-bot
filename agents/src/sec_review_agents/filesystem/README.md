@@ -11,7 +11,7 @@ Docker is the only execution backend. `AGENT_SANDBOX_BACKEND` may be unset or `d
 
 ## LangChain And DeepAgents Boundary
 
-LangChain provides `ShellToolMiddleware`, and its packaging is useful. It exposes a persistent shell session, supports startup and shutdown commands, handles timeouts and output limits, and can run through host, Docker, or Codex sandbox execution policies. It is a strong fit for early demos because it quickly gives an agent the edit-run-observe loop that engineering workflows need.
+LangChain provides `ShellToolMiddleware`, and its packaging is useful. It exposes a persistent shell session, supports startup and shutdown commands, handles timeouts and output limits, and can run through host, Docker, or Codex sandbox execution policies. That makes it a good fit for early demos, since it quickly gives an agent the edit-run-observe loop that engineering workflows need.
 
 This project does not use `ShellToolMiddleware` as the default execution path because shell execution alone does not provide the agent-visible virtual filesystem contract this package needs. Material views, route-aware path mapping, writable-root control, large-result artifact paths, and stage patch reconciliation all need to agree on the same workspace boundary.
 
@@ -24,14 +24,17 @@ The Docker backend implements `SandboxBackendProtocol`; the local filesystem bac
 LangChain and DeepAgents provide the backend interfaces we build on, but their default filesystem and shell implementations do not enforce all of this project's safety requirements.
 
 <!-- doc-default: LocalFilesystemBackend; source=agents/src/sec_review_agents/filesystem/local_backend.py -->
+
 Local file operations reuse `FilesystemBackend`. Docker reuses `BaseSandbox` for reading, searching, writing, editing, and deletion. Directory listing uses a small project-owned helper because upstream uses an `os.scandir` context manager unavailable in Python 3.5. Project wrappers enforce allowed paths and writable views; Docker also translates between agent-visible and container paths. File-operation limits, glob matching, pagination, and newline semantics follow the installed DeepAgents version rather than a project-owned fork.
 
 <!-- doc-default: DockerSandboxBackend; source=agents/src/sec_review_agents/filesystem/docker_backend.py -->
+
 Docker always provides writable container-native `/tmp`, independently of repository material views. Upstream large edits upload their payloads there; no project-owned edit staging or replacement script is retained. `/tmp` must not be remapped to a host directory or made read-only through a material view. Docker regular-file transfers retain directory-file-descriptor resolution, `O_NOFOLLOW`, and non-blocking type checks. Project-owned container helpers support Python 3.5 and later; the host worker still uses Python 3.14.
 
 Docker adds process isolation. It uses network and mount namespaces, `no-new-privileges`, a reduced capability set, and configurable PID, memory, and CPU limits. Docker also applies its daemon-provided seccomp and AppArmor defaults when available. A deployment can require named policies with `AGENT_DOCKER_SECCOMP_PROFILE` and `AGENT_DOCKER_APPARMOR_PROFILE`; a missing or rejected configured profile fails container startup.
 
 <!-- doc-default: AGENT_COMMAND_TIMEOUT_MS; source=agents/src/sec_review_agents/filesystem/limits.py -->
+
 Command execution uses a ten-minute timeout for Docker. Deployments may override it with `AGENT_COMMAND_TIMEOUT_MS`. Timeouts and output truncation are application safeguards, not resource quotas. Availability probes establish only that the configured baseline can start; integration tests own policy claims such as network isolation, read-only routes, private `/tmp`, symlink-safe transfers, and resource limits.
 
 Dependency upgrades must exercise route mapping, mutation permissions (including newly inherited operations), and large-edit staging. Upstream file-operation behavior is accepted; isolation and transfer protections remain project responsibilities.

@@ -22,11 +22,11 @@ Agent 的最终表现很大程度取决于底层 LLM 的代码理解、推理和
 
 ## 能力
 
-| 能力                | 行为                                                                 |
-| ------------------- | -------------------------------------------------------------------- |
-| Issue review        | 核查 Issue 报告、分析问题及其影响，再根据证据决定是否尝试修复，并独立验证分析结论和修复结果；有可交付补丁且指定 `--open-pr` 时，可创建 draft PR。       |
-| Pull request review | 审查 PR 变更，并可发布 review suggestions。                          |
-| Repository review   | 对仓库执行全仓或增量扫描，并进行问题发现、筛选、逐项处理和交付规划。 |
+| 能力                | 行为                                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Issue review        | 核查 Issue 报告、分析问题及其影响，再根据证据决定是否尝试修复，并独立验证分析结论和修复结果；有可交付补丁且指定 `--open-pr` 时，可创建 draft PR。 |
+| Pull request review | 审查 PR 变更，并可发布 review suggestions。                                                                                                       |
+| Repository review   | 对仓库执行全仓或增量扫描，并进行问题发现、筛选、逐项处理和交付规划。                                                                              |
 
 GitHub 触发条件和命令见 [github-integration](apps/github-integration/README.zh.md#触发)。
 
@@ -65,12 +65,12 @@ Temporal 调度 workflow/activity，PostgreSQL 保存协调状态，对象存储
 
 安装、配置和开发命令由各包的 README 维护：
 
-| 目标 | 入口 |
-| --- | --- |
-| 修改 Agent 或审查工作流 | [agents](agents/README.zh.md#开发者导航) |
-| 开发服务或控制台 | [文档地图](docs/README.zh.md)及对应包的 README |
-| 修改契约或生成产物 | [contracts](contracts/README.zh.md) |
-| 提交贡献 | [CONTRIBUTING](CONTRIBUTING.zh.md) |
+| 目标                    | 入口                                           |
+| ----------------------- | ---------------------------------------------- |
+| 修改 Agent 或审查工作流 | [agents](agents/README.zh.md#开发者导航)       |
+| 开发服务或控制台        | [文档地图](docs/README.zh.md)及对应包的 README |
+| 修改契约或生成产物      | [contracts](contracts/README.zh.md)            |
+| 提交贡献                | [CONTRIBUTING](CONTRIBUTING.zh.md)             |
 
 ## 论文
 

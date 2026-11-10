@@ -11,15 +11,15 @@ A webhook is an HTTP request sent to an address you provide after an event happe
 In this project:
 
 - GitHub is the event source.
-- your `sec-review-bot` service is the receiver.
-- you need to give GitHub a reachable webhook URL.
-- when issue / PR events happen, GitHub sends the payload to that URL.
+- Your `sec-review-bot` service is the receiver.
+- You give GitHub a webhook URL it can reach.
+- When issue or PR events happen, GitHub sends the payload to that URL.
 
-This is different from polling GitHub. GitHub pushes events to you.
+Your service does not poll GitHub; GitHub pushes events to it.
 
 ## Webhook and API Permissions
 
-Local webhook setup is only the receiving side. A working GitHub App also needs API permissions for the actions it will take after receiving an event.
+Local webhook setup covers only receiving events. The GitHub App also needs API permissions for the actions it takes after it receives an event.
 
 - Webhooks decide which GitHub events the App receives.
 - GitHub API permissions decide what the App can do afterward, such as posting comments, creating reviews, or opening draft PRs.
@@ -36,7 +36,7 @@ The required permissions and webhook subscriptions are listed in [GitHub App Per
 
 GitHub's servers cannot directly reach your local `localhost:30000`.
 
-For local development, you need a public HTTPS address that GitHub can reach, and then forward that address to your local webhook service:
+For local development, you need a public HTTPS address that GitHub can reach, forwarded to your local webhook service:
 
 ```text
 GitHub -> public HTTPS URL -> local http://localhost:30000/api/webhook
@@ -45,7 +45,7 @@ GitHub -> public HTTPS URL -> local http://localhost:30000/api/webhook
 Common choices:
 
 - `smee`
-  - quick and lightweight; good for local debugging
+  - quick and lightweight, good for local debugging
 - Cloudflare Tunnel
   - more formal; useful if you already have a domain or want a stable webhook URL
 
@@ -58,16 +58,14 @@ http://localhost:30000/api/webhook
 http://localhost:30000/api/repository-review/dispatch
 ```
 
-They serve different purposes:
-
 - `/api/webhook` receives issue and pull request events from the GitHub App.
 - `/api/repository-review/dispatch` receives repository review requests from GitHub Actions.
 
-The port comes from `PORT`. Only the first endpoint is needed when debugging GitHub App webhooks. The second endpoint must also be publicly reachable when using the repository review workflow.
+The port comes from `PORT`. To debug GitHub App webhooks you only need the first endpoint. The repository review workflow also needs the second endpoint to be publicly reachable.
 
 ## Option 1: Use `smee`
 
-Many GitHub App / webhook tutorials use [`smee.io`](https://smee.io/) because it is good for getting the local development path working quickly.
+Many GitHub App and webhook tutorials use [`smee.io`](https://smee.io/) because it gets a local development setup receiving events quickly.
 
 ### How `smee` Works
 
@@ -94,12 +92,12 @@ Where:
 
 ### Tradeoff
 
-- the URL is usually more like a temporary debug address
-- it is better suited to development than as a formal webhook address
+- the URL is usually a temporary debug address
+- it suits development, not a production webhook address
 
 ## Option 2: Use Cloudflare Tunnel
 
-If you already have a domain but no public inbound service, or if you do not want to manage port forwarding, TLS certificates, and exposing local ports, you can use Cloudflare Tunnel.
+Use Cloudflare Tunnel if you already have a domain but no public inbound service, or if you do not want to manage port forwarding, TLS certificates, and exposed local ports.
 
 ### How Cloudflare Tunnel Works
 
@@ -139,7 +137,7 @@ When finished, the same tunnel should contain the configured routes:
 
 ![Cloudflare GitHub inbound routes](../../assets/screenshots/cloudflare-github-inbound-routes.png)
 
-For uninstalling, see <https://developers.cloudflare.com/tunnel/troubleshooting/>.
+To uninstall, see <https://developers.cloudflare.com/tunnel/troubleshooting/>.
 The command is:
 
 ```bash
@@ -148,7 +146,7 @@ sudo cloudflared service uninstall
 
 ### When to Use Cloudflare Tunnel
 
-- stable, formal, reusable webhook URLs
+- stable, reusable webhook URLs
 - setups that already use Cloudflare and a domain
 - avoiding nginx, certificates, and public port exposure
 
@@ -157,7 +155,7 @@ sudo cloudflared service uninstall
 - The webhook secret does not match local configuration.
 - The webhook URL is correct, but the local forwarding tool is not running.
 - Cloudflare Tunnel only routes `/api/webhook`, so repository review requests from GitHub Actions return `404`.
-- You think you are listening on a public address, but the local service is not listening on the expected port.
+- The public address is set up, but the local service is not listening on the expected port.
 
 For permission errors such as `403 Resource not accessible by integration`, see [GitHub App Permission Settings](LOCAL_INTEGRATED_DEPLOYMENT.md#github-app-permission-settings).
 

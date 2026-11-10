@@ -8,9 +8,9 @@
 
 Discovery 是仓库审查的初筛阶段。它的目标是在成本可控、覆盖可解释的前提下，尽可能早地找出值得进一步分析的安全线索。
 
-这一阶段产出的是 candidate，而不是漏洞结论。candidate 应当有具体的仓库位置、可疑行为和初步证据，但可以存在不确定性。后续由 Triage 判断 candidate 应该 keep、suppress 还是 merge，再由 Analyzer 根据更完整的上下文确认或否定问题。
+这一阶段产出 candidate，即待查线索，尚非已确认的漏洞。candidate 应当有具体的仓库位置、可疑行为和初步证据，但可以存在不确定性。后续由 Triage 判断 candidate 应该 keep、suppress 还是 merge，再由 Analyzer 根据更完整的上下文确认或否定问题。
 
-Discovery 因此不承担漏洞定性、`vulnerability_type` / CWE 分类、跨文件根因合并或最终报告生成。它也不试图让一个 Agent 自由探索并理解整个仓库，而是在明确的文件范围和局部上下文中进行可重复的筛查。
+Discovery 因此不承担漏洞定性、`vulnerability_type` / CWE 分类、跨文件根因合并或最终报告生成。也不会让单个 Agent 自由探索整个仓库。Discovery 在明确的文件范围及为其组装的局部上下文中进行可重复的筛查。
 
 ## 扫描范围
 
@@ -31,21 +31,23 @@ Discovery 关注可能直接承载程序行为或安全边界的文件。“能�
 - 表格数据：`.csv`、`.tsv`；
 - 日志：`.log`。
 
-这是一项输入选择策略，而不是读取能力限制。这些文件仍可能在后续阶段成为有用上下文，但前提是已经存在具体 candidate 和明确的读取目标。
+这项策略只决定哪些文件作为 Discovery 起点，并不阻止后续阶段读取这些文件：它们仍可能在后续阶段成为有用上下文，但前提是已经存在具体 candidate 和明确的读取目标。
 
 文档文件不会仅仅因为名为 `SECURITY.md`、`threat-model.md` 等就进入 Discovery。文件名只能暗示主题，不能证明文档与某段代码或安全行为有关。只有将来存在可靠的代码关联机制，能够从代码、构建配置或显式依赖建立这种联系时，才应重新考虑文档边界。
 
 YAML、JSON、SQL、XML 和 HTML 保持扫描。它们既可能是普通数据，也可能直接描述部署、权限、策略、查询、模板或数据边界；仅凭扩展名排除会损失真实的安全覆盖。
 
-扫描结果应让读者能够区分主动忽略、类型策略排除、资源限制以及文件不可读，而不是把它们都解释为“未扫描”。
+扫描结果应让读者能够区分主动忽略、类型策略排除、资源限制以及文件不可读，不要把它们都报告为“未扫描”。
 
 ### 单文件大小保护
 
 <!-- doc-default: AGENT_DISCOVERY_MAX_FILE_BYTES; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
-Discovery 在读取文件之前使用 `AGENT_DISCOVERY_MAX_FILE_BYTES` 限制单文件字节数，默认值为 256 KiB。它是 Worker 读取、解码和提示词构造的资源边界，不是模型上下文边界；字节数与 token 数之间没有稳定换算关系，超过该限制并不表示模型一定装不下文件。
+
+Discovery 在读取文件之前使用 `AGENT_DISCOVERY_MAX_FILE_BYTES` 限制单文件字节数，默认值为 256 KiB。这个限制保护 Worker 在读取、解码和构造提示词时的资源，与模型上下文无关：字节数与 token 数之间没有稳定换算关系，超过该限制的文件仍可能放得进模型输入。
 
 <!-- doc-default: AGENT_DISCOVERY_MAX_FILE_BYTES; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
-这个限制属于服务运行环境，而不属于单次 review 的扫描范围。它不在公开 `scan_scope` 契约中，调用方不能为某次请求放宽 Worker 的安全边界。当前没有证据支持调整 256 KiB 默认值，只有发现值得扫描的源文件确实因此被排除时，才应结合具体样本和资源成本重新评估。
+
+这个限制属于服务运行环境，不属于单次 review 的扫描范围。它不在公开 `scan_scope` 契约中，调用方不能为某次请求放宽 Worker 的安全边界。当前没有证据支持调整 256 KiB 默认值，只有发现值得扫描的源文件确实因此被排除时，才应结合具体样本和资源成本重新评估。
 
 ## Chunk 设计
 
@@ -56,19 +58,20 @@ Discovery 输入支持以下组织策略。
 `batched` 策略先把若干文件组成 chunk，再让每个 Discovery Agent 处理一个 chunk。它可以分摊固定提示词的成本，并保留一定的跨文件上下文。相应的风险是 chunk 越大，模型需要同时关注的内容越多。请求没有超过输入上限，也不能保证模型会同等关注其中每个文件；这项取舍需要通过具体案例验证。
 
 <!-- doc-default: AGENT_DISCOVERY_CHUNK_STRATEGY; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
-当前默认策略是 `single-file`，让每次模型调用都有明确且集中的代码范围。`batched` 仍可通过 Worker 侧部署配置 `AGENT_DISCOVERY_CHUNK_STRATEGY` 启用，但不能由 review 请求选择。启用批量模式时，普通 chunk 的目标大小设为选定 deployment 配置的输入 token 上限的五分之一，在调用成本和注意力之间保留明确余量。
+
+当前默认策略是 `single-file`，让每次模型调用都有明确且集中的代码范围。`batched` 仍可通过 Worker 侧部署配置 `AGENT_DISCOVERY_CHUNK_STRATEGY` 启用，但不能由 review 请求选择。启用批量模式时，普通 chunk 的目标大小设为选定 deployment 配置的输入 token 上限的五分之一，以牺牲部分批量效率换取更集中的注意力。
 
 Discovery 使用普通 chunk target 和单文件 hard limit：
 
-| 输入形态 | 边界 | 行为 |
-| --- | --- | --- |
-| 普通多文件 chunk | 选定 deployment 配置的输入 token 上限的五分之一 | 持续加入文件，直到下一个文件会超过这个 target。 |
-| 单文件 chunk | 选定 deployment 配置的输入 token 上限的五分之四 | 文件即使超过普通 target，仍可以独立扫描；剩余五分之一用于运行时开销。 |
-| 超过单文件上限 | 超过选定 deployment 配置的输入 token 上限的五分之四 | 以超过 Discovery token budget 为由跳过文件。 |
+| 输入形态         | 边界                                                | 行为                                                                  |
+| ---------------- | --------------------------------------------------- | --------------------------------------------------------------------- |
+| 普通多文件 chunk | 选定 deployment 配置的输入 token 上限的五分之一     | 持续加入文件，直到下一个文件会超过这个 target。                       |
+| 单文件 chunk     | 选定 deployment 配置的输入 token 上限的五分之四     | 文件即使超过普通 target，仍可以独立扫描；剩余五分之一用于运行时开销。 |
+| 超过单文件上限   | 超过选定 deployment 配置的输入 token 上限的五分之四 | 以超过 Discovery token budget 为由跳过文件。                          |
 
-五分之一只约束普通多文件 chunk，不应反过来阻止完整文件被扫描。一个文件即使超过普通 target，只要没有超过单文件 hard limit，仍作为独立 chunk；只有超过 hard limit 时才无法进入 Discovery。
+五分之一的 target 只适用于普通多文件 chunk，不应阻止完整文件被扫描。一个文件即使超过普通 target，只要没有超过单文件 hard limit，仍作为独立 chunk；只有超过 hard limit 时才无法进入 Discovery。
 
-hard limit 会为运行时追加的 schema、skill guidance、tool turn 以及 token 估算误差预留剩余五分之一。文件保持完整，不为了满足 target 而切成片段。这样可以避免在任意位置打断局部语义，也让 candidate 的文件位置和扫描覆盖更容易解释。
+hard limit 会为运行时追加的 schema、skill guidance、tool turn 以及 token 估算误差预留剩余五分之一。Discovery 不会为了满足 target 而切分文件。保持文件完整可以避免在任意位置打断局部语义，也让 candidate 的文件位置和扫描覆盖更容易解释。
 
 所有 token 边界都基于选定 deployment 配置中的 `max_input_tokens`。Prompt 大小也按完整请求估算，包括系统提示词、用户提示词、文件信息和文件内容。
 

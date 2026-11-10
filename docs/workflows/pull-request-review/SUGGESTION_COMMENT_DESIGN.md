@@ -18,12 +18,12 @@ Sources:
 
 ## Inline Suggestion Scope
 
-GitHub suggestions are PR-diff-anchored review comments, not a generic patch transport channel. GitHub requires each inline suggestion to:
+GitHub suggestions are review comments anchored to the PR diff, so they cannot carry an arbitrary patch. GitHub requires each inline suggestion to:
 
 - target a file already present in the PR changed-file set.
 - anchor to a line interval visible in the PR diff.
 
-Therefore this workflow emits suggestions only for the part of a mitigation patch that can be mapped to those PR-visible lines. Mitigation edits outside the PR diff may remain in the mitigation diff, but they fall back to the standard summary path instead of being forced into inline suggestions.
+This workflow emits suggestions only for the part of a mitigation patch that maps to those PR-visible lines. Mitigation edits outside the PR diff may remain in the mitigation diff, but they fall back to the standard summary path instead of being forced into inline suggestions.
 
 ## Implementation
 
@@ -37,7 +37,7 @@ Emit suggestion candidates when a mitigation patch exists and at least one patch
 
 This is a partial-admission pipeline:
 
-- non-anchorable files/hunks are skipped, while anchorable ones are still emitted.
+- Non-anchorable files/hunks are skipped, and anchorable ones are still emitted.
 - Skipped entries are reported in the suggestion manifest under `unmapped_changes`.
 
 ### Mapping Pipeline

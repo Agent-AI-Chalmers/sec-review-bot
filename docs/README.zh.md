@@ -10,13 +10,13 @@
 
 ## 按任务选择阅读路线
 
-| 你想做什么 | 建议顺序 |
-| --- | --- |
-| 在本地运行一次审查 | [Agents 安装与模型配置](../agents/README.zh.md) → [本地运行示例](../agents/README.zh.md#本地运行)；无需先部署 GitHub 集成。 |
-| 部署 GitHub 审查服务 | [LOCAL_INTEGRATED_DEPLOYMENT](operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md) → [LOCAL_GITHUB_INBOUND_SETUP](operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) → [触发命令](../apps/github-integration/README.zh.md#触发)。 |
-| 修改 Agent 或工作流 | [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.zh.md) → [README](../agents/README.zh.md) → 对应工作流文档。 |
-| 修改服务间接口或产物格式 | [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.zh.md) → [契约目录](../contracts/README.zh.md) → 对应契约目录和使用方的说明。 |
-| 开发控制台界面 | [Control Plane UI](../apps/control-plane-ui/README.zh.md)，先用测试数据预览，无需启动完整后端。 |
+| 你想做什么               | 建议顺序                                                                                                                                                                                                             |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 在本地运行一次审查       | [Agents 安装与模型配置](../agents/README.zh.md) → [本地运行示例](../agents/README.zh.md#本地运行)；无需先部署 GitHub 集成。                                                                                          |
+| 部署 GitHub 审查服务     | [LOCAL_INTEGRATED_DEPLOYMENT](operations/LOCAL_INTEGRATED_DEPLOYMENT.zh.md) → [LOCAL_GITHUB_INBOUND_SETUP](operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md) → [触发命令](../apps/github-integration/README.zh.md#触发)。 |
+| 修改 Agent 或工作流      | [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.zh.md) → [README](../agents/README.zh.md) → 对应工作流文档。                                                                                              |
+| 修改服务间接口或产物格式 | [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.zh.md) → [契约目录](../contracts/README.zh.md) → 对应契约目录和使用方的说明。                                                                                 |
+| 开发控制台界面           | [Control Plane UI](../apps/control-plane-ui/README.zh.md)，先用测试数据预览，无需启动完整后端。                                                                                                                      |
 
 下面的目录用于按主题查阅，不要求从头读到尾。
 
@@ -33,16 +33,16 @@
 
 各包的 README 说明安装、命令、配置和代码结构。一个源码包可以实现多个独立运行的组件，例如 `agents/` 实现 Execution Worker、Memory Extraction Worker 与 Memory Maintenance Worker。
 
-| 运行角色 | 包说明 |
-| --- | --- |
-| GitHub Integration | [README](../apps/github-integration/README.zh.md) |
-| Review Runs | [README](../services/review-runs/README.zh.md) |
-| Control Plane UI | [README](../apps/control-plane-ui/README.zh.md) |
-| Execution Gateway | [README](../services/execution-gateway/README.zh.md) |
-| Execution Worker | [README](../agents/README.zh.md) |
-| Memory Extraction Worker | [README](../agents/README.zh.md) |
-| Memory Maintenance Worker | [README](../agents/README.zh.md) |
-| Memory Catalog Server | [README](../services/memory-catalog/README.zh.md) |
+| 运行角色                  | 包说明                                               |
+| ------------------------- | ---------------------------------------------------- |
+| GitHub Integration        | [README](../apps/github-integration/README.zh.md)    |
+| Review Runs               | [README](../services/review-runs/README.zh.md)       |
+| Control Plane UI          | [README](../apps/control-plane-ui/README.zh.md)      |
+| Execution Gateway         | [README](../services/execution-gateway/README.zh.md) |
+| Execution Worker          | [README](../agents/README.zh.md)                     |
+| Memory Extraction Worker  | [README](../agents/README.zh.md)                     |
+| Memory Maintenance Worker | [README](../agents/README.zh.md)                     |
+| Memory Catalog Server     | [README](../services/memory-catalog/README.zh.md)    |
 
 ### Agent
 

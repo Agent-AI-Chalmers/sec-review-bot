@@ -29,13 +29,13 @@ Consumers validate the effective path after applying `path`; placeholder names i
 
 Only regular files and directories are allowed. Every entry has canonical metadata:
 
-| Field | Regular file | Directory |
-| --- | --- | --- |
-| `mtime` | `0` | `0` |
-| `uid`, `gid` | `0`, `0` | `0`, `0` |
-| `uname`, `gname` | empty | empty |
-| mode | `0644` | `0755` |
-| size | actual body length | `0` |
+| Field            | Regular file       | Directory |
+| ---------------- | ------------------ | --------- |
+| `mtime`          | `0`                | `0`       |
+| `uid`, `gid`     | `0`, `0`           | `0`, `0`  |
+| `uname`, `gname` | empty              | empty     |
+| mode             | `0644`             | `0755`    |
+| size             | actual body length | `0`       |
 
 Profiles define which files and directories are allowed, but cannot relax these shared entry rules.
 

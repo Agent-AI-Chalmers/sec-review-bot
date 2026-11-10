@@ -36,7 +36,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Set up Node package
         uses: ./.github/actions/setup-node
         with:
@@ -54,4 +55,3 @@ jobs:
           pnpm --if-present run lint:contract
           pnpm --if-present run typecheck
           pnpm test
-

@@ -6,7 +6,7 @@ Language: English | [中文](REPOSITORY_REVIEW_STRATEGY.zh.md)
 
 `repository-review` is a repository-level workflow independent of `issue-review` and `pull-request-review`. It screens the repository, condenses file-level suspicious points into a small number of high-value problem clusters called `case`s, sends worthwhile cases through `analyzer / cvss-v4-scoring / mitigator / verifier`, and publishes a repository summary plus a small number of draft PRs.
 
-The workflow favors broad initial coverage, later denoising and consolidation, and final output that a reviewer can inspect. It is not a "one agent understands the whole repository" design, and it does not try to maximize raw finding count.
+The workflow favors broad initial coverage, then denoising and consolidation, and ends with output a reviewer can inspect. No single agent is expected to understand the whole repository, and the workflow does not try to maximize raw finding count.
 
 ## Stage Model
 
@@ -25,6 +25,7 @@ The workflow is organized into these segments:
 Discovery screens local chunks instead of giving an agent free-form repository exploration.
 
 <!-- doc-default: AGENT_DISCOVERY_CHUNK_STRATEGY; source=agents/src/sec_review_agents/scan_stages/discovery/stage.py -->
+
 Discovery defaults to `single-file`: each model call scans one complete file. Deployments can select `AGENT_DISCOVERY_CHUNK_STRATEGY=batched` to group nearby files within a context budget and share local context. See [Discovery design](DISCOVERY_AGENT_DESIGN.md) for file selection and budget rules.
 
 Discovery emits structured `candidate`s with location, category, rationale, and confidence. It stops short of vulnerability confirmation and `vulnerability_type` / `CWE` classification, keeping this stage high-recall and lightweight.

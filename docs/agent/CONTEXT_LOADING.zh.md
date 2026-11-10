@@ -14,7 +14,7 @@
 
 ## 何时各自更优
 
-决定性的问题不是内容有多大，而是内容是否**稳定且每次都需要**：
+决定因素是内容是否**稳定且每次都需要**，与内容大小无关：
 
 - **预加载**只在内容**既必需、又完整**时才成立。必需，指这个 Agent 的每次运行都必须拿到它才能作答；完整，指预加载的部分就是全部输入，而不是一份还需要 Agent 自己去补全的样本。case 摘要、candidate 列表、Discovery chunk 中内联的文件都属于这一类。预加载一份之后还要 Agent 去补全的内容，是两头不讨好：多了一次工具轮次，还背着一份可能已经过时的 payload。
 - **按需读取**适用于内容大、每次都在变、或只有部分相关的情况。仓库、diff、模型可能查也可能不查的产物属于这一类。
@@ -27,13 +27,13 @@
 
 按需加载在另外两个数据集上把有效输入降低了 52.8% 与 73.0%，同一篇论文也指出更长的输出可能吃掉小幅的输入节省。[Just-in-time retrieval](https://learn.agentpatterns.ai/context-engineering/just-in-time-retrieval/) 从上下文工程的角度给出同样的规则：上下文里保留一个小而稳定的核心，其余内容等到任务真正走到那里再加载。
 
-预加载同样有支持它的证据，而且并不只是“成本更低的那个选项”。
+预加载也有成本之外的依据。
 
 **位置比是否出现更关键。** [Lost in the Middle](https://arxiv.org/abs/2307.03172)（TACL 2023）测量了模型对其所获信息的实际利用率：
 
 > performance is often highest when relevant information occurs at the beginning or end of the input context, and significantly degrades when models must access relevant information in the middle of long contexts, even for explicitly long-context models
 
-按需读取并不能绕开这个问题。工具结果落在不断增长的对话中段，要同后面每一轮竞争注意力；而预加载的内容处在一个固定位置，模型一开始就读到。按需读取换来的是选择性，而不是被读到的保证。
+按需读取并不能绕开这个问题。工具结果落在不断增长的对话中段，要同后面每一轮竞争注意力；而预加载的内容处在一个固定位置，模型一开始就读到。按需读取让 Agent 自己选择读什么，但不保证模型会注意到读到的内容。
 
 **选择性读取要求 Agent 选得准。** 一份对 900 条 Agent 轨迹的定性分析在三个模型家族上都发现了四类反复出现的失败模式（[arXiv 2512.07497](https://ar5iv.labs.arxiv.org/html/2512.07497)）：
 
@@ -43,15 +43,15 @@
 
 ## 本项目各 Agent 的选择
 
-| Agent | 策略 | 预加载了什么，或为什么不预加载 |
-| --- | --- | --- |
-| 仓库 Discovery | 预加载 | 被扫描的文件以内联形式随提示词到达。Discovery 不挂载任何工作区，因此无法按需读取仓库文件：输入必须完整，提示词也明确说明这些内联内容就是全部输入。 |
-| 仓库 Triage | 预加载 | 候选内容随提示词到达。Triage 按设计不挂载工作区，其判断被定义为“只根据提供的内容作出”。 |
-| pull request 的 Analyzer、Mitigator、Verifier | 按需读取 | 挂载工作区与 `/history`，Agent 通过 git 读取窗口。提示词携带 PR 文本、引用信息与上一阶段结果，但不含渲染好的文件清单或差异。 |
-| issue 的 Analyzer、Mitigator、Verifier | 按需读取 | 挂载工作区与 `/history`；issue 文本被预加载，因为它是本次审查的信号本身。 |
-| 仓库 case 的 Analyzer、Mitigator、Verifier | 按需读取 | 挂载工作区；增量扫描还会挂载 `/history` 与 `/incremental-window`。case 审查输入提供定位线索，不摘抄文件内容。 |
-| CVSS Scoring | 混合 | 为核对评分事实提供代码访问能力，因此挂载工作区，并预加载待评分的发现。 |
-| 删除 case | 预加载，仅路径 | case 携带文件路径与窗口，从不携带文件内容。当前没有文件可读，所以路径就是完整输入；内容来自补丁或 git。 |
+| Agent                                         | 策略           | 预加载了什么，或为什么不预加载                                                                                                                     |
+| --------------------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 仓库 Discovery                                | 预加载         | 被扫描的文件以内联形式随提示词到达。Discovery 不挂载任何工作区，因此无法按需读取仓库文件：输入必须完整，提示词也明确说明这些内联内容就是全部输入。 |
+| 仓库 Triage                                   | 预加载         | 候选内容随提示词到达。Triage 按设计不挂载工作区，其判断被定义为“只根据提供的内容作出”。                                                            |
+| pull request 的 Analyzer、Mitigator、Verifier | 按需读取       | 挂载工作区与 `/history`，Agent 通过 git 读取窗口。提示词携带 PR 文本、引用信息与上一阶段结果，但不含渲染好的文件清单或差异。                       |
+| issue 的 Analyzer、Mitigator、Verifier        | 按需读取       | 挂载工作区与 `/history`；issue 文本被预加载，因为它是本次审查的信号本身。                                                                          |
+| 仓库 case 的 Analyzer、Mitigator、Verifier    | 按需读取       | 挂载工作区；增量扫描还会挂载 `/history` 与 `/incremental-window`。case 审查输入提供定位线索，不摘抄文件内容。                                      |
+| CVSS Scoring                                  | 混合           | 为核对评分事实提供代码访问能力，因此挂载工作区，并预加载待评分的发现。                                                                             |
+| 删除 case                                     | 预加载，仅路径 | case 携带文件路径与窗口，从不携带文件内容。当前没有文件可读，所以路径就是完整输入；内容来自补丁或 git。                                            |
 
 ## 仓库指导
 

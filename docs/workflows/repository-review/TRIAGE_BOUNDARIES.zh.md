@@ -6,7 +6,7 @@
 
 初筛阶段 Discovery 尽量多地找出安全线索，再交给 Triage 整理。candidate 并不等于漏洞：其中可能包含重复报告、证据较弱的推测、同一问题的前后端视角，以及明显不值得继续分析的噪音。
 
-Triage 阶段不确认漏洞，而是把这些 candidate 整理成后续 Analyzer 更容易处理的 case：
+Triage 阶段不确认漏洞。它把这些 candidate 整理成后续 Analyzer 更容易处理的 case：
 
 - 哪些 candidate 不值得继续分析，可以 suppress；
 - 哪些 candidate 描述同一个问题，可以 merge 为一个 case；
@@ -27,7 +27,7 @@ Triage 阶段不确认漏洞，而是把这些 candidate 整理成后续 Analyze
 - UI 显示 `/admin` 链接，但真正决定访问权限的是管理 API 的服务端角色检查。
 - 用户可以修改 localStorage 或 React 状态，但可信服务端的状态并不受其影响。
 
-`merge` 和 `suppress` 分别解决不同问题：
+是否相关并不能单独决定 `merge` 还是 `suppress`：
 
 - `merge`：多个 item 描述同一根因、危险操作、信任边界或修复点，merge 后能更完整地说明问题。
 - `suppress`：item 不属于漏洞问题，或只是弱旁证、重复线索，被更直接的证据覆盖后没有独立分析或修复价值。
@@ -45,7 +45,7 @@ Triage 优先避免漏掉值得调查的问题，因此 suppress 需要较充分
 
 如果答案是肯定的，即使证据很弱，也通常应保守 keep。因为这时 item 已经提供了一个 repository-specific anchor，后续 Analyzer 可以围绕这个落点检查跨文件鉴权、session 行为、数据流、schema、调用方或危险 sink。
 
-因此，suppress candidate 主要是清理没有可分析对象或没有独立价值的线索，不是代替 Analyzer 最终判定漏洞是否成立。
+suppress 清理的是没有可分析对象或没有独立价值的线索。漏洞是否成立仍由 Analyzer 最终判定。
 
 ## 何时 merge candidate
 

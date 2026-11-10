@@ -2,19 +2,19 @@
 
 Language: English | [中文](REVIEW_INTENT.zh.md)
 
-`review_intent` records the review objective a *caller* asks the *callee* to serve, plus an optional constraint on the final patch.
+`review_intent` records the review objective a _caller_ asks the _callee_ to serve, plus an optional constraint on the final patch.
 
-The caller, callee, and end user are different roles, and the distinction matters here:
+The caller, callee, and end user are three different roles:
 
 - The **caller** is whatever program invokes review execution and sets `review_intent`: the GitHub Integration, the PatchEval harness, or a local CLI run.
 - The **callee** is the review execution: the Execution Worker that accepts the request and runs the review workflow.
-- The **end user** interacts with that caller — for example, commenting `@<app-slug> review` on a GitHub issue. GitHub comment commands do not expose `objective`; the integration selects `audit`. Users can set `test_changes` by adding `--test-changes deny` to the comment.
+- The **end user** interacts with that caller, for example by commenting `@<app-slug> review` on a GitHub issue. GitHub comment commands do not expose `objective`; the integration selects `audit`. Users can set `test_changes` by adding `--test-changes deny` to the comment.
 
-*The local issue CLI does expose `--review-objective audit|repair`.*
+_The local issue CLI does expose `--review-objective audit|repair`._
 
 How a caller chooses the objective is its own product decision, not something `review_intent` decides. The GitHub Integration always sends `audit`, because the input it forwards (an issue or pull request someone wrote) is an unverified claim.
 
-*The PatchEval harness is deliberately designed to allow `repair` when evaluating repair capabilities on known CVEs.*
+_The PatchEval harness is deliberately designed to allow `repair` when evaluating repair capabilities on known CVEs._
 
 ## Fields
 
@@ -49,7 +49,7 @@ Default behavior:
 
 ### `repair`
 
-The caller has established that the input is a confirmed repair target — for example the PatchEval harness, whose input is a known CVE. Only a caller that holds a trusted input should send it.
+The caller has established that the input is a confirmed repair target. The PatchEval harness is one example: its input is a known CVE. Only a caller that holds a trusted input should send it.
 
 Default behavior:
 
@@ -62,7 +62,7 @@ Default behavior:
 
 `repair` does not allow hallucinated findings and is not blind obedience to reports. It still requires repository evidence. The difference is the default direction: advance toward the correct repair instead of re-arguing whether a repair was warranted.
 
-The objective sets the goal of Analyzer’s investigation without predetermining its conclusion or changing the meaning of result fields. For example, investigating with a repair objective does not require Analyzer to conclude that a vulnerability exists or Mitigator to produce a patch.
+The objective sets the goal of Analyzer's investigation without predetermining its conclusion or changing the meaning of result fields. For example, investigating with a repair objective does not require Analyzer to conclude that a vulnerability exists or Mitigator to produce a patch.
 
 ## Test Changes Policy
 

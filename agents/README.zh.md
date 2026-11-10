@@ -25,7 +25,7 @@ source .venv/bin/activate
 
 本目录自带 `.python-version`；`pyproject.toml` 要求 Python 3.14 或更新版本。
 
-> *Python 3.14 是本包开发、CI、打包和容器运行使用的基线版本。*
+> _Python 3.14 是本包开发、CI、打包和容器运行使用的基线版本。_
 
 ## LLM 配置
 
@@ -44,7 +44,7 @@ cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 
 `[agent_deployment_bindings]` 用来把具体 Agent 显式绑定到某个模型部署。所有运行到的 Agent 都必须显式声明；未声明的 Agent 会 fail fast，不会继承默认模型。
 
-每个 `[[deployments]]` 都必须显式声明 `max_input_tokens`。Execution Worker 不会从 LangChain 模型能力描述或模型服务商名字推断上下文窗口；这个模型部署 contract 才是上下文上限行为的事实来源。
+每个 `[[deployments]]` 都必须显式声明 `max_input_tokens`。Execution Worker 不会从 LangChain 模型能力描述或模型服务商名字推断上下文窗口；上下文上限行为以这个模型部署 contract 为准。
 
 ## 本地运行
 
@@ -56,11 +56,11 @@ cp agents/config/model-providers.sample.toml agents/config/model-providers.toml
 - Local `--temporal` 任务：用于验证 workflow / activity 编排。
 - 手动启动 Service 和 Worker：联调 HTTP 服务、Temporal 和 Worker，无需启动完整 Compose 栈。
 
-| 执行路径 | 执行归档发布 | 记忆处理 |
-| --- | --- | --- |
-| Direct `run-local-*`，标准工作流 | 本地执行归档 | 禁用 |
-| 本地 `--temporal`，标准工作流 | 本地执行归档 | 由 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
-| 手动启动 Service 和 Worker | S3 兼容存储中的执行归档 | 由 Execution Worker 环境中的 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
+| 执行路径                         | 执行归档发布            | 记忆处理                                                            |
+| -------------------------------- | ----------------------- | ------------------------------------------------------------------- |
+| Direct `run-local-*`，标准工作流 | 本地执行归档            | 禁用                                                                |
+| 本地 `--temporal`，标准工作流    | 本地执行归档            | 由 `AGENT_MEMORY_PROCESSING_ENABLED` 控制                           |
+| 手动启动 Service 和 Worker       | S3 兼容存储中的执行归档 | 由 Execution Worker 环境中的 `AGENT_MEMORY_PROCESSING_ENABLED` 控制 |
 
 ### `run-local-*` 命令
 
@@ -182,21 +182,22 @@ Agent 可以声明自己需要的 skills。Worker 启动 Agent 时会自动准�
 
 本包实现经验提取、记忆维护及对应 Worker。主链路的 Analyzer、Mitigator 和 Verifier 通过每次调用专用的文件系统视图读取维护后的记忆。整体设计见 [MEMORY_SYSTEM](../docs/agent/MEMORY_SYSTEM.zh.md)，基础设施搭建与运维见[LOCAL_MEMORY_DEVELOPMENT](../docs/operations/LOCAL_MEMORY_DEVELOPMENT.zh.md)。
 
-| 变量 | 用途 |
-| --- | --- |
-| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog 的基础 URL。未配置时，主链路 Agent 不加载记忆，记忆处理也无法运行。 |
-| `AGENT_MEMORY_CATALOG_TOKEN` | Memory Catalog 经验提取和自动记忆维护使用的 Worker bearer token。配置 `AGENT_MEMORY_CATALOG_URL` 时必须同时配置。 |
-| `AGENT_MEMORY_CONSUMPTION_ENABLED` | 是否让主链路 Agent 加载当前生效的记忆文件树。 |
-| `AGENT_MEMORY_PROCESSING_ENABLED` | 是否启用经验提取和记忆维护。 |
+| 变量                               | 用途                                                                                                              |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `AGENT_MEMORY_CATALOG_URL`         | Memory Catalog 的基础 URL。未配置时，主链路 Agent 不加载记忆，记忆处理也无法运行。                                |
+| `AGENT_MEMORY_CATALOG_TOKEN`       | Memory Catalog 经验提取和自动记忆维护使用的 Worker bearer token。配置 `AGENT_MEMORY_CATALOG_URL` 时必须同时配置。 |
+| `AGENT_MEMORY_CONSUMPTION_ENABLED` | 是否让主链路 Agent 加载当前生效的记忆文件树。                                                                     |
+| `AGENT_MEMORY_PROCESSING_ENABLED`  | 是否启用经验提取和记忆维护。                                                                                      |
 
 ### 结构化输出
 
 <!-- doc-default: AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES; source=agents/src/sec_review_agents/runtime/structured_response_middleware.py -->
+
 需要结构化输出的 Agent 必须返回 `structured_response`。模型只返回普通文本，或工具参数无法解析且没有有效工具调用可以继续时，中间件会在同一次 Agent 执行中追加纠正消息并重试。`AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES` 控制重试上限，默认 `2`。这与服务商 API 请求重试不同；已解析参数的 schema 校验错误仍由 LangChain 的结构化输出机制处理。
 
 ## 沙箱运行环境
 
-审查代码的 Agent 阶段必须运行在能够执行命令的 sandbox 里，否则它无法运行测试、读取历史或复现发现。具体用哪个 sandbox 属于部署配置：
+审查代码的 Agent 阶段必须运行在能够执行命令的 sandbox 里，否则它无法运行测试、读取历史或复现发现。具体使用哪个 sandbox 由部署配置决定：
 
 - `AGENT_SANDBOX_BACKEND` 不设置或设置为 `docker`：要求使用 Docker sandbox
 

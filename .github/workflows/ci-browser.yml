@@ -22,7 +22,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Set up Node package
         uses: ./.github/actions/setup-node
         with:
@@ -43,4 +44,3 @@ jobs:
             apps/control-plane-ui/test-results/
           retention-days: 14
           if-no-files-found: warn
-

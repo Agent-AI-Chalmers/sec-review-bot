@@ -29,7 +29,7 @@
 - `agents` 下的内部 Python 模块路径；
 - Temporal workflow 名称，以及工作流和阶段的实现细节；
 - 用于诊断的阶段产物结构，除非其中某字段已明确纳入契约；
-- GitHub Integration内部如何安排各步骤；
+- GitHub Integration 内部如何安排各步骤；
 - 只用于发布策略或本地工具、未纳入契约的字段。
 
 ## 双方分别负责什么
@@ -48,7 +48,7 @@ Agent 执行侧负责：
 - 返回以 `review_record` 和仓库审查的 `deliveries[]` 为核心的结构化结果；
 - 保存各种产物。
 
-GitHub Integration是调用方的一种实现：它根据 GitHub 事件准备执行输入，再按平台规则发布结果。
+GitHub Integration 是调用方的一种实现：它根据 GitHub 事件准备执行输入，再按平台规则发布结果。
 
 这种分工也限制了权限：GitHub 身份、权限、API 调用、发布、重试和审计由调用方处理。Execution Worker 只执行 Execution API 约定的任务，不直接操作 GitHub。
 

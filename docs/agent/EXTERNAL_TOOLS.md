@@ -2,7 +2,7 @@
 
 Language: English | [中文](EXTERNAL_TOOLS.zh.md)
 
-This page explains which external tools the agent uses and how those tools enter the runtime. Tool capability comes first; CLI, skills, and Model Context Protocol (MCP) are possible interfaces rather than goals of their own.
+This page explains which external tools the agent uses and how those tools enter the runtime. Start from the capability a tool provides, then choose how to expose it: CLI, skills, or Model Context Protocol (MCP).
 
 ## TL;DR
 
@@ -20,13 +20,13 @@ MCP is a protocol for exposing capabilities to a model client. Its [server featu
 
 This project currently consumes MCP tools only. It does not load MCP prompts or resources. An adapter would not decide which server instructions belong in which agent, how instructions should be merged, how provenance should be recorded, or whether server content should be trusted.
 
-For tools, the model chooses from the exposed name, description, and schema. An MCP integration therefore adds tool schemas to the model context and introduces another process, transport, lifecycle, and failure boundary. Those costs may be justified, but they are not free discovery.
+For tools, the model chooses from the exposed name, description, and schema. An MCP integration therefore adds tool schemas to the model context and introduces another process, transport, lifecycle, and failure boundary. Those costs can be worth paying, but discovery through MCP is not free.
 
 MCP is most useful when it exposes something bash cannot accurately provide: an existing application session shared with a human, credentials that must remain outside the sandbox, host resources that cannot be mounted into the workspace, or genuinely interactive operations built around notifications and shared live state.
 
 Remote, long-running, or stateful does not establish that need. A CLI can call a remote API, preserve a session in files, and operate a long-running process. An MCP tool whose main operation accepts an arbitrary command, query, script, or code string deserves particular scrutiny because it may only wrap a capability the agent already has.
 
-Past experiments also show why protocol support is not enough. This project tried StacklokLabs' [OSV MCP](https://github.com/StacklokLabs/osv-mcp) and removed it. In an issue-analyzer probe for [CVE-2024-1724](https://www.cve.org/CVERecord?id=CVE-2024-1724), the server returned valid advisory facts, but they did not help locate or understand the defect in the current checkout. The protocol worked; the capability did not improve the workflow's decision.
+Past experiments also show why protocol support is not enough. This project tried StacklokLabs' [OSV MCP](https://github.com/StacklokLabs/osv-mcp) and removed it. In an issue-analyzer probe for [CVE-2024-1724](https://www.cve.org/CVERecord?id=CVE-2024-1724), the server returned valid advisory facts, but they did not help locate or understand the defect in the current checkout. The protocol worked, but the capability did not improve the workflow's decision.
 
 Official references:
 
@@ -62,9 +62,9 @@ Neither capability requires MCP in this runtime:
 
 The project enables the installed commands independently with `AGENT_JOERN_ENABLED` and `AGENT_PLAYWRIGHT_ENABLED`; both default to false. Each review agent declares which external tools it may use, and a tool is advertised only when both the deployment switch and the agent declaration select it. Joern and Playwright use the Docker execution backend. Browser sessions and setup services remain in the same container across commands. Configuration fails when a selected tool is incompatible with the resolved backend. Docker deployments must provide the commands in their selected image.
 
-An MCP layer would therefore expose substantially the same capabilities while adding tool schemas and connection lifecycle. It has not demonstrated an additional capability that the default workflow needs. CLI is the default because it is sufficient, not because CLI is universally better than MCP.
+An MCP layer would therefore expose substantially the same capabilities while adding tool schemas and connection lifecycle. It has not demonstrated an additional capability that the default workflow needs. CLI is the default because it is sufficient here; that does not make CLI better than MCP in general.
 
-Skills remain an optional enhancement for Joern and Playwright, not a prerequisite for using either tool. They may provide additional workflow or interpretation guidance when that guidance proves useful, but the default integration does not depend on them.
+Skills are optional for Joern and Playwright; agents can use either tool without one. A skill may provide additional workflow or interpretation guidance when that guidance proves useful, but the default integration does not depend on them.
 
 The Playwright agent prompt explicitly selects `--browser chromium`. The workspace image installs Playwright Chromium, but the CLI defaults to a system Chrome executable and its current help text does not list `chromium` among the accepted values even though the option works. This is deployment knowledge that `--help` cannot currently supply reliably, so it belongs in the selected tool prompt rather than in a skill.
 

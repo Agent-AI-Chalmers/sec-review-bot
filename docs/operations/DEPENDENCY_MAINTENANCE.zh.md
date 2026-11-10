@@ -12,7 +12,7 @@
 - 依赖更新要和其他变更分开。
 - 直接依赖先看哪些代码导入了它。传递依赖先查是哪个包把它带进来的。
 - 对安全问题、已知生产 bug 或高风险运行时依赖，使用定向更新。
-- 只有在 dependency-only、resolver 有解、更新集合可理解，并且 包内检查 通过时，才做完整 lockfile refresh。
+- 只有在 dependency-only、resolver 有解、更新集合可理解，并且包内检查通过时，才做完整 lockfile refresh。
 
 Dependabot 配置在 [`.github/dependabot.yml`](../../.github/dependabot.yml)，管理 `npm`、`uv`、`pip` 和 GitHub Actions。Dependabot PR 是有用的更新探针，但 grouped PR 通常更新目标依赖，以及让这些目标能升级所需的 lockfile 变化；它不一定会把所有兼容的传递依赖都升到当前 resolver 能选到的最高版本。
 
@@ -25,23 +25,24 @@ Dependabot 配置在 [`.github/dependabot.yml`](../../.github/dependabot.yml)，
 ## Node.js 包（pnpm）
 
 <!-- doc-default: node-workspace; source=pnpm-workspace.yaml -->
+
 Node.js 包各自维护 `package.json`，并共用根目录的 pnpm 工作区和 `pnpm-lock.yaml`。包列表见 `pnpm-workspace.yaml`；依赖版本变更需要同步更新根目录的 lockfile，不为每个包另建 lockfile。
 
-| 目标 | 命令（在包目录中运行） |
-| --- | --- |
-| 检查过期依赖 | `pnpm outdated` |
-| 在 package.json 声明的版本范围内更新 | `pnpm update` |
-| 本地检查 | `pnpm run lint`、`pnpm run typecheck`、`pnpm test` |
+| 目标                                 | 命令（在包目录中运行）                             |
+| ------------------------------------ | -------------------------------------------------- |
+| 检查过期依赖                         | `pnpm outdated`                                    |
+| 在 package.json 声明的版本范围内更新 | `pnpm update`                                      |
+| 本地检查                             | `pnpm run lint`、`pnpm run typecheck`、`pnpm test` |
 
 ## Python Agent
 
 Agents 包在 `agents/` 下使用 `uv`。直接依赖声明在 [`agents/pyproject.toml`](../../agents/pyproject.toml)，解析后的包锁在 [`agents/uv.lock`](../../agents/uv.lock)。
 
-| 目标 | 命令 |
-| --- | --- |
-| 检查顶层过期包 | `uv tree --outdated --all-groups --depth 1` |
-| 预览完整 lockfile refresh | `uv lock --upgrade --dry-run` |
-| 执行完整 lockfile refresh | `uv lock --upgrade` |
+| 目标                      | 命令                                        |
+| ------------------------- | ------------------------------------------- |
+| 检查顶层过期包            | `uv tree --outdated --all-groups --depth 1` |
+| 预览完整 lockfile refresh | `uv lock --upgrade --dry-run`               |
+| 执行完整 lockfile refresh | `uv lock --upgrade`                         |
 
 检查：
 
@@ -65,6 +66,7 @@ action 以 major tag 固定在 `.github/workflows/`，由 Dependabot 的 `github
 ## 运行时与工具链版本
 
 <!-- doc-default: node-runtime; source=package.json -->
+
 当前声明：每个 TypeScript 包把 `engines.node` 钉在 `>=26.13.0 <27`，CI 通过 `node-version-file` 从 `package.json` 安装 Node，Dependabot 忽略 `typescript` 与 `@types/node` 的 semver-major。agents 包声明 `requires-python = ">=3.14"`，精确补丁版本记在 `agents/.python-version`，CI 通过 `python-version-file` 安装 Python。
 
 何时可以升级到下一个版本：

@@ -6,17 +6,17 @@
 
 `review_intent` 记录**调用方**要求**被调用方**服务哪一种 review 目标，外加对最终补丁的可选约束。
 
-**调用方**、**被调用方**与**最终用户**是三个不同角色，这个区分在这里很关键：
+**调用方**、**被调用方**与**最终用户**是三个不同角色：
 
-- **调用方（caller）**是真正调用 review 执行侧、设置 `review_intent` 的程序：GitHub Integration、PatchEval harness，或本地 CLI 运行。
-- **被调用方（callee）**是 review 执行侧：接收请求、校验 `review_intent` 并运行 review 工作流的 Execution Worker。
-- **最终用户（end user）**通过调用方交互——例如在 GitHub issue 下评论 `@<app-slug> review`。GitHub 评论命令不提供 `objective` 参数，由 GitHub Integration 固定使用 `audit`。用户可以通过 `--test-changes deny` 设置 `test_changes`。
+- **调用方**（caller）是真正调用 review 执行侧、设置 `review_intent` 的程序：GitHub Integration、PatchEval harness，或本地 CLI 运行。
+- **被调用方**（callee）是 review 执行侧：接收请求、校验 `review_intent` 并运行 review 工作流的 Execution Worker。
+- **最终用户**（end user）通过调用方交互，例如在 GitHub issue 下评论 `@<app-slug> review`。GitHub 评论命令不提供 `objective` 参数，由 GitHub Integration 固定使用 `audit`。用户可以通过 `--test-changes deny` 设置 `test_changes`。
 
-*本地 Issue CLI 则允许通过 `--review-objective audit|repair` 选择目标。*
+_本地 Issue CLI 则允许通过 `--review-objective audit|repair` 选择目标。_
 
-调用方如何选择 objective 是它自己的产品决策，不是 `review_intent` 决定的。GitHub Integration 始终使用 `audit`，因为它转发的是别人写的 issue 或 pull request——一个未经证实的说法。
+调用方如何选择 objective 是它自己的产品决策，不是 `review_intent` 决定的。GitHub Integration 始终使用 `audit`，因为它转发的是别人写的 issue 或 pull request，属于未经证实的说法。
 
-*我们特意将 PatchEval harness 设计为可使用 `repair`，以评测针对已知 CVE 的修复能力。*
+_我们特意将 PatchEval harness 设计为可使用 `repair`，以评测针对已知 CVE 的修复能力。_
 
 ## 字段
 
@@ -51,7 +51,7 @@
 
 ### `repair`
 
-调用方已经确认输入是一个可修复目标——例如 PatchEval harness，其输入是已知 CVE。只有手握可信输入的调用方才应发送它。
+调用方已经确认输入是一个可修复目标。PatchEval harness 就是一例，其输入是已知 CVE。只有手握可信输入的调用方才应发送它。
 
 默认行为：
 

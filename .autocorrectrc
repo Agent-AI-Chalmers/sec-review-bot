@@ -1,0 +1,8 @@
+# AutoCorrect checks CJK spacing and punctuation in Chinese documentation.
+# Run `pnpm run lint:zh` from the repository root.
+rules:
+  # Full-width parentheses are standard in Chinese prose, even around English terms.
+  halfwidth-punctuation: 0
+textRules: {}
+fileTypes:
+  md: markdown

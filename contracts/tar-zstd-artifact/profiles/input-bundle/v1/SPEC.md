@@ -6,15 +6,15 @@ Language: English | [中文](SPEC.zh.md)
 
 A v1 input bundle uses the restricted POSIX PAX [envelope v1](../../../envelope/v1/SPEC.md).
 
-| Property | Required value |
-| --- | --- |
-| Media type | `application/tar+zstd` |
-| Digest | lowercase `sha256` of the actual compressed archive bytes |
-| Maximum compressed archive size | 2 GiB (`2,147,483,648` bytes) |
-| Maximum entry count | 100,000, including files and directories |
-| Maximum total regular-file size | 8 GiB (`8,589,934,592` bytes) |
+| Property                        | Required value                                            |
+| ------------------------------- | --------------------------------------------------------- |
+| Media type                      | `application/tar+zstd`                                    |
+| Digest                          | lowercase `sha256` of the actual compressed archive bytes |
+| Maximum compressed archive size | 2 GiB (`2,147,483,648` bytes)                             |
+| Maximum entry count             | 100,000, including files and directories                  |
+| Maximum total regular-file size | 8 GiB (`8,589,934,592` bytes)                             |
 
-The Execution API reference binds the URI, media type, compressed-byte size, and digest. Storage location is owned by the caller's storage contract rather than this archive profile.
+The Execution API reference binds the URI, media type, compressed-byte size, and digest. The caller's storage contract owns the storage location; this archive profile does not define it.
 
 ## Required Tree
 

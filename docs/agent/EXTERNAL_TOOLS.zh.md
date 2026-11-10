@@ -22,13 +22,13 @@ MCP 是向模型客户端提供工具和上下文的协议。它的 [server feat
 
 本项目只使用 MCP tools，不加载 MCP prompts 或 resources。即使增加 adapter，它也不会自动决定哪些 server instruction 应该进入哪个 Agent、instruction 如何合并、来源如何记录，或者 server 内容是否可信。
 
-对于 tools，模型根据暴露的 name、description 和 schema 进行选择。因此每项 MCP 集成都会占用模型上下文，并增加一套进程、transport、生命周期和失败边界。这些成本可能值得承担，但它们不是免费的工具发现机制。
+对于 tools，模型根据暴露的 name、description 和 schema 进行选择。因此每项 MCP 集成都会占用模型上下文，并增加一套进程、transport、生命周期和失败边界。这些成本可能值得承担，但通过 MCP 发现工具并非没有代价。
 
 当 MCP 暴露的是 bash 无法准确提供的能力时，它最有价值。例如：由人与 Agent 共享的既有应用 session；必须留在 sandbox 外的 credential；无法挂载进工作区的 host 资源；或者确实围绕通知和共享实时状态建立的交互操作。
 
 远程、长期运行或有状态，本身不能证明需要 MCP。CLI 同样可以调用远程 API、把 session 保存在文件中并操作长期运行的进程。如果一个 MCP tool 的主要操作接受任意 command、query、script 或 code string，就尤其值得审视，因为它可能只是在包装 Agent 已经拥有的能力。
 
-过去的实验也说明，支持协议本身并不足够。本项目试过 StacklokLabs 的 [OSV MCP](https://github.com/StacklokLabs/osv-mcp)，后来将其删除。在一次针对 [CVE-2024-1724](https://www.cve.org/CVERecord?id=CVE-2024-1724) 的 issue-analyzer probe 中，server 返回了正确的 advisory facts，但这些信息无助于定位或理解当前 checkout 中的缺陷。协议是工作的，但能力没有改善工作流的判断。
+过去的实验也说明，支持协议本身并不足够。本项目试过 StacklokLabs 的 [OSV MCP](https://github.com/StacklokLabs/osv-mcp)，后来将其删除。在一次针对 [CVE-2024-1724](https://www.cve.org/CVERecord?id=CVE-2024-1724) 的 issue-analyzer probe 中，server 返回了正确的 advisory facts，但这些信息无助于定位或理解当前 checkout 中的缺陷。协议本身运行正常，但这项能力没有改善工作流的判断。
 
 官方参考：
 
@@ -64,11 +64,11 @@ Joern 提供代码属性图、结构查询、调用关系和数据流分析；Pl
 
 本项目分别通过 `AGENT_JOERN_ENABLED` 和 `AGENT_PLAYWRIGHT_ENABLED` 启用已安装的命令；两者默认均为 false。每类 review Agent 会声明自己可以使用哪些外部工具，只有部署开关和 Agent 声明同时选中某项工具时，相关提示才会进入上下文。Joern 和 Playwright 使用 Docker 执行 backend。browser session 和 setup service 在多次命令之间保留在同一个容器中。如果选中的工具与最终 backend 不兼容，配置会直接失败。Docker 部署必须在所选镜像中提供相应命令。
 
-因此，MCP layer 暴露的能力大体相同，却会增加 tool schema 和 connection lifecycle。它尚未证明能够提供默认工作流所需的额外能力。选择 CLI 是因为 CLI 已经足够，而不是因为 CLI 在任何场景都优于 MCP。
+因此，MCP layer 暴露的能力大体相同，却会增加 tool schema 和 connection lifecycle。它尚未证明能够提供默认工作流所需的额外能力。默认使用 CLI 是因为它在这里已经足够，并不表示 CLI 在所有场景都优于 MCP。
 
-Skills 对 Joern 和 Playwright 而言是可选的增强，而不是使用这些工具的前提。它们可以在确有帮助时补充工作流或结果解释指导，但默认集成不依赖 skills。
+Skill 对 Joern 和 Playwright 是可选的，Agent 不需要 Skill 也能使用这两个工具。Skill 可以在确有帮助时补充工作流或结果解释指导，但默认集成不依赖 skills。
 
-Playwright 的 Agent 提示词会显式选择 `--browser chromium`。工作区镜像 安装的是 Playwright Chromium，但 CLI 默认寻找系统 Chrome；当前帮助文本也没有把实际可用的 `chromium` 列在可选值中。这项部署知识目前无法由 `--help` 可靠提供，因此应当进入选中的工具提示词，而不是另建 skill。
+Playwright 的 Agent 提示词会显式选择 `--browser chromium`。工作区镜像安装的是 Playwright Chromium，但 CLI 默认寻找系统 Chrome；当前帮助文本也没有把实际可用的 `chromium` 列在可选值中。这项部署知识目前无法由 `--help` 可靠提供，因此应当进入选中的工具提示词，而不是另建 skill。
 
 Capability tests 使用显式 `println` marker 固定 Joern query 的证据。Joern 的交互输出包含 ANSI 格式；稳定 marker 让确定性测试能够断言语义值，而不与终端渲染绑定。Agent 正常使用 Joern 时不需要遵循这项约定。
 

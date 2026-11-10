@@ -1,0 +1,19 @@
+# Fast checks on staged files only. CI runs the full repository-wide checks.
+# Hooks install with `pnpm install` through the root `prepare` script.
+pre-commit:
+  parallel: true
+  commands:
+    prettier:
+      glob: '*.{md,yml,yaml,json,jsonc,mjs,js}'
+      exclude:
+        - 'apps/**'
+        - 'services/**'
+        - 'contracts/**/tools/**'
+        - 'contracts/codegen/**'
+      run: pnpm exec prettier --check --ignore-unknown {staged_files}
+    markdownlint:
+      glob: '*.md'
+      run: pnpm exec markdownlint-cli2 {staged_files}
+    autocorrect:
+      glob: '*.zh.md'
+      run: pnpm exec autocorrect --lint {staged_files}

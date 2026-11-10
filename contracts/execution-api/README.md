@@ -6,7 +6,7 @@ This contract defines the complete public Execution API: HTTP operations, execut
 
 Use these documents:
 
-- [v1/openapi.yaml](v1/openapi.yaml): how callers create and poll workflow runs — paths, status codes, request and response shapes, and the security scheme.
+- [v1/openapi.yaml](v1/openapi.yaml): how callers create and poll workflow runs, including paths, status codes, request and response shapes, and the security scheme.
 - [v1/CONTRACT.md](v1/CONTRACT.md): workflow input and result shapes.
 - [v1/schemas](v1/schemas): JSON Schemas for machine validation.
 - [v1/fixtures](v1/fixtures): executable JSON examples shared by Python and TypeScript tests.
@@ -104,7 +104,7 @@ The agents wheel includes a build-time copy of the canonical schemas as package 
 > publishing policy, such as whether a schema-valid file path may be published to a
 > sensitive GitHub location, stays with the caller.
 
-Runtime parsers may also enforce canonical forms that schemas intentionally leave structural, such as enum normalization, unsupported public fields, and publishable repository path policy. Treat those parser checks as part of the runtime boundary for each consumer, not as replacement schema definitions.
+Runtime parsers may also enforce canonical forms that schemas intentionally leave structural, such as enum normalization, unsupported public fields, and publishable repository path policy. Those parser checks belong to each consumer's runtime boundary and add to the schemas without replacing them.
 
 ## Artifact Boundary
 

@@ -16,11 +16,11 @@ The declaration crosses the boundary between **GitHub Integration** (the produce
 - GitHub Integration reads `.sec-review/setup.yml` from the base repository's default branch, validates it against this format, and rejects an invalid one before submitting the run.
 - The Execution Worker re-validates the same text as defense in depth, then executes it inside the sandbox.
 
-Only the *format* is this contract. Where a declaration came from — trust in its origin — is not: that is decided by the integration reading the default branch, never a fork or a payload-supplied ref.
+This contract covers only the format. It does not decide whether to trust where a declaration came from; the integration handles that by reading the default branch, never a fork or a payload-supplied ref.
 
 ## Enforcement
 
-There is no JSON Schema for this contract. The rules that matter are decision logic (a `working-directory` that cannot escape the repository root, an `env` name that cannot smuggle shell syntax, a positive-integer timeout), not a structural shape, so they stay in the Execution Worker and GitHub Integration parsers rather than in a schema that could disagree with them:
+There is no JSON Schema for this contract. The rules that matter are decision logic (a `working-directory` that cannot escape the repository root, an `env` name that cannot smuggle shell syntax, a positive-integer timeout), and do not fit a structural shape. They live in the Execution Worker and GitHub Integration parsers, so no separate schema can disagree with them:
 
 - Python (Execution Worker): `agents/src/sec_review_agents/entrypoints/setup_declaration.py`
 - TypeScript (GitHub Integration): `apps/github-integration/src/github/setup-declaration.ts`

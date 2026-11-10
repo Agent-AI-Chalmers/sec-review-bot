@@ -16,15 +16,15 @@ Messages use `event: "message"`. Their envelope carries provenance and execution
 
 ## Messages and Sources
 
-| Field | Meaning |
-| --- | --- |
-| `message.id` | Message identity, unique within the trajectory; repeated observations of the same message retain this identity and are recorded once |
-| `message.role` | `system`, `user`, `assistant`, or `tool` |
-| `message.content` | Original text or structured content blocks; a block's `type` describes its content kind, not the message role |
-| `agent` | Agent responsible for the message's conversation or execution branch, when known |
-| `source` | Message origin or purpose, when known; `summarization` identifies summary-related material |
-| `call_id` | Model invocation that generated this response, when applicable |
-| `run_id`, `parent_ids` | Execution identity and ordered ancestry from root to immediate parent, when available |
+| Field                  | Meaning                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `message.id`           | Message identity, unique within the trajectory; repeated observations of the same message retain this identity and are recorded once |
+| `message.role`         | `system`, `user`, `assistant`, or `tool`                                                                                             |
+| `message.content`      | Original text or structured content blocks; a block's `type` describes its content kind, not the message role                        |
+| `agent`                | Agent responsible for the message's conversation or execution branch, when known                                                     |
+| `source`               | Message origin or purpose, when known; `summarization` identifies summary-related material                                           |
+| `call_id`              | Model invocation that generated this response, when applicable                                                                       |
+| `run_id`, `parent_ids` | Execution identity and ordered ancestry from root to immediate parent, when available                                                |
 
 `agent` and `source` have the same meaning across producers. Framework-specific metadata may be retained as additional evidence, but readers do not need it to interpret these fields. Missing labels mean unknown provenance, not an implicit root agent.
 
@@ -44,12 +44,12 @@ Retain observed history even when it is later removed from the active conversati
 
 ## Model Calls and Tool Interactions
 
-| Event | Meaning |
-| --- | --- |
-| `model_calls_start` | Start of model-call recording for the execution |
-| `model_call_start` | Start of a model invocation, identified by `call_id` |
-| `model_call_end` | Successful return from that invocation; `message_id` references its response message |
-| `model_calls_end` | End of recording, with execution status `completed`, `failed`, or `interrupted` |
+| Event               | Meaning                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------ |
+| `model_calls_start` | Start of model-call recording for the execution                                      |
+| `model_call_start`  | Start of a model invocation, identified by `call_id`                                 |
+| `model_call_end`    | Successful return from that invocation; `message_id` references its response message |
+| `model_calls_end`   | End of recording, with execution status `completed`, `failed`, or `interrupted`      |
 
 A response is stored once as a message. Its call-end record references it rather than duplicating the response or its usage. A call that fails or is interrupted may have a start without an end; do not manufacture a successful response for it.
 
@@ -75,14 +75,14 @@ Message `usage_metadata` describes the model invocation that generated that resp
 
 This contract follows OpenTelemetry GenAI token-accounting semantics: inclusive input/output totals with cache and reasoning represented as subsets. Its JSON field names and record structure are project-owned, not a copy of OpenTelemetry attribute or metric names. OpenTelemetry GenAI conventions evolve independently; an upstream naming change does not change this contract. Producers map their source vocabulary to the fields defined below.
 
-| Field | Meaning |
-| --- | --- |
-| `input_tokens` | Inclusive input, including cache reads and cache creation |
-| `output_tokens` | Inclusive output, including reasoning |
-| `total_tokens` | `input_tokens + output_tokens` when both are known; otherwise `null` |
-| `cache_read_input_tokens` | Cache-read subset of input |
-| `cache_creation_input_tokens` | Cache-creation subset of input, disjoint from cache reads |
-| `reasoning_tokens` | Reasoning subset of output |
+| Field                         | Meaning                                                              |
+| ----------------------------- | -------------------------------------------------------------------- |
+| `input_tokens`                | Inclusive input, including cache reads and cache creation            |
+| `output_tokens`               | Inclusive output, including reasoning                                |
+| `total_tokens`                | `input_tokens + output_tokens` when both are known; otherwise `null` |
+| `cache_read_input_tokens`     | Cache-read subset of input                                           |
+| `cache_creation_input_tokens` | Cache-creation subset of input, disjoint from cache reads            |
+| `reasoning_tokens`            | Reasoning subset of output                                           |
 
 Known cache subsets cannot sum to more than known input; known reasoning cannot exceed known output. Consumers reject impossible subsets, inconsistent totals, missing fields in a non-null usage object, and framework-specific detail keys inside canonical usage. Counts are bounded by `9007199254740991` for Python/JavaScript interoperability. Cache and reasoning counts are subsets and must not be added to inclusive totals.
 

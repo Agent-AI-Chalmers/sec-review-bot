@@ -24,18 +24,18 @@ Without the worker responsible for a task queue, tasks on that queue remain in T
 
 Default local endpoints:
 
-| Service | URL |
-| --- | --- |
-| GitHub Integration | `http://127.0.0.1:30000` |
-| Review Runs | `http://127.0.0.1:8090` |
-| Control Plane UI | `http://127.0.0.1:8091` |
-| Execution Gateway | `http://127.0.0.1:8000` |
-| Memory Catalog Server | `http://127.0.0.1:8092` |
-| PostgreSQL | `postgresql://127.0.0.1:5432` |
-| Temporal gRPC | `127.0.0.1:7233` |
-| Temporal Web UI | `http://127.0.0.1:8233` |
-| RustFS API | `http://127.0.0.1:9100` |
-| RustFS Console | `http://127.0.0.1:9101` |
+| Service               | URL                           |
+| --------------------- | ----------------------------- |
+| GitHub Integration    | `http://127.0.0.1:30000`      |
+| Review Runs           | `http://127.0.0.1:8090`       |
+| Control Plane UI      | `http://127.0.0.1:8091`       |
+| Execution Gateway     | `http://127.0.0.1:8000`       |
+| Memory Catalog Server | `http://127.0.0.1:8092`       |
+| PostgreSQL            | `postgresql://127.0.0.1:5432` |
+| Temporal gRPC         | `127.0.0.1:7233`              |
+| Temporal Web UI       | `http://127.0.0.1:8233`       |
+| RustFS API            | `http://127.0.0.1:9100`       |
+| RustFS Console        | `http://127.0.0.1:9101`       |
 
 Temporal is attached to a dedicated internal Compose network shared only with Execution Gateway. Its gRPC and Web UI ports are published on host loopback for the host workers and local operators.
 
@@ -171,23 +171,23 @@ If [`ops/systemd/deployment.env.sample`](../../ops/systemd/deployment.env.sample
 
 Core fields:
 
-| Field | Configuration |
-| --- | --- |
-| `TEMPORAL_ADDRESS` | Must use the host port exposed by `TEMPORAL_PORT` in the repository `.env`; the default is `127.0.0.1:7233`. |
-| `TEMPORAL_NAMESPACE`, `TEMPORAL_EXECUTION_TASK_QUEUE` | Must match the same-named values in the repository `.env`. |
-| `AGENT_DOCKER_IMAGE` | Image used for Docker sandboxes; the default is a general-purpose image. |
-| `AGENT_SKILLS_ENABLED` | Materialize bundled skills for agents that declare them; defaults to `true`. |
-| `AGENT_JOERN_ENABLED`, `AGENT_PLAYWRIGHT_ENABLED` | Advertise the corresponding installed CLI to eligible agents; both default to `false`. |
-| `AGENT_MCP_ENABLED` | Enable configured MCP integrations; defaults to `false`. |
-| `AGENT_MEMORY_CONSUMPTION_ENABLED` | Allow review agents to read curated memory; defaults to `true`. |
-| `AGENT_MEMORY_PROCESSING_ENABLED` | Allow trajectory extraction and memory maintenance; defaults to `true`. |
-| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT` | Optional custom S3-compatible endpoint. The local RustFS deployment uses `http://127.0.0.1:9100`; omit it to use the AWS endpoint selected from `AWS_REGION`. |
-| `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE` | S3 request addressing: `auto`, `path`, or `virtual`. The local RustFS deployment uses `path`; external storage can use `auto` or `virtual` without changing artifact references. |
-| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`, `SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker credential; it can read run inputs, write execution archives, and read active memory revisions. |
-| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`, `SEC_REVIEW_MEMORY_S3_SECRET_KEY` | Shared storage credential for both memory workers; it can read execution archives and read/write memory revisions and compressed memory-agent trajectories. |
-| `AGENT_MEMORY_CATALOG_URL` | Memory Catalog coordination API; the Compose default is `http://127.0.0.1:8092`. |
-| `AGENT_MEMORY_CATALOG_TOKEN` | Worker credential for extraction and automatic maintenance; it grants no direct PostgreSQL access. |
-| `AGENT_MEMORY_CATALOG_OPERATOR_TOKEN` | Operator credential used by Control Plane UI for memory reads and manual control operations. |
+| Field                                                                      | Configuration                                                                                                                                                                    |
+| -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TEMPORAL_ADDRESS`                                                         | Must use the host port exposed by `TEMPORAL_PORT` in the repository `.env`; the default is `127.0.0.1:7233`.                                                                     |
+| `TEMPORAL_NAMESPACE`, `TEMPORAL_EXECUTION_TASK_QUEUE`                      | Must match the same-named values in the repository `.env`.                                                                                                                       |
+| `AGENT_DOCKER_IMAGE`                                                       | Image used for Docker sandboxes; the default is a general-purpose image.                                                                                                         |
+| `AGENT_SKILLS_ENABLED`                                                     | Materialize bundled skills for agents that declare them; defaults to `true`.                                                                                                     |
+| `AGENT_JOERN_ENABLED`, `AGENT_PLAYWRIGHT_ENABLED`                          | Advertise the corresponding installed CLI to eligible agents; both default to `false`.                                                                                           |
+| `AGENT_MCP_ENABLED`                                                        | Enable configured MCP integrations; defaults to `false`.                                                                                                                         |
+| `AGENT_MEMORY_CONSUMPTION_ENABLED`                                         | Allow review agents to read curated memory; defaults to `true`.                                                                                                                  |
+| `AGENT_MEMORY_PROCESSING_ENABLED`                                          | Allow trajectory extraction and memory maintenance; defaults to `true`.                                                                                                          |
+| `SEC_REVIEW_ARTIFACT_S3_ENDPOINT`                                          | Optional custom S3-compatible endpoint. The local RustFS deployment uses `http://127.0.0.1:9100`; omit it to use the AWS endpoint selected from `AWS_REGION`.                    |
+| `SEC_REVIEW_ARTIFACT_S3_ADDRESSING_STYLE`                                  | S3 request addressing: `auto`, `path`, or `virtual`. The local RustFS deployment uses `path`; external storage can use `auto` or `virtual` without changing artifact references. |
+| `SEC_REVIEW_EXECUTION_S3_ACCESS_KEY`, `SEC_REVIEW_EXECUTION_S3_SECRET_KEY` | Execution Worker credential; it can read run inputs, write execution archives, and read active memory revisions.                                                                 |
+| `SEC_REVIEW_MEMORY_S3_ACCESS_KEY`, `SEC_REVIEW_MEMORY_S3_SECRET_KEY`       | Shared storage credential for both memory workers; it can read execution archives and read/write memory revisions and compressed memory-agent trajectories.                      |
+| `AGENT_MEMORY_CATALOG_URL`                                                 | Memory Catalog coordination API; the Compose default is `http://127.0.0.1:8092`.                                                                                                 |
+| `AGENT_MEMORY_CATALOG_TOKEN`                                               | Worker credential for extraction and automatic maintenance; it grants no direct PostgreSQL access.                                                                               |
+| `AGENT_MEMORY_CATALOG_OPERATOR_TOKEN`                                      | Operator credential used by Control Plane UI for memory reads and manual control operations.                                                                                     |
 
 #### Artifacts And Storage Credentials
 
@@ -289,13 +289,13 @@ CodeGraph runs inside the sandbox, so it needs a backend that can execute comman
 
 With the sample configuration, the integrated deployment stores runtime data in these repository-level paths:
 
-| Path | Owner | Purpose |
-| --- | --- | --- |
-| `.agent-rustfs-state` | RustFS | Persistent object storage for run inputs, execution archives, memory-tree revisions, memory-agent trajectories, and other artifacts |
-| `.agent-run-inputs` | Host worker | Materialized input for active runs; never included in published execution archives |
-| `.agent-artifacts` | Host worker | Agent artifacts and workflow output for each task |
-| `.agent-postgres-state` | PostgreSQL | Review Runs run state and Memory Catalog coordination state |
-| `.agent-temporal-state` | Temporal | Workflow history and pending task state |
+| Path                    | Owner       | Purpose                                                                                                                             |
+| ----------------------- | ----------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `.agent-rustfs-state`   | RustFS      | Persistent object storage for run inputs, execution archives, memory-tree revisions, memory-agent trajectories, and other artifacts |
+| `.agent-run-inputs`     | Host worker | Materialized input for active runs; never included in published execution archives                                                  |
+| `.agent-artifacts`      | Host worker | Agent artifacts and workflow output for each task                                                                                   |
+| `.agent-postgres-state` | PostgreSQL  | Review Runs run state and Memory Catalog coordination state                                                                         |
+| `.agent-temporal-state` | Temporal    | Workflow history and pending task state                                                                                             |
 
 ## Run The Deployment
 
@@ -329,10 +329,10 @@ sudo systemctl enable --now sec-review-bot.target
 
 The control plane includes GitHub Integration, Execution Gateway, and Temporal.
 
-Startup and runtime failures are supervised differently, and it matters when diagnosing a run:
+Startup and runtime failures are supervised differently, which affects how you diagnose a run:
 
 - **Startup.** The unit waits for the Compose health gate before systemd starts dependent workers. A service that never becomes healthy, or a one-shot init service like `rustfs-init` that fails, therefore fails the start without exposing a partially ready stack to workers. The failed attempt is cleaned up before systemd performs a bounded retry; after the retry limit, the unit stays failed until an operator intervenes.
-- **Runtime.** A crashing service restarts on its own, up to a bounded number of attempts, without affecting the rest of the stack — PostgreSQL in particular. Once a service exhausts its attempts it stays stopped, and **the unit still reports `active (running)`**, because the process keeping the journal fed follows logs rather than supervising health.
+- **Runtime.** A crashing service restarts on its own, up to a bounded number of attempts, without affecting the rest of the stack, PostgreSQL in particular. Once a service exhausts its attempts it stays stopped, and **the unit still reports `active (running)`**, because the process keeping the journal fed follows logs rather than supervising health.
 
 For routine lifecycle operations, use only the target:
 
@@ -428,10 +428,11 @@ This command does not start any host worker.
 <!-- doc-default: TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES; source=agents/src/sec_review_agents/entrypoints/execution_worker/main.py -->
 <!-- doc-default: TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES; source=agents/src/sec_review_agents/entrypoints/memory_extraction_worker/main.py -->
 <!-- doc-default: TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES; source=agents/src/sec_review_agents/entrypoints/memory_maintenance_worker/main.py -->
-| Setting | Worker | Per-process activity concurrency limit |
-| --- | --- | --- |
-| `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES` | Execution Worker | Defaults to `2`, limiting concurrent review activities. |
-| `TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES` | Memory Extraction Worker | Defaults to `4`, independently limiting extraction activities. |
+
+| Setting                                                 | Worker                    | Per-process activity concurrency limit                               |
+| ------------------------------------------------------- | ------------------------- | -------------------------------------------------------------------- |
+| `TEMPORAL_EXECUTION_MAX_CONCURRENT_ACTIVITIES`          | Execution Worker          | Defaults to `2`, limiting concurrent review activities.              |
+| `TEMPORAL_MEMORY_EXTRACTION_MAX_CONCURRENT_ACTIVITIES`  | Memory Extraction Worker  | Defaults to `4`, independently limiting extraction activities.       |
 | `TEMPORAL_MEMORY_MAINTENANCE_MAX_CONCURRENT_ACTIVITIES` | Memory Maintenance Worker | Fixed at `1`; its unit is not a template and must not be scaled out. |
 
 Each review activity may create a sandbox and make multiple model calls, so a single-node deployment should start with the conservative default.
@@ -482,6 +483,7 @@ The GitHub Integration image build and Git workspace fetches use separate networ
 ### pnpm And npm Registries
 
 <!-- doc-default: node-workspace.package-manager; source=package.json -->
+
 Node service builds copy pnpm from the official `ghcr.io/pnpm/pnpm:12-alpine` image. pnpm selects the project version declared in the root `package.json#packageManager`. Docker needs access to GHCR; pnpm uses the npm registry selected by `NPM_CONFIG_REGISTRY`.
 
 pnpm uses `https://registry.npmjs.org` by default for project dependencies. If that endpoint is unavailable or unreliable, select a reachable npm registry:
@@ -509,6 +511,7 @@ GITHUB_INTEGRATION_GIT_HTTP_PROXY=http://127.0.0.1:7897
 ```
 
 <!-- doc-default: GITHUB_INTEGRATION_GIT_TIMEOUT_MS; source=apps/github-integration/src/artifacts/git-workspace.ts -->
+
 Each git and snapshot command has a `GITHUB_INTEGRATION_GIT_TIMEOUT_MS` timeout (default `600000`, i.e. 10 minutes) so a hung remote cannot stall input preparation indefinitely. Raise it for repositories whose cold clone legitimately takes longer.
 
 ## Why The Deployment Looks Like This

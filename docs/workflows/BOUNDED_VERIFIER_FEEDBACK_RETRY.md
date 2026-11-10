@@ -9,24 +9,21 @@ The base downstream path is `analyzer -> mitigator -> verifier`. When verifier f
 - `analyzer -> mitigator -> verifier -> [feedback-guided mitigator -> verifier] * k`
 
 <!-- doc-default: MAX_FEEDBACK_RETRY_ATTEMPTS; source=agents/src/sec_review_agents/review_stages/feedback_loop.py -->
+
 The code constant `MAX_FEEDBACK_RETRY_ATTEMPTS` limits `k` to `1`. This is not a deployment setting. Changing it requires considering context growth, latency, and model cost, and rerunning focused agent-behavior probes.
 
 ## Why This Exists
 
-`verifier` is not only a terminal audit stage. It is also the stage to identify:
+`verifier` runs last, but it does more than audit. It also identifies:
 
 - incomplete security coverage
 - ineffective remediation
 - unsafe fixes
 - overstated analyzer claims that should no longer drive patch scope
 
-Without a bounded retry path, that judgment is descriptive but not corrective. The feedback retry mechanism makes verifier operationally useful while preserving deterministic stop conditions.
-
----
+Without a bounded retry path, verifier can describe these problems but nothing acts on them. The feedback retry lets verifier output drive a correction while the workflow keeps deterministic stop conditions.
 
 There is also a structural reason for this mechanism. A single agent can often verify and revise its own patch inside one continuous run. A multi-stage workflow cannot. Once analysis, mitigation, and verification are split into separate stages, verifier output remains purely downstream unless the system explicitly feeds it back into mitigation. Without that feedback path, the multi-stage design gives up a basic self-correction loop.
-
----
 
 Verifier-led retry is weaker than a failed PoC, a failed test, or another directly reproducible failure signal. Those signals are stronger because they come from running the code, not from model judgment.
 
@@ -37,7 +34,7 @@ In practice, though, many security repair tasks do not come with runnable PoCs, 
 - Analyzer conclusions do not prevent the subsequent mitigation and verification stages from running.
 - Mitigator decides whether to change code based on evidence. It may leave code unchanged when no safe, justified repair is available.
 - Verifier independently checks whether the problem exists within the review scope and whether mitigator handled it appropriately, even when there is no patch.
-- Only `next_step=retry-ai` schedules a retry (see [Next Step](#next-step)); other outcomes continue to result assembly and delivery.
+- Only `next_step=retry-ai` schedules a retry (see [Next step](#next-step)); other outcomes continue to result assembly and delivery.
 - A retry reruns mitigation and verification, not analysis: the existing analysis still defines the review scope. The retrying mitigator generates a new patch from the original prepared workspace, starting from the problems verifier raised.
 
 ## Next Step
@@ -85,7 +82,7 @@ In this situation, verifier identifies the concerns to investigate first during 
 
 When verifier chooses `next_step=retry-ai`, it should include concrete `findings[]` text so the retrying mitigator has actionable patch-correction feedback instead of a vague negative verdict.
 
-The design intent is simple: retry only when verifier has produced actionable patch-correction feedback. The mechanism is not meant to reopen every unsuccessful review.
+Retry runs only when verifier has produced actionable patch-correction feedback, so it does not reopen every unsuccessful review.
 
 ## Retry Context Model
 
@@ -112,7 +109,7 @@ Its operating rules are:
 
 ### Retrying Verifier
 
-The retrying verifier is feedback-aware, but its independence is preserved.
+The retrying verifier sees earlier feedback but still judges independently.
 
 It should receive:
 
@@ -133,11 +130,11 @@ The retrying verifier is not meant to redo a full analyzer audit by default. Pri
 
 ### History Retention
 
-The workflow retains the complete retry history — initial outcomes, later attempts, and retry trigger reasons — for auditability and downstream inspection. Agents receive only the projection described above; older verifier history is summarized structurally rather than replayed as raw full-text reports.
+The workflow retains the complete retry history (initial outcomes, later attempts, and retry trigger reasons) for auditability and downstream inspection. Agents receive only the projection described above; older verifier history is summarized structurally rather than replayed as raw full-text reports.
 
 ## Design Boundary
 
-This architecture is intentionally optimized for **small retry budgets**, not arbitrarily large `N`.
+This architecture is intentionally optimized for **small retry budgets**. It is not designed for arbitrarily large `N`.
 
 If the retry budget grows, the expected costs also grow:
 
@@ -146,4 +143,4 @@ If the retry budget grows, the expected costs also grow:
 - higher latency
 - higher cost
 
-That is acceptable for bounded experimentation, but it is not a goal of this design to make large retry counts cheap or structurally invisible.
+That is acceptable for bounded experimentation, but this design does not aim to make large retry counts cheap or structurally invisible.

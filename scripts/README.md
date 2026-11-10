@@ -20,7 +20,7 @@ Repository-wide checks live in `checks/` and run as modules from the repository 
 
 ## Check Entrypoints
 
-Check scripts are intended to be repeatable from the repository root:
+Run the check scripts from the repository root. They can be rerun safely:
 
 ```bash
 # Check local Markdown links.
@@ -32,6 +32,14 @@ python -m scripts.checks.markdown_wrapping
 # Check translated headings, fact markers, and shell examples.
 python -m scripts.checks.translated_doc_headings
 ```
+
+Markdown style is checked by markdownlint, configured in the root `.markdownlint-cli2.jsonc`. Run `pnpm run lint:md` from the repository root.
+
+Repository-level files outside workspace packages are formatted by the root `.prettierrc.json`. Run `pnpm run format:root:check` from the repository root.
+
+Chinese documentation spacing and punctuation are checked by AutoCorrect, configured in the root `.autocorrectrc`. Run `pnpm run lint:zh` from the repository root.
+
+`pnpm install` at the repository root attempts to install a pre-commit hook from `lefthook.yml` that runs these three tools on staged files. Hook installation failures do not block dependency installation, including in Docker builds and source archives without `.git`. CI runs the checks independently.
 
 `translated_doc_headings.py` scans all tracked `*.zh.md` files and finds the matching English `.md` source. It checks heading levels and numbered section markers, then compares `doc-default` / `doc-time-sensitive` marker contents and counts and shell command examples within corresponding sections. Shell comments, blank lines, continuation wrapping, and code-block splitting may differ. Prose and non-shell examples may be localized; their semantic equivalence still requires review. It also reports possible omissions by comparing paragraph, list-item, table-row, blockquote-paragraph, and non-shell example counts per section. These counts are advisory: translation may legitimately merge or split blocks; they do not affect the exit code.
 
@@ -115,4 +123,5 @@ uv --project agents run python -m scripts.ops.memory_ops --env-file compose.memo
 ```
 
 <!-- doc-default: memory-maintenance-mode; source=scripts/ops/memory_ops.py -->
+
 `maintain` starts a maintenance workflow in Temporal. The default `--mode learning` consumes pending observations; `--mode reorganization` reorganizes the active memory without consuming observations and is manually triggered. `schedules maintenance ensure` creates or updates the periodic learning trigger. Both require the configured Temporal service; actual maintenance also requires the worker, Memory Catalog, and object storage. Use each subcommand's `--help` to inspect connection, timeout, batch, and schedule options.

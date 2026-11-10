@@ -48,9 +48,9 @@ Review Runs 轮询 `queued` 和 `running` run。Execution API 服务成功后，
 
 <!-- doc-default: DEFAULT_CLAIM_TIMEOUT_MS; source=services/review-runs/src/persistence/review-run-store.ts -->
 
-重复接纳一个已经见过的 ingress 身份是一次只读重放：它返回既有的 run，不会去 claim 它的 preparation。接纳时创建的 preparation 行是 `preparing`，只由最初的接纳方持有，因此在中途崩溃的进程是靠租约过期恢复的，而不是靠重放请求。在默认 claim 超时下，这意味着一次重放最多要等十分钟才能推进——所以客户端不能把"请求返回了"当成"工作已继续"。
+重复接纳一个已经见过的 ingress 身份是一次只读重放：它返回既有的 run，不会去 claim 它的 preparation。接纳时创建的 preparation 行是 `preparing`，只由最初的接纳方持有，因此在中途崩溃的进程是靠租约过期恢复的，而不是靠重放请求。在默认 claim 超时下，这意味着一次重放最多要等十分钟才能推进，所以客户端不能把"请求返回了"当成"工作已继续"。
 
-如果 Execution API 服务 submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。进入该状态不是失败，也不会创建 notice：未确认的提交仍可能在重放时被接受，此时宣告失败就是在陈述一个 run 可能推翻的结论——而已发布的评论无法撤回。
+如果 Execution API 服务 submission 可能成功但响应丢失，run 会进入 recovery，而不是创建第二个身份。进入该状态不是失败，也不会创建 notice：未确认的提交仍可能在重放时被接受，此时宣告失败就是在陈述一个 run 可能推翻的结论，而已发布的评论无法撤回。
 
 重放结果按以下方式处理：
 
@@ -221,13 +221,13 @@ Temporal history、PostgreSQL 协调状态和对象存储 artifact 是彼此独�
 | `POST /v1/admin/runs/:run_id/give-up`    | `REVIEW_RUNS_ADMIN_TOKEN` | 不再等待一个 disconnected run     |
 | `POST /v1/admin/runs/:run_id/resume`     | `REVIEW_RUNS_ADMIN_TOKEN` | 把 disconnected 轴交回自动恢复    |
 
-写面——接纳、提交、准备与发布租约及其终态——是一组 REST 路由，其请求/响应形状、安全方案与错误码都来自手写的 [openapi.yaml](../../contracts/review-runs-api/v1/openapi.yaml) 契约；那份文档才是整个面的单一事实来源，而不是这张表。
+写面（接纳、提交、准备与发布租约及其终态）是一组 REST 路由，其请求/响应形状、安全方案与错误码都来自手写的 [openapi.yaml](../../contracts/review-runs-api/v1/openapi.yaml) 契约。整个写面以那份文档为准，这张表不是事实来源。
 
-契约在**请求侧是强制执行的**：路由、path/query/body 校验与鉴权都由它派生，因此任何不符合该文档的请求都会在进入 handler 之前被拒绝。响应侧由契约**描述**，但运行时并不对其校验——`fastify-openapi-glue` 只处理请求——因此声明的响应 schema 是 handler 需要遵守的约定，由测试而非框架来固定。`services/review-runs/test/observed-run-contract.test.ts` 会用共享 schema 校验已提交的 fixtures 以及 `observeRun()` 实际产出的形状，`services/review-runs/test/server-http.test.ts` 则覆盖 HTTP 面，这正是防止响应在无人察觉的情况下偏离其 schema 的机制。
+契约在**请求侧强制执行**：路由、path/query/body 校验与鉴权都由它派生，因此任何不符合该文档的请求都会在进入 handler 之前被拒绝。契约也**描述**响应，但运行时没有校验，因为 `fastify-openapi-glue` 只处理请求。handler 是否符合声明的响应 schema 由测试保证，框架不负责。`services/review-runs/test/observed-run-contract.test.ts` 会用共享 schema 校验已提交的 fixtures 以及 `observeRun()` 实际产出的形状，`services/review-runs/test/server-http.test.ts` 则覆盖 HTTP 面。两者一起发现偏离 schema 的响应。
 
 查询响应不包含 `execution_input` 和 `publish_context`。它们会保留 `source_platform`，用于稳定的平台聚合；也会保留 `connector_id`，用于标识拥有该 run 的 connector 类型与实例。没有 snapshot row 时，`execution_statistics` 为 `null`；存在时，它从两张关系型统计表投影 reconciliation 状态、已观测 totals 和分组 totals。缺失或不完整的 snapshot 不代表零用量。UI BFF 持有 read token；浏览器代码既不接收 Review Runs token，也不接收 Langfuse 凭据。
 
-service token 用于协调 run 的各个组件，read token 用于脱敏读取，可选的 admin token 用于 `/v1/admin` 下的运维面。这些 token 分别授予不同能力：持有 service token 无法访问 admin 路由，admin token 也不能接纳 run 或让 run 走正常生命周期。只有在配置了 `REVIEW_RUNS_ADMIN_TOKEN` 时 `/v1/admin` 才存在——否则这些路径返回 404 而不是 401，因此未配置的部署不会暴露任何运维面。查看 parked 队列（三轴合一的"停止重试"列表）只需要 read token，因为"知道某个 run 卡住了"并不属于特权；只有"决定放弃它、不再等待它、或把它交回自动恢复"才需要 admin token。
+service token 用于协调 run 的各个组件，read token 用于脱敏读取，可选的 admin token 用于 `/v1/admin` 下的运维面。这些 token 分别授予不同能力：持有 service token 无法访问 admin 路由，admin token 也不能接纳 run 或让 run 走正常生命周期。只有在配置了 `REVIEW_RUNS_ADMIN_TOKEN` 时 `/v1/admin` 才存在。否则这些路径返回 404 而不是 401，因此未配置的部署不会暴露运维面。查看 parked 队列（三轴合一的"停止重试"列表）只需要 read token，因为"知道某个 run 卡住了"并不属于特权；只有"决定放弃它、不再等待它、或把它交回自动恢复"才需要 admin token。
 
 查询响应以形状一致的嵌套对象报告彼此独立的生命周期轴：`preparation`、`execution` 与 `publication`。每组各自带有 `status`、`started_at`、`finished_at` 与 `updated_at`。preparation 摘要额外给出 `attempt_count` 以及终态的 `failure_code`，但绝不包含其 opaque input 或 claim token。`notices` 包含 run 的某个环节失败或需要关注时应由集成展示给用户的消息。消息按产生时间从早到晚排列；同一 run 发生多次独立事件时会保留多条，不会合并。
 

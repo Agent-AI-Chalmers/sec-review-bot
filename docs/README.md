@@ -8,15 +8,15 @@ For a project overview, start with the repository [README](../README.md).
 
 ## Reading Paths By Task
 
-| Task | Suggested order |
-| --- | --- |
-| Run one local review | [Agents installation and model setup](../agents/README.md) → [local run examples](../agents/README.md#local-runs); GitHub Integration is not required. |
-| Deploy GitHub reviews | [LOCAL_INTEGRATED_DEPLOYMENT](operations/LOCAL_INTEGRATED_DEPLOYMENT.md) → [LOCAL_GITHUB_INBOUND_SETUP](operations/LOCAL_GITHUB_INBOUND_SETUP.md) → [trigger commands](../apps/github-integration/README.md#triggers). |
-| Change an agent or workflow | [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.md) → [README](../agents/README.md) → the relevant workflow document. |
-| Change a service interface or artifact format | [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.md) → [contracts catalog](../contracts/README.md) → the family and consumer guides. |
-| Develop the console | [Control Plane UI](../apps/control-plane-ui/README.md); start with fixtures without deploying the full backend. |
+| Task                                          | Suggested order                                                                                                                                                                                                        |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Run one local review                          | [Agents installation and model setup](../agents/README.md) → [local run examples](../agents/README.md#local-runs); GitHub Integration is not required.                                                                 |
+| Deploy GitHub reviews                         | [LOCAL_INTEGRATED_DEPLOYMENT](operations/LOCAL_INTEGRATED_DEPLOYMENT.md) → [LOCAL_GITHUB_INBOUND_SETUP](operations/LOCAL_GITHUB_INBOUND_SETUP.md) → [trigger commands](../apps/github-integration/README.md#triggers). |
+| Change an agent or workflow                   | [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.md) → [README](../agents/README.md) → the relevant workflow document.                                                                                       |
+| Change a service interface or artifact format | [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.md) → [contracts catalog](../contracts/README.md) → the family and consumer guides.                                                                             |
+| Develop the console                           | [Control Plane UI](../apps/control-plane-ui/README.md); start with fixtures without deploying the full backend.                                                                                                        |
 
-The catalog below is a reference, not a required reading sequence.
+Use the catalog below as a topic reference; you do not need to read it in order.
 
 ## Documentation Index
 
@@ -31,16 +31,16 @@ The catalog below is a reference, not a required reading sequence.
 
 Package READMEs explain installation, commands, configuration, and code layout. One source package can implement several independently running components: `agents/` implements the Execution Worker, Memory Extraction Worker, and Memory Maintenance Worker.
 
-| Runtime role | Package guide |
-| --- | --- |
-| GitHub Integration | [README](../apps/github-integration/README.md) |
-| Review Runs | [README](../services/review-runs/README.md) |
-| Control Plane UI | [README](../apps/control-plane-ui/README.md) |
-| Execution Gateway | [README](../services/execution-gateway/README.md) |
-| Execution Worker | [README](../agents/README.md) |
-| Memory Extraction Worker | [README](../agents/README.md) |
-| Memory Maintenance Worker | [README](../agents/README.md) |
-| Memory Catalog Server | [README](../services/memory-catalog/README.md) |
+| Runtime role              | Package guide                                     |
+| ------------------------- | ------------------------------------------------- |
+| GitHub Integration        | [README](../apps/github-integration/README.md)    |
+| Review Runs               | [README](../services/review-runs/README.md)       |
+| Control Plane UI          | [README](../apps/control-plane-ui/README.md)      |
+| Execution Gateway         | [README](../services/execution-gateway/README.md) |
+| Execution Worker          | [README](../agents/README.md)                     |
+| Memory Extraction Worker  | [README](../agents/README.md)                     |
+| Memory Maintenance Worker | [README](../agents/README.md)                     |
+| Memory Catalog Server     | [README](../services/memory-catalog/README.md)    |
 
 ### Agents
 

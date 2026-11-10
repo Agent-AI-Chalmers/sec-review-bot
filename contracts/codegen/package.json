@@ -28,7 +28,7 @@
     "@types/node": "^26.6.6",
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
-    "globals": "^17.0.0",
+    "globals": "^17.14.0",
     "prettier": "^3.9.10",
     "tsx": "^4.23.15",
     "typescript-eslint": "^8.72.1"

@@ -8,9 +8,9 @@ An issue's title and body provide leads, not established facts. A report may be 
 
 The agent cannot trust the issue directly, but it cannot ignore the direction it provides either: without those leads, it may not know where to start looking in code. For example, if the issue describes inconsistent state, helpers behaving differently, or a fallback problem, the agent should follow those leads to find the first code evidence.
 
-The issue **provides the initial search direction**; the agent **follows its leads without treating its claims as facts**.
+The issue **provides the initial search direction**. The agent **follows its leads without treating its claims as facts**.
 
-*This page describes investigation under `audit`; see [review intent](../REVIEW_INTENT.md) for how `repair` uses trusted repair leads.*
+_This page describes investigation under `audit`; see [review intent](../REVIEW_INTENT.md) for how `repair` uses trusted repair leads._
 
 ## The Two Investigation Risks
 
@@ -25,13 +25,7 @@ The agent can easily think:
 - it looks plausible
 - so this is probably the problem
 
-The result:
-
-- fast convergence
-- possibly wrong convergence
-- the issue's explanation is treated as fact
-
-The failure mode is: **trusting the issue too early and trusting the first explanation too early**.
+The investigation then converges fast, possibly on the wrong answer, and the issue's explanation is treated as fact. The agent **trusted the issue too early and trusted the first explanation it found too early**.
 
 ### Risk 2: Expanding Forever for Completeness
 
@@ -43,23 +37,13 @@ The agent can also go the other way:
 - so I need to inspect every related helper
 - maybe there are other similar paths too
 
-The result is constant searching, constant confirmation, refusal to stop, and eventual circling.
+The result is constant searching, constant confirmation, refusal to stop, and eventual circling. **Afraid of missing something, the agent keeps adding checks** and **loses restraint in trying to be comprehensive**.
 
-The failure mode is:
-
-- **fear of missing something, so the agent keeps adding checks**
-- **trying to be comprehensive and losing restraint**
-
-The core tension in issue-review is simple:
-
-- do not trust the issue too early
-- do not expand without bound in the name of completeness
+Issue review has to hold both constraints: do not trust the issue too early, and do not expand without bound in the name of completeness.
 
 ## What The Agent Must Do While Investigating
 
-When investigating an issue, the agent should not take the issue body as one block of truth. It should keep decomposing it during investigation.
-
-This does not mean leaving investigation to do static parsing. It means **reading code while correcting the agent's understanding of the issue narrative**.
+The agent should not take the issue body as one block of truth. It should keep decomposing the issue while it reads code, correcting its understanding of the issue narrative as evidence comes in, instead of parsing the text separately before investigating.
 
 During this process, the agent should keep handling at least four kinds of information.
 
@@ -76,14 +60,12 @@ Examples:
 
 ### 2. What It Implies
 
-These are not explicit conclusions, but they affect investigation scope.
+These are not explicit conclusions, but they affect investigation scope and keep the agent from narrowing too much.
 
 Examples:
 
-- If it says `different paths`, the agent should not inspect only one path.
-- If it says `resulting state inconsistent`, the agent should inspect final state, not only local calls.
-
-The role of these implications is to keep the agent from narrowing too much.
+- If it says `different paths`, the agent should inspect more than one path.
+- If it says `resulting state inconsistent`, the agent should inspect final state as well as local calls.
 
 ### 3. What It Leaves Unclear
 
@@ -97,7 +79,7 @@ Examples:
 
 ### 4. Where It Most Easily Causes Premature Conclusions
 
-This does not mean the issue is deceptive. It means some phrasing makes it especially easy for the agent to choose a local explanation too early.
+The issue need not be deceptive for this to happen. Some phrasing makes it especially easy for the agent to choose a local explanation too early.
 
 Examples:
 
@@ -106,9 +88,7 @@ Examples:
 
 ## A Simple Working Flow
 
-Compressed into a simple working flow:
-
-1. The issue arrives. Do not treat it as fact; treat it as an investigation entry point and follow it to the first code evidence.
+1. The issue arrives. Treat it as an investigation entry point rather than fact, and follow it to the first code evidence.
 2. While investigating, update the judgment of the issue's claims.
 3. If the issue's claim is disproved, stop pursuing that claim; this does not directly terminate the entire workflow.
 4. If the broad direction is supported, carefully decide whether to expand the investigation scope.

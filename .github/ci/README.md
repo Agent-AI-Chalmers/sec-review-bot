@@ -38,6 +38,7 @@ GitHub displays called jobs beneath their caller names. Branch protection should
 ## Shared Node Setup
 
 <!-- doc-default: shared-node-setup; source=.github/actions/setup-node/action.yml -->
+
 [The Node setup action](../actions/setup-node/action.yml) owns pnpm setup, package-specific Node selection, dependency caching, and frozen-lockfile installation. Call it after checkout with a repository-relative package directory to select the Node version. The action uses the root lockfile for caching and installs the repository workspace once from the root, making dependencies available to all workspace packages.
 
 Package checks and service containers live in the workflows; change conditions stay in [the main CI workflow](../workflows/ci.yml). Changes to the shared action trigger its consuming areas through `changed-areas.yml`.
@@ -52,6 +53,7 @@ node --test .github/ci/check-package-boundaries.test.mjs
 ```
 
 <!-- doc-default: node-package-boundaries; source=.github/ci/check-package-boundaries.mjs -->
+
 Applications and services must not depend on or import other repository packages. Contract tools may use `contracts/codegen`. The checker validates dependency declarations and uses the TypeScript AST to inspect literal references, including type imports, re-exports, dynamic imports, `require`, and file URLs; it also resolves TypeScript path aliases. Contract schemas and fixtures remain available as data. Package tests follow the same boundaries as production code. Tests that combine packages belong under `system-tests/`. Computed paths assembled at runtime are outside this static check's coverage.
 
 ## Shared Python Setup
@@ -79,7 +81,6 @@ The first checks that every CI job contributes to `CI Status`. The second checks
 
 [The smoke inventory](../../system-tests/README.md#smoke-inventory) lists all scenarios, their boundaries, and CI policies. Execution submission and Integration-to-Review-Runs HTTP checks run in `Smoke — Service Boundaries`. The `Smoke — Memory and Artifacts` job groups the Catalog client, input bundle, and operator edit tests to share infrastructure.
 
-
 The `catalog-seam`, `input-bundle-seam`, and `memory-bff-seam` areas select the lightweight probes run by [the smoke action](../actions/check-seams/action.yml). The main workflow owns their single job and final status dependency; the action builds selected participants and runs them in one pytest process to share disposable services. See [the system-test guide](../../system-tests/README.md#model-free-cross-service-smoke-tests) for commands and coverage limits.
 
 [The execution lifecycle workflow](../workflows/execution-lifecycle.yml) is manual-only and separate from required PR checks. It uses a deterministic analysis activity and does not measure model quality.
@@ -94,12 +95,12 @@ CI does not run every job on every change. The `changes` job decides which areas
 
 That decision lives in **`changed-areas.yml`**:
 
-- each top-level key is an **area** a job gates on;
+- each top-level key is an **area** that a job gates on;
 - the globs under it select the area;
 - `ci.yml` reads the file **directly** (`filters: .github/ci/changed-areas.yml`);
 - each job gates on its area with `needs.changes.outputs.<area> == 'true'`.
 
-A static `outputs:` map on the `changes` job is a GitHub Actions requirement, so the workflow does restate the area names once. `check-changed-areas.py` checks that restatement against the model, along with what the model cannot state about itself.
+GitHub Actions requires a static `outputs:` map on the `changes` job, so the workflow restates the area names once. `check-changed-areas.py` checks that list against the model, along with facts the model cannot state about itself.
 
 ## Why the couplings are written down
 
@@ -109,18 +110,18 @@ CI cannot see a cross-package dependency in an import graph, so the couplings ar
 - **Generated artifacts.** A contract tool renders a projection into another package, so `contract-tools` lists each one. The checker derives that set from the tools' `generated-artifacts.json` manifests, so a new projection cannot be added without wiring it up.
 - **Cross-package tests.** The repository-level `review-runs-http.test.mjs` combines the Integration client and Review Runs server. The `system-tests` area covers both participants and the test entrypoint.
 
-A missed path means a change runs **no job at all** — silent, green CI. That is the class of defect that let an empty-200 response break the client: the job that would have caught it was not wired to the file that changed.
+If a path is missed, a change to it runs **no job at all**, and CI reports green. An empty-200 response once broke the client this way: the job that would have caught it was not wired to the file that changed.
 
 ## What the checker does — and does not do
 
-The model is trusted as given: it states _intent_. The checker does not "verify the model"; it checks **completeness** — facts about the repository that no file can state about itself:
+The model is trusted as given because it states intent. The checker checks **completeness**, meaning facts about the repository that no file can state about itself:
 
 - every generated artifact (from the tools' manifests) is covered by `contract-tools`;
 - every tracked file is covered by an area or acknowledged in `UNCOVERED`;
 - the client↔server seam is wired to both packages;
 - no filter is dead (an area declared with no job, or a job gating on an area not declared).
 
-The one thing it is _not_ is a second opinion on the model's own contents — there is no rendered copy of the model left to compare against.
+It does not second-guess the model's own contents, since there is no rendered copy of the model to compare against.
 
 ## Files
 
@@ -143,4 +144,4 @@ The checker runs in CI's `automation-config` job (whose filter includes `.github
 - the client↔server seam is no longer wired to both packages;
 - a tracked file is covered by neither an area nor the `UNCOVERED` allow-list in the checker.
 
-A tracked file the model does not cover has to be added to an area, or to `UNCOVERED` with a reason. `UNCOVERED` is a short constant (report data, binary assets, root metadata) kept beside the check, so an uncovered path is a deliberate, reviewable choice rather than an oversight.
+A tracked file the model does not cover has to be added to an area, or to `UNCOVERED` with a reason. `UNCOVERED` is a short constant (report data, binary assets, root metadata) kept beside the check, so leaving a path uncovered is a deliberate choice that shows up in review.

@@ -3,20 +3,21 @@
 语言：[English](README.md) | 中文
 
 <!-- doc-default: system-tests.inventory; source=system-tests/ -->
+
 这些冒烟测试使用跨包或跨语言边界的生产代码，不调用真实模型。下表列出它们在 CI 中的执行策略。以下命令均从仓库根目录运行。
 
 ## 冒烟测试清单
 
-| 冒烟场景 / 入口 | 验证的真实边界 | 主要断言 | CI 执行策略 |
-| --- | --- | --- | --- |
-| [Review Runs HTTP](review-runs-http/review-runs-http.test.mjs) | GitHub Integration 的 Review Runs 客户端 → Review Runs HTTP | 成功的空响应不会触发 JSON 解析错误；JSON 响应仍能正常解析。 | PR 按路径触发 + 合并队列 |
-| [run 提交](execution-submission/execution-submission.test.mjs) | Review Runs 的 Execution API 客户端 → Execution Gateway HTTP → Temporal | 提交、重放相同提交并读取运行状态。在 Worker 执行前停止。 | PR 按路径触发 + 合并队列 |
-| [Memory Catalog 客户端](memory-catalog/test_memory_catalog.py) | agents 包的 Memory Catalog 客户端 → Memory Catalog HTTP → PostgreSQL | 必须先确认；重复注册保持幂等；拒绝冲突的发布意图和错误凭据。 | PR 按路径触发 + 合并队列 |
-| [输入包](input-bundle/test_input_bundle.py) | TypeScript 归档/上传 → RustFS → Python 输入准备 | 重复发布保持身份一致；工作区字节在传输后保持不变；拒绝错误摘要。 | PR 按路径触发 + 合并队列 |
-| [Memory 操作员编辑](memory-operator-edit/test_memory_bff.py) | UI BFF → Catalog/PostgreSQL + RustFS | 重放编辑不会创建额外修订；过期编辑产生冲突；恢复返回先前指针和可读取的产物。 | PR 按路径触发 + 合并队列 |
-| [执行生命周期](execution-lifecycle/test_execution_lifecycle.py) | Review Runs 协调 → Execution Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | 任务失败后能自动重试、执行能完成、运行文件可读取，且重新打开存储后仍能读取发布结果。安全分析使用预设结果，不调用真实模型或向 GitHub 发布。 | 仅手动执行 |
+| 冒烟场景 / 入口                                                 | 验证的真实边界                                                                           | 主要断言                                                                                                                                   | CI 执行策略              |
+| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
+| [Review Runs HTTP](review-runs-http/review-runs-http.test.mjs)  | GitHub Integration 的 Review Runs 客户端 → Review Runs HTTP                              | 成功的空响应不会触发 JSON 解析错误；JSON 响应仍能正常解析。                                                                                | PR 按路径触发 + 合并队列 |
+| [run 提交](execution-submission/execution-submission.test.mjs)  | Review Runs 的 Execution API 客户端 → Execution Gateway HTTP → Temporal                  | 提交、重放相同提交并读取运行状态。在 Worker 执行前停止。                                                                                   | PR 按路径触发 + 合并队列 |
+| [Memory Catalog 客户端](memory-catalog/test_memory_catalog.py)  | agents 包的 Memory Catalog 客户端 → Memory Catalog HTTP → PostgreSQL                     | 必须先确认；重复注册保持幂等；拒绝冲突的发布意图和错误凭据。                                                                               | PR 按路径触发 + 合并队列 |
+| [输入包](input-bundle/test_input_bundle.py)                     | TypeScript 归档/上传 → RustFS → Python 输入准备                                          | 重复发布保持身份一致；工作区字节在传输后保持不变；拒绝错误摘要。                                                                           | PR 按路径触发 + 合并队列 |
+| [Memory 操作员编辑](memory-operator-edit/test_memory_bff.py)    | UI BFF → Catalog/PostgreSQL + RustFS                                                     | 重放编辑不会创建额外修订；过期编辑产生冲突；恢复返回先前指针和可读取的产物。                                                               | PR 按路径触发 + 合并队列 |
+| [执行生命周期](execution-lifecycle/test_execution_lifecycle.py) | Review Runs 协调 → Execution Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | 任务失败后能自动重试、执行能完成、运行文件可读取，且重新打开存储后仍能读取发布结果。安全分析使用预设结果，不调用真实模型或向 GitHub 发布。 | 仅手动执行               |
 
-Review Runs HTTP 和 run 提交共用 `Smoke — Service Boundaries` job。Catalog 客户端、输入包和操作员编辑共用 `Smoke — Memory and Artifacts`，让选中的测试复用临时服务；各测试仍有独立的路径过滤器。手动工作流为 `Smoke — Execution Lifecycle`。共用 job 是执行成本上的选择，不代表另一类冒烟测试。
+Review Runs HTTP 和 run 提交共用 `Smoke — Service Boundaries` job。Catalog 客户端、输入包和操作员编辑共用 `Smoke — Memory and Artifacts`，让选中的测试复用临时服务；各测试仍有独立的路径过滤器。手动工作流为 `Smoke — Execution Lifecycle`。共用 job 只为节省执行成本，这些测试并不因此成为另一类冒烟测试。
 
 ## 目录结构
 

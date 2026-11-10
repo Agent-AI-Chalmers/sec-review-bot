@@ -60,7 +60,7 @@ deepagents 只读取调用方交给它的 source path，不负责替某个工作
 
 ### Skill 选择层级
 
-有些外部 skill 或 command 覆盖的能力，在本项目里已经由公开工作流和对应 review 阶段实现。例如 Anthropic 的 [`security-review.md`](https://github.com/anthropics/claude-code-security-review/blob/main/.claude/commands/security-review.md) 描述的是“做安全审查”，OrchestKit 的 [`review-pr.md`](https://github.com/yonatangross/orchestkit/blob/main/plugins/ork/commands/review-pr.md) 描述的是“审查 PR”。在这里，它们不是一个单独 skill。
+有些外部 skill 或 command 覆盖的能力，在本项目里已经由公开工作流和对应 review 阶段实现。例如 Anthropic 的 [`security-review.md`](https://github.com/anthropics/claude-code-security-review/blob/main/.claude/commands/security-review.md) 描述的是“做安全审查”，OrchestKit 的 [`review-pr.md`](https://github.com/yonatangross/orchestkit/blob/main/plugins/ork/commands/review-pr.md) 描述的是“审查 PR”。在本项目里，这些能力内置在公开工作流及其 review 阶段中，没有做成单独的 skill。
 
 内置 skills 位于项目目标的下一层。它们为 review 工作流补充可复用的安全知识。
 
