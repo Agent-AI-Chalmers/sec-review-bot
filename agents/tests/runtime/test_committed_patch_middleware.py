@@ -93,13 +93,14 @@ def test_empty_commit_is_accepted_without_a_caller_correction(
     check.assert_called_once()
 
 
-def test_empty_commit_gets_the_caller_correction_once_then_fails(
+def test_empty_commit_gets_the_caller_correction_once(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """The caller owns the wording, so synthesis can allow an honest empty result.
+    """The caller owns the wording and the empty outcome.
 
     A generic "correct the commits" message pushed synthesis to stitch
-    contradictory cases together; the middleware must relay the caller's text.
+    contradictory cases together, so the middleware relays the caller's text
+    once and then hands a still-empty response back for the caller to report.
     """
     middleware, check = _empty_commit_middleware(
         tmp_path, monkeypatch, "caller correction text"
@@ -116,8 +117,7 @@ def test_empty_commit_gets_the_caller_correction_once_then_fails(
     state["committed_patch_correction_attempted"] = correction[
         "committed_patch_correction_attempted"
     ]
-    with pytest.raises(ValueError, match="empty"):
-        middleware.after_model(state, cast(Runtime[Any], None))
+    assert middleware.after_model(state, cast(Runtime[Any], None)) is None
     check.assert_not_called()
 
 

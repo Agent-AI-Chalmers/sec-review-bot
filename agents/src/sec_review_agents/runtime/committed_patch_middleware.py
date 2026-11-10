@@ -35,7 +35,9 @@ class CommittedPatchMiddleware(AgentMiddleware[CommittedPatchState, Any, Any]):
     response and return to the model while its tools and workspace remain alive.
     Empty repairs are accepted unless the caller supplies
     `empty_repair_correction`: then an empty commit is rejected once with that
-    caller-owned message, and fails if the corrected response is still empty.
+    caller-owned message. A response that is still empty after the correction is
+    returned to the caller, which owns the empty outcome and can report the
+    agent's own explanation.
     """
 
     worktree_path: Path
@@ -57,7 +59,7 @@ class CommittedPatchMiddleware(AgentMiddleware[CommittedPatchState, Any, Any]):
             )
             if self.empty_repair_correction is not None and not artifact.file_changes:
                 if correction_attempted:
-                    raise ValueError("Committed repair is empty.")
+                    return None
                 return self._correction(self.empty_repair_correction)
             error = check_workspace_patch_applies_to_fresh_baseline(
                 self.workspace_snapshot_tar_path, artifact.patch_diff
