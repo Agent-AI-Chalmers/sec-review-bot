@@ -36,7 +36,7 @@ pnpm run test:integration
 
 ## 本地接收端
 
-完整审查还需要 Execution Gateway 和 Execution Worker。要在本地跑完整链路，请使用仓库级 Docker Compose 部署。下面的命令只启动 GitHub Integration。
+完整审查还需要 Execution Gateway 和 Execution Worker。要在本地跑完整链路，请使用仓库级 Docker Compose 部署。本节只涉及 GitHub Integration 本身。
 
 非 Compose 启动时，先按 `apps/github-integration/.env.sample` 填好 `apps/github-integration/.env`；至少需要设置 `APP_ID`、`PRIVATE_KEY_PATH`、`WEBHOOK_SECRET`、`REVIEW_RUNS_SERVICE_URL` 和 `REVIEW_RUNS_SERVICE_TOKEN`。
 
@@ -46,49 +46,13 @@ pnpm run test:integration
 
 `REVIEW_RUNS_REQUEST_TIMEOUT_MS` 限制每次 Review Runs 请求的最长等待时间，默认 30 秒。发布租约续租失败或超时会被视为持有任务的资格已丢失：发布组件不再启动新的 GitHub 写操作，而是等待租约接管恢复。
 
-```bash
-pnpm run server
-```
-
-开发态：
-
-```bash
-pnpm run dev
-```
-
-本地 URL：
-
-```text
-http://localhost:30000/api/webhook
-http://localhost:30000/api/repository-review/dispatch
-```
-
-如果本地没有公网 HTTPS 地址，可以用 `smee`，如：
-
-```bash
-npx smee -u https://smee.io/your-channel -t http://localhost:30000/api/webhook
-```
-
-GitHub 参考：
-
-- GitHub App quickstart:
-  - <https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/quickstart>
-- GitHub Webhook app guide:
-  - <https://docs.github.com/en/apps/creating-github-apps/writing-code-for-a-github-app/building-a-github-app-that-responds-to-webhook-events>
-
-如果你已经有域名，也可以用 Cloudflare Tunnel 把公网地址转到本地服务。
-
-GitHub App Webhook 和 GitHub Actions 仓库审查请求的本地转发说明见 [本地 GitHub 入站设置](../../docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
+用 `pnpm run server` 启动，开发时用 `pnpm run dev`。服务在 `http://localhost:30000/api/webhook` 接收 GitHub App Webhook，在 `http://localhost:30000/api/repository-review/dispatch` 接收 GitHub Actions 发起的仓库审查请求。如何通过 `smee` 或 Cloudflare Tunnel 让 GitHub 访问这些地址，见 [本地 GitHub 入站设置](../../docs/operations/LOCAL_GITHUB_INBOUND_SETUP.zh.md)。
 
 ## 职责
 
 - 读取 GitHub App 元信息与 installation 身份
-
-- 接收 GitHub Webhook
-- 接收 GitHub Actions 发起的仓库审查 HTTP 请求，并通过 OIDC 验证身份
-
+- 接收 GitHub Webhook，以及 GitHub Actions 发起、通过 OIDC 验证身份的仓库审查 HTTP 请求
 - 准备 Issue、PR 和仓库审查输入
-
 - 向 Review Runs 提交已准备的输入并领取发布任务
 - 把结构化结果发布回 GitHub
 

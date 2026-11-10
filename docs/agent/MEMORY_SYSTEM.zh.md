@@ -77,11 +77,12 @@ maintenance 会读取 extraction 产生的 observations，并把有用经验并�
 - 来源：issue 或 pull-request review 发布 trajectories 后，会进入异步 memory 处理。repository review 则会按每个实际存在 trajectories 的 case 形成一个 extraction unit。
 - extraction 会分别处理各个 review，并产出 pending observations。
   - 可以并发执行多个 extraction。
+<!-- doc-default: MEMORY_MAINTENANCE_SCHEDULE_DEFAULT_INTERVAL_SECONDS; source=agents/src/sec_review_agents/entrypoints/memory_maintenance_worker/schedules.py -->
+<!-- doc-default: MEMORY_MAINTENANCE_PENDING_THRESHOLD; source=agents/src/sec_review_agents/workflows/memory/maintenance.py -->
+<!-- doc-default: MEMORY_MAINTENANCE_PENDING_MAX_AGE; source=agents/src/sec_review_agents/workflows/memory/maintenance.py -->
 - maintenance 定时检查，达到阈值或者时间过长就处理：maintenance trigger schedule 默认每小时运行一次。只有 pending observations 至少有 10 条，或者最老的 pending observation 已经等待至少 1 天时，才启动 maintenance。
   - maintenance 不可并行，同一时间只有一个；但是一次会处理多条 observations；
   - 用 `processed` 表示已经审阅并处理过，不表示经验一定被吸收进 memory（如上会做判断）。
-
-> 10 条是经验设计，可调整
 
 ## 治理
 
@@ -89,45 +90,31 @@ memory 不会让提取出的经验自动变可靠。重要经验仍然需要人�
 
 memory 应该保持小而可审计。它一旦长成笔记堆，就应该通过合并、改写、删除来整理，或者把重要材料提升到 prompts、skills 等地方。
 
-> 注：如果是**正式产品**，仅从 prompt engineering 的角度来看，这种行为也是需要审慎的，因为必须要证明改动是有提升的。但是如果是个人助理的 agent，可以考虑如自动 skills 生成，这样就是一个自治理的好系统了。
-
 当材料已经超出 memory 的职责时，检索应该建立在专门系统上。客户记录、用户画像和文档库需要明确的 schema、owner、权限、保留策略、评估和运维流程；search 或 RAG 不能让一个膨胀的 memory tree 变健康。
 
 `MEMORY.md` 有启动注入上限。超过这个上限，说明 memory 已经欠整理了：maintenance 应该缩短索引、把细节下沉到 topic 文件，而不是把截断当成正常检索路径。
 
 ## 一些设计取舍
 
+下面的选择都基于本项目的场景：大量并发的审查 agent 收集安全审查经验。场景不同，可以合理地做出不同选择。
+
 ### 没有用户偏好记录
 
-最典型的例子就是 Hermes Agent。他们有 `USER.md`，这种记录用户偏好和身份信息的文件。但是我们的项目是代码审查，所以没有必要维护所谓的用户偏好。
-
----
-
-如果使用场景改变，也可以自然地加入：`USER.md` + `preference/` 目录就行。
+Hermes Agent 等系统用 `USER.md` 记录用户偏好和身份信息。代码审查没有需要画像的用户，所以本项目不维护。如果场景改变，加一个 `USER.md` 和 `preference/` 目录就够了。
 
 ### 没有热读写
 
-本项目没有把 memory 写入放在主 agent 的主流程关键路径上，核心原因有两个：
+memory 写入不在主 agent 的关键路径上，原因有两个：
 
-1. 是多 agent 并发。多个 review、多个阶段 agent 或多个 repository case 同时运行时，如果它们都直接改长期 memory，会遇到直接的写冲突问题。文件化 memory 尤其如此。即使用文件锁串行化写入，也会把锁等待和写入延迟带回主流程。
-2. 本项目没有 supervisor，单个 agent 也缺少全局视角，仅靠它自身，通常很难稳定地产生足够好的长期经验。
+1. 并发。同一时间往往有许多审查任务在运行，每个任务里又有多个阶段 agent。如果它们都直接改写存放在文件里的 memory，就会互相冲突；加锁让写入排队，又会把等锁和写入的耗时带回主流程。
+2. 没有 supervisor。单个阶段 agent 缺少全局视角，仅靠自身很难稳定产出足够好的长期经验。
 
-因此，当前实现只让主 agent 留下 trajectories，把经验写入、筛选和归并放到异步 extraction / maintenance 流程里。这样会牺牲一部分即时记忆体验，但换来更清楚的来源、更稳定的主流程，以及更容易审计和回滚的 memory 更新。
+因此主 agent 只留下 trajectories，由异步 extraction 和 maintenance 写入 memory。这牺牲了即时记忆，换来更清楚的来源、更稳定的主流程，以及更容易审计和回滚的 memory 更新。
 
----
+当只有一个台前 agent/session、确实有 supervisor、且 memory 还要收集用户偏好时，就可以考虑热读写。这三个条件通常同时出现在个人助理 agent / coding agent 中。
 
-但仍需结合使用场景判断，例如：
+### 没有做的
 
-- 假设台前工作的只有一个 agent/session
-- 确实有一个 supervisor
-- memory 不仅是收集经验，还要收集用户偏好
-
-那么就是可以考虑热读写的。
-
-这三个条件通常同时出现在个人助理 agent / coding agent 中。
-
-### 其他
-
-- 没有复杂的 DB 和 向量检索
-- 没有 `session_search`（允许 agent 查询以前的对话细节）
-- 自动 skills 生成（对个人 agent 是可行的，但是正式产品存疑，详细见上治理）
+- 没有向量检索。
+- 没有 `session_search`（查询以前的对话细节）。
+- 没有自动 skills 生成。它对个人 agent 可行，但正式产品必须先证明每次生成的改动确实有提升。

@@ -30,6 +30,8 @@ The server in this project:
 2. parses the event payload from GitHub
 3. calls the GitHub API as the App
 
+The required permissions and webhook subscriptions are listed in [GitHub App Permission Settings](LOCAL_INTEGRATED_DEPLOYMENT.md#github-app-permission-settings).
+
 ## Why Local Development Cannot Use `localhost` Directly
 
 GitHub's servers cannot directly reach your local `localhost:30000`.
@@ -150,22 +152,14 @@ sudo cloudflared service uninstall
 - setups that already use Cloudflare and a domain
 - avoiding nginx, certificates, and public port exposure
 
-## Common GitHub App Permission Pitfalls
+## Common Inbound Pitfalls
 
-- You changed App permissions, but the installation has not been re-approved.
 - The webhook secret does not match local configuration.
 - The webhook URL is correct, but the local forwarding tool is not running.
 - Cloudflare Tunnel only routes `/api/webhook`, so repository review requests from GitHub Actions return `404`.
 - You think you are listening on a public address, but the local service is not listening on the expected port.
-- The App lacks enough `Pull requests`, `Issues`, or `Contents` permissions, so later write-back fails.
 
-A common GitHub API error is:
-
-```text
-403 Resource not accessible by integration
-```
-
-This usually means permissions are insufficient or the installation has not been updated.
+For permission errors such as `403 Resource not accessible by integration`, see [GitHub App Permission Settings](LOCAL_INTEGRATED_DEPLOYMENT.md#github-app-permission-settings).
 
 ## References
 

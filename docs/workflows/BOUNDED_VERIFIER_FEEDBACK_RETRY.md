@@ -4,17 +4,12 @@ Language: English | [中文](BOUNDED_VERIFIER_FEEDBACK_RETRY.zh.md)
 
 ## Summary
 
-This page describes the bounded verifier-to-mitigator feedback retry model in the shared review workflow.
+The base downstream path is `analyzer -> mitigator -> verifier`. When verifier finds a concrete, repairable problem in the attempted mitigation, the workflow may run a bounded feedback retry:
 
-The base downstream path is:
+- `analyzer -> mitigator -> verifier -> [feedback-guided mitigator -> verifier] * k`
 
-- `analyzer -> mitigator -> verifier`
-
-When verifier concludes that an attempted patch is materially weak, incomplete, or risky, the workflow may take one bounded recovery pass:
-
-- `analyzer -> mitigator(pass1) -> verifier(pass1) -> mitigator(pass2) -> verifier(pass2)`
-
-Feedback retries have **an explicit limit** to prevent mitigation and verification from repeating indefinitely. The current policy allows one additional retry.
+<!-- doc-default: MAX_FEEDBACK_RETRY_ATTEMPTS; source=agents/src/sec_review_agents/review_stages/feedback_loop.py -->
+The code constant `MAX_FEEDBACK_RETRY_ATTEMPTS` limits `k` to `1`. This is not a deployment setting. Changing it requires considering context growth, latency, and model cost, and rerunning focused agent-behavior probes.
 
 ## Why This Exists
 
@@ -41,34 +36,9 @@ In practice, though, many security repair tasks do not come with runnable PoCs, 
 
 - Analyzer conclusions do not prevent the subsequent mitigation and verification stages from running.
 - Mitigator decides whether to change code based on evidence. It may leave code unchanged when no safe, justified repair is available.
-- Verifier independently checks whether the problem exists within the review scope and whether Mitigator handled it appropriately, even when there is no patch.
-- If Verifier finds a concrete, repairable problem, it can ask Mitigator to try once more. This retry prioritizes the problems identified by Verifier, uses the original analysis as context, and does not rerun Analyzer.
-
-### Normal Path
-
-- `analyzer -> mitigator -> verifier`
-
-If the first verification result needs no further action, no feedback retry is scheduled; the workflow continues to result assembly and any delivery steps.
-
-### Recovery Path
-
-- `analyzer -> mitigator(pass1) -> verifier(pass1) -> mitigator(retry) -> verifier(retry)`
-
-During retry, the mitigator uses the previous repair result and verifier feedback to generate a new patch from the original prepared workspace. It checks the problems raised by the verifier first, then uses code and execution evidence to decide whether and how to revise the patch. The retry addresses the original review task and reruns mitigation and verification without rerunning the analyzer; the existing analysis continues to define the review scope.
-
-### Generalized Bounded Model
-
-Architecturally, the workflow is modeled as:
-
-- `analyzer -> mitigator -> verifier -> [feedback-guided mitigator -> verifier] * k`
-
-where:
-
-- `k` is the number of additional mitigation/verification retries
-- the code constant `MAX_FEEDBACK_RETRY_ATTEMPTS` bounds `k`
-
-<!-- doc-default: MAX_FEEDBACK_RETRY_ATTEMPTS; source=agents/src/sec_review_agents/review_stages/feedback_loop.py -->
-The code constant `MAX_FEEDBACK_RETRY_ATTEMPTS` limits additional retries to `1`, so `k <= 1`. This is not a deployment setting. Changing the limit requires considering context growth, latency, and model cost, and rerunning focused agent-behavior probes.
+- Verifier independently checks whether the problem exists within the review scope and whether mitigator handled it appropriately, even when there is no patch.
+- Only `next_step=retry-ai` schedules a retry (see [Next Step](#next-step)); other outcomes continue to result assembly and delivery.
+- A retry reruns mitigation and verification, not analysis: the existing analysis still defines the review scope. The retrying mitigator generates a new patch from the original prepared workspace, starting from the problems verifier raised.
 
 ## Next Step
 
@@ -161,36 +131,9 @@ That context exists to help verifier judge whether earlier patch concerns are no
 
 The retrying verifier is not meant to redo a full analyzer audit by default. Prior verifier judgments are continuity context, not binding authority. The new patch and current repository evidence remain the basis for the new verification decision.
 
-## Context And History Policy
+### History Retention
 
-The workflow may retain complete retry history locally, but the agent should receive only a **history projection** suited to its current task.
-
-The workflow should retain:
-
-- the initial mitigation and verifier outcomes
-- later retry attempts
-- retry trigger reasons
-
-This full history is valuable for:
-
-- auditability
-- comparison between initial and revised outcomes
-- downstream inspection
-
-The history projection for retrying mitigator should center on:
-
-- original analyzer scope
-- latest verifier feedback
-- what the previous mitigation attempted and which files it changed
-- earlier verifier patch findings as a compact history snapshot
-
-The history projection for retrying verifier should center on:
-
-- current patch and repository evidence
-- the previous verifier patch findings
-- enough continuity to decide whether the new patch resolved, preserved, or superseded those findings
-
-Older verifier history should be summarized structurally rather than replayed blindly as raw full-text reports.
+The workflow retains the complete retry history — initial outcomes, later attempts, and retry trigger reasons — for auditability and downstream inspection. Agents receive only the projection described above; older verifier history is summarized structurally rather than replayed as raw full-text reports.
 
 ## Design Boundary
 

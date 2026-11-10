@@ -35,18 +35,9 @@ suggestion 锚定是另一件事，它使用输入中的 `files` 集合，由输
 | 完整 PR | `base_sha...head_sha` | pull request 相对 merge base 引入的全部变更。 |
 | Push | `previous_head_sha..head_sha` | 仅触发本次 run 的 `synchronize` 事件新增的提交。 |
 
-`previous_head_sha` 来自 [`pull_request` webhook 的 `before` 字段](https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request)。`synchronize` 载荷类型要求同时存在 `after` 与 `before`，其定义来自本仓库锁定的 `@octokit/openapi-webhooks-types`：
+`previous_head_sha` 来自 [`pull_request` webhook 的 `before` 字段](https://docs.github.com/en/webhooks/webhook-events-and-payloads#pull_request)。本仓库依赖的 `@octokit/openapi-webhooks-types` 中，`synchronize` 载荷类型要求同时存在 `after` 与 `before`。
 
-```ts
-"webhook-pull-request-synchronize": {
-  action: "synchronize";
-  after: string;
-  before: string;
-  ...
-}
-```
-
-这个类型是唯一可得的规范性陈述。webhook 文档对分支被 force-push 后 `before` 的含义没有任何说明，而 [compare 端点](https://docs.github.com/en/rest/commits/commits#compare-two-commits) 只文档化了它自己的 `basehead` 参数，没有说明其背后提交的可达性。
+这个类型是唯一可得的规范性陈述。webhook 文档对分支被 force-push 后 `before` 的含义没有任何说明，而 [compare 端点](https://docs.github.com/en/rest/commits/commits#compare-two-commits) 的文档只说明了 `basehead` 参数的格式，没有说明被 force-push 丢弃的旧提交是否还能用来比较。
 
 ## 实测的 API 行为
 

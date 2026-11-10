@@ -32,6 +32,8 @@ Webhook 可以理解成“事件发生后，对方向你预留的地址发一个
 2. 解析 GitHub 发来的事件 payload
 3. 通过 App 身份去请求 GitHub API
 
+所需权限和 Webhook 订阅见 [GitHub App 权限设置](LOCAL_INTEGRATED_DEPLOYMENT.zh.md#github-app-权限设置)。
+
 ## 为什么本地开发不能直接填 `localhost`
 
 GitHub 的服务器无法直接访问你本机的 `localhost:30000`。
@@ -151,22 +153,14 @@ sudo cloudflared service uninstall
 - 已经有 Cloudflare 和域名
 - 不想自己维护 nginx、证书和公网端口暴露
 
-## 与 GitHub App 权限相关的常见坑
+## 入站转发的常见坑
 
-- 你改了 App 权限，但 installation 还没重新批准
 - Webhook secret 和本地配置不一致
 - Webhook URL 填对了，但本地转发工具没在跑
 - Cloudflare Tunnel 只配置了 `/api/webhook`，导致 GitHub Actions 发起的仓库审查请求返回 `404`
 - 你以为自己在监听公网地址，其实本地服务没有监听对应端口
-- App 没有 `Pull requests`、`Issues` 或 `Contents` 的足够权限，导致后续回写失败
 
-常见 GitHub API 报错是：
-
-```text
-403 Resource not accessible by integration
-```
-
-这通常意味着权限不够或 installation 还没更新。
+`403 Resource not accessible by integration` 等权限问题见 [GitHub App 权限设置](LOCAL_INTEGRATED_DEPLOYMENT.zh.md#github-app-权限设置)。
 
 ## 参考
 

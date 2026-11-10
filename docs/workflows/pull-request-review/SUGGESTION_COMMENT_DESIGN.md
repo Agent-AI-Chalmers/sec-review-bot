@@ -44,11 +44,7 @@ This is a partial-admission pipeline:
 
 #### 1. Parse the mitigation diff
 
-Parse unified diff content and collect, per file:
-
-- `path`
-- hunk header (`old_start`, `old_count`, `new_start`, `new_count`)
-- hunk lines
+Parse the unified diff into per-file hunks.
 
 #### 2. Restrict to PR-visible files
 
@@ -65,13 +61,7 @@ Split each patch hunk into suggestion blocks of consecutive added and removed li
 
 #### 4. Build review anchors from overlapping PR patch hunks
 
-For each suggestion block, find an overlapping PR patch hunk in the same file and intersect their line ranges in the PR's current version:
-
-- `start_line = max(block.start_line, pr_hunk.new_start)`
-- `line = min(block.line, pr_hunk.new_start + pr_hunk.new_count - 1)`
-- `side = RIGHT`
-
-Skip blocks with no valid overlap. If `start_line === line`, submit a single-line anchor. If `start_line < line`, submit a multi-line anchor with `start_line` and `start_side`.
+For each suggestion block, anchor it to the intersection of its line range with an overlapping PR patch hunk in the same file, on the right (current-version) side. Skip blocks with no overlap; an overlap of one line becomes a single-line anchor, a longer one a multi-line anchor.
 
 #### 5. Publish one review with all inline suggestions
 
