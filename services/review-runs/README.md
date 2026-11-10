@@ -132,19 +132,21 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-  steppending[pending] --> runningstep[running] --> stepsucceeded[succeeded]
-  runningstep --> stepfailed[failed]
-  stepfailed --> runningstep
-  runningstep -->|terminal error| terminalfailed[terminal_failed]
-  stepfailed -->|attempts exhausted| stepuncertain[uncertain]
-  runningstep -->|attempts exhausted| stepuncertain
+  steppending[pending] -->|attempt started| runningstep[running]
+  runningstep -->|side effect written| stepsucceeded[succeeded]
+  runningstep -->|retryable failure| stepfailed[failed]
+  stepfailed -->|retry started| runningstep
+  runningstep -->|terminal failure| terminalfailed[terminal_failed]
+  runningstep -->|attempts exhausted| stepuncertain[uncertain]
+  stepfailed -->|attempts exhausted| stepuncertain
   stepuncertain -->|reconciled present| stepsucceeded
-  stepuncertain -->|reconciled absent| terminalfailed
-  stepuncertain -->|recovery budget spent| stepdisconnected[disconnected]
+  stepuncertain -->|reconciled absent or terminal failure| terminalfailed
+  stepuncertain -->|failure reported without retry| stepfailed
+  stepuncertain -->|reconciliation budget spent| stepdisconnected[disconnected]
   stepdisconnected -->|resumed by an operator| steppending
 ```
 
-_The diagrams omit two self-loops that only record an audit event without changing the state: execution `uncertain → uncertain` (replay claimed) and publication `publishing → publishing` (publishing lease expired)._
+_The diagrams omit four self-loops that do not change the state: execution `uncertain → uncertain` (replay claimed) and publication `publishing → publishing` (publishing lease expired) only record an audit event; publication step `running → running` (taken over by a new owner) and `uncertain → uncertain` (reconciliation inconclusive) only advance the attempt or reconciliation count._
 
 The axes are connected by three cross-axis triggers. These are orchestration triggers, not status transitions within one table:
 

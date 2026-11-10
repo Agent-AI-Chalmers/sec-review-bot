@@ -1340,6 +1340,69 @@ x-state-machines:
           reason: PUBLICATION_ABANDONED,
           label: execution failed,
         }
+  # One connector side effect inside a publication (a comment, a review, a branch). Steps are
+  # not written to the run event log, so the observed edges are pinned by
+  # services/review-runs/test/integration/publication-step-edges.test.ts instead of the
+  # audit-log comparison the run axes use. The publication axis above is derived from these.
+  publication_step:
+    order: 4
+    title: Publication step
+    field: ObservedPublicationStep.status
+    initial: pending
+    terminal: [succeeded, terminal_failed]
+    states:
+      pending:
+        label: Pending
+        description: Not attempted yet, or returned to the queue with fresh budgets by an operator.
+      running:
+        label: Running
+        description: >-
+          An attempt started. Its owner may still be performing the side effect, or may have died
+          after performing it, so a later claim cannot assume nothing happened.
+      failed:
+        label: Failed
+        description: The last attempt reported a retryable failure; another attempt may start while the attempt budget lasts.
+      uncertain:
+        label: Uncertain
+        description: >-
+          The attempt budget is spent, but any started attempt may have taken effect remotely, so
+          the connector must reconcile against the remote system before the step can conclude.
+      disconnected:
+        label: Disconnected
+        description: >-
+          Reconciliation used its budget without an answer. An operator has to establish what is
+          on the remote system.
+      succeeded:
+        label: Succeeded
+        description: The side effect exists, either written by an attempt or found by reconciliation.
+      terminal_failed:
+        label: Terminal failure
+        description: >-
+          The step will not be attempted again: an attempt failed terminally, or reconciliation
+          confirmed that the side effect is absent.
+    transitions:
+      - { from: pending, to: running, label: attempt started }
+      # A running step whose owner died is taken over by a different claim token. The status
+      # stays `running`; the attempt count records the new attempt.
+      - { from: running, to: running, label: taken over by a new owner }
+      - { from: failed, to: running, label: retry started }
+      - { from: running, to: succeeded, label: side effect written }
+      - { from: running, to: failed, label: retryable failure }
+      - { from: running, to: terminal_failed, label: terminal failure }
+      # Exhaustion is checked when the next claim is refused: the last attempt may have taken
+      # effect, so the step goes to reconciliation instead of failing.
+      - { from: running, to: uncertain, label: attempts exhausted }
+      - { from: failed, to: uncertain, label: attempts exhausted }
+      - { from: uncertain, to: succeeded, label: reconciled present }
+      # Two decisions share this pair: reconciliation confirmed the effect is absent, or the
+      # connector reported a terminal failure while reconciling.
+      - { from: uncertain, to: terminal_failed, label: reconciled absent or terminal failure }
+      - { from: uncertain, to: uncertain, label: reconciliation inconclusive }
+      - { from: uncertain, to: disconnected, label: reconciliation budget spent }
+      # A failure reported without `retry` while reconciling records a plain failure; the next
+      # refused claim returns the exhausted step to `uncertain`.
+      - { from: uncertain, to: failed, label: failure reported without retry }
+      - { from: disconnected, to: pending, label: resumed by an operator }
 paths:
   /healthz:
     get:

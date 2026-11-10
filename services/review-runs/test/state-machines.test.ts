@@ -20,6 +20,12 @@ type Spec = {
 /** Pull the enum off the schema a machine's `field` points into. ObservedRun is the read
  * surface the console renders, so its enums are the ones the diagram must match. */
 function enumFor(spec: Spec, field: string): string[] {
+  // A machine that is not a run axis names its schema directly (`ObservedPublicationStep.status`).
+  const [schemaName = '', member = ''] = field.split('.')
+  const direct = spec.components?.schemas?.[schemaName] as
+    { properties?: Record<string, { enum?: unknown }> } | undefined
+  if (direct !== undefined)
+    return asEnum(direct.properties?.[member]?.enum, field)
   const observed = spec.components?.schemas?.ObservedRun as
     { properties?: Record<string, unknown> } | undefined
   const props = observed?.properties
