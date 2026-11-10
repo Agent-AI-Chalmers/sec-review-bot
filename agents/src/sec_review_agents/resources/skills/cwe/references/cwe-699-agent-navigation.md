@@ -93,8 +93,8 @@ Classic injection-style weaknesses caused by failing to neutralize dangerous syn
 
 Weaknesses related to files, paths, directories, and file-system semantics.
 
-- `CWE-22`: Directory traversal / Path traversal
-- `CWE-59`: Insecure temporary file / Zip Slip
+- `CWE-22`: Directory traversal / Path traversal / Zip Slip
+- `CWE-59`: Link following / Symlink attack
 - `CWE-426`: Untrusted Search Path / Untrusted Path
 - `CWE-427`: Uncontrolled Search Path Element / DLL preloading / Binary planting / Insecure library loading / Dependency confusion
 
@@ -186,7 +186,7 @@ Resource lifecycle and availability mistakes beyond locking alone.
 - `CWE-502`: Deserialization of Untrusted Data / Marshaling / Unmarshaling / Pickling / Unpickling / PHP Object Injection
 - `CWE-908`: Use of Uninitialized Resource
 - `CWE-910`: Use of Expired File Descriptor / Stale file descriptor
-- `CWE-915`: Mass Assignment / AutoBinding / PHP Object Injection
+- `CWE-915`: Mass Assignment / AutoBinding
 
 ### CWE-136: Type Errors
 
