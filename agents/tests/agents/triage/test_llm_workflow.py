@@ -244,3 +244,93 @@ def _scanner_style_candidates() -> list[DiscoveryCandidateResult]:
             grounding_status="grounded",
         ),
     ]
+
+
+def _availability_candidates() -> list[DiscoveryCandidateResult]:
+    return [
+        # Availability leads: discovery reports them, triage keeps only those an
+        # outside attacker can drive. The terse wording mirrors real discovery
+        # output, which states code facts without an impact argument.
+        DiscoveryCandidateResult(
+            candidate_id="public-regex-backtracking",
+            candidate=DiscoveryCandidate(
+                category="Resource abuse / regex",
+                description="signup() matches request.form['email'] against "
+                "re.compile(r'^([a-zA-Z0-9]+)*@example\\.com$'). The pattern has a "
+                "nested quantifier and the input length is not checked.",
+                locations=[
+                    DiscoveryLocation(
+                        file="app/routes/signup.py", line=18, label="Email regex"
+                    )
+                ],
+                evidence=["EMAIL_RE.match(request.form['email'])"],
+            ),
+            grounding_status="grounded",
+        ),
+        DiscoveryCandidateResult(
+            candidate_id="operator-sandbox-no-timeout",
+            candidate=DiscoveryCandidate(
+                category="Resource abuse / unbounded execution",
+                description="command_timeout_ms defaults to None when neither the "
+                "constructor argument nor AGENT_BWRAP_COMMAND_TIMEOUT_MS is set, so "
+                "sandboxed agent commands run with no timeout and can consume host "
+                "resources. The commands are issued by the operator's own review "
+                "agent inside its sandbox; no external request reaches this path.",
+                locations=[
+                    DiscoveryLocation(
+                        file="agents/filesystem/bwrap_backend.py",
+                        line=88,
+                        label="No default command timeout",
+                    )
+                ],
+                evidence=["effective_timeout = self.command_timeout_ms"],
+            ),
+            grounding_status="grounded",
+        ),
+        DiscoveryCandidateResult(
+            candidate_id="admin-reindex-no-rate-limit",
+            candidate=DiscoveryCandidate(
+                category="Resource abuse / missing rate limiting",
+                description="POST /admin/reindex triggers a full search reindex and "
+                "has no rate limit. The route is wrapped by @require_role('admin'), "
+                "so only administrators can call it.",
+                locations=[
+                    DiscoveryLocation(
+                        file="app/routes/admin.py", line=52, label="Reindex route"
+                    )
+                ],
+                evidence=["@require_role('admin')", "search.rebuild_all()"],
+            ),
+            grounding_status="grounded",
+        ),
+    ]
+
+
+@pytest.mark.skipif(not PROBE.enabled(), reason=PROBE.skip_reason())
+@pytest.mark.asyncio
+async def test_triage_keeps_attacker_driven_availability_leads_only() -> None:
+    """Discovery reports availability leads; triage keeps only attacker-driven ones.
+
+    The suppress rule for availability issues without a trust boundary must not
+    drop a public unauthenticated ReDoS, while still dropping a lead only the
+    operator's own agent can trigger. The admin-only lead stays in the input as a
+    distractor but is not asserted: whether an administrator-triggered expensive
+    job is worth keeping is a judgment call, and the model kept it in 1 of 3 runs.
+    Kept separate from the scanner noise test so neither input set changes the
+    other's skill-reading behavior.
+    """
+    with patch(
+        "sec_review_agents.filesystem.backend_selection.selected_sandbox_backend_kind",
+        return_value="local",
+    ):
+        result = await run_repository_triage_agent(
+            triage_root=_artifact_root(),
+            triage_candidates=_availability_candidates(),
+            max_passes=1,
+            triage_mode="single",
+        )
+
+    kept = {cid for case in result.cases for cid in case.member_candidate_ids}
+    suppressed = {item.candidate_id for item in result.suppressed_candidates}
+    assert "public-regex-backtracking" in kept
+    assert "operator-sandbox-no-timeout" in suppressed
