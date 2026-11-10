@@ -86,7 +86,12 @@ flowchart LR
   prepending[pending] -->|claimed| preparing
   preparing -->|input accepted| submitted
   preparing -->|retry| prepending
-  preparing -->|failed| prepfailed[failed]
+  preparing -->|claim lapsed| prepuncertain[uncertain]
+  prepuncertain -->|reclaim to confirm| preparing
+  preparing -->|cannot be concluded automatically| prepdisconnected[disconnected]
+  prepdisconnected -->|resumed by an operator| prepuncertain
+  prepdisconnected -->|given up or abandoned by an operator| prepfailed[failed]
+  preparing -->|failed| prepfailed
 ```
 
 `executions.status` / `execution.status`:
@@ -96,12 +101,15 @@ flowchart LR
   pending -->|input submitted| queued
   pending -->|preparation failed| skipped
   pending -->|submission unconfirmed| uncertain
+  uncertain -->|replay accepted| queued
+  uncertain -->|replay rejected| failed
+  uncertain -->|recovery disconnected| disconnected
+  disconnected -->|resumed by an operator| uncertain
+  disconnected -->|given up by an operator| failed
   queued --> running --> succeeded
   queued --> succeeded
   queued --> failed
   running --> failed
-  uncertain -->|replay accepted| queued
-  uncertain -->|replay rejected| failed
 ```
 
 `publications.status`:
@@ -109,9 +117,14 @@ flowchart LR
 ```mermaid
 flowchart LR
   pubpending[pending] --> publishing --> published
+  publishing -->|a step may have taken effect| pubuncertain[uncertain]
+  pubuncertain -->|step settled| publishing
+  pubuncertain -->|reconciliation could not conclude| pubdisconnected[disconnected]
+  pubdisconnected -->|resumed by an operator| pubpending
+  pubdisconnected -->|given up by an operator| pubfailed[failed]
   publishing -->|retryable failure| pubpending
-  publishing -->|terminal failure| pubfailed[failed]
-  pubpending -->|execution not publishable| skipped
+  publishing -->|terminal failure| pubfailed
+  pubpending -->|execution not published| skipped
   publishing -->|execution failed| skipped
 ```
 
@@ -122,14 +135,37 @@ flowchart LR
   steppending[pending] --> runningstep[running] --> stepsucceeded[succeeded]
   runningstep --> stepfailed[failed]
   stepfailed --> runningstep
-  stepfailed -->|limit reached, reconciled absent| terminalfailed[terminal_failed]
+  runningstep -->|terminal error| terminalfailed[terminal_failed]
+  stepfailed -->|attempts exhausted| stepuncertain[uncertain]
+  runningstep -->|attempts exhausted| stepuncertain
+  stepuncertain -->|reconciled present| stepsucceeded
+  stepuncertain -->|reconciled absent| terminalfailed
+  stepuncertain -->|recovery budget spent| stepdisconnected[disconnected]
+  stepdisconnected -->|resumed by an operator| steppending
 ```
 
-The axes remain connected by these cross-axis triggers: a submitted preparation causes Execution input submission, a succeeded execution makes publication claimable, and claiming publication initializes its connector side effects. These are orchestration triggers, not status transitions within one table.
+_The diagrams omit two self-loops that only record an audit event without changing the state: execution `uncertain → uncertain` (replay claimed) and publication `publishing → publishing` (publishing lease expired)._
 
-`publication_steps.attempt_count` is the step's retry budget, and attempts are the only unit that budget counts: an attempt is spent when it starts, so a publisher that dies mid-effect consumes one exactly like a failed attempt does. That count — not failures, not crashes, not elapsed time — is the single source of truth for whether another attempt is allowed. Nothing stores a separate failure total; the `failed` transitions on the step are what `failure_code`, `failure_message`, and the run's event log already record. `recovery_attempt_count` is deliberately a different budget: a reconciliation reads the remote system, which does not spend permission to repeat the write, so it never advances `attempt_count`.
+The axes are connected by three cross-axis triggers. These are orchestration triggers, not status transitions within one table:
 
-Reaching the attempt limit does not fail a step. Any attempt that started may have completed its side effect on the remote system before its owner died or its response was lost, and Review Runs cannot see that system, so an exhausted step becomes a question for the connector instead of a verdict. The connector looks for the effect its own step would have produced — a run-specific branch, a review or comment marker — and reports what it found through `settleExhaustedPublicationStep`: the step becomes `succeeded` when the effect is there, and only a confirmation that it is absent makes the step `terminal_failed`. A reconciliation that could not be performed is not evidence of absence, so it propagates rather than concluding.
+- a submitted preparation causes Execution input submission;
+- a succeeded execution makes publication claimable;
+- claiming publication initializes its connector side effects.
+
+**The two `publication_steps` budgets**
+
+| Field                    | Counts                                              | Advances when                                                                                                               |
+| ------------------------ | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `attempt_count`          | Attempts to write the side effect; the retry budget | An attempt starts, so a publisher that dies mid-effect consumes one exactly like a failed attempt                           |
+| `recovery_attempt_count` | Attempts to confirm the remote outcome              | A reconciliation cannot conclude. Reading the remote system does not repeat the write, so it never advances `attempt_count` |
+
+Whether another attempt is allowed depends only on `attempt_count`, not on failures, crashes, or elapsed time. Nothing stores a separate failure total: each `failed` transition is already recorded by `failure_code`, `failure_message`, and the run's event log.
+
+**An exhausted step goes to the connector for a check, not a verdict.** Any attempt that started may have completed its side effect on the remote system before its owner died or its response was lost, and Review Runs cannot see that system. So:
+
+1. The connector looks for the effect its step would have produced, such as a run-specific branch or a review or comment marker.
+2. It reports through `settleExhaustedPublicationStep`: the step becomes `succeeded` when the effect is there, and `terminal_failed` only when its absence is confirmed.
+3. A reconciliation that could not be performed is not evidence of absence: the error propagates instead of concluding.
 
 ## Claims and recovery
 
