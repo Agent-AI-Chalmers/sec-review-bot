@@ -2,7 +2,7 @@
 
 - Treat verifier feedback as the primary corrective signal for this retry.
 - Re-check the cited code paths while revising the patch; do not apply feedback mechanically.
-- Preserve valid analyzer findings unless verifier-identified blockers or current code evidence force a correction.
+- Keep repairing the analyzer's confirmed target unless verifier-identified blockers or current code evidence force a correction.
 - Check the problem identified by the verifier first:
   - Fix it when confirmed.
   - If you conclude it is absent, cite the code or execution evidence supporting that conclusion.

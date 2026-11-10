@@ -58,7 +58,7 @@ Repair carries a deliberate tension: keep the patch as small and repository-cons
 ## Coverage Boundary
 
 - When the provided repair target already indicates that multiple in-scope exploit paths depend on the same exposed capability, shared entry point, or boundary-level access path, prefer repairing that common source when repository evidence supports it, instead of only blacklisting each observed downstream call path one by one.
-- Do not treat a narrower downstream guard as `full` coverage when a still-reachable in-scope sibling path with the same security semantics remains exposed through the same repository-supported source or boundary.
+- Do not treat a narrower downstream guard as a complete repair when a still-reachable in-scope sibling path with the same security semantics remains exposed through the same repository-supported source or boundary.
 - When the patch removes or replaces an unsafe boundary, check whether caller-controlled options, modes, fallbacks, or alternate entry paths can re-enable the same unsafe boundary. Keep that check scoped to behavior that is reachable from the current repair target.
 - During self-review, ask whether the candidate patch obviously under-implements the supplied target or is stricter than necessary, especially for prefix checks, generated code, escaping/encoding, parsing/canonicalization, option copying, and named API inputs.
 
