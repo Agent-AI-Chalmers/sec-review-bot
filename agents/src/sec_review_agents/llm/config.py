@@ -385,9 +385,6 @@ def resolve_deployment_for_agent_config(
     llm_config: LlmConfig,
     agent_name: str | None,
 ) -> str:
-    if not agent_name:
-        raise ValueError("An agent name is required to resolve an LLM deployment.")
-
     normalized_agent = _normalize_agent_key(agent_name)
     if not normalized_agent:
         raise ValueError("An agent name is required to resolve an LLM deployment.")
@@ -400,19 +397,12 @@ def resolve_deployment_for_agent_config(
     return llm_config.agent_deployment_bindings[normalized_agent]
 
 
-def resolve_chat_deployment_for_agent_config(
-    llm_config: LlmConfig,
+def resolve_chat_deployment_for_agent(
     agent_name: str | None,
 ) -> ChatDeploymentConfig:
+    llm_config = get_llm_config()
     deployment_name = resolve_deployment_for_agent_config(llm_config, agent_name)
     lookup = _build_chat_deployment_lookup(list(llm_config.deployments))
     if deployment_name not in lookup:
         raise ValueError(f"Unknown chat deployment '{deployment_name}'.")
     return lookup[deployment_name]
-
-
-def resolve_chat_deployment_for_agent(
-    agent_name: str | None,
-) -> ChatDeploymentConfig:
-    llm_config = get_llm_config()
-    return resolve_chat_deployment_for_agent_config(llm_config, agent_name)
