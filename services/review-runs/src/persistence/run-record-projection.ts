@@ -1,5 +1,5 @@
 import type {
-  ReviewRunWorkflow as WorkflowName,
+  ReviewRunWorkflow,
   ExecutionArtifactStorage
 } from '../contracts.js'
 import type { Pool, PoolClient } from 'pg'
@@ -31,7 +31,7 @@ interface AxisRowColumns<S> {
 export interface ReviewRunRow {
   trunk: {
     run_id: string
-    workflow: WorkflowName
+    workflow: ReviewRunWorkflow
     source_platform: 'github'
     connector_id: string
     publish_context: JsonObject
