@@ -34,7 +34,7 @@ def build_maintenance_prompt(
                 "",
                 (
                     "If the memory is already clear and needs no reorganization, leave it "
-                    "unchanged and say so."
+                    "unchanged."
                 ),
             ]
         )
@@ -59,7 +59,7 @@ def build_maintenance_prompt(
             "",
             (
                 "If the memory is already clear and the selected observations add no "
-                "durable material, leave memory unchanged and say so."
+                "durable material, leave memory unchanged."
             ),
         ]
     )
