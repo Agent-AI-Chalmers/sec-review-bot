@@ -34,7 +34,7 @@ Report only when repository evidence shows:
 ## False-Positive Precedents
 
 - Read-only endpoints are not CSRF findings unless they trigger side effects or leak through a browser-readable channel.
-- Bearer-token APIs that require a non-cookie `Authorization` header are usually not CSRF unless the token is automatically attached or CORS enables attacker control.
+- Bearer-token APIs that require a non-cookie `Authorization` header are usually not CSRF unless the browser attaches the token automatically; permissive CORS does not give an attacker origin a bearer token it cannot otherwise read.
 - Missing CSRF token in a JSON API is not enough if the request requires custom headers and CORS blocks attacker-origin submission.
 - `SameSite` may be a relevant guard; do not ignore it, but verify the cookie mode and request context.
 - Client-side CSRF token generation is not a guard unless the server validates an unpredictable token tied to trusted state.
