@@ -195,7 +195,7 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
         .getByText('Memory overview could not be loaded.', { exact: true })
         .waitFor()
       await partialFailurePage
-        .getByText('Automatic maintenance', { exact: true })
+        .getByText('Automatic memory updates', { exact: true })
         .waitFor()
       await partialFailurePage.getByText('Revisions', { exact: true }).click()
       await partialFailurePage.locator('.revision-graph-node').first().waitFor()
@@ -313,16 +313,16 @@ export async function runMemoryFlow({
     await zhPage.addInitScript(() => localStorage.setItem('ui-language', 'zh'))
     await zhPage.goto(`${base}/memory`, { waitUntil: 'domcontentloaded' })
     await zhPage.getByRole('heading', { name: '记忆' }).waitFor()
-    const maintenanceSwitch = zhPage.getByRole('switch', {
-      name: '自动维护'
+    const automationSwitch = zhPage.getByRole('switch', {
+      name: '记忆自动更新'
     })
-    await maintenanceSwitch.waitFor()
-    await zhPage.getByRole('img', { name: '说明自动维护控制行为' }).hover()
-    const maintenanceHelp = zhPage.getByRole('tooltip')
-    await maintenanceHelp.waitFor()
+    await automationSwitch.waitFor()
+    await zhPage.getByRole('img', { name: '说明记忆自动更新控制行为' }).hover()
+    const automationHelp = zhPage.getByRole('tooltip')
+    await automationHelp.waitFor()
     assert.ok(
-      (await maintenanceHelp.textContent())?.trim(),
-      `${name} maintenance help tooltip must render its explanation`
+      (await automationHelp.textContent())?.trim(),
+      `${name} automation help tooltip must render its explanation`
     )
     await zhPage.getByText('概览', { exact: true }).waitFor()
     await zhPage
@@ -365,7 +365,7 @@ export async function runMemoryFlow({
     await zhContext.close()
 
     const memoryEndpoints = [
-      '/api/memory/maintenance-control',
+      '/api/memory/tree/automation',
       '/api/memory/tree',
       '/api/memory/revisions',
       '/api/memory/observations',

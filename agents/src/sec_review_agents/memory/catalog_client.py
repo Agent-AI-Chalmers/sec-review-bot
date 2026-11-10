@@ -2,7 +2,7 @@
 
 import json
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -42,8 +42,12 @@ class MemoryCatalogConflictError(RuntimeError):
     """A catalog identity or revision precondition conflicts with stored state."""
 
 
-class MemoryMaintenancePausedError(MemoryCatalogConflictError):
-    """The catalog refused a maintenance commit because automation is paused."""
+class MemoryPublicationAbandonedError(MemoryCatalogConflictError):
+    """The revision candidate was abandoned and cannot be committed."""
+
+
+class MemoryAutomationPausedError(MemoryCatalogConflictError):
+    """The catalog refused a new automatic memory-tree revision while automation is paused."""
 
 
 def _error_code(detail: str) -> str | None:
@@ -89,8 +93,10 @@ class MemoryCatalogClient:
             detail = error.read().decode("utf-8", errors="replace")
             message = f"Memory catalog returned HTTP {error.code}: {detail}"
             if error.code == 409:
-                if _error_code(detail) == "MAINTENANCE_PAUSED":
-                    raise MemoryMaintenancePausedError(message) from error
+                if _error_code(detail) == "AUTOMATION_PAUSED":
+                    raise MemoryAutomationPausedError(message) from error
+                if _error_code(detail) == "PUBLICATION_ABANDONED":
+                    raise MemoryPublicationAbandonedError(message) from error
                 raise MemoryCatalogConflictError(message) from error
             raise RuntimeError(message) from error
         except URLError as error:
@@ -117,25 +123,47 @@ class MemoryCatalogClient:
     def confirm_extraction_publication(self, intent: dict[str, Any]) -> None:
         self._request("POST", f"{_API_ROOT}/extractions/publications/confirm", intent)
 
-    def list_revision_publications(self, maintenance_id: str) -> list[dict[str, Any]]:
+    def list_revision_publications(
+        self,
+        operation_id: str,
+        *,
+        kind: Literal["learning", "reorganization"] = "learning",
+    ) -> list[dict[str, Any]]:
         value = self._request(
             "GET",
-            f"{_API_ROOT}/memory-tree/revisions/publications/maintenance/{quote(maintenance_id, safe='')}",
+            f"{_API_ROOT}/memory-tree/revisions/publications/{kind}/{quote(operation_id, safe='')}",
         )
         publications = value.get("publications")
         if not isinstance(publications, list):
             raise RuntimeError("Invalid revision publication list.")
         return publications
 
-    def reserve_revision_publication(self, intent: dict[str, Any]) -> None:
+    def abandon_revision_publications(
+        self, operation_id: str, *, kind: Literal["learning", "reorganization"]
+    ) -> None:
         self._request(
-            "POST", f"{_API_ROOT}/memory-tree/revisions/publications/reserve", intent
+            "POST",
+            f"{_API_ROOT}/memory-tree/revisions/publications/abandon",
+            {"kind": kind, "operation_id": operation_id},
         )
 
+    def reserve_revision_publication(self, intent: dict[str, Any]) -> None:
+        result = self._request(
+            "POST", f"{_API_ROOT}/memory-tree/revisions/publications/reserve", intent
+        )
+        if result.get("status") == "abandoned":
+            raise MemoryPublicationAbandonedError(
+                "Revision publication has been abandoned."
+            )
+
     def confirm_revision_publication(self, intent: dict[str, Any]) -> None:
-        self._request(
+        result = self._request(
             "POST", f"{_API_ROOT}/memory-tree/revisions/publications/confirm", intent
         )
+        if result.get("status") == "abandoned":
+            raise MemoryPublicationAbandonedError(
+                "Revision publication has been abandoned."
+            )
 
     def register_extraction(
         self,
@@ -214,50 +242,48 @@ class MemoryCatalogClient:
     def get_observation_backlog(self) -> dict[str, Any]:
         return self._request("GET", f"{_API_ROOT}/observation-backlog")
 
-    def get_maintenance_control(self) -> dict[str, Any]:
-        return self._request("GET", f"{_API_ROOT}/maintenance-control")
+    def get_memory_tree_automation(self) -> dict[str, Any]:
+        return self._request("GET", f"{_API_ROOT}/memory-tree/automation")
 
-    def change_maintenance_control(
+    def change_memory_tree_automation(
         self,
         *,
         target_state: str,
         operation_id: str,
         expected_generation: int,
-        actor: dict[str, str],
     ) -> dict[str, Any]:
         if target_state not in {"enabled", "paused"}:
-            raise ValueError("Maintenance control target state is invalid.")
+            raise ValueError("Memory-tree automation target state is invalid.")
         action = "resume" if target_state == "enabled" else "pause"
         return self._request(
             "POST",
-            f"{_API_ROOT}/maintenance-control/{action}",
+            f"{_API_ROOT}/memory-tree/automation/{action}",
             {
                 "operation_id": operation_id,
                 "expected_generation": expected_generation,
-                "actor": actor,
             },
         )
 
-    def get_maintenance_input(self, *, limit: int) -> dict[str, Any] | None:
+    def get_learning_input(self, *, limit: int) -> dict[str, Any] | None:
         value = self._request(
             "GET",
-            f"{_API_ROOT}/maintenance-input?limit={limit}",
+            f"{_API_ROOT}/learning-input?limit={limit}",
         )
-        maintenance_input = value.get("input")
-        if maintenance_input is None:
+        learning_input = value.get("input")
+        if learning_input is None:
             return None
-        if not isinstance(maintenance_input, dict):
-            raise RuntimeError("Memory catalog returned invalid maintenance input.")
-        return dict(maintenance_input)
+        if not isinstance(learning_input, dict):
+            raise RuntimeError("Memory catalog returned invalid learning input.")
+        return dict(learning_input)
 
-    def create_memory_tree_revision(
+    def create_learning_revision(
         self,
         *,
-        maintenance_id: str,
+        operation_id: str,
         expected_active_revision: int,
         extraction_ids: list[str],
         memory_tree_reference: ArtifactReference,
-        maintenance_trajectory_reference: ArtifactReference,
+        trajectory_reference: ArtifactReference,
     ) -> dict[str, Any]:
         return self._request(
             "POST",
@@ -266,10 +292,32 @@ class MemoryCatalogClient:
                 "expected_active_revision": expected_active_revision,
                 "memory_tree_reference": memory_tree_reference.as_dict(),
                 "source": {
-                    "kind": "maintenance",
-                    "maintenance_id": maintenance_id,
+                    "kind": "learning",
+                    "operation_id": operation_id,
                     "extraction_ids": extraction_ids,
-                    "trajectory_reference": maintenance_trajectory_reference.as_dict(),
+                    "trajectory_reference": trajectory_reference.as_dict(),
+                },
+            },
+        )
+
+    def create_reorganization_revision(
+        self,
+        *,
+        operation_id: str,
+        expected_active_revision: int,
+        memory_tree_reference: ArtifactReference,
+        trajectory_reference: ArtifactReference,
+    ) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            f"{_API_ROOT}/memory-tree/revisions",
+            {
+                "expected_active_revision": expected_active_revision,
+                "memory_tree_reference": memory_tree_reference.as_dict(),
+                "source": {
+                    "kind": "reorganization",
+                    "operation_id": operation_id,
+                    "trajectory_reference": trajectory_reference.as_dict(),
                 },
             },
         )
@@ -310,8 +358,9 @@ def configured_memory_catalog_client() -> MemoryCatalogClient | None:
 __all__ = [
     "AGENT_MEMORY_CATALOG_TOKEN_ENV",
     "AGENT_MEMORY_CATALOG_URL_ENV",
+    "MemoryAutomationPausedError",
     "MemoryCatalogClient",
     "MemoryCatalogConflictError",
-    "MemoryMaintenancePausedError",
+    "MemoryPublicationAbandonedError",
     "configured_memory_catalog_client",
 ]

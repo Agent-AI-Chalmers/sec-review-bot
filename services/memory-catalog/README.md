@@ -6,24 +6,24 @@ Memory Catalog provides an HTTP API to record completed extractions, manage pend
 
 ## API
 
-| Method | Path                                   | Purpose                                                                                                   |
-| ------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `GET`  | `/healthz`                             | Report service health.                                                                                    |
-| `POST` | `/v1/extractions`                      | Register a completed extraction, its trajectory reference, and its optional observation.                  |
-| `GET`  | `/v1/extractions`                      | List completed extractions with stable cursor pagination and provenance filters.                          |
-| `GET`  | `/v1/extractions/{extraction_id}`      | Return one extraction, its trajectory reference, and its optional observation.                            |
-| `GET`  | `/v1/observations`                     | List observations with stable cursor pagination and consumption filters.                                  |
-| `GET`  | `/v1/overview`                         | Summarize completed extraction coverage, observation outcomes, and a 30-day, 90-day, or all-time trend.   |
-| `GET`  | `/v1/observation-backlog`              | Return the count and oldest age of pending observations.                                                  |
-| `GET`  | `/v1/maintenance-control`              | Return the durable `enabled` or `paused` automatic-maintenance state.                                     |
-| `POST` | `/v1/maintenance-control/pause`        | Idempotently pause automatic maintenance with generation compare-and-swap.                                |
-| `POST` | `/v1/maintenance-control/resume`       | Idempotently resume automatic maintenance with generation compare-and-swap.                               |
-| `GET`  | `/v1/maintenance-input?limit=...`      | Return up to `limit` observations and the active memory state they must be maintained against.            |
-| `POST` | `/v1/memory-tree/revisions`            | Create a maintenance or operator revision with idempotency and expected-active-revision compare-and-swap. |
-| `GET`  | `/v1/memory-tree`                      | Return the current memory tree and its revision.                                                          |
-| `POST` | `/v1/memory-tree/restore`              | Move the active pointer to an existing revision without creating a revision.                              |
-| `GET`  | `/v1/memory-tree/revisions`            | List memory tree revision history.                                                                        |
-| `GET`  | `/v1/memory-tree/revisions/{revision}` | Return one memory tree revision, its maintenance identity, and its artifact references.                   |
+| Method | Path                                   | Purpose                                                                                                               |
+| ------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `GET`  | `/healthz`                             | Report service health.                                                                                                |
+| `POST` | `/v1/extractions`                      | Register a completed extraction, its trajectory reference, and its optional observation.                              |
+| `GET`  | `/v1/extractions`                      | List completed extractions with stable cursor pagination and provenance filters.                                      |
+| `GET`  | `/v1/extractions/{extraction_id}`      | Return one extraction, its trajectory reference, and its optional observation.                                        |
+| `GET`  | `/v1/observations`                     | List observations with stable cursor pagination and consumption filters.                                              |
+| `GET`  | `/v1/overview`                         | Summarize completed extraction coverage, observation outcomes, and a 30-day, 90-day, or all-time trend.               |
+| `GET`  | `/v1/observation-backlog`              | Return the count and oldest age of pending observations.                                                              |
+| `GET`  | `/v1/memory-tree/automation`           | Return the durable `enabled` or `paused` memory-tree automation admission state.                                      |
+| `POST` | `/v1/memory-tree/automation/pause`     | Idempotently pause automatic memory-tree commits with generation compare-and-swap.                                    |
+| `POST` | `/v1/memory-tree/automation/resume`    | Idempotently resume automatic memory-tree commits with generation compare-and-swap.                                   |
+| `GET`  | `/v1/learning-input?limit=...`         | Return up to `limit` observations and the active memory state they must be maintained against.                        |
+| `POST` | `/v1/memory-tree/revisions`            | Create a learning, reorganization, or manual revision with idempotency and expected-active-revision compare-and-swap. |
+| `GET`  | `/v1/memory-tree`                      | Return the current memory tree and its revision.                                                                      |
+| `POST` | `/v1/memory-tree/restore`              | Move the active pointer to an existing revision without creating a revision.                                          |
+| `GET`  | `/v1/memory-tree/revisions`            | List memory tree revision history.                                                                                    |
+| `GET`  | `/v1/memory-tree/revisions/{revision}` | Return one memory tree revision, its source identity, and its artifact references.                                    |
 
 ## Usage Notes
 
@@ -33,13 +33,17 @@ The service uses its own PostgreSQL database, with applied schema versions recor
 
 Extractions and observations are ordered by `created_at` and then `extraction_id`, both descending. Callers should paginate with the returned cursor without interpreting its contents; the next page excludes the cursor item.
 
-### Revisions And Automatic Maintenance
+### Revisions And Memory-Tree Automation
 
-Revision sources use `maintenance` for automatic maintenance and `operator` for manual edits. `predecessor_revision` records the revision active at creation. Restoring an earlier revision only changes the active revision; it creates no new revision, and later revision numbers continue increasing. Manual edits do not consume pending observations.
+Revision sources use `learning` for incorporating new observations, `reorganization` for reorganizing existing memory, and `manual` for human edits. `predecessor_revision` records the revision active at creation. Restoring an earlier revision only changes the active revision; it creates no new revision, and later revision numbers continue increasing. Manual edits do not consume pending observations.
 
-Automatic maintenance supports `enabled` and `paused`, initially `enabled`. Pause and resume requests require `operation_id` and `expected_generation` to prevent duplicate operations and overwriting concurrent changes. Automatic maintenance commits are rejected with `MAINTENANCE_PAUSED` while paused; operator revisions are unaffected.
+<!-- doc-default: memory-tree-automation-state; source=services/memory-catalog/src/database/schema-versions/001_initial_catalog.sql -->
+
+Memory-tree automation supports `enabled` and `paused`, initially `enabled`. This state controls admission of new `learning` and `reorganization` revision commits, not worker execution. Pause and resume requests require `operation_id` and `expected_generation`; responses contain `created` and an `automation` snapshot. Paused commits return HTTP 409 with `AUTOMATION_PAUSED`. Pausing does not cancel running work or block extraction registration, artifact publication, manual revisions, restores, or identical replays of successful commits.
 
 Only one maintenance task may run at a time, enforced by Temporal's fixed workflow ID and `SKIP` overlap policy.
+
+A worker can abandon existing unselected automatic revision publications with `POST /v1/memory-tree/revisions/publications/abandon`. The `abandoned` state is final for those candidates: reserve and confirm retries preserve it, while commit returns HTTP 409 with `PUBLICATION_ABANDONED`. A paused automatic commit atomically abandons the existing unselected publications for its source kind and operation ID before returning `AUTOMATION_PAUSED`. Maintenance workflows also abandon on a pause observed during preparation and exit without backlog continuation. Selected publications remain replayable; artifact objects are retained.
 
 ### Publication And Retries
 

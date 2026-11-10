@@ -10,7 +10,9 @@ import { BASE_TIME } from '../runs/generate.js'
 import type {
   CatalogOverviewWorkflow,
   ExtractionRecord,
-  ObservationRecord
+  ObservationRecord,
+  MemoryTreeAutomation,
+  MemoryTreeAutomationOperationResult
 } from '../../../browser/features/memory/api-types.generated.js'
 
 const trajectoryContent: TrajectoryContentResponse = {
@@ -34,8 +36,8 @@ const trajectoryReference = {
 export function createMemoryHandler(
   sourceRunIds: SourceRunIds
 ): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
-  let memoryControl = {
-    state: 'enabled' as 'enabled' | 'paused',
+  let memoryAutomation: MemoryTreeAutomation = {
+    state: 'enabled',
     generation: 1,
     changed_by: { kind: 'service', id: 'memory-catalog' },
     changed_at: new Date(BASE_TIME).toISOString()
@@ -84,7 +86,7 @@ export function createMemoryHandler(
       predecessor_revision: 1,
       created_at: new Date(BASE_TIME + 120_000).toISOString(),
       source: {
-        kind: 'operator',
+        kind: 'manual',
         operation_id: 'fixture-operator-branch',
         actor: { kind: 'user', id: 'fixture-operator' }
       }
@@ -94,8 +96,8 @@ export function createMemoryHandler(
       predecessor_revision: 1,
       created_at: new Date(BASE_TIME + 60_000).toISOString(),
       source: {
-        kind: 'maintenance',
-        maintenance_id: 'fixture-maintenance-2',
+        kind: 'learning',
+        operation_id: 'fixture-maintenance-2',
         extraction_ids: ['fixture-extraction-2'],
         trajectory_reference: trajectoryReference
       }
@@ -105,7 +107,7 @@ export function createMemoryHandler(
       predecessor_revision: null,
       created_at: new Date(BASE_TIME).toISOString(),
       source: {
-        kind: 'operator',
+        kind: 'manual',
         operation_id: 'fixture-bootstrap-memory',
         actor: { kind: 'service', id: 'fixture-bootstrap' }
       }
@@ -229,10 +231,10 @@ export function createMemoryHandler(
     const requestUrl = request.url
     if (requestUrl === undefined) return
     if (
-      requestUrl === '/api/memory/maintenance-control' &&
+      requestUrl === '/api/memory/tree/automation' &&
       request.method === 'GET'
     ) {
-      response.end(JSON.stringify(memoryControl))
+      response.end(JSON.stringify(memoryAutomation))
       return
     }
     if (requestUrl === '/api/memory/tree' && request.method === 'GET') {
@@ -415,7 +417,9 @@ export function createMemoryHandler(
       return
     }
     const memoryWriteMatch =
-      /^\/api\/memory\/(pause|resume|edit|restore)$/.exec(requestUrl)
+      /^\/api\/memory\/(?:tree\/automation\/(pause|resume)|(edit|restore))$/.exec(
+        requestUrl
+      )
     if (request.method === 'POST' && memoryWriteMatch !== null) {
       const chunks: Buffer[] = []
       for await (const chunk of request) chunks.push(Buffer.from(chunk))
@@ -423,20 +427,26 @@ export function createMemoryHandler(
         string,
         unknown
       >
-      const action = memoryWriteMatch[1]
+      const action = memoryWriteMatch[1] ?? memoryWriteMatch[2]
       if (action === 'pause' || action === 'resume') {
-        if (body.expected_generation !== memoryControl.generation) {
+        if (body.expected_generation !== memoryAutomation.generation) {
           response.statusCode = 409
           response.end(JSON.stringify({ error: 'generation_conflict' }))
           return
         }
-        memoryControl = {
+        memoryAutomation = {
           state: action === 'pause' ? 'paused' : 'enabled',
-          generation: memoryControl.generation + 1,
+          generation: memoryAutomation.generation + 1,
           changed_by: { kind: 'service', id: 'control-plane-ui' },
           changed_at: new Date().toISOString()
         }
-        response.end(JSON.stringify(memoryControl))
+        response.statusCode = 201
+        response.end(
+          JSON.stringify({
+            created: true,
+            automation: memoryAutomation
+          } satisfies MemoryTreeAutomationOperationResult)
+        )
         return
       }
       if (body.expected_active_revision !== activeMemoryRevision) {
@@ -471,7 +481,7 @@ export function createMemoryHandler(
         predecessor_revision: activeMemoryRevision,
         created_at: new Date().toISOString(),
         source: {
-          kind: 'operator',
+          kind: 'manual',
           operation_id: body.operation_id,
           actor: { kind: 'service', id: 'control-plane-ui' }
         }

@@ -569,7 +569,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
           revision,
           'a consumed observation must name an existing revision'
         )
-        assert.strictEqual(revision.source.kind, 'maintenance')
+        assert.strictEqual(revision.source.kind, 'learning')
         assert.ok(
           revision.source.extraction_ids.includes(observation.extraction_id)
         )
@@ -578,10 +578,10 @@ test('memory fixtures form one coherent provenance graph', async () => {
 
     for (const revision of revisions.revisions as Array<{
       source:
-        | { kind: 'maintenance'; extraction_ids: string[] }
-        | { kind: 'operator'; operation_id: string; actor: unknown }
+        | { kind: 'learning'; extraction_ids: string[] }
+        | { kind: 'manual'; operation_id: string; actor: unknown }
     }>) {
-      if (revision.source.kind === 'maintenance') {
+      if (revision.source.kind === 'learning') {
         for (const extractionId of revision.source.extraction_ids) {
           const observation = observations.observations.find(
             (candidate: { extraction_id: string }) =>

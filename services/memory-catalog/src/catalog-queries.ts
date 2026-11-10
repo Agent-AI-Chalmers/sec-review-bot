@@ -6,7 +6,7 @@ import type {
   CatalogOverview,
   ExtractionList,
   ExtractionRecord,
-  MaintenanceControl,
+  MemoryTreeAutomation,
   MemoryTree,
   MemoryTreeRevision,
   MemoryTreeRevisionList,
@@ -41,7 +41,7 @@ export interface MemoryCatalogQueries {
   ): Promise<ObservationList>
   getObservationBacklog(): Promise<ObservationBacklog>
   getCatalogOverview(range: CatalogOverviewRange): Promise<CatalogOverview>
-  getMaintenanceControl(): Promise<MaintenanceControl>
+  getMemoryTreeAutomation(): Promise<MemoryTreeAutomation>
   getMemoryTree(): Promise<MemoryTree>
   getMemoryTreeRevision(
     revision: number,
@@ -64,11 +64,10 @@ interface CatalogCursor {
 interface RevisionRow {
   revision: string
   predecessor_revision: string | null
-  source_kind: 'maintenance' | 'operator'
-  maintenance_id: string | null
+  source_kind: 'learning' | 'reorganization' | 'manual'
+  operation_id: string
   extraction_ids: string[]
-  maintenance_trajectory_reference: ArtifactReference | null
-  operation_id: string | null
+  trajectory_reference: ArtifactReference | null
   actor: Actor | null
   memory_tree_reference: ArtifactReference
   created_at: Date
@@ -433,17 +432,17 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
     }
   }
 
-  async getMaintenanceControl(): Promise<MaintenanceControl> {
+  async getMemoryTreeAutomation(): Promise<MemoryTreeAutomation> {
     const result = await this.pool.query<{
       state: 'enabled' | 'paused'
       generation: string
       changed_by: Actor
       changed_at: Date
     }>(`select state, generation, changed_by, changed_at
-        from maintenance_control where singleton=true`)
+        from memory_tree_automation where singleton=true`)
     const row = result.rows[0]
     if (row === undefined)
-      throw new Error('Maintenance control row is missing.')
+      throw new Error('Memory-tree automation row is missing.')
     return {
       state: row.state,
       generation: Number(row.generation),
@@ -474,8 +473,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
   ): Promise<MemoryTreeRevision | undefined> {
     const result = await this.pool.query<RevisionRow>(
       `select revision.revision, revision.predecessor_revision, revision.source_kind,
-              revision.maintenance_id, revision.maintenance_trajectory_reference,
-              revision.operation_id, revision.actor,
+              revision.operation_id, revision.trajectory_reference, revision.actor,
               coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
                 filter (where observation.extraction_id is not null), '{}') as extraction_ids,
               revision.memory_tree_reference, revision.created_at
@@ -496,8 +494,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
   ): Promise<MemoryTreeRevisionList> {
     const result = await this.pool.query<RevisionRow>(
       `select revision.revision, revision.predecessor_revision, revision.source_kind,
-              revision.maintenance_id, revision.maintenance_trajectory_reference,
-              revision.operation_id, revision.actor,
+              revision.operation_id, revision.trajectory_reference, revision.actor,
               coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
                 filter (where observation.extraction_id is not null), '{}') as extraction_ids,
               revision.memory_tree_reference, revision.created_at
@@ -545,21 +542,30 @@ function projectExtraction(row: {
 
 function projectRevision(row: RevisionRow): MemoryTreeRevision {
   const source =
-    row.source_kind === 'maintenance'
+    row.source_kind === 'learning'
       ? {
-          kind: 'maintenance' as const,
-          maintenance_id: requireValue(row.maintenance_id, 'maintenance_id'),
+          kind: 'learning' as const,
+          operation_id: row.operation_id,
           extraction_ids: row.extraction_ids,
           trajectory_reference: requireValue(
-            row.maintenance_trajectory_reference,
-            'maintenance_trajectory_reference',
+            row.trajectory_reference,
+            'trajectory_reference',
           ),
         }
-      : {
-          kind: 'operator' as const,
-          operation_id: requireValue(row.operation_id, 'operation_id'),
-          actor: requireValue(row.actor, 'actor'),
-        }
+      : row.source_kind === 'reorganization'
+        ? {
+            kind: 'reorganization' as const,
+            operation_id: row.operation_id,
+            trajectory_reference: requireValue(
+              row.trajectory_reference,
+              'trajectory_reference',
+            ),
+          }
+        : {
+            kind: 'manual' as const,
+            operation_id: row.operation_id,
+            actor: requireValue(row.actor, 'actor'),
+          }
   return {
     revision: Number(row.revision),
     predecessor_revision:

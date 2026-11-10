@@ -72,7 +72,10 @@ function publishedMemoryArtifact(
   if (request.collection === 'extractions')
     return catalogArtifactReference(record.trajectory_reference, 'trajectory')
   const source = record.source
-  if (!isRecord(source) || source.kind !== 'maintenance')
+  if (
+    !isRecord(source) ||
+    (source.kind !== 'learning' && source.kind !== 'reorganization')
+  )
     return { kind: 'invalid' }
   return catalogArtifactReference(source.trajectory_reference, 'trajectory')
 }

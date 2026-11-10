@@ -10,6 +10,9 @@ from temporalio.converter import DataConverter
 from temporalio.worker import Worker
 
 from sec_review_agents.artifacts.reference import ArtifactReference
+from sec_review_agents.memory.coordinated_maintenance import (
+    CoordinatedReorganizationResult,
+)
 from sec_review_agents.memory.revision_commit_input import (
     MemoryTreeRevisionCommitInput,
 )
@@ -48,18 +51,18 @@ def _commit_input(
     *, extraction_ids: tuple[str, ...] = ("extraction-1",)
 ) -> MemoryTreeRevisionCommitInput:
     return MemoryTreeRevisionCommitInput(
-        maintenance_id="maintenance-run-1",
+        operation_id="memory-tree-run-1",
         expected_active_revision=3,
         extraction_ids=extraction_ids,
         memory_tree_reference=_reference(),
-        maintenance_trajectory_reference=_reference(),
+        trajectory_reference=_reference(),
     )
 
 
 @pytest.mark.parametrize(
     ("overrides", "message"),
     [
-        ({"maintenance_id": ""}, "maintenance_id"),
+        ({"operation_id": ""}, "operation_id"),
         ({"expected_active_revision": True}, "expected_active_revision"),
         ({"expected_active_revision": -1}, "expected_active_revision"),
         ({"extraction_ids": ()}, "extraction_ids"),
@@ -71,16 +74,79 @@ def test_memory_tree_commit_input_rejects_invalid_invariants(
     message: str,
 ) -> None:
     values: dict[str, object] = {
-        "maintenance_id": "maintenance-run-1",
+        "operation_id": "memory-tree-run-1",
         "expected_active_revision": 3,
         "extraction_ids": ("extraction-1",),
         "memory_tree_reference": _reference(),
-        "maintenance_trajectory_reference": _reference(),
+        "trajectory_reference": _reference(),
     }
     values.update(overrides)
 
     with pytest.raises((TypeError, ValueError), match=message):
         MemoryTreeRevisionCommitInput(**values)  # type: ignore[arg-type]
+
+
+def test_reorganization_commit_input_accepts_empty_extraction_ids() -> None:
+    value = MemoryTreeRevisionCommitInput(
+        operation_id="memory-tree-run-1",
+        expected_active_revision=3,
+        extraction_ids=(),
+        memory_tree_reference=_reference(),
+        trajectory_reference=_reference(),
+        source_kind="reorganization",
+    )
+    assert value.extraction_ids == ()
+    assert value.source_kind == "reorganization"
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        (
+            {"source_kind": "reorganization", "extraction_ids": ("extraction-1",)},
+            "must not consume",
+        ),
+        ({"source_kind": "learning", "extraction_ids": ()}, "must be non-empty"),
+        ({"source_kind": "unknown"}, "source_kind"),
+    ],
+)
+def test_commit_input_enforces_source_kind_extraction_invariants(
+    overrides: dict[str, object],
+    message: str,
+) -> None:
+    values: dict[str, object] = {
+        "operation_id": "memory-tree-run-1",
+        "expected_active_revision": 3,
+        "extraction_ids": (),
+        "memory_tree_reference": _reference(),
+        "trajectory_reference": _reference(),
+        "source_kind": "reorganization",
+    }
+    values.update(overrides)
+    with pytest.raises((TypeError, ValueError), match=message):
+        MemoryTreeRevisionCommitInput(**values)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({"mode": "unknown"}, "mode"),
+        ({"mode": "observation"}, "mode"),
+        ({"mode": "consolidation"}, "mode"),
+        (
+            {"mode": "reorganization", "require_threshold": True},
+            "cannot require",
+        ),
+    ],
+)
+def test_memory_maintenance_request_validates_mode(
+    overrides: dict[str, object],
+    message: str,
+) -> None:
+    values: dict[str, object] = {"timeout_seconds": 30}
+    values.update(overrides)
+    with pytest.raises(ValueError, match=message):
+        MemoryMaintenanceRequest(**values)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize(
@@ -580,7 +646,7 @@ async def test_maintenance_prepare_skips_without_accessing_catalog_when_disabled
         catalog,
     )
     monkeypatch.setattr(
-        "sec_review_agents.memory.coordinated_maintenance.prepare_coordinated_memory_revision",
+        "sec_review_agents.memory.coordinated_maintenance.prepare_coordinated_memory_learning",
         prepare,
     )
 
@@ -606,7 +672,7 @@ async def test_maintenance_prepare_uses_catalog_input(monkeypatch) -> None:
         Mock(return_value=client),
     )
     monkeypatch.setattr(
-        "sec_review_agents.memory.coordinated_maintenance.prepare_coordinated_memory_revision",
+        "sec_review_agents.memory.coordinated_maintenance.prepare_coordinated_memory_learning",
         prepare,
     )
     monkeypatch.setattr(
@@ -625,7 +691,7 @@ async def test_maintenance_prepare_uses_catalog_input(monkeypatch) -> None:
     )
     prepare.assert_awaited_once_with(
         catalog_client=client,
-        maintenance_id="maintenance-run-1",
+        operation_id="memory-tree-run-1",
         deployment=None,
         batch_size=7,
     )
@@ -642,7 +708,7 @@ async def test_maintenance_prepare_completes_when_catalog_backlog_is_empty(
         Mock(return_value=client),
     )
     monkeypatch.setattr(
-        "sec_review_agents.memory.coordinated_maintenance.prepare_coordinated_memory_revision",
+        "sec_review_agents.memory.coordinated_maintenance.prepare_coordinated_memory_learning",
         prepare,
     )
     monkeypatch.setattr(
@@ -661,7 +727,7 @@ async def test_maintenance_prepare_completes_when_catalog_backlog_is_empty(
     )
     prepare.assert_awaited_once_with(
         catalog_client=client,
-        maintenance_id="maintenance-run-1",
+        operation_id="memory-tree-run-1",
         deployment=None,
         batch_size=7,
     )
@@ -813,11 +879,11 @@ async def test_coordinated_maintenance_commits_recorded_preparation(
 @pytest.mark.asyncio
 async def test_maintenance_workflow_retries_commit_with_history_revision() -> None:
     commit_input = MemoryTreeRevisionCommitInput(
-        maintenance_id="maintenance-run-1",
+        operation_id="memory-tree-run-1",
         expected_active_revision=3,
         extraction_ids=("extraction-1", "extraction-2"),
         memory_tree_reference=_reference(),
-        maintenance_trajectory_reference=ArtifactReference(
+        trajectory_reference=ArtifactReference(
             uri=(
                 "s3://sec-review/memory/trajectories/memory-maintainer/"
                 "trajectory.v1.jsonl.zst"
@@ -900,7 +966,7 @@ async def test_catalog_revision_conflict_is_not_retried(monkeypatch) -> None:
 
     monkeypatch.setattr(
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
-        Mock(return_value=SimpleNamespace(create_memory_tree_revision=conflict)),
+        Mock(return_value=SimpleNamespace(create_learning_revision=conflict)),
     )
 
     with pytest.raises(ApplicationError) as captured:
@@ -910,39 +976,48 @@ async def test_catalog_revision_conflict_is_not_retried(monkeypatch) -> None:
     assert captured.value.non_retryable is True
 
 
-@pytest.mark.asyncio
-async def test_catalog_maintenance_pause_is_not_retried(monkeypatch) -> None:
-    from temporalio.exceptions import ApplicationError
-
+@pytest.mark.parametrize(
+    "error_type, reason",
+    [("paused", "automation_paused"), ("abandoned", "publication_abandoned")],
+)
+def test_commit_pause_and_abandonment_complete_without_failure(
+    monkeypatch, error_type, reason
+):
     from sec_review_agents.memory.catalog_client import (
-        MemoryMaintenancePausedError,
+        MemoryAutomationPausedError,
+        MemoryPublicationAbandonedError,
     )
 
-    def paused(**_kwargs):
-        raise MemoryMaintenancePausedError("Automatic memory maintenance is paused.")
-
+    client = Mock()
+    client.create_learning_revision.side_effect = (
+        MemoryAutomationPausedError("paused")
+        if error_type == "paused"
+        else MemoryPublicationAbandonedError("abandoned")
+    )
     monkeypatch.setattr(
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
-        Mock(return_value=SimpleNamespace(create_memory_tree_revision=paused)),
+        Mock(return_value=client),
     )
-
-    with pytest.raises(ApplicationError) as captured:
-        maintenance_workflow.commit_memory_tree_revision_activity(_commit_input())
-
-    assert captured.value.type == "MEMORY_MAINTENANCE_PAUSED"
-    assert captured.value.non_retryable is True
+    assert maintenance_workflow.commit_memory_tree_revision_activity(
+        _commit_input()
+    ) == {
+        "ok": True,
+        "skipped": True,
+        "processed_count": 0,
+        "reason": reason,
+    }
 
 
 def test_commit_memory_tree_revision_uses_prepared_payload_after_processing_is_disabled(
     monkeypatch,
 ) -> None:
     client = Mock()
-    client.create_memory_tree_revision.return_value = {
+    client.create_learning_revision.return_value = {
         "created": True,
         "revision": 4,
         "source": {
-            "kind": "maintenance",
-            "maintenance_id": "maintenance-run-1",
+            "kind": "learning",
+            "operation_id": "memory-tree-run-1",
         },
     }
     monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "false")
@@ -958,21 +1033,189 @@ def test_commit_memory_tree_revision_uses_prepared_payload_after_processing_is_d
         "summary": "Processed 2 memory observations.",
         "processed_count": 2,
     }
-    client.create_memory_tree_revision.assert_called_once_with(
-        maintenance_id="maintenance-run-1",
+    client.create_learning_revision.assert_called_once_with(
+        operation_id="memory-tree-run-1",
         expected_active_revision=3,
         extraction_ids=["extraction-1", "extraction-2"],
         memory_tree_reference=_reference(),
-        maintenance_trajectory_reference=_reference(),
+        trajectory_reference=_reference(),
     )
+
+
+@pytest.mark.asyncio
+async def test_maintenance_prepare_reorganization_uses_active_memory(
+    monkeypatch,
+) -> None:
+    client = Mock()
+    commit_input = MemoryTreeRevisionCommitInput(
+        operation_id="memory-tree-run-1",
+        expected_active_revision=3,
+        extraction_ids=(),
+        memory_tree_reference=_reference(),
+        trajectory_reference=_reference(),
+        source_kind="reorganization",
+    )
+    prepare = AsyncMock(
+        return_value=CoordinatedReorganizationResult(
+            commit_input=commit_input,
+            summary="Prepared reorganization revision.",
+        )
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        Mock(return_value=client),
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.memory.coordinated_maintenance.prepare_coordinated_memory_reorganization",
+        prepare,
+    )
+    monkeypatch.setattr(
+        maintenance_workflow.activity,
+        "info",
+        lambda: SimpleNamespace(workflow_run_id="run-1"),
+    )
+
+    result = await maintenance_workflow.prepare_memory_maintenance_activity(
+        MemoryMaintenanceRequest(timeout_seconds=30, mode="reorganization")
+    )
+
+    assert result == MemoryMaintenancePreparationResult(
+        kind="prepared",
+        commit_input=commit_input,
+    )
+    prepare.assert_awaited_once_with(
+        catalog_client=client,
+        operation_id="memory-tree-run-1",
+        deployment=None,
+    )
+
+
+@pytest.mark.asyncio
+async def test_maintenance_prepare_reorganization_completes_without_active_memory(
+    monkeypatch,
+) -> None:
+    client = Mock()
+    prepare = AsyncMock(
+        return_value=CoordinatedReorganizationResult(
+            commit_input=None,
+            summary="No active memory to reorganize.",
+        )
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        Mock(return_value=client),
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.memory.coordinated_maintenance.prepare_coordinated_memory_reorganization",
+        prepare,
+    )
+    monkeypatch.setattr(
+        maintenance_workflow.activity,
+        "info",
+        lambda: SimpleNamespace(workflow_run_id="run-1"),
+    )
+
+    result = await maintenance_workflow.prepare_memory_maintenance_activity(
+        MemoryMaintenanceRequest(timeout_seconds=30, mode="reorganization")
+    )
+
+    assert result == MemoryMaintenancePreparationResult(
+        kind="complete",
+        summary="No active memory to reorganize.",
+    )
+
+
+def test_commit_reorganization_revision_uses_reorganization_client(
+    monkeypatch,
+) -> None:
+    client = Mock()
+    client.create_reorganization_revision.return_value = {
+        "created": True,
+        "revision": 4,
+        "source": {
+            "kind": "reorganization",
+            "operation_id": "memory-tree-run-1",
+        },
+    }
+    monkeypatch.setattr(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        Mock(return_value=client),
+    )
+    prepared = MemoryTreeRevisionCommitInput(
+        operation_id="memory-tree-run-1",
+        expected_active_revision=3,
+        extraction_ids=(),
+        memory_tree_reference=_reference(),
+        trajectory_reference=_reference(),
+        source_kind="reorganization",
+    )
+
+    assert maintenance_workflow.commit_memory_tree_revision_activity(prepared) == {
+        "ok": True,
+        "skipped": False,
+        "summary": "Reorganized the active memory tree.",
+        "processed_count": 0,
+    }
+    client.create_reorganization_revision.assert_called_once_with(
+        operation_id="memory-tree-run-1",
+        expected_active_revision=3,
+        memory_tree_reference=_reference(),
+        trajectory_reference=_reference(),
+    )
+    client.create_learning_revision.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_reorganization_workflow_skips_pending_observation_checks(
+    monkeypatch,
+) -> None:
+    commit_input = MemoryTreeRevisionCommitInput(
+        operation_id="memory-tree-run-1",
+        expected_active_revision=3,
+        extraction_ids=(),
+        memory_tree_reference=_reference(),
+        trajectory_reference=_reference(),
+        source_kind="reorganization",
+    )
+    results = iter(
+        [
+            MemoryMaintenancePreparationResult(
+                kind="prepared",
+                commit_input=commit_input,
+            ),
+            {"ok": True, "processed_count": 0},
+        ]
+    )
+    calls: list[object] = []
+
+    async def execute(activity_fn, argument=None, **_kwargs):
+        calls.append(activity_fn)
+        return next(results)
+
+    monkeypatch.setattr(maintenance_workflow.workflow, "execute_activity", execute)
+
+    result = await MemoryMaintenanceWorkflow().run(
+        MemoryMaintenanceRequest(timeout_seconds=30, mode="reorganization")
+    )
+
+    assert result == {"ok": True, "processed_count": 0}
+    assert calls == [
+        maintenance_workflow.prepare_memory_maintenance_activity,
+        maintenance_workflow.commit_memory_tree_revision_activity,
+    ]
 
 
 @pytest.mark.asyncio
 async def test_prepare_memory_maintenance_exits_while_control_is_paused(
     monkeypatch,
 ) -> None:
+    monkeypatch.setattr(
+        maintenance_workflow.activity,
+        "info",
+        Mock(return_value=SimpleNamespace(workflow_run_id="paused-run")),
+    )
     client = Mock()
-    client.get_maintenance_control.return_value = {"state": "paused"}
+    client.get_memory_tree_automation.return_value = {"state": "paused"}
     monkeypatch.setattr(
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
         Mock(return_value=client),
@@ -984,21 +1227,24 @@ async def test_prepare_memory_maintenance_exits_while_control_is_paused(
 
     assert result == MemoryMaintenancePreparationResult(
         kind="complete",
-        summary="Automatic memory maintenance is paused.",
+        reason="automation_paused",
     )
-    client.get_maintenance_input.assert_not_called()
+    client.abandon_revision_publications.assert_called_once_with(
+        "memory-tree-paused-run", kind="learning"
+    )
+    client.get_learning_input.assert_not_called()
 
 
 def test_commit_memory_tree_revision_retry_reuses_prepared_references(
     monkeypatch,
 ) -> None:
     client = Mock()
-    client.create_memory_tree_revision.return_value = {
+    client.create_learning_revision.return_value = {
         "created": False,
         "revision": 4,
         "source": {
-            "kind": "maintenance",
-            "maintenance_id": "maintenance-run-1",
+            "kind": "learning",
+            "operation_id": "memory-tree-run-1",
         },
     }
     monkeypatch.setattr(
@@ -1012,12 +1258,77 @@ def test_commit_memory_tree_revision_retry_reuses_prepared_references(
 
     assert first["processed_count"] == second["processed_count"] == 2
     expected = {
-        "maintenance_id": "maintenance-run-1",
+        "operation_id": "memory-tree-run-1",
         "expected_active_revision": 3,
         "extraction_ids": ["extraction-1", "extraction-2"],
         "memory_tree_reference": _reference(),
-        "maintenance_trajectory_reference": _reference(),
+        "trajectory_reference": _reference(),
     }
-    assert client.create_memory_tree_revision.call_count == 2
-    assert client.create_memory_tree_revision.call_args_list[0].kwargs == expected
-    assert client.create_memory_tree_revision.call_args_list[1].kwargs == expected
+    assert client.create_learning_revision.call_count == 2
+    assert client.create_learning_revision.call_args_list[0].kwargs == expected
+    assert client.create_learning_revision.call_args_list[1].kwargs == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("during_commit", [False, True])
+@pytest.mark.parametrize("reason", ["automation_paused", "publication_abandoned"])
+async def test_paused_or_abandoned_workflow_never_continues_with_large_backlog(
+    monkeypatch, during_commit, reason
+):
+    calls = []
+
+    async def execute(fn, *args, **kwargs):
+        calls.append(fn)
+        if fn is maintenance_workflow.count_pending_memory_observations_activity:
+            return {"ok": True, "pending_count": 100}
+        if fn is maintenance_workflow.prepare_memory_maintenance_activity:
+            return (
+                MemoryMaintenancePreparationResult(
+                    kind="prepared", commit_input=_commit_input()
+                )
+                if during_commit
+                else MemoryMaintenancePreparationResult(kind="complete", reason=reason)
+            )
+        return {"ok": True, "skipped": True, "processed_count": 0, "reason": reason}
+
+    monkeypatch.setattr(maintenance_workflow.workflow, "execute_activity", execute)
+    continue_as_new = Mock(side_effect=AssertionError("must stop"))
+    monkeypatch.setattr(
+        maintenance_workflow.workflow, "continue_as_new", continue_as_new
+    )
+    result = await MemoryMaintenanceWorkflow().run(
+        MemoryMaintenanceRequest(timeout_seconds=30)
+    )
+    assert result["reason"] == reason
+    assert (
+        calls.count(maintenance_workflow.count_pending_memory_observations_activity)
+        == 1
+    )
+    continue_as_new.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_prepare_after_abandonment_does_not_fail_workflow(monkeypatch):
+    from sec_review_agents.memory.catalog_client import MemoryPublicationAbandonedError
+
+    client = Mock()
+    client.get_memory_tree_automation.return_value = {"state": "enabled"}
+    monkeypatch.setattr(
+        "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
+        Mock(return_value=client),
+    )
+    monkeypatch.setattr(
+        maintenance_workflow.activity,
+        "info",
+        Mock(return_value=SimpleNamespace(workflow_run_id="old-run")),
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.memory.coordinated_maintenance.prepare_coordinated_memory_learning",
+        AsyncMock(side_effect=MemoryPublicationAbandonedError("abandoned")),
+    )
+    result = await maintenance_workflow.prepare_memory_maintenance_activity(
+        MemoryMaintenanceRequest(timeout_seconds=30)
+    )
+    assert result == MemoryMaintenancePreparationResult(
+        kind="complete", reason="publication_abandoned"
+    )

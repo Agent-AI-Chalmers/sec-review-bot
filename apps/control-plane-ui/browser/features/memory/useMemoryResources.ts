@@ -3,7 +3,7 @@ import { api } from '../../shared/api-client.js'
 import { useResource, type Resource } from '../../shared/resource.js'
 import { useRefresh, type RefreshState } from '../../shared/refresh.js'
 import type {
-  MaintenanceControl,
+  MemoryTreeAutomation,
   MemoryTree,
   MemoryTreeRevisionList,
   ObservationList,
@@ -14,7 +14,7 @@ import type {
 type OverviewRange = NonNullable<GetCatalogOverviewQuery['range']>
 
 interface MemoryResources extends RefreshState {
-  control: Resource<MaintenanceControl>
+  automation: Resource<MemoryTreeAutomation>
   tree: Resource<MemoryTree>
   revisions: Resource<MemoryTreeRevisionList>
   observations: Resource<ObservationList>
@@ -29,8 +29,8 @@ export function useMemoryResources(): MemoryResources {
   // the reader picked, not the one this render closed over.
   const overviewRangeRef = React.useRef<OverviewRange>('30d')
   const [overviewRange, setOverviewRange] = React.useState<OverviewRange>('30d')
-  const control = useResource((signal) =>
-    api<MaintenanceControl>('/memory/maintenance-control', { signal })
+  const automation = useResource((signal) =>
+    api<MemoryTreeAutomation>('/memory/tree/automation', { signal })
   )
   const tree = useResource((signal) =>
     api<MemoryTree>('/memory/tree', { signal })
@@ -48,14 +48,14 @@ export function useMemoryResources(): MemoryResources {
   )
   const load = React.useCallback(async (): Promise<void> => {
     await Promise.all([
-      control.reload(),
+      automation.reload(),
       tree.reload(),
       revisions.reload(),
       observations.reload(),
       overview.reload()
     ])
   }, [
-    control.reload,
+    automation.reload,
     observations.reload,
     overview.reload,
     revisions.reload,
@@ -70,7 +70,7 @@ export function useMemoryResources(): MemoryResources {
   }
 
   return {
-    control,
+    automation,
     tree,
     revisions,
     observations,

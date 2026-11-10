@@ -109,11 +109,11 @@ def test_commit_requires_worker_catalog_even_when_dotenv_provides_one(
         else:
             commit_memory_tree_revision_activity(
                 MemoryTreeRevisionCommitInput(
-                    maintenance_id="maintenance-1",
+                    operation_id="maintenance-1",
                     expected_active_revision=0,
                     extraction_ids=("extraction-1",),
                     memory_tree_reference=reference,
-                    maintenance_trajectory_reference=reference,
+                    trajectory_reference=reference,
                 )
             )
     assert dict(os.environ) == before

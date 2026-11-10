@@ -38,13 +38,13 @@ await test('applies the complete catalog schema as version 1', async () => {
   )
   assert.ok(
     statements.some(({ sql }) =>
-      sql.includes('create table maintenance_control'),
+      sql.includes('create table memory_tree_automation'),
     ),
   )
   assert.ok(statements.some(({ sql }) => sql.includes('source_kind text')))
   assert.ok(
     statements.some(({ sql }) =>
-      sql.includes('create table maintenance_control_operations'),
+      sql.includes('create table memory_tree_automation_operations'),
     ),
   )
   const ledgerInserts = statements.filter(({ sql }) =>

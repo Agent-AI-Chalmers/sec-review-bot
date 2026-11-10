@@ -100,7 +100,13 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
     maintain = subcommands.add_parser(
         "maintain",
-        help="Start the Temporal workflow that maintains pending observations.",
+        help="Start the Temporal workflow that maintains pending observations or reorganizes memory.",
+    )
+    maintain.add_argument(
+        "--mode",
+        choices=("learning", "reorganization"),
+        default="learning",
+        help="Learning consumes pending observations; reorganization only reorganizes active memory.",
     )
     maintain.add_argument(
         "--batch-size",
@@ -166,6 +172,7 @@ async def _start_memory_maintenance_workflow(args: argparse.Namespace) -> str:
     request = MemoryMaintenanceRequest(
         timeout_seconds=args.timeout_seconds,
         batch_size=args.batch_size,
+        mode=getattr(args, "mode", "learning"),
     )
     try:
         await client.start_workflow(

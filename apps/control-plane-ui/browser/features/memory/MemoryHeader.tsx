@@ -11,37 +11,35 @@ import {
 import { IconEdit, IconInfoCircle } from '@tabler/icons-react'
 
 import { useMessages } from '../../shared/i18n.js'
-import type { MaintenanceControl } from './api-types.generated.js'
+import type { MemoryTreeAutomation } from './api-types.generated.js'
 import { RefreshControls } from '../../shared/refresh.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
-type Control = MaintenanceControl
-
 export function MemoryHeader({
-  control,
+  automation,
   activeRevision,
   busy,
-  controlLoading,
+  automationLoading,
   treeLoading,
-  controlError,
+  automationError,
   treeError,
   refresh,
   refreshing,
   lastChecked,
-  onToggleMaintenance,
+  onToggleAutomation,
   onEdit
 }: {
-  control: Control | undefined
+  automation: MemoryTreeAutomation | undefined
   activeRevision: number | undefined
   busy: boolean
-  controlLoading: boolean
+  automationLoading: boolean
   treeLoading: boolean
-  controlError: string
+  automationError: string
   treeError: string
   refresh: () => Promise<void>
   refreshing: boolean
   lastChecked: Date | undefined
-  onToggleMaintenance: () => void
+  onToggleAutomation: () => void
   onEdit: () => void
 }): React.JSX.Element {
   const t = useMessages()
@@ -51,19 +49,13 @@ export function MemoryHeader({
       <Group justify="space-between" align="center" wrap="wrap">
         <Group align="center" wrap="wrap">
           <Switch
-            checked={control?.state === 'enabled'}
-            disabled={!control || busy}
-            label={
-              control?.state === 'enabled'
-                ? t('maintenanceEnabled')
-                : control?.state === 'paused'
-                  ? t('maintenancePaused')
-                  : t('maintenanceLoading')
-            }
-            onChange={onToggleMaintenance}
+            checked={automation?.state === 'enabled'}
+            disabled={!automation || busy}
+            label={t('memoryAutomation')}
+            onChange={onToggleAutomation}
           />
           <Tooltip
-            label={t('maintenanceControlHelp')}
+            label={t('memoryTreeAutomationHelp')}
             multiline
             w={360}
             position="bottom-start"
@@ -76,7 +68,7 @@ export function MemoryHeader({
               variant="subtle"
               color="gray"
               size="sm"
-              aria-label={t('maintenanceControlHelpLabel')}
+              aria-label={t('memoryTreeAutomationHelpLabel')}
             >
               <IconInfoCircle size={ICON_SIZE.md} />
             </ActionIcon>
@@ -96,11 +88,11 @@ export function MemoryHeader({
           lastChecked={lastChecked}
         />
       </Group>
-      {((controlLoading && !control) ||
+      {((automationLoading && !automation) ||
         (treeLoading && activeRevision === undefined)) && <p>{t('loading')}</p>}
-      {controlError && (
+      {automationError && (
         <Alert color="red" mt="md">
-          {controlError}
+          {automationError}
         </Alert>
       )}
       {treeError && (

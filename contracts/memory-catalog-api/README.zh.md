@@ -10,15 +10,17 @@ extraction（已完成的经验提取记录）和 observation 列表按从新到
 
 `GET /v1/overview` 直接根据 Catalog 状态统计已完成提取的单元，以 `(source_run_id, source_unit_id)` 标识。同一单元至少完成过一次提取、但所有提取都未产出 observation 时，归为“未产出 observation”；失败或尚未结束的提取不计入。`range` 可选 30 天、90 天或全部历史；`trend_points` 按 `trend_granularity` 声明的粒度返回，有限时间范围按日、全部历史按月统计。`period_start` 是对应自然日或自然月的 UTC 起始日期，包含该起点。
 
-记忆修订通过 `source` 区分来源：`maintenance` 包含维护任务身份、已处理的提取 ID 和执行轨迹引用；`operator` 请求包含用于幂等处理的操作 ID，保存修订时再根据认证凭据补充操作者信息。`predecessor_revision` 记录创建修订时的生效版本。恢复版本是独立的幂等操作：通过比较并交换（CAS）将当前版本指向已有修订，不创建新修订。
+记忆修订通过 `source` 区分来源：`learning` 包含 `operation_id`、已处理的提取 ID 和 `trajectory_reference`；`reorganization` 包含 `operation_id` 和 `trajectory_reference`，但不消费 observation；`manual` 请求包含用于幂等处理的 `operation_id`，保存修订时再根据认证凭据补充操作者信息。`operation_id` 在所有来源类型中唯一标识一次修订操作；以不同类型复用同一 ID 会产生冲突。`predecessor_revision` 记录创建修订时的生效版本。恢复版本是独立的幂等操作：通过比较并交换（CAS）将当前版本指向已有修订，不创建新修订。
 
-Worker 凭据允许登记 extraction、读取维护输入和提交自动维护修订。Operator 凭据允许暂停或恢复维护、提交人工修订和恢复已有版本。两类凭据都能读取共享目录数据；创建修订时，请求来源类型必须与认证角色匹配。
+Worker 凭据允许登记 extraction、读取 learning 输入和提交 learning 或 reorganization 修订。Operator 凭据允许暂停或恢复记忆树自动更新、提交人工修订和恢复已有版本。两类凭据都能读取共享目录数据；创建修订时，请求来源类型必须与认证角色匹配。
 
-维护控制状态只有 `enabled` 和 `paused`。暂停、恢复请求通过 `operation_id` 保证幂等，并用 `expected_generation` 做 CAS 检查。相同请求重放时返回该操作原先产生的控制状态快照，即使当前状态后来已经改变。
+`GET /v1/memory-tree/automation` 返回 `enabled` 或 `paused`，表示是否允许提交新的 `learning` 和 `reorganization` 修订。暂停时，这些提交返回 HTTP 409 和 `AUTOMATION_PAUSED`；暂停不会中止已运行的任务，也不阻止产物发布、extraction 登记、`manual` 修订、恢复版本或成功提交的相同请求重放。`/pause` 和 `/resume` 请求通过 `operation_id` 保证幂等，并用 `expected_generation` 做 CAS 检查。响应包含 `created` 和 `automation` 状态快照。相同请求重放时返回该操作原先产生的快照，即使当前状态后来已经改变。
 
 发布 extraction 或记忆修订时，先登记发布意图，记录完整结果和文件引用；上传文件后，再由上传方确认这些文件已存在。这里的确认是上传方的声明，并非 Catalog 检查对象存储的结果。正式登记结果时，Catalog 要求提交内容与已确认的发布意图一致，并在同一事务中完成登记和意图选定。
 
 发布中断后，调用方可以查询已记录的意图，用于重试。Catalog 会保留这些记录，但不会自动完成中断的发布，也不会自动清理相关对象。
+
+Worker 可以通过 `POST /v1/memory-tree/revisions/publications/abandon` 放弃已有且未选定的 `learning` 或 `reorganization` publication。这些 publication 变为 `abandoned`；重试不会恢复它们，提交它们会返回 HTTP 409 和 `PUBLICATION_ABANDONED`。新的自动提交在暂停期间被拒绝时，会在同一事务中放弃该来源类型和 operation ID 下已有且未选定的 publication。维护 workflow 在准备阶段发现暂停时放弃这些 publication，遇到暂停或放弃后正常退出，不再因 backlog 续跑。已选定的 publication 和共用的产物对象会保留。
 
 ## 工具
 

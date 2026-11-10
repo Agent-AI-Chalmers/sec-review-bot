@@ -5,7 +5,39 @@ MEMORY_MAINTAINER_SYSTEM_PROMPT = load_prompt_resource("memory/maintain-system.m
 
 def build_maintenance_prompt(
     observations: list[tuple[str, str]],
+    *,
+    reorganization: bool = False,
 ) -> str:
+    if reorganization:
+        if observations:
+            raise ValueError(
+                "Memory reorganization must not receive selected observations."
+            )
+        return "\n".join(
+            [
+                "### Selected Observations",
+                "",
+                "None. No observations were selected for this reorganization pass.",
+                "",
+                "### Task",
+                "",
+                (
+                    "Maintain `/memory/MEMORY.md` and `/memory/topics/*.md` using only "
+                    "the current memory."
+                ),
+                "",
+                (
+                    "You may merge, split, delete, rename, compress, rewrite, or "
+                    "cross-reference topic files. Do not add security-review facts or "
+                    "rules that are not already present in the current memory."
+                ),
+                "",
+                (
+                    "If the memory is already clear and needs no reorganization, leave it "
+                    "unchanged and say so."
+                ),
+            ]
+        )
     if not observations:
         raise ValueError("Memory maintenance requires at least one observation.")
     selected = "\n".join(

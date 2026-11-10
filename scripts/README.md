@@ -90,7 +90,7 @@ uv --project agents run python -m scripts.experiments.memory_maintain \
   --output-dir runs/memory-02
 ```
 
-Inputs are processed in argument order; filename stems identify observations and must be unique. `--deployment` optionally overrides the maintainer model deployment. The output directory must not exist. It contains `memory/`, a maintainer trajectory, and `manifest.json` with input hashes, base-tree fingerprints, the deployment override, timestamps, execution status, and successful output fingerprints. Input files and the base tree are not modified. Staged observations are removed from a successful Memory output; a failed attempt keeps its partial files and records failure. Retry into a new directory. Empty observation batches are rejected; no automatic batching or retry is performed.
+Inputs are processed in argument order; filename stems identify observations and must be unique. `--deployment` optionally overrides the maintainer model deployment. The output directory must not exist. It contains `memory/`, a maintainer trajectory, and `manifest.json` with input hashes, base-tree fingerprints, the deployment override, timestamps, execution status, and successful output fingerprints. Input files and the base tree are not modified. Staged observations are removed from a successful Memory output; a failed attempt keeps its partial files and records failure. Retry into a new directory. Learning requires at least one observation; reorganization requires `--base-memory` and accepts no observations; no automatic batching or retry is performed.
 
 ## Local Development Workers
 
@@ -110,7 +110,9 @@ Run these commands from the repository root with the agents project environment:
 
 ```bash
 uv --project agents run python -m scripts.ops.memory_ops --env-file compose.memory.env maintain
+uv --project agents run python -m scripts.ops.memory_ops --env-file compose.memory.env maintain --mode reorganization
 uv --project agents run python -m scripts.ops.memory_ops --env-file compose.memory.env schedules maintenance ensure
 ```
 
-`maintain` starts a maintenance workflow in Temporal; `schedules maintenance ensure` creates or updates its periodic trigger. Both require the configured Temporal service; actual maintenance also requires the worker, Memory Catalog, and object storage. Use each subcommand's `--help` to inspect connection, timeout, batch, and schedule options.
+<!-- doc-default: memory-maintenance-mode; source=scripts/ops/memory_ops.py -->
+`maintain` starts a maintenance workflow in Temporal. The default `--mode learning` consumes pending observations; `--mode reorganization` reorganizes the active memory without consuming observations and is manually triggered. `schedules maintenance ensure` creates or updates the periodic learning trigger. Both require the configured Temporal service; actual maintenance also requires the worker, Memory Catalog, and object storage. Use each subcommand's `--help` to inspect connection, timeout, batch, and schedule options.

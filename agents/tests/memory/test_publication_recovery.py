@@ -5,7 +5,7 @@ from unittest.mock import Mock
 import pytest
 
 from sec_review_agents.memory.coordinated_maintenance import (
-    prepare_coordinated_memory_revision,
+    prepare_coordinated_memory_learning,
 )
 from sec_review_agents.workflows.memory.extraction import (
     MemoryExtractionRequest,
@@ -76,8 +76,8 @@ async def test_selected_maintenance_never_rebuilds_a_missing_or_uncertain_artifa
         "expected_active_revision": 2,
         "memory_tree_reference": reference("a"),
         "source": {
-            "kind": "maintenance",
-            "maintenance_id": "maintain-1",
+            "kind": "learning",
+            "operation_id": "maintain-1",
             "extraction_ids": ["extract-1"],
             "trajectory_reference": reference("b"),
         },
@@ -95,10 +95,10 @@ async def test_selected_maintenance_never_rebuilds_a_missing_or_uncertain_artifa
         "sec_review_agents.memory.coordinated_maintenance.s3_artifact_exists", probe
     )
     with pytest.raises(RuntimeError):
-        await prepare_coordinated_memory_revision(
-            catalog_client=catalog, maintenance_id="maintain-1", batch_size=10
+        await prepare_coordinated_memory_learning(
+            catalog_client=catalog, operation_id="maintain-1", batch_size=10
         )
-    catalog.get_maintenance_input.assert_not_called()
+    catalog.get_learning_input.assert_not_called()
     catalog.reserve_revision_publication.assert_not_called()
 
 
@@ -110,8 +110,8 @@ async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
         "expected_active_revision": 2,
         "memory_tree_reference": reference("a"),
         "source": {
-            "kind": "maintenance",
-            "maintenance_id": "maintain-1",
+            "kind": "learning",
+            "operation_id": "maintain-1",
             "extraction_ids": ["extract-1", "extract-2"],
             "trajectory_reference": reference("b"),
         },
@@ -124,20 +124,20 @@ async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
     monkeypatch.setattr(
         "sec_review_agents.memory.coordinated_maintenance.s3_artifact_exists", probe
     )
-    result = await prepare_coordinated_memory_revision(
-        catalog_client=catalog, maintenance_id="maintain-1", batch_size=10
+    result = await prepare_coordinated_memory_learning(
+        catalog_client=catalog, operation_id="maintain-1", batch_size=10
     )
     assert result is not None
     assert result.expected_active_revision == 2
     assert result.extraction_ids == ("extract-1", "extract-2")
     assert result.memory_tree_reference.as_dict() == intent["memory_tree_reference"]
     assert (
-        result.maintenance_trajectory_reference.as_dict()
+        result.trajectory_reference.as_dict()
         == intent["source"]["trajectory_reference"]
     )
     assert probe.call_count == 2
     catalog.confirm_revision_publication.assert_called_once_with(intent)
-    catalog.get_maintenance_input.assert_not_called()
+    catalog.get_learning_input.assert_not_called()
 
 
 @pytest.mark.asyncio
@@ -148,8 +148,8 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
         "expected_active_revision": 2,
         "memory_tree_reference": reference("a"),
         "source": {
-            "kind": "maintenance",
-            "maintenance_id": "maintain-1",
+            "kind": "learning",
+            "operation_id": "maintain-1",
             "extraction_ids": ["extract-1"],
             "trajectory_reference": reference("b"),
         },
@@ -158,8 +158,8 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
         "expected_active_revision": 3,
         "memory_tree_reference": reference("c"),
         "source": {
-            "kind": "maintenance",
-            "maintenance_id": "maintain-1",
+            "kind": "learning",
+            "operation_id": "maintain-1",
             "extraction_ids": ["extract-2"],
             "trajectory_reference": reference("d"),
         },
@@ -173,16 +173,39 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
         "sec_review_agents.memory.coordinated_maintenance.s3_artifact_exists",
         Mock(side_effect=[True, False, True, True]),
     )
-    result = await prepare_coordinated_memory_revision(
-        catalog_client=catalog, maintenance_id="maintain-1", batch_size=10
+    result = await prepare_coordinated_memory_learning(
+        catalog_client=catalog, operation_id="maintain-1", batch_size=10
     )
     assert result is not None
     assert result.expected_active_revision == 3
     assert result.extraction_ids == ("extract-2",)
     assert result.memory_tree_reference.as_dict() == complete["memory_tree_reference"]
     assert (
-        result.maintenance_trajectory_reference.as_dict()
+        result.trajectory_reference.as_dict()
         == complete["source"]["trajectory_reference"]
     )
     catalog.confirm_revision_publication.assert_called_once_with(complete)
-    catalog.get_maintenance_input.assert_not_called()
+    catalog.get_learning_input.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_abandoned_publication_never_recovers_or_runs_model(monkeypatch):
+    from sec_review_agents.memory.catalog_client import MemoryPublicationAbandonedError
+
+    catalog = Mock()
+    catalog.list_revision_publications.return_value = [
+        {"status": "abandoned", "intent": {}}
+    ]
+    exists = Mock(
+        side_effect=AssertionError("abandoned artifacts must not be recovered")
+    )
+    monkeypatch.setattr(
+        "sec_review_agents.memory.coordinated_maintenance.s3_artifact_exists", exists
+    )
+    with pytest.raises(MemoryPublicationAbandonedError):
+        await prepare_coordinated_memory_learning(
+            catalog_client=catalog, operation_id="abandoned-1", batch_size=10
+        )
+    catalog.get_learning_input.assert_not_called()
+    catalog.confirm_revision_publication.assert_not_called()
+    exists.assert_not_called()

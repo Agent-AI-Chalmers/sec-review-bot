@@ -3,6 +3,8 @@ import crypto from 'node:crypto'
 import test from 'node:test'
 import { Pool } from 'pg'
 import {
+  AutomationPausedError,
+  PublicationAbandonedError,
   ExtractionConflictError,
   MemoryTreeRevisionConflictError,
   PostgresMemoryCatalogStore,
@@ -94,8 +96,8 @@ await test('publication recovery preserves intents and attachment transactions s
       expected_active_revision: 0,
       memory_tree_reference: artifact('c'),
       source: {
-        kind: 'maintenance' as const,
-        maintenance_id: 'maintain-1',
+        kind: 'learning' as const,
+        operation_id: 'maintain-1',
         extraction_ids: ['extract-1'],
         trajectory_reference: artifact('e'),
       },
@@ -125,13 +127,13 @@ await test('publication recovery preserves intents and attachment transactions s
     assert.equal((await store.queries.getMemoryTree()).revision, 1)
     assert.equal((await store.queries.getObservationBacklog()).pending_count, 0)
     const publications = await store.listRevisionPublications(
-      'maintenance',
+      'learning',
       'maintain-1',
     )
     assert.equal(publications[0]?.status, 'selected')
     assert.equal(publications[1]?.status, 'present')
     const selected = publications[0].intent
-    assert(selected.source.kind === 'maintenance')
+    assert(selected.source.kind === 'learning')
     assert.equal(
       (
         await store.createMemoryTreeRevision({
@@ -146,7 +148,7 @@ await test('publication recovery preserves intents and attachment transactions s
       expected_active_revision: 0,
       memory_tree_reference: artifact('a'),
       source: {
-        kind: 'operator' as const,
+        kind: 'manual' as const,
         operation_id: 'edit-1',
         actor: { kind: 'service' as const, id: 'operator' },
       },
@@ -158,11 +160,246 @@ await test('publication recovery preserves intents and attachment transactions s
       MemoryTreeRevisionConflictError,
     )
     assert.equal(
-      (await store.listRevisionPublications('operator', 'edit-1'))[0]?.status,
+      (await store.listRevisionPublications('manual', 'edit-1'))[0]?.status,
       'present',
       'CAS failure rolls back candidate selection',
     )
     assert.equal((await store.queries.getMemoryTree()).revision, 1)
+
+    // Different kinds must serialize on the same globally unique operation ID.
+    const candidates = [
+      {
+        expected_active_revision: 1,
+        memory_tree_reference: artifact('a'),
+        source: {
+          kind: 'reorganization' as const,
+          operation_id: 'shared-operation',
+          trajectory_reference: artifact('e'),
+        },
+      },
+      {
+        ...operator,
+        expected_active_revision: 1,
+        source: { ...operator.source, operation_id: 'shared-operation' },
+      },
+    ]
+    for (const candidate of candidates) {
+      await store.reserveRevisionPublication(candidate)
+      await store.confirmRevisionPublication(candidate)
+    }
+    const concurrent = await Promise.allSettled(
+      candidates.map((candidate) => store.createMemoryTreeRevision(candidate)),
+    )
+    assert.equal(
+      concurrent.filter((result) => result.status === 'fulfilled').length,
+      1,
+    )
+    const rejected = concurrent.find((result) => result.status === 'rejected')
+    assert(
+      rejected?.status === 'rejected' &&
+        rejected.reason instanceof MemoryTreeRevisionConflictError,
+    )
+    const recorded = await Promise.all(
+      candidates.map((candidate) =>
+        store.listRevisionPublications(
+          candidate.source.kind,
+          'shared-operation',
+        ),
+      ),
+    )
+    assert.equal(
+      recorded.flat().filter((publication) => publication.status === 'selected')
+        .length,
+      1,
+    )
+    assert.equal((await store.queries.getMemoryTree()).revision, 2)
+
+    // Preparation cleanup is idempotent and never changes selected publications.
+    await store.abandonRevisionPublications({
+      kind: 'learning',
+      operation_id: 'maintain-1',
+    })
+    assert.equal(
+      (await store.listRevisionPublications('learning', 'maintain-1'))[0]
+        ?.status,
+      'selected',
+    )
+    assert.equal(
+      (
+        await store.createMemoryTreeRevision({
+          ...selected,
+          source: selected.source,
+        })
+      ).created,
+      false,
+    )
+    const prepared = {
+      expected_active_revision: 2,
+      memory_tree_reference: artifact('c'),
+      source: {
+        kind: 'reorganization' as const,
+        operation_id: 'prepared',
+        trajectory_reference: artifact('e'),
+      },
+    }
+    await store.reserveRevisionPublication(prepared)
+    const other = { ...prepared, memory_tree_reference: artifact('f') }
+    await store.reserveRevisionPublication(other)
+    await store.confirmRevisionPublication(other)
+    assert.equal(
+      (
+        await store.abandonRevisionPublications({
+          kind: 'reorganization',
+          operation_id: 'prepared',
+        })
+      ).length,
+      2,
+    )
+    assert.deepEqual(
+      await store.abandonRevisionPublications({
+        kind: 'reorganization',
+        operation_id: 'prepared',
+      }),
+      [],
+    )
+    assert.equal(
+      (await store.confirmRevisionPublication(prepared)).status,
+      'abandoned',
+    )
+    assert.equal(
+      (await store.reserveRevisionPublication(prepared)).status,
+      'abandoned',
+    )
+    await assert.rejects(
+      store.createMemoryTreeRevision(prepared),
+      PublicationAbandonedError,
+    )
+
+    // A paused commit persists abandonment despite returning an HTTP conflict.
+    const pausedCandidate = {
+      ...prepared,
+      source: { ...prepared.source, operation_id: 'paused-candidate' },
+    }
+    await store.reserveRevisionPublication(pausedCandidate)
+    await store.confirmRevisionPublication(pausedCandidate)
+    await pool.query("update memory_tree_automation set state='paused'")
+    await assert.rejects(
+      store.createMemoryTreeRevision(pausedCandidate),
+      AutomationPausedError,
+    )
+    assert.equal(
+      (
+        await store.listRevisionPublications(
+          'reorganization',
+          'paused-candidate',
+        )
+      )[0]?.status,
+      'abandoned',
+    )
+    assert.equal((await store.queries.getMemoryTree()).revision, 2)
+    await pool.query("update memory_tree_automation set state='enabled'")
+    // A response-lost retry after resume must not submit the abandoned candidate.
+    await assert.rejects(
+      store.createMemoryTreeRevision(pausedCandidate),
+      PublicationAbandonedError,
+    )
+
+    // Commit and cleanup serialize: either a selected revision survives or its candidate is abandoned.
+    const racing = {
+      ...prepared,
+      source: { ...prepared.source, operation_id: 'racing' },
+    }
+    await store.reserveRevisionPublication(racing)
+    await store.confirmRevisionPublication(racing)
+    const race = await Promise.allSettled([
+      store.createMemoryTreeRevision(racing),
+      store.abandonRevisionPublications({
+        kind: 'reorganization',
+        operation_id: 'racing',
+      }),
+    ])
+    const cleanup = race[1]
+    assert(cleanup?.status === 'fulfilled' && Array.isArray(cleanup.value))
+    const status = (
+      await store.listRevisionPublications('reorganization', 'racing')
+    )[0]?.status
+    if (cleanup.value.length) {
+      assert.equal(status, 'abandoned')
+      assert.equal((await store.queries.getMemoryTree()).revision, 2)
+      assert.equal(race[0]?.status, 'rejected')
+    } else {
+      assert.equal(status, 'selected')
+      assert.equal((await store.queries.getMemoryTree()).revision, 3)
+      assert.equal(race[0]?.status, 'fulfilled')
+    }
+    // Abandonment is publication-scoped, not an operation-level ban. A late
+    // attempt may reserve a new candidate after an abandon; only explicit
+    // cleanup or a paused commit can abandon that new publication.
+    const lateOwner = {
+      kind: 'reorganization' as const,
+      operation_id: 'late-publication',
+    }
+    assert.deepEqual(await store.abandonRevisionPublications(lateOwner), [])
+    const latePublication = {
+      expected_active_revision: (await store.queries.getMemoryTree()).revision,
+      memory_tree_reference: artifact('a'),
+      source: {
+        kind: 'reorganization' as const,
+        operation_id: 'late-publication',
+        trajectory_reference: artifact('b'),
+      },
+    }
+    assert.equal(
+      (await store.reserveRevisionPublication(latePublication)).status,
+      'reserved',
+    )
+    assert.equal(
+      (await store.confirmRevisionPublication(latePublication)).status,
+      'present',
+    )
+    assert.equal(
+      (
+        await store.listRevisionPublications(
+          'reorganization',
+          'late-publication',
+        )
+      )[0]?.status,
+      'present',
+    )
+    await store.abandonRevisionPublications(lateOwner)
+    const laterPublication = {
+      ...latePublication,
+      memory_tree_reference: artifact('c'),
+    }
+    assert.equal(
+      (await store.reserveRevisionPublication(laterPublication)).status,
+      'reserved',
+    )
+    assert.equal(
+      (await store.confirmRevisionPublication(laterPublication)).status,
+      'present',
+    )
+    const latePublications = await store.listRevisionPublications(
+      lateOwner.kind,
+      lateOwner.operation_id,
+    )
+    assert.equal(latePublications.length, 2)
+    assert.equal(
+      latePublications.find(
+        ({ intent }) =>
+          intent.memory_tree_reference.digest ===
+          latePublication.memory_tree_reference.digest,
+      )?.status,
+      'abandoned',
+    )
+    assert.equal(
+      latePublications.find(
+        ({ intent }) =>
+          intent.memory_tree_reference.digest ===
+          laterPublication.memory_tree_reference.digest,
+      )?.status,
+      'present',
+    )
   } finally {
     await store.close()
     await admin.query(`drop schema ${schema} cascade`)

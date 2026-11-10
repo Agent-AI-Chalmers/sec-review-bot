@@ -16,11 +16,11 @@ components:
     workerToken:
       type: http
       scheme: bearer
-      description: Worker credential for extraction and automatic maintenance operations.
+      description: Worker credential for extraction and learning or reorganization revisions.
     operatorToken:
       type: http
       scheme: bearer
-      description: Operator credential for maintenance control and manual memory changes.
+      description: Operator credential for memory-tree automation control and manual memory changes.
   schemas:
     ArtifactReference:
       type: object
@@ -40,10 +40,6 @@ components:
           type: integer
           minimum: 0
     ExtractionId:
-      type: string
-      minLength: 1
-      pattern: "^[A-Za-z0-9._:-]+$"
-    MaintenanceId:
       type: string
       minLength: 1
       pattern: "^[A-Za-z0-9._:-]+$"
@@ -119,6 +115,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ExtractionPublication"
+    AutomaticRevisionPublicationOwner:
+      type: object
+      additionalProperties: false
+      required: [kind, operation_id]
+      properties:
+        kind: { type: string, enum: [learning, reorganization] }
+        operation_id: { type: string, minLength: 1, pattern: "^[A-Za-z0-9._:-]+$" }
     RevisionPublication:
       type: object
       additionalProperties: false
@@ -126,7 +129,7 @@ components:
       properties:
         intent:
           $ref: "#/components/schemas/MemoryTreeRevisionCreation"
-        status: { type: string, enum: [reserved, present, selected] }
+        status: { type: string, enum: [reserved, present, selected, abandoned] }
     RevisionPublicationList:
       type: object
       additionalProperties: false
@@ -293,7 +296,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/CatalogOverviewWorkflow"
-    MaintenanceObservation:
+    LearningObservation:
       type: object
       additionalProperties: false
       required: [extraction_id, body_markdown]
@@ -301,7 +304,7 @@ components:
         extraction_id:
           $ref: "#/components/schemas/ExtractionId"
         body_markdown: { type: string, minLength: 1 }
-    MaintenanceInput:
+    LearningInput:
       type: object
       additionalProperties: false
       required:
@@ -310,7 +313,7 @@ components:
         expected_active_revision:
           type: integer
           minimum: 0
-          description: Active revision that must still be current when this maintenance input is committed.
+          description: Active revision that must still be current when this learning input is committed.
         active_memory_tree_reference:
           oneOf:
             - $ref: "#/components/schemas/ArtifactReference"
@@ -319,28 +322,28 @@ components:
           type: array
           minItems: 1
           items:
-            $ref: "#/components/schemas/MaintenanceObservation"
-    MaintenanceInputResult:
+            $ref: "#/components/schemas/LearningObservation"
+    LearningInputResult:
       type: object
       additionalProperties: false
       required: [input]
       properties:
         input:
           oneOf:
-            - $ref: "#/components/schemas/MaintenanceInput"
+            - $ref: "#/components/schemas/LearningInput"
             - type: "null"
-    MaintenanceRevisionSource:
+    LearningRevisionSource:
       type: object
       additionalProperties: false
       required:
         - kind
-        - maintenance_id
+        - operation_id
         - extraction_ids
         - trajectory_reference
       properties:
-        kind: { type: string, const: maintenance }
-        maintenance_id:
-          $ref: "#/components/schemas/MaintenanceId"
+        kind: { type: string, const: learning }
+        operation_id:
+          $ref: "#/components/schemas/OperationId"
         extraction_ids:
           type: array
           minItems: 1
@@ -349,28 +352,43 @@ components:
             $ref: "#/components/schemas/ExtractionId"
         trajectory_reference:
           $ref: "#/components/schemas/ArtifactReference"
-    OperatorRevisionSource:
+    ReorganizationRevisionSource:
+      type: object
+      additionalProperties: false
+      description: A maintainer-only curation of existing memory that consumes no observations.
+      required:
+        - kind
+        - operation_id
+        - trajectory_reference
+      properties:
+        kind: { type: string, const: reorganization }
+        operation_id:
+          $ref: "#/components/schemas/OperationId"
+        trajectory_reference:
+          $ref: "#/components/schemas/ArtifactReference"
+    ManualRevisionSource:
       type: object
       additionalProperties: false
       required: [kind, operation_id, actor]
       properties:
-        kind: { type: string, const: operator }
+        kind: { type: string, const: manual }
         operation_id:
           $ref: "#/components/schemas/OperationId"
         actor:
           $ref: "#/components/schemas/Actor"
-    OperatorRevisionCreationSource:
+    ManualRevisionCreationSource:
       type: object
       additionalProperties: false
       required: [kind, operation_id]
       properties:
-        kind: { type: string, const: operator }
+        kind: { type: string, const: manual }
         operation_id:
           $ref: "#/components/schemas/OperationId"
     MemoryTreeRevisionSource:
       oneOf:
-        - $ref: "#/components/schemas/MaintenanceRevisionSource"
-        - $ref: "#/components/schemas/OperatorRevisionSource"
+        - $ref: "#/components/schemas/LearningRevisionSource"
+        - $ref: "#/components/schemas/ReorganizationRevisionSource"
+        - $ref: "#/components/schemas/ManualRevisionSource"
     MemoryTreeRevisionCreation:
       type: object
       additionalProperties: false
@@ -384,8 +402,9 @@ components:
           $ref: "#/components/schemas/ArtifactReference"
         source:
           oneOf:
-            - $ref: "#/components/schemas/MaintenanceRevisionSource"
-            - $ref: "#/components/schemas/OperatorRevisionCreationSource"
+            - $ref: "#/components/schemas/LearningRevisionSource"
+            - $ref: "#/components/schemas/ReorganizationRevisionSource"
+            - $ref: "#/components/schemas/ManualRevisionCreationSource"
     MemoryTreeRevisionCreationResult:
       type: object
       additionalProperties: false
@@ -397,16 +416,23 @@ components:
           oneOf:
             - type: object
               additionalProperties: false
-              required: [kind, maintenance_id]
+              required: [kind, operation_id]
               properties:
-                kind: { type: string, const: maintenance }
-                maintenance_id:
-                  $ref: "#/components/schemas/MaintenanceId"
+                kind: { type: string, const: learning }
+                operation_id:
+                  $ref: "#/components/schemas/OperationId"
             - type: object
               additionalProperties: false
               required: [kind, operation_id]
               properties:
-                kind: { type: string, const: operator }
+                kind: { type: string, const: reorganization }
+                operation_id:
+                  $ref: "#/components/schemas/OperationId"
+            - type: object
+              additionalProperties: false
+              required: [kind, operation_id]
+              properties:
+                kind: { type: string, const: manual }
                 operation_id:
                   $ref: "#/components/schemas/OperationId"
     MemoryTree:
@@ -478,12 +504,14 @@ components:
         next_before_revision:
           type: [integer, "null"]
           minimum: 1
-    MaintenanceControl:
+    MemoryTreeAutomation:
+      description: Admission state for new learning and reorganization revision commits. Pausing does not cancel running work or block manual revisions, restores, extraction registration, artifact publication, or successful-operation replays.
       type: object
       additionalProperties: false
       required: [state, generation, changed_by, changed_at]
       properties:
         state:
+          description: Whether new learning and reorganization revisions may commit; this is not a worker execution status.
           type: string
           enum: [enabled, paused]
         generation:
@@ -494,7 +522,7 @@ components:
         changed_at:
           type: string
           format: date-time
-    MaintenanceControlOperation:
+    MemoryTreeAutomationOperation:
       type: object
       additionalProperties: false
       required: [operation_id, expected_generation]
@@ -504,14 +532,14 @@ components:
         expected_generation:
           type: integer
           minimum: 0
-    MaintenanceControlOperationResult:
+    MemoryTreeAutomationOperationResult:
       type: object
       additionalProperties: false
-      required: [created, control]
+      required: [created, automation]
       properties:
         created: { type: boolean }
-        control:
-          $ref: "#/components/schemas/MaintenanceControl"
+        automation:
+          $ref: "#/components/schemas/MemoryTreeAutomation"
     Health:
       type: object
       additionalProperties: false
@@ -527,7 +555,7 @@ components:
         code:
           type: string
           enum:
-            [INVALID_BODY, UNAUTHORIZED, NOT_FOUND, CONFLICT, MAINTENANCE_PAUSED, INTERNAL_ERROR]
+            [INVALID_BODY, UNAUTHORIZED, NOT_FOUND, CONFLICT, AUTOMATION_PAUSED, PUBLICATION_ABANDONED, INTERNAL_ERROR]
   responses:
     InvalidBody:
       description: The JSON body does not match the operation schema.
@@ -540,7 +568,7 @@ components:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
     Conflict:
-      description: An immutable identity differs from existing content, a revision compare-and-swap precondition failed, or a maintenance revision was attempted while automatic maintenance is paused.
+      description: An immutable identity differs from existing content, a revision compare-and-swap precondition failed, or a learning or reorganization revision was attempted while memory-tree automation is paused.
       content:
         application/json:
           schema: { $ref: "#/components/schemas/ErrorResponse" }
@@ -713,10 +741,10 @@ paths:
               schema: { $ref: "#/components/schemas/CatalogOverview" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /v1/maintenance-input:
+  /v1/learning-input:
     get:
       description: Return a bounded observation set and the active memory state it must be maintained against.
-      operationId: getMaintenanceInput
+      operationId: getLearningInput
       security: [{ workerToken: [] }]
       parameters:
         - in: query
@@ -728,13 +756,13 @@ paths:
           description: Current memory state and bounded pending observations, or null when none are pending.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/MaintenanceInputResult" }
+              schema: { $ref: "#/components/schemas/LearningInputResult" }
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/memory-tree/revisions:
     post:
-      description: Select a matching confirmed publication intent, create its immutable revision with compare-and-swap, and consume its source observations.
+      description: Select a matching confirmed publication intent, create its immutable revision with compare-and-swap, and consume any source observations.
       operationId: createMemoryTreeRevision
       security: [{ catalogToken: [] }]
       requestBody:
@@ -755,7 +783,7 @@ paths:
                   $ref: "#/components/schemas/MemoryTreeRevisionCreationResult",
                 }
         "200":
-          description: An identical maintenance submission had already created this revision.
+          description: An identical revision submission had already created this revision.
           content:
             application/json:
               schema:
@@ -834,29 +862,29 @@ paths:
         "409": { $ref: "#/components/responses/Conflict" }
         "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /v1/maintenance-control:
+  /v1/memory-tree/automation:
     get:
-      description: Return whether automatic memory maintenance is currently allowed.
-      operationId: getMaintenanceControl
+      description: Return whether new learning and reorganization memory-tree revisions may commit.
+      operationId: getMemoryTreeAutomation
       security: [{ catalogToken: [] }]
       responses:
         "200":
-          description: Current durable maintenance control state.
+          description: Current durable memory-tree automation state.
           content:
             application/json:
-              schema: { $ref: "#/components/schemas/MaintenanceControl" }
+              schema: { $ref: "#/components/schemas/MemoryTreeAutomation" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /v1/maintenance-control/pause:
+  /v1/memory-tree/automation/pause:
     post:
-      description: Idempotently transition automatic maintenance from enabled to paused.
-      operationId: pauseMaintenance
+      description: Idempotently transition memory-tree automation from enabled to paused.
+      operationId: pauseMemoryTreeAutomation
       security: [{ operatorToken: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/MaintenanceControlOperation" }
+            schema: { $ref: "#/components/schemas/MemoryTreeAutomationOperation" }
       responses:
         "200":
           description: An identical control operation was replayed.
@@ -864,31 +892,31 @@ paths:
             application/json:
               schema:
                 {
-                  $ref: "#/components/schemas/MaintenanceControlOperationResult",
+                  $ref: "#/components/schemas/MemoryTreeAutomationOperationResult",
                 }
         "201":
-          description: Automatic maintenance was paused.
+          description: Memory-tree automation was paused.
           content:
             application/json:
               schema:
                 {
-                  $ref: "#/components/schemas/MaintenanceControlOperationResult",
+                  $ref: "#/components/schemas/MemoryTreeAutomationOperationResult",
                 }
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "409": { $ref: "#/components/responses/Conflict" }
         "413": { $ref: "#/components/responses/PayloadTooLarge" }
         "500": { $ref: "#/components/responses/InternalError" }
-  /v1/maintenance-control/resume:
+  /v1/memory-tree/automation/resume:
     post:
-      description: Idempotently transition automatic maintenance from paused to enabled.
-      operationId: resumeMaintenance
+      description: Idempotently transition memory-tree automation from paused to enabled.
+      operationId: resumeMemoryTreeAutomation
       security: [{ operatorToken: [] }]
       requestBody:
         required: true
         content:
           application/json:
-            schema: { $ref: "#/components/schemas/MaintenanceControlOperation" }
+            schema: { $ref: "#/components/schemas/MemoryTreeAutomationOperation" }
       responses:
         "200":
           description: An identical control operation was replayed.
@@ -896,15 +924,15 @@ paths:
             application/json:
               schema:
                 {
-                  $ref: "#/components/schemas/MaintenanceControlOperationResult",
+                  $ref: "#/components/schemas/MemoryTreeAutomationOperationResult",
                 }
         "201":
-          description: Automatic maintenance was enabled.
+          description: Memory-tree automation was enabled.
           content:
             application/json:
               schema:
                 {
-                  $ref: "#/components/schemas/MaintenanceControlOperationResult",
+                  $ref: "#/components/schemas/MemoryTreeAutomationOperationResult",
                 }
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
@@ -913,7 +941,7 @@ paths:
         "500": { $ref: "#/components/responses/InternalError" }
   /v1/memory-tree/revisions/{revision}:
     get:
-      description: Return one immutable memory tree revision and its maintenance trajectory.
+      description: Return one immutable memory tree revision and its maintainer trajectory.
       operationId: getMemoryTreeRevision
       security: [{ catalogToken: [] }]
       parameters:
@@ -992,6 +1020,26 @@ paths:
         "400": { $ref: "#/components/responses/InvalidBody" }
         "401": { $ref: "#/components/responses/Unauthorized" }
         "500": { $ref: "#/components/responses/InternalError" }
+  /v1/memory-tree/revisions/publications/abandon:
+    post:
+      description: Abandon existing unselected publications for an automatic revision. Selected publications and artifact objects are preserved.
+      operationId: abandonRevisionPublications
+      security: [{ workerToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AutomaticRevisionPublicationOwner" }
+      responses:
+        "200":
+          description: Publications changed to abandoned; empty on a retry or when none exist.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RevisionPublicationList" }
+        "400": { $ref: "#/components/responses/InvalidBody" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "413": { $ref: "#/components/responses/PayloadTooLarge" }
+        "500": { $ref: "#/components/responses/InternalError" }
   /v1/memory-tree/revisions/publications/reserve:
     post:
       description: Reserve the complete intent before uploading its immutable artifacts.
@@ -1043,7 +1091,7 @@ paths:
         - in: path
           name: kind
           required: true
-          schema: { type: string, enum: [maintenance, operator] }
+          schema: { type: string, enum: [learning, reorganization, manual] }
         - in: path
           name: owner_id
           required: true

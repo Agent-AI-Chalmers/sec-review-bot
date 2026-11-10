@@ -145,8 +145,8 @@ The BFF also proxies execution archive downloads from private RustFS storage. It
 
 The server-side memory tree reader and builder implement the versioned [memory-tree profile](../../contracts/tar-zstd-artifact/profiles/memory-tree/README.md). They remain outside the browser bundle; the BFF is responsible for validation, digest calculation, and canonical object keys.
 
-Set `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_OPERATOR_TOKEN` to manage memory in the console: pause or resume automatic maintenance, edit the active memory tree, and restore an existing revision.
+Set `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_OPERATOR_TOKEN` to manage memory in the console: pause or resume automatic memory updates, edit the active memory tree, and restore an existing revision.
 
 The BFF accesses Catalog and object storage and verifies artifact size and SHA-256 digest before returning artifacts. The browser receives no storage URIs or credentials.
 
-After an edit fails, keeping the editor open with unchanged content allows retries of the same operation using the original operation ID. Closing or reloading the editor starts a new operation. Failed edits or restores do not automatically resume memory maintenance.
+After an edit fails, keeping the editor open with unchanged content allows retries of the same operation using the original operation ID. Closing or reloading the editor starts a new operation. Editing and restoring do not change memory-tree automation state.

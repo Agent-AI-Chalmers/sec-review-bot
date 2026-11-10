@@ -42,7 +42,7 @@ test('BFF verifies and strictly parses memory trajectories for the viewer', asyn
       JSON.stringify({
         revision: 2,
         source: {
-          kind: 'maintenance',
+          kind: 'learning',
           trajectory_reference: {
             uri: 's3://sec-review/memory/trajectories/memory-maintainer/example/trajectory.v1.jsonl.zst',
             digest,
@@ -122,7 +122,7 @@ test('BFF rejects a memory tree reference whose object key is not derived from i
           size_bytes: 1
         },
         source: {
-          kind: 'operator',
+          kind: 'manual',
           operation_id: 'edit-1'
         }
       })
@@ -186,7 +186,7 @@ test('BFF rejects oversized memory artifacts before reading object storage', asy
           size_bytes: 64 * 1024 * 1024 + 1
         },
         source: {
-          kind: 'operator',
+          kind: 'manual',
           operation_id: 'edit-1'
         }
       })
@@ -245,7 +245,7 @@ test('BFF rejects oversized memory objects before buffering their body', async (
           size_bytes: 1
         },
         source: {
-          kind: 'operator',
+          kind: 'manual',
           operation_id: 'edit-1'
         }
       })
@@ -310,7 +310,7 @@ test('BFF times out and closes a stalled memory artifact body', async () => {
           size_bytes: 2
         },
         source: {
-          kind: 'operator',
+          kind: 'manual',
           operation_id: 'edit-1'
         }
       })
@@ -387,7 +387,7 @@ test('BFF rejects same-size memory content that does not match the stored digest
           size_bytes: 8
         },
         source: {
-          kind: 'operator',
+          kind: 'manual',
           operation_id: 'edit-1'
         }
       })
@@ -479,7 +479,7 @@ async function memoryArtifactFixture(t: TestContext): Promise<{
       },
       trajectory_reference: trajectoryReference(extractionKey, extraction),
       source: {
-        kind: 'maintenance',
+        kind: 'learning',
         trajectory_reference: trajectoryReference(maintenanceKey, maintenance)
       }
     })
@@ -626,7 +626,7 @@ test('malformed Catalog records fail as upstream errors before reading object st
   assert.deepEqual(fixture.objectReads, [])
 })
 
-test('revision trajectories require a maintenance source while unavailable references remain 409', async (t) => {
+test('revision trajectories reject non-maintainer sources while unavailable references remain 409', async (t) => {
   const fixture = await memoryArtifactFixture(t)
   const record: unknown = JSON.parse(fixture.catalogReply.body)
   assert(
@@ -637,7 +637,7 @@ test('revision trajectories require a maintenance source while unavailable refer
     null,
     [],
     'maintenance',
-    { kind: 'operator', trajectory_reference: record.trajectory_reference }
+    { kind: 'manual', trajectory_reference: record.trajectory_reference }
   ]) {
     fixture.catalogReply.body = JSON.stringify({
       source,
@@ -650,4 +650,21 @@ test('revision trajectories require a maintenance source while unavailable refer
     })
   }
   assert.deepEqual(fixture.objectReads, [])
+})
+
+test('reorganization trajectories support verified download and content preview', async (t) => {
+  const fixture = await memoryArtifactFixture(t)
+  const record = JSON.parse(fixture.catalogReply.body)
+  record.source.kind = 'reorganization'
+  fixture.catalogReply.body = JSON.stringify(record)
+  const download = await fixture.get('/revisions/2/trajectory')
+  assert.equal(download.status, 200)
+  assert.deepEqual(
+    Buffer.from(await download.arrayBuffer()),
+    fixture.maintenance
+  )
+  const preview = await fixture.get('/revisions/2/trajectory/content')
+  assert.equal(preview.status, 200)
+  const content = await preview.json()
+  assert.equal(content.events[0].message.content, 'Maintenance trajectory')
 })
