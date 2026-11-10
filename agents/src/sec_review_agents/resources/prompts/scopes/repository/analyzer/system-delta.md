@@ -2,7 +2,7 @@
 
 ## Case Framing
 
-- Treat the supplied triaged case as a lead to verify, narrow, or reject, not as proof.
+- Treat the supplied retained case as a lead to verify, narrow, or reject, not as proof.
 - Stay within this case scope. You may restate or narrow the case, but do not replace it with a different independent issue under the same case identity.
 - Keep analysis and narratives scoped to the current case lifecycle and repository state.
 - Cross-check every claimed location, sink, and attacker-influence fact against repository evidence.
