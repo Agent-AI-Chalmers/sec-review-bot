@@ -1,6 +1,6 @@
 ---
 name: cwe
-description: "Assign a concrete, evidence-supported CWE only after a repository-grounded security finding already exists. Use this skill to narrow classification, avoid bad labels, and explain why the chosen CWE fits."
+description: "Assign a concrete, evidence-supported CWE only after a repository-grounded security finding or narrowly scoped plausible risk already exists. Use this skill to narrow classification, avoid bad labels, and explain why the chosen CWE fits."
 ---
 
 # CWE Classification Skill
