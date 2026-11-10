@@ -2,6 +2,8 @@ version: 2
 
 updates:
   - package-ecosystem: 'npm'
+    cooldown:
+      default-days: 7
     directory: '/'
     schedule:
       interval: 'monthly'
@@ -23,6 +25,8 @@ updates:
           - 'version-update:semver-major'
 
   - package-ecosystem: 'uv'
+    cooldown:
+      default-days: 7
     directory: '/agents'
     schedule:
       interval: 'monthly'
@@ -54,6 +58,8 @@ updates:
           - 'opentelemetry-*'
 
   - package-ecosystem: 'pip'
+    cooldown:
+      default-days: 7
     directory: '/ops/rustfs-init'
     schedule:
       interval: 'monthly'
@@ -64,6 +70,8 @@ updates:
       prefix-development: 'build(deps-dev)'
 
   - package-ecosystem: 'github-actions'
+    cooldown:
+      default-days: 7
     directory: '/'
     schedule:
       interval: 'monthly'

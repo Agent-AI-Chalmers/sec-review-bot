@@ -18,6 +18,7 @@ concurrency:
 
 permissions:
   contents: read
+  # dorny/paths-filter lists pull request files through the API.
   pull-requests: read
 
 jobs:
@@ -43,7 +44,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Detect changed areas
         id: filter
         uses: dorny/paths-filter@v4
@@ -60,12 +62,12 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       # actionlint catches invalid expressions, job dependencies, event syntax,
       # and other GitHub Actions mistakes that ordinary project tests cannot see.
       - name: Lint GitHub Actions workflows
         uses: raven-actions/actionlint@v2
-
       # Dependabot has no equivalent local semantic validator, but parsing the
       # file still prevents malformed YAML from reaching the default branch.
       - name: Parse Dependabot configuration
@@ -98,7 +100,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       # ops/ and the root Compose files sit outside every app suite; validate them
       # cheaply so a change there cannot land with CI Status green but untested.
       # install.sh is `#!/bin/sh`, so check it with the POSIX shell (dash on the
@@ -153,7 +156,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Set up Node package
         uses: ./.github/actions/setup-node
         with:
@@ -198,7 +202,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Set up Node package
         uses: ./.github/actions/setup-node
         with:
@@ -229,7 +234,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Set up Node package
         uses: ./.github/actions/setup-node
         with:
@@ -257,6 +263,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/check-seams
         with:
           catalog: ${{ github.event_name == 'merge_group' || needs.changes.outputs.catalog-seam == 'true' }}
@@ -273,7 +281,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Set up Node package
         uses: ./.github/actions/setup-node
         with:
@@ -301,7 +310,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Set up Node package
         uses: ./.github/actions/setup-node
         with:
@@ -335,7 +345,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Set up Node package
         uses: ./.github/actions/setup-node
         with:
@@ -370,7 +381,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Check agents
         uses: ./.github/actions/check-agents
 
@@ -384,7 +396,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Set up Python environment
         id: setup-python
         uses: ./.github/actions/setup-python
@@ -416,7 +429,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Set up Python
         uses: actions/setup-python@v7
         with:

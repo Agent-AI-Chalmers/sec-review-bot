@@ -24,7 +24,8 @@ jobs:
       - name: Check out repository
         if: github.event_name == 'pull_request'
         uses: actions/checkout@v7
-
+        with:
+          persist-credentials: false
       - name: Validate pull request title
         if: github.event_name == 'pull_request'
         env:
