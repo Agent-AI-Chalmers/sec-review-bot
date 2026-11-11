@@ -63,7 +63,7 @@ export function Memory(): React.JSX.Element {
   const [activeTab, setActiveTab] = React.useState<string | null>('overview')
   const [revisionView, setRevisionView] = React.useState('graph')
   const [highlightedRevision, setHighlightedRevision] = React.useState<number>()
-  const [highlightedExtraction, setHighlightedExtraction] =
+  const [highlightedObservation, setHighlightedObservation] =
     React.useState<string>()
   const [error, setError] = React.useState('')
   const [queryFailure, setQueryFailure] = React.useState<unknown>()
@@ -80,12 +80,12 @@ export function Memory(): React.JSX.Element {
 
   // A revision consumes one learning batch, which the catalog caps at 100, the same
   // as its largest list page; the filtered first page at that size holds the target.
-  const revealObservation = (revision: number, extractionId: string): void => {
+  const revealObservation = (revision: number, observationId: string): void => {
     setActiveTab('observations')
-    setHighlightedExtraction(undefined)
+    setHighlightedObservation(undefined)
     void observationPages
       .openFirst({ filter: revision, limit: MAX_PAGE_SIZE })
-      .then(() => setHighlightedExtraction(extractionId))
+      .then(() => setHighlightedObservation(observationId))
   }
 
   const viewMemoryMaintainerTrajectory = (revision: number): void => {
@@ -303,14 +303,14 @@ export function Memory(): React.JSX.Element {
             )}
             revisionFilter={observationPages.query.filter}
             onClearRevisionFilter={() => {
-              setHighlightedExtraction(undefined)
+              setHighlightedObservation(undefined)
               void observationPages.openFirst({
                 filter: undefined,
                 limit: DEFAULT_PAGE_SIZE
               })
             }}
-            highlightedExtraction={highlightedExtraction}
-            onHighlightEnd={() => setHighlightedExtraction(undefined)}
+            highlightedObservation={highlightedObservation}
+            onHighlightEnd={() => setHighlightedObservation(undefined)}
             onRevealRevision={revealRevision}
             onViewTrajectory={(item) =>
               setTrajectoryTarget({

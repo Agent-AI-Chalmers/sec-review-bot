@@ -27,17 +27,21 @@ def test_python_catalog_publication_replay_and_conflict(catalog):
         "source_unit_id": "review",
         "execution_archive_digest": f"sha256:{'b' * 64}",
         "trajectory_reference": trajectory.as_dict(),
-        "observation": {"body_markdown": "跨语言 observation"},
+        "observations": [
+            {
+                "observation_id": f"{extraction_id}:1",
+                "body_markdown": "跨语言 observation",
+            },
+            {"observation_id": f"{extraction_id}:2", "body_markdown": "独立经验"},
+        ],
     }
     intent = {"registration": registration, "summary": "Seam probe"}
     arguments = {
         key: value
         for key, value in registration.items()
-        if key not in {"trajectory_reference", "observation"}
+        if key not in {"trajectory_reference"}
     }
-    arguments.update(
-        trajectory_reference=trajectory, observation_markdown="跨语言 observation"
-    )
+    arguments.update(trajectory_reference=trajectory)
     client.reserve_extraction_publication(intent)
     with pytest.raises(MemoryCatalogConflictError):
         client.register_extraction(**arguments)
@@ -47,7 +51,9 @@ def test_python_catalog_publication_replay_and_conflict(catalog):
     assert client.list_extraction_publications(extraction_id) == [
         {"intent": intent, "status": "selected"}
     ]
-    assert client.get_extraction(extraction_id)["extraction_id"] == extraction_id
+    stored = client.get_extraction(extraction_id)
+    assert stored["extraction_id"] == extraction_id
+    assert stored["observations"] == registration["observations"]
     with pytest.raises(MemoryCatalogConflictError):
         client.reserve_extraction_publication({**intent, "summary": "conflicting"})
     with pytest.raises(RuntimeError, match="HTTP 401"):

@@ -37,7 +37,7 @@ export function MaintenanceReportButton({
   onRevealObservation
 }: {
   report: MaintenanceReport
-  onRevealObservation: (extractionId: string) => void
+  onRevealObservation: (observationId: string) => void
 }): React.JSX.Element {
   const t = useMessages()
   const [opened, setOpened] = React.useState(false)
@@ -60,9 +60,9 @@ export function MaintenanceReportButton({
       >
         <MaintenanceReportView
           report={report}
-          onRevealObservation={(extractionId) => {
+          onRevealObservation={(observationId) => {
             setOpened(false)
-            onRevealObservation(extractionId)
+            onRevealObservation(observationId)
           }}
         />
       </Modal>
@@ -75,7 +75,7 @@ function MaintenanceReportView({
   onRevealObservation
 }: {
   report: MaintenanceReport
-  onRevealObservation: (extractionId: string) => void
+  onRevealObservation: (observationId: string) => void
 }): React.JSX.Element {
   const t = useMessages()
   const decisions = report.observation_decisions
@@ -89,7 +89,7 @@ function MaintenanceReportView({
       ) : (
         <Stack gap="xs" component="ul" className="maintenance-decisions">
           {decisions.map((decision) => (
-            <li key={decision.extraction_id} className="maintenance-decision">
+            <li key={decision.observation_id} className="maintenance-decision">
               <Group gap="xs" wrap="nowrap" mb={4}>
                 <Badge
                   size="sm"
@@ -104,7 +104,7 @@ function MaintenanceReportView({
                   component="button"
                   type="button"
                   size="xs"
-                  onClick={() => onRevealObservation(decision.extraction_id)}
+                  onClick={() => onRevealObservation(decision.observation_id)}
                 >
                   {t('showObservation')}
                 </Anchor>

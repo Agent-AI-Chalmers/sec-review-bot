@@ -59,8 +59,8 @@ def build_maintenance_prompt(
     if not observations:
         raise ValueError("Memory maintenance requires at least one observation.")
     selected = "\n".join(
-        f"- `{extraction_id}`: `{mounted_path}`"
-        for extraction_id, mounted_path in observations
+        f"- `{observation_id}`: `{mounted_path}`"
+        for observation_id, mounted_path in observations
     )
     return "\n".join(
         ["### Selected Observations", "", selected, "", MEMORY_MAINTENANCE_TASK]

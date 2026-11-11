@@ -45,8 +45,10 @@ async def test_extractor_returns_preview_and_records_to_explicit_trajectory(
             "sec_review_agents.memory.extractor.run_memory_extractor_agent",
             AsyncMock(
                 return_value=MemoryObservationOutput(
-                    has_observation=True,
-                    observation_markdown="Reuse the verified boundary.",
+                    observations=[
+                        "Reuse the verified boundary.",
+                        "Preserve format compatibility.",
+                    ],
                 )
             ),
         ) as invoke,
@@ -60,8 +62,9 @@ async def test_extractor_returns_preview_and_records_to_explicit_trajectory(
         )
 
     assert result.extractor_trajectory_path == agent_trajectory
-    assert result.observation_markdown is not None
-    assert "Reuse the verified boundary." in result.observation_markdown
+    assert len(result.observations) == 2
+    assert "Reuse the verified boundary." in result.observations[0]
+    assert "Preserve format compatibility." in result.observations[1]
     create_model.assert_called_once_with(
         agent_name="memory-extractor",
         deployment_override=None,
@@ -92,7 +95,7 @@ async def test_extractor_skips_without_trajectories_or_agent_execution(
 
     assert result.extraction_id == "explicit-extraction-1"
     assert result.skipped is True
-    assert result.observation_markdown is None
+    assert result.observations == []
     assert result.extractor_trajectory_path is None
     invoke.assert_not_awaited()
 
@@ -112,11 +115,7 @@ async def test_extractor_skips_when_agent_produces_no_observation(
         ) as create_model,
         patch(
             "sec_review_agents.memory.extractor.run_memory_extractor_agent",
-            AsyncMock(
-                return_value=MemoryObservationOutput(
-                    has_observation=False, observation_markdown="ignored text"
-                )
-            ),
+            AsyncMock(return_value=MemoryObservationOutput(observations=[])),
         ),
     ):
         result = await preview_memory_observation_from_paths(
@@ -126,7 +125,7 @@ async def test_extractor_skips_when_agent_produces_no_observation(
         )
 
     assert result.skipped is True
-    assert result.observation_markdown is None
+    assert result.observations == []
     assert result.extractor_trajectory_path == agent_trajectory
     create_model.assert_called_once_with(
         agent_name="memory-extractor",
@@ -184,7 +183,7 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
     )
     assert invoke.await_args is not None
     assert invoke.await_args.kwargs["trajectory_paths"] == (agent_trajectory,)
-    assert invoke.await_args.kwargs["extraction_ids"] == ["extraction-1"]
+    assert invoke.await_args.kwargs["observation_ids"] == ["extraction-1"]
     assert (
         "/memory/observations/observation-0001.md"
         in invoke.await_args.kwargs["user_prompt"]
@@ -348,7 +347,7 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
         "expected_active_revision": expected_active_revision,
         "active_memory_tree_reference": active_reference,
         "observations": [
-            {"extraction_id": "extraction-1", "body_markdown": "Remember this."}
+            {"observation_id": "extraction-1", "body_markdown": "Remember this."}
         ],
     }
     base_tree = tmp_path / "active"
@@ -357,7 +356,7 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
         {
             "observation_decisions": [
                 {
-                    "extraction_id": "extraction-1",
+                    "observation_id": "extraction-1",
                     "action": "added",
                     "topics": ["/memory/topics/example.md"],
                     "reason": "Adds durable guidance.",
@@ -407,7 +406,7 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
 
     assert prepared is not None
     assert prepared.expected_active_revision == expected_active_revision
-    assert prepared.extraction_ids == ("extraction-1",)
+    assert prepared.observation_ids == ("extraction-1",)
     assert prepared.maintenance_report == report
     intent = client.reserve_revision_publication.call_args.args[0]
     assert intent["source"]["maintenance_report"] == report.model_dump(mode="json")
@@ -491,7 +490,7 @@ async def test_coordinated_reorganization_uses_active_memory_without_observation
 
     assert reorganized.commit_input is not None
     assert reorganized.commit_input.source_kind == "reorganization"
-    assert reorganized.commit_input.extraction_ids == ()
+    assert reorganized.commit_input.observation_ids == ()
     assert reorganized.commit_input.expected_active_revision == 2
     assert maintain.await_args is not None
     assert maintain.await_args.kwargs["observations"] == []
@@ -501,7 +500,7 @@ async def test_coordinated_reorganization_uses_active_memory_without_observation
     )
     intent = client.reserve_revision_publication.call_args.args[0]
     assert intent["source"]["kind"] == "reorganization"
-    assert "extraction_ids" not in intent["source"]
+    assert "observation_ids" not in intent["source"]
     assert intent["source"]["maintenance_report"] == {
         "observation_decisions": [],
         "summary": "Merged duplicate topics.",
@@ -583,7 +582,7 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                 "active_memory_tree_reference": None,
                 "observations": [
                     {
-                        "extraction_id": "extraction-1",
+                        "observation_id": "extraction-1",
                         "body_markdown": "Remember this.",
                     }
                 ],
@@ -596,7 +595,7 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                 "active_memory_tree_reference": [],
                 "observations": [
                     {
-                        "extraction_id": "extraction-1",
+                        "observation_id": "extraction-1",
                         "body_markdown": "Remember this.",
                     }
                 ],
@@ -611,7 +610,7 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                 ).as_dict(),
                 "observations": [
                     {
-                        "extraction_id": "extraction-1",
+                        "observation_id": "extraction-1",
                         "body_markdown": "Remember this.",
                     }
                 ],
@@ -624,7 +623,7 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                 "active_memory_tree_reference": None,
                 "observations": [
                     {
-                        "extraction_id": "extraction-1",
+                        "observation_id": "extraction-1",
                         "body_markdown": "Remember this.",
                     }
                 ],
@@ -636,16 +635,18 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                 "expected_active_revision": 0,
                 "active_memory_tree_reference": None,
                 "observations": [
-                    {"extraction_id": 1, "body_markdown": "Remember this."}
+                    {"observation_id": 1, "body_markdown": "Remember this."}
                 ],
             },
-            "extraction_id",
+            "observation_id",
         ),
         (
             {
                 "expected_active_revision": 0,
                 "active_memory_tree_reference": None,
-                "observations": [{"extraction_id": "extraction-1", "body_markdown": 1}],
+                "observations": [
+                    {"observation_id": "extraction-1", "body_markdown": 1}
+                ],
             },
             "body_markdown",
         ),

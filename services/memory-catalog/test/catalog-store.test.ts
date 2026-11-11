@@ -72,7 +72,9 @@ await test('extraction registration atomically stores its optional observation',
       source_unit_id: 'review',
       execution_archive_digest: `sha256:${'d'.repeat(64)}`,
       trajectory_reference: extractionTrajectory,
-      observation: { body_markdown: 'Remember this.' },
+      observations: [
+        { observation_id: 'extraction-1', body_markdown: 'Remember this.' },
+      ],
     }),
     true,
   )
@@ -131,7 +133,7 @@ await test('extraction replay compares the optional observation as part of ident
       source_unit_id: 'review',
       execution_archive_digest: `sha256:${'d'.repeat(64)}`,
       trajectory_reference: extractionTrajectory,
-      observation: null,
+      observations: [],
     }),
     ExtractionConflictError,
   )
@@ -155,9 +157,9 @@ await test('learning commit records immutable history before moving the active p
         return Promise.resolve({ rows: [{ revision: '3' }], rowCount: 1 })
       if (sql.includes('select state from memory_tree_automation'))
         return Promise.resolve({ rows: [{ state: 'enabled' }], rowCount: 1 })
-      if (sql.includes('select extraction_id from observations'))
+      if (sql.includes('select observation_id from observations'))
         return Promise.resolve({
-          rows: [{ extraction_id: 'extraction-1' }],
+          rows: [{ observation_id: 'extraction-1' }],
           rowCount: 1,
         })
       if (sql.includes('coalesce(max(revision)'))
@@ -179,7 +181,7 @@ await test('learning commit records immutable history before moving the active p
       source: {
         kind: 'learning',
         operation_id: 'maintenance-1',
-        extraction_ids: ['extraction-1'],
+        observation_ids: ['extraction-1'],
         trajectory_reference: revisionTrajectory,
         maintenance_report: learningReport(['extraction-1']),
       },
@@ -267,7 +269,7 @@ await test('reorganization commit records history without consuming observations
   assert.equal(
     statements.some(
       ({ sql }) =>
-        sql.includes('select extraction_id from observations') ||
+        sql.includes('select observation_id from observations') ||
         sql.includes('update observations set consumed_revision'),
     ),
     false,
@@ -318,7 +320,7 @@ await test('an identical learning operation id replays the created revision', as
       source: {
         kind: 'learning',
         operation_id: 'maintenance-1',
-        extraction_ids: ['extraction-1'],
+        observation_ids: ['extraction-1'],
         trajectory_reference: revisionTrajectory,
         maintenance_report: learningReport(['extraction-1']),
       },
@@ -360,7 +362,7 @@ await test('paused control rejects a new automatic revision commit before active
       source: {
         kind: 'learning',
         operation_id: 'maintenance-1',
-        extraction_ids: ['extraction-1'],
+        observation_ids: ['extraction-1'],
         trajectory_reference: revisionTrajectory,
         maintenance_report: learningReport(['extraction-1']),
       },
@@ -419,7 +421,7 @@ await test('manual edit commits without consuming observations', async () => {
   assert.equal(
     statements.some(
       ({ sql }) =>
-        sql.includes('select extraction_id from observations') ||
+        sql.includes('select observation_id from observations') ||
         sql.includes('update observations set consumed_revision'),
     ),
     false,

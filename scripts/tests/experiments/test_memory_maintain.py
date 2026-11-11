@@ -50,7 +50,7 @@ async def test_build_preserves_inputs_and_excludes_staged_observations(
         (tree / "MEMORY.md").write_text("Maintained\n")
         kwargs["maintainer_trajectory_path"].write_text("trajectory\n")
         decision = ObservationDecision(
-            extraction_id="task-01",
+            observation_id="task-01",
             action="skipped",
             topics=[],
             reason="Already covered.",

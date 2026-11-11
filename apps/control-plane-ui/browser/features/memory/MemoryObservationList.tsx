@@ -21,7 +21,7 @@ export function MemoryObservationList({
   pagination,
   revisionFilter,
   onClearRevisionFilter,
-  highlightedExtraction,
+  highlightedObservation,
   onHighlightEnd,
   onRevealRevision,
   onViewTrajectory
@@ -32,7 +32,7 @@ export function MemoryObservationList({
   pagination: React.ComponentProps<typeof CursorPagination>
   revisionFilter: number | undefined
   onClearRevisionFilter: () => void
-  highlightedExtraction: string | undefined
+  highlightedObservation: string | undefined
   onHighlightEnd: () => void
   onRevealRevision: (revision: number) => void
   onViewTrajectory: (observation: Observation) => void
@@ -44,21 +44,21 @@ export function MemoryObservationList({
 
   // Reveal a requested observation: scroll to, focus, and highlight its row.
   const targetLoaded =
-    highlightedExtraction !== undefined &&
-    observations.some((item) => item.extraction_id === highlightedExtraction)
+    highlightedObservation !== undefined &&
+    observations.some((item) => item.observation_id === highlightedObservation)
   React.useEffect(() => {
-    if (highlightedExtraction === undefined || !targetLoaded) return
+    if (highlightedObservation === undefined || !targetLoaded) return
     const frame = requestAnimationFrame(() => {
       const row = document.querySelector<HTMLElement>(
-        `[data-extraction-row="${CSS.escape(highlightedExtraction)}"]`
+        `[data-observation-row="${CSS.escape(highlightedObservation)}"]`
       )
       row?.scrollIntoView({ block: 'center', behavior: 'smooth' })
       row?.focus({ preventScroll: true })
     })
     return (): void => cancelAnimationFrame(frame)
-  }, [highlightedExtraction, targetLoaded])
+  }, [highlightedObservation, targetLoaded])
   const targetMissing =
-    highlightedExtraction !== undefined && !targetLoaded && !loading && !error
+    highlightedObservation !== undefined && !targetLoaded && !loading && !error
 
   const filterBanner = revisionFilter !== undefined && (
     <Alert color="gray" mb="md">
@@ -117,16 +117,16 @@ export function MemoryObservationList({
           <Table.Tbody>
             {observations.map((item, index) => (
               <Table.Tr
-                key={item.extraction_id}
-                data-extraction-row={item.extraction_id}
+                key={item.observation_id}
+                data-observation-row={item.observation_id}
                 tabIndex={-1}
                 data-highlighted={
-                  item.extraction_id === highlightedExtraction || undefined
+                  item.observation_id === highlightedObservation || undefined
                 }
                 onAnimationEnd={(event) => {
                   if (
                     event.currentTarget === event.target &&
-                    item.extraction_id === highlightedExtraction
+                    item.observation_id === highlightedObservation
                   )
                     onHighlightEnd()
                 }}

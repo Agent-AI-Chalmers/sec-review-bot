@@ -21,7 +21,7 @@ class MemoryTreeRevisionCommitInput:
 
     operation_id: str
     expected_active_revision: int
-    extraction_ids: tuple[str, ...]
+    observation_ids: tuple[str, ...]
     memory_tree_reference: ArtifactReference
     trajectory_reference: ArtifactReference
     maintenance_report: MemoryMaintenanceOutput
@@ -44,28 +44,28 @@ class MemoryTreeRevisionCommitInput:
             raise ValueError(
                 "Memory tree revision commit input source_kind is invalid."
             )
-        if not isinstance(self.extraction_ids, tuple):
+        if not isinstance(self.observation_ids, tuple):
             raise TypeError(
-                "Memory tree revision commit input extraction_ids must be a tuple."
+                "Memory tree revision commit input observation_ids must be a tuple."
             )
-        if self.source_kind == "learning" and not self.extraction_ids:
+        if self.source_kind == "learning" and not self.observation_ids:
             raise ValueError(
-                "Learning tree revision commit input extraction_ids must be non-empty."
+                "Learning tree revision commit input observation_ids must be non-empty."
             )
-        if self.source_kind == "reorganization" and self.extraction_ids:
+        if self.source_kind == "reorganization" and self.observation_ids:
             raise ValueError(
                 "Reorganization tree revision commit input must not consume observations."
             )
         if any(
-            not isinstance(extraction_id, str) or not extraction_id.strip()
-            for extraction_id in self.extraction_ids
+            not isinstance(observation_id, str) or not observation_id.strip()
+            for observation_id in self.observation_ids
         ):
             raise ValueError(
-                "Memory tree revision commit input extraction_ids must be non-empty strings."
+                "Memory tree revision commit input observation_ids must be non-empty strings."
             )
-        if len(set(self.extraction_ids)) != len(self.extraction_ids):
+        if len(set(self.observation_ids)) != len(self.observation_ids):
             raise ValueError(
-                "Memory tree revision commit input extraction_ids must be unique."
+                "Memory tree revision commit input observation_ids must be unique."
             )
         if not isinstance(self.memory_tree_reference, ArtifactReference):
             raise TypeError(
@@ -80,13 +80,13 @@ class MemoryTreeRevisionCommitInput:
                 "Memory tree revision commit input maintenance report is invalid."
             )
         decided = [
-            decision.extraction_id
+            decision.observation_id
             for decision in self.maintenance_report.observation_decisions
         ]
-        if sorted(decided) != sorted(self.extraction_ids):
+        if sorted(decided) != sorted(self.observation_ids):
             raise ValueError(
                 "Memory tree revision commit input maintenance report must decide "
-                "each consumed extraction exactly once."
+                "each consumed observation exactly once."
             )
 
 

@@ -34,10 +34,10 @@ async def run_memory_maintainer_agent(
     backend: BackendProtocol,
     worktree_root: Path,
     user_prompt: str,
-    extraction_ids: Sequence[str],
+    observation_ids: Sequence[str],
     trajectory_paths: tuple[Path, ...] = (),
 ) -> MemoryMaintenanceOutput:
-    response_format = memory_maintenance_output_model(extraction_ids)
+    response_format = memory_maintenance_output_model(observation_ids)
     # Force ToolStrategy: auto-selected ProviderStrategy (e.g. OpenAI models)
     # raises on validator errors instead of returning them to the model for retry.
     agent = await build_agent_runtime_graph(

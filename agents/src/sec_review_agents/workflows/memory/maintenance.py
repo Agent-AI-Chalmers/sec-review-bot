@@ -170,7 +170,7 @@ def commit_memory_tree_revision_activity(
             committed = catalog_client.create_learning_revision(
                 operation_id=commit_input.operation_id,
                 expected_active_revision=commit_input.expected_active_revision,
-                extraction_ids=list(commit_input.extraction_ids),
+                observation_ids=list(commit_input.observation_ids),
                 memory_tree_reference=commit_input.memory_tree_reference,
                 trajectory_reference=commit_input.trajectory_reference,
                 maintenance_report=commit_input.maintenance_report,
@@ -203,7 +203,7 @@ def commit_memory_tree_revision_activity(
     ):
         raise RuntimeError("Catalog returned a different revision operation identity.")
     processed_count = (
-        len(commit_input.extraction_ids)
+        len(commit_input.observation_ids)
         if commit_input.source_kind == "learning"
         else 0
     )

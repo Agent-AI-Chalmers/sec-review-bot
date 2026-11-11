@@ -85,7 +85,7 @@ The output describes calls observed by Langfuse. `complete_for_observed_calls` m
 - `experiments/memory_extract_observations.py` runs the memory extractor against specified trajectory files or review artifact directories, producing observations and an extractor trajectory.
 - `experiments/memory_maintain.py` calls the package memory maintainer directly to build or update a local memory tree from observations.
 
-Both scripts read and write local files without Temporal, Memory Catalog, PostgreSQL, or object storage.
+Both scripts read and write local files without Temporal, Memory Catalog, PostgreSQL, or object storage. Extraction requires a fresh output directory and writes one `<extraction-id>-observation-<ordinal>.md` file per independent lesson. An empty model result is a successful extraction with no Markdown files; missing trajectory inputs and model or execution failures fail the command.
 
 ```bash
 # Build a new Memory tree from observation Markdown files.

@@ -12,10 +12,10 @@ from sec_review_agents.agents.memory_maintainer.model import (
 
 
 def _decision(
-    extraction_id: str, action: str = "skipped", topics: tuple[str, ...] = ()
+    observation_id: str, action: str = "skipped", topics: tuple[str, ...] = ()
 ) -> dict[str, object]:
     return {
-        "extraction_id": extraction_id,
+        "observation_id": observation_id,
         "action": action,
         "topics": list(topics),
         "reason": "Already covered by existing guidance.",
@@ -35,7 +35,7 @@ def test_accepts_one_decision_per_selected_observation() -> None:
         }
     )
 
-    assert [d.extraction_id for d in output.observation_decisions] == ["b", "a"]
+    assert [d.observation_id for d in output.observation_decisions] == ["b", "a"]
 
 
 @pytest.mark.parametrize(
@@ -107,7 +107,7 @@ async def test_maintainer_uses_retryable_tool_strategy(tmp_path: Path) -> None:
             backend=Mock(),
             worktree_root=tmp_path,
             user_prompt="task",
-            extraction_ids=["a"],
+            observation_ids=["a"],
         )
 
     assert build.await_args is not None

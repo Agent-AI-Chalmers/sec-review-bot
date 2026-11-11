@@ -88,7 +88,7 @@ async def main() -> int:
     bootstrap_agents_env()
     args = _parse_args()
     output_dir = args.output_dir.expanduser().resolve()
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=False)
     run_label = slug_filename_component(
         args.extraction_id or args.job_id or args.source_workflow,
         fallback="preview",
@@ -107,14 +107,17 @@ async def main() -> int:
         run_id=args.run_id,
         extractor_trajectory_path=trajectory_output,
     )
-    if result.skipped or result.observation_markdown is None:
+    if result.extractor_trajectory_path is None:
+        raise ValueError("No review trajectories found; extraction did not run.")
+    if result.skipped or not result.observations:
         print(f"No observation written: {result.summary}")
         print(f"Extractor trajectory: {trajectory_output}")
-        return 1
+        return 0
 
-    target = output_dir / f"{result.extraction_id}.md"
-    _write_observation(target, result.observation_markdown)
-    print(f"Observation: {target}")
+    for index, observation in enumerate(result.observations, start=1):
+        target = output_dir / f"{result.extraction_id}-observation-{index:04d}.md"
+        _write_observation(target, observation)
+        print(f"Observation: {target}")
     print(f"Extractor trajectory: {trajectory_output}")
     print(WARNING)
     return 0

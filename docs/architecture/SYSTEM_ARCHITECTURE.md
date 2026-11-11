@@ -94,7 +94,7 @@ sequenceDiagram
     Temporal->>MaintenanceWorker: Dispatch maintenance work
     Note over Temporal,MaintenanceWorker: One fixed workflow ID permits only one maintainer
     MaintenanceWorker->>Catalog: Select a batch of pending observations
-    Catalog-->>MaintenanceWorker: Observations, extraction IDs, expected active revision, and current memory tree reference
+    Catalog-->>MaintenanceWorker: Observations, observation IDs, expected active revision, and current memory tree reference
     opt Current memory tree exists
       MaintenanceWorker->>Storage: Download current memory tree artifact
       Storage-->>MaintenanceWorker: Memory tree artifact
@@ -103,7 +103,7 @@ sequenceDiagram
     Note over MaintenanceWorker: Run maintainer
     MaintenanceWorker->>Storage: Store maintainer trajectory
     MaintenanceWorker->>Storage: Store new memory tree artifact
-    MaintenanceWorker-->>Temporal: Artifact references, extraction IDs, and expected active revision
+    MaintenanceWorker-->>Temporal: Artifact references, observation IDs, and expected active revision
     Note over Temporal: Later commit retries reuse this activity result
     Temporal->>MaintenanceWorker: Dispatch revision commit
     MaintenanceWorker->>Catalog: Create memory tree revision with maintenance ID and expected-active-revision CAS
@@ -159,7 +159,7 @@ After an interruption, retries check the recorded publication intent and object 
 | Artifact                            | Durable recovery basis                                                                                                                    | Recovery boundary                                                                                                                                                                                            |
 | ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Review input bundle                 | Review Runs publication intent: reference, prepared input, and publish context                                                            | A replacement preparation claim can reuse the original publication intent when the object is present. Only definite absence permits abandoning an unused candidate and rebuilding.                           |
-| Extraction trajectory               | Memory Catalog publication intent containing the trajectory reference, observation, and summary                                           | Retries check recorded candidates before rerunning the model; selection and extraction registration commit together.                                                                                         |
+| Extraction trajectory               | Memory Catalog publication intent containing the trajectory reference, observations, and summary                                          | Retries check recorded candidates before rerunning the model; selection and extraction registration commit together.                                                                                         |
 | Learning or reorganization revision | Memory Catalog publication intent grouping the tree, trajectory, operation ID, expected active revision, and observation IDs for learning | Different model outputs can be separate candidates; selection, revision creation, observation consumption for learning, and active pointer update commit together.                                           |
 | Manual revision                     | Memory Catalog publication intent containing the tree reference, operation ID, and expected active revision; the UI BFF uploads the tree  | Retries of unchanged content within the open editor retain the operation ID and original expected revision. The BFF repeats reservation, conditional upload, confirmation, and idempotent revision creation. |
 | Execution archive in S3             | Temporal publication request and the fixed run key                                                                                        | Recovery verifies the existing archive against the request before using local files. If neither a complete uploaded archive nor local artifacts remain, the request cannot reconstruct the archive bytes.    |

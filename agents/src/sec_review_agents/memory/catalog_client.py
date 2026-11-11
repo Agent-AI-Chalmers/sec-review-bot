@@ -175,7 +175,7 @@ class MemoryCatalogClient:
         source_unit_id: str,
         execution_archive_digest: str,
         trajectory_reference: ArtifactReference,
-        observation_markdown: str | None,
+        observations: list[dict[str, str]],
     ) -> bool:
         value = self._request(
             "POST",
@@ -187,11 +187,7 @@ class MemoryCatalogClient:
                 "source_unit_id": source_unit_id,
                 "execution_archive_digest": execution_archive_digest,
                 "trajectory_reference": trajectory_reference.as_dict(),
-                "observation": (
-                    {"body_markdown": observation_markdown}
-                    if observation_markdown is not None
-                    else None
-                ),
+                "observations": observations,
             },
         )
         if value.get("ok") is not True:
@@ -282,7 +278,7 @@ class MemoryCatalogClient:
         *,
         operation_id: str,
         expected_active_revision: int,
-        extraction_ids: list[str],
+        observation_ids: list[str],
         memory_tree_reference: ArtifactReference,
         trajectory_reference: ArtifactReference,
         maintenance_report: MemoryMaintenanceOutput,
@@ -296,7 +292,7 @@ class MemoryCatalogClient:
                 "source": {
                     "kind": "learning",
                     "operation_id": operation_id,
-                    "extraction_ids": extraction_ids,
+                    "observation_ids": observation_ids,
                     "trajectory_reference": trajectory_reference.as_dict(),
                     "maintenance_report": maintenance_report.model_dump(mode="json"),
                 },

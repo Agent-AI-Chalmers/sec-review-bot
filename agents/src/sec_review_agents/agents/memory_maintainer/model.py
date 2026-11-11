@@ -14,8 +14,8 @@ class ObservationDecision(BaseModel):
     The reason should justify the decision, such as why the lesson is durable, which existing guidance already covers it, or why it is too specific to one run; it should not restate the lesson itself.
     """
 
-    extraction_id: NonEmptyText = Field(
-        description="Extraction id of one selected observation, exactly as listed in the task."
+    observation_id: NonEmptyText = Field(
+        description="Observation id of one selected observation, exactly as listed in the task."
     )
     action: Literal["added", "merged", "skipped", "conflict"] = Field(
         description=(
@@ -59,12 +59,12 @@ class MemoryMaintenanceOutput(BaseModel):
 
 
 # Build the completion schema per run so its validator can close over the
-# selected extraction ids. Under LangChain ToolStrategy a failure is returned to
+# selected observation ids. Under LangChain ToolStrategy a failure is returned to
 # the model for retry; under ProviderStrategy it fails the run.
 def memory_maintenance_output_model(
-    extraction_ids: Sequence[str],
+    observation_ids: Sequence[str],
 ) -> type[MemoryMaintenanceOutput]:
-    expected = list(extraction_ids)
+    expected = list(observation_ids)
 
     class MemoryMaintenanceRunOutput(MemoryMaintenanceOutput):
         __doc__ = MemoryMaintenanceOutput.__doc__
@@ -72,7 +72,7 @@ def memory_maintenance_output_model(
         @model_validator(mode="after")
         def require_one_decision_per_observation(self) -> Self:
             reported = [
-                decision.extraction_id for decision in self.observation_decisions
+                decision.observation_id for decision in self.observation_decisions
             ]
             duplicates = sorted({item for item in reported if reported.count(item) > 1})
             missing = [item for item in expected if item not in reported]
@@ -88,7 +88,7 @@ def memory_maintenance_output_model(
             ]
             if problems:
                 raise ValueError(
-                    "observation_decisions must cover each selected extraction id "
+                    "observation_decisions must cover each selected observation id "
                     "exactly once; " + "; ".join(problems)
                 )
             return self

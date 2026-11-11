@@ -101,7 +101,7 @@ export function createMemoryHandler(
       source: {
         kind: 'learning',
         operation_id: 'fixture-maintenance-2',
-        extraction_ids: [
+        observation_ids: [
           'fixture-extraction-2',
           'fixture-extraction-3',
           'fixture-extraction-4'
@@ -155,7 +155,7 @@ export function createMemoryHandler(
       source_unit_id: 'case-reachability',
       execution_archive_digest: `sha256:${'2'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: null,
+      observations: [],
       created_at: new Date(BASE_TIME - 300_000).toISOString()
     },
     {
@@ -165,10 +165,13 @@ export function createMemoryHandler(
       source_unit_id: 'case-authentication',
       execution_archive_digest: `sha256:${'3'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: {
-        body_markdown:
-          '**Reject unequal input lengths before calling `timingSafeEqual`.** Comparing buffers of different lengths throws instead of returning false, so validate the length first and fail authentication without exposing a distinct error path.'
-      },
+      observations: [
+        {
+          observation_id: 'extraction-1',
+          body_markdown:
+            '**Reject unequal input lengths before calling `timingSafeEqual`.** Comparing buffers of different lengths throws instead of returning false, so validate the length first and fail authentication without exposing a distinct error path.'
+        }
+      ],
       created_at: new Date(BASE_TIME).toISOString()
     },
     {
@@ -178,10 +181,13 @@ export function createMemoryHandler(
       source_unit_id: 'case-proxy-boundary',
       execution_archive_digest: `sha256:${'4'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: {
-        body_markdown:
-          '**Strip internal debugging headers when proxying upstream responses.** Forward only an explicit response-header allowlist so private identifiers and credentials cannot cross the service boundary.'
-      },
+      observations: [
+        {
+          observation_id: 'extraction-1',
+          body_markdown:
+            '**Strip internal debugging headers when proxying upstream responses.** Forward only an explicit response-header allowlist so private identifiers and credentials cannot cross the service boundary.'
+        }
+      ],
       created_at: new Date(BASE_TIME + 120_000).toISOString()
     },
     {
@@ -191,10 +197,13 @@ export function createMemoryHandler(
       source_unit_id: 'pull-request',
       execution_archive_digest: `sha256:${'5'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: {
-        body_markdown:
-          '**Perform tenant authorization before any lookup whose result reveals resource existence.** A post-lookup guard still permits status, timing, or error differences to disclose whether another tenant owns the requested object.'
-      },
+      observations: [
+        {
+          observation_id: 'extraction-1',
+          body_markdown:
+            '**Perform tenant authorization before any lookup whose result reveals resource existence.** A post-lookup guard still permits status, timing, or error differences to disclose whether another tenant owns the requested object.'
+        }
+      ],
       created_at: new Date(BASE_TIME + 180_000).toISOString()
     },
     {
@@ -204,7 +213,7 @@ export function createMemoryHandler(
       source_unit_id: 'issue',
       execution_archive_digest: `sha256:${'6'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: null,
+      observations: [],
       created_at: new Date(BASE_TIME + 240_000).toISOString()
     },
     {
@@ -214,7 +223,7 @@ export function createMemoryHandler(
       source_unit_id: 'case-reachability',
       execution_archive_digest: `sha256:${'7'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: null,
+      observations: [],
       created_at: new Date(BASE_TIME + 300_000).toISOString()
     }
   ]
@@ -277,7 +286,9 @@ export function createMemoryHandler(
         source_unit_id: `case-${sampleIndex}`,
         execution_archive_digest: `sha256:${'5'.repeat(64)}`,
         trajectory_reference: trajectoryReference,
-        observation: { body_markdown: sample.body },
+        observations: [
+          { observation_id: 'extraction-1', body_markdown: sample.body }
+        ],
         created_at: new Date(Date.parse(createdAt) - 900_000).toISOString()
       })
       if (sample.action !== 'skipped')
@@ -289,7 +300,7 @@ export function createMemoryHandler(
       source = {
         kind: 'learning',
         operation_id: `fixture-learning-${revision}`,
-        extraction_ids: [extractionId],
+        observation_ids: [extractionId],
         trajectory_reference: trajectoryReference,
         maintenance_report: {
           summary: sample.reason,
@@ -321,7 +332,9 @@ export function createMemoryHandler(
       source_unit_id: `case-${sampleIndex + 1}`,
       execution_archive_digest: `sha256:${'5'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: { body_markdown: sample.body },
+      observations: [
+        { observation_id: 'extraction-1', body_markdown: sample.body }
+      ],
       created_at: new Date(
         BASE_TIME - (historySamples.length - sampleIndex) * 60_000
       ).toISOString()
@@ -330,21 +343,21 @@ export function createMemoryHandler(
   // The operator restored the predecessor after inspecting the latest reorganization.
   activeMemoryRevision = 59
   extractionRecords.sort((a, b) => a.created_at.localeCompare(b.created_at))
+  for (const record of extractionRecords)
+    for (const observation of record.observations)
+      observation.observation_id = record.extraction_id
   const observations: ObservationRecord[] = extractionRecords.flatMap(
     (record) =>
-      record.observation === null
-        ? []
-        : [
-            {
-              extraction_id: record.extraction_id,
-              source_run_id: record.source_run_id,
-              source_unit_id: record.source_unit_id,
-              body_markdown: record.observation.body_markdown,
-              consumed_revision:
-                consumedRevisionByExtraction.get(record.extraction_id) ?? null,
-              created_at: record.created_at
-            }
-          ]
+      record.observations.map((observation) => ({
+        observation_id: observation.observation_id,
+        extraction_id: record.extraction_id,
+        source_run_id: record.source_run_id,
+        source_unit_id: record.source_unit_id,
+        body_markdown: observation.body_markdown,
+        consumed_revision:
+          consumedRevisionByExtraction.get(record.extraction_id) ?? null,
+        created_at: record.created_at
+      }))
   )
   const unitOutcomes = new Map<
     string,
@@ -356,7 +369,7 @@ export function createMemoryHandler(
     unitOutcomes.set(key, {
       source_workflow: record.source_workflow,
       hasObservation:
-        (current?.hasObservation ?? false) || record.observation !== null
+        (current?.hasObservation ?? false) || record.observations.length > 0
     })
   }
   const workflowOutcomes = new Map<string, CatalogOverviewWorkflow>()
@@ -430,7 +443,7 @@ export function createMemoryHandler(
               const key = `${record.source_run_id}:${record.source_unit_id}`
               units.set(
                 key,
-                (units.get(key) ?? false) || record.observation !== null
+                (units.get(key) ?? false) || record.observations.length > 0
               )
             }
             return {

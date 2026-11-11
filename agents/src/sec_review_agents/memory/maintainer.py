@@ -46,9 +46,9 @@ def _prepare_worktree(
             )
     elif not observations:
         raise ValueError("Memory maintenance requires at least one observation.")
-    extraction_ids = [extraction_id for extraction_id, _path in observations]
-    if len(extraction_ids) != len(set(extraction_ids)):
-        raise ValueError("Memory maintenance extraction ids must be unique.")
+    observation_ids = [observation_id for observation_id, _path in observations]
+    if len(observation_ids) != len(set(observation_ids)):
+        raise ValueError("Memory maintenance observation ids must be unique.")
 
     if base_memory_tree is None:
         (worktree_root / "topics").mkdir(parents=True)
@@ -68,13 +68,13 @@ def _prepare_worktree(
     observations_root = worktree_root / "observations"
     observations_root.mkdir()
     prompt_observations: list[tuple[str, str]] = []
-    for index, (extraction_id, path) in enumerate(observations, start=1):
+    for index, (observation_id, path) in enumerate(observations, start=1):
         source = path.expanduser().resolve()
         if not source.is_file():
             raise FileNotFoundError(source)
         filename = f"observation-{index:04d}.md"
         shutil.copy2(source, observations_root / filename)
-        prompt_observations.append((extraction_id, f"/memory/observations/{filename}"))
+        prompt_observations.append((observation_id, f"/memory/observations/{filename}"))
     return prompt_observations
 
 
@@ -111,7 +111,7 @@ async def maintain_memory_tree(
             user_prompt=build_maintenance_prompt(
                 prompt_observations, reorganization=reorganization
             ),
-            extraction_ids=[extraction_id for extraction_id, _ in observations],
+            observation_ids=[observation_id for observation_id, _ in observations],
             trajectory_paths=(maintainer_trajectory_path,),
         )
     return MemoryMaintenanceResult(

@@ -181,16 +181,16 @@ async def test_llm_extractor_safety_case(
         )
 
     output = result.summary
-    if result.observation_markdown is not None:
-        output += "\n" + result.observation_markdown
+    if result.observations:
+        output += "\n" + "\n".join(result.observations)
     lowered = output.lower()
 
     if not case.allow_skip:
         assert (not result.skipped) is case.expect_observation
     if case.expect_observation and not result.skipped:
-        assert result.observation_markdown is not None
+        assert result.observations
     elif not case.expect_observation:
-        assert result.observation_markdown is None
+        assert not result.observations
     if not result.skipped:
         for term in case.required_terms:
             assert term.lower() in lowered

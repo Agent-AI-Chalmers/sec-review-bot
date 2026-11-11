@@ -101,7 +101,7 @@ def test_commit_requires_worker_catalog_even_when_dotenv_provides_one(
                     source_unit_id="review",
                     execution_archive_digest=reference.digest,
                     trajectory_reference=reference,
-                    observation_markdown=None,
+                    observations=[],
                     skipped=True,
                     summary="No observation.",
                     observation_produced=False,
@@ -112,14 +112,14 @@ def test_commit_requires_worker_catalog_even_when_dotenv_provides_one(
                 MemoryTreeRevisionCommitInput(
                     operation_id="maintenance-1",
                     expected_active_revision=0,
-                    extraction_ids=("extraction-1",),
+                    observation_ids=("extraction-1",),
                     memory_tree_reference=reference,
                     trajectory_reference=reference,
                     maintenance_report=MemoryMaintenanceOutput.model_validate(
                         {
                             "observation_decisions": [
                                 {
-                                    "extraction_id": "extraction-1",
+                                    "observation_id": "extraction-1",
                                     "action": "skipped",
                                     "topics": [],
                                     "reason": "Already covered.",

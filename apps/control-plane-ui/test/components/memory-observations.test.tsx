@@ -14,6 +14,7 @@ beforeAll(() => {
 function observation(index: number): ObservationRecord {
   return {
     extraction_id: `extraction-${index}`,
+    observation_id: `observation-${index}`,
     source_run_id: `run-${index}`,
     source_unit_id: 'unit',
     body_markdown: `Observation ${index}`,
@@ -41,7 +42,7 @@ function renderList(
         }}
         revisionFilter={undefined}
         onClearRevisionFilter={vi.fn()}
-        highlightedExtraction={undefined}
+        highlightedObservation={undefined}
         onHighlightEnd={vi.fn()}
         onRevealRevision={vi.fn()}
         onViewTrajectory={vi.fn()}
@@ -59,13 +60,13 @@ test('the revision filter banner names the filtered revision', () => {
 })
 
 test('a revealed observation is highlighted once it is in the list', () => {
-  renderList({ highlightedExtraction: 'extraction-1' })
-  const row = document.querySelector('[data-extraction-row="extraction-1"]')
+  renderList({ highlightedObservation: 'observation-1' })
+  const row = document.querySelector('[data-observation-row="observation-1"]')
   expect(row).toHaveAttribute('data-highlighted')
 })
 
 test('a revealed observation missing from the page is reported without its id', () => {
-  renderList({ highlightedExtraction: 'extraction-9' })
+  renderList({ highlightedObservation: 'observation-9' })
   expect(
     screen.getByText('This observation is not on this page.')
   ).toBeInTheDocument()

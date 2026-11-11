@@ -43,7 +43,9 @@ await test('publication recovery preserves intents and attachment transactions s
       source_unit_id: 'review',
       execution_archive_digest: `sha256:${'d'.repeat(64)}`,
       trajectory_reference: artifact('a'),
-      observation: { body_markdown: 'Remember this.' },
+      observations: [
+        { observation_id: 'extract-1', body_markdown: 'Remember this.' },
+      ],
     },
     summary: 'Produced observation.',
   }
@@ -99,7 +101,7 @@ await test('publication recovery preserves intents and attachment transactions s
       source: {
         kind: 'learning' as const,
         operation_id: 'maintain-1',
-        extraction_ids: ['extract-1'],
+        observation_ids: ['extract-1'],
         trajectory_reference: artifact('e'),
         maintenance_report: learningReport(['extract-1']),
       },

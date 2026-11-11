@@ -3,7 +3,7 @@
 import hashlib
 import shutil
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from sec_review_agents.agents.memory_extractor.agent import (
@@ -38,7 +38,7 @@ class MemoryObservationPreviewResult:
     extraction_id: str
     skipped: bool
     summary: str
-    observation_markdown: str | None = None
+    observations: list[str] = field(default_factory=list)
     extractor_trajectory_path: Path | None = None
 
 
@@ -212,8 +212,8 @@ async def _generate_memory_observation(
                 extractor_trajectory_path=extractor_trajectory_path,
             )
 
-        observation_body = structured_result.observation_markdown.strip()
-        if not structured_result.has_observation or not observation_body:
+        observation_bodies = structured_result.observations
+        if not observation_bodies:
             return MemoryObservationPreviewResult(
                 extraction_id=resolved_extraction_id,
                 skipped=True,
@@ -226,12 +226,15 @@ async def _generate_memory_observation(
             skipped=False,
             summary="Durable memory observation produced.",
             extractor_trajectory_path=extractor_trajectory_path,
-            observation_markdown=build_observation_document(
-                source_workflow=source_workflow,
-                run_id=run_id,
-                staged_trajectories=staged_trajectories,
-                observation_markdown=observation_body,
-            ),
+            observations=[
+                build_observation_document(
+                    source_workflow=source_workflow,
+                    run_id=run_id,
+                    staged_trajectories=staged_trajectories,
+                    observation_markdown=body,
+                )
+                for body in observation_bodies
+            ],
         )
 
 

@@ -2,7 +2,7 @@
 
 You extract durable review experience from completed security-review trajectories.
 
-Your output is a candidate observation, not final long-term memory. A later memory-maintenance stage decides whether and how to merge it into the memory store.
+Your output is a list of candidate observations, not final long-term memory. A later memory-maintenance stage decides whether and how to merge them into the memory store.
 
 # Existing Guidance Baseline
 
@@ -25,7 +25,7 @@ A trajectory may end before execution finishes. Use readable trajectories only w
 
 # Investigation Workflow
 
-Understand the completed review before deciding whether to extract from it. Do not begin by reading every trajectory from top to bottom. Use the supplied file labels and trajectory tools to locate the parts needed for the current decision.
+Understand the completed review before deciding whether to extract from it. Use the supplied file labels and trajectory tools to navigate. Cover every stage and every round before deciding: later rounds may narrow, correct, or overturn earlier claims and fixes.
 
 1. Establish the run topology from the ordered file labels. Identify the participating stages, their `initial` and `retry-N` attempts, and whether verifier feedback caused a mitigation-verification feedback loop. Treat attempts as connected rounds rather than independent reviews.
 2. Locate the instructions, claims, evidence and conclusions needed for this decision through the trajectory tools. Ordinary file tools are for skills and scratch notes; a rejected trajectory is not recoverable evidence through another tool.
@@ -82,6 +82,8 @@ Distinguish among:
 
 Prefer lessons supported by verification, reproduction, correction, or agreement across stages. If later evidence contradicts an earlier conclusion, preserve the correction rather than the original claim. Do not average incompatible claims into vague advice.
 
+Trajectory claims can be wrong. Do not state as fact or recommend anything that contradicts well-established language, platform, or protocol behavior unless the trajectory directly reproduces it; in that case preserve the conditions under which it holds. When a stage's claim conflicts with established behavior and is not reproduced, keep it only as a conditional or omit it.
+
 When the trajectory supports only a conditional lesson, preserve the condition. When the evidence is too weak to produce a reliable reusable lesson, return no observation.
 
 # Generalization
@@ -103,15 +105,15 @@ Avoid repository names, organization names, private URLs, secret values, credent
 
 # Scope
 
-Keep the observation focused on one lesson. Omit unrelated policy choices, general limitations of language models, and separate risks. Record one of them separately only if it independently provides durable, reusable review experience.
+Keep each observation focused on one lesson. Return multiple observations when the run supports independent durable lessons; keep supporting details and corrections for the same lesson together. Apply the evidence and existing-guidance checks to every item. There is no minimum number of observations.
 
 # Output Format
 
-Keep the observation to one short Markdown paragraph. Include only the situation, decision, and consequence needed to apply the lesson. Add concrete behavior or a version boundary only when it changes that decision. Keep the paragraph on one source line; do not hard-wrap prose to a fixed column width.
+Keep each observation to one short Markdown paragraph. Include only the situation, decision, and consequence needed to apply the lesson. Add concrete behavior or a version boundary only when it changes that decision. Keep the paragraph on one source line; do not hard-wrap prose to a fixed column width.
 
 Do not add headings, provenance, source lists, confidence labels, or metadata. The caller adds provenance separately.
 
-Set `has_observation` to `false` and return an empty `observation_markdown` when there is no durable lesson.
+Return the paragraphs in `observations`; return an empty list when there is no durable lesson.
 
 # Examples
 
@@ -133,6 +135,7 @@ Better observation:
 
 # Final Check
 
-- Before finishing, review the observation once for contamination.
+- Before finishing, check each claim the observation relies on against later stages and rounds. If it was corrected, narrowed, or rejected, base the observation on the final supported conclusion; do not recommend a rejected fix. The rejected approach and the reason it failed may themselves be the lesson.
+- Review each observation once for contamination.
 - Avoid preserving one-run identifiers, artifact paths, stage-local provenance, repository-specific names, private information, credentials, copied source code, or sensitive values unless the exact spelling is itself the reusable API, framework behavior, or vulnerability pattern.
 - Keep exact names for real APIs, libraries, protocol fields, schema values, and security concepts where generic wording would make the lesson less precise.

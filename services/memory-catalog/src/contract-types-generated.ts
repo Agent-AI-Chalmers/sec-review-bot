@@ -55,6 +55,11 @@ export type ExtractionObservation = {
    * @minLength 1
    * @type string
    */
+  observation_id: string
+  /**
+   * @minLength 1
+   * @type string
+   */
   body_markdown: string
 }
 
@@ -86,7 +91,7 @@ export type ExtractionRegistration = {
    */
   execution_archive_digest: string
   trajectory_reference: ArtifactReference
-  observation: ExtractionObservation | null
+  observations: ExtractionObservation[]
 }
 
 export type ExtractionPublicationIntent = {
@@ -120,10 +125,9 @@ export type AutomaticRevisionPublicationOwner = {
 export type ObservationDecision = {
   /**
    * @minLength 1
-   * @pattern ^[A-Za-z0-9._:-]+$
    * @type string
    */
-  extraction_id: ExtractionId
+  observation_id: string
   action: 'added' | 'merged' | 'skipped' | 'conflict'
   /**
    * @description Memory topic paths edited for this decision; empty only for skipped.
@@ -139,7 +143,7 @@ export type ObservationDecision = {
 }
 
 /**
- * @description Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed extraction; reorganization reports carry none.
+ * @description Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed observation; reorganization reports carry none.
  * @type object
  */
 export type MaintenanceReport = {
@@ -160,10 +164,10 @@ export type LearningRevisionSource = {
    * @type string
    */
   operation_id: OperationId
-  extraction_ids: ExtractionId[]
+  observation_ids: ExtractionId[]
   trajectory_reference: ArtifactReference
   /**
-   * @description Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed extraction; reorganization reports carry none.
+   * @description Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed observation; reorganization reports carry none.
    * @type object
    */
   maintenance_report: MaintenanceReport
@@ -183,7 +187,7 @@ export type ReorganizationRevisionSource = {
   operation_id: OperationId
   trajectory_reference: ArtifactReference
   /**
-   * @description Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed extraction; reorganization reports carry none.
+   * @description Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed observation; reorganization reports carry none.
    * @type object
    */
   maintenance_report: MaintenanceReport
@@ -255,7 +259,7 @@ export type ExtractionRecord = {
    */
   execution_archive_digest: string
   trajectory_reference: ArtifactReference
-  observation: ExtractionObservation | null
+  observations: ExtractionObservation[]
   /**
    * @description
    * Format: `date-time`
@@ -270,6 +274,11 @@ export type ExtractionList = {
 }
 
 export type ObservationRecord = {
+  /**
+   * @minLength 1
+   * @type string
+   */
+  observation_id: string
   /**
    * @minLength 1
    * @pattern ^[A-Za-z0-9._:-]+$
@@ -415,10 +424,9 @@ export type CatalogOverview = {
 export type LearningObservation = {
   /**
    * @minLength 1
-   * @pattern ^[A-Za-z0-9._:-]+$
    * @type string
    */
-  extraction_id: ExtractionId
+  observation_id: string
   /**
    * @minLength 1
    * @type string

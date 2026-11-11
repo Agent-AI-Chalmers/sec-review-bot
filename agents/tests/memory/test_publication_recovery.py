@@ -14,16 +14,16 @@ from sec_review_agents.workflows.memory.extraction import (
 )
 
 
-def _report(extraction_ids: list[str]) -> dict[str, object]:
+def _report(observation_ids: list[str]) -> dict[str, object]:
     return {
         "observation_decisions": [
             {
-                "extraction_id": extraction_id,
+                "observation_id": extraction_id,
                 "action": "skipped",
                 "topics": [],
                 "reason": "Already covered.",
             }
-            for extraction_id in extraction_ids
+            for extraction_id in observation_ids
         ],
         "summary": "Maintained memory.",
     }
@@ -55,7 +55,16 @@ async def test_extraction_recovers_full_intent_without_rerunning_model(
             "source_unit_id": "review",
             "execution_archive_digest": diagnostic["digest"],
             "trajectory_reference": reference("b"),
-            "observation": {"body_markdown": "Original observation."},
+            "observations": [
+                {
+                    "observation_id": "observation-1",
+                    "body_markdown": "Original observation.",
+                },
+                {
+                    "observation_id": "observation-2",
+                    "body_markdown": "Independent lesson.",
+                },
+            ],
         },
         "summary": "Original summary.",
     }
@@ -73,7 +82,10 @@ async def test_extraction_recovers_full_intent_without_rerunning_model(
     result = await prepare_memory_extraction(
         MemoryExtractionRequest("issue-review", "run-1", "review", diagnostic, 30)
     )
-    assert result.observation_markdown == "Original observation."
+    assert result.observations == [
+        {"observation_id": "observation-1", "body_markdown": "Original observation."},
+        {"observation_id": "observation-2", "body_markdown": "Independent lesson."},
+    ]
     assert result.summary == "Original summary."
     assert (
         result.trajectory_reference.as_dict()
@@ -93,7 +105,7 @@ async def test_selected_maintenance_never_rebuilds_a_missing_or_uncertain_artifa
         "source": {
             "kind": "learning",
             "operation_id": "maintain-1",
-            "extraction_ids": ["extract-1"],
+            "observation_ids": ["extract-1"],
             "trajectory_reference": reference("b"),
             "maintenance_report": _report(["extract-1"]),
         },
@@ -128,7 +140,7 @@ async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
         "source": {
             "kind": "learning",
             "operation_id": "maintain-1",
-            "extraction_ids": ["extract-1", "extract-2"],
+            "observation_ids": ["extract-1", "extract-2"],
             "trajectory_reference": reference("b"),
             "maintenance_report": _report(["extract-1", "extract-2"]),
         },
@@ -146,7 +158,7 @@ async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
     )
     assert result is not None
     assert result.expected_active_revision == 2
-    assert result.extraction_ids == ("extract-1", "extract-2")
+    assert result.observation_ids == ("extract-1", "extract-2")
     assert result.memory_tree_reference.as_dict() == intent["memory_tree_reference"]
     assert (
         result.trajectory_reference.as_dict()
@@ -173,7 +185,7 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
         "source": {
             "kind": "learning",
             "operation_id": "maintain-1",
-            "extraction_ids": ["extract-1"],
+            "observation_ids": ["extract-1"],
             "trajectory_reference": reference("b"),
             "maintenance_report": _report(["extract-1"]),
         },
@@ -184,7 +196,7 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
         "source": {
             "kind": "learning",
             "operation_id": "maintain-1",
-            "extraction_ids": ["extract-2"],
+            "observation_ids": ["extract-2"],
             "trajectory_reference": reference("d"),
             "maintenance_report": _report(["extract-2"]),
         },
@@ -203,7 +215,7 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
     )
     assert result is not None
     assert result.expected_active_revision == 3
-    assert result.extraction_ids == ("extract-2",)
+    assert result.observation_ids == ("extract-2",)
     assert result.memory_tree_reference.as_dict() == complete["memory_tree_reference"]
     assert (
         result.trajectory_reference.as_dict()

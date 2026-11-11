@@ -61,8 +61,11 @@ components:
     ExtractionObservation:
       type: object
       additionalProperties: false
-      required: [body_markdown]
+      required: [observation_id, body_markdown]
       properties:
+        observation_id:
+          type: string
+          minLength: 1
         body_markdown: { type: string, minLength: 1 }
     ExtractionRegistration:
       type: object
@@ -74,7 +77,7 @@ components:
         - source_unit_id
         - execution_archive_digest
         - trajectory_reference
-        - observation
+        - observations
       properties:
         extraction_id:
           $ref: "#/components/schemas/ExtractionId"
@@ -86,10 +89,10 @@ components:
           pattern: ^sha256:[0-9a-f]{64}$
         trajectory_reference:
           $ref: "#/components/schemas/ArtifactReference"
-        observation:
-          oneOf:
-            - $ref: "#/components/schemas/ExtractionObservation"
-            - type: "null"
+        observations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtractionObservation"
     ExtractionPublicationIntent:
       type: object
       additionalProperties: false
@@ -156,7 +159,7 @@ components:
         - source_unit_id
         - execution_archive_digest
         - trajectory_reference
-        - observation
+        - observations
         - created_at
       properties:
         extraction_id:
@@ -169,10 +172,10 @@ components:
           pattern: ^sha256:[0-9a-f]{64}$
         trajectory_reference:
           $ref: "#/components/schemas/ArtifactReference"
-        observation:
-          oneOf:
-            - $ref: "#/components/schemas/ExtractionObservation"
-            - type: "null"
+        observations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtractionObservation"
         created_at:
           type: string
           format: date-time
@@ -191,6 +194,7 @@ components:
       type: object
       additionalProperties: false
       required:
+        - observation_id
         - extraction_id
         - source_run_id
         - source_unit_id
@@ -198,6 +202,9 @@ components:
         - consumed_revision
         - created_at
       properties:
+        observation_id:
+          type: string
+          minLength: 1
         extraction_id:
           $ref: "#/components/schemas/ExtractionId"
         source_run_id: { type: string, minLength: 1 }
@@ -299,10 +306,11 @@ components:
     LearningObservation:
       type: object
       additionalProperties: false
-      required: [extraction_id, body_markdown]
+      required: [observation_id, body_markdown]
       properties:
-        extraction_id:
-          $ref: "#/components/schemas/ExtractionId"
+        observation_id:
+          type: string
+          minLength: 1
         body_markdown: { type: string, minLength: 1 }
     LearningInput:
       type: object
@@ -336,10 +344,11 @@ components:
       type: object
       additionalProperties: false
       description: What the maintainer did with one consumed observation and why.
-      required: [extraction_id, action, topics, reason]
+      required: [observation_id, action, topics, reason]
       properties:
-        extraction_id:
-          $ref: "#/components/schemas/ExtractionId"
+        observation_id:
+          type: string
+          minLength: 1
         action:
           type: string
           enum: [added, merged, skipped, conflict]
@@ -352,7 +361,7 @@ components:
     MaintenanceReport:
       type: object
       additionalProperties: false
-      description: Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed extraction; reorganization reports carry none.
+      description: Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed observation; reorganization reports carry none.
       required: [summary, observation_decisions]
       properties:
         summary: { type: string, minLength: 1, maxLength: 4000 }
@@ -367,14 +376,14 @@ components:
       required:
         - kind
         - operation_id
-        - extraction_ids
+        - observation_ids
         - trajectory_reference
         - maintenance_report
       properties:
         kind: { type: string, const: learning }
         operation_id:
           $ref: "#/components/schemas/OperationId"
-        extraction_ids:
+        observation_ids:
           type: array
           minItems: 1
           uniqueItems: true

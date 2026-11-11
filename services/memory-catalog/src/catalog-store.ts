@@ -190,7 +190,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       const identity = revisionPublicationIdentity(intent)
       await client.query(
         `insert into memory_revision_publications
-        (source_kind, owner_id, tree_digest, trajectory_digest, intent)
+        (source_kind, operation_id, tree_digest, trajectory_digest, intent)
         values ($1,$2,$3,$4,$5) on conflict do nothing`,
         [...identity, intent],
       )
@@ -200,7 +200,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         identical: boolean
       }>(
         `select intent, status, intent=$5::jsonb as identical from memory_revision_publications
-         where source_kind=$1 and owner_id=$2 and tree_digest=$3 and trajectory_digest=$4 for update`,
+         where source_kind=$1 and operation_id=$2 and tree_digest=$3 and trajectory_digest=$4 for update`,
         [...identity, intent],
       )
       const row = result.rows[0]!
@@ -220,7 +220,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       status: RevisionPublication['status']
     }>(
       `update memory_revision_publications set status=case when status in ('selected','abandoned') then status else 'present' end
-       where source_kind=$1 and owner_id=$2 and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb
+       where source_kind=$1 and operation_id=$2 and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb
        returning intent,status`,
       [...revisionPublicationIdentity(intent), intent],
     )
@@ -239,7 +239,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       intent: AuthenticatedMemoryTreeRevisionCreation
       status: RevisionPublication['status']
     }>(
-      `select intent,status from memory_revision_publications where source_kind=$1 and owner_id=$2
+      `select intent,status from memory_revision_publications where source_kind=$1 and operation_id=$2
        order by (status='selected') desc, created_at, tree_digest, trajectory_digest`,
       [kind, ownerId],
     )
@@ -258,7 +258,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         intent: AuthenticatedMemoryTreeRevisionCreation
         status: RevisionPublication['status']
       }>(
-        "update memory_revision_publications set status='abandoned' where source_kind=$1 and owner_id=$2 and status in ('reserved','present') returning intent,status",
+        "update memory_revision_publications set status='abandoned' where source_kind=$1 and operation_id=$2 and status in ('reserved','present') returning intent,status",
         [input.kind, input.operation_id],
       )
       return result.rows.map(projectRevisionPublication)
@@ -311,12 +311,20 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         ],
       )
       if (inserted.rowCount === 1) {
-        if (input.observation !== null) {
-          await client.query(
-            `insert into observations (extraction_id, body_markdown)
-             values ($1,$2)`,
-            [input.extraction_id, input.observation.body_markdown],
+        for (const observation of input.observations) {
+          const insertedObservation = await client.query(
+            `insert into observations (observation_id, extraction_id, body_markdown)
+             values ($1,$2,$3) on conflict (observation_id) do nothing`,
+            [
+              observation.observation_id,
+              input.extraction_id,
+              observation.body_markdown,
+            ],
           )
+          if (insertedObservation.rowCount !== 1)
+            throw new ExtractionConflictError(
+              `Observation ID is already occupied: ${observation.observation_id}`,
+            )
         }
         return true
       }
@@ -324,11 +332,11 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         `select source_workflow=$2 and source_run_id=$3 and
                 source_unit_id=$4 and execution_archive_digest=$5 and
                 trajectory_reference=$6::jsonb and
-                (($7::text is null and observation.body_markdown is null) or
-                 observation.body_markdown=$7) as identical
+                coalesce((select jsonb_agg(jsonb_build_object('observation_id', observation_id,
+                   'body_markdown', body_markdown) order by observation_id)
+                   from observations where extraction_id=$1), '[]'::jsonb)=$7::jsonb as identical
          from extractions extraction
-         left join observations observation using (extraction_id)
-         where extraction_id=$1`,
+         where extraction.extraction_id=$1`,
         [
           input.extraction_id,
           input.source_workflow,
@@ -336,7 +344,11 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           input.source_unit_id,
           input.execution_archive_digest,
           JSON.stringify(input.trajectory_reference),
-          input.observation?.body_markdown ?? null,
+          JSON.stringify(
+            [...input.observations].sort((a, b) =>
+              a.observation_id.localeCompare(b.observation_id),
+            ),
+          ),
         ],
       )
       if (existing.rows[0]?.identical !== true) {
@@ -362,7 +374,8 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       }>(
         `select target_state=$2 and expected_generation=$3 and
                 actor=$4::jsonb as identical,
-                resulting_state, resulting_generation, actor, changed_at
+                target_state as resulting_state, expected_generation + 1 as resulting_generation,
+                actor, changed_at
          from memory_tree_automation_operations where operation_id=$1`,
         [
           input.operation_id,
@@ -425,16 +438,13 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         throw new Error('Memory-tree automation update returned no row.')
       await client.query(
         `insert into memory_tree_automation_operations (
-           operation_id, target_state, expected_generation, actor,
-           resulting_state, resulting_generation, changed_at
-         ) values ($1,$2,$3,$4,$5,$6,$7)`,
+           operation_id, target_state, expected_generation, actor, changed_at
+         ) values ($1,$2,$3,$4,$5)`,
         [
           input.operation_id,
           targetState,
           input.expected_generation,
           input.actor,
-          control.state,
-          Number(control.generation),
           control.changed_at,
         ],
       )
@@ -453,13 +463,13 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
   async getLearningInput(limit: number): Promise<LearningInput | null> {
     return await inTransaction(this.#pool, async (client) => {
       const observations = await client.query<{
-        extraction_id: string
+        observation_id: string
         body_markdown: string
       }>(
-        `select extraction_id, body_markdown
+        `select observation_id, body_markdown
          from observations
          where consumed_revision is null
-         order by created_at, extraction_id limit $1`,
+         order by created_at, observation_id limit $1`,
         [limit],
       )
       if (observations.rowCount === 0) return null
@@ -494,7 +504,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       )
       const selected = await client.query(
         `select 1 from memory_revision_publications
-        where owner_id=$1 and status='selected' and intent<>$2::jsonb`,
+        where operation_id=$1 and status='selected' and intent<>$2::jsonb`,
         [source.operation_id, input],
       )
       if (selected.rows[0])
@@ -504,7 +514,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       const candidate = await client.query<{
         status: RevisionPublication['status']
       }>(
-        'select status from memory_revision_publications where source_kind=$1 and owner_id=$2 and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb',
+        'select status from memory_revision_publications where source_kind=$1 and operation_id=$2 and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb',
         [...revisionPublicationIdentity(input), input],
       )
       if (candidate.rows[0]?.status === 'abandoned')
@@ -512,7 +522,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           'Revision publication has been abandoned.',
         )
       const publication = await client.query(
-        `select 1 from memory_revision_publications where source_kind=$1 and owner_id=$2
+        `select 1 from memory_revision_publications where source_kind=$1 and operation_id=$2
          and tree_digest=$3 and trajectory_digest=$4 and intent=$5::jsonb
          and status in ('present','selected') for update`,
         [...revisionPublicationIdentity(input), input],
@@ -532,8 +542,8 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
                   revision.memory_tree_reference=$3::jsonb and
                   revision.trajectory_reference=$4::jsonb and
                   revision.maintenance_report=$6::jsonb and
-                  coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
-                    filter (where observation.extraction_id is not null), '{}')=$5::text[]
+                  coalesce(array_agg(observation.observation_id order by observation.observation_id)
+                    filter (where observation.observation_id is not null), '{}')=$5::text[]
                     as identical
            from memory_tree_revisions revision
            left join observations observation
@@ -545,7 +555,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
             input.expected_active_revision,
             JSON.stringify(input.memory_tree_reference),
             JSON.stringify(source.trajectory_reference),
-            [...source.extraction_ids].sort(),
+            [...source.observation_ids].sort(),
             JSON.stringify(source.maintenance_report),
           ],
         )
@@ -612,7 +622,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         )
         if (control.rows[0]?.state !== 'enabled') {
           await client.query(
-            "update memory_revision_publications set status='abandoned' where source_kind=$1 and owner_id=$2 and status in ('reserved','present')",
+            "update memory_revision_publications set status='abandoned' where source_kind=$1 and operation_id=$2 and status in ('reserved','present')",
             [source.kind, source.operation_id],
           )
           return null
@@ -621,7 +631,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
 
       await client.query(
         `update memory_revision_publications set status='selected'
-        where source_kind=$1 and owner_id=$2 and tree_digest=$3 and trajectory_digest=$4`,
+        where source_kind=$1 and operation_id=$2 and tree_digest=$3 and trajectory_digest=$4`,
         revisionPublicationIdentity(input),
       )
       const active = await client.query<{ revision: string }>(
@@ -634,15 +644,15 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
         )
       }
       if (source.kind === 'learning') {
-        const selected = await client.query<{ extraction_id: string }>(
-          `select extraction_id from observations
-           where extraction_id=any($1) and consumed_revision is null for update`,
-          [source.extraction_ids],
+        const selected = await client.query<{ observation_id: string }>(
+          `select observation_id from observations
+           where observation_id=any($1) and consumed_revision is null for update`,
+          [source.observation_ids],
         )
         if (
-          selected.rowCount !== source.extraction_ids.length ||
-          !source.extraction_ids.every((id) =>
-            selected.rows.some((row) => row.extraction_id === id),
+          selected.rowCount !== source.observation_ids.length ||
+          !source.observation_ids.every((id) =>
+            selected.rows.some((row) => row.observation_id === id),
           )
         ) {
           throw new MemoryTreeRevisionConflictError(
@@ -674,12 +684,12 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       if (source.kind === 'learning')
         await client.query(
           `update observations set consumed_revision=$1
-           where extraction_id=any($2) and consumed_revision is null`,
-          [nextRevision, source.extraction_ids],
+           where observation_id=any($2) and consumed_revision is null`,
+          [nextRevision, source.observation_ids],
         )
       await client.query(
         `update memory_tree_state
-         set active_revision=$1, updated_at=clock_timestamp()
+         set active_revision=$1
          where singleton=true`,
         [nextRevision],
       )
@@ -760,7 +770,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       )
       await client.query(
         `update memory_tree_state
-         set active_revision=$1, updated_at=clock_timestamp()
+         set active_revision=$1
          where singleton=true`,
         [input.restored_revision],
       )

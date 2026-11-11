@@ -78,3 +78,9 @@ pnpm run test:integration
 ```
 
 `pnpm test` 运行隔离的单元测试和服务端测试。`pnpm run test:integration` 使用显式提供的 `TEST_DATABASE_URL` 对 PostgreSQL 存储实现进行测试；未设置时，启动脚本会使用仓库 `compose.yaml` 中配置的镜像创建并清理一个临时本地 Docker PostgreSQL 实例。启动脚本会有意忽略服务常规使用的 `MEMORY_CATALOG_DATABASE_URL`，避免测试意外修改共享数据库。
+
+每次 extraction 可以产出零到多条 observation。`extraction_id` 标识调用及其来源；`observation_id` 标识可独立维护的经验。注册操作原子发布完整的 `observations` 数组；learning 消费 `observation_ids`，并为每条 observation 记录一个决定。
+
+这是不兼容的 schema 和 API 变更。已有 Memory Catalog 数据库必须重建，worker 与服务端必须同步更新；旧的单 observation 请求和待处理 workflow payload 不受支持，不提供迁移或兼容适配层。
+
+Observation ID 是全局唯一的不透明标识，API 不要求 extraction ID 前缀。另一条 extraction 使用已占用的 observation ID 时，返回 HTTP 409，并回滚整次注册。分页游标是不透明的，排序位置使用当前列表的行 ID。

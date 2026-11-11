@@ -66,27 +66,33 @@ function invalidBody(message: string): Error {
   })
 }
 
-// OpenAPI cannot relate decision ids to the consumed extraction ids.
+function validateExtraction(input: RequestBody<'registerExtraction'>): void {
+  const ids = input.observations.map((item) => item.observation_id)
+  if (new Set(ids).size !== ids.length)
+    throw invalidBody('Observation IDs must be unique within an extraction.')
+}
+
+// OpenAPI cannot relate decision ids to the consumed observation ids.
 function validateMaintenanceReport(
   source: RequestBody<'createMemoryTreeRevision'>['source'],
 ): void {
   if (source.kind === 'manual') return
   const decided = source.maintenance_report.observation_decisions.map(
-    (decision) => decision.extraction_id,
+    (decision) => decision.observation_id,
   )
-  const expected = source.kind === 'learning' ? source.extraction_ids : []
+  const expected = source.kind === 'learning' ? source.observation_ids : []
   if (
     decided.length !== expected.length ||
     new Set(decided).size !== decided.length ||
     !expected.every((id) => decided.includes(id))
   )
     throw invalidBody(
-      'maintenance_report must contain exactly one decision per consumed extraction id.',
+      'maintenance_report must contain exactly one decision per consumed observation id.',
     )
   for (const decision of source.maintenance_report.observation_decisions)
     if (decision.action !== 'skipped' && decision.topics.length === 0)
       throw invalidBody(
-        `maintenance_report decision ${decision.extraction_id} must name edited topics.`,
+        `maintenance_report decision ${decision.observation_id} must name edited topics.`,
       )
 }
 
@@ -163,14 +169,18 @@ export async function registerMemoryCatalogRoutes(
   await app.register(openapiGlue, {
     specification: specPath(),
     serviceHandlers: {
-      reserveExtractionPublication: async (request: FastifyRequest) =>
-        await store.reserveExtractionPublication(
-          request.body as RequestBody<'reserveExtractionPublication'>,
-        ),
-      confirmExtractionPublication: async (request: FastifyRequest) =>
-        await store.confirmExtractionPublication(
-          request.body as RequestBody<'confirmExtractionPublication'>,
-        ),
+      reserveExtractionPublication: async (request: FastifyRequest) => {
+        const input =
+          request.body as RequestBody<'reserveExtractionPublication'>
+        validateExtraction(input.registration)
+        return await store.reserveExtractionPublication(input)
+      },
+      confirmExtractionPublication: async (request: FastifyRequest) => {
+        const input =
+          request.body as RequestBody<'confirmExtractionPublication'>
+        validateExtraction(input.registration)
+        return await store.confirmExtractionPublication(input)
+      },
       listExtractionPublications: async (request: FastifyRequest) => ({
         publications: await store.listExtractionPublications(
           (request.params as PathParameters<'listExtractionPublications'>)
@@ -204,12 +214,11 @@ export async function registerMemoryCatalogRoutes(
         }
       },
       health: () => ({ status: 'ok' }),
-      registerExtraction: async (request: FastifyRequest) => ({
-        ok: true,
-        created: await store.registerExtraction(
-          request.body as RequestBody<'registerExtraction'>,
-        ),
-      }),
+      registerExtraction: async (request: FastifyRequest) => {
+        const input = request.body as RequestBody<'registerExtraction'>
+        validateExtraction(input)
+        return { ok: true, created: await store.registerExtraction(input) }
+      },
       getExtraction: async (request: FastifyRequest, reply: FastifyReply) => {
         const extractionId = (request.params as PathParameters<'getExtraction'>)
           .extraction_id

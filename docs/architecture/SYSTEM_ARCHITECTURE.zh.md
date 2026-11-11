@@ -96,7 +96,7 @@ sequenceDiagram
     Temporal->>MaintenanceWorker: 分发 maintenance 工作
     Note over Temporal,MaintenanceWorker: 固定 workflow ID 确保同一时间只有一个 maintainer
     MaintenanceWorker->>Catalog: 选择一批待处理 observations
-    Catalog-->>MaintenanceWorker: 返回 observations、extraction IDs、expected active revision 和当前 memory tree reference
+    Catalog-->>MaintenanceWorker: 返回 observations、observation IDs、expected active revision 和当前 memory tree reference
     opt 存在当前 memory tree
       MaintenanceWorker->>Storage: 下载当前 memory tree artifact
       Storage-->>MaintenanceWorker: memory tree artifact
@@ -105,7 +105,7 @@ sequenceDiagram
     Note over MaintenanceWorker: 运行 maintainer
     MaintenanceWorker->>Storage: 保存 maintainer trajectory
     MaintenanceWorker->>Storage: 保存新的 memory tree artifact
-    MaintenanceWorker-->>Temporal: 返回 artifact references、extraction IDs 和 expected active revision
+    MaintenanceWorker-->>Temporal: 返回 artifact references、observation IDs 和 expected active revision
     Note over Temporal: 后续 commit 重试复用该 activity 结果
     Temporal->>MaintenanceWorker: 调度 revision commit
     MaintenanceWorker->>Catalog: 使用 maintenance ID 和 expected active revision CAS 创建 memory tree revision

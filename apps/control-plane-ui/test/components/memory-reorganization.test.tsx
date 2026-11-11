@@ -41,19 +41,19 @@ const learningRevision: MemoryTreeRevision = {
   source: {
     kind: 'learning',
     operation_id: 'learning-3',
-    extraction_ids: ['extraction-1', 'extraction-2'],
+    observation_ids: ['extraction-1', 'extraction-2'],
     trajectory_reference: trajectoryReference,
     maintenance_report: {
       summary: 'Added one lesson and skipped a duplicate.',
       observation_decisions: [
         {
-          extraction_id: 'extraction-1',
+          observation_id: 'extraction-1',
           action: 'added',
           topics: ['/memory/topics/path.md'],
           reason: 'New reusable containment check.'
         },
         {
-          extraction_id: 'extraction-2',
+          observation_id: 'extraction-2',
           action: 'skipped',
           topics: [],
           reason: 'Already covered by the path topic.'

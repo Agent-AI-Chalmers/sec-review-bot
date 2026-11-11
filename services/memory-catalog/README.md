@@ -9,9 +9,9 @@ Memory Catalog provides an HTTP API to record completed extractions, manage pend
 | Method | Path                                   | Purpose                                                                                                               |
 | ------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
 | `GET`  | `/healthz`                             | Report service health.                                                                                                |
-| `POST` | `/v1/extractions`                      | Register a completed extraction, its trajectory reference, and its optional observation.                              |
+| `POST` | `/v1/extractions`                      | Register a completed extraction, its trajectory reference, and its observations.                                      |
 | `GET`  | `/v1/extractions`                      | List completed extractions with stable cursor pagination and provenance filters.                                      |
-| `GET`  | `/v1/extractions/{extraction_id}`      | Return one extraction, its trajectory reference, and its optional observation.                                        |
+| `GET`  | `/v1/extractions/{extraction_id}`      | Return one extraction, its trajectory reference, and its observations.                                                |
 | `GET`  | `/v1/observations`                     | List observations with stable cursor pagination and consumption filters.                                              |
 | `GET`  | `/v1/overview`                         | Summarize completed extraction coverage, observation outcomes, and a 30-day, 90-day, or all-time trend.               |
 | `GET`  | `/v1/observation-backlog`              | Return the count and oldest age of pending observations.                                                              |
@@ -35,7 +35,7 @@ Extractions and observations are ordered by `created_at` and then `extraction_id
 
 ### Revisions And Memory-Tree Automation
 
-Revision sources use `learning` for incorporating new observations, `reorganization` for reorganizing existing memory, and `manual` for human edits. `predecessor_revision` records the revision active at creation. Restoring an earlier revision only changes the active revision; it creates no new revision, and later revision numbers continue increasing. Manual edits do not consume pending observations. Learning and reorganization revisions store the maintainer's `maintenance_report`; the server rejects a report that does not decide each consumed extraction exactly once, or that names no edited topics for a non-skipped decision.
+Revision sources use `learning` for incorporating new observations, `reorganization` for reorganizing existing memory, and `manual` for human edits. `predecessor_revision` records the revision active at creation. Restoring an earlier revision only changes the active revision; it creates no new revision, and later revision numbers continue increasing. Manual edits do not consume pending observations. Learning and reorganization revisions store the maintainer's `maintenance_report`; the server rejects a report that does not decide each consumed observation exactly once, or that names no edited topics for a non-skipped decision.
 
 <!-- doc-default: memory-tree-automation-state; source=services/memory-catalog/src/database/schema-versions/001_initial_catalog.sql -->
 
@@ -76,3 +76,9 @@ pnpm run test:integration
 ```
 
 `pnpm test` runs the isolated unit and server tests. `pnpm run test:integration` exercises the PostgreSQL store against an explicitly supplied `TEST_DATABASE_URL`; when it is unset, the launcher creates and removes a temporary local Docker PostgreSQL instance using the image configured in the repository `compose.yaml`. The launcher deliberately ignores the service's ordinary `MEMORY_CATALOG_DATABASE_URL` so a test cannot modify a shared database by accident.
+
+Each extraction produces zero or more observations. `extraction_id` identifies the invocation and its provenance; `observation_id` identifies an independently maintained lesson. Extraction registration publishes the complete `observations` array atomically. Learning consumes `observation_ids` and reports one decision per observation.
+
+This is a breaking schema and API change. Recreate existing Memory Catalog databases and restart workers together with the server; old single-observation payloads and pending workflow payloads are not supported. No migration or compatibility adapter is provided.
+
+Observation IDs are globally unique opaque identifiers; the API does not require an extraction-ID prefix. Reusing an occupied observation ID in another extraction returns HTTP 409 and rolls back the entire registration. Pagination cursors are opaque and bind their ordering position to the listed row ID.

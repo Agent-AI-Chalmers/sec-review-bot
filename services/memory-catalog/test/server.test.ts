@@ -30,7 +30,7 @@ const revision = {
   source: {
     kind: 'learning' as const,
     operation_id: 'maintenance-1',
-    extraction_ids: ['extraction-1'],
+    observation_ids: ['extraction-1'],
     trajectory_reference: {
       uri: 's3://sec-review/memory/trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
       digest: `sha256:${'b'.repeat(64)}`,
@@ -60,7 +60,9 @@ const extraction = {
     media_type: 'application/zstd',
     size_bytes: 42,
   },
-  observation: { body_markdown: 'Remember this.' },
+  observations: [
+    { observation_id: 'extraction-1', body_markdown: 'Remember this.' },
+  ],
 }
 
 const emptyOverview = {
@@ -142,6 +144,16 @@ await test('the contract authenticates and validates extraction registration', a
     headers: workerHeaders,
     payload: { ...extraction, unknown: true },
   })
+  const duplicate = await app.inject({
+    method: 'POST',
+    url: '/v1/extractions',
+    headers: workerHeaders,
+    payload: {
+      ...extraction,
+      observations: [extraction.observations[0], extraction.observations[0]],
+    },
+  })
+  assert.equal(duplicate.statusCode, 400)
   const registered = await app.inject({
     method: 'POST',
     url: '/v1/extractions',
@@ -282,7 +294,7 @@ await test('completed extractions are queryable with or without an observation',
       {
         ...extraction,
         extraction_id: 'extraction-2',
-        observation: null,
+        observations: [],
         created_at: '2026-10-23T00:01:00.000Z',
       },
     ],
@@ -403,6 +415,7 @@ await test('UI catalog reads expose paginated records and durable control state'
           observations: [
             {
               extraction_id: 'extraction-1',
+              observation_id: 'extraction-1',
               source_run_id: 'run-1',
               source_unit_id: 'review',
               body_markdown: 'Remember this.',
@@ -560,7 +573,7 @@ await test('learning input is read and a revision is created with resource seman
     expected_active_revision: 0,
     active_memory_tree_reference: null,
     observations: [
-      { extraction_id: 'extraction-1', body_markdown: 'Remember this.' },
+      { observation_id: 'extraction-1', body_markdown: 'Remember this.' },
     ],
   }
   const store: MemoryCatalogStore = {

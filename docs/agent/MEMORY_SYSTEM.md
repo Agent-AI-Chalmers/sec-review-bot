@@ -58,7 +58,9 @@ maintenance
 
 Extraction reads the stage trajectories from one review, such as analyzer, mitigation, and verification process records, and extracts reusable experience into observations. System prompts and all bundled skills under `/skills` count as guidance the agents already have. An observation should add supported, durable experience beyond that guidance; otherwise, extraction produces no observation.
 
-Maintenance reads observations produced by extraction and folds useful experience into memory.
+Each extraction can produce zero or more independent observations. Every observation captures one lesson; supporting details and corrections for the same lesson stay together. The caller assigns each observation an `observation_id`, while `extraction_id` identifies the shared invocation and provenance.
+
+Maintenance reads observations produced by extraction and folds useful experience into memory. It selects and consumes observations independently, including observations from the same extraction, and records one decision per observation.
 
 - It must not create new security-review experience from general knowledge; it can only organize existing memory or absorb sufficiently stable, reusable experience from selected observations.
 - It can merge, compress, rewrite, rename, and split topics, shorten `MEMORY.md`, and delete obsolete or duplicate topic files after their content has been merged.

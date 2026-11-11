@@ -494,7 +494,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
       extraction_id: string
       source_run_id: string
       source_unit_id: string
-      observation: { body_markdown: string } | null
+      observations: { observation_id: string; body_markdown: string }[]
     }
 
     const extractionById = new Map<string, FixtureExtraction>(
@@ -546,7 +546,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
       assert.strictEqual(extraction.source_run_id, observation.source_run_id)
       assert.strictEqual(extraction.source_unit_id, observation.source_unit_id)
       assert.strictEqual(
-        extraction.observation?.body_markdown,
+        extraction.observations[0]?.body_markdown,
         observation.body_markdown
       )
 
@@ -571,19 +571,19 @@ test('memory fixtures form one coherent provenance graph', async () => {
         )
         assert.strictEqual(revision.source.kind, 'learning')
         assert.ok(
-          revision.source.extraction_ids.includes(observation.extraction_id)
+          revision.source.observation_ids.includes(observation.extraction_id)
         )
       }
     }
 
     for (const revision of revisions.revisions as Array<{
       source:
-        | { kind: 'learning'; extraction_ids: string[] }
+        | { kind: 'learning'; observation_ids: string[] }
         | { kind: 'manual'; operation_id: string; actor: unknown }
         | { kind: 'reorganization'; operation_id: string }
     }>) {
       if (revision.source.kind === 'learning') {
-        for (const extractionId of revision.source.extraction_ids) {
+        for (const extractionId of revision.source.observation_ids) {
           const observation = observations.observations.find(
             (candidate: { extraction_id: string }) =>
               candidate.extraction_id === extractionId

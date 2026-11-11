@@ -6,6 +6,7 @@ import type {
   MaintenanceReport,
   CatalogOverview,
   ExtractionList,
+  ExtractionObservation,
   ExtractionRecord,
   MemoryTreeAutomation,
   MemoryTree,
@@ -59,7 +60,7 @@ export class InvalidCatalogCursorError extends Error {
 
 interface CatalogCursor {
   createdAt: string
-  extractionId: string
+  rowId: string
 }
 
 interface RevisionRow {
@@ -67,7 +68,7 @@ interface RevisionRow {
   predecessor_revision: string | null
   source_kind: 'learning' | 'reorganization' | 'manual'
   operation_id: string
-  extraction_ids: string[]
+  observation_ids: string[]
   trajectory_reference: ArtifactReference | null
   maintenance_report: MaintenanceReport | null
   actor: Actor | null
@@ -92,15 +93,15 @@ function decodeCursor(value: string | undefined): CatalogCursor | undefined {
       !('createdAt' in decoded) ||
       typeof decoded.createdAt !== 'string' ||
       Number.isNaN(Date.parse(decoded.createdAt)) ||
-      !('extractionId' in decoded) ||
-      typeof decoded.extractionId !== 'string' ||
-      decoded.extractionId.length === 0
+      !('rowId' in decoded) ||
+      typeof decoded.rowId !== 'string' ||
+      decoded.rowId.length === 0
     ) {
       throw new Error('invalid shape')
     }
     return {
       createdAt: decoded.createdAt,
-      extractionId: decoded.extractionId,
+      rowId: decoded.rowId,
     }
   } catch {
     throw new InvalidCatalogCursorError('Invalid catalog pagination cursor.')
@@ -121,15 +122,17 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       source_unit_id: string
       execution_archive_digest: string
       trajectory_reference: ArtifactReference
-      body_markdown: string | null
+      observations: ExtractionObservation[]
       created_at: Date
     }>(
       `select extraction.extraction_id, extraction.source_workflow,
               extraction.source_run_id, extraction.source_unit_id,
               extraction.execution_archive_digest, extraction.trajectory_reference,
-              observation.body_markdown, extraction.created_at
+              coalesce((select jsonb_agg(jsonb_build_object('observation_id', observation_id,
+                'body_markdown', body_markdown) order by observation_id)
+                from observations where extraction_id=extraction.extraction_id), '[]'::jsonb) as observations,
+              extraction.created_at
        from extractions extraction
-       left join observations observation using (extraction_id)
        where extraction.extraction_id=$1`,
       [extractionId],
     )
@@ -142,10 +145,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
           source_unit_id: row.source_unit_id,
           execution_archive_digest: row.execution_archive_digest,
           trajectory_reference: row.trajectory_reference,
-          observation:
-            row.body_markdown === null
-              ? null
-              : { body_markdown: row.body_markdown },
+          observations: row.observations,
           created_at: row.created_at.toISOString(),
         }
       : undefined
@@ -164,25 +164,27 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       source_unit_id: string
       execution_archive_digest: string
       trajectory_reference: ArtifactReference
-      body_markdown: string | null
+      observations: ExtractionObservation[]
       created_at: Date
     }>(
       `select extraction.extraction_id, extraction.source_workflow,
               extraction.source_run_id, extraction.source_unit_id,
               extraction.execution_archive_digest, extraction.trajectory_reference,
-              observation.body_markdown, extraction.created_at
+              coalesce((select jsonb_agg(jsonb_build_object('observation_id', observation_id,
+                'body_markdown', body_markdown) order by observation_id)
+                from observations where extraction_id=extraction.extraction_id), '[]'::jsonb) as observations,
+              extraction.created_at
        from extractions extraction
-       left join observations observation using (extraction_id)
        where ($1::timestamptz is null or
                 (extraction.created_at, extraction.extraction_id) < ($1, $2))
          and ($3::text is null or extraction.source_workflow=$3)
          and ($4::text is null or extraction.source_run_id=$4)
-         and ($5::boolean is null or (observation.extraction_id is not null)=$5)
+         and ($5::boolean is null or (exists (select 1 from observations where extraction_id=extraction.extraction_id))=$5)
        order by extraction.created_at desc, extraction.extraction_id desc
        limit $6`,
       [
         cursor?.createdAt ?? null,
-        cursor?.extractionId ?? null,
+        cursor?.rowId ?? null,
         filters.sourceWorkflow ?? null,
         filters.sourceRunId ?? null,
         filters.hasObservation ?? null,
@@ -196,7 +198,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
         result.rows.length > limit && rows.length > 0
           ? encodeCursor({
               createdAt: rows[rows.length - 1]!.created_at.toISOString(),
-              extractionId: rows[rows.length - 1]!.extraction_id,
+              rowId: rows[rows.length - 1]!.extraction_id,
             })
           : null,
     }
@@ -209,6 +211,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
   ): Promise<ObservationList> {
     const cursor = decodeCursor(cursorValue)
     const result = await this.pool.query<{
+      observation_id: string
       extraction_id: string
       source_run_id: string
       source_unit_id: string
@@ -216,23 +219,23 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       consumed_revision: string | null
       created_at: Date
     }>(
-      `select observation.extraction_id, extraction.source_run_id,
+      `select observation.observation_id, observation.extraction_id, extraction.source_run_id,
               extraction.source_unit_id,
               observation.body_markdown,
               observation.consumed_revision, observation.created_at
        from observations observation
        join extractions extraction using (extraction_id)
        where ($1::timestamptz is null or
-                (observation.created_at, observation.extraction_id) < ($1, $2))
+                (observation.created_at, observation.observation_id) < ($1, $2))
          and ($3::text is null or
               ($3='pending' and observation.consumed_revision is null) or
               ($3='consumed' and observation.consumed_revision is not null))
          and ($4::bigint is null or observation.consumed_revision=$4)
-       order by observation.created_at desc, observation.extraction_id desc
+       order by observation.created_at desc, observation.observation_id desc
        limit $5`,
       [
         cursor?.createdAt ?? null,
-        cursor?.extractionId ?? null,
+        cursor?.rowId ?? null,
         filters.status ?? null,
         filters.consumedRevision ?? null,
         limit + 1,
@@ -241,6 +244,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
     const rows = result.rows.slice(0, limit)
     return {
       observations: rows.map((row) => ({
+        observation_id: row.observation_id,
         extraction_id: row.extraction_id,
         source_run_id: row.source_run_id,
         source_unit_id: row.source_unit_id,
@@ -253,7 +257,7 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
         result.rows.length > limit && rows.length > 0
           ? encodeCursor({
               createdAt: rows[rows.length - 1]!.created_at.toISOString(),
-              extractionId: rows[rows.length - 1]!.extraction_id,
+              rowId: rows[rows.length - 1]!.observation_id,
             })
           : null,
     }
@@ -477,8 +481,8 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       `select revision.revision, revision.predecessor_revision, revision.source_kind,
               revision.operation_id, revision.trajectory_reference,
               revision.maintenance_report, revision.actor,
-              coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
-                filter (where observation.extraction_id is not null), '{}') as extraction_ids,
+              coalesce(array_agg(observation.observation_id order by observation.observation_id)
+                filter (where observation.observation_id is not null), '{}') as observation_ids,
               revision.memory_tree_reference, revision.created_at
        from memory_tree_revisions revision
        left join observations observation
@@ -499,8 +503,8 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
       `select revision.revision, revision.predecessor_revision, revision.source_kind,
               revision.operation_id, revision.trajectory_reference,
               revision.maintenance_report, revision.actor,
-              coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
-                filter (where observation.extraction_id is not null), '{}') as extraction_ids,
+              coalesce(array_agg(observation.observation_id order by observation.observation_id)
+                filter (where observation.observation_id is not null), '{}') as observation_ids,
               revision.memory_tree_reference, revision.created_at
        from memory_tree_revisions revision
        left join observations observation
@@ -528,7 +532,7 @@ function projectExtraction(row: {
   source_unit_id: string
   execution_archive_digest: string
   trajectory_reference: ArtifactReference
-  body_markdown: string | null
+  observations: ExtractionObservation[]
   created_at: Date
 }): ExtractionRecord {
   return {
@@ -538,8 +542,7 @@ function projectExtraction(row: {
     source_unit_id: row.source_unit_id,
     execution_archive_digest: row.execution_archive_digest,
     trajectory_reference: row.trajectory_reference,
-    observation:
-      row.body_markdown === null ? null : { body_markdown: row.body_markdown },
+    observations: row.observations,
     created_at: row.created_at.toISOString(),
   }
 }
@@ -550,7 +553,7 @@ function projectRevision(row: RevisionRow): MemoryTreeRevision {
       ? {
           kind: 'learning' as const,
           operation_id: row.operation_id,
-          extraction_ids: row.extraction_ids,
+          observation_ids: row.observation_ids,
           trajectory_reference: requireValue(
             row.trajectory_reference,
             'trajectory_reference',

@@ -57,17 +57,17 @@ class _RecordingClient(MemoryCatalogClient):
         return self.responses.pop(0)
 
 
-def _report(extraction_ids: list[str]) -> dict[str, object]:
+def _report(observation_ids: list[str]) -> dict[str, object]:
     return {
         "summary": "Maintained memory.",
         "observation_decisions": [
             {
-                "extraction_id": extraction_id,
+                "observation_id": extraction_id,
                 "action": "added",
                 "topics": ["/memory/topics/example.md"],
                 "reason": "Adds durable guidance.",
             }
-            for extraction_id in extraction_ids
+            for extraction_id in observation_ids
         ],
     }
 
@@ -97,7 +97,7 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         "source": {
             "kind": "learning",
             "operation_id": "maintenance-1",
-            "extraction_ids": ["extraction-1"],
+            "observation_ids": ["extraction-1"],
             "trajectory_reference": _artifact(
                 "maintenance-trajectory.jsonl.zst",
                 media_type="application/zstd",
@@ -110,7 +110,7 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         "expected_active_revision": 1,
         "active_memory_tree_reference": _artifact("memory").as_dict(),
         "observations": [
-            {"extraction_id": "observation-1", "body_markdown": "Remember this."}
+            {"observation_id": "observation-1", "body_markdown": "Remember this."}
         ],
     }
     extraction = {
@@ -123,7 +123,9 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
             "extraction-trajectory.jsonl.zst",
             media_type="application/zstd",
         ).as_dict(),
-        "observation": {"body_markdown": "Remember this."},
+        "observations": [
+            {"observation_id": "observation-1", "body_markdown": "Remember this."}
+        ],
         "created_at": "2026-10-23T00:00:00Z",
     }
     extraction_list = {"extractions": [extraction], "next_cursor": "next-page"}
@@ -131,6 +133,7 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         "observations": [
             {
                 "extraction_id": "extraction-1",
+                "observation_id": "observation-1",
                 "source_run_id": "run-1",
                 "source_unit_id": "review",
                 "body_markdown": "Remember this.",
@@ -176,7 +179,9 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
             "extraction-trajectory.jsonl.zst",
             media_type="application/zstd",
         ),
-        observation_markdown="Remember this.",
+        observations=[
+            {"observation_id": "observation-1", "body_markdown": "Remember this."}
+        ],
     )
     assert client.get_extraction("extraction-1") == extraction
     assert (
@@ -204,7 +209,7 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
     assert client.create_learning_revision(
         operation_id="maintenance-2",
         expected_active_revision=1,
-        extraction_ids=["extraction-1"],
+        observation_ids=["extraction-1"],
         memory_tree_reference=_artifact("memory-2"),
         trajectory_reference=_artifact(
             "maintenance-trajectory.jsonl.zst",
@@ -319,7 +324,12 @@ def test_extraction_conflict_preserves_non_retryable_catalog_semantics() -> None
                 "extraction-trajectory.jsonl.zst",
                 media_type="application/zstd",
             ),
-            observation_markdown="Different content.",
+            observations=[
+                {
+                    "observation_id": "observation-1",
+                    "body_markdown": "Different content.",
+                }
+            ],
         )
 
 
@@ -357,7 +367,7 @@ def test_automation_pause_preserves_its_own_conflict_semantics() -> None:
         client.create_learning_revision(
             operation_id="maintenance-1",
             expected_active_revision=1,
-            extraction_ids=["extraction-1"],
+            observation_ids=["extraction-1"],
             memory_tree_reference=_artifact("memory"),
             trajectory_reference=_artifact(
                 "maintenance-trajectory.jsonl.zst",
@@ -473,7 +483,7 @@ def test_revision_kind_contract_uses_explicit_revision_types(
             ["extraction-1"] if kind == "learning" else []
         )
         if kind == "learning":
-            source["extraction_ids"] = ["extraction-1"]
+            source["observation_ids"] = ["extraction-1"]
     value = {
         "expected_active_revision": 1,
         "memory_tree_reference": _artifact("memory").as_dict(),
@@ -606,7 +616,7 @@ def test_maintainer_output_limits_match_catalog_report_contract(
 
     def report(value: object) -> dict[str, Any]:
         decision: dict[str, Any] = {
-            "extraction_id": "extraction-1",
+            "observation_id": "extraction-1",
             "action": "added",
             "topics": ["/memory/topics/example.md"],
             "reason": "Adds durable guidance.",
