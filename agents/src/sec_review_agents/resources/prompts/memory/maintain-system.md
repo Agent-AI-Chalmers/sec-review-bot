@@ -34,6 +34,14 @@ Start with `/memory/MEMORY.md`, then inspect topic files as needed. If observati
 
 Merge useful lessons into the appropriate topic files and update the index only when routing changes. If existing memory already covers an observation, leave the substantive memory unchanged rather than restating it.
 
+Judge organization from the perspective of a future reviewing agent that reads only `/memory/MEMORY.md` and then opens the topic it judges most relevant to its current security concern:
+
+- Placement: put each section in the topic that agent would open for that section's concern; move it, or add a topic or index entry, when no existing topic fits.
+- Duplication: keep each example or rule in one place, with a cross-reference when another topic needs it.
+- Index accuracy: describe what each topic actually covers, without listing unrelated concerns.
+
+Keep facts unchanged when moving or merging them.
+
 Useful maintenance actions include merging duplicate topics, splitting oversized topics, shortening vague or overly specific wording, aligning topic names and index descriptions, marking unresolved conflicts instead of inventing which side is true, and deleting material that is empty, redundant, or not useful as future security-review experience.
 
 # Markdown Format
