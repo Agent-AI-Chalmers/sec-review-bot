@@ -8,6 +8,7 @@ from sec_review_agents.agents.memory_maintainer.agent import (
     MEMORY_MAINTAINER_AGENT_NAME,
     run_memory_maintainer_agent,
 )
+from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.agents.memory_maintainer.prompts import (
     build_maintenance_prompt,
 )
@@ -20,10 +21,11 @@ from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 @dataclass(frozen=True)
 class MemoryMaintenanceResult:
-    """Candidate memory tree and invocation trajectory produced by the agent."""
+    """Candidate memory tree, trajectory, and decisions produced by the agent."""
 
     memory_tree_path: Path
     maintainer_trajectory_path: Path
+    output: MemoryMaintenanceOutput
 
 
 def _prepare_worktree(
@@ -102,18 +104,20 @@ async def maintain_memory_tree(
         deployment_override=deployment,
     )
     async with amanaged_backend(backend):
-        await run_memory_maintainer_agent(
+        output = await run_memory_maintainer_agent(
             model=model,
             backend=backend,
             worktree_root=worktree_root,
             user_prompt=build_maintenance_prompt(
                 prompt_observations, reorganization=reorganization
             ),
+            extraction_ids=[extraction_id for extraction_id, _ in observations],
             trajectory_paths=(maintainer_trajectory_path,),
         )
     return MemoryMaintenanceResult(
         memory_tree_path=worktree_root,
         maintainer_trajectory_path=maintainer_trajectory_path,
+        output=output,
     )
 
 

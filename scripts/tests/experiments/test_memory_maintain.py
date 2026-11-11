@@ -4,6 +4,19 @@ from unittest.mock import AsyncMock
 
 import pytest
 from scripts.experiments import memory_maintain
+from sec_review_agents.agents.memory_maintainer.model import (
+    MemoryMaintenanceOutput,
+    ObservationDecision,
+)
+from sec_review_agents.memory.maintainer import MemoryMaintenanceResult
+
+
+def _result(kwargs, output):
+    return MemoryMaintenanceResult(
+        memory_tree_path=kwargs["worktree_root"],
+        maintainer_trajectory_path=kwargs["maintainer_trajectory_path"],
+        output=output,
+    )
 
 
 def _args(tmp_path):
@@ -36,6 +49,18 @@ async def test_build_preserves_inputs_and_excludes_staged_observations(
         (tree / "observations" / "input.md").write_text("Experience\n")
         (tree / "MEMORY.md").write_text("Maintained\n")
         kwargs["maintainer_trajectory_path"].write_text("trajectory\n")
+        decision = ObservationDecision(
+            extraction_id="task-01",
+            action="skipped",
+            topics=[],
+            reason="Already covered.",
+        )
+        return _result(
+            kwargs,
+            MemoryMaintenanceOutput(
+                observation_decisions=[decision], summary="No change."
+            ),
+        )
 
     monkeypatch.setattr(memory_maintain, "maintain_memory_tree", maintain)
     tree = await memory_maintain.run(args)
@@ -48,6 +73,9 @@ async def test_build_preserves_inputs_and_excludes_staged_observations(
     assert manifest["status"] == "completed"
     assert manifest["observations"][0]["id"] == "task-01"
     assert manifest["memory_files"][0]["path"] == "MEMORY.md"
+    assert manifest["maintainer_output"]["observation_decisions"][0]["action"] == (
+        "skipped"
+    )
 
 
 @pytest.mark.asyncio
@@ -74,6 +102,10 @@ async def test_reorganization_uses_base_memory_and_no_observations(
         (tree / "observations").mkdir(parents=True)
         (tree / "MEMORY.md").write_text("Reorganized\n")
         kwargs["maintainer_trajectory_path"].write_text("trajectory\n")
+        return _result(
+            kwargs,
+            MemoryMaintenanceOutput(observation_decisions=[], summary="Merged topics."),
+        )
 
     monkeypatch.setattr(memory_maintain, "maintain_memory_tree", maintain)
     tree = await memory_maintain.run(args)
@@ -81,6 +113,7 @@ async def test_reorganization_uses_base_memory_and_no_observations(
     manifest = json.loads((args.output_dir / "manifest.json").read_text())
     assert manifest["mode"] == "reorganization"
     assert manifest["observations"] == []
+    assert manifest["maintainer_output"]["summary"] == "Merged topics."
 
 
 @pytest.mark.asyncio

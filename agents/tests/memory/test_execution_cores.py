@@ -155,7 +155,7 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
             encoding="utf-8"
         ) == "New lesson.\n"
         (worktree / "MEMORY.md").write_text("# Updated\n", encoding="utf-8")
-        return MemoryMaintenanceOutput()
+        return MemoryMaintenanceOutput(observation_decisions=[], summary="Updated.")
 
     with (
         patch(
@@ -184,6 +184,7 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
     )
     assert invoke.await_args is not None
     assert invoke.await_args.kwargs["trajectory_paths"] == (agent_trajectory,)
+    assert invoke.await_args.kwargs["extraction_ids"] == ["extraction-1"]
     assert (
         "/memory/observations/observation-0001.md"
         in invoke.await_args.kwargs["user_prompt"]
@@ -226,7 +227,7 @@ async def test_maintainer_reorganization_accepts_base_without_observations(
         assert not list((candidate / "observations").iterdir())
         assert "None. No observations" in kwargs["user_prompt"]
         (candidate / "MEMORY.md").write_text("# Reorganized\n", encoding="utf-8")
-        return MemoryMaintenanceOutput()
+        return MemoryMaintenanceOutput(observation_decisions=[], summary="Updated.")
 
     with (
         patch(
