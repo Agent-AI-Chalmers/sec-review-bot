@@ -2,6 +2,7 @@ import React from 'react'
 import { api } from '../../shared/api-client.js'
 import { useResource, type Resource } from '../../shared/resource.js'
 import { useRefresh, type RefreshState } from '../../shared/refresh.js'
+import { usePagedResource, type PagedResource } from './usePagedResource.js'
 import type {
   MemoryTreeAutomation,
   MemoryTree,
@@ -16,8 +17,12 @@ type OverviewRange = NonNullable<GetCatalogOverviewQuery['range']>
 interface MemoryResources extends RefreshState {
   automation: Resource<MemoryTreeAutomation>
   tree: Resource<MemoryTree>
-  revisions: Resource<MemoryTreeRevisionList>
-  observations: Resource<ObservationList>
+  /** The newest revisions; the graph draws only this window. */
+  latestRevisions: Resource<MemoryTreeRevisionList>
+  /** One page of revision history for the list view. */
+  revisionPages: PagedResource<null, number, MemoryTreeRevisionList>
+  /** One page of observations, optionally filtered to one consuming revision. */
+  observationPages: PagedResource<number | undefined, string, ObservationList>
   overview: Resource<CatalogOverview>
   overviewRange: OverviewRange
   changeOverviewRange: (range: OverviewRange) => Promise<void>
@@ -35,11 +40,36 @@ export function useMemoryResources(): MemoryResources {
   const tree = useResource((signal) =>
     api<MemoryTree>('/memory/tree', { signal })
   )
-  const revisions = useResource((signal) =>
-    api<MemoryTreeRevisionList>('/memory/revisions?limit=50', { signal })
+  const latestRevisions = useResource((signal) =>
+    api<MemoryTreeRevisionList>(
+      `/memory/revisions?limit=${GRAPH_REVISION_WINDOW}`,
+      { signal }
+    )
   )
-  const observations = useResource((signal) =>
-    api<ObservationList>('/memory/observations?limit=50', { signal })
+  const revisionPages = usePagedResource<null, number, MemoryTreeRevisionList>(
+    { filter: null, limit: DEFAULT_PAGE_SIZE },
+    ({ limit, trail }, signal) => {
+      const query = new URLSearchParams({ limit: String(limit) })
+      const before = trail.at(-1)
+      if (before !== undefined) query.set('before_revision', String(before))
+      return api<MemoryTreeRevisionList>(`/memory/revisions?${query}`, {
+        signal
+      })
+    }
+  )
+  const observationPages = usePagedResource<
+    number | undefined,
+    string,
+    ObservationList
+  >(
+    { filter: undefined, limit: DEFAULT_PAGE_SIZE },
+    ({ filter, limit, trail }, signal) => {
+      const query = new URLSearchParams({ limit: String(limit) })
+      if (filter !== undefined) query.set('consumed_revision', String(filter))
+      const cursor = trail.at(-1)
+      if (cursor !== undefined) query.set('cursor', cursor)
+      return api<ObservationList>(`/memory/observations?${query}`, { signal })
+    }
   )
   const overview = useResource((signal) =>
     api<CatalogOverview>(`/memory/overview?range=${overviewRangeRef.current}`, {
@@ -50,15 +80,17 @@ export function useMemoryResources(): MemoryResources {
     await Promise.all([
       automation.reload(),
       tree.reload(),
-      revisions.reload(),
-      observations.reload(),
+      latestRevisions.reload(),
+      revisionPages.resource.reload(),
+      observationPages.resource.reload(),
       overview.reload()
     ])
   }, [
     automation.reload,
-    observations.reload,
+    latestRevisions.reload,
+    observationPages.resource.reload,
     overview.reload,
-    revisions.reload,
+    revisionPages.resource.reload,
     tree.reload
   ])
   const { refresh, refreshing, lastChecked } = useRefresh(load)
@@ -72,8 +104,9 @@ export function useMemoryResources(): MemoryResources {
   return {
     automation,
     tree,
-    revisions,
-    observations,
+    latestRevisions,
+    revisionPages,
+    observationPages,
     overview,
     overviewRange,
     changeOverviewRange,
@@ -82,3 +115,8 @@ export function useMemoryResources(): MemoryResources {
     lastChecked
   }
 }
+
+/** Matches the default the Runs list uses for its cursor pager. */
+export const DEFAULT_PAGE_SIZE = 20
+/** The graph draws one window of the newest revisions; older ones are in the list. */
+export const GRAPH_REVISION_WINDOW = 50

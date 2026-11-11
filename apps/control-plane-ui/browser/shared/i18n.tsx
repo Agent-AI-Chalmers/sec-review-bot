@@ -185,6 +185,13 @@ export const messages = {
     maintenanceReport: 'Maintenance report',
     maintenanceDecisions: 'Decisions',
     noObservationDecisions: 'No observations were consumed.',
+    showObservation: 'View observation',
+    observationsForRevision:
+      'Showing observations included in revision {revision}.',
+    showAllObservations: 'Show all observations',
+    observationNotFound: 'This observation is not on this page.',
+    revisionGraphWindow:
+      'The graph shows the newest {count} revisions. Use the list to browse older ones.',
     extractionId: 'Extraction ID',
     decisionAction: 'Decision',
     decisionTopics: 'Topics',
@@ -772,6 +779,12 @@ export const messages = {
     maintenanceReport: '维护报告',
     maintenanceDecisions: '决定',
     noObservationDecisions: '本次未消费观察项。',
+    showObservation: '查看观察项',
+    observationsForRevision: '仅显示被修订 {revision} 采纳的观察项。',
+    showAllObservations: '显示全部观察项',
+    observationNotFound: '当前页没有这条观察项。',
+    revisionGraphWindow:
+      '关系图只显示最新的 {count} 个修订，更早的修订请在列表中查看。',
     extractionId: '提取 ID',
     decisionAction: '处理方式',
     decisionTopics: '主题',

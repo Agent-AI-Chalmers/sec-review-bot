@@ -150,6 +150,7 @@
   line-height: inherit;
 }
 
+[data-extraction-row][data-highlighted],
 .revision-graph-node[data-highlighted] {
   outline: 2px solid transparent;
   outline-offset: 3px;
@@ -545,9 +546,4 @@
 
 .maintenance-decision-action {
   flex: none;
-}
-
-.maintenance-decision-id {
-  min-width: 0;
-  overflow-wrap: anywhere;
 }

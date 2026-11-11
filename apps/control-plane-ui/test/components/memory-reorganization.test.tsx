@@ -63,21 +63,52 @@ const learningRevision: MemoryTreeRevision = {
   }
 }
 
+function historyProps(
+  revisions: MemoryTreeRevision[]
+): Pick<
+  React.ComponentProps<typeof MemoryRevisionHistory>,
+  | 'graphRevisions'
+  | 'graphLoading'
+  | 'graphError'
+  | 'graphTruncated'
+  | 'listRevisions'
+  | 'listLoading'
+  | 'listError'
+  | 'pagination'
+> {
+  return {
+    graphRevisions: revisions,
+    graphLoading: false,
+    graphError: '',
+    graphTruncated: false,
+    listRevisions: revisions,
+    listLoading: false,
+    listError: '',
+    pagination: {
+      pageSize: 20,
+      page: 1,
+      total: 1,
+      onPageSizeChange: vi.fn(),
+      onPreviousPage: vi.fn(),
+      onNextPage: vi.fn()
+    }
+  }
+}
+
 test.each(['list', 'graph'])(
   'reorganization has its own label and opens its trajectory in %s view',
   (view) => {
     const onViewTrajectory = vi.fn()
     renderComponent(
       <MemoryRevisionHistory
-        revisions={[revision]}
+        {...historyProps([revision])}
         activeRevision={2}
-        loading={false}
-        error=""
         view={view}
         highlightedRevision={undefined}
         onViewChange={vi.fn()}
         onViewFiles={vi.fn()}
         onViewTrajectory={onViewTrajectory}
+        onRevealObservation={vi.fn()}
         onCompare={vi.fn()}
         onSetCurrent={vi.fn()}
         onHighlightEnd={vi.fn()}
@@ -92,19 +123,19 @@ test.each(['list', 'graph'])(
 
 function renderHistory(
   revisions: MemoryTreeRevision[],
-  view: string = 'list'
+  view: string = 'list',
+  onRevealObservation = vi.fn()
 ): void {
   renderComponent(
     <MemoryRevisionHistory
-      revisions={revisions}
+      {...historyProps(revisions)}
       activeRevision={revisions[0]?.revision}
-      loading={false}
-      error=""
       view={view}
       highlightedRevision={undefined}
       onViewChange={vi.fn()}
       onViewFiles={vi.fn()}
       onViewTrajectory={vi.fn()}
+      onRevealObservation={onRevealObservation}
       onCompare={vi.fn()}
       onSetCurrent={vi.fn()}
       onHighlightEnd={vi.fn()}
@@ -116,11 +147,11 @@ test.each(['list', 'graph'])(
   'the maintenance report shows the summary and each observation decision in %s view',
   async (view) => {
     renderHistory([learningRevision], view)
-    fireEvent.click(screen.getByRole('button', { name: 'Maintenance report' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Decisions' }))
     expect(
       await screen.findByText('Added one lesson and skipped a duplicate.')
     ).toBeInTheDocument()
-    expect(screen.getByText('extraction-1')).toBeInTheDocument()
+    expect(screen.queryByText('extraction-1')).not.toBeInTheDocument()
     expect(screen.getByText('Added')).toBeInTheDocument()
     expect(screen.getByText('/memory/topics/path.md')).toBeInTheDocument()
     expect(screen.getByText('Skipped')).toBeInTheDocument()
@@ -132,9 +163,47 @@ test.each(['list', 'graph'])(
 
 test('a reorganization report states that no observations were consumed', async () => {
   renderHistory([revision])
-  fireEvent.click(screen.getByRole('button', { name: 'Maintenance report' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Decisions' }))
   expect(
     await screen.findByText('Merged duplicate path topics.')
   ).toBeInTheDocument()
   expect(screen.getByText('No observations were consumed.')).toBeInTheDocument()
+})
+
+test.each(['list', 'graph'])(
+  'a report decision reveals its observation with the revision in %s view',
+  async (view) => {
+    const onRevealObservation = vi.fn()
+    renderHistory([learningRevision], view, onRevealObservation)
+    fireEvent.click(screen.getByRole('button', { name: 'Decisions' }))
+    const links = await screen.findAllByRole('button', {
+      name: 'View observation'
+    })
+    fireEvent.click(links[1]!)
+    expect(onRevealObservation).toHaveBeenCalledWith(3, 'extraction-2')
+  }
+)
+
+test('the graph says when older revisions are outside its window', () => {
+  renderComponent(
+    <MemoryRevisionHistory
+      {...historyProps([revision])}
+      graphTruncated
+      activeRevision={2}
+      view="graph"
+      highlightedRevision={undefined}
+      onViewChange={vi.fn()}
+      onViewFiles={vi.fn()}
+      onViewTrajectory={vi.fn()}
+      onRevealObservation={vi.fn()}
+      onCompare={vi.fn()}
+      onSetCurrent={vi.fn()}
+      onHighlightEnd={vi.fn()}
+    />
+  )
+  expect(
+    screen.getByText(
+      'The graph shows the newest 50 revisions. Use the list to browse older ones.'
+    )
+  ).toBeInTheDocument()
 })

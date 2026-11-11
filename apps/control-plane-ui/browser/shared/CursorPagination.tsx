@@ -1,10 +1,11 @@
 import type React from 'react'
 import { Group, Pagination, Select, Text } from '@mantine/core'
-import { useMessages } from '../../../shared/i18n.js'
+import { useMessages } from './i18n.js'
 
 const PAGE_SIZES: readonly number[] = [10, 20, 50, 100]
 
-export function RunsPagination({
+/** Previous/next pager for forward-only cursor APIs, with a page-size selector. */
+export function CursorPagination({
   pageSize,
   page,
   total,

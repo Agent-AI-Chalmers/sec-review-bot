@@ -1,6 +1,15 @@
 import React from 'react'
-import { Badge, Button, Code, Group, Modal, Stack, Text } from '@mantine/core'
-import { IconFileText } from '@tabler/icons-react'
+import {
+  Anchor,
+  Badge,
+  Button,
+  Code,
+  Group,
+  Modal,
+  Stack,
+  Text
+} from '@mantine/core'
+import { IconListCheck } from '@tabler/icons-react'
 
 import { useMessages } from '../../shared/i18n.js'
 import { ICON_SIZE } from '../../shared/design.js'
@@ -24,9 +33,11 @@ const DECISION_COLORS = {
 
 // Shared by the revision list and graph so both views open the same report.
 export function MaintenanceReportButton({
-  report
+  report,
+  onRevealObservation
 }: {
   report: MaintenanceReport
+  onRevealObservation: (extractionId: string) => void
 }): React.JSX.Element {
   const t = useMessages()
   const [opened, setOpened] = React.useState(false)
@@ -35,10 +46,10 @@ export function MaintenanceReportButton({
       <Button
         size="xs"
         variant="subtle"
-        leftSection={<IconFileText size={ICON_SIZE.sm} />}
+        leftSection={<IconListCheck size={ICON_SIZE.sm} />}
         onClick={() => setOpened(true)}
       >
-        {t('maintenanceReport')}
+        {t('maintenanceDecisions')}
       </Button>
       <Modal
         opened={opened}
@@ -47,16 +58,24 @@ export function MaintenanceReportButton({
         size="lg"
         centered
       >
-        <MaintenanceReportView report={report} />
+        <MaintenanceReportView
+          report={report}
+          onRevealObservation={(extractionId) => {
+            setOpened(false)
+            onRevealObservation(extractionId)
+          }}
+        />
       </Modal>
     </>
   )
 }
 
 function MaintenanceReportView({
-  report
+  report,
+  onRevealObservation
 }: {
   report: MaintenanceReport
+  onRevealObservation: (extractionId: string) => void
 }): React.JSX.Element {
   const t = useMessages()
   const decisions = report.observation_decisions
@@ -80,9 +99,15 @@ function MaintenanceReportView({
                 >
                   {t(DECISION_LABELS[decision.action])}
                 </Badge>
-                <Text size="xs" c="dimmed" className="maintenance-decision-id">
-                  {decision.extraction_id}
-                </Text>
+                {/* Extraction ids are internal keys; the list does not show them either. */}
+                <Anchor
+                  component="button"
+                  type="button"
+                  size="xs"
+                  onClick={() => onRevealObservation(decision.extraction_id)}
+                >
+                  {t('showObservation')}
+                </Anchor>
               </Group>
               <Text size="sm">{decision.reason}</Text>
               {decision.topics.length > 0 && (

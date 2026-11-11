@@ -1,10 +1,19 @@
 import React from 'react'
-import { Alert, Button, Group, SegmentedControl, Table } from '@mantine/core'
+import {
+  Alert,
+  Button,
+  Group,
+  SegmentedControl,
+  Table,
+  Text
+} from '@mantine/core'
 import { IconArrowsDiff, IconEye, IconHistory } from '@tabler/icons-react'
 
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { EmptyState, LoadingState } from '../../shared/StateMessage.js'
 import type { MemoryTreeRevision } from './api-types.generated.js'
+import { CursorPagination } from '../../shared/CursorPagination.js'
+import { GRAPH_REVISION_WINDOW } from './useMemoryResources.js'
 import { MaintenanceReportButton } from './MaintenanceReport.js'
 import { RevisionGraph } from './RevisionGraph.js'
 import { ICON_SIZE } from '../../shared/design.js'
@@ -12,36 +21,56 @@ import { ICON_SIZE } from '../../shared/design.js'
 type Revision = MemoryTreeRevision
 
 export function MemoryRevisionHistory({
-  revisions,
+  graphRevisions,
+  graphLoading,
+  graphError,
+  graphTruncated,
+  listRevisions,
+  listLoading,
+  listError,
+  pagination,
   activeRevision,
-  loading,
-  error,
   view,
   highlightedRevision,
   onViewChange,
   onViewFiles,
   onViewTrajectory,
+  onRevealObservation,
   onCompare,
   onSetCurrent,
   onHighlightEnd
 }: {
-  revisions: Revision[]
+  /** The newest revisions; the graph draws only this window. */
+  graphRevisions: Revision[]
+  graphLoading: boolean
+  graphError: string
+  /** True when older revisions exist beyond the graph window. */
+  graphTruncated: boolean
+  /** One page of revision history for the list view. */
+  listRevisions: Revision[]
+  listLoading: boolean
+  listError: string
+  pagination: React.ComponentProps<typeof CursorPagination>
   activeRevision: number | undefined
-  loading: boolean
-  error: string
   view: string
   highlightedRevision: number | undefined
   onViewChange: (view: string) => void
   onViewFiles: (revision: number) => void
   onViewTrajectory: (revision: number) => void
+  onRevealObservation: (revision: number, extractionId: string) => void
   onCompare: (revision: Revision) => void
   onSetCurrent: (revision: number) => void
   onHighlightEnd: () => void
 }): React.JSX.Element {
   const t = useMessages()
   const { language } = useLanguage()
+  const isGraph = view === 'graph'
+  const revisions = isGraph ? graphRevisions : listRevisions
+  const loading = isGraph ? graphLoading : listLoading
+  const error = isGraph ? graphError : listError
 
-  if (!loading && revisions.length === 0 && !error)
+  // An empty later page is not an empty history, so only page one shows the empty state.
+  if (!loading && revisions.length === 0 && !error && pagination.page === 1)
     return <EmptyState message={t('noRevisions')} />
 
   return (
@@ -64,13 +93,22 @@ export function MemoryRevisionHistory({
           ]}
         />
       </Group>
-      {view === 'graph' ? (
+      {isGraph && graphTruncated && (
+        <Text size="sm" c="dimmed" mb="sm">
+          {t('revisionGraphWindow').replace(
+            '{count}',
+            String(GRAPH_REVISION_WINDOW)
+          )}
+        </Text>
+      )}
+      {isGraph ? (
         <RevisionGraph
           revisions={revisions}
           activeRevision={activeRevision}
           allowSetCurrent={activeRevision !== undefined}
           onViewFiles={onViewFiles}
           onViewTrajectory={onViewTrajectory}
+          onRevealObservation={onRevealObservation}
           onCompare={onCompare}
           onSetCurrent={onSetCurrent}
           highlightedRevision={highlightedRevision}
@@ -158,6 +196,9 @@ export function MemoryRevisionHistory({
                       {item.source.kind !== 'manual' ? (
                         <MaintenanceReportButton
                           report={item.source.maintenance_report}
+                          onRevealObservation={(extractionId) =>
+                            onRevealObservation(item.revision, extractionId)
+                          }
                         />
                       ) : (
                         <span aria-hidden="true" />
@@ -192,6 +233,7 @@ export function MemoryRevisionHistory({
           </Table>
         </div>
       )}
+      {!isGraph && <CursorPagination {...pagination} />}
     </>
   )
 }

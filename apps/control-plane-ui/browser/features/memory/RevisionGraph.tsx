@@ -100,6 +100,7 @@ export function RevisionGraph({
   activeRevision,
   onViewFiles,
   onViewTrajectory,
+  onRevealObservation,
   onCompare,
   onSetCurrent,
   allowSetCurrent,
@@ -110,6 +111,7 @@ export function RevisionGraph({
   activeRevision: number | undefined
   onViewFiles: (revision: number) => void
   onViewTrajectory: (revision: number) => void
+  onRevealObservation: (revision: number, extractionId: string) => void
   onCompare: (revision: RevisionGraphItem) => void
   onSetCurrent: (revision: number) => void
   allowSetCurrent: boolean
@@ -380,6 +382,9 @@ export function RevisionGraph({
                   </Button>
                   <MaintenanceReportButton
                     report={selected.source.maintenance_report}
+                    onRevealObservation={(extractionId) =>
+                      onRevealObservation(selected.revision, extractionId)
+                    }
                   />
                 </>
               )}

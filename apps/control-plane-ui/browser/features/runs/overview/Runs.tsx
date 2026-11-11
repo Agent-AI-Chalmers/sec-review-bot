@@ -10,7 +10,7 @@ import { ParkedRuns } from './ParkedRuns.js'
 import { RunJump } from '../RunJump.js'
 import { RunFilters } from './RunFilters.js'
 import { RunsTable } from './RunsTable.js'
-import { RunsPagination } from './RunsPagination.js'
+import { CursorPagination } from '../../../shared/CursorPagination.js'
 import { useRunsData } from './useRunsData.js'
 import { useRunsLocation } from './useRunsLocation.js'
 
@@ -91,7 +91,7 @@ export function Runs(): React.JSX.Element {
       ) : (
         <>
           <RunsTable runs={data.runs} listSearch={search.toString()} />
-          <RunsPagination
+          <CursorPagination
             pageSize={pageSize}
             page={page}
             total={totalPages}

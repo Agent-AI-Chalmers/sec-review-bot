@@ -336,10 +336,22 @@ export function createMemoryHandler(
       requestUrl.startsWith('/api/memory/revisions?') &&
       request.method === 'GET'
     ) {
+      // Honor before_revision paging like the catalog: newest first, exclusive.
+      const query = new URL(requestUrl, 'http://fixture').searchParams
+      const limit = Number(query.get('limit') ?? '50')
+      const before = query.get('before_revision')
+      const matching = memoryRevisions.filter(
+        (revision) =>
+          before === null || Number(revision.revision) < Number(before)
+      )
+      const page = matching.slice(0, limit)
       response.end(
         JSON.stringify({
-          revisions: memoryRevisions,
-          next_before_revision: null
+          revisions: page,
+          next_before_revision:
+            matching.length > limit
+              ? Number(page[page.length - 1]?.revision)
+              : null
         })
       )
       return
@@ -348,10 +360,25 @@ export function createMemoryHandler(
       requestUrl.startsWith('/api/memory/observations?') &&
       request.method === 'GET'
     ) {
+      // Honor the catalog's revision filter and cursor so the UI's paging and
+      // report-to-observation jump behave as they do against the real catalog.
+      const query = new URL(requestUrl, 'http://fixture').searchParams
+      const consumedRevision = query.get('consumed_revision')
+      const limit = Number(query.get('limit') ?? '50')
+      const offset = Number(query.get('cursor') ?? '0')
+      const matching = [...observations]
+        .reverse()
+        .filter(
+          (observation) =>
+            consumedRevision === null ||
+            observation.consumed_revision === Number(consumedRevision)
+        )
+      const page = matching.slice(offset, offset + limit)
       response.end(
         JSON.stringify({
-          observations: [...observations].reverse(),
-          next_cursor: null
+          observations: page,
+          next_cursor:
+            offset + limit < matching.length ? String(offset + limit) : null
         })
       )
       return
