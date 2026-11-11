@@ -198,10 +198,11 @@
 }
 
 /* Revision rows have optional process actions, but the current-state control must not drift
-   between rows. Fixed semantic slots keep every command aligned without adding fake controls. */
+   between rows. Fixed semantic slots keep every command aligned without adding fake controls.
+   The fourth slot holds the maintainer decisions action. */
 .memory-revision-actions {
   display: grid;
-  grid-template-columns: 72px 84px 84px 140px;
+  grid-template-columns: 72px 84px 84px 84px 140px;
   align-items: center;
   column-gap: var(--mantine-spacing-xs);
   width: max-content;
@@ -528,4 +529,25 @@
 .memory-overview-workflows tfoot th {
   border-top: 1px solid var(--border);
   color: var(--mantine-color-text);
+}
+
+.maintenance-decisions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.maintenance-decision {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.maintenance-decision-action {
+  flex: none;
+}
+
+.maintenance-decision-id {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }

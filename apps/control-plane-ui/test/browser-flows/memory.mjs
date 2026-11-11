@@ -195,7 +195,7 @@ export async function runMemoryPreflightFlow({ name, context, base, server }) {
         .getByText('Memory overview could not be loaded.', { exact: true })
         .waitFor()
       await partialFailurePage
-        .getByText('Automatic memory updates', { exact: true })
+        .getByText('Auto-update', { exact: true })
         .waitFor()
       await partialFailurePage.getByText('Revisions', { exact: true }).click()
       await partialFailurePage.locator('.revision-graph-node').first().waitFor()
@@ -314,7 +314,7 @@ export async function runMemoryFlow({
     await zhPage.goto(`${base}/memory`, { waitUntil: 'domcontentloaded' })
     await zhPage.getByRole('heading', { name: '记忆' }).waitFor()
     const automationSwitch = zhPage.getByRole('switch', {
-      name: '记忆自动更新'
+      name: '自动更新'
     })
     await automationSwitch.waitFor()
     await zhPage.getByRole('img', { name: '说明记忆自动更新控制行为' }).hover()
@@ -809,9 +809,10 @@ export async function runMemoryFlow({
       /^\/runs\/[0-9a-f-]+$/,
       `${name} every observation must link to its source run`
     )
-    const incorporatedRevision = page.getByRole('button', {
-      name: 'revision 2'
-    })
+    // Several fixture observations were consumed by the same revision.
+    const incorporatedRevision = page
+      .getByRole('button', { name: 'revision 2' })
+      .first()
     await incorporatedRevision.click()
     const linkedRevisionNode = page.locator(
       '.revision-graph-node[data-revision-node="2"]'

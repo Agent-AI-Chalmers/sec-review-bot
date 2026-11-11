@@ -12,7 +12,7 @@ test('memory-tree automation mutates only this worker fixture server', async ({
   await page.goto('/memory')
 
   const control = page.getByRole('switch', {
-    name: 'Automatic memory updates'
+    name: 'Auto-update'
   })
   await expect(control).toBeChecked()
 

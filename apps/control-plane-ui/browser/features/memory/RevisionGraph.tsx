@@ -4,6 +4,7 @@ import { IconArrowsDiff, IconEye, IconHistory } from '@tabler/icons-react'
 
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import type { MemoryTreeRevision } from './api-types.generated.js'
+import { MaintenanceReportButton } from './MaintenanceReport.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
 export type RevisionGraphItem = MemoryTreeRevision
@@ -368,14 +369,19 @@ export function RevisionGraph({
                 {t('compareWithPredecessor')}
               </Button>
               {selected.source.kind !== 'manual' && (
-                <Button
-                  size="xs"
-                  variant="subtle"
-                  leftSection={<IconEye size={ICON_SIZE.sm} />}
-                  onClick={() => onViewTrajectory(selected.revision)}
-                >
-                  {t('trajectory')}
-                </Button>
+                <>
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    leftSection={<IconEye size={ICON_SIZE.sm} />}
+                    onClick={() => onViewTrajectory(selected.revision)}
+                  >
+                    {t('trajectory')}
+                  </Button>
+                  <MaintenanceReportButton
+                    report={selected.source.maintenance_report}
+                  />
+                </>
               )}
               {activeRevision !== undefined &&
               selected.revision === activeRevision ? (

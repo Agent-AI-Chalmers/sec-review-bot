@@ -5,6 +5,7 @@ import { IconArrowsDiff, IconEye, IconHistory } from '@tabler/icons-react'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { EmptyState, LoadingState } from '../../shared/StateMessage.js'
 import type { MemoryTreeRevision } from './api-types.generated.js'
+import { MaintenanceReportButton } from './MaintenanceReport.js'
 import { RevisionGraph } from './RevisionGraph.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
@@ -151,6 +152,13 @@ export function MemoryRevisionHistory({
                         >
                           {t('trajectory')}
                         </Button>
+                      ) : (
+                        <span aria-hidden="true" />
+                      )}
+                      {item.source.kind !== 'manual' ? (
+                        <MaintenanceReportButton
+                          report={item.source.maintenance_report}
+                        />
                       ) : (
                         <span aria-hidden="true" />
                       )}

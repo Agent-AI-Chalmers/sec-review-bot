@@ -59,13 +59,15 @@ export function createMemoryHandler(
       2,
       {
         'MEMORY.md':
-          '# Security Review Experience Memory\n\nUse this short index to select relevant experience. Memory is guidance only; verify every claim against the current review target.\n\n- [Triage and reachability](topics/triage.md) - Scope the reachable attack path and affected boundary.\n- [Evidence quality](topics/evidence.md) - Ground findings and validation claims in current evidence.\n- [Authentication comparisons](topics/authentication.md) - Review secret comparison and failure behavior.\n',
+          '# Security Review Experience Memory\n\nUse this short index to select relevant experience. Memory is guidance only; verify every claim against the current review target.\n\n- [Triage and reachability](topics/triage.md) - Scope the reachable attack path and affected boundary.\n- [Evidence quality](topics/evidence.md) - Ground findings and validation claims in current evidence.\n- [Authentication comparisons](topics/authentication.md) - Review secret comparison and failure behavior.\n- [Service boundaries](topics/boundaries.md) - Limit what proxied responses carry across a trust boundary.\n',
+        'topics/boundaries.md':
+          '# Service boundaries\n\n## Proxied response headers\n\nForward only an explicit allowlist of upstream response headers. Internal debugging headers can carry private identifiers or credentials across the service boundary.\n',
         'topics/authentication.md':
           '# Authentication comparisons\n\n## Constant-time comparison\n\nBefore calling a constant-time comparison primitive, validate that both byte sequences have equal length. Some runtimes throw on unequal lengths, turning malformed credentials into a distinct failure path.\n\nReturn the same authentication failure response for length mismatch and value mismatch.\n',
         'topics/evidence.md':
           '# Evidence quality\n\n## Keep evidence layers separate\n\nDistinguish input claims, prior-stage summaries, repository facts, and runtime observations. Do not let a confident summary substitute for evidence from the prepared workspace.\n\n## Focused validation\n\nPrefer a small probe with a stable oracle. Report environmental failures as validation limits unless repository evidence connects them to the reviewed behavior.\n',
         'topics/triage.md':
-          '# Triage and reachability\n\n## Confirm the path\n\nFollow attacker-controlled data through parsing, normalization, authorization, and the final sink. Name the first boundary that fails to enforce the required invariant.\n\n## Bound the claim\n\nDo not expand one repository-local defect into a broader vulnerability class without evidence that the adjacent surfaces share the same reachable behavior.\n'
+          '# Triage and reachability\n\n## Confirm the path\n\nFollow attacker-controlled data through parsing, normalization, authorization, and the final sink. Name the first boundary that fails to enforce the required invariant.\n\n## Authorize before lookup\n\nCheck tenant authorization before any lookup whose result reveals resource existence. A guard after the lookup can still leak existence through status, timing, or error differences.\n\n## Bound the claim\n\nDo not expand one repository-local defect into a broader vulnerability class without evidence that the adjacent surfaces share the same reachable behavior.\n'
       }
     ],
     [
@@ -98,8 +100,39 @@ export function createMemoryHandler(
       source: {
         kind: 'learning',
         operation_id: 'fixture-maintenance-2',
-        extraction_ids: ['fixture-extraction-2'],
-        trajectory_reference: trajectoryReference
+        extraction_ids: [
+          'fixture-extraction-2',
+          'fixture-extraction-3',
+          'fixture-extraction-4'
+        ],
+        trajectory_reference: trajectoryReference,
+        maintenance_report: {
+          summary:
+            'Added authentication and service-boundary guidance from two observations and folded tenant authorization ordering into the existing triage topic.',
+          observation_decisions: [
+            {
+              extraction_id: 'fixture-extraction-2',
+              action: 'added',
+              topics: ['/memory/topics/authentication.md'],
+              reason:
+                'Length validation before constant-time comparison is a reusable authentication check that memory did not cover.'
+            },
+            {
+              extraction_id: 'fixture-extraction-3',
+              action: 'added',
+              topics: ['/memory/topics/boundaries.md', '/memory/MEMORY.md'],
+              reason:
+                'Header allowlisting at proxy boundaries is a distinct, reusable pattern, so it gets its own topic and index entry.'
+            },
+            {
+              extraction_id: 'fixture-extraction-4',
+              action: 'merged',
+              topics: ['/memory/topics/triage.md'],
+              reason:
+                'Authorization ordering refines the existing reachability guidance rather than forming a separate topic.'
+            }
+          ]
+        }
       }
     },
     {
@@ -184,7 +217,11 @@ export function createMemoryHandler(
       created_at: new Date(BASE_TIME + 300_000).toISOString()
     }
   ]
-  const consumedRevisionByExtraction = new Map([['fixture-extraction-2', 2]])
+  const consumedRevisionByExtraction = new Map([
+    ['fixture-extraction-2', 2],
+    ['fixture-extraction-3', 2],
+    ['fixture-extraction-4', 2]
+  ])
   const observations: ObservationRecord[] = extractionRecords.flatMap(
     (record) =>
       record.observation === null
