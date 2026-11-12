@@ -111,7 +111,7 @@ pnpm run build
 - `pnpm test`：运行 Node 测试和 React 组件测试，检查组件渲染与交互。
 - `pnpm run test:e2e`：运行桌面和移动端 Chrome 浏览器测试，检查布局、滚动、下载等浏览器行为，以及无障碍和视觉效果。
 
-本地浏览器测试为每个 Playwright worker 启动独立的测试数据服务，端口随机分配。调试时可通过 `CONTROL_PLANE_UI_E2E_PORT` 指定固定端口。
+本地浏览器测试为每个 Playwright 测试启动独立的测试数据服务，端口随机分配。调试时可通过 `CONTROL_PLANE_UI_E2E_PORT` 指定固定端口。
 
 ### 测试外部部署
 

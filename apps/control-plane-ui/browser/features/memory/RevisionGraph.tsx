@@ -1,9 +1,16 @@
 import React from 'react'
-import { Button, Group, Paper, Text } from '@mantine/core'
-import { IconArrowsDiff, IconEye, IconHistory } from '@tabler/icons-react'
+import { Button, Group, Paper, Text, Tooltip, ActionIcon } from '@mantine/core'
+import {
+  IconArrowsDiff,
+  IconEye,
+  IconHistory,
+  IconInfoCircle,
+  IconArrowUp
+} from '@tabler/icons-react'
 
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import type { MemoryTreeRevision } from './api-types.generated.js'
+import { MaintenanceReportButton } from './MaintenanceReport.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
 export type RevisionGraphItem = MemoryTreeRevision
@@ -96,22 +103,32 @@ function layoutRevisions(revisions: RevisionGraphItem[]): {
 
 export function RevisionGraph({
   revisions,
+  windowHelp,
+  historical,
+  onShowLatest,
   activeRevision,
   onViewFiles,
   onViewTrajectory,
+  onRevealObservation,
   onCompare,
   onSetCurrent,
   allowSetCurrent,
   highlightedRevision,
+  focusRevision,
   onHighlightEnd
 }: {
   revisions: RevisionGraphItem[]
+  windowHelp: string
+  historical: boolean
+  onShowLatest: (() => void) | undefined
   activeRevision: number | undefined
   onViewFiles: (revision: number) => void
   onViewTrajectory: (revision: number) => void
+  onRevealObservation: (revision: number, extractionId: string) => void
   onCompare: (revision: RevisionGraphItem) => void
   onSetCurrent: (revision: number) => void
   allowSetCurrent: boolean
+  focusRevision?: number | undefined
   highlightedRevision: number | undefined
   onHighlightEnd: () => void
 }): React.JSX.Element {
@@ -145,190 +162,210 @@ export function RevisionGraph({
   }
   const selected = nodes.get(selectedRevision) ?? layout.nodes[0]
 
+  const positioned = React.useRef<string | undefined>(undefined)
+  const navigationTarget = highlightedRevision ?? focusRevision
+  const requestedPosition =
+    navigationTarget === undefined ? 'latest' : `revision:${navigationTarget}`
   React.useLayoutEffect(() => {
     const viewport = scrollRef.current
-    if (!viewport) return
-    // On a narrow canvas the graph is wider than its viewport. Centering the
-    // whole canvas can leave the current revision half outside the initial
-    // frame, so center the current node instead and fall back to the canvas
-    // center only when no revision is current.
+    if (!viewport || layout.nodes.length === 0) return
+    // Refreshes replace the rows, but only an explicit navigation changes the
+    // requested position. Preserve the reader's pan/scroll through data updates.
+    if (positioned.current === requestedPosition) return
+    const target = layout.nodes.find(
+      (item) => item.revision === navigationTarget
+    )
+    if (navigationTarget !== undefined && !target) return
+    positioned.current = requestedPosition
     const current =
-      activeRevision === undefined
-        ? undefined
-        : layout.nodes.find((item) => item.revision === activeRevision)
-    if (!current) {
-      viewport.scrollLeft = Math.max(
-        0,
-        (viewport.scrollWidth - viewport.clientWidth) / 2
-      )
-      viewport.scrollTop = 0
-      return
-    }
+      target ?? layout.nodes.find((item) => item.revision === activeRevision)
     viewport.scrollLeft = Math.max(
       0,
-      Math.min(
-        viewport.scrollWidth - viewport.clientWidth,
-        current.x + NODE_WIDTH / 2 - viewport.clientWidth / 2
-      )
+      current
+        ? current.x + NODE_WIDTH / 2 - viewport.clientWidth / 2
+        : (viewport.scrollWidth - viewport.clientWidth) / 2
     )
-    viewport.scrollTop = 0
-  }, [layout.height, layout.width, layout.nodes, activeRevision])
-
-  React.useEffect(() => {
-    if (highlightedRevision === undefined) return
-    const target = layout.nodes.find(
-      (item) => item.revision === highlightedRevision
-    )
-    const viewport = scrollRef.current
-    if (!target || !viewport) return
-    setSelectedRevision(highlightedRevision)
-    const frame = requestAnimationFrame(() => {
-      viewport.scrollTo({
-        left: Math.max(0, target.x + NODE_WIDTH / 2 - viewport.clientWidth / 2),
-        top: Math.max(
-          0,
-          target.y + NODE_HEIGHT / 2 - viewport.clientHeight / 2
-        ),
-        behavior: 'smooth'
-      })
+    viewport.scrollTop = target
+      ? Math.max(0, target.y + NODE_HEIGHT / 2 - viewport.clientHeight / 2)
+      : 0
+    if (target) {
+      setSelectedRevision(target.revision)
       viewport
-        .querySelector<HTMLElement>(
-          `[data-revision-node="${highlightedRevision}"]`
-        )
+        .querySelector<HTMLElement>(`[data-revision-node="${target.revision}"]`)
         ?.focus({ preventScroll: true })
-    })
-    return (): void => cancelAnimationFrame(frame)
-  }, [highlightedRevision, layout.nodes])
+    }
+  }, [requestedPosition, navigationTarget, layout.nodes, activeRevision])
+
+  const revisionNumbers = revisions.map((item) => item.revision)
+  const rangeStart = revisionNumbers.length
+    ? String(Math.min(...revisionNumbers))
+    : '—'
+  const rangeEnd = revisionNumbers.length
+    ? String(Math.max(...revisionNumbers))
+    : '—'
 
   return (
     <div className="revision-graph-section">
-      <div
-        ref={scrollRef}
-        className="revision-graph-scroll"
-        data-panning={panning || undefined}
-        role="region"
-        aria-label={t('revisionGraph')}
-        tabIndex={0}
-        onPointerDown={(event) => {
-          if (
-            event.pointerType !== 'mouse' ||
-            event.button !== 0 ||
-            (event.target as HTMLElement).closest('.revision-graph-node')
-          )
-            return
-          panStart.current = {
-            pointerX: event.clientX,
-            pointerY: event.clientY,
-            scrollLeft: event.currentTarget.scrollLeft,
-            scrollTop: event.currentTarget.scrollTop
-          }
-          setPanning(true)
-          event.currentTarget.setPointerCapture(event.pointerId)
-        }}
-        onPointerMove={(event) => {
-          if (!panStart.current) return
-          event.currentTarget.scrollLeft =
-            panStart.current.scrollLeft +
-            panStart.current.pointerX -
-            event.clientX
-          event.currentTarget.scrollTop =
-            panStart.current.scrollTop +
-            panStart.current.pointerY -
-            event.clientY
-        }}
-        onPointerUp={(event) => {
-          if (!panStart.current) return
-          panStart.current = null
-          setPanning(false)
-          event.currentTarget.releasePointerCapture(event.pointerId)
-        }}
-      >
-        <div
-          className="revision-graph"
-          style={{ width: layout.width, height: layout.height }}
+      <div className="revision-graph-frame">
+        <Group
+          className="revision-graph-toolbar"
+          justify="space-between"
+          gap="xs"
         >
-          <svg
-            className="revision-graph-edges"
-            width={layout.width}
-            height={layout.height}
-            aria-hidden="true"
+          <Group gap="xs">
+            <Text size="sm" c="var(--muted)">
+              {t('revisionGraphRange')
+                .replace('{from}', rangeStart)
+                .replace('{to}', rangeEnd)}
+            </Text>
+            <Tooltip label={windowHelp} multiline w={260}>
+              <ActionIcon
+                variant="subtle"
+                color="gray"
+                size="sm"
+                aria-label={windowHelp}
+              >
+                <IconInfoCircle size={ICON_SIZE.sm} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
+          <Button
+            size="xs"
+            variant="subtle"
+            leftSection={<IconArrowUp size={ICON_SIZE.sm} />}
+            disabled={!historical}
+            onClick={onShowLatest}
           >
-            {layout.nodes.map((item) => {
-              if (item.predecessor_revision === null) return null
-              const predecessor = nodes.get(item.predecessor_revision)
-              if (!predecessor) return null
-              const startX = item.x + NODE_WIDTH / 2
-              const startY = item.y + NODE_HEIGHT
-              const endX = predecessor.x + NODE_WIDTH / 2
-              const endY = predecessor.y
-              const middleY = startY + (endY - startY) / 2
-              return (
-                <path
-                  key={`${item.revision}-${predecessor.revision}`}
-                  d={`M ${startX} ${startY} C ${startX} ${middleY}, ${endX} ${middleY}, ${endX} ${endY}`}
-                  data-active-line={
-                    activeLineage.has(item.revision) &&
-                    activeLineage.has(predecessor.revision)
-                      ? 'true'
-                      : undefined
-                  }
-                />
-              )
-            })}
-          </svg>
-          {layout.nodes.map((item) => (
-            <button
-              key={item.revision}
-              type="button"
-              className="revision-graph-node"
-              style={{
-                left: item.x,
-                top: item.y,
-                width: NODE_WIDTH,
-                height: NODE_HEIGHT
-              }}
-              data-current={
-                activeRevision !== undefined && item.revision === activeRevision
-                  ? true
-                  : undefined
-              }
-              data-selected={item.revision === selected?.revision || undefined}
-              data-highlighted={
-                item.revision === highlightedRevision || undefined
-              }
-              data-revision-node={item.revision}
-              onClick={() => setSelectedRevision(item.revision)}
-              onAnimationEnd={(event) => {
-                if (
-                  event.currentTarget === event.target &&
-                  item.revision === highlightedRevision
-                )
-                  onHighlightEnd()
-              }}
-              aria-label={t('revisionReference').replace(
-                '{revision}',
-                String(item.revision)
-              )}
+            {t('revisionGraphLatest')}
+          </Button>
+        </Group>
+        <div
+          ref={scrollRef}
+          className="revision-graph-scroll"
+          data-panning={panning || undefined}
+          role="region"
+          aria-label={t('revisionGraph')}
+          tabIndex={0}
+          onPointerDown={(event) => {
+            if (
+              event.pointerType !== 'mouse' ||
+              event.button !== 0 ||
+              (event.target as HTMLElement).closest('.revision-graph-node')
+            )
+              return
+            panStart.current = {
+              pointerX: event.clientX,
+              pointerY: event.clientY,
+              scrollLeft: event.currentTarget.scrollLeft,
+              scrollTop: event.currentTarget.scrollTop
+            }
+            setPanning(true)
+            event.currentTarget.setPointerCapture(event.pointerId)
+          }}
+          onPointerMove={(event) => {
+            if (!panStart.current) return
+            event.currentTarget.scrollLeft =
+              panStart.current.scrollLeft +
+              panStart.current.pointerX -
+              event.clientX
+            event.currentTarget.scrollTop =
+              panStart.current.scrollTop +
+              panStart.current.pointerY -
+              event.clientY
+          }}
+          onPointerUp={(event) => {
+            if (!panStart.current) return
+            panStart.current = null
+            setPanning(false)
+            event.currentTarget.releasePointerCapture(event.pointerId)
+          }}
+        >
+          <div
+            className="revision-graph"
+            style={{ width: layout.width, height: layout.height }}
+          >
+            <svg
+              className="revision-graph-edges"
+              width={layout.width}
+              height={layout.height}
+              aria-hidden="true"
             >
-              <strong>
-                {t('revisionReference').replace(
-                  '{revision}',
-                  String(item.revision)
-                )}
-              </strong>
-              <span>
-                {item.source.kind === 'learning'
-                  ? t('sourceLearning')
-                  : item.source.kind === 'reorganization'
-                    ? t('sourceReorganization')
-                    : t('sourceManual')}
-                {activeRevision !== undefined &&
-                item.revision === activeRevision
-                  ? ` · ${t('current')}`
-                  : ''}
-              </span>
-            </button>
-          ))}
+              {layout.nodes.map((item) => {
+                if (item.predecessor_revision === null) return null
+                const predecessor = nodes.get(item.predecessor_revision)
+                if (!predecessor) return null
+                const startX = item.x + NODE_WIDTH / 2
+                const startY = item.y + NODE_HEIGHT
+                const endX = predecessor.x + NODE_WIDTH / 2
+                const endY = predecessor.y
+                const middleY = startY + (endY - startY) / 2
+                return (
+                  <path
+                    key={`${item.revision}-${predecessor.revision}`}
+                    d={`M ${startX} ${startY} C ${startX} ${middleY}, ${endX} ${middleY}, ${endX} ${endY}`}
+                    data-active-line={
+                      activeLineage.has(item.revision) &&
+                      activeLineage.has(predecessor.revision)
+                        ? 'true'
+                        : undefined
+                    }
+                  />
+                )
+              })}
+            </svg>
+            {layout.nodes.map((item) => (
+              <button
+                key={item.revision}
+                type="button"
+                className="revision-graph-node"
+                style={{
+                  left: item.x,
+                  top: item.y,
+                  width: NODE_WIDTH,
+                  height: NODE_HEIGHT
+                }}
+                data-current={
+                  activeRevision !== undefined &&
+                  item.revision === activeRevision
+                    ? true
+                    : undefined
+                }
+                data-selected={
+                  item.revision === selected?.revision || undefined
+                }
+                data-highlighted={
+                  item.revision === highlightedRevision || undefined
+                }
+                data-revision-node={item.revision}
+                onClick={() => setSelectedRevision(item.revision)}
+                onAnimationEnd={(event) => {
+                  if (
+                    event.currentTarget === event.target &&
+                    item.revision === highlightedRevision
+                  )
+                    onHighlightEnd()
+                }}
+              >
+                <strong>
+                  {t('revisionReference').replace(
+                    '{revision}',
+                    String(item.revision)
+                  )}
+                </strong>
+                <span>
+                  {item.source.kind === 'learning'
+                    ? t('sourceLearning')
+                    : item.source.kind === 'reorganization'
+                      ? t('sourceReorganization')
+                      : t('sourceManual')}
+                  {activeRevision !== undefined &&
+                  item.revision === activeRevision
+                    ? ` · ${t('current')}`
+                    : ''}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
       {selected && (
@@ -341,7 +378,7 @@ export function RevisionGraph({
                   String(selected.revision)
                 )}
               </Text>
-              <Text size="sm" c="dimmed">
+              <Text size="sm" c="var(--muted)">
                 {formatDate(selected.created_at, language)} ·{' '}
                 {selected.source.kind === 'learning'
                   ? t('sourceLearning')
@@ -368,14 +405,22 @@ export function RevisionGraph({
                 {t('compareWithPredecessor')}
               </Button>
               {selected.source.kind !== 'manual' && (
-                <Button
-                  size="xs"
-                  variant="subtle"
-                  leftSection={<IconEye size={ICON_SIZE.sm} />}
-                  onClick={() => onViewTrajectory(selected.revision)}
-                >
-                  {t('trajectory')}
-                </Button>
+                <>
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    leftSection={<IconEye size={ICON_SIZE.sm} />}
+                    onClick={() => onViewTrajectory(selected.revision)}
+                  >
+                    {t('trajectory')}
+                  </Button>
+                  <MaintenanceReportButton
+                    report={selected.source.maintenance_report}
+                    onRevealObservation={(extractionId) =>
+                      onRevealObservation(selected.revision, extractionId)
+                    }
+                  />
+                </>
               )}
               {activeRevision !== undefined &&
               selected.revision === activeRevision ? (

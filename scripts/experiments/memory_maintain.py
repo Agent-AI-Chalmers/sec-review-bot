@@ -76,7 +76,7 @@ async def run(args: argparse.Namespace) -> Path:
 
     save_manifest()
     try:
-        await maintain_memory_tree(
+        result = await maintain_memory_tree(
             base_memory_tree=base,
             observations=list(zip(ids, inputs, strict=True)),
             worktree_root=output / "memory",
@@ -90,6 +90,7 @@ async def run(args: argparse.Namespace) -> Path:
             shutil.rmtree(observations_root)
         if not (output / "memory" / "MEMORY.md").is_file():
             raise ValueError("Maintainer output is missing MEMORY.md.")
+        manifest["maintainer_output"] = result.output.model_dump(mode="json")
         manifest["memory_files"] = _tree_fingerprint(output / "memory")
         manifest["status"] = "completed"
     finally:

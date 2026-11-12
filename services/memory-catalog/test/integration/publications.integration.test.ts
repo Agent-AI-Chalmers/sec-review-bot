@@ -13,6 +13,7 @@ import type {
   ArtifactReference,
   ExtractionPublicationIntent,
 } from '../../src/contract-types-generated.js'
+import { learningReport, reorganizationReport } from '../maintenance-report.js'
 
 function artifact(character: string): ArtifactReference {
   return {
@@ -42,7 +43,9 @@ await test('publication recovery preserves intents and attachment transactions s
       source_unit_id: 'review',
       execution_archive_digest: `sha256:${'d'.repeat(64)}`,
       trajectory_reference: artifact('a'),
-      observation: { body_markdown: 'Remember this.' },
+      observations: [
+        { observation_id: 'extract-1', body_markdown: 'Remember this.' },
+      ],
     },
     summary: 'Produced observation.',
   }
@@ -98,8 +101,9 @@ await test('publication recovery preserves intents and attachment transactions s
       source: {
         kind: 'learning' as const,
         operation_id: 'maintain-1',
-        extraction_ids: ['extract-1'],
+        observation_ids: ['extract-1'],
         trajectory_reference: artifact('e'),
+        maintenance_report: learningReport(['extract-1']),
       },
     }
     await store.reserveRevisionPublication(revision)
@@ -175,6 +179,7 @@ await test('publication recovery preserves intents and attachment transactions s
           kind: 'reorganization' as const,
           operation_id: 'shared-operation',
           trajectory_reference: artifact('e'),
+          maintenance_report: reorganizationReport,
         },
       },
       {
@@ -240,6 +245,7 @@ await test('publication recovery preserves intents and attachment transactions s
         kind: 'reorganization' as const,
         operation_id: 'prepared',
         trajectory_reference: artifact('e'),
+        maintenance_report: reorganizationReport,
       },
     }
     await store.reserveRevisionPublication(prepared)
@@ -347,6 +353,7 @@ await test('publication recovery preserves intents and attachment transactions s
         kind: 'reorganization' as const,
         operation_id: 'late-publication',
         trajectory_reference: artifact('b'),
+        maintenance_report: reorganizationReport,
       },
     }
     assert.equal(

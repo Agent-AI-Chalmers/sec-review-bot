@@ -109,7 +109,7 @@ Additional UI consistency checks:
 - `pnpm test`: runs Node tests and React component tests for component rendering and interaction.
 - `pnpm run test:e2e`: runs desktop and mobile Chrome browser tests for layout, scrolling, downloads, and other browser behavior, as well as accessibility and visual checks.
 
-Local browser tests start an isolated fixture server for each Playwright worker on a random port. Set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed port when debugging.
+Local browser tests start an isolated fixture server for each Playwright test on a random port. Set `CONTROL_PLANE_UI_E2E_PORT` to use a fixed port when debugging.
 
 ### Test An External Deployment
 

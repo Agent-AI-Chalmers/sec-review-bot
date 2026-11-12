@@ -1,16 +1,24 @@
+from collections.abc import Sequence
 from pathlib import Path
 
 from deepagents.backends.protocol import BackendProtocol
+from langchain.agents.structured_output import ToolStrategy
 from langchain_core.language_models import BaseChatModel
 
-from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
+from sec_review_agents.agents.memory_maintainer.model import (
+    MemoryMaintenanceOutput,
+    memory_maintenance_output_model,
+)
 from sec_review_agents.agents.memory_maintainer.prompts import (
     MEMORY_MAINTAINER_SYSTEM_PROMPT,
 )
 from sec_review_agents.agents.memory_maintainer.tools import (
     build_memory_delete_file_tool,
 )
-from sec_review_agents.runtime.agent_runtime_graph import run_agent_runtime_graph
+from sec_review_agents.runtime.agent_runtime_graph import (
+    build_agent_runtime_graph,
+    invoke_agent_runtime_graph,
+)
 from sec_review_agents.runtime.filesystem_middleware import create_filesystem_middleware
 from sec_review_agents.runtime.structured_response_middleware import (
     MissingStructuredResponseMiddleware,
@@ -26,17 +34,19 @@ async def run_memory_maintainer_agent(
     backend: BackendProtocol,
     worktree_root: Path,
     user_prompt: str,
+    observation_ids: Sequence[str],
     trajectory_paths: tuple[Path, ...] = (),
 ) -> MemoryMaintenanceOutput:
-    return await run_agent_runtime_graph(
-        user_prompt=user_prompt,
-        trajectory_paths=trajectory_paths,
+    response_format = memory_maintenance_output_model(observation_ids)
+    # Force ToolStrategy: auto-selected ProviderStrategy (e.g. OpenAI models)
+    # raises on validator errors instead of returning them to the model for retry.
+    agent = await build_agent_runtime_graph(
         model=model,
         agent_name=MEMORY_MAINTAINER_AGENT_NAME,
         backend=backend,
         system_prompt=MEMORY_MAINTAINER_SYSTEM_PROMPT,
         tools=[build_memory_delete_file_tool(worktree_root)],
-        response_format=MemoryMaintenanceOutput,
+        response_format=ToolStrategy(response_format),
         middleware=[
             MissingStructuredResponseMiddleware(
                 max_retries=missing_structured_response_max_retries(),
@@ -45,4 +55,11 @@ async def run_memory_maintainer_agent(
                 backend=backend,
             ),
         ],
+    )
+    return await invoke_agent_runtime_graph(
+        agent=agent,
+        response_format=response_format,
+        agent_name=MEMORY_MAINTAINER_AGENT_NAME,
+        user_prompt=user_prompt,
+        trajectory_paths=trajectory_paths,
     )

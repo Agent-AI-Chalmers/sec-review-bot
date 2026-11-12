@@ -5,7 +5,10 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from sec_review_agents.agents.memory_extractor.model import MemoryObservationOutput
-from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
+from sec_review_agents.agents.memory_maintainer.model import (
+    MemoryMaintenanceOutput,
+    ObservationDecision,
+)
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.memory.coordinated_maintenance import (
     prepare_coordinated_memory_learning,
@@ -17,6 +20,7 @@ from sec_review_agents.memory.memory_tree_artifact import (
     materialize_memory_tree,
     publish_memory_tree_artifact,
 )
+from sec_review_agents.resources.loader import load_prompt_resource
 
 
 def _s3_reference(name: str) -> ArtifactReference:
@@ -45,8 +49,10 @@ async def test_extractor_returns_preview_and_records_to_explicit_trajectory(
             "sec_review_agents.memory.extractor.run_memory_extractor_agent",
             AsyncMock(
                 return_value=MemoryObservationOutput(
-                    has_observation=True,
-                    observation_markdown="Reuse the verified boundary.",
+                    observations=[
+                        "Reuse the verified boundary.",
+                        "Preserve format compatibility.",
+                    ],
                 )
             ),
         ) as invoke,
@@ -60,8 +66,9 @@ async def test_extractor_returns_preview_and_records_to_explicit_trajectory(
         )
 
     assert result.extractor_trajectory_path == agent_trajectory
-    assert result.observation_markdown is not None
-    assert "Reuse the verified boundary." in result.observation_markdown
+    assert len(result.observations) == 2
+    assert "Reuse the verified boundary." in result.observations[0]
+    assert "Preserve format compatibility." in result.observations[1]
     create_model.assert_called_once_with(
         agent_name="memory-extractor",
         deployment_override=None,
@@ -92,7 +99,7 @@ async def test_extractor_skips_without_trajectories_or_agent_execution(
 
     assert result.extraction_id == "explicit-extraction-1"
     assert result.skipped is True
-    assert result.observation_markdown is None
+    assert result.observations == []
     assert result.extractor_trajectory_path is None
     invoke.assert_not_awaited()
 
@@ -112,11 +119,7 @@ async def test_extractor_skips_when_agent_produces_no_observation(
         ) as create_model,
         patch(
             "sec_review_agents.memory.extractor.run_memory_extractor_agent",
-            AsyncMock(
-                return_value=MemoryObservationOutput(
-                    has_observation=False, observation_markdown="ignored text"
-                )
-            ),
+            AsyncMock(return_value=MemoryObservationOutput(observations=[])),
         ),
     ):
         result = await preview_memory_observation_from_paths(
@@ -126,7 +129,7 @@ async def test_extractor_skips_when_agent_produces_no_observation(
         )
 
     assert result.skipped is True
-    assert result.observation_markdown is None
+    assert result.observations == []
     assert result.extractor_trajectory_path == agent_trajectory
     create_model.assert_called_once_with(
         agent_name="memory-extractor",
@@ -155,7 +158,7 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
             encoding="utf-8"
         ) == "New lesson.\n"
         (worktree / "MEMORY.md").write_text("# Updated\n", encoding="utf-8")
-        return MemoryMaintenanceOutput()
+        return MemoryMaintenanceOutput(observation_decisions=[], summary="Updated.")
 
     with (
         patch(
@@ -184,6 +187,7 @@ async def test_maintainer_builds_candidate_tree_from_explicit_inputs(
     )
     assert invoke.await_args is not None
     assert invoke.await_args.kwargs["trajectory_paths"] == (agent_trajectory,)
+    assert invoke.await_args.kwargs["observation_ids"] == ["extraction-1"]
     assert (
         "/memory/observations/observation-0001.md"
         in invoke.await_args.kwargs["user_prompt"]
@@ -226,7 +230,7 @@ async def test_maintainer_reorganization_accepts_base_without_observations(
         assert not list((candidate / "observations").iterdir())
         assert "None. No observations" in kwargs["user_prompt"]
         (candidate / "MEMORY.md").write_text("# Reorganized\n", encoding="utf-8")
-        return MemoryMaintenanceOutput()
+        return MemoryMaintenanceOutput(observation_decisions=[], summary="Updated.")
 
     with (
         patch(
@@ -347,14 +351,28 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
         "expected_active_revision": expected_active_revision,
         "active_memory_tree_reference": active_reference,
         "observations": [
-            {"extraction_id": "extraction-1", "body_markdown": "Remember this."}
+            {"observation_id": "extraction-1", "body_markdown": "Remember this."}
         ],
     }
     base_tree = tmp_path / "active"
     base_tree.mkdir()
+    report = MemoryMaintenanceOutput.model_validate(
+        {
+            "observation_decisions": [
+                {
+                    "observation_id": "extraction-1",
+                    "action": "added",
+                    "topics": ["/memory/topics/example.md"],
+                    "reason": "Adds durable guidance.",
+                }
+            ],
+            "summary": "Added one observation.",
+        }
+    )
     result = SimpleNamespace(
         memory_tree_path=tmp_path / "candidate",
         maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
+        output=report,
     )
     memory_reference = _s3_reference("published-memory-tree")
     trajectory_reference = _s3_reference("maintainer-trajectory")
@@ -392,7 +410,10 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
 
     assert prepared is not None
     assert prepared.expected_active_revision == expected_active_revision
-    assert prepared.extraction_ids == ("extraction-1",)
+    assert prepared.observation_ids == ("extraction-1",)
+    assert prepared.maintenance_report == report
+    intent = client.reserve_revision_publication.call_args.args[0]
+    assert intent["source"]["maintenance_report"] == report.model_dump(mode="json")
     assert maintain.await_args is not None
     assert maintain.await_args.kwargs["base_memory_tree"] == (
         None if active_reference is None else base_tree
@@ -426,6 +447,9 @@ async def test_coordinated_reorganization_uses_active_memory_without_observation
     result = SimpleNamespace(
         memory_tree_path=candidate_tree,
         maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
+        output=MemoryMaintenanceOutput(
+            observation_decisions=[], summary="Merged duplicate topics."
+        ),
     )
     candidate_reference = ArtifactReference(
         uri="s3://sec-review/candidate-memory-tree",
@@ -470,7 +494,7 @@ async def test_coordinated_reorganization_uses_active_memory_without_observation
 
     assert reorganized.commit_input is not None
     assert reorganized.commit_input.source_kind == "reorganization"
-    assert reorganized.commit_input.extraction_ids == ()
+    assert reorganized.commit_input.observation_ids == ()
     assert reorganized.commit_input.expected_active_revision == 2
     assert maintain.await_args is not None
     assert maintain.await_args.kwargs["observations"] == []
@@ -480,7 +504,11 @@ async def test_coordinated_reorganization_uses_active_memory_without_observation
     )
     intent = client.reserve_revision_publication.call_args.args[0]
     assert intent["source"]["kind"] == "reorganization"
-    assert "extraction_ids" not in intent["source"]
+    assert "observation_ids" not in intent["source"]
+    assert intent["source"]["maintenance_report"] == {
+        "observation_decisions": [],
+        "summary": "Merged duplicate topics.",
+    }
 
 
 @pytest.mark.asyncio
@@ -503,6 +531,7 @@ async def test_coordinated_reorganization_skips_unchanged_tree(
     result = SimpleNamespace(
         memory_tree_path=tmp_path / "candidate",
         maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
+        output=MemoryMaintenanceOutput(observation_decisions=[], summary="No change."),
     )
 
     with (
@@ -557,7 +586,7 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                 "active_memory_tree_reference": None,
                 "observations": [
                     {
-                        "extraction_id": "extraction-1",
+                        "observation_id": "extraction-1",
                         "body_markdown": "Remember this.",
                     }
                 ],
@@ -570,7 +599,7 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                 "active_memory_tree_reference": [],
                 "observations": [
                     {
-                        "extraction_id": "extraction-1",
+                        "observation_id": "extraction-1",
                         "body_markdown": "Remember this.",
                     }
                 ],
@@ -585,7 +614,7 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                 ).as_dict(),
                 "observations": [
                     {
-                        "extraction_id": "extraction-1",
+                        "observation_id": "extraction-1",
                         "body_markdown": "Remember this.",
                     }
                 ],
@@ -598,7 +627,7 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                 "active_memory_tree_reference": None,
                 "observations": [
                     {
-                        "extraction_id": "extraction-1",
+                        "observation_id": "extraction-1",
                         "body_markdown": "Remember this.",
                     }
                 ],
@@ -610,16 +639,18 @@ async def test_coordinated_reorganization_rejects_empty_active_memory() -> None:
                 "expected_active_revision": 0,
                 "active_memory_tree_reference": None,
                 "observations": [
-                    {"extraction_id": 1, "body_markdown": "Remember this."}
+                    {"observation_id": 1, "body_markdown": "Remember this."}
                 ],
             },
-            "extraction_id",
+            "observation_id",
         ),
         (
             {
                 "expected_active_revision": 0,
                 "active_memory_tree_reference": None,
-                "observations": [{"extraction_id": "extraction-1", "body_markdown": 1}],
+                "observations": [
+                    {"observation_id": "extraction-1", "body_markdown": 1}
+                ],
             },
             "body_markdown",
         ),
@@ -639,3 +670,47 @@ async def test_coordinated_maintenance_rejects_invalid_catalog_payloads(
             operation_id="maintenance-1",
             batch_size=10,
         )
+
+
+@pytest.mark.asyncio
+async def test_maintainer_seeds_empty_base_with_initial_index_resource(
+    tmp_path: Path,
+) -> None:
+    observation = tmp_path / "observation.md"
+    observation.write_text("New lesson.\n", encoding="utf-8")
+    candidate = tmp_path / "candidate"
+    seeded: dict[str, str] = {}
+
+    async def invoke_agent(**kwargs) -> MemoryMaintenanceOutput:
+        seeded["index"] = (candidate / "MEMORY.md").read_text(encoding="utf-8")
+        return MemoryMaintenanceOutput(
+            observation_decisions=[
+                ObservationDecision(
+                    observation_id="extraction-1",
+                    action="skipped",
+                    topics=[],
+                    reason="Test.",
+                )
+            ],
+            summary="Seeded.",
+        )
+
+    with (
+        patch(
+            "sec_review_agents.memory.maintainer.create_chat_model",
+            return_value=Mock(name="memory-maintainer-model"),
+        ),
+        patch(
+            "sec_review_agents.memory.maintainer.run_memory_maintainer_agent",
+            AsyncMock(side_effect=invoke_agent),
+        ),
+    ):
+        await maintain_memory_tree(
+            base_memory_tree=None,
+            observations=[("extraction-1", observation)],
+            worktree_root=candidate,
+            maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
+        )
+
+    assert seeded["index"] == load_prompt_resource("memory/initial-index.md") + "\n"
+    assert (candidate / "topics").is_dir()

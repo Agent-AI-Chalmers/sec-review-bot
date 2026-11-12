@@ -30,7 +30,7 @@ class MemoryExtractionRegistrationPayload:
     source_unit_id: str
     execution_archive_digest: str
     trajectory_reference: ArtifactReference
-    observation_markdown: str | None
+    observations: list[dict[str, str]]
     skipped: bool
     summary: str
     observation_produced: bool
@@ -48,18 +48,34 @@ class MemoryExtractionRegistrationPayload:
             raise TypeError("Memory extraction provenance and summary must be strings.")
         if not isinstance(self.trajectory_reference, ArtifactReference):
             raise TypeError("Memory extraction trajectory_reference is invalid.")
-        if self.observation_markdown is not None and not isinstance(
-            self.observation_markdown, str
-        ):
-            raise TypeError("Memory extraction observation_markdown must be a string.")
+        if not isinstance(self.observations, list):
+            raise TypeError("Memory extraction observations must be a list.")
+        observation_ids: set[str] = set()
+        for observation in self.observations:
+            if not isinstance(observation, dict) or set(observation) != {
+                "observation_id",
+                "body_markdown",
+            }:
+                raise ValueError(
+                    "Each observation requires observation_id and body_markdown."
+                )
+            if any(
+                not isinstance(value, str) or not value.strip()
+                for value in observation.values()
+            ):
+                raise ValueError("Observation fields must be non-empty strings.")
+            observation_id = observation["observation_id"]
+            if observation_id in observation_ids:
+                raise ValueError("Observation IDs must be unique within an extraction.")
+            observation_ids.add(observation_id)
         if not isinstance(self.skipped, bool):
             raise TypeError("Memory extraction skipped must be a boolean.")
         if not isinstance(self.observation_produced, bool):
             raise TypeError("Memory extraction observation_produced must be a boolean.")
-        observation_exists = self.observation_markdown is not None
+        observation_exists = bool(self.observations)
         if self.observation_produced is not observation_exists:
             raise ValueError(
-                "Memory extraction observation_produced must match observation_markdown."
+                "Memory extraction observation_produced must match observations."
             )
         if self.skipped is observation_exists:
             raise ValueError(
@@ -209,11 +225,13 @@ async def prepare_memory_extraction(
                 "source_unit_id": request.unit_id,
                 "execution_archive_digest": reference.digest,
                 "trajectory_reference": remote.as_dict(),
-                "observation": (
-                    {"body_markdown": preview.observation_markdown}
-                    if preview.observation_markdown is not None
-                    else None
-                ),
+                "observations": [
+                    {
+                        "observation_id": f"{extraction_id}:observation:{index:04d}",
+                        "body_markdown": body,
+                    }
+                    for index, body in enumerate(preview.observations, start=1)
+                ],
             },
             "summary": preview.summary,
         }
@@ -229,7 +247,7 @@ def _registration_payload(
     intent: dict[str, Any],
 ) -> MemoryExtractionRegistrationPayload:
     registration = intent["registration"]
-    observation = registration["observation"]
+    observations = registration["observations"]
     return MemoryExtractionRegistrationPayload(
         extraction_id=registration["extraction_id"],
         source_workflow=registration["source_workflow"],
@@ -239,12 +257,10 @@ def _registration_payload(
         trajectory_reference=ArtifactReference.from_mapping(
             registration["trajectory_reference"]
         ),
-        observation_markdown=(
-            observation["body_markdown"] if observation is not None else None
-        ),
-        skipped=observation is None,
+        observations=observations,
+        skipped=not observations,
         summary=intent["summary"],
-        observation_produced=observation is not None,
+        observation_produced=bool(observations),
     )
 
 
@@ -294,7 +310,7 @@ def register_memory_extraction_activity(
             source_unit_id=payload.source_unit_id,
             execution_archive_digest=payload.execution_archive_digest,
             trajectory_reference=payload.trajectory_reference,
-            observation_markdown=payload.observation_markdown,
+            observations=payload.observations,
         )
     except MemoryCatalogConflictError as error:
         raise ApplicationError(

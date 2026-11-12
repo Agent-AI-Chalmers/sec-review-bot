@@ -52,6 +52,41 @@ test('memory workspace has no detectable WCAG A/AA violations', async ({
   await expectNoAccessibilityViolations(page)
 })
 
+test('memory graph toolbar and nodes have no detectable WCAG A/AA violations', async ({
+  page
+}) => {
+  await openAuthenticatedRuns(page)
+  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.getByRole('tab', { name: 'Revisions' }).click()
+  await page.locator('.revision-graph-node[data-current]').waitFor()
+  await expectNoAccessibilityViolations(page)
+})
+
+test('memory loading state has no detectable WCAG A/AA violations', async ({
+  page
+}) => {
+  await openAuthenticatedRuns(page)
+  let release!: () => void
+  const ready = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/memory/overview?*', async (route) => {
+    await ready
+    await route.continue()
+  })
+  try {
+    await page.goto('/memory', { waitUntil: 'domcontentloaded' })
+    await page
+      .getByRole('status')
+      .filter({ hasText: 'Loading…' })
+      .first()
+      .waitFor()
+    await expectNoAccessibilityViolations(page)
+  } finally {
+    release()
+  }
+})
+
 test('trajectory viewer has no detectable WCAG A/AA violations', async ({
   page
 }) => {

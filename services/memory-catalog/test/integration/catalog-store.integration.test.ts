@@ -16,6 +16,7 @@ import type {
   ArtifactReference,
   ExtractionRegistration,
 } from '../../src/contract-types-generated.js'
+import { learningReport, reorganizationReport } from '../maintenance-report.js'
 
 const databaseUrl = process.env.TEST_DATABASE_URL
 if (databaseUrl === undefined)
@@ -51,7 +52,9 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
       'trajectories/memory-extractor/trajectory.v1.jsonl.zst',
       'c',
     ),
-    observation: { body_markdown: observationBody },
+    observations: [
+      { observation_id: 'extraction-1', body_markdown: observationBody },
+    ],
   }
 
   try {
@@ -68,15 +71,20 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
     await assert.rejects(
       store.registerExtraction({
         ...extraction,
-        observation: { body_markdown: 'Conflicting observation.' },
+        observations: [
+          {
+            observation_id: 'extraction-1',
+            body_markdown: 'Conflicting observation.',
+          },
+        ],
       }),
       ExtractionConflictError,
     )
 
     const stored = await store.queries.getExtraction(extraction.extraction_id)
     assert.equal(
-      stored?.observation?.body_markdown,
-      extraction.observation?.body_markdown,
+      stored?.observations[0]?.body_markdown,
+      extraction.observations[0]?.body_markdown,
     )
     assert.deepEqual(
       stored?.trajectory_reference,
@@ -102,7 +110,7 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
     assert.equal(learningInput?.expected_active_revision, 0)
     assert.deepEqual(learningInput?.observations, [
       {
-        extraction_id: extraction.extraction_id,
+        observation_id: extraction.extraction_id,
         body_markdown: observationBody,
       },
     ])
@@ -113,11 +121,12 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
       source: {
         kind: 'learning' as const,
         operation_id: 'maintenance-1',
-        extraction_ids: [extraction.extraction_id],
+        observation_ids: [extraction.extraction_id],
         trajectory_reference: artifact(
           'trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
           'b',
         ),
+        maintenance_report: learningReport([extraction.extraction_id]),
       },
     }
     await store.reserveRevisionPublication(revisionInput)
@@ -188,6 +197,7 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
           'trajectories/memory-maintainer/reorganization.v1.jsonl.zst',
           'e',
         ),
+        maintenance_report: reorganizationReport,
       },
     }
     for (const source of [
@@ -258,6 +268,12 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
     const pendingExtraction = {
       ...extraction,
       extraction_id: 'extraction-while-paused',
+      observations: [
+        {
+          observation_id: 'extraction-while-paused',
+          body_markdown: observationBody,
+        },
+      ],
     }
     const pendingPublication = {
       registration: pendingExtraction,
@@ -270,7 +286,7 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
       {
         ...revisionInput.source,
         operation_id: 'paused-learning',
-        extraction_ids: [pendingExtraction.extraction_id],
+        observation_ids: [pendingExtraction.extraction_id],
       },
       { ...reorganizationInput.source, operation_id: 'paused-reorganization' },
     ]) {
@@ -330,6 +346,128 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
       await store.queries.getMemoryTreeAutomation(),
       resumed.automation,
     )
+  } finally {
+    await store.close()
+    await administrator.query(`drop schema if exists ${schema} cascade`)
+    await administrator.end()
+  }
+})
+
+await test('one extraction publishes multiple observations that paginate and consume independently', async () => {
+  const schema = `memory_catalog_${crypto.randomUUID().replaceAll('-', '_')}`
+  const administrator = new Pool({ connectionString: databaseUrl })
+  await administrator.query(`create schema ${schema}`)
+  const pool = new Pool({
+    connectionString: databaseUrl,
+    options: `-c search_path=${schema},public`,
+  })
+  const store = new PostgresMemoryCatalogStore('unused', pool)
+  try {
+    await store.initialize()
+    const extraction: ExtractionRegistration = {
+      extraction_id: 'one-run',
+      source_workflow: 'issue-review',
+      source_run_id: 'run',
+      source_unit_id: 'review',
+      execution_archive_digest: `sha256:${'d'.repeat(64)}`,
+      trajectory_reference: artifact('extractor', 'c'),
+      observations: [
+        {
+          observation_id: 'lesson-a',
+          body_markdown: 'Trace implicit deserialization sinks.',
+        },
+        {
+          observation_id: 'lesson-b',
+          body_markdown: 'Preserve serialization semantics.',
+        },
+      ],
+    }
+    const intent = {
+      registration: extraction,
+      summary: 'Two independent lessons.',
+    }
+    await store.reserveExtractionPublication(intent)
+    await store.confirmExtractionPublication(intent)
+    assert.equal(await store.registerExtraction(extraction), true)
+    assert.equal(await store.registerExtraction(extraction), false)
+    const collision = { ...extraction, extraction_id: 'another-run' }
+    const collisionIntent = {
+      registration: collision,
+      summary: 'Conflicting IDs.',
+    }
+    await store.reserveExtractionPublication(collisionIntent)
+    await store.confirmExtractionPublication(collisionIntent)
+    await assert.rejects(
+      store.registerExtraction(collision),
+      ExtractionConflictError,
+    )
+    assert.equal(await store.queries.getExtraction('another-run'), undefined)
+    assert.equal(
+      (await store.listExtractionPublications('another-run'))[0]?.status,
+      'present',
+    )
+    assert.deepEqual(
+      (await store.queries.getExtraction('one-run'))?.observations,
+      extraction.observations,
+    )
+    assert.equal(
+      (await store.queries.listExtractions(undefined, 1, {})).extractions
+        .length,
+      1,
+    )
+    // Equal timestamps force the observation ID to act as the pagination tie-breaker.
+    await pool.query('update observations set created_at=$1', [
+      '2026-01-01T00:00:00Z',
+    ])
+    const first = await store.queries.listObservations(undefined, 1, {})
+    assert(first.next_cursor)
+    const second = await store.queries.listObservations(
+      first.next_cursor,
+      1,
+      {},
+    )
+    assert.deepEqual(
+      [
+        first.observations[0]?.observation_id,
+        second.observations[0]?.observation_id,
+      ],
+      ['lesson-b', 'lesson-a'],
+    )
+    assert.equal(second.next_cursor, null)
+    const input = await store.getLearningInput(1)
+    assert.deepEqual(
+      input?.observations.map((item) => item.observation_id),
+      ['lesson-a'],
+    )
+    const revision = {
+      expected_active_revision: 0,
+      memory_tree_reference: artifact('tree', 'e'),
+      source: {
+        kind: 'learning' as const,
+        operation_id: 'learn-one',
+        observation_ids: ['lesson-a'],
+        trajectory_reference: artifact('maintainer', 'f'),
+        maintenance_report: learningReport(['lesson-a']),
+      },
+    }
+    await store.reserveRevisionPublication(revision)
+    await store.confirmRevisionPublication(revision)
+    assert.equal((await store.createMemoryTreeRevision(revision)).created, true)
+    assert.equal(
+      (await store.createMemoryTreeRevision(revision)).created,
+      false,
+    )
+    assert.deepEqual(
+      (await store.getLearningInput(10))?.observations.map(
+        (item) => item.observation_id,
+      ),
+      ['lesson-b'],
+    )
+    assert.equal((await store.queries.getObservationBacklog()).pending_count, 1)
+    const overview = await store.queries.getCatalogOverview('all')
+    assert.equal(overview.totals.completed_extraction_count, 1)
+    assert.equal(overview.totals.extracted_unit_count, 1)
+    assert.equal(overview.totals.observation_count, 2)
   } finally {
     await store.close()
     await administrator.query(`drop schema if exists ${schema} cascade`)

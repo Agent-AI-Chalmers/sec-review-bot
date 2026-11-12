@@ -9,6 +9,7 @@ from temporalio import activity
 from temporalio.converter import DataConverter
 from temporalio.worker import Worker
 
+from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.memory.coordinated_maintenance import (
     CoordinatedReorganizationResult,
@@ -47,15 +48,33 @@ def _reference() -> ArtifactReference:
     )
 
 
+def _report(observation_ids: tuple[str, ...]) -> MemoryMaintenanceOutput:
+    return MemoryMaintenanceOutput.model_validate(
+        {
+            "observation_decisions": [
+                {
+                    "observation_id": extraction_id,
+                    "action": "skipped",
+                    "topics": [],
+                    "reason": "Already covered.",
+                }
+                for extraction_id in observation_ids
+            ],
+            "summary": "Maintained memory.",
+        }
+    )
+
+
 def _commit_input(
-    *, extraction_ids: tuple[str, ...] = ("extraction-1",)
+    *, observation_ids: tuple[str, ...] = ("extraction-1",)
 ) -> MemoryTreeRevisionCommitInput:
     return MemoryTreeRevisionCommitInput(
         operation_id="memory-tree-run-1",
         expected_active_revision=3,
-        extraction_ids=extraction_ids,
+        observation_ids=observation_ids,
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(observation_ids),
     )
 
 
@@ -65,8 +84,10 @@ def _commit_input(
         ({"operation_id": ""}, "operation_id"),
         ({"expected_active_revision": True}, "expected_active_revision"),
         ({"expected_active_revision": -1}, "expected_active_revision"),
-        ({"extraction_ids": ()}, "extraction_ids"),
-        ({"extraction_ids": ("extraction-1", "extraction-1")}, "unique"),
+        ({"observation_ids": ()}, "observation_ids"),
+        ({"observation_ids": ("extraction-1", "extraction-1")}, "unique"),
+        ({"maintenance_report": _report(("extraction-2",))}, "exactly once"),
+        ({"maintenance_report": {"summary": "x"}}, "maintenance report"),
     ],
 )
 def test_memory_tree_commit_input_rejects_invalid_invariants(
@@ -76,9 +97,10 @@ def test_memory_tree_commit_input_rejects_invalid_invariants(
     values: dict[str, object] = {
         "operation_id": "memory-tree-run-1",
         "expected_active_revision": 3,
-        "extraction_ids": ("extraction-1",),
+        "observation_ids": ("extraction-1",),
         "memory_tree_reference": _reference(),
         "trajectory_reference": _reference(),
+        "maintenance_report": _report(("extraction-1",)),
     }
     values.update(overrides)
 
@@ -86,16 +108,17 @@ def test_memory_tree_commit_input_rejects_invalid_invariants(
         MemoryTreeRevisionCommitInput(**values)  # type: ignore[arg-type]
 
 
-def test_reorganization_commit_input_accepts_empty_extraction_ids() -> None:
+def test_reorganization_commit_input_accepts_empty_observation_ids() -> None:
     value = MemoryTreeRevisionCommitInput(
         operation_id="memory-tree-run-1",
         expected_active_revision=3,
-        extraction_ids=(),
+        observation_ids=(),
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(()),
         source_kind="reorganization",
     )
-    assert value.extraction_ids == ()
+    assert value.observation_ids == ()
     assert value.source_kind == "reorganization"
 
 
@@ -103,10 +126,10 @@ def test_reorganization_commit_input_accepts_empty_extraction_ids() -> None:
     ("overrides", "message"),
     [
         (
-            {"source_kind": "reorganization", "extraction_ids": ("extraction-1",)},
+            {"source_kind": "reorganization", "observation_ids": ("extraction-1",)},
             "must not consume",
         ),
-        ({"source_kind": "learning", "extraction_ids": ()}, "must be non-empty"),
+        ({"source_kind": "learning", "observation_ids": ()}, "must be non-empty"),
         ({"source_kind": "unknown"}, "source_kind"),
     ],
 )
@@ -117,9 +140,10 @@ def test_commit_input_enforces_source_kind_extraction_invariants(
     values: dict[str, object] = {
         "operation_id": "memory-tree-run-1",
         "expected_active_revision": 3,
-        "extraction_ids": (),
+        "observation_ids": (),
         "memory_tree_reference": _reference(),
         "trajectory_reference": _reference(),
+        "maintenance_report": _report(()),
         "source_kind": "reorganization",
     }
     values.update(overrides)
@@ -241,7 +265,9 @@ async def test_extraction_workflow_prepares_then_registers_fixed_payload(
         source_unit_id="review",
         execution_archive_digest=_reference().digest,
         trajectory_reference=_reference(),
-        observation_markdown="Remember this.",
+        observations=[
+            {"observation_id": "observation-1", "body_markdown": "Remember this."}
+        ],
         skipped=False,
         summary="Produced observation.",
         observation_produced=True,
@@ -273,7 +299,7 @@ async def test_prepare_extraction_returns_complete_serializable_payload(
     trajectory.write_text("{}\n", encoding="utf-8")
     preview = SimpleNamespace(
         extraction_id="observation-1",
-        observation_markdown="Remember this.",
+        observations=["Remember this."],
         skipped=False,
         summary="Produced observation.",
         extractor_trajectory_path=tmp_path / "memory-extractor.jsonl",
@@ -331,7 +357,12 @@ async def test_prepare_extraction_returns_complete_serializable_payload(
         source_unit_id="review",
         execution_archive_digest=_reference().digest,
         trajectory_reference=extraction_trajectory,
-        observation_markdown="Remember this.",
+        observations=[
+            {
+                "observation_id": f"{result.extraction_id}:observation:0001",
+                "body_markdown": "Remember this.",
+            }
+        ],
         skipped=False,
         summary="Produced observation.",
         observation_produced=True,
@@ -347,7 +378,7 @@ async def test_extraction_payload_round_trips_through_temporal_converter() -> No
         source_unit_id="review",
         execution_archive_digest=_reference().digest,
         trajectory_reference=_reference(),
-        observation_markdown=None,
+        observations=[],
         skipped=True,
         summary="No durable memory observation produced.",
         observation_produced=False,
@@ -372,7 +403,7 @@ async def test_extraction_payload_rejects_wrong_field_type_during_conversion() -
                 "source_unit_id": "review",
                 "execution_archive_digest": _reference().digest,
                 "trajectory_reference": _reference().as_dict(),
-                "observation_markdown": None,
+                "observations": [],
                 "skipped": "yes",
                 "summary": "No durable memory observation produced.",
                 "observation_produced": False,
@@ -397,7 +428,12 @@ async def test_extraction_payload_rejects_inconsistent_observation_flags() -> No
                 "source_unit_id": "review",
                 "execution_archive_digest": _reference().digest,
                 "trajectory_reference": _reference().as_dict(),
-                "observation_markdown": "Remember this.",
+                "observations": [
+                    {
+                        "observation_id": "observation-1",
+                        "body_markdown": "Remember this.",
+                    }
+                ],
                 "skipped": True,
                 "summary": "Produced observation.",
                 "observation_produced": False,
@@ -437,7 +473,7 @@ def test_register_extraction_retries_with_identical_payload_and_no_observation(
         source_unit_id="review",
         execution_archive_digest=_reference().digest,
         trajectory_reference=trajectory_reference,
-        observation_markdown=None,
+        observations=[],
         skipped=True,
         summary="No durable memory observation produced.",
         observation_produced=False,
@@ -466,7 +502,7 @@ def test_register_extraction_retries_with_identical_payload_and_no_observation(
         "source_unit_id": "review",
         "execution_archive_digest": _reference().digest,
         "trajectory_reference": trajectory_reference,
-        "observation_markdown": None,
+        "observations": [],
     }
     assert client.register_extraction.call_count == 2
     assert client.register_extraction.call_args_list[0].kwargs == expected
@@ -482,7 +518,7 @@ async def test_extraction_workflow_retries_registration_with_history_payload() -
         source_unit_id="review",
         execution_archive_digest=_reference().digest,
         trajectory_reference=_reference(),
-        observation_markdown=None,
+        observations=[],
         skipped=True,
         summary="No durable memory observation produced.",
         observation_produced=False,
@@ -564,7 +600,7 @@ def test_catalog_extraction_conflict_is_not_retried(monkeypatch) -> None:
         source_unit_id="review",
         execution_archive_digest=_reference().digest,
         trajectory_reference=_reference(),
-        observation_markdown=None,
+        observations=[],
         skipped=True,
         summary="No observation.",
         observation_produced=False,
@@ -881,7 +917,7 @@ async def test_maintenance_workflow_retries_commit_with_history_revision() -> No
     commit_input = MemoryTreeRevisionCommitInput(
         operation_id="memory-tree-run-1",
         expected_active_revision=3,
-        extraction_ids=("extraction-1", "extraction-2"),
+        observation_ids=("extraction-1", "extraction-2"),
         memory_tree_reference=_reference(),
         trajectory_reference=ArtifactReference(
             uri=(
@@ -892,6 +928,7 @@ async def test_maintenance_workflow_retries_commit_with_history_revision() -> No
             media_type="application/zstd",
             size_bytes=10,
         ),
+        maintenance_report=_report(("extraction-1", "extraction-2")),
     )
     prepare_calls = 0
     commit_revisions: list[MemoryTreeRevisionCommitInput] = []
@@ -1025,7 +1062,7 @@ def test_commit_memory_tree_revision_uses_prepared_payload_after_processing_is_d
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
         Mock(return_value=client),
     )
-    prepared = _commit_input(extraction_ids=("extraction-1", "extraction-2"))
+    prepared = _commit_input(observation_ids=("extraction-1", "extraction-2"))
 
     assert maintenance_workflow.commit_memory_tree_revision_activity(prepared) == {
         "ok": True,
@@ -1036,9 +1073,10 @@ def test_commit_memory_tree_revision_uses_prepared_payload_after_processing_is_d
     client.create_learning_revision.assert_called_once_with(
         operation_id="memory-tree-run-1",
         expected_active_revision=3,
-        extraction_ids=["extraction-1", "extraction-2"],
+        observation_ids=["extraction-1", "extraction-2"],
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(("extraction-1", "extraction-2")),
     )
 
 
@@ -1050,9 +1088,10 @@ async def test_maintenance_prepare_reorganization_uses_active_memory(
     commit_input = MemoryTreeRevisionCommitInput(
         operation_id="memory-tree-run-1",
         expected_active_revision=3,
-        extraction_ids=(),
+        observation_ids=(),
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(()),
         source_kind="reorganization",
     )
     prepare = AsyncMock(
@@ -1144,9 +1183,10 @@ def test_commit_reorganization_revision_uses_reorganization_client(
     prepared = MemoryTreeRevisionCommitInput(
         operation_id="memory-tree-run-1",
         expected_active_revision=3,
-        extraction_ids=(),
+        observation_ids=(),
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(()),
         source_kind="reorganization",
     )
 
@@ -1161,6 +1201,7 @@ def test_commit_reorganization_revision_uses_reorganization_client(
         expected_active_revision=3,
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(()),
     )
     client.create_learning_revision.assert_not_called()
 
@@ -1172,9 +1213,10 @@ async def test_reorganization_workflow_skips_pending_observation_checks(
     commit_input = MemoryTreeRevisionCommitInput(
         operation_id="memory-tree-run-1",
         expected_active_revision=3,
-        extraction_ids=(),
+        observation_ids=(),
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(()),
         source_kind="reorganization",
     )
     results = iter(
@@ -1251,7 +1293,7 @@ def test_commit_memory_tree_revision_retry_reuses_prepared_references(
         "sec_review_agents.memory.catalog_client.configured_memory_catalog_client",
         Mock(return_value=client),
     )
-    prepared = _commit_input(extraction_ids=("extraction-1", "extraction-2"))
+    prepared = _commit_input(observation_ids=("extraction-1", "extraction-2"))
 
     first = maintenance_workflow.commit_memory_tree_revision_activity(prepared)
     second = maintenance_workflow.commit_memory_tree_revision_activity(prepared)
@@ -1260,9 +1302,10 @@ def test_commit_memory_tree_revision_retry_reuses_prepared_references(
     expected = {
         "operation_id": "memory-tree-run-1",
         "expected_active_revision": 3,
-        "extraction_ids": ["extraction-1", "extraction-2"],
+        "observation_ids": ["extraction-1", "extraction-2"],
         "memory_tree_reference": _reference(),
         "trajectory_reference": _reference(),
+        "maintenance_report": _report(("extraction-1", "extraction-2")),
     }
     assert client.create_learning_revision.call_count == 2
     assert client.create_learning_revision.call_args_list[0].kwargs == expected
@@ -1332,3 +1375,31 @@ async def test_prepare_after_abandonment_does_not_fail_workflow(monkeypatch):
     assert result == MemoryMaintenancePreparationResult(
         kind="complete", reason="publication_abandoned"
     )
+
+
+@pytest.mark.parametrize(
+    "observations",
+    [
+        None,
+        "invalid",
+        [None],
+        [{}],
+        [{"observation_id": 1, "body_markdown": "lesson"}],
+        [{"observation_id": "id", "body_markdown": " "}],
+        [{"observation_id": "id", "body_markdown": "lesson"}] * 2,
+    ],
+)
+def test_extraction_payload_rejects_invalid_observations(observations) -> None:
+    with pytest.raises((TypeError, ValueError)):
+        MemoryExtractionRegistrationPayload(
+            extraction_id="extraction",
+            source_workflow="issue-review",
+            source_run_id="run",
+            source_unit_id="review",
+            execution_archive_digest="digest",
+            trajectory_reference=_reference(),
+            observations=observations,
+            skipped=False,
+            summary="Produced.",
+            observation_produced=True,
+        )

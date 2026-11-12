@@ -23,7 +23,7 @@ export function LoadingState({
       role="status"
     >
       <Loader size="sm" />
-      <Text c="dimmed" size="sm">
+      <Text c="var(--muted)" size="sm">
         {message}
       </Text>
     </Stack>

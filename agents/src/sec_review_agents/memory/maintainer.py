@@ -8,22 +8,24 @@ from sec_review_agents.agents.memory_maintainer.agent import (
     MEMORY_MAINTAINER_AGENT_NAME,
     run_memory_maintainer_agent,
 )
+from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.agents.memory_maintainer.prompts import (
     build_maintenance_prompt,
 )
 from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.filesystem.path_views import writable_memory_view
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.memory.memory_tree_artifact import DEFAULT_MEMORY_INDEX
+from sec_review_agents.resources.loader import load_prompt_resource
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 
 @dataclass(frozen=True)
 class MemoryMaintenanceResult:
-    """Candidate memory tree and invocation trajectory produced by the agent."""
+    """Candidate memory tree, trajectory, and decisions produced by the agent."""
 
     memory_tree_path: Path
     maintainer_trajectory_path: Path
+    output: MemoryMaintenanceOutput
 
 
 def _prepare_worktree(
@@ -44,14 +46,14 @@ def _prepare_worktree(
             )
     elif not observations:
         raise ValueError("Memory maintenance requires at least one observation.")
-    extraction_ids = [extraction_id for extraction_id, _path in observations]
-    if len(extraction_ids) != len(set(extraction_ids)):
-        raise ValueError("Memory maintenance extraction ids must be unique.")
+    observation_ids = [observation_id for observation_id, _path in observations]
+    if len(observation_ids) != len(set(observation_ids)):
+        raise ValueError("Memory maintenance observation ids must be unique.")
 
     if base_memory_tree is None:
         (worktree_root / "topics").mkdir(parents=True)
         (worktree_root / "MEMORY.md").write_text(
-            DEFAULT_MEMORY_INDEX,
+            load_prompt_resource("memory/initial-index.md") + "\n",
             encoding="utf-8",
         )
     else:
@@ -66,13 +68,13 @@ def _prepare_worktree(
     observations_root = worktree_root / "observations"
     observations_root.mkdir()
     prompt_observations: list[tuple[str, str]] = []
-    for index, (extraction_id, path) in enumerate(observations, start=1):
+    for index, (observation_id, path) in enumerate(observations, start=1):
         source = path.expanduser().resolve()
         if not source.is_file():
             raise FileNotFoundError(source)
         filename = f"observation-{index:04d}.md"
         shutil.copy2(source, observations_root / filename)
-        prompt_observations.append((extraction_id, f"/memory/observations/{filename}"))
+        prompt_observations.append((observation_id, f"/memory/observations/{filename}"))
     return prompt_observations
 
 
@@ -102,18 +104,20 @@ async def maintain_memory_tree(
         deployment_override=deployment,
     )
     async with amanaged_backend(backend):
-        await run_memory_maintainer_agent(
+        output = await run_memory_maintainer_agent(
             model=model,
             backend=backend,
             worktree_root=worktree_root,
             user_prompt=build_maintenance_prompt(
                 prompt_observations, reorganization=reorganization
             ),
+            observation_ids=[observation_id for observation_id, _ in observations],
             trajectory_paths=(maintainer_trajectory_path,),
         )
     return MemoryMaintenanceResult(
         memory_tree_path=worktree_root,
         maintainer_trajectory_path=maintainer_trajectory_path,
+        output=output,
     )
 
 

@@ -6,7 +6,7 @@ interface FixtureRuntime {
   server: ViteDevServer | undefined
 }
 
-interface WorkerFixtures {
+interface TestFixtures {
   fixtureRuntime: FixtureRuntime
 }
 
@@ -23,7 +23,8 @@ function fixturePort(): number {
   return port
 }
 
-export const test = base.extend<object, WorkerFixtures>({
+export const test = base.extend<TestFixtures>({
+  // Mutating browser flows must not leak revisions or session state into later tests.
   fixtureRuntime: [
     async ({ browserName }, use): Promise<void> => {
       if (browserName !== 'chromium') {
@@ -37,6 +38,7 @@ export const test = base.extend<object, WorkerFixtures>({
       }
 
       process.env.CONTROL_PLANE_UI_DEV_FIXTURES = '1'
+      process.env.CONTROL_PLANE_UI_E2E_FIXTURE_TIME = '2026-11-12T12:00:00Z'
       let server: ViteDevServer | undefined
       try {
         server = await createServer({
@@ -57,7 +59,7 @@ export const test = base.extend<object, WorkerFixtures>({
         await server?.close()
       }
     },
-    { scope: 'worker' }
+    { scope: 'test' }
   ],
   baseURL: async ({ fixtureRuntime }, use): Promise<void> => {
     await use(fixtureRuntime.baseURL)

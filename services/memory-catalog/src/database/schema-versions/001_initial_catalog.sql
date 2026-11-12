@@ -17,17 +17,18 @@ comment on column extractions.execution_archive_digest is
 comment on column extractions.trajectory_reference is
   'Content-addressed compressed trajectory for this extractor invocation.';
 
--- An extraction produces zero or one observation. Reusing extraction_id as the primary key keeps
--- the one-to-zero-or-one relationship structural instead of maintaining a second identity.
+-- Each extraction produces zero or more independently maintained observations.
 create table observations (
-  extraction_id text primary key references extractions(extraction_id),
+  observation_id text primary key,
+  extraction_id text not null references extractions(extraction_id),
   body_markdown text not null,
   consumed_revision bigint,
   created_at timestamptz not null default clock_timestamp()
 );
 
 comment on table observations is
-  'Optional durable observations produced by completed extractions.';
+  'Independent durable observations produced by completed extractions.';
+create index observations_extraction on observations (extraction_id);
 comment on column observations.consumed_revision is
   'NULL while pending; otherwise the immutable memory revision that consumed this observation.';
 
@@ -40,16 +41,19 @@ create table memory_tree_revisions (
   source_kind text not null check (source_kind in ('learning', 'reorganization', 'manual')),
   operation_id text not null,
   trajectory_reference jsonb,
+  maintenance_report jsonb,
   actor jsonb,
   created_at timestamptz not null default clock_timestamp(),
   unique (operation_id),
   constraint memory_tree_revisions_source_shape_check check (
     (
       source_kind in ('learning', 'reorganization') and
-      trajectory_reference is not null and actor is null
+      trajectory_reference is not null and maintenance_report is not null and
+      actor is null
     ) or (
       source_kind = 'manual' and
-      trajectory_reference is null and actor is not null
+      trajectory_reference is null and maintenance_report is null and
+      actor is not null
     )
   )
 );
@@ -74,15 +78,14 @@ alter table observations
   foreign key (consumed_revision) references memory_tree_revisions(revision);
 
 create index observations_pending_order
-  on observations (created_at, extraction_id)
+  on observations (created_at, observation_id)
   where consumed_revision is null;
 
 -- This singleton is only the mutable active pointer. Revision zero represents an empty catalog
 -- before the first revision commit and deliberately has no memory_tree_revisions row.
 create table memory_tree_state (
   singleton boolean primary key default true check (singleton),
-  active_revision bigint not null check (active_revision >= 0),
-  updated_at timestamptz not null default clock_timestamp()
+  active_revision bigint not null check (active_revision >= 0)
 );
 
 comment on table memory_tree_state is
@@ -123,8 +126,6 @@ create table memory_tree_automation_operations (
   target_state text not null check (target_state in ('enabled', 'paused')),
   expected_generation bigint not null check (expected_generation >= 0),
   actor jsonb not null,
-  resulting_state text not null check (resulting_state in ('enabled', 'paused')),
-  resulting_generation bigint not null check (resulting_generation > 0),
   changed_at timestamptz not null
 );
 
@@ -147,16 +148,16 @@ create unique index extraction_publications_selected on extraction_publications 
 
 create table memory_revision_publications (
   source_kind text not null check (source_kind in ('learning', 'reorganization', 'manual')),
-  owner_id text not null,
+  operation_id text not null,
   tree_digest text not null,
   trajectory_digest text not null,
   intent jsonb not null,
   status text not null default 'reserved' check (status in ('reserved', 'present', 'selected', 'abandoned')),
   created_at timestamptz not null default clock_timestamp(),
-  primary key (source_kind, owner_id, tree_digest, trajectory_digest),
+  primary key (source_kind, operation_id, tree_digest, trajectory_digest),
   check (source_kind = intent #>> '{source,kind}'),
-  check (owner_id = intent #>> '{source,operation_id}'),
+  check (operation_id = intent #>> '{source,operation_id}'),
   check (tree_digest = intent #>> '{memory_tree_reference,digest}'),
   check (trajectory_digest = coalesce(intent #>> '{source,trajectory_reference,digest}', ''))
 );
-create unique index memory_revision_publications_selected on memory_revision_publications (owner_id) where status = 'selected';
+create unique index memory_revision_publications_selected on memory_revision_publications (operation_id) where status = 'selected';

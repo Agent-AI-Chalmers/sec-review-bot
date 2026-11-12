@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from sec_review_agents.agents.memory_maintainer.agent import (
     MEMORY_MAINTAINER_AGENT_NAME,
 )
+from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.artifacts.s3_adapter import (
     planned_s3_artifact,
@@ -56,18 +57,21 @@ def _commit_input_from_intent(
         raise RuntimeError(
             "Memory revision publication intent is not a maintainer source."
         )
-    extraction_ids = source.get("extraction_ids", ())
-    if not isinstance(extraction_ids, (list, tuple)):
-        raise RuntimeError("Memory revision publication extraction_ids is invalid.")
+    observation_ids = source.get("observation_ids", ())
+    if not isinstance(observation_ids, (list, tuple)):
+        raise RuntimeError("Memory revision publication observation_ids is invalid.")
     return MemoryTreeRevisionCommitInput(
         operation_id=operation_id,
         expected_active_revision=intent["expected_active_revision"],
-        extraction_ids=tuple(extraction_ids),
+        observation_ids=tuple(observation_ids),
         memory_tree_reference=ArtifactReference.from_mapping(
             intent["memory_tree_reference"]
         ),
         trajectory_reference=ArtifactReference.from_mapping(
             source["trajectory_reference"]
+        ),
+        maintenance_report=MemoryMaintenanceOutput.model_validate(
+            source["maintenance_report"]
         ),
         source_kind=kind,
     )
@@ -116,9 +120,10 @@ def _publish_candidate(
     operation_id: str,
     expected_active_revision: int,
     source_kind: MemoryRevisionSourceKind,
-    extraction_ids: tuple[str, ...],
+    observation_ids: tuple[str, ...],
     memory_tree_path: Path,
     maintainer_trajectory_path: Path,
+    maintenance_report: MemoryMaintenanceOutput,
     temp_root: Path,
 ) -> MemoryTreeRevisionCommitInput:
     trajectory = build_memory_agent_trajectory(
@@ -139,9 +144,10 @@ def _publish_candidate(
         "kind": source_kind,
         "operation_id": operation_id,
         "trajectory_reference": trajectory_reference.as_dict(),
+        "maintenance_report": maintenance_report.model_dump(mode="json"),
     }
     if source_kind == "learning":
-        source["extraction_ids"] = list(extraction_ids)
+        source["observation_ids"] = list(observation_ids)
     intent = {
         "expected_active_revision": expected_active_revision,
         "memory_tree_reference": memory_tree_reference.as_dict(),
@@ -156,9 +162,10 @@ def _publish_candidate(
     return MemoryTreeRevisionCommitInput(
         operation_id=operation_id,
         expected_active_revision=expected_active_revision,
-        extraction_ids=extraction_ids,
+        observation_ids=observation_ids,
         memory_tree_reference=memory_tree_reference,
         trajectory_reference=trajectory_reference,
+        maintenance_report=maintenance_report,
         source_kind=source_kind,
     )
 
@@ -229,16 +236,16 @@ async def prepare_coordinated_memory_learning(
         observations_root = temp_root / "observations"
         observations_root.mkdir()
         maintenance_observations: list[tuple[str, Path]] = []
-        extraction_ids: list[str] = []
+        observation_ids: list[str] = []
         for index, item in enumerate(observations, start=1):
             if not isinstance(item, dict):
                 raise ValueError("Catalog observation must be an object.")
-            extraction_id = item.get("extraction_id")
-            if not isinstance(extraction_id, str) or not extraction_id:
+            observation_id = item.get("observation_id")
+            if not isinstance(observation_id, str) or not observation_id:
                 raise ValueError(
-                    "Catalog observation extraction_id must be a non-empty string."
+                    "Catalog observation observation_id must be a non-empty string."
                 )
-            extraction_ids.append(extraction_id)
+            observation_ids.append(observation_id)
             body = item.get("body_markdown")
             if not isinstance(body, str) or not body:
                 raise ValueError(
@@ -247,7 +254,7 @@ async def prepare_coordinated_memory_learning(
             filename = f"observation-{index:04d}.md"
             (observations_root / filename).write_text(body, encoding="utf-8")
             maintenance_observations.append(
-                (extraction_id, observations_root / filename)
+                (observation_id, observations_root / filename)
             )
 
         maintainer_trajectory_path = trajectory_path(
@@ -266,9 +273,10 @@ async def prepare_coordinated_memory_learning(
             operation_id=operation_id,
             expected_active_revision=expected_active_revision,
             source_kind="learning",
-            extraction_ids=tuple(extraction_ids),
+            observation_ids=tuple(observation_ids),
             memory_tree_path=result.memory_tree_path,
             maintainer_trajectory_path=result.maintainer_trajectory_path,
+            maintenance_report=result.output,
             temp_root=temp_root,
         )
 
@@ -352,9 +360,10 @@ async def prepare_coordinated_memory_reorganization(
             operation_id=operation_id,
             expected_active_revision=expected_active_revision,
             source_kind="reorganization",
-            extraction_ids=(),
+            observation_ids=(),
             memory_tree_path=result.memory_tree_path,
             maintainer_trajectory_path=result.maintainer_trajectory_path,
+            maintenance_report=result.output,
             temp_root=temp_root,
         )
         return CoordinatedReorganizationResult(

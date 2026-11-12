@@ -9,6 +9,7 @@ import {
   MemoryTreeRevisionConflictError,
 } from '../src/catalog-store.js'
 import { createApp } from '../src/server.js'
+import { learningReport, reorganizationReport } from './maintenance-report.js'
 
 const auth = {
   workerToken: 'worker-secret',
@@ -29,13 +30,14 @@ const revision = {
   source: {
     kind: 'learning' as const,
     operation_id: 'maintenance-1',
-    extraction_ids: ['extraction-1'],
+    observation_ids: ['extraction-1'],
     trajectory_reference: {
       uri: 's3://sec-review/memory/trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
       digest: `sha256:${'b'.repeat(64)}`,
       media_type: 'application/zstd',
       size_bytes: 21,
     },
+    maintenance_report: learningReport(['extraction-1']),
   },
   created_at: '2026-10-23T00:00:00.000Z',
 }
@@ -58,7 +60,9 @@ const extraction = {
     media_type: 'application/zstd',
     size_bytes: 42,
   },
-  observation: { body_markdown: 'Remember this.' },
+  observations: [
+    { observation_id: 'extraction-1', body_markdown: 'Remember this.' },
+  ],
 }
 
 const emptyOverview = {
@@ -140,6 +144,16 @@ await test('the contract authenticates and validates extraction registration', a
     headers: workerHeaders,
     payload: { ...extraction, unknown: true },
   })
+  const duplicate = await app.inject({
+    method: 'POST',
+    url: '/v1/extractions',
+    headers: workerHeaders,
+    payload: {
+      ...extraction,
+      observations: [extraction.observations[0], extraction.observations[0]],
+    },
+  })
+  assert.equal(duplicate.statusCode, 400)
   const registered = await app.inject({
     method: 'POST',
     url: '/v1/extractions',
@@ -200,6 +214,7 @@ await test('worker and operator credentials are restricted to their write roles'
         kind: 'reorganization',
         operation_id: 'maintenance-1',
         trajectory_reference: revision.source.trajectory_reference,
+        maintenance_report: reorganizationReport,
       },
     },
   })
@@ -279,7 +294,7 @@ await test('completed extractions are queryable with or without an observation',
       {
         ...extraction,
         extraction_id: 'extraction-2',
-        observation: null,
+        observations: [],
         created_at: '2026-10-23T00:01:00.000Z',
       },
     ],
@@ -400,6 +415,7 @@ await test('UI catalog reads expose paginated records and durable control state'
           observations: [
             {
               extraction_id: 'extraction-1',
+              observation_id: 'extraction-1',
               source_run_id: 'run-1',
               source_unit_id: 'review',
               body_markdown: 'Remember this.',
@@ -557,7 +573,7 @@ await test('learning input is read and a revision is created with resource seman
     expected_active_revision: 0,
     active_memory_tree_reference: null,
     observations: [
-      { extraction_id: 'extraction-1', body_markdown: 'Remember this.' },
+      { observation_id: 'extraction-1', body_markdown: 'Remember this.' },
     ],
   }
   const store: MemoryCatalogStore = {
@@ -728,6 +744,78 @@ await test('revision conflicts are declared as 409', async () => {
 
   assert.equal(response.statusCode, 409)
   assert.equal(responseCode(response), 'CONFLICT')
+})
+
+await test('maintenance reports must match consumed extractions before reaching the store', async () => {
+  const store = storeWithRevisionFailure(new Error('store must not be called'))
+  const reached: string[] = []
+  store.reserveRevisionPublication = () => {
+    reached.push('reserve')
+    return Promise.reject(new Error('store must not be called'))
+  }
+  store.confirmRevisionPublication = () => {
+    reached.push('confirm')
+    return Promise.reject(new Error('store must not be called'))
+  }
+  const decision = revision.source.maintenance_report.observation_decisions[0]
+  const invalidSources = [
+    {
+      ...revision.source,
+      maintenance_report: { summary: 'Missing.', observation_decisions: [] },
+    },
+    {
+      ...revision.source,
+      maintenance_report: {
+        summary: 'Duplicate.',
+        observation_decisions: [decision, decision],
+      },
+    },
+    {
+      ...revision.source,
+      maintenance_report: {
+        summary: 'No topics.',
+        observation_decisions: [{ ...decision, topics: [] }],
+      },
+    },
+    {
+      kind: 'reorganization',
+      operation_id: 'maintenance-1',
+      trajectory_reference: revision.source.trajectory_reference,
+      maintenance_report: {
+        summary: 'Invented.',
+        observation_decisions: [decision],
+      },
+    },
+  ]
+  const app = await createApp({ store, ...auth })
+  try {
+    for (const source of invalidSources)
+      for (const url of [
+        '/v1/memory-tree/revisions',
+        '/v1/memory-tree/revisions/publications/reserve',
+        '/v1/memory-tree/revisions/publications/confirm',
+      ]) {
+        const response = await app.inject({
+          method: 'POST',
+          url,
+          headers: workerHeaders,
+          payload: {
+            expected_active_revision: 0,
+            memory_tree_reference: revision.memory_tree_reference,
+            source,
+          },
+        })
+        assert.equal(
+          response.statusCode,
+          400,
+          `${url} ${source.maintenance_report.summary}`,
+        )
+        assert.equal(responseCode(response), 'INVALID_BODY')
+      }
+  } finally {
+    await app.close()
+  }
+  assert.deepEqual(reached, [])
 })
 
 await test('a paused automatic revision commit has its own 409 code', async () => {

@@ -1,0 +1,254 @@
+[
+  {
+    "body": "When auditing untrusted deserialization, do not stop at the code paths that already apply a pre-load guard: enumerate every call site of the sink and confirm each dispatcher-reachable path applies it. Here the checkpoint probe paths ran a pickle scanner before `torch.load` on downloaded model files, but a parallel probe path (IP-Adapter folder detection) called `torch.load` directly with no scan, leaving a reachable RCE during model install; the fix had to apply the scan-before-load guard consistently across all probe-path deserialization, and the verifier confirmed coverage by grepping for every remaining `torch.load` and checking each was guarded.",
+    "action": "added",
+    "topics": ["/memory/topics/deserialization.md"],
+    "reason": "Establishes reusable sink-coverage and verification guidance without retaining repository-specific probe names."
+  },
+  {
+    "body": "A pickle `Unpickler` allowlist that permits only a data-holder class (e.g. a params/payload wrapper) does not neutralize attacker-controlled bytes carried inside that class's fields: the allowlist restricts which classes get constructed, not how the opaque bytes/string fields are interpreted downstream, so trace each permitted field's consumer for a second deserializer \u2014 a container-type selector plus raw data bytes can still be re-fed to a container-specific loader that unpickles them and executes gadgets.",
+    "action": "added",
+    "topics": ["/memory/topics/deserialization.md"],
+    "reason": "Adds a distinct nested-deserialization failure mode that outer class restrictions do not address."
+  },
+  {
+    "body": "When an HTTP endpoint selects its request deserializer from an attacker-controlled Content-Type (or Accept) header and indexes a media-type-to-deserializer table, enumerate every entry for an unsafe format (e.g. pickle/marshal/unconstrained YAML) rather than assuming only \"public\" formats are reachable; a format dismissed as \"internal-only\" is still reachable when the internal client merely attaches an Authorization header that the server never validates \u2014 there is no real trust boundary, and gating that format by requiring a shared token both changes the security posture and silently breaks the legitimate internal caller.",
+    "action": "added",
+    "topics": ["/memory/topics/deserialization.md"],
+    "reason": "Adds durable format-dispatch and trust-boundary checks, with caller compatibility framed as something to verify."
+  },
+  {
+    "body": "The Python `shelve` module serializes stored values with `pickle` under the hood, so a dict-like store that opens a shelve and materializes it (e.g. `dict(shelve.open(path))`) is an insecure-deserialization sink even when no `pickle` import appears in the module; when hunting untrusted-deserialization sinks, grep for `shelve` (and similar value-serializing wrappers) alongside `pickle`/`marshal`/unsafe `yaml.load`, not just for the deserializer names themselves.",
+    "action": "added",
+    "topics": ["/memory/topics/deserialization.md"],
+    "reason": "Preserves reusable Python wrapper behavior that direct deserializer searches can miss."
+  },
+  {
+    "body": "When auditing or mitigating unsafe deserialization in a library with several serialization entry points, a guard applied to one method (e.g. an `allow_dangerous_deserialization` opt-in on a `load_local` path) does not imply its sibling entry points are guarded: here `deserialize_from_bytes` reached the same `pickle.loads` sink with no opt-in. Enumerate every public method that funnels caller-supplied bytes into the same unpickling call and confirm the guard is attached to each, rather than treating the presence of a guard elsewhere in the class as coverage.",
+    "action": "merged",
+    "topics": ["/memory/topics/deserialization.md"],
+    "reason": "Combines the sibling-public-method case with the same guard-coverage pattern from the first observation."
+  },
+  {
+    "body": "When mitigating unsafe deserialization at a shared enforcement point that legitimately carries arbitrary custom object types (dataclasses, enums, framework structs), a class allowlist is the wrong fix: it rejects the very types the queue transports, and widening it to cover them re-opens the RCE. When the legitimate sender is a trusted peer and the only threat is a third party injecting bytes into an unauthenticated channel, authenticate messages before unpickling (e.g., a per-queue HMAC verified with a constant-time compare) rather than restricting the deserializer, and confirm the key-distribution channel is itself trusted since a secret passed in cleartext lets an eavesdropper forge tags.",
+    "action": "added",
+    "topics": ["/memory/topics/deserialization.md"],
+    "reason": "Adds a mitigation tradeoff explicitly scoped to trusted senders and third-party injection, including key-distribution requirements."
+  },
+  {
+    "body": "When a diff/merge/patch library applies a change set over a live object graph, treat its path segments as attacker-controlled attribute selection rather than inert data keys: libraries such as DeepDiff's `Delta` reconstruct changes via `getattr`/`setattr` for dot-notation segments, so a crafted path can traverse dunder attributes (`__class__`, `__init__`, `__globals__`, `__subclasses__`) out of the intended data structure into arbitrary reachable objects \u2014 an untrusted-deserialization/attribute-traversal sink (CWE-502) even though the payload is JSON data, not pickle or YAML. State-sync and \"apply delta\" endpoints should therefore be analyzed as object-construction sinks, not mere data mutation.",
+    "action": "added",
+    "topics": ["/memory/topics/object-reachability.md"],
+    "reason": "Adds a reusable live-object traversal pattern that can be obscured by JSON payload syntax."
+  },
+  {
+    "body": "An input-validation guard that checks only the container type (e.g., `isinstance(state, dict)`) still admits semantically malformed payloads, so when the downstream sink dereferences specific keys or iterates nested structure, verify the schema the consumer actually assumes rather than just the top-level type; otherwise a dict with unexpected nested content passes the guard and can still corrupt state or raise an uncaught exception in the consumer, leaving the crash path only partially closed.",
+    "action": "added",
+    "topics": ["/memory/topics/input-validation.md"],
+    "reason": "Adds a compact consumer-schema verification lesson applicable beyond the original state-handling code."
+  },
+  {
+    "body": "When hardening a Python eval/exec sandbox, removing dangerous builtins, pinning `__builtins__`, and restricting the import allowlist are all insufficient on their own: every object injected into the execution globals (or allowed by the import allowlist) exposes its full transitive attribute graph, and popular numeric/data modules re-export `os`, `subprocess`, `sys`, and `ctypes` through ordinary non-dunder submodule attributes (e.g. `numpy.ctypeslib.load_library(...).system(...)`, `numpy.f2py.os`, `pandas.io.common.os`). A name-based denylist of `os`/`sys`/`ctypes`/`subprocess` cannot enumerate every such alias, so confirm the fix by tracing each injected global's reachable attributes (including nested submodules) rather than trusting the builtin/import restriction, and prefer removing the object or allowlisting the exact reachable names over extending the denylist.",
+    "action": "added",
+    "topics": ["/memory/topics/object-reachability.md"],
+    "reason": "Adds a distinct Python sandbox capability-reachability pattern with reusable API examples."
+  },
+  {
+    "body": "When a codebase already exposes a `validate_path`/`is_safe_path`-style helper, do not credit it as a control without confirming two things: what property it actually enforces, and whether it is invoked on the exact path the dangerous sink resolves. A helper that only checks `path.exists()` (existence, not containment) and is never called on the delete/read path provides no guard, even while an unconfined `base / name` join still reaches `unlink()` and file-serving sinks \u2014 its presence can make an unvalidated path traversal look defended.",
+    "action": "added",
+    "topics": ["/memory/topics/path-validation.md"],
+    "reason": "Adds a reusable evidence requirement for path helpers that existing deserialization coverage does not address."
+  },
+  {
+    "body": "A path-containment helper that resolves both sides with `path.resolve` and then compares using `startsWith(base)` without a trailing path separator blocks `..` traversal but still passes prefix confusion: a user whose directory is a string prefix of a sibling's (e.g. `user123` vs `user1234`) can target the sibling's files, turning a traversal fix into a cross-user object-level authorization gap. When a mitigation reuses an existing containment helper, verify the boundary comparison includes the separator (e.g. compare against `base + path.sep`), not merely that both paths are resolved.",
+    "action": "added",
+    "topics": ["/memory/topics/path-validation.md"],
+    "reason": "Adds a distinct containment comparison failure with a concrete verification case."
+  },
+  {
+    "body": "When crediting `path.basename` (or any basename-style sanitizer) as a path-traversal fix, remember it strips directory separators but passes the special entries `.` and `..` through unchanged, so a later `path.join(root, name)` can still resolve to the parent directory or the root itself; verify the actual sink rejects these inputs (e.g., a write that fails EISDIR on a directory target) rather than assuming basename fully neutralizes traversal, since a read, delete, or static-serve sink would still escape containment.",
+    "action": "added",
+    "topics": ["/memory/topics/path-validation.md"],
+    "reason": "Adds a basename edge case while preserving the need to establish exploitability at the actual sink."
+  },
+  {
+    "body": "When mitigating path traversal by allowlisting a set of \"trusted\" base directories, verify the provenance of those directories themselves: if the allowlist members are derived from attacker-influenced registration or config input (e.g., a run directory set by an unauthenticated client through a register endpoint), a correctly implemented realpath+prefix check only constrains the resolved path's shape and relocates the trust boundary rather than closing it \u2014 the attacker can still read files under any directory they can register, even though the literal suffix (a fixed `file` component) still blocks absolute reads like `/etc/passwd`. Treat such a fix as a partial mitigation and flag the allowlist source as a residual boundary-trust weakness.",
+    "action": "added",
+    "topics": ["/memory/topics/path-validation.md"],
+    "reason": "Adds a durable trust-provenance check and a useful limit on claims of arbitrary-file access."
+  },
+  {
+    "body": "Path validation applied to one direction of a shared file-transfer boundary does not protect the other: a downloader that trusts path entries returned by a caller-controlled remote repository (e.g. an HTTP artifact server whose JSON `files` listing becomes `FileInfo.path`) is a distinct sink from the upload path, and each listed entry flows into `os.path.join` + `open(wb)` without the traversal/containment check that already guards uploads. When the listing source is remote and attacker-influenced, verify every listed path at the shared write boundary, not just the single-file entry point.",
+    "action": "added",
+    "topics": ["/memory/topics/path-validation.md"],
+    "reason": "Extends guard-coverage reasoning to remote listings and distinct file-transfer directions."
+  },
+  {
+    "body": "When a URI guard unquotes percent-encoded input before parsing it with `urlparse`, an encoded `#` or `?` becomes a literal fragment/query delimiter that silently shunts any trailing `../` (or other dangerous component) out of `.path`, so a traversal check on the decoded path passes while a second sink that parses the still-encoded string keeps the traversal in its own path. Validate the undecoded representation the actual consumer parses, not only a decoded/normalized copy, and confirm both sides see the same delimiter interpretation before crediting a path check.",
+    "action": "added",
+    "topics": ["/memory/topics/path-validation.md"],
+    "reason": "Adds a concrete parser-order mismatch absent from existing memory."
+  },
+  {
+    "body": "When sanitizing an attacker-controlled filename for a filesystem write in cross-platform code, a POSIX-only basename guard (e.g. `posixpath.basename`) strips `/`-separated traversal but leaves Windows backslash sequences like `..\\evil` intact, so a `..\\` payload still escapes the destination directory on Windows; normalize `\\` to `/` before basename extraction (or use the platform-appropriate basename) and confirm the code actually runs on Windows before crediting the guard.",
+    "action": "added",
+    "topics": ["/memory/topics/path-validation.md"],
+    "reason": "Adds platform-dependent sanitizer behavior with an explicit runtime-reachability caveat."
+  },
+  {
+    "body": "When a language-level permission/sandbox model performs its path allowlist check in native code but relies on path normalization done in the same process's mutable language runtime through reassignable prototype methods (e.g. Buffer.prototype.utf8Slice/utf8Write), in-process attacker code can monkeypatch those methods so the check and the OS operation resolve different paths; resolve `.`/`..` from the raw bytes in the same trusted native layer as the check rather than trusting any normalization step the attacker can override.",
+    "action": "added",
+    "topics": ["/memory/topics/path-validation.md"],
+    "reason": "Adds a distinct trusted-normalization boundary for in-process permission checks."
+  },
+  {
+    "body": "A path-walking loop that terminates on the single separator (e.g. `while path and path != sep`) and advances by calling `posixpath.split` fails to terminate on multi-character all-separator heads: `posixpath.split` special-cases an all-separator string and returns it unchanged (`split('//') == ('//', '')`), so the head is never reduced and the loop yields the same value forever. When the walked path comes from attacker-controlled input such as a ZIP entry name beginning with `//`, this becomes a reachable CWE-835 infinite-loop DoS across every caller (directory enumeration and path joining); the fix is to bound the guard on whether stripping the separator leaves a non-empty string (e.g. `while path and path.strip(sep)`) rather than only excluding the exact single separator.",
+    "action": "added",
+    "topics": ["/memory/topics/path-validation.md"],
+    "reason": "Adds a reusable path-walker termination pattern grounded in specific API behavior."
+  },
+  {
+    "body": "When reproducing an archive-extraction path traversal (Zip Slip), a test that does not escape the extraction directory can mislead if the runtime's standard library has backported protections: patched `zipfile.extractall`/`tarfile.extractall` silently strip leading `/` and `..` components and re-root them under the target. A failed reproduction is evidence about the runtime build, not about the repository code, which may still pass member names to `extractall` with no validation of its own and remain exploitable on unpatched or older runtimes; confirm containment exists in the repository's own code (and that symlink/hardlink members are handled \u2014 `tarfile` preserves them while `zipfile` writes them as regular files) before downgrading the finding.",
+    "action": "merged",
+    "topics": ["/memory/topics/path-validation.md"],
+    "reason": "Added runtime-dependent archive reproduction guidance while avoiding universal claims about extraction-library behavior."
+  },
+  {
+    "body": "When mitigating archive-extraction path traversal (Zip Slip), validating only member names via normpath/join/resolve plus a prefix check does not close the link escape vector: a symlink (or hardlink/junction) member whose target points outside the destination can be written through by a later member, bypassing the name check entirely. The mitigation must explicitly reject link-type members at the application level (e.g., checking the library's own `is_symlink`/link-detection field on each member before extraction) rather than relying on the extraction library's built-in symlink containment, which is version-dependent and not guaranteed across unpinned deployments.",
+    "action": "merged",
+    "topics": ["/memory/topics/path-validation.md"],
+    "reason": "Extended existing containment guidance with the distinct archive-link escape and its verification requirements."
+  },
+  {
+    "body": "When auditing a \"write-to-temp-then-rename\" atomic file replacement helper, verify that the destination is not opened or truncated (e.g. `fopen(path, \"w\")`) before the temporary file is successfully created; a helper that truncates first and only then builds/opens the temp name destroys the original file on any temp-creation failure \u2014 for instance a temp name that appends a random suffix plus `.tmp` and thereby exceeds `NAME_MAX`/`ENAMETOOLONG` leaves the existing persisted state truncated to zero. A `stat`/`S_ISREG` check placed after the truncating open does not guard against this, so trace the ordering and only credit the helper as atomic once the destination is replaced after the temp file exists.",
+    "action": "added",
+    "topics": ["/memory/topics/persistence.md"],
+    "reason": "The failure-ordering pattern is reusable for reviewing atomic persistence helpers and was absent from existing memory."
+  },
+  {
+    "body": "When mitigating retention of sensitive training data in a serialized object, distinguish the in-memory attribute from the persisted state rather than deleting the attribute: if the sensitive value lives in a documented, test-asserted public attribute (e.g. an introspection field listing pruned terms), emptying it stops the leak but breaks a supported API contract. Exclude that attribute from serialization instead \u2014 via a `__getstate__`/`__setstate__` override that drops it from the pickled state \u2014 so the value remains available in memory for introspection while never reaching the persisted/shared artifact.",
+    "action": "added",
+    "topics": ["/memory/topics/persistence.md"],
+    "reason": "Preserving public in-memory behavior while excluding sensitive persisted state provides a durable patch-scope lesson."
+  },
+  {
+    "body": "When a mitigation is a dependency version-floor bump and the fixed release cannot be installed in the sandbox (offline/empty package index), an empirical reproduction or timing test will run against the still-installed vulnerable version: it demonstrates the vulnerability in the old version but does not verify the fix, and its output can be misread as \"the fix is still vulnerable.\" For such patches, mark validation as logic-simulated, and confirm remediation via the version-boundary fact and the absence of any other pinning/lockfile that could still select the vulnerable release, not via a runtime test of the unfetchable fixed version.",
+    "action": "added",
+    "topics": ["/memory/topics/verification.md"],
+    "reason": "Installed-version evidence and unavailable fixed-version tests warrant explicit reusable verification guidance."
+  },
+  {
+    "body": "When fixing an open redirect on a route that also serves as a legitimate file/proxy download endpoint, a blanket rejection of all cross-origin redirect targets over-blocks and breaks the programmatic client that fetches external files by following that same redirect. Distinguish the two consumers: reject cross-origin redirects server-side for browser navigation, but let the programmatic client fetch external URLs directly (stripping auth cookies/headers) instead of routing them through the redirect endpoint, and compare hostname plus port when deciding same-origin since hostname-only comparison leaves a same-host/different-port bypass.",
+    "action": "added",
+    "topics": ["/memory/topics/redirects.md"],
+    "reason": "The differing redirect consumers and credential boundaries form a reusable compatibility and security pattern."
+  },
+  {
+    "body": "When a classification or trust check tries to distinguish genuine objects from attacker-controlled data by requiring a type marker embedded in the same payload (e.g. `meta._type == \"SomeType\"`), that marker is itself forgeable and the fix remains bypassable with a one-field change. Confirm the discriminator is a server-side property established by the trusted code path \u2014 such as a component's type/class attribute \u2014 rather than any field the attacker can set inside the data being interpreted.",
+    "action": "merged",
+    "topics": ["/memory/topics/input-validation.md"],
+    "reason": "Forgeable discriminator provenance complements the existing consumer-validation guidance without retaining repository-specific markers."
+  },
+  {
+    "body": "When mitigating XML entity expansion by swapping `import xml.etree.ElementTree` for `defusedxml.ElementTree`, do not assume the alias change defuses every entry point: `defusedxml` re-exports the stdlib module and only overrides a subset of parsing functions, so `XMLPullParser` still defaults to the vulnerable stdlib parser and must be given `_parser=ET.DefusedXMLParser(target=...)` explicitly, while `TreeBuilder`/`Element` type references are absent from the defusedxml alias and must stay on the stdlib import; test each parse path (fromstring vs pull vs async) independently rather than crediting a single blocked entry point as full coverage.",
+    "action": "merged",
+    "topics": ["/memory/topics/deserialization.md"],
+    "reason": "XML parser replacement adds a concrete entry-point coverage pattern, with version-sensitive API behavior kept conditional."
+  },
+  {
+    "body": "A central log-injection fix that neutralizes control characters in the assembled `info.message` at a winston format stage does not cover caller-controlled data passed as logger interpolation (splat) arguments or as structured metadata, because `winston.format.splat()` and metadata/object traversal run after that sanitization and re-emit the raw values; when auditing such a fix, confirm it also sanitizes splat arguments and traversed object fields, not just the final message string.",
+    "action": "added",
+    "topics": ["/memory/topics/injection.md"],
+    "reason": "Formatter ordering and secondary logging inputs add a reusable injection pattern absent from existing memory."
+  },
+  {
+    "body": "When hardening a cross-user delete/query where a model helper already exposes an ownership-scope parameter, confirm both that the vulnerable caller actually passes the owner scope and that the helper ANDs it with the object-id filter instead of replacing the query when the owner is set; an `if (owner) query = {owner}` branch silently drops the id filter, and the helper must distinguish a null \"delete all\" id list from an empty one, because ANDing an empty `$in` with the owner filter deletes nothing while null must still mean \"all records for that owner.\"",
+    "action": "added",
+    "topics": ["/memory/topics/authorization.md"],
+    "reason": "Ownership-filter composition and preservation of empty-versus-null query semantics provide durable authorization review guidance."
+  },
+  {
+    "body": "When a mitigation summary describes a token or API-key comparison as \"constant-value equality,\" do not accept the wording as evidence of timing safety: plain `==` is not a constant-time comparison and short-circuits on the first mismatching byte, so a constant-time claim requires a primitive such as `hmac.compare_digest`. Verify the actual comparison operator in the diff against the summary's claimed property rather than crediting \"constant-value\"/\"constant-time\" language at face value.",
+    "action": "merged",
+    "topics": ["/memory/topics/verification.md"],
+    "reason": "The implementation-versus-summary evidence requirement extends the existing patch-verification topic with a concrete comparison-property check."
+  },
+  {
+    "body": "On an ID-based mutation endpoint, a precondition scoped only to the caller's own tenant does not constrain which row the mutation affects; a `count(*) > 1` gate over the caller's org (a minimum-resource invariant) looked like an authorization check but never bound the target object ID to the caller's tenant, so an unscoped `delete ... where id = ${id}` reached foreign rows. Before crediting any precondition as a guard, confirm the query's WHERE clause actually ties the resolved target ID to the caller's principal scope rather than validating an unrelated invariant about the caller's own resources.",
+    "action": "added",
+    "topics": ["/memory/topics/authorization.md"],
+    "reason": "The distinction between a caller-resource invariant and authorization of the target complements ownership-filter composition in the new authorization topic."
+  },
+  {
+    "body": "When remediating a case-sensitivity identity bypass (e.g., duplicate accounts via email case variation), the normalization must be applied to every identity-boundary operation \u2014 the duplicate check, the insert, and sibling lookups such as login, password-reset, and email-verification \u2014 not just the single reported check. A case-sensitive `unique` constraint offers no protection, and a partial fix that normalizes only the signup path locks out pre-existing mixed-case accounts while leaving sibling flows inconsistent; the correct repair both canonicalizes on write and matches case-insensitively (e.g., `lower(email)`) on every read path.",
+    "action": "added",
+    "topics": ["/memory/topics/authorization.md"],
+    "reason": "Cross-flow identity normalization and compatibility with existing mixed-case identities are reusable concerns not covered by prior topics."
+  },
+  {
+    "body": "When a fix mints a purpose-scoped signed token (e.g., an organization-invite JWT) that shares the signing key and claim shape with session tokens, verify that the authenticating middleware actually discriminates on the token's purpose/type claim rather than only on signature validity and a tenant/org identifier; otherwise the invite token can be presented as a bearer session token and inherit whatever access is gated on that org claim alone, even though the two token types were meant to be distinct.",
+    "action": "added",
+    "topics": ["/memory/topics/authorization.md"],
+    "reason": "Purpose enforcement at signed-token consumption adds a distinct and durable authorization boundary pattern."
+  },
+  {
+    "body": "When a worker assembles a command string from several attacker-controlled task fields and runs it under `shell=True`, quoting only the field named in the finding leaves sibling fields live at the same boundary: a helper called \"sanitize\" that only normalizes one character class (e.g. replacing non-breaking spaces) is not shell-metacharacter neutralization, and a filename token derived from a URL via path-segment splitting (`split(\"/\")[-1]`) still carries `;`, `&&`, `$()`, or backticks, so audit every token interpolated into the same command rather than only the reported one.",
+    "action": "added",
+    "topics": ["/memory/topics/injection.md"],
+    "reason": "Sibling shell inputs and misleading sanitizer names supply concrete injection-review guidance absent from existing memory."
+  },
+  {
+    "body": "When a VCS/download helper normalizes a URL by stripping a known scheme prefix before passing the remainder to git/hg as an argv element, check the scheme character set and reconstruction so a crafted scheme cannot leave a leading `--option` in the result: a permissive scheme regex (allowing `+` and `-`) lets `git+--upload-pack://host/repo` match, and after the `git+` prefix is stripped the reconstructed value `--upload-pack://...` is interpreted by `git clone` as the `--upload-pack` option, which names an arbitrary helper program to run. Switching from a shell string to an argv list stops shell-metacharacter command injection but does not stop this option-recognition vector, since a single array element beginning with `--` is still parsed as a flag by the target tool.",
+    "action": "added",
+    "topics": ["/memory/topics/injection.md"],
+    "reason": "Option recognition after URL reconstruction captures a distinct command-execution boundary that remains relevant with argv-based invocation."
+  },
+  {
+    "body": "When evaluating a crash/DoS claim, do not dismiss it merely because the process registers an `uncaughtException` handler: a failure path through an `async` middleware (or other promise) rejects rather than throws, and in Express 4 that rejection is not forwarded to error-handling middleware, surfacing instead as `unhandledRejection` \u2014 a distinct Node event an `uncaughtException` handler does not intercept, so the process can still terminate. Confirm which event the crash path produces before crediting any global exception handler as a mitigating control.",
+    "action": "added",
+    "topics": ["/memory/topics/resource-exhaustion.md"],
+    "reason": "Adds a distinct asynchronous crash-verification pattern, framed to require runtime-specific evidence before crediting exception handlers."
+  },
+  {
+    "body": "A denial-of-service can be quadratic without any regex: a loop that alternately strips two disjoint trailing character classes from the same end of an attacker-controlled string (e.g. `rstrip(\";\")` and `rstrip(\".,:!\")`) rescans the whole remaining suffix on each pass while alternating input like `;:;:;:` forces one character stripped per iteration. Collapsing to a single `rstrip` over the union of characters fixes the complexity, but do not accept the mitigator's claim that output is unchanged without a differential check \u2014 a stripped character may carry a second semantic role (a trailing semicolon also terminates an HTML character entity), so the single-pass version silently rewrites boundary cases like an entity followed by punctuation and then a semicolon; a fuzz comparison against the pre-fix implementation surfaced many output diffs that the \"entity handling unchanged\" assertion missed, even though those diffs were non-security and matched the upstream fix.",
+    "action": "added",
+    "topics": ["/memory/topics/resource-exhaustion.md"],
+    "reason": "Adds a reusable complexity pattern and a concrete reason to verify semantic equivalence independently of the security fix."
+  },
+  {
+    "body": "When a resource-exhaustion finding against attacker-controlled text is met with \"the encoder/tokenizer truncates to a fixed length,\" that only bounds model-inference cost, not total resource use: the raw string is still held in memory across request parsing, object copies, and any verbatim logging before truncation. Trace where the full input string is retained and logged before crediting token truncation as a mitigation for a DoS finding.",
+    "action": "added",
+    "topics": ["/memory/topics/resource-exhaustion.md"],
+    "reason": "Adds a durable limit-placement lesson absent from the existing topics."
+  },
+  {
+    "body": "When mitigating a GraphQL denial-of-service via query-complexity limits, depth and field-selection caps bound the number of resolver invocations a document triggers, but they do not bound amplification driven by result cardinality: a single field selection whose resolver fans out to a per-element backend lookup (an N+1 pattern, e.g. selecting a related object on each row of a list result) still costs 1 + N backend queries for a large result set. After adding complexity limits, audit resolvers for per-child/per-row lookups, since static complexity analysis is blind to how many elements a resolver iterates over.",
+    "action": "added",
+    "topics": ["/memory/topics/resource-exhaustion.md"],
+    "reason": "Adds a framework-specific amplification pattern that complements the other resource-limit lessons."
+  },
+  {
+    "body": "In an asyncio web handler, capping the size of caller-controlled input does not by itself fix a CPU-complexity denial of service when the processing is super-linear and runs on the event loop: the bounded payload still blocks the loop (e.g. a ~10 KB adversarial nested-bracket input held the event loop for several seconds). Verify whether the CPU-bound step is offloaded (e.g. via asyncio.to_thread) rather than crediting a size ceiling as the mitigation, and measure loop responsiveness under a worst-case in-bounds payload before accepting the fix.",
+    "action": "added",
+    "topics": ["/memory/topics/resource-exhaustion.md"],
+    "reason": "Adds a reusable responsiveness verification requirement without retaining the run-specific payload size or timing."
+  },
+  {
+    "body": "When an error reporter renders a caret/pointer into a line it has normalized (e.g. stripping trailing newline bytes), the column used to position the pointer must be clamped to the length of that normalized line, not the raw offset; if line-break tracking and line-trimming disagree about what terminates a line (a counter that records only `\\n`/`\\r\\n` while the formatter also strips lone `\\r`), the reported column can exceed the displayed line length and a negative count reaches `String.repeat`/substring, throwing an uncaught `RangeError` that turns attacker-controlled input into a crash against callers relying on a documented never-throw parse contract.",
+    "action": "merged",
+    "topics": ["/memory/topics/input-validation.md"],
+    "reason": "Extends the existing input-validation topic with a distinct diagnostic-formatting failure pattern and broadens its routing description."
+  },
+  {
+    "body": "When a request-smuggling fix tightens HTTP/1.1 body-framing acceptance, pre-existing \"valid request\" test fixtures may themselves encode the now-rejected ambiguous framing (e.g., `Transfer-Encoding: identity`, a negative `Content-Length`, or `chunked` combined with `Content-Length`/`identity`), so their failure under the fix confirms the patch rather than indicating a regression; inspect each failing fixture's framing semantics before treating the failures as a reason to weaken or revert the fix.",
+    "action": "merged",
+    "topics": ["/memory/topics/verification.md"],
+    "reason": "Extends patch-verification guidance with a concrete false-regression pattern for security-sensitive fixtures."
+  },
+  {
+    "body": "When reviewing an endpoint that dispatches to methods by name (reflection, `getattr`/eval-style dynamic dispatch, or route-to-handler mapping), verify the callable allowlist is enforced at the server-side dispatch point, not merely computed and advertised elsewhere. A backend that marks intended handlers with a decorator and collects them into an allowlist \u2014 but where only the client honors that list \u2014 leaves `getattr(obj, attacker_name)(attacker_data)` open to invoking any method on the resolved object, turning otherwise-internal helpers (e.g., one that copies a local path into a downloadable cache) into arbitrary-file-read primitives; the fix is to reject any resolved attribute lacking the allowlist marker at the dispatch boundary.",
+    "action": "merged",
+    "topics": ["/memory/topics/authorization.md"],
+    "reason": "Extends authorization guidance with enforcement at dynamic dispatch, retaining the capability pattern without repository-specific helpers."
+  }
+]

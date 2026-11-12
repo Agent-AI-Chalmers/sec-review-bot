@@ -37,7 +37,7 @@ extraction 和 observation 按 `created_at`、`extraction_id` 降序排列。调
 
 ### 修订与记忆树自动更新
 
-修订通过 `learning`（吸收新 observation）、`reorganization`（整理现有记忆）或 `manual`（人工编辑）区分产生方式。`predecessor_revision` 记录创建时的生效版本；恢复旧版本只改变当前生效版本，不创建新修订，后续修订编号仍递增。人工编辑不消费待处理 observation。
+修订通过 `learning`（吸收新 observation）、`reorganization`（整理现有记忆）或 `manual`（人工编辑）区分产生方式。`predecessor_revision` 记录创建时的生效版本；恢复旧版本只改变当前生效版本，不创建新修订，后续修订编号仍递增。人工编辑不消费待处理 observation。`learning` 和 `reorganization` 修订保存 maintainer 的 `maintenance_report`；如果报告没有对每个已消费提取恰好给出一条决定，或非 `skipped` 决定未列出修改的主题，服务会拒绝请求。
 
 <!-- doc-default: memory-tree-automation-state; source=services/memory-catalog/src/database/schema-versions/001_initial_catalog.sql -->
 
@@ -78,3 +78,7 @@ pnpm run test:integration
 ```
 
 `pnpm test` 运行隔离的单元测试和服务端测试。`pnpm run test:integration` 使用显式提供的 `TEST_DATABASE_URL` 对 PostgreSQL 存储实现进行测试；未设置时，启动脚本会使用仓库 `compose.yaml` 中配置的镜像创建并清理一个临时本地 Docker PostgreSQL 实例。启动脚本会有意忽略服务常规使用的 `MEMORY_CATALOG_DATABASE_URL`，避免测试意外修改共享数据库。
+
+每次 extraction 可以产出零到多条 observation。`extraction_id` 标识调用及其来源；`observation_id` 标识可独立维护的经验。注册操作原子发布完整的 `observations` 数组；learning 消费 `observation_ids`，并为每条 observation 记录一个决定。
+
+Observation ID 是全局唯一的不透明标识，API 不要求 extraction ID 前缀。另一条 extraction 使用已占用的 observation ID 时，返回 HTTP 409，并回滚整次注册。分页游标是不透明的，排序位置使用当前列表的行 ID。

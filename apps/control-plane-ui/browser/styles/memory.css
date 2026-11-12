@@ -11,12 +11,21 @@
   gap: var(--mantine-spacing-md);
 }
 
+.revision-graph-frame {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+}
+
+.revision-graph-toolbar {
+  padding: var(--mantine-spacing-xs) var(--mantine-spacing-sm);
+  border-bottom: 1px solid var(--border);
+}
+
 .revision-graph-scroll {
   display: flex;
   max-height: min(68vh, 720px);
   overflow: auto;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
   background: light-dark(
     var(--mantine-color-gray-0),
     var(--mantine-color-dark-8)
@@ -97,7 +106,7 @@
 
 .revision-graph-node span {
   margin-top: 4px;
-  color: var(--mantine-color-dimmed);
+  color: var(--mantine-color-text);
   font-size: var(--mantine-font-size-xs);
 }
 
@@ -150,6 +159,7 @@
   line-height: inherit;
 }
 
+[data-extraction-row][data-highlighted],
 .revision-graph-node[data-highlighted] {
   outline: 2px solid transparent;
   outline-offset: 3px;
@@ -188,7 +198,7 @@
   align-items: center;
   gap: var(--mantine-spacing-xs);
   padding-inline: var(--mantine-spacing-xs);
-  color: var(--mantine-color-dimmed);
+  color: var(--mantine-color-text);
   font-size: var(--mantine-font-size-xs);
   font-weight: 600;
 }
@@ -198,10 +208,11 @@
 }
 
 /* Revision rows have optional process actions, but the current-state control must not drift
-   between rows. Fixed semantic slots keep every command aligned without adding fake controls. */
+   between rows. Fixed semantic slots keep every command aligned without adding fake controls.
+   The fourth slot holds the maintainer decisions action. */
 .memory-revision-actions {
   display: grid;
-  grid-template-columns: 72px 84px 84px 140px;
+  grid-template-columns: 72px 84px 84px 84px 140px;
   align-items: center;
   column-gap: var(--mantine-spacing-xs);
   width: max-content;
@@ -528,4 +539,20 @@
 .memory-overview-workflows tfoot th {
   border-top: 1px solid var(--border);
   color: var(--mantine-color-text);
+}
+
+.maintenance-decisions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.maintenance-decision {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.maintenance-decision-action {
+  flex: none;
 }

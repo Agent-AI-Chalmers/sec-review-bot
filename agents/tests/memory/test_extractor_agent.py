@@ -18,8 +18,12 @@ from tests.runtime.fake_chat_models import (
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("record_execution", [False, True])
+@pytest.mark.parametrize("observations", [[], ["Lesson one.", "Lesson two."]])
 async def test_extractor_reads_source_and_optionally_records_own_execution(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, record_execution: bool
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    record_execution: bool,
+    observations: list[str],
 ) -> None:
     """Exercise the real graph so input and output paths cannot silently swap roles."""
     monkeypatch.setenv("AGENT_SKILLS_ENABLED", "false")
@@ -56,7 +60,7 @@ async def test_extractor_reads_source_and_optionally_records_own_execution(
             ),
             structured_tool_call_message(
                 MemoryObservationOutput,
-                {"has_observation": False, "observation_markdown": ""},
+                {"observations": observations},
             ),
         ]
     )
@@ -68,7 +72,7 @@ async def test_extractor_reads_source_and_optionally_records_own_execution(
         extractor_trajectory_path=output if record_execution else None,
     )
 
-    assert result.has_observation is False
+    assert result.observations == observations
     assert source.read_text() == evidence
     assert output.exists() is record_execution
     if record_execution:

@@ -4,9 +4,10 @@ import type {
   MemoryTreeContentResponse,
   TrajectoryContentResponse
 } from '../../../shared/artifact-content.js'
+import historySamples from '../data/memory-history-samples.json' with { type: 'json' }
 import memoryTrajectory from '../data/memory-trajectory.json' with { type: 'json' }
 import { validateTrajectoryEvent } from '../../../shared/trajectory-events.js'
-import { BASE_TIME } from '../runs/generate.js'
+import { BASE_TIME as RUNS_BASE_TIME } from '../runs/generate.js'
 import type {
   CatalogOverviewWorkflow,
   ExtractionRecord,
@@ -36,6 +37,11 @@ const trajectoryReference = {
 export function createMemoryHandler(
   sourceRunIds: SourceRunIds
 ): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
+  // E2E pins the clock; interactive fixture previews stay relative to now.
+  const fixtureTime = process.env.CONTROL_PLANE_UI_E2E_FIXTURE_TIME
+  const BASE_TIME = fixtureTime ? Date.parse(fixtureTime) : RUNS_BASE_TIME
+  if (!Number.isFinite(BASE_TIME))
+    throw new Error('CONTROL_PLANE_UI_E2E_FIXTURE_TIME must be a valid date.')
   let memoryAutomation: MemoryTreeAutomation = {
     state: 'enabled',
     generation: 1,
@@ -59,13 +65,15 @@ export function createMemoryHandler(
       2,
       {
         'MEMORY.md':
-          '# Security Review Experience Memory\n\nUse this short index to select relevant experience. Memory is guidance only; verify every claim against the current review target.\n\n- [Triage and reachability](topics/triage.md) - Scope the reachable attack path and affected boundary.\n- [Evidence quality](topics/evidence.md) - Ground findings and validation claims in current evidence.\n- [Authentication comparisons](topics/authentication.md) - Review secret comparison and failure behavior.\n',
+          '# Security Review Experience Memory\n\nUse this short index to select relevant experience. Memory is guidance only; verify every claim against the current review target.\n\n- [Triage and reachability](topics/triage.md) - Scope the reachable attack path and affected boundary.\n- [Evidence quality](topics/evidence.md) - Ground findings and validation claims in current evidence.\n- [Authentication comparisons](topics/authentication.md) - Review secret comparison and failure behavior.\n- [Service boundaries](topics/boundaries.md) - Limit what proxied responses carry across a trust boundary.\n',
+        'topics/boundaries.md':
+          '# Service boundaries\n\n## Proxied response headers\n\nForward only an explicit allowlist of upstream response headers. Internal debugging headers can carry private identifiers or credentials across the service boundary.\n',
         'topics/authentication.md':
           '# Authentication comparisons\n\n## Constant-time comparison\n\nBefore calling a constant-time comparison primitive, validate that both byte sequences have equal length. Some runtimes throw on unequal lengths, turning malformed credentials into a distinct failure path.\n\nReturn the same authentication failure response for length mismatch and value mismatch.\n',
         'topics/evidence.md':
           '# Evidence quality\n\n## Keep evidence layers separate\n\nDistinguish input claims, prior-stage summaries, repository facts, and runtime observations. Do not let a confident summary substitute for evidence from the prepared workspace.\n\n## Focused validation\n\nPrefer a small probe with a stable oracle. Report environmental failures as validation limits unless repository evidence connects them to the reviewed behavior.\n',
         'topics/triage.md':
-          '# Triage and reachability\n\n## Confirm the path\n\nFollow attacker-controlled data through parsing, normalization, authorization, and the final sink. Name the first boundary that fails to enforce the required invariant.\n\n## Bound the claim\n\nDo not expand one repository-local defect into a broader vulnerability class without evidence that the adjacent surfaces share the same reachable behavior.\n'
+          '# Triage and reachability\n\n## Confirm the path\n\nFollow attacker-controlled data through parsing, normalization, authorization, and the final sink. Name the first boundary that fails to enforce the required invariant.\n\n## Authorize before lookup\n\nCheck tenant authorization before any lookup whose result reveals resource existence. A guard after the lookup can still leak existence through status, timing, or error differences.\n\n## Bound the claim\n\nDo not expand one repository-local defect into a broader vulnerability class without evidence that the adjacent surfaces share the same reachable behavior.\n'
       }
     ],
     [
@@ -98,8 +106,39 @@ export function createMemoryHandler(
       source: {
         kind: 'learning',
         operation_id: 'fixture-maintenance-2',
-        extraction_ids: ['fixture-extraction-2'],
-        trajectory_reference: trajectoryReference
+        observation_ids: [
+          'observation-fixture-extraction-2-1',
+          'observation-fixture-extraction-3-1',
+          'observation-fixture-extraction-4-1'
+        ],
+        trajectory_reference: trajectoryReference,
+        maintenance_report: {
+          summary:
+            'Added authentication and service-boundary guidance from two observations and folded tenant authorization ordering into the existing triage topic.',
+          observation_decisions: [
+            {
+              observation_id: 'observation-fixture-extraction-2-1',
+              action: 'added',
+              topics: ['/memory/topics/authentication.md'],
+              reason:
+                'Length validation before constant-time comparison is a reusable authentication check that memory did not cover.'
+            },
+            {
+              observation_id: 'observation-fixture-extraction-3-1',
+              action: 'added',
+              topics: ['/memory/topics/boundaries.md', '/memory/MEMORY.md'],
+              reason:
+                'Header allowlisting at proxy boundaries is a distinct, reusable pattern, so it gets its own topic and index entry.'
+            },
+            {
+              observation_id: 'observation-fixture-extraction-4-1',
+              action: 'merged',
+              topics: ['/memory/topics/triage.md'],
+              reason:
+                'Authorization ordering refines the existing reachability guidance rather than forming a separate topic.'
+            }
+          ]
+        }
       }
     },
     {
@@ -121,7 +160,7 @@ export function createMemoryHandler(
       source_unit_id: 'case-reachability',
       execution_archive_digest: `sha256:${'2'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: null,
+      observations: [],
       created_at: new Date(BASE_TIME - 300_000).toISOString()
     },
     {
@@ -131,10 +170,13 @@ export function createMemoryHandler(
       source_unit_id: 'case-authentication',
       execution_archive_digest: `sha256:${'3'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: {
-        body_markdown:
-          '**Reject unequal input lengths before calling `timingSafeEqual`.** Comparing buffers of different lengths throws instead of returning false, so validate the length first and fail authentication without exposing a distinct error path.'
-      },
+      observations: [
+        {
+          observation_id: 'extraction-1',
+          body_markdown:
+            '**Reject unequal input lengths before calling `timingSafeEqual`.** Comparing buffers of different lengths throws instead of returning false, so validate the length first and fail authentication without exposing a distinct error path.'
+        }
+      ],
       created_at: new Date(BASE_TIME).toISOString()
     },
     {
@@ -144,10 +186,13 @@ export function createMemoryHandler(
       source_unit_id: 'case-proxy-boundary',
       execution_archive_digest: `sha256:${'4'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: {
-        body_markdown:
-          '**Strip internal debugging headers when proxying upstream responses.** Forward only an explicit response-header allowlist so private identifiers and credentials cannot cross the service boundary.'
-      },
+      observations: [
+        {
+          observation_id: 'extraction-1',
+          body_markdown:
+            '**Strip internal debugging headers when proxying upstream responses.** Forward only an explicit response-header allowlist so private identifiers and credentials cannot cross the service boundary.'
+        }
+      ],
       created_at: new Date(BASE_TIME + 120_000).toISOString()
     },
     {
@@ -157,10 +202,13 @@ export function createMemoryHandler(
       source_unit_id: 'pull-request',
       execution_archive_digest: `sha256:${'5'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: {
-        body_markdown:
-          '**Perform tenant authorization before any lookup whose result reveals resource existence.** A post-lookup guard still permits status, timing, or error differences to disclose whether another tenant owns the requested object.'
-      },
+      observations: [
+        {
+          observation_id: 'extraction-1',
+          body_markdown:
+            '**Perform tenant authorization before any lookup whose result reveals resource existence.** A post-lookup guard still permits status, timing, or error differences to disclose whether another tenant owns the requested object.'
+        }
+      ],
       created_at: new Date(BASE_TIME + 180_000).toISOString()
     },
     {
@@ -170,7 +218,7 @@ export function createMemoryHandler(
       source_unit_id: 'issue',
       execution_archive_digest: `sha256:${'6'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: null,
+      observations: [],
       created_at: new Date(BASE_TIME + 240_000).toISOString()
     },
     {
@@ -180,26 +228,152 @@ export function createMemoryHandler(
       source_unit_id: 'case-reachability',
       execution_archive_digest: `sha256:${'7'.repeat(64)}`,
       trajectory_reference: trajectoryReference,
-      observation: null,
+      observations: [],
       created_at: new Date(BASE_TIME + 300_000).toISOString()
     }
   ]
-  const consumedRevisionByExtraction = new Map([['fixture-extraction-2', 2]])
-  const observations: ObservationRecord[] = extractionRecords.flatMap(
-    (record) =>
-      record.observation === null
-        ? []
-        : [
+  const consumedRevisionByObservation = new Map([
+    ['observation-fixture-extraction-2-1', 2],
+    ['observation-fixture-extraction-3-1', 2],
+    ['observation-fixture-extraction-4-1', 2]
+  ])
+  // Forty-two distinct observations and decisions adapted from the five
+  // learning-gpt-v2-r2 passes of bountybench-memory-20261108-deepseek-memory.
+  // Provenance is replaced; chronology, operator edits and reorganization are
+  // illustrative. Each observation is registered once, including pending work.
+  for (const record of [...memoryRevisions, ...extractionRecords])
+    record.created_at = new Date(
+      Date.parse(String(record.created_at)) - 64 * 3_600_000
+    ).toISOString()
+  let sampleIndex = 0
+  for (let revision = 4; revision <= 60; revision += 1) {
+    const predecessor = revision === 4 ? 2 : revision === 56 ? 53 : revision - 1
+    const files = { ...memoryFilesByRevision.get(predecessor)! }
+    const createdAt = new Date(
+      BASE_TIME - (61 - revision) * 3_600_000
+    ).toISOString()
+    let source: Record<string, unknown>
+    if (revision % 7 === 0) {
+      files['MEMORY.md'] +=
+        '\nReview only guidance relevant to the current trust boundary.\n'
+      source = {
+        kind: 'manual',
+        operation_id: `fixture-edit-${revision}`,
+        actor: { kind: 'user', id: 'review-operator' }
+      }
+    } else if (revision % 5 === 0) {
+      files['MEMORY.md'] =
+        '# Security Review Experience Memory\n\nSelect a topic, then verify its applicability against current repository evidence.\n\n' +
+        Object.keys(files)
+          .filter((path) => path.startsWith('topics/'))
+          .sort()
+          .map((path) => `- [${path}](${path})`)
+          .join('\n') +
+        '\n'
+      source = {
+        kind: 'reorganization',
+        operation_id: `fixture-reorganize-${revision}`,
+        trajectory_reference: trajectoryReference,
+        maintenance_report: {
+          summary:
+            'Consolidated the topic index and preserved the evidence and applicability limits of existing guidance.',
+          observation_decisions: []
+        }
+      }
+    } else {
+      const sample = historySamples[sampleIndex++]!
+      const extractionId = `fixture-history-${sampleIndex}`
+      consumedRevisionByObservation.set(
+        `observation-${extractionId}-1`,
+        revision
+      )
+      extractionRecords.push({
+        extraction_id: extractionId,
+        source_workflow: 'repository-review',
+        source_run_id: sourceRunIds['repository-review'],
+        source_unit_id: `case-${sampleIndex}`,
+        execution_archive_digest: `sha256:${'5'.repeat(64)}`,
+        trajectory_reference: trajectoryReference,
+        observations: [
+          { observation_id: 'extraction-1', body_markdown: sample.body }
+        ],
+        created_at: new Date(Date.parse(createdAt) - 900_000).toISOString()
+      })
+      if (sample.action !== 'skipped')
+        for (const topic of sample.topics) {
+          const path = topic.replace('/memory/', '')
+          files[path] =
+            `${files[path] ?? '# Review guidance\n'}\n${sample.action === 'conflict' ? '## Unresolved conflict\n\n' : ''}${sample.body}\n`
+        }
+      source = {
+        kind: 'learning',
+        operation_id: `fixture-learning-${revision}`,
+        observation_ids: [`observation-${extractionId}-1`],
+        trajectory_reference: trajectoryReference,
+        maintenance_report: {
+          summary: sample.reason,
+          observation_decisions: [
             {
-              extraction_id: record.extraction_id,
-              source_run_id: record.source_run_id,
-              source_unit_id: record.source_unit_id,
-              body_markdown: record.observation.body_markdown,
-              consumed_revision:
-                consumedRevisionByExtraction.get(record.extraction_id) ?? null,
-              created_at: record.created_at
+              observation_id: `observation-${extractionId}-1`,
+              action: sample.action,
+              topics: sample.topics,
+              reason: sample.reason
             }
           ]
+        }
+      }
+    }
+    memoryFilesByRevision.set(revision, files)
+    memoryRevisions.unshift({
+      revision,
+      predecessor_revision: predecessor,
+      created_at: createdAt,
+      source
+    })
+  }
+  for (; sampleIndex < historySamples.length; sampleIndex += 1) {
+    const sample = historySamples[sampleIndex]!
+    extractionRecords.push({
+      extraction_id: `fixture-history-${sampleIndex + 1}`,
+      source_workflow: 'repository-review',
+      source_run_id: sourceRunIds['repository-review'],
+      source_unit_id: `case-${sampleIndex + 1}`,
+      execution_archive_digest: `sha256:${'5'.repeat(64)}`,
+      trajectory_reference: trajectoryReference,
+      observations: [
+        { observation_id: 'extraction-1', body_markdown: sample.body }
+      ],
+      created_at: new Date(
+        BASE_TIME - (historySamples.length - sampleIndex) * 60_000
+      ).toISOString()
+    })
+  }
+  // The operator restored the predecessor after inspecting the latest reorganization.
+  activeMemoryRevision = 59
+  extractionRecords.sort((a, b) => a.created_at.localeCompare(b.created_at))
+  for (const record of extractionRecords)
+    for (const [index, observation] of record.observations.entries())
+      observation.observation_id = `observation-${record.extraction_id}-${index + 1}`
+  const authenticationExtraction = extractionRecords.find(
+    (record) => record.extraction_id === 'fixture-extraction-2'
+  )!
+  authenticationExtraction.observations.push({
+    observation_id: 'observation-fixture-extraction-2-2',
+    body_markdown:
+      '**Validate credential shape before comparison.** Reject malformed credential values before invoking the authentication comparator.'
+  })
+  const observations: ObservationRecord[] = extractionRecords.flatMap(
+    (record) =>
+      record.observations.map((observation) => ({
+        observation_id: observation.observation_id,
+        extraction_id: record.extraction_id,
+        source_run_id: record.source_run_id,
+        source_unit_id: record.source_unit_id,
+        body_markdown: observation.body_markdown,
+        consumed_revision:
+          consumedRevisionByObservation.get(observation.observation_id) ?? null,
+        created_at: record.created_at
+      }))
   )
   const unitOutcomes = new Map<
     string,
@@ -211,7 +385,7 @@ export function createMemoryHandler(
     unitOutcomes.set(key, {
       source_workflow: record.source_workflow,
       hasObservation:
-        (current?.hasObservation ?? false) || record.observation !== null
+        (current?.hasObservation ?? false) || record.observations.length > 0
     })
   }
   const workflowOutcomes = new Map<string, CatalogOverviewWorkflow>()
@@ -250,11 +424,6 @@ export function createMemoryHandler(
         'http://control-plane-ui.local'
       ).searchParams.get('range')
       const pointCount = range === '90d' ? 90 : range === 'all' ? 12 : 30
-      const activePoints = new Map([
-        [pointCount - 7, [1, 1]],
-        [pointCount - 4, [2, 1]],
-        [pointCount - 1, [2, 1]]
-      ])
       response.end(
         JSON.stringify({
           totals: {
@@ -276,7 +445,6 @@ export function createMemoryHandler(
           },
           trend_granularity: range === 'all' ? 'month' : 'day',
           trend_points: Array.from({ length: pointCount }, (_, index) => {
-            const outcome = activePoints.get(index) ?? [0, 0]
             const date = new Date(BASE_TIME)
             if (range === 'all') {
               date.setUTCDate(1)
@@ -284,10 +452,21 @@ export function createMemoryHandler(
             } else {
               date.setUTCDate(date.getUTCDate() - (pointCount - 1 - index))
             }
+            const period = date.toISOString().slice(0, range === 'all' ? 7 : 10)
+            const units = new Map<string, boolean>()
+            for (const record of extractionRecords) {
+              if (!record.created_at.startsWith(period)) continue
+              const key = `${record.source_run_id}:${record.source_unit_id}`
+              units.set(
+                key,
+                (units.get(key) ?? false) || record.observations.length > 0
+              )
+            }
             return {
               period_start: date.toISOString().slice(0, 10),
-              extracted_unit_count: outcome[0],
-              units_with_observation_count: outcome[1]
+              extracted_unit_count: units.size,
+              units_with_observation_count: [...units.values()].filter(Boolean)
+                .length
             }
           }),
           workflows: [...workflowOutcomes.values()]
@@ -299,10 +478,22 @@ export function createMemoryHandler(
       requestUrl.startsWith('/api/memory/revisions?') &&
       request.method === 'GET'
     ) {
+      // Honor before_revision paging like the catalog: newest first, exclusive.
+      const query = new URL(requestUrl, 'http://fixture').searchParams
+      const limit = Number(query.get('limit') ?? '50')
+      const before = query.get('before_revision')
+      const matching = memoryRevisions.filter(
+        (revision) =>
+          before === null || Number(revision.revision) < Number(before)
+      )
+      const page = matching.slice(0, limit)
       response.end(
         JSON.stringify({
-          revisions: memoryRevisions,
-          next_before_revision: null
+          revisions: page,
+          next_before_revision:
+            matching.length > limit
+              ? Number(page[page.length - 1]?.revision)
+              : null
         })
       )
       return
@@ -311,10 +502,25 @@ export function createMemoryHandler(
       requestUrl.startsWith('/api/memory/observations?') &&
       request.method === 'GET'
     ) {
+      // Honor the catalog's revision filter and cursor so the UI's paging and
+      // report-to-observation jump behave as they do against the real catalog.
+      const query = new URL(requestUrl, 'http://fixture').searchParams
+      const consumedRevision = query.get('consumed_revision')
+      const limit = Number(query.get('limit') ?? '50')
+      const offset = Number(query.get('cursor') ?? '0')
+      const matching = [...observations]
+        .reverse()
+        .filter(
+          (observation) =>
+            consumedRevision === null ||
+            observation.consumed_revision === Number(consumedRevision)
+        )
+      const page = matching.slice(offset, offset + limit)
       response.end(
         JSON.stringify({
-          observations: [...observations].reverse(),
-          next_cursor: null
+          observations: page,
+          next_cursor:
+            offset + limit < matching.length ? String(offset + limit) : null
         })
       )
       return

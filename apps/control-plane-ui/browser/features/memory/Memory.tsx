@@ -20,7 +20,9 @@ import { MemoryOverview } from './MemoryOverview.js'
 import { MemoryRevisionDiffViewer } from './MemoryRevisionDiff.js'
 import { MemoryRevisionHistory } from './MemoryRevisionHistory.js'
 import { useMemoryEditor } from './useMemoryEditor.js'
-import { useMemoryResources } from './useMemoryResources.js'
+import { DEFAULT_PAGE_SIZE, useMemoryResources } from './useMemoryResources.js'
+import type { PagedResource } from './usePagedResource.js'
+import { CursorPagination } from '../../shared/CursorPagination.js'
 import { LoadingState } from '../../shared/StateMessage.js'
 import {
   TrajectoryViewer,
@@ -39,8 +41,11 @@ export function Memory(): React.JSX.Element {
   const {
     automation,
     tree,
-    revisions,
-    observations,
+    graphRevisions,
+    graphTarget,
+    showGraph,
+    revisionPages,
+    observationPages,
     overview,
     overviewRange,
     changeOverviewRange,
@@ -58,6 +63,8 @@ export function Memory(): React.JSX.Element {
   const [activeTab, setActiveTab] = React.useState<string | null>('overview')
   const [revisionView, setRevisionView] = React.useState('graph')
   const [highlightedRevision, setHighlightedRevision] = React.useState<number>()
+  const [highlightedObservation, setHighlightedObservation] =
+    React.useState<string>()
   const [error, setError] = React.useState('')
   const [queryFailure, setQueryFailure] = React.useState<unknown>()
   const [busy, setBusy] = React.useState(false)
@@ -68,6 +75,17 @@ export function Memory(): React.JSX.Element {
     // Clearing first lets repeated visits to the same revision replay the cue.
     setHighlightedRevision(undefined)
     requestAnimationFrame(() => setHighlightedRevision(revision))
+    void showGraph(revision)
+  }
+
+  // A revision consumes one learning batch, which the catalog caps at 100, the same
+  // as its largest list page; the filtered first page at that size holds the target.
+  const revealObservation = (revision: number, observationId: string): void => {
+    setActiveTab('observations')
+    setHighlightedObservation(undefined)
+    void observationPages
+      .openFirst({ filter: revision, limit: MAX_PAGE_SIZE })
+      .then(() => setHighlightedObservation(observationId))
   }
 
   const viewMemoryMaintainerTrajectory = (revision: number): void => {
@@ -162,8 +180,9 @@ export function Memory(): React.JSX.Element {
     [
       automation.error,
       tree.error,
-      revisions.error,
-      observations.error,
+      graphRevisions.error,
+      revisionPages.resource.error,
+      observationPages.resource.error,
       overview.error
     ].find(isUnauthorizedApiError)
   throwIfUnauthorized(queryError)
@@ -176,12 +195,16 @@ export function Memory(): React.JSX.Element {
     'memoryAutomationLoadFailed'
   )
   const treeError = failureText(tree.error, 'memoryTreeLoadFailed')
-  const revisionsError = failureText(
-    revisions.error,
+  const graphRevisionsError = failureText(
+    graphRevisions.error,
+    'memoryRevisionsLoadFailed'
+  )
+  const revisionPageError = failureText(
+    revisionPages.resource.error,
     'memoryRevisionsLoadFailed'
   )
   const observationsError = failureText(
-    observations.error,
+    observationPages.resource.error,
     'memoryObservationsLoadFailed'
   )
   const overviewError = failureText(overview.error, 'memoryOverviewLoadFailed')
@@ -240,15 +263,28 @@ export function Memory(): React.JSX.Element {
         </Tabs.Panel>
         <Tabs.Panel value="revisions" pt="md">
           <MemoryRevisionHistory
-            revisions={revisions.data?.revisions ?? []}
+            graphRevisions={graphRevisions.data?.revisions ?? []}
+            graphTarget={graphTarget}
+            onShowLatest={() => {
+              setHighlightedRevision(undefined)
+              void showGraph()
+            }}
+            graphLoading={graphRevisions.loading}
+            graphError={graphRevisionsError}
+            listRevisions={revisionPages.resource.data?.page.revisions ?? []}
+            listLoading={revisionPages.resource.loading}
+            listError={revisionPageError}
+            pagination={pagination(
+              revisionPages,
+              revisionPages.resource.data?.page.next_before_revision
+            )}
             activeRevision={activeRevision}
-            loading={revisions.loading}
-            error={revisionsError}
             view={revisionView}
             highlightedRevision={highlightedRevision}
             onViewChange={setRevisionView}
             onViewFiles={setViewRevision}
             onViewTrajectory={viewMemoryMaintainerTrajectory}
+            onRevealObservation={revealObservation}
             onCompare={setDiffRevision}
             onSetCurrent={setRestoreRevision}
             onHighlightEnd={() => setHighlightedRevision(undefined)}
@@ -256,9 +292,25 @@ export function Memory(): React.JSX.Element {
         </Tabs.Panel>
         <Tabs.Panel value="observations" pt="md">
           <MemoryObservationList
-            observations={observations.data?.observations ?? []}
-            loading={observations.loading}
+            observations={
+              observationPages.resource.data?.page.observations ?? []
+            }
+            loading={observationPages.resource.loading}
             error={observationsError}
+            pagination={pagination(
+              observationPages,
+              observationPages.resource.data?.page.next_cursor
+            )}
+            revisionFilter={observationPages.query.filter}
+            onClearRevisionFilter={() => {
+              setHighlightedObservation(undefined)
+              void observationPages.openFirst({
+                filter: undefined,
+                limit: DEFAULT_PAGE_SIZE
+              })
+            }}
+            highlightedObservation={highlightedObservation}
+            onHighlightEnd={() => setHighlightedObservation(undefined)}
             onRevealRevision={revealRevision}
             onViewTrajectory={(item) =>
               setTrajectoryTarget({
@@ -301,4 +353,23 @@ export function Memory(): React.JSX.Element {
       )}
     </Container>
   )
+}
+
+const MAX_PAGE_SIZE = 100
+
+/** Pager props for one paged catalog list. */
+function pagination<Filter, Cursor, Page>(
+  paged: PagedResource<Filter, Cursor, Page>,
+  next: Cursor | null | undefined
+): React.ComponentProps<typeof CursorPagination> {
+  return {
+    pageSize: paged.query.limit,
+    page: paged.pageNumber,
+    total: next == null ? paged.pageNumber : paged.pageNumber + 1,
+    onPageSizeChange: (value) => void paged.openFirst({ limit: Number(value) }),
+    onPreviousPage: () => void paged.openPrevious(),
+    onNextPage: (): void => {
+      if (next != null) void paged.openNext(next)
+    }
+  }
 }

@@ -494,7 +494,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
       extraction_id: string
       source_run_id: string
       source_unit_id: string
-      observation: { body_markdown: string } | null
+      observations: { observation_id: string; body_markdown: string }[]
     }
 
     const extractionById = new Map<string, FixtureExtraction>(
@@ -504,9 +504,9 @@ test('memory fixtures form one coherent provenance graph', async () => {
     )
 
     assert.strictEqual(extractions.next_cursor, null)
-    assert.strictEqual(extractions.extractions.length, 6)
+    assert.strictEqual(extractions.extractions.length, 48)
     assert.strictEqual(observations.next_cursor, null)
-    assert.strictEqual(observations.observations.length, 3)
+    assert.strictEqual(observations.observations.length, 46)
     assert.strictEqual(
       overview.totals.completed_extraction_count,
       extractions.extractions.length
@@ -534,7 +534,38 @@ test('memory fixtures form one coherent provenance graph', async () => {
       overview.totals.extracted_unit_count
     )
 
+    const siblings = observations.observations.filter(
+      (item: { extraction_id: string }) =>
+        item.extraction_id === 'fixture-extraction-2'
+    )
+    assert.strictEqual(siblings.length, 2)
+    assert.strictEqual(
+      new Set(
+        siblings.map((item: { observation_id: string }) => item.observation_id)
+      ).size,
+      2
+    )
+    assert(
+      siblings.some(
+        (item: { consumed_revision: number | null }) =>
+          item.consumed_revision === null
+      )
+    )
+    assert(
+      siblings.some(
+        (item: { consumed_revision: number | null }) =>
+          item.consumed_revision === 2
+      )
+    )
+    assert(
+      observations.observations.every(
+        (item: { observation_id: string; extraction_id: string }) =>
+          item.observation_id !== item.extraction_id
+      )
+    )
+
     for (const observation of observations.observations as Array<{
+      observation_id: string
       extraction_id: string
       source_run_id: string
       source_unit_id: string
@@ -546,7 +577,9 @@ test('memory fixtures form one coherent provenance graph', async () => {
       assert.strictEqual(extraction.source_run_id, observation.source_run_id)
       assert.strictEqual(extraction.source_unit_id, observation.source_unit_id)
       assert.strictEqual(
-        extraction.observation?.body_markdown,
+        extraction.observations.find(
+          (item) => item.observation_id === observation.observation_id
+        )?.body_markdown,
         observation.body_markdown
       )
 
@@ -571,28 +604,42 @@ test('memory fixtures form one coherent provenance graph', async () => {
         )
         assert.strictEqual(revision.source.kind, 'learning')
         assert.ok(
-          revision.source.extraction_ids.includes(observation.extraction_id)
+          revision.source.observation_ids.includes(observation.observation_id)
         )
       }
     }
 
     for (const revision of revisions.revisions as Array<{
       source:
-        | { kind: 'learning'; extraction_ids: string[] }
+        | {
+            kind: 'learning'
+            observation_ids: string[]
+            maintenance_report: {
+              observation_decisions: { observation_id: string }[]
+            }
+          }
         | { kind: 'manual'; operation_id: string; actor: unknown }
+        | { kind: 'reorganization'; operation_id: string }
     }>) {
       if (revision.source.kind === 'learning') {
-        for (const extractionId of revision.source.extraction_ids) {
+        assert.deepStrictEqual(
+          revision.source.maintenance_report.observation_decisions
+            .map((decision) => decision.observation_id)
+            .sort(),
+          [...revision.source.observation_ids].sort(),
+          'maintenance decisions must identify every consumed observation'
+        )
+        for (const observationId of revision.source.observation_ids) {
           const observation = observations.observations.find(
-            (candidate: { extraction_id: string }) =>
-              candidate.extraction_id === extractionId
+            (candidate: { observation_id: string }) =>
+              candidate.observation_id === observationId
           )
           assert(
             observation,
-            `${extractionId} consumed by a revision must have an observation`
+            `${observationId} consumed by a revision must have an observation`
           )
         }
-      } else {
+      } else if (revision.source.kind === 'manual') {
         assert.ok(revision.source.operation_id)
         assert.ok(revision.source.actor)
       }

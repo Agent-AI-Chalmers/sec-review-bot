@@ -1,14 +1,13 @@
 from pydantic import BaseModel, Field
 
+from sec_review_agents.utils.pydantic_types import NonEmptyText
+
 
 class MemoryObservationOutput(BaseModel):
-    has_observation: bool = Field(
-        description="True when the trajectories contain durable reusable review experience.",
-    )
-    observation_markdown: str = Field(
-        default="",
+    observations: list[NonEmptyText] = Field(
         description=(
-            "Short Markdown observation body when has_observation is true. "
-            "Use an empty string when has_observation is false."
+            "Independent durable review lessons, each a short Markdown paragraph. "
+            "Return an empty list when none qualifies. Keep related evidence for "
+            "one lesson together; include multiple items only for independent lessons."
         ),
     )

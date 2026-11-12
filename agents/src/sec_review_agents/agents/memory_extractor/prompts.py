@@ -9,11 +9,14 @@ MEMORY_EXTRACTION_INPUTS_INTRO = "\n".join(
         "### Trajectory Inputs",
         "",
         (
-            "The staged append-only JSONL review trajectories are mounted at "
-            "`/trajectories`."
+            "The staged append-only JSONL review trajectories are readable only "
+            "through `list_trajectory_messages` and `read_trajectory_message`. "
+            "Their `/trajectories/...` paths are identifiers for those tools, "
+            "not files in the filesystem: `ls`, `glob`, and `read_file` cannot "
+            "see them."
         ),
         "",
-        "Read these trajectory files in order:",
+        "Read these trajectories in order:",
     ]
 )
 

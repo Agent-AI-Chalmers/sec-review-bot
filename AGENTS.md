@@ -133,6 +133,12 @@ uv --project ../agents run black --check .
 python -m compileall -q .
 ```
 
+Run the script tests from the repository root, as CI does, because they import `scripts.*` as a package:
+
+```bash
+uv --project agents run python -m pytest scripts/tests
+```
+
 Run targeted `--help` or fixture-based smoke checks for scripts affected by a change. Keep these probes focused on the relevant entrypoints and contracts rather than treating scripts as another fully typed application package.
 
 ### Documentation Checks

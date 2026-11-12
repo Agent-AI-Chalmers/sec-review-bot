@@ -11,20 +11,49 @@ test('execution filter keeps long selected labels and selected options visible',
     await page.getByRole('option', { name: label, exact: true }).click()
     await expect(filter).toHaveValue(label)
     // Input scrollWidth includes the arrow padding, so measure the actual text area.
-    expect(
-      await filter.evaluate((element) => {
-        const input = element as HTMLInputElement
-        const style = getComputedStyle(input)
-        const context = document.createElement('canvas').getContext('2d')!
-        context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
-        return (
-          context.measureText(input.value).width <=
+    const dimensions = await filter.evaluate((element) => {
+      const input = element as HTMLInputElement
+      const style = getComputedStyle(input)
+      // Measure using DOM layout, including the input's actual font shaping.
+      const text = document.createElement('span')
+      text.textContent = input.value
+      text.style.cssText = 'position:fixed;visibility:hidden;white-space:pre'
+      for (const property of [
+        'font-family',
+        'font-size',
+        'font-weight',
+        'font-style',
+        'font-stretch',
+        'font-variation-settings',
+        'font-feature-settings',
+        'font-optical-sizing',
+        'letter-spacing',
+        'text-transform'
+      ])
+        text.style.setProperty(property, style.getPropertyValue(property))
+      document.body.append(text)
+      const textWidth = text.getBoundingClientRect().width
+      text.remove()
+      return {
+        textWidth,
+        availableWidth:
           input.clientWidth -
-            parseFloat(style.paddingLeft) -
-            parseFloat(style.paddingRight)
-        )
-      })
-    ).toBe(true)
+          parseFloat(style.paddingLeft) -
+          parseFloat(style.paddingRight),
+        clientWidth: input.clientWidth,
+        paddingLeft: style.paddingLeft,
+        paddingRight: style.paddingRight,
+        fontFamily: style.fontFamily,
+        fontSize: style.fontSize,
+        fontWeight: style.fontWeight,
+        connected: input.isConnected,
+        value: input.value
+      }
+    })
+    expect(
+      dimensions.textWidth,
+      `Selected label geometry: ${JSON.stringify(dimensions)}`
+    ).toBeLessThanOrEqual(dimensions.availableWidth)
     await filter.click()
     const selected = page.getByRole('option', { name: label, exact: true })
     await expect(selected).toHaveAttribute('aria-selected', 'true')

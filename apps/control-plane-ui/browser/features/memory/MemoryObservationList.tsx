@@ -9,6 +9,7 @@ import { abbreviate } from '../../shared/format.js'
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import { EmptyState, LoadingState } from '../../shared/StateMessage.js'
 import type { ObservationRecord } from './api-types.generated.js'
+import { CursorPagination } from '../../shared/CursorPagination.js'
 import { ICON_SIZE } from '../../shared/design.js'
 
 type Observation = ObservationRecord
@@ -17,12 +18,22 @@ export function MemoryObservationList({
   observations,
   loading,
   error,
+  pagination,
+  revisionFilter,
+  onClearRevisionFilter,
+  highlightedObservation,
+  onHighlightEnd,
   onRevealRevision,
   onViewTrajectory
 }: {
   observations: Observation[]
   loading: boolean
   error: string
+  pagination: React.ComponentProps<typeof CursorPagination>
+  revisionFilter: number | undefined
+  onClearRevisionFilter: () => void
+  highlightedObservation: string | undefined
+  onHighlightEnd: () => void
   onRevealRevision: (revision: number) => void
   onViewTrajectory: (observation: Observation) => void
 }): React.JSX.Element {
@@ -31,14 +42,60 @@ export function MemoryObservationList({
   const [selectedObservation, setSelectedObservation] =
     React.useState<Observation>()
 
-  if (!loading && observations.length === 0 && !error)
-    return <EmptyState message={t('noObservations')} />
+  // Reveal a requested observation: scroll to, focus, and highlight its row.
+  const targetLoaded =
+    highlightedObservation !== undefined &&
+    observations.some((item) => item.observation_id === highlightedObservation)
+  React.useEffect(() => {
+    if (highlightedObservation === undefined || !targetLoaded) return
+    const frame = requestAnimationFrame(() => {
+      const row = document.querySelector<HTMLElement>(
+        `[data-observation-row="${CSS.escape(highlightedObservation)}"]`
+      )
+      row?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      row?.focus({ preventScroll: true })
+    })
+    return (): void => cancelAnimationFrame(frame)
+  }, [highlightedObservation, targetLoaded])
+  const targetMissing =
+    highlightedObservation !== undefined && !targetLoaded && !loading && !error
+
+  const filterBanner = revisionFilter !== undefined && (
+    <Alert color="gray" mb="md">
+      <Group justify="space-between" gap="xs">
+        <span>
+          {t('observationsForRevision').replace(
+            '{revision}',
+            String(revisionFilter)
+          )}
+        </span>
+        <Button size="xs" variant="subtle" onClick={onClearRevisionFilter}>
+          {t('showAllObservations')}
+        </Button>
+      </Group>
+    </Alert>
+  )
+
+  // An empty later page is not an empty list, so only page one shows the empty state.
+  if (!loading && observations.length === 0 && !error && pagination.page === 1)
+    return (
+      <>
+        {filterBanner}
+        <EmptyState message={t('noObservations')} />
+      </>
+    )
 
   return (
     <>
+      {filterBanner}
       {error && (
         <Alert color="red" mb="md">
           {error}
+        </Alert>
+      )}
+      {targetMissing && (
+        <Alert color="yellow" mb="md">
+          {t('observationNotFound')}
         </Alert>
       )}
       {loading && observations.length === 0 && (
@@ -59,7 +116,21 @@ export function MemoryObservationList({
           </Table.Thead>
           <Table.Tbody>
             {observations.map((item, index) => (
-              <Table.Tr key={item.extraction_id}>
+              <Table.Tr
+                key={item.observation_id}
+                data-observation-row={item.observation_id}
+                tabIndex={-1}
+                data-highlighted={
+                  item.observation_id === highlightedObservation || undefined
+                }
+                onAnimationEnd={(event) => {
+                  if (
+                    event.currentTarget === event.target &&
+                    item.observation_id === highlightedObservation
+                  )
+                    onHighlightEnd()
+                }}
+              >
                 {/* This is deliberately a display index, not an extraction identity. */}
                 <Table.Td className="memory-observation-index">
                   {index + 1}
@@ -122,6 +193,7 @@ export function MemoryObservationList({
           </Table.Tbody>
         </Table>
       </div>
+      <CursorPagination {...pagination} />
       <Modal
         opened={selectedObservation !== undefined}
         onClose={() => setSelectedObservation(undefined)}
