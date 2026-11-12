@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from sec_review_agents.agents.memory_maintainer.agent import (
     MEMORY_MAINTAINER_AGENT_NAME,
 )
+from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.artifacts.s3_adapter import (
     planned_s3_artifact,
@@ -69,6 +70,9 @@ def _commit_input_from_intent(
         trajectory_reference=ArtifactReference.from_mapping(
             source["trajectory_reference"]
         ),
+        maintenance_report=MemoryMaintenanceOutput.model_validate(
+            source["maintenance_report"]
+        ),
         source_kind=kind,
     )
 
@@ -119,6 +123,7 @@ def _publish_candidate(
     extraction_ids: tuple[str, ...],
     memory_tree_path: Path,
     maintainer_trajectory_path: Path,
+    maintenance_report: MemoryMaintenanceOutput,
     temp_root: Path,
 ) -> MemoryTreeRevisionCommitInput:
     trajectory = build_memory_agent_trajectory(
@@ -139,6 +144,7 @@ def _publish_candidate(
         "kind": source_kind,
         "operation_id": operation_id,
         "trajectory_reference": trajectory_reference.as_dict(),
+        "maintenance_report": maintenance_report.model_dump(mode="json"),
     }
     if source_kind == "learning":
         source["extraction_ids"] = list(extraction_ids)
@@ -159,6 +165,7 @@ def _publish_candidate(
         extraction_ids=extraction_ids,
         memory_tree_reference=memory_tree_reference,
         trajectory_reference=trajectory_reference,
+        maintenance_report=maintenance_report,
         source_kind=source_kind,
     )
 
@@ -269,6 +276,7 @@ async def prepare_coordinated_memory_learning(
             extraction_ids=tuple(extraction_ids),
             memory_tree_path=result.memory_tree_path,
             maintainer_trajectory_path=result.maintainer_trajectory_path,
+            maintenance_report=result.output,
             temp_root=temp_root,
         )
 
@@ -355,6 +363,7 @@ async def prepare_coordinated_memory_reorganization(
             extraction_ids=(),
             memory_tree_path=result.memory_tree_path,
             maintainer_trajectory_path=result.maintainer_trajectory_path,
+            maintenance_report=result.output,
             temp_root=temp_root,
         )
         return CoordinatedReorganizationResult(

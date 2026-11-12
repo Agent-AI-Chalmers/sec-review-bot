@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
+from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.memory.revision_commit_input import MemoryTreeRevisionCommitInput
 from sec_review_agents.workflows.memory.extraction import (
@@ -114,6 +115,19 @@ def test_commit_requires_worker_catalog_even_when_dotenv_provides_one(
                     extraction_ids=("extraction-1",),
                     memory_tree_reference=reference,
                     trajectory_reference=reference,
+                    maintenance_report=MemoryMaintenanceOutput.model_validate(
+                        {
+                            "observation_decisions": [
+                                {
+                                    "extraction_id": "extraction-1",
+                                    "action": "skipped",
+                                    "topics": [],
+                                    "reason": "Already covered.",
+                                }
+                            ],
+                            "summary": "Maintained memory.",
+                        }
+                    ),
                 )
             )
     assert dict(os.environ) == before

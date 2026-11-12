@@ -40,16 +40,19 @@ create table memory_tree_revisions (
   source_kind text not null check (source_kind in ('learning', 'reorganization', 'manual')),
   operation_id text not null,
   trajectory_reference jsonb,
+  maintenance_report jsonb,
   actor jsonb,
   created_at timestamptz not null default clock_timestamp(),
   unique (operation_id),
   constraint memory_tree_revisions_source_shape_check check (
     (
       source_kind in ('learning', 'reorganization') and
-      trajectory_reference is not null and actor is null
+      trajectory_reference is not null and maintenance_report is not null and
+      actor is null
     ) or (
       source_kind = 'manual' and
-      trajectory_reference is null and actor is not null
+      trajectory_reference is null and maintenance_report is null and
+      actor is not null
     )
   )
 );

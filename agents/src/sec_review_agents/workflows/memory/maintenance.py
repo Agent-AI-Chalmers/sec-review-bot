@@ -164,6 +164,7 @@ def commit_memory_tree_revision_activity(
                 expected_active_revision=commit_input.expected_active_revision,
                 memory_tree_reference=commit_input.memory_tree_reference,
                 trajectory_reference=commit_input.trajectory_reference,
+                maintenance_report=commit_input.maintenance_report,
             )
         else:
             committed = catalog_client.create_learning_revision(
@@ -172,6 +173,7 @@ def commit_memory_tree_revision_activity(
                 extraction_ids=list(commit_input.extraction_ids),
                 memory_tree_reference=commit_input.memory_tree_reference,
                 trajectory_reference=commit_input.trajectory_reference,
+                maintenance_report=commit_input.maintenance_report,
             )
     except MemoryAutomationPausedError:
         return {

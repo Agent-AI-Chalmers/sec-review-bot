@@ -332,6 +332,35 @@ components:
           oneOf:
             - $ref: "#/components/schemas/LearningInput"
             - type: "null"
+    ObservationDecision:
+      type: object
+      additionalProperties: false
+      description: What the maintainer did with one consumed observation and why.
+      required: [extraction_id, action, topics, reason]
+      properties:
+        extraction_id:
+          $ref: "#/components/schemas/ExtractionId"
+        action:
+          type: string
+          enum: [added, merged, skipped, conflict]
+        topics:
+          type: array
+          maxItems: 64
+          description: Memory topic paths edited for this decision; empty only for skipped.
+          items: { type: string, minLength: 1, maxLength: 512 }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+    MaintenanceReport:
+      type: object
+      additionalProperties: false
+      description: Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed extraction; reorganization reports carry none.
+      required: [summary, observation_decisions]
+      properties:
+        summary: { type: string, minLength: 1, maxLength: 4000 }
+        observation_decisions:
+          type: array
+          maxItems: 1000
+          items:
+            $ref: "#/components/schemas/ObservationDecision"
     LearningRevisionSource:
       type: object
       additionalProperties: false
@@ -340,6 +369,7 @@ components:
         - operation_id
         - extraction_ids
         - trajectory_reference
+        - maintenance_report
       properties:
         kind: { type: string, const: learning }
         operation_id:
@@ -352,6 +382,8 @@ components:
             $ref: "#/components/schemas/ExtractionId"
         trajectory_reference:
           $ref: "#/components/schemas/ArtifactReference"
+        maintenance_report:
+          $ref: "#/components/schemas/MaintenanceReport"
     ReorganizationRevisionSource:
       type: object
       additionalProperties: false
@@ -360,12 +392,15 @@ components:
         - kind
         - operation_id
         - trajectory_reference
+        - maintenance_report
       properties:
         kind: { type: string, const: reorganization }
         operation_id:
           $ref: "#/components/schemas/OperationId"
         trajectory_reference:
           $ref: "#/components/schemas/ArtifactReference"
+        maintenance_report:
+          $ref: "#/components/schemas/MaintenanceReport"
     ManualRevisionSource:
       type: object
       additionalProperties: false

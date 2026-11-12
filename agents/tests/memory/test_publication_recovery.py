@@ -14,6 +14,21 @@ from sec_review_agents.workflows.memory.extraction import (
 )
 
 
+def _report(extraction_ids: list[str]) -> dict[str, object]:
+    return {
+        "observation_decisions": [
+            {
+                "extraction_id": extraction_id,
+                "action": "skipped",
+                "topics": [],
+                "reason": "Already covered.",
+            }
+            for extraction_id in extraction_ids
+        ],
+        "summary": "Maintained memory.",
+    }
+
+
 def reference(character):
     return {
         "uri": f"s3://sec-review/memory/{character}",
@@ -80,6 +95,7 @@ async def test_selected_maintenance_never_rebuilds_a_missing_or_uncertain_artifa
             "operation_id": "maintain-1",
             "extraction_ids": ["extract-1"],
             "trajectory_reference": reference("b"),
+            "maintenance_report": _report(["extract-1"]),
         },
     }
     catalog = Mock()
@@ -114,6 +130,7 @@ async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
             "operation_id": "maintain-1",
             "extraction_ids": ["extract-1", "extract-2"],
             "trajectory_reference": reference("b"),
+            "maintenance_report": _report(["extract-1", "extract-2"]),
         },
     }
     catalog = Mock()
@@ -135,6 +152,12 @@ async def test_maintenance_recovery_reuses_tree_trajectory_and_observations(
         result.trajectory_reference.as_dict()
         == intent["source"]["trajectory_reference"]
     )
+    # The commit body must equal the confirmed intent, so the recovered report
+    # has to serialize back to exactly what was reserved.
+    assert (
+        result.maintenance_report.model_dump(mode="json")
+        == intent["source"]["maintenance_report"]
+    )
     assert probe.call_count == 2
     catalog.confirm_revision_publication.assert_called_once_with(intent)
     catalog.get_learning_input.assert_not_called()
@@ -152,6 +175,7 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
             "operation_id": "maintain-1",
             "extraction_ids": ["extract-1"],
             "trajectory_reference": reference("b"),
+            "maintenance_report": _report(["extract-1"]),
         },
     }
     complete = {
@@ -162,6 +186,7 @@ async def test_partial_maintenance_upload_does_not_mix_artifacts_from_different_
             "operation_id": "maintain-1",
             "extraction_ids": ["extract-2"],
             "trajectory_reference": reference("d"),
+            "maintenance_report": _report(["extract-2"]),
         },
     }
     catalog = Mock()

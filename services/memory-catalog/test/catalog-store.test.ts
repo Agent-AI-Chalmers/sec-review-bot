@@ -9,6 +9,7 @@ import {
   AutomationPausedError,
   MemoryTreeRevisionConflictError,
 } from '../src/catalog-store.js'
+import { learningReport, reorganizationReport } from './maintenance-report.js'
 
 const artifact = {
   uri: 's3://sec-review/memory/trees/memory-tree.v1.tar.zst',
@@ -180,6 +181,7 @@ await test('learning commit records immutable history before moving the active p
         operation_id: 'maintenance-1',
         extraction_ids: ['extraction-1'],
         trajectory_reference: revisionTrajectory,
+        maintenance_report: learningReport(['extraction-1']),
       },
     }),
     {
@@ -253,6 +255,7 @@ await test('reorganization commit records history without consuming observations
         kind: 'reorganization',
         operation_id: 'maintenance-1',
         trajectory_reference: revisionTrajectory,
+        maintenance_report: reorganizationReport,
       },
     }),
     {
@@ -279,6 +282,7 @@ await test('reorganization commit records history without consuming observations
     'reorganization',
     'maintenance-1',
     revisionTrajectory,
+    reorganizationReport,
     null,
   ])
 })
@@ -316,6 +320,7 @@ await test('an identical learning operation id replays the created revision', as
         operation_id: 'maintenance-1',
         extraction_ids: ['extraction-1'],
         trajectory_reference: revisionTrajectory,
+        maintenance_report: learningReport(['extraction-1']),
       },
     }),
     {
@@ -357,6 +362,7 @@ await test('paused control rejects a new automatic revision commit before active
         operation_id: 'maintenance-1',
         extraction_ids: ['extraction-1'],
         trajectory_reference: revisionTrajectory,
+        maintenance_report: learningReport(['extraction-1']),
       },
     }),
     AutomationPausedError,

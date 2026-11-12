@@ -59,6 +59,37 @@ function unauthorized(): Error {
   })
 }
 
+function invalidBody(message: string): Error {
+  return Object.assign(new Error(message), {
+    statusCode: 400,
+    code: 'INVALID_BODY',
+  })
+}
+
+// OpenAPI cannot relate decision ids to the consumed extraction ids.
+function validateMaintenanceReport(
+  source: RequestBody<'createMemoryTreeRevision'>['source'],
+): void {
+  if (source.kind === 'manual') return
+  const decided = source.maintenance_report.observation_decisions.map(
+    (decision) => decision.extraction_id,
+  )
+  const expected = source.kind === 'learning' ? source.extraction_ids : []
+  if (
+    decided.length !== expected.length ||
+    new Set(decided).size !== decided.length ||
+    !expected.every((id) => decided.includes(id))
+  )
+    throw invalidBody(
+      'maintenance_report must contain exactly one decision per consumed extraction id.',
+    )
+  for (const decision of source.maintenance_report.observation_decisions)
+    if (decision.action !== 'skipped' && decision.topics.length === 0)
+      throw invalidBody(
+        `maintenance_report decision ${decision.extraction_id} must name edited topics.`,
+      )
+}
+
 function specPath(): string {
   const moduleDirectory = import.meta.dirname
   const built = path.join(moduleDirectory, 'openapi.yaml')
@@ -124,6 +155,7 @@ export async function registerMemoryCatalogRoutes(
         authenticatedRoles.get(request) !== 'operator')
     )
       throw unauthorized()
+    validateMaintenanceReport(input.source)
     return input.source.kind === 'manual'
       ? { ...input, source: { ...input.source, actor: operatorActor } }
       : { ...input, source: input.source }

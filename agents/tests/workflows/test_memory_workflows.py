@@ -9,6 +9,7 @@ from temporalio import activity
 from temporalio.converter import DataConverter
 from temporalio.worker import Worker
 
+from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.memory.coordinated_maintenance import (
     CoordinatedReorganizationResult,
@@ -47,6 +48,23 @@ def _reference() -> ArtifactReference:
     )
 
 
+def _report(extraction_ids: tuple[str, ...]) -> MemoryMaintenanceOutput:
+    return MemoryMaintenanceOutput.model_validate(
+        {
+            "observation_decisions": [
+                {
+                    "extraction_id": extraction_id,
+                    "action": "skipped",
+                    "topics": [],
+                    "reason": "Already covered.",
+                }
+                for extraction_id in extraction_ids
+            ],
+            "summary": "Maintained memory.",
+        }
+    )
+
+
 def _commit_input(
     *, extraction_ids: tuple[str, ...] = ("extraction-1",)
 ) -> MemoryTreeRevisionCommitInput:
@@ -56,6 +74,7 @@ def _commit_input(
         extraction_ids=extraction_ids,
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(extraction_ids),
     )
 
 
@@ -67,6 +86,8 @@ def _commit_input(
         ({"expected_active_revision": -1}, "expected_active_revision"),
         ({"extraction_ids": ()}, "extraction_ids"),
         ({"extraction_ids": ("extraction-1", "extraction-1")}, "unique"),
+        ({"maintenance_report": _report(("extraction-2",))}, "exactly once"),
+        ({"maintenance_report": {"summary": "x"}}, "maintenance report"),
     ],
 )
 def test_memory_tree_commit_input_rejects_invalid_invariants(
@@ -79,6 +100,7 @@ def test_memory_tree_commit_input_rejects_invalid_invariants(
         "extraction_ids": ("extraction-1",),
         "memory_tree_reference": _reference(),
         "trajectory_reference": _reference(),
+        "maintenance_report": _report(("extraction-1",)),
     }
     values.update(overrides)
 
@@ -93,6 +115,7 @@ def test_reorganization_commit_input_accepts_empty_extraction_ids() -> None:
         extraction_ids=(),
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(()),
         source_kind="reorganization",
     )
     assert value.extraction_ids == ()
@@ -120,6 +143,7 @@ def test_commit_input_enforces_source_kind_extraction_invariants(
         "extraction_ids": (),
         "memory_tree_reference": _reference(),
         "trajectory_reference": _reference(),
+        "maintenance_report": _report(()),
         "source_kind": "reorganization",
     }
     values.update(overrides)
@@ -892,6 +916,7 @@ async def test_maintenance_workflow_retries_commit_with_history_revision() -> No
             media_type="application/zstd",
             size_bytes=10,
         ),
+        maintenance_report=_report(("extraction-1", "extraction-2")),
     )
     prepare_calls = 0
     commit_revisions: list[MemoryTreeRevisionCommitInput] = []
@@ -1039,6 +1064,7 @@ def test_commit_memory_tree_revision_uses_prepared_payload_after_processing_is_d
         extraction_ids=["extraction-1", "extraction-2"],
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(("extraction-1", "extraction-2")),
     )
 
 
@@ -1053,6 +1079,7 @@ async def test_maintenance_prepare_reorganization_uses_active_memory(
         extraction_ids=(),
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(()),
         source_kind="reorganization",
     )
     prepare = AsyncMock(
@@ -1147,6 +1174,7 @@ def test_commit_reorganization_revision_uses_reorganization_client(
         extraction_ids=(),
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(()),
         source_kind="reorganization",
     )
 
@@ -1161,6 +1189,7 @@ def test_commit_reorganization_revision_uses_reorganization_client(
         expected_active_revision=3,
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(()),
     )
     client.create_learning_revision.assert_not_called()
 
@@ -1175,6 +1204,7 @@ async def test_reorganization_workflow_skips_pending_observation_checks(
         extraction_ids=(),
         memory_tree_reference=_reference(),
         trajectory_reference=_reference(),
+        maintenance_report=_report(()),
         source_kind="reorganization",
     )
     results = iter(
@@ -1263,6 +1293,7 @@ def test_commit_memory_tree_revision_retry_reuses_prepared_references(
         "extraction_ids": ["extraction-1", "extraction-2"],
         "memory_tree_reference": _reference(),
         "trajectory_reference": _reference(),
+        "maintenance_report": _report(("extraction-1", "extraction-2")),
     }
     assert client.create_learning_revision.call_count == 2
     assert client.create_learning_revision.call_args_list[0].kwargs == expected

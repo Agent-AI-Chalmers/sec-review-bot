@@ -113,6 +113,45 @@ export type AutomaticRevisionPublicationOwner = {
   operation_id: string
 }
 
+/**
+ * @description What the maintainer did with one consumed observation and why.
+ * @type object
+ */
+export type ObservationDecision = {
+  /**
+   * @minLength 1
+   * @pattern ^[A-Za-z0-9._:-]+$
+   * @type string
+   */
+  extraction_id: ExtractionId
+  action: 'added' | 'merged' | 'skipped' | 'conflict'
+  /**
+   * @description Memory topic paths edited for this decision; empty only for skipped.
+   * @type array
+   */
+  topics: string[]
+  /**
+   * @minLength 1
+   * @maxLength 2000
+   * @type string
+   */
+  reason: string
+}
+
+/**
+ * @description Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed extraction; reorganization reports carry none.
+ * @type object
+ */
+export type MaintenanceReport = {
+  /**
+   * @minLength 1
+   * @maxLength 4000
+   * @type string
+   */
+  summary: string
+  observation_decisions: ObservationDecision[]
+}
+
 export type LearningRevisionSource = {
   kind: 'learning'
   /**
@@ -123,6 +162,11 @@ export type LearningRevisionSource = {
   operation_id: OperationId
   extraction_ids: ExtractionId[]
   trajectory_reference: ArtifactReference
+  /**
+   * @description Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed extraction; reorganization reports carry none.
+   * @type object
+   */
+  maintenance_report: MaintenanceReport
 }
 
 /**
@@ -138,6 +182,11 @@ export type ReorganizationRevisionSource = {
    */
   operation_id: OperationId
   trajectory_reference: ArtifactReference
+  /**
+   * @description Maintainer account of an automatic revision. Learning reports carry exactly one decision per consumed extraction; reorganization reports carry none.
+   * @type object
+   */
+  maintenance_report: MaintenanceReport
 }
 
 export type ManualRevisionCreationSource = {

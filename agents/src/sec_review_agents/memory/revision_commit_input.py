@@ -4,12 +4,14 @@ Learning or reorganization has already produced and published the candidate
 memory tree and its trajectory when this value is created. The Catalog has not
 yet assigned a revision number or advanced the active revision. Temporal
 persists this value between the preparation and commit activities so commit
-retries reuse the same artifacts, extraction IDs, and expected active revision.
+retries reuse the same artifacts, extraction IDs, maintenance report, and
+expected active revision.
 """
 
 from dataclasses import dataclass
 from typing import Literal
 
+from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.artifacts.reference import ArtifactReference
 
 
@@ -22,6 +24,7 @@ class MemoryTreeRevisionCommitInput:
     extraction_ids: tuple[str, ...]
     memory_tree_reference: ArtifactReference
     trajectory_reference: ArtifactReference
+    maintenance_report: MemoryMaintenanceOutput
     source_kind: Literal["learning", "reorganization"] = "learning"
 
     def __post_init__(self) -> None:
@@ -71,6 +74,19 @@ class MemoryTreeRevisionCommitInput:
         if not isinstance(self.trajectory_reference, ArtifactReference):
             raise TypeError(
                 "Memory tree revision commit input trajectory reference is invalid."
+            )
+        if not isinstance(self.maintenance_report, MemoryMaintenanceOutput):
+            raise TypeError(
+                "Memory tree revision commit input maintenance report is invalid."
+            )
+        decided = [
+            decision.extraction_id
+            for decision in self.maintenance_report.observation_decisions
+        ]
+        if sorted(decided) != sorted(self.extraction_ids):
+            raise ValueError(
+                "Memory tree revision commit input maintenance report must decide "
+                "each consumed extraction exactly once."
             )
 
 

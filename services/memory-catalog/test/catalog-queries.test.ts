@@ -7,6 +7,7 @@ import {
   InvalidCatalogCursorError,
   PostgresMemoryCatalogQueries,
 } from '../src/catalog-queries.js'
+import { learningReport, reorganizationReport } from './maintenance-report.js'
 
 const artifact = {
   uri: 's3://sec-review/memory/trees/memory-tree.v1.tar.zst',
@@ -44,6 +45,7 @@ await test('memory tree revision history pagination returns an exclusive descend
             extraction_ids: ['extraction-4'],
             memory_tree_reference: artifact,
             trajectory_reference: revisionTrajectory,
+            maintenance_report: learningReport(['extraction-4']),
             actor: null,
             created_at: new Date('2026-10-23T04:00:00Z'),
           },
@@ -55,6 +57,7 @@ await test('memory tree revision history pagination returns an exclusive descend
             extraction_ids: ['extraction-3'],
             memory_tree_reference: artifact,
             trajectory_reference: revisionTrajectory,
+            maintenance_report: learningReport(['extraction-3']),
             actor: null,
             created_at: new Date('2026-10-23T03:00:00Z'),
           },
@@ -66,6 +69,7 @@ await test('memory tree revision history pagination returns an exclusive descend
             extraction_ids: ['extraction-2'],
             memory_tree_reference: artifact,
             trajectory_reference: revisionTrajectory,
+            maintenance_report: learningReport(['extraction-2']),
             actor: null,
             created_at: new Date('2026-10-23T02:00:00Z'),
           },
@@ -360,6 +364,7 @@ await test('reorganization revisions retain their source and trajectory in detai
             operation_id: 'reorganization-2',
             extraction_ids: [],
             trajectory_reference: revisionTrajectory,
+            maintenance_report: reorganizationReport,
             actor: null,
             memory_tree_reference: artifact,
             created_at: new Date('2026-10-23T04:00:00Z'),
@@ -375,6 +380,7 @@ await test('reorganization revisions retain their source and trajectory in detai
       kind: 'reorganization',
       operation_id: 'reorganization-2',
       trajectory_reference: revisionTrajectory,
+      maintenance_report: reorganizationReport,
     },
     memory_tree_reference: artifact,
     created_at: '2026-10-23T04:00:00.000Z',

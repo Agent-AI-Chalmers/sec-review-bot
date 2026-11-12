@@ -16,6 +16,7 @@ import type {
   ArtifactReference,
   ExtractionRegistration,
 } from '../../src/contract-types-generated.js'
+import { learningReport, reorganizationReport } from '../maintenance-report.js'
 
 const databaseUrl = process.env.TEST_DATABASE_URL
 if (databaseUrl === undefined)
@@ -118,6 +119,7 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
           'trajectories/memory-maintainer/trajectory.v1.jsonl.zst',
           'b',
         ),
+        maintenance_report: learningReport([extraction.extraction_id]),
       },
     }
     await store.reserveRevisionPublication(revisionInput)
@@ -188,6 +190,7 @@ await test('PostgreSQL store preserves extraction and revision invariants', asyn
           'trajectories/memory-maintainer/reorganization.v1.jsonl.zst',
           'e',
         ),
+        maintenance_report: reorganizationReport,
       },
     }
     for (const source of [

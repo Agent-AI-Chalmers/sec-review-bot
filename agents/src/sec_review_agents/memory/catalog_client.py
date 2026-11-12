@@ -7,6 +7,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote, urlencode
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
+from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.contract_versions import MEMORY_CATALOG_API_VERSION
 from sec_review_agents.utils.env import env_value
@@ -284,6 +285,7 @@ class MemoryCatalogClient:
         extraction_ids: list[str],
         memory_tree_reference: ArtifactReference,
         trajectory_reference: ArtifactReference,
+        maintenance_report: MemoryMaintenanceOutput,
     ) -> dict[str, Any]:
         return self._request(
             "POST",
@@ -296,6 +298,7 @@ class MemoryCatalogClient:
                     "operation_id": operation_id,
                     "extraction_ids": extraction_ids,
                     "trajectory_reference": trajectory_reference.as_dict(),
+                    "maintenance_report": maintenance_report.model_dump(mode="json"),
                 },
             },
         )
@@ -307,6 +310,7 @@ class MemoryCatalogClient:
         expected_active_revision: int,
         memory_tree_reference: ArtifactReference,
         trajectory_reference: ArtifactReference,
+        maintenance_report: MemoryMaintenanceOutput,
     ) -> dict[str, Any]:
         return self._request(
             "POST",
@@ -318,6 +322,7 @@ class MemoryCatalogClient:
                     "kind": "reorganization",
                     "operation_id": operation_id,
                     "trajectory_reference": trajectory_reference.as_dict(),
+                    "maintenance_report": maintenance_report.model_dump(mode="json"),
                 },
             },
         )

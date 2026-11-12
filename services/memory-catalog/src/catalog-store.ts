@@ -531,6 +531,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
                   revision.predecessor_revision is not distinct from nullif($2, 0) and
                   revision.memory_tree_reference=$3::jsonb and
                   revision.trajectory_reference=$4::jsonb and
+                  revision.maintenance_report=$6::jsonb and
                   coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
                     filter (where observation.extraction_id is not null), '{}')=$5::text[]
                     as identical
@@ -545,6 +546,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
             JSON.stringify(input.memory_tree_reference),
             JSON.stringify(source.trajectory_reference),
             [...source.extraction_ids].sort(),
+            JSON.stringify(source.maintenance_report),
           ],
         )
         existing = replay.rows[0]
@@ -556,7 +558,8 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           `select revision.revision,
                   revision.predecessor_revision is not distinct from nullif($2, 0) and
                   revision.memory_tree_reference=$3::jsonb and
-                  revision.trajectory_reference=$4::jsonb
+                  revision.trajectory_reference=$4::jsonb and
+                  revision.maintenance_report=$5::jsonb
                     as identical
            from memory_tree_revisions revision
            where revision.source_kind='reorganization' and revision.operation_id=$1`,
@@ -565,6 +568,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
             input.expected_active_revision,
             JSON.stringify(input.memory_tree_reference),
             JSON.stringify(source.trajectory_reference),
+            JSON.stringify(source.maintenance_report),
           ],
         )
         existing = replay.rows[0]
@@ -654,8 +658,8 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
       await client.query(
         `insert into memory_tree_revisions (
            revision, predecessor_revision, memory_tree_reference, source_kind,
-           operation_id, trajectory_reference, actor
-         ) values ($1,nullif($2, 0),$3,$4,$5,$6,$7)`,
+           operation_id, trajectory_reference, maintenance_report, actor
+         ) values ($1,nullif($2, 0),$3,$4,$5,$6,$7,$8)`,
         [
           nextRevision,
           input.expected_active_revision,
@@ -663,6 +667,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           source.kind,
           source.operation_id,
           source.kind === 'manual' ? null : source.trajectory_reference,
+          source.kind === 'manual' ? null : source.maintenance_report,
           source.kind === 'manual' ? source.actor : null,
         ],
       )

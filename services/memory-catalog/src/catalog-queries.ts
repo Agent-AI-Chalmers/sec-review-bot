@@ -3,6 +3,7 @@ import type { Pool } from 'pg'
 import type {
   Actor,
   ArtifactReference,
+  MaintenanceReport,
   CatalogOverview,
   ExtractionList,
   ExtractionRecord,
@@ -68,6 +69,7 @@ interface RevisionRow {
   operation_id: string
   extraction_ids: string[]
   trajectory_reference: ArtifactReference | null
+  maintenance_report: MaintenanceReport | null
   actor: Actor | null
   memory_tree_reference: ArtifactReference
   created_at: Date
@@ -473,7 +475,8 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
   ): Promise<MemoryTreeRevision | undefined> {
     const result = await this.pool.query<RevisionRow>(
       `select revision.revision, revision.predecessor_revision, revision.source_kind,
-              revision.operation_id, revision.trajectory_reference, revision.actor,
+              revision.operation_id, revision.trajectory_reference,
+              revision.maintenance_report, revision.actor,
               coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
                 filter (where observation.extraction_id is not null), '{}') as extraction_ids,
               revision.memory_tree_reference, revision.created_at
@@ -494,7 +497,8 @@ export class PostgresMemoryCatalogQueries implements MemoryCatalogQueries {
   ): Promise<MemoryTreeRevisionList> {
     const result = await this.pool.query<RevisionRow>(
       `select revision.revision, revision.predecessor_revision, revision.source_kind,
-              revision.operation_id, revision.trajectory_reference, revision.actor,
+              revision.operation_id, revision.trajectory_reference,
+              revision.maintenance_report, revision.actor,
               coalesce(array_agg(observation.extraction_id order by observation.extraction_id)
                 filter (where observation.extraction_id is not null), '{}') as extraction_ids,
               revision.memory_tree_reference, revision.created_at
@@ -551,6 +555,10 @@ function projectRevision(row: RevisionRow): MemoryTreeRevision {
             row.trajectory_reference,
             'trajectory_reference',
           ),
+          maintenance_report: requireValue(
+            row.maintenance_report,
+            'maintenance_report',
+          ),
         }
       : row.source_kind === 'reorganization'
         ? {
@@ -559,6 +567,10 @@ function projectRevision(row: RevisionRow): MemoryTreeRevision {
             trajectory_reference: requireValue(
               row.trajectory_reference,
               'trajectory_reference',
+            ),
+            maintenance_report: requireValue(
+              row.maintenance_report,
+              'maintenance_report',
             ),
           }
         : {

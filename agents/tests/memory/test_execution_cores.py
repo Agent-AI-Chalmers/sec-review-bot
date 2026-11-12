@@ -353,9 +353,23 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
     }
     base_tree = tmp_path / "active"
     base_tree.mkdir()
+    report = MemoryMaintenanceOutput.model_validate(
+        {
+            "observation_decisions": [
+                {
+                    "extraction_id": "extraction-1",
+                    "action": "added",
+                    "topics": ["/memory/topics/example.md"],
+                    "reason": "Adds durable guidance.",
+                }
+            ],
+            "summary": "Added one observation.",
+        }
+    )
     result = SimpleNamespace(
         memory_tree_path=tmp_path / "candidate",
         maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
+        output=report,
     )
     memory_reference = _s3_reference("published-memory-tree")
     trajectory_reference = _s3_reference("maintainer-trajectory")
@@ -394,6 +408,9 @@ async def test_coordinated_maintenance_accepts_catalog_revision_reference_pairs(
     assert prepared is not None
     assert prepared.expected_active_revision == expected_active_revision
     assert prepared.extraction_ids == ("extraction-1",)
+    assert prepared.maintenance_report == report
+    intent = client.reserve_revision_publication.call_args.args[0]
+    assert intent["source"]["maintenance_report"] == report.model_dump(mode="json")
     assert maintain.await_args is not None
     assert maintain.await_args.kwargs["base_memory_tree"] == (
         None if active_reference is None else base_tree
@@ -427,6 +444,9 @@ async def test_coordinated_reorganization_uses_active_memory_without_observation
     result = SimpleNamespace(
         memory_tree_path=candidate_tree,
         maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
+        output=MemoryMaintenanceOutput(
+            observation_decisions=[], summary="Merged duplicate topics."
+        ),
     )
     candidate_reference = ArtifactReference(
         uri="s3://sec-review/candidate-memory-tree",
@@ -482,6 +502,10 @@ async def test_coordinated_reorganization_uses_active_memory_without_observation
     intent = client.reserve_revision_publication.call_args.args[0]
     assert intent["source"]["kind"] == "reorganization"
     assert "extraction_ids" not in intent["source"]
+    assert intent["source"]["maintenance_report"] == {
+        "observation_decisions": [],
+        "summary": "Merged duplicate topics.",
+    }
 
 
 @pytest.mark.asyncio
@@ -504,6 +528,7 @@ async def test_coordinated_reorganization_skips_unchanged_tree(
     result = SimpleNamespace(
         memory_tree_path=tmp_path / "candidate",
         maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
+        output=MemoryMaintenanceOutput(observation_decisions=[], summary="No change."),
     )
 
     with (

@@ -11,7 +11,9 @@ import pytest
 import yaml
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import ValidationError
+from pydantic import ValidationError as ModelValidationError
 
+from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.contract_versions import MEMORY_CATALOG_API_VERSION
 from sec_review_agents.memory.catalog_client import (
@@ -55,6 +57,21 @@ class _RecordingClient(MemoryCatalogClient):
         return self.responses.pop(0)
 
 
+def _report(extraction_ids: list[str]) -> dict[str, object]:
+    return {
+        "summary": "Maintained memory.",
+        "observation_decisions": [
+            {
+                "extraction_id": extraction_id,
+                "action": "added",
+                "topics": ["/memory/topics/example.md"],
+                "reason": "Adds durable guidance.",
+            }
+            for extraction_id in extraction_ids
+        ],
+    }
+
+
 def _artifact(
     name: str,
     *,
@@ -85,6 +102,7 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
                 "maintenance-trajectory.jsonl.zst",
                 media_type="application/zstd",
             ).as_dict(),
+            "maintenance_report": _report(["extraction-1"]),
         },
         "created_at": "2026-10-23T00:00:00Z",
     }
@@ -191,6 +209,9 @@ def test_client_wire_values_match_memory_catalog_contract() -> None:
         trajectory_reference=_artifact(
             "maintenance-trajectory.jsonl.zst",
             media_type="application/zstd",
+        ),
+        maintenance_report=MemoryMaintenanceOutput.model_validate(
+            _report(["extraction-1"])
         ),
     ) == {
         "created": True,
@@ -342,6 +363,9 @@ def test_automation_pause_preserves_its_own_conflict_semantics() -> None:
                 "maintenance-trajectory.jsonl.zst",
                 media_type="application/zstd",
             ),
+            maintenance_report=MemoryMaintenanceOutput.model_validate(
+                _report(["extraction-1"])
+            ),
         )
 
 
@@ -445,6 +469,9 @@ def test_revision_kind_contract_uses_explicit_revision_types(
         source["trajectory_reference"] = _artifact(
             "trajectory.jsonl.zst", media_type="application/zstd"
         ).as_dict()
+        source["maintenance_report"] = _report(
+            ["extraction-1"] if kind == "learning" else []
+        )
         if kind == "learning":
             source["extraction_ids"] = ["extraction-1"]
     value = {
@@ -518,6 +545,7 @@ def test_abandoned_publication_responses_stop_preparation(action):
             "trajectory_reference": _artifact(
                 "trajectory", media_type="application/zstd"
             ).as_dict(),
+            "maintenance_report": _report([]),
         },
     }
     response = {"intent": intent, "status": "abandoned"}
@@ -554,4 +582,48 @@ def test_abandoned_publication_http_conflict_preserves_its_semantics():
             expected_active_revision=0,
             memory_tree_reference=_artifact("tree"),
             trajectory_reference=_artifact("trajectory", media_type="application/zstd"),
+            maintenance_report=MemoryMaintenanceOutput.model_validate(_report([])),
         )
+
+
+@pytest.mark.parametrize(
+    ("field", "at_limit", "over_limit"),
+    [
+        ("summary", "x" * 4000, "x" * 4001),
+        ("reason", "x" * 2000, "x" * 2001),
+        ("topics", ["t"] * 64, ["t"] * 65),
+        ("topics", ["x" * 512], ["x" * 513]),
+    ],
+)
+def test_maintainer_output_limits_match_catalog_report_contract(
+    field: str, at_limit: object, over_limit: object
+) -> None:
+    """Over-limit output must fail in the agent, where ToolStrategy can retry.
+
+    If the model accepted it, the later reserve request would be rejected with
+    no recoverable publication intent, forcing the maintainer to rerun.
+    """
+
+    def report(value: object) -> dict[str, Any]:
+        decision: dict[str, Any] = {
+            "extraction_id": "extraction-1",
+            "action": "added",
+            "topics": ["/memory/topics/example.md"],
+            "reason": "Adds durable guidance.",
+        }
+        value_report: dict[str, Any] = {
+            "summary": "Maintained memory.",
+            "observation_decisions": [decision],
+        }
+        if field == "summary":
+            value_report["summary"] = value
+        else:
+            decision[field] = value
+        return value_report
+
+    contract = _validator("MaintenanceReport")
+    accepted = MemoryMaintenanceOutput.model_validate(report(at_limit))
+    contract.validate(accepted.model_dump(mode="json"))
+    assert not contract.is_valid(report(over_limit))
+    with pytest.raises(ModelValidationError):
+        MemoryMaintenanceOutput.model_validate(report(over_limit))

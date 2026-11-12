@@ -10,7 +10,7 @@ extraction（已完成的经验提取记录）和 observation 列表按从新到
 
 `GET /v1/overview` 直接根据 Catalog 状态统计已完成提取的单元，以 `(source_run_id, source_unit_id)` 标识。同一单元至少完成过一次提取、但所有提取都未产出 observation 时，归为“未产出 observation”；失败或尚未结束的提取不计入。`range` 可选 30 天、90 天或全部历史；`trend_points` 按 `trend_granularity` 声明的粒度返回，有限时间范围按日、全部历史按月统计。`period_start` 是对应自然日或自然月的 UTC 起始日期，包含该起点。
 
-记忆修订通过 `source` 区分来源：`learning` 包含 `operation_id`、已处理的提取 ID 和 `trajectory_reference`；`reorganization` 包含 `operation_id` 和 `trajectory_reference`，但不消费 observation；`manual` 请求包含用于幂等处理的 `operation_id`，保存修订时再根据认证凭据补充操作者信息。`operation_id` 在所有来源类型中唯一标识一次修订操作；以不同类型复用同一 ID 会产生冲突。`predecessor_revision` 记录创建修订时的生效版本。恢复版本是独立的幂等操作：通过比较并交换（CAS）将当前版本指向已有修订，不创建新修订。
+记忆修订通过 `source` 区分来源：`learning` 包含 `operation_id`、已处理的提取 ID 和 `trajectory_reference`；`reorganization` 包含 `operation_id` 和 `trajectory_reference`，但不消费 observation；两类自动修订还携带 maintainer 的 `maintenance_report`：一段总结，以及对每个已消费提取的一条决定（`added`、`merged`、`skipped` 或 `conflict`，附修改的主题和理由），`reorganization` 的决定列表为空，且报告属于发布意图精确匹配的一部分；`manual` 请求包含用于幂等处理的 `operation_id`，保存修订时再根据认证凭据补充操作者信息。`operation_id` 在所有来源类型中唯一标识一次修订操作；以不同类型复用同一 ID 会产生冲突。`predecessor_revision` 记录创建修订时的生效版本。恢复版本是独立的幂等操作：通过比较并交换（CAS）将当前版本指向已有修订，不创建新修订。
 
 Worker 凭据允许登记 extraction、读取 learning 输入和提交 learning 或 reorganization 修订。Operator 凭据允许暂停或恢复记忆树自动更新、提交人工修订和恢复已有版本。两类凭据都能读取共享目录数据；创建修订时，请求来源类型必须与认证角色匹配。
 

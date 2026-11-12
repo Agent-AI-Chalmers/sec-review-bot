@@ -13,6 +13,7 @@ import type {
   ArtifactReference,
   ExtractionPublicationIntent,
 } from '../../src/contract-types-generated.js'
+import { learningReport, reorganizationReport } from '../maintenance-report.js'
 
 function artifact(character: string): ArtifactReference {
   return {
@@ -100,6 +101,7 @@ await test('publication recovery preserves intents and attachment transactions s
         operation_id: 'maintain-1',
         extraction_ids: ['extract-1'],
         trajectory_reference: artifact('e'),
+        maintenance_report: learningReport(['extract-1']),
       },
     }
     await store.reserveRevisionPublication(revision)
@@ -175,6 +177,7 @@ await test('publication recovery preserves intents and attachment transactions s
           kind: 'reorganization' as const,
           operation_id: 'shared-operation',
           trajectory_reference: artifact('e'),
+          maintenance_report: reorganizationReport,
         },
       },
       {
@@ -240,6 +243,7 @@ await test('publication recovery preserves intents and attachment transactions s
         kind: 'reorganization' as const,
         operation_id: 'prepared',
         trajectory_reference: artifact('e'),
+        maintenance_report: reorganizationReport,
       },
     }
     await store.reserveRevisionPublication(prepared)
@@ -347,6 +351,7 @@ await test('publication recovery preserves intents and attachment transactions s
         kind: 'reorganization' as const,
         operation_id: 'late-publication',
         trajectory_reference: artifact('b'),
+        maintenance_report: reorganizationReport,
       },
     }
     assert.equal(

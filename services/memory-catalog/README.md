@@ -35,7 +35,7 @@ Extractions and observations are ordered by `created_at` and then `extraction_id
 
 ### Revisions And Memory-Tree Automation
 
-Revision sources use `learning` for incorporating new observations, `reorganization` for reorganizing existing memory, and `manual` for human edits. `predecessor_revision` records the revision active at creation. Restoring an earlier revision only changes the active revision; it creates no new revision, and later revision numbers continue increasing. Manual edits do not consume pending observations.
+Revision sources use `learning` for incorporating new observations, `reorganization` for reorganizing existing memory, and `manual` for human edits. `predecessor_revision` records the revision active at creation. Restoring an earlier revision only changes the active revision; it creates no new revision, and later revision numbers continue increasing. Manual edits do not consume pending observations. Learning and reorganization revisions store the maintainer's `maintenance_report`; the server rejects a report that does not decide each consumed extraction exactly once, or that names no edited topics for a non-skipped decision.
 
 <!-- doc-default: memory-tree-automation-state; source=services/memory-catalog/src/database/schema-versions/001_initial_catalog.sql -->
 

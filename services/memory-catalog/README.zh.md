@@ -37,7 +37,7 @@ extraction 和 observation 按 `created_at`、`extraction_id` 降序排列。调
 
 ### 修订与记忆树自动更新
 
-修订通过 `learning`（吸收新 observation）、`reorganization`（整理现有记忆）或 `manual`（人工编辑）区分产生方式。`predecessor_revision` 记录创建时的生效版本；恢复旧版本只改变当前生效版本，不创建新修订，后续修订编号仍递增。人工编辑不消费待处理 observation。
+修订通过 `learning`（吸收新 observation）、`reorganization`（整理现有记忆）或 `manual`（人工编辑）区分产生方式。`predecessor_revision` 记录创建时的生效版本；恢复旧版本只改变当前生效版本，不创建新修订，后续修订编号仍递增。人工编辑不消费待处理 observation。`learning` 和 `reorganization` 修订保存 maintainer 的 `maintenance_report`；如果报告没有对每个已消费提取恰好给出一条决定，或非 `skipped` 决定未列出修改的主题，服务会拒绝请求。
 
 <!-- doc-default: memory-tree-automation-state; source=services/memory-catalog/src/database/schema-versions/001_initial_catalog.sql -->
 
