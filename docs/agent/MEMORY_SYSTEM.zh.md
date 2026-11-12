@@ -60,7 +60,7 @@ maintenance
 
 extraction 从一次 review 的阶段 trajectories 中提取可复用经验，例如 analyzer、mitigation、verification 的执行轨迹，并写成 observation。system prompts 和 `/skills` 下的全部 bundled skills 都算是 agent 已经有的指导；observation 应该在此基础上增加有证据支持、可长期复用的经验，否则就不产生 observation。
 
-每次 extraction 可以产出零到多条独立 observation。每条只记录一个经验，同一经验的证据和修正保留在一起。调用方分配 `observation_id`，而 `extraction_id` 标识共享的调用与来源。Maintenance 独立选择和消费这些 observation，包括同一次 extraction 的不同经验，并为每条记录一个决定。
+每次 extraction 可以产出零到多条独立 observation。每条 observation 聚焦一个可复用的经验。
 
 maintenance 会读取 extraction 产生的 observations，并把有用经验并入 memory。
 

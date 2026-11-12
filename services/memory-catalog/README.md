@@ -79,6 +79,4 @@ pnpm run test:integration
 
 Each extraction produces zero or more observations. `extraction_id` identifies the invocation and its provenance; `observation_id` identifies an independently maintained lesson. Extraction registration publishes the complete `observations` array atomically. Learning consumes `observation_ids` and reports one decision per observation.
 
-This is a breaking schema and API change. Recreate existing Memory Catalog databases and restart workers together with the server; old single-observation payloads and pending workflow payloads are not supported. No migration or compatibility adapter is provided.
-
 Observation IDs are globally unique opaque identifiers; the API does not require an extraction-ID prefix. Reusing an occupied observation ID in another extraction returns HTTP 409 and rolls back the entire registration. Pagination cursors are opaque and bind their ordering position to the listed row ID.

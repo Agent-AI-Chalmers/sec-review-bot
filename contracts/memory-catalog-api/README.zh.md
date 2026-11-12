@@ -38,6 +38,4 @@ pnpm test
 
 每次 extraction 可以产出零到多条 observation。`extraction_id` 标识调用及其来源；`observation_id` 标识可独立维护的经验。注册操作原子发布完整的 `observations` 数组；learning 消费 `observation_ids`，并为每条 observation 记录一个决定。
 
-这是不兼容的 schema 和 API 变更。已有 Memory Catalog 数据库必须重建，worker 与服务端必须同步更新；旧的单 observation 请求和待处理 workflow payload 不受支持，不提供迁移或兼容适配层。
-
 Observation ID 是全局唯一的不透明标识，API 不要求 extraction ID 前缀。另一条 extraction 使用已占用的 observation ID 时，返回 HTTP 409，并回滚整次注册。分页游标是不透明的，排序位置使用当前列表的行 ID。
