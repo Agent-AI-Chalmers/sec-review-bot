@@ -5,7 +5,10 @@ from unittest.mock import AsyncMock, Mock, patch
 import pytest
 
 from sec_review_agents.agents.memory_extractor.model import MemoryObservationOutput
-from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
+from sec_review_agents.agents.memory_maintainer.model import (
+    MemoryMaintenanceOutput,
+    ObservationDecision,
+)
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.memory.coordinated_maintenance import (
     prepare_coordinated_memory_learning,
@@ -17,6 +20,7 @@ from sec_review_agents.memory.memory_tree_artifact import (
     materialize_memory_tree,
     publish_memory_tree_artifact,
 )
+from sec_review_agents.resources.loader import load_prompt_resource
 
 
 def _s3_reference(name: str) -> ArtifactReference:
@@ -666,3 +670,47 @@ async def test_coordinated_maintenance_rejects_invalid_catalog_payloads(
             operation_id="maintenance-1",
             batch_size=10,
         )
+
+
+@pytest.mark.asyncio
+async def test_maintainer_seeds_empty_base_with_initial_index_resource(
+    tmp_path: Path,
+) -> None:
+    observation = tmp_path / "observation.md"
+    observation.write_text("New lesson.\n", encoding="utf-8")
+    candidate = tmp_path / "candidate"
+    seeded: dict[str, str] = {}
+
+    async def invoke_agent(**kwargs) -> MemoryMaintenanceOutput:
+        seeded["index"] = (candidate / "MEMORY.md").read_text(encoding="utf-8")
+        return MemoryMaintenanceOutput(
+            observation_decisions=[
+                ObservationDecision(
+                    observation_id="extraction-1",
+                    action="skipped",
+                    topics=[],
+                    reason="Test.",
+                )
+            ],
+            summary="Seeded.",
+        )
+
+    with (
+        patch(
+            "sec_review_agents.memory.maintainer.create_chat_model",
+            return_value=Mock(name="memory-maintainer-model"),
+        ),
+        patch(
+            "sec_review_agents.memory.maintainer.run_memory_maintainer_agent",
+            AsyncMock(side_effect=invoke_agent),
+        ),
+    ):
+        await maintain_memory_tree(
+            base_memory_tree=None,
+            observations=[("extraction-1", observation)],
+            worktree_root=candidate,
+            maintainer_trajectory_path=tmp_path / "maintainer.jsonl",
+        )
+
+    assert seeded["index"] == load_prompt_resource("memory/initial-index.md") + "\n"
+    assert (candidate / "topics").is_dir()

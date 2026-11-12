@@ -33,17 +33,6 @@ MAX_MEMORY_TREE_ARTIFACT_ENTRIES = 10_000
 MAX_MEMORY_TREE_FILE_BYTES = 16 * 1024 * 1024
 MAX_EXTRACTED_MEMORY_BYTES = 256 * 1024 * 1024
 
-DEFAULT_MEMORY_INDEX = """# Security Review Experience Memory
-
-Reviewed security-review experience extracted from past trajectories.
-
-Use the top of this file as the runtime index. Keep it short: describe available
-experience topics and route future agents to topic files in `topics/`.
-
-Memory is guidance only; it is not evidence for the current repository, patch,
-or finding.
-"""
-
 
 def _validate_content_path(relative: str) -> None:
     if relative == "MEMORY.md":
@@ -294,7 +283,6 @@ def materialize_memory_tree(
 
 
 __all__ = [
-    "DEFAULT_MEMORY_INDEX",
     "MEMORY_TREE_ARTIFACT_FILENAME",
     "build_memory_tree_artifact",
     "materialize_memory_tree",

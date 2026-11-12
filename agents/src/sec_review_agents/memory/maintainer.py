@@ -15,7 +15,7 @@ from sec_review_agents.agents.memory_maintainer.prompts import (
 from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
 from sec_review_agents.filesystem.path_views import writable_memory_view
 from sec_review_agents.llm.factory import create_chat_model
-from sec_review_agents.memory.memory_tree_artifact import DEFAULT_MEMORY_INDEX
+from sec_review_agents.resources.loader import load_prompt_resource
 from sec_review_agents.runtime.backend_cleanup import amanaged_backend
 
 
@@ -53,7 +53,7 @@ def _prepare_worktree(
     if base_memory_tree is None:
         (worktree_root / "topics").mkdir(parents=True)
         (worktree_root / "MEMORY.md").write_text(
-            DEFAULT_MEMORY_INDEX,
+            load_prompt_resource("memory/initial-index.md") + "\n",
             encoding="utf-8",
         )
     else:
