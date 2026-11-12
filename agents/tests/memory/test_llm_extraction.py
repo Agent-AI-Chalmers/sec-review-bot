@@ -166,16 +166,10 @@ async def test_llm_extractor_safety_case(
     shutil.copytree(trajectory_dir, artifacts / "trajectories")
     system_prompt = _selected_system_prompt()
 
-    with (
-        patch(
-            "sec_review_agents.agents.memory_extractor.agent."
-            "MEMORY_EXTRACTOR_SYSTEM_PROMPT",
-            system_prompt,
-        ),
-        patch(
-            "sec_review_agents.memory.extractor.MEMORY_EXTRACTOR_SYSTEM_PROMPT",
-            system_prompt,
-        ),
+    with patch(
+        "sec_review_agents.agents.memory_extractor.agent."
+        "MEMORY_EXTRACTOR_SYSTEM_PROMPT",
+        system_prompt,
     ):
         result = await preview_memory_observation_from_paths(
             [artifacts],
