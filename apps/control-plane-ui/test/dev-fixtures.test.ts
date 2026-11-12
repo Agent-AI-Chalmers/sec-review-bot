@@ -535,6 +535,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
     )
 
     for (const observation of observations.observations as Array<{
+      observation_id: string
       extraction_id: string
       source_run_id: string
       source_unit_id: string
@@ -571,26 +572,39 @@ test('memory fixtures form one coherent provenance graph', async () => {
         )
         assert.strictEqual(revision.source.kind, 'learning')
         assert.ok(
-          revision.source.observation_ids.includes(observation.extraction_id)
+          revision.source.observation_ids.includes(observation.observation_id)
         )
       }
     }
 
     for (const revision of revisions.revisions as Array<{
       source:
-        | { kind: 'learning'; observation_ids: string[] }
+        | {
+            kind: 'learning'
+            observation_ids: string[]
+            maintenance_report: {
+              observation_decisions: { observation_id: string }[]
+            }
+          }
         | { kind: 'manual'; operation_id: string; actor: unknown }
         | { kind: 'reorganization'; operation_id: string }
     }>) {
       if (revision.source.kind === 'learning') {
-        for (const extractionId of revision.source.observation_ids) {
+        assert.deepStrictEqual(
+          revision.source.maintenance_report.observation_decisions
+            .map((decision) => decision.observation_id)
+            .sort(),
+          [...revision.source.observation_ids].sort(),
+          'maintenance decisions must identify every consumed observation'
+        )
+        for (const observationId of revision.source.observation_ids) {
           const observation = observations.observations.find(
-            (candidate: { extraction_id: string }) =>
-              candidate.extraction_id === extractionId
+            (candidate: { observation_id: string }) =>
+              candidate.observation_id === observationId
           )
           assert(
             observation,
-            `${extractionId} consumed by a revision must have an observation`
+            `${observationId} consumed by a revision must have an observation`
           )
         }
       } else if (revision.source.kind === 'manual') {

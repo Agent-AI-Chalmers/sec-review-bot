@@ -42,10 +42,10 @@ test('a report decision reveals its observation in the revision-filtered list', 
   await expect(
     page.getByText('Showing observations included in revision 2.')
   ).toBeVisible()
-  const row = page.locator('[data-extraction-row="fixture-extraction-2"]')
+  const row = page.locator('[data-observation-row="fixture-extraction-2"]')
   await expect(row).toBeVisible()
   await expect(row).toBeFocused()
-  await expect(page.locator('[data-extraction-row]')).toHaveCount(3)
+  await expect(page.locator('[data-observation-row]')).toHaveCount(3)
 
   await page.getByRole('button', { name: 'Show all observations' }).click()
   await expect(
@@ -63,13 +63,13 @@ test('the observation list pages forward and back with the shared pager', async 
   await openAuthenticatedRuns(page)
   await page.goto('/memory', { waitUntil: 'networkidle' })
   await page.getByRole('tab', { name: 'Observations' }).click()
-  const rows = page.locator('[data-extraction-row]')
+  const rows = page.locator('[data-observation-row]')
   await expect(rows).toHaveCount(1)
-  const first = await rows.first().getAttribute('data-extraction-row')
+  const first = await rows.first().getAttribute('data-observation-row')
   await page.getByRole('button', { name: 'Next page', exact: true }).click()
-  await expect(rows.first()).not.toHaveAttribute('data-extraction-row', first!)
+  await expect(rows.first()).not.toHaveAttribute('data-observation-row', first!)
   await page.getByRole('button', { name: 'Previous page', exact: true }).click()
-  await expect(rows.first()).toHaveAttribute('data-extraction-row', first!)
+  await expect(rows.first()).toHaveAttribute('data-observation-row', first!)
 })
 
 test('revision history pages in the list while the graph keeps the newest window', async ({
@@ -107,7 +107,7 @@ test('observation navigation centers the graph and can return to latest', async 
     .click()
   await page.getByRole('option', { name: '100', exact: true }).click()
   await page
-    .locator('[data-extraction-row="fixture-extraction-2"]')
+    .locator('[data-observation-row="fixture-extraction-2"]')
     .getByRole('button', { name: 'revision 2', exact: true })
     .click()
   await centered

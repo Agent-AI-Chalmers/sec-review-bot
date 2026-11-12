@@ -1,6 +1,6 @@
 import { expect, test } from './fixtures.js'
 
-test('memory-tree automation mutates only this worker fixture server', async ({
+test('memory-tree automation mutates only this test fixture server', async ({
   page,
   fixtureRuntime
 }) => {

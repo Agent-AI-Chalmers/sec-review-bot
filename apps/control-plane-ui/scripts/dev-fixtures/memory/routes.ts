@@ -7,7 +7,7 @@ import type {
 import historySamples from '../data/memory-history-samples.json' with { type: 'json' }
 import memoryTrajectory from '../data/memory-trajectory.json' with { type: 'json' }
 import { validateTrajectoryEvent } from '../../../shared/trajectory-events.js'
-import { BASE_TIME } from '../runs/generate.js'
+import { BASE_TIME as RUNS_BASE_TIME } from '../runs/generate.js'
 import type {
   CatalogOverviewWorkflow,
   ExtractionRecord,
@@ -37,6 +37,11 @@ const trajectoryReference = {
 export function createMemoryHandler(
   sourceRunIds: SourceRunIds
 ): (request: IncomingMessage, response: ServerResponse) => Promise<void> {
+  // E2E pins the clock; interactive fixture previews stay relative to now.
+  const fixtureTime = process.env.CONTROL_PLANE_UI_E2E_FIXTURE_TIME
+  const BASE_TIME = fixtureTime ? Date.parse(fixtureTime) : RUNS_BASE_TIME
+  if (!Number.isFinite(BASE_TIME))
+    throw new Error('CONTROL_PLANE_UI_E2E_FIXTURE_TIME must be a valid date.')
   let memoryAutomation: MemoryTreeAutomation = {
     state: 'enabled',
     generation: 1,
@@ -112,21 +117,21 @@ export function createMemoryHandler(
             'Added authentication and service-boundary guidance from two observations and folded tenant authorization ordering into the existing triage topic.',
           observation_decisions: [
             {
-              extraction_id: 'fixture-extraction-2',
+              observation_id: 'fixture-extraction-2',
               action: 'added',
               topics: ['/memory/topics/authentication.md'],
               reason:
                 'Length validation before constant-time comparison is a reusable authentication check that memory did not cover.'
             },
             {
-              extraction_id: 'fixture-extraction-3',
+              observation_id: 'fixture-extraction-3',
               action: 'added',
               topics: ['/memory/topics/boundaries.md', '/memory/MEMORY.md'],
               reason:
                 'Header allowlisting at proxy boundaries is a distinct, reusable pattern, so it gets its own topic and index entry.'
             },
             {
-              extraction_id: 'fixture-extraction-4',
+              observation_id: 'fixture-extraction-4',
               action: 'merged',
               topics: ['/memory/topics/triage.md'],
               reason:
@@ -306,7 +311,7 @@ export function createMemoryHandler(
           summary: sample.reason,
           observation_decisions: [
             {
-              extraction_id: extractionId,
+              observation_id: extractionId,
               action: sample.action,
               topics: sample.topics,
               reason: sample.reason
