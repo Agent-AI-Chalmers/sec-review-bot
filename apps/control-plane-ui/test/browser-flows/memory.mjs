@@ -438,13 +438,13 @@ export async function runMemoryFlow({
     const revisionGraphLayout = await page.evaluate(() => {
       const box = (revision) => {
         const node = document.querySelector(
-          `.revision-graph-node[aria-label="revision ${revision}"]`
+          `.revision-graph-node[data-revision-node="${revision}"]`
         )
         if (node === null) return null
         const bounds = node.getBoundingClientRect()
         return { x: bounds.x, y: bounds.y }
       }
-      return { revision3: box(3), revision2: box(2), revision1: box(1) }
+      return { revision3: box(56), revision2: box(54), revision1: box(53) }
     })
     assert.ok(
       revisionGraphLayout.revision3 !== null &&
@@ -483,8 +483,8 @@ export async function runMemoryFlow({
       assert.strictEqual(
         await page
           .locator('.revision-graph-node[data-current]')
-          .getAttribute('aria-label'),
-        'revision 2',
+          .getAttribute('data-revision-node'),
+        '59',
         `${name} initial graph must distinguish the active revision from the newest revision`
       )
     await page.getByText('List', { exact: true }).click()
@@ -549,6 +549,10 @@ export async function runMemoryFlow({
         ),
       `${name} set-current and already-current actions must keep the same geometry: ${JSON.stringify(currentActionLayout)}`
     )
+    await page
+      .getByRole('combobox', { name: 'Rows per page', exact: true })
+      .click()
+    await page.getByRole('option', { name: '100', exact: true }).click()
     const revisionTwoRow = page.locator('tbody tr').filter({
       has: page.locator('.memory-revision-cell', { hasText: /^2$/ })
     })
@@ -809,9 +813,13 @@ export async function runMemoryFlow({
       /^\/runs\/[0-9a-f-]+$/,
       `${name} every observation must link to its source run`
     )
+    await page
+      .getByRole('combobox', { name: 'Rows per page', exact: true })
+      .click()
+    await page.getByRole('option', { name: '100', exact: true }).click()
     // Several fixture observations were consumed by the same revision.
     const incorporatedRevision = page
-      .getByRole('button', { name: 'revision 2' })
+      .getByRole('button', { name: 'revision 2', exact: true })
       .first()
     await incorporatedRevision.click()
     const linkedRevisionNode = page.locator(

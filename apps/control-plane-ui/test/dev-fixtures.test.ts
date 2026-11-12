@@ -504,9 +504,9 @@ test('memory fixtures form one coherent provenance graph', async () => {
     )
 
     assert.strictEqual(extractions.next_cursor, null)
-    assert.strictEqual(extractions.extractions.length, 6)
+    assert.strictEqual(extractions.extractions.length, 48)
     assert.strictEqual(observations.next_cursor, null)
-    assert.strictEqual(observations.observations.length, 3)
+    assert.strictEqual(observations.observations.length, 45)
     assert.strictEqual(
       overview.totals.completed_extraction_count,
       extractions.extractions.length
@@ -580,6 +580,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
       source:
         | { kind: 'learning'; extraction_ids: string[] }
         | { kind: 'manual'; operation_id: string; actor: unknown }
+        | { kind: 'reorganization'; operation_id: string }
     }>) {
       if (revision.source.kind === 'learning') {
         for (const extractionId of revision.source.extraction_ids) {
@@ -592,7 +593,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
             `${extractionId} consumed by a revision must have an observation`
           )
         }
-      } else {
+      } else if (revision.source.kind === 'manual') {
         assert.ok(revision.source.operation_id)
         assert.ok(revision.source.actor)
       }

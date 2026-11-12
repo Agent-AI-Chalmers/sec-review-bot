@@ -41,7 +41,9 @@ export function Memory(): React.JSX.Element {
   const {
     automation,
     tree,
-    latestRevisions,
+    graphRevisions,
+    graphTarget,
+    showGraph,
     revisionPages,
     observationPages,
     overview,
@@ -73,6 +75,7 @@ export function Memory(): React.JSX.Element {
     // Clearing first lets repeated visits to the same revision replay the cue.
     setHighlightedRevision(undefined)
     requestAnimationFrame(() => setHighlightedRevision(revision))
+    void showGraph(revision)
   }
 
   // A revision consumes one learning batch, which the catalog caps at 100, the same
@@ -177,7 +180,7 @@ export function Memory(): React.JSX.Element {
     [
       automation.error,
       tree.error,
-      latestRevisions.error,
+      graphRevisions.error,
       revisionPages.resource.error,
       observationPages.resource.error,
       overview.error
@@ -193,7 +196,7 @@ export function Memory(): React.JSX.Element {
   )
   const treeError = failureText(tree.error, 'memoryTreeLoadFailed')
   const graphRevisionsError = failureText(
-    latestRevisions.error,
+    graphRevisions.error,
     'memoryRevisionsLoadFailed'
   )
   const revisionPageError = failureText(
@@ -260,10 +263,14 @@ export function Memory(): React.JSX.Element {
         </Tabs.Panel>
         <Tabs.Panel value="revisions" pt="md">
           <MemoryRevisionHistory
-            graphRevisions={latestRevisions.data?.revisions ?? []}
-            graphLoading={latestRevisions.loading}
+            graphRevisions={graphRevisions.data?.revisions ?? []}
+            graphTarget={graphTarget}
+            onShowLatest={() => {
+              setHighlightedRevision(undefined)
+              void showGraph()
+            }}
+            graphLoading={graphRevisions.loading}
             graphError={graphRevisionsError}
-            graphTruncated={latestRevisions.data?.next_before_revision != null}
             listRevisions={revisionPages.resource.data?.page.revisions ?? []}
             listLoading={revisionPages.resource.loading}
             listError={revisionPageError}

@@ -1,12 +1,5 @@
 import React from 'react'
-import {
-  Alert,
-  Button,
-  Group,
-  SegmentedControl,
-  Table,
-  Text
-} from '@mantine/core'
+import { Alert, Button, Group, SegmentedControl, Table } from '@mantine/core'
 import { IconArrowsDiff, IconEye, IconHistory } from '@tabler/icons-react'
 
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
@@ -24,7 +17,8 @@ export function MemoryRevisionHistory({
   graphRevisions,
   graphLoading,
   graphError,
-  graphTruncated,
+  graphTarget,
+  onShowLatest,
   listRevisions,
   listLoading,
   listError,
@@ -45,7 +39,8 @@ export function MemoryRevisionHistory({
   graphLoading: boolean
   graphError: string
   /** True when older revisions exist beyond the graph window. */
-  graphTruncated: boolean
+  graphTarget?: number | undefined
+  onShowLatest?: () => void
   /** One page of revision history for the list view. */
   listRevisions: Revision[]
   listLoading: boolean
@@ -93,16 +88,15 @@ export function MemoryRevisionHistory({
           ]}
         />
       </Group>
-      {isGraph && graphTruncated && (
-        <Text size="sm" c="dimmed" mb="sm">
-          {t('revisionGraphWindow').replace(
-            '{count}',
-            String(GRAPH_REVISION_WINDOW)
-          )}
-        </Text>
-      )}
       {isGraph ? (
         <RevisionGraph
+          windowHelp={t(
+            graphTarget === undefined
+              ? 'revisionGraphWindow'
+              : 'revisionGraphCentered'
+          ).replace('{count}', String(GRAPH_REVISION_WINDOW))}
+          historical={graphTarget !== undefined}
+          onShowLatest={onShowLatest}
           revisions={revisions}
           activeRevision={activeRevision}
           allowSetCurrent={activeRevision !== undefined}
@@ -111,6 +105,7 @@ export function MemoryRevisionHistory({
           onRevealObservation={onRevealObservation}
           onCompare={onCompare}
           onSetCurrent={onSetCurrent}
+          focusRevision={graphTarget}
           highlightedRevision={highlightedRevision}
           onHighlightEnd={onHighlightEnd}
         />

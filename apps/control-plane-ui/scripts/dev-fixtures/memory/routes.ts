@@ -4,6 +4,7 @@ import type {
   MemoryTreeContentResponse,
   TrajectoryContentResponse
 } from '../../../shared/artifact-content.js'
+import historySamples from '../data/memory-history-samples.json' with { type: 'json' }
 import memoryTrajectory from '../data/memory-trajectory.json' with { type: 'json' }
 import { validateTrajectoryEvent } from '../../../shared/trajectory-events.js'
 import { BASE_TIME } from '../runs/generate.js'
@@ -222,6 +223,113 @@ export function createMemoryHandler(
     ['fixture-extraction-3', 2],
     ['fixture-extraction-4', 2]
   ])
+  // Forty-two distinct observations and decisions adapted from the five
+  // learning-gpt-v2-r2 passes of bountybench-memory-20261108-deepseek-memory.
+  // Provenance is replaced; chronology, operator edits and reorganization are
+  // illustrative. Each observation is registered once, including pending work.
+  for (const record of [...memoryRevisions, ...extractionRecords])
+    record.created_at = new Date(
+      Date.parse(String(record.created_at)) - 64 * 3_600_000
+    ).toISOString()
+  let sampleIndex = 0
+  for (let revision = 4; revision <= 60; revision += 1) {
+    const predecessor = revision === 4 ? 2 : revision === 56 ? 53 : revision - 1
+    const files = { ...memoryFilesByRevision.get(predecessor)! }
+    const createdAt = new Date(
+      BASE_TIME - (61 - revision) * 3_600_000
+    ).toISOString()
+    let source: Record<string, unknown>
+    if (revision % 7 === 0) {
+      files['MEMORY.md'] +=
+        '\nReview only guidance relevant to the current trust boundary.\n'
+      source = {
+        kind: 'manual',
+        operation_id: `fixture-edit-${revision}`,
+        actor: { kind: 'user', id: 'review-operator' }
+      }
+    } else if (revision % 5 === 0) {
+      files['MEMORY.md'] =
+        '# Security Review Experience Memory\n\nSelect a topic, then verify its applicability against current repository evidence.\n\n' +
+        Object.keys(files)
+          .filter((path) => path.startsWith('topics/'))
+          .sort()
+          .map((path) => `- [${path}](${path})`)
+          .join('\n') +
+        '\n'
+      source = {
+        kind: 'reorganization',
+        operation_id: `fixture-reorganize-${revision}`,
+        trajectory_reference: trajectoryReference,
+        maintenance_report: {
+          summary:
+            'Consolidated the topic index and preserved the evidence and applicability limits of existing guidance.',
+          observation_decisions: []
+        }
+      }
+    } else {
+      const sample = historySamples[sampleIndex++]!
+      const extractionId = `fixture-history-${sampleIndex}`
+      consumedRevisionByExtraction.set(extractionId, revision)
+      extractionRecords.push({
+        extraction_id: extractionId,
+        source_workflow: 'repository-review',
+        source_run_id: sourceRunIds['repository-review'],
+        source_unit_id: `case-${sampleIndex}`,
+        execution_archive_digest: `sha256:${'5'.repeat(64)}`,
+        trajectory_reference: trajectoryReference,
+        observation: { body_markdown: sample.body },
+        created_at: new Date(Date.parse(createdAt) - 900_000).toISOString()
+      })
+      if (sample.action !== 'skipped')
+        for (const topic of sample.topics) {
+          const path = topic.replace('/memory/', '')
+          files[path] =
+            `${files[path] ?? '# Review guidance\n'}\n${sample.action === 'conflict' ? '## Unresolved conflict\n\n' : ''}${sample.body}\n`
+        }
+      source = {
+        kind: 'learning',
+        operation_id: `fixture-learning-${revision}`,
+        extraction_ids: [extractionId],
+        trajectory_reference: trajectoryReference,
+        maintenance_report: {
+          summary: sample.reason,
+          observation_decisions: [
+            {
+              extraction_id: extractionId,
+              action: sample.action,
+              topics: sample.topics,
+              reason: sample.reason
+            }
+          ]
+        }
+      }
+    }
+    memoryFilesByRevision.set(revision, files)
+    memoryRevisions.unshift({
+      revision,
+      predecessor_revision: predecessor,
+      created_at: createdAt,
+      source
+    })
+  }
+  for (; sampleIndex < historySamples.length; sampleIndex += 1) {
+    const sample = historySamples[sampleIndex]!
+    extractionRecords.push({
+      extraction_id: `fixture-history-${sampleIndex + 1}`,
+      source_workflow: 'repository-review',
+      source_run_id: sourceRunIds['repository-review'],
+      source_unit_id: `case-${sampleIndex + 1}`,
+      execution_archive_digest: `sha256:${'5'.repeat(64)}`,
+      trajectory_reference: trajectoryReference,
+      observation: { body_markdown: sample.body },
+      created_at: new Date(
+        BASE_TIME - (historySamples.length - sampleIndex) * 60_000
+      ).toISOString()
+    })
+  }
+  // The operator restored the predecessor after inspecting the latest reorganization.
+  activeMemoryRevision = 59
+  extractionRecords.sort((a, b) => a.created_at.localeCompare(b.created_at))
   const observations: ObservationRecord[] = extractionRecords.flatMap(
     (record) =>
       record.observation === null
@@ -287,11 +395,6 @@ export function createMemoryHandler(
         'http://control-plane-ui.local'
       ).searchParams.get('range')
       const pointCount = range === '90d' ? 90 : range === 'all' ? 12 : 30
-      const activePoints = new Map([
-        [pointCount - 7, [1, 1]],
-        [pointCount - 4, [2, 1]],
-        [pointCount - 1, [2, 1]]
-      ])
       response.end(
         JSON.stringify({
           totals: {
@@ -313,7 +416,6 @@ export function createMemoryHandler(
           },
           trend_granularity: range === 'all' ? 'month' : 'day',
           trend_points: Array.from({ length: pointCount }, (_, index) => {
-            const outcome = activePoints.get(index) ?? [0, 0]
             const date = new Date(BASE_TIME)
             if (range === 'all') {
               date.setUTCDate(1)
@@ -321,10 +423,21 @@ export function createMemoryHandler(
             } else {
               date.setUTCDate(date.getUTCDate() - (pointCount - 1 - index))
             }
+            const period = date.toISOString().slice(0, range === 'all' ? 7 : 10)
+            const units = new Map<string, boolean>()
+            for (const record of extractionRecords) {
+              if (!record.created_at.startsWith(period)) continue
+              const key = `${record.source_run_id}:${record.source_unit_id}`
+              units.set(
+                key,
+                (units.get(key) ?? false) || record.observation !== null
+              )
+            }
             return {
               period_start: date.toISOString().slice(0, 10),
-              extracted_unit_count: outcome[0],
-              units_with_observation_count: outcome[1]
+              extracted_unit_count: units.size,
+              units_with_observation_count: [...units.values()].filter(Boolean)
+                .length
             }
           }),
           workflows: [...workflowOutcomes.values()]

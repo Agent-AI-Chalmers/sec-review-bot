@@ -17,12 +17,14 @@ type OverviewRange = NonNullable<GetCatalogOverviewQuery['range']>
 interface MemoryResources extends RefreshState {
   automation: Resource<MemoryTreeAutomation>
   tree: Resource<MemoryTree>
-  /** The newest revisions; the graph draws only this window. */
-  latestRevisions: Resource<MemoryTreeRevisionList>
+  /** The graph window, centered on a navigation target or starting at latest. */
+  graphRevisions: Resource<MemoryTreeRevisionList>
   /** One page of revision history for the list view. */
   revisionPages: PagedResource<null, number, MemoryTreeRevisionList>
   /** One page of observations, optionally filtered to one consuming revision. */
   observationPages: PagedResource<number | undefined, string, ObservationList>
+  graphTarget: number | undefined
+  showGraph: (target?: number) => Promise<void>
   overview: Resource<CatalogOverview>
   overviewRange: OverviewRange
   changeOverviewRange: (range: OverviewRange) => Promise<void>
@@ -40,12 +42,33 @@ export function useMemoryResources(): MemoryResources {
   const tree = useResource((signal) =>
     api<MemoryTree>('/memory/tree', { signal })
   )
-  const latestRevisions = useResource((signal) =>
-    api<MemoryTreeRevisionList>(
-      `/memory/revisions?limit=${GRAPH_REVISION_WINDOW}`,
+  const graphTargetRef = React.useRef<number | undefined>(undefined)
+  const [graphTarget, setGraphTarget] = React.useState<number>()
+  const graphRevisions = useResource(async (signal) => {
+    const target = graphTargetRef.current
+    if (target === undefined)
+      return api<MemoryTreeRevisionList>(
+        `/memory/revisions?limit=${GRAPH_REVISION_WINDOW}`,
+        { signal }
+      )
+    const latest = await api<MemoryTreeRevisionList>(
+      '/memory/revisions?limit=1',
       { signal }
     )
-  )
+    const newest = latest.revisions[0]?.revision ?? 0
+    // Catalog assigns contiguous revisions with max(revision) + 1 and retains history.
+    // Prefer 25 newer and 24 older neighbors; transfer unused space at either end.
+    const upper = Math.min(newest, Math.max(GRAPH_REVISION_WINDOW, target + 25))
+    return api<MemoryTreeRevisionList>(
+      `/memory/revisions?limit=${GRAPH_REVISION_WINDOW}&before_revision=${upper + 1}`,
+      { signal }
+    )
+  })
+  const showGraph = async (target?: number): Promise<void> => {
+    graphTargetRef.current = target
+    setGraphTarget(target)
+    await graphRevisions.reload()
+  }
   const revisionPages = usePagedResource<null, number, MemoryTreeRevisionList>(
     { filter: null, limit: DEFAULT_PAGE_SIZE },
     ({ limit, trail }, signal) => {
@@ -80,14 +103,14 @@ export function useMemoryResources(): MemoryResources {
     await Promise.all([
       automation.reload(),
       tree.reload(),
-      latestRevisions.reload(),
+      graphRevisions.reload(),
       revisionPages.resource.reload(),
       observationPages.resource.reload(),
       overview.reload()
     ])
   }, [
     automation.reload,
-    latestRevisions.reload,
+    graphRevisions.reload,
     observationPages.resource.reload,
     overview.reload,
     revisionPages.resource.reload,
@@ -104,7 +127,9 @@ export function useMemoryResources(): MemoryResources {
   return {
     automation,
     tree,
-    latestRevisions,
+    graphRevisions,
+    graphTarget,
+    showGraph,
     revisionPages,
     observationPages,
     overview,
@@ -118,5 +143,5 @@ export function useMemoryResources(): MemoryResources {
 
 /** Matches the default the Runs list uses for its cursor pager. */
 export const DEFAULT_PAGE_SIZE = 20
-/** The graph draws one window of the newest revisions; older ones are in the list. */
+/** Maximum number of revisions drawn in a graph window. */
 export const GRAPH_REVISION_WINDOW = 50

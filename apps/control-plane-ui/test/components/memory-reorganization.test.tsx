@@ -70,7 +70,6 @@ function historyProps(
   | 'graphRevisions'
   | 'graphLoading'
   | 'graphError'
-  | 'graphTruncated'
   | 'listRevisions'
   | 'listLoading'
   | 'listError'
@@ -80,7 +79,6 @@ function historyProps(
     graphRevisions: revisions,
     graphLoading: false,
     graphError: '',
-    graphTruncated: false,
     listRevisions: revisions,
     listLoading: false,
     listError: '',
@@ -184,11 +182,10 @@ test.each(['list', 'graph'])(
   }
 )
 
-test('the graph says when older revisions are outside its window', () => {
+test('the graph toolbar exposes its range and keeps latest navigation in place', () => {
   renderComponent(
     <MemoryRevisionHistory
       {...historyProps([revision])}
-      graphTruncated
       activeRevision={2}
       view="graph"
       highlightedRevision={undefined}
@@ -201,9 +198,6 @@ test('the graph says when older revisions are outside its window', () => {
       onHighlightEnd={vi.fn()}
     />
   )
-  expect(
-    screen.getByText(
-      'The graph shows the newest 50 revisions. Use the list to browse older ones.'
-    )
-  ).toBeInTheDocument()
+  expect(screen.getByText('Revisions 2–2')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Back to latest' })).toBeDisabled()
 })

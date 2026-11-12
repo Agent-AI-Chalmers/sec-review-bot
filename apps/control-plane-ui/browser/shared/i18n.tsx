@@ -190,8 +190,12 @@ export const messages = {
       'Showing observations included in revision {revision}.',
     showAllObservations: 'Show all observations',
     observationNotFound: 'This observation is not on this page.',
+    revisionGraphRange: 'Revisions {from}–{to}',
+    revisionGraphLatest: 'Back to latest',
+    revisionGraphCentered:
+      'Showing up to {count} revisions around the selected revision; connections outside this window are omitted.',
     revisionGraphWindow:
-      'The graph shows the newest {count} revisions. Use the list to browse older ones.',
+      'Shows up to {count} recent revisions. Browse history in the list; connections outside this window are omitted.',
     extractionId: 'Extraction ID',
     decisionAction: 'Decision',
     decisionTopics: 'Topics',
@@ -783,8 +787,12 @@ export const messages = {
     observationsForRevision: '仅显示被修订 {revision} 采纳的观察项。',
     showAllObservations: '显示全部观察项',
     observationNotFound: '当前页没有这条观察项。',
+    revisionGraphRange: '修订 {from}–{to}',
+    revisionGraphLatest: '回到最新',
+    revisionGraphCentered:
+      '显示目标附近最多 {count} 个修订，窗口外的连线已省略。',
     revisionGraphWindow:
-      '关系图只显示最新的 {count} 个修订，更早的修订请在列表中查看。',
+      '最多显示最近的 {count} 个修订，窗口外的连线已省略。可在列表中浏览历史。',
     extractionId: '提取 ID',
     decisionAction: '处理方式',
     decisionTopics: '主题',
