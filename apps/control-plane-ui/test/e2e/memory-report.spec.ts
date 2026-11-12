@@ -42,9 +42,14 @@ test('a report decision reveals its observation in the revision-filtered list', 
   await expect(
     page.getByText('Showing observations included in revision 2.')
   ).toBeVisible()
-  const row = page.locator('[data-observation-row="fixture-extraction-2"]')
+  const row = page.locator(
+    '[data-observation-row="observation-fixture-extraction-2-1"]'
+  )
   await expect(row).toBeVisible()
   await expect(row).toBeFocused()
+  await expect(
+    page.locator('[data-observation-row="observation-fixture-extraction-2-2"]')
+  ).toHaveCount(0)
   await expect(page.locator('[data-observation-row]')).toHaveCount(3)
 
   await page.getByRole('button', { name: 'Show all observations' }).click()
@@ -107,7 +112,7 @@ test('observation navigation centers the graph and can return to latest', async 
     .click()
   await page.getByRole('option', { name: '100', exact: true }).click()
   await page
-    .locator('[data-observation-row="fixture-extraction-2"]')
+    .locator('[data-observation-row="observation-fixture-extraction-2-1"]')
     .getByRole('button', { name: 'revision 2', exact: true })
     .click()
   await centered

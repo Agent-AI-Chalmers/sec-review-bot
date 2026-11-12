@@ -506,7 +506,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
     assert.strictEqual(extractions.next_cursor, null)
     assert.strictEqual(extractions.extractions.length, 48)
     assert.strictEqual(observations.next_cursor, null)
-    assert.strictEqual(observations.observations.length, 45)
+    assert.strictEqual(observations.observations.length, 46)
     assert.strictEqual(
       overview.totals.completed_extraction_count,
       extractions.extractions.length
@@ -534,6 +534,36 @@ test('memory fixtures form one coherent provenance graph', async () => {
       overview.totals.extracted_unit_count
     )
 
+    const siblings = observations.observations.filter(
+      (item: { extraction_id: string }) =>
+        item.extraction_id === 'fixture-extraction-2'
+    )
+    assert.strictEqual(siblings.length, 2)
+    assert.strictEqual(
+      new Set(
+        siblings.map((item: { observation_id: string }) => item.observation_id)
+      ).size,
+      2
+    )
+    assert(
+      siblings.some(
+        (item: { consumed_revision: number | null }) =>
+          item.consumed_revision === null
+      )
+    )
+    assert(
+      siblings.some(
+        (item: { consumed_revision: number | null }) =>
+          item.consumed_revision === 2
+      )
+    )
+    assert(
+      observations.observations.every(
+        (item: { observation_id: string; extraction_id: string }) =>
+          item.observation_id !== item.extraction_id
+      )
+    )
+
     for (const observation of observations.observations as Array<{
       observation_id: string
       extraction_id: string
@@ -547,7 +577,9 @@ test('memory fixtures form one coherent provenance graph', async () => {
       assert.strictEqual(extraction.source_run_id, observation.source_run_id)
       assert.strictEqual(extraction.source_unit_id, observation.source_unit_id)
       assert.strictEqual(
-        extraction.observations[0]?.body_markdown,
+        extraction.observations.find(
+          (item) => item.observation_id === observation.observation_id
+        )?.body_markdown,
         observation.body_markdown
       )
 

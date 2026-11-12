@@ -107,9 +107,9 @@ export function createMemoryHandler(
         kind: 'learning',
         operation_id: 'fixture-maintenance-2',
         observation_ids: [
-          'fixture-extraction-2',
-          'fixture-extraction-3',
-          'fixture-extraction-4'
+          'observation-fixture-extraction-2-1',
+          'observation-fixture-extraction-3-1',
+          'observation-fixture-extraction-4-1'
         ],
         trajectory_reference: trajectoryReference,
         maintenance_report: {
@@ -117,21 +117,21 @@ export function createMemoryHandler(
             'Added authentication and service-boundary guidance from two observations and folded tenant authorization ordering into the existing triage topic.',
           observation_decisions: [
             {
-              observation_id: 'fixture-extraction-2',
+              observation_id: 'observation-fixture-extraction-2-1',
               action: 'added',
               topics: ['/memory/topics/authentication.md'],
               reason:
                 'Length validation before constant-time comparison is a reusable authentication check that memory did not cover.'
             },
             {
-              observation_id: 'fixture-extraction-3',
+              observation_id: 'observation-fixture-extraction-3-1',
               action: 'added',
               topics: ['/memory/topics/boundaries.md', '/memory/MEMORY.md'],
               reason:
                 'Header allowlisting at proxy boundaries is a distinct, reusable pattern, so it gets its own topic and index entry.'
             },
             {
-              observation_id: 'fixture-extraction-4',
+              observation_id: 'observation-fixture-extraction-4-1',
               action: 'merged',
               topics: ['/memory/topics/triage.md'],
               reason:
@@ -232,10 +232,10 @@ export function createMemoryHandler(
       created_at: new Date(BASE_TIME + 300_000).toISOString()
     }
   ]
-  const consumedRevisionByExtraction = new Map([
-    ['fixture-extraction-2', 2],
-    ['fixture-extraction-3', 2],
-    ['fixture-extraction-4', 2]
+  const consumedRevisionByObservation = new Map([
+    ['observation-fixture-extraction-2-1', 2],
+    ['observation-fixture-extraction-3-1', 2],
+    ['observation-fixture-extraction-4-1', 2]
   ])
   // Forty-two distinct observations and decisions adapted from the five
   // learning-gpt-v2-r2 passes of bountybench-memory-20261108-deepseek-memory.
@@ -283,7 +283,10 @@ export function createMemoryHandler(
     } else {
       const sample = historySamples[sampleIndex++]!
       const extractionId = `fixture-history-${sampleIndex}`
-      consumedRevisionByExtraction.set(extractionId, revision)
+      consumedRevisionByObservation.set(
+        `observation-${extractionId}-1`,
+        revision
+      )
       extractionRecords.push({
         extraction_id: extractionId,
         source_workflow: 'repository-review',
@@ -305,13 +308,13 @@ export function createMemoryHandler(
       source = {
         kind: 'learning',
         operation_id: `fixture-learning-${revision}`,
-        observation_ids: [extractionId],
+        observation_ids: [`observation-${extractionId}-1`],
         trajectory_reference: trajectoryReference,
         maintenance_report: {
           summary: sample.reason,
           observation_decisions: [
             {
-              observation_id: extractionId,
+              observation_id: `observation-${extractionId}-1`,
               action: sample.action,
               topics: sample.topics,
               reason: sample.reason
@@ -349,8 +352,16 @@ export function createMemoryHandler(
   activeMemoryRevision = 59
   extractionRecords.sort((a, b) => a.created_at.localeCompare(b.created_at))
   for (const record of extractionRecords)
-    for (const observation of record.observations)
-      observation.observation_id = record.extraction_id
+    for (const [index, observation] of record.observations.entries())
+      observation.observation_id = `observation-${record.extraction_id}-${index + 1}`
+  const authenticationExtraction = extractionRecords.find(
+    (record) => record.extraction_id === 'fixture-extraction-2'
+  )!
+  authenticationExtraction.observations.push({
+    observation_id: 'observation-fixture-extraction-2-2',
+    body_markdown:
+      '**Validate credential shape before comparison.** Reject malformed credential values before invoking the authentication comparator.'
+  })
   const observations: ObservationRecord[] = extractionRecords.flatMap(
     (record) =>
       record.observations.map((observation) => ({
@@ -360,7 +371,7 @@ export function createMemoryHandler(
         source_unit_id: record.source_unit_id,
         body_markdown: observation.body_markdown,
         consumed_revision:
-          consumedRevisionByExtraction.get(record.extraction_id) ?? null,
+          consumedRevisionByObservation.get(observation.observation_id) ?? null,
         created_at: record.created_at
       }))
   )
