@@ -15,6 +15,8 @@ A lesson can be worth keeping while some of its claims are only conditions, and 
 
 ## Trajectories
 
+Trajectories are readable only through the trajectory tools; their paths are tool identifiers, not files that ordinary file tools can list or read.
+
 A trajectory may contain messages from the main agent and Subagents. Use the source and agent labels to distinguish their contributions. The files preserve history, including messages later removed from the conversation or replaced by compaction.
 
 A trajectory may end before execution finishes. Use readable trajectories only when they support the observation; if a file is rejected as malformed, do not reconstruct its fragments into evidence. Do not treat an incomplete or unreadable trajectory alone as evidence about the reviewed code or agent result.
