@@ -81,12 +81,6 @@ export async function recoverReviewRunSubmission(
       run_id: run.run_id,
       input: run.execution_input
     })
-    return (await store.submissionTransitions.completeSubmissionRecovery(
-      run.run_id,
-      claimToken
-    ))
-      ? { status: 'recovered' }
-      : { status: 'claim_lost' }
   } catch (error) {
     const classified = dependencies.classifyError(error)
     if (classified.uncertain) {
@@ -109,6 +103,14 @@ export async function recoverReviewRunSubmission(
     )
     return { status: 'failed', error }
   }
+  // A local commit failure says nothing about the accepted remote submission.
+  // Let coordination retry after lease expiry instead of recording execution failure.
+  return (await store.submissionTransitions.completeSubmissionRecovery(
+    run.run_id,
+    claimToken
+  ))
+    ? { status: 'recovered' }
+    : { status: 'claim_lost' }
 }
 
 /** Disconnect an uncertain run whose replays keep ending unknown.
