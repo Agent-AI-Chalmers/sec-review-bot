@@ -214,9 +214,7 @@ export function RevisionGraph({
         >
           <Group gap="xs">
             <Text size="sm" c="var(--muted)">
-              {t('revisionGraphRange')
-                .replace('{from}', rangeStart)
-                .replace('{to}', rangeEnd)}
+              {t('revisionGraphRange', { from: rangeStart, to: rangeEnd })}
             </Text>
             <Tooltip label={windowHelp} multiline w={260}>
               <ActionIcon
@@ -347,10 +345,7 @@ export function RevisionGraph({
                 }}
               >
                 <strong>
-                  {t('revisionReference').replace(
-                    '{revision}',
-                    String(item.revision)
-                  )}
+                  {t('revisionReference', { revision: String(item.revision) })}
                 </strong>
                 <span>
                   {item.source.kind === 'learning'
@@ -373,10 +368,9 @@ export function RevisionGraph({
           <Group justify="space-between" wrap="wrap">
             <div>
               <Text fw={600}>
-                {t('revisionReference').replace(
-                  '{revision}',
-                  String(selected.revision)
-                )}
+                {t('revisionReference', {
+                  revision: String(selected.revision)
+                })}
               </Text>
               <Text size="sm" c="var(--muted)">
                 {formatDate(selected.created_at, language)} ·{' '}

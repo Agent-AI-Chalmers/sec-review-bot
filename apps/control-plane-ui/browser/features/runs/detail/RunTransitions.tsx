@@ -236,10 +236,9 @@ export function RunTransitions({
                       <Text size="xs" c="dimmed">
                         {duration.kind === 'final'
                           ? t('stateFinal')
-                          : t('stateDuration').replace(
-                              '{duration}',
-                              formatDuration(duration.ms, t)
-                            )}
+                          : t('stateDuration', {
+                              duration: formatDuration(duration.ms, t)
+                            })}
                       </Text>
                       {event.reason_code !== null && (
                         <TransitionReason code={event.reason_code} />

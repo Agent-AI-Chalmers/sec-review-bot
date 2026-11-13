@@ -64,10 +64,7 @@ export function MemoryObservationList({
     <Alert color="gray" mb="md">
       <Group justify="space-between" gap="xs">
         <span>
-          {t('observationsForRevision').replace(
-            '{revision}',
-            String(revisionFilter)
-          )}
+          {t('observationsForRevision', { revision: String(revisionFilter) })}
         </span>
         <Button size="xs" variant="subtle" onClick={onClearRevisionFilter}>
           {t('showAllObservations')}
@@ -157,10 +154,9 @@ export function MemoryObservationList({
                           onRevealRevision(item.consumed_revision!)
                         }
                       >
-                        {t('revisionReference').replace(
-                          '{revision}',
-                          String(item.consumed_revision)
-                        )}
+                        {t('revisionReference', {
+                          revision: String(item.consumed_revision)
+                        })}
                       </Anchor>
                     </span>
                   ) : (

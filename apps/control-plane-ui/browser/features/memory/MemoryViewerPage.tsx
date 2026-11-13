@@ -37,7 +37,7 @@ export function MemoryFilesPage(): React.JSX.Element {
   return (
     <Container fluid py="xl" px={{ base: 'md', md: 'xl' }}>
       <Title order={1} mb="lg">
-        {t('memoryFilesRevision').replace('{revision}', String(revision))}
+        {t('memoryFilesRevision', { revision: String(revision) })}
       </Title>
       <MemoryFilesContent revision={revision} fullPage />
     </Container>

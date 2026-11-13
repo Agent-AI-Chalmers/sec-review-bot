@@ -252,10 +252,9 @@ export function FileWorkspace({
             content
           ) : unpreviewable ? (
             <Alert color="gray" title={t('previewUnavailable')}>
-              {t('previewUnavailableDescription').replace(
-                '{size}',
-                formatBytes(unpreviewable.sizeBytes)
-              )}
+              {t('previewUnavailableDescription', {
+                size: formatBytes(unpreviewable.sizeBytes)
+              })}
             </Alert>
           ) : editable && mode === 'edit' ? (
             <React.Suspense fallback={null}>
@@ -345,7 +344,7 @@ export function FileWorkspace({
         title={t('deleteFile')}
         centered
       >
-        <Text>{t('deleteFileWarning').replace('{file}', selectedFile)}</Text>
+        <Text>{t('deleteFileWarning', { file: selectedFile })}</Text>
         <Group justify="end" mt="md">
           <Button variant="default" onClick={() => setDeleteOpen(false)}>
             {t('cancel')}

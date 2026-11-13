@@ -79,12 +79,11 @@ export function Viewer(): React.JSX.Element {
           >
             <div>
               <Text size="sm" fw={600}>
-                {t('trajectoryMessageCount').replace(
-                  '{count}',
-                  String(
+                {t('trajectoryMessageCount', {
+                  count: String(
                     events.filter((event) => event.event === 'message').length
                   )
-                )}
+                })}
               </Text>
               {filename && (
                 <Text size="xs" c="dimmed">

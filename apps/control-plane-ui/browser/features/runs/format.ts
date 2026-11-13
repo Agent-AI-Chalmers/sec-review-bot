@@ -1,5 +1,5 @@
 import { ApiError, type ArtifactStorage, type Run } from './api.js'
-import type { Message } from '../../shared/i18n.js'
+import type { Message, Translator } from '../../shared/i18n.js'
 import {
   abbreviate,
   failureReason,
@@ -8,8 +8,6 @@ import {
 } from '../../shared/format.js'
 
 export { abbreviate, failureReason, formatBytes, workflowLabel }
-
-type Translator = (key: Message) => string
 
 export function safeExternalUrl(value: string | null): string | undefined {
   if (value === null) return undefined

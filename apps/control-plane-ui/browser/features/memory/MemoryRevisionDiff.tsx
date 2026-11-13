@@ -20,7 +20,7 @@ import { DiffEditor } from '../workspace/DiffEditor.js'
 import { FileWorkspace } from '../workspace/FileWorkspace.js'
 import {
   type Language,
-  type Message,
+  type Translator,
   useLanguage,
   useMessages
 } from '../../shared/i18n.js'
@@ -35,19 +35,13 @@ function revisionDiffTitleParts(
   revision: number,
   predecessorRevision: number | null,
   language: Language,
-  t: (key: Message) => string
+  t: Translator
 ): string[] {
-  const revisionLabel = t('revisionReference').replace(
-    '{revision}',
-    String(revision)
-  )
+  const revisionLabel = t('revisionReference', { revision: String(revision) })
   const predecessorLabel =
     predecessorRevision === null
       ? t('emptyWorkspace')
-      : t('revisionReference').replace(
-          '{revision}',
-          String(predecessorRevision)
-        )
+      : t('revisionReference', { revision: String(predecessorRevision) })
   return language === 'zh'
     ? [revisionLabel, t('diffWith'), predecessorLabel, t('diffCompare')]
     : [t('diffCompare'), revisionLabel, t('diffWith'), predecessorLabel]
@@ -192,14 +186,8 @@ export function MemoryRevisionDiffContent({
   const predecessorLabel =
     predecessorRevision === null
       ? t('emptyWorkspace')
-      : t('revisionReference').replace(
-          '{revision}',
-          String(predecessorRevision)
-        )
-  const revisionLabel = t('revisionReference').replace(
-    '{revision}',
-    String(revision)
-  )
+      : t('revisionReference', { revision: String(predecessorRevision) })
+  const revisionLabel = t('revisionReference', { revision: String(revision) })
 
   if (error !== undefined)
     return (

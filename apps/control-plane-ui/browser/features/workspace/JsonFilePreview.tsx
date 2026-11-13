@@ -63,9 +63,10 @@ function JsonLine({
       onToggle={(event) => setOpened(event.currentTarget.open)}
     >
       <summary>
-        {t('jsonlRecord')
-          .replace('{record}', String(recordNumber))
-          .replace('{line}', String(lineNumber))}
+        {t('jsonlRecord', {
+          record: String(recordNumber),
+          line: String(lineNumber)
+        })}
         {value === undefined && (
           <Text component="span" c="red" size="xs" ml="xs">
             {t('jsonlInvalidRecord')}

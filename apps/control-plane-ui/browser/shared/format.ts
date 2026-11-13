@@ -1,7 +1,5 @@
 import { ApiError } from './api-client.js'
-import type { Message } from './i18n.js'
-
-type Translator = (key: Message) => string
+import type { Translator } from './i18n.js'
 
 export function workflowLabel(workflow: string, t: Translator): string {
   if (workflow === 'issue-review') return t('workflowIssueReview')
@@ -31,6 +29,6 @@ export function failureReason(
   if (error.code === 'memory_catalog_unavailable')
     return t('errorMemoryUnreachable')
   return error.status >= 500
-    ? t('errorStatus').replace('{status}', String(error.status))
+    ? t('errorStatus', { status: String(error.status) })
     : undefined
 }

@@ -132,7 +132,10 @@ test('a terminal transition has no growing duration', () => {
 
 test('transition explanations come from the state-machine edge', () => {
   assert.strictEqual(
-    transitionExplanation(event({}), STATE_MACHINES, (key) => key),
+    transitionExplanation(event({}), STATE_MACHINES, (key, ...args) => {
+      void args
+      return String(key)
+    }),
     'input submitted'
   )
 })

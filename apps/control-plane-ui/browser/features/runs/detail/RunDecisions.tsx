@@ -153,10 +153,12 @@ export function RunDecisions({
               </Group>
               {parkedAt !== null && (
                 <Text size="xs" c="dimmed">
-                  {t('parkedAge').replace(
-                    '{duration}',
-                    formatDuration(Math.max(0, now - Date.parse(parkedAt)), t)
-                  )}
+                  {t('parkedAge', {
+                    duration: formatDuration(
+                      Math.max(0, now - Date.parse(parkedAt)),
+                      t
+                    )
+                  })}
                 </Text>
               )}
             </Group>
