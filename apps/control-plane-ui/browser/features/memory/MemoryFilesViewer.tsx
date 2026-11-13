@@ -49,10 +49,7 @@ export function MemoryFilesViewer({
     <Modal
       opened={revision !== undefined}
       onClose={onClose}
-      title={t('memoryFilesRevision').replace(
-        '{revision}',
-        String(revision ?? '')
-      )}
+      title={t('memoryFilesRevision', { revision: String(revision ?? '') })}
       size="calc(100vw - 64px)"
       classNames={{ body: 'file-workspace-modal' }}
     >

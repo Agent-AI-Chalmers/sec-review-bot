@@ -11,9 +11,9 @@ import {
   KNOWN_FAILURE_CODE_KEYS
 } from '../browser/features/runs/format.js'
 import { ApiError } from '../browser/shared/api-client.js'
-import { messages, type Message } from '../browser/shared/i18n.js'
+import { messages, translate, type Translator } from '../browser/shared/i18n.js'
 
-const t = (key: keyof typeof messages.en): string => messages.en[key]
+const t: Translator = (key, ...args) => translate('en', key, ...args)
 
 test('every code the console explains has a sentence in both languages', () => {
   // Enumerate the mapping itself rather than a hand-picked subset: a code added to the console
@@ -47,7 +47,7 @@ test('a code whose sentence is missing from the active language renders no toolt
   // `t()` returns undefined for a key that is not in the table. Only testing the mapping's
   // presence returned that undefined as the explanation, and the caller checks for null, so it
   // rendered an empty tooltip instead of falling back to the bare code.
-  const missingTable = (() => undefined) as unknown as (key: Message) => string
+  const missingTable = (() => undefined) as unknown as Translator
   const result = failureCodeLabel('PREPARATION_RETRY_EXHAUSTED', missingTable)
   assert.strictEqual(result.code, 'PREPARATION_RETRY_EXHAUSTED')
   assert.strictEqual(result.explanation, null)

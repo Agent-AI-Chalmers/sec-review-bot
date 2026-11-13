@@ -93,8 +93,9 @@ export function MemoryRevisionHistory({
           windowHelp={t(
             graphTarget === undefined
               ? 'revisionGraphWindow'
-              : 'revisionGraphCentered'
-          ).replace('{count}', String(GRAPH_REVISION_WINDOW))}
+              : 'revisionGraphCentered',
+            { count: String(GRAPH_REVISION_WINDOW) }
+          )}
           historical={graphTarget !== undefined}
           onShowLatest={onShowLatest}
           revisions={revisions}

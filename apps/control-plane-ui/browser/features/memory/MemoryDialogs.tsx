@@ -117,17 +117,11 @@ export function MemoryRestoreDialog({
     <Modal
       opened={revision !== undefined}
       onClose={onClose}
-      title={t('restoreRevisionTitle').replace(
-        '{revision}',
-        String(revision ?? '')
-      )}
+      title={t('restoreRevisionTitle', { revision: String(revision ?? '') })}
       centered
     >
       <Alert color="yellow" mb="md">
-        {t('restoreRevisionWarning').replace(
-          '{revision}',
-          String(revision ?? '')
-        )}
+        {t('restoreRevisionWarning', { revision: String(revision ?? '') })}
       </Alert>
       <Group justify="end" mt="md">
         <Button variant="default" onClick={onClose}>

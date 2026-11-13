@@ -1154,7 +1154,13 @@ export const messages = {
   }
 } as const
 
-export type Message = keyof typeof messages.en
+type MessageKey = keyof typeof messages.en
+
+export type Message = {
+  [K in MessageKey]: Placeholders<(typeof messages.en)[K]> extends never
+    ? K
+    : never
+}[MessageKey]
 
 const LanguageContext = React.createContext<{
   language: Language
@@ -1191,9 +1197,41 @@ export function useLanguage(): React.ContextType<typeof LanguageContext> {
   return React.useContext(LanguageContext)
 }
 
-export function useMessages(): (key: Message) => string {
+type Placeholders<S extends string> =
+  S extends `${string}{${infer Name}}${infer Rest}`
+    ? (Name extends '' ? never : Name) | Placeholders<Rest>
+    : never
+
+type MessageArguments<K extends MessageKey> = [
+  Placeholders<(typeof messages.en)[K]>
+] extends [never]
+  ? []
+  : [params: Record<Placeholders<(typeof messages.en)[K]>, string | number>]
+
+export type Translator = <K extends MessageKey>(
+  key: K,
+  ...args: MessageArguments<K>
+) => string
+
+export function translate<K extends MessageKey>(
+  language: Language,
+  key: K,
+  ...args: MessageArguments<K>
+): string {
+  const params = args[0] as Record<string, string | number> | undefined
+  // One pass over the template keeps replacement values literal and opaque.
+  return messages[language][key].replace(/\{(\w+)\}/g, (token, name: string) =>
+    params && Object.hasOwn(params, name) ? String(params[name]) : token
+  )
+}
+
+export function useMessages(): Translator {
   const { language } = useLanguage()
-  return React.useCallback((key) => messages[language][key], [language])
+  return React.useCallback(
+    <K extends MessageKey>(key: K, ...args: MessageArguments<K>) =>
+      translate(language, key, ...args),
+    [language]
+  )
 }
 
 /** Render a timestamp for the console.

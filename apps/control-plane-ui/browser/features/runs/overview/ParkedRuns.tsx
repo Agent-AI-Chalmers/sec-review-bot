@@ -69,10 +69,9 @@ export function ParkedRuns({
                 </Group>
                 {oldestWait !== null && (
                   <Text size="xs" c="var(--muted)">
-                    {t('parkedOldest').replace(
-                      '{duration}',
-                      formatDuration(oldestWait, t)
-                    )}
+                    {t('parkedOldest', {
+                      duration: formatDuration(oldestWait, t)
+                    })}
                   </Text>
                 )}
               </Stack>
@@ -123,10 +122,9 @@ export function ParkedRuns({
                           </Text>
                           {Number.isFinite(wait) && (
                             <Text size="xs" c="dimmed">
-                              {t('parkedAge').replace(
-                                '{duration}',
-                                formatDuration(Math.max(0, wait), t)
-                              )}
+                              {t('parkedAge', {
+                                duration: formatDuration(Math.max(0, wait), t)
+                              })}
                             </Text>
                           )}
                         </UnstyledButton>

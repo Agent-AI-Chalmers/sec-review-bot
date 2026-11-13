@@ -4,7 +4,7 @@ import {
   type StateAxis,
   type StateMachine as StateMachineDefinition
 } from '../state-machines.generated.js'
-import type { Message } from '../../../shared/i18n.js'
+import type { Message, Translator } from '../../../shared/i18n.js'
 import {
   isDiagrammedAxis,
   type DiagrammedAxis
@@ -24,7 +24,7 @@ function stateKey(
 export function stateLabel(
   machine: StateMachineDefinition,
   state: string,
-  t: (key: Message) => string
+  t: Translator
 ): string {
   const key = stateKey(machine.axis, state, 'label')
   const translated = key === null ? undefined : t(key)
@@ -36,7 +36,7 @@ export function stateLabel(
 export function stateDescription(
   machine: StateMachineDefinition,
   state: string,
-  t: (key: Message) => string
+  t: Translator
 ): string {
   const key = stateKey(machine.axis, state, 'desc')
   const translated = key === null ? undefined : t(key)
@@ -48,7 +48,7 @@ export function stateDescription(
 export function edgeLabel(
   machine: StateMachineDefinition,
   edge: StateMachineDefinition['transitions'][number],
-  t: (key: Message) => string
+  t: Translator
 ): string {
   const key = `edge_${machine.axis}_${edge.from}_${edge.to}` as Message
   const translated = t(key)
@@ -59,7 +59,7 @@ export function edgeLabel(
 
 export function machineTitle(
   machine: StateMachineDefinition,
-  t: (key: Message) => string
+  t: Translator
 ): string {
   const key = `machine_${machine.axis}_title` as Message
   const translated = t(key)
@@ -87,7 +87,7 @@ export function stateLabelForEvent(
   event: RunEvent,
   machines: readonly StateMachineDefinition[],
   state: string | null,
-  t: (key: Message) => string
+  t: Translator
 ): string {
   if (state === null) return '—'
   const machine = machines.find((candidate) => candidate.axis === event.axis)
@@ -97,7 +97,7 @@ export function stateLabelForEvent(
 export function transitionExplanation(
   event: RunEvent,
   machines: readonly StateMachineDefinition[],
-  t: (key: Message) => string
+  t: Translator
 ): string | null {
   const machine = machines.find((candidate) => candidate.axis === event.axis)
   if (machine === undefined) return null

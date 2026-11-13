@@ -3,9 +3,9 @@ import test from 'node:test'
 
 import { ApiError } from '../browser/shared/api-client.js'
 import { failureReason } from '../browser/shared/format.js'
-import { messages, type Message } from '../browser/shared/i18n.js'
+import { translate, type Translator } from '../browser/shared/i18n.js'
 
-const t = (key: Message): string => messages.en[key]
+const t: Translator = (key, ...args) => translate('en', key, ...args)
 
 test('failure reasons name only the service identified by the error code', () => {
   assert.equal(

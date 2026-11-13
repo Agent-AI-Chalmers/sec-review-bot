@@ -86,9 +86,10 @@ export function TrajectoryTimeline({
             </Group>
             <Group gap={4} wrap="wrap">
               <Text size="xs" c="dimmed">
-                {t('trajectoryShowing')
-                  .replace('{shown}', String(filtered.length))
-                  .replace('{total}', String(document.messages.length))}
+                {t('trajectoryShowing', {
+                  shown: String(filtered.length),
+                  total: String(document.messages.length)
+                })}
               </Text>
               {Object.values(document.totalUsage).some(
                 (value) => value !== undefined
