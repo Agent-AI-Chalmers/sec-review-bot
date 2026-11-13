@@ -133,6 +133,39 @@ test('submission recovery replays the persisted input and commits its claim', as
   ])
 })
 
+test('submission recovery propagates a commit failure after Execution accepts', async () => {
+  // A local write failure cannot establish that the accepted remote execution failed.
+  const databaseError = new Error('database unavailable')
+  const failures: unknown[] = []
+  let accepted = false
+  await assert.rejects(
+    recoverReviewRunSubmission(
+      store({
+        async completeSubmissionRecovery() {
+          assert.strictEqual(accepted, true)
+          throw databaseError
+        },
+        async failSubmissionRecovery(...args) {
+          failures.push(args)
+          return true
+        }
+      }),
+      run(),
+      {
+        async submit() {
+          accepted = true
+        },
+        classifyError: (error) => ({
+          uncertain: false,
+          message: String(error)
+        })
+      }
+    ),
+    databaseError
+  )
+  assert.deepStrictEqual(failures, [])
+})
+
 test('submission recovery leaves an uncertain replay untouched', async () => {
   // An unknown replay outcome is not a failure: the Execution may have accepted the request, so
   // nothing may be concluded and the state must stay `uncertain`. The claim is deliberately left
