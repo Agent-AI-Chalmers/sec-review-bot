@@ -4,7 +4,7 @@
 // far the run actually got instead of always claiming it never started.
 import { createIssueCommentUnlessMarkerExists } from '../github/comment-service.js'
 import type { Octokit } from 'octokit'
-import { asErrorWithResponse, isRecord } from '../utils/error-utils.js'
+import { isRecord } from '../utils/error-utils.js'
 import { ensureSummaryIssueNumber } from '../reviews/repositories/publish.js'
 import { repositoryFullName } from '../github/repository-service.js'
 
@@ -68,43 +68,20 @@ function repositoryScope(input: Record<string, unknown>): {
   return { owner_login, repo_name }
 }
 
-/** Refuse to act on a repository this app is not installed on.
+/** Require the installation-scoped credentials to read the target repository before any write.
  *
- * The Octokit passed to the reply path is installation-scoped, so a repository outside that
- * installation is invisible to it. Any repository-naming failure notice is therefore verified
- * here before it can cause a write: for a repository scan the target comes from a persisted
- * `verified_repository`, and creating a summary issue or comment in a repository the run never
- * touched would let persisted state drive public writes outside the installation.
- *
- * A 404 (or a 403, which reveals the same "cannot prove access") is reported as a deterministic
- * failure so the caller records the notice as undelivered instead of retrying forever. Any other
- * fault is rethrown and stays retryable: a transient GitHub outage must not discard a terminal
- * outcome. */
-async function assertRepositoryIsInstalled(
+ * This checks repository access, not installation membership or permission to write.
+ * GitHub remains the authority on whether subsequent issue and comment writes are allowed.
+ * Preserve GitHub's error status, headers, and message so the caller can distinguish
+ * temporary rate limiting from a permanent access failure before deciding whether to retry. */
+async function assertRepositoryAccessible(
   octokit: Octokit,
   target: { owner_login: string; repo_name: string }
 ): Promise<void> {
-  try {
-    await octokit.rest.repos.get({
-      owner: target.owner_login,
-      repo: target.repo_name
-    })
-  } catch (error) {
-    const status = asErrorWithResponse(error).status
-    if (status === 404 || status === 403) {
-      // Carry the status on the error we throw rather than only its message. The caller decides
-      // retryability from `classifyPreparationFailure`, which retries when a status is absent:
-      // a bare Error here would be re-claimed every lease period forever, while a 404/403 is
-      // deterministic and concludes the notice as undelivered once.
-      throw Object.assign(
-        new Error(
-          `Run failure notice target ${target.owner_login}/${target.repo_name} is not installed on this app.`
-        ),
-        { status }
-      )
-    }
-    throw error
-  }
+  await octokit.rest.repos.get({
+    owner: target.owner_login,
+    repo: target.repo_name
+  })
 }
 
 export type RunNoticeAxis = 'preparation' | 'execution' | 'publication'
@@ -166,22 +143,21 @@ export async function sendRunNoticeReply(
   const conversation = replyTarget(args.input)
   const scanScope = conversation === null ? repositoryScope(args.input) : null
 
-  // The installation-scoped client is the authority on which repositories this app may write to.
-  // Verify exactly once, before any write: a persisted target outside the installation must not
-  // create a summary issue or a comment. This runs before the summary-issue lookup-or-create.
+  // Check that the installation-scoped credentials can read the target before any write.
+  // A failed access check must stop before creating a summary issue or comment.
   let target: {
     owner_login: string
     repo_name: string
     issue_number: number
   } | null
   if (conversation !== null) {
-    await assertRepositoryIsInstalled(octokit, conversation)
+    await assertRepositoryAccessible(octokit, conversation)
     target = conversation
   } else {
     // Neither a conversation nor a repository to report to: there is nowhere for the requester
     // to read the outcome, which the caller records as a failed delivery.
     if (scanScope === null) return null
-    await assertRepositoryIsInstalled(octokit, scanScope)
+    await assertRepositoryAccessible(octokit, scanScope)
     target = {
       ...scanScope,
       issue_number: await ensureRepositorySummaryIssue(

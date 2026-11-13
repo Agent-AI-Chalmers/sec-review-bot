@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
+import { classifyPreparationFailure } from '../../src/review-runs/preparation-failure.js'
 import { sendRunNoticeReply } from '../../src/review-runs/run-notice-reply.js'
 import { repositoryFullName } from '../../src/github/repository-service.js'
 import type { Octokit } from 'octokit'
@@ -170,7 +171,7 @@ test('the reply target and the installation lookup agree on what names a reposit
   }
 })
 
-test('a target repository outside the installation is refused before any write', async () => {
+test('an inaccessible target repository is refused before any write', async () => {
   // Persisted state names a repository this app is not installed on. The installation-scoped
   // client answers 404, so the reply path must refuse rather than create a summary issue or a
   // comment there - otherwise a bad persisted value becomes a public write in a foreign repo.
@@ -200,7 +201,11 @@ test('a target repository outside the installation is refused before any write',
         kind: 'failure',
         assert_notice_claim: keepNoticeClaim
       }),
-      /not installed on this app/,
+      (error: unknown) => {
+        assert.strictEqual(classifyPreparationFailure(error, 1).retry, false)
+        assert.strictEqual((error as { status: number }).status, 404)
+        return true
+      },
       `${JSON.stringify(input)} must be refused`
     )
     assert.deepStrictEqual(report.created, [], 'no issue may be created')
@@ -324,3 +329,44 @@ test('a lost notice claim stops before the public comment write', async () => {
     'the repository may be read, but no comment may be written after claim loss'
   )
 })
+
+for (const limited of [true, false]) {
+  test(`repository lookup 403 preserves retryability: rate limited=${limited}`, async () => {
+    const { octokit } = fakeGitHub(
+      () =>
+        new Response(
+          JSON.stringify({
+            message: limited ? 'API rate limit exceeded' : 'Forbidden'
+          }),
+          {
+            status: 403,
+            headers: {
+              'content-type': 'application/json',
+              ...(limited
+                ? { 'retry-after': '60', 'x-ratelimit-remaining': '0' }
+                : {})
+            }
+          }
+        )
+    )
+    await assert.rejects(
+      sendRunNoticeReply(octokit, {
+        run_id: 'run-limited',
+        notice_id: 'notice-limited',
+        input: {
+          issue: { owner_login: 'octo', repo_name: 'example', issue_number: 1 }
+        },
+        axis: 'execution',
+        kind: 'failure',
+        reason_code: null,
+        assert_notice_claim: keepNoticeClaim
+      }),
+      (error: unknown) => {
+        const classification = classifyPreparationFailure(error, 1)
+        assert.strictEqual(classification.retry, limited)
+        if (limited) assert.strictEqual(classification.retryAfterMs, 60_000)
+        return true
+      }
+    )
+  })
+}
