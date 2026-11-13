@@ -1,6 +1,7 @@
 from unittest.mock import patch, sentinel
 
 import pytest
+from langchain.agents.structured_output import ToolStrategy
 
 from sec_review_agents.agents.discovery.agent import (
     DISCOVERY_AGENT_NAME,
@@ -93,7 +94,8 @@ async def test_create_agent_uses_skills_filesystem_and_diagnostics_middleware() 
         sentinel.diagnostics_middleware,
     ]
     assert kwargs["system_prompt"] == "base system prompt"
-    assert kwargs["response_format"] is DiscoveryOutput
+    assert isinstance(kwargs["response_format"], ToolStrategy)
+    assert kwargs["response_format"].schema is DiscoveryOutput
     assert kwargs["name"] == DISCOVERY_AGENT_NAME
     assert "skills" not in kwargs
     assert "backend" not in kwargs

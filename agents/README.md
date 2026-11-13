@@ -189,9 +189,13 @@ This package implements memory extraction, maintenance, and their workers. The m
 
 ### Structured Output
 
+<!-- doc-default: AGENT_STRUCTURED_OUTPUT_VALIDATION_MAX_RETRIES; source=agents/src/sec_review_agents/runtime/tool_output_strategy.py -->
+
+Agents with an output schema explicitly use `ToolStrategy`, so local validation errors can be returned to the model within the same invocation. `AGENT_STRUCTURED_OUTPUT_VALIDATION_MAX_RETRIES` limits these correction retries, default `3`, in addition to the initial submission. Setting it to `0` keeps ToolStrategy but fails on the first rejected submission. This budget is separate from missing-response retries, provider/API request retries, and graph execution limits. Each invocation builds a fresh graph with its own correction budget.
+
 <!-- doc-default: AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES; source=agents/src/sec_review_agents/runtime/structured_response_middleware.py -->
 
-Agents that require structured output must return `structured_response`. If a model returns only prose, or unparseable tool arguments leave no valid tool call to proceed with, middleware appends a correction message and retries inside the same agent invocation. `AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES` controls the retry limit, default `2`. This is separate from provider/API request retries; schema validation errors in parsed arguments remain under LangChain structured-output handling.
+Agents that require structured output must return `structured_response`. If a model returns only prose, or unparseable tool arguments leave no valid tool call to proceed with, middleware appends a correction message and retries inside the same agent invocation. `AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES` controls the retry limit, default `2`. This is separate from provider/API request retries.
 
 ## Sandbox Runtime
 

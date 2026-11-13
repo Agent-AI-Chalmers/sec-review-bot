@@ -22,6 +22,9 @@ from sec_review_agents.observability.tracing import (
     build_tracing_config,
     tracing_configured,
 )
+from sec_review_agents.runtime.tool_output_strategy import (
+    tool_strategy_with_retry_limit,
+)
 from sec_review_agents.runtime.trajectories import TrajectoryWriter
 from sec_review_agents.utils.limit import (
     DEFAULT_GRAPH_RECURSION_LIMIT,
@@ -44,7 +47,8 @@ async def run_agent_runtime_graph[T: BaseModel](
 ) -> T:
     """Build and invoke a graph with one shared output type, name, and prompt.
 
-    response_format must be a Pydantic model class.
+    response_format must be a Pydantic model class. The builder selects
+    ToolStrategy with a correction budget for each invocation.
     The caller must keep tool resources alive for the duration of this call.
     """
     agent = await build_agent_runtime_graph(
@@ -72,13 +76,14 @@ async def build_agent_runtime_graph(
     model: BaseChatModel,
     backend: BackendProtocol | None,
     system_prompt: str,
-    response_format: Any | None = None,
+    response_format: type[BaseModel] | None = None,
     tools: list[Any] | None = None,
     middleware: Sequence[AgentMiddleware[Any, Any, Any]] | None = None,
 ) -> CompiledStateGraph:
     """Build a graph without taking ownership of tool resources.
 
     Keep resources used by the supplied tools alive while executing the graph.
+    Build a fresh graph per invocation: its structured-output retry budget is local.
     """
     agent_middleware = middleware or ()
 
@@ -87,7 +92,11 @@ async def build_agent_runtime_graph(
         middleware=agent_middleware,
         system_prompt=system_prompt,
         name=agent_name,
-        response_format=response_format,
+        response_format=(
+            tool_strategy_with_retry_limit(response_format)
+            if response_format is not None
+            else None
+        ),
         tools=list(tools or []),
     )
     log_agent_configuration(

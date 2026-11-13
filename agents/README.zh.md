@@ -191,9 +191,13 @@ Agent 可以声明自己需要的 skills。Worker 启动 Agent 时会自动准�
 
 ### 结构化输出
 
+<!-- doc-default: AGENT_STRUCTURED_OUTPUT_VALIDATION_MAX_RETRIES; source=agents/src/sec_review_agents/runtime/tool_output_strategy.py -->
+
+配置输出 schema 的 Agent 显式使用 `ToolStrategy`，使本地校验错误能够在同一次执行中反馈给模型。`AGENT_STRUCTURED_OUTPUT_VALIDATION_MAX_RETRIES` 限制首次提交之外的纠错重试次数，默认 `3`。设为 `0` 时仍使用 ToolStrategy，但首次提交被拒就失败。此预算独立于缺失答案重试、服务商 API 请求重试和图执行步数限制。每次执行构建新图，独立计算纠错预算。
+
 <!-- doc-default: AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES; source=agents/src/sec_review_agents/runtime/structured_response_middleware.py -->
 
-需要结构化输出的 Agent 必须返回 `structured_response`。模型只返回普通文本，或工具参数无法解析且没有有效工具调用可以继续时，中间件会在同一次 Agent 执行中追加纠正消息并重试。`AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES` 控制重试上限，默认 `2`。这与服务商 API 请求重试不同；已解析参数的 schema 校验错误仍由 LangChain 的结构化输出机制处理。
+需要结构化输出的 Agent 必须返回 `structured_response`。模型只返回普通文本，或工具参数无法解析且没有有效工具调用可以继续时，中间件会在同一次 Agent 执行中追加纠正消息并重试。`AGENT_MISSING_STRUCTURED_RESPONSE_MAX_RETRIES` 控制重试上限，默认 `2`。这与服务商 API 请求重试不同。
 
 ## 沙箱运行环境
 

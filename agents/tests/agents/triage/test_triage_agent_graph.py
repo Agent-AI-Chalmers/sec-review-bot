@@ -83,7 +83,7 @@ async def test_repository_triage_enables_scanner_finding_skill_without_todo() ->
     ]
     assert kwargs["system_prompt"] == "base prompt"
     assert kwargs["name"] == REPOSITORY_TRIAGER_AGENT_NAME
-    assert kwargs["response_format"].__name__ == "TriagePlanningDone"
+    assert kwargs["response_format"].schema.__name__ == "TriagePlanningDone"
     assert "context_schema" not in kwargs
 
 
