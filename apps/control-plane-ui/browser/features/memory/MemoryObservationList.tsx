@@ -129,11 +129,15 @@ export function MemoryObservationList({
                 }}
               >
                 {/* This is deliberately a display index, not an extraction identity. */}
-                <Table.Td className="memory-observation-index">
+                <Table.Td
+                  data-label={t('observation')}
+                  className="memory-observation-index"
+                >
                   {index + 1}
                 </Table.Td>
-                <Table.Td>
+                <Table.Td data-label={t('sourceRun')}>
                   <Anchor
+                    c="var(--link)"
                     component={Link}
                     to={`/runs/${encodeURIComponent(item.source_run_id)}`}
                     ff="monospace"
@@ -142,11 +146,12 @@ export function MemoryObservationList({
                     {abbreviate(item.source_run_id, 8, 4)}
                   </Anchor>
                 </Table.Td>
-                <Table.Td>
+                <Table.Td data-label={t('observationOutcome')}>
                   {item.consumed_revision ? (
                     <span className="memory-incorporation">
                       <span>{t('incorporatedInto')}</span>
                       <Anchor
+                        c="var(--link)"
                         component="button"
                         type="button"
                         className="memory-revision-link"
@@ -163,8 +168,10 @@ export function MemoryObservationList({
                     t('statusPending')
                   )}
                 </Table.Td>
-                <Table.Td>{formatDate(item.created_at, language)}</Table.Td>
-                <Table.Td>
+                <Table.Td data-label={t('created')}>
+                  {formatDate(item.created_at, language)}
+                </Table.Td>
+                <Table.Td data-label={t('actions')}>
                   <Group gap="xs" wrap="nowrap">
                     <Button
                       size="xs"

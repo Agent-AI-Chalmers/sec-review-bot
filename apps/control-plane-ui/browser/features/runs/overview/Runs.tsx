@@ -1,9 +1,18 @@
 import type React from 'react'
-import { Container, Group, Text, Title } from '@mantine/core'
+import {
+  Box,
+  Button,
+  Container,
+  Group,
+  Stack,
+  Text,
+  Title
+} from '@mantine/core'
 import { IconInbox } from '@tabler/icons-react'
 import { useMessages } from '../../../shared/i18n.js'
 import { RefreshControls } from '../../../shared/refresh.js'
 import { EmptyState, LoadingState } from '../../../shared/StateMessage.js'
+import { ResourceLoadError } from '../../../shared/ResourceLoadError.js'
 import { ICON_SIZE } from '../../../shared/design.js'
 import { failureReason } from '../format.js'
 import { ParkedRuns } from './ParkedRuns.js'
@@ -21,6 +30,8 @@ export function Runs(): React.JSX.Element {
     query,
     pageSize,
     page,
+    hasFilters,
+    clearFilters,
     updateFilter,
     changePageSize,
     openNextPage,
@@ -61,7 +72,7 @@ export function Runs(): React.JSX.Element {
         </Group>
       </Group>
       <ParkedRuns blocked={blocked} />
-      {Boolean(error) && (
+      {Boolean(error) && data !== undefined && (
         <Text role="alert" c="red" mb="md">
           {t('refreshFailed')}
           {failureReason(error, t) && ` ${failureReason(error, t)}`}
@@ -74,33 +85,55 @@ export function Runs(): React.JSX.Element {
             ` ${failureReason(auxiliaryError, t)}`}
         </Text>
       )}
-      <RunFilters search={search} onChange={updateFilter} />
-      {data === undefined ? (
-        <LoadingState message={t('loadingRuns')} fill />
-      ) : data.runs.length === 0 ? (
-        <EmptyState
-          message={t('emptyRuns')}
-          icon={
-            <IconInbox
-              size={ICON_SIZE.xxl}
-              stroke={1.2}
-              style={{ color: 'var(--mantine-color-dimmed)' }}
-            />
-          }
-        />
-      ) : (
-        <>
-          <RunsTable runs={data.runs} listSearch={search.toString()} />
-          <CursorPagination
-            pageSize={pageSize}
-            page={page}
-            total={totalPages}
-            onPageSizeChange={changePageSize}
-            onPreviousPage={openPreviousPage}
-            onNextPage={() => openNextPage(data.next_cursor)}
+      <RunFilters
+        search={search}
+        onChange={updateFilter}
+        onClear={clearFilters}
+      />
+      <Box aria-busy={refreshing}>
+        {data === undefined && Boolean(error) ? (
+          <ResourceLoadError
+            message={`${t('runsLoadFailed')} ${failureReason(error, t) ?? ''}`.trim()}
+            actions={
+              <Button variant="default" onClick={() => void refresh()}>
+                {t('retry')}
+              </Button>
+            }
           />
-        </>
-      )}
+        ) : data === undefined ? (
+          <LoadingState message={t('loadingRuns')} fill />
+        ) : data.runs.length === 0 ? (
+          <Stack align="center" gap="xs">
+            <EmptyState
+              message={t(hasFilters ? 'emptyRuns' : 'noRunsYet')}
+              icon={
+                <IconInbox
+                  size={ICON_SIZE.xxl}
+                  stroke={1.2}
+                  style={{ color: 'var(--mantine-color-dimmed)' }}
+                />
+              }
+            />
+            {hasFilters && (
+              <Button variant="default" onClick={clearFilters}>
+                {t('clearFilters')}
+              </Button>
+            )}
+          </Stack>
+        ) : (
+          <>
+            <RunsTable runs={data.runs} listSearch={search.toString()} />
+            <CursorPagination
+              pageSize={pageSize}
+              page={page}
+              total={totalPages}
+              onPageSizeChange={changePageSize}
+              onPreviousPage={openPreviousPage}
+              onNextPage={() => openNextPage(data.next_cursor)}
+            />
+          </>
+        )}
+      </Box>
     </Container>
   )
 }

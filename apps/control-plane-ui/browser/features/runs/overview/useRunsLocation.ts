@@ -19,6 +19,8 @@ interface RunsLocation {
   query: string
   pageSize: number
   page: number
+  hasFilters: boolean
+  clearFilters: () => void
   updateFilter: (name: string, value: string) => void
   changePageSize: (value: string) => void
   openNextPage: (target: string | null | undefined) => void
@@ -109,6 +111,17 @@ export function useRunsLocation(): RunsLocation {
       next.delete('cursor')
     })
   }
+  const hasFilters = [...search].some(
+    ([name, value]) => name !== 'limit' && name !== 'cursor' && value !== ''
+  )
+  const clearFilters = (): void => {
+    setCursorParents({})
+    const next = new URLSearchParams()
+    const limit = latestSearch.current.get('limit')
+    if (limit !== null) next.set('limit', limit)
+    latestSearch.current = next
+    setSearch(next)
+  }
   const openCursor = (target: string): void => {
     replaceSearch((next) => {
       if (target) next.set('cursor', target)
@@ -146,6 +159,8 @@ export function useRunsLocation(): RunsLocation {
     query,
     pageSize,
     page,
+    hasFilters,
+    clearFilters,
     updateFilter,
     changePageSize,
     openNextPage,

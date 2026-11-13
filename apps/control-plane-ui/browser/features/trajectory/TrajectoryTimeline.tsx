@@ -85,7 +85,7 @@ export function TrajectoryTimeline({
               })}
             </Group>
             <Group gap={4} wrap="wrap">
-              <Text size="xs" c="dimmed">
+              <Text size="xs" c="var(--muted)">
                 {t('trajectoryShowing', {
                   shown: String(filtered.length),
                   total: String(document.messages.length)

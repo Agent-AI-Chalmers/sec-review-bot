@@ -12,6 +12,14 @@ Internal web console for inspecting and operating review runs, execution archive
 
 <img src="test/e2e/visual.spec.ts-snapshots/runs-list-light-desktop-linux.png" alt="Runs list on a desktop viewport in the light theme" width="900">
 
+<!-- doc-default: control-plane-ui.runs-filters; source=apps/control-plane-ui/browser/features/runs/overview/RunFilters.tsx -->
+
+Filter runs by workflow, platform, lifecycle stage, or time range. On mobile, open **Filters** to edit the controls; applied conditions remain visible when the controls are collapsed. **Clear filters** removes the conditions and returns to the first page while keeping the page-size preference.
+
+<!-- doc-default: control-plane-ui.runs-query-state; source=apps/control-plane-ui/browser/features/runs/overview/useRunsData.ts -->
+
+Changing a query replaces the result region with loading feedback, so rows and pagination from the previous query cannot be mistaken for matches. A failed query keeps the filters available and offers **Retry**. Refreshing the same query preserves its last results and reports refresh failures explicitly.
+
 ### Memory
 
 <img src="test/e2e/visual.spec.ts-snapshots/memory-light-desktop-linux.png" alt="Memory overview in the light theme" width="900">
@@ -37,7 +45,13 @@ The fixture server also exposes stable full-page error states for visual inspect
 - `/memory/revisions/404/trajectory` shows a trajectory load failure.
 - `/runs/fixture-artifact-load-error/files` shows a run-files load failure.
 
-The Viewer page is entirely local to the browser. It accepts the project's event-based JSONL trajectory contract and direct LangGraph message-array JSON, from either a file or pasted content, without uploading the input to the BFF. Direct message arrays that omit tool-result IDs are linked only when one assistant message's calls are followed by an unambiguous, complete result sequence.
+<!-- doc-default: control-plane-ui.viewer-input; source=apps/control-plane-ui/shared/trajectory-events.ts -->
+
+The Viewer page runs entirely in the browser and accepts the project's event-based JSONL trajectory contract from a file or pasted content. Each nonempty line must contain a complete event with an increasing sequence number; message events require message IDs. Message arrays and wrapper objects are not supported. Input is not uploaded to the BFF.
+
+<!-- doc-default: control-plane-ui.viewer-navigation; source=apps/control-plane-ui/browser/app/App.tsx -->
+
+Viewer content and reading state stay in memory while navigating within the same tab. Returning restores the investigation; **Clear viewer** discards it. Reloading or closing the tab clears it, and no trajectory content is written to browser storage.
 
 ## Source layout
 
@@ -150,3 +164,7 @@ Set `MEMORY_CATALOG_URL` and `MEMORY_CATALOG_OPERATOR_TOKEN` to manage memory in
 The BFF accesses Catalog and object storage and verifies artifact size and SHA-256 digest before returning artifacts. The browser receives no storage URIs or credentials.
 
 After an edit fails, keeping the editor open with unchanged content allows retries of the same operation using the original operation ID. Closing or reloading the editor starts a new operation. Editing and restoring do not change memory-tree automation state.
+
+<!-- doc-default: control-plane-ui.memory-recovery; source=apps/control-plane-ui/browser/features/memory/Memory.tsx -->
+
+Memory edit and restore failures appear inside their operation dialogs. Editing preserves the draft for retries. File creation rejects existing paths, and renaming a file to its current path leaves it unchanged. On narrow screens, revision and observation lists keep identity and actions together, and selecting a graph node brings its details into view. Failed artifact previews can be retried without leaving the page.

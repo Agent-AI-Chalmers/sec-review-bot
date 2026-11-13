@@ -145,21 +145,29 @@ export function MemoryRevisionHistory({
                       : undefined
                   }
                 >
-                  <Table.Td className="memory-revision-cell">
+                  <Table.Td
+                    data-label={t('revision')}
+                    className="memory-revision-cell"
+                  >
                     {item.revision}
                   </Table.Td>
-                  <Table.Td className="memory-predecessor-cell">
+                  <Table.Td
+                    data-label={t('predecessorRevision')}
+                    className="memory-predecessor-cell"
+                  >
                     {item.predecessor_revision ?? '—'}
                   </Table.Td>
-                  <Table.Td>
+                  <Table.Td data-label={t('revisionMethod')}>
                     {item.source.kind === 'learning'
                       ? t('sourceLearning')
                       : item.source.kind === 'reorganization'
                         ? t('sourceReorganization')
                         : t('sourceManual')}
                   </Table.Td>
-                  <Table.Td>{formatDate(item.created_at, language)}</Table.Td>
-                  <Table.Td>
+                  <Table.Td data-label={t('created')}>
+                    {formatDate(item.created_at, language)}
+                  </Table.Td>
+                  <Table.Td data-label={t('actions')}>
                     <div className="memory-revision-actions">
                       <Button
                         size="xs"

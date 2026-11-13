@@ -100,7 +100,9 @@ test.each([
     await waitFor(() => expect(treeReads).toBeGreaterThan(readsBefore))
     const commit = screen.getByRole('button', { name: 'Commit revision' })
     fireEvent.click(commit)
-    await screen.findByText('The edit could not be committed.')
+    await within(
+      screen.getByRole('dialog', { name: 'Edit memory files' })
+    ).findByText('The edit could not be committed.')
     expect(apiPost).toHaveBeenLastCalledWith('/memory/edit', {
       operation_id: expect.any(String),
       expected_active_revision: baseRevision,

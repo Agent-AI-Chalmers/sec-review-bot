@@ -516,53 +516,64 @@ export async function runMemoryRevisionFlow({
     memoryBody !== null && memoryBody.width <= viewport.width + 1,
     `${name} memory layout overflows horizontally`
   )
-  const revisionColumnLayout = await page.evaluate(() => {
-    const revision = document.querySelector('.memory-revision-cell')
-    const predecessor = document.querySelector('.memory-predecessor-cell')
-    if (revision === null || predecessor === null) return null
-    return {
-      revisionWidth: revision.getBoundingClientRect().width,
-      predecessorWidth: predecessor.getBoundingClientRect().width,
-      revisionAlign: getComputedStyle(revision).textAlign,
-      predecessorAlign: getComputedStyle(predecessor).textAlign
-    }
-  })
-  assert.deepStrictEqual(
-    revisionColumnLayout,
-    {
-      revisionWidth: 120,
-      predecessorWidth: 120,
-      revisionAlign: 'center',
-      predecessorAlign: 'center'
-    },
-    `${name} revision and predecessor columns must share centered numeric layout`
-  )
-  const currentActionLayout = await page.evaluate(() =>
-    [...document.querySelectorAll('.memory-current-action')].map((button) => {
-      const icon = button.querySelector('svg')
+  if (viewport.width <= 600) {
+    const list = page.locator('.memory-table:visible')
+    assert.ok(
+      await list.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth
+      ),
+      `${name} mobile revisions must keep identity and actions inside each card`
+    )
+  } else {
+    const revisionColumnLayout = await page.evaluate(() => {
+      const revision = document.querySelector('.memory-revision-cell')
+      const predecessor = document.querySelector('.memory-predecessor-cell')
+      if (revision === null || predecessor === null) return null
       return {
-        left: button.getBoundingClientRect().left,
-        width: button.getBoundingClientRect().width,
-        iconOffset:
-          icon === null
-            ? null
-            : icon.getBoundingClientRect().left -
-              button.getBoundingClientRect().left
+        revisionWidth: revision.getBoundingClientRect().width,
+        predecessorWidth: predecessor.getBoundingClientRect().width,
+        revisionAlign: getComputedStyle(revision).textAlign,
+        predecessorAlign: getComputedStyle(predecessor).textAlign
       }
     })
-  )
-  assert.ok(
-    currentActionLayout.length >= 2 &&
-      currentActionLayout.every(
-        (layout) =>
-          Math.abs(layout.left - currentActionLayout[0].left) < 2 &&
-          layout.width === currentActionLayout[0].width &&
-          Math.abs(
-            (layout.iconOffset ?? 0) - (currentActionLayout[0].iconOffset ?? 0)
-          ) < 2
-      ),
-    `${name} set-current and already-current actions must keep the same geometry: ${JSON.stringify(currentActionLayout)}`
-  )
+    assert.deepStrictEqual(
+      revisionColumnLayout,
+      {
+        revisionWidth: 120,
+        predecessorWidth: 120,
+        revisionAlign: 'center',
+        predecessorAlign: 'center'
+      },
+      `${name} revision and predecessor columns must share centered numeric layout`
+    )
+    const currentActionLayout = await page.evaluate(() =>
+      [...document.querySelectorAll('.memory-current-action')].map((button) => {
+        const icon = button.querySelector('svg')
+        return {
+          left: button.getBoundingClientRect().left,
+          width: button.getBoundingClientRect().width,
+          iconOffset:
+            icon === null
+              ? null
+              : icon.getBoundingClientRect().left -
+                button.getBoundingClientRect().left
+        }
+      })
+    )
+    assert.ok(
+      currentActionLayout.length >= 2 &&
+        currentActionLayout.every(
+          (layout) =>
+            Math.abs(layout.left - currentActionLayout[0].left) < 2 &&
+            layout.width === currentActionLayout[0].width &&
+            Math.abs(
+              (layout.iconOffset ?? 0) -
+                (currentActionLayout[0].iconOffset ?? 0)
+            ) < 2
+        ),
+      `${name} set-current and already-current actions must keep the same geometry: ${JSON.stringify(currentActionLayout)}`
+    )
+  }
 }
 
 export async function runMemoryFilesFlow({

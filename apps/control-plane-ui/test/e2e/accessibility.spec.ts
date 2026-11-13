@@ -108,3 +108,36 @@ test('stable error state has no detectable WCAG A/AA violations', async ({
     .waitFor()
   await expectNoAccessibilityViolations(page)
 })
+
+test('populated memory files and observations keep readable text', async ({
+  page
+}) => {
+  await page.goto('/memory/revisions/2/tree', { waitUntil: 'networkidle' })
+  await expect(page.locator('.memory-markdown')).toBeVisible()
+  await expectNoAccessibilityViolations(page)
+  await page.goto('/memory', { waitUntil: 'networkidle' })
+  await page.getByRole('tab', { name: 'Observations', exact: true }).click()
+  await expect(page.locator('.memory-table tbody tr').first()).toBeVisible()
+  await expectNoAccessibilityViolations(page)
+})
+
+test('loaded trajectory tool calls keep readable text', async ({ page }) => {
+  await page.goto('/viewer', { waitUntil: 'networkidle' })
+  await page.getByRole('textbox').fill(
+    JSON.stringify({
+      seq: 1,
+      event: 'message',
+      message: {
+        id: 'assistant',
+        role: 'assistant',
+        content: 'Inspect this file.',
+        tool_calls: [
+          { id: 'call', name: 'read_file', args: { path: 'MEMORY.md' } }
+        ]
+      }
+    })
+  )
+  await page.getByRole('button', { name: 'Render', exact: true }).click()
+  await expect(page.locator('.trajectory-tool-call')).toBeVisible()
+  await expectNoAccessibilityViolations(page)
+})

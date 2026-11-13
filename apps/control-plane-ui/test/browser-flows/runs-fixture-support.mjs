@@ -1,4 +1,16 @@
-async function chooseSelect(page, label, option) {
+export async function openRunFilters(page) {
+  await page.getByRole('heading', { name: 'Runs', exact: true }).waitFor()
+  const toggle = page.getByRole('button', { name: /^Filters(?: \(\d+\))?$/ })
+  if (
+    (await toggle.isVisible()) &&
+    (await toggle.getAttribute('aria-expanded')) === 'false'
+  ) {
+    await toggle.click()
+  }
+}
+
+export async function chooseRunFilter(page, label, option) {
+  await openRunFilters(page)
   await page.getByRole('combobox', { name: label, exact: true }).click()
   await page.getByRole('option', { name: option, exact: true }).click()
 }
@@ -14,8 +26,8 @@ export async function openPublishedRepositoryRun({
 
   // A repository review publishes one step per delivery plus two summaries, so a
   // published one must render the multi-step delivery list.
-  await chooseSelect(page, 'Workflow', 'Repository review')
-  await chooseSelect(page, 'Publication', 'Published')
+  await chooseRunFilter(page, 'Workflow', 'Repository review')
+  await chooseRunFilter(page, 'Publication', 'Published')
   // The unfiltered list already starts with an active repository review. Observe both
   // cells before opening the first row so a stale response cannot select that run.
   await waitUntil(async () => {
