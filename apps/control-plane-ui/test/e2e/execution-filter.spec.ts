@@ -10,7 +10,8 @@ test('execution filter keeps long selected labels and selected options visible',
     await filter.click()
     await page.getByRole('option', { name: label, exact: true }).click()
     await expect(filter).toHaveValue(label)
-    // Input scrollWidth includes the arrow padding, so measure the actual text area.
+    // Chrome 157 changed input.clientWidth to exclude inline padding.
+    // Derive the content box from the border box on both old and new browsers.
     const dimensions = await filter.evaluate((element) => {
       const input = element as HTMLInputElement
       const style = getComputedStyle(input)
@@ -37,10 +38,12 @@ test('execution filter keeps long selected labels and selected options visible',
       return {
         textWidth,
         availableWidth:
-          input.clientWidth -
+          input.getBoundingClientRect().width -
+          parseFloat(style.borderLeftWidth) -
+          parseFloat(style.borderRightWidth) -
           parseFloat(style.paddingLeft) -
           parseFloat(style.paddingRight),
-        clientWidth: input.clientWidth,
+        borderBoxWidth: input.getBoundingClientRect().width,
         paddingLeft: style.paddingLeft,
         paddingRight: style.paddingRight,
         fontFamily: style.fontFamily,

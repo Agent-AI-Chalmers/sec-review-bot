@@ -1,6 +1,13 @@
 import { expect, type Page } from '@playwright/test'
 import { test, openAuthenticatedRuns } from './fixtures.js'
 
+test.beforeEach(async ({ fixtureRuntime }) => {
+  test.skip(
+    fixtureRuntime.server === undefined,
+    'Revision and observation scenarios require the stable local fixture data.'
+  )
+})
+
 /** Force a one-row page so every list has several pages to walk. */
 async function forceOneRowPages(page: Page, path: string): Promise<void> {
   await page.route(`**/api/memory/${path}?*`, (route) => {
