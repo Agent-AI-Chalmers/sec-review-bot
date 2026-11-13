@@ -143,11 +143,12 @@ export function startRunNoticeCoordinator({
   store?: RunNoticeCoordinatorStore
   intervalMs?: number
 }): RunNoticeCoordinator {
+  let stopped = false
   let active: Promise<void> | null = null
   const run = (): void => {
-    if (active !== null) return
+    if (stopped || active !== null) return
     active = (async () => {
-      while (await deliverRunNoticeOnce({ app, store })) {
+      while (!stopped && (await deliverRunNoticeOnce({ app, store }))) {
         // Drain currently available notices before returning to the poll interval.
       }
     })()
@@ -164,6 +165,7 @@ export function startRunNoticeCoordinator({
   logInfo('review_run_notice_coordinator_started', { interval_ms: intervalMs })
   return {
     stop: async () => {
+      stopped = true
       clearInterval(timer)
       await active
     }

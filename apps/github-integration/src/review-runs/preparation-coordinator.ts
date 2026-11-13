@@ -173,11 +173,12 @@ export function startPreparationCoordinator({
   store?: PreparationCoordinatorStore
   intervalMs?: number
 }): PreparationCoordinator {
+  let stopped = false
   let active: Promise<void> | null = null
   const run = (): void => {
-    if (active !== null) return
+    if (stopped || active !== null) return
     active = (async () => {
-      while (await prepareReviewRunsOnce({ app, store })) {
+      while (!stopped && (await prepareReviewRunsOnce({ app, store }))) {
         // Drain currently available preparations before returning to the poll interval.
       }
     })()
@@ -196,6 +197,7 @@ export function startPreparationCoordinator({
   logInfo('review_preparation_coordinator_started', { interval_ms: intervalMs })
   return {
     stop: async () => {
+      stopped = true
       clearInterval(timer)
       await active
     }
