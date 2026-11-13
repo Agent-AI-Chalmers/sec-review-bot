@@ -12,8 +12,17 @@ interface RunsData extends RefreshState {
 
 /** Refresh the list and parked queue together while keeping their failures independent. */
 export function useRunsData(query: string): RunsData {
-  const [data, setData] = React.useState<ListRunsResponseBody>()
-  const [error, setError] = React.useState<unknown>()
+  const [result, setResult] = React.useState<{
+    query: string
+    data: ListRunsResponseBody
+  }>()
+  const [failure, setFailure] = React.useState<{
+    query: string
+    error: unknown
+  }>()
+  // Only same-query refreshes may keep their previous rows and pagination.
+  const data = result?.query === query ? result.data : undefined
+  const error = failure?.query === query ? failure.error : undefined
   const [auxiliaryError, setAuxiliaryError] = React.useState<unknown>()
   // Runs coordination has stopped retrying on any axis. They are not part of the run list's
   // normal pagination, and an operator needs to see them before the list, so they load
@@ -23,6 +32,7 @@ export function useRunsData(query: string): RunsData {
   latestQuery.current = query
   const load = React.useCallback(async (): Promise<void> => {
     const requestedQuery = query
+    setFailure(undefined)
     // The parked queue is a separate read, but it belongs to the same refresh cycle: keeping it
     // out here made refresh look successful while a newly parked run stayed invisible.
     const parkedRequest = parkedRuns()
@@ -41,11 +51,11 @@ export function useRunsData(query: string): RunsData {
         `/runs?${requestedQuery}`
       )
       if (latestQuery.current === requestedQuery) {
-        setData(nextData)
-        setError(undefined)
+        setResult({ query: requestedQuery, data: nextData })
       }
     } catch (value) {
-      if (latestQuery.current === requestedQuery) setError(value)
+      if (latestQuery.current === requestedQuery)
+        setFailure({ query: requestedQuery, error: value })
     }
     await parkedRequest
   }, [query])
@@ -54,7 +64,6 @@ export function useRunsData(query: string): RunsData {
   // to show: nothing will update until it is handled, and the refresh banner cannot say so.
   throwIfUnauthorized(auxiliaryError)
   throwIfUnauthorized(error)
-  if (error && data === undefined) throw error
   return {
     data,
     blocked,

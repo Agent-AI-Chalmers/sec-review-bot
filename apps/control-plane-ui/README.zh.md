@@ -14,6 +14,14 @@
 
 <img src="test/e2e/visual.spec.ts-snapshots/runs-list-light-desktop-linux.png" alt="浅色主题下桌面视口的 run 列表" width="900">
 
+<!-- doc-default: control-plane-ui.runs-filters; source=apps/control-plane-ui/browser/features/runs/overview/RunFilters.tsx -->
+
+可以按工作流、平台、生命周期阶段或时间范围筛选 run。在移动端，点击“筛选”展开控件；收起后仍显示已应用的条件。“清除筛选”会移除条件并返回第一页，同时保留每页数量偏好。
+
+<!-- doc-default: control-plane-ui.runs-query-state; source=apps/control-plane-ui/browser/features/runs/overview/useRunsData.ts -->
+
+切换查询时，结果区域显示加载状态，避免将上一查询的记录和分页误认为当前结果。查询失败后仍可调整筛选或点击“重试”。刷新同一查询时保留上次结果，并明确提示刷新失败。
+
 ### Memory
 
 <img src="test/e2e/visual.spec.ts-snapshots/memory-light-desktop-linux.png" alt="浅色主题下的 memory 概览" width="900">
@@ -39,7 +47,13 @@ pnpm run dev:fixtures
 - `/memory/revisions/404/trajectory` 显示执行轨迹加载失败。
 - `/runs/fixture-artifact-load-error/files` 显示 run 文件加载失败。
 
-查看器页面完全在浏览器本地运行。它接受项目基于事件的 JSONL 执行轨迹格式和直接导出的 LangGraph 消息数组 JSON，可以上传文件或粘贴内容，输入不会发送到 BFF。对于缺少 tool result ID 的直接消息数组，只有在一条 assistant 消息的调用后紧跟完整且无歧义的结果序列时，查看器才会建立关联。
+<!-- doc-default: control-plane-ui.viewer-input; source=apps/control-plane-ui/shared/trajectory-events.ts -->
+
+查看器完全在浏览器内运行，接受从文件上传或粘贴的项目事件 JSONL。每个非空行必须包含带递增序号的完整事件，消息事件必须有消息 ID；不支持消息数组或包装对象。输入不会上传到 BFF。
+
+<!-- doc-default: control-plane-ui.viewer-navigation; source=apps/control-plane-ui/browser/app/App.tsx -->
+
+在同一标签页内切换页面时，Viewer 的内容和阅读状态保留在内存中，返回后可继续查看。“清空查看器”会丢弃当前内容；刷新或关闭标签页后也会清空，轨迹内容不会写入浏览器存储。
 
 ## 源码布局
 
@@ -152,3 +166,7 @@ BFF 还负责代理下载私有 RustFS 中的执行归档。它使用单独的 `
 BFF 负责访问 Catalog 和对象存储，并在返回产物前校验大小和 SHA-256 摘要。浏览器不会获得存储 URI 或凭据。
 
 编辑失败后，保持编辑器打开且内容不变，可以重试同一次操作，复用原来的 operation ID；关闭或重新加载编辑器会开始新操作。编辑和恢复版本不会改变记忆树自动更新状态。
+
+<!-- doc-default: control-plane-ui.memory-recovery; source=apps/control-plane-ui/browser/features/memory/Memory.tsx -->
+
+记忆编辑和恢复失败时，错误显示在对应操作弹窗内；编辑草稿会保留以便重试。新建文件会拒绝已有路径，重命名为原路径时不改变文件。在窄屏上，修订和观察列表将记录身份与操作放在一起，选择图节点后会将详情带入视野。产物预览失败后可在当前页面重试。

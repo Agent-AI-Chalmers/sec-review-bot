@@ -1,9 +1,15 @@
-import { openAuthenticatedRuns, test, expect } from './fixtures.js'
+import {
+  openAuthenticatedRuns,
+  openRunFilters,
+  test,
+  expect
+} from './fixtures.js'
 
 test('execution filter keeps long selected labels and selected options visible', async ({
   page
 }) => {
   await openAuthenticatedRuns(page)
+  await openRunFilters(page)
   await page.evaluate(() => document.fonts.ready.then(() => undefined))
   const filter = page.getByRole('combobox', { name: 'Execution', exact: true })
   for (const label of ['Disconnected', 'Succeeded']) {
@@ -88,6 +94,7 @@ test('selection fill remains distinct from keyboard navigation and hover', async
     theme
   )
   await openAuthenticatedRuns(page)
+  await openRunFilters(page)
   const filter = page.getByRole('combobox', {
     name: 'Execution',
     exact: true

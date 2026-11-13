@@ -38,7 +38,16 @@ function ToolCall({
       >
         <Group gap="xs" wrap="nowrap" className="trajectory-tool-call-identity">
           <IconTool size={ICON_SIZE.md} color="var(--trajectory-tool-color)" />
-          <Text fw={600} size="sm" c="var(--trajectory-tool-color)" truncate>
+          <Text
+            fw={600}
+            size="sm"
+            c={
+              call.resultStatus === 'error'
+                ? 'var(--failure-text)'
+                : 'var(--mantine-color-text)'
+            }
+            truncate
+          >
             <HighlightText value={call.name} query={query} />
           </Text>
           {call.resultStatus === 'error' && (
@@ -99,6 +108,7 @@ export function TrajectoryToolCalls({
       <Button
         variant="subtle"
         color="green"
+        c="var(--mantine-color-text)"
         size="compact-sm"
         className="trajectory-tool-calls-toggle"
         aria-expanded={opened}

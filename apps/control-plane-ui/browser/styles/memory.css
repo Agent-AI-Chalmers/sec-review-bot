@@ -7,6 +7,7 @@
 }
 
 .revision-graph-section {
+  min-width: 0;
   display: grid;
   gap: var(--mantine-spacing-md);
 }
@@ -306,7 +307,7 @@
 }
 
 .memory-markdown a {
-  color: var(--mantine-color-brand-6);
+  color: var(--link);
   text-decoration: underline;
   text-underline-offset: 2px;
 }

@@ -19,6 +19,7 @@ export function MemoryEditorDialog({
   files,
   initialFiles,
   busy,
+  error,
   onFilesChange,
   onClose,
   onCommit
@@ -26,6 +27,7 @@ export function MemoryEditorDialog({
   files: Record<string, string>
   initialFiles: Record<string, string>
   busy: boolean
+  error: string
   onFilesChange: (files: Record<string, string>) => void
   onClose: () => void
   onCommit: () => void
@@ -65,6 +67,11 @@ export function MemoryEditorDialog({
           modifiedFiles={modifiedFiles}
           className="file-workspace-editor"
         />
+        {error && (
+          <Alert color="red" mb="md">
+            {error}
+          </Alert>
+        )}
         <Group justify="end" className="file-workspace-editor-actions">
           <Button variant="default" onClick={requestClose}>
             {t('cancel')}
@@ -103,11 +110,13 @@ export function MemoryEditorDialog({
 export function MemoryRestoreDialog({
   revision,
   busy,
+  error,
   onClose,
   onConfirm
 }: {
   revision: number | undefined
   busy: boolean
+  error: string
   onClose: () => void
   onConfirm: () => void
 }): React.JSX.Element {
@@ -120,6 +129,11 @@ export function MemoryRestoreDialog({
       title={t('restoreRevisionTitle', { revision: String(revision ?? '') })}
       centered
     >
+      {error && (
+        <Alert color="red" mb="md">
+          {error}
+        </Alert>
+      )}
       <Alert color="yellow" mb="md">
         {t('restoreRevisionWarning', { revision: String(revision ?? '') })}
       </Alert>

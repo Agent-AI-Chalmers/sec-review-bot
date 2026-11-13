@@ -125,10 +125,11 @@ export function FileWorkspace({
   const applyOperation = (): void => {
     if (!editable || !onFilesChange || !operation) return
     const nextPath = pathInput.trim()
-    if (
-      !validFilePath(nextPath) ||
-      (nextPath !== selectedFile && Object.hasOwn(files, nextPath))
-    ) {
+    if (operation === 'rename' && nextPath === selectedFile) {
+      setOperation(undefined)
+      return
+    }
+    if (!validFilePath(nextPath) || Object.hasOwn(files, nextPath)) {
       setPathError(t('workspaceInvalidFilename'))
       return
     }

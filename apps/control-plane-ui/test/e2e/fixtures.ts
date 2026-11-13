@@ -85,3 +85,14 @@ export async function openAuthenticatedRuns(page: Page): Promise<void> {
 }
 
 export { expect }
+
+export async function openRunFilters(page: Page): Promise<void> {
+  await page.getByRole('heading', { name: 'Runs', exact: true }).waitFor()
+  const toggle = page.getByRole('button', { name: /^Filters(?: \(\d+\))?$/ })
+  if (
+    (await toggle.isVisible()) &&
+    (await toggle.getAttribute('aria-expanded')) === 'false'
+  ) {
+    await toggle.click()
+  }
+}

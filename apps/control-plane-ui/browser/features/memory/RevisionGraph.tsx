@@ -11,7 +11,7 @@ import {
 import { formatDate, useLanguage, useMessages } from '../../shared/i18n.js'
 import type { MemoryTreeRevision } from './api-types.generated.js'
 import { MaintenanceReportButton } from './MaintenanceReport.js'
-import { ICON_SIZE } from '../../shared/design.js'
+import { BREAKPOINTS, ICON_SIZE } from '../../shared/design.js'
 
 export type RevisionGraphItem = MemoryTreeRevision
 
@@ -137,6 +137,7 @@ export function RevisionGraph({
   const [selectedRevision, setSelectedRevision] = React.useState(
     activeRevision ?? 0
   )
+  const selectionRef = React.useRef<HTMLDivElement>(null)
   const [panning, setPanning] = React.useState(false)
   const scrollRef = React.useRef<HTMLDivElement>(null)
   const panStart = React.useRef<{
@@ -335,7 +336,18 @@ export function RevisionGraph({
                   item.revision === highlightedRevision || undefined
                 }
                 data-revision-node={item.revision}
-                onClick={() => setSelectedRevision(item.revision)}
+                onClick={() => {
+                  setSelectedRevision(item.revision)
+                  if (
+                    window.matchMedia(`(max-width: ${BREAKPOINTS.compact}px)`)
+                      .matches
+                  ) {
+                    requestAnimationFrame(() => {
+                      selectionRef.current?.scrollIntoView({ block: 'nearest' })
+                      selectionRef.current?.focus({ preventScroll: true })
+                    })
+                  }
+                }}
                 onAnimationEnd={(event) => {
                   if (
                     event.currentTarget === event.target &&
@@ -364,7 +376,13 @@ export function RevisionGraph({
         </div>
       </div>
       {selected && (
-        <Paper withBorder p="sm" className="revision-graph-selection">
+        <Paper
+          ref={selectionRef}
+          tabIndex={-1}
+          withBorder
+          p="sm"
+          className="revision-graph-selection"
+        >
           <Group justify="space-between" wrap="wrap">
             <div>
               <Text fw={600}>
@@ -381,7 +399,7 @@ export function RevisionGraph({
                     : t('sourceManual')}
               </Text>
             </div>
-            <Group gap="xs" wrap="nowrap">
+            <Group gap="xs" wrap="wrap">
               <Button
                 size="xs"
                 variant="subtle"

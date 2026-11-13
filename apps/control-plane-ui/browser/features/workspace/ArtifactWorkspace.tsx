@@ -63,8 +63,7 @@ export function ArtifactWorkspace({
     [artifact.data]
   )
 
-  // This surface owns its own scheduling: it opens with the artifact it was given, and does
-  // not refresh, so a mount-time load is the whole policy.
+  // Load on entry; a failed preview can be retried explicitly without leaving the artifact.
   React.useEffect(() => {
     void artifact.reload()
   }, [artifact.reload])
@@ -88,15 +87,24 @@ export function ArtifactWorkspace({
         <ResourceLoadError
           message={t(source.loadFailedMessage)}
           actions={
-            <Button
-              component="a"
-              href={source.download.href}
-              download
-              variant="default"
-              leftSection={<IconDownload size={ICON_SIZE.md} />}
-            >
-              {t(source.download.label)}
-            </Button>
+            <Group justify="center">
+              <Button
+                variant="default"
+                loading={artifact.loading}
+                onClick={() => void artifact.reload()}
+              >
+                {t('retry')}
+              </Button>
+              <Button
+                component="a"
+                href={source.download.href}
+                download
+                variant="default"
+                leftSection={<IconDownload size={ICON_SIZE.md} />}
+              >
+                {t(source.download.label)}
+              </Button>
+            </Group>
           }
         />
       </div>

@@ -22,6 +22,9 @@
 }
 
 .file-workspace-files {
+  /* Mantine raises modal scrollbars above its sticky header. Keep this nested
+     file-tree scrollbar in its own layer so it cannot cover the close button. */
+  isolation: isolate;
   min-height: 0;
   padding: var(--space-4);
   flex: 1;

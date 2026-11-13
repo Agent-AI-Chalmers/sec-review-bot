@@ -153,12 +153,28 @@
   box-shadow: var(--shadow-sm);
 }
 
-.operations-bar .operations-filter-groups {
-  column-gap: var(--space-7);
+.operations-filter-heading {
+  justify-content: flex-end;
 }
 
-.operations-row {
-  display: block;
+.operations-filter-heading:where(:has(> :only-child.operations-filter-toggle)),
+.operations-filter-toggle.operations-filter-toggle {
+  display: none;
+}
+
+.operations-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-4);
+}
+
+.operations-filter-grid > * {
+  min-width: 0;
+}
+
+.operations-filter-summary {
+  margin-top: var(--space-3);
+  overflow-wrap: anywhere;
 }
 
 a {

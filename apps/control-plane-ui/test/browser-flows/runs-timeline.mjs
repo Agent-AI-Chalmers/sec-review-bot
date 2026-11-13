@@ -1,13 +1,10 @@
 import assert from 'node:assert/strict'
 
-async function chooseSelect(page, label, option) {
-  await page.getByRole('combobox', { name: label, exact: true }).click()
-  await page.getByRole('option', { name: option, exact: true }).click()
-}
+import { chooseRunFilter } from './runs-fixture-support.mjs'
 
 export async function runRunsTimelineFlow({ name, page, base, waitUntil }) {
   await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
-  await chooseSelect(page, 'Execution', 'Running')
+  await chooseRunFilter(page, 'Execution', 'Running')
   await waitUntil(
     async () =>
       (
@@ -117,7 +114,7 @@ export async function runRunsTimelineFlow({ name, page, base, waitUntil }) {
   }
 
   await page.goto(`${base}/runs`, { waitUntil: 'networkidle' })
-  await chooseSelect(page, 'Execution', 'Failed')
+  await chooseRunFilter(page, 'Execution', 'Failed')
   await waitUntil(
     async () =>
       /[A-Z_]{4,}/.test(

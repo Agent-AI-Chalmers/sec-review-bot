@@ -1,5 +1,12 @@
 import React from 'react'
-import { Link, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import {
+  Link,
+  Navigate,
+  Route,
+  Routes,
+  useLocation,
+  useMatch
+} from 'react-router-dom'
 import {
   AppShell,
   Button,
@@ -166,6 +173,11 @@ function NotFound(): React.JSX.Element {
 export function App(): React.JSX.Element {
   const t = useMessages()
   const location = useLocation()
+  const viewerActive = useMatch('/viewer') !== null
+  const [viewerVisited, setViewerVisited] = React.useState(viewerActive)
+  React.useEffect(() => {
+    if (viewerActive) setViewerVisited(true)
+  }, [viewerActive])
   const [unauthorized, setUnauthorized] = React.useState(false)
   const activeSection = location.pathname.startsWith('/memory')
     ? 'memory'
@@ -251,9 +263,15 @@ export function App(): React.JSX.Element {
                   path="/memory/extractions/:extractionId/trajectory"
                   element={<ExtractionTrajectoryPage />}
                 />
-                <Route path="/viewer" element={<Viewer />} />
+                <Route path="/viewer" element={null} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              {/* Keep the local investigation in memory; hidden Activity suspends its effects. */}
+              {(viewerVisited || viewerActive) && (
+                <React.Activity mode={viewerActive ? 'visible' : 'hidden'}>
+                  <Viewer />
+                </React.Activity>
+              )}
             </React.Suspense>
           </ErrorBoundary>
         </AppShell.Main>

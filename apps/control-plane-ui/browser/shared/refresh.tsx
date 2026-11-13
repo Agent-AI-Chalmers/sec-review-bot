@@ -108,7 +108,7 @@ export function RefreshControls({
             <Menu.Dropdown>
               <Menu.Label>
                 {t('refreshInterval')}
-                {!autoRefresh && ` · ${t('autoRefresh')} off`}
+                {!autoRefresh && ` · ${t('autoRefreshOff')}`}
               </Menu.Label>
               {([5000, 15000, 30000, 60000] as const).map((ms) => (
                 <Menu.Item

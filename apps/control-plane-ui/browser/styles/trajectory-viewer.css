@@ -212,7 +212,7 @@
 
 .trajectory-tool-call {
   --trajectory-tool-color: light-dark(
-    var(--mantine-color-green-7),
+    var(--mantine-color-green-9),
     var(--mantine-color-green-4)
   );
   padding: var(--space-3);
@@ -228,7 +228,7 @@
 
 .trajectory-tool-call[data-result-status='error'] {
   --trajectory-tool-color: light-dark(
-    var(--mantine-color-red-7),
+    var(--mantine-color-red-9),
     var(--mantine-color-red-4)
   );
   border-color: light-dark(
@@ -268,7 +268,7 @@
 }
 
 .trajectory-arg-key {
-  color: var(--mantine-color-dimmed);
+  color: var(--muted);
 }
 
 .json-object {
@@ -284,7 +284,7 @@
 }
 
 .json-field-key {
-  color: var(--mantine-color-dimmed);
+  color: var(--muted);
   font-family: var(--mantine-font-family-monospace);
   font-size: var(--mantine-font-size-xs);
   font-weight: 600;
@@ -305,7 +305,7 @@
 
 .json-key {
   padding-top: 2px;
-  color: var(--mantine-color-dimmed);
+  color: var(--muted);
   font-family: var(--mantine-font-family-monospace);
   font-size: var(--mantine-font-size-xs);
   overflow-wrap: anywhere;
@@ -347,7 +347,7 @@
 
 .json-empty,
 .json-null {
-  color: var(--mantine-color-dimmed);
+  color: var(--muted);
   font-family: var(--mantine-font-family-monospace);
 }
 
@@ -364,7 +364,7 @@
 
 .json-index {
   margin-right: var(--space-2);
-  color: var(--mantine-color-dimmed);
+  color: var(--muted);
   font-family: var(--mantine-font-family-monospace);
   font-size: var(--mantine-font-size-xs);
 }
@@ -409,7 +409,7 @@
 }
 
 .json-table th {
-  color: var(--mantine-color-dimmed);
+  color: var(--muted);
   font-weight: 600;
 }
 
@@ -434,7 +434,7 @@
 
 .json-raw > summary {
   cursor: pointer;
-  color: var(--mantine-color-dimmed);
+  color: var(--muted);
   font-size: var(--mantine-font-size-sm);
 }
 
@@ -625,4 +625,16 @@
 
 .viewer-input-editor {
   padding-top: 1px;
+}
+
+.viewer-input-identity,
+.viewer-input-editor > .mantine-Group-root > .mantine-Group-root {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.viewer-filename {
+  overflow-wrap: anywhere;
+  min-width: 0;
+  max-width: 100%;
 }

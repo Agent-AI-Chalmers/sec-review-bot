@@ -1,10 +1,7 @@
 import assert from 'node:assert/strict'
 import { expect } from '@playwright/test'
 
-async function chooseSelect(page, label, option) {
-  await page.getByRole('combobox', { name: label, exact: true }).click()
-  await page.getByRole('option', { name: option, exact: true }).click()
-}
+import { chooseRunFilter } from './runs-fixture-support.mjs'
 
 export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
   const rows = () =>
@@ -35,16 +32,25 @@ export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
 
   const allRows = (await rows()).length
 
-  await chooseSelect(page, 'Preparation', 'Failed')
+  await chooseRunFilter(page, 'Preparation', 'Failed')
   await waitUntil(
-    async () => (await rows()).length < allRows,
+    async () => (await rows()).length > 0 && (await rows()).length < allRows,
     `${name} a preparation state must narrow the list`
   )
   assert.ok(
     (await page.locator('tbody tr').count()) > 0,
     `${name} a preparation filter must leave rows to inspect`
   )
-  await chooseSelect(page, 'Preparation', 'All')
+  const clearedPreparation = page.waitForResponse((response) => {
+    const url = new URL(response.url())
+    return (
+      url.pathname === '/api/runs' &&
+      !url.searchParams.has('preparation_status') &&
+      url.searchParams.get('limit') === '50'
+    )
+  })
+  await chooseRunFilter(page, 'Preparation', 'All')
+  await clearedPreparation
   await waitUntil(
     async () => (await rows()).length === allRows,
     `${name} clearing the preparation filter must restore the list`
@@ -58,12 +64,21 @@ export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
     `${name} the Execution filter must include uncertain and skipped`
   )
   await page.keyboard.press('Escape')
-  await chooseSelect(page, 'Execution', 'Uncertain')
+  await chooseRunFilter(page, 'Execution', 'Uncertain')
   await waitUntil(
-    async () => (await rows()).length < allRows,
+    async () => (await rows()).length > 0 && (await rows()).length < allRows,
     `${name} the uncertain execution state must narrow the list`
   )
-  await chooseSelect(page, 'Execution', 'All')
+  const clearedExecution = page.waitForResponse((response) => {
+    const url = new URL(response.url())
+    return (
+      url.pathname === '/api/runs' &&
+      !url.searchParams.has('execution_status') &&
+      url.searchParams.get('limit') === '50'
+    )
+  })
+  await chooseRunFilter(page, 'Execution', 'All')
+  await clearedExecution
   await waitUntil(
     async () => (await rows()).length === allRows,
     `${name} clearing the execution filter must restore the list`
@@ -128,7 +143,6 @@ export async function runFixtureRunRangeFlow({ page }) {
   const rows = page.locator('tbody tr')
   await expect(rows).toHaveCount(50)
   const allRows = await rows.count()
-  await page.getByRole('button', { name: 'More filters' }).click()
   let hourRows
   for (const [label, range, minutes] of [
     ['Last hour', '1h', 60],
@@ -153,7 +167,7 @@ export async function runFixtureRunRangeFlow({ page }) {
     })
     const [response] = await Promise.all([
       responsePromise,
-      chooseSelect(page, 'Time range', label)
+      chooseRunFilter(page, 'Time range', label)
     ])
     expect(response.ok()).toBe(true)
     await expect(page).toHaveURL(

@@ -75,6 +75,12 @@
   }
 }
 
+@media (max-width: 760px) {
+  .operations-filter-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 600px) {
   .statistics-model-column,
   .statistics-numeric-column {
@@ -187,23 +193,28 @@
     background: var(--brand);
   }
 
-  .operations-bar [aria-label='Run list controls'] {
+  .operations-filter-heading.operations-filter-heading {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .operations-filter-toggle.operations-filter-toggle {
+    display: inline-flex;
+  }
+
+  .operations-filter-heading .mantine-Button-root,
+  .operations-filter-grid .mantine-Input-input {
+    min-height: 44px;
+  }
+
+  .operations-filter-grid {
+    display: none;
+    grid-template-columns: minmax(0, 1fr);
+    margin-top: var(--space-4);
+  }
+
+  .operations-filter-grid[data-opened='true'] {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    column-gap: var(--space-5);
-    width: 100%;
-  }
-
-  .operations-bar .operations-filter-group {
-    display: contents;
-  }
-
-  .operations-filter-group > *,
-  .operations-bar [aria-label='Run list controls'] > *,
-  .operations-per-page,
-  .operations-more {
-    min-width: 0;
-    width: 100% !important;
   }
 
   .runs-heading > .runs-heading-actions {
@@ -581,5 +592,57 @@
   .json-table td:first-child {
     min-width: 0;
     white-space: normal;
+  }
+}
+
+@media (max-width: 600px) {
+  .memory-table table {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .memory-table thead {
+    display: none;
+  }
+
+  .memory-table tbody,
+  .memory-table tr,
+  .memory-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .memory-table tbody tr {
+    padding: var(--space-4);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .memory-table tbody td {
+    padding: var(--space-2) 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .memory-table tbody td::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: var(--mantine-font-size-xs);
+    margin-bottom: var(--space-1);
+  }
+
+  .memory-table .memory-revision-cell,
+  .memory-table .memory-predecessor-cell,
+  .memory-table .memory-observation-index {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    text-align: start;
+  }
+
+  .memory-table .memory-revision-actions {
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
   }
 }

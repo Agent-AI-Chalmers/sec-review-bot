@@ -66,6 +66,8 @@ export function Memory(): React.JSX.Element {
   const [highlightedObservation, setHighlightedObservation] =
     React.useState<string>()
   const [error, setError] = React.useState('')
+  const [editError, setEditError] = React.useState('')
+  const [restoreError, setRestoreError] = React.useState('')
   const [queryFailure, setQueryFailure] = React.useState<unknown>()
   const [busy, setBusy] = React.useState(false)
 
@@ -123,6 +125,7 @@ export function Memory(): React.JSX.Element {
   }
   const beginEdit = async (): Promise<void> => {
     if (activeRevision === undefined) return
+    setEditError('')
     try {
       await editor.begin(activeRevision)
     } catch (failure) {
@@ -133,13 +136,13 @@ export function Memory(): React.JSX.Element {
   const commitEdit = async (): Promise<void> => {
     if (editor.session === undefined) return
     setBusy(true)
-    setError('')
+    setEditError('')
     try {
       await editor.commit()
       await refresh()
     } catch (failure) {
       if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
-      setError(
+      setEditError(
         failure instanceof ApiError && failure.status === 409
           ? t('memoryRevisionConflict')
           : t('memoryEditFailed')
@@ -151,7 +154,7 @@ export function Memory(): React.JSX.Element {
   const restore = async (): Promise<void> => {
     if (restoreRevision === undefined || activeRevision === undefined) return
     setBusy(true)
-    setError('')
+    setRestoreError('')
     try {
       const request = {
         operation_id: operationId(),
@@ -163,7 +166,7 @@ export function Memory(): React.JSX.Element {
       await refresh()
     } catch (failure) {
       if (isUnauthorizedApiError(failure)) setQueryFailure(failure)
-      setError(
+      setRestoreError(
         failure instanceof ApiError && failure.status === 409
           ? t('memoryRestoreConflict')
           : t('memoryRestoreFailed')
@@ -286,7 +289,10 @@ export function Memory(): React.JSX.Element {
             onViewTrajectory={viewMemoryMaintainerTrajectory}
             onRevealObservation={revealObservation}
             onCompare={setDiffRevision}
-            onSetCurrent={setRestoreRevision}
+            onSetCurrent={(revision) => {
+              setRestoreError('')
+              setRestoreRevision(revision)
+            }}
             onHighlightEnd={() => setHighlightedRevision(undefined)}
           />
         </Tabs.Panel>
@@ -336,6 +342,7 @@ export function Memory(): React.JSX.Element {
         onClose={() => setTrajectoryTarget(undefined)}
       />
       <MemoryRestoreDialog
+        error={restoreError}
         revision={restoreRevision}
         busy={busy}
         onClose={() => setRestoreRevision(undefined)}
@@ -343,6 +350,7 @@ export function Memory(): React.JSX.Element {
       />
       {editor.session !== undefined && (
         <MemoryEditorDialog
+          error={editError}
           files={editor.session.files}
           initialFiles={editor.session.initialFiles}
           busy={busy}

@@ -54,6 +54,7 @@ function FileTreeItem({
       <div>
         <UnstyledButton
           className="file-workspace-node file-workspace-directory"
+          aria-expanded={opened}
           style={{ paddingLeft: 8 + depth * 16 }}
           onClick={() => setOpened((current) => !current)}
         >
@@ -85,6 +86,7 @@ function FileTreeItem({
     <UnstyledButton
       className="file-workspace-node file-workspace-file"
       data-active={node.path === selectedFile || undefined}
+      aria-current={node.path === selectedFile ? 'true' : undefined}
       data-modified={modifiedFiles.has(node.path) || undefined}
       style={{ paddingLeft: 24 + depth * 16 }}
       onClick={() => onSelect(node.path!)}
