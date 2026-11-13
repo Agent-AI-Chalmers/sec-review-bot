@@ -6,10 +6,11 @@ export async function runRunsFlow({
   page,
   server,
   waitUntil,
-  expectedHeaders
+  expectedHeaders,
+  screenshotPath
 }) {
   await page.screenshot({
-    path: `/tmp/control-plane-ui-${name}.png`,
+    path: screenshotPath,
     fullPage: true
   })
 

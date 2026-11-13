@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { expect } from '@playwright/test'
 
 async function chooseSelect(page, label, option) {
   await page.getByRole('combobox', { name: label, exact: true }).click()
@@ -32,24 +33,7 @@ export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
     `${name} default page size must apply`
   )
 
-  await page.getByRole('button', { name: 'More filters' }).click()
   const allRows = (await rows()).length
-  await chooseSelect(page, 'Time range', 'Last hour')
-  await waitUntil(
-    async () => (await rows()).length < allRows,
-    `${name} a one-hour range must narrow the list`
-  )
-  const hourRows = (await rows()).length
-  await chooseSelect(page, 'Time range', 'Last 24 hours')
-  await waitUntil(async () => {
-    const count = (await rows()).length
-    return count > hourRows && count < allRows
-  }, `${name} a 24-hour range must sit between the hour and everything`)
-  await chooseSelect(page, 'Time range', 'All')
-  await waitUntil(
-    async () => (await rows()).length === allRows,
-    `${name} clearing the range must restore the list`
-  )
 
   await chooseSelect(page, 'Preparation', 'Failed')
   await waitUntil(
@@ -133,4 +117,71 @@ export async function runFixtureRunListFlow({ name, page, base, waitUntil }) {
   )
   assert.strictEqual(await page.getByText('Refresh failed').count(), 0)
   assert.strictEqual(await page.locator('.run-id').count(), 0)
+}
+
+export async function runFixtureRunRangeFlow({ page }) {
+  // Freeze only Date, not timers: presets stay on one minute boundary while
+  // network and rendering still run normally, including the delayed response.
+  const now = new Date()
+  await page.clock.setFixedTime(now)
+  await page.goto('/runs?limit=50', { waitUntil: 'domcontentloaded' })
+  const rows = page.locator('tbody tr')
+  await expect(rows).toHaveCount(50)
+  const allRows = await rows.count()
+  await page.getByRole('button', { name: 'More filters' }).click()
+  let hourRows
+  for (const [label, range, minutes] of [
+    ['Last hour', '1h', 60],
+    ['Last 24 hours', '24h', 1440],
+    ['All', null, null]
+  ]) {
+    const from =
+      minutes === null
+        ? null
+        : new Date(
+            Math.floor(now.getTime() / 60_000) * 60_000 - minutes * 60_000
+          ).toISOString()
+    // Register before clicking; background and previous-range responses cannot
+    // satisfy this wait. UI assertions start only once this query has answered.
+    const responsePromise = page.waitForResponse((response) => {
+      const url = new URL(response.url())
+      return (
+        url.pathname === '/api/runs' &&
+        url.searchParams.get('limit') === '50' &&
+        url.searchParams.get('from') === from
+      )
+    })
+    const [response] = await Promise.all([
+      responsePromise,
+      chooseSelect(page, 'Time range', label)
+    ])
+    expect(response.ok()).toBe(true)
+    await expect(page).toHaveURL(
+      (url) => url.searchParams.get('range') === range
+    )
+    const result = await response.json()
+    const expectedLinks = result.runs.map(
+      (run) => `/runs/${encodeURIComponent(run.run_id)}`
+    )
+    await expect
+      .poll(() =>
+        page
+          .locator('tbody tr td:first-child a')
+          .evaluateAll((links) =>
+            links.map((link) => link.getAttribute('href'))
+          )
+      )
+      .toEqual(expectedLinks)
+    const count = result.runs.length
+    if (range === '1h') {
+      expect(count).toBeGreaterThan(0)
+      expect(count).toBeLessThan(allRows)
+      hourRows = count
+    } else if (range === '24h') {
+      expect(count).toBeGreaterThan(hourRows)
+      expect(count).toBeLessThan(allRows)
+    } else {
+      expect(count).toBe(allRows)
+    }
+  }
 }

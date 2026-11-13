@@ -10,7 +10,10 @@ import {
   runRunsErrorFlow
 } from '../browser-flows/runs-errors.mjs'
 import { runFixtureRunDeliveryFlow } from '../browser-flows/runs-fixture-delivery.mjs'
-import { runFixtureRunListFlow } from '../browser-flows/runs-fixture-list.mjs'
+import {
+  runFixtureRunListFlow,
+  runFixtureRunRangeFlow
+} from '../browser-flows/runs-fixture-list.mjs'
 import { runFixtureRunStatisticsFlow } from '../browser-flows/runs-fixture-statistics.mjs'
 import { runRunsTimelineFlow } from '../browser-flows/runs-timeline.mjs'
 import { runRunsFlow } from '../browser-flows/runs.mjs'
@@ -83,7 +86,8 @@ test('runs browser behavior', async ({ page, fixtureRuntime }, testInfo) => {
     base: fixtureRuntime.baseURL,
     server: fixtureRuntime.server,
     waitUntil,
-    expectedHeaders: EXPECTED_HEADERS
+    expectedHeaders: EXPECTED_HEADERS,
+    screenshotPath: testInfo.outputPath('runs.png')
   })
   test.skip(
     !hasRuns,
@@ -106,6 +110,35 @@ test('fixture run list covers pagination, filters and identity navigation', asyn
     base: fixtureRuntime.baseURL,
     waitUntil
   })
+})
+
+test('fixture time ranges wait for filtered responses', async ({
+  page,
+  fixtureRuntime
+}) => {
+  test.skip(
+    fixtureRuntime.server === undefined,
+    'Time range expectations require stable local fixtures.'
+  )
+  await page.addInitScript(() =>
+    localStorage.setItem('ui-auto-refresh', 'false')
+  )
+  await openAuthenticatedRuns(page)
+  let delayed = false
+  await page.route('**/api/runs?*', async (route) => {
+    if (!delayed && new URL(route.request().url()).searchParams.has('from')) {
+      delayed = true
+      // Deliberate network latency exceeds the old 5s DOM polling budget.
+      // This is a fault injection, never a wait for the page to become ready.
+      await delay(6500)
+    }
+    await route.continue()
+  })
+  try {
+    await runFixtureRunRangeFlow({ page })
+  } finally {
+    await page.unrouteAll({ behavior: 'wait' })
+  }
 })
 
 test('fixture run detail explains statistics and transitions', async ({
