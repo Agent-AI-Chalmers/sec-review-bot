@@ -2,7 +2,7 @@ from pathlib import Path
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from langchain.agents.structured_output import ToolStrategy
+from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, ValidationError
 
 from sec_review_agents.agents.memory_maintainer import agent as maintainer_agent
@@ -112,11 +112,74 @@ async def test_maintainer_uses_retryable_tool_strategy(tmp_path: Path) -> None:
 
     assert build.await_args is not None
     response_format = build.await_args.kwargs["response_format"]
-    assert isinstance(response_format, ToolStrategy)
-    assert [spec.name for spec in response_format.schema_specs] == [
-        "MemoryMaintenanceOutput"
-    ]
-    schema = response_format.schema
+    schema = response_format
     assert isinstance(schema, type) and issubclass(schema, BaseModel)
     with pytest.raises(ValidationError, match="missing: a"):
         schema.model_validate({"observation_decisions": [], "summary": "No change."})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failures", [1, 3, 4])
+async def test_maintainer_validation_retry_budget(
+    tmp_path: Path, failures: int
+) -> None:
+    """Real graph feedback must stop after three retries, independently per run."""
+    from sec_review_agents.runtime.agent_runtime_graph import build_agent_runtime_graph
+    from tests.runtime.fake_chat_models import (
+        ToolCallingFakeMessagesListChatModel,
+        structured_tool_call_message,
+    )
+
+    schema = memory_maintenance_output_model(["a"])
+    invalid = {"observation_decisions": [], "summary": "Incomplete."}
+    valid = {"observation_decisions": [_decision("a")], "summary": "Done."}
+
+    async def build_graph(**kwargs):
+        return await build_agent_runtime_graph(
+            agent_name="memory-maintainer",
+            model=kwargs["model"],
+            backend=None,
+            system_prompt="Maintain memory",
+            tools=[],
+            response_format=kwargs["response_format"],
+        )
+
+    async def invoke_graph(**kwargs):
+        result = await kwargs["agent"].ainvoke(
+            {"messages": [{"role": "user", "content": "Maintain"}]}
+        )
+        feedback = [
+            m
+            for m in result["messages"]
+            if m.type == "tool" and "missing: a" in m.content
+        ]
+        assert len(feedback) == failures
+        return result["structured_response"]
+
+    with (
+        patch.object(maintainer_agent, "create_filesystem_middleware"),
+        patch.object(maintainer_agent, "build_agent_runtime_graph", build_graph),
+        patch.object(maintainer_agent, "invoke_agent_runtime_graph", invoke_graph),
+    ):
+        for _ in range(2):
+            responses: list[BaseMessage] = [
+                structured_tool_call_message(schema, invalid, call_id=f"bad-{i}")
+                for i in range(failures)
+            ]
+            responses.append(
+                structured_tool_call_message(schema, valid, call_id="good")
+            )
+            model = ToolCallingFakeMessagesListChatModel(responses=responses)
+            invocation = maintainer_agent.run_memory_maintainer_agent(
+                model=model,
+                backend=Mock(),
+                worktree_root=tmp_path,
+                user_prompt="task",
+                observation_ids=["a"],
+            )
+            if failures > 3:
+                with pytest.raises(RuntimeError, match="after 3 correction retries"):
+                    await invocation
+                assert model.i == 4
+            else:
+                assert (await invocation).observation_decisions[0].observation_id == "a"

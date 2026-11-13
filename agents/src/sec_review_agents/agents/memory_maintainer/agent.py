@@ -2,7 +2,6 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from deepagents.backends.protocol import BackendProtocol
-from langchain.agents.structured_output import ToolStrategy
 from langchain_core.language_models import BaseChatModel
 
 from sec_review_agents.agents.memory_maintainer.model import (
@@ -38,15 +37,13 @@ async def run_memory_maintainer_agent(
     trajectory_paths: tuple[Path, ...] = (),
 ) -> MemoryMaintenanceOutput:
     response_format = memory_maintenance_output_model(observation_ids)
-    # Force ToolStrategy: auto-selected ProviderStrategy (e.g. OpenAI models)
-    # raises on validator errors instead of returning them to the model for retry.
     agent = await build_agent_runtime_graph(
         model=model,
         agent_name=MEMORY_MAINTAINER_AGENT_NAME,
         backend=backend,
         system_prompt=MEMORY_MAINTAINER_SYSTEM_PROMPT,
         tools=[build_memory_delete_file_tool(worktree_root)],
-        response_format=ToolStrategy(response_format),
+        response_format=response_format,
         middleware=[
             MissingStructuredResponseMiddleware(
                 max_retries=missing_structured_response_max_retries(),

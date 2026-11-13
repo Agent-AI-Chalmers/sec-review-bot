@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 import pytest
+from langchain.agents.structured_output import ToolStrategy
 
 from sec_review_agents.agents.patch_synthesis.agent import (
     EMPTY_REPAIR_CORRECTION,
@@ -68,7 +69,8 @@ async def test_run_patch_synthesis_agent_uses_fixed_response_format(
         )
 
     assert created_agent is agent
-    assert created_kwargs["response_format"] is PatchSynthesisOutput
+    assert isinstance(created_kwargs["response_format"], ToolStrategy)
+    assert created_kwargs["response_format"].schema is PatchSynthesisOutput
 
     acceptance = [
         item
