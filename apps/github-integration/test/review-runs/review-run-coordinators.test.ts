@@ -4,8 +4,14 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { parsePullRequestPreparationInput } from '../../src/review-runs/preparation-input.js'
-import { prepareReviewRunsOnce } from '../../src/review-runs/preparation-coordinator.js'
-import { deliverRunNoticeOnce } from '../../src/review-runs/run-notice-coordinator.js'
+import {
+  prepareReviewRunsOnce,
+  startPreparationCoordinator
+} from '../../src/review-runs/preparation-coordinator.js'
+import {
+  deliverRunNoticeOnce,
+  startRunNoticeCoordinator
+} from '../../src/review-runs/run-notice-coordinator.js'
 import type {
   PreparationCoordinatorStore,
   RunNoticeCoordinatorStore
@@ -734,3 +740,87 @@ test('reference recovery renews its claim and checkpoints the resolved PR before
   assert.ok(failures.length > 0)
   assert.ok(failures.every((message) => message === 'stop at checkpoint'))
 })
+
+for (const kind of ['preparation', 'notice'] as const) {
+  test(`${kind} shutdown drains current work without claiming more`, async () => {
+    let markEntered!: () => void
+    let releaseWork!: () => void
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve
+    })
+    const release = new Promise<void>((resolve) => {
+      releaseWork = resolve
+    })
+    let claims = 0
+    let completed = false
+    const finish = async (): Promise<boolean> => {
+      markEntered()
+      await release
+      completed = true
+      return true
+    }
+    const { app } = fakeApp()
+    const coordinator =
+      kind === 'preparation'
+        ? startPreparationCoordinator({
+            app,
+            store: {
+              ...unreachedPreparationMembers(),
+              claimNextPreparation: async () => {
+                claims++
+                return claims === 1
+                  ? {
+                      run_id: 'run-stop',
+                      claim_token: 'token',
+                      attempt_count: 1,
+                      workflow: 'issue-review',
+                      input_version: 'v1',
+                      input: {}
+                    }
+                  : null
+              },
+              failPreparation: async () => {
+                await finish()
+                return { retry_scheduled: false }
+              }
+            }
+          })
+        : startRunNoticeCoordinator({
+            app,
+            store: {
+              ...liveRunNoticeClaim(),
+              claimNextRunNotice: async () => {
+                claims++
+                return claims === 1
+                  ? {
+                      run_id: 'run-stop',
+                      notice_id: 'notice-stop',
+                      claim_token: 'token',
+                      input: {},
+                      axis: 'execution',
+                      kind: 'failure',
+                      reason_code: null
+                    }
+                  : null
+              },
+              completeRunNotice: finish
+            }
+          })
+    await entered
+    let stopped = false
+    const stopping = coordinator.stop().then(() => {
+      stopped = true
+    })
+    try {
+      await Promise.resolve()
+      assert.strictEqual(stopped, false)
+      releaseWork()
+      await stopping
+      assert.strictEqual(completed, true)
+      assert.strictEqual(claims, 1)
+    } finally {
+      releaseWork()
+      await stopping
+    }
+  })
+}
