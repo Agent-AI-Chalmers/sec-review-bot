@@ -157,7 +157,7 @@ export function createRunsHandler(): (
       // historical slot, so array order is not creation order. Without this sort the
       // predicate `created_at < cursor.createdAt` matched everything and every page repeated
       // the first one.
-      const ordered = [...filtered].sort((left, right) =>
+      const ordered = filtered.toSorted((left, right) =>
         left.created_at === right.created_at
           ? right.run_id.localeCompare(left.run_id)
           : right.created_at.localeCompare(left.created_at)

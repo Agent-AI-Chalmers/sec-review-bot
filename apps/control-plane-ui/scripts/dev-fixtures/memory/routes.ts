@@ -531,7 +531,7 @@ export function createMemoryHandler(
     ) {
       response.end(
         JSON.stringify({
-          extractions: [...extractionRecords].reverse(),
+          extractions: extractionRecords.toReversed(),
           next_cursor: null
         })
       )

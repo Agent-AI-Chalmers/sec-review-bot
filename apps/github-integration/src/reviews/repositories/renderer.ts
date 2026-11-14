@@ -211,7 +211,7 @@ function renderCvssScoringBody(cvss: ReviewRecord['cvss']): string[] {
 function sortDeliveriesByRisk(
   deliveries: PublishedDeliveryEntryLike[]
 ): PublishedDeliveryEntryLike[] {
-  return [...deliveries].sort((a, b) => {
+  return deliveries.toSorted((a, b) => {
     const scoreA = a.cvss_base_score ?? -1
     const scoreB = b.cvss_base_score ?? -1
     if (scoreA !== scoreB) {
@@ -263,7 +263,7 @@ function formatDeliveryCvssBadge(delivery: PublishedDeliveryEntryLike): string {
 }
 
 function sortSeverityKeys(keys: string[]): string[] {
-  return [...keys].sort((a, b) => {
+  return keys.toSorted((a, b) => {
     const rankDiff = cvssSeverityRank(b) - cvssSeverityRank(a)
     if (rankDiff !== 0) {
       return rankDiff
@@ -543,18 +543,10 @@ export function renderRepositorySecuritySummaryComment({
     const sortedDeliveryEntries = sortDeliveriesByRisk(
       normalizedDeliveryEntries
     )
-    const deliveryEntriesBySeverity = new Map<
-      string,
-      PublishedDeliveryEntryLike[]
-    >()
-
-    for (const item of sortedDeliveryEntries) {
-      const severityKey = deliverySeverityKey(item)
-      if (!deliveryEntriesBySeverity.has(severityKey)) {
-        deliveryEntriesBySeverity.set(severityKey, [])
-      }
-      deliveryEntriesBySeverity.get(severityKey)?.push(item)
-    }
+    const deliveryEntriesBySeverity = Map.groupBy(
+      sortedDeliveryEntries,
+      deliverySeverityKey
+    )
 
     for (const severityKey of sortSeverityKeys([
       ...deliveryEntriesBySeverity.keys()

@@ -345,7 +345,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
           input.execution_archive_digest,
           JSON.stringify(input.trajectory_reference),
           JSON.stringify(
-            [...input.observations].sort((a, b) =>
+            input.observations.toSorted((a, b) =>
               a.observation_id.localeCompare(b.observation_id),
             ),
           ),
@@ -555,7 +555,7 @@ export class PostgresMemoryCatalogStore implements MemoryCatalogStore {
             input.expected_active_revision,
             JSON.stringify(input.memory_tree_reference),
             JSON.stringify(source.trajectory_reference),
-            [...source.observation_ids].sort(),
+            source.observation_ids.toSorted(),
             JSON.stringify(source.maintenance_report),
           ],
         )

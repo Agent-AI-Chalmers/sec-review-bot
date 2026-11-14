@@ -123,19 +123,17 @@ function passSections(
   groups: StatisticsGroup[],
   t: ReturnType<typeof useMessages>
 ): UsageSection[] {
-  const sections = new Map<string, UsageSection>()
-  const add = (key: string, label: string, group: StatisticsGroup): void => {
-    const existing = sections.get(key)
-    if (existing === undefined)
-      sections.set(key, { key, label, groups: [group] })
-    else existing.groups.push(group)
-  }
-
-  for (const group of groups) {
-    const passKey = `${group.pass_kind ?? 'unknown'}:${group.pass_index ?? -1}:${group.batch_index ?? -1}`
-    add(passKey, passLabel(group, t), group)
-  }
-  return [...sections.values()]
+  return [
+    ...Map.groupBy(
+      groups,
+      (group) =>
+        `${group.pass_kind ?? 'unknown'}:${group.pass_index ?? -1}:${group.batch_index ?? -1}`
+    )
+  ].map(([key, passGroups]) => ({
+    key,
+    label: passLabel(passGroups[0]!, t),
+    groups: passGroups
+  }))
 }
 
 function groupCallCount(groups: StatisticsGroup[]): number {
@@ -181,11 +179,10 @@ function summarizeAgents(
   groups: StatisticsGroup[],
   breakdownLabelFor: (group: StatisticsGroup) => string | null
 ): AgentSummary {
-  const grouped = new Map<string, StatisticsGroup[]>()
+  const grouped = Map.groupBy(groups, agentGroupKey)
   const breakdownGroups = new Map<string, Map<string, StatisticsGroup[]>>()
   for (const group of groups) {
     const key = agentGroupKey(group)
-    grouped.set(key, [...(grouped.get(key) ?? []), group])
     const label = breakdownLabelFor(group)
     if (label !== null) {
       const agentBreakdowns = breakdownGroups.get(key) ?? new Map()

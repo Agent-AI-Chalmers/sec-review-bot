@@ -169,11 +169,10 @@ export function diagramGeometry(
     center: centers.get(state) as Point
   }))
 
-  const groups = new Map<string, StateMachine['transitions']>()
-  for (const transition of machine.transitions) {
-    const key = `${transition.from}->${transition.to}`
-    groups.set(key, [...(groups.get(key) ?? []), transition])
-  }
+  const groups = Map.groupBy(
+    machine.transitions,
+    (transition) => `${transition.from}->${transition.to}`
+  )
 
   const edges: DiagramEdge[] = []
   for (const [key, transitions] of groups) {

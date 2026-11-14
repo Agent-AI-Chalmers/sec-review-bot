@@ -75,7 +75,7 @@ function layoutRevisions(revisions: RevisionGraphItem[]): {
     .sort((left, right) => left.revision - right.revision)
     .forEach(place)
 
-  const newestFirst = [...revisions].sort(
+  const newestFirst = revisions.toSorted(
     (left, right) => right.revision - left.revision
   )
   const yByRevision = new Map(

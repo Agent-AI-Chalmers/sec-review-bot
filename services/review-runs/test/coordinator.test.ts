@@ -330,10 +330,7 @@ test('an unclassified execution observation failure aborts the coordination pass
 })
 
 test('coordinator loop does not overlap passes and stop drains the active pass', async () => {
-  let release: () => void = () => {}
-  const gate = new Promise<void>((resolve) => {
-    release = resolve
-  })
+  const { promise: gate, resolve: release } = Promise.withResolvers<void>()
   let passes = 0
   const loop = startReviewRunCoordinatorLoop({
     intervalMs: 1,

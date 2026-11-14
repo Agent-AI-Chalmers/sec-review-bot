@@ -228,15 +228,13 @@ export async function handleRepositoryReviewDispatch({
     throw error
   }
 
-  let resolveAdmission: (admission: DispatchAdmission) => void
-  const admissionPromise = new Promise<DispatchAdmission>((resolve) => {
-    resolveAdmission = resolve
-  })
+  const { promise: admissionPromise, resolve: resolveAdmission } =
+    Promise.withResolvers<DispatchAdmission>()
   const preparation = dispatchReview({
     app,
     payload,
     verified_repository: oidcClaims.repository,
-    on_admitted: resolveAdmission!
+    on_admitted: resolveAdmission
   })
   backgroundPreparations.start(preparation, {
     ingress: 'repository-review-dispatch',
