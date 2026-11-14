@@ -1,8 +1,8 @@
 """Sandbox scripts must parse on the interpreter the sandbox actually provides.
 
 These files are not host code. Each is shipped into the sandbox and run with whatever `python3`
-the image or host provides, so the project's own 3.14 interpreter is the wrong target: syntax that
-only 3.14 accepts passes every other test here and fails only inside a run.
+the image or host provides. Checking only against the host interpreter can accept newer syntax
+that fails inside a sandbox running an older interpreter.
 
 `ast.parse(..., feature_version=...)` checks a source against an older grammar without that
 interpreter being installed, so this regression needs no CI matrix.
@@ -76,7 +76,7 @@ def test_sandbox_script_parses_on_every_supported_python(
 ) -> None:
     """One case per version from the script's floor up to the host interpreter.
 
-    Formatting host code for Python 3.14 must not introduce syntax that older
+    Formatting host code must not introduce syntax that older
     sandbox interpreters cannot parse.
     """
     ast.parse(script.build_source(), feature_version=(3, minor))

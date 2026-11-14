@@ -67,11 +67,10 @@ action 以 major tag 固定在 `.github/workflows/`，由 Dependabot 的 `github
 
 <!-- doc-default: node-runtime; source=package.json -->
 
-当前声明：每个 TypeScript 包把 `engines.node` 钉在 `>=26.13.0 <27`，CI 通过 `node-version-file` 从 `package.json` 安装 Node，Dependabot 忽略 `typescript` 与 `@types/node` 的 semver-major。agents 包声明 `requires-python = ">=3.14"`，精确补丁版本记在 `agents/.python-version`，CI 通过 `python-version-file` 安装 Python。
+当前声明：每个 TypeScript 包把 `engines.node` 钉在 `>=26.13.0 <27`，CI 通过 `node-version-file` 从 `package.json` 安装 Node，Dependabot 忽略 `typescript` 与 `@types/node` 的 semver-major。agents 包声明 `requires-python = "==3.14.*"`，精确补丁版本记在 `agents/.python-version`，CI 通过 `python-version-file` 安装 Python。
 
 何时可以升级到下一个版本：
 
-- Python 3.15：在我们要构建的原生扩展包发布 3.15 wheel 之后。3.15 已于 2026-10-09 发布，但其中若干仍是仅源码。
 - TypeScript 7：在 `typescript-eslint` 接受它之后。其 peer 范围仍是 `>=4.8.4 <6.1.0`，tracking issue 仍为 open。
 
 大版本升级应单独审查。同步修改版本声明、CI 版本配置和相关 Dockerfile 基础镜像，再运行完整检查；不能只更新 lockfile。

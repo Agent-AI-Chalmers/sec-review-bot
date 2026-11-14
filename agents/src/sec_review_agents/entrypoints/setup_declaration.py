@@ -104,7 +104,7 @@ def parse_setup_declaration(content: str) -> SetupDeclaration:
     # explicit tag here keeps the two enforcers identical and turns a malformed
     # tag into a clean declaration error instead of an internal traceback.
     try:
-        for event in yaml.parse(content, Loader=yamlcore.CCoreLoader):
+        for event in yaml.parse(content, Loader=yamlcore.CoreLoader):
             if getattr(event, "tag", None) is not None:
                 raise SetupDeclarationError(
                     "Setup declaration must not use explicit YAML tags "
@@ -123,7 +123,7 @@ def parse_setup_declaration(content: str) -> SetupDeclaration:
         # accepted or rejected identically on both sides. In particular
         # `on`/`yes`/`no`/`off`/`y`/`n` are plain strings under 1.2, not
         # booleans, so a `run: on` is a command string rather than a parse error.
-        parsed: object = yaml.load(content, Loader=yamlcore.CCoreLoader)
+        parsed: object = yaml.load(content, Loader=yamlcore.CoreLoader)
     except yaml.YAMLError as error:
         raise SetupDeclarationError(
             f"Setup declaration is not valid YAML: {error}"

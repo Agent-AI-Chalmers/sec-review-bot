@@ -29,7 +29,7 @@ Local file operations reuse `FilesystemBackend`. Docker reuses `BaseSandbox` for
 
 <!-- doc-default: DockerSandboxBackend; source=agents/src/sec_review_agents/filesystem/docker_backend.py -->
 
-Docker always provides writable container-native `/tmp`, independently of repository material views. Upstream large edits upload their payloads there; no project-owned edit staging or replacement script is retained. `/tmp` must not be remapped to a host directory or made read-only through a material view. Docker regular-file transfers retain directory-file-descriptor resolution, `O_NOFOLLOW`, and non-blocking type checks. Project-owned container helpers support Python 3.5 and later; the host worker still uses Python 3.14.
+Docker always provides writable container-native `/tmp`, independently of repository material views. Upstream large edits upload their payloads there; no project-owned edit staging or replacement script is retained. `/tmp` must not be remapped to a host directory or made read-only through a material view. Docker regular-file transfers retain directory-file-descriptor resolution, `O_NOFOLLOW`, and non-blocking type checks. Project-owned container helpers support Python 3.5 and later.
 
 Docker adds process isolation. It uses network and mount namespaces, `no-new-privileges`, a reduced capability set, and configurable PID, memory, and CPU limits. Docker also applies its daemon-provided seccomp and AppArmor defaults when available. A deployment can require named policies with `AGENT_DOCKER_SECCOMP_PROFILE` and `AGENT_DOCKER_APPARMOR_PROFILE`; a missing or rejected configured profile fails container startup.
 

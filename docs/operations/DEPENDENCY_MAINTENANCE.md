@@ -65,11 +65,10 @@ Actions are pinned by major tag in `.github/workflows/` and updated by Dependabo
 
 <!-- doc-default: node-runtime; source=package.json -->
 
-Current declarations: every TypeScript package pins `engines.node` to `>=26.13.0 <27`, CI installs Node from `package.json` via `node-version-file`, and Dependabot ignores semver-major for `typescript` and `@types/node`. The agents package declares `requires-python = ">=3.14"` with the exact patch in `agents/.python-version`, and CI installs Python via `python-version-file`.
+Current declarations: every TypeScript package pins `engines.node` to `>=26.13.0 <27`, CI installs Node from `package.json` via `node-version-file`, and Dependabot ignores semver-major for `typescript` and `@types/node`. The agents package declares `requires-python = "==3.14.*"` with the exact patch in `agents/.python-version`, and CI installs Python via `python-version-file`.
 
 When the next version can be adopted:
 
-- Python 3.15: once the native-extension packages we build against publish 3.15 wheels. 3.15 shipped on 2026-10-09 but several are still source-only.
 - TypeScript 7: once `typescript-eslint` accepts it. Its peer range is still `>=4.8.4 <6.1.0` and the tracking issue is open.
 
 Review major upgrades separately. Update version declarations, CI version configuration, and relevant Dockerfile base images together, then run the complete checks; a lockfile-only update is insufficient.
