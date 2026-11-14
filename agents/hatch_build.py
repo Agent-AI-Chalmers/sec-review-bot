@@ -59,6 +59,24 @@ def _workflow_input_schema_path(project_root: Path) -> Path:
     )
 
 
+def _memory_catalog_spec_path(project_root: Path) -> Path:
+    src = str((project_root / _SRC).resolve())
+    if src not in sys.path:
+        sys.path.insert(0, src)
+    from sec_review_agents.contract_versions import MEMORY_CATALOG_API_VERSION
+
+    relative = (
+        Path("contracts")
+        / "memory-catalog-api"
+        / MEMORY_CATALOG_API_VERSION
+        / "openapi.yaml"
+    )
+    for path in (project_root.parent / relative, project_root / relative):
+        if path.is_file():
+            return path
+    raise RuntimeError("Could not locate Memory Catalog API contract for packaging.")
+
+
 class CustomBuildHook(BuildHookInterface):
     """Include canonical schemas in both source and wheel distributions."""
 
@@ -67,7 +85,12 @@ class CustomBuildHook(BuildHookInterface):
         schema_root = _contract_schemas_root(Path(self.root))
         force_include = build_data.setdefault("force_include", {})
         runtime_schema = _workflow_input_schema_path(Path(self.root))
+        catalog_spec = _memory_catalog_spec_path(Path(self.root))
+        catalog_relative = (
+            Path("memory-catalog-api") / catalog_spec.parent.name / catalog_spec.name
+        )
         if self.target_name == "sdist":
+            force_include[str(catalog_spec)] = str(Path("contracts") / catalog_relative)
             force_include[str(schema_root)] = (
                 f"contracts/execution-api/{api_version}/schemas"
             )
@@ -76,6 +99,9 @@ class CustomBuildHook(BuildHookInterface):
                 "execution-workflow-input.schema.json"
             )
         elif self.target_name == "wheel":
+            force_include[str(catalog_spec)] = str(
+                Path("sec_review_agents/resources/contracts") / catalog_relative
+            )
             force_include[str(schema_root)] = (
                 f"sec_review_agents/resources/contracts/{api_version}"
             )

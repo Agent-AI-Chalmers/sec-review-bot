@@ -196,13 +196,7 @@ test('truncated trajectory shows a parse alert outside message cards', async ({
 }) => {
   await openAuthenticatedRuns(page)
   await page.getByRole('link', { name: 'Viewer', exact: true }).click()
-  const raw = readFileSync(
-    new URL(
-      '../../../../contracts/agent-trajectory/v1/corpus/truncated.jsonl',
-      import.meta.url
-    ),
-    'utf8'
-  )
+  const raw = trajectoryCorpus('truncated.jsonl')
   await page.getByLabel('Paste trajectory JSONL').fill(raw)
   await page.getByRole('button', { name: 'Render', exact: true }).click()
   await expect(page.getByRole('alert')).toBeVisible()

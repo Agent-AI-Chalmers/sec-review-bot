@@ -1,3 +1,4 @@
+import { contractsRoot } from './contract-paths.js'
 import { timingSafeEqual } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
@@ -25,10 +26,7 @@ function specPath(): string {
   const moduleDirectory = import.meta.dirname
   const built = path.join(moduleDirectory, 'openapi.yaml')
   if (existsSync(built)) return built
-  return path.resolve(
-    moduleDirectory,
-    '../../../contracts/execution-api/v1/openapi.yaml',
-  )
+  return path.resolve(contractsRoot(), 'execution-api/v1/openapi.yaml')
 }
 
 function tokenMatches(header: string | undefined, expected: string): boolean {

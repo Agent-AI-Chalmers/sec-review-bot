@@ -20,6 +20,16 @@ After an interrupted publication, callers can query recorded intents for retries
 
 Workers can abandon existing unselected `learning` or `reorganization` publications through `POST /v1/memory-tree/revisions/publications/abandon`. These publications become `abandoned`; retries do not restore them, and committing them returns HTTP 409 with `PUBLICATION_ABANDONED`. A new automatic commit rejected while paused atomically abandons the existing unselected publications for its source kind and operation ID. Maintenance workflows abandon these publications when preparation observes a pause and exit normally without backlog continuation on pause or abandonment. Selected publications and shared artifact objects are retained.
 
+## Enforcement
+
+The shared [fixture manifest](v1/fixtures/manifest.json) assigns valid and invalid JSON messages to their named schemas. Python and TypeScript execute the same cases, and manifest checks require positive and negative cases for every component schema and reject unlisted or duplicate fixture files. Fixtures describe structural validity; workflow and store tests retain ownership of cross-field decisions, authorization, publication recovery, and compare-and-swap behavior.
+
+Memory Catalog validates response objects in `preSerialization` against the contract-derived route response schema, then uses Fastify’s normal serialization. Validation does not coerce types, insert defaults, or remove additional fields, so malformed objects are rejected before serialization can project their fields. Pre-serialized strings, buffers, and streams are outside this object-validation scope. Invalid output returns an opaque HTTP 500. Shared cases also exercise real read and write routes, including malformed store output and requests rejected before reaching the store.
+
+The Python worker validates HTTP success and error responses against the operation and status declared in this document before callers interpret them. Required fields, tagged variants, nested values, additional properties, and date/time formats are checked without coercion. Explicit null remains distinct from a missing field. Malformed responses raise a protocol error instead of being interpreted as empty memory, no pending observations, or enabled automation. The agents wheel and source distribution include the canonical OpenAPI document; Docker also carries it under the configured contracts root.
+
+The contract shape is unchanged. Responses that already conform retain their behavior; responses that violate the contract are now rejected at runtime.
+
 ## Tooling
 
 Run from `tools/`:

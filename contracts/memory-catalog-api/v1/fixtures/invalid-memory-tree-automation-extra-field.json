@@ -1,0 +1,10 @@
+{
+  "state": "enabled",
+  "generation": 0,
+  "changed_by": {
+    "kind": "user",
+    "id": "sample"
+  },
+  "changed_at": "2026-11-14T00:00:00Z",
+  "unexpected": 1
+}

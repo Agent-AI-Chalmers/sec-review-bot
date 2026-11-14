@@ -148,7 +148,7 @@ control-plane-ui:
   - '.github/workflows/ci-browser.yml'
   - '.github/actions/setup-node/**'
   - 'apps/control-plane-ui/**'
-  # It pins its response type to the shared contract fixture.
+  # Its generated response types and artifact readers consume the shared contracts.
   - 'contracts/**'
   # CI tooling.
   - '.github/workflows/ci.yml'

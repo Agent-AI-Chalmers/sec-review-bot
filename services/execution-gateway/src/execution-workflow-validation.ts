@@ -1,3 +1,4 @@
+import { contractsRoot } from './contract-paths.js'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
@@ -8,12 +9,6 @@ interface ExecutionWorkflowInputSchema {
 }
 
 let validator: ValidateFunction | undefined
-
-function contractsRoot(): string {
-  const configured = process.env.SEC_REVIEW_CONTRACTS_ROOT?.trim()
-  if (configured) return path.resolve(configured)
-  return path.resolve(import.meta.dirname, '../../../contracts')
-}
 
 function schema(): Record<string, unknown> & ExecutionWorkflowInputSchema {
   const schemaPath = path.join(

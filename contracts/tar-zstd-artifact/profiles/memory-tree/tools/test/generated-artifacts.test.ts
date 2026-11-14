@@ -6,7 +6,7 @@ import test from 'node:test'
 import generatedArtifacts from '../generated-artifacts.json' with { type: 'json' }
 import { corpusCaseDefinitions } from '../src/corpus.js'
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '../../../../../..')
+import { REPOSITORY_ROOT as REPO_ROOT } from '../src/paths.js'
 
 test('the generated artifact manifest exactly covers fixture outputs', () => {
   const expected = [

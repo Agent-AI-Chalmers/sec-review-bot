@@ -1,0 +1,9 @@
+{
+  "completed_extraction_count": "not-the-declared-type",
+  "extracted_unit_count": 0,
+  "units_with_observation_count": 0,
+  "units_without_observation_count": 0,
+  "observation_count": 0,
+  "pending_observation_count": 0,
+  "consumed_observation_count": 0
+}

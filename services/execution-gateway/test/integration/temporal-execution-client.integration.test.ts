@@ -1,3 +1,4 @@
+import { REPOSITORY_ROOT as repositoryDirectory } from '../project-paths.js'
 import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import { readFile } from 'node:fs/promises'
@@ -14,8 +15,6 @@ import { TemporalExecutionClient } from '../../src/temporal-execution-client.js'
 const temporalAddress = process.env.TEST_TEMPORAL_ADDRESS
 if (temporalAddress === undefined)
   throw new Error('TEST_TEMPORAL_ADDRESS is required for integration tests.')
-
-const repositoryDirectory = path.resolve(import.meta.dirname, '../../../..')
 
 async function issueReviewInput(): Promise<IssueReviewInput> {
   return JSON.parse(

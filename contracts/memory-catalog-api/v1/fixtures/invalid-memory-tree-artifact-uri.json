@@ -1,0 +1,9 @@
+{
+  "revision": 0,
+  "memory_tree_reference": {
+    "uri": "file:///tmp/memory",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "media_type": "sample",
+    "size_bytes": 0
+  }
+}

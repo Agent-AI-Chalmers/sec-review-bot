@@ -6,9 +6,11 @@ import { parse } from 'yaml'
 
 import { renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 
-const toolsRoot = path.resolve(import.meta.dirname, '..')
-const contractPath = path.resolve(toolsRoot, '../v1/openapi.yaml')
-const repositoryRoot = path.resolve(toolsRoot, '../../..')
+import {
+  REPOSITORY_ROOT as repositoryRoot,
+  SPEC_PATH as contractPath
+} from './paths.js'
+
 const outputPaths = [
   path.resolve(
     repositoryRoot,

@@ -1,0 +1,9 @@
+{
+  "revision": 0,
+  "memory_tree_reference": {
+    "uri": "s3://catalog/memory/tree.tar.zst",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "media_type": "",
+    "size_bytes": 0
+  }
+}

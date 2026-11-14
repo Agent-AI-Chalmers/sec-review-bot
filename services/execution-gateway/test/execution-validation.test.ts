@@ -16,7 +16,7 @@ import {
   validateExecutionWorkflowInput,
 } from '../src/execution-workflow-validation.js'
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '../../..')
+import { REPOSITORY_ROOT as REPO_ROOT } from './project-paths.js'
 
 function contractFixture(name: string): unknown {
   return JSON.parse(

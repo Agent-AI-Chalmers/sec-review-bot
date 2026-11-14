@@ -13,7 +13,7 @@ import test from 'node:test'
 
 import { parse as parseYaml } from 'yaml'
 
-import { workspaceRoot } from '../contract-fixtures.js'
+import { REPOSITORY_ROOT } from '../project-paths.js'
 import { classifyPublicationFailure } from '../../src/review-runs/publication-failure.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../../src/execution/publish-error-code.js'
 
@@ -23,7 +23,7 @@ function publicationStepCodesFromContract(): string[] {
   const spec = parseYaml(
     readFileSync(
       path.join(
-        workspaceRoot(),
+        REPOSITORY_ROOT,
         'contracts',
         'review-runs-api',
         'v1',

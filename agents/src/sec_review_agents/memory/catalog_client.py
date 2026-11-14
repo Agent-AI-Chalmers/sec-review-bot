@@ -10,6 +10,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from sec_review_agents.agents.memory_maintainer.model import MemoryMaintenanceOutput
 from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.contract_versions import MEMORY_CATALOG_API_VERSION
+from sec_review_agents.memory.catalog_schema import validate_catalog_response
 from sec_review_agents.utils.env import env_value
 
 AGENT_MEMORY_CATALOG_URL_ENV = "AGENT_MEMORY_CATALOG_URL"
@@ -90,8 +91,16 @@ class MemoryCatalogClient:
                 request, timeout=self.timeout_seconds
             ) as response:
                 value = json.loads(response.read().decode("utf-8"))
+                validate_catalog_response(method, path, response.status, value)
         except HTTPError as error:
             detail = error.read().decode("utf-8", errors="replace")
+            try:
+                error_body = json.loads(detail)
+                validate_catalog_response(method, path, error.code, error_body)
+            except (ValueError, RuntimeError) as invalid:
+                raise RuntimeError(
+                    f"Memory catalog returned invalid HTTP {error.code} response."
+                ) from invalid
             message = f"Memory catalog returned HTTP {error.code}: {detail}"
             if error.code == 409:
                 if _error_code(detail) == "AUTOMATION_PAUSED":
@@ -104,6 +113,8 @@ class MemoryCatalogClient:
             raise RuntimeError(
                 f"Memory catalog is unavailable: {error.reason}"
             ) from error
+        except (json.JSONDecodeError, UnicodeDecodeError) as error:
+            raise RuntimeError("Memory catalog returned invalid JSON.") from error
         if not isinstance(value, dict):
             raise RuntimeError("Memory catalog returned a non-object response.")
         return value
@@ -113,10 +124,7 @@ class MemoryCatalogClient:
             "GET",
             f"{_API_ROOT}/extractions/publications/{quote(extraction_id, safe='')}",
         )
-        publications = value.get("publications")
-        if not isinstance(publications, list):
-            raise RuntimeError("Invalid extraction publication list.")
-        return publications
+        return value["publications"]
 
     def reserve_extraction_publication(self, intent: dict[str, Any]) -> None:
         self._request("POST", f"{_API_ROOT}/extractions/publications/reserve", intent)
@@ -134,10 +142,7 @@ class MemoryCatalogClient:
             "GET",
             f"{_API_ROOT}/memory-tree/revisions/publications/{kind}/{quote(operation_id, safe='')}",
         )
-        publications = value.get("publications")
-        if not isinstance(publications, list):
-            raise RuntimeError("Invalid revision publication list.")
-        return publications
+        return value["publications"]
 
     def abandon_revision_publications(
         self, operation_id: str, *, kind: Literal["learning", "reorganization"]
@@ -152,7 +157,7 @@ class MemoryCatalogClient:
         result = self._request(
             "POST", f"{_API_ROOT}/memory-tree/revisions/publications/reserve", intent
         )
-        if result.get("status") == "abandoned":
+        if result["status"] == "abandoned":
             raise MemoryPublicationAbandonedError(
                 "Revision publication has been abandoned."
             )
@@ -161,7 +166,7 @@ class MemoryCatalogClient:
         result = self._request(
             "POST", f"{_API_ROOT}/memory-tree/revisions/publications/confirm", intent
         )
-        if result.get("status") == "abandoned":
+        if result["status"] == "abandoned":
             raise MemoryPublicationAbandonedError(
                 "Revision publication has been abandoned."
             )
@@ -190,9 +195,7 @@ class MemoryCatalogClient:
                 "observations": observations,
             },
         )
-        if value.get("ok") is not True:
-            raise RuntimeError("Memory catalog did not accept the extraction.")
-        return value.get("created") is True
+        return value["created"]
 
     def get_extraction(self, extraction_id: str) -> dict[str, Any]:
         return self._request(
@@ -266,12 +269,7 @@ class MemoryCatalogClient:
             "GET",
             f"{_API_ROOT}/learning-input?limit={limit}",
         )
-        learning_input = value.get("input")
-        if learning_input is None:
-            return None
-        if not isinstance(learning_input, dict):
-            raise RuntimeError("Memory catalog returned invalid learning input.")
-        return dict(learning_input)
+        return value["input"]
 
     def create_learning_revision(
         self,

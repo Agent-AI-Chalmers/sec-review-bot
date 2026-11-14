@@ -10,6 +10,7 @@ from sec_review_agents.contract_versions import (
     AGENT_TRAJECTORY_VERSION,
     EXECUTION_API_VERSION,
     EXECUTION_WORKFLOW_VERSION,
+    MEMORY_CATALOG_API_VERSION,
 )
 from tests.project_paths import CONTRACTS_ROOT
 
@@ -114,4 +115,27 @@ def trajectory_corpus_file(name: str) -> Path:
 def trajectory_corpus_manifest() -> dict[str, Any]:
     return json.loads(
         trajectory_corpus_file("manifest.json").read_text(encoding="utf-8")
+    )
+
+
+_MEMORY_CATALOG_FIXTURES_ROOT = (
+    CONTRACTS_ROOT / "memory-catalog-api" / MEMORY_CATALOG_API_VERSION / "fixtures"
+)
+
+
+def memory_catalog_fixture(name: str) -> Any:
+    return json.loads(
+        (_MEMORY_CATALOG_FIXTURES_ROOT / name).read_text(encoding="utf-8")
+    )
+
+
+def memory_catalog_fixture_manifest() -> dict[str, dict[str, str]]:
+    return memory_catalog_fixture("manifest.json")
+
+
+def memory_catalog_fixture_names() -> list[str]:
+    return sorted(
+        path.name
+        for path in _MEMORY_CATALOG_FIXTURES_ROOT.glob("*.json")
+        if path.name != "manifest.json"
     )

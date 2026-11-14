@@ -1,11 +1,11 @@
+import { SPEC_PATH } from '../src/paths.js'
 import assert from 'node:assert/strict'
-import path from 'node:path'
 import test from 'node:test'
 import ts from 'typescript'
 import { renderOpenApiTypes } from '@sec-review-bot/contract-codegen'
 
 test('every emitted operation response alias indexes its status map', async () => {
-  const specPath = path.resolve(import.meta.dirname, '../../v1/openapi.yaml')
+  const specPath = SPEC_PATH
   const generated = await renderOpenApiTypes(specPath)
   const file = ts.createSourceFile(
     'types.ts',
