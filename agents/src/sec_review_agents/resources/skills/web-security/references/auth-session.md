@@ -24,6 +24,7 @@ Use this reference for authentication bypass, session fixation, token validation
 - Check the session/token lifecycle required by the application: renewal after authentication or privilege changes, expiry, logout, recovery, and revocation. Verify which sessions and tokens an event actually invalidates; do not assume that terminating an identity-provider session terminates every relying-party session.
 - For stored passwords, inspect the password hashing scheme, salt, and work factor in the relevant implementation. Distinguish an offline credential-compromise threat from online login guessing.
 - Inspect whether login throttling or lockout can be bypassed or attacker-triggered against another account; absence of a named rate-limit mechanism alone is not proof.
+- For configuration-dependent authentication, follow parsing, source precedence and fallback to the effective credential and enforcement branch. Check whether missing or empty configured credentials and missing request credentials collapse to the same accepted value, or configuration errors select anonymous access instead of denying access.
 
 ## Report Conditions
 
@@ -43,3 +44,4 @@ A mismatch with a standard's assurance level or preferred configuration alone is
 - JWT library usage is not suspicious by itself; inspect the actual verification options and claims consumed.
 - A password reset endpoint is not vulnerable solely because it exists; require token predictability, leakage, reuse, missing binding, or unsafe state transition.
 - Missing MFA is usually product hardening unless the code claims MFA enforcement and can be bypassed.
+- A trusted administrator's explicit anonymous mode or security override is not by itself an authentication bypass. Establish how an unintended configuration state is reachable and lets an unauthenticated requester cross the intended boundary; distinguish that from assuming the requester can already replace trusted configuration.

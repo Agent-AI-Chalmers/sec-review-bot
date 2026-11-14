@@ -15,6 +15,15 @@ Authoritative references:
 - <https://cwe.mitre.org/data/definitions/287.html>
 - <https://cwe.mitre.org/data/definitions/384.html>
 
+Claim ledger:
+
+- Claim: Empty configured credentials and authentication failure fallbacks require inspecting the effective comparison and enforcement branch, not just the declared secure default.
+  Primary sources: [CWE-258, Description and Common Consequences](https://cwe.mitre.org/data/definitions/258.html); [CWE-636, Description and Demonstrative Examples](https://cwe.mitre.org/data/definitions/636.html).
+  Limit: CWE-258 concerns empty passwords; applying the same equality failure to API keys requires repository evidence. Neither source establishes a universal configuration precedence order. Resolve that order from the reviewed implementation and deployment inputs.
+- Project reporting rule: Distinguish an unintended reachable fail-open state from a trusted administrator deliberately configuring anonymous access. Report the actual authentication boundary crossed, without assuming an unauthenticated requester can replace trusted configuration.
+  External support: CWE-636 describes failure leading to weaker protection; the attacker-capability and reporting threshold are project policy.
+- Research provenance: Trail of Bits [sharp-edges configuration patterns](https://github.com/trailofbits/skills/blob/main/plugins/sharp-edges/skills/sharp-edges/references/config-patterns.md) prompted review of empty credential handling and effective configuration. The local rule is independently stated against the primary sources above; the upstream checklist, examples, mandatory validation rules and workflow are not incorporated.
+
 ## csrf
 
 Authoritative references:

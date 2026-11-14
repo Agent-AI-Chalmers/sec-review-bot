@@ -1,6 +1,6 @@
 # Object Construction From Serialized Data
 
-Use this reference when untrusted serialized data can select runtime types, constructors, hooks, or executable object behavior. For external entities, includes, expansion, or other parser features, use `parser-capabilities.md`.
+Use this reference when untrusted serialized data can select runtime types, constructors, hooks, prototypes, or executable object behavior. For external entities, includes, expansion, or other parser features, use `parser-capabilities.md`.
 
 ## Sources
 
@@ -12,6 +12,7 @@ Use this reference when untrusted serialized data can select runtime types, cons
 - Python: `pickle.load` / `pickle.loads`, `marshal`, unsafe `yaml.load`, dynamic import or object hooks driven by untrusted data.
 - YAML: explicit tags, custom constructors and language-object tags can select object types or invoke construction behavior. Data-only safe loaders are a counterexample when no later dynamic construction occurs.
 - JSON: polymorphic type metadata, default typing, class-name fields and object hooks can turn a data format into object construction. Verify the configured resolver, allowed types and library version.
+- JavaScript: follow attacker-controlled property names through dynamic assignment or recursive merging. Distinguish modifying one target's prototype via `__proto__` from writing a shared prototype, including through `constructor.prototype`; identify which inherited property the security-sensitive consumer actually reads.
 - PHP: `unserialize` on request/cookie/upload data, especially without `allowed_classes`.
 - Java: `ObjectInputStream`, unsafe polymorphic JSON typing, framework-specific type metadata such as `@type` when reachable from untrusted input.
 - .NET: `BinaryFormatter`, `NetDataContractSerializer`, `ObjectStateFormatter`, unsafe ViewState patterns.
@@ -35,3 +36,4 @@ Use this reference when untrusted serialized data can select runtime types, cons
 - A JSON or YAML format name does not establish data-only behavior; inspect enabled type metadata, tags, constructors and hooks.
 - Dependency presence alone does not prove reachability.
 - A theoretical gadget chain is not enough without an untrusted deserialization path and relevant classes or framework behavior.
+- `JSON.parse` of a `__proto__` key alone creates an own data property, not prototype pollution. Object spread does not invoke the target's prototype setter as `Object.assign` can; null-prototype dictionaries and own-property checks protect only the objects and reads where they are actually applied. Prove the later write and affected consumer instead of treating every dynamic key as a vulnerability.
