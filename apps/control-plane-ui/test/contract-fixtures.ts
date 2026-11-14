@@ -1,20 +1,11 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-function workspaceRoot(): string {
-  let current = import.meta.dirname
-  while (!existsSync(path.join(current, 'contracts', 'README.md'))) {
-    const parent = path.dirname(current)
-    if (parent === current)
-      throw new Error('Could not locate workspace contracts root.')
-    current = parent
-  }
-  return current
-}
+// Repository layout is local to this package's shared contract fixtures.
+const contractsRoot = path.resolve(import.meta.dirname, '../../../contracts')
 
 export const TRAJECTORY_CONTRACT_ROOT = path.join(
-  workspaceRoot(),
-  'contracts',
+  contractsRoot,
   'agent-trajectory',
   'v1'
 )
@@ -32,3 +23,11 @@ export function trajectoryManifest(): { valid: string[]; invalid: string[] } {
     invalid: string[]
   }
 }
+
+export const TAR_ZSTD_CORPUS_ROOT = path.join(
+  contractsRoot,
+  'tar-zstd-artifact',
+  'envelope',
+  'v1',
+  'corpus'
+)

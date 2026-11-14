@@ -1,0 +1,14 @@
+{
+  "kind": "reorganization",
+  "operation_id": "sample",
+  "trajectory_reference": {
+    "uri": "s3://catalog/memory/tree.tar.zst",
+    "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "media_type": "sample",
+    "size_bytes": 0
+  },
+  "maintenance_report": {
+    "summary": "sample",
+    "observation_decisions": []
+  }
+}

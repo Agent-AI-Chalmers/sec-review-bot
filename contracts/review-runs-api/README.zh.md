@@ -34,7 +34,7 @@ Review Runs 通过 `observeRun()` 生成供读取接口使用的脱敏记录，�
 
 ## 如何校验
 
-控制台的 `Run` 类型由契约生成，构建时会对照测试数据检查字段集合。测试数据增加、删除或改名字段后，类型不一致就会导致编译失败。这里只比较字段集合：TypeScript 读取 JSON 时会将字符串推断为较宽泛的类型，直接比较值类型可能误拒绝合法测试数据。
+控制台从契约生成的模块导入 `Run` 和 `ArtifactStorage` 类型。契约工具检查已提交的投影是否与重新生成的结果一致。UI 类型测试独立验证赋值行为：可用归档必须包含引用及其 URI 和 digest，不可用归档不需要引用。这些测试使用 UI 公开的类型，不导入契约 fixtures，也不比较某份样例的完整字段集合。
 
 字段值由 Review Runs 的 `services/review-runs/test/observed-run-contract.test.ts` 验证：测试按清单校验每份输入，也校验 `observeRun()` 的实际输出。类型和 schema 都来自 `openapi.yaml` 的 `ObservedRun`，无需另外维护一份字段对照。超出枚举的状态、不符合 schema 中 pattern 约束的值或格式错误的时间戳都会让测试失败。
 

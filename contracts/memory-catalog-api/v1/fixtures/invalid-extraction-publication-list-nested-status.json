@@ -1,0 +1,24 @@
+{
+  "publications": [
+    {
+      "intent": {
+        "registration": {
+          "extraction_id": "sample",
+          "source_workflow": "sample",
+          "source_run_id": "sample",
+          "source_unit_id": "sample",
+          "execution_archive_digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "trajectory_reference": {
+            "uri": "s3://catalog/memory/tree.tar.zst",
+            "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            "media_type": "sample",
+            "size_bytes": 0
+          },
+          "observations": []
+        },
+        "summary": "sample"
+      },
+      "status": "unknown"
+    }
+  ]
+}

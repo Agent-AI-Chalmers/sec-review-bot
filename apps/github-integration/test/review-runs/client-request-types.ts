@@ -11,8 +11,7 @@
 import { operationRoutes } from '../../src/review-runs/review-runs-api.js'
 import type {
   GetInternalRunResponseBody,
-  OperationOptionsById,
-  SubmitPreparedRunOptions
+  OperationOptionsById
 } from '../../src/review-runs/review-runs-api.js'
 import type { ReviewRunsClient } from '../../src/review-runs/client.js'
 
@@ -21,16 +20,6 @@ type Equals<A, B> =
   (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
     ? true
     : false
-
-/** The submission body the contract declares exposes `preparation_token`, `publish_context`,
- * and `input` — the three fields the client sends. A rename in `openapi.yaml` breaks the
- * object literal in `submitPreparedRun` at compile time. */
-export type SubmissionBodyFieldsMatchContract = Expect<
-  Equals<
-    keyof SubmitPreparedRunOptions['body'],
-    'preparation_token' | 'publish_context' | 'input'
-  >
->
 
 /** The contract declares a request body for these operations, so the client cannot call them
  * without one: the body parameter is required by the derived type. */

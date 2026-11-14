@@ -7,6 +7,7 @@ which has no imports of its own. These tests pin that link.
 
 import sys
 from pathlib import Path
+from unittest.mock import Mock
 
 import hatch_build
 from tests.project_paths import AGENTS_ROOT
@@ -97,3 +98,43 @@ def test_workflow_input_schema_resolves_from_sdist_layout(tmp_path: Path) -> Non
     schema.write_text("{}", encoding="utf-8")
 
     assert hatch_build._workflow_input_schema_path(tmp_path) == schema
+
+
+def test_memory_catalog_contract_resolves_from_repository_and_sdist(
+    tmp_path: Path,
+) -> None:
+    from sec_review_agents.contract_versions import MEMORY_CATALOG_API_VERSION
+
+    relative = (
+        Path("contracts")
+        / "memory-catalog-api"
+        / MEMORY_CATALOG_API_VERSION
+        / "openapi.yaml"
+    )
+    assert (
+        hatch_build._memory_catalog_spec_path(AGENTS_ROOT)
+        == AGENTS_ROOT.parent / relative
+    )
+    copied = tmp_path / relative
+    copied.parent.mkdir(parents=True)
+    copied.write_text("openapi: 3.1.0\n", encoding="utf-8")
+    assert hatch_build._memory_catalog_spec_path(tmp_path) == copied
+
+
+def test_memory_catalog_contract_is_included_for_wheel_and_sdist() -> None:
+    """An installed worker must validate without a repository checkout."""
+    from sec_review_agents.contract_versions import MEMORY_CATALOG_API_VERSION
+
+    source = hatch_build._memory_catalog_spec_path(AGENTS_ROOT)
+    for target, prefix in (
+        ("sdist", "contracts"),
+        ("wheel", "sec_review_agents/resources/contracts"),
+    ):
+        hook = hatch_build.CustomBuildHook(
+            str(AGENTS_ROOT), {}, None, Mock(), "dist", target
+        )
+        data: dict = {}
+        hook.initialize("standard", data)
+        assert data["force_include"][str(source)] == (
+            f"{prefix}/memory-catalog-api/{MEMORY_CATALOG_API_VERSION}/openapi.yaml"
+        )

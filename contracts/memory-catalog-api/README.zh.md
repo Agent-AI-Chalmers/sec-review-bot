@@ -22,6 +22,16 @@ Worker 凭据允许登记 extraction、读取 learning 输入和提交 learning 
 
 Worker 可以通过 `POST /v1/memory-tree/revisions/publications/abandon` 放弃已有且未选定的 `learning` 或 `reorganization` publication。这些 publication 变为 `abandoned`；重试不会恢复它们，提交它们会返回 HTTP 409 和 `PUBLICATION_ABANDONED`。新的自动提交在暂停期间被拒绝时，会在同一事务中放弃该来源类型和 operation ID 下已有且未选定的 publication。维护 workflow 在准备阶段发现暂停时放弃这些 publication，遇到暂停或放弃后正常退出，不再因 backlog 续跑。已选定的 publication 和共用的产物对象会保留。
 
+## 契约执行
+
+共享的 [fixture 清单](v1/fixtures/manifest.json) 将有效和无效的 JSON 消息映射到具名 schema。Python 和 TypeScript 执行同一组案例，清单检查要求每个组件 schema 都有正反例，并拒绝未列出或重复的 fixture 文件。Fixtures 描述结构合法性；跨字段决策、授权、发布恢复和比较交换行为仍由工作流和存储测试负责。
+
+Memory Catalog 在 `preSerialization` 中按照契约派生的路由响应 schema 校验响应对象，然后使用 Fastify 的正常序列化流程。校验不会转换类型、补默认值或删除额外字段，因此格式错误的对象在序列化筛选字段前就会被拒绝。预序列化的字符串、Buffer 和流不属于这项对象校验的范围。非法输出返回不暴露内部细节的 HTTP 500。共享案例还覆盖真实读写路由，包括格式错误的存储输出，以及在到达存储前就被拒绝的请求。
+
+Python Worker 在调用者解释响应前，按照本文档声明的操作和状态码校验 HTTP 成功及错误响应。不进行类型转换，检查必需字段、带标签的变体、嵌套值、额外字段和日期时间格式，并区分显式 null 与字段缺失。格式错误的响应会报协议错误，而不会被解释为空 memory、没有待处理 observations 或已启用自动维护。agents 的 wheel 和源码分发包包含规范 OpenAPI 文档；Docker 也在配置的契约根目录下提供该文档。
+
+契约结构没有变化。符合契约的响应保持原有行为，违反契约的响应现在会在运行时被拒绝。
+
 ## 工具
 
 在 `tools/` 中运行：

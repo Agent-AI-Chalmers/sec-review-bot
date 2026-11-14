@@ -1,0 +1,36 @@
+{
+  "intent": {
+    "expected_active_revision": 0,
+    "memory_tree_reference": {
+      "uri": "s3://catalog/memory/tree.tar.zst",
+      "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "media_type": "sample",
+      "size_bytes": 0
+    },
+    "source": {
+      "kind": "learning",
+      "operation_id": "sample",
+      "observation_ids": [
+        "sample"
+      ],
+      "trajectory_reference": {
+        "uri": "s3://catalog/memory/tree.tar.zst",
+        "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "media_type": "sample",
+        "size_bytes": 0
+      },
+      "maintenance_report": {
+        "summary": "sample",
+        "observation_decisions": [
+          {
+            "observation_id": "sample",
+            "action": "skipped",
+            "topics": [],
+            "reason": "No new lesson."
+          }
+        ]
+      }
+    }
+  },
+  "status": "abandoned"
+}

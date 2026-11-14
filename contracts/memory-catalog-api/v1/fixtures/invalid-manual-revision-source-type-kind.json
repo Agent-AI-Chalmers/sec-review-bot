@@ -1,0 +1,8 @@
+{
+  "kind": 42,
+  "operation_id": "sample",
+  "actor": {
+    "kind": "user",
+    "id": "sample"
+  }
+}

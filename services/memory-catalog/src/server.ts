@@ -27,6 +27,7 @@ import type {
   RequestBody,
 } from './route-types.js'
 import { integerEnv } from './env.js'
+import { registerResponseValidation } from './response-validation.js'
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim()
@@ -134,6 +135,7 @@ export async function registerMemoryCatalogRoutes(
   },
 ): Promise<void> {
   const { store, workerToken, operatorToken } = options
+  registerResponseValidation(app)
   // OpenAPI Glue runs security handlers before service handlers. Keep the authenticated role
   // out of request bodies and attach it to the request object without mutating Fastify types.
   const authenticatedRoles = new WeakMap<FastifyRequest, CatalogRole>()

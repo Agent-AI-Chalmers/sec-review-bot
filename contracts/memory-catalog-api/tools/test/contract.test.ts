@@ -1,12 +1,11 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import test from 'node:test'
 
 import { parse } from 'yaml'
 
-const REPO_ROOT = path.resolve(import.meta.dirname, '../../../..')
-const CONTRACT_ROOT = path.join(REPO_ROOT, 'contracts', 'memory-catalog-api')
+import { REPOSITORY_ROOT as REPO_ROOT, CONTRACT_ROOT } from '../src/paths.js'
 
 test('the HTTP contract is a hand-maintained YAML source, not a service projection', () => {
   const contract = parse(
@@ -69,4 +68,36 @@ test('the generated artifact manifest covers the generator output and CI filter'
       `contract-tools CI filter does not cover ${relativeOutput}`
     )
   }
+})
+
+test('the shared fixture manifest covers every schema and fixture exactly once', () => {
+  const spec = parse(
+    readFileSync(path.join(CONTRACT_ROOT, 'v1/openapi.yaml'), 'utf8')
+  ) as { components: { schemas: Record<string, unknown> } }
+  const root = path.join(CONTRACT_ROOT, 'v1/fixtures')
+  const manifest = JSON.parse(
+    readFileSync(path.join(root, 'manifest.json'), 'utf8')
+  ) as {
+    schema_fixtures: Record<string, string>
+    invalid_schema_fixtures: Record<string, string>
+  }
+  const names = [
+    ...Object.keys(manifest.schema_fixtures),
+    ...Object.keys(manifest.invalid_schema_fixtures)
+  ]
+  assert.equal(names.length, new Set(names).size)
+  assert.deepEqual(
+    names.sort(),
+    readdirSync(root)
+      .filter((name) => name.endsWith('.json') && name !== 'manifest.json')
+      .sort()
+  )
+  assert.deepEqual(
+    [...new Set(Object.values(manifest.schema_fixtures))].sort(),
+    Object.keys(spec.components.schemas).sort()
+  )
+  assert.deepEqual(
+    [...new Set(Object.values(manifest.invalid_schema_fixtures))].sort(),
+    Object.keys(spec.components.schemas).sort()
+  )
 })

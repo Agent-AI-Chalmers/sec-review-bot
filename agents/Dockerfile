@@ -33,6 +33,7 @@ COPY . ./
 # COPY because `contracts/.dockerignore` keeps it out of the build context.
 COPY --from=contracts execution-api /contracts/execution-api
 COPY --from=contracts execution-workflow /contracts/execution-workflow
+COPY --from=contracts memory-catalog-api /contracts/memory-catalog-api
 RUN uv sync --frozen --no-dev
 
 CMD ["sec-review-execution-worker"]

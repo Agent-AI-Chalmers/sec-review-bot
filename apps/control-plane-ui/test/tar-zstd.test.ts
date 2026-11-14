@@ -6,10 +6,7 @@ import { zstdDecompressSync } from 'node:zlib'
 
 import { validateRestrictedPaxTar } from '../server/artifacts/tar-zstd.js'
 
-const corpus = path.resolve(
-  import.meta.dirname,
-  '../../../contracts/tar-zstd-artifact/envelope/v1/corpus'
-)
+import { TAR_ZSTD_CORPUS_ROOT as corpus } from './contract-fixtures.js'
 
 test('restricted PAX reader matches the shared corpus', () => {
   const manifest = JSON.parse(

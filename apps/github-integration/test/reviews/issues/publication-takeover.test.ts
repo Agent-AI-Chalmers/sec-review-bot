@@ -1,6 +1,6 @@
+import { contractFixture } from '../../contract-fixtures.js'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 
 import { handleIssueReviewRun } from '../../../src/reviews/issues/publish.js'
@@ -76,15 +76,7 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
       event_type: 'manual_review',
       open_pr: false
     }
-    const result: unknown = JSON.parse(
-      await readFile(
-        new URL(
-          '../../../../../contracts/execution-api/v1/fixtures/issue-review-result.json',
-          import.meta.url
-        ),
-        'utf8'
-      )
-    )
+    const result = contractFixture('issue-review-result.json')
     const firstToken = owner
 
     const paused = Promise.withResolvers<void>()
