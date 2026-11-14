@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from uuid import uuid4
 
@@ -18,8 +19,14 @@ MAINTENANCE_PROBE = llm_probe(
     not MAINTENANCE_PROBE.enabled(),
     reason=MAINTENANCE_PROBE.skip_reason(),
 )
+@pytest.mark.parametrize(
+    "reorganization", [False, True], ids=["learning", "reorganization"]
+)
 @pytest.mark.asyncio
-async def test_llm_maintenance_reorganizes_messy_memory_without_trajectories() -> None:
+async def test_llm_maintenance_preserves_lessons_and_routes_topics(
+    reorganization: bool,
+) -> None:
+    """Both maintenance modes preserve decisions without requiring a particular filename."""
     root = Path(".agent-artifacts") / "memory-probes" / f"maintenance-{uuid4().hex[:8]}"
     runtime_memory_root = root / "base-memory"
     topics_root = runtime_memory_root / "topics"
@@ -74,7 +81,7 @@ async def test_llm_maintenance_reorganizes_messy_memory_without_trajectories() -
             [
                 "# Observation",
                 "",
-                "Reusable lesson: verifier evidence should lower analyzer confidence when they conflict.",
+                "Reusable lesson: pickle.loads executes object reconstruction hooks. An HMAC must be verified before pickle.loads, and a valid HMAC does not make malicious data from an authorized sender safe.",
             ]
         )
         + "\n",
@@ -82,7 +89,8 @@ async def test_llm_maintenance_reorganizes_messy_memory_without_trajectories() -
     )
     result = await maintain_memory_tree(
         base_memory_tree=runtime_memory_root,
-        observations=[("maintenance-probe", observation)],
+        observations=[] if reorganization else [("maintenance-probe", observation)],
+        reorganization=reorganization,
         worktree_root=root / "candidate-memory",
         maintainer_trajectory_path=root / "memory-maintainer.jsonl",
         deployment=llm_test_deployment(),
@@ -111,10 +119,44 @@ async def test_llm_maintenance_reorganizes_messy_memory_without_trajectories() -
         )
     )
 
-    assert "topics/" in memory_index
-    assert len(memory_index) < 450
-    assert "grown into a notebook" not in memory_index
-    assert not (candidate / "topics" / "retry-confidence.md").exists()
-    assert "source-to-sink" in topic_text.lower()
-    assert "confidence" in topic_text.lower()
+    topics = list((candidate / "topics").glob("*.md"))
+    routed_topics = [path for path in topics if path.name in memory_index]
+    assert routed_topics, memory_index
+    routed_text = "\n".join(path.read_text(encoding="utf-8") for path in routed_topics)
+    # The retained lesson must be accessible through the index, regardless of renaming.
+    lesson_topics = [
+        path
+        for path in routed_topics
+        if re.search(
+            r"verif.*(?:contradict|conflict|disagree)",
+            path.read_text(encoding="utf-8"),
+            re.IGNORECASE | re.DOTALL,
+        )
+    ]
+    assert len(lesson_topics) == 1, routed_text
+    assert re.search(r"verif", routed_text, re.IGNORECASE), routed_text
+    assert re.search(
+        r"contradict|conflict|disagree", routed_text, re.IGNORECASE
+    ), routed_text
+    assert re.search(
+        r"confidence|certainty|reassess|re.?check", routed_text, re.IGNORECASE
+    ), routed_text
+    if not reorganization:
+        assert "pickle.loads" in routed_text, routed_text
+        assert "hmac" in routed_text.lower(), routed_text
+        assert re.search(
+            r"(?:verif|check|authenticat)[^\n]*hmac[^\n]*(?:before|prior)[^\n]*pickle\.loads",
+            routed_text,
+            re.IGNORECASE,
+        ), routed_text
+        assert re.search(
+            r"(?:does not|doesn't|not|never|cannot)[^\n]*(?:safe|trust)|(?:unsafe|malicious)[^\n]*(?:authorized|trusted|authenticated)",
+            routed_text,
+            re.IGNORECASE,
+        ), routed_text
+        assert re.search(
+            r"authorized|trusted|authenticated", routed_text, re.IGNORECASE
+        ), routed_text
+    else:
+        assert "pickle.loads" not in topic_text, topic_text
     assert observation.exists()

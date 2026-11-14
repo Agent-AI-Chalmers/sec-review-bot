@@ -25,7 +25,7 @@ Use the documented responsibilities and actual callers to determine who owns a c
 
   For example, consider `caller -> A() -> B()`. If `A()` only forwards arguments to `B()` and returns its result unchanged, with no other role such as validation, logging, or compatibility with an old interface, consider letting callers use `B()` directly. Check the callers first; if the old interface is still needed, do not simply delete `A()`. Handle any compatibility break as described below.
 
-- State whether the change preserves compatibility. If it breaks compatibility, list the affected callers, artifacts, persisted data, configuration, or operational procedures and explain how to migrate.
+- Explain compatibility impacts when callers, artifacts, persisted data, configuration, or operational procedures are affected. For breaking changes, explain how to migrate.
 - If a change affects component responsibilities, environment setup, configuration, public behavior, or operational steps, update the relevant documentation too.
 - If you need to change a generated file, edit its source and run the corresponding generator. Do not edit the generated output directly.
 
@@ -80,9 +80,9 @@ Describe the primary result rather than listing every modified area. The reposit
 
 Follow [the pull request template](.github/pull_request_template.md):
 
-- `Summary` explains what changed and why.
-- `Compatibility` selects exactly one of `No compatibility impact`, `Backward-compatible behavior change`, or `Breaking change`. A breaking change must state what breaks and how callers or operators should migrate.
-- `Validation` describes the checks and tests you ran, their results, and any relevant checks you did not run.
-- `Review Notes` is optional. Use it for details that help reviewers, such as where to start reading, why you chose the approach, or what remains for later.
+- `Summary` is required: explain the concrete problem and resulting behavior.
+- `Compatibility` is required: select exactly one of `No compatibility impact`, `Backward-compatible behavior change`, or `Breaking change`. For breaking changes, explain what breaks and how callers or operators migrate.
+- `Validation` is optional: record evidence CI does not provide (manual reproduction, model probes, performance experiments) or important verification gaps. Do not repeat routine CI commands or results.
+- `Review Notes` is optional: include specific review guidance or tradeoffs when useful.
 
-The PR description must include non-empty `Summary`, `Compatibility`, and `Validation` sections. In `Compatibility`, keep the template options and select exactly one. You may add other sections to help reviewers. Delete `Review Notes` if there is nothing useful to add.
+Delete unused optional sections. The description validator requires non-empty `Summary` and `Compatibility` sections and exactly one compatibility classification; authors and reviewers remain responsible for identifying important verification gaps.

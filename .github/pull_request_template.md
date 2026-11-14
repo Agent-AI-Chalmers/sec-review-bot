@@ -1,28 +1,21 @@
 ## Summary
 
-<!-- What changed, and why? Focus on observable behavior or the responsibility boundary being changed. -->
+<!-- Describe the concrete problem and resulting behavior. -->
 
 ## Compatibility
 
-<!--
-Select exactly one classification. For a breaking change, state what breaks and how callers or
-operators should migrate.
--->
+<!-- Select exactly one classification. For breaking changes, explain what breaks and how callers or operators migrate. -->
 
 - [ ] No compatibility impact
 - [ ] Backward-compatible behavior change
 - [ ] Breaking change
 
+<!-- Optional sections: delete when not useful for this change. -->
+
 ## Validation
 
-<!-- Describe the checks and tests you ran, their results, and any relevant checks you did not run. -->
+<!-- Include evidence CI does not provide (manual reproduction, model probes, performance experiments) or important verification gaps. Do not repeat routine CI commands or results. -->
 
 ## Review Notes
 
-<!--
-Optional. Delete this section when there is nothing useful to add.
-
-Add details that help reviewers and are not already covered above, such as where to start reading, why you chose the approach, or what remains for later.
--->
-
-<!-- Add any other headings or sections that help explain this pull request. -->
+<!-- Include specific review guidance or tradeoffs when useful. -->
