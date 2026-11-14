@@ -23,9 +23,7 @@ uv sync --group dev
 source .venv/bin/activate
 ```
 
-本目录自带 `.python-version`；`pyproject.toml` 要求 Python 3.14 或更新版本。
-
-> _Python 3.14 是本包开发、CI、打包和容器运行使用的基线版本。_
+使用 `.python-version` 指定的解释器；`pyproject.toml` 将安装范围限定在受支持的 Python 次版本系列。
 
 ## LLM 配置
 

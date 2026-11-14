@@ -21,9 +21,7 @@ uv sync --group dev
 source .venv/bin/activate
 ```
 
-This directory carries its own `.python-version`; `pyproject.toml` requires Python 3.14 or newer.
-
-> _Python 3.14 is the default development, CI, package, and container runtime baseline for this package._
+Use the interpreter pinned in `.python-version`; `pyproject.toml` limits installation to the supported Python minor series.
 
 ## LLM Setup
 
