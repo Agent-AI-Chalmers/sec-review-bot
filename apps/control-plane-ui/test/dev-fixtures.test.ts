@@ -626,7 +626,7 @@ test('memory fixtures form one coherent provenance graph', async () => {
           revision.source.maintenance_report.observation_decisions
             .map((decision) => decision.observation_id)
             .sort(),
-          [...revision.source.observation_ids].sort(),
+          revision.source.observation_ids.toSorted(),
           'maintenance decisions must identify every consumed observation'
         )
         for (const observationId of revision.source.observation_ids) {

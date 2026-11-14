@@ -5,17 +5,6 @@ import { afterEach, expect, test, vi } from 'vitest'
 import { TrajectoryContent } from '../../browser/features/trajectory/TrajectoryContent.js'
 import { renderComponent } from './render.js'
 
-function deferredResponse(): {
-  promise: Promise<Response>
-  resolve(value: Response): void
-} {
-  let resolve!: (value: Response) => void
-  const promise = new Promise<Response>((nextResolve) => {
-    resolve = nextResolve
-  })
-  return { promise, resolve }
-}
-
 function trajectoryResponse(content: string): Response {
   return Response.json({
     events: [
@@ -34,8 +23,8 @@ for (const staleOutcome of ['success', 'failure'] as const) {
   test(`changing the content address ignores a stale ${staleOutcome} even when fetch ignores abort`, async () => {
     // Cancellation alone is insufficient: a response can finish after navigation. The
     // remote content owner must keep old data and old failures out of the new timeline.
-    const first = deferredResponse()
-    const second = deferredResponse()
+    const first = Promise.withResolvers<Response>()
+    const second = Promise.withResolvers<Response>()
     const fetch = vi
       .fn<typeof globalThis.fetch>()
       .mockReturnValueOnce(first.promise)

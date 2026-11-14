@@ -3,23 +3,9 @@ import { expect, test, vi } from 'vitest'
 
 import { useResource } from '../../browser/shared/resource.js'
 
-function deferred<T>(): {
-  promise: Promise<T>
-  resolve(value: T): void
-  reject(error: unknown): void
-} {
-  let resolve!: (value: T) => void
-  let reject!: (error: unknown) => void
-  const promise = new Promise<T>((nextResolve, nextReject) => {
-    resolve = nextResolve
-    reject = nextReject
-  })
-  return { promise, resolve, reject }
-}
-
 test('a newer resource reload aborts and supersedes the previous attempt', async () => {
-  const first = deferred<string>()
-  const second = deferred<string>()
+  const first = Promise.withResolvers<string>()
+  const second = Promise.withResolvers<string>()
   const signals: AbortSignal[] = []
   const load = vi
     .fn<(signal: AbortSignal) => Promise<string>>()

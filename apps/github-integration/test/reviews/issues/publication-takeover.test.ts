@@ -12,14 +12,6 @@ import type {
 } from '../../../src/review-runs/client.js'
 import { fakeGitHub, githubJson } from '../../github-client.js'
 
-function barrier() {
-  let resolve!: () => void
-  const promise = new Promise<void>((done) => {
-    resolve = done
-  })
-  return { promise, resolve }
-}
-
 for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
   test(`publication takeover recovers while the old owner is paused at ${pauseAt}`, async () => {
     // The connector owns GitHub effects; model only its HTTP store boundary here.
@@ -95,8 +87,8 @@ for (const pauseAt of ['comment lookup', 'accepted comment'] as const) {
     )
     const firstToken = owner
 
-    const paused = barrier()
-    const release = barrier()
+    const paused = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
     let pauseOnce = true
     let posts = 0
     const comments: Array<{

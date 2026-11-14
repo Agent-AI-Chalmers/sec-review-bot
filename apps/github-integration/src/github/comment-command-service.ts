@@ -4,10 +4,6 @@ import {
   getGitHubAppMetadata
 } from './github-app-metadata-service.js'
 
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-}
-
 /** The forms a user may type to address this app in a command comment.
  *
  * Two spellings are real: the bare slug (`@my-app`) and the bot login GitHub actually assigns
@@ -142,7 +138,7 @@ export function extractCommentCommand(body: unknown): {
 
   for (const candidate of buildMentionCandidates()) {
     const pattern = new RegExp(
-      `(?:^|\\s)@${escapeRegExp(candidate)}(?:[,:]|\\s|$)`,
+      `(?:^|\\s)@${RegExp.escape(candidate)}(?:[,:]|\\s|$)`,
       'i'
     )
     const match = normalizedBody.match(pattern)

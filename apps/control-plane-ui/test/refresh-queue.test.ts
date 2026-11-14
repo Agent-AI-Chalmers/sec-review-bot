@@ -3,23 +3,9 @@ import test from 'node:test'
 
 import { RefreshQueue } from '../browser/shared/refresh-queue.js'
 
-function controlledPromise(): {
-  promise: Promise<void>
-  resolve: () => void
-  reject: (reason?: unknown) => void
-} {
-  let resolve!: () => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<void>((settle, fail) => {
-    resolve = settle
-    reject = fail
-  })
-  return { promise, resolve, reject }
-}
-
 test('concurrent refresh requests merge into one queued attempt', async () => {
-  const first = controlledPromise()
-  const second = controlledPromise()
+  const first = Promise.withResolvers<void>()
+  const second = Promise.withResolvers<void>()
   const attempts = [first, second]
   let runs = 0
   const queue = new RefreshQueue(() => attempts[runs++].promise)
@@ -46,7 +32,11 @@ test('concurrent refresh requests merge into one queued attempt', async () => {
 })
 
 test('requests arriving during the queued attempt append only one further attempt', async () => {
-  const gates = [controlledPromise(), controlledPromise(), controlledPromise()]
+  const gates = [
+    Promise.withResolvers<void>(),
+    Promise.withResolvers<void>(),
+    Promise.withResolvers<void>()
+  ]
   let runs = 0
   const queue = new RefreshQueue(() => gates[runs++].promise)
 
@@ -75,8 +65,8 @@ test('requests arriving during the queued attempt append only one further attemp
 })
 
 test('a rejected attempt settles its waiters and continues the trailing batch', async () => {
-  const first = controlledPromise()
-  const second = controlledPromise()
+  const first = Promise.withResolvers<void>()
+  const second = Promise.withResolvers<void>()
   const attempts = [first, second]
   const runningChanges: boolean[] = []
   let runs = 0
@@ -111,7 +101,7 @@ test('a rejected attempt settles its waiters and continues the trailing batch', 
 })
 
 test('a throwing start notification cannot block the attempt or later requests', async () => {
-  const gates = [controlledPromise(), controlledPromise()]
+  const gates = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
   let runs = 0
   const queue = new RefreshQueue(
     () => gates[runs++].promise,
@@ -132,7 +122,7 @@ test('a throwing start notification cannot block the attempt or later requests',
 })
 
 test('a throwing settled notification cannot strand waiters or stop the queue', async () => {
-  const gates = [controlledPromise(), controlledPromise()]
+  const gates = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
   let runs = 0
   const queue = new RefreshQueue(
     () => gates[runs++].promise,
@@ -153,7 +143,7 @@ test('a throwing settled notification cannot strand waiters or stop the queue', 
 })
 
 test('a throwing end notification leaves the queue ready for another request', async () => {
-  const gates = [controlledPromise(), controlledPromise()]
+  const gates = [Promise.withResolvers<void>(), Promise.withResolvers<void>()]
   let runs = 0
   const queue = new RefreshQueue(
     () => gates[runs++].promise,

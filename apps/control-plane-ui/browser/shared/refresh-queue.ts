@@ -12,16 +12,15 @@ export class RefreshQueue {
 
   request(): Promise<void> {
     let shouldStart = false
-    const completion = new Promise<void>((resolve) => {
-      if (this.running) {
-        this.queued = true
-        this.queuedWaiters.push(resolve)
-      } else {
-        this.running = true
-        this.activeWaiters = [resolve]
-        shouldStart = true
-      }
-    })
+    const { promise: completion, resolve } = Promise.withResolvers<void>()
+    if (this.running) {
+      this.queued = true
+      this.queuedWaiters.push(resolve)
+    } else {
+      this.running = true
+      this.activeWaiters = [resolve]
+      shouldStart = true
+    }
     if (shouldStart) void this.drain()
     return completion
   }

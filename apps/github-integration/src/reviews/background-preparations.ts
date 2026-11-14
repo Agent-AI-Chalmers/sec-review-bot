@@ -32,15 +32,15 @@ export class BackgroundPreparations {
     start: (on_admitted: () => void) => Promise<unknown>,
     context: Record<string, unknown> = {}
   ): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
-      // Register before invoking the command, including commands that throw
-      // synchronously. Shutdown must see the work even after the handler returns.
-      const preparation = Promise.resolve().then(() => start(resolve))
-      this.start(preparation, context)
-      // Replays and commands that finish without a notification must also settle
-      // the handler rather than leave it waiting for admission indefinitely.
-      void preparation.then(() => resolve(), reject)
-    })
+    const { promise, resolve, reject } = Promise.withResolvers<void>()
+    // Register before invoking the command, including commands that throw
+    // synchronously. Shutdown must see the work even after the handler returns.
+    const preparation = Promise.resolve().then(() => start(resolve))
+    this.start(preparation, context)
+    // Replays and commands that finish without a notification must also settle
+    // the handler rather than leave it waiting for admission indefinitely.
+    void preparation.then(() => resolve(), reject)
+    return promise
   }
 
   async stop(): Promise<void> {

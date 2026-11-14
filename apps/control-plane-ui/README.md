@@ -98,6 +98,8 @@ Vite proxies `/api` requests to the BFF at `http://127.0.0.1:8091`. The BFF conn
 
 The complete Compose deployment is available at `http://127.0.0.1:8091` by default.
 
+The console supports continuously updated modern browsers. Keep your browser up to date; legacy browser versions are outside the support scope.
+
 ## Local checks
 
 ```bash

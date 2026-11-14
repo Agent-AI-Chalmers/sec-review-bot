@@ -3,20 +3,6 @@ import test from 'node:test'
 
 import { LatestRequestGuard } from '../browser/shared/latest-request.js'
 
-function deferred<T>(): {
-  promise: Promise<T>
-  resolve: (value: T) => void
-  reject: (reason: unknown) => void
-} {
-  let resolve!: (value: T) => void
-  let reject!: (reason: unknown) => void
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise
-    reject = rejectPromise
-  })
-  return { promise, resolve, reject }
-}
-
 test('only the latest request may commit data, error, or loading state', async () => {
   const guard = new LatestRequestGuard()
   const state: {
@@ -40,8 +26,8 @@ test('only the latest request may commit data, error, or loading state', async (
       })
   }
 
-  const staleData = deferred<string>()
-  const currentData = deferred<string>()
+  const staleData = Promise.withResolvers<string>()
+  const currentData = Promise.withResolvers<string>()
   const staleDataCompletion = run(staleData.promise)
   const currentDataCompletion = run(currentData.promise)
   staleData.resolve('stale')
@@ -56,8 +42,8 @@ test('only the latest request may commit data, error, or loading state', async (
     error: undefined
   })
 
-  const staleError = deferred<string>()
-  const finalData = deferred<string>()
+  const staleError = Promise.withResolvers<string>()
+  const finalData = Promise.withResolvers<string>()
   const staleErrorCompletion = run(staleError.promise)
   const finalDataCompletion = run(finalData.promise)
   staleError.reject(new Error('stale failure'))

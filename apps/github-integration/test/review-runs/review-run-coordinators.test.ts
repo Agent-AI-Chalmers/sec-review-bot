@@ -743,14 +743,10 @@ test('reference recovery renews its claim and checkpoints the resolved PR before
 
 for (const kind of ['preparation', 'notice'] as const) {
   test(`${kind} shutdown drains current work without claiming more`, async () => {
-    let markEntered!: () => void
-    let releaseWork!: () => void
-    const entered = new Promise<void>((resolve) => {
-      markEntered = resolve
-    })
-    const release = new Promise<void>((resolve) => {
-      releaseWork = resolve
-    })
+    const { promise: entered, resolve: markEntered } =
+      Promise.withResolvers<void>()
+    const { promise: release, resolve: releaseWork } =
+      Promise.withResolvers<void>()
     let claims = 0
     let completed = false
     const finish = async (): Promise<boolean> => {
