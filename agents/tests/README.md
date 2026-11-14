@@ -85,6 +85,8 @@ Probe-agent tests also require `LLM_TEST_DEPLOYMENT=<deployment name>`. Product 
 | Bundled skill cases   | `RUN_LLM_SKILL_CASES=1`                                                                                                          | `LLM_TEST_DEPLOYMENT`                        | Runs JSON-defined prompted, discovery, and compare cases, including web, CI, and CWE checks. Compare cases record paired Skills OFF/ON outputs without automatically declaring a winner. |
 | CodeGraph MCP smoke   | `RUN_LLM_CODEGRAPH_MCP_INTEGRATION=1`                                                                                            | `LLM_TEST_DEPLOYMENT`, `codegraph` on `PATH` | Checks local CodeGraph MCP wiring.                                                                                                                                                       |
 
+| Filesystem newline edits | `RUN_LLM_NEWLINE_EDITS=1` | `LLM_TEST_DEPLOYMENT` | Exercises real read/edit middleware on CRLF, mixed endings and missing final newline; checks the resulting LF-normalized bytes. |
+
 Run the project-instructions probe with:
 
 ```bash
@@ -165,6 +167,8 @@ Run heavy probes only on purpose. They may start Docker containers, run full ana
 | MCP cases                   | `RUN_LLM_MCP_CASES=1`                             | relevant product agent bindings, `sec-review-bot-workspace:tools` image           | Runs data-driven MCP discovery and paired comparison cases through normal product workflows. Transport and state continuity are covered by separate no-model capability tests.                                                                                                   |
 | External tool cases         | `RUN_LLM_EXTERNAL_TOOL_CASES=1`                   | product agent bindings, base and `sec-review-bot-workspace:tools` images          | Runs Joern and Playwright CLI discovery cases plus pinned public-checkout comparisons with skills and MCP disabled. Comparison OFF arms use the base image so the CLI is genuinely unavailable. Installation and CLI behavior are covered by separate no-model capability tests. |
 
+| Combined patch synthesis | `RUN_LLM_PATCH_SYNTHESIS_CONFLICT=1` | delivery execution binding, Docker sandbox | Checks that contradictory repair intents produce no commit while compatible repairs are combined; executes model-written code only inside Docker. |
+
 Build the workspace tools image when a probe needs CodeGraph or Playwright:
 
 ```bash
@@ -176,3 +180,31 @@ docker build -f agents/docker/workspace-tools.Dockerfile \
 Heavy probes usually write artifacts under `.agent-artifacts/`.
 MCP cases retain each run under `.agent-artifacts/mcp-cases/`; set `MCP_CASE_OUTPUT_DIR` to override that location.
 External tool cases retain each run under `.agent-artifacts/external-tool-cases/`; set `EXTERNAL_TOOL_CASE_OUTPUT_DIR` to override that location.
+
+### Additional Probe Entrypoints
+
+Run these from `agents/`; the newline probe uses `LLM_TEST_DEPLOYMENT`, while synthesis uses the normal product binding.
+
+```bash
+RUN_LLM_NEWLINE_EDITS=1 LLM_TEST_DEPLOYMENT=<deployment> \
+uv run python -m pytest tests/filesystem/test_llm_newline_edits.py -q -s
+
+RUN_LLM_PATCH_SYNTHESIS_CONFLICT=1 \
+uv run python -m pytest tests/delivery_stages/execution/test_llm_patch_synthesis_conflict.py -q -s
+```
+
+## Tests Outside Routine CI Coverage
+
+The model probes above require explicit opt-in. Other environment-dependent tests and manually triggered checks have separate prerequisites:
+
+| Test group                   | Entrypoint                                                                                                      | Prerequisites and CI policy                                                                                                                                                                                                               |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| MCP capability               | `tests/mcp/test_capability.py`                                                                                  | Docker and `sec-review-bot-workspace:tools`; ordinary CI does not build this image, so capability cases skip when it is absent. See [MCP tests](mcp/README.md).                                                                           |
+| External CLI capability      | `tests/external_tools/test_capability.py`                                                                       | Docker and `sec-review-bot-workspace:tools`; skips when the image is absent. See [external tool tests](external_tools/README.md).                                                                                                         |
+| S3 adapter                   | `tests/artifacts/test_s3_adapter_integration.py`, S3 integration case in `tests/artifacts/test_s3_adapter.py`   | `SEC_REVIEW_TEST_S3_ENDPOINT`, `SEC_REVIEW_TEST_S3_BUCKET` and suitable AWS credentials; skips without endpoint or bucket.                                                                                                                |
+| Execution archive recovery   | `tests/execution_archives/test_recovery_integration.py`                                                         | Same S3 configuration; exercises recovery after a successful upload whose response is lost.                                                                                                                                               |
+| Legacy Python runtime        | `tests/filesystem/test_legacy_python_skill_loading.py`                                                          | `LEGACY_PYTHON_TEST_IMAGE` selecting Python 3.5 or 3.6; see the command under Running Tests.                                                                                                                                              |
+| GitHub Integration S3 upload | `apps/github-integration/test/integration/artifacts/s3-input-storage.integration.test.ts` (repository-relative) | Run `pnpm run test:integration` from `apps/github-integration/`; requires dedicated S3 configuration. The main CI deliberately omits this suite.                                                                                          |
+| Execution lifecycle          | `system-tests/execution-lifecycle/test_execution_lifecycle.py` (repository-relative)                            | Model-free, private PostgreSQL/Temporal/RustFS containers and compiled service participants; runs only through the manual workflow or a local command. See [system tests](../../system-tests/README.md#manual-execution-lifecycle-probe). |
+
+Ordinary Docker backend tests are selected by CI and build their own small image; they skip only when Docker is unavailable. Temporal time-skipping tests are also selected, but skip if their test server cannot start. Neither group is excluded merely because it carries the `integration` marker. A successful CI status alone does not establish that environment-dependent cases executed.
