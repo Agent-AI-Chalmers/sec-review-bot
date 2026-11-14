@@ -53,3 +53,25 @@ Run the no-model capability integration with:
 docker image inspect sec-review-bot-workspace:tools >/dev/null
 uv run python -m pytest -q -s tests/mcp/test_capability.py
 ```
+
+## CodeGraph Comparisons
+
+The standalone comparison probes exercise explicitly requested tool evidence, not autonomous discovery. Model setup is documented in [PROBES.md](../PROBES.md).
+
+```bash
+RUN_LLM_ANALYZER_CODEGRAPH_DOCKER_INTEGRATION=1 \
+uv run python -m pytest tests/mcp/test_llm_analyzer_codegraph.py -q -s
+
+RUN_LLM_CODEGRAPH_REAL_CHECKOUT_INTEGRATION=1 \
+uv run python -m pytest tests/mcp/test_llm_codegraph_real_checkout.py -q -s
+```
+
+The synthetic cross-file case uses the repository analyzer binding; the pinned public checkout uses the issue analyzer binding. Both need the tools image. The public checkout also needs Git network access. Tests isolate global Git configuration; supply `HTTP_PROXY` and `HTTPS_PROXY` in the process environment when a proxy is needed.
+
+Comparisons require a successful non-empty tool reply in the explicitly instructed ON arm and no CodeGraph calls in the OFF arm. Verdicts, known-file mentions and result concepts are observations retained for inspection, not pass criteria or evidence that CodeGraph improves detection.
+
+The synthetic probe retains trajectories under pytest's temporary directory. Public checkout runs retain their workspace, trajectories and summary under `.agent-artifacts/codegraph-real-checkout/`; override this with `CODEGRAPH_REAL_CHECKOUT_OUTPUT_DIR`.
+
+<!-- doc-default: codegraph-real-checkout-budget; source=agents/tests/mcp/test_llm_codegraph_real_checkout.py -->
+
+The public-checkout probe allows 300 graph steps per arm and a 900-second test timeout.
