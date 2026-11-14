@@ -17,3 +17,16 @@ Requirements are tied to the actual primitive or protocol; they do not support a
 | CRYPTO-11: TLS reference identity; `certificate-path-identity.md` | [RFC 9525](https://www.rfc-editor.org/rfc/rfc9525.html), §§2, 4 and 6 | Match the presented identifiers against a reference identity derived from trusted application configuration. Path validity, SNI and destination text do not by themselves establish the intended service identity. |
 
 Public-data checksums are not password verifiers; signature validity alone is not identity; missing rotation alone is not a confirmed exploit.
+
+## Secret-Dependent Observations: Verification Reference
+
+This rule group belongs to `verification-contracts.md`: cryptographic secret leakage, verification observations and authenticated-result handling. It does not own generic performance regressions or impose constant-time processing on public data.
+
+Research provenance: Trail of Bits [constant-time analysis](https://github.com/trailofbits/skills/tree/main/plugins/constant-time-analysis) and [cryptographic API sharp edges](https://github.com/trailofbits/skills/blob/main/plugins/sharp-edges/skills/sharp-edges/references/crypto-apis.md) prompted this review. Rules are independently stated against the primary sources below; upstream code examples and remediation claims are not adopted.
+
+| ID and skill location | Primary source and locator | Supported decision and limit |
+| --- | --- | --- |
+| CRYPTO-12: secret-dependent execution and target scope; `verification-contracts.md` | [BearSSL Constant-Time Crypto](https://www.bearssl.org/constanttime.html), Execution Model and Compiler Woes | Branches, memory accesses and instruction latency can depend on secrets; compiler and hardware behavior matter. Source patterns identify leads, not an attacker observation or proof of key recovery. Requiring a feasible observation and security effect is project reporting policy. |
+| CRYPTO-13: comparison boundary; `verification-contracts.md` | [Node.js crypto.timingSafeEqual](https://nodejs.org/api/crypto.html#cryptotimingsafeequala-b) | The API requires equal byte lengths and explicitly does not guarantee timing safety of surrounding code. This is a Node.js API example, not a claim that all comparison APIs have the same failure contract. Check the target runtime's actual API and preprocessing. |
+| CRYPTO-14: statistical evidence limits; `verification-contracts.md` | [dudect README](https://github.com/oreparaz/dudect#readme), About and How does it work | Statistical testing can detect timing differences but cannot prove constant-time execution. Input distributions, compilation and measurement environment bound the observation; do not interpret a clean run as universal absence or a difference as automatic secret recovery. |
+| CRYPTO-15: padding and authentication observations; `verification-contracts.md` | [RFC 7366](https://www.rfc-editor.org/rfc/rfc7366.html), §3; [RFC 5116](https://www.rfc-editor.org/rfc/rfc5116.html), §2.2 | TLS encrypt-then-MAC verifies the MAC before decryption and terminates on failure. AEAD decryption returns plaintext or FAIL rather than partial plaintext. These establish distinct authentication/consumption boundaries, not a universal CBC ban or a requirement to replace every protocol with one construction. Uniform error text does not establish uniform execution timing. |
