@@ -3,7 +3,7 @@ import re
 import sys
 from pathlib import Path
 
-REQUIRED_SECTIONS = ("Summary", "Compatibility", "Validation")
+REQUIRED_SECTIONS = ("Summary", "Compatibility")
 COMPATIBILITY_CLASSIFICATIONS = (
     "No compatibility impact",
     "Backward-compatible behavior change",

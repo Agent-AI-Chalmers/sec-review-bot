@@ -27,7 +27,7 @@
 
   例如，调用关系是 `调用方 -> A() -> B()`。如果 `A()` 只是把参数原样传给 `B()`，再原样返回结果，也不承担校验、日志记录或旧接口兼容等其他职责，就可以考虑让调用方直接调用 `B()`。删除前先检查调用方；如果仍需保留旧接口，就不能直接删掉 `A()`。涉及破坏性变更时，按下条要求处理。
 
-- 明确说明是否保持兼容。破坏性变更必须列出受影响的调用方、产物、已保存的数据、配置或运维操作，并说明如何迁移。
+- 涉及调用方、产物、已保存的数据、配置或运维操作时，说明兼容性影响。破坏性变更必须说明如何迁移。
 - 如果修改改变了组件职责、环境准备方式、配置、对外行为或运维步骤，也要更新相应文档。
 - 如果需要修改生成文件，应先修改其源文件，再运行对应的生成器，不要直接手改生成结果。
 
@@ -82,9 +82,9 @@ feat(contracts)!: remove legacy execution fields
 
 遵循 [pull request 模板](.github/pull_request_template.md)：
 
-- `Summary` 说明修改内容和原因。
-- `Compatibility` 必须且只能选择 `No compatibility impact`、`Backward-compatible behavior change` 或 `Breaking change` 之一。破坏性变更必须说明受影响内容，以及调用方或运维人员应如何迁移。
-- `Validation` 说明运行了哪些检查和测试、结果如何，以及哪些相关检查没有运行。
-- `Review Notes` 可选，用来补充有助于审查本次修改的信息，例如建议先看哪些文件、为什么采用当前方案，或哪些工作留待以后处理。
+- `Summary` 必填：说明具体问题和修改后的行为。
+- `Compatibility` 必填：必须且只能选择 `No compatibility impact`、`Backward-compatible behavior change` 或 `Breaking change` 之一。破坏性变更必须说明受影响内容，以及调用方或运维人员应如何迁移。
+- `Validation` 可选：记录 CI 无法提供的证据（手动复现、模型探针、性能实验）或重要验证缺口。不要重复常规 CI 命令或结果。
+- `Review Notes` 可选：有具体审查提示或需要解释的取舍时填写。
 
-PR 描述中的 `Summary`、`Compatibility` 和 `Validation` 不能为空；`Compatibility` 按模板保留选项，只勾选一项。可以添加其他有助于审查的章节。没有需要补充的内容时，删除 `Review Notes`。
+删除未使用的可选章节。描述校验脚本要求非空的 `Summary` 和 `Compatibility`，且必须只选择一个兼容性分类；作者和审查者仍需识别重要验证缺口。
