@@ -668,6 +668,44 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       { retry: false }
     )
 
+    // publication: uncertain -> failed and uncertain -> pending when the owner concludes the
+    // publication while a step is still being reconciled. The axis reports `uncertain`, and the
+    // conclusion must record that state, not the `publishing` it no longer holds.
+    for (const retry of [false, true]) {
+      const reconciling = await newPublishingRun()
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await store.publications.requirePublicationStepClaim(
+          reconciling.runId,
+          reconciling.token,
+          'issue:summary-comment'
+        )
+        await store.publications.failPublicationStep(
+          reconciling.runId,
+          reconciling.token,
+          'issue:summary-comment',
+          { message: 'response lost' },
+          { retry: true }
+        )
+      }
+      await assert.rejects(
+        store.publications.requirePublicationStepClaim(
+          reconciling.runId,
+          reconciling.token,
+          'issue:summary-comment'
+        )
+      )
+      assert.strictEqual(
+        (await store.queries.getRun(reconciling.runId))?.publication.status,
+        'uncertain'
+      )
+      await store.publications.fail(
+        reconciling.runId,
+        reconciling.token,
+        { code: 'GITHUB_TIMEOUT', message: 'gave up while reconciling' },
+        { retry }
+      )
+    }
+
     // publication: publishing -> pending on a retryable failure.
     const publishRetried = await newPublishingRun()
     await store.publications.fail(

@@ -66,6 +66,29 @@ import { queueRunNotice, supersedeRunAttentionNotices } from './run-notices.js'
  * UPDATE open in a second session and assert the step write waits), not by raising the load.
  */
 
+/** The publication states a claim token can own, passed as a `text[]` parameter. Ownership is
+ * the token: `uncertain` and `disconnected` describe what a step is doing, not who may act, so
+ * token-fenced writes use this set to keep acting on the step that put the axis there.
+ * Concluding the axis itself uses the narrower CONCLUDABLE_PUBLICATION_STATUSES.
+ *
+ * A publication write that admits several statuses must not name a literal `fromStatus` in its
+ * event: it reads the prior status back with `WITH previous AS (SELECT ... FROM publications ...
+ * FOR UPDATE) ... RETURNING previous.status`. The `FOR UPDATE` there locks the publication row
+ * itself; step writes rely on that lock instead (see the module note). */
+const OWNED_PUBLICATION_STATUSES: readonly PublicationStatus[] = [
+  'publishing',
+  'uncertain',
+  'disconnected'
+]
+
+/** The states in which an owner may conclude the publication itself. A `disconnected` axis is
+ * excluded: automation handed it to an operator, and concluding it would leave a disconnected
+ * step that refuses every claim on a run that has left the parked queue. */
+const CONCLUDABLE_PUBLICATION_STATUSES: readonly PublicationStatus[] = [
+  'publishing',
+  'uncertain'
+]
+
 /** How many times one side effect may be attempted before the step is given up on.
  *
  * The budget is spent by attempts, not by recorded failures, so a publisher that dies mid-effect
@@ -75,15 +98,6 @@ import { queueRunNotice, supersedeRunAttentionNotices } from './run-notices.js'
  * summarises. The other axes bound work the same way and for the same reason, each with its own
  * number (`MAX_PREPARATION_ATTEMPTS` here, `MAX_SUBMISSION_RECOVERY_ATTEMPTS` for replays), so
  * changing one is a local decision about that axis' external traffic rather than a shared policy. */
-/** The publication states a claim token can own, passed as a `text[]` parameter. Ownership is
- * the token: `uncertain` and `disconnected` describe what a step is doing, not who may act, so
- * every token-fenced write uses this one set. */
-const OWNED_PUBLICATION_STATUSES: readonly PublicationStatus[] = [
-  'publishing',
-  'uncertain',
-  'disconnected'
-]
-
 const MAX_PUBLICATION_STEP_ATTEMPTS = 3
 const MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS = 3
 
@@ -292,22 +306,30 @@ export class PublicationStore {
 
   async complete(runId: string, token: string): Promise<boolean> {
     return await transaction(this.pool, async (client) => {
-      const result = await client.query(
-        `UPDATE publications SET status='published', claim_token=NULL,
+      const result = await client.query<{ from_status: string }>(
+        `WITH previous AS (
+           SELECT run_id, status FROM publications
+           WHERE run_id=$1 AND connector_id=$2
+             AND status = ANY($4::text[]) AND claim_token=$3
+           FOR UPDATE
+         )
+         UPDATE publications p SET status='published', claim_token=NULL,
            finished_at=clock_timestamp(),
            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2
-           AND status = ANY($4::text[]) AND claim_token=$3
+         FROM previous
+         WHERE p.run_id=previous.run_id
            AND NOT EXISTS (SELECT 1 FROM publication_steps
-             WHERE run_id=$1 AND connector_id=$2 AND status <> 'succeeded')`,
-        [runId, this.connectorId, token, OWNED_PUBLICATION_STATUSES]
+             WHERE run_id=$1 AND connector_id=$2 AND status <> 'succeeded')
+         RETURNING previous.status AS from_status`,
+        [runId, this.connectorId, token, CONCLUDABLE_PUBLICATION_STATUSES]
       )
-      if (result.rowCount !== 1) return false
+      const completed = result.rows[0]
+      if (completed === undefined) return false
       await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
         axis: 'publication',
-        fromStatus: 'publishing',
+        fromStatus: completed.from_status,
         toStatus: 'published'
       })
       return true
@@ -327,13 +349,22 @@ export class PublicationStore {
   ): Promise<boolean> {
     const toStatus = options.retry ? 'pending' : 'failed'
     return await transaction(this.pool, async (client) => {
-      const result = await client.query(
-        `UPDATE publications SET status=$4, claim_token=NULL, failure_code=$5,
+      // Only CONCLUDABLE_PUBLICATION_STATUSES may conclude; a refused `disconnected` axis returns
+      // false, which the caller already treats as nothing committed.
+      const result = await client.query<{ from_status: string }>(
+        `WITH previous AS (
+           SELECT run_id, status FROM publications
+           WHERE run_id=$1 AND connector_id=$2
+             AND status = ANY($7::text[]) AND claim_token=$3
+           FOR UPDATE
+         )
+         UPDATE publications p SET status=$4, claim_token=NULL, failure_code=$5,
            failure_message=$6,
            finished_at=CASE WHEN $4='failed' THEN clock_timestamp() ELSE NULL END,
            updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2
-           AND status = ANY($7::text[]) AND claim_token=$3`,
+         FROM previous
+         WHERE p.run_id=previous.run_id
+         RETURNING previous.status AS from_status`,
         [
           runId,
           this.connectorId,
@@ -341,10 +372,11 @@ export class PublicationStore {
           toStatus,
           error.code ?? null,
           error.message,
-          OWNED_PUBLICATION_STATUSES
+          CONCLUDABLE_PUBLICATION_STATUSES
         ]
       )
-      if (result.rowCount !== 1) return false
+      const failed = result.rows[0]
+      if (failed === undefined) return false
       // A terminal publication failure ends the run. The requester is told about it here, not
       // only when an individual step happens to be marked terminal: the coordinator can conclude
       // the whole publication without going through `failPublicationStep`.
@@ -352,7 +384,7 @@ export class PublicationStore {
         runId,
         connectorId: this.connectorId,
         axis: 'publication',
-        fromStatus: 'publishing',
+        fromStatus: failed.from_status,
         toStatus,
         reasonCode: error.code ?? null
       })
@@ -806,10 +838,9 @@ export class PublicationStore {
       // axis reports that so the run surfaces in the operator queue instead of looking active.
       await derivePublicationStatus(client, this.connectorId, runId)
       if (!terminal) return true
-      // The step update above already moved the axis by re-deriving it from the steps, so the
-      // terminal failure has to name the state it is actually leaving: `uncertain` when this step
-      // was the uncertain one, `disconnected` when another step parked the axis. Recording a
-      // hardcoded `publishing` would put an edge in the log the snapshot never held.
+      // The step update above re-derived the axis, so the prior status is read back rather than
+      // assumed. Only CONCLUDABLE_PUBLICATION_STATUSES may conclude; the step's failure above
+      // stands either way.
       const publication = await client.query<{ from_status: string }>(
         `WITH previous AS (
            SELECT run_id, status FROM publications
@@ -830,14 +861,13 @@ export class PublicationStore {
           error.code ?? null,
           error.message,
           token,
-          OWNED_PUBLICATION_STATUSES
+          CONCLUDABLE_PUBLICATION_STATUSES
         ]
       )
       const failedFrom = publication.rows[0]?.from_status
-      if (failedFrom === undefined)
-        throw new Error(
-          `Publication ${runId} changed while its terminal step failed.`
-        )
+      // The ownership lock is still held, so a missing row means the axis is `disconnected`: the
+      // step's terminal failure is recorded, and the publication stays parked for the operator.
+      if (failedFrom === undefined) return true
       const eventId = await appendEvent(client, {
         runId,
         connectorId: this.connectorId,

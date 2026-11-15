@@ -73,6 +73,7 @@ export const RETURN_EDGES: Record<CoordinationAxis, readonly string[]> = {
   publication: [
     'publishing->pending',
     'uncertain->publishing',
+    'uncertain->pending',
     'disconnected->pending'
   ]
 }

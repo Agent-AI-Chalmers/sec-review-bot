@@ -484,3 +484,143 @@ test('a publication that cannot complete names the steps that kept it from compl
   )
   assert.doesNotMatch(messages[0] ?? '', /repository:summary-issue/)
 })
+
+test('a refused conclusion is logged as left for the operator when a step is parked', async () => {
+  // Review Runs refuses to conclude a publication for two reasons: the claim moved, or a step
+  // parked and the publication now belongs to an operator. Only the first is a claim race, and
+  // logging the second as one sends whoever reads the log looking for a race that never happened.
+  const run = async (
+    stepStatus: 'disconnected' | 'pending' | 'unreadable',
+    publishThrows = false
+  ): Promise<string[]> => {
+    const lines: string[] = []
+    const store = {
+      claimNextPublication: async () =>
+        ({
+          run_id: RUN_ID,
+          workflow: 'repository-review',
+          source_platform: 'github',
+          connector_id: 'github-integration:test',
+          publish_context: REPOSITORY_CONTEXT,
+          preparation: {
+            status: 'submitted',
+            attempt_count: 1,
+            started_at: '2026-01-01T00:00:01.000Z',
+            finished_at: '2026-01-01T00:00:02.000Z',
+            updated_at: '2026-01-01T00:00:03.000Z',
+            failure_code: null,
+            disconnect_reason: null
+          },
+          execution: {
+            status: 'succeeded',
+            started_at: null,
+            finished_at: null,
+            updated_at: '2026-01-01T00:00:00.000Z'
+          },
+          publication: {
+            status: 'publishing',
+            started_at: null,
+            finished_at: null,
+            updated_at: '2026-01-01T00:00:00.000Z'
+          },
+          created_at: '2026-10-07T00:00:00.000Z',
+          failure_code: null,
+          failure_message: null,
+          artifact_storage: null,
+          notices: [],
+          workflow_result: EMPTY_REPOSITORY_RESULT,
+          claim_token: 'claim-1'
+        }) satisfies PublicationWork,
+      renewPublicationClaim: async () => true,
+      publicationHeartbeatIntervalMs: async () => 60_000,
+      completePublication: async () => false,
+      failPublication: async () => false,
+      initializePublicationSteps: async () => {
+        if (publishThrows) throw new Error('GitHub answered 502 Bad Gateway')
+      },
+      listPublicationSteps: async () => {
+        if (stepStatus === 'unreadable')
+          throw new Error('Review Runs unreachable')
+        return [
+          {
+            step_key: 'repository:delivery:gone',
+            status: stepStatus,
+            attempt_count: 3,
+            last_attempt_at: null,
+            recovery_attempt_count: 0,
+            remote_object_id: null,
+            remote_object_url: null,
+            failure_code: null,
+            failure_message: null
+          }
+        ]
+      },
+      requirePublicationStepClaim: async () => {},
+      completePublicationStep: async () => true,
+      settleExhaustedPublicationStep: async () => true,
+      failPublicationStep: async () => true,
+      connectorId: 'github-integration:test'
+    } as unknown as PublicationCoordinatorStore
+    const { app } = fakeApp({
+      respond: () => githubJson({ id: 1 }),
+      installationOctokit: fakeInstallationOctokit()
+    })
+    const restore = { log: console.log, error: console.error }
+    console.log = (line: unknown) => lines.push(String(line))
+    console.error = (line: unknown) => lines.push(String(line))
+    try {
+      await publishReviewRunsOnce({ app, store })
+    } finally {
+      console.log = restore.log
+      console.error = restore.error
+    }
+    return lines
+  }
+
+  const parked = await run('disconnected')
+  assert.ok(
+    parked.some(
+      (line) =>
+        line.includes('review_publication_left_for_operator') &&
+        line.includes('repository:delivery:gone')
+    )
+  )
+  assert.ok(
+    !parked.some((line) => line.includes('review_publication_claim_lost'))
+  )
+
+  const lost = await run('pending')
+  assert.ok(lost.some((line) => line.includes('review_publication_claim_lost')))
+  assert.ok(
+    !lost.some((line) => line.includes('review_publication_left_for_operator'))
+  )
+
+  // A publish error is the diagnosis; a refused conclusion only explains why the run did not
+  // change, so it must not replace the error in the log.
+  const thrown = await run('disconnected', true)
+  assert.ok(
+    thrown.some(
+      (line) =>
+        line.includes('review_publication_failed') &&
+        line.includes('502 Bad Gateway')
+    ),
+    'the publish error is logged even though its conclusion was refused'
+  )
+  assert.ok(
+    thrown.some((line) => line.includes('review_publication_left_for_operator'))
+  )
+
+  // When the steps cannot be read the lost-claim warning stays, and the read failure says why
+  // the refusal could not be explained.
+  const unreadable = await run('unreadable')
+  assert.ok(
+    unreadable.some(
+      (line) =>
+        line.includes('review_publication_refusal_unexplained') &&
+        line.includes('Review Runs unreachable')
+    )
+  )
+  assert.ok(
+    unreadable.some((line) => line.includes('review_publication_claim_lost'))
+  )
+})

@@ -595,6 +595,10 @@ export const messages = {
       'a step failed but can be retried, so publishing waits and retries',
     edge_publication_publishing_failed:
       'retries were used up, so publishing failed for good',
+    edge_publication_uncertain_pending:
+      'publishing stopped while a step was being reconciled and will be retried',
+    edge_publication_uncertain_failed:
+      'publishing failed for good while a step was being reconciled',
     edge_publication_pending_skipped:
       'execution did not succeed, so there is nothing to publish',
     edge_publication_publishing_skipped:
@@ -1214,6 +1218,8 @@ export const messages = {
     edge_execution_pending_skipped: '准备失败，因此执行不会发生',
     edge_publication_publishing_pending: '某步骤失败但可重试，回到等待后重试',
     edge_publication_publishing_failed: '重试次数用尽，发布最终失败',
+    edge_publication_uncertain_pending: '核对某个步骤期间发布中止，稍后重试',
+    edge_publication_uncertain_failed: '核对某个步骤期间发布最终失败',
     edge_publication_pending_skipped: '执行未成功，没有可发布的内容',
     edge_publication_publishing_skipped:
       '发布过程中发现执行已失败，因此放弃发布',

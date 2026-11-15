@@ -1345,6 +1345,10 @@ x-state-machines:
         }
       - { from: publishing, to: pending, label: retryable failure }
       - { from: publishing, to: failed, label: terminal failure }
+      # The owner can conclude the publication while a step is still being reconciled, so the
+      # axis leaves `uncertain` the same two ways it leaves `publishing`.
+      - { from: uncertain, to: pending, label: retryable failure }
+      - { from: uncertain, to: failed, label: terminal failure }
       - { from: pending, to: skipped, label: execution not published }
       # A publication can already be in flight when the execution axis is later found
       # unusable, so the execution-failure paths converge it from `publishing` as well as from

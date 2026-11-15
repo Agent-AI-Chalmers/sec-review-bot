@@ -389,6 +389,16 @@ export const STATE_MACHINES: readonly StateMachine[] = [
         label: 'terminal failure'
       },
       {
+        from: 'uncertain',
+        to: 'pending',
+        label: 'retryable failure'
+      },
+      {
+        from: 'uncertain',
+        to: 'failed',
+        label: 'terminal failure'
+      },
+      {
         from: 'pending',
         to: 'skipped',
         label: 'execution not published'

@@ -4253,6 +4253,185 @@ test('a second step parking later does not move the publication parked_at', asyn
   }
 })
 
+/** Drive one step through its attempts and reconciliation budget until it parks, the way a
+ * connector whose remote checks keep failing does. */
+async function parkStep(
+  store: ReviewRunStore,
+  runId: string,
+  token: string,
+  step: string
+): Promise<void> {
+  for (let round = 0; round < 20; round += 1) {
+    const status = (await store.publications.listPublicationSteps(runId)).find(
+      (item) => item.step_key === step
+    )?.status
+    if (status === 'disconnected') return
+    if (status === 'pending' || status === 'failed')
+      await store.publications
+        .requirePublicationStepClaim(runId, token, step)
+        .catch(() => undefined)
+    await store.publications.failPublicationStep(
+      runId,
+      token,
+      step,
+      { code: 'GITHUB_TIMEOUT', message: 'no answer' },
+      { retry: true }
+    )
+    await store.publications
+      .requirePublicationStepClaim(runId, token, step)
+      .catch(() => undefined)
+  }
+  assert.fail(`${step} did not park`)
+}
+
+test('a reconciliation that keeps failing across passes parks the step instead of looping', async () => {
+  // Each pass the connector finds the step exhausted, tries to look it up, and the lookup fails
+  // with a transient fault. It records that as a retryable step failure and the publication is
+  // retried. Those records are what spend the reconciliation budget: without them the step would
+  // stay `uncertain` and the run would be retried forever, never reaching an operator.
+  const store = await createStore({ claimTimeoutMs: 0 })
+  try {
+    const runId = await createSuccessfulRun(store)
+    const step = 'repository:delivery:gone'
+    let token = await store.publicationClaims.claim(runId)
+    assert.ok(token)
+    await store.publications.initializePublicationSteps(runId, token, [step])
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await store.publications.requirePublicationStepClaim(runId, token, step)
+      await store.publications.failPublicationStep(
+        runId,
+        token,
+        step,
+        { message: 'response lost' },
+        { retry: true }
+      )
+    }
+
+    let passes = 0
+    for (; passes < 10; passes += 1) {
+      const status = (await store.publications.listPublicationSteps(runId))[0]
+        ?.status
+      if (status === 'disconnected') break
+      // One connector pass: the claim is refused as exhausted, the lookup fails, the failure is
+      // recorded as a retryable reconciliation failure, and the publication is retried.
+      await assert.rejects(
+        store.publications.requirePublicationStepClaim(runId, token, step)
+      )
+      await store.publications.failPublicationStep(
+        runId,
+        token,
+        step,
+        { code: null, message: 'GitHub answered 502' },
+        { retry: true }
+      )
+      if (
+        await store.publications.fail(
+          runId,
+          token,
+          { code: 'GITHUB_TRANSIENT', message: 'GitHub answered 502' },
+          { retry: true }
+        )
+      ) {
+        token = await store.publicationClaims.claim(runId)
+        assert.ok(token, 'a retried publication is claimed again')
+      }
+    }
+
+    assert.ok(passes <= 3, `parked after ${passes} passes, within the budget`)
+    assert.strictEqual(
+      (await store.publications.listPublicationSteps(runId))[0]?.status,
+      'disconnected'
+    )
+    assert.strictEqual(
+      (await store.queries.getRun(runId))?.publication.status,
+      'disconnected'
+    )
+    assert.ok(
+      (await store.queries.listParkedRuns()).some(
+        (parked) => parked.run_id === runId
+      ),
+      'the run reaches the operator queue'
+    )
+  } finally {
+    await store.close()
+  }
+})
+
+test('an owner cannot conclude a publication an operator has to decide on', async () => {
+  // Once a step parks, the axis is `disconnected` and only an operator may move it. The owner's
+  // claim is still valid, and the connector reports the reconciliation failure it just hit. If
+  // that report concluded the publication, the run would be `pending` with a disconnected step:
+  // refused by every claim and missing from the parked queue, so nobody could ever move it. Both
+  // ways an owner concludes a publication are refused, and the run stays parked.
+  const store = await createStore()
+  try {
+    for (const conclude of ['fail', 'terminal-step'] as const) {
+      const runId = await createSuccessfulRun(store)
+      const token = await store.publicationClaims.claim(runId)
+      assert.ok(token)
+      await store.publications.initializePublicationSteps(runId, token, [
+        'issue:draft-pr',
+        'issue:summary-comment'
+      ])
+      await parkStep(store, runId, token, 'issue:draft-pr')
+      assert.strictEqual(
+        (await store.queries.getRun(runId))?.publication.status,
+        'disconnected'
+      )
+
+      if (conclude === 'fail') {
+        assert.strictEqual(
+          await store.publications.fail(
+            runId,
+            token,
+            { code: 'GITHUB_TIMEOUT', message: 'reconciliation failed' },
+            { retry: true }
+          ),
+          false
+        )
+      } else {
+        // A different step of the same run fails terminally while the axis is parked. Its own
+        // failure is recorded; the publication is not concluded on top of it.
+        await store.publications.requirePublicationStepClaim(
+          runId,
+          token,
+          'issue:summary-comment'
+        )
+        assert.strictEqual(
+          await store.publications.failPublicationStep(
+            runId,
+            token,
+            'issue:summary-comment',
+            { code: 'GITHUB_VALIDATION_REJECTED', message: 'rejected' },
+            { retry: false }
+          ),
+          true
+        )
+        assert.strictEqual(
+          (await store.publications.listPublicationSteps(runId)).find(
+            (step) => step.step_key === 'issue:summary-comment'
+          )?.status,
+          'terminal_failed'
+        )
+      }
+
+      assert.strictEqual(
+        (await store.queries.getRun(runId))?.publication.status,
+        'disconnected',
+        `${conclude}: the publication stays parked`
+      )
+      assert.ok(
+        (await store.queries.listParkedRuns()).some(
+          (parked) => parked.run_id === runId && parked.axis === 'publication'
+        ),
+        `${conclude}: the run stays in the operator queue`
+      )
+    }
+  } finally {
+    await store.close()
+  }
+})
+
 test('a disconnected publication is parked until an operator resumes it', async () => {
   // A step parked after its reconciliation budget ran out excludes the whole publication from
   // every automatic claim, which is what keeps a side effect with an unknown remote outcome from
