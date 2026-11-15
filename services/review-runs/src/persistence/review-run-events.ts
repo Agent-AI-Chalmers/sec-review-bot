@@ -28,11 +28,7 @@ export interface ReviewRunEventRow {
   from_status: string | null
   to_status: string
   reason_code: string | null
-  occurred_at: Date | string
-}
-
-function iso(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : value
+  occurred_at: Date
 }
 
 /** Append one transition. Callers run this on the same client as the snapshot UPDATE, so the
@@ -82,6 +78,6 @@ export async function listEvents(
     from_status: row.from_status,
     to_status: row.to_status,
     reason_code: row.reason_code,
-    occurred_at: iso(row.occurred_at)
+    occurred_at: row.occurred_at.toISOString()
   }))
 }

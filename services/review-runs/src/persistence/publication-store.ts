@@ -422,7 +422,7 @@ export class PublicationStore {
   ): Promise<PublicationStepRecord[]> {
     const result = await client.query<
       Omit<PublicationStepRecord, 'last_attempt_at'> & {
-        last_attempt_at: Date | string | null
+        last_attempt_at: Date | null
       }
     >(
       `
@@ -438,12 +438,7 @@ export class PublicationStore {
     // declares it a date-time string like every other timestamp on the read surface.
     return result.rows.map((row) => ({
       ...row,
-      last_attempt_at:
-        row.last_attempt_at === null
-          ? null
-          : row.last_attempt_at instanceof Date
-            ? row.last_attempt_at.toISOString()
-            : row.last_attempt_at
+      last_attempt_at: row.last_attempt_at?.toISOString() ?? null
     }))
   }
   /** Lock the publication that owns this claim token, or answer false.

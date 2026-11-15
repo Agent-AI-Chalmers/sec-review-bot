@@ -323,14 +323,21 @@ export class ReviewRunQueries {
   }
 
   async listParkedRuns(): Promise<ParkedRun[]> {
-    const result = await this.pool.query<ParkedRun>(
+    const result = await this.pool.query<
+      Omit<ParkedRun, 'parked_at'> & { parked_at: Date }
+    >(
       `SELECT run_id, axis, reason, parked_at FROM (
          ${PARKED_AXES.map(parkedAxisSelect).join('\n         UNION ALL\n         ')}
        ) parked
        ORDER BY parked_at, run_id`,
       [this.connectorId]
     )
-    return result.rows
+    // `parked_at` is a timestamptz, which node-pg hands back as a Date; the contract declares a
+    // date-time string.
+    return result.rows.map((row) => ({
+      ...row,
+      parked_at: row.parked_at.toISOString()
+    }))
   }
 
   async listSubmissionRecoveries(): Promise<RunRowsProjection> {

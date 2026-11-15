@@ -3493,7 +3493,7 @@ test('abandoning a disconnected run concludes its open axes and keeps the execut
     )
     assert.ok(disconnectEvent, 'the park must leave a transition event')
     assert.strictEqual(
-      new Date(parked[0]?.parked_at ?? 0).toISOString(),
+      parked[0]?.parked_at,
       new Date(disconnectEvent.occurred_at).toISOString(),
       'parked_at must be the transition instant, not a later activity timestamp'
     )
