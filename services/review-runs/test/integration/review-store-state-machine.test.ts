@@ -1360,7 +1360,7 @@ test('the publication axis records an event only when its derived status actuall
 
     const publicationEvents = async () =>
       (await store.queries.listEvents(runId)).filter(
-        (event) => event.axis === 'publication'
+        (event) => event.axis === 'publication' && event.step_key === null
       )
 
     // A retryable failure leaves the axis publishing: the step is still claimable, so the axis
@@ -1500,7 +1500,7 @@ test('a publication left uncertain by a dead publisher is reclaimed once its lea
     assert.ok(reclaimed, 'an expired uncertain lease must be reclaimable')
     assert.notStrictEqual(reclaimed, token)
     const event = (await store.queries.listEvents(runId))
-      .filter((item) => item.axis === 'publication')
+      .filter((item) => item.axis === 'publication' && item.step_key === null)
       .at(-1)
     assert.strictEqual(event?.from_status, 'uncertain')
     assert.strictEqual(event?.to_status, 'publishing')
@@ -2383,7 +2383,9 @@ test('every publication transition writes exactly one audit event', async () => 
   const store = await createStore()
   const publicationEvents = async (runId: string) =>
     (await store.queries.listEvents(runId))
-      .filter((event) => event.axis === 'publication')
+      .filter(
+        (event) => event.axis === 'publication' && event.step_key === null
+      )
       .map((event) => `${event.from_status}->${event.to_status}`)
   try {
     // Terminal execution failure skips publication.
@@ -2729,7 +2731,9 @@ test('an exhausted preparation keeps the last real failure reason instead of the
     // converged through some other write path cannot be misreported - but that case is not
     // reachable here, so this assertion pins the reachable behaviour only.
     const publicationEvents = (await store.queries.listEvents(runId))
-      .filter((event) => event.axis === 'publication')
+      .filter(
+        (event) => event.axis === 'publication' && event.step_key === null
+      )
       .map((event) => `${event.from_status}->${event.to_status}`)
     assert.deepStrictEqual(publicationEvents, [
       'null->pending',
@@ -2816,6 +2820,7 @@ test('a terminal execution failure converges an in-flight publication', async ()
     const abandoned = events.find(
       (event) =>
         event.axis === 'publication' &&
+        event.step_key === null &&
         event.from_status === 'publishing' &&
         event.to_status === 'skipped'
     )
@@ -3213,7 +3218,9 @@ test('a publisher that died mid-publication is taken over once its lease expires
 
     // The takeover is auditable, not silent.
     const publicationEvents = (await store.queries.listEvents(runId))
-      .filter((event) => event.axis === 'publication')
+      .filter(
+        (event) => event.axis === 'publication' && event.step_key === null
+      )
       .map((event) => `${event.from_status}->${event.to_status}`)
     assert.deepStrictEqual(publicationEvents, [
       'null->pending',
@@ -3551,6 +3558,8 @@ test('abandoning a disconnected run concludes its open axes and keeps the execut
       events.some(
         (event) =>
           event.axis === 'publication' &&
+          event.step_key === null &&
+          event.step_key === null &&
           (event.from_status === 'publishing' ||
             event.from_status === 'pending') &&
           event.to_status === 'skipped'
@@ -4026,7 +4035,9 @@ test('an operator resume publishes the parked steps again instead of only reconc
     const resumedTwice = await store.queries.listEvents(runId)
     assert.strictEqual(
       resumedTwice.filter(
-        (event) => event.reason_code === 'PUBLICATION_RESUMED_BY_OPERATOR'
+        (event) =>
+          event.step_key === null &&
+          event.reason_code === 'PUBLICATION_RESUMED_BY_OPERATOR'
       ).length,
       2,
       'each operator decision is on the record'
@@ -4179,6 +4190,69 @@ test('an operator resume completes on a pool that has exactly one connection', a
   }
 })
 
+test('a second step parking later does not move the publication parked_at', async () => {
+  // Step events share the publication axis. The axis parks when its first step does; a later step
+  // parking changes nothing about the axis, so taking its event as the park time would make the
+  // run look newer in the operator queue than it is.
+  const store = await createStore()
+  const pool = new Pool({ connectionString: requireTestDatabase() })
+  const steps = ['issue:first', 'issue:second']
+  try {
+    const runId = await createSuccessfulRun(store)
+    const token = await store.publicationClaims.claim(runId)
+    assert.ok(token)
+    await store.publications.initializePublicationSteps(runId, token, steps)
+    const park = async (step: string): Promise<void> => {
+      for (let round = 0; round < 20; round += 1) {
+        const current = (
+          await store.publications.listPublicationSteps(runId)
+        ).find((item) => item.step_key === step)?.status
+        if (current === 'disconnected') return
+        if (current === 'pending' || current === 'failed')
+          await store.publications
+            .requirePublicationStepClaim(runId, token, step)
+            .catch(() => undefined)
+        await store.publications.failPublicationStep(
+          runId,
+          token,
+          step,
+          { code: 'GITHUB_TIMEOUT', message: 'no answer' },
+          { retry: true }
+        )
+        await store.publications
+          .requirePublicationStepClaim(runId, token, step)
+          .catch(() => undefined)
+      }
+      assert.fail(`${step} did not park`)
+    }
+    await park('issue:first')
+    const axisParkedAt = (await store.queries.listParkedRuns()).find(
+      (item) => item.run_id === runId
+    )?.parked_at
+    assert.ok(axisParkedAt)
+    await park('issue:second')
+    const events = await store.queries.listEvents(runId)
+    const secondParkedAt = events.find(
+      (event) =>
+        event.step_key === 'issue:second' && event.to_status === 'disconnected'
+    )?.occurred_at
+    assert.ok(secondParkedAt)
+    assert.ok(
+      Date.parse(secondParkedAt) > Date.parse(axisParkedAt),
+      'the second step must park after the axis did for this test to mean anything'
+    )
+    assert.strictEqual(
+      (await store.queries.listParkedRuns()).find(
+        (item) => item.run_id === runId
+      )?.parked_at,
+      axisParkedAt
+    )
+  } finally {
+    await pool.end()
+    await store.close()
+  }
+})
+
 test('a disconnected publication is parked until an operator resumes it', async () => {
   // A step parked after its reconciliation budget ran out excludes the whole publication from
   // every automatic claim, which is what keeps a side effect with an unknown remote outcome from
@@ -4257,6 +4331,26 @@ test('a disconnected publication is parked until an operator resumes it', async 
     assert.strictEqual(attention.run_id, runId)
     assert.strictEqual(attention.axis, 'publication')
     assert.strictEqual(attention.kind, 'attention')
+    // The axis records that it parked; the step event beside it records which step did.
+    const parkEvents = (await store.queries.listEvents(runId)).filter(
+      (event) => event.to_status === 'disconnected'
+    )
+    assert.deepStrictEqual(
+      parkEvents.map((event) => [event.axis, event.step_key]).sort(),
+      [
+        ['publication', null],
+        ['publication', 'issue:summary-comment']
+      ]
+    )
+    // Like an axis' admission, each step's history starts at its creation, so the log accounts
+    // for a step even before anything attempted it.
+    const firstStepEvent = (await store.queries.listEvents(runId)).find(
+      (event) => event.step_key === 'issue:summary-comment'
+    )
+    assert.deepStrictEqual(
+      [firstStepEvent?.from_status, firstStepEvent?.to_status],
+      [null, 'pending']
+    )
     // Automation must not pick it up: no selector claims a run whose step is parked, and the
     // internal single-run claim refuses it too. Without a way out, the run would be stuck with
     // no owner and no writer - which is exactly why the operator resume exists.
@@ -4349,6 +4443,8 @@ test('a disconnected publication is parked until an operator resumes it', async 
       events.some(
         (event) =>
           event.axis === 'publication' &&
+          event.step_key === null &&
+          event.step_key === null &&
           event.to_status === 'pending' &&
           event.reason_code === 'PUBLICATION_RESUMED_BY_OPERATOR'
       )

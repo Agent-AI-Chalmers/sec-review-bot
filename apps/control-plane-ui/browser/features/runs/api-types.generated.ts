@@ -674,6 +674,11 @@ export type ReviewRunEvent = {
   event_id: number
   axis: 'execution' | 'preparation' | 'publication'
   /**
+   * @description Null when the axis itself moved. On the `publication` axis, names the publication step that moved instead; its states are those of `x-state-machines.publication.step`.
+   * @type string
+   */
+  step_key: string | null
+  /**
    * @description State before the transition; null for the first event on an axis.
    * @type string
    */
@@ -779,7 +784,13 @@ export type ListRunsQuery = {
       | 'skipped'
       | 'failed'
     publication_status?:
-      'pending' | 'publishing' | 'published' | 'failed' | 'skipped'
+      | 'pending'
+      | 'publishing'
+      | 'uncertain'
+      | 'disconnected'
+      | 'published'
+      | 'failed'
+      | 'skipped'
     /**
      * @description Matches the run's redacted preparation summary by state. Every readable run carries that summary, so the filter never has to decide what a missing one means: a stored run that lacks its preparation row is corrupt, is dropped from list reads, and therefore cannot appear under any value of this filter.
      * @type string | undefined

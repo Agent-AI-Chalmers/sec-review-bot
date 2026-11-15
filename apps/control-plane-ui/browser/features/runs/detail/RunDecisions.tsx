@@ -5,7 +5,12 @@ import type { Run, RunEvent } from '../api.js'
 import { useMessages } from '../../../shared/i18n.js'
 import { ICON_SIZE } from '../../../shared/design.js'
 import { AdminRunActionDialog } from './AdminRunActionDialog.js'
-import { canResumeRun, failureCodeLabel, formatDuration } from '../format.js'
+import {
+  canResumeRun,
+  failureCodeLabel,
+  formatDuration,
+  parkedSince
+} from '../format.js'
 
 export function RunDecisions({
   run,
@@ -45,28 +50,7 @@ export function RunDecisions({
           ? 'publication'
           : null
   const parkedAt: string | null =
-    parkedAxis === null
-      ? null
-      : ((): string | null => {
-          let latest: string | null = null
-          for (const event of events) {
-            if (event.axis !== parkedAxis || event.to_status !== 'disconnected')
-              continue
-            if (
-              latest === null ||
-              Date.parse(event.occurred_at) > Date.parse(latest)
-            )
-              latest = event.occurred_at
-          }
-          return (
-            latest ??
-            (parkedAxis === 'preparation'
-              ? run.preparation.updated_at
-              : parkedAxis === 'execution'
-                ? run.execution.updated_at
-                : run.publication.updated_at)
-          )
-        })()
+    parkedAxis === null ? null : parkedSince(run, parkedAxis, events)
   return (
     <>
       <AdminRunActionDialog

@@ -16,7 +16,8 @@ import test from 'node:test'
 
 import {
   STATE_MACHINES,
-  type StateAxis
+  type CoordinationAxis,
+  type MachineBody
 } from '../../src/state-machines.generated.js'
 import { Pool } from 'pg'
 
@@ -64,15 +65,25 @@ async function createQueuedRun(
   return runId
 }
 
-/** Machines whose transitions are written to the run event log. Publication steps are not, so
- * their edges are pinned by publication-step-edges.test.ts instead. */
-const AUDITED_MACHINES = STATE_MACHINES.filter(
-  (machine) => machine.axis !== 'publication_step'
+/** Every machine the run event log records, named the way an event addresses it: an axis, or
+ * `<axis>.step` for the steps an axis is made of (an event on that axis with a `step_key`). */
+const AUDITED_MACHINES: ReadonlyMap<string, MachineBody> = new Map(
+  STATE_MACHINES.flatMap((machine): Array<[string, MachineBody]> => [
+    [machine.axis, machine],
+    ...(machine.step === undefined
+      ? []
+      : [[`${machine.axis}.step`, machine.step] as [string, MachineBody]])
+  ])
 )
 
-function declaredEdges(axis: StateAxis): Set<string> {
-  const machine = STATE_MACHINES.find((candidate) => candidate.axis === axis)
-  assert.ok(machine, `the contract declares an ${axis} machine`)
+function machineName(event: {
+  axis: CoordinationAxis
+  step_key: string | null
+}): string {
+  return event.step_key === null ? event.axis : `${event.axis}.step`
+}
+
+function declaredEdges(machine: MachineBody): Set<string> {
   return new Set(machine.transitions.map((edge) => `${edge.from}->${edge.to}`))
 }
 
@@ -117,7 +128,8 @@ async function claimNoticeFor(
 }
 
 interface RecordedEdge {
-  axis: StateAxis
+  /** The machine the edge belongs to, as named by `machineName`. */
+  machine: string
   edge: string
   reason: string | null
 }
@@ -549,6 +561,113 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       'a settled step hands the axis back to its publisher'
     )
 
+    // publication step: running -> running when an expired publication lease lets a new owner
+    // take over a step its predecessor started.
+    const takenOver = await newPublishingRun()
+    await store.publications.requirePublicationStepClaim(
+      takenOver.runId,
+      takenOver.token,
+      'issue:summary-comment'
+    )
+    await pool.query(
+      `UPDATE publications SET claimed_at=clock_timestamp()-interval '1 hour'
+       WHERE run_id=$1`,
+      [takenOver.runId]
+    )
+    const newOwner = await store.publicationClaims.claim(takenOver.runId)
+    assert.ok(newOwner)
+    await store.publications.requirePublicationStepClaim(
+      takenOver.runId,
+      newOwner,
+      'issue:summary-comment'
+    )
+
+    // publication step: running -> uncertain when the last attempt never reported: the claim
+    // that finds no attempt left sends the still-running step to reconciliation.
+    const neverReported = await newPublishingRun()
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      await store.publications.requirePublicationStepClaim(
+        neverReported.runId,
+        neverReported.token,
+        'issue:summary-comment'
+      )
+      await store.publications.failPublicationStep(
+        neverReported.runId,
+        neverReported.token,
+        'issue:summary-comment',
+        { message: 'response lost' },
+        { retry: true }
+      )
+    }
+    await store.publications.requirePublicationStepClaim(
+      neverReported.runId,
+      neverReported.token,
+      'issue:summary-comment'
+    )
+    await assert.rejects(
+      store.publications.requirePublicationStepClaim(
+        neverReported.runId,
+        neverReported.token,
+        'issue:summary-comment'
+      )
+    )
+
+    // publication step: uncertain -> failed when a reconciling publisher reports a failure
+    // without asking to retry (the next refused claim returns it to uncertain), and
+    // uncertain -> terminal_failed through a reconciliation that confirmed the effect absent.
+    // A terminal failure while reconciling shares that pair and is driven on its own run.
+    const reconciledAbsent = await newPublishingRun()
+    const terminalWhileReconciling = await newPublishingRun()
+    for (const run of [reconciledAbsent, terminalWhileReconciling]) {
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        await store.publications.requirePublicationStepClaim(
+          run.runId,
+          run.token,
+          'issue:summary-comment'
+        )
+        await store.publications.failPublicationStep(
+          run.runId,
+          run.token,
+          'issue:summary-comment',
+          { message: 'response lost' },
+          { retry: true }
+        )
+      }
+      await assert.rejects(
+        store.publications.requirePublicationStepClaim(
+          run.runId,
+          run.token,
+          'issue:summary-comment'
+        )
+      )
+    }
+    await store.publications.failPublicationStep(
+      reconciledAbsent.runId,
+      reconciledAbsent.token,
+      'issue:summary-comment',
+      { message: 'reconciliation errored' }
+    )
+    await assert.rejects(
+      store.publications.requirePublicationStepClaim(
+        reconciledAbsent.runId,
+        reconciledAbsent.token,
+        'issue:summary-comment'
+      )
+    )
+    await store.publications.settleExhaustedPublicationStep(
+      reconciledAbsent.runId,
+      reconciledAbsent.token,
+      'issue:summary-comment',
+      { found: false }
+    )
+    await store.publications.failPublicationStep(
+      terminalWhileReconciling.runId,
+      terminalWhileReconciling.token,
+      'issue:summary-comment',
+      { code: 'GITHUB_VALIDATION_REJECTED', message: 'rejected' },
+      { retry: false }
+    )
+
     // publication: publishing -> pending on a retryable failure.
     const publishRetried = await newPublishingRun()
     await store.publications.fail(
@@ -767,12 +886,45 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       'operator decision'
     )
 
+    // The publication axis stores a copy of its strongest step state, re-derived by every step
+    // write. A write path that forgot the re-derivation would leave the copy stale while every
+    // edge it recorded still looked legal, so compare the stored axis with its steps for every
+    // run this driver moved through a step path.
+    const drift = await pool.query<{
+      run_id: string
+      stored: string
+      derived: string
+    }>(
+      `SELECT p.run_id, p.status AS stored,
+              CASE
+                WHEN bool_or(s.status='disconnected') THEN 'disconnected'
+                WHEN bool_or(s.status='uncertain') THEN 'uncertain'
+                ELSE 'publishing'
+              END AS derived
+       FROM publications p
+       JOIN publication_steps s
+         ON s.run_id=p.run_id AND s.connector_id=p.connector_id
+       WHERE p.run_id = ANY($1::text[])
+         AND p.status IN ('publishing','uncertain','disconnected')
+       GROUP BY p.run_id, p.status`,
+      [runIds]
+    )
+    assert.deepStrictEqual(
+      drift.rows.filter((row) => row.stored !== row.derived),
+      [],
+      'a live publication axis must equal the strongest state of its steps'
+    )
+    assert.ok(
+      new Set(drift.rows.map((row) => row.stored)).size === 3,
+      'the driver must leave live publications in all three owned states'
+    )
+
     const recorded: RecordedEdge[] = []
     for (const runId of runIds) {
       for (const event of await store.queries.listEvents(runId)) {
         if (event.from_status === null) continue
         recorded.push({
-          axis: event.axis,
+          machine: machineName(event),
           edge: `${event.from_status}->${event.to_status}`,
           reason: event.reason_code
         })
@@ -797,16 +949,11 @@ function recordEveryPathOnce(): Promise<RecordedEdge[]> {
 
 test('every transition a run records is declared in the contract', async () => {
   const recorded = await recordEveryPathOnce()
-  const declared = new Map(
-    AUDITED_MACHINES.map((machine) => [
-      machine.axis,
-      declaredEdges(machine.axis)
-    ])
-  )
-  for (const { axis, edge } of recorded) {
+  for (const { machine, edge } of recorded) {
+    const declared = AUDITED_MACHINES.get(machine)
     assert.ok(
-      declared.get(axis)?.has(edge),
-      `${axis} recorded ${edge}, which the contract does not declare`
+      declared !== undefined && declaredEdges(declared).has(edge),
+      `${machine} recorded ${edge}, which the contract does not declare`
     )
   }
 })
@@ -818,22 +965,22 @@ test('every declared edge is reachable by a write path', async () => {
   // new name, instead of silently agreeing with a stale list.
   const recorded = await recordEveryPathOnce()
   const observed = new Map<string, Set<string>>()
-  for (const { axis, edge } of recorded) {
-    const edges = observed.get(axis) ?? new Set<string>()
+  for (const { machine, edge } of recorded) {
+    const edges = observed.get(machine) ?? new Set<string>()
     edges.add(edge)
-    observed.set(axis, edges)
+    observed.set(machine, edges)
   }
-  for (const machine of AUDITED_MACHINES) {
-    for (const edge of declaredEdges(machine.axis)) {
+  for (const [name, machine] of AUDITED_MACHINES) {
+    for (const edge of declaredEdges(machine)) {
       assert.ok(
-        observed.get(machine.axis)?.has(edge),
-        `${machine.axis} declares ${edge}, but no write path produces it`
+        observed.get(name)?.has(edge),
+        `${name} declares ${edge}, but no write path produces it`
       )
     }
   }
 })
 
-/** The reasons each declared edge promises, keyed by `axis from->to`.
+/** The reasons each declared edge promises, keyed by `machine from->to`.
  *
  * One pair of states can be written by more than one decision: a disconnected preparation is
  * abandoned when it contradicts execution, and given up on when an operator simply stops
@@ -842,9 +989,9 @@ test('every declared edge is reachable by a write path', async () => {
  * A `null` entry means the edge deliberately accepts any reason (a connector-supplied code). */
 function declaredReasons(): Map<string, Array<string | null>> {
   const reasons = new Map<string, Array<string | null>>()
-  for (const machine of AUDITED_MACHINES) {
+  for (const [name, machine] of AUDITED_MACHINES) {
     for (const edge of machine.transitions) {
-      const key = `${machine.axis} ${edge.from}->${edge.to}`
+      const key = `${name} ${edge.from}->${edge.to}`
       const existing = reasons.get(key) ?? []
       existing.push(edge.reason ?? null)
       reasons.set(key, existing)
@@ -860,8 +1007,8 @@ test('a reason the audit log writes is the reason the contract declares', async 
   // code is an open set owned by the connector, not a contract value.
   const recorded = await recordEveryPathOnce()
   const declared = declaredReasons()
-  for (const { axis, edge, reason } of recorded) {
-    const key = `${axis} ${edge}`
+  for (const { machine, edge, reason } of recorded) {
+    const key = `${machine} ${edge}`
     const expected = declared.get(key)
     assert.ok(expected !== undefined, `${key} is not declared`)
     // An edge that accepts any reason makes the whole pair open.

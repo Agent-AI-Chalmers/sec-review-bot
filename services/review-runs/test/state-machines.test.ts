@@ -10,7 +10,10 @@ import test from 'node:test'
 
 import { parse as parseYaml } from 'yaml'
 
-import { STATE_MACHINES } from '../src/state-machines.generated.js'
+import {
+  STATE_MACHINES,
+  type MachineBody
+} from '../src/state-machines.generated.js'
 import { REVIEW_RUNS_API_SPEC_PATH as SPEC_PATH } from './generated-paths.js'
 
 type Spec = {
@@ -49,6 +52,15 @@ function enumFor(spec: Spec, field: string): string[] {
   return asEnum(node?.enum, field)
 }
 
+/** Every machine with a name for messages: each axis, and each axis' step machine. */
+const ALL_MACHINES: ReadonlyArray<[string, MachineBody]> =
+  STATE_MACHINES.flatMap((machine): Array<[string, MachineBody]> => [
+    [machine.axis, machine],
+    ...(machine.step === undefined
+      ? []
+      : [[`${machine.axis}.step`, machine.step] as [string, MachineBody]])
+  ])
+
 function asEnum(value: unknown, field: string): string[] {
   if (!Array.isArray(value)) throw new Error(`${field} has no enum`)
   // Nullable enums include null; state machines only describe named string states.
@@ -57,46 +69,43 @@ function asEnum(value: unknown, field: string): string[] {
 
 test('each state-machine axis matches the enum of the field it describes', () => {
   const spec = parseYaml(readFileSync(SPEC_PATH, 'utf8')) as Spec
-  for (const machine of STATE_MACHINES) {
+  for (const [name, machine] of ALL_MACHINES) {
     const enumValues = enumFor(spec, machine.field)
     const states = [...machine.states].sort()
     assert.deepStrictEqual(
       [...enumValues].sort(),
       states,
-      `${machine.axis} states must equal the enum of ${machine.field}`
+      `${name} states must equal the enum of ${machine.field}`
     )
   }
 })
 
 test('every state declares a label and hover description in both languages', () => {
-  for (const machine of STATE_MACHINES) {
+  for (const [name, machine] of ALL_MACHINES) {
     for (const state of machine.states) {
       const detail = machine.details[state]
-      assert.ok(detail, `${machine.axis}.${state} has no details`)
+      assert.ok(detail, `${name}.${state} has no details`)
       for (const key of ['label', 'description'] as const)
         assert.ok(
           detail[key] && detail[key].trim().length > 0,
-          `${machine.axis}.${state}.${key} must be non-empty`
+          `${name}.${state}.${key} must be non-empty`
         )
     }
     // The details map must not describe states the machine does not declare.
     assert.deepStrictEqual(
       Object.keys(machine.details).sort(),
       [...machine.states].sort(),
-      `${machine.axis} details must cover exactly its states`
+      `${name} details must cover exactly its states`
     )
   }
 })
 
 test('every transition names states the machine declares, and every state is reachable', () => {
-  for (const machine of STATE_MACHINES) {
+  for (const [name, machine] of ALL_MACHINES) {
     const states = new Set(machine.states)
-    assert.ok(states.has(machine.initial), `${machine.axis} initial is a state`)
+    assert.ok(states.has(machine.initial), `${name} initial is a state`)
     for (const terminal of machine.terminal)
-      assert.ok(
-        states.has(terminal),
-        `${machine.axis} terminal ${terminal} is a state`
-      )
+      assert.ok(states.has(terminal), `${name} terminal ${terminal} is a state`)
     const reached = new Set<string>([machine.initial])
     // Breadth-first over the declared edges: a state with no path from the initial one is a
     // diagram lie (it would be drawn but never entered).
@@ -106,7 +115,7 @@ test('every transition names states the machine declares, and every state is rea
       for (const edge of machine.transitions) {
         assert.ok(
           states.has(edge.from) && states.has(edge.to),
-          `${machine.axis} edge ${edge.from}->${edge.to}`
+          `${name} edge ${edge.from}->${edge.to}`
         )
         if (reached.has(edge.from) && !reached.has(edge.to)) {
           reached.add(edge.to)
@@ -115,9 +124,6 @@ test('every transition names states the machine declares, and every state is rea
       }
     }
     for (const state of machine.states)
-      assert.ok(
-        reached.has(state),
-        `${machine.axis} state ${state} is unreachable`
-      )
+      assert.ok(reached.has(state), `${name} state ${state} is unreachable`)
   }
 })

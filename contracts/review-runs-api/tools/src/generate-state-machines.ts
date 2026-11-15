@@ -20,8 +20,9 @@ const SPEC_PATH = path.resolve(
   'openapi.yaml'
 )
 
-export type StateAxis =
-  'preparation' | 'execution' | 'publication' | 'publication_step'
+/** The three run axes. Each owns one row per run and one state machine; this is the only sense
+ * of "axis" the contract uses. */
+export type CoordinationAxis = 'preparation' | 'execution' | 'publication'
 
 export interface StateTransition {
   from: string
@@ -32,7 +33,7 @@ export interface StateTransition {
   label?: string
 }
 
-/** One state on an axis: its display labels and the sentence shown when it is hovered. This
+/** One state on a machine: its display labels and the sentence shown when it is hovered. This
  * text lives in the contract so a tooltip can never describe a state differently from the
  * diagram or the schema. */
 export interface StateDetail {
@@ -42,12 +43,9 @@ export interface StateDetail {
   description: string
 }
 
-export interface StateMachine {
-  axis: StateAxis
-  /** Display order across axes: earlier in the lifecycle sorts first (preparation before
-   * execution before publication). */
-  order: number
-  title: string
+/** The lifecycle of one row: an axis row, or a step row nested under its axis. */
+export interface MachineBody {
+  /** The schema field whose enum this machine's states must equal. */
   field: string
   initial: string
   terminal: string[]
@@ -58,11 +56,21 @@ export interface StateMachine {
   transitions: StateTransition[]
 }
 
-const AXES: readonly StateAxis[] = [
+export interface StateMachine extends MachineBody {
+  axis: CoordinationAxis
+  /** Display order across axes: earlier in the lifecycle sorts first (preparation before
+   * execution before publication). */
+  order: number
+  title: string
+  /** The machine of the steps this axis is made of, when it has steps. Step transitions are
+   * recorded on this axis with a `step_key`. */
+  step?: MachineBody
+}
+
+const AXES: readonly CoordinationAxis[] = [
   'preparation',
   'execution',
-  'publication',
-  'publication_step'
+  'publication'
 ]
 
 /** Read and validate the `x-state-machines` block. Validation here is deliberately strict:
@@ -75,76 +83,74 @@ export function readStateMachines(): StateMachine[] {
   const block = spec['x-state-machines']
   if (block === undefined)
     throw new Error('openapi.yaml has no x-state-machines block')
-  const machines = AXES.map((axis) => {
-    const raw = block[axis]
-    if (typeof raw !== 'object' || raw === null)
-      throw new Error(`x-state-machines.${axis} is missing`)
-    const machine = raw as {
-      order?: unknown
-      title?: unknown
-      field?: unknown
-      initial?: unknown
-      terminal?: unknown
-      states?: unknown
-      transitions?: unknown
-    }
-    const { states, details } = readStates(machine.states, `${axis}.states`)
-    const terminal = asStringArray(machine.terminal, `${axis}.terminal`)
-    const order = asNumber(machine.order, `${axis}.order`)
-    const initial = asString(machine.initial, `${axis}.initial`)
-    const field = asString(machine.field, `${axis}.field`)
-    const title = asString(machine.title, `${axis}.title`)
-    if (!states.includes(initial))
-      throw new Error(
-        `x-state-machines.${axis}.initial is not one of its states`
-      )
-    for (const state of terminal)
-      if (!states.includes(state))
-        throw new Error(
-          `x-state-machines.${axis}.terminal ${state} is not a state`
-        )
-    const transitions = (
-      Array.isArray(machine.transitions)
-        ? machine.transitions
-        : (() => {
-            throw new Error(
-              `x-state-machines.${axis}.transitions must be an array`
-            )
-          })()
-    ).map((edge, index): StateTransition => {
-      if (typeof edge !== 'object' || edge === null)
-        throw new Error(
-          `x-state-machines.${axis}.transitions[${index}] is invalid`
-        )
-      const record = edge as Record<string, unknown>
-      const from = asString(record.from, `${axis}.transitions[${index}].from`)
-      const to = asString(record.to, `${axis}.transitions[${index}].to`)
-      if (!states.includes(from) || !states.includes(to))
-        throw new Error(
-          `x-state-machines.${axis}.transitions[${index}] names an unknown state`
-        )
-      return {
-        from,
-        to,
-        ...(typeof record.reason === 'string' ? { reason: record.reason } : {}),
-        ...(typeof record.label === 'string' ? { label: record.label } : {})
-      }
-    })
+  const unknown = Object.keys(block).filter(
+    (key) => !(AXES as readonly string[]).includes(key)
+  )
+  if (unknown.length > 0)
+    throw new Error(
+      `x-state-machines declares ${unknown.join(', ')}, which is not an axis`
+    )
+  const machines = AXES.map((axis): StateMachine => {
+    const raw = asRecord(block[axis], axis)
+    const body = readMachineBody(raw, axis)
+    const step =
+      raw.step === undefined
+        ? undefined
+        : readMachineBody(asRecord(raw.step, `${axis}.step`), `${axis}.step`)
     return {
       axis,
-      order,
-      title,
-      field,
-      initial,
-      terminal,
-      states,
-      details,
-      transitions
+      order: asNumber(raw.order, `${axis}.order`),
+      title: asString(raw.title, `${axis}.title`),
+      ...body,
+      ...(step === undefined ? {} : { step })
     }
   })
   // The lifecycle order is declared in the contract (`order`), not implied by YAML key order,
   // so the diagram reads preparation -> execution -> publication.
   return machines.sort((left, right) => left.order - right.order)
+}
+
+function readMachineBody(
+  raw: Record<string, unknown>,
+  where: string
+): MachineBody {
+  const { states, details } = readStates(raw.states, `${where}.states`)
+  const terminal = asStringArray(raw.terminal, `${where}.terminal`)
+  const initial = asString(raw.initial, `${where}.initial`)
+  const field = asString(raw.field, `${where}.field`)
+  if (!states.includes(initial))
+    throw new Error(
+      `x-state-machines.${where}.initial is not one of its states`
+    )
+  for (const state of terminal)
+    if (!states.includes(state))
+      throw new Error(
+        `x-state-machines.${where}.terminal ${state} is not a state`
+      )
+  if (!Array.isArray(raw.transitions))
+    throw new Error(`x-state-machines.${where}.transitions must be an array`)
+  const transitions = raw.transitions.map((edge, index): StateTransition => {
+    const record = asRecord(edge, `${where}.transitions[${index}]`)
+    const from = asString(record.from, `${where}.transitions[${index}].from`)
+    const to = asString(record.to, `${where}.transitions[${index}].to`)
+    if (!states.includes(from) || !states.includes(to))
+      throw new Error(
+        `x-state-machines.${where}.transitions[${index}] names an unknown state`
+      )
+    return {
+      from,
+      to,
+      ...(typeof record.reason === 'string' ? { reason: record.reason } : {}),
+      ...(typeof record.label === 'string' ? { label: record.label } : {})
+    }
+  })
+  return { field, initial, terminal, states, details, transitions }
+}
+
+function asRecord(value: unknown, where: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value))
+    throw new Error(`x-state-machines.${where} must be an object`)
+  return value as Record<string, unknown>
 }
 
 /** Read the `states` map: each key is a state value, each value its labels and hover
@@ -201,9 +207,8 @@ const HEADER = `// Generated from contracts/review-runs-api/v1/openapi.yaml (pat
  * Control-Plane-side consistency test read exactly the same machines. */
 async function renderStateMachinesModule(): Promise<string> {
   const machines = readStateMachines()
-  const axes = machines.map((machine) => machine.axis)
   const rendered = `${HEADER}
-export type StateAxis = ${axes.map((axis) => `'${axis}'`).join(' | ')}
+export type CoordinationAxis = ${AXES.map((axis) => `'${axis}'`).join(' | ')}
 
 export interface StateTransition {
   from: string
@@ -217,10 +222,7 @@ export interface StateDetail {
   description: string
 }
 
-export interface StateMachine {
-  axis: StateAxis
-  order: number
-  title: string
+export interface MachineBody {
   field: string
   initial: string
   terminal: string[]
@@ -229,17 +231,36 @@ export interface StateMachine {
   transitions: StateTransition[]
 }
 
-/** Every declared state machine. Which of them the console draws is a presentation decision
- * that lives in the console, not here. */
+export interface StateMachine extends MachineBody {
+  axis: CoordinationAxis
+  order: number
+  title: string
+  step?: MachineBody
+}
+
+/** The three axis machines, in lifecycle order. A machine's steps, when it has them, are its
+ * \`step\` member. */
 export const STATE_MACHINES: readonly StateMachine[] = ${JSON.stringify(
     machines,
     null,
     2
   )} as const
 
-/** The machine for one axis, or undefined if the axis is unknown. */
-export function stateMachine(axis: StateAxis): StateMachine | undefined {
-  return STATE_MACHINES.find((machine) => machine.axis === axis)
+/** The machine for one axis. */
+export function stateMachine(axis: CoordinationAxis): StateMachine {
+  const machine = STATE_MACHINES.find((candidate) => candidate.axis === axis)
+  if (machine === undefined) throw new Error(\`no state machine for \${axis}\`)
+  return machine
+}
+
+/** The machine whose states an audit event's \`from_status\` and \`to_status\` name: the axis
+ * itself, or its step machine when the event names a step. */
+export function machineForEvent(event: {
+  axis: CoordinationAxis
+  step_key: string | null
+}): MachineBody | undefined {
+  const machine = stateMachine(event.axis)
+  return event.step_key === null ? machine : machine.step
 }
 `
   const options = await prettier.resolveConfig(

@@ -77,7 +77,7 @@ The run trunk and the lifecycle axes are separate tables. `review_runs` holds on
 | `publication_steps`           | Recoverable individual connector side effects                      | `pending`, `running`, `uncertain`, `disconnected`, `succeeded`, `failed`, `terminal_failed`   |
 | `execution_statistics`        | Statistics reconciliation state and run totals                     | `pending`, `reconciling`, `settled`, `unavailable`                                            |
 | `execution_statistics_groups` | Workflow-coordinate/agent/provider/model call and token totals     | —                                                                                             |
-| `review_run_events`           | Append-only audit log of transitions on every axis                 | —                                                                                             |
+| `review_run_events`           | Append-only audit log of axis and publication step transitions     | —                                                                                             |
 
 `preparations.status`:
 
@@ -146,7 +146,9 @@ flowchart LR
   stepdisconnected -->|resumed by an operator| steppending
 ```
 
-_The diagrams omit four self-loops that do not change the state: execution `uncertain → uncertain` (replay claimed) and publication `publishing → publishing` (publishing lease expired) only record an audit event; publication step `running → running` (taken over by a new owner) and `uncertain → uncertain` (reconciliation inconclusive) only advance the attempt or reconciliation count._
+The publication axis follows its steps: while it is owned, it reports the strongest step state, in the order `disconnected`, then `uncertain`, then `publishing`. A parked step therefore outranks one still being reconciled, because that is what the operator queue has to surface. `published` and `failed` are the owner's own conclusions and are never derived from steps.
+
+_The diagrams omit four self-loops that do not change the state: execution `uncertain → uncertain` (replay claimed) and publication `publishing → publishing` (publishing lease expired) only record an audit event; publication step `running → running` (taken over by a new owner) and `uncertain → uncertain` (reconciliation inconclusive) advance the attempt or reconciliation count and record an audit event._
 
 The axes are connected by three cross-axis triggers. These are orchestration triggers, not status transitions within one table:
 
@@ -160,6 +162,10 @@ The axes are connected by three cross-axis triggers. These are orchestration tri
 | ------------------------ | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | `attempt_count`          | Attempts to write the side effect; the retry budget | An attempt starts, so a publisher that dies mid-effect consumes one exactly like a failed attempt                           |
 | `recovery_attempt_count` | Attempts to confirm the remote outcome              | A reconciliation cannot conclude. Reading the remote system does not repeat the write, so it never advances `attempt_count` |
+
+<!-- doc-default: MAX_PUBLICATION_STEP_ATTEMPTS, MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS; source=services/review-runs/src/persistence/publication-store.ts -->
+
+Each budget is currently three. A step whose `attempt_count` reaches it is refused a new attempt and goes to the connector for reconciliation; a step whose `recovery_attempt_count` reaches it becomes `disconnected`.
 
 Whether another attempt is allowed depends only on `attempt_count`, not on failures, crashes, or elapsed time. Nothing stores a separate failure total: each `failed` transition is already recorded by `failure_code`, `failure_message`, and the run's event log.
 

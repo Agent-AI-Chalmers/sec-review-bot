@@ -1,4 +1,9 @@
-import { ApiError, type ArtifactStorage, type Run } from './api.js'
+import {
+  ApiError,
+  type ArtifactStorage,
+  type Run,
+  type RunEvent
+} from './api.js'
 import type { Message, Translator } from '../../shared/i18n.js'
 import {
   abbreviate,
@@ -34,6 +39,28 @@ export function safeExternalUrl(value: string | null): string | undefined {
  *   leave the row stalled and invisible, which is worse than the parked state it replaced.
  *
  * Offering a button the server answers with 409 teaches an operator that the decision existed. */
+/** When the parked axis entered `disconnected`: its own latest transition there, falling back to
+ * the axis' last write when no such event exists. A step event shares its axis, but a step
+ * parking later does not re-park the axis, so step events are not the axis' park time. */
+export function parkedSince(
+  run: Run,
+  axis: 'preparation' | 'execution' | 'publication',
+  events: readonly RunEvent[]
+): string {
+  let latest: string | null = null
+  for (const event of events) {
+    if (
+      event.axis !== axis ||
+      event.step_key !== null ||
+      event.to_status !== 'disconnected'
+    )
+      continue
+    if (latest === null || Date.parse(event.occurred_at) > Date.parse(latest))
+      latest = event.occurred_at
+  }
+  return latest ?? run[axis].updated_at
+}
+
 export function canResumeRun(run: Run): boolean {
   if (run.preparation.status === 'disconnected') {
     return run.execution.status === 'pending'

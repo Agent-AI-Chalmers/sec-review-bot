@@ -427,6 +427,7 @@ export const messages = {
     axisExecution: 'Execution',
     axisPreparation: 'Preparation',
     axisPublication: 'Publication',
+    axisPublicationStep: 'Publication step {step}',
     created: 'Created',
     preparation: 'Preparation',
     preparationAttempts: 'Attempts',
@@ -515,6 +516,52 @@ export const messages = {
     state_publication_skipped_label: 'Skipped',
     state_publication_skipped_desc:
       'Nothing was published because execution did not succeed.',
+    state_publication_step_pending_label: 'Pending',
+    state_publication_step_pending_desc:
+      'Not attempted yet, or returned to the queue with fresh budgets by an operator.',
+    state_publication_step_running_label: 'Running',
+    state_publication_step_running_desc:
+      'An attempt started. Its owner may still be writing to the remote system, or may have stopped after writing, so a later attempt cannot assume nothing happened.',
+    state_publication_step_failed_label: 'Failed',
+    state_publication_step_failed_desc:
+      'The last attempt reported a retryable failure; another attempt may start while attempts remain.',
+    state_publication_step_uncertain_label: 'Uncertain',
+    state_publication_step_uncertain_desc:
+      'No attempts remain, but an earlier attempt may have taken effect remotely, so the step is checked against the remote system before it concludes.',
+    state_publication_step_disconnected_label: 'Disconnected',
+    state_publication_step_disconnected_desc:
+      'Checking the remote system ran out of tries without an answer. An operator has to establish what is actually there.',
+    state_publication_step_succeeded_label: 'Succeeded',
+    state_publication_step_succeeded_desc:
+      'The remote change exists, either written by an attempt or found by a check.',
+    state_publication_step_terminal_failed_label: 'Terminal failure',
+    state_publication_step_terminal_failed_desc:
+      'The step will not be tried again: an attempt failed for good, or a check confirmed the change is absent.',
+    edge_publication_step_pending_running: 'an attempt started',
+    edge_publication_step_running_running:
+      'the previous owner stopped, and a new owner took over the attempt',
+    edge_publication_step_failed_running: 'a retry started',
+    edge_publication_step_running_succeeded: 'the remote change was written',
+    edge_publication_step_running_failed:
+      'the attempt failed and can be retried',
+    edge_publication_step_running_terminal_failed:
+      'the attempt failed and cannot be retried',
+    edge_publication_step_running_uncertain:
+      'no attempts remain and the last one never reported, so the remote system is checked',
+    edge_publication_step_failed_uncertain:
+      'no attempts remain, so the remote system is checked before concluding',
+    edge_publication_step_uncertain_succeeded:
+      'the check found the remote change',
+    edge_publication_step_uncertain_terminal_failed:
+      'the check found no remote change, or failed for good',
+    edge_publication_step_uncertain_uncertain:
+      'the check could not reach an answer and will be tried again',
+    edge_publication_step_uncertain_disconnected:
+      'the check ran out of tries, so automation stops',
+    edge_publication_step_uncertain_failed:
+      'the check reported a failure without asking to retry',
+    edge_publication_step_disconnected_pending:
+      'an operator returned the step to the queue with fresh budgets',
     machine_preparation_title: 'Preparation',
     machine_execution_title: 'Execution',
     machine_publication_title: 'Publication',
@@ -1017,6 +1064,7 @@ export const messages = {
     axisExecution: '执行',
     axisPreparation: '准备',
     axisPublication: '发布',
+    axisPublicationStep: '发布步骤 {step}',
     created: '创建',
     preparation: '准备',
     preparationAttempts: '尝试次数',
@@ -1098,6 +1146,45 @@ export const messages = {
       '发布已确定失败：可重试的失败会退回「等待中」重试，只有确定性失败或操作员的决定才停在这里。',
     state_publication_skipped_label: '已跳过',
     state_publication_skipped_desc: '因为执行未成功，没有可发布的内容。',
+    state_publication_step_pending_label: '等待中',
+    state_publication_step_pending_desc:
+      '尚未尝试，或已由 operator 放回队列并重置预算。',
+    state_publication_step_running_label: '进行中',
+    state_publication_step_running_desc:
+      '一次尝试已经开始。执行者可能仍在写入远端，也可能写入后就中止了，因此后续尝试不能假定什么都没发生。',
+    state_publication_step_failed_label: '失败',
+    state_publication_step_failed_desc:
+      '上一次尝试报告了可重试的失败；尝试次数未用完前还会再试。',
+    state_publication_step_uncertain_label: '待确认',
+    state_publication_step_uncertain_desc:
+      '尝试次数已用完，但之前的尝试可能已在远端生效，因此先查询远端再下结论。',
+    state_publication_step_disconnected_label: '失联',
+    state_publication_step_disconnected_desc:
+      '查询远端的次数用完仍没有结论，需要 operator 确认远端的实际情况。',
+    state_publication_step_succeeded_label: '成功',
+    state_publication_step_succeeded_desc:
+      '远端的变更已经存在：由某次尝试写入，或由查询发现。',
+    state_publication_step_terminal_failed_label: '最终失败',
+    state_publication_step_terminal_failed_desc:
+      '这个步骤不会再尝试：某次尝试确定失败，或查询确认远端没有这项变更。',
+    edge_publication_step_pending_running: '开始一次尝试',
+    edge_publication_step_running_running:
+      '原执行者已中止，新执行者接管了这次尝试',
+    edge_publication_step_failed_running: '开始重试',
+    edge_publication_step_running_succeeded: '远端变更已写入',
+    edge_publication_step_running_failed: '尝试失败，可以重试',
+    edge_publication_step_running_terminal_failed: '尝试失败，不能重试',
+    edge_publication_step_running_uncertain:
+      '尝试次数用完且最后一次没有回报，转为查询远端',
+    edge_publication_step_failed_uncertain: '尝试次数用完，下结论前先查询远端',
+    edge_publication_step_uncertain_succeeded: '查询发现了远端变更',
+    edge_publication_step_uncertain_terminal_failed:
+      '查询确认没有远端变更，或确定失败',
+    edge_publication_step_uncertain_uncertain: '查询没有结论，稍后再试',
+    edge_publication_step_uncertain_disconnected: '查询次数用完，自动处理停止',
+    edge_publication_step_uncertain_failed: '查询报告了失败且未要求重试',
+    edge_publication_step_disconnected_pending:
+      'operator 把这个步骤放回队列并重置预算',
     machine_preparation_title: '准备',
     machine_execution_title: '执行',
     machine_publication_title: '发布',

@@ -14,10 +14,10 @@ import {
   RETURN_EDGES,
   STATE_LAYOUT
 } from '../browser/features/runs/detail/state-machine-layout.js'
-import { diagrammedMachines } from '../browser/features/runs/detail/transitions.js'
+import { STATE_MACHINES } from '../browser/features/runs/state-machines.generated.js'
 
 test('every drawn state has its own cell, and no cell names an undeclared state', () => {
-  for (const machine of diagrammedMachines()) {
+  for (const machine of STATE_MACHINES) {
     const layout = STATE_LAYOUT[machine.axis]
     assert.deepStrictEqual(
       Object.keys(layout).sort(),
@@ -34,7 +34,7 @@ test('every drawn state has its own cell, and no cell names an undeclared state'
 })
 
 test('every listed return edge is a transition the contract declares', () => {
-  for (const machine of diagrammedMachines()) {
+  for (const machine of STATE_MACHINES) {
     const declared = new Set(
       machine.transitions.map((edge) => `${edge.from}->${edge.to}`)
     )
@@ -47,7 +47,7 @@ test('every listed return edge is a transition the contract declares', () => {
 })
 
 test('every declared transition is drawn on exactly one line', () => {
-  for (const machine of diagrammedMachines()) {
+  for (const machine of STATE_MACHINES) {
     const { edges } = diagramGeometry(machine)
     const drawn = edges.flatMap((edge) => edge.transitions)
     assert.strictEqual(drawn.length, machine.transitions.length)
@@ -63,7 +63,7 @@ test('every declared transition is drawn on exactly one line', () => {
 test('no edge passes through a state it does not connect', () => {
   // An edge hidden under a node reads as if the transition did not exist, which is how
   // `queued -> succeeded` once disappeared behind `running`.
-  for (const machine of diagrammedMachines()) {
+  for (const machine of STATE_MACHINES) {
     const { nodes, edges } = diagramGeometry(machine)
     for (const edge of edges) {
       if (edge.kind === 'self') continue
@@ -85,7 +85,7 @@ test('no edge passes through a state it does not connect', () => {
 })
 
 test('the view box contains every node and edge', () => {
-  for (const machine of diagrammedMachines()) {
+  for (const machine of STATE_MACHINES) {
     const { nodes, edges, viewBox } = diagramGeometry(machine)
     const inside = (x: number, y: number): boolean =>
       x >= viewBox.x &&

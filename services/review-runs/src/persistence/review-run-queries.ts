@@ -137,6 +137,9 @@ function parkedAxisSelect({
              WHERE e.run_id = ${table}.run_id
                AND e.connector_id = ${table}.connector_id
                AND e.axis = '${axis}'
+               -- The axis row's own transition. A publication step event shares the axis, and a
+               -- second step parking later must not move the axis' parked_at forward.
+               AND e.step_key IS NULL
                AND e.to_status = 'disconnected'
              ORDER BY e.occurred_at DESC LIMIT 1
            ), updated_at) AS parked_at
