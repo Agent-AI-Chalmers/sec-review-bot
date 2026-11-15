@@ -8,16 +8,17 @@
 
 ## 冒烟测试清单
 
-| 冒烟场景 / 入口                                                 | 验证的真实边界                                                                           | 主要断言                                                                                                                                   | CI 执行策略              |
-| --------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------ |
-| [Review Runs HTTP](review-runs-http/review-runs-http.test.mjs)  | GitHub Integration 的 Review Runs 客户端 → Review Runs HTTP                              | 成功的空响应不会触发 JSON 解析错误；JSON 响应仍能正常解析。                                                                                | PR 按路径触发 + 合并队列 |
-| [run 提交](execution-submission/execution-submission.test.mjs)  | Review Runs 的 Execution API 客户端 → Execution Gateway HTTP → Temporal                  | 提交、重放相同提交并读取运行状态。在 Worker 执行前停止。                                                                                   | PR 按路径触发 + 合并队列 |
-| [Memory Catalog 客户端](memory-catalog/test_memory_catalog.py)  | agents 包的 Memory Catalog 客户端 → Memory Catalog HTTP → PostgreSQL                     | 必须先确认；重复注册保持幂等；拒绝冲突的发布意图和错误凭据。                                                                               | PR 按路径触发 + 合并队列 |
-| [输入包](input-bundle/test_input_bundle.py)                     | TypeScript 归档/上传 → RustFS → Python 输入准备                                          | 重复发布保持身份一致；工作区字节在传输后保持不变；拒绝错误摘要。                                                                           | PR 按路径触发 + 合并队列 |
-| [Memory 操作员编辑](memory-operator-edit/test_memory_bff.py)    | UI BFF → Catalog/PostgreSQL + RustFS                                                     | 重放编辑不会创建额外修订；过期编辑产生冲突；恢复返回先前指针和可读取的产物。                                                               | PR 按路径触发 + 合并队列 |
-| [执行生命周期](execution-lifecycle/test_execution_lifecycle.py) | Review Runs 协调 → Execution Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | 任务失败后能自动重试、执行能完成、运行文件可读取，且重新打开存储后仍能读取发布结果。安全分析使用预设结果，不调用真实模型或向 GitHub 发布。 | 仅手动执行               |
+| 冒烟场景 / 入口                                                        | 验证的真实边界                                                                           | 主要断言                                                                                                                                     | CI 执行策略              |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| [Review Runs HTTP](review-runs-http/review-runs-http.test.mjs)         | GitHub Integration 的 Review Runs 客户端 → Review Runs HTTP                              | 成功的空响应不会触发 JSON 解析错误；JSON 响应仍能正常解析。                                                                                  | PR 按路径触发 + 合并队列 |
+| [发布协调](publication-coordination/publication-coordination.test.mjs) | GitHub Integration 的仓库发布路径 → Review Runs HTTP → Review Runs store → PostgreSQL    | 确定失败的步骤把发布留给持有者，后续 delivery 仍能发布；持续失败的核对查询会让步骤停住；确定失败的查询结束该步骤，但不会被当作“不存在”结算。 | PR 按路径触发 + 合并队列 |
+| [run 提交](execution-submission/execution-submission.test.mjs)         | Review Runs 的 Execution API 客户端 → Execution Gateway HTTP → Temporal                  | 提交、重放相同提交并读取运行状态。在 Worker 执行前停止。                                                                                     | PR 按路径触发 + 合并队列 |
+| [Memory Catalog 客户端](memory-catalog/test_memory_catalog.py)         | agents 包的 Memory Catalog 客户端 → Memory Catalog HTTP → PostgreSQL                     | 必须先确认；重复注册保持幂等；拒绝冲突的发布意图和错误凭据。                                                                                 | PR 按路径触发 + 合并队列 |
+| [输入包](input-bundle/test_input_bundle.py)                            | TypeScript 归档/上传 → RustFS → Python 输入准备                                          | 重复发布保持身份一致；工作区字节在传输后保持不变；拒绝错误摘要。                                                                             | PR 按路径触发 + 合并队列 |
+| [Memory 操作员编辑](memory-operator-edit/test_memory_bff.py)           | UI BFF → Catalog/PostgreSQL + RustFS                                                     | 重放编辑不会创建额外修订；过期编辑产生冲突；恢复返回先前指针和可读取的产物。                                                                 | PR 按路径触发 + 合并队列 |
+| [执行生命周期](execution-lifecycle/test_execution_lifecycle.py)        | Review Runs 协调 → Execution Gateway → Temporal/Worker → RustFS → Review Runs/PostgreSQL | 任务失败后能自动重试、执行能完成、运行文件可读取，且重新打开存储后仍能读取发布结果。安全分析使用预设结果，不调用真实模型或向 GitHub 发布。   | 仅手动执行               |
 
-Review Runs HTTP 和 run 提交共用 `Smoke — Service Boundaries` job。Catalog 客户端、输入包和操作员编辑共用 `Smoke — Memory and Artifacts`，让选中的测试复用临时服务；各测试仍有独立的路径过滤器。手动工作流为 `Smoke — Execution Lifecycle`。共用 job 只为节省执行成本，这些测试并不因此成为另一类冒烟测试。
+Review Runs HTTP、发布协调和 run 提交共用 `Smoke — Service Boundaries` job。Catalog 客户端、输入包和操作员编辑共用 `Smoke — Memory and Artifacts`，让选中的测试复用临时服务；各测试仍有独立的路径过滤器。手动工作流为 `Smoke — Execution Lifecycle`。共用 job 只为节省执行成本，这些测试并不因此成为另一类冒烟测试。
 
 ## 目录结构
 
@@ -29,6 +30,7 @@ system-tests/
 ├── project_paths.py
 ├── pytest.ini
 ├── review-runs-http/
+├── publication-coordination/
 ├── execution-submission/
 ├── memory-catalog/
 ├── input-bundle/
@@ -56,6 +58,16 @@ pnpm --dir apps/github-integration run build
 pnpm --dir services/review-runs run build
 node --test system-tests/review-runs-http/review-runs-http.test.mjs
 ```
+
+## 发布协调
+
+connector 的单元测试 mock 了 Review Runs store，只能看到调用了什么，看不到 store 对这些调用做了什么。本测试让 GitHub Integration 编译后的仓库发布路径通过真实的 Review Runs 客户端，访问 Review Runs HTTP 路由和真实的 PostgreSQL store，并断言 Review Runs 实际记录的步骤与发布状态。GitHub 是本地假实现，按场景回答查询，不会有请求离开进程。
+
+```bash
+node --test system-tests/publication-coordination/publication-coordination.test.mjs
+```
+
+测试会构建两个包。设置 `TEST_DATABASE_URL` 可使用已有的临时数据库；否则使用 `compose.yaml` 配置的 PostgreSQL 镜像，并在结束后移除临时 Docker 容器。每个场景使用独立的 connector id，互相看不到对方的 run。
 
 ## run 提交
 

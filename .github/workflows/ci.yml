@@ -297,6 +297,9 @@ jobs:
       - name: Test execution submission boundary
         run: node --test system-tests/execution-submission/execution-submission.test.mjs
 
+      - name: Test publication coordination against the Review Runs store
+        run: node --test system-tests/publication-coordination/publication-coordination.test.mjs
+
   github-integration:
     name: GitHub Integration
     needs: changes
