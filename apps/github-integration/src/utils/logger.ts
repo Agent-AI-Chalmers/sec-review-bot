@@ -28,10 +28,30 @@ function formatScalar(value: unknown): string {
   return /\s/.test(text) ? JSON.stringify(text) : text
 }
 
+/** The diagnostic fields of an error, including its cause chain. `JSON.stringify` alone sees none
+ * of them: `message`, `stack`, and `cause` are not enumerable on an Error, so an error field
+ * would otherwise render as `{}`. A bounded depth stops a cause cycle. */
+function describeError(error: Error, depth = 0): Record<string, unknown> {
+  const extra = error as Error & { code?: unknown; status?: unknown }
+  return {
+    name: error.name,
+    message: error.message,
+    ...(extra.code === undefined ? {} : { code: extra.code }),
+    ...(extra.status === undefined ? {} : { status: extra.status }),
+    ...(error.cause instanceof Error && depth < 5
+      ? { cause: describeError(error.cause, depth + 1) }
+      : error.cause === undefined
+        ? {}
+        : { cause: String(error.cause) })
+  }
+}
+
 function formatValue(value: unknown): string {
   if (Array.isArray(value)) {
     return `[${value.map((item) => formatScalar(item)).join(',')}]`
   }
+
+  if (value instanceof Error) return JSON.stringify(describeError(value))
 
   if (value && typeof value === 'object') {
     return JSON.stringify(value)
