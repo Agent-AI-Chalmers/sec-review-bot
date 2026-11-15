@@ -5092,3 +5092,62 @@ test('a step whose owners kept dying exhausts the budget and is concluded', asyn
     await store.close()
   }
 })
+
+test('a reconciliation failure reported twice against one count spends the budget once', async () => {
+  // A connector whose failure report lost its response reports it again with the same expected
+  // count. The second report must not be counted, or each lost response would park the step a
+  // pass early. It must also succeed rather than be refused: after the first report parked the
+  // step, the status guard alone would answer false and the connector would read it as a lost
+  // claim. A report against a count that is still current is a new failure and is applied.
+  const store = await createStore({ claimTimeoutMs: 0 })
+  try {
+    const runId = await createSuccessfulRun(store)
+    const step = 'repository:delivery:retry'
+    const token = await store.publicationClaims.claim(runId)
+    assert.ok(token)
+    await store.publications.initializePublicationSteps(runId, token, [step])
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      await store.publications.requirePublicationStepClaim(runId, token, step)
+      await store.publications.failPublicationStep(
+        runId,
+        token,
+        step,
+        { message: 'response lost' },
+        { retry: true }
+      )
+    }
+    await assert.rejects(
+      store.publications.requirePublicationStepClaim(runId, token, step)
+    )
+    const recoveryCount = async () =>
+      (await store.publications.listPublicationSteps(runId))[0]
+        ?.recovery_attempt_count
+    const report = async (expected: number) =>
+      await store.publications.failPublicationStep(
+        runId,
+        token,
+        step,
+        { message: 'GitHub answered 502' },
+        { retry: true, expectedRecoveryAttemptCount: expected }
+      )
+
+    assert.strictEqual(await report(0), true)
+    assert.strictEqual(await report(0), true, 'the repeat is acknowledged')
+    assert.strictEqual(await recoveryCount(), 1, 'and counted once')
+
+    assert.strictEqual(await report(1), true)
+    assert.strictEqual(await report(2), true)
+    assert.strictEqual(
+      (await store.publications.listPublicationSteps(runId))[0]?.status,
+      'disconnected'
+    )
+    assert.strictEqual(
+      await report(2),
+      true,
+      'a repeat of the failure that parked the step is still acknowledged'
+    )
+    assert.strictEqual(await recoveryCount(), 3)
+  } finally {
+    await store.close()
+  }
+})

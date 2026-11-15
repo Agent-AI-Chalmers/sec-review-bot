@@ -257,6 +257,7 @@ test('a reconciliation that loses the step ends the publication instead of holdi
   // step.
   const lost = await settleExhaustedStep({
     store: {
+      listPublicationSteps: async () => [],
       settleExhaustedPublicationStep: async () => false
     } as unknown as Parameters<typeof settleExhaustedStep>[0]['store'],
     runId: 'run-1',
@@ -330,6 +331,7 @@ test('a reconciliation that loses the step ends the publication instead of holdi
           status: 'pending' as const,
           attempt_count: 3,
           last_attempt_at: null,
+          recovery_attempt_count: 0,
           remote_object_id: null,
           remote_object_url: null,
           failure_code: null,
@@ -374,4 +376,111 @@ test('a reconciliation that loses the step ends the publication instead of holdi
     ],
     'a lost reconciliation is recorded as a terminal failure, which releases the claim'
   )
+})
+
+test('a publication that cannot complete names the steps that kept it from completing', async () => {
+  // A step can be left unsettled with nothing of its own on record: an exhausted delivery whose
+  // reconciliation lookup got a 404 is skipped, because this pass never claimed it. The
+  // publication then fails as incomplete, and that failure must say which step and why, or the
+  // reason lives only in a log line an operator looking at the run never sees.
+  const messages: string[] = []
+  const store = {
+    claimNextPublication: async () =>
+      ({
+        run_id: RUN_ID,
+        workflow: 'repository-review',
+        source_platform: 'github',
+        connector_id: 'github-integration:test',
+        publish_context: REPOSITORY_CONTEXT,
+        preparation: {
+          status: 'submitted',
+          attempt_count: 1,
+          started_at: '2026-01-01T00:00:01.000Z',
+          finished_at: '2026-01-01T00:00:02.000Z',
+          updated_at: '2026-01-01T00:00:03.000Z',
+          failure_code: null,
+          disconnect_reason: null
+        },
+        execution: {
+          status: 'succeeded',
+          started_at: null,
+          finished_at: null,
+          updated_at: '2026-01-01T00:00:00.000Z'
+        },
+        publication: {
+          status: 'publishing',
+          started_at: null,
+          finished_at: null,
+          updated_at: '2026-01-01T00:00:00.000Z'
+        },
+        created_at: '2026-10-07T00:00:00.000Z',
+        failure_code: null,
+        failure_message: null,
+        artifact_storage: null,
+        notices: [],
+        workflow_result: EMPTY_REPOSITORY_RESULT,
+        claim_token: 'claim-1'
+      }) satisfies PublicationWork,
+    renewPublicationClaim: async () => true,
+    publicationHeartbeatIntervalMs: async () => 60_000,
+    completePublication: async () => false,
+    failPublication: async (
+      _runId: string,
+      _token: string,
+      error: { code?: string | null; message: string }
+    ) => {
+      messages.push(`${error.code}: ${error.message}`)
+      return true
+    },
+    initializePublicationSteps: async () => {},
+    listPublicationSteps: async () => [
+      {
+        step_key: 'repository:summary-issue',
+        status: 'succeeded' as const,
+        attempt_count: 1,
+        last_attempt_at: null,
+        recovery_attempt_count: 0,
+        remote_object_id: '1',
+        remote_object_url: 'https://example.test/issues/1',
+        failure_code: null,
+        failure_message: null
+      },
+      {
+        step_key: 'repository:delivery:gone',
+        status: 'uncertain' as const,
+        attempt_count: 3,
+        last_attempt_at: null,
+        recovery_attempt_count: 0,
+        remote_object_id: null,
+        remote_object_url: null,
+        failure_code: 'GITHUB_TIMEOUT',
+        failure_message: null
+      }
+    ],
+    requirePublicationStepClaim: async () => {},
+    completePublicationStep: async () => true,
+    settleExhaustedPublicationStep: async () => true,
+    failPublicationStep: async () => true,
+    connectorId: 'github-integration:test'
+  } as unknown as PublicationCoordinatorStore
+  const { app } = fakeApp({
+    respond: () => githubJson({ id: 1 }),
+    installationOctokit: fakeInstallationOctokit()
+  })
+
+  const restore = console.error
+  console.error = () => {}
+  try {
+    await publishReviewRunsOnce({ app, store })
+  } finally {
+    console.error = restore
+  }
+
+  assert.strictEqual(messages.length, 1)
+  assert.match(messages[0] ?? '', /^PUBLICATION_STEPS_INCOMPLETE: /)
+  assert.match(
+    messages[0] ?? '',
+    /repository:delivery:gone \(uncertain, GITHUB_TIMEOUT\)/
+  )
+  assert.doesNotMatch(messages[0] ?? '', /repository:summary-issue/)
 })

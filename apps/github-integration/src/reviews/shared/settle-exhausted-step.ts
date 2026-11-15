@@ -15,7 +15,8 @@ import type { Octokit } from 'octokit'
 
 import type { PublicationStepStore } from '../../review-runs/client.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../../execution/publish-error-code.js'
-import { errorCode } from '../../utils/error-utils.js'
+import { classifyPublicationFailure } from '../../review-runs/publication-failure.js'
+import { asErrorMessage, errorCode } from '../../utils/error-utils.js'
 
 /** Whether a publish error is the "no attempts left, reconcile first" signal. */
 export function isPublicationStepExhausted(error: unknown): boolean {
@@ -23,6 +24,28 @@ export function isPublicationStepExhausted(error: unknown): boolean {
     errorCode(error) ===
     EXECUTION_PUBLISH_ERROR_CODES.publication_step_retry_exhausted
   )
+}
+
+const RECORDED = Symbol('reconciliation failure recorded on its step')
+const RECOVERY_ATTEMPT = Symbol('recovery attempt count the lookup failed at')
+
+/** Whether this error is a reconciliation lookup failure already recorded on its step. A caller
+ * that records step failures itself must not record it a second time. The original error is
+ * thrown unchanged, so its status still drives retry classification. */
+export function isRecordedReconciliationFailure(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && RECORDED in error
+}
+
+/** The step's `recovery_attempt_count` before the failed lookup this error reports, when the
+ * lookup failed but recording it did not complete. A caller that records the failure itself
+ * passes it as `expectedRecoveryAttemptCount`, so if the earlier write did commit, Review Runs
+ * recognizes the same failure and does not spend the budget twice. */
+export function unrecordedRecoveryAttemptCount(
+  error: unknown
+): number | undefined {
+  if (typeof error !== 'object' || error === null) return undefined
+  const value = (error as { [RECOVERY_ATTEMPT]?: unknown })[RECOVERY_ATTEMPT]
+  return typeof value === 'number' ? value : undefined
 }
 
 /** What a reconciliation found, in the shape the completion path already uses. */
@@ -71,17 +94,66 @@ export async function settleExhaustedStep({
   stepKey: string
   find: () => Promise<ReconciledRemote | null>
 }): Promise<SettleExhaustedOutcome> {
-  const found = await find()
+  // The count this lookup will be reported against, read before looking. Like an activity
+  // failure that carries its attempt number, it identifies this one failure, so reporting it
+  // again after a lost response cannot spend the budget a second time.
+  const expectedRecoveryAttemptCount = (
+    await store.listPublicationSteps(runId)
+  ).find((step) => step.step_key === stepKey)?.recovery_attempt_count
+  let found: ReconciledRemote | null
+  try {
+    found = await find()
+  } catch (error) {
+    // A failed lookup settles nothing: it is not evidence of absence. It is recorded as a failed
+    // reconciliation of this `uncertain` step, retryable when transient, because that is what
+    // spends the step's reconciliation budget: a remote that keeps failing then parks the step
+    // as `disconnected` for an operator instead of being looked at again forever.
+    const failure = classifyPublicationFailure(error)
+    // Throw an object so a marker always sticks; a thrown primitive would otherwise lose it.
+    const thrown =
+      typeof error === 'object' && error !== null
+        ? error
+        : new Error(asErrorMessage(error), { cause: error })
+    if (expectedRecoveryAttemptCount !== undefined)
+      Object.defineProperty(thrown, RECOVERY_ATTEMPT, {
+        value: expectedRecoveryAttemptCount
+      })
+    // A lost response leaves it unknown whether the write committed. Reporting against the same
+    // count makes a repeat harmless, so it is retried once here, where every caller passes
+    // through, instead of in each caller.
+    const record = async () =>
+      await store.failPublicationStep(
+        runId,
+        token,
+        stepKey,
+        { code: failure.code, message: asErrorMessage(error) },
+        {
+          retry: failure.retry,
+          ...(expectedRecoveryAttemptCount === undefined
+            ? {}
+            : { expectedRecoveryAttemptCount })
+        }
+      )
+    try {
+      await record().catch(record)
+    } catch {
+      // Still unknown. The lookup error is the diagnosis, so it is what propagates, unmarked: a
+      // caller that records step failures records it with the same count, which Review Runs
+      // applies at most once; one that does not leaves it to the next pass, which looks again.
+      throw thrown
+    }
+    Object.defineProperty(thrown, RECORDED, { value: true })
+    throw thrown
+  }
   const settled = await store.settleExhaustedPublicationStep(
     runId,
     token,
     stepKey,
     found === null ? null : { remote: found }
   )
-  // Nothing was written. The publication coordinator turns the error these callers then
-  // propagate (`PUBLICATION_STEP_RETRY_EXHAUSTED`) into a terminal failure on the publication,
-  // which releases the claim so the next owner re-reads the step instead of this lease waiting
-  // to expire. That record is about the publication, not about this step's remote effect.
+  // Nothing was written: another owner moved the step or the publication, so this caller no
+  // longer owns it. The caller rethrows the exhaustion error and records nothing of its own; the
+  // claim's lease decides who acts next.
   if (!settled) return { outcome: 'not_owned' }
   // Both remaining branches wrote to the step; only the recorded state and the remote reference
   // differ between them.

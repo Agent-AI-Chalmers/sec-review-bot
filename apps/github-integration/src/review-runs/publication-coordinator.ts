@@ -114,6 +114,38 @@ export async function withPublicationHeartbeat(
   }
 }
 
+/** Name the steps that kept the publication from completing, with each one's status and recorded
+ * failure code.
+ *
+ * A step can be left unsettled without a failure of its own on record, for example an exhausted
+ * delivery whose reconciliation lookup got a 404: this pass never claimed it, so it was not
+ * written to. Naming the steps here puts that on the run itself instead of only in the logs. The
+ * message is best-effort: a failed lookup falls back to the generic sentence rather than losing
+ * the failure record. */
+async function incompleteStepsMessage(
+  store: PublicationCoordinatorStore,
+  runId: string
+): Promise<string> {
+  const generic = 'Publication completed without all required steps succeeding.'
+  try {
+    const unsettled = (await store.listPublicationSteps(runId)).filter(
+      (step) => step.status !== 'succeeded'
+    )
+    if (unsettled.length === 0) return generic
+    const described = unsettled.map(
+      (step) =>
+        `${step.step_key} (${step.status}${step.failure_code === null ? '' : `, ${step.failure_code}`})`
+    )
+    return `${generic} Not succeeded: ${described.join('; ')}.`
+  } catch (error) {
+    logWarn('review_publication_incomplete_steps_unavailable', {
+      error,
+      run_id: runId
+    })
+    return generic
+  }
+}
+
 /** Claims only terminal work; Execution Gateway observation is owned by Review Runs. */
 export async function publishReviewRunsOnce({
   app,
@@ -149,8 +181,7 @@ export async function publishReviewRunsOnce({
         work.claim_token,
         {
           code: 'PUBLICATION_STEPS_INCOMPLETE',
-          message:
-            'Publication completed without all required steps succeeding.'
+          message: await incompleteStepsMessage(store, work.run_id)
         },
         { retry: false }
       )

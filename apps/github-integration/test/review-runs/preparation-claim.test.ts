@@ -57,3 +57,26 @@ test('preparation heartbeat fences active work when its claim is lost', async ()
   await assert.rejects(heartbeat.assertOwned(), PreparationClaimLostError)
   assert.strictEqual(await heartbeat.stop(), false)
 })
+
+test('a transport failure during renewal blocks further work but does not claim the lease was lost', async () => {
+  // Unlike a `false` renewal, a thrown one does not prove another owner took the work: Review
+  // Runs may simply have been unreachable. Work must not continue on an unconfirmed lease, so
+  // `assertOwned` rejects. `stop()` still reports the claim as possibly held so the caller can
+  // record the failure, and Review Runs fences that report by token if ownership did move.
+  let reachable = true
+  const heartbeat = await startPreparationClaimHeartbeat(
+    {
+      renewPreparationClaim: async () => {
+        if (!reachable) throw new Error('connect ECONNREFUSED')
+        return true
+      },
+      preparationHeartbeatIntervalMs: () => 60_000
+    },
+    'run-1',
+    'claim-1'
+  )
+
+  reachable = false
+  await assert.rejects(heartbeat.assertOwned(), /ECONNREFUSED/)
+  assert.strictEqual(await heartbeat.stop(), true)
+})

@@ -454,7 +454,7 @@ export class PublicationStore {
       }
     >(
       `
-      SELECT step_key,status,attempt_count,last_attempt_at,
+      SELECT step_key,status,attempt_count,last_attempt_at,recovery_attempt_count,
              remote_object_id,remote_object_url,failure_code,failure_message
       FROM publication_steps
       WHERE run_id=$1 AND connector_id=$2
@@ -725,15 +725,31 @@ export class PublicationStore {
     token: string,
     stepKey: string,
     error: { code?: string | null; message: string },
-    options: { retry?: boolean } = {}
+    options: { retry?: boolean; expectedRecoveryAttemptCount?: number } = {}
   ): Promise<boolean> {
     const terminal = options.retry === false
+    const expected = options.expectedRecoveryAttemptCount ?? null
     return await transaction(this.pool, async (client) => {
       // Lock first; see the module note on why the step UPDATE alone is not a precondition check.
       if (!(await this.lockPublicationOwnership(client, runId, token)))
         return false
+      // A reconciliation failure names the count it was reported against, the way an activity
+      // failure carries its attempt number. If the count has already moved past it, this exact
+      // failure was recorded by an earlier call whose response was lost: answer that it is
+      // recorded instead of spending the budget again. The step may have parked since, so this is
+      // decided before the status guard below, which would refuse a `disconnected` step.
+      if (expected !== null) {
+        const current = await client.query<{ recovery_attempt_count: number }>(
+          `SELECT recovery_attempt_count FROM publication_steps
+           WHERE run_id=$1 AND connector_id=$2 AND step_key=$3`,
+          [runId, this.connectorId, stepKey]
+        )
+        const stored = current.rows[0]?.recovery_attempt_count
+        if (stored !== undefined && stored > expected) return true
+      }
       // Placeholders are ordered by type, not by the call's argument list: $1/$2 are the
-      // identity, $3/$4 the connector-supplied strings, $5 the status, $6 the step. Swapping
+      // identity, $3/$4 the connector-supplied strings, $5 the status, $6 the step, $7-$9 the
+      // retry flag, the recovery budget, and the count this failure was reported against. Swapping
       // $3 and $4 would silently store the message as the code (both are text), which no
       // status-only assertion would catch.
       const result = await client.query<{
@@ -760,6 +776,7 @@ export class PublicationStore {
               WHERE run_id=$1 AND connector_id=$2 AND step_key=$6) previous
         WHERE s.run_id=$1 AND s.connector_id=$2 AND s.step_key=$6
           AND s.status IN ('running','uncertain')
+          AND ($9::integer IS NULL OR s.recovery_attempt_count = $9)
         RETURNING previous.status AS from_status, s.status AS to_status
       `,
         [
@@ -770,7 +787,8 @@ export class PublicationStore {
           terminal ? 'terminal_failed' : 'failed',
           stepKey,
           options.retry === true,
-          MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS
+          MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS,
+          expected
         ]
       )
       const moved = result.rows[0]

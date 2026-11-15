@@ -49,14 +49,15 @@ export type JsonObject = Record<string, unknown>
 /** The durable record's artifact storage, narrowed from the Execution API's loose type. */
 export type ArtifactStorage = ReviewRunRecord['artifact_storage']
 
-/** The observed step summary is the step record minus the reconciliation id and the timing of
- * the latest attempt. `attempt_count` is deliberately kept: it is the step's budget, so a
+/** The observed step summary is the step record minus the reconciliation id, the timing of the
+ * latest attempt, and the reconciliation-failure count a connector uses to report each failure
+ * once. `attempt_count` is deliberately kept: it is the step's budget, so a
  * reader of the summary can tell a step that is on its last try from one that has not started.
  * The reconciliation id stays internal because it names the remote object, which the summary
  * reaches through `remote_object_url` instead. */
 export type PublicationStepSummary = Omit<
   PublicationStepRecord,
-  'remote_object_id' | 'last_attempt_at'
+  'remote_object_id' | 'last_attempt_at' | 'recovery_attempt_count'
 >
 
 /** The arguments the store accepts for a new run. */
