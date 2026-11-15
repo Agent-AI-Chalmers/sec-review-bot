@@ -19,7 +19,7 @@ import {
   PUBLICATION_STEP_ERROR_CODES
 } from '../errors.js'
 import type { PublicationStatus, PublicationStepRecord } from '../shapes.js'
-import { appendEvent } from './review-run-events.js'
+import { appendEvent, type AppendEventFields } from './review-run-events.js'
 import { queueRunNotice, supersedeRunAttentionNotices } from './run-notices.js'
 
 /**
@@ -287,11 +287,7 @@ export class PublicationStore {
     for (const step of resumedSteps.rows.toSorted((a, b) =>
       a.step_key.localeCompare(b.step_key)
     ))
-      await appendEvent(client, {
-        axis: 'publication',
-        runId,
-        connectorId: this.connectorId,
-        stepKey: step.step_key,
+      await this.appendStepEvent(client, runId, step.step_key, {
         fromStatus: 'disconnected',
         toStatus: 'pending',
         reasonCode: 'PUBLICATION_RESUMED_BY_OPERATOR'
@@ -444,11 +440,7 @@ export class PublicationStore {
           )
           // A step's creation is recorded like an axis' admission: `null -> pending`, so the log
           // shows every step that existed, including one that was never attempted.
-          await appendEvent(client, {
-            runId,
-            connectorId: this.connectorId,
-            axis: 'publication',
-            stepKey,
+          await this.appendStepEvent(client, runId, stepKey, {
             fromStatus: null,
             toStatus: 'pending'
           })
@@ -505,6 +497,25 @@ export class PublicationStore {
    * Callers must hold the returned lock before writing `publication_steps`; see the module-level
    * note on why a single `UPDATE ... FROM publications` is not sufficient. Kept in one place so
    * the claim, complete, and fail paths cannot diverge in the order they take these locks. */
+  /** Record one publication step transition on this connector's audit trail. */
+  private async appendStepEvent(
+    client: PoolClient,
+    runId: string,
+    stepKey: string,
+    transition: Pick<
+      AppendEventFields,
+      'fromStatus' | 'toStatus' | 'reasonCode'
+    >
+  ): Promise<void> {
+    await appendEvent(client, {
+      axis: 'publication',
+      runId,
+      connectorId: this.connectorId,
+      stepKey,
+      ...transition
+    })
+  }
+
   private async lockPublicationOwnership(
     client: PoolClient,
     runId: string,
@@ -568,11 +579,7 @@ export class PublicationStore {
       )
       const claimed = result.rows[0]
       if (claimed === undefined) return false
-      await appendEvent(client, {
-        axis: 'publication',
-        runId,
-        connectorId: this.connectorId,
-        stepKey,
+      await this.appendStepEvent(client, runId, stepKey, {
         fromStatus: claimed.from_status,
         toStatus: 'running'
       })
@@ -609,11 +616,7 @@ export class PublicationStore {
         )
         // `current` was read under the publication lock, so it is the status this UPDATE left.
         if (moved.rowCount === 1)
-          await appendEvent(client, {
-            axis: 'publication',
-            runId,
-            connectorId: this.connectorId,
-            stepKey,
+          await this.appendStepEvent(client, runId, stepKey, {
             fromStatus: current.status,
             toStatus: 'uncertain'
           })
@@ -698,11 +701,7 @@ export class PublicationStore {
             [runId, this.connectorId, stepKey, MAX_PUBLICATION_STEP_ATTEMPTS]
           )
       if (result.rowCount !== 1) return false
-      await appendEvent(client, {
-        axis: 'publication',
-        runId,
-        connectorId: this.connectorId,
-        stepKey,
+      await this.appendStepEvent(client, runId, stepKey, {
         fromStatus: 'uncertain',
         toStatus: outcome.found ? 'succeeded' : 'terminal_failed'
       })
@@ -740,11 +739,7 @@ export class PublicationStore {
         ]
       )
       if (result.rowCount !== 1) return false
-      await appendEvent(client, {
-        axis: 'publication',
-        runId,
-        connectorId: this.connectorId,
-        stepKey,
+      await this.appendStepEvent(client, runId, stepKey, {
         fromStatus: 'running',
         toStatus: 'succeeded'
       })
@@ -824,11 +819,7 @@ export class PublicationStore {
       )
       const moved = result.rows[0]
       if (moved === undefined) return false
-      await appendEvent(client, {
-        axis: 'publication',
-        runId,
-        connectorId: this.connectorId,
-        stepKey,
+      await this.appendStepEvent(client, runId, stepKey, {
         fromStatus: moved.from_status,
         toStatus: moved.to_status,
         reasonCode: error.code ?? null

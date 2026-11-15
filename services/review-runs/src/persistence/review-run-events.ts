@@ -11,7 +11,7 @@ import type { ReviewRunEvent } from '../shapes.js'
 
 export type CoordinationAxis = 'execution' | 'preparation' | 'publication'
 
-interface AppendEventFields {
+export interface AppendEventFields {
   runId: string
   connectorId: string
   fromStatus: string | null
