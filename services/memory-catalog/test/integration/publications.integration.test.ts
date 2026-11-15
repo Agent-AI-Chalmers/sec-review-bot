@@ -303,6 +303,21 @@ await test('publication recovery preserves intents and attachment transactions s
       'abandoned',
     )
     assert.equal((await store.queries.getMemoryTree()).revision, 2)
+    // The two ways a candidate is abandoned are recorded apart, so an operator can tell a paused
+    // commit from a worker's cleanup without reconstructing it from logs.
+    const reasons = await pool.query<{
+      operation_id: string
+      reasons: string[]
+    }>(
+      `select operation_id, array_agg(distinct abandon_reason) as reasons
+       from memory_revision_publications
+       where operation_id in ('prepared','paused-candidate')
+       group by operation_id order by operation_id`,
+    )
+    assert.deepEqual(reasons.rows, [
+      { operation_id: 'paused-candidate', reasons: ['automation_paused'] },
+      { operation_id: 'prepared', reasons: ['worker_cleanup'] },
+    ])
     await pool.query("update memory_tree_automation set state='enabled'")
     // A response-lost retry after resume must not submit the abandoned candidate.
     await assert.rejects(

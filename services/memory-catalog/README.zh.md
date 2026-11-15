@@ -45,7 +45,7 @@ extraction 和 observation 按 `created_at`、`extraction_id` 降序排列。调
 
 同一时间只允许一个记忆维护任务运行，由 Temporal 的固定 workflow ID 和 `SKIP` 重叠策略保证。
 
-Worker 可通过 `POST /v1/memory-tree/revisions/publications/abandon` 放弃已有且未选定的自动修订 publication。对这些候选而言，`abandoned` 是终态：reserve 和 confirm 重试会保留该状态，commit 返回 HTTP 409 和 `PUBLICATION_ABANDONED`。自动提交遇到暂停时，会在同一事务中放弃该来源类型和 operation ID 下已有且未选定的 publication，然后返回 `AUTOMATION_PAUSED`。维护 workflow 在准备阶段发现暂停时也会放弃这些 publication，并退出，不再因 backlog 续跑。已选定的 publication 仍可重放；产物对象会保留。
+Worker 可通过 `POST /v1/memory-tree/revisions/publications/abandon` 放弃已有且未选定的自动修订 publication。对这些候选而言，`abandoned` 是终态：reserve 和 confirm 重试会保留该状态，commit 返回 HTTP 409 和 `PUBLICATION_ABANDONED`。自动提交遇到暂停时，会在同一事务中放弃该来源类型和 operation ID 下已有且未选定的 publication，然后返回 `AUTOMATION_PAUSED`。维护 workflow 在准备阶段发现暂停时也会放弃这些 publication，并退出，不再因 backlog 续跑。已选定的 publication 仍可重放；产物对象会保留。每个被放弃的候选都记录 `abandon_reason`（`worker_cleanup` 或 `automation_paused`）和 `status_changed_at`，operator 可以据此看出它是被哪条路径、在什么时候放弃的。
 
 ### 发布与重试
 
@@ -53,7 +53,7 @@ Worker 可通过 `POST /v1/memory-tree/revisions/publications/abandon` 放弃已
 
 中断后，重试先检查已有发布意图和存储对象，再决定是否重新调用模型。无法访问存储不等于对象不存在；已经登记的结果所引用的对象丢失时，应报错，不能用新结果替换。
 
-人工编辑重试沿用 operation ID 和最初预期的修订；相同内容返回原结果，改变内容则冲突。协议不会自动清理未引用对象，也不会在重试耗尽后自动完成发布。详细流程见 [SYSTEM_ARCHITECTURE](../../docs/architecture/SYSTEM_ARCHITECTURE.zh.md#artifact-发布与恢复)。
+人工编辑重试沿用 operation ID 和最初预期的修订；相同内容返回原结果，改变内容则冲突。协议不会自动清理未引用对象，也不会在重试耗尽后自动完成发布。
 
 ## 本地运行
 

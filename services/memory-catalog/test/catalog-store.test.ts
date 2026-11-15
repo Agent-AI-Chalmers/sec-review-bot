@@ -521,7 +521,27 @@ await test('restore moves the active pointer without creating a revision', async
   )
 })
 
-await test('control replay precedes generation checks and returns stored result', async () => {
+/** Assert that each pattern matches a recorded statement, in this order. Statements are found by
+ * what they do rather than by position, so transaction control or an unrelated read added
+ * between them does not break the assertion; only a change in their relative order does. */
+function assertStatementOrder(statements: string[], patterns: RegExp[]): void {
+  let previous = -1
+  for (const pattern of patterns) {
+    const index = statements.findIndex(
+      (sql, position) => position > previous && pattern.test(sql),
+    )
+    assert.ok(
+      index > previous,
+      `expected a statement matching ${pattern} after position ${previous}`,
+    )
+    previous = index
+  }
+}
+
+await test('control replay is checked under the lock and precedes generation checks', async () => {
+  // The lock comes first so an overlapping retry waits for the first attempt and then finds its
+  // ledger row; the generation check comes after the replay so a retry is not refused for a
+  // generation its own first attempt advanced.
   const statements: string[] = []
   const pool = {
     connect: () =>
@@ -570,10 +590,10 @@ await test('control replay precedes generation checks and returns stored result'
       },
     },
   )
-  assert.equal(
-    statements.some((sql) => sql.includes('from memory_tree_automation\n')),
-    false,
-  )
+  assertStatementOrder(statements, [
+    /from memory_tree_automation\s+where singleton=true for update/,
+    /from memory_tree_automation_operations/,
+  ])
 })
 
 await test('new control operation locks, checks, updates, and records the transition', async () => {
@@ -624,10 +644,10 @@ await test('new control operation locks, checks, updates, and records the transi
   })
 
   assert.equal(result.created, true)
-  assert.match(statements[2] ?? '', /for update/)
-  assert.match(statements[3] ?? '', /update memory_tree_automation/)
-  assert.match(
-    statements[4] ?? '',
+  assertStatementOrder(statements, [
+    /from memory_tree_automation\s+where singleton=true for update/,
+    /from memory_tree_automation_operations/,
+    /update memory_tree_automation\s/,
     /insert into memory_tree_automation_operations/,
-  )
+  ])
 })
