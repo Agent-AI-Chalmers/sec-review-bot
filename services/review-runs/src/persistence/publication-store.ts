@@ -18,7 +18,7 @@ import {
   DeterministicReviewRunError,
   PUBLICATION_STEP_ERROR_CODES
 } from '../errors.js'
-import type { PublicationStepRecord } from '../shapes.js'
+import type { PublicationStatus, PublicationStepRecord } from '../shapes.js'
 import { appendEvent } from './review-run-events.js'
 import { queueRunNotice, supersedeRunAttentionNotices } from './run-notices.js'
 
@@ -70,6 +70,15 @@ import { queueRunNotice, supersedeRunAttentionNotices } from './run-notices.js'
  * summarises. The other axes bound work the same way and for the same reason, each with its own
  * number (`MAX_PREPARATION_ATTEMPTS` here, `MAX_SUBMISSION_RECOVERY_ATTEMPTS` for replays), so
  * changing one is a local decision about that axis' external traffic rather than a shared policy. */
+/** The publication states a claim token can own, passed as a `text[]` parameter. Ownership is
+ * the token: `uncertain` and `disconnected` describe what a step is doing, not who may act, so
+ * every token-fenced write uses this one set. */
+const OWNED_PUBLICATION_STATUSES: readonly PublicationStatus[] = [
+  'publishing',
+  'uncertain',
+  'disconnected'
+]
+
 const MAX_PUBLICATION_STEP_ATTEMPTS = 3
 const MAX_PUBLICATION_STEP_RECOVERY_ATTEMPTS = 3
 
@@ -111,7 +120,7 @@ async function derivePublicationStatus(
     WITH previous AS (
       SELECT run_id, status FROM publications
       WHERE run_id=$1 AND connector_id=$2
-        AND status IN ('publishing','uncertain','disconnected')
+        AND status = ANY($3::text[])
       FOR UPDATE
     ),
     -- The axis reports the strongest step-level uncertainty. When no step is in either state, an
@@ -141,7 +150,7 @@ async function derivePublicationStatus(
       AND derived.from_status <> derived.to_status
     RETURNING derived.from_status, p.status AS to_status
   `,
-    [runId, connectorId]
+    [runId, connectorId, OWNED_PUBLICATION_STATUSES]
   )
   const changed = result.rows[0]
   if (changed === undefined) return
@@ -196,8 +205,8 @@ export class PublicationStore {
     const result = await this.pool.query(
       `UPDATE publications SET claimed_at=clock_timestamp(), updated_at=clock_timestamp()
        WHERE run_id=$1 AND connector_id=$2
-           AND status IN ('publishing','uncertain','disconnected') AND claim_token=$3`,
-      [runId, this.connectorId, token]
+           AND status = ANY($4::text[]) AND claim_token=$3`,
+      [runId, this.connectorId, token, OWNED_PUBLICATION_STATUSES]
     )
     return result.rowCount === 1
   }
@@ -205,7 +214,7 @@ export class PublicationStore {
   /** Hand a publication back to automatic recovery, on an operator's decision.
    *
    * A publication is excluded from every claim while any step is `disconnected`
-   * (`claimPublication`/`claimNextPublication`), which is correct for automation: the step's
+   * (`PublicationClaimStore.claim`/`claimNext`), which is correct for automation: the step's
    * remote outcome is unknown, so re-running it unsupervised could duplicate a side effect. It
    * also means nothing can ever retry the run, so an operator needs a way to hand the work back.
    *
@@ -216,57 +225,51 @@ export class PublicationStore {
     client: PoolClient,
     runId: string
   ): Promise<boolean> {
-    {
-      const result = await client.query<{ from_status: string }>(
-        `WITH previous AS (
-           SELECT run_id, status FROM publications
-           WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'
-           FOR UPDATE
-         )
-         UPDATE publications p
-         SET status='pending', claim_token=NULL, claimed_at=NULL,
-             updated_at=clock_timestamp()
-         FROM previous
-         WHERE p.run_id=previous.run_id
-         RETURNING previous.status AS from_status`,
-        [runId, this.connectorId]
-      )
-      const row = result.rows[0]
-      if (row === undefined) return false
-      // The resume returns the attempt budget, which is what makes it "published again" rather
-      // than "keep publishing": a spent budget refuses the write, so without this the connector
-      // could only ever reconcile, and would conclude a step it found absent as failed.
-      //
-      // There is deliberately no cap on how often this can be granted. The caller is an operator
-      // holding the admin token, and that authority is theirs: capping it here would replace their
-      // judgment with a constant, while still leaving the same power available to whoever can
-      // change the constant. What the system owes them instead is a record - every resume appends
-      // its own event - so the decision is visible after the fact rather than blocked in advance.
-      // Parked steps become attemptable and reconcilable again: the status returns to `pending`
-      // so a claim can start the side effect, and both budgets are refreshed. Steps that already
-      // succeeded are untouched - the run continues from where it stopped, it does not start over.
-      await client.query(
-        `UPDATE publication_steps
-         SET status='pending', claimed_by=NULL, attempt_count=0, recovery_attempt_count=0,
-             updated_at=clock_timestamp()
-         WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
-        [runId, this.connectorId]
-      )
-      await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'publication',
-        fromStatus: row.from_status,
-        toStatus: 'pending',
-        reasonCode: 'PUBLICATION_RESUMED_BY_OPERATOR'
-      })
-      await supersedeRunAttentionNotices(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'publication'
-      })
-      return true
-    }
+    const result = await client.query<{ from_status: string }>(
+      `WITH previous AS (
+         SELECT run_id, status FROM publications
+         WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'
+         FOR UPDATE
+       )
+       UPDATE publications p
+       SET status='pending', claim_token=NULL, claimed_at=NULL,
+           updated_at=clock_timestamp()
+       FROM previous
+       WHERE p.run_id=previous.run_id
+       RETURNING previous.status AS from_status`,
+      [runId, this.connectorId]
+    )
+    const row = result.rows[0]
+    if (row === undefined) return false
+    // The resume returns the attempt budget, which is what makes it "published again" rather
+    // than "keep publishing": a spent budget refuses the write, so without this the connector
+    // could only ever reconcile, and would conclude a step it found absent as failed.
+    //
+    // Resumes are deliberately uncapped: the operator decides, and each resume appends an event.
+    // Parked steps become attemptable and reconcilable again: the status returns to `pending`
+    // so a claim can start the side effect, and both budgets are refreshed. Steps that already
+    // succeeded are untouched - the run continues from where it stopped, it does not start over.
+    await client.query(
+      `UPDATE publication_steps
+       SET status='pending', claimed_by=NULL, attempt_count=0, recovery_attempt_count=0,
+           updated_at=clock_timestamp()
+       WHERE run_id=$1 AND connector_id=$2 AND status='disconnected'`,
+      [runId, this.connectorId]
+    )
+    await appendEvent(client, {
+      runId,
+      connectorId: this.connectorId,
+      axis: 'publication',
+      fromStatus: row.from_status,
+      toStatus: 'pending',
+      reasonCode: 'PUBLICATION_RESUMED_BY_OPERATOR'
+    })
+    await supersedeRunAttentionNotices(client, {
+      runId,
+      connectorId: this.connectorId,
+      axis: 'publication'
+    })
+    return true
   }
 
   async complete(runId: string, token: string): Promise<boolean> {
@@ -276,10 +279,10 @@ export class PublicationStore {
            finished_at=clock_timestamp(),
            failure_code=NULL, failure_message=NULL, updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2
-           AND status IN ('publishing','uncertain','disconnected') AND claim_token=$3
+           AND status = ANY($4::text[]) AND claim_token=$3
            AND NOT EXISTS (SELECT 1 FROM publication_steps
              WHERE run_id=$1 AND connector_id=$2 AND status <> 'succeeded')`,
-        [runId, this.connectorId, token]
+        [runId, this.connectorId, token, OWNED_PUBLICATION_STATUSES]
       )
       if (result.rowCount !== 1) return false
       await appendEvent(client, {
@@ -312,14 +315,15 @@ export class PublicationStore {
            finished_at=CASE WHEN $4='failed' THEN clock_timestamp() ELSE NULL END,
            updated_at=clock_timestamp()
          WHERE run_id=$1 AND connector_id=$2
-           AND status IN ('publishing','uncertain','disconnected') AND claim_token=$3`,
+           AND status = ANY($7::text[]) AND claim_token=$3`,
         [
           runId,
           this.connectorId,
           token,
           toStatus,
           error.code ?? null,
-          error.message
+          error.message,
+          OWNED_PUBLICATION_STATUSES
         ]
       )
       if (result.rowCount !== 1) return false
@@ -363,10 +367,10 @@ export class PublicationStore {
         `
         SELECT 1 FROM publications
         WHERE run_id=$1 AND connector_id=$2
-          AND status IN ('publishing','uncertain','disconnected') AND claim_token=$3
+          AND status = ANY($4::text[]) AND claim_token=$3
         FOR UPDATE
       `,
-        [runId, this.connectorId, token]
+        [runId, this.connectorId, token, OWNED_PUBLICATION_STATUSES]
       )
       if (owner.rowCount !== 1)
         throw new Error(
@@ -458,9 +462,9 @@ export class PublicationStore {
          -- Ownership is the token. uncertain and disconnected describe what a step is doing, not
          -- who may act: the publisher holding the claim must still be able to settle the very
          -- step that put the axis in that state.
-         AND status IN ('publishing','uncertain','disconnected') AND claim_token=$3
+         AND status = ANY($4::text[]) AND claim_token=$3
        FOR UPDATE`,
-      [runId, this.connectorId, token]
+      [runId, this.connectorId, token, OWNED_PUBLICATION_STATUSES]
     )
     return owner.rowCount === 1
   }
@@ -710,7 +714,7 @@ export class PublicationStore {
         `WITH previous AS (
            SELECT run_id, status FROM publications
            WHERE run_id=$1 AND connector_id=$2
-             AND status IN ('publishing','uncertain','disconnected') AND claim_token=$5
+             AND status = ANY($6::text[]) AND claim_token=$5
            FOR UPDATE
          )
          UPDATE publications p
@@ -720,7 +724,14 @@ export class PublicationStore {
          FROM previous
          WHERE p.run_id=previous.run_id
          RETURNING previous.status AS from_status`,
-        [runId, this.connectorId, error.code ?? null, error.message, token]
+        [
+          runId,
+          this.connectorId,
+          error.code ?? null,
+          error.message,
+          token,
+          OWNED_PUBLICATION_STATUSES
+        ]
       )
       const failedFrom = publication.rows[0]?.from_status
       if (failedFrom === undefined)
