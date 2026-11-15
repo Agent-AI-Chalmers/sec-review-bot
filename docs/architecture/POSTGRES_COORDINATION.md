@@ -55,6 +55,7 @@ Review Runs holds the most coordination state, so it has rules Memory Catalog do
 
 - A mismatch is a normal result. A write whose preconditions no longer hold changes nothing, and the caller reads `rowCount !== 1` as "you no longer own this work". Raising a database error instead would abort the surrounding transaction, so preconditions stay in the `WHERE` clause.
 - Steps are written under the publication lock. Every write to `publication_steps` first locks the owning `publications` row. A single `UPDATE ... FROM publications` reads the publication without locking it, so a concurrent conclusion could commit between the read and the write.
+- Steps end one at a time. A terminal step failure ends only that step, and the connector decides whether the publication goes on. It publishes its remaining steps and then concludes the publication through `complete`, which is refused while any step has not succeeded, or through `fail`. A step whose reconciliation lookup keeps failing does not hold up the others either: it spends its own budget and parks as `disconnected` while the other steps are still attempted.
 - The three axes behave alike. The publication axis stores `uncertain` and `disconnected` like the preparation and execution axes, derived from its steps, so operator queues, notices, and the console handle all three the same way.
 
 ## Alternatives Evaluated

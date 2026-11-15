@@ -57,6 +57,7 @@ Review Runs 承载的协调状态最多，因此有一些 Memory Catalog 不需�
 
 - 不匹配是正常结果。前置条件不再成立的写入不会修改任何东西，调用方把 `rowCount !== 1` 理解为"你已经不再持有这份工作"。如果改为抛出数据库错误，会中止外层事务，因此前置条件保留在 `WHERE` 子句中。
 - 写 step 要在 publication 锁之下进行。任何对 `publication_steps` 的写入都先锁住所属的 `publications` 行。单条 `UPDATE ... FROM publications` 读取 publication 时并不加锁，并发的结束操作可能在读和写之间提交。
+- step 各自结束。终态的 step 失败只结束这一个 step，publication 是否继续由 connector 决定。connector 先发布其余 step，再通过 `complete`（只要还有 step 未成功就会被拒绝）或 `fail` 结束 publication。对账查询持续失败的 step 也不会拦住其他 step：它只消耗自己的预算，最终停放为 `disconnected`，其他 step 照常尝试。
 - 三个轴行为一致。publication 轴与 preparation、execution 轴一样存储 `uncertain` 和 `disconnected`，由其 steps 推导而来，因此运维队列、通知和控制台以相同方式处理三个轴。
 
 ## 评估过的替代方案

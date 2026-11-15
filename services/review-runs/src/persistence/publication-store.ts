@@ -377,9 +377,8 @@ export class PublicationStore {
       )
       const failed = result.rows[0]
       if (failed === undefined) return false
-      // A terminal publication failure ends the run. The requester is told about it here, not
-      // only when an individual step happens to be marked terminal: the coordinator can conclude
-      // the whole publication without going through `failPublicationStep`.
+      // A terminal publication failure ends the run, and this is the only place it is concluded,
+      // so the requester is told about it here.
       const publicationEventId = await appendEvent(client, {
         runId,
         connectorId: this.connectorId,
@@ -836,54 +835,11 @@ export class PublicationStore {
       })
       // A reconciliation that could not reach an answer moves the step to `disconnected`; the
       // axis reports that so the run surfaces in the operator queue instead of looking active.
+      // A terminal step failure ends only that step. Whether the publication goes on is the
+      // connector's decision: it may publish its other steps and then conclude through `complete`
+      // (refused while any step has not succeeded) or `fail`. Concluding the publication here
+      // would take the claim away from steps the connector still means to publish.
       await derivePublicationStatus(client, this.connectorId, runId)
-      if (!terminal) return true
-      // The step update above re-derived the axis, so the prior status is read back rather than
-      // assumed. Only CONCLUDABLE_PUBLICATION_STATUSES may conclude; the step's failure above
-      // stands either way.
-      const publication = await client.query<{ from_status: string }>(
-        `WITH previous AS (
-           SELECT run_id, status FROM publications
-           WHERE run_id=$1 AND connector_id=$2
-             AND status = ANY($6::text[]) AND claim_token=$5
-           FOR UPDATE
-         )
-         UPDATE publications p
-         SET status='failed', claim_token=NULL, claimed_at=NULL,
-             failure_code=$3, failure_message=$4, finished_at=clock_timestamp(),
-             updated_at=clock_timestamp()
-         FROM previous
-         WHERE p.run_id=previous.run_id
-         RETURNING previous.status AS from_status`,
-        [
-          runId,
-          this.connectorId,
-          error.code ?? null,
-          error.message,
-          token,
-          CONCLUDABLE_PUBLICATION_STATUSES
-        ]
-      )
-      const failedFrom = publication.rows[0]?.from_status
-      // The ownership lock is still held, so a missing row means the axis is `disconnected`: the
-      // step's terminal failure is recorded, and the publication stays parked for the operator.
-      if (failedFrom === undefined) return true
-      const eventId = await appendEvent(client, {
-        runId,
-        connectorId: this.connectorId,
-        axis: 'publication',
-        fromStatus: failedFrom,
-        toStatus: 'failed',
-        reasonCode: error.code ?? null
-      })
-      await queueRunNotice(client, {
-        runId,
-        connectorId: this.connectorId,
-        sourceEventId: eventId,
-        kind: 'failure',
-        axis: 'publication',
-        reasonCode: error.code ?? null
-      })
       return true
     })
   }
