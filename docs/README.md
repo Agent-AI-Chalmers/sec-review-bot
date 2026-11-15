@@ -26,6 +26,8 @@ Use the catalog below as a topic reference; you do not need to read it in order.
 
 - [SYSTEM_ARCHITECTURE](architecture/SYSTEM_ARCHITECTURE.md): Runtime component responsibilities, deployment, and data flow through reviews and background memory processing.
 - [STAGE_AGENT_OWNERSHIP](architecture/STAGE_AGENT_OWNERSHIP.md): What stages and agents are responsible for, and who creates and closes workspaces, connections, and MCP sessions.
+- [ARTIFACT_PUBLICATION](architecture/ARTIFACT_PUBLICATION.md): How files in object storage and their PostgreSQL records stay consistent across interruptions, and how each artifact is recovered.
+- [POSTGRES_COORDINATION](architecture/POSTGRES_COORDINATION.md): Why Review Runs and Memory Catalog coordinate work with hand-written PostgreSQL statements, how each applies the shared approach, which alternatives were evaluated, and what keeps that SQL safe to change.
 
 ### Packages and services
 
