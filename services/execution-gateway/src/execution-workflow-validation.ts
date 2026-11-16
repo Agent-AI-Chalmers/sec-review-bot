@@ -1,3 +1,5 @@
+import type { ExecutionWorkflowInput } from './execution.js'
+import { validateExecutionInput } from './execution-api-validation.js'
 import { contractsRoot } from './contract-paths.js'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
@@ -28,7 +30,9 @@ export function executionWorkflowType(): string {
   return schema()['x-temporal-workflow-type']
 }
 
-export function validateExecutionWorkflowInput(value: unknown): void {
+export function validateExecutionWorkflowInput(
+  value: unknown,
+): asserts value is Omit<ExecutionWorkflowInput, 'input'> & { input: unknown } {
   if (!validator) {
     const ajv = new Ajv2020Module.default({ allErrors: true, strict: true })
     ajv.addKeyword({
@@ -44,4 +48,12 @@ export function validateExecutionWorkflowInput(value: unknown): void {
       `Execution Workflow input does not match execution-workflow/v1: ${first?.instancePath || '<root>'} ${first?.message ?? 'is invalid'}`,
     )
   }
+}
+
+/** Validate a complete submission and preserve its workflow/input relationship. */
+export function validateExecutionSubmission(
+  value: unknown,
+): asserts value is ExecutionWorkflowInput {
+  validateExecutionWorkflowInput(value)
+  validateExecutionInput(value.workflow, value.input)
 }

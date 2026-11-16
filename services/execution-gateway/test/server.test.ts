@@ -24,7 +24,7 @@ class FakeExecutionRunClient {
         'issue-review',
       )
     }
-    const record = {
+    const record: ExecutionRecord = {
       run_id: request.run_id,
       workflow: request.workflow,
       status: 'running',

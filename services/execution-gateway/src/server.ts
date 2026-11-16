@@ -1,3 +1,5 @@
+import { validateExecutionSubmission } from './execution-workflow-validation.js'
+import type { ExecutionError } from './execution-api-types-generated.js'
 import { contractsRoot } from './contract-paths.js'
 import { timingSafeEqual } from 'node:crypto'
 import { existsSync } from 'node:fs'
@@ -10,10 +12,7 @@ import Fastify, {
   type FastifyRequest,
 } from 'fastify'
 
-import {
-  supportedWorkflows,
-  validateExecutionInput,
-} from './execution-api-validation.js'
+import { supportedWorkflows } from './execution-api-validation.js'
 import { ExecutionRunConflictError, type ExecutionRecord } from './execution.js'
 import type { PathParameters, RequestBody } from './route-types.js'
 import { integerEnv } from './env.js'
@@ -44,10 +43,10 @@ function response(record: ExecutionRecord): Record<string, unknown> {
 
 function semanticError(
   code: string,
-  category: string,
+  category: ExecutionError['category'],
   message: string,
   details: Record<string, unknown> = {},
-): Record<string, unknown> {
+): ExecutionError {
   return { category, code, message, retryable: false, details }
 }
 
@@ -81,8 +80,15 @@ export async function registerExecutionGatewayRoutes(
             ),
           })
         }
+        const submission = {
+          workflow,
+          run_id: body.run_id,
+          input: body.input,
+          timeout_seconds: workflowTimeoutSeconds,
+          ...('runtime' in body ? { runtime: body.runtime } : {}),
+        }
         try {
-          validateExecutionInput(workflow, body.input)
+          validateExecutionSubmission(submission)
         } catch (error) {
           return await reply.status(400).send({
             run_id: body.run_id,
@@ -95,17 +101,9 @@ export async function registerExecutionGatewayRoutes(
           })
         }
         try {
-          return await reply.status(202).send(
-            response(
-              await client.start({
-                workflow,
-                run_id: body.run_id,
-                input: body.input,
-                timeout_seconds: workflowTimeoutSeconds,
-                ...('runtime' in body ? { runtime: body.runtime } : {}),
-              }),
-            ),
-          )
+          return await reply
+            .status(202)
+            .send(response(await client.start(submission)))
         } catch (error) {
           if (error instanceof ExecutionRunConflictError) {
             return await reply.status(409).send({
