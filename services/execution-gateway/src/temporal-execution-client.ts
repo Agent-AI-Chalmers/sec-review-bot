@@ -14,9 +14,12 @@ import {
 } from './execution-api-validation.js'
 import {
   executionWorkflowType,
-  validateExecutionWorkflowInput,
+  validateExecutionSubmission,
 } from './execution-workflow-validation.js'
-import type { ExecutionArtifactStorage } from './execution-api-types-generated.js'
+import type {
+  ExecutionArtifactStorage,
+  ExecutionError,
+} from './execution-api-types-generated.js'
 import {
   ExecutionRunConflictError,
   type ExecutionRecord,
@@ -31,7 +34,6 @@ function fingerprint(request: ExecutionWorkflowInput): string {
     workflow: request.workflow,
     run_id: request.run_id,
     input: request.input,
-    ...(request.runtime === undefined ? {} : { runtime: request.runtime }),
   }
   return createHash('sha256')
     .update(JSON.stringify(canonicalValue(requestIdentity)))
@@ -79,7 +81,7 @@ export class TemporalExecutionClient {
   }
 
   async start(request: ExecutionWorkflowInput): Promise<ExecutionRecord> {
-    validateExecutionWorkflowInput(request)
+    validateExecutionSubmission(request)
     const requestFingerprint = fingerprint(request)
     try {
       await this.client.workflow.start(executionWorkflowType(), {
@@ -142,7 +144,19 @@ export class TemporalExecutionClient {
       }
     }
     if (temporalStatus === 'COMPLETED') {
-      const response = (await handle.result()) as Record<string, unknown>
+      const response: unknown = await handle.result()
+      if (!isRecord(response)) {
+        return {
+          run_id: runId,
+          ...(workflow ? { workflow } : {}),
+          status: 'failed',
+          artifact_storage: { status: 'unavailable' },
+          error: executionError(
+            'EXECUTION_RESPONSE_INVALID',
+            'Invalid workflow response.',
+          ),
+        }
+      }
       if (response.ok === true && 'result' in response) {
         if (!workflow) {
           return {
@@ -198,13 +212,9 @@ export class TemporalExecutionClient {
           status: 'succeeded',
           result: response.result,
           artifact_storage,
-          ...(typeof response.memory_processing === 'object' &&
-          response.memory_processing !== null
+          ...(isRecord(response.memory_processing)
             ? {
-                memory_processing: response.memory_processing as Record<
-                  string,
-                  unknown
-                >,
+                memory_processing: response.memory_processing,
               }
             : {}),
         }
@@ -300,9 +310,6 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-export function executionError(
-  code: string,
-  message: string,
-): Record<string, unknown> {
+export function executionError(code: string, message: string): ExecutionError {
   return { category: 'runtime', code, message, retryable: false, details: {} }
 }

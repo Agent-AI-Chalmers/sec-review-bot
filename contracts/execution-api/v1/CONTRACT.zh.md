@@ -15,7 +15,9 @@ v1 的公开结果只按工作流暴露最终结果，不暴露内部阶段的�
 
 ## 1. 工作流输入
 
-本节定义 create-run API（`POST /v1/workflows/{workflow}/runs`，operationId 为 `createRun`）的 request body 中的 workflow `input` 对象。`run_id`、`runtime` 等 HTTP envelope 字段由 [Execution API OpenAPI 文档](openapi.yaml) 定义。
+本节定义 create-run API（`POST /v1/workflows/{workflow}/runs`，operationId 为 `createRun`）的 request body 中的 workflow `input` 对象。`run_id` 等 HTTP envelope 字段由 [Execution API OpenAPI 文档](openapi.yaml) 定义。
+
+create-run 请求体只接受 `run_id` 和 `input`。
 
 所有工作流输入都包含：
 

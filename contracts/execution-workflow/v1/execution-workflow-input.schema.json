@@ -16,18 +16,6 @@
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
     },
     "input": { "type": "object" },
-    "timeout_seconds": { "type": "integer", "minimum": 1 },
-    "runtime": {
-      "oneOf": [
-        { "type": "null" },
-        {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "workspace_image": { "type": "string", "pattern": "\\S" }
-          }
-        }
-      ]
-    }
+    "timeout_seconds": { "type": "integer", "minimum": 1 }
   }
 }

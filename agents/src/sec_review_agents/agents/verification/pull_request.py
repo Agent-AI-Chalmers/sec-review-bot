@@ -26,7 +26,7 @@ from sec_review_agents.review_stages.feedback_loop import (
 )
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.runtime.runtime_config import (
-    ExecutionRuntimeContext,
+    RuntimeContext,
     runtime_workspace_image,
     runtime_workspace_path,
 )
@@ -64,7 +64,7 @@ def build_pr_verification_backend_config(
     workspace_root_path: Path,
     history_path: Path,
     incremental_window_path: Path,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
 ) -> BackendConfig:
     if not workspace_root_path.is_dir():
         raise FileNotFoundError(

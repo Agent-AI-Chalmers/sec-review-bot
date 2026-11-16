@@ -22,9 +22,6 @@ type JsonObject = Record<string, unknown>
 
 const MAX_EXECUTION_RESPONSE_BYTES = 4 * 1024 * 1024
 
-/** One run as the published contract reports it. */
-type ContractRunResponse = RunResponse
-
 /**
  * A response as parsed, before any field has been checked.
  *
@@ -32,7 +29,7 @@ type ContractRunResponse = RunResponse
  * while the values stay unknown because JSON off the wire is unverified until the checks
  * below run.
  */
-type UnvalidatedRunResponse = { [K in keyof ContractRunResponse]?: unknown }
+type UnvalidatedRunResponse = { [K in keyof RunResponse]?: unknown }
 
 /**
  * A response whose identity and status have been checked.
@@ -43,11 +40,36 @@ type UnvalidatedRunResponse = { [K in keyof ContractRunResponse]?: unknown }
 type ValidatedRunResponse = UnvalidatedRunResponse & {
   run_id: string
   workflow: ReviewRunWorkflow
-  status: string
+  status: RunResponse['status']
 }
 
-/** The error envelope as parsed. Every field is read defensively. */
-type UnvalidatedExecutionError = Partial<ExecutionError>
+/** Parse the public error envelope without coercing fields off the wire. */
+function parseExecutionError(value: unknown): ExecutionError {
+  if (
+    !isRecord(value) ||
+    (value.category !== 'input' &&
+      value.category !== 'workflow' &&
+      value.category !== 'llm' &&
+      value.category !== 'runtime' &&
+      value.category !== 'internal') ||
+    typeof value.code !== 'string' ||
+    typeof value.message !== 'string' ||
+    typeof value.retryable !== 'boolean' ||
+    (value.details !== undefined && !isRecord(value.details))
+  ) {
+    throw new ExecutionProtocolError(
+      'EXECUTION_INVALID_RESPONSE',
+      'Execution returned an invalid error envelope.'
+    )
+  }
+  return {
+    category: value.category,
+    code: value.code,
+    message: value.message,
+    retryable: value.retryable,
+    ...(value.details === undefined ? {} : { details: value.details })
+  }
+}
 
 /**
  * The statuses the Execution API may report.
@@ -63,6 +85,10 @@ const EXECUTION_STATUS_VALUES = [
 ] as const
 const EXECUTION_STATUSES: ReadonlySet<string> = new Set(EXECUTION_STATUS_VALUES)
 
+function isExecutionStatus(value: string): value is RunResponse['status'] {
+  return EXECUTION_STATUSES.has(value)
+}
+
 type SameValues<A, B> = [A] extends [B]
   ? [B] extends [A]
     ? true
@@ -71,22 +97,18 @@ type SameValues<A, B> = [A] extends [B]
 type Expect<T extends true> = T
 /** Fails to compile if the runtime status list and the contract disagree either way. */
 export type StatusesMatchTheContract = Expect<
-  SameValues<
-    (typeof EXECUTION_STATUS_VALUES)[number],
-    ContractRunResponse['status']
-  >
+  SameValues<(typeof EXECUTION_STATUS_VALUES)[number], RunResponse['status']>
 >
 
 export const EXECUTION_RUN_NOT_FOUND = 'EXECUTION_RUN_NOT_FOUND'
 
 export interface ExecutionRunStatus extends Omit<
-  ContractRunResponse,
-  'run_id' | 'workflow' | 'status' | 'error' | 'artifact_storage'
+  RunResponse,
+  'run_id' | 'workflow' | 'error' | 'artifact_storage'
 > {
   run_id: string
   workflow: ReviewRunWorkflow
-  status: string
-  error?: UnvalidatedExecutionError
+  error?: ExecutionError
   /** Present only once `parseArtifactStorage` has accepted it. */
   artifact_storage?: ExecutionArtifactStorage
 }
@@ -294,16 +316,20 @@ function serviceHeaders(url: string): Record<string, string> {
 }
 
 function executionError(body: unknown, status: number): ExecutionServiceError {
-  const source =
-    isRecord(body) && isRecord(body.error)
-      ? (body.error as UnvalidatedExecutionError)
-      : {}
+  let source: ExecutionError | undefined
+  if (isRecord(body) && body.error !== undefined) {
+    try {
+      source = parseExecutionError(body.error)
+    } catch {
+      // A malformed HTTP error must not erase retryability determined by status.
+    }
+  }
   return Object.assign(
-    new Error(source.message ?? `Execution returned HTTP ${status}.`),
+    new Error(source?.message ?? `Execution returned HTTP ${status}.`),
     {
       name: 'ExecutionServiceError' as const,
-      code: source.code ?? 'EXECUTION_API_ERROR',
-      retryable: source.retryable ?? (status === 429 || status >= 500)
+      code: source?.code ?? 'EXECUTION_API_ERROR',
+      retryable: source?.retryable ?? (status === 429 || status >= 500)
     }
   )
 }
@@ -383,7 +409,7 @@ function parseResponse(
       'EXECUTION_INVALID_RESPONSE',
       'Execution returned an invalid run response.'
     )
-  if (!EXECUTION_STATUSES.has(body.status)) {
+  if (!isExecutionStatus(body.status)) {
     throw new ExecutionProtocolError(
       'EXECUTION_INVALID_STATUS',
       `Execution returned an unknown status: ${body.status}.`
@@ -403,7 +429,12 @@ function parseResponse(
       `Execution returned an unexpected workflow for ${expectedRunId}.`
     )
   }
-  return body as unknown as ValidatedRunResponse
+  return {
+    ...body,
+    run_id: body.run_id,
+    workflow: body.workflow,
+    status: body.status
+  }
 }
 
 export async function submitExecutionRun({
@@ -459,11 +490,13 @@ export interface ExecutionRunStatusBatch {
   /** Runs the Execution has no record for, kept apart so a caller can tell them from a drop. */
   readonly missing: readonly string[]
   /** The same statuses by run id, for callers that look runs up instead of iterating. */
-  readonly byRunId: ReadonlyMap<string, string>
+  readonly byRunId: ReadonlyMap<string, RunResponse['status']>
 }
 
 /** One run's status token, as the contract defines it. */
-export type ExecutionRunStatusToken = RunStatusToken
+export type ExecutionRunStatusToken = RunStatusToken & {
+  status: RunResponse['status']
+}
 
 /**
  * How many run IDs one status request carries.
@@ -492,7 +525,7 @@ export async function getExecutionRunStatuses(
 ): Promise<ExecutionRunStatusBatch> {
   const runs: ExecutionRunStatusToken[] = []
   const missing: string[] = []
-  const byRunId = new Map<string, string>()
+  const byRunId = new Map<string, RunResponse['status']>()
 
   for (
     let start = 0;
@@ -539,7 +572,7 @@ async function readExecutionRunStatuses(
     )
   }
   const runs: ExecutionRunStatusToken[] = []
-  const byRunId = new Map<string, string>()
+  const byRunId = new Map<string, RunResponse['status']>()
   for (const entry of body.runs) {
     if (
       !isRecord(entry) ||
@@ -551,7 +584,7 @@ async function readExecutionRunStatuses(
         'Execution returned an invalid status entry.'
       )
     }
-    if (!EXECUTION_STATUSES.has(entry.status)) {
+    if (!isExecutionStatus(entry.status)) {
       throw new ExecutionProtocolError(
         'EXECUTION_INVALID_STATUS',
         `Execution returned an unknown status: ${entry.status}.`
@@ -586,15 +619,15 @@ export async function getExecutionRunStatus(
   const parsed = parseResponse(body, runId, workflow)
   return {
     run_id: runId,
-    workflow: parsed.workflow as ReviewRunWorkflow,
+    workflow: parsed.workflow,
     status: parsed.status,
     ...(Object.hasOwn(parsed, 'result') ? { result: parsed.result } : {}),
     ...(isRecord(parsed.memory_processing)
       ? { memory_processing: parsed.memory_processing }
       : {}),
-    ...(isRecord(parsed.error)
-      ? { error: parsed.error as UnvalidatedExecutionError }
-      : {}),
+    ...(parsed.error === undefined || parsed.error === null
+      ? {}
+      : { error: parseExecutionError(parsed.error) }),
     ...(parsed.artifact_storage === undefined
       ? {}
       : {

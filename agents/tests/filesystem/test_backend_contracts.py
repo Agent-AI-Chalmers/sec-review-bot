@@ -29,7 +29,7 @@ from sec_review_agents.agents.verification.repository import (
     build_repository_verification_backend_config,
 )
 from sec_review_agents.filesystem.backend_factory import create_backend_with_path_views
-from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
+from sec_review_agents.runtime.runtime_config import RuntimeContext
 
 pytestmark = pytest.mark.integration
 
@@ -90,7 +90,7 @@ def _scan_mode(input_data: dict) -> str:
 
 def _repository_analyzer_backend(
     input_data: dict,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
 ):
     local_root = _local_root(input_data)
     scan_mode = _scan_mode(input_data)

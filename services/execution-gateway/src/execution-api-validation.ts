@@ -57,8 +57,9 @@ export function isExecutionError(value: unknown): value is ExecutionError {
     return false
   const error = value as Record<string, unknown>
   return (
+    typeof error.category === 'string' &&
     ['input', 'workflow', 'llm', 'runtime', 'internal'].includes(
-      String(error.category),
+      error.category,
     ) &&
     typeof error.code === 'string' &&
     typeof error.message === 'string' &&

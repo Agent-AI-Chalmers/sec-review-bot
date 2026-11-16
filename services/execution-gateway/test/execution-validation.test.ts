@@ -13,6 +13,7 @@ import {
 import { EXECUTION_API_VERSION } from '../src/execution-api-version.js'
 import {
   executionWorkflowType,
+  validateExecutionSubmission,
   validateExecutionWorkflowInput,
 } from '../src/execution-workflow-validation.js'
 
@@ -108,33 +109,23 @@ await test('execution workflow input owns the Temporal workflow type', () => {
   )
 })
 
-await test('execution workflow input accepts only the declared runtime override shape', () => {
+await test('execution workflow input rejects runtime overrides', () => {
   const request = {
     workflow: 'issue-review',
     run_id: 'run-runtime-contract',
     input: {},
     timeout_seconds: 60,
   }
-
-  assert.doesNotThrow(() => validateExecutionWorkflowInput(request))
-  assert.doesNotThrow(() =>
-    validateExecutionWorkflowInput({ ...request, runtime: null }),
-  )
-  assert.doesNotThrow(() =>
-    validateExecutionWorkflowInput({
-      ...request,
-      runtime: { workspace_image: 'benchmark:latest' },
-    }),
-  )
   for (const runtime of [
-    'benchmark:latest',
+    null,
+    {},
+    { workspace_image: 'benchmark:latest' },
+    'image',
     [],
-    { workspace_image: '   ' },
-    { unknown: true },
   ]) {
     assert.throws(
       () => validateExecutionWorkflowInput({ ...request, runtime }),
-      /execution-workflow\/v1/,
+      /Execution Workflow input does not match/,
     )
   }
 })
@@ -182,3 +173,30 @@ await test('contract schemas resolve independently of the process working direct
     await rm(other, { recursive: true, force: true })
   }
 })
+
+for (const [workflow, fixture] of [
+  ['issue-review', 'issue-review-input.json'],
+  ['pull-request-review', 'pull-request-review-input.json'],
+  ['repository-review', 'repository-review-input-full.json'],
+] as const) {
+  await test(`complete submission validates and narrows ${workflow}`, () => {
+    const submission: unknown = {
+      workflow,
+      input: contractFixture(fixture),
+      run_id: 'run-1',
+      timeout_seconds: 30,
+    }
+    validateExecutionSubmission(submission)
+    switch (submission.workflow) {
+      case 'issue-review':
+        assert.equal(typeof submission.input.issue.number, 'number')
+        break
+      case 'pull-request-review':
+        assert.equal(typeof submission.input.pr.number, 'number')
+        break
+      case 'repository-review':
+        assert.ok(submission.input.scan_target)
+        break
+    }
+  })
+}

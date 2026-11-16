@@ -19,7 +19,7 @@ from sec_review_agents.review_stages.record import (
 )
 from sec_review_agents.review_stages.single_agent.result import SingleAgentFixOutcome
 from sec_review_agents.runtime.runtime_config import (
-    ExecutionRuntimeContext,
+    RuntimeContext,
     runtime_workspace_path,
 )
 from sec_review_agents.temporal.support import (
@@ -42,7 +42,7 @@ async def run_issue_single_agent(
     single_agent_artifacts_path: Path,
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> SingleAgentFixOutcome:
     """Run the single-agent stage and return its raw result.
@@ -200,7 +200,7 @@ class IssueSingleAgentWorkflow:
         return {
             "ok": True,
             "result": public_result,
-            "artifact_storage": finalized["artifact_storage"],
+            "artifact_storage": finalized.to_artifact_storage(),
         }
 
 
@@ -253,7 +253,7 @@ async def execute_issue_single_agent(
     single_agent_artifacts_path: Path,
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     """Run the stage and project it into the public ablation result shape."""

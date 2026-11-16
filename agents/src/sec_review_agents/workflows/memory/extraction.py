@@ -18,7 +18,7 @@ class MemoryExtractionRequest:
     source_workflow: str
     run_id: str
     unit_id: str
-    execution_archive: dict[str, Any]
+    execution_archive: ArtifactReference
     timeout_seconds: int
 
 
@@ -155,7 +155,7 @@ async def prepare_memory_extraction(
     catalog = configured_memory_catalog_client()
     if catalog is None:
         raise RuntimeError("Memory catalog is required for extraction publication.")
-    reference = ArtifactReference.from_mapping(request.execution_archive)
+    reference = request.execution_archive
     extraction_id = memory_extraction_workflow_id(
         execution_archive_digest=reference.digest,
         unit_id=request.unit_id,

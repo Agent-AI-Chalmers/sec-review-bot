@@ -14,7 +14,7 @@ from sec_review_agents.review_stages.mitigation.stage import (
     run_mitigation_stage,
 )
 from sec_review_agents.runtime.runtime_config import (
-    ExecutionRuntimeContext,
+    RuntimeContext,
     runtime_workspace_path,
 )
 from sec_review_agents.workflows.review_intent import (
@@ -32,7 +32,7 @@ async def mitigate_issue_with_self_check(
     published_trajectory_path: Path | None = None,
     analysis_result: AnalysisStageResult,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> MitigationStageResult:
     return await run_mitigation_stage(

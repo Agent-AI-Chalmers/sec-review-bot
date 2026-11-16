@@ -1,25 +1,23 @@
 import type {
-  ExecutionArtifactStorage,
+  RunResponse,
   ExecutionWorkflow,
   WorkflowInputByName,
 } from './execution-api-types-generated.js'
 
-export interface ExecutionWorkflowInput {
-  workflow: ExecutionWorkflow
-  run_id: string
-  input: WorkflowInputByName[ExecutionWorkflow]
-  timeout_seconds: number
-  runtime?: { workspace_image?: string } | null
-}
+// Derive each workflow/input pair from the generated API mapping. The Temporal
+// contract adds the handoff fields; runtime validation checks both contracts.
+export type ExecutionWorkflowInput = {
+  [Workflow in ExecutionWorkflow]: {
+    workflow: Workflow
+    run_id: string
+    input: WorkflowInputByName[Workflow]
+    timeout_seconds: number
+  }
+}[ExecutionWorkflow]
 
-export interface ExecutionRecord {
+export type ExecutionRecord = RunResponse & {
   run_id: string
   workflow?: string
-  status: string
-  result?: unknown
-  error?: Record<string, unknown>
-  memory_processing?: Record<string, unknown>
-  artifact_storage?: ExecutionArtifactStorage
 }
 
 export class ExecutionRunConflictError extends Error {

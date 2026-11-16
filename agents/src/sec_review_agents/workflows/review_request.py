@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
+from sec_review_agents.runtime.runtime_config import RuntimeContext
 from sec_review_agents.workflows.prepared_input import PreparedWorkflowInput
 
 
@@ -18,7 +18,7 @@ class ReviewWorkflowRequest:
     run_id: str
     prepared_input: PreparedWorkflowInput
     timeout_seconds: int
-    runtime_context: ExecutionRuntimeContext
+    runtime_context: RuntimeContext
     post_processing: ReviewPostProcessingPolicy = ReviewPostProcessingPolicy()
 
 

@@ -53,7 +53,6 @@ async def test_temporal_conversion_preserves_raw_input_until_validation() -> Non
         "run_id": "run-1",
         "input": {},
         "timeout_seconds": 30,
-        "runtime": None,
     }
     encoded_normalized = await DataConverter.default.encode([normalized_payload])
 
@@ -230,11 +229,24 @@ class PreparedRequestProbe:
     async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
         return {
             "ok": True,
-            "run_id": request.run_id,
-            "prepared_input": request.prepared_input.model_dump(mode="json"),
-            "prepared_type": type(request.prepared_input).__name__,
-            "execution_archive_scheme": request.post_processing.execution_archive_scheme,
-            "memory_processing_enabled": request.post_processing.memory_processing_enabled,
+            "result": {
+                "run_id": request.run_id,
+                "prepared_input": request.prepared_input.model_dump(mode="json"),
+                "prepared_type": type(request.prepared_input).__name__,
+                "execution_archive_scheme": request.post_processing.execution_archive_scheme,
+                "memory_processing_enabled": request.post_processing.memory_processing_enabled,
+            },
+            "memory_processing": {"extractions": []},
+            "artifact_storage": {
+                "status": "available",
+                "artifact": {
+                    "kind": "execution_archive",
+                    "uri": "s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst",
+                    "digest": f"sha256:{'a' * 64}",
+                    "media_type": "application/tar+zstd",
+                    "size_bytes": 42,
+                },
+            },
         }
 
 
@@ -274,8 +286,8 @@ async def test_prepared_request_reaches_child_through_real_temporal(
                     ),
                     timeout=30,
                 )
-    assert result == {
-        "ok": True,
+    assert result["ok"] is True
+    assert result["result"] == {
         "run_id": "run-1",
         "prepared_input": prepared_issue_input(
             artifact_root_path="/tmp/run-1/artifacts"
@@ -284,3 +296,55 @@ async def test_prepared_request_reaches_child_through_real_temporal(
         "execution_archive_scheme": "s3",
         "memory_processing_enabled": False,
     }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("success", [True, False])
+async def test_execution_result_type_roundtrips_through_temporal(success) -> None:
+    from sec_review_agents.artifacts.reference import ArtifactReference
+    from sec_review_agents.entrypoints.execution_protocol import build_execution_error
+
+    reference = ArtifactReference(
+        uri="file:///tmp/execution-archive.v1.tar.zst",
+        digest=f"sha256:{'a' * 64}",
+        media_type="application/tar+zstd",
+        size_bytes=42,
+    ).as_dict()
+    value = (
+        {
+            "ok": True,
+            "result": {},
+            "memory_processing": {"extractions": []},
+            "artifact_storage": {
+                "status": "available",
+                "artifact": {"kind": "execution_archive", **reference},
+            },
+        }
+        if success
+        else {
+            "ok": False,
+            "error": build_execution_error(
+                code=EXECUTION_REQUEST_INVALID, category="input", message="Invalid"
+            ),
+        }
+    )
+    definition = workflow._Definition.must_from_class(
+        execution_workflow.ExecutionWorkflow
+    )
+    assert definition.ret_type is not None
+    payloads = await pydantic_data_converter.encode([value])
+    restored = await pydantic_data_converter.decode(payloads, [definition.ret_type])
+    assert restored == [value]
+
+
+@pytest.mark.asyncio
+async def test_temporal_execution_result_rejects_incomplete_success() -> None:
+    from pydantic import ValidationError
+
+    definition = workflow._Definition.must_from_class(
+        execution_workflow.ExecutionWorkflow
+    )
+    assert definition.ret_type is not None
+    payloads = await pydantic_data_converter.encode([{"ok": True, "result": {}}])
+    with pytest.raises(ValidationError):
+        await pydantic_data_converter.decode(payloads, [definition.ret_type])

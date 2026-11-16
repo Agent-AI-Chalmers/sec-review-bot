@@ -22,9 +22,6 @@ export type CreateRunRequest = {
    * @type string
    */
   run_id: string
-  runtime?: {
-    [key: string]: unknown
-  } | null
 }
 
 /**

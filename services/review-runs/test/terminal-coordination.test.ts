@@ -165,7 +165,12 @@ test('Execution failure records its artifact atomically with the terminal failur
         status: 'failed',
         artifact_storage: artifact,
         notices: [],
-        error: { code: 'EXECUTION_FAILED', message: 'failed' }
+        error: {
+          category: 'runtime',
+          code: 'EXECUTION_FAILED',
+          message: 'failed',
+          retryable: false
+        }
       }),
       () => false
     ),

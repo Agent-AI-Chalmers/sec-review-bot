@@ -353,3 +353,83 @@ test('the status batch size is the limit the contract publishes', () => {
     EXECUTION_STATUS_QUERY_LIMIT
   )
 })
+
+for (const error of [
+  { category: ['runtime'], code: 'FAIL', message: 'failed', retryable: false },
+  { category: 'runtime', code: 42, message: 'failed', retryable: false },
+  { category: 'runtime', code: 'FAIL', message: {}, retryable: false },
+  { category: 'runtime', code: 'FAIL', message: 'failed', retryable: 'false' },
+  {
+    category: 'runtime',
+    code: 'FAIL',
+    message: 'failed',
+    retryable: false,
+    details: []
+  }
+]) {
+  test(`rejects malformed terminal error fields: ${JSON.stringify(error)}`, async () => {
+    configureExecution()
+    globalThis.fetch = async () =>
+      new Response(
+        JSON.stringify({
+          run_id: 'run-1',
+          workflow: 'issue-review',
+          status: 'failed',
+          error
+        }),
+        { status: 200 }
+      )
+    await assert.rejects(getExecutionRunStatus('run-1'), (failure: unknown) => {
+      assert.equal(isTerminalExecutionPollingError(failure), true)
+      assert.equal(
+        (failure as { code?: string }).code,
+        'EXECUTION_INVALID_RESPONSE'
+      )
+      return true
+    })
+  })
+}
+
+test('malformed HTTP error fields cannot override retry behavior with coerced values', async () => {
+  configureExecution()
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        error: {
+          category: 'runtime',
+          code: 42,
+          message: {},
+          retryable: 'false'
+        }
+      }),
+      { status: 503 }
+    )
+  await assert.rejects(getExecutionRunStatus('run-1'), (failure: unknown) => {
+    assert.equal(isTerminalExecutionPollingError(failure), false)
+    assert.equal((failure as { code?: string }).code, 'EXECUTION_API_ERROR')
+    assert.equal((failure as Error).message, 'Execution returned HTTP 503.')
+    return true
+  })
+})
+
+test('preserves a fully validated terminal Execution error', async () => {
+  configureExecution()
+  const error = {
+    category: 'runtime',
+    code: 'FAIL',
+    message: 'failed',
+    retryable: false,
+    details: { step: 'publish' }
+  }
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({
+        run_id: 'run-1',
+        workflow: 'issue-review',
+        status: 'failed',
+        error
+      }),
+      { status: 200 }
+    )
+  assert.deepEqual((await getExecutionRunStatus('run-1')).error, error)
+})

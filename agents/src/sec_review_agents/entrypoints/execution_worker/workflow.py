@@ -9,6 +9,7 @@ from temporalio import activity, workflow
 from sec_review_agents.entrypoints.execution_protocol import (
     EXECUTION_REQUEST_INVALID,
     EXECUTION_WORKFLOW_UNSUPPORTED,
+    ExecutionFailure,
     build_execution_error,
 )
 from sec_review_agents.entrypoints.execution_workflow import EXECUTION_WORKFLOW_TYPE
@@ -20,6 +21,7 @@ from sec_review_agents.workflows.pull_request.workflow import PullRequestReviewW
 from sec_review_agents.workflows.repository.workflow import (
     RepositoryReviewWorkflow,
 )
+from sec_review_agents.workflows.result import ReviewWorkflowSuccess
 from sec_review_agents.workflows.review_request import (
     ReviewPostProcessingPolicy,
     ReviewWorkflowRequest,
@@ -59,7 +61,6 @@ def prepare_execution_run_activity(
     from sec_review_agents.features import memory_processing_enabled
     from sec_review_agents.observability.diagnostics import log_diagnostic
     from sec_review_agents.observability.trace_context import bind_trace_context
-    from sec_review_agents.runtime.runtime_config import runtime_context_from_config
 
     try:
         parsed_request = parse_execution_workflow_input(request)
@@ -82,7 +83,7 @@ def prepare_execution_run_activity(
                     run_id=parsed_request.run_id,
                     workflow=parsed_request.workflow,
                 ),
-                runtime_context=runtime_context_from_config(parsed_request.runtime),
+                runtime_context={},
                 timeout_seconds=parsed_request.timeout_seconds,
                 post_processing=ReviewPostProcessingPolicy(
                     memory_processing_enabled=memory_processing_enabled(),
@@ -102,7 +103,9 @@ def prepare_execution_run_activity(
 @workflow.defn(name=EXECUTION_WORKFLOW_TYPE)
 class ExecutionWorkflow:
     @workflow.run
-    async def run(self, request: dict[str, Any]) -> dict[str, Any]:
+    async def run(
+        self, request: dict[str, Any]
+    ) -> ReviewWorkflowSuccess | ExecutionFailure:
         prepared = await workflow.execute_activity(
             prepare_execution_run_activity,
             request,
@@ -140,17 +143,13 @@ class ExecutionWorkflow:
         else:
             return {
                 "ok": False,
-                "error": {
-                    "category": "workflow",
-                    "code": EXECUTION_WORKFLOW_UNSUPPORTED,
-                    "message": f"Unsupported workflow: {prepared.workflow}",
-                    "retryable": False,
-                    "details": {},
-                },
+                "error": build_execution_error(
+                    category="workflow",
+                    code=EXECUTION_WORKFLOW_UNSUPPORTED,
+                    message=f"Unsupported workflow: {prepared.workflow}",
+                ),
             }
-        return {
-            **result,
-        }
+        return result
 
 
 def _child_workflow_id(run_id: str, workflow_name: str) -> str:

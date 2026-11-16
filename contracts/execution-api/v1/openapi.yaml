@@ -1,6 +1,7 @@
 components:
   schemas:
     CreateRunRequest:
+      additionalProperties: false
       description: A request to start one workflow run.
       properties:
         input:
@@ -13,12 +14,6 @@ components:
           pattern: ^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$
           title: Run Id
           type: string
-        runtime:
-          anyOf:
-            - additionalProperties: true
-              type: object
-            - type: "null"
-          title: Runtime
       required:
         - run_id
         - input

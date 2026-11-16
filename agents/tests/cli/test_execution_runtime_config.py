@@ -119,3 +119,34 @@ def test_execution_input_rejects_caller_run_id() -> None:
             run_id="run-runtime-config",
             workflow="issue-review",
         )
+
+
+def test_local_review_bundle_retains_evaluation_runtime_overrides(
+    tmp_path, monkeypatch
+):
+    """Evaluation supplies per-case resources locally, outside the public handoff."""
+    from sec_review_agents.cli import local_execution
+    from sec_review_agents.cli.local_materialization.common import ReviewBundle
+    from tests.prepared_input_fixtures import prepared_issue_input
+
+    monkeypatch.setenv("EXECUTION_ALLOW_WORKSPACE_IMAGE_OVERRIDE", "true")
+    prepared = prepared_issue_input(artifact_root_path=str(tmp_path / "artifacts"))
+    monkeypatch.setattr(
+        local_execution, "prepare_workflow_input", lambda *args, **kwargs: prepared
+    )
+    bundle = ReviewBundle(
+        workflow="issue-review",
+        run_id="evaluation",
+        input={},
+        local_root_path=tmp_path,
+        runtime_config={
+            "workspace_image": "evaluation:latest",
+            "workspace_path": "/app/repo",
+        },
+    )
+    request = local_execution.build_local_workflow_request(bundle, timeout_seconds=60)
+    assert request.prepared_input is prepared
+    assert request.runtime_context == {
+        "workspace_image": "evaluation:latest",
+        "workspace_path": "/app/repo",
+    }

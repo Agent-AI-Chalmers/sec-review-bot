@@ -21,7 +21,7 @@ from sec_review_agents.resources.loader import (
     load_prompt_resource,
 )
 from sec_review_agents.runtime.runtime_config import (
-    ExecutionRuntimeContext,
+    RuntimeContext,
     runtime_workspace_image,
     runtime_workspace_path,
 )
@@ -49,7 +49,7 @@ def build_issue_single_agent_backend_config(
     *,
     workspace_root: Path,
     history_path: Path,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
 ) -> BackendConfig:
     workspace_image = runtime_workspace_image(runtime_context)
     workspace_directory = runtime_workspace_path(runtime_context)

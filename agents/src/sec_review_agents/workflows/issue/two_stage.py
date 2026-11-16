@@ -14,7 +14,7 @@ from sec_review_agents.execution_archives.publication import (
 from sec_review_agents.review_stages.analysis.result import AnalysisStageResult
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
 from sec_review_agents.review_stages.record import build_review_record
-from sec_review_agents.runtime.runtime_config import ExecutionRuntimeContext
+from sec_review_agents.runtime.runtime_config import RuntimeContext
 from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
@@ -153,7 +153,7 @@ class IssueTwoStageWorkflow:
         return {
             "ok": True,
             "result": public_result,
-            "artifact_storage": finalized["artifact_storage"],
+            "artifact_storage": finalized.to_artifact_storage(),
         }
 
 
@@ -166,7 +166,7 @@ async def execute_issue_two_stage(
     mitigator_artifacts_path: Path,
     review_objective: ReviewObjective,
     test_changes: TestChangesPolicy = TEST_CHANGES_ALLOW,
-    runtime_context: ExecutionRuntimeContext | None = None,
+    runtime_context: RuntimeContext | None = None,
     setup_declaration_content: str | None = None,
 ) -> dict[str, Any]:
     """Run analyzer and self-checking mitigation, then publish their review record."""

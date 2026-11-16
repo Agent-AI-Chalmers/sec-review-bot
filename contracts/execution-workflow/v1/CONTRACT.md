@@ -6,4 +6,4 @@ Gateway starts the workflow with one `ExecutionWorkflowInput` JSON object. Worke
 
 The `input` value carries an Execution API v1 workflow input and is validated against the selected workflow schema in `execution-api/v1`.
 
-`runtime` is optional. When present, it is `null` or a closed object whose only supported field is the non-blank `workspace_image` string. The Worker separately decides whether the deployment authorizes that override.
+The envelope contains only `workflow`, `run_id`, `input`, and `timeout_seconds`.
