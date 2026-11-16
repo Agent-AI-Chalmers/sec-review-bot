@@ -105,6 +105,11 @@ export async function runPublicationStep({
       stepKey,
       find
     })
+    if (settled.outcome === 'lookup_failed') {
+      if (settled.recording === 'not_owned')
+        throw new PublicationClaimLostError(runId)
+      throw settled.error
+    }
     if (settled.outcome !== 'recorded' || settled.step !== 'succeeded')
       throw error
     return {

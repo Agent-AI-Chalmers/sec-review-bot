@@ -55,6 +55,6 @@ pnpm test
 ## 错误码
 
 - **请求校验错误**：`INVALID_QUERY`、`INVALID_BODY`、`INVALID_PATH_PARAMETER` 分别表示查询参数、请求体和路径参数未通过 schema 校验，返回 HTTP 400 和字符串 `code`。运行列表不接受未声明的查询参数：`listRuns` 将过滤条件定义为 `additionalProperties: false` 的对象，因此未知参数返回 `INVALID_QUERY`。服务端从契约枚举生成 `ERROR_RESPONSE_CODES_FROM_CONTRACT`，不会返回枚举之外的 `ErrorResponse.code`。
-- **发布流程错误**：`PUBLICATION_STEP_*` 错误码表示确定的、应停止自动重试的发布失败，定义在 [openapi.yaml](v1/openapi.yaml) 的 `ErrorResponse.code` 中，写入接口以 HTTP 409 和字符串 `code` 返回。Review Runs 从该枚举生成 `PUBLICATION_STEP_ERROR_CODES`；GitHub Integration 为每个码设置 `retry: false`。两侧不一致时，`publication-error-code-alignment.test.ts` 会失败，避免遗漏停止重试规则。
+- **发布流程错误**：`PUBLICATION_STEP_*` 错误码表示确定的、应停止自动重试的发布失败，定义在 [openapi.yaml](v1/openapi.yaml) 的 `ErrorResponse.code` 中，写入接口以 HTTP 409 和字符串 `code` 返回。Review Runs 从该枚举生成 `PUBLICATION_STEP_ERROR_CODES`；GitHub Integration 使用生成的 `REVIEW_RUNS_PUBLICATION_ERROR_CODES` 映射，不再重复定义字符串。收到确定拒绝时按 `retry: false` 处理，`publication-error-code-alignment.test.ts` 对照源契约检查该策略。传输失败携带的次数耗尽错误码仍允许重试，因为它不能证明服务已拒绝请求。
 - **不带 `code` 的错误**：每个操作都声明 HTTP 500（`InternalError`）；读取请求体的操作还声明超过 1 MiB 上限时的 HTTP 413（`PayloadTooLarge`）。两者不返回 `code`：内部错误不暴露细节，过大的请求体则在 schema 校验前被拒绝。Spectral 规则 `operation-declares-server-errors` 会检查新增操作是否遗漏这些响应。
 - **诊断错误码**：`failure_code` 和执行错误的 `code` 暂不限定为枚举，可以增加新值。

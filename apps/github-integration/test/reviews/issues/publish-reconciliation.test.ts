@@ -9,11 +9,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { handleIssueReviewRun } from '../../../src/reviews/issues/publish.js'
-import {
-  isRecordedReconciliationFailure,
-  unrecordedRecoveryAttemptCount,
-  settleExhaustedStep
-} from '../../../src/reviews/shared/settle-exhausted-step.js'
+import { settleExhaustedStep } from '../../../src/reviews/shared/settle-exhausted-step.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../../../src/execution/publish-error-code.js'
 import type { PublicationStepStore } from '../../../src/review-runs/client.js'
 import type { ReviewRecord } from '../../../src/reviews/review-record.js'
@@ -289,48 +285,48 @@ test('every outcome names whether the step was written, so a caller need not inf
 test('a reconciliation that cannot reach GitHub records the failure but settles nothing', async () => {
   // A lookup that failed is not a lookup that found nothing. Settling it as absent would record
   // `terminal_failed` for a step whose comment may well be on GitHub, so nothing is settled and the
-  // error propagates. It is still recorded as a failed reconciliation, retryable when transient:
+  // error is returned. It is still recorded as a failed reconciliation, retryable when transient:
   // that is what spends the step's reconciliation budget, so a remote that keeps failing parks the
   // step for an operator instead of being retried forever.
   let settled = false
   const failures: Array<{ code: string | null | undefined; retry: unknown }> =
     []
-  await assert.rejects(
-    settleExhaustedStep({
-      store: {
-        listPublicationSteps: async () => [],
-        settleExhaustedPublicationStep: async () => {
-          settled = true
-          return true
-        },
-        failPublicationStep: async (
-          _runId: string,
-          _token: string,
-          _stepKey: string,
-          error: { code?: string | null },
-          options: { retry?: boolean }
-        ) => {
-          failures.push({ code: error.code, retry: options.retry })
-          return true
-        }
-      } as unknown as PublicationStepStore,
-      runId: RUN_ID,
-      token: 'claim',
-      stepKey: 'issue:summary-comment',
-      find: async () => {
-        throw Object.assign(new Error('GitHub answered 502'), { status: 502 })
+  const result = await settleExhaustedStep({
+    store: {
+      listPublicationSteps: async () => [],
+      settleExhaustedPublicationStep: async () => {
+        settled = true
+        return true
+      },
+      failPublicationStep: async (
+        _runId: string,
+        _token: string,
+        _stepKey: string,
+        error: { code?: string | null },
+        options: { retry?: boolean }
+      ) => {
+        failures.push({ code: error.code, retry: options.retry })
+        return true
       }
-    }),
-    /502/
-  )
+    } as unknown as PublicationStepStore,
+    runId: RUN_ID,
+    token: 'claim',
+    stepKey: 'issue:summary-comment',
+    find: async () => {
+      throw Object.assign(new Error('GitHub answered 502'), { status: 502 })
+    }
+  })
+  assert.equal(result.outcome, 'lookup_failed')
+  assert.ok(result.outcome === 'lookup_failed')
+  assert.match(String(result.error), /502/)
+  assert.equal(result.recording, 'accepted')
   assert.strictEqual(settled, false)
   assert.deepStrictEqual(failures, [{ code: null, retry: true }])
 })
 
-test('a lookup that throws a non-object is still marked as recorded', async () => {
-  // The caller that records step failures itself skips one already recorded here. A thrown
-  // primitive cannot carry that mark, so it is wrapped; otherwise it would be recorded twice.
-  const thrown = await settleExhaustedStep({
+test('a lookup can return a primitive error without mutation or wrapping', async () => {
+  // The original error is data in the outcome; recording state is a separate field.
+  const result = await settleExhaustedStep({
     store: {
       listPublicationSteps: async () => [],
       settleExhaustedPublicationStep: async () => true,
@@ -342,19 +338,17 @@ test('a lookup that throws a non-object is still marked as recorded', async () =
     find: async () => {
       throw 'lookup exploded'
     }
-  }).then(
-    () => assert.fail('the lookup failure must propagate'),
-    (error: unknown) => error
-  )
-  assert.ok(isRecordedReconciliationFailure(thrown))
-  assert.match(String((thrown as Error).message), /lookup exploded/)
+  })
+  assert.ok(result.outcome === 'lookup_failed')
+  assert.equal(result.recording, 'accepted')
+  assert.match(String(result.error), /lookup exploded/)
 })
 
 test('a lookup failure whose first report is lost is recorded by the retry', async () => {
   // Issue and pull-request steps have no caller that records the failure again, so the retry
   // here is what keeps a lost response from leaving the pass unrecorded.
   let calls = 0
-  const thrown = await settleExhaustedStep({
+  const result = await settleExhaustedStep({
     store: {
       listPublicationSteps: async () => [],
       settleExhaustedPublicationStep: async () => true,
@@ -373,21 +367,19 @@ test('a lookup failure whose first report is lost is recorded by the retry', asy
     find: async () => {
       throw Object.assign(new Error('GitHub answered 502'), { status: 502 })
     }
-  }).then(
-    () => assert.fail('the lookup failure must propagate'),
-    (error: unknown) => error
-  )
+  })
+  assert.ok(result.outcome === 'lookup_failed')
   assert.strictEqual(calls, 2)
-  assert.ok(isRecordedReconciliationFailure(thrown))
+  assert.equal(result.recording, 'accepted')
 })
 
 test('a lookup failure whose recording did not complete is reported again against the same count', async () => {
   // Whether a write committed is unknown when its response is lost. The report is retried once
   // against the count read before the lookup, so if the first write did commit, Review Runs sees
   // the count has moved and does not spend the budget again. If both fail, the lookup error
-  // propagates unmarked with that count, for a caller that records step failures itself.
+  // returns an unknown recording outcome with that count for a caller that reports again.
   const reported: Array<number | undefined> = []
-  const thrown = await settleExhaustedStep({
+  const result = await settleExhaustedStep({
     store: {
       listPublicationSteps: async () => [
         {
@@ -422,16 +414,37 @@ test('a lookup failure whose recording did not complete is reported again agains
     find: async () => {
       throw Object.assign(new Error('GitHub answered 502'), { status: 502 })
     }
-  }).then(
-    () => assert.fail('the lookup failure must propagate'),
-    (error: unknown) => error
-  )
+  })
+  assert.ok(result.outcome === 'lookup_failed')
   assert.deepStrictEqual(
     reported,
     [1, 1],
     'retried once, against the same count both times'
   )
-  assert.match(String((thrown as Error).message), /502/)
-  assert.ok(!isRecordedReconciliationFailure(thrown))
-  assert.strictEqual(unrecordedRecoveryAttemptCount(thrown), 1)
+  assert.match(String(result.error), /502/)
+  assert.equal(result.recording, 'unknown')
+  assert.strictEqual(result.expectedRecoveryAttemptCount, 1)
+})
+
+test('a frozen lookup error is returned unchanged with explicit recording state', async () => {
+  const error = Object.freeze(
+    Object.assign(new Error('GitHub unavailable'), { status: 502 })
+  )
+  for (const accepted of [true, false]) {
+    const result = await settleExhaustedStep({
+      store: {
+        listPublicationSteps: async () => [],
+        failPublicationStep: async () => accepted
+      } as unknown as PublicationStepStore,
+      runId: RUN_ID,
+      token: 'claim',
+      stepKey: 'issue:summary-comment',
+      find: async () => {
+        throw error
+      }
+    })
+    assert.ok(result.outcome === 'lookup_failed')
+    assert.equal(result.error, error)
+    assert.equal(result.recording, accepted ? 'accepted' : 'not_owned')
+  }
 })

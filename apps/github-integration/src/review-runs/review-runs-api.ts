@@ -2185,3 +2185,10 @@ export interface OperationResponseById {
   listInputBundleCandidates: ListInputBundleCandidatesResponseBody
   settleInputBundleCandidate: SettleInputBundleCandidateResponseBody
 }
+
+export const REVIEW_RUNS_PUBLICATION_ERROR_CODES = {
+  publication_step_not_claimable: 'PUBLICATION_STEP_NOT_CLAIMABLE',
+  publication_step_retry_exhausted: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
+  publication_step_set_changed: 'PUBLICATION_STEP_SET_CHANGED',
+  publication_step_set_duplicate: 'PUBLICATION_STEP_SET_DUPLICATE'
+} as const
