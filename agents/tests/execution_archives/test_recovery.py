@@ -107,18 +107,17 @@ def test_activity_recovers_after_upload_and_loss_of_local_artifacts(
     assert (
         not root.exists()
     ), "Recovery must not rebuild or recreate the lost worker directory."
-    assert result["unit_ids"] == [
-        "case-a"
-    ], "Empty units stay omitted without re-globbing local paths."
+    assert result.unit_ids == (
+        "case-a",
+    ), "Empty units stay omitted without re-globbing local paths."
     blob = next(iter(objects.values()))[0]
-    reference = result["execution_archive"]
-    assert reference["digest"] == f"sha256:{hashlib.sha256(blob).hexdigest()}"
-    assert reference["size_bytes"] == len(blob)
+    reference = result.reference
+    assert reference.digest == f"sha256:{hashlib.sha256(blob).hexdigest()}"
+    assert reference.size_bytes == len(blob)
     assert (
-        reference["uri"]
+        reference.uri
         == "s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst"
     )
-    assert result["artifact_storage"]["artifact"]["digest"] == reference["digest"]
     assert client.put_object.call_count == 1
     assert client.get_object.call_count == 1
 

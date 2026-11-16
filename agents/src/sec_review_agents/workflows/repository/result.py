@@ -71,12 +71,16 @@ def build_repository_workflow_result(
     Every input is a stage output, so nothing about the window arrives here as a loose argument
     that the stages never produced.
     """
+    from sec_review_agents.entrypoints.execution_api_schema import (
+        validate_execution_api_result,
+    )
+
     # The window's deletion reading is produced by the scan but published in two places, and each
     # placement is deliberate. The count belongs in scan_summary with the other counts. The skip
     # flag cannot join it there: scan_summary is counts only, and a boolean would break that
     # shape. It is published at the top level instead, where a consumer reading only the summary
     # numbers cannot mistake an unreviewed window for a reviewed one.
-    return RepositoryWorkflowResult.model_validate(
+    result = RepositoryWorkflowResult.model_validate(
         {
             "api_version": EXECUTION_API_VERSION,
             "scan_summary": build_scan_summary(scan_result=scan_result),
@@ -91,3 +95,6 @@ def build_repository_workflow_result(
             ),
         }
     ).model_dump(mode="json")
+
+    validate_execution_api_result(result, "repository-review")
+    return result

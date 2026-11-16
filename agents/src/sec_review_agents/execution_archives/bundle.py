@@ -28,6 +28,7 @@ from sec_review_agents.artifacts.tar_zstd import (
     validate_restricted_pax_archive,
 )
 from sec_review_agents.contract_versions import EXECUTION_ARCHIVE_ARTIFACT_VERSION
+from sec_review_agents.execution_archives.models import ExecutionArchive
 from sec_review_agents.runtime.trajectories import TRAJECTORY_SUFFIX
 
 EXECUTION_ARCHIVE_FILENAME = (
@@ -51,12 +52,6 @@ class ArchiveReviewUnit:
 class MaterializedTrajectoryUnit:
     unit_id: str
     trajectory_paths: tuple[Path, ...]
-
-
-@dataclass(frozen=True)
-class ExecutionArchive:
-    reference: ArtifactReference
-    unit_ids: tuple[str, ...]
 
 
 def execution_archive_s3_key(run_id: str) -> str:
@@ -472,7 +467,6 @@ def _is_trajectory_manifest_path(value: str) -> bool:
 
 __all__ = [
     "ArchiveReviewUnit",
-    "ExecutionArchive",
     "MaterializedTrajectoryUnit",
     "execution_archive_s3_key",
     "materialize_archive_trajectory_unit",

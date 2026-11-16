@@ -66,7 +66,12 @@ async def test_preparation_requires_worker_catalog_even_when_dotenv_provides_one
                     source_workflow="issue-review",
                     run_id="run-1",
                     unit_id="review",
-                    execution_archive={},
+                    execution_archive=ArtifactReference(
+                        uri="file:///tmp/execution-archive.v1.tar.zst",
+                        digest=f"sha256:{'a' * 64}",
+                        media_type="application/tar+zstd",
+                        size_bytes=42,
+                    ),
                     timeout_seconds=30,
                 )
             )

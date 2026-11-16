@@ -1,6 +1,6 @@
 """Define the Execution protocol: run ID validation and errors."""
 
-from typing import Any
+from typing import Any, Literal, TypedDict
 
 from sec_review_agents.entrypoints.execution_workflow import (
     RUN_ID_PATTERN,
@@ -15,6 +15,19 @@ EXECUTION_REQUEST_INVALID = "EXECUTION_REQUEST_INVALID"
 EXECUTION_WORKFLOW_UNSUPPORTED = "EXECUTION_WORKFLOW_UNSUPPORTED"
 
 
+class ExecutionError(TypedDict):
+    category: str
+    code: str
+    message: str
+    retryable: bool
+    details: dict[str, Any]
+
+
+class ExecutionFailure(TypedDict):
+    ok: Literal[False]
+    error: ExecutionError
+
+
 def build_execution_error(
     *,
     code: str,
@@ -22,7 +35,7 @@ def build_execution_error(
     category: str = "internal",
     retryable: bool = False,
     details: dict[str, Any] | None = None,
-) -> dict[str, Any]:
+) -> ExecutionError:
     return {
         "category": category,
         "code": code,
@@ -44,6 +57,8 @@ __all__ = [
     "EXECUTION_REQUEST_INVALID",
     "EXECUTION_WORKFLOW_UNSUPPORTED",
     "RUN_ID_REQUIREMENT_MESSAGE",
+    "ExecutionError",
+    "ExecutionFailure",
     "build_execution_error",
     "validate_run_id",
 ]

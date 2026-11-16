@@ -37,13 +37,13 @@ async def test_scheduling_starts_one_abandoned_child_per_review_unit(
     result = await schedule_memory_extractions(
         source_workflow="repository-review",
         run_id="run-1",
-        execution_archive=_reference().as_dict(),
+        execution_archive=_reference(),
         unit_ids=["case-a", "case-b"],
         timeout_seconds=30,
         enabled=True,
     )
 
-    assert [entry["status"] for entry in result["extractions"]] == [
+    assert [entry["status"] for entry in result] == [
         "started",
         "started",
     ]
@@ -80,13 +80,13 @@ async def test_scheduling_reports_an_existing_extraction(monkeypatch) -> None:
     result = await schedule_memory_extractions(
         source_workflow="issue-review",
         run_id="run-1",
-        execution_archive=_reference().as_dict(),
+        execution_archive=_reference(),
         unit_ids=["case-a"],
         timeout_seconds=30,
         enabled=True,
     )
 
-    assert result["extractions"] == [
+    assert result == [
         {
             "unit_id": "case-a",
             "workflow_id": memory_extraction_workflow_id(
@@ -110,11 +110,41 @@ async def test_disabled_scheduling_does_not_start_children(monkeypatch) -> None:
     result = await schedule_memory_extractions(
         source_workflow="issue-review",
         run_id="run-1",
-        execution_archive=_reference().as_dict(),
+        execution_archive=_reference(),
         unit_ids=["review"],
         timeout_seconds=30,
         enabled=False,
     )
 
-    assert result == {"extractions": []}
+    assert result == []
     start_child.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_failed_start_does_not_prevent_later_units(monkeypatch) -> None:
+    started = []
+
+    async def start_child(*args, **kwargs):
+        unit_id = args[1].unit_id
+        started.append(unit_id)
+        if unit_id == "case-a":
+            raise RuntimeError("unavailable")
+
+    monkeypatch.setattr(memory_scheduling.workflow, "start_child_workflow", start_child)
+    monkeypatch.setattr(memory_scheduling.workflow, "logger", Mock())
+    result = await schedule_memory_extractions(
+        source_workflow="repository-review",
+        run_id="run-1",
+        execution_archive=_reference(),
+        unit_ids=["case-a", "case-b"],
+        timeout_seconds=30,
+        enabled=True,
+    )
+
+    assert started == ["case-a", "case-b"]
+    failed, successful = result
+    assert failed["status"] == "start_failed"
+    assert "error_code" in failed
+    assert failed["error_code"] == "MEMORY_EXTRACTION_START_FAILED"
+    assert successful["status"] == "started"
+    assert "error_code" not in successful

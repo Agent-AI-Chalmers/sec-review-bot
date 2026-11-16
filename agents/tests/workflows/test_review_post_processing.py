@@ -2,7 +2,9 @@ from datetime import timedelta
 
 import pytest
 
+from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.contract_versions import EXECUTION_API_VERSION
+from sec_review_agents.execution_archives.models import ExecutionArchive
 from sec_review_agents.execution_archives.publication import (
     ExecutionArchivePublicationRequest,
 )
@@ -25,26 +27,16 @@ from tests.prepared_input_fixtures import (
 from tests.verification_fixtures import skipped_verification_fixture
 
 
-def _finalized(*unit_ids: str) -> dict[str, object]:
-    return {
-        "execution_archive": {
-            "uri": "s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst",
-            "digest": f"sha256:{'a' * 64}",
-            "media_type": "application/tar+zstd",
-            "size_bytes": 42,
-        },
-        "artifact_storage": {
-            "status": "available",
-            "artifact": {
-                "kind": "execution_archive",
-                "uri": "s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst",
-                "digest": f"sha256:{'a' * 64}",
-                "media_type": "application/tar+zstd",
-                "size_bytes": 42,
-            },
-        },
-        "unit_ids": list(unit_ids),
-    }
+def _finalized(*unit_ids: str) -> ExecutionArchive:
+    return ExecutionArchive(
+        reference=ArtifactReference(
+            uri="s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst",
+            digest=f"sha256:{'a' * 64}",
+            media_type="application/tar+zstd",
+            size_bytes=42,
+        ),
+        unit_ids=unit_ids,
+    )
 
 
 @pytest.mark.asyncio
@@ -85,14 +77,20 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
             ),
             timeout_seconds=30,
             runtime_context={},
-            post_processing=ReviewPostProcessingPolicy(execution_archive_scheme="file"),
+            post_processing=ReviewPostProcessingPolicy(execution_archive_scheme="s3"),
         )
     )
 
     assert result == {
         "ok": True,
         "result": public_result,
-        "artifact_storage": _finalized("review")["artifact_storage"],
+        "artifact_storage": {
+            "status": "available",
+            "artifact": {
+                "kind": "execution_archive",
+                **_finalized("review").reference.as_dict(),
+            },
+        },
     }
     assert publications == [
         ExecutionArchivePublicationRequest(
@@ -105,7 +103,7 @@ async def test_issue_ablation_publishes_without_scheduling_memory(
                 }
             ],
             result=public_result,
-            destination_scheme="file",
+            destination_scheme="s3",
         )
     ]
 
@@ -143,7 +141,7 @@ async def test_single_review_publishes_before_scheduling_memory(
     async def fake_schedule(**kwargs):
         events.append("schedule")
         assert kwargs["unit_ids"] == ["review"]
-        return {"extractions": []}
+        return []
 
     monkeypatch.setattr(
         workflow_module.workflow, "execute_activity", fake_execute_activity
@@ -161,9 +159,20 @@ async def test_single_review_publishes_before_scheduling_memory(
             )(artifact_root_path="/tmp/run-1/artifacts"),
             timeout_seconds=30,
             runtime_context={},
+            post_processing=ReviewPostProcessingPolicy(execution_archive_scheme="s3"),
         )
     )
 
+    assert result["artifact_storage"] == {
+        "status": "available",
+        "artifact": {
+            "kind": "execution_archive",
+            "uri": "s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst",
+            "digest": f"sha256:{'a' * 64}",
+            "media_type": "application/tar+zstd",
+            "size_bytes": 42,
+        },
+    }
     assert result["result"] == {"api_version": EXECUTION_API_VERSION}
     assert events == ["publish", "schedule"]
     assert publications[0].review_units == [
@@ -210,7 +219,7 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
 
     async def fake_schedule(**kwargs):
         assert kwargs["unit_ids"] == ["case-a", "case-b"]
-        return {"extractions": []}
+        return []
 
     monkeypatch.setattr(
         repository_workflow.workflow, "execute_activity", fake_execute_activity
@@ -224,7 +233,7 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
         repository_workflow, "schedule_memory_extractions", fake_schedule
     )
 
-    await repository_workflow.RepositoryReviewWorkflow().run(
+    result = await repository_workflow.RepositoryReviewWorkflow().run(
         ReviewWorkflowRequest(
             workflow="repository-review",
             run_id="run-1",
@@ -233,9 +242,20 @@ async def test_repository_publishes_one_run_bundle_with_case_units(
             ),
             timeout_seconds=30,
             runtime_context={},
+            post_processing=ReviewPostProcessingPolicy(execution_archive_scheme="s3"),
         )
     )
 
+    assert result["artifact_storage"] == {
+        "status": "available",
+        "artifact": {
+            "kind": "execution_archive",
+            "uri": "s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst",
+            "digest": f"sha256:{'a' * 64}",
+            "media_type": "application/tar+zstd",
+            "size_bytes": 42,
+        },
+    }
     assert len(publications) == 1
     assert publications[0].review_units == [
         {
@@ -287,10 +307,21 @@ async def test_repository_without_cases_still_publishes_execution_archive(
             ),
             timeout_seconds=30,
             runtime_context={},
+            post_processing=ReviewPostProcessingPolicy(execution_archive_scheme="s3"),
         )
     )
 
     assert result["memory_processing"] is None
+    assert result["artifact_storage"] == {
+        "status": "available",
+        "artifact": {
+            "kind": "execution_archive",
+            "uri": "s3://sec-review/runs/run-1/artifacts/execution-archive.v1.tar.zst",
+            "digest": f"sha256:{'a' * 64}",
+            "media_type": "application/tar+zstd",
+            "size_bytes": 42,
+        },
+    }
     assert len(publications) == 1
     assert publications[0].review_units == []
 
@@ -312,7 +343,7 @@ async def test_disabling_memory_does_not_skip_review_publication(monkeypatch) ->
     async def fake_schedule(**kwargs):
         events.append("schedule")
         assert kwargs["enabled"] is False
-        return {"extractions": []}
+        return []
 
     monkeypatch.setattr(
         issue_workflow.workflow, "execute_activity", fake_execute_activity
@@ -328,7 +359,9 @@ async def test_disabling_memory_does_not_skip_review_publication(monkeypatch) ->
             ),
             timeout_seconds=30,
             runtime_context={},
-            post_processing=ReviewPostProcessingPolicy(memory_processing_enabled=False),
+            post_processing=ReviewPostProcessingPolicy(
+                memory_processing_enabled=False, execution_archive_scheme="s3"
+            ),
         )
     )
 
@@ -372,3 +405,92 @@ async def test_publication_failure_fails_review_before_memory_scheduling(
                 runtime_context={},
             )
         )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("module", "workflow_class", "name", "prepare"),
+    [
+        (
+            issue_workflow,
+            issue_workflow.IssueReviewWorkflow,
+            "issue-review",
+            prepared_issue_input,
+        ),
+        (
+            pr_workflow,
+            pr_workflow.PullRequestReviewWorkflow,
+            "pull-request-review",
+            prepared_pull_request_input,
+        ),
+        (
+            repository_workflow,
+            repository_workflow.RepositoryReviewWorkflow,
+            "repository-review",
+            prepared_repository_input,
+        ),
+        (
+            single_agent_workflow,
+            single_agent_workflow.IssueSingleAgentWorkflow,
+            "issue-review",
+            prepared_issue_input,
+        ),
+        (
+            two_stage_workflow,
+            two_stage_workflow.IssueTwoStageWorkflow,
+            "issue-review",
+            prepared_issue_input,
+        ),
+    ],
+)
+async def test_invalid_publication_activity_failure_prevents_success_and_memory(
+    monkeypatch, module, workflow_class, name, prepare
+):
+    """Reject another run's archive at the producer, before Memory sees the reference."""
+    from temporalio.exceptions import ActivityError, ApplicationError
+
+    failure = ActivityError(
+        "Publication failed",
+        scheduled_event_id=1,
+        started_event_id=2,
+        identity="test-worker",
+        activity_type="publish_execution_archive_activity",
+        activity_id="publication",
+        retry_state=None,
+    )
+    failure.__cause__ = ApplicationError(
+        "Invalid publication", type="ARTIFACT_REFERENCE_INVALID", non_retryable=True
+    )
+
+    async def execute_activity(function, *args, **kwargs):
+        if function is module.publish_execution_archive_activity:
+            raise failure
+        if function.__name__.startswith("verify_"):
+            return skipped_verification_fixture(reason="Test verification skipped")
+        return {}
+
+    async def child(*args, **kwargs):
+        return {}
+
+    async def schedule(**kwargs):
+        raise AssertionError("Invalid archives must not reach Memory scheduling")
+
+    monkeypatch.setattr(module.workflow, "execute_activity", execute_activity)
+    monkeypatch.setattr(module.workflow, "execute_child_workflow", child)
+    if hasattr(module, "schedule_memory_extractions"):
+        monkeypatch.setattr(module, "schedule_memory_extractions", schedule)
+    with pytest.raises(ActivityError) as caught:
+        await workflow_class().run(
+            ReviewWorkflowRequest(
+                workflow=name,
+                run_id="run-1",
+                prepared_input=prepare(artifact_root_path="/tmp/run-1/artifacts"),
+                timeout_seconds=30,
+                runtime_context={},
+                post_processing=ReviewPostProcessingPolicy(
+                    execution_archive_scheme="s3"
+                ),
+            )
+        )
+
+    assert caught.value is failure

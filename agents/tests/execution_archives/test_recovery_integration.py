@@ -10,7 +10,6 @@ import boto3  # type: ignore[import-untyped]
 import pytest
 from botocore.config import Config  # type: ignore[import-untyped]
 
-from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.execution_archives.bundle import (
     execution_archive_s3_key,
     materialize_archive_trajectory_unit,
@@ -72,8 +71,8 @@ def test_diagnostic_recovery_after_successful_put_with_lost_response(
         shutil.rmtree(root)
         recovered = publish_execution_archive_activity(request)
         assert not root.exists()
-        assert recovered["unit_ids"] == ["review"]
-        reference = ArtifactReference.from_mapping(recovered["execution_archive"])
+        assert recovered.unit_ids == ("review",)
+        reference = recovered.reference
         assert reference.uri == f"s3://{bucket}/{execution_archive_s3_key(run_id)}"
         unit = materialize_archive_trajectory_unit(
             reference, run_id=run_id, unit_id="review", destination=tmp_path / "reader"

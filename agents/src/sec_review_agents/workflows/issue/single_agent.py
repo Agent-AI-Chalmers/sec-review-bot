@@ -200,7 +200,7 @@ class IssueSingleAgentWorkflow:
         return {
             "ok": True,
             "result": public_result,
-            "artifact_storage": finalized["artifact_storage"],
+            "artifact_storage": finalized.to_artifact_storage(),
         }
 
 

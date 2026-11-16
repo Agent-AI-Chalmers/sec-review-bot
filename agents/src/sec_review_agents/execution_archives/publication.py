@@ -5,6 +5,18 @@ from pathlib import Path
 from typing import Any, Literal
 
 from temporalio import activity
+from temporalio.exceptions import ApplicationError
+
+from sec_review_agents.artifacts.reference import (
+    ARCHIVE_MEDIA_TYPE,
+    require_artifact_media_type,
+)
+from sec_review_agents.artifacts.uri import (
+    parse_artifact_uri,
+    parse_local_artifact_uri,
+    parse_s3_artifact_uri,
+)
+from sec_review_agents.execution_archives.models import ExecutionArchive
 
 
 @dataclass(frozen=True)
@@ -19,15 +31,17 @@ class ExecutionArchivePublicationRequest:
 @activity.defn
 def publish_execution_archive_activity(
     request: ExecutionArchivePublicationRequest,
-) -> dict[str, Any]:
+) -> ExecutionArchive:
     from sec_review_agents.execution_archives.bundle import (
+        EXECUTION_ARCHIVE_FILENAME,
         ArchiveReviewUnit,
+        execution_archive_s3_key,
         publish_execution_archive,
     )
 
     units = [
         ArchiveReviewUnit(
-            unit_id=str(unit["unit_id"]),
+            unit_id=unit["unit_id"],
             trajectory_root=Path(unit["trajectory_root"]),
         )
         for unit in request.review_units
@@ -39,18 +53,43 @@ def publish_execution_archive_activity(
         result=request.result,
         destination_scheme=request.destination_scheme,
     )
-    reference = publication.reference
-    return {
-        "artifact_storage": {
-            "status": "available",
-            "artifact": {
-                "kind": "execution_archive",
-                **reference.as_dict(),
-            },
-        },
-        "execution_archive": reference.as_dict(),
-        "unit_ids": list(publication.unit_ids),
-    }
+
+    # Both newly uploaded and recovered publications pass through this boundary.
+    # Only invalid publication metadata is non-retryable; storage failures retain
+    # the activity's normal retry policy.
+    try:
+        reference = publication.reference
+        require_artifact_media_type(reference, ARCHIVE_MEDIA_TYPE)
+        uri = parse_artifact_uri(reference.uri)
+        if uri.scheme != request.destination_scheme:
+            raise ValueError(
+                "Execution archive URI does not match publication destination."
+            )
+        if request.destination_scheme == "s3":
+            parse_s3_artifact_uri(reference.uri)
+            if uri.path != f"/{execution_archive_s3_key(request.run_id)}":
+                raise ValueError("Execution archive URI does not belong to the run.")
+        elif request.destination_scheme == "file":
+            expected = (
+                Path(request.artifact_root_path).resolve()
+                / "published"
+                / EXECUTION_ARCHIVE_FILENAME
+            )
+            if parse_local_artifact_uri(reference.uri) != expected:
+                raise ValueError(
+                    "Execution archive URI does not match the local publication path."
+                )
+        else:
+            raise ValueError("Unsupported execution archive publication destination.")
+        if reference.size_bytes > 2**53 - 1:
+            raise ValueError(
+                "Execution archive size exceeds the public JSON integer range."
+            )
+    except ValueError as error:
+        raise ApplicationError(
+            str(error), type="ARTIFACT_REFERENCE_INVALID", non_retryable=True
+        ) from error
+    return publication
 
 
 __all__ = [

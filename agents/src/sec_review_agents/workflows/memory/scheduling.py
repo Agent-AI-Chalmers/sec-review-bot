@@ -1,9 +1,10 @@
-from typing import Any
+from typing import Literal, NotRequired, TypedDict
 
 from temporalio import workflow
 from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import WorkflowAlreadyStartedError
 
+from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.temporal.config import DEFAULT_MEMORY_EXTRACTION_TASK_QUEUE
 from sec_review_agents.workflows.memory.extraction import (
     MemoryExtractionRequest,
@@ -12,15 +13,22 @@ from sec_review_agents.workflows.memory.extraction import (
 )
 
 
+class MemoryExtractionStartResult(TypedDict):
+    unit_id: str
+    workflow_id: str
+    status: Literal["started", "already_started", "start_failed"]
+    error_code: NotRequired[Literal["MEMORY_EXTRACTION_START_FAILED"]]
+
+
 async def schedule_memory_extractions(
     *,
     source_workflow: str,
     run_id: str,
-    execution_archive: dict[str, Any],
+    execution_archive: ArtifactReference,
     unit_ids: list[str],
     timeout_seconds: int,
     enabled: bool,
-) -> dict[str, Any]:
+) -> list[MemoryExtractionStartResult]:
     """Schedule best-effort memory extraction after a review artifact is final.
 
     Start one child workflow per review unit and wait only for Temporal to accept
@@ -35,19 +43,20 @@ async def schedule_memory_extractions(
     parent's deterministic history rather than delegating orchestration to an
     activity.
     """
-    result: dict[str, Any] = {"extractions": []}
+    extractions: list[MemoryExtractionStartResult] = []
     if not enabled:
-        return result
+        return extractions
 
-    digest = str(execution_archive["digest"])
+    digest = execution_archive.digest
     for unit_id in unit_ids:
         extraction_id = memory_extraction_workflow_id(
             execution_archive_digest=digest,
             unit_id=unit_id,
         )
-        extraction = {
+        extraction: MemoryExtractionStartResult = {
             "unit_id": unit_id,
             "workflow_id": extraction_id,
+            "status": "started",
         }
         try:
             await workflow.start_child_workflow(
@@ -64,7 +73,6 @@ async def schedule_memory_extractions(
                 parent_close_policy=workflow.ParentClosePolicy.ABANDON,
                 id_reuse_policy=WorkflowIDReusePolicy.REJECT_DUPLICATE,
             )
-            extraction["status"] = "started"
         except WorkflowAlreadyStartedError:
             extraction["status"] = "already_started"
         except Exception as error:
@@ -75,8 +83,8 @@ async def schedule_memory_extractions(
             )
             extraction["status"] = "start_failed"
             extraction["error_code"] = "MEMORY_EXTRACTION_START_FAILED"
-        result["extractions"].append(extraction)
-    return result
+        extractions.append(extraction)
+    return extractions
 
 
-__all__ = ["schedule_memory_extractions"]
+__all__ = ["MemoryExtractionStartResult", "schedule_memory_extractions"]

@@ -34,7 +34,10 @@ from sec_review_agents.temporal.support import (
     activity_retry_policy,
 )
 from sec_review_agents.utils.bounded_map import map_bounded
-from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
+from sec_review_agents.workflows.memory.scheduling import (
+    MemoryExtractionStartResult,
+    schedule_memory_extractions,
+)
 from sec_review_agents.workflows.prepared_input import PreparedRepositoryInput
 from sec_review_agents.workflows.repository.scan_result import (
     RepositoryScanResult,
@@ -45,6 +48,7 @@ from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
     RepositoryCaseReviewWorkflow,
 )
+from sec_review_agents.workflows.result import ReviewWorkflowSuccess
 from sec_review_agents.workflows.review_intent import (
     REVIEW_OBJECTIVE_AUDIT,
 )
@@ -755,7 +759,7 @@ class RepositoryDeliveryWorkflow:
 @workflow.defn
 class RepositoryReviewWorkflow:
     @workflow.run
-    async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
+    async def run(self, request: ReviewWorkflowRequest) -> ReviewWorkflowSuccess:
         scan_result = await workflow.execute_child_workflow(
             RepositoryScanWorkflow.run,
             request,
@@ -801,21 +805,23 @@ class RepositoryReviewWorkflow:
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
-        memory_processing: dict[str, Any] | None = None
+        artifact_storage = finalized.to_artifact_storage()
+        memory_processing: dict[str, list[MemoryExtractionStartResult]] | None = None
         if review_units:
-            memory_processing = await schedule_memory_extractions(
+            extractions = await schedule_memory_extractions(
                 source_workflow=request.workflow,
                 run_id=request.run_id,
-                execution_archive=dict(finalized["execution_archive"]),
-                unit_ids=[str(value) for value in finalized["unit_ids"]],
+                execution_archive=finalized.reference,
+                unit_ids=list(finalized.unit_ids),
                 timeout_seconds=request.timeout_seconds,
                 enabled=request.post_processing.memory_processing_enabled,
             )
+            memory_processing = {"extractions": extractions}
         return {
             "ok": True,
             "result": result,
             "memory_processing": memory_processing,
-            "artifact_storage": finalized["artifact_storage"],
+            "artifact_storage": artifact_storage,
         }
 
 

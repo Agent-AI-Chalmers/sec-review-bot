@@ -255,7 +255,7 @@ async def test_extraction_workflow_prepares_then_registers_fixed_payload(
         source_workflow="issue-review",
         run_id="run-1",
         unit_id="review",
-        execution_archive=_reference().as_dict(),
+        execution_archive=_reference(),
         timeout_seconds=30,
     )
     payload = MemoryExtractionRegistrationPayload(
@@ -327,7 +327,7 @@ async def test_prepare_extraction_returns_complete_serializable_payload(
         source_workflow="issue-review",
         run_id="run-1",
         unit_id="review",
-        execution_archive=_reference().as_dict(),
+        execution_archive=_reference(),
         timeout_seconds=30,
     )
 
@@ -556,7 +556,7 @@ async def test_extraction_workflow_retries_registration_with_history_payload() -
         source_workflow="issue-review",
         run_id="run-1",
         unit_id="review",
-        execution_archive=_reference().as_dict(),
+        execution_archive=_reference(),
         timeout_seconds=30,
     )
     async with temporal_time_skipping_environment() as env:
@@ -621,7 +621,7 @@ async def test_extraction_activity_requires_catalog_when_processing_is_enabled(
         source_workflow="issue-review",
         run_id="run-1",
         unit_id="review",
-        execution_archive=_reference().as_dict(),
+        execution_archive=_reference(),
         timeout_seconds=30,
     )
     monkeypatch.setenv("AGENT_MEMORY_PROCESSING_ENABLED", "true")
@@ -639,7 +639,7 @@ async def test_extraction_activity_skips_when_processing_is_disabled(
         source_workflow="issue-review",
         run_id="run-1",
         unit_id="review",
-        execution_archive=_reference().as_dict(),
+        execution_archive=_reference(),
         timeout_seconds=30,
     )
     prepare_extraction = AsyncMock()

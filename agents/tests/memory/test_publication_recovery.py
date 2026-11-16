@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 
+from sec_review_agents.artifacts.reference import ArtifactReference
 from sec_review_agents.memory.coordinated_maintenance import (
     prepare_coordinated_memory_learning,
 )
@@ -29,7 +30,7 @@ def _report(observation_ids: list[str]) -> dict[str, object]:
     }
 
 
-def reference(character):
+def reference(character: str) -> dict[str, object]:
     return {
         "uri": f"s3://sec-review/memory/{character}",
         "digest": f"sha256:{character * 64}",
@@ -43,9 +44,9 @@ def reference(character):
 async def test_extraction_recovers_full_intent_without_rerunning_model(
     monkeypatch, status
 ):
-    diagnostic = reference("a")
+    diagnostic = ArtifactReference.from_mapping(reference("a"))
     extraction_id = memory_extraction_workflow_id(
-        execution_archive_digest=diagnostic["digest"], unit_id="review"
+        execution_archive_digest=diagnostic.digest, unit_id="review"
     )
     intent = {
         "registration": {
@@ -53,7 +54,7 @@ async def test_extraction_recovers_full_intent_without_rerunning_model(
             "source_workflow": "issue-review",
             "source_run_id": "run-1",
             "source_unit_id": "review",
-            "execution_archive_digest": diagnostic["digest"],
+            "execution_archive_digest": diagnostic.digest,
             "trajectory_reference": reference("b"),
             "observations": [
                 {
@@ -80,7 +81,13 @@ async def test_extraction_recovers_full_intent_without_rerunning_model(
         "sec_review_agents.artifacts.s3_adapter.s3_artifact_exists", lambda _: True
     )
     result = await prepare_memory_extraction(
-        MemoryExtractionRequest("issue-review", "run-1", "review", diagnostic, 30)
+        MemoryExtractionRequest(
+            "issue-review",
+            "run-1",
+            "review",
+            diagnostic,
+            30,
+        )
     )
     assert result.observations == [
         {"observation_id": "observation-1", "body_markdown": "Original observation."},

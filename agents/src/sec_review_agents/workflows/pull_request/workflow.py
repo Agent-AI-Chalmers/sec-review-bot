@@ -25,6 +25,7 @@ from sec_review_agents.temporal.support import (
 from sec_review_agents.utils.paths import required_path
 from sec_review_agents.workflows.memory.scheduling import schedule_memory_extractions
 from sec_review_agents.workflows.prepared_input import PreparedPullRequestInput
+from sec_review_agents.workflows.result import ReviewWorkflowSuccess
 from sec_review_agents.workflows.review_intent import (
     REVIEW_OBJECTIVE_AUDIT,
 )
@@ -260,9 +261,12 @@ def build_pull_request_review_result_activity(
     mitigation_result: MitigationStageResult | None,
     verifier_result: VerificationStageResult | None,
 ) -> dict[str, Any]:
+    from sec_review_agents.entrypoints.execution_api_schema import (
+        validate_execution_api_result,
+    )
     from sec_review_agents.review_stages.record import build_review_record
 
-    return {
+    result = {
         "api_version": EXECUTION_API_VERSION,
         "review_record": build_review_record(
             analysis_result=analysis_result,
@@ -271,12 +275,14 @@ def build_pull_request_review_result_activity(
             cvss_result=None,
         ).model_dump(mode="json", by_alias=True),
     }
+    validate_execution_api_result(result, "pull-request-review")
+    return result
 
 
 @workflow.defn
 class PullRequestReviewWorkflow:
     @workflow.run
-    async def run(self, request: ReviewWorkflowRequest) -> dict[str, Any]:
+    async def run(self, request: ReviewWorkflowRequest) -> ReviewWorkflowSuccess:
         analysis_result = await workflow.execute_activity(
             analyze_pull_request_activity,
             request,
@@ -366,19 +372,20 @@ class PullRequestReviewWorkflow:
             schedule_to_close_timeout=timedelta(seconds=request.timeout_seconds),
             retry_policy=activity_retry_policy(),
         )
-        memory_processing = await schedule_memory_extractions(
+        artifact_storage = finalized.to_artifact_storage()
+        extractions = await schedule_memory_extractions(
             source_workflow=request.workflow,
             run_id=request.run_id,
-            execution_archive=dict(finalized["execution_archive"]),
-            unit_ids=[str(value) for value in finalized["unit_ids"]],
+            execution_archive=finalized.reference,
+            unit_ids=list(finalized.unit_ids),
             timeout_seconds=request.timeout_seconds,
             enabled=request.post_processing.memory_processing_enabled,
         )
         return {
             "ok": True,
             "result": result,
-            "memory_processing": memory_processing,
-            "artifact_storage": finalized["artifact_storage"],
+            "memory_processing": {"extractions": extractions},
+            "artifact_storage": artifact_storage,
         }
 
 
