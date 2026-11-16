@@ -69,6 +69,7 @@ from sec_review_agents.workflows.repository_case.workflow import (
 WORKFLOWS: list[Any] = [
     ExecutionWorkflow,
     IssueReviewWorkflow,
+    # Local Temporal ablations select these directly; ExecutionWorkflow does not dispatch them.
     IssueTwoStageWorkflow,
     IssueSingleAgentWorkflow,
     PullRequestReviewWorkflow,

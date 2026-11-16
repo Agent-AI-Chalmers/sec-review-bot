@@ -16,6 +16,7 @@ from sec_review_agents.review_stages.cvss.result import (
 )
 from sec_review_agents.review_stages.feedback_loop import FeedbackRetryContext
 from sec_review_agents.review_stages.mitigation.result import MitigationStageResult
+from sec_review_agents.review_stages.types import NextStep, RegressionStatus
 from sec_review_agents.review_stages.verification.result import VerificationStageResult
 from sec_review_agents.workflows.repository_case import stage as case_workflow
 from sec_review_agents.workflows.repository_case.input import (
@@ -26,6 +27,7 @@ from sec_review_agents.workflows.repository_case.result import RepositoryCaseRes
 from sec_review_agents.workflows.repository_case.workflow import (
     RepositoryCaseReviewRequest,
     RepositoryCaseReviewWorkflow,
+    build_repository_case_result_activity,
 )
 from sec_review_agents.workflows.review_intent import TEST_CHANGES_ALLOW
 from sec_review_agents.workspace.snapshots import create_workspace_snapshot_tar
@@ -196,7 +198,18 @@ async def test_repository_case_without_patch_does_not_retry_verification() -> No
 
 
 @pytest.mark.asyncio
-async def test_repository_case_workflow_retries_and_passes_verifier_history() -> None:
+@pytest.mark.parametrize(
+    ("next_step", "regression", "disposition"),
+    [
+        ("none", "passed", "keep"),
+        ("retry-ai", "passed", "blocked"),
+        ("none", None, "blocked"),
+    ],
+)
+async def test_repository_case_workflow_retries_and_passes_verifier_history(
+    next_step: NextStep, regression: RegressionStatus | None, disposition: str
+) -> None:
+    """Retry exhaustion must preserve the real builder's delivery restrictions."""
     state = _CaseWorkflowState(
         mitigation_results=[
             MitigationStageResult(
@@ -226,12 +239,12 @@ async def test_repository_case_workflow_retries_and_passes_verifier_history() ->
                 overview="Patch fully covers the target claim.",
                 target_claim="target claim",
                 coverage="full",
-                next_step="none",
+                next_step=next_step,
                 validation_level="static",
                 findings=[],
                 evidence=["second verifier"],
                 residual_risks=[],
-                regression=None,
+                regression=regression,
             ),
         ],
     )
@@ -248,7 +261,9 @@ async def test_repository_case_workflow_retries_and_passes_verifier_history() ->
     assert state.verification_retry_contexts[1].retry_index == 1
     assert len(state.archive_retry_contexts) == 1
     assert result.review_record.verification.coverage == "full"
-    assert result.disposition == "keep"
+    assert result.disposition == disposition
+    assert result.review_record.verification.next_step == next_step
+    assert result.review_record.verification.regression == regression
     assert "diagnostics" not in result.model_dump()
 
 
@@ -338,43 +353,6 @@ async def _run_case_workflow(state: _CaseWorkflowState) -> RepositoryCaseResult:
     ) -> None:
         state.archive_retry_contexts.append(retry_context)
 
-    @activity.defn(name="build_repository_case_result_activity")
-    def fake_build_repository_case_result(
-        prepared_case: PreparedRepositoryCase,
-        _analysis_result: AnalysisStageResult,
-        cvss_result: CvssStageResult | None,
-        mitigation_result: MitigationStageResult | None,
-        verifier_result: VerificationStageResult | None,
-    ) -> RepositoryCaseResult:
-        return RepositoryCaseResult.model_validate(
-            {
-                "case_id": prepared_case.case_execution_input.case_id,
-                "disposition": (
-                    "keep"
-                    if verifier_result is not None
-                    and verifier_result.coverage == "full"
-                    else "blocked"
-                ),
-                "review_record": {
-                    "cvss": (
-                        cvss_result.model_dump(mode="json")
-                        if cvss_result is not None
-                        else None
-                    ),
-                    "mitigation": (
-                        mitigation_result.model_dump(mode="json")
-                        if mitigation_result is not None
-                        else {}
-                    ),
-                    "verification": (
-                        verifier_result.model_dump(mode="json")
-                        if verifier_result is not None
-                        else {}
-                    ),
-                },
-            }
-        )
-
     async with temporal_time_skipping_environment() as env:
         with ThreadPoolExecutor(max_workers=4) as executor:
             async with Worker(
@@ -388,7 +366,7 @@ async def _run_case_workflow(state: _CaseWorkflowState) -> RepositoryCaseResult:
                     fake_mitigate_repository_case,
                     fake_verify_repository_case,
                     fake_archive_repository_case_feedback_attempt,
-                    fake_build_repository_case_result,
+                    build_repository_case_result_activity,
                 ],
                 activity_executor=executor,
             ):
