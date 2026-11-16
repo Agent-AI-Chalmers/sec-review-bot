@@ -22,6 +22,7 @@ import {
 import { Pool } from 'pg'
 
 import { ReviewRunStore } from '../../src/persistence/review-run-store.js'
+import { assertPublicationAxesFollowSteps } from './publication-invariants.js'
 
 const connectionString =
   process.env.TEST_DATABASE_URL ?? process.env.DATABASE_URL
@@ -33,11 +34,11 @@ function requireTestDatabase(): string {
 }
 
 async function createStore(
-  options: { claimTimeoutMs?: number } = {}
+  options: { claimTimeoutMs?: number; connectorId?: string } = {}
 ): Promise<ReviewRunStore> {
   const store = new ReviewRunStore({
     connectionString: requireTestDatabase(),
-    connectorId: `edges:${randomUUID()}`,
+    connectorId: options.connectorId ?? `edges:${randomUUID()}`,
     ...(options.claimTimeoutMs === undefined
       ? {}
       : { claimTimeoutMs: options.claimTimeoutMs })
@@ -146,7 +147,11 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
   // Expiry is provoked by backdating `claimed_at` below, never by waiting on this lease. Keep
   // enough headroom for a shared CI runner to suspend this process without turning an ordinary
   // write into an unrelated lost-claim failure.
-  const store = await createStore({ claimTimeoutMs: 60_000 })
+  const connector = `edges:${randomUUID()}`
+  const store = await createStore({
+    claimTimeoutMs: 60_000,
+    connectorId: connector
+  })
   const pool = new Pool({ connectionString: requireTestDatabase() })
   try {
     const newPreparingRun = async (): Promise<{
@@ -924,36 +929,17 @@ async function recordEveryPath(): Promise<RecordedEdge[]> {
       'operator decision'
     )
 
-    // The publication axis stores a copy of its strongest step state, re-derived by every step
-    // write. A write path that forgot the re-derivation would leave the copy stale while every
-    // edge it recorded still looked legal, so compare the stored axis with its steps for every
-    // run this driver moved through a step path.
-    const drift = await pool.query<{
-      run_id: string
-      stored: string
-      derived: string
-    }>(
-      `SELECT p.run_id, p.status AS stored,
-              CASE
-                WHEN bool_or(s.status='disconnected') THEN 'disconnected'
-                WHEN bool_or(s.status='uncertain') THEN 'uncertain'
-                ELSE 'publishing'
-              END AS derived
-       FROM publications p
-       JOIN publication_steps s
-         ON s.run_id=p.run_id AND s.connector_id=p.connector_id
-       WHERE p.run_id = ANY($1::text[])
-         AND p.status IN ('publishing','uncertain','disconnected')
-       GROUP BY p.run_id, p.status`,
+    // Leave live publications in all three owned states, then check each equals its steps.
+    await assertPublicationAxesFollowSteps(pool, [connector])
+    const live = await pool.query<{ status: string }>(
+      `SELECT DISTINCT status FROM publications
+       WHERE run_id = ANY($1::text[])
+         AND status IN ('publishing','uncertain','disconnected')`,
       [runIds]
     )
-    assert.deepStrictEqual(
-      drift.rows.filter((row) => row.stored !== row.derived),
-      [],
-      'a live publication axis must equal the strongest state of its steps'
-    )
-    assert.ok(
-      new Set(drift.rows.map((row) => row.stored)).size === 3,
+    assert.strictEqual(
+      live.rows.length,
+      3,
       'the driver must leave live publications in all three owned states'
     )
 
