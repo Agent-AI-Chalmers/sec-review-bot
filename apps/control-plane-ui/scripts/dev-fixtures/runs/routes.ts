@@ -358,14 +358,14 @@ export function createRunsHandler(): (
       // the operator a run that looks untouched after an irreversible decision.
       const now = new Date().toISOString()
       run.preparation.status = 'failed'
-      run.preparation.failure_code = 'PREPARATION_ABANDONED'
+      run.preparation.failure_code = 'EXECUTION_ALREADY_ADVANCED'
       run.notices = [
         {
           notice_id: `fixture-${run.run_id}-abandoned`,
           kind: 'failure',
           status: 'pending',
           axis: 'preparation',
-          reason_code: 'PREPARATION_ABANDONED',
+          reason_code: 'EXECUTION_ALREADY_ADVANCED',
           comment_url: null
         }
       ]
