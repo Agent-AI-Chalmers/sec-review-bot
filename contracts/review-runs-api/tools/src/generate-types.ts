@@ -146,7 +146,12 @@ export async function renderReviewRunsApiTypes(): Promise<string> {
     '\n\n' +
     renderOperationRoutes(spec) +
     '\n' +
-    renderOperationTypeMaps(spec)
+    renderOperationTypeMaps(spec) +
+    '\nexport const REVIEW_RUNS_PUBLICATION_ERROR_CODES = {\n' +
+    publicationStepCodes(spec)
+      .map((code) => `  ${code.toLowerCase()}: '${code}'`)
+      .join(',\n') +
+    '\n} as const\n'
   const options = await prettier.resolveConfig(OUTPUT_PATH)
   return await prettier.format(rendered, { ...options, filepath: OUTPUT_PATH })
 }

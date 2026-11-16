@@ -26,28 +26,6 @@ export function isPublicationStepExhausted(error: unknown): boolean {
   )
 }
 
-const RECORDED = Symbol('reconciliation failure recorded on its step')
-const RECOVERY_ATTEMPT = Symbol('recovery attempt count the lookup failed at')
-
-/** Whether this error is a reconciliation lookup failure already recorded on its step. A caller
- * that records step failures itself must not record it a second time. The original error is
- * thrown unchanged, so its status still drives retry classification. */
-export function isRecordedReconciliationFailure(error: unknown): boolean {
-  return typeof error === 'object' && error !== null && RECORDED in error
-}
-
-/** The step's `recovery_attempt_count` before the failed lookup this error reports, when the
- * lookup failed but recording it did not complete. A caller that records the failure itself
- * passes it as `expectedRecoveryAttemptCount`, so if the earlier write did commit, Review Runs
- * recognizes the same failure and does not spend the budget twice. */
-export function unrecordedRecoveryAttemptCount(
-  error: unknown
-): number | undefined {
-  if (typeof error !== 'object' || error === null) return undefined
-  const value = (error as { [RECOVERY_ATTEMPT]?: unknown })[RECOVERY_ATTEMPT]
-  return typeof value === 'number' ? value : undefined
-}
-
 /** What a reconciliation found, in the shape the completion path already uses. */
 export type ReconciledRemote = { id?: string | number | null; url?: string }
 
@@ -56,7 +34,7 @@ export type ReconciledRemote = { id?: string | number | null; url?: string }
  *
  * `find` must answer exactly one question: does this step's side effect already exist on the
  * remote system? It answers `null` when it looked and found nothing, which is the only outcome
- * that makes the step a terminal failure. An error from `find` propagates: a reconciliation that
+ * that makes the step a terminal failure. An error from `find` returns `lookup_failed`: a reconciliation that
  * could not be performed is not evidence of absence, and treating it as such is the bug this
  * module exists to avoid.
  *
@@ -71,6 +49,8 @@ export type ReconciledRemote = { id?: string | number | null; url?: string }
  * - `recorded` with `step: 'terminal_failed'`: the effect was absent and the write was accepted,
  *   so the step is now `terminal_failed`. That conclusion is already on the record, and the
  *   caller reports it as the failure it is.
+ * - `lookup_failed`: the lookup error and whether recording was accepted, refused, or unknown.
+ *   The caller classifies the original error; only an unknown report may need another write.
  * - `not_owned`: the write was refused because another owner moved the step or the publication
  *   while this reconciliation ran. Nothing was recorded, and the step is whatever that other
  *   owner made it — so the caller must neither carry on nor record a result of its own; it
@@ -80,6 +60,14 @@ export type SettleExhaustedOutcome =
   | { outcome: 'recorded'; step: 'succeeded'; remote: ReconciledRemote }
   | { outcome: 'recorded'; step: 'terminal_failed' }
   | { outcome: 'not_owned' }
+  | ReconciliationLookupFailure
+
+export interface ReconciliationLookupFailure {
+  outcome: 'lookup_failed'
+  error: unknown
+  recording: 'accepted' | 'not_owned' | 'unknown'
+  expectedRecoveryAttemptCount: number | undefined
+}
 
 export async function settleExhaustedStep({
   store,
@@ -109,15 +97,6 @@ export async function settleExhaustedStep({
     // spends the step's reconciliation budget: a remote that keeps failing then parks the step
     // as `disconnected` for an operator instead of being looked at again forever.
     const failure = classifyPublicationFailure(error)
-    // Throw an object so a marker always sticks; a thrown primitive would otherwise lose it.
-    const thrown =
-      typeof error === 'object' && error !== null
-        ? error
-        : new Error(asErrorMessage(error), { cause: error })
-    if (expectedRecoveryAttemptCount !== undefined)
-      Object.defineProperty(thrown, RECOVERY_ATTEMPT, {
-        value: expectedRecoveryAttemptCount
-      })
     // A lost response leaves it unknown whether the write committed. Reporting against the same
     // count makes a repeat harmless, so it is retried once here, where every caller passes
     // through, instead of in each caller.
@@ -134,16 +113,18 @@ export async function settleExhaustedStep({
             : { expectedRecoveryAttemptCount })
         }
       )
+    let recording: ReconciliationLookupFailure['recording']
     try {
-      await record().catch(record)
+      recording = (await record().catch(record)) ? 'accepted' : 'not_owned'
     } catch {
-      // Still unknown. The lookup error is the diagnosis, so it is what propagates, unmarked: a
-      // caller that records step failures records it with the same count, which Review Runs
-      // applies at most once; one that does not leaves it to the next pass, which looks again.
-      throw thrown
+      recording = 'unknown'
     }
-    Object.defineProperty(thrown, RECORDED, { value: true })
-    throw thrown
+    return {
+      outcome: 'lookup_failed',
+      error,
+      recording,
+      expectedRecoveryAttemptCount
+    }
   }
   const settled = await store.settleExhaustedPublicationStep(
     runId,

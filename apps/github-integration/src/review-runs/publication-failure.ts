@@ -1,3 +1,4 @@
+import { REVIEW_RUNS_PUBLICATION_ERROR_CODES } from './review-runs-api.js'
 import { asErrorWithResponse, errorCode } from '../utils/error-utils.js'
 import { EXECUTION_PUBLISH_ERROR_CODES } from '../execution/publish-error-code.js'
 import { isDeterministicExecutionPublishError } from '../execution/publish-error.js'
@@ -19,11 +20,13 @@ interface PublishFailureClassification {
 // Review Runs publication faults that retrying cannot repair. The step set is
 // fixed for a stored run, so re-claiming the publication re-enters the same
 // condition and fails identically. Treat them as terminal instead of looping.
-const DETERMINISTIC_REVIEW_RUNS_PUBLICATION_CODES = new Set<string>([
-  EXECUTION_PUBLISH_ERROR_CODES.publication_step_set_duplicate,
-  EXECUTION_PUBLISH_ERROR_CODES.publication_step_set_changed,
-  EXECUTION_PUBLISH_ERROR_CODES.publication_step_not_claimable
-])
+const DETERMINISTIC_REVIEW_RUNS_PUBLICATION_CODES = new Set<string>(
+  Object.values(REVIEW_RUNS_PUBLICATION_ERROR_CODES).filter(
+    (code) =>
+      code !==
+      REVIEW_RUNS_PUBLICATION_ERROR_CODES.publication_step_retry_exhausted
+  )
+)
 
 /** Whether the failure is about reaching the service, not about what it answered.
  *

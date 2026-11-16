@@ -484,18 +484,18 @@ test('a lookup failure whose report committed but lost its response spends the b
     return recorded
   }
 
-  await assert.rejects(
-    modules.settleExhaustedStep({
-      store: lossy,
-      runId,
-      token,
-      stepKey: step,
-      find: async () => {
-        throw Object.assign(new Error('GitHub answered 502'), { status: 502 })
-      }
-    }),
-    /502/
-  )
+  const outcome = await modules.settleExhaustedStep({
+    store: lossy,
+    runId,
+    token,
+    stepKey: step,
+    find: async () => {
+      throw Object.assign(new Error('GitHub answered 502'), { status: 502 })
+    }
+  })
+  assert.equal(outcome.outcome, 'lookup_failed')
+  assert.equal(outcome.recording, 'accepted')
+  assert.match(String(outcome.error), /502/)
 
   assert.equal(reports, 2, 'the lost report is retried')
   const [after] = await store.publications.listPublicationSteps(runId)

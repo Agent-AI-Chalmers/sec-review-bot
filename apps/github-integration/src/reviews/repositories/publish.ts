@@ -29,9 +29,8 @@ import { asErrorMessage } from '../../utils/error-utils.js'
 import {
   findOpenPullRequestByHeadBranch,
   isPublicationStepExhausted,
-  isRecordedReconciliationFailure,
   settleExhaustedStep,
-  unrecordedRecoveryAttemptCount
+  type ReconciliationLookupFailure
 } from '../shared/settle-exhausted-step.js'
 import { runPublicationStep } from '../shared/publication-step.js'
 import {
@@ -200,13 +199,14 @@ export async function publishDeliveryDraftPrs({
   for (const delivery of deliveries) {
     const deliveryId = String(delivery.delivery_id ?? '')
     const stepKey = `repository:delivery:${deliveryId}`
+    let reconciliationFailure: ReconciliationLookupFailure | undefined
     try {
       const deliveryCvss = deliveryCvssFieldsFromCases(delivery, case_results)
       const persisted = persistedSteps.get(stepKey)
       // A deterministic rejection is already final for this delivery. Later
       // publication retries still need to reach the summary and other deliveries.
       if (persisted?.status === 'terminal_failed') continue
-      const draftPullRequest: DraftPullRequestSummary =
+      const result =
         persisted?.status === 'succeeded' &&
         persisted.remote_object_id &&
         persisted.remote_object_url
@@ -231,6 +231,13 @@ export async function publishDeliveryDraftPrs({
               event_type,
               assert_publication_claim
             })
+      if ('outcome' in result) {
+        if (result.recording === 'not_owned')
+          throw new PublicationClaimLostError(run_id)
+        reconciliationFailure = result
+        throw result.error
+      }
+      const draftPullRequest = result
       published_delivery_entries.push({
         delivery_id: String(delivery.delivery_id ?? ''),
         case_count: deliveryCvss.case_count,
@@ -258,9 +265,9 @@ export async function publishDeliveryDraftPrs({
       // A failed reconciliation lookup was already recorded on its step by settleExhaustedStep.
       // One whose recording did not complete is recorded here against the same count, so a write
       // that did commit is not counted twice.
-      if (!isRecordedReconciliationFailure(error)) {
+      if (reconciliationFailure?.recording !== 'accepted') {
         const expectedRecoveryAttemptCount =
-          unrecordedRecoveryAttemptCount(error)
+          reconciliationFailure?.expectedRecoveryAttemptCount
         await store.failPublicationStep(
           run_id,
           claim_token,
@@ -289,7 +296,8 @@ export async function publishDeliveryDraftPrs({
           `Failed to publish repository delivery ${String(delivery?.delivery_id ?? '(unknown)')}: ${errorMessage}`,
           { cause: error }
         )
-        if (!isRecordedReconciliationFailure(error)) throw publicationFailure
+        if (reconciliationFailure?.recording !== 'accepted')
+          throw publicationFailure
         deferredReconciliationFailure ??= publicationFailure
       }
     }
@@ -425,7 +433,7 @@ async function publishOrReconcileDeliveryDraftPr({
   scan_target: { target_branch?: string } | undefined
   event_type: string
   assert_publication_claim: () => Promise<void>
-}): Promise<DraftPullRequestSummary> {
+}): Promise<DraftPullRequestSummary | ReconciliationLookupFailure> {
   try {
     await store.requirePublicationStepClaim(run_id, claim_token, stepKey)
   } catch (error) {
@@ -446,6 +454,7 @@ async function publishOrReconcileDeliveryDraftPr({
           : { id: existing.number, url: existing.html_url }
       }
     })
+    if (settled.outcome === 'lookup_failed') return settled
     if (settled.outcome !== 'recorded' || settled.step !== 'succeeded')
       throw error
     logInfo('delivery_draft_pr_reconciled', {

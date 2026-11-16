@@ -1,4 +1,7 @@
+import { REVIEW_RUNS_PUBLICATION_ERROR_CODES } from '../review-runs/review-runs-api.js'
+
 export const EXECUTION_PUBLISH_ERROR_CODES = {
+  ...REVIEW_RUNS_PUBLICATION_ERROR_CODES,
   issue_result_invalid: 'ISSUE_RESULT_INVALID',
   pull_request_result_invalid: 'PULL_REQUEST_RESULT_INVALID',
   repository_result_invalid: 'REPOSITORY_RESULT_INVALID',
@@ -7,17 +10,6 @@ export const EXECUTION_PUBLISH_ERROR_CODES = {
   github_not_found: 'GITHUB_NOT_FOUND',
   github_publish_rejected: 'GITHUB_PUBLISH_REJECTED',
   github_validation_rejected: 'GITHUB_VALIDATION_REJECTED',
-  // These four codes Review Runs emits as terminal (deterministic) publication
-  // step failures. They must match the `ErrorResponse.code` enum in the hand-written
-  // `contracts/review-runs-api/v1/openapi.yaml`; the alignment test reads Review Runs's
-  // single source and asserts each code is classified `retry: false`, so a new code on
-  // Review Runs side cannot silently retry the publication forever.
-  publication_step_retry_exhausted: 'PUBLICATION_STEP_RETRY_EXHAUSTED',
-  publication_step_set_duplicate: 'PUBLICATION_STEP_SET_DUPLICATE',
-  publication_step_set_changed: 'PUBLICATION_STEP_SET_CHANGED',
-  // A step that is already 'succeeded' (or otherwise not claimable and not
-  // retry-exhausted) cannot be repaired by re-claiming, so it is terminal.
-  publication_step_not_claimable: 'PUBLICATION_STEP_NOT_CLAIMABLE',
   execution_publish_non_retryable: 'EXECUTION_PUBLISH_NON_RETRYABLE',
   // The app could not attribute a bot-authored object because its own login is unknown.
   // Re-claiming the same publication re-enters the same condition, so retrying only loops; a
